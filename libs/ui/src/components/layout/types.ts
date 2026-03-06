@@ -16,4 +16,5 @@ export interface NavGroup {
 export interface LayoutConfig {
   appName: string;
   navGroups: NavGroup[];
+  onLogout?: () => void;
 }

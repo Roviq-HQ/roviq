@@ -5,6 +5,7 @@ import { GeistSans } from 'geist/font/sans';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
+import { Providers } from './providers';
 import '../global.css';
 
 type Props = {
@@ -37,7 +38,7 @@ export default async function LocaleLayout({ children, params }: Props) {
     >
       <body className="min-h-screen antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
+          <Providers>{children}</Providers>
         </NextIntlClientProvider>
       </body>
     </html>

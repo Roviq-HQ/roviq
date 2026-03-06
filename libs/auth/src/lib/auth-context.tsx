@@ -2,10 +2,13 @@
 
 import * as React from 'react';
 import { isTokenExpired } from './jwt-decode';
+import type { SessionExpiredDialogProps } from './session-expired-dialog';
+import { SessionExpiredDialog } from './session-expired-dialog';
 import { tokenStorage } from './token-storage';
 import type { AuthState, AuthUser, LoginInput } from './types';
 
 interface AuthContextValue extends AuthState {
+  sessionExpired: boolean;
   login: (input: LoginInput) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -28,6 +31,7 @@ interface AuthProviderProps {
   }>;
   logoutMutation: () => Promise<void>;
   onAuthError?: () => void;
+  sessionExpiredLabels?: SessionExpiredDialogProps['labels'];
   children: React.ReactNode;
 }
 
@@ -36,8 +40,10 @@ export function AuthProvider({
   refreshMutation,
   logoutMutation,
   onAuthError,
+  sessionExpiredLabels,
   children,
 }: AuthProviderProps) {
+  const [sessionExpired, setSessionExpired] = React.useState(false);
   const [state, setState] = React.useState<AuthState>({
     user: null,
     tokens: null,
@@ -83,13 +89,7 @@ export function AuthProvider({
             });
             scheduleRefresh(result.accessToken);
           } catch {
-            tokenStorage.clear();
-            setState({
-              user: null,
-              tokens: null,
-              isAuthenticated: false,
-              isLoading: false,
-            });
+            setSessionExpired(true);
             onAuthError?.();
           }
         }, expiresIn);
@@ -228,19 +228,34 @@ export function AuthProvider({
     }
   }, []);
 
+  const handleReLoginSuccess = React.useCallback(() => {
+    setSessionExpired(false);
+  }, []);
+
   const value = React.useMemo<AuthContextValue>(
     () => ({
       ...state,
+      sessionExpired,
       login,
       logout,
       refreshSession,
       getAccessToken,
       switchTenant,
     }),
-    [state, login, logout, refreshSession, getAccessToken, switchTenant],
+    [state, sessionExpired, login, logout, refreshSession, getAccessToken, switchTenant],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <SessionExpiredDialog
+        open={sessionExpired}
+        username={state.user?.username}
+        onLoginSuccess={handleReLoginSuccess}
+        labels={sessionExpiredLabels}
+      />
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

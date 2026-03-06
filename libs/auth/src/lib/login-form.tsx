@@ -15,16 +15,37 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-interface LoginFormProps {
+export interface LoginFormProps {
   tenantId?: string;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
+  labels?: {
+    username?: string;
+    password?: string;
+    organizationId?: string;
+    enterUsername?: string;
+    enterPassword?: string;
+    enterOrganizationId?: string;
+    signIn?: string;
+    signingIn?: string;
+  };
 }
 
-export function LoginForm({ tenantId, onSuccess, onError }: LoginFormProps) {
+export function LoginForm({ tenantId, onSuccess, onError, labels }: LoginFormProps) {
   const { login } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const l = {
+    username: labels?.username ?? 'Username',
+    password: labels?.password ?? 'Password',
+    organizationId: labels?.organizationId ?? 'Organization ID',
+    enterUsername: labels?.enterUsername ?? 'Enter your username',
+    enterPassword: labels?.enterPassword ?? 'Enter your password',
+    enterOrganizationId: labels?.enterOrganizationId ?? 'Enter organization ID',
+    signIn: labels?.signIn ?? 'Sign in',
+    signingIn: labels?.signingIn ?? 'Signing in...',
+  };
 
   const {
     register,
@@ -62,11 +83,11 @@ export function LoginForm({ tenantId, onSuccess, onError }: LoginFormProps) {
 
       {!tenantId && (
         <div className="space-y-2">
-          <Label htmlFor="tenantId">Organization ID</Label>
+          <Label htmlFor="tenantId">{l.organizationId}</Label>
           <Input
             id="tenantId"
             type="text"
-            placeholder="Enter organization ID"
+            placeholder={l.enterOrganizationId}
             {...register('tenantId')}
           />
           {errors.tenantId && <p className="text-destructive text-sm">{errors.tenantId.message}</p>}
@@ -74,31 +95,31 @@ export function LoginForm({ tenantId, onSuccess, onError }: LoginFormProps) {
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="username">{l.username}</Label>
         <Input
           id="username"
           type="text"
           autoComplete="username"
-          placeholder="Enter your username"
+          placeholder={l.enterUsername}
           {...register('username')}
         />
         {errors.username && <p className="text-destructive text-sm">{errors.username.message}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{l.password}</Label>
         <Input
           id="password"
           type="password"
           autoComplete="current-password"
-          placeholder="Enter your password"
+          placeholder={l.enterPassword}
           {...register('password')}
         />
         {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? 'Signing in...' : 'Sign in'}
+        {isSubmitting ? l.signingIn : l.signIn}
       </Button>
     </form>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { ProtectedRoute, useAuth } from '@roviq/auth';
 import type { LayoutConfig } from '@roviq/ui';
 import { AdminLayout } from '@roviq/ui';
 import { Activity, Building2, LayoutDashboard, Settings, Shield, Users } from 'lucide-react';
@@ -8,9 +9,11 @@ import { useTranslations } from 'next-intl';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
+  const { logout } = useAuth();
 
   const config: LayoutConfig = {
     appName: tCommon('appName'),
+    onLogout: logout,
     navGroups: [
       {
         title: 'Overview',
@@ -31,5 +34,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ],
   };
 
-  return <AdminLayout config={config}>{children}</AdminLayout>;
+  return (
+    <ProtectedRoute>
+      <AdminLayout config={config}>{children}</AdminLayout>
+    </ProtectedRoute>
+  );
 }

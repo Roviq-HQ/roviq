@@ -33,7 +33,7 @@ function ThemeToggle() {
   );
 }
 
-function UserMenu() {
+function UserMenu({ onLogout }: { onLogout?: () => void }) {
   const t = useTranslations('auth');
 
   return (
@@ -50,7 +50,7 @@ function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem>{t('profile')}</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>{t('logout')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onLogout}>{t('logout')}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -68,7 +68,7 @@ export function Topbar({ config }: { config: LayoutConfig }) {
         </Button>
         <LocaleSwitcher />
         <ThemeToggle />
-        <UserMenu />
+        <UserMenu onLogout={config.onLogout} />
       </div>
     </header>
   );
