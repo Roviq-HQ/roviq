@@ -57,11 +57,11 @@ roviq/
 ## Quick Start
 
 ```bash
-# Prerequisites: Node.js 20+, Bun, Docker, Tilt, dotenvx
+# Prerequisites: Node.js 20+, Bun, Docker, Tilt
 
 bun install
+cp .env.example .env
 
-# Get .env.keys from a team member (decrypts .env.development)
 tilt up
 
 # In a separate terminal:
