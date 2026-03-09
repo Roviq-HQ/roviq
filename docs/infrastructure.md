@@ -38,12 +38,15 @@ Tenant-scoped tables (`memberships`, `roles`, `refresh_tokens`, `profiles`, `stu
 Platform tables (`users`, `organizations`, `phone_numbers`, `auth_providers`) have **no RLS**.
 
 ### Migrations
+
+Tilt runs migrations, client generation, and seeding automatically on `tilt up`. For manual use:
+
 ```bash
 pnpm run db:migrate:dev   # Interactive dev migrations
 pnpm run db:migrate       # Deploy migrations (CI/production)
 pnpm run db:generate      # Regenerate Prisma client
 pnpm run db:seed          # Seed test data
-pnpm run db:reset         # Nuke DB + re-migrate
+pnpm run db:reset         # Nuke DB + re-migrate (or use db-clean in Tilt UI)
 ```
 
 ## NATS JetStream Streams

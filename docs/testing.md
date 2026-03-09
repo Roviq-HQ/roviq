@@ -49,7 +49,7 @@ Key coverage:
 
 ## E2E Tests
 
-All e2e tests require dev environment running (`tilt up`) with database migrated and seeded (`pnpm run db:migrate:dev && pnpm run db:seed`).
+All e2e tests require dev environment running (`tilt up`). Tilt automatically handles migrations and seeding.
 
 ### API Gateway (Vitest)
 

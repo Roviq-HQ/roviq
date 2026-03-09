@@ -10,6 +10,15 @@ async function main() {
   });
   const prisma = createAdminClient(new PrismaClient({ adapter }));
 
+  // Skip if already seeded (idempotency for Tilt auto-run)
+  const existing = await prisma.organization.findUnique({
+    where: { slug: 'demo-institute' },
+  });
+  if (existing) {
+    console.log('Database already seeded, skipping.');
+    process.exit(0);
+  }
+
   console.log('Seeding database...');
 
   // 1. Create test organizations

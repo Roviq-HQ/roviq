@@ -2,6 +2,7 @@
   "name": "roviq",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0",
   "scripts": {
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
@@ -23,6 +24,7 @@
     "db:generate": "pnpx prisma generate --schema=libs/prisma-client/prisma/schema.prisma",
     "db:seed": "pnpx tsx scripts/seed.ts",
     "db:reset": "bash -c 'cd libs/prisma-client && pnpx prisma migrate reset --force'",
+    "db:studio": "bash -c 'cd libs/prisma-client && DATABASE_URL=$DATABASE_URL_ADMIN pnpx prisma studio'",
     "e2e": "nx run-many -t e2e",
     "e2e:gateway": "nx run api-gateway-e2e:e2e",
     "e2e:admin-portal": "nx run admin-portal-e2e:e2e",
