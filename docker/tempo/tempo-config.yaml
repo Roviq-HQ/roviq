@@ -19,5 +19,3 @@ storage:
 metrics_generator:
   storage:
     path: /var/tempo/metrics
-  traces_storage:
-    path: /var/tempo/blocks

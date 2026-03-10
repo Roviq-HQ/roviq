@@ -86,16 +86,12 @@ services:
     ports:
       - '4317:4317'
       - '4318:4318'
+      - '13133:13133'
     depends_on:
       tempo:
         condition: service_started
       loki:
         condition: service_started
-    healthcheck:
-      test: ['CMD', 'wget', '--spider', 'http://localhost:13133']
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   tempo:
     image: grafana/tempo:latest
@@ -105,11 +101,6 @@ services:
       - tempo_data:/var/tempo
     ports:
       - '3200:3200'
-    healthcheck:
-      test: ['CMD', 'wget', '--spider', 'http://localhost:3200/ready']
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   loki:
     image: grafana/loki:latest
@@ -119,11 +110,6 @@ services:
       - loki_data:/loki
     ports:
       - '3100:3100'
-    healthcheck:
-      test: ['CMD', 'wget', '--spider', 'http://localhost:3100/ready']
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   prometheus:
     image: prom/prometheus:latest
