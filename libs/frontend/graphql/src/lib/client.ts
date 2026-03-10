@@ -3,7 +3,7 @@ import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
-import { getMainDefinition } from '@apollo/client/utilities';
+import { getMainDefinition, relayStylePagination } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 
 export interface ApolloClientConfig {
@@ -72,6 +72,12 @@ export function createApolloClient(config: ApolloClientConfig) {
       Student: { keyFields: ['id'] },
       Section: { keyFields: ['id'] },
       Role: { keyFields: ['id'] },
+      AuditLog: { keyFields: ['id'] },
+      Query: {
+        fields: {
+          auditLogs: relayStylePagination(['filter']),
+        },
+      },
     },
   });
 

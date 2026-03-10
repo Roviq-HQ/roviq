@@ -1,5 +1,5 @@
 import { jetstreamManager, RetentionPolicy, StorageType } from '@nats-io/jetstream';
-import type { NatsConnection } from '@nats-io/transport-node';
+import type { NatsConnection } from '@nats-io/nats-core';
 
 export const STREAMS = {
   INSTITUTE: {
@@ -20,6 +20,13 @@ export const STREAMS = {
     name: 'NOTIFICATION',
     subjects: ['NOTIFICATION.>'],
     retention: 'workqueue' as const,
+    storage: 'file' as const,
+    maxDeliver: 5,
+  },
+  AUDIT: {
+    name: 'AUDIT',
+    subjects: ['AUDIT.>'],
+    retention: 'limits' as const,
     storage: 'file' as const,
     maxDeliver: 5,
   },

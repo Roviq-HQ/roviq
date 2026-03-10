@@ -1,6 +1,6 @@
 import { jetstream } from '@nats-io/jetstream';
-import type { NatsConnection } from '@nats-io/transport-node';
-import { headers as natsHeaders } from '@nats-io/transport-node';
+import type { NatsConnection } from '@nats-io/nats-core';
+import { headers as natsHeaders } from '@nats-io/nats-core';
 
 export interface DlqMessage<T = unknown> {
   originalSubject: string;

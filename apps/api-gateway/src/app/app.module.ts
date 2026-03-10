@@ -1,13 +1,18 @@
 import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
-import { Module } from '@nestjs/common';
+import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@roviq/nestjs-prisma';
 import { RedisModule } from '@roviq/redis';
 import { TelemetryModule } from '@roviq/telemetry';
+import { AuditInterceptor } from '../audit/audit.interceptor';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
+import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { HealthModule } from '../health/health.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -35,8 +40,20 @@ import { AppService } from './app.service';
     AuthModule,
     CaslModule,
     HealthModule,
+    AuditModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*path');
+    consumer.apply(TenantMiddleware).forRoutes('*path');
+  }
+}

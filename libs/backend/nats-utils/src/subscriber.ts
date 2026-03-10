@@ -1,5 +1,5 @@
 import { jetstream } from '@nats-io/jetstream';
-import type { NatsConnection } from '@nats-io/transport-node';
+import type { NatsConnection } from '@nats-io/nats-core';
 import { publishToDlq } from './dlq.js';
 
 export interface SubscribeOptions {

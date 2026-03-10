@@ -200,6 +200,9 @@ importers:
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
       pino-http:
         specifier: ^11.0.0
         version: 11.0.0
@@ -327,6 +330,9 @@ importers:
       '@types/passport-jwt':
         specifier: ^4.0.1
         version: 4.0.1
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.18.0
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.14
@@ -354,68 +360,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@22.19.15)(happy-dom@20.8.3)(jiti@2.6.1)(less@4.5.1)(lightningcss@1.31.1)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(yaml@2.8.2)
-
-  dist/apps/api-gateway: {}
-
-  dist/libs/casl: {}
-
-  dist/libs/common-types:
-    dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  dist/libs/nestjs-prisma: {}
-
-  dist/libs/prisma-client:
-    dependencies:
-      '@prisma/adapter-pg':
-        specifier: ^7.4.2
-        version: 7.4.2
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  dist/libs/redis: {}
-
-  dist/libs/telemetry:
-    dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  libs/backend/casl: {}
-
-  libs/backend/nats-utils:
-    dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  libs/backend/nestjs-prisma: {}
-
-  libs/backend/prisma-client:
-    dependencies:
-      '@prisma/adapter-pg':
-        specifier: ^7.4.2
-        version: 7.4.2
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  libs/backend/redis: {}
-
-  libs/backend/telemetry:
-    dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  libs/shared/common-types:
-    dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
 
 packages:
 
@@ -4859,6 +4803,9 @@ packages:
 
   '@types/pg@8.15.6':
     resolution: {integrity: sha512-NoaMtzhxOrubeL/7UZuNTrejB4MPAJ0RpxZqXQf2qXuVlTPuG6Y8p4u9dKRaue4yjmC7ZhzVO2/Yyyn25znrPQ==}
+
+  '@types/pg@8.18.0':
+    resolution: {integrity: sha512-gT+oueVQkqnj6ajGJXblFR4iavIXWsGAFCk3dP4Kki5+a9R4NMt0JARdk6s8cUKcfUoqP5dAtDSLU8xYUTFV+Q==}
 
   '@types/qs@6.15.0':
     resolution: {integrity: sha512-JawvT8iBVWpzTrz3EGw9BTQFg3BQNmwERdKE22vlTxawwtbyUSlMppvZYKLZzB5zgACXdXxbD3m1bXaMqP/9ow==}
@@ -15530,9 +15477,15 @@ snapshots:
 
   '@types/pg-pool@2.0.7':
     dependencies:
-      '@types/pg': 8.15.6
+      '@types/pg': 8.18.0
 
   '@types/pg@8.15.6':
+    dependencies:
+      '@types/node': 22.19.15
+      pg-protocol: 1.13.0
+      pg-types: 2.2.0
+
+  '@types/pg@8.18.0':
     dependencies:
       '@types/node': 22.19.15
       pg-protocol: 1.13.0

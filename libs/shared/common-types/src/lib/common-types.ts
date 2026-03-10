@@ -23,6 +23,7 @@ export const AppSubject = {
   Subject: 'Subject',
   Timetable: 'Timetable',
   Attendance: 'Attendance',
+  AuditLog: 'AuditLog',
 } as const;
 
 export type AppSubject = (typeof AppSubject)[keyof typeof AppSubject];
