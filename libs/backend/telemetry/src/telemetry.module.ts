@@ -15,8 +15,7 @@ import { LoggerModule } from 'nestjs-pino';
             config.get<string>('NODE_ENV') !== 'production'
               ? { target: 'pino-pretty', options: { colorize: true } }
               : undefined,
-          genReqId: (req: { headers: Record<string, string | undefined> }) =>
-            req.headers['x-request-id'] || crypto.randomUUID(),
+          genReqId: (req) => req.headers['x-request-id']?.toString() || crypto.randomUUID(),
         },
         exclude: [{ method: RequestMethod.ALL, path: 'health' }],
       }),
