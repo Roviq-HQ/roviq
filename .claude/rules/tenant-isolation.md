@@ -2,7 +2,7 @@
 paths:
   - "apps/api-gateway/**"
   - "apps/institute-service/**"
-  - "libs/prisma-client/**"
+  - "libs/backend/prisma-client/**"
 ---
 
 # Tenant Isolation & Authorization (Security-Critical)

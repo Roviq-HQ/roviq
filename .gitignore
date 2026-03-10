@@ -14,7 +14,7 @@ dist/
 out
 
 # Prisma generated client
-libs/prisma-client/src/generated/
+libs/backend/prisma-client/src/generated/
 
 # Obsidian
 docs/.obsidian/

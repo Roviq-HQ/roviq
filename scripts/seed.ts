@@ -1,8 +1,11 @@
 import { hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { DEFAULT_ROLE_ABILITIES, DefaultRoles } from '../libs/common-types/src/lib/common-types';
-import { PrismaClient } from '../libs/prisma-client/src/generated/prisma/client';
-import { createAdminClient } from '../libs/prisma-client/src/tenant-extension';
+import { PrismaClient } from '../libs/backend/prisma-client/src/generated/prisma/client';
+import { createAdminClient } from '../libs/backend/prisma-client/src/tenant-extension';
+import {
+  DEFAULT_ROLE_ABILITIES,
+  DefaultRoles,
+} from '../libs/shared/common-types/src/lib/common-types';
 
 async function main() {
   const adapter = new PrismaPg({

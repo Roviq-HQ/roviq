@@ -48,7 +48,7 @@ local_resource(
     echo "Migration failed after 30 attempts"
     exit 1
   ''',
-  deps=['libs/prisma-client/prisma/migrations'],
+  deps=['libs/backend/prisma-client/prisma/migrations'],
   resource_deps=['pnpm-install', 'postgres'],
   labels=['database'],
 )
