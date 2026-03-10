@@ -1,6 +1,3 @@
-// MUST be first import — initializes OpenTelemetry before NestJS
-import '../../../libs/backend/telemetry/src/init-telemetry';
-
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';

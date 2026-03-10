@@ -16,6 +16,17 @@ Run through this while coding:
 - [ ] New feature has translation namespace in `messages/{locale}/`?
 - [ ] `ConfigService`, not `process.env` in NestJS?
 - [ ] New env var added to `.env.example` too?
+- [ ] New lib added to root `tsconfig.json` references?
+- [ ] No relative imports crossing project boundaries? Use `@roviq/*` aliases instead.
+
+## Runtime Verification
+
+Compilation passing does NOT mean it works. After any change to:
+- NX project.json, tsconfig, path aliases, module resolution, or imports
+- Docker compose, infra configs, or environment variables
+- New library scaffolding or cross-project wiring
+
+**You MUST run the actual app** (`nx run api-gateway:serve:development` or equivalent) and verify it starts without runtime errors. Fix iteratively until the app runs clean — do not wait for the user to tell you.
 
 ## Post-Implementation (do proactively)
 

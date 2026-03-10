@@ -10,7 +10,8 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
-const isProduction = process.env.NODE_ENV === 'production';
+const env = process.env;
+const isProduction = env['NODE_ENV'] === 'production';
 
 const sdk = new NodeSDK({
   sampler: new ParentBasedSampler({
@@ -19,7 +20,7 @@ const sdk = new NodeSDK({
   spanProcessors: [
     new BatchSpanProcessor(
       new OTLPTraceExporter({
-        url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',
+        url: env['OTEL_EXPORTER_OTLP_ENDPOINT'] || 'http://localhost:4317',
       }),
       {
         maxExportBatchSize: isProduction ? 200 : 50,
@@ -28,8 +29,9 @@ const sdk = new NodeSDK({
     ),
   ],
   resource: resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'unknown-service',
-    [ATTR_SERVICE_VERSION]: process.env.OTEL_SERVICE_VERSION || '0.0.0',
+    [ATTR_SERVICE_NAME]: env['OTEL_SERVICE_NAME'] || 'unknown-service',
+    [ATTR_SERVICE_VERSION]: env['OTEL_SERVICE_VERSION'] || '0.0.0',
+    'deployment.environment.name': env['NODE_ENV'] || 'development',
   }),
   instrumentations: [
     getNodeAutoInstrumentations({
@@ -49,6 +51,12 @@ const sdk = new NodeSDK({
 
 sdk.start();
 
-process.on('SIGTERM', () => {
-  sdk.shutdown().finally(() => process.exit(0));
-});
+const shutdown = () => {
+  sdk
+    .shutdown()
+    .catch((err) => console.error('OTel SDK shutdown error', err))
+    .finally(() => process.exit(0));
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
