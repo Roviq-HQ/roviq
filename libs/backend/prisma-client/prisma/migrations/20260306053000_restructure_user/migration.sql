@@ -21,7 +21,7 @@ DROP INDEX "users_tenant_id_role_id_idx";
 DROP INDEX "users_tenant_id_username_key";
 
 -- AlterTable
-ALTER TABLE "refresh_tokens" ADD COLUMN     "membership_id" TEXT;
+ALTER TABLE "refresh_tokens" ADD COLUMN     "membership_id" UUID;
 
 -- AlterTable
 ALTER TABLE "users" DROP COLUMN "abilities",

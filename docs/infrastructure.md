@@ -32,7 +32,7 @@ Tilt UI: http://localhost:10350
 ### RLS Policies
 Tenant-scoped tables (`memberships`, `roles`, `refresh_tokens`, `profiles`, `student_guardians`) have:
 - `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`
-- Tenant isolation policy: `tenant_id = current_setting('app.current_tenant_id', true)::text`
+- Tenant isolation policy: `tenant_id = current_setting('app.current_tenant_id', true)::uuid`
 - Admin bypass policy: `current_setting('app.is_platform_admin', true) = 'true'`
 
 Platform tables (`users`, `organizations`, `phone_numbers`, `auth_providers`) have **no RLS**.

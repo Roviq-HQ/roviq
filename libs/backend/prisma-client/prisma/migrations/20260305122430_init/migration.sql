@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "organizations" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "logo_url" TEXT,
@@ -16,8 +16,8 @@ CREATE TABLE "organizations" (
 
 -- CreateTable
 CREATE TABLE "roles" (
-    "id" TEXT NOT NULL,
-    "tenant_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "tenant_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "abilities" JSONB NOT NULL DEFAULT '[]',
     "is_default" BOOLEAN NOT NULL DEFAULT false,
@@ -29,9 +29,9 @@ CREATE TABLE "roles" (
 
 -- CreateTable
 CREATE TABLE "users" (
-    "id" TEXT NOT NULL,
-    "tenant_id" TEXT NOT NULL,
-    "role_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "tenant_id" UUID NOT NULL,
+    "role_id" UUID NOT NULL,
     "email" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "password_hash" TEXT NOT NULL,
@@ -45,9 +45,9 @@ CREATE TABLE "users" (
 
 -- CreateTable
 CREATE TABLE "refresh_tokens" (
-    "id" TEXT NOT NULL,
-    "tenant_id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "tenant_id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
     "token_hash" TEXT NOT NULL,
     "device_info" TEXT,
     "expires_at" TIMESTAMP(3) NOT NULL,

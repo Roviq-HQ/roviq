@@ -1,9 +1,9 @@
 -- CreateTable
 CREATE TABLE "memberships" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "tenant_id" TEXT NOT NULL,
-    "role_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "tenant_id" UUID NOT NULL,
+    "role_id" UUID NOT NULL,
     "abilities" JSONB DEFAULT '[]',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -14,9 +14,9 @@ CREATE TABLE "memberships" (
 
 -- CreateTable
 CREATE TABLE "profiles" (
-    "id" TEXT NOT NULL,
-    "membership_id" TEXT NOT NULL,
-    "tenant_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "membership_id" UUID NOT NULL,
+    "tenant_id" UUID NOT NULL,
     "type" TEXT NOT NULL,
     "metadata" JSONB DEFAULT '{}',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
@@ -28,10 +28,10 @@ CREATE TABLE "profiles" (
 
 -- CreateTable
 CREATE TABLE "student_guardians" (
-    "id" TEXT NOT NULL,
-    "student_profile_id" TEXT NOT NULL,
-    "guardian_profile_id" TEXT NOT NULL,
-    "tenant_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "student_profile_id" UUID NOT NULL,
+    "guardian_profile_id" UUID NOT NULL,
+    "tenant_id" UUID NOT NULL,
     "relationship" TEXT NOT NULL,
     "is_primary" BOOLEAN NOT NULL DEFAULT false,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
@@ -43,8 +43,8 @@ CREATE TABLE "student_guardians" (
 
 -- CreateTable
 CREATE TABLE "phone_numbers" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
     "country_code" TEXT NOT NULL,
     "number" TEXT NOT NULL,
     "label" TEXT NOT NULL DEFAULT 'personal',
@@ -59,8 +59,8 @@ CREATE TABLE "phone_numbers" (
 
 -- CreateTable
 CREATE TABLE "auth_providers" (
-    "id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
     "provider" TEXT NOT NULL,
     "provider_user_id" TEXT,
     "provider_data" JSONB,
