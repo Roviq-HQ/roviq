@@ -50,7 +50,7 @@
       "linter": { "enabled": false }
     },
     {
-      "includes": ["apps/api-gateway/**", "apps/institute-service/**", "libs/backend/**"],
+      "includes": ["apps/api-gateway/**", "libs/backend/**"],
       "javascript": {
         "parser": {
           "unsafeParameterDecoratorsEnabled": true

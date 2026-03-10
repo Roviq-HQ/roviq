@@ -4,7 +4,6 @@
   "include": [],
   "references": [
     { "path": "apps/api-gateway" },
-    { "path": "apps/institute-service" },
     { "path": "apps/admin-portal" },
     { "path": "apps/institute-portal" },
     { "path": "libs/shared/common-types" },

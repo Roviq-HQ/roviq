@@ -44,47 +44,6 @@ services:
         - action: rebuild
           path: pnpm-lock.yaml
 
-  institute-service:
-    build:
-      context: .
-      target: dev
-    command: npx nx serve institute-service
-    ports:
-      - "3100:3100"
-    env_file:
-      - .env.docker
-    environment:
-      INSTITUTE_SERVICE_PORT: 3100
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
-    develop:
-      watch:
-        - action: sync
-          path: ./apps/institute-service/src
-          target: /app/apps/institute-service/src
-          initial_sync: true
-          ignore:
-            - node_modules/
-        - action: sync
-          path: ./libs
-          target: /app/libs
-          initial_sync: true
-          ignore:
-            - node_modules/
-            - "**/generated/**"
-        - action: sync+restart
-          path: ./apps/institute-service/tsconfig.app.json
-          target: /app/apps/institute-service/tsconfig.app.json
-        - action: rebuild
-          path: package.json
-        - action: rebuild
-          path: pnpm-lock.yaml
-
   admin-portal:
     build:
       context: .

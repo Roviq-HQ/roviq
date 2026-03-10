@@ -101,16 +101,6 @@ local_resource(
   links=['http://localhost:3000/api/graphql'],
 )
 
-# Institute Service (NestJS microservice)
-local_resource(
-  'institute-service',
-  labels=['backend'],
-  serve_cmd='pnpm run dev:institute',
-  serve_dir='.',
-  deps=[],
-  resource_deps=['db-seed', 'redis', 'nats'],
-)
-
 # Admin Portal (Next.js)
 local_resource(
   'admin-portal',

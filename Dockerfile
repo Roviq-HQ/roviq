@@ -37,17 +37,3 @@ COPY --from=build /app/package.json ./
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
-
-# ── Production: institute-service ────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS institute-service
-
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY --from=build /app/dist/apps/institute-service ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./
-
-USER node
-EXPOSE 3000
-CMD ["node", "dist/main.js"]

@@ -75,7 +75,6 @@ Track progress on [GitHub Issues](https://github.com/Roviq-HQ/roviq/issues).
 roviq/
 ├── apps/
 │   ├── api-gateway/            # GraphQL gateway — auth, audit, routing
-│   ├── institute-service/      # Institute domain logic
 │   ├── admin-portal/           # Super admin UI (Next.js)
 │   └── institute-portal/       # Institute-facing UI (Next.js)
 ├── libs/

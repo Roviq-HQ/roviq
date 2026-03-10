@@ -1,7 +1,6 @@
 ---
 paths:
   - "apps/api-gateway/**"
-  - "apps/institute-service/**"
   - "libs/backend/prisma-client/**"
 ---
 

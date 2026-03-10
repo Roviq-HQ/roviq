@@ -6,7 +6,6 @@
 roviq/
 ├── apps/
 │   ├── api-gateway/          # NestJS — GraphQL API entry point
-│   ├── institute-service/    # NestJS — institute business logic
 │   ├── admin-portal/         # Next.js — platform admin UI
 │   └── institute-portal/     # Next.js — institute-facing UI
 ├── libs/

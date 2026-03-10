@@ -32,7 +32,6 @@ tilt down                    # Stop everything
 
 # Individual apps (if not using Tilt)
 pnpm run dev:gateway          # API Gateway — port 3000
-pnpm run dev:institute        # Institute Service
 pnpm run dev:admin            # Admin Portal — port 4200
 pnpm run dev:portal           # Institute Portal — port 4300
 
@@ -58,7 +57,6 @@ nx affected:build            # Build changed projects only
 ## Architecture
 
 - **api-gateway** — NestJS GraphQL API (Apollo, code-first). Auth (JWT + Passport), CASL authorization. Port 3000.
-- **institute-service** — NestJS microservice for institute business logic.
 - **admin-portal** — Next.js 16 (App Router) for platform-wide admin.
 - **institute-portal** — Next.js 16 (App Router) for institute users.
 - **Shared libs** (`@roviq/*`): `prisma-client`, `common-types`, `nats-utils`, `graphql`, `auth`, `i18n`, `ui`
