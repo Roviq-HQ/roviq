@@ -22,6 +22,28 @@ Tilt UI: http://localhost:10350
 | MinIO | 9000 (API), 9001 (console) | S3-compatible object storage |
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
+| OTel Collector | 4317 (gRPC), 4318 (HTTP), 13133 (health) | OpenTelemetry collector — receives traces/metrics/logs, fans out to Tempo/Loki/Prometheus |
+| Tempo | 3200 | Distributed tracing backend (Grafana Tempo 2.7.2) |
+| Loki | 3100 | Log aggregation backend |
+| Prometheus | 9090 | Metrics scraping and storage |
+| Grafana | 3001 | Observability dashboards — also embedded in admin-portal at `/observability` |
+
+## Observability
+
+The stack is wired end-to-end via OpenTelemetry:
+
+```
+App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
+                                        → Loki    (logs)
+                                        → Prometheus (metrics, namespace: roviq)
+                                             ↓
+                                        Grafana (3001) ← embedded in admin-portal
+```
+
+- **Traces**: auto-instrumented via `@opentelemetry/auto-instrumentations-node`. Sampling: 100% in dev, 10% in production.
+- **Metrics**: exported every 10s in dev (60s in production). Metric names are prefixed `roviq_`.
+- **Logs**: OTel Pino instrumentation injects `trace_id`/`span_id` into log records for correlation (log shipping to Loki requires a separate pipeline — not yet configured).
+- **Grafana dashboard**: provisioned at `docker/grafana/dashboards/overview.json`, accessible at http://localhost:3001/d/roviq-overview or via the admin-portal Observability page.
 
 ## Database
 
@@ -86,3 +108,9 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | SENTRY_DSN | Sentry error tracking (leave empty to disable) |
 | CORS_ORIGINS | Comma-separated allowed origins (optional, defaults to localhost) |
 | PORT | Server port (optional, defaults to 3000) |
+| OTEL_EXPORTER_OTLP_ENDPOINT | OTel Collector gRPC endpoint (default: http://localhost:4317) |
+| OTEL_SERVICE_NAME | Service name reported in traces and metrics |
+| OTEL_SERVICE_VERSION | Service version reported in traces and metrics |
+| LOG_LEVEL | Pino log level (default: info) |
+| NEXT_PUBLIC_API_URL | Public API base URL for browser-side requests (default: http://localhost:3000) |
+| NEXT_PUBLIC_GRAFANA_URL | Grafana base URL for the admin-portal Observability iframe (default: http://localhost:3001) |
