@@ -12,6 +12,9 @@ BEGIN
 END
 $$;
 
+-- RLS bypass is policy-based, not role-level — remove BYPASSRLS from all roles
+ALTER ROLE roviq NOBYPASSRLS;
+
 -- Role inheritance: roviq_admin gets all table permissions from roviq (the table owner)
 GRANT roviq TO roviq_admin;
 GRANT USAGE ON SCHEMA public TO roviq_admin;
