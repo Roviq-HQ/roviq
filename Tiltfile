@@ -33,6 +33,14 @@ dc_resource('minio', labels=['infra'])
 dc_resource('temporal', labels=['infra'], resource_deps=['postgres'])
 dc_resource('temporal-ui', labels=['infra'])
 
+# Observability (Grafana, Prometheus, Loki, Tempo, OTel Collector)
+dc_resource('otel-collector', labels=['observability'], resource_deps=['tempo', 'loki'])
+dc_resource('prometheus', labels=['observability'])
+dc_resource('tempo', labels=['observability'])
+dc_resource('loki', labels=['observability'])
+dc_resource('grafana', labels=['observability'], resource_deps=['prometheus', 'tempo', 'loki'],
+            links=['http://localhost:3001'])
+
 # Database migrations — auto-runs, retries until postgres is ready
 local_resource(
   'db-migrate',
@@ -97,7 +105,7 @@ local_resource(
   serve_cmd='pnpm run dev:gateway',
   serve_dir='.',
   deps=[],
-  resource_deps=['db-seed', 'redis', 'nats'],
+  resource_deps=['db-seed', 'redis', 'nats', 'otel-collector'],
   links=['http://localhost:3000/api/graphql'],
 )
 

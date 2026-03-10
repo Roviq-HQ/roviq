@@ -17,7 +17,7 @@ tilt up
 Tilt handles everything automatically:
 - Creates `.env` from `.env.example` on first run
 - Installs dependencies (`pnpm install`)
-- Starts infra (Postgres, Redis, NATS, MinIO, Temporal) in Docker
+- Starts infra (Postgres, Redis, NATS, MinIO, Temporal, OTel/Grafana stack) in Docker
 - Runs database migrations, generates Prisma client, and seeds test data
 - Starts all apps locally
 
@@ -38,6 +38,14 @@ Login requires only username + password — no Organization ID.
 ```bash
 # GraphQL playground
 open http://localhost:3000/api/graphql
+
+# Health check
+curl http://localhost:3000/api/health
+
+# Observability (also accessible via admin-portal → Observability)
+open http://localhost:3001/d/roviq-overview  # Grafana dashboard
+open http://localhost:9090                   # Prometheus
+open http://localhost:3200                   # Tempo
 
 # Login mutation (single-org user → direct JWT)
 curl -s http://localhost:3000/api/graphql -X POST \

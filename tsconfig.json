@@ -12,6 +12,7 @@
     { "path": "libs/backend/casl" },
     { "path": "libs/backend/redis" },
     { "path": "libs/backend/nats-utils" },
+    { "path": "libs/backend/telemetry" },
     { "path": "libs/frontend/ui" },
     { "path": "libs/frontend/graphql" },
     { "path": "libs/frontend/auth" },
