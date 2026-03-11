@@ -137,7 +137,7 @@ export class PasskeyService {
       deviceType: credentialDeviceType,
       backedUp: credentialBackedUp,
       webauthnUserID: userId,
-      name: name?.trim() || `Passkey ${new Date().toLocaleDateString()}`,
+      name: name?.trim() || `Passkey ${new Date().toISOString().slice(0, 10)}`,
       registeredAt: now,
       lastUsedAt: null,
       aaguid: aaguid ?? '00000000-0000-0000-0000-000000000000',
