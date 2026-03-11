@@ -9,7 +9,7 @@ export class EeModule {
     // ConfigService. This is intentional — EeModule.register() runs during module
     // assembly, before the NestJS DI container is initialized and ConfigService
     // is available. This is a bootstrap-time decision, not a runtime one.
-    if (process.env.ROVIQ_EE !== 'true') {
+    if (process.env['ROVIQ_EE'] !== 'true') {
       return { module: EeModule, imports: [] };
     }
 
