@@ -28,7 +28,7 @@ export default function SelectOrgPage() {
       await selectOrganization(membership.tenantId);
       router.replace('/dashboard');
     } catch {
-      setError('Failed to select organization. Please try again.');
+      setError(t('selectFailed'));
       setSelecting(null);
     }
   };
