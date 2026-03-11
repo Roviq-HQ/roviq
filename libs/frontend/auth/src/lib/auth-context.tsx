@@ -261,10 +261,28 @@ export function AuthProvider({
     await handleLoginResult(result);
   }, [passkeyLoginMutation, handleLoginResult]);
 
+  const clearAllState = React.useCallback(() => {
+    tokenStorage.clear();
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    setNeedsOrgSelection(false);
+    setMemberships(null);
+    setState({
+      user: null,
+      tokens: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
+  }, []);
+
   const selectOrganization = React.useCallback(
     async (tenantId: string) => {
       const platformToken = tokenStorage.getPlatformToken();
-      if (!platformToken) throw new Error('No platform token');
+      if (!platformToken || isTokenExpired(platformToken)) {
+        clearAllState();
+        throw new Error('Session expired');
+      }
 
       const result = await selectOrgMutation(tenantId, platformToken);
       tokenStorage.clearPlatform();
@@ -285,7 +303,7 @@ export function AuthProvider({
       });
       scheduleRefresh(result.accessToken);
     },
-    [selectOrgMutation, scheduleRefresh],
+    [selectOrgMutation, scheduleRefresh, clearAllState],
   );
 
   const switchOrganization = React.useCallback(
