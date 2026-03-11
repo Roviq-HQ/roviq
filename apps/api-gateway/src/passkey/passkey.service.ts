@@ -49,7 +49,7 @@ export class PasskeyService {
     this.rpId = this.config.getOrThrow<string>('WEBAUTHN_RP_ID');
     this.rpName = this.config.getOrThrow<string>('WEBAUTHN_RP_NAME');
     this.origins = this.config
-      .getOrThrow<string>('WEBAUTHN_ORIGINS')
+      .getOrThrow<string>('ALLOWED_ORIGINS')
       .split(',')
       .map((o) => o.trim());
   }
