@@ -99,6 +99,9 @@ services:
       JWT_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 7d
       API_GATEWAY_PORT: 3000
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_NAME: Roviq
+      ALLOWED_ORIGINS: http://localhost:4200,http://localhost:4300
     depends_on:
       postgres:
         condition: service_healthy
