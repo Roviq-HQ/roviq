@@ -29,9 +29,12 @@ export default function LoginPage() {
     enterPassword: t('enterPassword'),
     signIn: t('signIn'),
     signingIn: t('signingIn'),
+    signInWithPasskey: t('signInWithPasskey'),
+    or: t('or'),
     usernameRequired: t('usernameRequired'),
     passwordRequired: t('passwordRequired'),
     loginFailed: t('loginFailed'),
+    passkeyNotAvailable: t('passkeyNotAvailable'),
   };
 
   return (

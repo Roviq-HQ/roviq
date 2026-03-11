@@ -10,6 +10,7 @@ export default createRequestConfig(async (locale) => {
   const error = (await import(`../../messages/${locale}/error.json`)).default;
   const observability = (await import(`../../messages/${locale}/observability.json`)).default;
   const auditLogs = (await import(`../../messages/${locale}/auditLogs.json`)).default;
+  const account = (await import(`../../messages/${locale}/account.json`)).default;
 
   return {
     common,
@@ -21,5 +22,6 @@ export default createRequestConfig(async (locale) => {
     error,
     observability,
     auditLogs,
+    account,
   };
 });

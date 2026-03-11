@@ -14,6 +14,7 @@ import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { HealthModule } from '../health/health.module';
+import { PasskeyModule } from '../passkey/passkey.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -41,6 +42,7 @@ import { AppService } from './app.service';
     CaslModule,
     HealthModule,
     AuditModule,
+    PasskeyModule,
   ],
   controllers: [AppController],
   providers: [

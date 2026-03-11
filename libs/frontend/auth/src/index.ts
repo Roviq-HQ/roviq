@@ -3,6 +3,12 @@ export { createAuthMutations } from './lib/auth-mutations';
 export { decodeJwt, isTokenExpired } from './lib/jwt-decode';
 export type { LoginFormProps } from './lib/login-form';
 export { LoginForm } from './lib/login-form';
+export type {
+  PasskeyManagerLabels,
+  PasskeyManagerMutations,
+  PasskeyManagerProps,
+} from './lib/passkey-manager';
+export { PasskeyManager } from './lib/passkey-manager';
 export { ProtectedRoute } from './lib/protected-route';
 export type {
   SessionExpiredDialogLabels,
@@ -17,5 +23,7 @@ export type {
   LoginInput,
   LoginResult,
   MembershipInfo,
+  PasskeyAuthOptions,
+  PasskeyInfo,
   Tenant,
 } from './lib/types';

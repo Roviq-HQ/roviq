@@ -3,7 +3,15 @@
 import { ProtectedRoute, useAuth } from '@roviq/auth';
 import type { LayoutConfig } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
-import { BookOpen, Calendar, GraduationCap, LayoutDashboard, Settings, Users } from 'lucide-react';
+import {
+  BookOpen,
+  Calendar,
+  GraduationCap,
+  LayoutDashboard,
+  Settings,
+  UserCog,
+  Users,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -46,7 +54,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       },
       {
         title: t('system'),
-        items: [{ title: t('settings'), href: '/settings', icon: Settings }],
+        items: [
+          { title: t('settings'), href: '/settings', icon: Settings },
+          { title: t('account'), href: '/account', icon: UserCog },
+        ],
       },
     ],
   };

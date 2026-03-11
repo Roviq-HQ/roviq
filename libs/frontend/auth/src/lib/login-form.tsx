@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Input, Label } from '@roviq/ui';
+import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -19,15 +20,19 @@ export interface LoginFormProps {
     enterPassword?: string;
     signIn?: string;
     signingIn?: string;
+    signInWithPasskey?: string;
+    or?: string;
     usernameRequired?: string;
     passwordRequired?: string;
     loginFailed?: string;
+    passkeyNotAvailable?: string;
   };
 }
 
 export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
-  const { login } = useAuth();
+  const { login, loginWithPasskey } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isPasskeyLoading, setIsPasskeyLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const l = {
@@ -37,9 +42,13 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
     enterPassword: labels?.enterPassword ?? 'Enter your password',
     signIn: labels?.signIn ?? 'Sign in',
     signingIn: labels?.signingIn ?? 'Signing in...',
+    signInWithPasskey: labels?.signInWithPasskey ?? 'Sign in with passkey',
+    or: labels?.or ?? 'or',
     usernameRequired: labels?.usernameRequired ?? 'Username is required',
     passwordRequired: labels?.passwordRequired ?? 'Password is required',
     loginFailed: labels?.loginFailed ?? 'Login failed. Please try again.',
+    passkeyNotAvailable:
+      labels?.passkeyNotAvailable ?? 'No passkey found. Try signing in with your password.',
   };
 
   const loginSchema = z.object({
@@ -74,39 +83,96 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
     }
   };
 
+  const handlePasskeyLogin = async () => {
+    setIsPasskeyLoading(true);
+    setError(null);
+    try {
+      await loginWithPasskey();
+      onSuccess?.();
+    } catch (err) {
+      const errName = err instanceof Error ? err.name : '';
+      const message =
+        errName === 'NotAllowedError' || errName === 'AbortError'
+          ? l.passkeyNotAvailable
+          : err instanceof Error
+            ? err.message
+            : l.loginFailed;
+      setError(message);
+      onError?.(err instanceof Error ? err : new Error(message));
+    } finally {
+      setIsPasskeyLoading(false);
+    }
+  };
+
+  const isBusy = isSubmitting || isPasskeyLoading;
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <div className="space-y-5">
       {error && (
-        <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">{error}</div>
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="username">{l.username}</Label>
-        <Input
-          id="username"
-          type="text"
-          autoComplete="username"
-          placeholder={l.enterUsername}
-          {...register('username')}
-        />
-        {errors.username && <p className="text-destructive text-sm">{errors.username.message}</p>}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="username">{l.username}</Label>
+          <Input
+            id="username"
+            type="text"
+            autoComplete="username webauthn"
+            placeholder={l.enterUsername}
+            disabled={isBusy}
+            {...register('username')}
+          />
+          {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">{l.password}</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder={l.enterPassword}
+            disabled={isBusy}
+            {...register('password')}
+          />
+          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+        </div>
+
+        <Button type="submit" disabled={isBusy} className="w-full">
+          {isSubmitting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              {l.signingIn}
+            </>
+          ) : (
+            l.signIn
+          )}
+        </Button>
+      </form>
+
+      <div className="relative flex items-center">
+        <div className="flex-1 border-t border-border" />
+        <span className="text-muted-foreground px-3 text-xs uppercase tracking-wide">{l.or}</span>
+        <div className="flex-1 border-t border-border" />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="password">{l.password}</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          placeholder={l.enterPassword}
-          {...register('password')}
-        />
-        {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
-      </div>
-
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? l.signingIn : l.signIn}
+      <Button
+        type="button"
+        variant="outline"
+        disabled={isBusy}
+        className="w-full gap-2.5"
+        onClick={handlePasskeyLogin}
+      >
+        {isPasskeyLoading ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Fingerprint className="size-4" />
+        )}
+        {isPasskeyLoading ? l.signingIn : l.signInWithPasskey}
       </Button>
-    </form>
+    </div>
   );
 }

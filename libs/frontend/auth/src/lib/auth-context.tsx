@@ -12,6 +12,7 @@ interface AuthContextValue extends AuthState {
   needsOrgSelection: boolean;
   memberships: MembershipInfo[] | null;
   login: (input: LoginInput) => Promise<void>;
+  loginWithPasskey: () => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   getAccessToken: () => string | null;
@@ -23,6 +24,7 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 interface AuthProviderProps {
   loginMutation: (input: LoginInput) => Promise<LoginResult>;
+  passkeyLoginMutation?: () => Promise<LoginResult>;
   selectOrgMutation: (
     tenantId: string,
     platformToken: string,
@@ -44,6 +46,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({
   loginMutation,
+  passkeyLoginMutation,
   selectOrgMutation,
   refreshMutation,
   logoutMutation,
@@ -174,12 +177,9 @@ export function AuthProvider({
     };
   }, [refreshMutation, scheduleRefresh]);
 
-  const login = React.useCallback(
-    async (input: LoginInput) => {
-      const result = await loginMutation(input);
-
+  const handleLoginResult = React.useCallback(
+    (result: LoginResult) => {
       if (result.accessToken && result.refreshToken && result.user) {
-        // Single-org path
         tokenStorage.setTokens({
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
@@ -196,15 +196,30 @@ export function AuthProvider({
         });
         scheduleRefresh(result.accessToken);
       } else if (result.platformToken && result.memberships) {
-        // Multi-org path — store platform token, show org picker
         tokenStorage.setPlatformToken(result.platformToken);
         tokenStorage.setMemberships(result.memberships);
         setMemberships(result.memberships);
         setNeedsOrgSelection(true);
       }
     },
-    [loginMutation, scheduleRefresh],
+    [scheduleRefresh],
   );
+
+  const login = React.useCallback(
+    async (input: LoginInput) => {
+      const result = await loginMutation(input);
+      handleLoginResult(result);
+    },
+    [loginMutation, handleLoginResult],
+  );
+
+  const loginWithPasskey = React.useCallback(async () => {
+    if (!passkeyLoginMutation) {
+      throw new Error('Passkey login is not configured');
+    }
+    const result = await passkeyLoginMutation();
+    handleLoginResult(result);
+  }, [passkeyLoginMutation, handleLoginResult]);
 
   const selectOrganization = React.useCallback(
     async (tenantId: string) => {
@@ -315,6 +330,7 @@ export function AuthProvider({
       needsOrgSelection,
       memberships,
       login,
+      loginWithPasskey,
       logout,
       refreshSession,
       getAccessToken,
@@ -327,6 +343,7 @@ export function AuthProvider({
       needsOrgSelection,
       memberships,
       login,
+      loginWithPasskey,
       logout,
       refreshSession,
       getAccessToken,

@@ -49,3 +49,17 @@ export interface Tenant {
   slug: string;
   logoUrl?: string;
 }
+
+export interface PasskeyAuthOptions {
+  optionsJSON: Record<string, unknown>;
+  challengeId: string;
+}
+
+export interface PasskeyInfo {
+  id: string;
+  name: string;
+  deviceType: string;
+  backedUp: boolean;
+  registeredAt: string;
+  lastUsedAt?: string;
+}

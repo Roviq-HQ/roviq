@@ -2,7 +2,8 @@
 
 import { Bell, Building2, Check, ChevronsUpDown, Moon, Sun } from 'lucide-react';
 import Image from 'next/image';
-import { useTranslations } from 'next-intl';
+import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { Button } from '../ui/button';
 import {
@@ -76,6 +77,7 @@ function ThemeToggle() {
 
 function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: string }) {
   const t = useTranslations('auth');
+  const locale = useLocale();
   const initial = username ? username.charAt(0).toUpperCase() : 'U';
 
   return (
@@ -90,7 +92,9 @@ function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: st
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>{t('myAccount')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>{t('profile')}</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/${locale}/account`}>{t('profile')}</Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onLogout}>{t('logout')}</DropdownMenuItem>
       </DropdownMenuContent>

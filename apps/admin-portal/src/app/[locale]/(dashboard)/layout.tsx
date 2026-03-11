@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Settings,
   Shield,
+  UserCog,
   Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -54,6 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           { title: t('auditLogs'), href: '/audit-logs', icon: FileText },
           { title: t('observability'), href: '/observability', icon: BarChart2 },
           { title: t('settings'), href: '/settings', icon: Settings },
+          { title: t('account'), href: '/account', icon: UserCog },
         ],
       },
     ],
