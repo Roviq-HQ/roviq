@@ -1,0 +1,101 @@
+'use client';
+
+import {
+  Button,
+  DataTableToolbar,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@roviq/ui';
+import { X } from 'lucide-react';
+import { parseAsString, useQueryStates } from 'nuqs';
+
+const ACTION_TYPES = ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'REVOKE'] as const;
+
+const ENTITY_TYPES = [
+  'User',
+  'Role',
+  'Student',
+  'Section',
+  'Standard',
+  'Subject',
+  'Timetable',
+  'Attendance',
+] as const;
+
+const filterParsers = {
+  entityType: parseAsString,
+  actionType: parseAsString,
+  userId: parseAsString,
+};
+
+export function useAuditLogFilters() {
+  return useQueryStates(filterParsers);
+}
+
+interface AuditLogFiltersProps {
+  t: (key: string) => string;
+}
+
+export function AuditLogFilters({ t }: AuditLogFiltersProps) {
+  const [filters, setFilters] = useQueryStates(filterParsers);
+
+  const hasFilters = Object.values(filters).some(Boolean);
+
+  return (
+    <DataTableToolbar>
+      <Select
+        value={filters.entityType ?? ''}
+        onValueChange={(value) => setFilters({ entityType: value || null })}
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder={t('filters.entityType')} />
+        </SelectTrigger>
+        <SelectContent>
+          {ENTITY_TYPES.map((type) => (
+            <SelectItem key={type} value={type}>
+              {type}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.actionType ?? ''}
+        onValueChange={(value) => setFilters({ actionType: value || null })}
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder={t('filters.actionType')} />
+        </SelectTrigger>
+        <SelectContent>
+          {ACTION_TYPES.map((type) => (
+            <SelectItem key={type} value={type}>
+              {t(`actionTypes.${type}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Input
+        placeholder={t('filters.userId')}
+        value={filters.userId ?? ''}
+        onChange={(e) => setFilters({ userId: e.target.value || null })}
+        className="w-[200px]"
+      />
+
+      {hasFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setFilters({ entityType: null, actionType: null, userId: null })}
+        >
+          <X className="mr-1 size-4" />
+          {t('filters.clearFilters')}
+        </Button>
+      )}
+    </DataTableToolbar>
+  );
+}

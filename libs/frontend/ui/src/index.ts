@@ -5,6 +5,15 @@ export {
   useAbility,
 } from './components/auth/ability-provider';
 export { RouteGuard } from './components/auth/route-guard';
+export { DataTable, type DataTableProps } from './components/data-table/data-table';
+export {
+  DataTablePagination,
+  type DataTablePaginationProps,
+} from './components/data-table/data-table-pagination';
+export {
+  DataTableToolbar,
+  type DataTableToolbarProps,
+} from './components/data-table/data-table-toolbar';
 export { AdminLayout } from './components/layout/admin-layout';
 export { PageErrorBoundary } from './components/layout/error-boundary';
 export { ErrorPage, type ErrorPageProps } from './components/layout/error-page';
@@ -84,6 +93,16 @@ export {
   SheetTitle,
   SheetTrigger,
 } from './components/ui/sheet';
+export {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './components/ui/table';
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 export {
   Tooltip,

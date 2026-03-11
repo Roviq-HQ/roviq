@@ -1,0 +1,61 @@
+{
+  "title": "Audit Logs",
+  "description": "System-wide audit trail of all actions across institutes.",
+  "columns": {
+    "timestamp": "Timestamp",
+    "actor": "Actor",
+    "action": "Action",
+    "actionType": "Type",
+    "entityType": "Entity",
+    "entityId": "Entity ID",
+    "source": "Source",
+    "ipAddress": "IP Address"
+  },
+  "filters": {
+    "entityType": "Entity type",
+    "actionType": "Action type",
+    "userId": "User ID",
+    "search": "Search...",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "clearFilters": "Clear filters"
+  },
+  "actionTypes": {
+    "CREATE": "Create",
+    "UPDATE": "Update",
+    "DELETE": "Delete",
+    "RESTORE": "Restore",
+    "ASSIGN": "Assign",
+    "REVOKE": "Revoke"
+  },
+  "pagination": {
+    "loadMore": "Load more",
+    "showing": "Showing",
+    "of": "of"
+  },
+  "empty": "No audit logs found.",
+  "detail": {
+    "title": "Audit Log Details",
+    "description": "Full details of the audit event.",
+    "id": "ID",
+    "tenantId": "Institute ID",
+    "userId": "User ID",
+    "actorId": "Actor ID",
+    "impersonatorId": "Impersonator ID",
+    "action": "Action",
+    "actionType": "Action Type",
+    "entityType": "Entity Type",
+    "entityId": "Entity ID",
+    "changes": "Changes",
+    "metadata": "Metadata",
+    "correlationId": "Correlation ID",
+    "ipAddress": "IP Address",
+    "userAgent": "User Agent",
+    "source": "Source",
+    "createdAt": "Created At",
+    "impersonated": "Impersonated",
+    "noChanges": "No changes recorded.",
+    "noMetadata": "No metadata."
+  },
+  "accessDenied": "You do not have permission to view audit logs."
+}

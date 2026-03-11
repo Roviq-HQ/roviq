@@ -1,0 +1,61 @@
+{
+  "title": "ऑडिट लॉग",
+  "description": "सभी संस्थानों में की गई कार्रवाइयों का सिस्टम-व्यापी ऑडिट ट्रेल।",
+  "columns": {
+    "timestamp": "समय",
+    "actor": "कर्ता",
+    "action": "कार्रवाई",
+    "actionType": "प्रकार",
+    "entityType": "इकाई",
+    "entityId": "इकाई ID",
+    "source": "स्रोत",
+    "ipAddress": "IP पता"
+  },
+  "filters": {
+    "entityType": "इकाई प्रकार",
+    "actionType": "कार्रवाई प्रकार",
+    "userId": "उपयोगकर्ता ID",
+    "search": "खोजें...",
+    "dateFrom": "से",
+    "dateTo": "तक",
+    "clearFilters": "फ़िल्टर हटाएँ"
+  },
+  "actionTypes": {
+    "CREATE": "बनाएँ",
+    "UPDATE": "अपडेट",
+    "DELETE": "हटाएँ",
+    "RESTORE": "पुनर्स्थापित",
+    "ASSIGN": "सौंपें",
+    "REVOKE": "निरस्त"
+  },
+  "pagination": {
+    "loadMore": "और लोड करें",
+    "showing": "दिखा रहा है",
+    "of": "में से"
+  },
+  "empty": "कोई ऑडिट लॉग नहीं मिला।",
+  "detail": {
+    "title": "ऑडिट लॉग विवरण",
+    "description": "ऑडिट इवेंट का पूर्ण विवरण।",
+    "id": "ID",
+    "tenantId": "संस्थान ID",
+    "userId": "उपयोगकर्ता ID",
+    "actorId": "कर्ता ID",
+    "impersonatorId": "प्रतिरूपक ID",
+    "action": "कार्रवाई",
+    "actionType": "कार्रवाई प्रकार",
+    "entityType": "इकाई प्रकार",
+    "entityId": "इकाई ID",
+    "changes": "परिवर्तन",
+    "metadata": "मेटाडेटा",
+    "correlationId": "सहसंबंध ID",
+    "ipAddress": "IP पता",
+    "userAgent": "उपयोगकर्ता एजेंट",
+    "source": "स्रोत",
+    "createdAt": "बनाया गया",
+    "impersonated": "प्रतिरूपित",
+    "noChanges": "कोई परिवर्तन दर्ज नहीं।",
+    "noMetadata": "कोई मेटाडेटा नहीं।"
+  },
+  "accessDenied": "आपको ऑडिट लॉग देखने की अनुमति नहीं है।"
+}

@@ -3,7 +3,15 @@
 import { ProtectedRoute, useAuth } from '@roviq/auth';
 import type { LayoutConfig } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
-import { BarChart2, Building2, LayoutDashboard, Settings, Shield, Users } from 'lucide-react';
+import {
+  BarChart2,
+  Building2,
+  FileText,
+  LayoutDashboard,
+  Settings,
+  Shield,
+  Users,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -43,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         title: t('system'),
         items: [
           { title: t('roles'), href: '/roles', icon: Shield },
+          { title: t('auditLogs'), href: '/audit-logs', icon: FileText },
           { title: t('observability'), href: '/observability', icon: BarChart2 },
           { title: t('settings'), href: '/settings', icon: Settings },
         ],
