@@ -77,9 +77,9 @@ importers:
       '@novu/framework':
         specifier: ^2.9.0
         version: 2.9.0(@nestjs/common@11.1.16(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(encoding@0.1.13)(express@5.2.1)(next@16.0.11(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-macros@3.1.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3))(zod@4.3.6)
-      '@novu/react':
+      '@novu/nextjs':
         specifier: ^3.14.1
-        version: 3.14.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 3.14.1(next@16.0.11(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-macros@3.1.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -3007,6 +3007,16 @@ packages:
 
   '@novu/js@3.14.1':
     resolution: {integrity: sha512-Og9IrPPunw3XleaMl8nkV0vSu0rGXE75CO/CP/upEQWpbK+KvMZbN6rF9+KTrcO1EDG6DwNjI+jhZO83KaIQNg==}
+
+  '@novu/nextjs@3.14.1':
+    resolution: {integrity: sha512-ToT0yWd7hJp6h0SGn5bwvjYcJP9qg3VK8Rvb6IZYMCSkcAibrk0k4GYVa5HMz+9VIBZcQQuaHQjX4iSlLhhRsw==}
+    peerDependencies:
+      next: '>=13.5.2 || ^14.0.0 || ^15.0.0'
+      react: ^18.0.0 || ^19.0.0 || ^19.0.0-0
+      react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-0
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
 
   '@novu/react@3.14.1':
     resolution: {integrity: sha512-hRdjpg0Ld+8bBJjDlJFotbSCYjbuuDfvRS6ymY2l+rf3fToVRDx+ph7fa178ONJOGcfdw/Zg1mXp88GwaZeAFg==}
@@ -13824,6 +13834,18 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - react
+      - supports-color
+      - utf-8-validate
+
+  '@novu/nextjs@3.14.1(next@16.0.11(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-macros@3.1.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@novu/react': 3.14.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      next: 16.0.11(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-macros@3.1.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(sass@1.97.3)
+      react: 19.2.4
+    optionalDependencies:
+      react-dom: 19.2.4(react@19.2.4)
+    transitivePeerDependencies:
+      - bufferutil
       - supports-color
       - utf-8-validate
 

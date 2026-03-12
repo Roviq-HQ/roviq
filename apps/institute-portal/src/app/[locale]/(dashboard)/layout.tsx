@@ -57,7 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     orgSwitcher,
     notifications: subscriberHash
       ? {
-          applicationIdentifier: process.env.NEXT_PUBLIC_NOVU_APP_ID ?? '',
+          applicationIdentifier: process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER ?? '',
           subscriberId,
           subscriberHash,
           tenantId: user?.tenantId,
