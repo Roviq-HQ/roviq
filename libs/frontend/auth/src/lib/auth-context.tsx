@@ -381,6 +381,11 @@ export function AuthProvider({
     setSessionExpired(false);
   }, []);
 
+  const handleSwitchAccount = React.useCallback(async () => {
+    setSessionExpired(false);
+    await logout();
+  }, [logout]);
+
   const value = React.useMemo<AuthContextValue>(
     () => ({
       ...state,
@@ -417,6 +422,7 @@ export function AuthProvider({
         open={sessionExpired}
         username={state.user?.username}
         onLoginSuccess={handleReLoginSuccess}
+        onSwitchAccount={handleSwitchAccount}
         labels={sessionExpiredLabels}
       />
     </AuthContext.Provider>

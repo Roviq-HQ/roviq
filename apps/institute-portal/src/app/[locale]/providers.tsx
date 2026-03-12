@@ -44,6 +44,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         or: t('or'),
         loginFailed: t('loginFailed'),
         passkeyNotAvailable: t('passkeyNotAvailable'),
+        switchAccount: t('switchAccount'),
       },
     }),
     [t],
