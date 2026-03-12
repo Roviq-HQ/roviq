@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { NovuModule } from '@novu/framework/nest';
 import { PrismaModule } from '@roviq/nestjs-prisma';
 import { TelemetryModule } from '@roviq/telemetry';
 import { validate } from '../config/env.validation';
@@ -12,6 +13,12 @@ import { NatsModule } from '../nats/nats.module';
 import { NotificationTriggerService } from '../services/notification-trigger.service';
 import { PreferenceLoaderService } from '../services/preference-loader.service';
 import { SubscriberSyncService } from '../services/subscriber-sync.service';
+import {
+  approvalRequestWorkflow,
+  attendanceAbsentWorkflow,
+  feeOverdueWorkflow,
+  systemAuthWorkflow,
+} from '../workflows';
 import { AppController } from './app.controller';
 
 @Module({
@@ -20,6 +27,15 @@ import { AppController } from './app.controller';
     TelemetryModule,
     PrismaModule,
     NatsModule,
+    NovuModule.register({
+      apiPath: '/api/novu',
+      workflows: [
+        systemAuthWorkflow,
+        attendanceAbsentWorkflow,
+        feeOverdueWorkflow,
+        approvalRequestWorkflow,
+      ],
+    }),
   ],
   controllers: [AppController],
   providers: [
