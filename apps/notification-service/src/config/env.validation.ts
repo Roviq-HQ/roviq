@@ -18,8 +18,8 @@ const envSchema = z.looseObject({
   NOVU_SECRET_KEY: z.string({
     error: 'NOVU_SECRET_KEY — Novu Cloud secret key for server-side API calls',
   }),
-  NOVU_APP_ID: z.string({
-    error: 'NOVU_APP_ID — Novu application identifier',
+  NOVU_APPLICATION_IDENTIFIER: z.string({
+    error: 'NOVU_APPLICATION_IDENTIFIER — Novu application identifier',
   }),
 
   // Optional

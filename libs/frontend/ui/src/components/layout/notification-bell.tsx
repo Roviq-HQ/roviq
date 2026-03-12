@@ -1,11 +1,13 @@
 'use client';
 
-import { Inbox } from '@novu/react';
+import { Inbox } from '@novu/nextjs';
 import { useLocale } from 'next-intl';
+import { useTheme } from 'next-themes';
 import type { NotificationConfig } from './types';
 
 export function NotificationBell({ config }: { config: NotificationConfig }) {
   const locale = useLocale();
+  const { resolvedTheme } = useTheme();
 
   return (
     <Inbox
@@ -14,6 +16,44 @@ export function NotificationBell({ config }: { config: NotificationConfig }) {
       subscriberHash={config.subscriberHash}
       localization={{ locale }}
       context={config.tenantId ? { tenant: { id: config.tenantId } } : undefined}
+      placement="bottom-end"
+      placementOffset={8}
+      appearance={{
+        baseTheme: resolvedTheme === 'dark' ? { variables: darkVariables } : undefined,
+        variables: lightVariables,
+        elements: {
+          bellIcon: {
+            width: '16px',
+            height: '16px',
+          },
+        },
+      }}
     />
   );
 }
+
+const lightVariables = {
+  colorBackground: 'var(--background)',
+  colorForeground: 'var(--foreground)',
+  colorPrimary: 'var(--primary)',
+  colorPrimaryForeground: 'var(--primary-foreground)',
+  colorSecondary: 'var(--secondary)',
+  colorSecondaryForeground: 'var(--secondary-foreground)',
+  colorNeutral: 'var(--border)',
+  colorRing: 'var(--ring)',
+  colorShadow: 'oklch(0 0 0 / 0.08)',
+  fontSize: '14px',
+  borderRadius: 'var(--radius)',
+};
+
+const darkVariables = {
+  colorBackground: 'var(--background)',
+  colorForeground: 'var(--foreground)',
+  colorPrimary: 'var(--primary)',
+  colorPrimaryForeground: 'var(--primary-foreground)',
+  colorSecondary: 'var(--secondary)',
+  colorSecondaryForeground: 'var(--secondary-foreground)',
+  colorNeutral: 'var(--border)',
+  colorRing: 'var(--ring)',
+  colorShadow: 'oklch(0 0 0 / 0.3)',
+};
