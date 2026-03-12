@@ -20,8 +20,9 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  roles       Role[]
-  memberships Membership[]
+  roles               Role[]
+  memberships         Membership[]
+  notificationConfigs InstituteNotificationConfig[]
 
   @@map("organizations")
 }
@@ -174,4 +175,24 @@ model AuthProvider {
   @@unique([provider, providerUserId])
   @@index([userId])
   @@map("auth_providers")
+}
+
+model InstituteNotificationConfig {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  notificationType String   @map("notification_type")
+  inAppEnabled     Boolean  @default(true) @map("in_app_enabled")
+  whatsappEnabled  Boolean  @default(true) @map("whatsapp_enabled")
+  emailEnabled     Boolean  @default(true) @map("email_enabled")
+  pushEnabled      Boolean  @default(false) @map("push_enabled")
+  digestEnabled    Boolean  @default(false) @map("digest_enabled")
+  digestCron       String?  @map("digest_cron")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, notificationType])
+  @@index([tenantId])
+  @@map("institute_notification_configs")
 }
