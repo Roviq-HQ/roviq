@@ -14,6 +14,12 @@
         "assets": ["apps/notification-service/src/assets"]
       }
     },
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "config": "apps/notification-service/vitest.config.ts"
+      }
+    },
     "serve": {
       "continuous": true,
       "executor": "@nx/js:node",
