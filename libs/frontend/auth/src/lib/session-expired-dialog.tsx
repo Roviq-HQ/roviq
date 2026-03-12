@@ -14,6 +14,7 @@ export interface SessionExpiredDialogProps {
   open: boolean;
   username?: string;
   onLoginSuccess: () => void;
+  onSwitchAccount?: () => void;
   labels?: SessionExpiredDialogLabels;
 }
 
@@ -21,6 +22,7 @@ export function SessionExpiredDialog({
   open,
   username,
   onLoginSuccess,
+  onSwitchAccount,
   labels,
 }: SessionExpiredDialogProps) {
   return (
@@ -39,6 +41,7 @@ export function SessionExpiredDialog({
         <ReAuthForm
           username={username ?? ''}
           onSuccess={onLoginSuccess}
+          onSwitchAccount={onSwitchAccount}
           labels={labels?.formLabels}
         />
       </DialogContent>

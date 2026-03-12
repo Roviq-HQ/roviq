@@ -18,32 +18,42 @@ export interface ReAuthFormLabels {
   passwordRequired?: string;
   loginFailed?: string;
   passkeyNotAvailable?: string;
+  switchAccount?: string;
 }
+
+function getPasskeyErrorMessage(err: unknown, fallback: string, notAvailable: string): string {
+  const errName = err instanceof Error ? err.name : '';
+  if (errName === 'NotAllowedError' || errName === 'AbortError') return notAvailable;
+  return err instanceof Error ? err.message : fallback;
+}
+
+const DEFAULT_LABELS: Required<ReAuthFormLabels> = {
+  password: 'Password',
+  enterPassword: 'Enter your password',
+  signIn: 'Sign in',
+  signingIn: 'Signing in...',
+  signInWithPasskey: 'Sign in with passkey',
+  or: 'or',
+  passwordRequired: 'Password is required',
+  loginFailed: 'Login failed. Please try again.',
+  passkeyNotAvailable: 'No passkey found. Try signing in with your password.',
+  switchAccount: 'Switch account',
+};
 
 interface ReAuthFormProps {
   username: string;
   onSuccess?: () => void;
+  onSwitchAccount?: () => void;
   labels?: ReAuthFormLabels;
 }
 
-export function ReAuthForm({ username, onSuccess, labels }: ReAuthFormProps) {
+export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReAuthFormProps) {
   const { login, loginWithPasskey } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const l = {
-    password: labels?.password ?? 'Password',
-    enterPassword: labels?.enterPassword ?? 'Enter your password',
-    signIn: labels?.signIn ?? 'Sign in',
-    signingIn: labels?.signingIn ?? 'Signing in...',
-    signInWithPasskey: labels?.signInWithPasskey ?? 'Sign in with passkey',
-    or: labels?.or ?? 'or',
-    passwordRequired: labels?.passwordRequired ?? 'Password is required',
-    loginFailed: labels?.loginFailed ?? 'Login failed. Please try again.',
-    passkeyNotAvailable:
-      labels?.passkeyNotAvailable ?? 'No passkey found. Try signing in with your password.',
-  };
+  const l = { ...DEFAULT_LABELS, ...labels };
 
   const schema = z.object({
     password: z.string().min(1, l.passwordRequired),
@@ -79,14 +89,7 @@ export function ReAuthForm({ username, onSuccess, labels }: ReAuthFormProps) {
       await loginWithPasskey();
       onSuccess?.();
     } catch (err) {
-      const errName = err instanceof Error ? err.name : '';
-      const message =
-        errName === 'NotAllowedError' || errName === 'AbortError'
-          ? l.passkeyNotAvailable
-          : err instanceof Error
-            ? err.message
-            : l.loginFailed;
-      setError(message);
+      setError(getPasskeyErrorMessage(err, l.loginFailed, l.passkeyNotAvailable));
     } finally {
       setIsPasskeyLoading(false);
     }
@@ -101,7 +104,16 @@ export function ReAuthForm({ username, onSuccess, labels }: ReAuthFormProps) {
         <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
           {initials}
         </div>
-        <span className="text-sm font-medium">{username}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{username}</span>
+        {onSwitchAccount && (
+          <button
+            type="button"
+            onClick={onSwitchAccount}
+            className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {l.switchAccount}
+          </button>
+        )}
       </div>
 
       {error && (
