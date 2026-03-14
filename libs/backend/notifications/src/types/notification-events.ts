@@ -70,3 +70,20 @@ export interface UserSyncEvent {
   lastName: string;
   username: string;
 }
+
+export interface BillingNotificationEvent {
+  subscriptionId: string;
+  organizationId: string;
+  organizationName: string;
+  planName: string;
+  planAmount: number;
+  planCurrency: string;
+  ownerUserId: string | null;
+  platformAdminUserId: string | null;
+}
+
+export interface BillingWebhookNotificationEvent extends BillingNotificationEvent {
+  eventType: string;
+  providerEventId: string;
+  provider: string;
+}

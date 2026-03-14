@@ -11,6 +11,8 @@ export type {
   ApprovalResolvedEvent,
   AttendanceAbsentEvent,
   AuthSecurityEvent,
+  BillingNotificationEvent,
+  BillingWebhookNotificationEvent,
   FeeOverdueEvent,
   FeeReminderEvent,
   UserSyncEvent,
