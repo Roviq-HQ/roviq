@@ -38,6 +38,8 @@ pnpm run db:reset             # Nuke DB + re-migrate (fresh start)
 - **Shared libs** (`@roviq/*`): `prisma-client`, `common-types`, `nats-utils`, `graphql`, `auth`, `i18n`, `ui`
 - **Infra**: PostgreSQL 16 + RLS, Redis 7, NATS 2.10 + JetStream, MinIO, Temporal — all in Docker via Tilt
 
+- **NX libs** — every NX library must have a `package.json` in its root (alongside `project.json`)
+
 See `docs/architecture.md` for full details.
 
 ## Key Docs
