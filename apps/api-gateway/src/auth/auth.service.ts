@@ -1,13 +1,15 @@
 import { createHash } from 'node:crypto';
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
-import { ADMIN_PRISMA_CLIENT } from '@roviq/nestjs-prisma';
-import type { AdminPrismaClient } from '@roviq/prisma-client';
 import { v4 as uuidv4 } from 'uuid';
 import type { AuthPayload, LoginResult } from './dto/auth-payload';
 import type { RegisterInput } from './dto/register.input';
+import { MembershipRepository } from './repositories/membership.repository';
+import { RefreshTokenRepository } from './repositories/refresh-token.repository';
+import type { UserRecord } from './repositories/types';
+import { UserRepository } from './repositories/user.repository';
 
 interface AccessTokenPayload {
   sub: string;
@@ -32,18 +34,18 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly jwtService: JwtService,
-    @Inject(ADMIN_PRISMA_CLIENT) private readonly adminPrisma: AdminPrismaClient,
+    private readonly userRepo: UserRepository,
+    private readonly membershipRepo: MembershipRepository,
+    private readonly refreshTokenRepo: RefreshTokenRepository,
   ) {}
 
   async register(input: RegisterInput): Promise<AuthPayload> {
     const passwordHash = await hash(input.password);
 
-    const user = await this.adminPrisma.user.create({
-      data: {
-        username: input.username,
-        email: input.email,
-        passwordHash,
-      },
+    const user = await this.userRepo.create({
+      username: input.username,
+      email: input.email,
+      passwordHash,
     });
 
     return {
@@ -56,9 +58,7 @@ export class AuthService {
   }
 
   async login(username: string, password: string): Promise<LoginResult> {
-    const user = await this.adminPrisma.user.findUnique({
-      where: { username },
-    });
+    const user = await this.userRepo.findByUsername(username);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
@@ -69,13 +69,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const memberships = await this.adminPrisma.membership.findMany({
-      where: { userId: user.id, isActive: true },
-      include: {
-        organization: { select: { id: true, name: true, slug: true, logoUrl: true } },
-        role: { select: { id: true, name: true, abilities: true } },
-      },
-    });
+    const memberships = await this.membershipRepo.findActiveByUserId(user.id);
 
     if (memberships.length === 0) {
       throw new UnauthorizedException('No active memberships');
@@ -116,21 +110,13 @@ export class AuthService {
   }
 
   async loginByUserId(userId: string): Promise<LoginResult> {
-    const user = await this.adminPrisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await this.userRepo.findById(userId);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const memberships = await this.adminPrisma.membership.findMany({
-      where: { userId: user.id, isActive: true },
-      include: {
-        organization: { select: { id: true, name: true, slug: true, logoUrl: true } },
-        role: { select: { id: true, name: true, abilities: true } },
-      },
-    });
+    const memberships = await this.membershipRepo.findActiveByUserId(user.id);
 
     if (memberships.length === 0) {
       throw new UnauthorizedException('No active memberships');
@@ -171,27 +157,19 @@ export class AuthService {
   }
 
   async verifyPassword(userId: string, password: string): Promise<boolean> {
-    const user = await this.adminPrisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await this.userRepo.findById(userId);
     if (!user) return false;
     return verify(user.passwordHash, password);
   }
 
   async selectOrganization(userId: string, tenantId: string): Promise<AuthPayload> {
-    const membership = await this.adminPrisma.membership.findUnique({
-      where: { userId_tenantId: { userId, tenantId } },
-      include: {
-        organization: { select: { id: true, name: true, slug: true, logoUrl: true } },
-        role: { select: { id: true, name: true, abilities: true } },
-      },
-    });
+    const membership = await this.membershipRepo.findByUserAndTenant(userId, tenantId);
 
     if (!membership || !membership.isActive) {
       throw new ForbiddenException('No active membership for this organization');
     }
 
-    const user = await this.adminPrisma.user.findUnique({ where: { id: userId } });
+    const user = await this.userRepo.findById(userId);
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
@@ -230,17 +208,7 @@ export class AuthService {
     }
 
     const tokenHash = this.hashToken(token);
-    const storedToken = await this.adminPrisma.refreshToken.findUnique({
-      where: { id: payload.tokenId },
-      include: {
-        user: true,
-        membership: {
-          include: {
-            role: { select: { id: true, abilities: true } },
-          },
-        },
-      },
-    });
+    const storedToken = await this.refreshTokenRepo.findByIdWithRelations(payload.tokenId);
 
     if (!storedToken) {
       throw new UnauthorizedException('Refresh token not found');
@@ -251,10 +219,7 @@ export class AuthService {
     }
 
     if (storedToken.revokedAt) {
-      await this.adminPrisma.refreshToken.updateMany({
-        where: { userId: storedToken.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.refreshTokenRepo.revokeAllForUser(storedToken.userId);
       throw new UnauthorizedException('Refresh token reuse detected');
     }
 
@@ -262,10 +227,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired');
     }
 
-    await this.adminPrisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: { revokedAt: new Date() },
-    });
+    await this.refreshTokenRepo.revoke(storedToken.id);
 
     const user = storedToken.user;
     const membership = storedToken.membership;
@@ -295,10 +257,7 @@ export class AuthService {
     }
 
     // Legacy refresh token without membership — issue tokens for first active membership
-    const firstMembership = await this.adminPrisma.membership.findFirst({
-      where: { userId: user.id, isActive: true },
-      include: { role: { select: { id: true, abilities: true } } },
-    });
+    const firstMembership = await this.membershipRepo.findFirstActive(user.id);
 
     if (!firstMembership) {
       throw new UnauthorizedException('No active memberships');
@@ -329,16 +288,19 @@ export class AuthService {
 
   async logout(userId: string, refreshTokenId?: string): Promise<void> {
     if (refreshTokenId) {
-      await this.adminPrisma.refreshToken.update({
-        where: { id: refreshTokenId },
-        data: { revokedAt: new Date() },
-      });
+      await this.refreshTokenRepo.revoke(refreshTokenId);
     } else {
-      await this.adminPrisma.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.refreshTokenRepo.revokeAllForUser(userId);
     }
+  }
+
+  async getUserById(id: string): Promise<UserRecord | null> {
+    return this.userRepo.findById(id);
+  }
+
+  async getUserIdByUsername(username: string): Promise<string | null> {
+    const user = await this.userRepo.findByUsername(username);
+    return user?.id ?? null;
   }
 
   private generatePlatformToken(userId: string): string {
@@ -383,15 +345,13 @@ export class AuthService {
     const tokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    await this.adminPrisma.refreshToken.create({
-      data: {
-        id: tokenId,
-        tokenHash,
-        userId,
-        tenantId,
-        membershipId,
-        expiresAt,
-      },
+    await this.refreshTokenRepo.create({
+      id: tokenId,
+      tokenHash,
+      userId,
+      tenantId,
+      membershipId,
+      expiresAt,
     });
 
     return { accessToken, refreshToken };
