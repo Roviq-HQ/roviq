@@ -1,9 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Int, Query, Resolver } from '@nestjs/graphql';
-import { CheckAbility } from '@roviq/casl';
+import { CheckAbility, GqlAuthGuard } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { AuditService } from './audit.service';
 import { AuditLogFilterInput } from './dto/audit-log-filter.input';
 import { AuditLogConnection } from './models/audit-log-connection.model';
