@@ -1,11 +1,13 @@
 'use client';
 
 import { ProtectedRoute, useAuth } from '@roviq/auth';
+import { useEdition } from '@roviq/graphql';
 import type { LayoutConfig } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
 import {
   BarChart2,
   Building2,
+  CreditCard,
   FileText,
   LayoutDashboard,
   Settings,
@@ -21,6 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
   const { logout, user, memberships, switchOrganization } = useAuth();
+  const edition = useEdition();
 
   usePushNotifications();
 
@@ -84,6 +87,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           { title: t('account'), href: '/account', icon: UserCog },
         ],
       },
+      ...(edition === 'ee'
+        ? [
+            {
+              title: t('billing'),
+              items: [
+                { title: t('plans'), href: '/billing/plans', icon: CreditCard },
+                { title: t('subscriptions'), href: '/billing/subscriptions', icon: CreditCard },
+                { title: t('invoices'), href: '/billing/invoices', icon: FileText },
+              ],
+            },
+          ]
+        : []),
     ],
   };
 

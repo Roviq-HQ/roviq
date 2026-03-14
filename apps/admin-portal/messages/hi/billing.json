@@ -1,0 +1,187 @@
+{
+  "nav": "बिलिंग",
+  "plans": {
+    "title": "सदस्यता योजनाएँ",
+    "description": "संस्थानों के लिए सदस्यता योजनाएँ प्रबंधित करें।",
+    "createPlan": "योजना बनाएँ",
+    "editPlan": "योजना संपादित करें",
+    "columns": {
+      "name": "नाम",
+      "amount": "राशि",
+      "interval": "अंतराल",
+      "status": "स्थिति",
+      "createdAt": "निर्मित"
+    },
+    "intervals": {
+      "MONTHLY": "मासिक",
+      "QUARTERLY": "त्रैमासिक",
+      "YEARLY": "वार्षिक"
+    },
+    "form": {
+      "name": "योजना का नाम",
+      "namePlaceholder": "उदा. प्रो प्लान",
+      "description": "विवरण",
+      "descriptionPlaceholder": "वैकल्पिक योजना विवरण",
+      "amount": "राशि (₹)",
+      "amountPlaceholder": "उदा. 999",
+      "currency": "मुद्रा",
+      "interval": "बिलिंग अंतराल",
+      "selectInterval": "अंतराल चुनें",
+      "maxUsers": "अधिकतम उपयोगकर्ता",
+      "maxSections": "अधिकतम अनुभाग",
+      "isActive": "सक्रिय",
+      "save": "योजना सहेजें",
+      "saving": "सहेजा जा रहा है...",
+      "nameRequired": "योजना का नाम आवश्यक है",
+      "amountRequired": "राशि 0 से अधिक होनी चाहिए",
+      "createSuccess": "योजना सफलतापूर्वक बनाई गई।",
+      "updateSuccess": "योजना सफलतापूर्वक अपडेट की गई।",
+      "createError": "योजना बनाने में विफल।",
+      "updateError": "योजना अपडेट करने में विफल।"
+    },
+    "active": "सक्रिय",
+    "inactive": "निष्क्रिय",
+    "empty": "कोई सदस्यता योजना नहीं मिली।",
+    "accessDenied": "आपको सदस्यता योजनाएँ प्रबंधित करने की अनुमति नहीं है।"
+  },
+  "subscriptions": {
+    "title": "सदस्यताएँ",
+    "description": "संस्थान सदस्यताएँ देखें और प्रबंधित करें।",
+    "assignPlan": "योजना असाइन करें",
+    "columns": {
+      "organization": "संस्थान",
+      "plan": "योजना",
+      "status": "स्थिति",
+      "currentPeriodEnd": "अवधि समाप्ति",
+      "createdAt": "निर्मित"
+    },
+    "statuses": {
+      "ACTIVE": "सक्रिय",
+      "PAST_DUE": "अतिदेय",
+      "CANCELED": "रद्द",
+      "PENDING_PAYMENT": "भुगतान लंबित",
+      "PAUSED": "रुका हुआ",
+      "COMPLETED": "पूर्ण"
+    },
+    "assign": {
+      "title": "संस्थान को योजना असाइन करें",
+      "organization": "संस्थान",
+      "selectOrganization": "संस्थान चुनें",
+      "plan": "सदस्यता योजना",
+      "selectPlan": "योजना चुनें",
+      "provider": "भुगतान प्रदाता",
+      "selectProvider": "प्रदाता चुनें",
+      "providers": {
+        "RAZORPAY": "Razorpay",
+        "CASHFREE": "Cashfree"
+      },
+      "assign": "योजना असाइन करें",
+      "assigning": "असाइन हो रहा है...",
+      "success": "योजना असाइन की गई। चेकआउट URL संस्थान को साझा करें।",
+      "error": "योजना असाइन करने में विफल।",
+      "checkoutUrl": "चेकआउट URL",
+      "copyUrl": "URL कॉपी करें",
+      "copied": "कॉपी हो गया!",
+      "close": "बंद करें",
+      "customerEmail": "बिलिंग ईमेल",
+      "emailPlaceholder": "billing@institute.com",
+      "customerPhone": "बिलिंग फ़ोन",
+      "phonePlaceholder": "9876543210",
+      "orgRequired": "संस्थान आवश्यक है।",
+      "planRequired": "योजना आवश्यक है।",
+      "providerRequired": "प्रदाता आवश्यक है।",
+      "emailRequired": "मान्य ईमेल आवश्यक है।",
+      "phoneRequired": "फ़ोन नंबर आवश्यक है।",
+      "free": "मुफ़्त"
+    },
+    "actions": {
+      "cancel": "सदस्यता रद्द करें",
+      "cancelAtCycleEnd": "चक्र के अंत में रद्द करें",
+      "cancelImmediately": "तुरंत रद्द करें",
+      "pause": "सदस्यता रोकें",
+      "cancelConfirm": "क्या आप वाकई इस सदस्यता को रद्द करना चाहते हैं?",
+      "pauseConfirm": "क्या आप वाकई इस सदस्यता को रोकना चाहते हैं?",
+      "resumeConfirm": "क्या आप वाकई इस सदस्यता को फिर से शुरू करना चाहते हैं?",
+      "cancelSuccess": "सदस्यता रद्द कर दी गई।",
+      "pauseSuccess": "सदस्यता रोक दी गई।",
+      "resumeSuccess": "सदस्यता फिर से शुरू कर दी गई।",
+      "cancelError": "सदस्यता रद्द करने में विफल।",
+      "pauseError": "सदस्यता रोकने में विफल।",
+      "resumeError": "सदस्यता फिर से शुरू करने में विफल।",
+      "resume": "सदस्यता फिर से शुरू करें",
+      "cancelConfirmTitle": "सदस्यता रद्द करें",
+      "pauseConfirmTitle": "सदस्यता रोकें",
+      "resumeConfirmTitle": "सदस्यता फिर से शुरू करें",
+      "confirmCancel": "वापस जाएँ",
+      "confirmProceed": "पुष्टि करें"
+    },
+    "detail": {
+      "title": "सदस्यता विवरण",
+      "description": "सदस्यता का पूरा विवरण।",
+      "id": "ID",
+      "organization": "संस्थान",
+      "plan": "योजना",
+      "status": "स्थिति",
+      "providerSubscriptionId": "प्रदाता सदस्यता ID",
+      "providerCustomerId": "प्रदाता ग्राहक ID",
+      "currentPeriodStart": "अवधि प्रारंभ",
+      "currentPeriodEnd": "अवधि समाप्ति",
+      "canceledAt": "रद्द किया गया",
+      "trialEndsAt": "परीक्षण समाप्ति",
+      "createdAt": "निर्मित"
+    },
+    "filters": {
+      "status": "स्थिति",
+      "clearFilters": "फ़िल्टर साफ़ करें"
+    },
+    "empty": "कोई सदस्यता नहीं मिली।",
+    "accessDenied": "आपको सदस्यताएँ प्रबंधित करने की अनुमति नहीं है।"
+  },
+  "invoices": {
+    "title": "चालान",
+    "description": "सभी संस्थानों के बिलिंग चालान देखें।",
+    "columns": {
+      "organization": "संस्थान",
+      "amount": "राशि",
+      "status": "स्थिति",
+      "billingPeriod": "बिलिंग अवधि",
+      "dueDate": "देय तिथि",
+      "paidAt": "भुगतान तिथि"
+    },
+    "statuses": {
+      "PAID": "भुगतान किया गया",
+      "PENDING": "लंबित",
+      "OVERDUE": "अतिदेय",
+      "FAILED": "विफल",
+      "REFUNDED": "वापसी"
+    },
+    "detail": {
+      "title": "चालान विवरण",
+      "description": "चालान का पूरा विवरण।",
+      "id": "ID",
+      "organization": "संस्थान",
+      "subscription": "सदस्यता",
+      "amount": "राशि",
+      "currency": "मुद्रा",
+      "status": "स्थिति",
+      "providerInvoiceId": "प्रदाता चालान ID",
+      "providerPaymentId": "प्रदाता भुगतान ID",
+      "billingPeriodStart": "अवधि प्रारंभ",
+      "billingPeriodEnd": "अवधि समाप्ति",
+      "dueDate": "देय तिथि",
+      "paidAt": "भुगतान तिथि",
+      "createdAt": "निर्मित"
+    },
+    "filters": {
+      "status": "स्थिति",
+      "clearFilters": "फ़िल्टर साफ़ करें"
+    },
+    "empty": "कोई चालान नहीं मिला।",
+    "accessDenied": "आपको चालान देखने की अनुमति नहीं है।"
+  },
+  "pagination": {
+    "loadMore": "और लोड करें",
+    "showing": "दिखा रहा है",
+    "of": "में से"
+  }
+}
