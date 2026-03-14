@@ -1,0 +1,187 @@
+{
+  "nav": "Billing",
+  "plans": {
+    "title": "Subscription Plans",
+    "description": "Manage subscription plans for institutes.",
+    "createPlan": "Create Plan",
+    "editPlan": "Edit Plan",
+    "columns": {
+      "name": "Name",
+      "amount": "Amount",
+      "interval": "Interval",
+      "status": "Status",
+      "createdAt": "Created"
+    },
+    "intervals": {
+      "MONTHLY": "Monthly",
+      "QUARTERLY": "Quarterly",
+      "YEARLY": "Yearly"
+    },
+    "form": {
+      "name": "Plan Name",
+      "namePlaceholder": "e.g. Pro Plan",
+      "description": "Description",
+      "descriptionPlaceholder": "Optional plan description",
+      "amount": "Amount (₹)",
+      "amountPlaceholder": "e.g. 999",
+      "currency": "Currency",
+      "interval": "Billing Interval",
+      "selectInterval": "Select interval",
+      "maxUsers": "Max Users",
+      "maxSections": "Max Sections",
+      "isActive": "Active",
+      "save": "Save Plan",
+      "saving": "Saving...",
+      "nameRequired": "Plan name is required",
+      "amountRequired": "Amount must be greater than 0",
+      "createSuccess": "Plan created successfully.",
+      "updateSuccess": "Plan updated successfully.",
+      "createError": "Failed to create plan.",
+      "updateError": "Failed to update plan."
+    },
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No subscription plans found.",
+    "accessDenied": "You do not have permission to manage subscription plans."
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "description": "View and manage institute subscriptions.",
+    "assignPlan": "Assign Plan",
+    "columns": {
+      "organization": "Institute",
+      "plan": "Plan",
+      "status": "Status",
+      "currentPeriodEnd": "Period Ends",
+      "createdAt": "Created"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "PAST_DUE": "Past Due",
+      "CANCELED": "Canceled",
+      "PENDING_PAYMENT": "Pending Payment",
+      "PAUSED": "Paused",
+      "COMPLETED": "Completed"
+    },
+    "assign": {
+      "title": "Assign Plan to Institute",
+      "organization": "Institute",
+      "selectOrganization": "Select institute",
+      "plan": "Subscription Plan",
+      "selectPlan": "Select plan",
+      "provider": "Payment Provider",
+      "selectProvider": "Select provider",
+      "providers": {
+        "RAZORPAY": "Razorpay",
+        "CASHFREE": "Cashfree"
+      },
+      "assign": "Assign Plan",
+      "assigning": "Assigning...",
+      "success": "Plan assigned. Share the checkout URL with the institute.",
+      "error": "Failed to assign plan.",
+      "checkoutUrl": "Checkout URL",
+      "copyUrl": "Copy URL",
+      "copied": "Copied!",
+      "close": "Close",
+      "customerEmail": "Billing Email",
+      "emailPlaceholder": "billing@institute.com",
+      "customerPhone": "Billing Phone",
+      "phonePlaceholder": "9876543210",
+      "orgRequired": "Institute is required.",
+      "planRequired": "Plan is required.",
+      "providerRequired": "Provider is required.",
+      "emailRequired": "Valid email is required.",
+      "phoneRequired": "Phone number is required.",
+      "free": "Free"
+    },
+    "actions": {
+      "cancel": "Cancel Subscription",
+      "cancelAtCycleEnd": "Cancel at cycle end",
+      "cancelImmediately": "Cancel immediately",
+      "pause": "Pause Subscription",
+      "cancelConfirm": "Are you sure you want to cancel this subscription?",
+      "pauseConfirm": "Are you sure you want to pause this subscription?",
+      "resumeConfirm": "Are you sure you want to resume this subscription?",
+      "cancelSuccess": "Subscription canceled.",
+      "pauseSuccess": "Subscription paused.",
+      "resumeSuccess": "Subscription resumed.",
+      "cancelError": "Failed to cancel subscription.",
+      "pauseError": "Failed to pause subscription.",
+      "resumeError": "Failed to resume subscription.",
+      "resume": "Resume Subscription",
+      "cancelConfirmTitle": "Cancel Subscription",
+      "pauseConfirmTitle": "Pause Subscription",
+      "resumeConfirmTitle": "Resume Subscription",
+      "confirmCancel": "Go Back",
+      "confirmProceed": "Confirm"
+    },
+    "detail": {
+      "title": "Subscription Details",
+      "description": "Full details of the subscription.",
+      "id": "ID",
+      "organization": "Institute",
+      "plan": "Plan",
+      "status": "Status",
+      "providerSubscriptionId": "Provider Sub ID",
+      "providerCustomerId": "Provider Customer ID",
+      "currentPeriodStart": "Period Start",
+      "currentPeriodEnd": "Period End",
+      "canceledAt": "Canceled At",
+      "trialEndsAt": "Trial Ends",
+      "createdAt": "Created"
+    },
+    "filters": {
+      "status": "Status",
+      "clearFilters": "Clear filters"
+    },
+    "empty": "No subscriptions found.",
+    "accessDenied": "You do not have permission to manage subscriptions."
+  },
+  "invoices": {
+    "title": "Invoices",
+    "description": "View billing invoices across all institutes.",
+    "columns": {
+      "organization": "Institute",
+      "amount": "Amount",
+      "status": "Status",
+      "billingPeriod": "Billing Period",
+      "dueDate": "Due Date",
+      "paidAt": "Paid At"
+    },
+    "statuses": {
+      "PAID": "Paid",
+      "PENDING": "Pending",
+      "OVERDUE": "Overdue",
+      "FAILED": "Failed",
+      "REFUNDED": "Refunded"
+    },
+    "detail": {
+      "title": "Invoice Details",
+      "description": "Full details of the invoice.",
+      "id": "ID",
+      "organization": "Institute",
+      "subscription": "Subscription",
+      "amount": "Amount",
+      "currency": "Currency",
+      "status": "Status",
+      "providerInvoiceId": "Provider Invoice ID",
+      "providerPaymentId": "Provider Payment ID",
+      "billingPeriodStart": "Period Start",
+      "billingPeriodEnd": "Period End",
+      "dueDate": "Due Date",
+      "paidAt": "Paid At",
+      "createdAt": "Created"
+    },
+    "filters": {
+      "status": "Status",
+      "clearFilters": "Clear filters"
+    },
+    "empty": "No invoices found.",
+    "accessDenied": "You do not have permission to view invoices."
+  },
+  "pagination": {
+    "loadMore": "Load more",
+    "showing": "Showing",
+    "of": "of"
+  }
+}

@@ -9,5 +9,9 @@
   "overview": "अवलोकन",
   "system": "सिस्टम",
   "account": "खाता",
-  "notifications": "सूचनाएँ"
+  "notifications": "सूचनाएँ",
+  "billing": "बिलिंग",
+  "plans": "योजनाएँ",
+  "subscriptions": "सदस्यताएँ",
+  "invoices": "चालान"
 }

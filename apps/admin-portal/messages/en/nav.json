@@ -9,5 +9,9 @@
   "overview": "Overview",
   "system": "System",
   "account": "Account",
-  "notifications": "Notifications"
+  "notifications": "Notifications",
+  "billing": "Billing",
+  "plans": "Plans",
+  "subscriptions": "Subscriptions",
+  "invoices": "Invoices"
 }
