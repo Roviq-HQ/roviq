@@ -1,11 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Novu } from '@novu/api';
 import { ChatOrPushProviderEnum } from '@novu/api/models/components';
-import { TENANT_PRISMA_CLIENT } from '@roviq/nestjs-prisma';
-import type { TenantPrismaClient } from '@roviq/prisma-client';
 import type { UpdateNotificationConfigInput } from './dto/update-notification-config.input';
 import type { NotificationConfigModel } from './models/notification-config.model';
+import { NotificationConfigRepository } from './repositories/notification-config.repository';
 
 @Injectable()
 export class NotificationConfigService {
@@ -13,16 +12,14 @@ export class NotificationConfigService {
   private readonly novu: Novu;
 
   constructor(
-    @Inject(TENANT_PRISMA_CLIENT) private readonly tenantPrisma: TenantPrismaClient,
+    private readonly notificationConfigRepo: NotificationConfigRepository,
     config: ConfigService,
   ) {
     this.novu = new Novu({ secretKey: config.getOrThrow<string>('NOVU_SECRET_KEY') });
   }
 
   async findAll(): Promise<NotificationConfigModel[]> {
-    const configs = await this.tenantPrisma.instituteNotificationConfig.findMany({
-      orderBy: { notificationType: 'asc' },
-    });
+    const configs = await this.notificationConfigRepo.findAll();
     return configs as unknown as NotificationConfigModel[];
   }
 
@@ -32,19 +29,10 @@ export class NotificationConfigService {
   ): Promise<NotificationConfigModel> {
     const { notificationType, ...data } = input;
 
-    const config = await this.tenantPrisma.instituteNotificationConfig.upsert({
-      where: {
-        tenantId_notificationType: {
-          tenantId,
-          notificationType,
-        },
-      },
-      update: data,
-      create: {
-        tenantId,
-        notificationType,
-        ...data,
-      },
+    const config = await this.notificationConfigRepo.upsert({
+      tenantId,
+      notificationType,
+      ...data,
     });
 
     return config as unknown as NotificationConfigModel;
