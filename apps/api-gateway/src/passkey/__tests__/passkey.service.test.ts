@@ -1,10 +1,11 @@
 import { UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import type { AdminPrismaClient } from '@roviq/prisma-client';
 import type Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthService } from '../../auth/auth.service';
+import type { UserRepository } from '../../auth/repositories/user.repository';
 import { PasskeyService } from '../passkey.service';
+import type { AuthProviderRepository } from '../repositories/auth-provider.repository';
 
 // Mock @simplewebauthn/server
 vi.mock('@simplewebauthn/server', () => ({
@@ -14,6 +15,7 @@ vi.mock('@simplewebauthn/server', () => ({
   verifyAuthenticationResponse: vi.fn(),
 }));
 
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -29,20 +31,23 @@ function createMockRedis() {
   };
 }
 
-function createMockPrisma() {
+function createMockAuthProviderRepo() {
   return {
-    user: {
-      findUnique: vi.fn(),
-    },
-    authProvider: {
-      findMany: vi.fn(),
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      deleteMany: vi.fn(),
-      count: vi.fn(),
-    },
+    findPasskeysByUserId: vi.fn(),
+    findByActiveUsername: vi.fn(),
+    findByCredentialId: vi.fn(),
+    create: vi.fn(),
+    updateProviderData: vi.fn(),
+    countOtherPasskeys: vi.fn(),
+    deletePasskey: vi.fn(),
+  };
+}
+
+function createMockUserRepo() {
+  return {
+    findById: vi.fn(),
+    findByUsername: vi.fn(),
+    create: vi.fn(),
   };
 }
 
@@ -72,21 +77,24 @@ function createMockConfigService() {
 describe('PasskeyService', () => {
   let service: PasskeyService;
   let mockRedis: ReturnType<typeof createMockRedis>;
-  let mockPrisma: ReturnType<typeof createMockPrisma>;
+  let mockAuthProviderRepo: ReturnType<typeof createMockAuthProviderRepo>;
+  let mockUserRepo: ReturnType<typeof createMockUserRepo>;
   let mockAuth: ReturnType<typeof createMockAuthService>;
   let mockConfig: ReturnType<typeof createMockConfigService>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockRedis = createMockRedis();
-    mockPrisma = createMockPrisma();
+    mockAuthProviderRepo = createMockAuthProviderRepo();
+    mockUserRepo = createMockUserRepo();
     mockAuth = createMockAuthService();
     mockConfig = createMockConfigService();
 
     service = new PasskeyService(
       mockConfig as unknown as ConfigService,
       mockAuth as unknown as AuthService,
-      mockPrisma as unknown as AdminPrismaClient,
+      mockAuthProviderRepo as unknown as AuthProviderRepository,
+      mockUserRepo as unknown as UserRepository,
       mockRedis as unknown as Redis,
     );
   });
@@ -102,8 +110,8 @@ describe('PasskeyService', () => {
 
     it('should generate options and store challenge in Redis', async () => {
       mockAuth.verifyPassword.mockResolvedValue(true);
-      mockPrisma.authProvider.findMany.mockResolvedValue([]);
-      mockPrisma.user.findUnique.mockResolvedValue({ username: 'admin' });
+      mockAuthProviderRepo.findPasskeysByUserId.mockResolvedValue([]);
+      mockUserRepo.findById.mockResolvedValue({ username: 'admin' });
       const mockOptions = { challenge: 'test-challenge', user: { id: 'webauthn-user-id' } };
       (generateRegistrationOptions as ReturnType<typeof vi.fn>).mockResolvedValue(mockOptions);
 
@@ -120,8 +128,8 @@ describe('PasskeyService', () => {
 
     it('should exclude existing passkeys from registration options', async () => {
       mockAuth.verifyPassword.mockResolvedValue(true);
-      mockPrisma.user.findUnique.mockResolvedValue({ username: 'admin' });
-      mockPrisma.authProvider.findMany.mockResolvedValue([
+      mockUserRepo.findById.mockResolvedValue({ username: 'admin' });
+      mockAuthProviderRepo.findPasskeysByUserId.mockResolvedValue([
         {
           providerUserId: 'existing-cred-id',
           providerData: { transports: ['internal'] },
@@ -146,9 +154,9 @@ describe('PasskeyService', () => {
     it('should throw if challenge not found in Redis', async () => {
       mockRedis.get.mockResolvedValue(null);
 
-      await expect(service.verifyRegistration('user-1', {} as any, 'My Key')).rejects.toThrow(
-        'Challenge expired',
-      );
+      await expect(
+        service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
+      ).rejects.toThrow('Challenge expired');
     });
 
     it('should throw if verification fails', async () => {
@@ -157,9 +165,9 @@ describe('PasskeyService', () => {
         verified: false,
       });
 
-      await expect(service.verifyRegistration('user-1', {} as any, 'My Key')).rejects.toThrow(
-        'Verification failed',
-      );
+      await expect(
+        service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
+      ).rejects.toThrow('Verification failed');
     });
 
     it('should create AuthProvider row on success', async () => {
@@ -178,7 +186,7 @@ describe('PasskeyService', () => {
           aaguid: '00000000-0000-0000-0000-000000000000',
         },
       });
-      mockPrisma.authProvider.create.mockResolvedValue({
+      mockAuthProviderRepo.create.mockResolvedValue({
         id: 'ap-1',
         providerData: {
           name: 'My Key',
@@ -189,17 +197,19 @@ describe('PasskeyService', () => {
         },
       });
 
-      const result = await service.verifyRegistration('user-1', {} as any, 'My Key');
+      const result = await service.verifyRegistration(
+        'user-1',
+        {} as RegistrationResponseJSON,
+        'My Key',
+      );
 
       expect(result.name).toBe('My Key');
       expect(mockRedis.del).toHaveBeenCalledWith('webauthn:reg:user-1');
-      expect(mockPrisma.authProvider.create).toHaveBeenCalledWith(
+      expect(mockAuthProviderRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            userId: 'user-1',
-            provider: 'passkey',
-            providerUserId: 'cred-id',
-          }),
+          userId: 'user-1',
+          provider: 'passkey',
+          providerUserId: 'cred-id',
         }),
       );
     });
@@ -207,7 +217,7 @@ describe('PasskeyService', () => {
 
   describe('generateAuthOptions', () => {
     it('should throw generic error when user has no passkeys', async () => {
-      mockPrisma.authProvider.findMany.mockResolvedValue([]);
+      mockAuthProviderRepo.findByActiveUsername.mockResolvedValue([]);
 
       await expect(service.generateAuthOptions('nonexistent')).rejects.toThrow(
         'Invalid credentials',
@@ -215,7 +225,7 @@ describe('PasskeyService', () => {
     });
 
     it('should store challenge with random challengeId and return it', async () => {
-      mockPrisma.authProvider.findMany.mockResolvedValue([
+      mockAuthProviderRepo.findByActiveUsername.mockResolvedValue([
         { providerUserId: 'cred-1', providerData: { transports: ['internal'] } },
       ]);
       (generateAuthenticationOptions as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -239,23 +249,23 @@ describe('PasskeyService', () => {
     it('should throw if challenge not found', async () => {
       mockRedis.get.mockResolvedValue(null);
 
-      await expect(service.verifyAuth('challenge-id', {} as any)).rejects.toThrow(
-        'Challenge expired',
-      );
+      await expect(
+        service.verifyAuth('challenge-id', {} as AuthenticationResponseJSON),
+      ).rejects.toThrow('Challenge expired');
     });
 
     it('should throw if passkey not found for credential', async () => {
       mockRedis.get.mockResolvedValue(JSON.stringify({ challenge: 'c' }));
-      mockPrisma.authProvider.findFirst.mockResolvedValue(null);
+      mockAuthProviderRepo.findByCredentialId.mockResolvedValue(null);
 
       await expect(
-        service.verifyAuth('challenge-id', { id: 'unknown-cred' } as any),
+        service.verifyAuth('challenge-id', { id: 'unknown-cred' } as AuthenticationResponseJSON),
       ).rejects.toThrow('Invalid credentials');
     });
 
     it('should update counter and lastUsedAt, then call loginByUserId', async () => {
       mockRedis.get.mockResolvedValue(JSON.stringify({ challenge: 'stored-challenge' }));
-      mockPrisma.authProvider.findFirst.mockResolvedValue({
+      mockAuthProviderRepo.findByCredentialId.mockResolvedValue({
         id: 'ap-1',
         userId: 'user-1',
         providerUserId: 'cred-1',
@@ -276,26 +286,24 @@ describe('PasskeyService', () => {
         verified: true,
         authenticationInfo: { newCounter: 1 },
       });
-      mockPrisma.authProvider.update.mockResolvedValue({});
+      mockAuthProviderRepo.updateProviderData.mockResolvedValue(undefined);
       mockAuth.loginByUserId.mockResolvedValue({
         accessToken: 'at',
         refreshToken: 'rt',
         user: { id: 'user-1' },
       });
 
-      const result = await service.verifyAuth('challenge-id', { id: 'cred-1' } as any);
+      const result = await service.verifyAuth('challenge-id', {
+        id: 'cred-1',
+      } as AuthenticationResponseJSON);
 
       expect(result.accessToken).toBe('at');
       expect(mockRedis.del).toHaveBeenCalledWith('webauthn:auth:challenge-id');
-      expect(mockPrisma.authProvider.update).toHaveBeenCalledWith(
+      expect(mockAuthProviderRepo.updateProviderData).toHaveBeenCalledWith(
+        'ap-1',
         expect.objectContaining({
-          where: { id: 'ap-1' },
-          data: expect.objectContaining({
-            providerData: expect.objectContaining({
-              counter: 1,
-              lastUsedAt: expect.any(String),
-            }),
-          }),
+          counter: 1,
+          lastUsedAt: expect.any(String),
         }),
       );
       expect(mockAuth.loginByUserId).toHaveBeenCalledWith('user-1');
@@ -304,7 +312,7 @@ describe('PasskeyService', () => {
 
   describe('myPasskeys', () => {
     it('should return formatted passkey list', async () => {
-      mockPrisma.authProvider.findMany.mockResolvedValue([
+      mockAuthProviderRepo.findPasskeysByUserId.mockResolvedValue([
         {
           id: 'ap-1',
           providerData: {
@@ -327,8 +335,8 @@ describe('PasskeyService', () => {
 
   describe('removePasskey', () => {
     it('should throw if passkey is last auth method and user has no password', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ passwordHash: null });
-      mockPrisma.authProvider.count.mockResolvedValue(0);
+      mockUserRepo.findById.mockResolvedValue({ passwordHash: null });
+      mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
 
       await expect(service.removePasskey('user-1', 'ap-1')).rejects.toThrow(
         'Cannot remove your only authentication method',
@@ -336,31 +344,29 @@ describe('PasskeyService', () => {
     });
 
     it('should allow removal if user still has a password', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ passwordHash: '$argon2id$...' });
-      mockPrisma.authProvider.count.mockResolvedValue(0);
-      mockPrisma.authProvider.deleteMany.mockResolvedValue({ count: 1 });
+      mockUserRepo.findById.mockResolvedValue({ passwordHash: '$argon2id$...' });
+      mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
+      mockAuthProviderRepo.deletePasskey.mockResolvedValue(1);
 
       await service.removePasskey('user-1', 'ap-1');
 
-      expect(mockPrisma.authProvider.deleteMany).toHaveBeenCalledWith({
-        where: { id: 'ap-1', userId: 'user-1' },
-      });
+      expect(mockAuthProviderRepo.deletePasskey).toHaveBeenCalledWith('ap-1', 'user-1');
     });
 
     it('should allow removal if user has other passkeys', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ passwordHash: null });
-      mockPrisma.authProvider.count.mockResolvedValue(1);
-      mockPrisma.authProvider.deleteMany.mockResolvedValue({ count: 1 });
+      mockUserRepo.findById.mockResolvedValue({ passwordHash: null });
+      mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(1);
+      mockAuthProviderRepo.deletePasskey.mockResolvedValue(1);
 
       await service.removePasskey('user-1', 'ap-1');
 
-      expect(mockPrisma.authProvider.deleteMany).toHaveBeenCalled();
+      expect(mockAuthProviderRepo.deletePasskey).toHaveBeenCalled();
     });
 
     it('should throw if passkey does not belong to user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ passwordHash: '$argon2id$...' });
-      mockPrisma.authProvider.count.mockResolvedValue(0);
-      mockPrisma.authProvider.deleteMany.mockResolvedValue({ count: 0 });
+      mockUserRepo.findById.mockResolvedValue({ passwordHash: '$argon2id$...' });
+      mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
+      mockAuthProviderRepo.deletePasskey.mockResolvedValue(0);
 
       await expect(service.removePasskey('user-1', 'other-users-ap')).rejects.toThrow(
         'Passkey not found',

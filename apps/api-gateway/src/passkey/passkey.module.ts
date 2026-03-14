@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { PlatformDatabaseModule } from '@roviq/nestjs-prisma';
 import { AuthModule } from '../auth/auth.module';
+import { AuthRepositoryModule } from '../auth/repositories/auth-repository.module';
 import { PasskeyResolver } from './passkey.resolver';
 import { PasskeyService } from './passkey.service';
+import { PasskeyRepositoryModule } from './repositories/passkey-repository.module';
 
 @Module({
-  imports: [PlatformDatabaseModule, AuthModule],
+  imports: [PasskeyRepositoryModule, AuthRepositoryModule, AuthModule],
   providers: [PasskeyService, PasskeyResolver],
 })
 export class PasskeyModule {}
