@@ -4,27 +4,32 @@ import type { JwtService } from '@nestjs/jwt';
 import { hash } from '@node-rs/argon2';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from '../auth.service';
+import type { MembershipRepository } from '../repositories/membership.repository';
+import type { RefreshTokenRepository } from '../repositories/refresh-token.repository';
+import type { UserRepository } from '../repositories/user.repository';
 
-function createMockPrisma() {
+function createMockUserRepo() {
   return {
-    user: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-    },
-    role: {
-      findFirst: vi.fn(),
-    },
-    membership: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    refreshToken: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
+    create: vi.fn(),
+    findById: vi.fn(),
+    findByUsername: vi.fn(),
+  };
+}
+
+function createMockMembershipRepo() {
+  return {
+    findActiveByUserId: vi.fn(),
+    findByUserAndTenant: vi.fn(),
+    findFirstActive: vi.fn(),
+  };
+}
+
+function createMockRefreshTokenRepo() {
+  return {
+    create: vi.fn(),
+    findByIdWithRelations: vi.fn(),
+    revoke: vi.fn(),
+    revokeAllForUser: vi.fn(),
   };
 }
 
@@ -52,19 +57,25 @@ function createMockConfigService() {
 
 describe('AuthService', () => {
   let authService: AuthService;
-  let mockPrisma: ReturnType<typeof createMockPrisma>;
+  let mockUserRepo: ReturnType<typeof createMockUserRepo>;
+  let mockMembershipRepo: ReturnType<typeof createMockMembershipRepo>;
+  let mockRefreshTokenRepo: ReturnType<typeof createMockRefreshTokenRepo>;
   let mockJwt: ReturnType<typeof createMockJwtService>;
   let mockConfig: ReturnType<typeof createMockConfigService>;
 
   beforeEach(() => {
-    mockPrisma = createMockPrisma();
+    mockUserRepo = createMockUserRepo();
+    mockMembershipRepo = createMockMembershipRepo();
+    mockRefreshTokenRepo = createMockRefreshTokenRepo();
     mockJwt = createMockJwtService();
     mockConfig = createMockConfigService();
 
     authService = new AuthService(
       mockConfig as unknown as ConfigService,
       mockJwt as unknown as JwtService,
-      mockPrisma as any,
+      mockUserRepo as unknown as UserRepository,
+      mockMembershipRepo as unknown as MembershipRepository,
+      mockRefreshTokenRepo as unknown as RefreshTokenRepository,
     );
   });
 
@@ -95,9 +106,9 @@ describe('AuthService', () => {
     });
 
     it('should return tenant-scoped JWT when user has single membership', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([mockMembership]);
-      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership]);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('jwt-token');
 
       const result = await authService.login('admin', 'correct-password');
@@ -119,8 +130,8 @@ describe('AuthService', () => {
         role: { id: 'role-2', name: 'Teacher', abilities: [] },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([mockMembership, secondMembership]);
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership, secondMembership]);
       mockJwt.sign.mockReturnValue('platform-jwt');
 
       const result = await authService.login('admin', 'correct-password');
@@ -133,7 +144,7 @@ describe('AuthService', () => {
     });
 
     it('should reject invalid password', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
 
       await expect(authService.login('admin', 'wrong-password')).rejects.toThrow(
         UnauthorizedException,
@@ -141,7 +152,7 @@ describe('AuthService', () => {
     });
 
     it('should reject inactive user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ ...mockUser, isActive: false });
+      mockUserRepo.findByUsername.mockResolvedValue({ ...mockUser, isActive: false });
 
       await expect(authService.login('admin', 'correct-password')).rejects.toThrow(
         UnauthorizedException,
@@ -149,7 +160,7 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for non-existent user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockUserRepo.findByUsername.mockResolvedValue(null);
 
       await expect(authService.login('nonexistent', 'password')).rejects.toThrow(
         UnauthorizedException,
@@ -157,8 +168,8 @@ describe('AuthService', () => {
     });
 
     it('should throw when user has no active memberships', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([]);
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
 
       await expect(authService.login('admin', 'correct-password')).rejects.toThrow(
         'No active memberships',
@@ -166,39 +177,37 @@ describe('AuthService', () => {
     });
 
     it('should use the same error message for user-not-found and wrong-password', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockUserRepo.findByUsername.mockResolvedValue(null);
       const err1 = await authService.login('admin', 'pass').catch((e: Error) => e);
 
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       const err2 = await authService.login('admin', 'wrong').catch((e: Error) => e);
 
       expect((err1 as UnauthorizedException).message).toBe((err2 as UnauthorizedException).message);
     });
 
     it('should find user by username (no tenantId)', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockUserRepo.findByUsername.mockResolvedValue(null);
 
       await authService.login('admin', 'pass').catch(() => {});
 
-      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-        where: { username: 'admin' },
-      });
+      expect(mockUserRepo.findByUsername).toHaveBeenCalledWith('admin');
     });
 
     it('should store hashed refresh token in DB with membershipId', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([mockMembership]);
-      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership]);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
 
       await authService.login('admin', 'correct-password');
 
-      expect(mockPrisma.refreshToken.create).toHaveBeenCalledTimes(1);
-      const createCall = mockPrisma.refreshToken.create.mock.calls[0][0];
-      expect(createCall.data.tokenHash).toBeDefined();
-      expect(createCall.data.tokenHash.length).toBe(64);
-      expect(createCall.data.userId).toBe('user-1');
-      expect(createCall.data.tenantId).toBe('tenant-1');
-      expect(createCall.data.membershipId).toBe('membership-1');
+      expect(mockRefreshTokenRepo.create).toHaveBeenCalledTimes(1);
+      const createCall = mockRefreshTokenRepo.create.mock.calls[0][0];
+      expect(createCall.tokenHash).toBeDefined();
+      expect(createCall.tokenHash.length).toBe(64);
+      expect(createCall.userId).toBe('user-1');
+      expect(createCall.tenantId).toBe('tenant-1');
+      expect(createCall.membershipId).toBe('membership-1');
     });
   });
 
@@ -225,9 +234,9 @@ describe('AuthService', () => {
     };
 
     it('should return tenant-scoped JWT for single membership without password', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([mockMembership]);
-      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockUserRepo.findById.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership]);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('jwt-token');
 
       const result = await authService.loginByUserId('user-1');
@@ -246,8 +255,8 @@ describe('AuthService', () => {
         role: { id: 'role-2', name: 'Teacher', abilities: [] },
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([mockMembership, secondMembership]);
+      mockUserRepo.findById.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership, secondMembership]);
       mockJwt.sign.mockReturnValue('platform-jwt');
 
       const result = await authService.loginByUserId('user-1');
@@ -257,14 +266,14 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException when user not found', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockUserRepo.findById.mockResolvedValue(null);
 
       await expect(authService.loginByUserId('nonexistent')).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw when user has no active memberships', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.membership.findMany.mockResolvedValue([]);
+      mockUserRepo.findById.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
 
       await expect(authService.loginByUserId('user-1')).rejects.toThrow('No active memberships');
     });
@@ -273,7 +282,7 @@ describe('AuthService', () => {
   describe('verifyPassword', () => {
     it('should return true for correct password', async () => {
       const passwordHash = await hash('correct-password');
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockUserRepo.findById.mockResolvedValue({
         id: 'user-1',
         passwordHash,
       });
@@ -284,7 +293,7 @@ describe('AuthService', () => {
 
     it('should return false for wrong password', async () => {
       const passwordHash = await hash('correct-password');
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockUserRepo.findById.mockResolvedValue({
         id: 'user-1',
         passwordHash,
       });
@@ -294,7 +303,7 @@ describe('AuthService', () => {
     });
 
     it('should return false for non-existent user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockUserRepo.findById.mockResolvedValue(null);
 
       const result = await authService.verifyPassword('missing', 'password');
       expect(result).toBe(false);
@@ -315,9 +324,9 @@ describe('AuthService', () => {
       };
       const user = { id: 'user-1', username: 'admin', email: 'admin@test.com', isActive: true };
 
-      mockPrisma.membership.findUnique.mockResolvedValue(membership);
-      mockPrisma.user.findUnique.mockResolvedValue(user);
-      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockMembershipRepo.findByUserAndTenant.mockResolvedValue(membership);
+      mockUserRepo.findById.mockResolvedValue(user);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('access-jwt');
 
       const result = await authService.selectOrganization('user-1', 'tenant-1');
@@ -328,7 +337,7 @@ describe('AuthService', () => {
     });
 
     it('should reject if no active membership for that tenant', async () => {
-      mockPrisma.membership.findUnique.mockResolvedValue(null);
+      mockMembershipRepo.findByUserAndTenant.mockResolvedValue(null);
 
       await expect(authService.selectOrganization('user-1', 'tenant-999')).rejects.toThrow(
         ForbiddenException,
@@ -336,7 +345,7 @@ describe('AuthService', () => {
     });
 
     it('should reject inactive membership', async () => {
-      mockPrisma.membership.findUnique.mockResolvedValue({
+      mockMembershipRepo.findByUserAndTenant.mockResolvedValue({
         id: 'membership-1',
         isActive: false,
         organization: {},
@@ -357,7 +366,7 @@ describe('AuthService', () => {
         email: 'new@test.com',
         passwordHash: '$argon2id$...',
       };
-      mockPrisma.user.create.mockResolvedValue(createdUser);
+      mockUserRepo.create.mockResolvedValue(createdUser);
 
       const result = await authService.register({
         username: 'newuser',
@@ -367,15 +376,15 @@ describe('AuthService', () => {
 
       expect(result.user?.username).toBe('newuser');
 
-      const createCall = mockPrisma.user.create.mock.calls[0][0];
-      expect(createCall.data.passwordHash).not.toBe('SecurePass123!');
-      expect(createCall.data.passwordHash.startsWith('$argon2id$')).toBe(true);
+      const createCall = mockUserRepo.create.mock.calls[0][0];
+      expect(createCall.passwordHash).not.toBe('SecurePass123!');
+      expect(createCall.passwordHash.startsWith('$argon2id$')).toBe(true);
     });
 
-    it('should propagate Prisma unique constraint error on duplicate username', async () => {
+    it('should propagate unique constraint error on duplicate username', async () => {
       const prismaError = new Error('Unique constraint failed on the fields: (`username`)');
       prismaError.name = 'PrismaClientKnownRequestError';
-      mockPrisma.user.create.mockRejectedValue(prismaError);
+      mockUserRepo.create.mockRejectedValue(prismaError);
 
       await expect(
         authService.register({
@@ -395,7 +404,7 @@ describe('AuthService', () => {
       const { createHash } = await import('node:crypto');
       const fakeToken = 'mock-token';
       const expectedHash = createHash('sha256').update(fakeToken).digest('hex');
-      mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue({
         id: tokenId,
         tokenHash: expectedHash,
         userId: 'user-1',
@@ -417,20 +426,15 @@ describe('AuthService', () => {
         },
       });
 
-      mockPrisma.refreshToken.update.mockResolvedValue({});
-      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('new-jwt');
 
       const result = await authService.refreshToken(fakeToken);
 
       expect(result.accessToken).toBe('new-jwt');
       expect(result.user?.id).toBe('user-1');
-      expect(mockPrisma.refreshToken.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: tokenId },
-          data: { revokedAt: expect.any(Date) },
-        }),
-      );
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith(tokenId);
     });
 
     it('should throw on invalid JWT', async () => {
@@ -452,11 +456,11 @@ describe('AuthService', () => {
       mockJwt.verify.mockReturnValue({ sub: 'user-1', tokenId, type: 'refresh' });
 
       const { createHash } = await import('node:crypto');
-      const hash = createHash('sha256').update('mock-token').digest('hex');
+      const tokenHash = createHash('sha256').update('mock-token').digest('hex');
 
-      mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue({
         id: tokenId,
-        tokenHash: hash,
+        tokenHash,
         userId: 'user-1',
         tenantId: 'tenant-1',
         membershipId: null,
@@ -474,15 +478,12 @@ describe('AuthService', () => {
         'Refresh token reuse detected',
       );
 
-      expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: 'user-1', revokedAt: null },
-        data: { revokedAt: expect.any(Date) },
-      });
+      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1');
     });
 
     it('should throw when token not found in DB', async () => {
       mockJwt.verify.mockReturnValue({ sub: 'user-1', tokenId: 'missing', type: 'refresh' });
-      mockPrisma.refreshToken.findUnique.mockResolvedValue(null);
+      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(null);
 
       await expect(authService.refreshToken('mock-token')).rejects.toThrow(
         'Refresh token not found',
@@ -492,7 +493,7 @@ describe('AuthService', () => {
     it('should throw when token hash does not match', async () => {
       const tokenId = 'token-mismatch';
       mockJwt.verify.mockReturnValue({ sub: 'user-1', tokenId, type: 'refresh' });
-      mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue({
         id: tokenId,
         tokenHash: 'wrong-hash-value',
         userId: 'user-1',
@@ -512,11 +513,11 @@ describe('AuthService', () => {
       mockJwt.verify.mockReturnValue({ sub: 'user-1', tokenId, type: 'refresh' });
 
       const { createHash } = await import('node:crypto');
-      const hash = createHash('sha256').update('mock-token').digest('hex');
+      const tokenHash = createHash('sha256').update('mock-token').digest('hex');
 
-      mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue({
         id: tokenId,
-        tokenHash: hash,
+        tokenHash,
         userId: 'user-1',
         tenantId: 'tenant-1',
         membershipId: null,
@@ -537,7 +538,7 @@ describe('AuthService', () => {
       const fakeToken = 'mock-token';
       const expectedHash = createHash('sha256').update(fakeToken).digest('hex');
 
-      mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue({
         id: tokenId,
         tokenHash: expectedHash,
         userId: 'user-1',
@@ -551,7 +552,7 @@ describe('AuthService', () => {
 
       const roleAbilities = [{ action: 'manage', subject: 'all' }];
       const memberAbilities = [{ action: 'read', subject: 'Profile' }];
-      mockPrisma.membership.findFirst.mockResolvedValue({
+      mockMembershipRepo.findFirstActive.mockResolvedValue({
         id: 'membership-1',
         tenantId: 'tenant-1',
         roleId: 'role-1',
@@ -559,8 +560,8 @@ describe('AuthService', () => {
         role: { id: 'role-1', abilities: roleAbilities },
       });
 
-      mockPrisma.refreshToken.update.mockResolvedValue({});
-      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('new-jwt');
 
       const result = await authService.refreshToken(fakeToken);
@@ -571,34 +572,61 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('should revoke specific refresh token when ID provided', async () => {
-      mockPrisma.refreshToken.update.mockResolvedValue({});
+      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
 
       await authService.logout('user-1', 'token-id-1');
 
-      expect(mockPrisma.refreshToken.update).toHaveBeenCalledWith({
-        where: { id: 'token-id-1' },
-        data: { revokedAt: expect.any(Date) },
-      });
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1');
     });
 
     it('should revoke all user tokens when no token ID provided', async () => {
-      mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 3 });
+      mockRefreshTokenRepo.revokeAllForUser.mockResolvedValue(undefined);
 
       await authService.logout('user-1');
 
-      expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: 'user-1', revokedAt: null },
-        data: { revokedAt: expect.any(Date) },
-      });
+      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1');
     });
 
     it('should not throw when called twice with same token ID', async () => {
-      mockPrisma.refreshToken.update.mockResolvedValue({});
+      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
 
       await authService.logout('user-1', 'token-id-1');
       await authService.logout('user-1', 'token-id-1');
 
-      expect(mockPrisma.refreshToken.update).toHaveBeenCalledTimes(2);
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getUserById', () => {
+    it('should return user when found', async () => {
+      const user = { id: 'user-1', username: 'admin', email: 'admin@test.com', isActive: true };
+      mockUserRepo.findById.mockResolvedValue(user);
+
+      const result = await authService.getUserById('user-1');
+      expect(result).toEqual(user);
+    });
+
+    it('should return null when not found', async () => {
+      mockUserRepo.findById.mockResolvedValue(null);
+
+      const result = await authService.getUserById('missing');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getUserIdByUsername', () => {
+    it('should return user id when found', async () => {
+      mockUserRepo.findByUsername.mockResolvedValue({ id: 'user-1', username: 'admin' });
+
+      const result = await authService.getUserIdByUsername('admin');
+      expect(result).toBe('user-1');
+    });
+
+    it('should return null when not found', async () => {
+      mockUserRepo.findByUsername.mockResolvedValue(null);
+
+      const result = await authService.getUserIdByUsername('nonexistent');
+      expect(result).toBeNull();
     });
   });
 });
