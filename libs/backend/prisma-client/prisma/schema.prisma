@@ -8,6 +8,34 @@ datasource db {
   provider = "postgresql"
 }
 
+enum BillingInterval {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PENDING_PAYMENT
+  PAUSED
+  COMPLETED
+}
+
+enum InvoiceStatus {
+  PAID
+  PENDING
+  OVERDUE
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  CASHFREE
+  RAZORPAY
+}
+
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -23,6 +51,10 @@ model Organization {
   roles               Role[]
   memberships         Membership[]
   notificationConfigs InstituteNotificationConfig[]
+
+  subscriptions        Subscription[]
+  invoices             Invoice[]
+  paymentGatewayConfig PaymentGatewayConfig?
 
   @@map("organizations")
 }
@@ -195,4 +227,104 @@ model InstituteNotificationConfig {
   @@unique([tenantId, notificationType])
   @@index([tenantId])
   @@map("institute_notification_configs")
+}
+
+model SubscriptionPlan {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  description     String?
+  amount          Int
+  currency        String          @default("INR")
+  billingInterval BillingInterval @map("billing_interval")
+  featureLimits   Json            @map("feature_limits")
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  organizationId         String             @map("organization_id") @db.Uuid
+  planId                 String             @map("plan_id") @db.Uuid
+  status                 SubscriptionStatus @default(PENDING_PAYMENT)
+  providerSubscriptionId String?            @map("provider_subscription_id")
+  providerCustomerId     String?            @map("provider_customer_id")
+  currentPeriodStart     DateTime?          @map("current_period_start")
+  currentPeriodEnd       DateTime?          @map("current_period_end")
+  canceledAt             DateTime?          @map("canceled_at")
+  trialEndsAt            DateTime?          @map("trial_ends_at")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  organization  Organization     @relation(fields: [organizationId], references: [id])
+  plan          SubscriptionPlan @relation(fields: [planId], references: [id])
+  invoices      Invoice[]
+  paymentEvents PaymentEvent[]
+
+  @@index([organizationId])
+  @@index([planId])
+  @@index([providerSubscriptionId])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id                 String        @id @default(uuid()) @db.Uuid
+  subscriptionId     String        @map("subscription_id") @db.Uuid
+  organizationId     String        @map("organization_id") @db.Uuid
+  amount             Int
+  currency           String        @default("INR")
+  status             InvoiceStatus @default(PENDING)
+  providerInvoiceId  String?       @map("provider_invoice_id")
+  providerPaymentId  String?       @map("provider_payment_id")
+  billingPeriodStart DateTime      @map("billing_period_start")
+  billingPeriodEnd   DateTime      @map("billing_period_end")
+  paidAt             DateTime?     @map("paid_at")
+  dueDate            DateTime      @map("due_date")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  subscription  Subscription   @relation(fields: [subscriptionId], references: [id])
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  paymentEvents PaymentEvent[]
+
+  @@index([subscriptionId])
+  @@index([organizationId])
+  @@map("invoices")
+}
+
+model PaymentGatewayConfig {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @unique @map("organization_id") @db.Uuid
+  provider       PaymentProvider
+  isActive       Boolean         @default(true) @map("is_active")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("payment_gateway_configs")
+}
+
+model PaymentEvent {
+  id              String          @id @default(uuid()) @db.Uuid
+  organizationId  String?         @map("organization_id") @db.Uuid
+  subscriptionId  String?         @map("subscription_id") @db.Uuid
+  invoiceId       String?         @map("invoice_id") @db.Uuid
+  provider        PaymentProvider
+  eventType       String          @map("event_type")
+  providerEventId String          @unique @map("provider_event_id")
+  payload         Json
+  processedAt     DateTime?       @map("processed_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id])
+
+  @@index([subscriptionId])
+  @@index([invoiceId])
+  @@map("payment_events")
 }
