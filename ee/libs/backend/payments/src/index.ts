@@ -1,3 +1,13 @@
-// @roviq/ee-payments — Payment gateway port/adapter library (EE)
-// Port interface, adapters, and factory will be added by the billing implementation plan.
-export {};
+export { PaymentGatewayFactory } from './factory/payment-gateway.factory';
+export { PaymentsModule } from './payments.module';
+export type {
+  CreatePlanInput,
+  CreateSubscriptionInput,
+  PaymentGateway,
+  ProviderPayment,
+  ProviderPlan,
+  ProviderRefund,
+  ProviderSubscription,
+  ProviderWebhookEvent,
+} from './ports/payment-gateway.port';
+export { PaymentGatewayError } from './ports/payment-gateway.port';
