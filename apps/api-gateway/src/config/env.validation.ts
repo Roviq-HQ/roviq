@@ -47,6 +47,7 @@ const envSchema = z.looseObject({
   JWT_REFRESH_EXPIRATION: z.string().optional(),
   ROVIQ_EE: z.string().optional(),
   NOTIFICATION_SERVICE_URL: z.string().optional(),
+  BILLING_RETURN_URL: z.string().url().optional(),
 });
 
 export function validate(config: Record<string, unknown>) {

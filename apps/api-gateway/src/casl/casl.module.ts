@@ -1,7 +1,6 @@
 import { Global, Module } from '@nestjs/common';
-import { AbilityFactory } from '@roviq/casl';
+import { AbilityFactory, AbilityGuard } from '@roviq/casl';
 import { PlatformDatabaseModule } from '@roviq/nestjs-prisma';
-import { AbilityGuard } from './ability.guard';
 
 @Global()
 @Module({

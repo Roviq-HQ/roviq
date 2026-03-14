@@ -1,11 +1,11 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { GqlAuthGuard } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { GraphQLJSON } from 'graphql-type-json';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { LoginResult } from '../auth/dto/auth-payload';
-import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import {
   GeneratePasskeyRegistrationInput,
   VerifyPasskeyAuthInput,

@@ -2,7 +2,7 @@ import type { NatsConnection } from '@nats-io/nats-core';
 import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { emitAuditEvent, NoAudit } from '@roviq/audit';
-import { AbilityFactory } from '@roviq/casl';
+import { AbilityFactory, GqlAuthGuard } from '@roviq/casl';
 import type { AbilityRule, AuthUser } from '@roviq/common-types';
 import { publish } from '@roviq/nats-utils';
 import { ADMIN_PRISMA_CLIENT } from '@roviq/nestjs-prisma';
@@ -15,7 +15,6 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthPayload, LoginResult, UserType } from './dto/auth-payload';
 import { RegisterInput } from './dto/register.input';
 import { GqlAnyAuthGuard } from './guards/gql-any-auth.guard';
-import { GqlAuthGuard } from './guards/gql-auth.guard';
 
 interface GqlContext {
   req: {
