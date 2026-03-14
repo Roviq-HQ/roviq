@@ -29,6 +29,19 @@ export type {
   OrgSwitcherConfig,
   UserInfo,
 } from './components/layout/types';
+export {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './components/ui/alert-dialog';
 export { Badge, badgeVariants } from './components/ui/badge';
 export { Button, buttonVariants } from './components/ui/button';
 export {
@@ -39,6 +52,7 @@ export {
   CardHeader,
   CardTitle,
 } from './components/ui/card';
+export { Checkbox } from './components/ui/checkbox';
 export {
   Dialog,
   DialogClose,
@@ -87,6 +101,7 @@ export {
 export { Separator } from './components/ui/separator';
 export {
   Sheet,
+  SheetBody,
   SheetClose,
   SheetContent,
   SheetDescription,

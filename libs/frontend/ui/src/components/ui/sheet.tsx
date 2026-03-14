@@ -50,6 +50,7 @@ function SheetContent({
   className,
   children,
   side = 'right',
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & VariantProps<typeof sheetVariants>) {
   return (
@@ -58,6 +59,13 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(sheetVariants({ side }), className)}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target?.closest('[data-sonner-toaster]')) {
+            e.preventDefault();
+          }
+          onInteractOutside?.(e);
+        }}
         {...props}
       >
         {children}
@@ -73,6 +81,16 @@ function SheetContent({
 function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div data-slot="sheet-header" className={cn('flex flex-col gap-2 p-6', className)} {...props} />
+  );
+}
+
+function SheetBody({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="sheet-body"
+      className={cn('flex-1 overflow-y-auto px-6', className)}
+      {...props}
+    />
   );
 }
 
@@ -111,6 +129,7 @@ function SheetDescription({
 
 export {
   Sheet,
+  SheetBody,
   SheetPortal,
   SheetOverlay,
   SheetTrigger,
