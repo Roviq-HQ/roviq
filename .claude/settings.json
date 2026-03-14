@@ -1,20 +1,28 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "attribution": {
     "commit": "",
     "pr": ""
   },
-  "allowedTools": [
-    "Bash(tilt:*)",
-    "Bash(curl:*)",
-    "Bash(grep:*)",
-    "Bash(find:*)",
-    "Bash(ls:*)",
-    "Bash(cat:*)",
-    "Bash(head:*)",
-    "Bash(tail:*)",
-    "Bash(wc:*)",
-    "Bash(rg:*)",
-    "Bash(fd:*)",
-    "Bash(tree:*)"
-  ]
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(git commit *)",
+      "Bash(git add *)",
+      "Read",
+      "WebFetch",
+      "Agent"
+    ],
+    "deny": []
+  }
 }
