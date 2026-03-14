@@ -1,8 +1,5 @@
 import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { InputJsonValue } from '@prisma/client/runtime/client';
-import { ADMIN_PRISMA_CLIENT } from '@roviq/nestjs-prisma';
-import type { AdminPrismaClient } from '@roviq/prisma-client';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type {
   AuthenticationResponseJSON,
@@ -19,19 +16,15 @@ import type Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/auth.service';
 import type { LoginResult } from '../auth/dto/auth-payload';
+import { UserRepository } from '../auth/repositories/user.repository';
 import type { PasskeyAuthOptions, PasskeyInfo } from './dto/passkey-info.model';
 import type { PasskeyProviderData } from './dto/passkey-provider-data';
+import { AuthProviderRepository } from './repositories/auth-provider.repository';
 
 const CHALLENGE_TTL = 300; // 5 minutes
 
 function toProviderData(json: unknown): PasskeyProviderData {
   return json as PasskeyProviderData;
-}
-
-function toInputJson(data: PasskeyProviderData): InputJsonValue {
-  // PasskeyProviderData is fully JSON-serializable (strings, numbers, booleans, string[], null).
-  // TypeScript can't structurally verify this against Prisma's recursive InputJsonValue type.
-  return data as unknown as InputJsonValue;
 }
 
 @Injectable()
@@ -43,7 +36,8 @@ export class PasskeyService {
   constructor(
     private readonly config: ConfigService,
     private readonly authService: AuthService,
-    @Inject(ADMIN_PRISMA_CLIENT) private readonly adminPrisma: AdminPrismaClient,
+    private readonly authProviderRepo: AuthProviderRepository,
+    private readonly userRepo: UserRepository,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
     this.rpId = this.config.getOrThrow<string>('WEBAUTHN_RP_ID');
@@ -63,14 +57,9 @@ export class PasskeyService {
       throw new UnauthorizedException('Invalid password');
     }
 
-    const existingPasskeys = await this.adminPrisma.authProvider.findMany({
-      where: { userId, provider: 'passkey' },
-    });
+    const existingPasskeys = await this.authProviderRepo.findPasskeysByUserId(userId);
 
-    const user = await this.adminPrisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true },
-    });
+    const user = await this.userRepo.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
@@ -143,13 +132,11 @@ export class PasskeyService {
       aaguid: aaguid ?? '00000000-0000-0000-0000-000000000000',
     };
 
-    const record = await this.adminPrisma.authProvider.create({
-      data: {
-        userId,
-        provider: 'passkey',
-        providerUserId: cred.id,
-        providerData: toInputJson(providerData),
-      },
+    const record = await this.authProviderRepo.create({
+      userId,
+      provider: 'passkey',
+      providerUserId: cred.id,
+      providerData,
     });
 
     return {
@@ -165,12 +152,7 @@ export class PasskeyService {
     let allowCredentials: { id: string; transports: AuthenticatorTransportFuture[] }[] | undefined;
 
     if (username) {
-      const passkeys = await this.adminPrisma.authProvider.findMany({
-        where: {
-          provider: 'passkey',
-          user: { username, isActive: true },
-        },
-      });
+      const passkeys = await this.authProviderRepo.findByActiveUsername(username);
 
       if (passkeys.length === 0) {
         throw new UnauthorizedException('Invalid credentials');
@@ -219,9 +201,7 @@ export class PasskeyService {
 
     const { challenge } = JSON.parse(stored) as { challenge: string };
 
-    const passkey = await this.adminPrisma.authProvider.findFirst({
-      where: { provider: 'passkey', providerUserId: credential.id },
-    });
+    const passkey = await this.authProviderRepo.findByCredentialId(credential.id);
 
     if (!passkey) {
       throw new UnauthorizedException('Invalid credentials');
@@ -248,25 +228,17 @@ export class PasskeyService {
     }
 
     // Update counter and lastUsedAt
-    await this.adminPrisma.authProvider.update({
-      where: { id: passkey.id },
-      data: {
-        providerData: toInputJson({
-          ...data,
-          counter: verification.authenticationInfo.newCounter,
-          lastUsedAt: new Date().toISOString(),
-        }),
-      },
+    await this.authProviderRepo.updateProviderData(passkey.id, {
+      ...data,
+      counter: verification.authenticationInfo.newCounter,
+      lastUsedAt: new Date().toISOString(),
     });
 
     return this.authService.loginByUserId(passkey.userId);
   }
 
   async myPasskeys(userId: string): Promise<PasskeyInfo[]> {
-    const passkeys = await this.adminPrisma.authProvider.findMany({
-      where: { userId, provider: 'passkey' },
-      orderBy: { createdAt: 'desc' },
-    });
+    const passkeys = await this.authProviderRepo.findPasskeysByUserId(userId);
 
     return passkeys.map((p) => {
       const data = toProviderData(p.providerData);
@@ -282,25 +254,18 @@ export class PasskeyService {
   }
 
   async removePasskey(userId: string, passkeyId: string): Promise<boolean> {
-    const user = await this.adminPrisma.user.findUnique({
-      where: { id: userId },
-      select: { passwordHash: true },
-    });
+    const user = await this.userRepo.findById(userId);
     const hasPassword = !!user?.passwordHash;
 
-    const otherPasskeys = await this.adminPrisma.authProvider.count({
-      where: { userId, provider: 'passkey', id: { not: passkeyId } },
-    });
+    const otherPasskeys = await this.authProviderRepo.countOtherPasskeys(userId, passkeyId);
 
     if (!hasPassword && otherPasskeys === 0) {
       throw new BadRequestException('Cannot remove your only authentication method');
     }
 
-    const deleted = await this.adminPrisma.authProvider.deleteMany({
-      where: { id: passkeyId, userId },
-    });
+    const deletedCount = await this.authProviderRepo.deletePasskey(passkeyId, userId);
 
-    if (deleted.count === 0) {
+    if (deletedCount === 0) {
       throw new BadRequestException('Passkey not found');
     }
 
