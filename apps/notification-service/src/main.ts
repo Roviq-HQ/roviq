@@ -1,6 +1,8 @@
 import type { NatsConnection } from '@nats-io/nats-core';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { MicroserviceOptions } from '@nestjs/microservices';
+import { Transport } from '@nestjs/microservices';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app/app.module';
 import { ensureConsumers } from './nats/ensure-consumers';
@@ -14,6 +16,17 @@ async function bootstrap() {
   await ensureConsumers(nc);
 
   const config = app.get(ConfigService);
+
+  // Hybrid app: HTTP + NATS microservice for billing event consumption
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.NATS,
+    options: {
+      servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
+      queue: 'notification-service',
+    },
+  });
+  await app.startAllMicroservices();
+
   const port = config.get<number>('NOTIFICATION_SERVICE_PORT', 3002);
   await app.listen(port);
 

@@ -4,6 +4,7 @@ import { NovuModule } from '@novu/framework/nest';
 import { PrismaModule } from '@roviq/nestjs-prisma';
 import { TelemetryModule } from '@roviq/telemetry';
 import { validate } from '../config/env.validation';
+import { BillingNotificationController } from '../controllers/billing-notification.controller';
 import { ApprovalListener } from '../listeners/approval.listener';
 import { AttendanceListener } from '../listeners/attendance.listener';
 import { AuthListener } from '../listeners/auth.listener';
@@ -17,6 +18,7 @@ import { SubscriberSyncService } from '../services/subscriber-sync.service';
 import {
   approvalRequestWorkflow,
   attendanceAbsentWorkflow,
+  billingEventWorkflow,
   feeOverdueWorkflow,
   systemAuthWorkflow,
 } from '../workflows';
@@ -35,10 +37,11 @@ import { AppController } from './app.controller';
         attendanceAbsentWorkflow,
         feeOverdueWorkflow,
         approvalRequestWorkflow,
+        billingEventWorkflow,
       ],
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, BillingNotificationController],
   providers: [
     NotificationTriggerService,
     SubscriberSyncService,
