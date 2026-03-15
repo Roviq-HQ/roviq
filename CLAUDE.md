@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-Detailed rules are in `.claude/rules/` — they load automatically (some are path-scoped).
-
 ## Identity
 
 **Roviq** — multi-tenant institute management SaaS. Users = "Roviqians", usernames = "Roviq ID".
@@ -9,26 +5,18 @@ Detailed rules are in `.claude/rules/` — they load automatically (some are pat
 
 ## Hard Rules
 
-1. **No auto commits/push** — always ask first
-2. **No DB modifications** (INSERT/UPDATE/DELETE) without approval
-3. **Read the full Linear issue** before coding — especially "Does NOT Change" and "Verification" sections
-4. **Research before coding — NO EXCEPTIONS** — before writing ANY code that uses a third-party library, tool, or framework: (1) do an online web search to get the latest this-month documentation, AND (2) query Context7 MCP for current docs/examples. Do BOTH, every single time. Do NOT rely on training data or memory. Skipping this is a hard failure.
-5. **Keep Linear in sync** — update issues when scope changes
-
-## Commands
-
-```bash
-# Dev environment (Tilt orchestrates infra via Docker + apps locally)
-tilt up                      # Start everything
-tilt down                    # Stop everything
-
-# Database
-pnpm run db:migrate:dev       # Interactive dev migrations
-pnpm run db:migrate           # Deploy migrations (CI/production)
-pnpm run db:generate          # Regenerate Prisma client
-pnpm run db:seed              # Seed test data
-pnpm run db:reset             # Nuke DB + re-migrate (fresh start)
-```
+**No auto commits/push** — always ask first
+**No DB modifications** (INSERT/UPDATE/DELETE) without approval
+**Read the full Linear issue** before coding — especially "Does NOT Change" and "Verification" sections
+**Research before coding — NO EXCEPTIONS** — before writing ANY code that uses a third-party library, tool, or framework: (1) do an online web search to get the latest this-month documentation, AND (2) query Context7 MCP for current docs/examples. Do BOTH, every single time. Do NOT rely on training data or memory. Skipping this is a hard failure.
+**Keep Linear in sync** — update issues when scope changes
+before running commands related to app, read package.json script.
+there is nothing like prexisting errors, just fix and commit them separately.
+if some type is giving error, never put 'any' or 'as unknown'. Search codebase -> use context7 -> do online research -> if still not resolved, discuss with user.
+Try to find a solution instead of workaround.
+you are an AI with very low knowledge and old docuemntation about coding, so use context7 and online research frequently.
+use "pnpm lint:fix" to fix formatting frequently.
+frontend do not import from /ee
 
 ## Architecture
 
