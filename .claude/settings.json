@@ -6,6 +6,7 @@
   },
   "permissions": {
     "allow": [
+      "Bash",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(head:*)",
@@ -25,11 +26,24 @@
       "Bash(npx nx:*)",
       "Bash(npx tsc --project apps:*)",
       "Bash(git commit *)",
-      "Bash(git add *)",
+      "Bash(git log *)",
       "Read",
       "WebFetch",
       "Agent"
     ],
     "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-project-dir.sh"
+          }
+        ]
+      }
+    ]
   }
 }
