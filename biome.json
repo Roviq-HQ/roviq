@@ -18,7 +18,14 @@
         }
       },
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noUnknownAtRules": "off",
+        "noExplicitAny": "error",
+        "noConsole": {
+          "level": "warn",
+          "options": {
+            "allow": ["assert", "error", "info", "warn"]
+          }
+        }
       },
       "style": {
         "noNonNullAssertion": "warn"
@@ -84,6 +91,16 @@
           },
           "style": {
             "useImportType": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["scripts/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
           }
         }
       }

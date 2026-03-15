@@ -3,6 +3,8 @@
 import type { LoginResult } from '@roviq/auth';
 import { AuthProvider, createAuthMutations, tokenStorage } from '@roviq/auth';
 import { GraphQLProvider } from '@roviq/graphql';
+import { ThemeProvider } from '@roviq/ui/components/theme-provider';
+import { Toaster } from '@roviq/ui/components/ui/sonner';
 import {
   type PublicKeyCredentialRequestOptionsJSON,
   startAuthentication,
@@ -67,7 +69,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
           // Handled by AuthProvider's session expired dialog
         }}
       >
-        <NuqsAdapter>{children}</NuqsAdapter>
+        <NuqsAdapter>
+          <ThemeProvider>
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </NuqsAdapter>
       </GraphQLProvider>
     </AuthProvider>
   );

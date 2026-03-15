@@ -17,37 +17,13 @@ import {
 } from '@roviq/ui';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import type {
+  NotificationConfigsQuery,
+  UpdateNotificationConfigMutation,
+  UpdateNotificationConfigMutationVariables,
+} from './page.generated';
 
-interface NotificationConfig {
-  id: string;
-  notificationType: string;
-  inAppEnabled: boolean;
-  whatsappEnabled: boolean;
-  emailEnabled: boolean;
-  pushEnabled: boolean;
-  digestEnabled: boolean;
-  digestCron?: string | null;
-}
-
-interface NotificationConfigsData {
-  notificationConfigs: NotificationConfig[];
-}
-
-interface UpdateNotificationConfigData {
-  updateNotificationConfig: NotificationConfig;
-}
-
-interface UpdateNotificationConfigVariables {
-  input: {
-    notificationType: string;
-    inAppEnabled?: boolean;
-    whatsappEnabled?: boolean;
-    emailEnabled?: boolean;
-    pushEnabled?: boolean;
-    digestEnabled?: boolean;
-    digestCron?: string;
-  };
-}
+type NotificationConfig = NotificationConfigsQuery['notificationConfigs'][number];
 
 const NOTIFICATION_CONFIGS_QUERY = gql`
   query NotificationConfigs {
@@ -107,6 +83,7 @@ const CHANNELS: Array<{ field: ChannelField; labelKey: ChannelLabelKey }> = [
 
 function getDefaultConfig(notificationType: string): NotificationConfig {
   return {
+    __typename: 'NotificationConfigModel',
     id: '',
     notificationType,
     inAppEnabled: false,
@@ -121,11 +98,11 @@ function getDefaultConfig(notificationType: string): NotificationConfig {
 export default function NotificationPreferencesPage() {
   const t = useTranslations('notifications');
 
-  const { data, loading } = useQuery<NotificationConfigsData>(NOTIFICATION_CONFIGS_QUERY);
+  const { data, loading } = useQuery<NotificationConfigsQuery>(NOTIFICATION_CONFIGS_QUERY);
 
   const [updateConfig] = useMutation<
-    UpdateNotificationConfigData,
-    UpdateNotificationConfigVariables
+    UpdateNotificationConfigMutation,
+    UpdateNotificationConfigMutationVariables
   >(UPDATE_NOTIFICATION_CONFIG_MUTATION, {
     refetchQueries: [{ query: NOTIFICATION_CONFIGS_QUERY }],
     onCompleted: () => {

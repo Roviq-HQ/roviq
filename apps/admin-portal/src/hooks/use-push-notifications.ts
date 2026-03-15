@@ -3,6 +3,10 @@
 import { gql, useMutation } from '@roviq/graphql';
 import { getFcmToken } from '@roviq/ui/lib/firebase';
 import { useEffect, useRef } from 'react';
+import type {
+  RegisterDeviceTokenMutation,
+  RegisterDeviceTokenMutationVariables,
+} from './use-push-notifications.generated';
 
 const REGISTER_DEVICE_TOKEN = gql`
   mutation RegisterDeviceToken($token: String!) {
@@ -11,7 +15,10 @@ const REGISTER_DEVICE_TOKEN = gql`
 `;
 
 export function usePushNotifications() {
-  const [registerToken] = useMutation(REGISTER_DEVICE_TOKEN);
+  const [registerToken] = useMutation<
+    RegisterDeviceTokenMutation,
+    RegisterDeviceTokenMutationVariables
+  >(REGISTER_DEVICE_TOKEN);
   const registered = useRef(false);
 
   useEffect(() => {
