@@ -6,7 +6,6 @@ import {
   type ApprovalResolvedEvent,
   NOTIFICATION_SUBJECTS,
 } from '@roviq/notifications';
-import { tenantContext } from '@roviq/prisma-client';
 import { NATS_CONNECTION } from '../nats/nats.provider';
 import { NotificationTriggerService } from '../services/notification-trigger.service';
 import { PreferenceLoaderService } from '../services/preference-loader.service';
@@ -51,27 +50,25 @@ export class ApprovalListener implements OnModuleInit {
         `in tenant "${event.tenantId}"`,
     );
 
-    await tenantContext.run({ tenantId: event.tenantId }, async () => {
-      const config = await this.preferenceLoader.loadConfig(event.tenantId, 'APPROVAL');
+    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'APPROVAL');
 
-      await this.triggerService.trigger({
-        workflowId: 'approval-request',
-        to: { subscriberId: event.approverId },
-        payload: {
-          requesterName: event.requesterName,
-          approverName: event.approverName,
-          approvalType: event.approvalType,
-          entityId: event.entityId,
-          summary: event.summary,
-          config: {
-            inApp: config.inApp,
-            whatsapp: config.whatsapp,
-            email: config.email,
-            push: config.push,
-          },
+    await this.triggerService.trigger({
+      workflowId: 'approval-request',
+      to: { subscriberId: event.approverId },
+      payload: {
+        requesterName: event.requesterName,
+        approverName: event.approverName,
+        approvalType: event.approvalType,
+        entityId: event.entityId,
+        summary: event.summary,
+        config: {
+          inApp: config.inApp,
+          whatsapp: config.whatsapp,
+          email: config.email,
+          push: config.push,
         },
-        tenantId: event.tenantId,
-      });
+      },
+      tenantId: event.tenantId,
     });
   }
 
@@ -81,27 +78,25 @@ export class ApprovalListener implements OnModuleInit {
         `for "${event.requesterName}" in tenant "${event.tenantId}"`,
     );
 
-    await tenantContext.run({ tenantId: event.tenantId }, async () => {
-      const config = await this.preferenceLoader.loadConfig(event.tenantId, 'APPROVAL');
+    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'APPROVAL');
 
-      await this.triggerService.trigger({
-        workflowId: 'approval-request',
-        to: { subscriberId: event.requesterId },
-        payload: {
-          requesterName: event.requesterName,
-          reviewerName: event.reviewerName,
-          approvalType: event.approvalType,
-          status: event.status,
-          remarks: event.remarks,
-          config: {
-            inApp: config.inApp,
-            whatsapp: config.whatsapp,
-            email: config.email,
-            push: config.push,
-          },
+    await this.triggerService.trigger({
+      workflowId: 'approval-request',
+      to: { subscriberId: event.requesterId },
+      payload: {
+        requesterName: event.requesterName,
+        reviewerName: event.reviewerName,
+        approvalType: event.approvalType,
+        status: event.status,
+        remarks: event.remarks,
+        config: {
+          inApp: config.inApp,
+          whatsapp: config.whatsapp,
+          email: config.email,
+          push: config.push,
         },
-        tenantId: event.tenantId,
-      });
+      },
+      tenantId: event.tenantId,
     });
   }
 }

@@ -1,20 +1,20 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@roviq/nestjs-prisma';
-import { BillingReadPrismaRepository } from './billing-read.prisma-repository';
+import { DatabaseModule } from '@roviq/database';
+import { BillingReadDrizzleRepository } from './billing-read.drizzle-repository';
 import { BillingReadRepository } from './billing-read.repository';
-import { NotificationConfigReadPrismaRepository } from './notification-config-read.prisma-repository';
+import { NotificationConfigReadDrizzleRepository } from './notification-config-read.drizzle-repository';
 import { NotificationConfigReadRepository } from './notification-config-read.repository';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [DatabaseModule],
   providers: [
     {
       provide: NotificationConfigReadRepository,
-      useClass: NotificationConfigReadPrismaRepository,
+      useClass: NotificationConfigReadDrizzleRepository,
     },
     {
       provide: BillingReadRepository,
-      useClass: BillingReadPrismaRepository,
+      useClass: BillingReadDrizzleRepository,
     },
   ],
   exports: [NotificationConfigReadRepository, BillingReadRepository],
