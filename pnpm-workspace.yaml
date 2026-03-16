@@ -1,3 +1,7 @@
+packages:
+  - 'libs/**'
+  - 'ee/**'
+
 allowBuilds:
   '@apollo/protobufjs': true
   '@nestjs/core': true
