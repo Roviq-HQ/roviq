@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PaymentsModule } from '@roviq/ee-payments';
-import { PlatformDatabaseModule } from '@roviq/nestjs-prisma';
 import './billing.enums';
 import { BillingRepository } from './billing.repository';
 import { BillingResolver } from './billing.resolver';
@@ -11,7 +10,6 @@ import { WebhookController } from './webhook.controller';
 
 @Module({
   imports: [
-    PlatformDatabaseModule,
     PaymentsModule,
     ClientsModule.registerAsync([
       {

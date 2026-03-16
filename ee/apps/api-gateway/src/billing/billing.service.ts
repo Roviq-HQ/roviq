@@ -11,12 +11,15 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { ClientProxy } from '@nestjs/microservices';
 import type { AppAbility } from '@roviq/common-types';
+import { getRequestContext } from '@roviq/common-types';
+import { i18nDisplay, SYSTEM_USER_ID } from '@roviq/database';
 import { BillingPeriod } from '@roviq/domain';
 import type {
   BillingInterval,
   FeatureLimits,
   InvoiceStatus,
   PaymentProvider,
+  PlanStatus,
   SubscriptionStatus,
 } from '@roviq/ee-billing-types';
 import {
@@ -62,13 +65,17 @@ export class BillingService {
     billingInterval: BillingInterval;
     featureLimits: FeatureLimits;
   }) {
+    const { userId } = getRequestContext();
+
     const plan = await this.repo.createPlan({
-      name: input.name,
-      description: input.description,
+      name: { en: input.name },
+      description: input.description ? { en: input.description } : undefined,
       amount: input.amount,
       currency: input.currency,
       billingInterval: input.billingInterval,
       featureLimits: input.featureLimits,
+      createdBy: userId,
+      updatedBy: userId,
     });
 
     this.emitEvent('billing.plan.created', { id: plan.id, name: plan.name });
@@ -83,17 +90,17 @@ export class BillingService {
       amount?: number;
       billingInterval?: BillingInterval;
       featureLimits?: FeatureLimits;
-      isActive?: boolean;
+      status?: PlanStatus;
     },
   ) {
     type UpdatePlanData = Parameters<BillingRepository['updatePlan']>[1];
     const data: UpdatePlanData = {};
-    if (input.name !== undefined) data.name = input.name;
-    if (input.description !== undefined) data.description = input.description;
+    if (input.name !== undefined) data.name = { en: input.name };
+    if (input.description !== undefined) data.description = { en: input.description };
     if (input.amount !== undefined) data.amount = input.amount;
     if (input.billingInterval !== undefined) data.billingInterval = input.billingInterval;
     if (input.featureLimits !== undefined) data.featureLimits = input.featureLimits;
-    if (input.isActive !== undefined) data.isActive = input.isActive;
+    if (input.status !== undefined) data.status = input.status;
 
     const plan = await this.repo.updatePlan(id, data);
 
@@ -140,9 +147,11 @@ export class BillingService {
     const plan = await this.repo.findPlanById(input.planId);
     if (!plan) throw new NotFoundException('Subscription plan not found');
 
-    if (!plan.isActive) {
+    if (plan.status !== 'ACTIVE') {
       throw new BadRequestException('Cannot assign an inactive plan');
     }
+
+    const { userId } = getRequestContext();
 
     // Free plans (amount=0) are internal-only — no gateway interaction needed
     if (plan.amount === 0) {
@@ -150,6 +159,8 @@ export class BillingService {
         organizationId: input.organizationId,
         planId: input.planId,
         status: 'ACTIVE',
+        createdBy: userId,
+        updatedBy: userId,
       });
 
       this.emitEvent('billing.subscription.created', {
@@ -169,11 +180,11 @@ export class BillingService {
     try {
       // Create plan on provider (lazy sync)
       providerPlan = await gateway.createPlan({
-        name: plan.name,
+        name: i18nDisplay(plan.name),
         amount: plan.amount,
         currency: plan.currency,
         interval: plan.billingInterval as BillingInterval,
-        description: plan.description ?? undefined,
+        description: i18nDisplay(plan.description) || undefined,
       });
 
       // Create subscription on provider
@@ -181,7 +192,7 @@ export class BillingService {
       providerSub = await gateway.createSubscription({
         providerPlanId: providerPlan.providerPlanId,
         customer: {
-          name: org.name,
+          name: i18nDisplay(org.name),
           email: input.customerEmail,
           phone: input.customerPhone,
         },
@@ -201,6 +212,8 @@ export class BillingService {
       status: 'PENDING_PAYMENT',
       providerSubscriptionId: providerSub.providerSubscriptionId,
       providerCustomerId: providerSub.providerCustomerId,
+      createdBy: userId,
+      updatedBy: userId,
     });
 
     this.emitEvent('billing.subscription.created', {
@@ -348,7 +361,7 @@ export class BillingService {
     const hasNextPage = items.length > take;
     const edges = items.slice(0, take).map((item) => ({
       cursor: item.id,
-      node: item as SubscriptionModel,
+      node: item as unknown as SubscriptionModel,
     }));
 
     return {
@@ -383,7 +396,7 @@ export class BillingService {
     const hasNextPage = items.length > take;
     const edges = items.slice(0, take).map((item) => ({
       cursor: item.id,
-      node: item as InvoiceModel,
+      node: item as unknown as InvoiceModel,
     }));
 
     return {
@@ -434,7 +447,7 @@ export class BillingService {
   /**
    * Handle normalized webhook events. Both adapters normalize provider-specific
    * event types to a common vocabulary (e.g. Cashfree SUBSCRIPTION_PAYMENT_SUCCESS
-   * → "subscription.charged"), so this method is provider-agnostic.
+   * -> "subscription.charged"), so this method is provider-agnostic.
    */
   private async handleSubscriptionEvent(subscriptionId: string, event: ProviderWebhookEvent) {
     const eventType = event.eventType.toLowerCase();
@@ -510,6 +523,8 @@ export class BillingService {
           billingPeriodEnd: period.end,
           paidAt: now,
           dueDate: now,
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
         });
       }
     }

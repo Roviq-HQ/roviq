@@ -1,8 +1,10 @@
 import { registerEnumType } from '@nestjs/graphql';
 import {
   BillingInterval,
+  GatewayConfigStatus,
   InvoiceStatus,
   PaymentProvider,
+  PlanStatus,
   SubscriptionStatus,
 } from '@roviq/ee-billing-types';
 
@@ -24,4 +26,14 @@ registerEnumType(InvoiceStatus, {
 registerEnumType(PaymentProvider, {
   name: 'PaymentProvider',
   description: 'Supported payment gateway providers.',
+});
+
+registerEnumType(PlanStatus, {
+  name: 'PlanStatus',
+  description: 'Lifecycle status of a subscription plan.',
+});
+
+registerEnumType(GatewayConfigStatus, {
+  name: 'GatewayConfigStatus',
+  description: 'Status of a payment gateway configuration.',
 });

@@ -1,4 +1,5 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
+import { GatewayConfigStatus } from '@roviq/ee-billing-types';
 
 @ObjectType()
 export class PaymentGatewayConfigModel {
@@ -11,8 +12,8 @@ export class PaymentGatewayConfigModel {
   @Field()
   provider!: string;
 
-  @Field()
-  isActive!: boolean;
+  @Field(() => GatewayConfigStatus)
+  status!: GatewayConfigStatus;
 
   @Field()
   createdAt!: Date;
