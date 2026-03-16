@@ -1,9 +1,14 @@
+import type { memberships, users } from '@roviq/database';
+
+type UserStatus = (typeof users.$inferSelect)['status'];
+type MembershipStatus = (typeof memberships.$inferSelect)['status'];
+
 export interface UserRecord {
   id: string;
   username: string;
   email: string;
   passwordHash: string;
-  isActive: boolean;
+  status: UserStatus;
 }
 
 export interface CreateUserData {
@@ -29,7 +34,7 @@ export interface MembershipWithOrgAndRole {
   id: string;
   tenantId: string;
   roleId: string;
-  isActive: boolean;
+  status: MembershipStatus;
   abilities: unknown;
   organization: OrgInfo;
   role: RoleInfo;
@@ -39,7 +44,7 @@ export interface MembershipWithRole {
   id: string;
   tenantId: string;
   roleId: string;
-  isActive: boolean;
+  status: MembershipStatus;
   abilities: unknown;
   role: Pick<RoleInfo, 'id' | 'abilities'>;
 }

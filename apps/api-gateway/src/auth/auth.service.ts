@@ -60,7 +60,7 @@ export class AuthService {
   async login(username: string, password: string): Promise<LoginResult> {
     const user = await this.userRepo.findByUsername(username);
 
-    if (!user || !user.isActive) {
+    if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -112,7 +112,7 @@ export class AuthService {
   async loginByUserId(userId: string): Promise<LoginResult> {
     const user = await this.userRepo.findById(userId);
 
-    if (!user || !user.isActive) {
+    if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -165,12 +165,12 @@ export class AuthService {
   async selectOrganization(userId: string, tenantId: string): Promise<AuthPayload> {
     const membership = await this.membershipRepo.findByUserAndTenant(userId, tenantId);
 
-    if (!membership || !membership.isActive) {
+    if (!membership || membership.status !== 'ACTIVE') {
       throw new ForbiddenException('No active membership for this organization');
     }
 
     const user = await this.userRepo.findById(userId);
-    if (!user || !user.isActive) {
+    if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User not found or inactive');
     }
 

@@ -1,18 +1,16 @@
 import { Module } from '@nestjs/common';
-import { PlatformDatabaseModule } from '@roviq/nestjs-prisma';
-import { MembershipPrismaRepository } from './membership.prisma-repository';
+import { MembershipDrizzleRepository } from './membership.drizzle-repository';
 import { MembershipRepository } from './membership.repository';
-import { RefreshTokenPrismaRepository } from './refresh-token.prisma-repository';
+import { RefreshTokenDrizzleRepository } from './refresh-token.drizzle-repository';
 import { RefreshTokenRepository } from './refresh-token.repository';
-import { UserPrismaRepository } from './user.prisma-repository';
+import { UserDrizzleRepository } from './user.drizzle-repository';
 import { UserRepository } from './user.repository';
 
 @Module({
-  imports: [PlatformDatabaseModule],
   providers: [
-    { provide: UserRepository, useClass: UserPrismaRepository },
-    { provide: MembershipRepository, useClass: MembershipPrismaRepository },
-    { provide: RefreshTokenRepository, useClass: RefreshTokenPrismaRepository },
+    { provide: UserRepository, useClass: UserDrizzleRepository },
+    { provide: MembershipRepository, useClass: MembershipDrizzleRepository },
+    { provide: RefreshTokenRepository, useClass: RefreshTokenDrizzleRepository },
   ],
   exports: [UserRepository, MembershipRepository, RefreshTokenRepository],
 })
