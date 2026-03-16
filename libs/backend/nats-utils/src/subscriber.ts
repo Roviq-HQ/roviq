@@ -1,5 +1,6 @@
 import { jetstream } from '@nats-io/jetstream';
 import type { NatsConnection } from '@nats-io/nats-core';
+import { type RequestContext, requestContext } from '@roviq/common-types';
 import { publishToDlq } from './dlq.js';
 
 export interface SubscribeOptions {
@@ -25,13 +26,23 @@ export async function subscribe<T>(
   const messages = await consumer.consume();
 
   for await (const msg of messages) {
-    const correlationId = msg.headers?.get('correlation-id') ?? 'unknown';
+    const correlationId = msg.headers?.get('correlation-id') || crypto.randomUUID();
     const tenantId = msg.headers?.get('tenant-id') || undefined;
+    const actorId = msg.headers?.get('actor-id') || '';
+    const impersonatorId = msg.headers?.get('impersonator-id') || null;
     const payload = msg.json<T>();
     const redeliveryCount = msg.info.deliveryCount ?? 1;
 
+    // Auto-restore request context from NATS headers
+    const ctx: RequestContext = {
+      tenantId: tenantId || null,
+      userId: actorId,
+      impersonatorId,
+      correlationId,
+    };
+
     try {
-      await handler(payload, { correlationId, tenantId });
+      await requestContext.run(ctx, () => handler(payload, { correlationId, tenantId }));
       msg.ack();
     } catch (err) {
       if (redeliveryCount >= maxRetries) {
