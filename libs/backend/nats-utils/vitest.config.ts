@@ -5,7 +5,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@roviq/nats-utils': path.resolve(__dirname, 'src/index.ts'),
-      '@roviq/prisma-client': path.resolve(__dirname, '../prisma-client/src/index.ts'),
     },
   },
   test: {
