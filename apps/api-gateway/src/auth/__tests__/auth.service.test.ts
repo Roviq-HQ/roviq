@@ -85,7 +85,7 @@ describe('AuthService', () => {
       username: 'admin',
       email: 'admin@test.com',
       passwordHash: '',
-      isActive: true,
+      status: 'ACTIVE',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -96,7 +96,7 @@ describe('AuthService', () => {
       tenantId: 'tenant-1',
       roleId: 'role-1',
       abilities: null,
-      isActive: true,
+      status: 'ACTIVE',
       organization: { id: 'tenant-1', name: 'Test Org', slug: 'test-org', logoUrl: null },
       role: { id: 'role-1', name: 'Admin', abilities: [] },
     };
@@ -152,7 +152,7 @@ describe('AuthService', () => {
     });
 
     it('should reject inactive user', async () => {
-      mockUserRepo.findByUsername.mockResolvedValue({ ...mockUser, isActive: false });
+      mockUserRepo.findByUsername.mockResolvedValue({ ...mockUser, status: 'SUSPENDED' });
 
       await expect(authService.login('admin', 'correct-password')).rejects.toThrow(
         UnauthorizedException,
@@ -217,7 +217,7 @@ describe('AuthService', () => {
       username: 'admin',
       email: 'admin@test.com',
       passwordHash: '',
-      isActive: true,
+      status: 'ACTIVE',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -228,7 +228,7 @@ describe('AuthService', () => {
       tenantId: 'tenant-1',
       roleId: 'role-1',
       abilities: null,
-      isActive: true,
+      status: 'ACTIVE',
       organization: { id: 'tenant-1', name: 'Test Org', slug: 'test-org', logoUrl: null },
       role: { id: 'role-1', name: 'Admin', abilities: [] },
     };
@@ -318,11 +318,11 @@ describe('AuthService', () => {
         tenantId: 'tenant-1',
         roleId: 'role-1',
         abilities: null,
-        isActive: true,
+        status: 'ACTIVE',
         organization: { id: 'tenant-1', name: 'Test Org', slug: 'test-org', logoUrl: null },
         role: { id: 'role-1', name: 'Admin', abilities: [] },
       };
-      const user = { id: 'user-1', username: 'admin', email: 'admin@test.com', isActive: true };
+      const user = { id: 'user-1', username: 'admin', email: 'admin@test.com', status: 'ACTIVE' };
 
       mockMembershipRepo.findByUserAndTenant.mockResolvedValue(membership);
       mockUserRepo.findById.mockResolvedValue(user);
@@ -347,7 +347,7 @@ describe('AuthService', () => {
     it('should reject inactive membership', async () => {
       mockMembershipRepo.findByUserAndTenant.mockResolvedValue({
         id: 'membership-1',
-        isActive: false,
+        status: 'SUSPENDED',
         organization: {},
         role: {},
       });
@@ -599,7 +599,7 @@ describe('AuthService', () => {
 
   describe('getUserById', () => {
     it('should return user when found', async () => {
-      const user = { id: 'user-1', username: 'admin', email: 'admin@test.com', isActive: true };
+      const user = { id: 'user-1', username: 'admin', email: 'admin@test.com', status: 'ACTIVE' };
       mockUserRepo.findById.mockResolvedValue(user);
 
       const result = await authService.getUserById('user-1');

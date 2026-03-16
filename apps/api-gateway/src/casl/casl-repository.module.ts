@@ -1,17 +1,15 @@
 import { Module } from '@nestjs/common';
 import {
-  MembershipAbilityPrismaRepository,
+  MembershipAbilityDrizzleRepository,
   MembershipAbilityRepository,
-  RolePrismaRepository,
+  RoleDrizzleRepository,
   RoleRepository,
 } from '@roviq/casl';
-import { PlatformDatabaseModule } from '@roviq/nestjs-prisma';
 
 @Module({
-  imports: [PlatformDatabaseModule],
   providers: [
-    { provide: RoleRepository, useClass: RolePrismaRepository },
-    { provide: MembershipAbilityRepository, useClass: MembershipAbilityPrismaRepository },
+    { provide: RoleRepository, useClass: RoleDrizzleRepository },
+    { provide: MembershipAbilityRepository, useClass: MembershipAbilityDrizzleRepository },
   ],
   exports: [RoleRepository, MembershipAbilityRepository],
 })

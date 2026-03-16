@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
-import { auditDbProvider } from '../audit-db.provider';
-import { AuditQueryPgRepository } from './audit-query.pg-repository';
+import { DatabaseModule } from '@roviq/database';
+import { AuditQueryDrizzleRepository } from './audit-query.drizzle-repository';
 import { AuditQueryRepository } from './audit-query.repository';
-import { AuditWritePgRepository } from './audit-write.pg-repository';
+import { AuditWriteDrizzleRepository } from './audit-write.drizzle-repository';
 import { AuditWriteRepository } from './audit-write.repository';
 
 @Module({
+  imports: [DatabaseModule],
   providers: [
-    auditDbProvider,
-    { provide: AuditQueryRepository, useClass: AuditQueryPgRepository },
-    { provide: AuditWriteRepository, useClass: AuditWritePgRepository },
+    { provide: AuditQueryRepository, useClass: AuditQueryDrizzleRepository },
+    { provide: AuditWriteRepository, useClass: AuditWriteDrizzleRepository },
   ],
   exports: [AuditQueryRepository, AuditWriteRepository],
 })

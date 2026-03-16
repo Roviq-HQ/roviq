@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@roviq/nestjs-prisma';
-import { NotificationConfigPrismaRepository } from './notification-config.prisma-repository';
+import { DatabaseModule } from '@roviq/database';
+import { NotificationConfigDrizzleRepository } from './notification-config.drizzle-repository';
 import { NotificationConfigRepository } from './notification-config.repository';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [DatabaseModule],
   providers: [
     {
       provide: NotificationConfigRepository,
-      useClass: NotificationConfigPrismaRepository,
+      useClass: NotificationConfigDrizzleRepository,
     },
   ],
   exports: [NotificationConfigRepository],
