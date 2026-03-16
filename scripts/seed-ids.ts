@@ -1,0 +1,12 @@
+// Deterministic UUIDs for seeded test data.
+// Imported by scripts/seed.ts and e2e/api-gateway-e2e/e2e-constants.ts.
+// This file must have ZERO @roviq/* imports so Vitest can resolve it.
+export const SEED_IDS = {
+  INSTITUTE_1: '00000000-0000-4000-a000-000000000101',
+  INSTITUTE_2: '00000000-0000-4000-a000-000000000102',
+  USER_ADMIN: '00000000-0000-4000-a000-000000000201',
+  USER_TEACHER: '00000000-0000-4000-a000-000000000202',
+  USER_STUDENT: '00000000-0000-4000-a000-000000000203',
+  PLAN_FREE: '00000000-0000-4000-a000-000000000001',
+  PLAN_PRO: '00000000-0000-4000-a000-000000000002',
+} as const;

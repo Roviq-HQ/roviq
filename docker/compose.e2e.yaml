@@ -1,0 +1,164 @@
+# E2E test environment — isolated, reproducible, one-command.
+# Reads env vars from .env (same as dev), overrides only DB URLs to use roviq_test.
+#
+# Usage:
+#   docker compose -f docker/compose.e2e.yaml --profile hurl up --build --abort-on-container-exit --exit-code-from hurl-tests
+#   docker compose -f docker/compose.e2e.yaml --profile vitest up --build --abort-on-container-exit --exit-code-from vitest-e2e
+#   docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest up --build --abort-on-container-exit
+#
+# Teardown:
+#   docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest down -v --remove-orphans
+
+services:
+  # --- Minimal infra (no observability, no mongodb/minio/temporal) ---
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: roviq
+      POSTGRES_PASSWORD: roviq_dev
+      POSTGRES_DB: roviq
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roviq"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Migrate & seed (one-shot, exits on completion) ---
+
+  migrate-and-seed:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    command: sh -c "pnpm run db:push && pnpm run db:seed"
+    env_file: ../.env
+    environment:
+      # Override DB to use roviq_test instead of dev roviq
+      DATABASE_URL: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+      DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # --- Application services ---
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: api-gateway
+    env_file: ../.env
+    environment:
+      # Override DB to use roviq_test
+      DATABASE_URL: postgresql://roviq_app:roviq_app_dev@postgres:5432/roviq_test
+      DATABASE_URL_ADMIN: postgresql://roviq_admin:roviq_admin_dev@postgres:5432/roviq_test
+      # Override service URLs to use Docker network hostnames
+      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://redis:6379
+      NOTIFICATION_SERVICE_URL: http://notification-service:3002
+      # E2E-specific overrides
+      API_GATEWAY_PORT: "4000"
+      ALLOWED_ORIGINS: "http://localhost:4000"
+      NODE_ENV: test
+    depends_on:
+      migrate-and-seed:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: build
+    command: >
+      sh -c "
+        mkdir -p /app/node_modules/@roviq &&
+        for pkg in /app/dist/libs/*/package.json; do
+          dir=$$(dirname $$pkg) &&
+          name=$$(node -p \"require('$$pkg').name.replace('@roviq/','')\") &&
+          ln -sfn $$dir /app/node_modules/@roviq/$$name;
+        done &&
+        node /app/dist/apps/notification-service/src/main.js
+      "
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql://roviq_app:roviq_app_dev@postgres:5432/roviq_test
+      NATS_URL: nats://nats:4222
+      NODE_ENV: test
+    depends_on:
+      migrate-and-seed:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+
+  # --- Test runners (activated via profiles) ---
+
+  hurl-tests:
+    image: ghcr.io/orange-opensource/hurl:latest
+    volumes:
+      - ../e2e/api-gateway-e2e/hurl:/hurl:ro
+    working_dir: /hurl
+    command: [
+      "--test", "--jobs", "1",
+      "--variables-file", "vars.e2e.env",
+      "--variable", "base_url=http://api-gateway:4000/api",
+      "billing/01-create-plan.hurl",
+      "billing/02-update-plan.hurl",
+      "billing/03-assign-plan.hurl",
+      "billing/04-deactivate-plan.hurl",
+      "billing/05-duplicate-subscription.hurl",
+      "billing/06-subscription-lifecycle.hurl",
+      "billing/07-cancel-at-cycle-end.hurl",
+      "billing/08-cancel-already-canceled.hurl",
+      "billing/09-pause-invalid-state.hurl"
+    ]
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    profiles: [hurl]
+
+  vitest-e2e:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    command: pnpm vitest run --config e2e/api-gateway-e2e/vitest.config.ts
+    env_file: ../.env
+    environment:
+      API_URL: http://api-gateway:4000/api/graphql
+      WS_URL: ws://api-gateway:4000/api/graphql
+      DATABASE_URL_ADMIN: postgresql://roviq_admin:roviq_admin_dev@postgres:5432/roviq_test
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    profiles: [vitest]

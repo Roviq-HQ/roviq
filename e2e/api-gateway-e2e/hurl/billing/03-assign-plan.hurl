@@ -50,18 +50,7 @@ plan_id: jsonpath "$.data.createSubscriptionPlan.id"
 [Asserts]
 jsonpath "$.data.createSubscriptionPlan.amount" == 0
 
-# Step 4: Get the second institute's ID
-POST {{base_url}}/graphql
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-{
-  "query": "{ institutes { id name } }"
-}
-HTTP 200
-[Captures]
-institute_id: jsonpath "$.data.institutes[1].id"
-
-# Step 5: Assign the free plan to the institute (fresh DB — no existing sub)
+# Step 4: Assign the free plan to the institute (fresh DB — no existing sub)
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -69,7 +58,7 @@ Authorization: Bearer {{access_token}}
   "query": "mutation AssignPlan($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id status instituteId planId } checkoutUrl } }",
   "variables": {
     "input": {
-      "instituteId": "{{institute_id}}",
+      "instituteId": "{{institute_2_id}}",
       "planId": "{{plan_id}}",
       "provider": "RAZORPAY",
       "customerEmail": "test@roviq.com",
