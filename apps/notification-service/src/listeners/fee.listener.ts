@@ -6,7 +6,6 @@ import {
   type FeeReminderEvent,
   NOTIFICATION_SUBJECTS,
 } from '@roviq/notifications';
-import { tenantContext } from '@roviq/prisma-client';
 import { NATS_CONNECTION } from '../nats/nats.provider';
 import { NotificationTriggerService } from '../services/notification-trigger.service';
 import { PreferenceLoaderService } from '../services/preference-loader.service';
@@ -50,30 +49,28 @@ export class FeeListener implements OnModuleInit {
       `Processing fee overdue for student "${event.studentId}" in tenant "${event.tenantId}"`,
     );
 
-    await tenantContext.run({ tenantId: event.tenantId }, async () => {
-      const config = await this.preferenceLoader.loadConfig(event.tenantId, 'FEE');
+    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'FEE');
 
-      await this.triggerService.trigger({
-        workflowId: 'fee-overdue',
-        to: { subscriberId: event.studentId },
-        payload: {
-          studentName: event.studentName,
-          feeId: event.feeId,
-          amount: event.amount,
-          currency: event.currency,
-          dueDate: event.dueDate,
-          daysOverdue: event.daysOverdue,
-          feeType: event.feeType,
-          config: {
-            inApp: config.inApp,
-            whatsapp: config.whatsapp,
-            email: config.email,
-            push: config.push,
-          },
-          digestCron: config.digestCron,
+    await this.triggerService.trigger({
+      workflowId: 'fee-overdue',
+      to: { subscriberId: event.studentId },
+      payload: {
+        studentName: event.studentName,
+        feeId: event.feeId,
+        amount: event.amount,
+        currency: event.currency,
+        dueDate: event.dueDate,
+        daysOverdue: event.daysOverdue,
+        feeType: event.feeType,
+        config: {
+          inApp: config.inApp,
+          whatsapp: config.whatsapp,
+          email: config.email,
+          push: config.push,
         },
-        tenantId: event.tenantId,
-      });
+        digestCron: config.digestCron,
+      },
+      tenantId: event.tenantId,
     });
   }
 
@@ -82,30 +79,28 @@ export class FeeListener implements OnModuleInit {
       `Processing fee reminder for student "${event.studentId}" in tenant "${event.tenantId}"`,
     );
 
-    await tenantContext.run({ tenantId: event.tenantId }, async () => {
-      const config = await this.preferenceLoader.loadConfig(event.tenantId, 'FEE');
+    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'FEE');
 
-      await this.triggerService.trigger({
-        workflowId: 'fee-reminder',
-        to: { subscriberId: event.studentId },
-        payload: {
-          studentName: event.studentName,
-          feeId: event.feeId,
-          amount: event.amount,
-          currency: event.currency,
-          dueDate: event.dueDate,
-          feeType: event.feeType,
-          feePeriod: event.feePeriod,
-          config: {
-            inApp: config.inApp,
-            whatsapp: config.whatsapp,
-            email: config.email,
-            push: config.push,
-          },
-          digestCron: config.digestCron,
+    await this.triggerService.trigger({
+      workflowId: 'fee-reminder',
+      to: { subscriberId: event.studentId },
+      payload: {
+        studentName: event.studentName,
+        feeId: event.feeId,
+        amount: event.amount,
+        currency: event.currency,
+        dueDate: event.dueDate,
+        feeType: event.feeType,
+        feePeriod: event.feePeriod,
+        config: {
+          inApp: config.inApp,
+          whatsapp: config.whatsapp,
+          email: config.email,
+          push: config.push,
         },
-        tenantId: event.tenantId,
-      });
+        digestCron: config.digestCron,
+      },
+      tenantId: event.tenantId,
     });
   }
 }

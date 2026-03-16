@@ -6,13 +6,6 @@ vi.mock('@roviq/nats-utils', () => ({
   subscribe: vi.fn(),
 }));
 
-// Mock @roviq/prisma-client tenantContext so it just runs the callback
-vi.mock('@roviq/prisma-client', () => ({
-  tenantContext: {
-    run: vi.fn((_ctx: unknown, fn: () => Promise<unknown>) => fn()),
-  },
-}));
-
 import { AttendanceListener } from '../attendance.listener';
 
 type Handler = (payload: AttendanceAbsentEvent, meta: object) => Promise<void>;
