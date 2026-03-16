@@ -13,14 +13,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@roviq/ee-payments': path.resolve(__dirname, 'src/index.ts'),
-      '@roviq/prisma-client': path.resolve(
-        __dirname,
-        '../../../../libs/backend/prisma-client/src/index.ts',
-      ),
-      '@roviq/nestjs-prisma': path.resolve(
-        __dirname,
-        '../../../../libs/backend/nestjs-prisma/src/index.ts',
-      ),
       '@roviq/nats-utils': path.resolve(
         __dirname,
         '../../../../libs/backend/nats-utils/src/index.ts',

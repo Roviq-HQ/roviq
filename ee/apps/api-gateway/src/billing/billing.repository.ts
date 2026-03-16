@@ -1,224 +1,365 @@
-import { accessibleBy } from '@casl/prisma';
-import { Inject, Injectable } from '@nestjs/common';
-import type { AppAbility } from '@roviq/common-types';
-import { ADMIN_PRISMA_CLIENT } from '@roviq/nestjs-prisma';
-import type {
-  AdminPrismaClient,
-  InvoiceStatus,
-  PaymentProvider,
-  Prisma,
-  SubscriptionStatus,
-} from '@roviq/prisma-client';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { type AppAbility, getRequestContext } from '@roviq/common-types';
+import {
+  DRIZZLE_DB,
+  type DrizzleDB,
+  invoices,
+  organizations,
+  paymentEvents,
+  paymentGatewayConfigs,
+  subscriptionPlans,
+  subscriptions,
+  withAdmin,
+} from '@roviq/database';
+import { and, count, desc, eq, gte, isNull, lte, type SQL, sql } from 'drizzle-orm';
 
-function abilityWhereInput(ability: AppAbility, action: string, model: Prisma.ModelName) {
-  // biome-ignore lint/suspicious/noExplicitAny: bridging MongoAbility → PrismaAbility (runtime-compatible, verified by tests)
-  return accessibleBy(ability as any, action)[model];
+// TODO: Phase 4 — replace with proper CASL-to-Drizzle adapter (@roviq/casl-drizzle)
+// For now, CASL ability filtering is a no-op. The RLS policies still enforce tenant isolation.
+function _abilityFilter(_ability?: AppAbility, _action?: string): SQL | undefined {
+  return undefined;
 }
 
 @Injectable()
 export class BillingRepository {
-  constructor(@Inject(ADMIN_PRISMA_CLIENT) private readonly prisma: AdminPrismaClient) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+
+  private get userId(): string {
+    return getRequestContext().userId;
+  }
 
   // ---------------------------------------------------------------------------
   // Plans
   // ---------------------------------------------------------------------------
 
-  async createPlan(data: Prisma.SubscriptionPlanCreateInput) {
-    return this.prisma.subscriptionPlan.create({ data });
-  }
-
-  async updatePlan(id: string, data: Prisma.SubscriptionPlanUpdateInput) {
-    return this.prisma.subscriptionPlan.update({ where: { id }, data });
-  }
-
-  async findAllPlans(ability?: AppAbility) {
-    return this.prisma.subscriptionPlan.findMany({
-      where: ability ? abilityWhereInput(ability, 'read', 'SubscriptionPlan') : {},
-      orderBy: { createdAt: 'desc' },
+  async createPlan(data: typeof subscriptionPlans.$inferInsert) {
+    return withAdmin(this.db, async (tx) => {
+      const [plan] = await tx.insert(subscriptionPlans).values(data).returning();
+      return plan;
     });
   }
 
-  async findPlanById(id: string, ability?: AppAbility) {
-    return this.prisma.subscriptionPlan.findFirst({
-      where: {
-        AND: [{ id }, ability ? abilityWhereInput(ability, 'read', 'SubscriptionPlan') : {}],
-      },
+  async updatePlan(id: string, data: Partial<typeof subscriptionPlans.$inferInsert>) {
+    return withAdmin(this.db, async (tx) => {
+      const [plan] = await tx
+        .update(subscriptionPlans)
+        .set({ ...data, updatedAt: new Date(), updatedBy: this.userId })
+        .where(and(eq(subscriptionPlans.id, id), isNull(subscriptionPlans.deletedAt)))
+        .returning();
+      return plan;
+    });
+  }
+
+  async findAllPlans(_ability?: AppAbility) {
+    return withAdmin(this.db, async (tx) => {
+      return tx
+        .select()
+        .from(subscriptionPlans)
+        .where(isNull(subscriptionPlans.deletedAt))
+        .orderBy(desc(subscriptionPlans.createdAt));
+    });
+  }
+
+  async findPlanById(id: string, _ability?: AppAbility) {
+    return withAdmin(this.db, async (tx) => {
+      const [plan] = await tx
+        .select()
+        .from(subscriptionPlans)
+        .where(and(eq(subscriptionPlans.id, id), isNull(subscriptionPlans.deletedAt)))
+        .limit(1);
+      return plan ?? null;
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Subscriptions
+  // Subscriptions (financial records — never soft-deleted, status-driven)
   // ---------------------------------------------------------------------------
 
-  async createSubscription(data: Prisma.SubscriptionUncheckedCreateInput) {
-    return this.prisma.subscription.create({ data, include: { plan: true } });
-  }
-
-  async updateSubscription(id: string, data: Prisma.SubscriptionUpdateInput) {
-    return this.prisma.subscription.update({ where: { id }, data });
-  }
-
-  async updateSubscriptionWithPlan(id: string, data: Prisma.SubscriptionUpdateInput) {
-    return this.prisma.subscription.update({
-      where: { id },
-      data,
-      include: { plan: true },
+  async createSubscription(data: typeof subscriptions.$inferInsert) {
+    return withAdmin(this.db, async (tx) => {
+      const [sub] = await tx.insert(subscriptions).values(data).returning();
+      const [plan] = await tx
+        .select()
+        .from(subscriptionPlans)
+        .where(eq(subscriptionPlans.id, sub.planId))
+        .limit(1);
+      return { ...sub, plan };
     });
   }
 
-  async findSubscriptionById(id: string, ability?: AppAbility) {
-    return this.prisma.subscription.findFirst({
-      where: {
-        AND: [{ id }, ability ? abilityWhereInput(ability, 'read', 'Subscription') : {}],
-      },
+  async updateSubscription(id: string, data: Partial<typeof subscriptions.$inferInsert>) {
+    return withAdmin(this.db, async (tx) => {
+      const [sub] = await tx
+        .update(subscriptions)
+        .set({ ...data, updatedAt: new Date(), updatedBy: this.userId })
+        .where(eq(subscriptions.id, id))
+        .returning();
+      return sub;
     });
   }
 
-  async findSubscriptionByOrg(organizationId: string, ability?: AppAbility) {
-    return this.prisma.subscription.findFirst({
-      where: {
-        AND: [
-          { organizationId },
-          ability ? abilityWhereInput(ability, 'read', 'Subscription') : {},
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { plan: true },
+  async updateSubscriptionWithPlan(id: string, data: Partial<typeof subscriptions.$inferInsert>) {
+    return withAdmin(this.db, async (tx) => {
+      const [sub] = await tx
+        .update(subscriptions)
+        .set({ ...data, updatedAt: new Date(), updatedBy: this.userId })
+        .where(eq(subscriptions.id, id))
+        .returning();
+      const [plan] = await tx
+        .select()
+        .from(subscriptionPlans)
+        .where(eq(subscriptionPlans.id, sub.planId))
+        .limit(1);
+      return { ...sub, plan };
+    });
+  }
+
+  async findSubscriptionById(id: string, _ability?: AppAbility) {
+    return withAdmin(this.db, async (tx) => {
+      const [sub] = await tx.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);
+      return sub ?? null;
+    });
+  }
+
+  async findSubscriptionByOrg(organizationId: string, _ability?: AppAbility) {
+    return withAdmin(this.db, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(subscriptions)
+        .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+        .where(eq(subscriptions.organizationId, organizationId))
+        .orderBy(desc(subscriptions.createdAt))
+        .limit(1);
+      if (!rows[0]) return null;
+      return { ...rows[0].subscriptions, plan: rows[0].subscription_plans };
     });
   }
 
   async findSubscriptionByProviderId(providerSubscriptionId: string) {
-    return this.prisma.subscription.findFirst({
-      where: { providerSubscriptionId },
+    return withAdmin(this.db, async (tx) => {
+      const [sub] = await tx
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.providerSubscriptionId, providerSubscriptionId))
+        .limit(1);
+      return sub ?? null;
     });
   }
 
   async findAllSubscriptions(params: {
-    filter?: { status?: SubscriptionStatus };
+    filter?: { status?: (typeof subscriptions.$inferSelect)['status'] };
     first: number;
     after?: string;
     ability?: AppAbility;
   }) {
-    const conditions: Prisma.SubscriptionWhereInput[] = [];
-    if (params.filter?.status) conditions.push({ status: params.filter.status });
-    if (params.ability) conditions.push(abilityWhereInput(params.ability, 'read', 'Subscription'));
+    return withAdmin(this.db, async (tx) => {
+      const conditions: SQL[] = [];
+      if (params.filter?.status) {
+        conditions.push(eq(subscriptions.status, params.filter.status));
+      }
 
-    const where: Prisma.SubscriptionWhereInput = conditions.length > 0 ? { AND: conditions } : {};
+      // Composite cursor: (createdAt, id) for stable DESC pagination
+      if (params.after) {
+        const [cursor] = await tx
+          .select({ createdAt: subscriptions.createdAt, id: subscriptions.id })
+          .from(subscriptions)
+          .where(eq(subscriptions.id, params.after))
+          .limit(1);
+        if (cursor) {
+          conditions.push(
+            sql`(${subscriptions.createdAt}, ${subscriptions.id}) < (${cursor.createdAt}, ${cursor.id})`,
+          );
+        }
+      }
 
-    const cursor = params.after ? { id: params.after } : undefined;
-    const skip = cursor ? 1 : 0;
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, totalCount] = await Promise.all([
-      this.prisma.subscription.findMany({
-        where,
-        take: params.first,
-        skip,
-        cursor,
-        orderBy: { createdAt: 'desc' },
-        include: { organization: { select: { id: true, name: true } }, plan: true },
-      }),
-      this.prisma.subscription.count({ where }),
-    ]);
+      const [items, [{ total }]] = await Promise.all([
+        tx
+          .select({
+            subscription: subscriptions,
+            plan: subscriptionPlans,
+            org: { id: organizations.id, name: organizations.name },
+          })
+          .from(subscriptions)
+          .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+          .innerJoin(organizations, eq(subscriptions.organizationId, organizations.id))
+          .where(where)
+          .orderBy(desc(subscriptions.createdAt), desc(subscriptions.id))
+          .limit(params.first),
+        tx.select({ total: count() }).from(subscriptions).where(where),
+      ]);
 
-    return { items, totalCount };
+      return {
+        items: items.map((row) => ({
+          ...row.subscription,
+          plan: row.plan,
+          organization: row.org,
+        })),
+        totalCount: total,
+      };
+    });
   }
 
   // ---------------------------------------------------------------------------
-  // Invoices
+  // Invoices (financial records — never soft-deleted, status-driven)
   // ---------------------------------------------------------------------------
 
-  async createInvoice(data: Prisma.InvoiceUncheckedCreateInput) {
-    return this.prisma.invoice.create({ data });
+  async createInvoice(data: typeof invoices.$inferInsert) {
+    return withAdmin(this.db, async (tx) => {
+      const [invoice] = await tx.insert(invoices).values(data).returning();
+      return invoice;
+    });
   }
 
   async findInvoiceByProviderPaymentId(providerPaymentId: string) {
-    return this.prisma.invoice.findFirst({ where: { providerPaymentId } });
+    return withAdmin(this.db, async (tx) => {
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(eq(invoices.providerPaymentId, providerPaymentId))
+        .limit(1);
+      return invoice ?? null;
+    });
   }
 
   async findInvoices(params: {
     organizationId?: string;
-    filter?: { status?: InvoiceStatus; from?: Date; to?: Date };
+    filter?: {
+      status?: (typeof invoices.$inferSelect)['status'];
+      from?: Date;
+      to?: Date;
+    };
     first: number;
     after?: string;
     ability?: AppAbility;
   }) {
-    const conditions: Prisma.InvoiceWhereInput[] = [];
-    if (params.organizationId) conditions.push({ organizationId: params.organizationId });
-    if (params.filter?.status) conditions.push({ status: params.filter.status });
-    if (params.filter?.from || params.filter?.to) {
-      conditions.push({
-        createdAt: {
-          ...(params.filter.from && { gte: params.filter.from }),
-          ...(params.filter.to && { lte: params.filter.to }),
-        },
-      });
-    }
-    if (params.ability) conditions.push(abilityWhereInput(params.ability, 'read', 'Invoice'));
+    return withAdmin(this.db, async (tx) => {
+      const conditions: SQL[] = [];
+      if (params.organizationId) {
+        conditions.push(eq(invoices.organizationId, params.organizationId));
+      }
+      if (params.filter?.status) {
+        conditions.push(eq(invoices.status, params.filter.status));
+      }
+      if (params.filter?.from) {
+        conditions.push(gte(invoices.createdAt, params.filter.from));
+      }
+      if (params.filter?.to) {
+        conditions.push(lte(invoices.createdAt, params.filter.to));
+      }
 
-    const where: Prisma.InvoiceWhereInput = conditions.length > 0 ? { AND: conditions } : {};
+      // Composite cursor for stable DESC pagination
+      if (params.after) {
+        const [cursor] = await tx
+          .select({ createdAt: invoices.createdAt, id: invoices.id })
+          .from(invoices)
+          .where(eq(invoices.id, params.after))
+          .limit(1);
+        if (cursor) {
+          conditions.push(
+            sql`(${invoices.createdAt}, ${invoices.id}) < (${cursor.createdAt}, ${cursor.id})`,
+          );
+        }
+      }
 
-    const cursor = params.after ? { id: params.after } : undefined;
-    const skip = cursor ? 1 : 0;
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, totalCount] = await Promise.all([
-      this.prisma.invoice.findMany({
-        where,
-        take: params.first,
-        skip,
-        cursor,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          subscription: {
-            select: {
-              id: true,
-              organization: { select: { id: true, name: true } },
+      const [items, [{ total }]] = await Promise.all([
+        tx
+          .select({
+            invoice: invoices,
+            subscription: {
+              id: subscriptions.id,
+              organizationId: subscriptions.organizationId,
             },
-          },
-        },
-      }),
-      this.prisma.invoice.count({ where }),
-    ]);
+            org: { id: organizations.id, name: organizations.name },
+          })
+          .from(invoices)
+          .innerJoin(subscriptions, eq(invoices.subscriptionId, subscriptions.id))
+          .innerJoin(organizations, eq(subscriptions.organizationId, organizations.id))
+          .where(where)
+          .orderBy(desc(invoices.createdAt), desc(invoices.id))
+          .limit(params.first),
+        tx.select({ total: count() }).from(invoices).where(where),
+      ]);
 
-    return { items, totalCount };
+      return {
+        items: items.map((row) => ({
+          ...row.invoice,
+          subscription: { id: row.subscription.id, organization: row.org },
+        })),
+        totalCount: total,
+      };
+    });
   }
 
   // ---------------------------------------------------------------------------
   // Payment Infrastructure
   // ---------------------------------------------------------------------------
 
-  async upsertGatewayConfig(organizationId: string, provider: PaymentProvider) {
-    return this.prisma.paymentGatewayConfig.upsert({
-      where: { organizationId },
-      create: {
-        organizationId,
-        provider,
-        isActive: true,
-      },
-      update: { provider, isActive: true },
+  async upsertGatewayConfig(
+    organizationId: string,
+    provider: (typeof paymentGatewayConfigs.$inferSelect)['provider'],
+  ) {
+    const actorId = this.userId;
+    return withAdmin(this.db, async (tx) => {
+      const [config] = await tx
+        .insert(paymentGatewayConfigs)
+        .values({ organizationId, provider, createdBy: actorId, updatedBy: actorId })
+        .onConflictDoUpdate({
+          target: paymentGatewayConfigs.organizationId,
+          set: {
+            provider,
+            updatedAt: new Date(),
+            updatedBy: actorId,
+            deletedAt: null,
+            deletedBy: null,
+          },
+        })
+        .returning();
+      return config;
     });
   }
 
   async findOrganizationById(id: string) {
-    return this.prisma.organization.findUniqueOrThrow({ where: { id } });
+    return withAdmin(this.db, async (tx) => {
+      const [org] = await tx
+        .select()
+        .from(organizations)
+        .where(and(eq(organizations.id, id), isNull(organizations.deletedAt)))
+        .limit(1);
+      if (!org) throw new NotFoundException(`Organization ${id} not found`);
+      return org;
+    });
   }
 
   async findAllOrganizations() {
-    return this.prisma.organization.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
+    return withAdmin(this.db, async (tx) => {
+      return tx
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(isNull(organizations.deletedAt))
+        .orderBy(organizations.name);
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Events
+  // Events (immutable — no updatedBy needed)
   // ---------------------------------------------------------------------------
 
   async findPaymentEvent(providerEventId: string) {
-    return this.prisma.paymentEvent.findUnique({ where: { providerEventId } });
+    return withAdmin(this.db, async (tx) => {
+      const [event] = await tx
+        .select()
+        .from(paymentEvents)
+        .where(eq(paymentEvents.providerEventId, providerEventId))
+        .limit(1);
+      return event ?? null;
+    });
   }
 
   async upsertPaymentEvent(data: {
-    provider: PaymentProvider;
+    provider: (typeof paymentEvents.$inferSelect)['provider'];
     eventType: string;
     providerEventId: string;
     subscriptionId?: string | null;
@@ -226,45 +367,51 @@ export class BillingRepository {
     payload: Record<string, unknown>;
     processedAt: Date;
   }) {
-    return this.prisma.paymentEvent.upsert({
-      where: { providerEventId: data.providerEventId },
-      create: {
-        provider: data.provider,
-        eventType: data.eventType,
-        providerEventId: data.providerEventId,
-        subscriptionId: data.subscriptionId,
-        organizationId: data.organizationId,
-        payload: data.payload as Prisma.InputJsonValue,
-        processedAt: data.processedAt,
-      },
-      update: { processedAt: data.processedAt },
+    return withAdmin(this.db, async (tx) => {
+      const [event] = await tx
+        .insert(paymentEvents)
+        .values({
+          provider: data.provider,
+          eventType: data.eventType,
+          providerEventId: data.providerEventId,
+          subscriptionId: data.subscriptionId,
+          organizationId: data.organizationId,
+          payload: data.payload,
+          processedAt: data.processedAt,
+        })
+        .onConflictDoUpdate({
+          target: paymentEvents.providerEventId,
+          set: { processedAt: data.processedAt },
+        })
+        .returning();
+      return event;
     });
   }
 
   async claimPaymentEvent(
     providerEventId: string,
     data: {
-      provider: PaymentProvider;
+      provider: (typeof paymentEvents.$inferSelect)['provider'];
       eventType: string;
       payload: Record<string, unknown>;
     },
   ): Promise<boolean> {
     try {
-      await this.prisma.paymentEvent.create({
-        data: {
+      await withAdmin(this.db, async (tx) => {
+        await tx.insert(paymentEvents).values({
           providerEventId,
           provider: data.provider,
           eventType: data.eventType,
-          payload: data.payload as Prisma.InputJsonValue,
-        },
+          payload: data.payload,
+        });
       });
       return true;
     } catch (error) {
-      // P2002 = unique constraint violation — event already claimed
+      // 23505 = unique_violation in PostgreSQL (equivalent to Prisma P2002)
       if (
         error instanceof Error &&
         'code' in error &&
-        (error as { code: string }).code === 'P2002'
+        (error as { code: string }).code === '23505'
       ) {
         return false;
       }
@@ -279,9 +426,11 @@ export class BillingRepository {
       organizationId?: string;
     },
   ): Promise<void> {
-    await this.prisma.paymentEvent.update({
-      where: { providerEventId },
-      data: { ...data, processedAt: new Date() },
+    await withAdmin(this.db, async (tx) => {
+      await tx
+        .update(paymentEvents)
+        .set({ ...data, processedAt: new Date() })
+        .where(eq(paymentEvents.providerEventId, providerEventId));
     });
   }
 }

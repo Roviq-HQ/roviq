@@ -1,5 +1,5 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
-import { BillingInterval, type FeatureLimits } from '@roviq/ee-billing-types';
+import { BillingInterval, type FeatureLimits, PlanStatus } from '@roviq/ee-billing-types';
 import { GraphQLJSON } from 'graphql-type-json';
 
 @ObjectType()
@@ -25,8 +25,8 @@ export class SubscriptionPlanModel {
   @Field(() => GraphQLJSON)
   featureLimits!: FeatureLimits;
 
-  @Field()
-  isActive!: boolean;
+  @Field(() => PlanStatus)
+  status!: PlanStatus;
 
   @Field()
   createdAt!: Date;

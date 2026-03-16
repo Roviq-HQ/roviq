@@ -26,6 +26,17 @@ export enum PaymentProvider {
   RAZORPAY = 'RAZORPAY',
 }
 
+export enum PlanStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  ARCHIVED = 'ARCHIVED',
+}
+
+export enum GatewayConfigStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
+
 export interface FeatureLimits {
   [key: string]: number | undefined;
   maxUsers?: number;
