@@ -50,18 +50,7 @@ plan_id: jsonpath "$.data.createSubscriptionPlan.id"
 [Asserts]
 jsonpath "$.data.createSubscriptionPlan.amount" == 49900
 
-# Step 4: Get the first institute's ID
-POST {{base_url}}/graphql
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-{
-  "query": "{ institutes { id name } }"
-}
-HTTP 200
-[Captures]
-institute_id: jsonpath "$.data.institutes[0].id"
-
-# Step 5: Assign the paid plan → gateway creates provider plan + subscription (fresh DB — no existing sub)
+# Step 4: Assign the paid plan → gateway creates provider plan + subscription (fresh DB — no existing sub)
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -69,7 +58,7 @@ Authorization: Bearer {{access_token}}
   "query": "mutation AssignPlan($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id status providerSubscriptionId } checkoutUrl } }",
   "variables": {
     "input": {
-      "instituteId": "{{institute_id}}",
+      "instituteId": "{{institute_1_id}}",
       "planId": "{{plan_id}}",
       "provider": "{{provider}}",
       "customerEmail": "test@roviq.com",
@@ -86,13 +75,13 @@ jsonpath "$.data.assignPlanToInstitute.subscription.status" == "PENDING_PAYMENT"
 jsonpath "$.data.assignPlanToInstitute.subscription.providerSubscriptionId" != null
 jsonpath "$.data.assignPlanToInstitute.checkoutUrl" != null
 
-# Step 7: Verify subscription via query
+# Step 5: Verify subscription via query
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
   "query": "query Sub($instituteId: ID!) { subscription(instituteId: $instituteId) { id status providerSubscriptionId } }",
-  "variables": { "instituteId": "{{institute_id}}" }
+  "variables": { "instituteId": "{{institute_1_id}}" }
 }
 HTTP 200
 [Asserts]

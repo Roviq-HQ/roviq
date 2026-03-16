@@ -10,6 +10,30 @@
       "options": {
         "cwd": "{projectRoot}"
       }
+    },
+    "e2e:hurl": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl up --build --abort-on-container-exit --exit-code-from hurl-tests"
+      }
+    },
+    "e2e:vitest": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose -f docker/compose.e2e.yaml --profile vitest up --build --abort-on-container-exit --exit-code-from vitest-e2e"
+      }
+    },
+    "e2e:all": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest up --build --abort-on-container-exit"
+      }
+    },
+    "e2e:down": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest down -v --remove-orphans"
+      }
     }
   },
   "tags": ["e2e"]

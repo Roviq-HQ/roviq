@@ -1,59 +1,12 @@
-import type { FormattedExecutionResult } from 'graphql';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const API_URL = process.env.API_URL || 'http://localhost:3000/api/graphql';
+import { E2E_USERS } from '../e2e-constants';
+import { loginAsAdmin } from './helpers/auth';
+import { gql } from './helpers/gql-client';
+
 const DATABASE_URL =
   process.env.DATABASE_URL_ADMIN || 'postgresql://roviq_admin:roviq_admin_dev@localhost:5432/roviq';
-
-// biome-ignore lint/suspicious/noExplicitAny: e2e tests use dynamic GraphQL queries with varying response shapes
-type GqlResult = FormattedExecutionResult<Record<string, any>>;
-
-async function gql(
-  query: string,
-  variables?: Record<string, unknown>,
-  token?: string,
-): Promise<GqlResult> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ query, variables }),
-  });
-  return res.json() as Promise<GqlResult>;
-}
-
-/** Get a tenant-scoped admin token (login → selectInstitute) */
-async function getAdminToken(): Promise<{ accessToken: string; tenantId: string }> {
-  const loginRes = await gql(`
-    mutation {
-      login(username: "admin", password: "admin123") {
-        platformToken
-        memberships { tenantId instituteName }
-      }
-    }
-  `);
-
-  const platformToken = loginRes.data?.login?.platformToken;
-  const tenantId = loginRes.data?.login?.memberships?.[0]?.tenantId;
-
-  const selectRes = await gql(
-    `mutation SelectInstitute($tenantId: String!) {
-      selectInstitute(tenantId: $tenantId) {
-        accessToken
-      }
-    }`,
-    { tenantId },
-    platformToken,
-  );
-
-  return {
-    accessToken: selectRes.data!.selectInstitute.accessToken,
-    tenantId,
-  };
-}
 
 /**
  * Execute a query against audit_logs with RLS context set.
@@ -81,6 +34,56 @@ async function queryWithRls(
   }
 }
 
+/**
+ * Execute a query with platform admin context, bypassing tenant isolation.
+ * Sets app.is_platform_admin = 'true' so the admin_platform_access policy passes.
+ */
+async function queryAsPlatformAdmin(
+  pool: pg.Pool,
+  sql: string,
+  params: unknown[] = [],
+): Promise<pg.QueryResult> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.is_platform_admin', 'true', true)");
+    const result = await client.query(sql, params);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Poll DB until an audit log row appears for the given tenant and action.
+ * Uses set_config for RLS context since FORCE ROW LEVEL SECURITY is enabled.
+ */
+async function waitForAuditLog(
+  pool: pg.Pool,
+  tenantId: string,
+  action: string,
+  timeoutMs = 5000,
+): Promise<Record<string, unknown>[]> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const result = await queryWithRls(
+      pool,
+      tenantId,
+      `SELECT * FROM audit_logs WHERE tenant_id = $1 AND action = $2 ORDER BY created_at DESC LIMIT 5`,
+      [tenantId, action],
+    );
+    if (result.rows.length > 0) return result.rows;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(
+    `No audit log found for tenant=${tenantId} action=${action} after ${timeoutMs}ms`,
+  );
+}
+
 describe('Audit E2E', () => {
   let pool: pg.Pool;
   let adminToken: string;
@@ -97,7 +100,7 @@ describe('Audit E2E', () => {
 
     pool = new pg.Pool({ connectionString: DATABASE_URL, max: 3 });
 
-    const admin = await getAdminToken();
+    const admin = await loginAsAdmin();
     adminToken = admin.accessToken;
     adminTenantId = admin.tenantId;
   });
@@ -113,7 +116,7 @@ describe('Audit E2E', () => {
       // Use teacher1 (single-institute, gets direct accessToken with tenantId)
       const loginRes = await gql(`
         mutation {
-          login(username: "teacher1", password: "teacher123") {
+          login(username: "${E2E_USERS.TEACHER.username}", password: "${E2E_USERS.TEACHER.password}") {
             accessToken
             refreshToken
             user { id tenantId }
@@ -405,53 +408,3 @@ describe('Audit E2E', () => {
     });
   });
 });
-
-/**
- * Execute a query with platform admin context, bypassing tenant isolation.
- * Sets app.is_platform_admin = 'true' so the admin_platform_access policy passes.
- */
-async function queryAsPlatformAdmin(
-  pool: pg.Pool,
-  sql: string,
-  params: unknown[] = [],
-): Promise<pg.QueryResult> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.is_platform_admin', 'true', true)");
-    const result = await client.query(sql, params);
-    await client.query('COMMIT');
-    return result;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Poll DB until an audit log row appears for the given tenant and action.
- * Uses set_config for RLS context since FORCE ROW LEVEL SECURITY is enabled.
- */
-async function waitForAuditLog(
-  pool: pg.Pool,
-  tenantId: string,
-  action: string,
-  timeoutMs = 5000,
-): Promise<Record<string, unknown>[]> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const result = await queryWithRls(
-      pool,
-      tenantId,
-      `SELECT * FROM audit_logs WHERE tenant_id = $1 AND action = $2 ORDER BY created_at DESC LIMIT 5`,
-      [tenantId, action],
-    );
-    if (result.rows.length > 0) return result.rows;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error(
-    `No audit log found for tenant=${tenantId} action=${action} after ${timeoutMs}ms`,
-  );
-}

@@ -65,24 +65,13 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.updateSubscriptionPlan.status" == "INACTIVE"
 
-# Step 5: Get institute ID
-POST {{base_url}}/graphql
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-{
-  "query": "{ institutes { id name } }"
-}
-HTTP 200
-[Captures]
-institute_id: jsonpath "$.data.institutes[1].id"
-
-# Step 6: Cancel any existing subscription to free up the institute
+# Step 5: Cancel any existing subscription to free up the institute
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
   "query": "query Sub($instituteId: ID!) { subscription(instituteId: $instituteId) { id status } }",
-  "variables": { "instituteId": "{{institute_id}}" }
+  "variables": { "instituteId": "{{institute_2_id}}" }
 }
 HTTP 200
 [Captures]
@@ -97,7 +86,7 @@ Authorization: Bearer {{access_token}}
 }
 HTTP 200
 
-# Step 7: Try to assign the deactivated plan — should fail
+# Step 6: Try to assign the deactivated plan — should fail
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -105,7 +94,7 @@ Authorization: Bearer {{access_token}}
   "query": "mutation AssignPlan($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id } } }",
   "variables": {
     "input": {
-      "instituteId": "{{institute_id}}",
+      "instituteId": "{{institute_2_id}}",
       "planId": "{{plan_id}}",
       "provider": "RAZORPAY",
       "customerEmail": "test@roviq.com",

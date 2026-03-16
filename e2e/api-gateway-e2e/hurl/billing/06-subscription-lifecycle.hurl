@@ -47,18 +47,7 @@ HTTP 200
 [Captures]
 plan_id: jsonpath "$.data.createSubscriptionPlan.id"
 
-# Step 4: Get the first institute's ID
-POST {{base_url}}/graphql
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-{
-  "query": "{ institutes { id name } }"
-}
-HTTP 200
-[Captures]
-institute_id: jsonpath "$.data.institutes[0].id"
-
-# Step 5: Assign the free plan → creates an ACTIVE subscription (fresh DB — no existing sub)
+# Step 4: Assign the free plan → creates an ACTIVE subscription (fresh DB — no existing sub)
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -66,7 +55,7 @@ Authorization: Bearer {{access_token}}
   "query": "mutation AssignPlan($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id status } } }",
   "variables": {
     "input": {
-      "instituteId": "{{institute_id}}",
+      "instituteId": "{{institute_1_id}}",
       "planId": "{{plan_id}}",
       "provider": "RAZORPAY",
       "customerEmail": "test@roviq.com",
@@ -80,7 +69,7 @@ sub_id: jsonpath "$.data.assignPlanToInstitute.subscription.id"
 [Asserts]
 jsonpath "$.data.assignPlanToInstitute.subscription.status" == "ACTIVE"
 
-# Step 8: Pause the subscription
+# Step 5: Pause the subscription
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -93,19 +82,19 @@ HTTP 200
 jsonpath "$.data.pauseSubscription.id" == {{sub_id}}
 jsonpath "$.data.pauseSubscription.status" == "PAUSED"
 
-# Step 9: Re-query — verify the subscription is now PAUSED
+# Step 6: Re-query — verify the subscription is now PAUSED
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
   "query": "query Sub($instituteId: ID!) { subscription(instituteId: $instituteId) { id status } }",
-  "variables": { "instituteId": "{{institute_id}}" }
+  "variables": { "instituteId": "{{institute_1_id}}" }
 }
 HTTP 200
 [Asserts]
 jsonpath "$.data.subscription.status" == "PAUSED"
 
-# Step 10: Resume the subscription
+# Step 7: Resume the subscription
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -118,13 +107,13 @@ HTTP 200
 jsonpath "$.data.resumeSubscription.id" == {{sub_id}}
 jsonpath "$.data.resumeSubscription.status" == "ACTIVE"
 
-# Step 11: Final verify — subscription is back to ACTIVE
+# Step 8: Final verify — subscription is back to ACTIVE
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
   "query": "query Sub($instituteId: ID!) { subscription(instituteId: $instituteId) { id status } }",
-  "variables": { "instituteId": "{{institute_id}}" }
+  "variables": { "instituteId": "{{institute_1_id}}" }
 }
 HTTP 200
 [Asserts]

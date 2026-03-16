@@ -17,6 +17,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
+import { SEED_IDS } from './seed-ids';
+
 async function main() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL_MIGRATE || process.env.DATABASE_URL,
@@ -49,6 +51,7 @@ async function main() {
     const [institute] = await tx
       .insert(institutes)
       .values({
+        id: SEED_IDS.INSTITUTE_1,
         name: { en: 'Demo Institute' },
         slug: 'demo-institute',
         timezone: 'Asia/Kolkata',
@@ -67,6 +70,7 @@ async function main() {
     const [institute2] = await tx
       .insert(institutes)
       .values({
+        id: SEED_IDS.INSTITUTE_2,
         name: { en: 'Second Institute' },
         slug: 'second-institute',
         timezone: 'Asia/Kolkata',
@@ -165,6 +169,7 @@ async function main() {
     const [admin] = await tx
       .insert(users)
       .values({
+        id: SEED_IDS.USER_ADMIN,
         username: 'admin',
         email: 'admin@demo-institute.com',
         passwordHash: adminPassword,
@@ -178,6 +183,7 @@ async function main() {
     const [teacher] = await tx
       .insert(users)
       .values({
+        id: SEED_IDS.USER_TEACHER,
         username: 'teacher1',
         email: 'teacher1@demo-institute.com',
         passwordHash: teacherPassword,
@@ -191,6 +197,7 @@ async function main() {
     const [student] = await tx
       .insert(users)
       .values({
+        id: SEED_IDS.USER_STUDENT,
         username: 'student1',
         email: 'student1@demo-institute.com',
         passwordHash: studentPassword,
@@ -305,7 +312,7 @@ async function seedBillingData(tx: DrizzleDB, instituteId: string, instituteName
   const [freePlan] = await tx
     .insert(subscriptionPlans)
     .values({
-      id: '00000000-0000-4000-a000-000000000001',
+      id: SEED_IDS.PLAN_FREE,
       name: { en: 'Free' },
       description: { en: 'Free tier for evaluation' },
       amount: 0,
@@ -325,7 +332,7 @@ async function seedBillingData(tx: DrizzleDB, instituteId: string, instituteName
   const [proPlan] = await tx
     .insert(subscriptionPlans)
     .values({
-      id: '00000000-0000-4000-a000-000000000002',
+      id: SEED_IDS.PLAN_PRO,
       name: { en: 'Pro' },
       description: { en: 'Professional plan for growing institutes' },
       amount: 99900,

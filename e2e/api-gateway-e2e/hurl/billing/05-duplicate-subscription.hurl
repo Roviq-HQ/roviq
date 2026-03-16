@@ -67,23 +67,13 @@ HTTP 200
 [Captures]
 plan_b_id: jsonpath "$.data.createSubscriptionPlan.id"
 
-# Step 4: Get institute ID and cancel any existing subscription
-POST {{base_url}}/graphql
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-{
-  "query": "{ institutes { id name } }"
-}
-HTTP 200
-[Captures]
-institute_id: jsonpath "$.data.institutes[1].id"
-
+# Step 4: Cancel any existing subscription
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
   "query": "query Sub($instituteId: ID!) { subscription(instituteId: $instituteId) { id status } }",
-  "variables": { "instituteId": "{{institute_id}}" }
+  "variables": { "instituteId": "{{institute_2_id}}" }
 }
 HTTP 200
 [Captures]
@@ -106,7 +96,7 @@ Authorization: Bearer {{access_token}}
   "query": "mutation AssignPlan($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id status } } }",
   "variables": {
     "input": {
-      "instituteId": "{{institute_id}}",
+      "instituteId": "{{institute_2_id}}",
       "planId": "{{plan_a_id}}",
       "provider": "RAZORPAY",
       "customerEmail": "test@roviq.com",
@@ -126,7 +116,7 @@ Authorization: Bearer {{access_token}}
   "query": "mutation AssignPlan($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id } } }",
   "variables": {
     "input": {
-      "instituteId": "{{institute_id}}",
+      "instituteId": "{{institute_2_id}}",
       "planId": "{{plan_b_id}}",
       "provider": "RAZORPAY",
       "customerEmail": "test@roviq.com",
