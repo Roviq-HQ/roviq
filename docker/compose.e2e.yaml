@@ -1,10 +1,17 @@
-# E2E test environment — isolated, reproducible, one-command.
+# E2E test environment — isolated, reproducible, two-phase.
 # Reads env vars from .env (same as dev), overrides only DB URLs to use roviq_test.
 #
-# Usage:
-#   docker compose -f docker/compose.e2e.yaml --profile hurl up --build --abort-on-container-exit --exit-code-from hurl-tests
-#   docker compose -f docker/compose.e2e.yaml --profile vitest up --build --abort-on-container-exit --exit-code-from vitest-e2e
-#   docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest up --build --abort-on-container-exit
+# Phase 1: `docker compose up -d --build --wait` brings up infra + app,
+#           blocks until api-gateway is healthy. The migrate-and-seed one-shot
+#           exits safely in detached mode without triggering abort.
+# Phase 2: `docker compose run --rm <test-runner>` executes the test suite
+#           against the already-running api-gateway.
+#
+# Usage (from repo root via pnpm scripts):
+#   pnpm e2e:hurl        — run Hurl billing tests
+#   pnpm e2e:vitest      — run Vitest e2e tests
+#   pnpm e2e:all         — run both sequentially
+#   pnpm e2e:down        — teardown
 #
 # Teardown:
 #   docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest down -v --remove-orphans

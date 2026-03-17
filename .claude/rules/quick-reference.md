@@ -9,7 +9,7 @@
 | `User.abilities` | `Membership.abilities` (abilities live on Membership) |
 | `$transaction` | `tenantTransaction()` |
 | `if (role === 'teacher')` | `ability.can()` |
-| `js.publish()` | `publish()` from nats-utils |
+| `js.publish()` | `JetStreamClient` from `@roviq/nats-jetstream` |
 | "school" or "organization" | "institute" (domain), "tenant" (infra) |
 | `.graphql` files | Code-first decorators |
 | Logic in resolvers | Logic in services |

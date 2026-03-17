@@ -35,9 +35,8 @@ const memberships = await withTenant(db, tenantId, (tx) =>
 import { withAdmin } from '@roviq/database';
 await withAdmin(db, async (tx) => { ... });
 
-// NATS messages — propagate tenant + correlation headers
-import { publish } from '@roviq/nats-utils';
-await publish(js, 'INSTITUTE.attendance.marked', payload, { correlationId });
+// NATS messages — use JetStreamClient from @roviq/nats-jetstream
+// The NestJS custom transport handles tenant + correlation header propagation
 ```
 
 - Exception: `withAdmin()` for platform admin cross-tenant ops and auth service (user lookup at login).

@@ -80,7 +80,8 @@ roviq/
 ├── libs/
 │   ├── database/               # Drizzle ORM schema, RLS policies, tenant helpers
 │   ├── common-types/           # Shared types, CASL subjects/actions
-│   ├── nats-utils/             # JetStream helpers, circuit breakers
+│   ├── nats-jetstream/         # NestJS JetStream custom transport
+│   ├── resilience/            # Circuit breaker (opossum)
 │   ├── ui/                     # shadcn/ui component library
 │   ├── graphql/                # Apollo Client config
 │   ├── auth/                   # Auth context, guards, token utils

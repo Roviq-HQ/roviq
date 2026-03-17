@@ -14,19 +14,19 @@
     "e2e:hurl": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl up --build --abort-on-container-exit --exit-code-from hurl-tests"
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm hurl-tests"
       }
     },
     "e2e:vitest": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "docker compose -f docker/compose.e2e.yaml --profile vitest up --build --abort-on-container-exit --exit-code-from vitest-e2e"
+        "command": "docker compose -f docker/compose.e2e.yaml --profile vitest up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
       }
     },
     "e2e:all": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest up --build --abort-on-container-exit"
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm hurl-tests && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
       }
     },
     "e2e:down": {
