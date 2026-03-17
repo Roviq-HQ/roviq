@@ -21,10 +21,45 @@ export const invoiceStatus = pgEnum('InvoiceStatus', [
 
 // Domain-specific status enums — each entity owns its lifecycle
 export const userStatus = pgEnum('UserStatus', ['ACTIVE', 'SUSPENDED', 'LOCKED']);
-export const instituteStatus = pgEnum('InstituteStatus', ['ACTIVE', 'SUSPENDED', 'ONBOARDING']);
+export const instituteStatus = pgEnum('InstituteStatus', [
+  'PENDING',
+  'ACTIVE',
+  'INACTIVE',
+  'SUSPENDED',
+  'REJECTED',
+]);
 export const membershipStatus = pgEnum('MembershipStatus', ['ACTIVE', 'SUSPENDED', 'REVOKED']);
 export const roleStatus = pgEnum('RoleStatus', ['ACTIVE', 'INACTIVE']);
 export const planStatus = pgEnum('PlanStatus', ['ACTIVE', 'INACTIVE', 'ARCHIVED']);
 export const gatewayConfigStatus = pgEnum('GatewayConfigStatus', ['ACTIVE', 'INACTIVE']);
 
 export const paymentProvider = pgEnum('PaymentProvider', ['CASHFREE', 'RAZORPAY']);
+
+// ── Institute domain enums ─────────────────────────────
+export const instituteType = pgEnum('InstituteType', ['SCHOOL', 'COACHING', 'LIBRARY']);
+
+export const structureFramework = pgEnum('StructureFramework', ['NEP', 'TRADITIONAL']);
+
+export const setupStatus = pgEnum('SetupStatus', ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED']);
+
+export const identifierType = pgEnum('IdentifierType', [
+  'UDISE_PLUS',
+  'CBSE_AFFILIATION',
+  'CBSE_SCHOOL_CODE',
+  'BSEH_AFFILIATION',
+  'RBSE_REGISTRATION',
+  'SOCIETY_REGISTRATION',
+  'STATE_RECOGNITION',
+  'SHALA_DARPAN_ID',
+]);
+
+export const boardType = pgEnum('BoardType', ['CBSE', 'BSEH', 'RBSE', 'ICSE']);
+
+export const affiliationStatus = pgEnum('AffiliationStatus', [
+  'PROVISIONAL',
+  'REGULAR',
+  'EXTENSION_PENDING',
+  'REVOKED',
+]);
+
+export const attendanceType = pgEnum('AttendanceType', ['LECTURE_WISE', 'DAILY']);

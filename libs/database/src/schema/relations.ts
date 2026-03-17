@@ -46,6 +46,16 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.institutes.id,
       to: r.paymentGatewayConfigs.instituteId,
     }),
+    identifiers: r.many.instituteIdentifiers(),
+    affiliations: r.many.instituteAffiliations(),
+    branding: r.one.instituteBranding({
+      from: r.institutes.id,
+      to: r.instituteBranding.tenantId,
+    }),
+    config: r.one.instituteConfigs({
+      from: r.institutes.id,
+      to: r.instituteConfigs.tenantId,
+    }),
   },
 
   roles: {
@@ -96,6 +106,35 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.studentGuardians.guardianProfileId,
       to: r.profiles.id,
       alias: 'guardianProfile',
+    }),
+  },
+
+  // ── Institute Children ────────────────────────────────
+  instituteIdentifiers: {
+    institute: r.one.institutes({
+      from: r.instituteIdentifiers.tenantId,
+      to: r.institutes.id,
+    }),
+  },
+
+  instituteAffiliations: {
+    institute: r.one.institutes({
+      from: r.instituteAffiliations.tenantId,
+      to: r.institutes.id,
+    }),
+  },
+
+  instituteBranding: {
+    institute: r.one.institutes({
+      from: r.instituteBranding.tenantId,
+      to: r.institutes.id,
+    }),
+  },
+
+  instituteConfigs: {
+    institute: r.one.institutes({
+      from: r.instituteConfigs.tenantId,
+      to: r.institutes.id,
     }),
   },
 
