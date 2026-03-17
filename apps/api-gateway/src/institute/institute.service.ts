@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { encodeCursor } from '../common/pagination/relay-pagination.model';
 import type { CreateInstituteInput } from './dto/create-institute.input';
+import type { InstituteFilterInput } from './dto/institute-filter.input';
 import type { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
 import type { InstituteModel } from './models/institute.model';
 import { InstituteRepository } from './repositories/institute.repository';
@@ -22,6 +24,36 @@ export class InstituteService {
     private readonly instituteRepo: InstituteRepository,
     private readonly setupService: InstituteSetupService,
   ) {}
+
+  async search(filter: InstituteFilterInput) {
+    const { records, total } = await this.instituteRepo.search({
+      search: filter.search,
+      status: filter.status,
+      type: filter.type,
+      first: (filter.first ?? 20) + 1, // Fetch one extra to determine hasNextPage
+      after: filter.after,
+    });
+
+    const limit = filter.first ?? 20;
+    const hasNextPage = records.length > limit;
+    const nodes = hasNextPage ? records.slice(0, limit) : records;
+
+    const edges = nodes.map((record) => ({
+      node: record as unknown as InstituteModel,
+      cursor: encodeCursor({ id: record.id }),
+    }));
+
+    return {
+      edges,
+      pageInfo: {
+        hasNextPage,
+        hasPreviousPage: !!filter.after,
+        startCursor: edges[0]?.cursor,
+        endCursor: edges[edges.length - 1]?.cursor,
+      },
+      totalCount: total,
+    };
+  }
 
   async findById(id: string): Promise<InstituteModel> {
     const record = await this.instituteRepo.findById(id);
