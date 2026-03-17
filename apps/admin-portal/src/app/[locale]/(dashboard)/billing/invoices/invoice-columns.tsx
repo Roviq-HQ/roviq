@@ -19,10 +19,10 @@ export function createInvoiceColumns(
 ): ColumnDef<InvoiceNode, unknown>[] {
   return [
     {
-      accessorKey: 'organization',
+      accessorKey: 'institute',
       header: t('invoices.columns.institute'),
       cell: ({ row }) => (
-        <span className="font-medium">{row.original.subscription?.organization?.name}</span>
+        <span className="font-medium">{row.original.subscription?.institute?.name?.en ?? ''}</span>
       ),
     },
     {

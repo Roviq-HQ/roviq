@@ -1,6 +1,7 @@
 'use client';
 
 import { extractGraphQLError } from '@roviq/graphql';
+import { useFormatDate, useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@roviq/ui';
+import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import {
@@ -33,9 +35,6 @@ interface SubscriptionDetailProps {
   subscription: SubscriptionNode | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  t: (key: string) => string;
-  formatDate: (date: Date) => string;
-  formatCurrency: (amount: number) => string;
 }
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -133,12 +132,14 @@ function SubscriptionFields({
   t,
   formatDate,
   formatCurrency,
+  ti,
   onAction,
 }: {
   subscription: SubscriptionNode;
   t: (key: string) => string;
   formatDate: (date: Date) => string;
   formatCurrency: (amount: number) => string;
+  ti: (field: Record<string, string> | string | null | undefined) => string;
   onAction: (action: ConfirmAction) => void;
 }) {
   return (
@@ -148,10 +149,11 @@ function SubscriptionFields({
           <span className="font-mono text-xs">{subscription.id}</span>
         </DetailRow>
         <DetailRow label={t('subscriptions.detail.institute')}>
-          {subscription.organization?.name}
+          {ti(subscription.institute?.name)}
         </DetailRow>
         <DetailRow label={t('subscriptions.detail.plan')}>
-          {subscription.plan?.name} &mdash; {formatCurrency((subscription.plan?.amount ?? 0) / 100)}
+          {ti(subscription.plan?.name)} &mdash;{' '}
+          {formatCurrency((subscription.plan?.amount ?? 0) / 100)}
         </DetailRow>
 
         <Separator className="my-2" />
@@ -210,14 +212,14 @@ async function executeAction(
   }
 }
 
-export function SubscriptionDetail({
-  subscription,
-  open,
-  onOpenChange,
-  t,
-  formatDate,
-  formatCurrency,
-}: SubscriptionDetailProps) {
+export function SubscriptionDetail({ subscription, open, onOpenChange }: SubscriptionDetailProps) {
+  const t = useTranslations('billing');
+  const { format } = useFormatDate();
+  const { currency } = useFormatNumber();
+  const ti = useI18nField();
+  const formatDate = (date: Date) => format(date, 'dd MMM yyyy');
+  const formatCurrency = (amount: number) => currency(amount);
+
   const [cancelSubscription] = useCancelSubscription();
   const [pauseSubscription] = usePauseSubscription();
   const [resumeSubscription] = useResumeSubscription();
@@ -261,6 +263,7 @@ export function SubscriptionDetail({
               t={t}
               formatDate={formatDate}
               formatCurrency={formatCurrency}
+              ti={ti}
               onAction={setConfirmAction}
             />
           </div>
