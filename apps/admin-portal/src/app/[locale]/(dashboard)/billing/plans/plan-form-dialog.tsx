@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import { Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { FormProvider, type Resolver, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -44,10 +45,10 @@ interface PlanFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   plan?: SubscriptionPlanNode | null;
-  t: (key: string) => string;
 }
 
-export function PlanFormDialog({ open, onOpenChange, plan, t }: PlanFormDialogProps) {
+export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps) {
+  const t = useTranslations('billing');
   const isEditing = !!plan;
   const [createPlan] = useCreatePlan();
   const [updatePlan] = useUpdatePlan();
@@ -61,7 +62,7 @@ export function PlanFormDialog({ open, onOpenChange, plan, t }: PlanFormDialogPr
         billingInterval: z.enum(BILLING_INTERVALS),
         maxUsers: z.number().int().min(0).optional(),
         maxSections: z.number().int().min(0).optional(),
-        isActive: z.boolean().optional(),
+        status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).optional(),
       }),
     [t],
   );
@@ -80,7 +81,6 @@ export function PlanFormDialog({ open, onOpenChange, plan, t }: PlanFormDialogPr
       billingInterval: plan?.billingInterval ?? 'MONTHLY',
       maxUsers: getFeatureLimits(plan).maxUsers ?? undefined,
       maxSections: getFeatureLimits(plan).maxSections ?? undefined,
-      isActive: plan?.isActive ?? true,
     },
   });
 
@@ -102,7 +102,7 @@ export function PlanFormDialog({ open, onOpenChange, plan, t }: PlanFormDialogPr
         billingInterval: plan?.billingInterval ?? 'MONTHLY',
         maxUsers: getFeatureLimits(plan).maxUsers ?? undefined,
         maxSections: getFeatureLimits(plan).maxSections ?? undefined,
-        isActive: plan?.isActive ?? true,
+        status: (plan?.status as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | undefined) ?? 'ACTIVE',
       });
     }
   }, [open, plan, planName, planDescription, reset]);
@@ -123,7 +123,7 @@ export function PlanFormDialog({ open, onOpenChange, plan, t }: PlanFormDialogPr
               amount: Math.round(values.amount * 100),
               billingInterval: values.billingInterval,
               featureLimits,
-              isActive: values.isActive,
+              status: values.status,
             },
           },
         });
@@ -238,11 +238,13 @@ export function PlanFormDialog({ open, onOpenChange, plan, t }: PlanFormDialogPr
               {isEditing && (
                 <Field orientation="horizontal">
                   <Checkbox
-                    id="isActive"
-                    checked={watch('isActive')}
-                    onCheckedChange={(checked) => setValue('isActive', !!checked)}
+                    id="status"
+                    checked={watch('status') === 'ACTIVE'}
+                    onCheckedChange={(checked) =>
+                      setValue('status', checked ? 'ACTIVE' : 'INACTIVE')
+                    }
                   />
-                  <FieldLabel htmlFor="isActive">{t('plans.form.isActive')}</FieldLabel>
+                  <FieldLabel htmlFor="status">{t('plans.form.isActive')}</FieldLabel>
                 </Field>
               )}
             </FieldGroup>

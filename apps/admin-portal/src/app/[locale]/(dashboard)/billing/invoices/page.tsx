@@ -31,7 +31,6 @@ export default function InvoicesPage() {
   const t = useTranslations('billing');
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
-
   const [filters, setFilters] = useQueryStates(filterParsers);
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceNode | null>(null);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
@@ -142,9 +141,6 @@ export default function InvoicesPage() {
                 onOpenChange={(open) => {
                   if (!open) setSelectedInvoice(null);
                 }}
-                t={t}
-                formatDate={formatDate}
-                formatCurrency={formatCurrency}
               />
             </>
           ) : (

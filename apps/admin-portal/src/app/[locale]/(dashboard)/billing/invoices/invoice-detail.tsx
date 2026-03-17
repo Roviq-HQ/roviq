@@ -1,5 +1,6 @@
 'use client';
 
+import { useFormatDate, useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
   Badge,
   ScrollArea,
@@ -10,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@roviq/ui';
+import { useTranslations } from 'next-intl';
 import type * as React from 'react';
 import type { InvoiceNode } from './use-invoices';
 
@@ -17,9 +19,6 @@ interface InvoiceDetailProps {
   invoice: InvoiceNode | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  t: (key: string) => string;
-  formatDate: (date: Date) => string;
-  formatCurrency: (amount: number) => string;
 }
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -31,15 +30,14 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-export function InvoiceDetail({
-  invoice,
-  open,
-  onOpenChange,
-  t,
-  formatDate,
-  formatCurrency,
-}: InvoiceDetailProps) {
-  if (!invoice) return null;
+export function InvoiceDetail({ invoice, open, onOpenChange }: InvoiceDetailProps) {
+  const t = useTranslations('billing');
+  const { format } = useFormatDate();
+  const { currency } = useFormatNumber();
+  const ti = useI18nField();
+
+  const formatDate = (date: Date) => format(date, 'dd MMM yyyy');
+  const formatCurrency = (amount: number) => currency(amount);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -49,63 +47,65 @@ export function InvoiceDetail({
           <SheetDescription>{t('invoices.detail.description')}</SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4">
-          <ScrollArea className="h-[calc(100vh-120px)]">
-            <div className="space-y-1 pt-4">
-              <DetailRow label={t('invoices.detail.id')}>
-                <span className="font-mono text-xs">{invoice.id}</span>
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.institute')}>
-                {invoice.subscription?.organization?.name}
-              </DetailRow>
+        {invoice && (
+          <div className="flex-1 overflow-y-auto px-4">
+            <ScrollArea className="h-[calc(100vh-120px)]">
+              <div className="space-y-1 pt-4">
+                <DetailRow label={t('invoices.detail.id')}>
+                  <span className="font-mono text-xs">{invoice.id}</span>
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.institute')}>
+                  {ti(invoice.subscription?.institute?.name)}
+                </DetailRow>
 
-              <Separator className="my-2" />
+                <Separator className="my-2" />
 
-              <DetailRow label={t('invoices.detail.amount')}>
-                {formatCurrency(invoice.amount / 100)}
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.currency')}>{invoice.currency}</DetailRow>
-              <DetailRow label={t('invoices.detail.status')}>
-                <Badge>{t(`invoices.statuses.${invoice.status}`)}</Badge>
-              </DetailRow>
+                <DetailRow label={t('invoices.detail.amount')}>
+                  {formatCurrency(invoice.amount / 100)}
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.currency')}>{invoice.currency}</DetailRow>
+                <DetailRow label={t('invoices.detail.status')}>
+                  <Badge>{t(`invoices.statuses.${invoice.status}`)}</Badge>
+                </DetailRow>
 
-              <Separator className="my-2" />
+                <Separator className="my-2" />
 
-              <DetailRow label={t('invoices.detail.billingPeriodStart')}>
-                {formatDate(new Date(invoice.billingPeriodStart))}
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.billingPeriodEnd')}>
-                {formatDate(new Date(invoice.billingPeriodEnd))}
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.dueDate')}>
-                {formatDate(new Date(invoice.dueDate))}
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.paidAt')}>
-                {invoice.paidAt ? formatDate(new Date(invoice.paidAt)) : '—'}
-              </DetailRow>
+                <DetailRow label={t('invoices.detail.billingPeriodStart')}>
+                  {formatDate(new Date(invoice.billingPeriodStart))}
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.billingPeriodEnd')}>
+                  {formatDate(new Date(invoice.billingPeriodEnd))}
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.dueDate')}>
+                  {formatDate(new Date(invoice.dueDate))}
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.paidAt')}>
+                  {invoice.paidAt ? formatDate(new Date(invoice.paidAt)) : '—'}
+                </DetailRow>
 
-              <Separator className="my-2" />
+                <Separator className="my-2" />
 
-              <DetailRow label={t('invoices.detail.providerInvoiceId')}>
-                {invoice.providerInvoiceId ? (
-                  <span className="font-mono text-xs">{invoice.providerInvoiceId}</span>
-                ) : (
-                  '—'
-                )}
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.providerPaymentId')}>
-                {invoice.providerPaymentId ? (
-                  <span className="font-mono text-xs">{invoice.providerPaymentId}</span>
-                ) : (
-                  '—'
-                )}
-              </DetailRow>
-              <DetailRow label={t('invoices.detail.createdAt')}>
-                {formatDate(new Date(invoice.createdAt))}
-              </DetailRow>
-            </div>
-          </ScrollArea>
-        </div>
+                <DetailRow label={t('invoices.detail.providerInvoiceId')}>
+                  {invoice.providerInvoiceId ? (
+                    <span className="font-mono text-xs">{invoice.providerInvoiceId}</span>
+                  ) : (
+                    '—'
+                  )}
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.providerPaymentId')}>
+                  {invoice.providerPaymentId ? (
+                    <span className="font-mono text-xs">{invoice.providerPaymentId}</span>
+                  ) : (
+                    '—'
+                  )}
+                </DetailRow>
+                <DetailRow label={t('invoices.detail.createdAt')}>
+                  {formatDate(new Date(invoice.createdAt))}
+                </DetailRow>
+              </div>
+            </ScrollArea>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
