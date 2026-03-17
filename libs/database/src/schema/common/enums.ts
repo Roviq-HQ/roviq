@@ -80,3 +80,11 @@ export const streamType = pgEnum('StreamType', ['SCIENCE', 'COMMERCE', 'ARTS']);
 export const genderRestriction = pgEnum('GenderRestriction', ['CO_ED', 'BOYS_ONLY', 'GIRLS_ONLY']);
 
 export const batchStatus = pgEnum('BatchStatus', ['UPCOMING', 'ACTIVE', 'COMPLETED']);
+
+export const subjectType = pgEnum('SubjectType', [
+  'ACADEMIC',
+  'LANGUAGE',
+  'SKILL',
+  'EXTRACURRICULAR',
+  'INTERNAL_ASSESSMENT',
+]);

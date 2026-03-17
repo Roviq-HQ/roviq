@@ -152,6 +152,38 @@ export const relations = defineRelations(schema, (r) => ({
     }),
   },
 
+  // ── Subject ─────────────────────────────────────────
+  subjects: {
+    institute: r.one.institutes({
+      from: r.subjects.tenantId,
+      to: r.institutes.id,
+    }),
+    standardSubjects: r.many.standardSubjects(),
+    sectionSubjects: r.many.sectionSubjects(),
+  },
+
+  standardSubjects: {
+    subject: r.one.subjects({
+      from: r.standardSubjects.subjectId,
+      to: r.subjects.id,
+    }),
+    standard: r.one.standards({
+      from: r.standardSubjects.standardId,
+      to: r.standards.id,
+    }),
+  },
+
+  sectionSubjects: {
+    subject: r.one.subjects({
+      from: r.sectionSubjects.subjectId,
+      to: r.subjects.id,
+    }),
+    section: r.one.sections({
+      from: r.sectionSubjects.sectionId,
+      to: r.sections.id,
+    }),
+  },
+
   // ── Institute Children ────────────────────────────────
   instituteIdentifiers: {
     institute: r.one.institutes({

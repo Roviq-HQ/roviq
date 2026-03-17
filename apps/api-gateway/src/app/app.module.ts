@@ -24,6 +24,7 @@ import { NovuProxyModule } from '../novu-proxy/novu-proxy.module';
 import { PasskeyModule } from '../passkey/passkey.module';
 import { SectionModule } from '../section/section.module';
 import { StandardModule } from '../standard/standard.module';
+import { SubjectModule } from '../subject/subject.module';
 import { AppController } from './app.controller';
 import { AppResolver } from './app.resolver';
 import { AppService } from './app.service';
@@ -59,6 +60,7 @@ import { AppService } from './app.service';
     NovuProxyModule,
     SectionModule,
     StandardModule,
+    SubjectModule,
     EeModule.register(),
   ],
   controllers: [AppController],
