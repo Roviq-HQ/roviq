@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import { Copy, Loader2 } from 'lucide-react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -47,10 +47,10 @@ const INSTITUTES_QUERY = gql`
 interface AssignPlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  t: (key: string) => string;
 }
 
-export function AssignPlanDialog({ open, onOpenChange, t }: AssignPlanDialogProps) {
+export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) {
+  const t = useTranslations('billing');
   const locale = useLocale();
   const ti = useI18nField();
   const { plans } = useSubscriptionPlans();
@@ -58,7 +58,7 @@ export function AssignPlanDialog({ open, onOpenChange, t }: AssignPlanDialogProp
   const [assignPlan] = useAssignPlan();
   const [checkoutUrl, setCheckoutUrl] = React.useState<string | null>(null);
 
-  const activePlans = plans.filter((p) => p.isActive);
+  const activePlans = plans.filter((p) => p.status === 'ACTIVE');
   const institutes = institutesData?.institutes ?? [];
 
   const assignSchema = React.useMemo(
@@ -113,7 +113,7 @@ export function AssignPlanDialog({ open, onOpenChange, t }: AssignPlanDialogProp
       const { data } = await assignPlan({
         variables: {
           input: {
-            organizationId: values.instituteId,
+            instituteId: values.instituteId,
             planId: values.planId,
             provider: values.provider,
             customerEmail: values.customerEmail,
@@ -121,7 +121,7 @@ export function AssignPlanDialog({ open, onOpenChange, t }: AssignPlanDialogProp
           },
         },
       });
-      const url = data?.assignPlanToOrganization?.checkoutUrl;
+      const url = data?.assignPlanToInstitute?.checkoutUrl;
       if (url) {
         setCheckoutUrl(url);
       } else {

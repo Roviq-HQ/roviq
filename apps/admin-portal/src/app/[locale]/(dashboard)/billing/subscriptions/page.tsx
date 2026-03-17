@@ -160,12 +160,9 @@ export default function SubscriptionsPage() {
                 onOpenChange={(open) => {
                   if (!open) setSelectedSub(null);
                 }}
-                t={t}
-                formatDate={formatDate}
-                formatCurrency={formatCurrency}
               />
 
-              <AssignPlanDialog open={assignOpen} onOpenChange={setAssignOpen} t={t} />
+              <AssignPlanDialog open={assignOpen} onOpenChange={setAssignOpen} />
             </>
           ) : (
             <div className="flex h-[50vh] items-center justify-center">
