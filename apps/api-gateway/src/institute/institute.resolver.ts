@@ -4,13 +4,24 @@ import { CheckAbility, GqlAuthGuard } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateInstituteInput } from './dto/create-institute.input';
+import { InstituteFilterInput } from './dto/institute-filter.input';
 import { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
 import { InstituteService } from './institute.service';
 import { InstituteModel } from './models/institute.model';
+import { InstituteConnection } from './models/institute-connection.model';
 
 @Resolver(() => InstituteModel)
 export class InstituteResolver {
   constructor(private readonly instituteService: InstituteService) {}
+
+  @Query(() => InstituteConnection)
+  @UseGuards(GqlAuthGuard)
+  @CheckAbility('read', 'Institute')
+  async institutes(
+    @Args('filter', { nullable: true }) filter?: InstituteFilterInput,
+  ): Promise<InstanceType<typeof InstituteConnection>> {
+    return this.instituteService.search(filter ?? {});
+  }
 
   @Query(() => InstituteModel)
   @UseGuards(GqlAuthGuard)

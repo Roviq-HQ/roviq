@@ -29,6 +29,14 @@ export interface CreateInstituteData {
   address?: InstituteAddress;
 }
 
+export interface InstituteSearchParams {
+  search?: string;
+  status?: string;
+  type?: string;
+  first?: number;
+  after?: string;
+}
+
 export interface UpdateInstituteInfoData {
   name?: Record<string, string>;
   code?: string;

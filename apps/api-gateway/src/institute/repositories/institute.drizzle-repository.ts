@@ -1,9 +1,15 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { getRequestContext } from '@roviq/common-types';
 import { DRIZZLE_DB, type DrizzleDB, institutes, withAdmin } from '@roviq/database';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { decodeCursor } from '../../common/pagination/relay-pagination.model';
 import { InstituteRepository } from './institute.repository';
-import type { CreateInstituteData, InstituteRecord, UpdateInstituteInfoData } from './types';
+import type {
+  CreateInstituteData,
+  InstituteRecord,
+  InstituteSearchParams,
+  UpdateInstituteInfoData,
+} from './types';
 
 const instituteColumns = {
   id: institutes.id,
@@ -28,6 +34,59 @@ const instituteColumns = {
 export class InstituteDrizzleRepository extends InstituteRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
     super();
+  }
+
+  async search(
+    params: InstituteSearchParams,
+  ): Promise<{ records: InstituteRecord[]; total: number }> {
+    const { search, status, type, first = 20, after } = params;
+
+    return withAdmin(this.db, async (tx) => {
+      const conditions: SQL[] = [isNull(institutes.deletedAt)];
+
+      if (status)
+        conditions.push(
+          eq(
+            institutes.status,
+            status as 'ACTIVE' | 'PENDING' | 'INACTIVE' | 'SUSPENDED' | 'REJECTED',
+          ),
+        );
+      if (type) conditions.push(eq(institutes.type, type as 'SCHOOL' | 'COACHING' | 'LIBRARY'));
+      if (search) {
+        const pattern = `%${search}%`;
+        const searchCondition = or(
+          ilike(institutes.slug, pattern),
+          ilike(institutes.code, pattern),
+          sql`${institutes.name}::text ILIKE ${pattern}`,
+        );
+        if (searchCondition) conditions.push(searchCondition);
+      }
+
+      // Cursor pagination
+      if (after) {
+        const cursor = decodeCursor(after);
+        if (cursor.id) {
+          conditions.push(sql`${institutes.id} > ${cursor.id as string}`);
+        }
+      }
+
+      const where = and(...conditions);
+
+      const [totalResult, records] = await Promise.all([
+        tx.select({ value: count() }).from(institutes).where(where),
+        tx
+          .select(instituteColumns)
+          .from(institutes)
+          .where(where)
+          .orderBy(asc(institutes.createdAt))
+          .limit(first),
+      ]);
+
+      return {
+        records: records as InstituteRecord[],
+        total: totalResult[0]?.value ?? 0,
+      };
+    });
   }
 
   async findById(id: string): Promise<InstituteRecord | null> {
