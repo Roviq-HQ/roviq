@@ -16,6 +16,7 @@ import { CaslModule } from '../casl/casl.module';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { validate } from '../config/env.validation';
 import { HealthModule } from '../health/health.module';
+import { InstituteModule } from '../institute/institute.module';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
 import { NotificationConfigModule } from '../notification-config/notification-config.module';
 import { NovuProxyModule } from '../novu-proxy/novu-proxy.module';
@@ -49,6 +50,7 @@ import { AppService } from './app.service';
     HealthModule,
     AuditModule,
     PasskeyModule,
+    InstituteModule,
     NotificationConfigModule,
     NovuProxyModule,
     EeModule.register(),
