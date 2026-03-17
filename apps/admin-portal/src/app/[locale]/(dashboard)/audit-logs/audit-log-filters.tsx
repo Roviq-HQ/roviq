@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import { X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryStates } from 'nuqs';
 
 const ACTION_TYPES = ['CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'ASSIGN', 'REVOKE'] as const;
@@ -36,11 +37,8 @@ export function useAuditLogFilters() {
   return useQueryStates(filterParsers);
 }
 
-interface AuditLogFiltersProps {
-  t: (key: string) => string;
-}
-
-export function AuditLogFilters({ t }: AuditLogFiltersProps) {
+export function AuditLogFilters() {
+  const t = useTranslations('auditLogs');
   const [filters, setFilters] = useQueryStates(filterParsers);
 
   const hasFilters = Object.values(filters).some(Boolean);

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
 import Razorpay from 'razorpay';
+import type { INormalizeError } from 'razorpay/dist/types/api';
 import { validateWebhookSignature } from 'razorpay/dist/utils/razorpay-utils';
 import type { BillingInterval } from '../ports/payment-gateway.port';
 import {
@@ -28,11 +29,19 @@ const INTERVAL_COUNT: Record<BillingInterval, number> = {
   YEARLY: 1,
 };
 
+function isRazorpayError(error: unknown): error is INormalizeError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'error' in error &&
+    typeof (error as INormalizeError).error === 'object'
+  );
+}
+
 function razorpayErrorDetail(error: unknown): string {
-  if (typeof error !== 'object' || error === null) return '';
-  const err = error as Record<string, unknown>;
-  const nested = err['error'] as Record<string, unknown> | undefined;
-  return (nested?.['description'] as string) ?? '';
+  if (isRazorpayError(error)) return error['error']['description'] ?? '';
+  if (error instanceof Error) return error.message;
+  return '';
 }
 
 export class RazorpayAdapter implements PaymentGateway {
@@ -195,11 +204,11 @@ export class RazorpayAdapter implements PaymentGateway {
       });
       const items = result.items ?? [];
       return items.map((inv) => ({
-        providerPaymentId: String(inv['payment_id'] ?? inv['id'] ?? ''),
-        amount: Number(inv['amount'] ?? 0),
-        currency: String(inv['currency'] ?? 'INR'),
-        status: String(inv['status'] ?? ''),
-        paidAt: inv['paid_at'] ? new Date(Number(inv['paid_at']) * 1000) : undefined,
+        providerPaymentId: String(inv.payment_id ?? inv.id ?? ''),
+        amount: Number(inv.amount ?? 0),
+        currency: String(inv.currency ?? 'INR'),
+        status: String(inv.status ?? ''),
+        paidAt: inv.paid_at ? new Date(Number(inv.paid_at) * 1000) : undefined,
       }));
     } catch (error) {
       const detail = razorpayErrorDetail(error);

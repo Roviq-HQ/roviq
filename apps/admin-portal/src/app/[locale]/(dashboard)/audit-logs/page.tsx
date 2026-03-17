@@ -56,7 +56,7 @@ export default function AuditLogsPage() {
         {(allowed: boolean) =>
           allowed ? (
             <>
-              <AuditLogFilters t={t} />
+              <AuditLogFilters />
 
               <DataTable
                 columns={columns}
@@ -85,8 +85,6 @@ export default function AuditLogsPage() {
                 onOpenChange={(open) => {
                   if (!open) setSelectedLog(null);
                 }}
-                t={t}
-                formatDate={formatDate}
               />
             </>
           ) : (

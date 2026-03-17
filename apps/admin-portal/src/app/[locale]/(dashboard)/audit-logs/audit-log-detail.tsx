@@ -1,5 +1,6 @@
 'use client';
 
+import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   Badge,
   ScrollArea,
@@ -11,6 +12,7 @@ import {
 } from '@roviq/ui';
 import { Check, Clock, Copy, ExternalLink, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import type { AuditLogNode } from './use-audit-logs';
 
@@ -18,8 +20,6 @@ interface AuditLogDetailProps {
   log: AuditLogNode | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  t: (key: string) => string;
-  formatDate: (date: Date) => string;
 }
 
 const ACTION_TYPE_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -170,7 +170,11 @@ function JsonBlock({
   );
 }
 
-export function AuditLogDetail({ log, open, onOpenChange, t, formatDate }: AuditLogDetailProps) {
+export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps) {
+  const t = useTranslations('auditLogs');
+  const { format } = useFormatDate();
+  const formatDate = (date: Date) => format(date, 'dd MMM yyyy');
+  const ti = useI18nField();
   if (!log) return null;
 
   const style = getActionTypeStyle(log.actionType);
@@ -243,7 +247,7 @@ export function AuditLogDetail({ log, open, onOpenChange, t, formatDate }: Audit
                 <NameWithId name={log.userName} id={log.userId} />
               </FieldRow>
               <FieldRow label={t('detail.tenantId')} copyValue={log.tenantId}>
-                <NameWithId name={log.tenantName} id={log.tenantId} />
+                <NameWithId name={ti(log.tenantName)} id={log.tenantId} />
               </FieldRow>
             </div>
 

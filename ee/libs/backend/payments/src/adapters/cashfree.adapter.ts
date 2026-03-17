@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
+import { isAxiosError } from 'axios';
 import { Cashfree, CFEnvironment } from 'cashfree-pg';
 import type { BillingInterval } from '../ports/payment-gateway.port';
 import {
@@ -33,12 +34,12 @@ const CF_INTERVAL_COUNT: Record<BillingInterval, number> = {
 };
 
 function cashfreeErrorDetail(error: unknown): string {
+  if (isAxiosError(error)) {
+    const message = (error.response?.data as Record<string, unknown> | undefined)?.['message'];
+    return typeof message === 'string' ? message : error.message;
+  }
   if (error instanceof Error) return error.message;
-  if (typeof error !== 'object' || error === null) return '';
-  const err = error as Record<string, unknown>;
-  const response = err['response'] as Record<string, unknown> | undefined;
-  const data = response?.['data'] as Record<string, unknown> | undefined;
-  return (data?.['message'] as string) ?? '';
+  return '';
 }
 
 export class CashfreeAdapter implements PaymentGateway {
@@ -229,11 +230,11 @@ export class CashfreeAdapter implements PaymentGateway {
       const response = await this.client.SubsFetchSubscriptionPayments(providerSubscriptionId);
       const items = response?.data ?? [];
       return items.map((p) => ({
-        providerPaymentId: p['cf_payment_id'] ?? '',
-        amount: Math.round((p['payment_amount'] ?? 0) * 100),
+        providerPaymentId: p.cf_payment_id ?? '',
+        amount: Math.round((p.payment_amount ?? 0) * 100),
         currency: 'INR',
-        status: p['payment_status'] ?? '',
-        paidAt: p['payment_initiated_date'] ? new Date(p['payment_initiated_date']) : undefined,
+        status: p.payment_status ?? '',
+        paidAt: p.payment_initiated_date ? new Date(p.payment_initiated_date) : undefined,
       }));
     } catch (error) {
       const detail = cashfreeErrorDetail(error);
