@@ -8,6 +8,7 @@ import { EeModule } from '@roviq/ee-gateway';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import { RedisModule } from '@roviq/redis';
 import { TelemetryModule } from '@roviq/telemetry';
+import { AcademicYearModule } from '../academic-year/academic-year.module';
 import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -50,6 +51,7 @@ import { AppService } from './app.service';
     HealthModule,
     AuditModule,
     PasskeyModule,
+    AcademicYearModule,
     InstituteModule,
     NotificationConfigModule,
     NovuProxyModule,

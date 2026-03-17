@@ -1,0 +1,63 @@
+import { UseGuards } from '@nestjs/common';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { AcademicYearService } from './academic-year.service';
+import { CreateAcademicYearInput } from './dto/create-academic-year.input';
+import { UpdateAcademicYearInput } from './dto/update-academic-year.input';
+import { AcademicYearModel } from './models/academic-year.model';
+
+@Resolver(() => AcademicYearModel)
+export class AcademicYearResolver {
+  constructor(private readonly academicYearService: AcademicYearService) {}
+
+  @Query(() => [AcademicYearModel])
+  @UseGuards(GqlAuthGuard)
+  async academicYears(): Promise<AcademicYearModel[]> {
+    return this.academicYearService.findAll();
+  }
+
+  @Query(() => AcademicYearModel)
+  @UseGuards(GqlAuthGuard)
+  async academicYear(@Args('id', { type: () => ID }) id: string): Promise<AcademicYearModel> {
+    return this.academicYearService.findById(id);
+  }
+
+  @Query(() => AcademicYearModel, { nullable: true })
+  @UseGuards(GqlAuthGuard)
+  async activeAcademicYear(): Promise<AcademicYearModel | null> {
+    return this.academicYearService.findActive();
+  }
+
+  @Mutation(() => AcademicYearModel)
+  @UseGuards(GqlAuthGuard)
+  async createAcademicYear(
+    @Args('input') input: CreateAcademicYearInput,
+  ): Promise<AcademicYearModel> {
+    return this.academicYearService.create(input);
+  }
+
+  @Mutation(() => AcademicYearModel)
+  @UseGuards(GqlAuthGuard)
+  async updateAcademicYear(
+    @Args('id', { type: () => ID }) id: string,
+    @Args('input') input: UpdateAcademicYearInput,
+  ): Promise<AcademicYearModel> {
+    return this.academicYearService.update(id, input);
+  }
+
+  @Mutation(() => AcademicYearModel)
+  @UseGuards(GqlAuthGuard)
+  async activateAcademicYear(
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<AcademicYearModel> {
+    return this.academicYearService.activate(id);
+  }
+
+  @Mutation(() => AcademicYearModel)
+  @UseGuards(GqlAuthGuard)
+  async archiveAcademicYear(
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<AcademicYearModel> {
+    return this.academicYearService.archive(id);
+  }
+}
