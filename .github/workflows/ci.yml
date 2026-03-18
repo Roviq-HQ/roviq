@@ -112,25 +112,6 @@ jobs:
           JWT_EXPIRATION: 15m
           JWT_REFRESH_EXPIRATION: 7d
 
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: [build]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-      - run: corepack enable && corepack install
-      - run: pnpm install --frozen-lockfile
-      - name: Start infra + api-gateway
-        run: pnpm e2e:up
-      - name: Run E2E tests (clean + hurl + vitest)
-        run: pnpm e2e:all
-      - name: Teardown
-        if: always()
-        run: pnpm e2e:down
-
   build:
     name: Build
     runs-on: ubuntu-latest

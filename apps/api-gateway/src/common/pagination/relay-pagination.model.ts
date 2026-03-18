@@ -1,20 +1,6 @@
 import { type Type } from '@nestjs/common';
 import { Field, Int, ObjectType } from '@nestjs/graphql';
-
-@ObjectType()
-export class PageInfo {
-  @Field()
-  hasNextPage!: boolean;
-
-  @Field()
-  hasPreviousPage!: boolean;
-
-  @Field({ nullable: true })
-  startCursor?: string;
-
-  @Field({ nullable: true })
-  endCursor?: string;
-}
+import { PageInfo } from '@roviq/nestjs-graphql';
 
 /**
  * Creates a Relay-style Connection type for the given node type.

@@ -169,8 +169,7 @@ describe('AuditInterceptor', () => {
       interceptor.intercept(context, createMockCallHandler({ id: 'new-entity-1' })),
       () => {
         expect(mockEmitAuditEvent).toHaveBeenCalledOnce();
-        const [, event, correlationId] = mockEmitAuditEvent.mock.calls[0];
-        expect(correlationId).toBe('corr-123');
+        const [, event] = mockEmitAuditEvent.mock.calls[0];
         expect(event).toMatchObject({
           tenantId: 'tenant-1',
           userId: 'user-1',

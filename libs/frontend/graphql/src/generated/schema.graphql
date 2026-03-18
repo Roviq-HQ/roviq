@@ -1,7 +1,7 @@
 input AssignPlanInput {
   customerEmail: String!
   customerPhone: String!
-  organizationId: String!
+  instituteId: String!
   planId: String!
   provider: PaymentProvider!
 }
@@ -27,7 +27,7 @@ type AuditLog {
   metadata: JSON
   source: String!
   tenantId: String!
-  tenantName: String
+  tenantName: I18nText
   userAgent: String
   userId: String!
   userName: String
@@ -78,9 +78,9 @@ input CreatePlanInput {
   amount: Int!
   billingInterval: BillingInterval!
   currency: String! = "INR"
-  description: String
+  description: I18nText
   featureLimits: JSON!
-  name: String!
+  name: I18nText!
 }
 
 input DateRangeInput {
@@ -97,6 +97,16 @@ input GeneratePasskeyRegistrationInput {
   password: String!
 }
 
+"""
+Multi-language text stored as { locale: text }
+"""
+scalar I18nText
+
+type InstituteRef {
+  id: ID!
+  name: I18nText!
+}
+
 type InvoiceConnection {
   edges: [InvoiceModelEdge!]!
   pageInfo: PageInfo!
@@ -111,7 +121,7 @@ type InvoiceModel {
   currency: String!
   dueDate: DateTime!
   id: ID!
-  organizationId: String!
+  instituteId: String!
   paidAt: DateTime
   providerInvoiceId: String
   providerPaymentId: String
@@ -160,16 +170,16 @@ input ManageSubscriptionInput {
 }
 
 type MembershipInfo {
-  orgLogoUrl: String
-  orgName: String!
-  orgSlug: String!
+  instituteLogoUrl: String
+  instituteName: I18nText!
+  instituteSlug: String!
   roleId: String!
-  roleName: String!
+  roleName: I18nText!
   tenantId: String!
 }
 
 type Mutation {
-  assignPlanToOrganization(input: AssignPlanInput!): AssignPlanResult!
+  assignPlanToInstitute(input: AssignPlanInput!): AssignPlanResult!
   cancelSubscription(input: ManageSubscriptionInput!): SubscriptionModel!
   createSubscriptionPlan(input: CreatePlanInput!): SubscriptionPlanModel!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
@@ -182,7 +192,7 @@ type Mutation {
   registerDeviceToken(token: String!): Boolean!
   removePasskey(passkeyId: String!): Boolean!
   resumeSubscription(subscriptionId: ID!): SubscriptionModel!
-  selectOrganization(tenantId: String!): AuthPayload!
+  selectInstitute(tenantId: String!): AuthPayload!
   updateNotificationConfig(input: UpdateNotificationConfigInput!): NotificationConfigModel!
   updateSubscriptionPlan(id: ID!, input: UpdatePlanInput!): SubscriptionPlanModel!
   verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): LoginResult!
@@ -199,11 +209,6 @@ type NotificationConfigModel {
   pushEnabled: Boolean!
   tenantId: String!
   whatsappEnabled: Boolean!
-}
-
-type OrganizationRef {
-  id: ID!
-  name: String!
 }
 
 type PageInfo {
@@ -235,6 +240,15 @@ enum PaymentProvider {
   RAZORPAY
 }
 
+"""
+Lifecycle status of a subscription plan.
+"""
+enum PlanStatus {
+  ACTIVE
+  ARCHIVED
+  INACTIVE
+}
+
 type Query {
   auditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
 
@@ -242,17 +256,17 @@ type Query {
   Returns the current Roviq edition: ce or ee
   """
   edition: String!
+  institutes: [InstituteRef!]!
   invoices(
     after: String
     filter: BillingFilterInput
     first: Int = 20
-    organizationId: ID
+    instituteId: ID
   ): InvoiceConnection!
   me: UserType!
   myPasskeys: [PasskeyInfo!]!
   notificationConfigs: [NotificationConfigModel!]!
-  organizations: [OrganizationRef!]!
-  subscription(organizationId: ID!): SubscriptionModel
+  subscription(instituteId: ID!): SubscriptionModel
   subscriptionPlan(id: ID!): SubscriptionPlanModel!
   subscriptionPlans: [SubscriptionPlanModel!]!
   subscriptions(
@@ -284,8 +298,8 @@ type SubscriptionModel {
   currentPeriodEnd: DateTime
   currentPeriodStart: DateTime
   id: ID!
-  organization: OrganizationRef
-  organizationId: String!
+  institute: InstituteRef
+  instituteId: String!
   plan: SubscriptionPlanModel
   planId: String!
   providerCustomerId: String
@@ -305,17 +319,17 @@ type SubscriptionPlanModel {
   billingInterval: BillingInterval!
   createdAt: DateTime!
   currency: String!
-  description: String
+  description: I18nText
   featureLimits: JSON!
   id: ID!
-  isActive: Boolean!
-  name: String!
+  name: I18nText!
+  status: PlanStatus!
   updatedAt: DateTime!
 }
 
 type SubscriptionRef {
   id: ID!
-  organization: OrganizationRef
+  institute: InstituteRef
 }
 
 """
@@ -343,10 +357,10 @@ input UpdateNotificationConfigInput {
 input UpdatePlanInput {
   amount: Int
   billingInterval: BillingInterval
-  description: String
+  description: I18nText
   featureLimits: JSON
-  isActive: Boolean
-  name: String
+  name: I18nText
+  status: PlanStatus
 }
 
 type UserType {

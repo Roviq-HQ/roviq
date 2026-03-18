@@ -30,6 +30,7 @@ export const AppSubject = {
   Subscription: 'Subscription',
   Invoice: 'Invoice',
   PaymentGatewayConfig: 'PaymentGatewayConfig',
+  InstituteGroup: 'InstituteGroup',
 } as const;
 
 export type AppSubject = (typeof AppSubject)[keyof typeof AppSubject];

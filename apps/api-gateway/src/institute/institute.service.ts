@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { ClientProxy } from '@nestjs/microservices';
 import { encodeCursor } from '../common/pagination/relay-pagination.model';
 import type { CreateInstituteInput } from './dto/create-institute.input';
 import type { InstituteFilterInput } from './dto/institute-filter.input';
@@ -23,7 +24,14 @@ export class InstituteService {
   constructor(
     private readonly instituteRepo: InstituteRepository,
     private readonly setupService: InstituteSetupService,
+    @Inject('JETSTREAM_CLIENT') private readonly natsClient: ClientProxy,
   ) {}
+
+  private emitEvent(pattern: string, data: Record<string, unknown>) {
+    this.natsClient.emit(pattern, data).subscribe({
+      error: (err) => this.logger.warn(`Failed to emit ${pattern}`, err),
+    });
+  }
 
   async search(filter: InstituteFilterInput) {
     const { records, total } = await this.instituteRepo.search({
@@ -85,6 +93,8 @@ export class InstituteService {
         this.logger.error(`Setup failed for institute ${institute.id}`, err);
       });
 
+    this.emitEvent('INSTITUTE.created', { instituteId: institute.id, type: input.type });
+
     return institute;
   }
 
@@ -104,6 +114,9 @@ export class InstituteService {
     }
 
     const record = await this.instituteRepo.updateStatus(id, 'ACTIVE');
+
+    this.emitEvent('INSTITUTE.activated', { instituteId: id, previousStatus: institute.status });
+
     return record as unknown as InstituteModel;
   }
 
@@ -111,6 +124,9 @@ export class InstituteService {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'INACTIVE');
     const record = await this.instituteRepo.updateStatus(id, 'INACTIVE');
+
+    this.emitEvent('INSTITUTE.deactivated', { instituteId: id, previousStatus: institute.status });
+
     return record as unknown as InstituteModel;
   }
 
@@ -118,6 +134,9 @@ export class InstituteService {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'SUSPENDED');
     const record = await this.instituteRepo.updateStatus(id, 'SUSPENDED');
+
+    this.emitEvent('INSTITUTE.suspended', { instituteId: id, previousStatus: institute.status });
+
     return record as unknown as InstituteModel;
   }
 
@@ -125,17 +144,26 @@ export class InstituteService {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'REJECTED');
     const record = await this.instituteRepo.updateStatus(id, 'REJECTED');
+
+    this.emitEvent('INSTITUTE.rejected', { instituteId: id, previousStatus: institute.status });
+
     return record as unknown as InstituteModel;
   }
 
   async delete(id: string): Promise<boolean> {
     await this.requireInstitute(id);
     await this.instituteRepo.softDelete(id);
+
+    this.emitEvent('INSTITUTE.deleted', { instituteId: id });
+
     return true;
   }
 
   async restore(id: string): Promise<InstituteModel> {
     const record = await this.instituteRepo.restore(id);
+
+    this.emitEvent('INSTITUTE.restored', { instituteId: id });
+
     return record as unknown as InstituteModel;
   }
 

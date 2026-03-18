@@ -41,20 +41,20 @@ export class InstituteModel {
   @Field(() => GraphQLJSON)
   name!: Record<string, string>;
 
-  @Field()
+  @Field(() => String)
   slug!: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   code?: string | null;
 
   @Field(() => InstituteTypeEnum)
-  type!: string;
+  type!: InstituteTypeEnum;
 
   @Field(() => StructureFrameworkEnum)
-  structureFramework!: string;
+  structureFramework!: StructureFrameworkEnum;
 
   @Field(() => SetupStatusEnum)
-  setupStatus!: string;
+  setupStatus!: SetupStatusEnum;
 
   @Field(() => GraphQLJSON)
   contact!: InstituteContact;
@@ -62,24 +62,24 @@ export class InstituteModel {
   @Field(() => GraphQLJSON, { nullable: true })
   address?: InstituteAddress | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   logoUrl?: string | null;
 
-  @Field()
+  @Field(() => String)
   timezone!: string;
 
-  @Field()
+  @Field(() => String)
   currency!: string;
 
   @Field(() => GraphQLJSON)
   settings!: Record<string, unknown>;
 
   @Field(() => InstituteStatusEnum)
-  status!: string;
+  status!: InstituteStatusEnum;
 
-  @Field()
+  @Field(() => Date)
   createdAt!: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt!: Date;
 }

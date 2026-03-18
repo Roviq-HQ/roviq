@@ -123,7 +123,7 @@ describe('BillingService', () => {
           }),
         );
         expect(result.id).toBe('plan-1');
-        expect(natsClient.emit).toHaveBeenCalledWith('billing.plan.created', {
+        expect(natsClient.emit).toHaveBeenCalledWith('BILLING.plan.created', {
           id: 'plan-1',
           name: { en: 'Pro' },
         });
@@ -165,7 +165,7 @@ describe('BillingService', () => {
           'plan-1',
           expect.objectContaining({ name: { en: 'Pro Plus' } }),
         );
-        expect(natsClient.emit).toHaveBeenCalledWith('billing.plan.updated', { id: 'plan-1' });
+        expect(natsClient.emit).toHaveBeenCalledWith('BILLING.plan.updated', { id: 'plan-1' });
       }));
 
     it('should only include defined fields in the update', () =>
@@ -309,7 +309,7 @@ describe('BillingService', () => {
             updatedBy: TEST_CTX.userId,
           }),
         );
-        expect(natsClient.emit).toHaveBeenCalledWith('billing.subscription.created', {
+        expect(natsClient.emit).toHaveBeenCalledWith('BILLING.subscription.created', {
           subscriptionId: 'sub-1',
           instituteId: 'institute-1',
         });
@@ -337,7 +337,7 @@ describe('BillingService', () => {
         expect(repo.updateSubscription).toHaveBeenCalledWith('sub-1', {
           canceledAt: expect.any(Date),
         });
-        expect(natsClient.emit).toHaveBeenCalledWith('billing.subscription.canceled', {
+        expect(natsClient.emit).toHaveBeenCalledWith('BILLING.subscription.canceled', {
           subscriptionId: 'sub-1',
         });
       }));
@@ -448,7 +448,7 @@ describe('BillingService', () => {
 
         expect(factory._mockGateway.pauseSubscription).toHaveBeenCalledWith('rzp_sub_1');
         expect(repo.updateSubscription).toHaveBeenCalledWith('sub-1', { status: 'PAUSED' });
-        expect(natsClient.emit).toHaveBeenCalledWith('billing.subscription.paused', {
+        expect(natsClient.emit).toHaveBeenCalledWith('BILLING.subscription.paused', {
           subscriptionId: 'sub-1',
         });
       }));
@@ -516,7 +516,7 @@ describe('BillingService', () => {
 
         expect(factory._mockGateway.resumeSubscription).toHaveBeenCalledWith('rzp_sub_1');
         expect(repo.updateSubscription).toHaveBeenCalledWith('sub-1', { status: 'ACTIVE' });
-        expect(natsClient.emit).toHaveBeenCalledWith('billing.subscription.resumed', {
+        expect(natsClient.emit).toHaveBeenCalledWith('BILLING.subscription.resumed', {
           subscriptionId: 'sub-1',
         });
       }));
@@ -606,7 +606,7 @@ describe('BillingService', () => {
           instituteId: 'institute-1',
         });
         expect(natsClient.emit).toHaveBeenCalledWith(
-          'billing.webhook.razorpay',
+          'BILLING.webhook.razorpay',
           expect.objectContaining({
             eventType: 'payment.captured',
             providerEventId: 'evt-2',
@@ -847,7 +847,7 @@ describe('BillingService', () => {
           instituteId: undefined,
         });
         expect(natsClient.emit).toHaveBeenCalledWith(
-          'billing.webhook.cashfree',
+          'BILLING.webhook.cashfree',
           expect.objectContaining({ provider: 'CASHFREE' }),
         );
       }));

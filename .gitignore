@@ -27,6 +27,9 @@ libs/prisma-client/
 # Obsidian
 docs/.obsidian/
 
+# Playwright auth state
+**/playwright/.auth/
+
 # Temp / build artifacts
 tmp/
 

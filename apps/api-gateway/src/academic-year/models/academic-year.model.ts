@@ -28,7 +28,7 @@ export class AcademicYearModel {
   isActive!: boolean;
 
   @Field(() => AcademicYearStatusEnum)
-  status!: string;
+  status!: AcademicYearStatusEnum;
 
   @Field(() => GraphQLJSON, { nullable: true })
   termStructure?: unknown[];
