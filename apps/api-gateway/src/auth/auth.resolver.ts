@@ -51,6 +51,7 @@ export class AuthResolver {
     const result = await this.authService.login(username, password);
 
     if (result.user?.tenantId && result.user?.roleId) {
+      // This step is mandatory because it resolves the conditions of CASL in abilities
       const rules = await this.getAbilityRules(
         result.user.id,
         result.user.tenantId,

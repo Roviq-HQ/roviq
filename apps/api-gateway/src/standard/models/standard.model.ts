@@ -33,12 +33,12 @@ export class StandardModel {
   numericOrder!: number;
 
   @Field(() => EducationLevelEnum, { nullable: true })
-  level?: string | null;
+  level?: EducationLevelEnum | null;
 
   @Field(() => NepStageEnum, { nullable: true })
-  nepStage?: string | null;
+  nepStage?: NepStageEnum | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   department?: string | null;
 
   @Field()

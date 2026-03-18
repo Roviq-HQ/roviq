@@ -30,14 +30,18 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useSubscriptionPlans } from '../plans/use-plans';
-import type { InstitutesForAssignQuery } from './assign-plan-dialog.generated';
+
+type InstitutesForAssignQuery = {
+  billingInstitutes: Array<{ id: string; name: string }>;
+};
+
 import { useAssignPlan } from './use-subscriptions';
 
 const PROVIDERS = ['RAZORPAY', 'CASHFREE'] as const;
 
 const INSTITUTES_QUERY = gql`
   query InstitutesForAssign {
-    institutes {
+    billingInstitutes {
       id
       name
     }
@@ -59,7 +63,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
   const [checkoutUrl, setCheckoutUrl] = React.useState<string | null>(null);
 
   const activePlans = plans.filter((p) => p.status === 'ACTIVE');
-  const institutes = institutesData?.institutes ?? [];
+  const institutes = institutesData?.billingInstitutes ?? [];
 
   const assignSchema = React.useMemo(
     () =>

@@ -90,9 +90,13 @@ export class InstituteDrizzleRepository extends InstituteRepository {
   }
 
   async findById(id: string): Promise<InstituteRecord | null> {
-    // institutes table uses entityPolicies (no tenantId) — use withAdmin for direct lookup
+    // withAdmin bypasses RLS (admin_all policy = true), so we must explicitly
+    // filter out soft-deleted records that RLS would normally exclude.
     return withAdmin(this.db, async (tx) => {
-      const rows = await tx.select(instituteColumns).from(institutes).where(eq(institutes.id, id));
+      const rows = await tx
+        .select(instituteColumns)
+        .from(institutes)
+        .where(and(eq(institutes.id, id), isNull(institutes.deletedAt)));
       return (rows[0] as InstituteRecord | undefined) ?? null;
     });
   }

@@ -18,14 +18,14 @@ export class SubjectModel {
   @Field()
   name!: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shortName?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   boardCode?: string | null;
 
   @Field(() => SubjectTypeEnum)
-  type!: string;
+  type!: SubjectTypeEnum;
 
   @Field()
   isMandatory!: boolean;
@@ -45,7 +45,7 @@ export class SubjectModel {
   @Field()
   isElective!: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   electiveGroup?: string | null;
 
   @Field()

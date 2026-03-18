@@ -1,5 +1,5 @@
+import assert from 'node:assert';
 import { beforeAll, describe, expect, it } from 'vitest';
-
 import { E2E_USERS } from '../e2e-constants';
 import { gql } from './helpers/gql-client';
 
@@ -27,6 +27,7 @@ describe('Auth E2E', () => {
       `);
 
       expect(res.errors).toBeUndefined();
+      assert(res.data);
       // Multi-institute user gets platformToken, not accessToken
       expect(res.data.login.platformToken).toBeTruthy();
       expect(res.data.login.accessToken).toBeNull();
@@ -58,6 +59,7 @@ describe('Auth E2E', () => {
       `);
 
       expect(res.errors).toBeUndefined();
+      assert(res.data);
       // Single-institute user gets accessToken directly
       expect(res.data.login.accessToken).toBeTruthy();
       expect(res.data.login.refreshToken).toBeTruthy();
@@ -75,6 +77,7 @@ describe('Auth E2E', () => {
           }
         }
       `);
+      assert(loginRes.data);
       const platformToken = loginRes.data.login.platformToken;
       const tenantId = loginRes.data.login.memberships[0].tenantId;
 
@@ -92,6 +95,7 @@ describe('Auth E2E', () => {
       );
 
       expect(res.errors).toBeUndefined();
+      assert(res.data);
       expect(res.data.selectInstitute.accessToken).toBeTruthy();
       expect(res.data.selectInstitute.user.username).toBe(E2E_USERS.ADMIN.username);
       expect(res.data.selectInstitute.user.tenantId).toBe(tenantId);
@@ -115,6 +119,7 @@ describe('Auth E2E', () => {
         }
       `);
 
+      assert(res.data);
       const rules = res.data.login.user.abilityRules;
       expect(rules.length).toBeGreaterThan(1);
 
@@ -140,8 +145,9 @@ describe('Auth E2E', () => {
         }
       `);
 
-      const userId = res.data.login.user.id;
-      const rules = res.data.login.user.abilityRules;
+      assert(res.data);
+      const userId = res.data?.login.user.id;
+      const rules = res.data?.login.user.abilityRules;
       const attendanceRule = rules.find(
         (r: { action: string; subject: string; conditions?: Record<string, unknown> }) =>
           r.action === 'read' && r.subject === 'Attendance',
@@ -193,6 +199,7 @@ describe('Auth E2E', () => {
           login(username: "${E2E_USERS.ADMIN.username}", password: "${E2E_USERS.ADMIN.password}") { platformToken }
         }
       `);
+      assert(loginRes.data);
       const platformToken = loginRes.data.login.platformToken;
 
       const res = await gql(
@@ -214,6 +221,7 @@ describe('Auth E2E', () => {
       );
 
       expect(res.errors).toBeUndefined();
+      assert(res.data);
       expect(res.data.me.username).toBe(E2E_USERS.ADMIN.username);
       expect(res.data.me.abilityRules).toBeDefined();
     });
@@ -244,6 +252,7 @@ describe('Auth E2E', () => {
       `);
 
       expect(res.errors).toBeUndefined();
+      assert(res.data);
       expect(res.data.refreshToken.accessToken).toBeTruthy();
       expect(res.data.refreshToken.refreshToken).toBeTruthy();
       expect(res.data.refreshToken.user.username).toBe(E2E_USERS.ADMIN.username);
@@ -277,11 +286,13 @@ describe('Auth E2E', () => {
           }
         }
       `);
+      assert(loginRes.data);
       const token = loginRes.data.login.accessToken;
 
       const res = await gql('mutation { logout }', undefined, token);
 
       expect(res.errors).toBeUndefined();
+      assert(res.data);
       expect(res.data.logout).toBe(true);
     });
 
@@ -294,6 +305,7 @@ describe('Auth E2E', () => {
           }
         }
       `);
+      assert(loginRes.data);
       const { accessToken, refreshToken } = loginRes.data.login;
 
       // Logout

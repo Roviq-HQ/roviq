@@ -1,7 +1,7 @@
 import type { ClientProxy } from '@nestjs/microservices';
 
 export interface AuditEvent {
-  tenantId: string;
+  tenantId?: string;
   userId: string;
   actorId: string;
   impersonatorId?: string;

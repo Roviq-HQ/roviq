@@ -79,7 +79,7 @@ export class BillingResolver {
   @Query(() => [InstituteRef])
   @UseGuards(GqlAuthGuard, AbilityGuard)
   @CheckAbility('read', 'Institute')
-  async institutes() {
+  async billingInstitutes() {
     return this.billingService.findAllInstitutes();
   }
 

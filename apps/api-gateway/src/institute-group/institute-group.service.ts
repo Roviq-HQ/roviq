@@ -1,0 +1,160 @@
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { ClientProxy } from '@nestjs/microservices';
+import { encodeCursor } from '../common/pagination/relay-pagination.model';
+import type { CreateInstituteGroupInput } from './dto/create-institute-group.input';
+import type { InstituteGroupFilterInput } from './dto/institute-group-filter.input';
+import type { UpdateInstituteGroupInput } from './dto/update-institute-group.input';
+import type { GroupMembershipModel } from './models/group-membership.model';
+import type { InstituteGroupModel } from './models/institute-group.model';
+import { InstituteGroupRepository } from './repositories/institute-group.repository';
+
+@Injectable()
+export class InstituteGroupService {
+  private readonly logger = new Logger(InstituteGroupService.name);
+
+  constructor(
+    private readonly groupRepo: InstituteGroupRepository,
+    @Inject('JETSTREAM_CLIENT') private readonly natsClient: ClientProxy,
+  ) {}
+
+  private emitEvent(pattern: string, data: Record<string, unknown>) {
+    this.natsClient.emit(pattern, data).subscribe({
+      error: (err) => this.logger.warn(`Failed to emit ${pattern}`, err),
+    });
+  }
+
+  async search(filter: InstituteGroupFilterInput) {
+    const { records, total } = await this.groupRepo.search({
+      search: filter.search,
+      status: filter.status,
+      type: filter.type,
+      first: (filter.first ?? 20) + 1, // Fetch one extra to determine hasNextPage
+      after: filter.after,
+    });
+
+    const limit = filter.first ?? 20;
+    const hasNextPage = records.length > limit;
+    const nodes = hasNextPage ? records.slice(0, limit) : records;
+
+    const edges = nodes.map((record) => ({
+      node: record as unknown as InstituteGroupModel,
+      cursor: encodeCursor({ id: record.id }),
+    }));
+
+    return {
+      edges,
+      pageInfo: {
+        hasNextPage,
+        hasPreviousPage: !!filter.after,
+        startCursor: edges[0]?.cursor,
+        endCursor: edges[edges.length - 1]?.cursor,
+      },
+      totalCount: total,
+    };
+  }
+
+  async findById(id: string): Promise<InstituteGroupModel> {
+    const record = await this.groupRepo.findById(id);
+    if (!record) {
+      throw new NotFoundException(`Institute group ${id} not found`);
+    }
+    return record as unknown as InstituteGroupModel;
+  }
+
+  async create(input: CreateInstituteGroupInput): Promise<InstituteGroupModel> {
+    const record = await this.groupRepo.create(input);
+    const group = record as unknown as InstituteGroupModel;
+
+    this.emitEvent('INSTITUTE.group.created', { id: group.id, name: group.name });
+    return group;
+  }
+
+  async update(id: string, input: UpdateInstituteGroupInput): Promise<InstituteGroupModel> {
+    await this.requireGroup(id);
+    const record = await this.groupRepo.update(id, input);
+    const group = record as unknown as InstituteGroupModel;
+
+    this.emitEvent('INSTITUTE.group.updated', { id: group.id });
+    return group;
+  }
+
+  async activate(id: string): Promise<InstituteGroupModel> {
+    await this.requireGroup(id);
+    const record = await this.groupRepo.updateStatus(id, 'ACTIVE');
+    const group = record as unknown as InstituteGroupModel;
+
+    this.emitEvent('INSTITUTE.group.activated', { id: group.id });
+    return group;
+  }
+
+  async deactivate(id: string): Promise<InstituteGroupModel> {
+    await this.requireGroup(id);
+    const record = await this.groupRepo.updateStatus(id, 'INACTIVE');
+    const group = record as unknown as InstituteGroupModel;
+
+    this.emitEvent('INSTITUTE.group.deactivated', { id: group.id });
+    return group;
+  }
+
+  async suspend(id: string): Promise<InstituteGroupModel> {
+    await this.requireGroup(id);
+    const record = await this.groupRepo.updateStatus(id, 'SUSPENDED');
+    const group = record as unknown as InstituteGroupModel;
+
+    this.emitEvent('INSTITUTE.group.suspended', { id: group.id });
+    return group;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    await this.requireGroup(id);
+    await this.groupRepo.softDelete(id);
+
+    this.emitEvent('INSTITUTE.group.deleted', { id });
+    return true;
+  }
+
+  async addInstituteToGroup(instituteId: string, groupId: string): Promise<boolean> {
+    await this.requireGroup(groupId);
+    await this.groupRepo.addInstituteToGroup(instituteId, groupId);
+
+    this.emitEvent('INSTITUTE.group.institute_added', { groupId, instituteId });
+    return true;
+  }
+
+  async removeInstituteFromGroup(instituteId: string): Promise<boolean> {
+    await this.groupRepo.removeInstituteFromGroup(instituteId);
+
+    this.emitEvent('INSTITUTE.group.institute_removed', { instituteId });
+    return true;
+  }
+
+  async addMember(groupId: string, userId: string, roleId: string): Promise<GroupMembershipModel> {
+    await this.requireGroup(groupId);
+    const record = await this.groupRepo.addMember(groupId, userId, roleId);
+    const membership = record as unknown as GroupMembershipModel;
+
+    this.emitEvent('INSTITUTE.group.member_added', { groupId, userId });
+    return membership;
+  }
+
+  async removeMember(groupId: string, userId: string): Promise<boolean> {
+    await this.requireGroup(groupId);
+    await this.groupRepo.removeMember(groupId, userId);
+
+    this.emitEvent('INSTITUTE.group.member_removed', { groupId, userId });
+    return true;
+  }
+
+  async findMyGroups(userId: string): Promise<GroupMembershipModel[]> {
+    const records = await this.groupRepo.findMembershipsByUser(userId);
+    return records as unknown as GroupMembershipModel[];
+  }
+
+  private async requireGroup(id: string) {
+    const record = await this.groupRepo.findById(id);
+    if (!record) {
+      throw new NotFoundException(`Institute group ${id} not found`);
+    }
+    return record;
+  }
+}

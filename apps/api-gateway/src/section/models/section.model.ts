@@ -36,22 +36,22 @@ export class SectionModel {
   @Field()
   name!: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   displayLabel?: string | null;
 
   @Field(() => StreamTypeEnum, { nullable: true })
-  stream?: string | null;
+  stream?: StreamTypeEnum | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   medium?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shift?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   classTeacherId?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   room?: string | null;
 
   @Field(() => Int, { nullable: true })
@@ -61,19 +61,19 @@ export class SectionModel {
   currentStrength!: number;
 
   @Field(() => GenderRestrictionEnum)
-  genderRestriction!: string;
+  genderRestriction!: GenderRestrictionEnum;
 
   @Field(() => Int)
   displayOrder!: number;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   startTime?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   endTime?: string | null;
 
   @Field(() => BatchStatusEnum, { nullable: true })
-  batchStatus?: string | null;
+  batchStatus?: BatchStatusEnum | null;
 
   @Field()
   createdAt!: Date;
