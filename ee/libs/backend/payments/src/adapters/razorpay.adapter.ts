@@ -39,7 +39,7 @@ function isRazorpayError(error: unknown): error is INormalizeError {
 }
 
 function razorpayErrorDetail(error: unknown): string {
-  if (isRazorpayError(error)) return error['error']['description'] ?? '';
+  if (isRazorpayError(error)) return error.error.description ?? '';
   if (error instanceof Error) return error.message;
   return '';
 }

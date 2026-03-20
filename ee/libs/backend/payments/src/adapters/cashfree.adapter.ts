@@ -35,7 +35,7 @@ const CF_INTERVAL_COUNT: Record<BillingInterval, number> = {
 
 function cashfreeErrorDetail(error: unknown): string {
   if (isAxiosError(error)) {
-    const message = (error.response?.data as Record<string, unknown> | undefined)?.['message'];
+    const message = error.response?.data?.message;
     return typeof message === 'string' ? message : error.message;
   }
   if (error instanceof Error) return error.message;

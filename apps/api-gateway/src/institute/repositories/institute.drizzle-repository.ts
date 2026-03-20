@@ -90,6 +90,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
   }
 
   async findById(id: string): Promise<InstituteRecord | null> {
+    // @TODO verify this claim.
     // withAdmin bypasses RLS (admin_all policy = true), so we must explicitly
     // filter out soft-deleted records that RLS would normally exclude.
     return withAdmin(this.db, async (tx) => {

@@ -9,6 +9,7 @@ export interface UserRecord {
   email: string;
   passwordHash: string;
   status: UserStatus;
+  isPlatformAdmin: boolean;
 }
 
 export interface CreateUserData {
@@ -53,7 +54,7 @@ export interface CreateRefreshTokenData {
   id: string;
   tokenHash: string;
   userId: string;
-  tenantId: string;
+  tenantId: string | null;
   membershipId?: string;
   expiresAt: Date;
 }

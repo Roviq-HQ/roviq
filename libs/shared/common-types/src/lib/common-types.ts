@@ -58,6 +58,7 @@ export interface AuthUser {
   tenantId: string;
   roleId: string;
   type: 'access' | 'platform';
+  isPlatformAdmin?: boolean;
 }
 
 // Billing feature limits (JSON scalar in GraphQL, used by both frontend and backend)

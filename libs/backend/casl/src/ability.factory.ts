@@ -21,7 +21,13 @@ export class AbilityFactory {
     userId: string;
     tenantId: string;
     roleId: string;
+    isPlatformAdmin?: boolean;
   }): Promise<AppAbility> {
+    // Platform admins get manage:all — no DB lookup needed
+    if (user.isPlatformAdmin) {
+      return createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]);
+    }
+
     const roleAbilities = await this.getRoleAbilities(user.roleId);
 
     // Fetch membership-specific abilities

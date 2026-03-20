@@ -29,6 +29,9 @@ export class TenantMiddleware implements NestMiddleware {
       get userId(): string {
         return req.user?.userId ?? '';
       },
+      get isPlatformAdmin(): boolean {
+        return req.user?.isPlatformAdmin ?? false;
+      },
       impersonatorId: null,
       correlationId,
     };

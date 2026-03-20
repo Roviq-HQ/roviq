@@ -136,30 +136,13 @@ services:
     volumes:
       - ../e2e/api-gateway-e2e/hurl:/hurl:ro
     working_dir: /hurl
-    command: [
-      "--test", "--jobs", "1",
-      "--variables-file", "vars.e2e.env",
-      "--variable", "base_url=http://api-gateway:3004/api",
-      "billing/01-create-plan.hurl",
-      "billing/02-update-plan.hurl",
-      "billing/03-assign-plan.hurl",
-      "billing/04-deactivate-plan.hurl",
-      "billing/05-duplicate-subscription.hurl",
-      "billing/06-subscription-lifecycle.hurl",
-      "billing/07-cancel-at-cycle-end.hurl",
-      "billing/08-cancel-already-canceled.hurl",
-      "billing/09-pause-invalid-state.hurl",
-      "institute/01-list-institutes.hurl",
-      "institute/02-get-institute.hurl",
-      "institute/03-create-institute.hurl",
-      "institute/04-update-institute.hurl",
-      "institute/05-status-transitions.hurl",
-      "institute/06-delete-restore.hurl",
-      "institute-group/01-crud-institute-group.hurl",
-      "institute-group/02-status-transitions.hurl",
-      "institute-group/03-institute-linking.hurl",
-      "institute-group/04-not-found-errors.hurl"
-    ]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        find /hurl -name '*.hurl' -not -path '*/paid/*' -not -path '*/novu/*' | sort | \
+        xargs hurl --test --jobs 1 \
+          --variables-file vars.e2e.env \
+          --variable base_url=http://api-gateway:3004/api
     depends_on:
       api-gateway:
         condition: service_healthy

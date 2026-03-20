@@ -7,6 +7,7 @@ export function withTestContext<T>(fn: () => T | Promise<T>, overrides?: Partial
       tenantId: 'test-tenant-id',
       impersonatorId: null,
       correlationId: 'test-correlation-id',
+      isPlatformAdmin: false,
       ...overrides,
     },
     fn,

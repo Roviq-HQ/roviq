@@ -9,6 +9,7 @@ interface JwtPayload {
   tenantId?: string;
   roleId?: string;
   type: 'access' | 'platform';
+  isPlatformAdmin?: boolean;
 }
 
 @Injectable()
@@ -29,6 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         tenantId: '',
         roleId: '',
         type: 'platform',
+        isPlatformAdmin: payload.isPlatformAdmin ?? false,
       };
     }
     return {
@@ -36,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: payload.tenantId ?? '',
       roleId: payload.roleId ?? '',
       type: 'access',
+      isPlatformAdmin: false,
     };
   }
 }

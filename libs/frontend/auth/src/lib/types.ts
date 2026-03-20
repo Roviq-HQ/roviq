@@ -9,6 +9,7 @@ export interface AuthUser {
   tenantId?: string;
   roleId?: string;
   abilityRules?: AbilityRule[];
+  isPlatformAdmin?: boolean;
 }
 
 export interface AuthTokens {

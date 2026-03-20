@@ -6,6 +6,7 @@ export interface RequestContext {
   userId: string;
   impersonatorId: string | null;
   correlationId: string;
+  isPlatformAdmin: boolean;
 }
 
 export const requestContext = new AsyncLocalStorage<RequestContext>();

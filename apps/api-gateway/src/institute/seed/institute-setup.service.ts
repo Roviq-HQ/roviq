@@ -27,7 +27,7 @@ export class InstituteSetupService {
   ) {}
 
   async runSetup(input: SetupInput): Promise<void> {
-    const { instituteId, type, departments, board, isDemo } = input;
+    const { instituteId, type, departments, board } = input;
     this.logger.log(`Starting setup for institute ${instituteId} (type=${type})`);
 
     try {
@@ -44,7 +44,6 @@ export class InstituteSetupService {
         await this.seeder.seedStandards(instituteId, academicYearId, departments, board);
 
         // Phase 2b: Seed sections for each standard
-        const { userId } = getRequestContext();
         const _allStandards = await withAdmin(this.db, async (tx) => {
           return tx
             .select({ id: academicYears.id })

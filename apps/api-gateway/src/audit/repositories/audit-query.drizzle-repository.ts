@@ -5,6 +5,7 @@ import {
   type DrizzleDB,
   institutes,
   users,
+  withAdmin,
   withTenant,
 } from '@roviq/database';
 import { and, count, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
@@ -37,11 +38,22 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
   async findAuditLogs(params: FindAuditLogsParams): Promise<AuditLogQueryResult> {
     const { tenantId, filter, first, after } = params;
 
-    return withTenant(this.db, tenantId, async (tx) => {
+    // Platform admins (no tenantId) see all audit logs via withAdmin
+    const runInContext = tenantId
+      ? (
+          fn: (tx: Parameters<Parameters<typeof withTenant>[2]>[0]) => Promise<AuditLogQueryResult>,
+        ) => withTenant(this.db, tenantId, fn)
+      : (
+          fn: (tx: Parameters<Parameters<typeof withAdmin>[1]>[0]) => Promise<AuditLogQueryResult>,
+        ) => withAdmin(this.db, fn);
+
+    return runInContext(async (tx) => {
       const conditions: SQL[] = [];
 
-      // Defense-in-depth: explicit tenant filter alongside RLS
-      conditions.push(eq(auditLogs.tenantId, tenantId));
+      // Defense-in-depth: explicit tenant filter alongside RLS (skip for platform admins)
+      if (tenantId) {
+        conditions.push(eq(auditLogs.tenantId, tenantId));
+      }
 
       // Cursor: base64url("timestamp:uuid") → WHERE (created_at, id) < ($N, $N)
       if (after) {

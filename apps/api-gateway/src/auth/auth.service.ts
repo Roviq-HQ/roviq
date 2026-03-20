@@ -21,6 +21,7 @@ interface AccessTokenPayload {
 interface PlatformTokenPayload {
   sub: string;
   type: 'platform';
+  isPlatformAdmin: boolean;
 }
 
 interface RefreshTokenPayload {
@@ -69,6 +70,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Platform admin: return platform token directly (no institute selection needed)
+    if (user.isPlatformAdmin) {
+      return this.buildPlatformAdminResult(user);
+    }
+
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
 
     if (memberships.length === 0) {
@@ -114,6 +120,11 @@ export class AuthService {
 
     if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Platform admin: return platform token directly
+    if (user.isPlatformAdmin) {
+      return this.buildPlatformAdminResult(user);
     }
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
@@ -232,6 +243,11 @@ export class AuthService {
     const user = storedToken.user;
     const membership = storedToken.membership;
 
+    // Platform admin: re-issue platform token
+    if (user.isPlatformAdmin) {
+      return this.buildPlatformAdminResult(user);
+    }
+
     if (membership) {
       const tokens = await this.generateTokens(
         user.id,
@@ -303,12 +319,56 @@ export class AuthService {
     return user?.id ?? null;
   }
 
-  private generatePlatformToken(userId: string): string {
-    const payload: PlatformTokenPayload = { sub: userId, type: 'platform' };
+  private generatePlatformToken(userId: string, isPlatformAdmin = false): string {
+    const payload: PlatformTokenPayload = { sub: userId, type: 'platform', isPlatformAdmin };
     return this.jwtService.sign(payload, {
       secret: this.config.getOrThrow<string>('JWT_SECRET'),
-      expiresIn: '5m',
+      // Platform admins use this as their access token (15m), regular users just for institute selection (5m)
+      expiresIn: isPlatformAdmin ? '15m' : '5m',
     });
+  }
+
+  private async generateRefreshTokenOnly(
+    userId: string,
+    tenantId: string | null = null,
+    membershipId?: string,
+  ): Promise<string> {
+    const tokenId = uuidv4();
+    const refreshPayload: RefreshTokenPayload = { sub: userId, tokenId, type: 'refresh' };
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      expiresIn: '7d',
+    });
+    const tokenHash = this.hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await this.refreshTokenRepo.create({
+      id: tokenId,
+      tokenHash,
+      userId,
+      tenantId,
+      membershipId,
+      expiresAt,
+    });
+    return refreshToken;
+  }
+
+  private async buildPlatformAdminResult(user: UserRecord): Promise<LoginResult> {
+    const accessToken = this.generatePlatformToken(user.id, true);
+    const refreshToken = await this.generateRefreshTokenOnly(user.id);
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isPlatformAdmin: true,
+        abilityRules: [{ action: 'manage', subject: 'all' }] as unknown as Record<
+          string,
+          unknown
+        >[],
+      },
+    };
   }
 
   private async generateTokens(

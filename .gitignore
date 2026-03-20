@@ -39,3 +39,9 @@ CLAUDE.local.md
 # IDE
 .idea/
 .vscode/
+
+docs/plans
+docs/institute
+docs/superpowers
+.claude/worktrees
+.claude/settings.local.json

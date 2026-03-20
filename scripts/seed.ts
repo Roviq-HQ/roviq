@@ -177,10 +177,11 @@ async function main() {
         username: 'admin',
         email: 'admin@demo-institute.com',
         passwordHash: adminPassword,
+        isPlatformAdmin: true,
       })
       .onConflictDoUpdate({
         target: users.username,
-        set: { updatedAt: new Date() },
+        set: { updatedAt: new Date(), isPlatformAdmin: true },
       })
       .returning();
 

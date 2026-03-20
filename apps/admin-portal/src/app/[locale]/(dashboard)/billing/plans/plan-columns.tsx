@@ -34,10 +34,11 @@ export function createPlanColumns(
       },
     },
     {
-      accessorKey: 'isActive',
+      accessorKey: 'status',
       header: t('plans.columns.status'),
       cell: ({ row }) => {
-        const isActive = row.getValue<boolean>('isActive');
+        const status = row.getValue<string>('status');
+        const isActive = status === 'ACTIVE';
         return (
           <Badge variant={isActive ? 'default' : 'secondary'}>
             {isActive ? t('plans.active') : t('plans.inactive')}
