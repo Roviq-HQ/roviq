@@ -22,6 +22,9 @@ export class UserType {
 
   @Field(() => [GraphQLJSONObject], { nullable: true })
   abilityRules?: Record<string, unknown>[];
+
+  @Field({ nullable: true })
+  isPlatformAdmin?: boolean;
 }
 
 @ObjectType()

@@ -15,7 +15,9 @@ export class GqlAuthGuard extends AuthGuard('jwt') {
     if (err || !user) {
       throw err || new UnauthorizedException();
     }
-    if ((user as AuthUser).type !== 'access') {
+    const authUser = user as AuthUser;
+    // Platform admins use platform tokens as their access tokens
+    if (authUser.type !== 'access' && !(authUser.type === 'platform' && authUser.isPlatformAdmin)) {
       throw new UnauthorizedException('Access token required');
     }
     return user as TUser;

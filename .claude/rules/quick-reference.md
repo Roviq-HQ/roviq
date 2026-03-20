@@ -4,7 +4,7 @@
 |-------|-----|
 | Raw DB queries for tenant data | `withTenant(db, tenantId, fn)` |
 | `BYPASSRLS` on DB roles | Policy-based bypass (`app.is_platform_admin`) |
-| Direct DB access for platform queries | `withAdmin(db, fn)` |
+| Direct DB access for platform queries | `withAdmin(db, fn)` (note: bypasses ALL RLS — add explicit `deletedAt IS NULL` filters) |
 | RLS migration without admin policy | Include `admin_platform_access` policy |
 | `User.abilities` | `Membership.abilities` (abilities live on Membership) |
 | `$transaction` | `tenantTransaction()` |

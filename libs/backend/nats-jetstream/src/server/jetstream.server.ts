@@ -327,6 +327,7 @@ export class JetStreamServer extends ServerNats {
       userId: msg.headers?.get('actor-id') || '',
       impersonatorId: msg.headers?.get('impersonator-id') || null,
       correlationId,
+      isPlatformAdmin: false,
     };
   }
 

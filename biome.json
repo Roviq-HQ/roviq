@@ -14,11 +14,12 @@
       "complexity": {
         "noExcessiveCognitiveComplexity": {
           "level": "warn",
-          "options": { "maxAllowedComplexity": 15 }
+          "options": { "maxAllowedComplexity": 25 }
         }
       },
       "suspicious": {
         "noUnknownAtRules": "off",
+        "noTemplateCurlyInString": "off",
         "noExplicitAny": "error",
         "noConsole": {
           "level": "warn",

@@ -135,6 +135,20 @@ export class AuthResolver {
   async me(@CurrentUser() user: AuthUser): Promise<UserType> {
     const dbUser = await this.authService.getUserById(user.userId);
 
+    // Platform admin: return manage:all abilities
+    if (user.isPlatformAdmin) {
+      return {
+        id: user.userId,
+        username: dbUser?.username ?? '',
+        email: dbUser?.email ?? '',
+        isPlatformAdmin: true,
+        abilityRules: [{ action: 'manage', subject: 'all' }] as unknown as Record<
+          string,
+          unknown
+        >[],
+      };
+    }
+
     if (user.tenantId && user.roleId) {
       const rules = await this.getAbilityRules(user.userId, user.tenantId, user.roleId);
       return {

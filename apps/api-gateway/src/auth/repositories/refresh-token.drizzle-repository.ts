@@ -47,6 +47,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
             email: users.email,
             passwordHash: users.passwordHash,
             status: users.status,
+            isPlatformAdmin: users.isPlatformAdmin,
           },
           membershipId: memberships.id,
           membershipTenantId: memberships.tenantId,

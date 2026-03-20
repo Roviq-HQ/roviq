@@ -44,7 +44,6 @@ Tilt handles everything — dependencies, environment setup, database migrations
 
 Then open http://localhost:4200 (Admin Portal) or http://localhost:4300 (Institute Portal).
 
-Full guide: [Getting Started](docs/getting-started.md)
 
 ## Documentation
 

@@ -1,4 +1,4 @@
-import { pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { timestamps } from '../common/columns';
 import { userStatus } from '../common/enums';
 
@@ -11,6 +11,7 @@ export const users = pgTable(
     passwordHash: text('password_hash').notNull(),
     avatarUrl: text('avatar_url'),
     status: userStatus().default('ACTIVE').notNull(),
+    isPlatformAdmin: boolean('is_platform_admin').default(false).notNull(),
     ...timestamps,
   },
   (table) => [

@@ -244,7 +244,7 @@ export class InstituteSeederService {
 
     // Create the Library standard manually since it's not in departments
     const { userId } = getRequestContext();
-    let libraryStandardId: string;
+    let libraryStandardId = '';
 
     await withTenant(this.db, tenantId, async (tx) => {
       const existing = await tx
@@ -275,7 +275,7 @@ export class InstituteSeederService {
       }
     });
 
-    await this.seedSections(tenantId, libraryStandardId!, academicYearId, 2, LIBRARY_SECTIONS);
+    await this.seedSections(tenantId, libraryStandardId, academicYearId, 2, LIBRARY_SECTIONS);
     this.logger.log('Seeded library structure');
   }
 }

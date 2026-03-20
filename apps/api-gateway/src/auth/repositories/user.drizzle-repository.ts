@@ -4,6 +4,15 @@ import { eq } from 'drizzle-orm';
 import type { CreateUserData, UserRecord } from './types';
 import { UserRepository } from './user.repository';
 
+const userSelect = {
+  id: users.id,
+  username: users.username,
+  email: users.email,
+  passwordHash: users.passwordHash,
+  status: users.status,
+  isPlatformAdmin: users.isPlatformAdmin,
+} as const;
+
 @Injectable()
 export class UserDrizzleRepository extends UserRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -19,47 +28,21 @@ export class UserDrizzleRepository extends UserRepository {
           email: data.email,
           passwordHash: data.passwordHash,
         })
-        .returning({
-          id: users.id,
-          username: users.username,
-          email: users.email,
-          passwordHash: users.passwordHash,
-          status: users.status,
-        }),
+        .returning(userSelect),
     );
     return user;
   }
 
   async findById(id: string): Promise<UserRecord | null> {
     const [user] = await withAdmin(this.db, (tx) =>
-      tx
-        .select({
-          id: users.id,
-          username: users.username,
-          email: users.email,
-          passwordHash: users.passwordHash,
-          status: users.status,
-        })
-        .from(users)
-        .where(eq(users.id, id))
-        .limit(1),
+      tx.select(userSelect).from(users).where(eq(users.id, id)).limit(1),
     );
     return user ?? null;
   }
 
   async findByUsername(username: string): Promise<UserRecord | null> {
     const [user] = await withAdmin(this.db, (tx) =>
-      tx
-        .select({
-          id: users.id,
-          username: users.username,
-          email: users.email,
-          passwordHash: users.passwordHash,
-          status: users.status,
-        })
-        .from(users)
-        .where(eq(users.username, username))
-        .limit(1),
+      tx.select(userSelect).from(users).where(eq(users.username, username)).limit(1),
     );
     return user ?? null;
   }

@@ -8,7 +8,7 @@ export const refreshTokens = pgTable(
   'refresh_tokens',
   {
     id: uuid().defaultRandom().primaryKey(),
-    tenantId: uuid('tenant_id').notNull(),
+    tenantId: uuid('tenant_id'), // nullable for platform admin tokens
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),

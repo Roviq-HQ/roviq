@@ -68,6 +68,7 @@ const TEST_CTX = {
   userId: 'test-user',
   impersonatorId: null,
   correlationId: 'test-corr',
+  isPlatformAdmin: false,
 };
 
 describe('BillingService', () => {
