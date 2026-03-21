@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import type { AuthUser } from '@roviq/common-types';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type Redis from 'ioredis';
+import { REDIS_KEYS } from './redis-keys';
 
 @Controller('auth')
 export class WsTicketController {
@@ -16,7 +17,7 @@ export class WsTicketController {
     const user = req.user;
 
     await this.redis.set(
-      `ws-ticket:${ticket}`,
+      `${REDIS_KEYS.WS_TICKET}${ticket}`,
       JSON.stringify({
         userId: user.userId,
         scope: user.scope,

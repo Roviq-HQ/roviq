@@ -25,6 +25,7 @@ import type Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthEventService } from './auth-event.service';
 import type { ImpersonationAuthPayload } from './dto/impersonation.dto';
+import { REDIS_KEYS } from './redis-keys';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -39,9 +40,6 @@ const MAX_SESSION_DURATION_MS = 60 * 60 * 1000;
 
 /** Minimum reason length (enforced by DB CHECK, validated here for better errors) */
 const MIN_REASON_LENGTH = 10;
-
-/** Redis key prefix for one-time impersonation codes */
-const REDIS_KEY_PREFIX = 'impersonation-code:';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -229,7 +227,7 @@ export class ImpersonationService {
     };
 
     await this.redis.set(
-      `${REDIS_KEY_PREFIX}${code}`,
+      `${REDIS_KEYS.IMPERSONATION_CODE}${code}`,
       JSON.stringify(codePayload),
       'EX',
       CODE_TTL_SECONDS,
@@ -242,82 +240,69 @@ export class ImpersonationService {
 
   async exchangeCode(code: string): Promise<ImpersonationAuthPayload> {
     // Read and delete atomically (single-use)
-    const stored = await this.redis.get(`${REDIS_KEY_PREFIX}${code}`);
+    const stored = await this.redis.get(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
     if (!stored) {
       throw new UnauthorizedException('Impersonation code expired or already used');
     }
-    await this.redis.del(`${REDIS_KEY_PREFIX}${code}`);
+    await this.redis.del(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
 
     const { sessionId, targetUserId, tenantId } = JSON.parse(stored) as CodePayload;
 
-    // Load target user info
-    const [targetUser] = await withAdmin(this.db, (tx) =>
-      tx
-        .select({ id: users.id, username: users.username })
-        .from(users)
-        .where(and(eq(users.id, targetUserId), eq(users.status, 'ACTIVE')))
-        .limit(1),
+    // Fetch all required data in parallel within a single transaction
+    const [targetUsers, membershipRows, sessions, instituteRows] = await withAdmin(this.db, (tx) =>
+      Promise.all([
+        tx
+          .select({ id: users.id, username: users.username })
+          .from(users)
+          .where(and(eq(users.id, targetUserId), eq(users.status, 'ACTIVE')))
+          .limit(1),
+        tx
+          .select({
+            id: memberships.id,
+            tenantId: memberships.tenantId,
+            roleId: memberships.roleId,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, targetUserId),
+              eq(memberships.tenantId, tenantId),
+              eq(memberships.status, 'ACTIVE'),
+              isNull(memberships.deletedAt),
+            ),
+          )
+          .limit(1),
+        tx
+          .select({
+            id: impersonationSessions.id,
+            impersonatorId: impersonationSessions.impersonatorId,
+          })
+          .from(impersonationSessions)
+          .where(eq(impersonationSessions.id, sessionId))
+          .limit(1),
+        tx
+          .select({
+            id: institutes.id,
+            name: institutes.name,
+          })
+          .from(institutes)
+          .where(eq(institutes.id, tenantId))
+          .limit(1),
+      ]),
     );
 
-    if (!targetUser) {
-      throw new UnauthorizedException('Target user no longer active');
-    }
+    const targetUser = targetUsers[0];
+    if (!targetUser) throw new UnauthorizedException('Target user no longer active');
 
-    // Load target membership + role
-    const [membership] = await withAdmin(this.db, (tx) =>
-      tx
-        .select({
-          id: memberships.id,
-          tenantId: memberships.tenantId,
-          roleId: memberships.roleId,
-        })
-        .from(memberships)
-        .where(
-          and(
-            eq(memberships.userId, targetUserId),
-            eq(memberships.tenantId, tenantId),
-            eq(memberships.status, 'ACTIVE'),
-            isNull(memberships.deletedAt),
-          ),
-        )
-        .limit(1),
-    );
-
-    if (!membership) {
+    const membership = membershipRows[0];
+    if (!membership)
       throw new UnauthorizedException('Target user no longer has an active membership');
-    }
 
-    // Load impersonation session to get impersonator info
-    const [session] = await withAdmin(this.db, (tx) =>
-      tx
-        .select({
-          id: impersonationSessions.id,
-          impersonatorId: impersonationSessions.impersonatorId,
-        })
-        .from(impersonationSessions)
-        .where(eq(impersonationSessions.id, sessionId))
-        .limit(1),
-    );
+    const session = sessions[0];
+    if (!session) throw new UnauthorizedException('Impersonation session not found');
 
-    if (!session) {
-      throw new UnauthorizedException('Impersonation session not found');
-    }
-
-    // Load institute info
-    const [institute] = await withAdmin(this.db, (tx) =>
-      tx
-        .select({
-          id: institutes.id,
-          name: institutes.name,
-        })
-        .from(institutes)
-        .where(eq(institutes.id, tenantId))
-        .limit(1),
-    );
-
-    if (!institute) {
-      throw new UnauthorizedException('Institute not found');
-    }
+    const institute = instituteRows[0];
+    if (!institute) throw new UnauthorizedException('Institute not found');
 
     // Generate impersonation access token (non-renewable, no refresh token)
     const accessToken = this.generateImpersonationToken({

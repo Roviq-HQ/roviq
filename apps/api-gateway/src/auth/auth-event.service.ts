@@ -1,10 +1,23 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { AuthScope } from '@roviq/common-types';
 import { authEvents, DRIZZLE_DB, type DrizzleDB, withAdmin } from '@roviq/database';
+
+export type AuthEventType =
+  | 'login_success'
+  | 'login_failed'
+  | 'logout'
+  | 'token_refresh'
+  | 'institute_switch'
+  | 'impersonation_start'
+  | 'impersonation_end'
+  | 'all_sessions_revoked'
+  | 'password_change'
+  | 'account_locked';
 
 export interface AuthEventInput {
   userId?: string;
-  type: string;
-  scope?: string;
+  type: AuthEventType;
+  scope?: AuthScope;
   tenantId?: string;
   resellerId?: string;
   authMethod?: string;

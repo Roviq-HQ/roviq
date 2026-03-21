@@ -21,6 +21,7 @@ import { REDIS_CLIENT } from '@roviq/redis';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import { AuthEventService } from '../../auth/auth-event.service';
+import { REDIS_KEYS } from '../../auth/redis-keys';
 
 /** Default "Roviq Direct" system reseller UUID */
 const DEFAULT_RESELLER_ID = '00000000-0000-0000-0000-000000000001';
@@ -99,9 +100,9 @@ export class AdminResellerService {
             .where(inArray(impersonationSessions.id, sessionIds));
 
           // Invalidate Redis cache for impersonation sessions
-          for (const session of activeSessions) {
-            await this.redis.del(`impersonation-session:${session.id}`);
-          }
+          await this.redis.del(
+            ...activeSessions.map((s) => `${REDIS_KEYS.IMPERSONATION_SESSION}${s.id}`),
+          );
         }
 
         // 6. Emit auth events for each affected staff member
