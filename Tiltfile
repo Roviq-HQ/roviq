@@ -69,30 +69,17 @@ local_resource(
   links=['http://localhost:3000/api/graphql'],
 )
 
-# Admin Portal (Next.js) — platform-wide admin
+# Web (Next.js) — merged admin + institute portal
 local_resource(
-  'admin-portal',
+  'web',
   labels=['dev'],
-  serve_cmd='pnpm run dev:admin',
+  serve_cmd='pnpm run dev:web',
   serve_dir='.',
   deps=['.env'],
   resource_deps=['pnpm-install'],
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,
   links=['http://localhost:4200'],
-)
-
-# Institute Portal (Next.js) — institute users
-local_resource(
-  'institute-portal',
-  labels=['dev'],
-  serve_cmd='pnpm run dev:portal',
-  serve_dir='.',
-  deps=['.env'],
-  resource_deps=['pnpm-install'],
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
-  links=['http://localhost:4300'],
 )
 
 # ─── Infra ────────────────────────────────────────────────────────────────────
@@ -183,7 +170,7 @@ local_resource(
 local_resource(
   'e2e-admin-portal',
   cmd='pnpm run e2e:admin-portal',
-  resource_deps=['admin-portal'],
+  resource_deps=['web'],
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,
   labels=['tests'],
@@ -192,7 +179,7 @@ local_resource(
 local_resource(
   'e2e-institute-portal',
   cmd='pnpm run e2e:institute-portal',
-  resource_deps=['institute-portal'],
+  resource_deps=['web'],
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,
   labels=['tests'],

@@ -10,6 +10,10 @@ interface GraphQLProviderProps {
   wsUrl: string;
   getAccessToken: () => string | null;
   onAuthError: () => void;
+  /** Called when a GraphQL error with code IMPERSONATION_ENDED is received. */
+  onImpersonationEnded?: () => void;
+  /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
+  apiUrl?: string;
   children: React.ReactNode;
 }
 
@@ -18,6 +22,8 @@ export function GraphQLProvider({
   wsUrl,
   getAccessToken,
   onAuthError,
+  onImpersonationEnded,
+  apiUrl,
   children,
 }: GraphQLProviderProps) {
   const clientRef = React.useRef<ReturnType<typeof createApolloClient> | null>(null);
@@ -28,6 +34,8 @@ export function GraphQLProvider({
       wsUrl,
       getAccessToken,
       onAuthError,
+      onImpersonationEnded,
+      apiUrl,
       onNetworkError: (message) => {
         toast.error('Network Error', { description: message });
       },

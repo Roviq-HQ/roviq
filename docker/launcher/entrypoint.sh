@@ -54,14 +54,13 @@ docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm -w /app migrato
 log "✓ Seed data loaded"
 
 # 5. Start app containers
-docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d api-gateway admin-portal institute-portal
+docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d api-gateway web
 
 # Wait briefly for apps to start
 sleep 5
 
 log "✓ API Gateway ready       → http://localhost:3000/api/graphql"
-log "✓ Admin Portal ready      → http://localhost:4200"
-log "✓ Institute Portal ready  → http://localhost:4300"
+log "✓ Web Portal ready        → http://localhost:4200"
 log ""
 log "Roviq is running!"
 log ""

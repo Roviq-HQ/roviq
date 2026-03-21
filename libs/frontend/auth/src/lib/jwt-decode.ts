@@ -4,6 +4,7 @@ interface JwtPayload {
   roleId: string;
   exp: number;
   iat: number;
+  isImpersonated?: boolean;
 }
 
 export function decodeJwt(token: string): JwtPayload | null {
@@ -22,4 +23,14 @@ export function isTokenExpired(token: string, bufferSeconds = 30): boolean {
   if (!payload) return true;
   const now = Math.floor(Date.now() / 1000);
   return payload.exp - bufferSeconds <= now;
+}
+
+/**
+ * Checks if the current access token represents an impersonated session.
+ * Decodes the JWT payload (without verification) and reads the `isImpersonated` claim.
+ */
+export function checkIsImpersonated(token: string | null): boolean {
+  if (!token) return false;
+  const payload = decodeJwt(token);
+  return payload?.isImpersonated === true;
 }

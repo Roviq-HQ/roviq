@@ -4,8 +4,7 @@
   "include": [],
   "references": [
     { "path": "apps/api-gateway" },
-    { "path": "apps/admin-portal" },
-    { "path": "apps/institute-portal" },
+    { "path": "apps/web" },
     { "path": "libs/shared/common-types" },
     { "path": "libs/database" },
     { "path": "libs/backend/casl" },

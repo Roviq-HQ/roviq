@@ -24,12 +24,9 @@ jobs:
           - name: migrator
             dockerfile: docker/Dockerfile.backend
             target: migrator
-          - name: admin-portal
+          - name: web
             dockerfile: docker/Dockerfile.web
-            target: admin-portal
-          - name: institute-portal
-            dockerfile: docker/Dockerfile.web
-            target: institute-portal
+            target: web
           - name: roviq
             dockerfile: docker/Dockerfile.launcher
             target: ""

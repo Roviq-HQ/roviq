@@ -101,7 +101,7 @@ services:
       API_GATEWAY_PORT: 3000
       WEBAUTHN_RP_ID: localhost
       WEBAUTHN_RP_NAME: Roviq
-      ALLOWED_ORIGINS: http://localhost:4200,http://localhost:4300
+      ALLOWED_ORIGINS: http://localhost:4200
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,24 +110,12 @@ services:
       nats:
         condition: service_healthy
 
-  admin-portal:
-    image: ghcr.io/roviq-hq/admin-portal:${ROVIQ_VERSION:-latest}
+  web:
+    image: ghcr.io/roviq-hq/web:${ROVIQ_VERSION:-latest}
     networks: [roviq-net]
     ports: ["4200:4200"]
     environment:
       PORT: 4200
-      NEXT_PUBLIC_API_URL: http://localhost:3000
-      NEXT_PUBLIC_WS_URL: ws://localhost:3000
-    depends_on:
-      api-gateway:
-        condition: service_started
-
-  institute-portal:
-    image: ghcr.io/roviq-hq/institute-portal:${ROVIQ_VERSION:-latest}
-    networks: [roviq-net]
-    ports: ["4300:4300"]
-    environment:
-      PORT: 4300
       NEXT_PUBLIC_API_URL: http://localhost:3000
       NEXT_PUBLIC_WS_URL: ws://localhost:3000
     depends_on:
