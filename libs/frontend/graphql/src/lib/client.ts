@@ -12,6 +12,10 @@ export interface ApolloClientConfig {
   getAccessToken: () => string | null;
   onAuthError: () => void;
   onNetworkError: (message: string) => void;
+  /** Called when a GraphQL error with code IMPERSONATION_ENDED is received. */
+  onImpersonationEnded?: () => void;
+  /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
+  apiUrl?: string;
 }
 
 export function createApolloClient(config: ApolloClientConfig) {
@@ -30,6 +34,13 @@ export function createApolloClient(config: ApolloClientConfig) {
   const errorLink = onError(({ error }) => {
     if (CombinedGraphQLErrors.is(error)) {
       for (const err of error.errors) {
+        if (err.extensions?.code === 'IMPERSONATION_ENDED') {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('roviq-impersonation-token');
+          }
+          config.onImpersonationEnded?.();
+          return;
+        }
         if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
           config.onAuthError();
           return;
@@ -43,9 +54,22 @@ export function createApolloClient(config: ApolloClientConfig) {
   const wsLink = new GraphQLWsLink(
     createClient({
       url: config.wsUrl,
-      connectionParams: () => {
-        const token = config.getAccessToken();
-        return token ? { authorization: `Bearer ${token}` } : {};
+      connectionParams: async () => {
+        if (config.apiUrl) {
+          // Use ws-ticket pattern: exchange access token for a short-lived ticket
+          const accessToken = config.getAccessToken();
+          if (accessToken) {
+            const response = await fetch(`${config.apiUrl}/auth/ws-ticket`, {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (response.ok) {
+              const { ticket } = await response.json();
+              return { ticket };
+            }
+          }
+        }
+        // No fallback — ws-ticket is required
+        return {};
       },
       shouldRetry: () => true,
       retryAttempts: Infinity,

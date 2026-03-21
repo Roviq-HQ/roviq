@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "e2e/institute-portal-e2e",
   "projectType": "application",
-  "implicitDependencies": ["institute-portal"],
+  "implicitDependencies": ["web"],
   "targets": {
     "e2e": {
       "command": "playwright test",

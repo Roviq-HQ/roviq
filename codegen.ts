@@ -30,7 +30,7 @@ const sharedConfig = {
 const config: CodegenConfig = {
   overwrite: true,
   schema: SCHEMA_SOURCE,
-  documents: ['apps/admin-portal/src/**/*.{ts,tsx}', 'apps/institute-portal/src/**/*.{ts,tsx}'],
+  documents: ['apps/web/src/**/*.{ts,tsx}'],
 
   generates: {
     // 1. Download schema for offline use / CI

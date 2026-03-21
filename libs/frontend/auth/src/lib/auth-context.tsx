@@ -1,16 +1,20 @@
 'use client';
 
+import type { AuthScope } from '@roviq/common-types';
 import * as React from 'react';
-import { isTokenExpired } from './jwt-decode';
+import { checkIsImpersonated, isTokenExpired } from './jwt-decode';
 import type { SessionExpiredDialogProps } from './session-expired-dialog';
 import { SessionExpiredDialog } from './session-expired-dialog';
-import { tokenStorage } from './token-storage';
+import { createScopedTokenStorage } from './token-storage';
 import type { AuthState, AuthUser, LoginInput, LoginResult, MembershipInfo } from './types';
 
 interface AuthContextValue extends AuthState {
+  scope: AuthScope;
   sessionExpired: boolean;
   needsInstituteSelection: boolean;
   memberships: MembershipInfo[] | null;
+  isImpersonated: boolean;
+  impersonationEnded: boolean;
   login: (input: LoginInput) => Promise<void>;
   loginWithPasskey: () => Promise<void>;
   logout: () => Promise<void>;
@@ -18,16 +22,27 @@ interface AuthContextValue extends AuthState {
   getAccessToken: () => string | null;
   selectInstitute: (tenantId: string) => Promise<void>;
   switchInstitute: (tenantId: string) => Promise<void>;
+  notifyImpersonationEnded: () => void;
+  clearImpersonationEnded: () => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 interface AuthProviderProps {
+  scope?: AuthScope;
   loginMutation: (input: LoginInput) => Promise<LoginResult>;
   passkeyLoginMutation?: () => Promise<LoginResult>;
   selectInstituteMutation: (
     tenantId: string,
     platformToken: string,
+  ) => Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUser;
+  }>;
+  switchInstituteMutation?: (
+    membershipId: string,
+    accessToken: string,
   ) => Promise<{
     accessToken: string;
     refreshToken: string;
@@ -45,18 +60,29 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({
+  scope = 'institute',
   loginMutation,
   passkeyLoginMutation,
   selectInstituteMutation,
+  switchInstituteMutation,
   refreshMutation,
   logoutMutation,
   onAuthError,
   sessionExpiredLabels,
   children,
 }: AuthProviderProps) {
+  // Use scoped storage so tokens from different scopes don't collide
+  const tokenStorage = React.useMemo(() => createScopedTokenStorage(scope), [scope]);
+
   const [sessionExpired, setSessionExpired] = React.useState(false);
   const [needsInstituteSelection, setNeedsInstituteSelection] = React.useState(false);
   const [memberships, setMemberships] = React.useState<MembershipInfo[] | null>(null);
+  const [impersonationEnded, setImpersonationEnded] = React.useState(false);
+
+  // Check for impersonation session first (sessionStorage, dies with tab)
+  const impersonationToken =
+    typeof window !== 'undefined' ? sessionStorage.getItem('roviq-impersonation-token') : null;
+
   const [state, setState] = React.useState<AuthState>({
     user: null,
     tokens: null,
@@ -66,6 +92,14 @@ export function AuthProvider({
 
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevTenantIdRef = React.useRef<string | undefined>(undefined);
+
+  // Derive isImpersonated from impersonation token or current access token
+  const isImpersonated = React.useMemo(
+    () =>
+      checkIsImpersonated(impersonationToken) ||
+      checkIsImpersonated(state.tokens?.accessToken ?? null),
+    [impersonationToken, state.tokens?.accessToken],
+  );
 
   // Capture tenantId when session expires so re-login can auto-select the same institute
   React.useEffect(() => {
@@ -110,7 +144,21 @@ export function AuthProvider({
               isLoading: false,
             });
             scheduleRefresh(result.accessToken);
-          } catch {
+          } catch (err) {
+            // If password was changed, clear all state and force re-login
+            const message = err instanceof Error ? err.message : '';
+            if (message.includes('Password changed') || message.includes('PASSWORD_CHANGED')) {
+              tokenStorage.clear();
+              if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+              setState({
+                user: null,
+                tokens: null,
+                isAuthenticated: false,
+                isLoading: false,
+              });
+              onAuthError?.();
+              return;
+            }
             setSessionExpired(true);
             onAuthError?.();
           }
@@ -119,7 +167,7 @@ export function AuthProvider({
         // Invalid token, ignore
       }
     },
-    [refreshMutation, onAuthError],
+    [refreshMutation, onAuthError, tokenStorage],
   );
 
   // Restore session on mount
@@ -185,7 +233,7 @@ export function AuthProvider({
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [refreshMutation, scheduleRefresh]);
+  }, [refreshMutation, scheduleRefresh, tokenStorage]);
 
   const handleLoginResult = React.useCallback(
     async (result: LoginResult) => {
@@ -242,7 +290,7 @@ export function AuthProvider({
         }
       }
     },
-    [scheduleRefresh, selectInstituteMutation],
+    [scheduleRefresh, selectInstituteMutation, tokenStorage],
   );
 
   const login = React.useCallback(
@@ -274,7 +322,7 @@ export function AuthProvider({
       isAuthenticated: false,
       isLoading: false,
     });
-  }, []);
+  }, [tokenStorage]);
 
   const selectInstitute = React.useCallback(
     async (tenantId: string) => {
@@ -303,33 +351,53 @@ export function AuthProvider({
       });
       scheduleRefresh(result.accessToken);
     },
-    [selectInstituteMutation, scheduleRefresh, clearAllState],
+    [selectInstituteMutation, scheduleRefresh, clearAllState, tokenStorage],
   );
 
   const switchInstitute = React.useCallback(
     async (tenantId: string) => {
-      // Re-login flow: use current access token to call selectInstitute mutation
       const accessToken = tokenStorage.getAccessToken();
       if (!accessToken) throw new Error('No access token');
 
-      const result = await selectInstituteMutation(tenantId, accessToken);
-      tokenStorage.setTokens({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      });
-      tokenStorage.setUser(result.user);
-      setState({
-        user: result.user,
-        tokens: {
+      if (switchInstituteMutation) {
+        // Use dedicated switchInstitute mutation with membershipId
+        const result = await switchInstituteMutation(tenantId, accessToken);
+        tokenStorage.setTokens({
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
-        },
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      scheduleRefresh(result.accessToken);
+        });
+        tokenStorage.setUser(result.user);
+        setState({
+          user: result.user,
+          tokens: {
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        scheduleRefresh(result.accessToken);
+      } else {
+        // Fallback: use selectInstitute mutation with current access token
+        const result = await selectInstituteMutation(tenantId, accessToken);
+        tokenStorage.setTokens({
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        });
+        tokenStorage.setUser(result.user);
+        setState({
+          user: result.user,
+          tokens: {
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        scheduleRefresh(result.accessToken);
+      }
     },
-    [selectInstituteMutation, scheduleRefresh],
+    [selectInstituteMutation, switchInstituteMutation, scheduleRefresh, tokenStorage],
   );
 
   const logout = React.useCallback(async () => {
@@ -350,7 +418,7 @@ export function AuthProvider({
       isAuthenticated: false,
       isLoading: false,
     });
-  }, [logoutMutation]);
+  }, [logoutMutation, tokenStorage]);
 
   const refreshSession = React.useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
@@ -371,10 +439,26 @@ export function AuthProvider({
       isLoading: false,
     });
     scheduleRefresh(result.accessToken);
-  }, [refreshMutation, scheduleRefresh]);
+  }, [refreshMutation, scheduleRefresh, tokenStorage]);
 
   const getAccessToken = React.useCallback(() => {
+    // Prefer impersonation token if present (sessionStorage, dies with tab)
+    if (typeof window !== 'undefined') {
+      const impToken = sessionStorage.getItem('roviq-impersonation-token');
+      if (impToken) return impToken;
+    }
     return tokenStorage.getAccessToken();
+  }, [tokenStorage]);
+
+  const notifyImpersonationEnded = React.useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('roviq-impersonation-token');
+    }
+    setImpersonationEnded(true);
+  }, []);
+
+  const clearImpersonationEnded = React.useCallback(() => {
+    setImpersonationEnded(false);
   }, []);
 
   const handleReLoginSuccess = React.useCallback(() => {
@@ -389,9 +473,12 @@ export function AuthProvider({
   const value = React.useMemo<AuthContextValue>(
     () => ({
       ...state,
+      scope,
       sessionExpired,
       needsInstituteSelection,
       memberships,
+      isImpersonated,
+      impersonationEnded,
       login,
       loginWithPasskey,
       logout,
@@ -399,12 +486,17 @@ export function AuthProvider({
       getAccessToken,
       selectInstitute,
       switchInstitute,
+      notifyImpersonationEnded,
+      clearImpersonationEnded,
     }),
     [
       state,
+      scope,
       sessionExpired,
       needsInstituteSelection,
       memberships,
+      isImpersonated,
+      impersonationEnded,
       login,
       loginWithPasskey,
       logout,
@@ -412,6 +504,8 @@ export function AuthProvider({
       getAccessToken,
       selectInstitute,
       switchInstitute,
+      notifyImpersonationEnded,
+      clearImpersonationEnded,
     ],
   );
 

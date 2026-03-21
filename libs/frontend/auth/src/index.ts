@@ -1,6 +1,6 @@
 export { AuthContext, AuthProvider, useAuth } from './lib/auth-context';
 export { createAuthMutations } from './lib/auth-mutations';
-export { decodeJwt, isTokenExpired } from './lib/jwt-decode';
+export { checkIsImpersonated, decodeJwt, isTokenExpired } from './lib/jwt-decode';
 export type { LoginFormProps } from './lib/login-form';
 export { LoginForm } from './lib/login-form';
 export type {
@@ -16,8 +16,9 @@ export type {
   SessionExpiredDialogProps,
 } from './lib/session-expired-dialog';
 export { SessionExpiredDialog } from './lib/session-expired-dialog';
-export { tokenStorage } from './lib/token-storage';
+export { createScopedTokenStorage, tokenStorage } from './lib/token-storage';
 export type {
+  AuthScope,
   AuthState,
   AuthTokens,
   AuthUser,
@@ -26,5 +27,7 @@ export type {
   MembershipInfo,
   PasskeyAuthOptions,
   PasskeyInfo,
+  SessionInfo,
   Tenant,
 } from './lib/types';
+export { useSessions } from './lib/use-sessions';

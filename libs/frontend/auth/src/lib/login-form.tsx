@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { AuthScope } from '@roviq/common-types';
 import { Button, Input, Label } from '@roviq/ui';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
@@ -11,6 +12,8 @@ import { useAuth } from './auth-context';
 type LoginFormValues = { username: string; password: string };
 
 export interface LoginFormProps {
+  /** Auth scope — determines which login mutation is called. Default: 'institute'. */
+  scope?: AuthScope;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
   labels?: {

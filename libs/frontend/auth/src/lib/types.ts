@@ -1,4 +1,6 @@
-import type { AbilityRule } from '@roviq/common-types';
+import type { AbilityRule, AuthScope } from '@roviq/common-types';
+
+export type { AuthScope };
 
 export type I18nContent = Record<string, string>;
 
@@ -6,7 +8,7 @@ export interface AuthUser {
   id: string;
   username: string;
   email: string;
-  scope: 'platform' | 'reseller' | 'institute';
+  scope: AuthScope;
   tenantId?: string;
   resellerId?: string;
   membershipId?: string;
@@ -67,4 +69,13 @@ export interface PasskeyInfo {
   backedUp: boolean;
   registeredAt: string;
   lastUsedAt?: string;
+}
+
+export interface SessionInfo {
+  id: string;
+  ipAddress?: string;
+  userAgent?: string;
+  lastActiveAt: string;
+  createdAt: string;
+  isCurrent: boolean;
 }

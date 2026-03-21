@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { decodeJwt, isTokenExpired } from '../lib/jwt-decode';
+import { checkIsImpersonated, decodeJwt, isTokenExpired } from '../lib/jwt-decode';
 
 function createFakeJwt(payload: Record<string, unknown>): string {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
@@ -108,5 +108,50 @@ describe('isTokenExpired', () => {
     const exp = Math.floor(new Date('2025-01-01T01:00:00Z').getTime() / 1000); // 1s left
     const token = createFakeJwt({ exp, sub: 'u', tenantId: 't', roleId: 'r', iat: 0 });
     expect(isTokenExpired(token, 0)).toBe(false);
+  });
+});
+
+describe('checkIsImpersonated', () => {
+  it('should return true when isImpersonated claim is true', () => {
+    const token = createFakeJwt({
+      sub: 'u1',
+      tenantId: 't1',
+      roleId: 'r1',
+      exp: 9999999999,
+      iat: 0,
+      isImpersonated: true,
+    });
+    expect(checkIsImpersonated(token)).toBe(true);
+  });
+
+  it('should return false when isImpersonated claim is absent', () => {
+    const token = createFakeJwt({
+      sub: 'u1',
+      tenantId: 't1',
+      roleId: 'r1',
+      exp: 9999999999,
+      iat: 0,
+    });
+    expect(checkIsImpersonated(token)).toBe(false);
+  });
+
+  it('should return false when isImpersonated claim is false', () => {
+    const token = createFakeJwt({
+      sub: 'u1',
+      tenantId: 't1',
+      roleId: 'r1',
+      exp: 9999999999,
+      iat: 0,
+      isImpersonated: false,
+    });
+    expect(checkIsImpersonated(token)).toBe(false);
+  });
+
+  it('should return false for null token', () => {
+    expect(checkIsImpersonated(null)).toBe(false);
+  });
+
+  it('should return false for invalid token', () => {
+    expect(checkIsImpersonated('garbage')).toBe(false);
   });
 });

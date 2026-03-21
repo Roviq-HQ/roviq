@@ -4,6 +4,7 @@ import type {
   LoginResult,
   MembershipInfo,
   PasskeyAuthOptions,
+  SessionInfo,
 } from './types';
 
 interface AuthResponse {
@@ -11,6 +12,15 @@ interface AuthResponse {
   refreshToken: string;
   user: AuthUser;
 }
+
+const USER_FIELDS = 'id username email scope tenantId resellerId membershipId roleId abilityRules';
+const LOGIN_RESULT_FIELDS = `
+  accessToken
+  refreshToken
+  user { ${USER_FIELDS} }
+  platformToken
+  memberships { tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
+`;
 
 async function graphqlFetch<T>(
   url: string,
@@ -35,6 +45,7 @@ async function graphqlFetch<T>(
 
 export function createAuthMutations(graphqlUrl: string) {
   return {
+    // Legacy login — kept for backward compatibility
     async login(input: LoginInput): Promise<LoginResult> {
       const data = await graphqlFetch<{
         login: {
@@ -48,16 +59,52 @@ export function createAuthMutations(graphqlUrl: string) {
         graphqlUrl,
         `mutation Login($username: String!, $password: String!) {
           login(username: $username, password: $password) {
-            accessToken
-            refreshToken
-            user { id username email scope tenantId resellerId membershipId roleId abilityRules }
-            platformToken
-            memberships { tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
+            ${LOGIN_RESULT_FIELDS}
           }
         }`,
         { username: input.username, password: input.password },
       );
       return data.login;
+    },
+
+    // Scope-specific login mutations
+    async adminLogin(input: LoginInput): Promise<LoginResult> {
+      const data = await graphqlFetch<{ adminLogin: LoginResult }>(
+        graphqlUrl,
+        `mutation AdminLogin($username: String!, $password: String!) {
+          adminLogin(username: $username, password: $password) {
+            ${LOGIN_RESULT_FIELDS}
+          }
+        }`,
+        { username: input.username, password: input.password },
+      );
+      return data.adminLogin;
+    },
+
+    async resellerLogin(input: LoginInput): Promise<LoginResult> {
+      const data = await graphqlFetch<{ resellerLogin: LoginResult }>(
+        graphqlUrl,
+        `mutation ResellerLogin($username: String!, $password: String!) {
+          resellerLogin(username: $username, password: $password) {
+            ${LOGIN_RESULT_FIELDS}
+          }
+        }`,
+        { username: input.username, password: input.password },
+      );
+      return data.resellerLogin;
+    },
+
+    async instituteLogin(input: LoginInput): Promise<LoginResult> {
+      const data = await graphqlFetch<{ instituteLogin: LoginResult }>(
+        graphqlUrl,
+        `mutation InstituteLogin($username: String!, $password: String!) {
+          instituteLogin(username: $username, password: $password) {
+            ${LOGIN_RESULT_FIELDS}
+          }
+        }`,
+        { username: input.username, password: input.password },
+      );
+      return data.instituteLogin;
     },
 
     async selectInstitute(tenantId: string, platformToken: string): Promise<AuthResponse> {
@@ -67,13 +114,29 @@ export function createAuthMutations(graphqlUrl: string) {
           selectInstitute(tenantId: $tenantId) {
             accessToken
             refreshToken
-            user { id username email scope tenantId resellerId membershipId roleId abilityRules }
+            user { ${USER_FIELDS} }
           }
         }`,
         { tenantId },
         { Authorization: `Bearer ${platformToken}` },
       );
       return data.selectInstitute;
+    },
+
+    async switchInstitute(membershipId: string, accessToken: string): Promise<AuthResponse> {
+      const data = await graphqlFetch<{ switchInstitute: AuthResponse }>(
+        graphqlUrl,
+        `mutation SwitchInstitute($membershipId: String!) {
+          switchInstitute(membershipId: $membershipId) {
+            accessToken
+            refreshToken
+            user { ${USER_FIELDS} }
+          }
+        }`,
+        { membershipId },
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.switchInstitute;
     },
 
     async refresh(refreshToken: string): Promise<AuthResponse> {
@@ -83,7 +146,7 @@ export function createAuthMutations(graphqlUrl: string) {
           refreshToken(token: $token) {
             accessToken
             refreshToken
-            user { id username email scope tenantId resellerId membershipId roleId abilityRules }
+            user { ${USER_FIELDS} }
           }
         }`,
         { token: refreshToken },
@@ -99,6 +162,51 @@ export function createAuthMutations(graphqlUrl: string) {
       }
     },
 
+    // Session management
+    async mySessions(accessToken: string): Promise<SessionInfo[]> {
+      const data = await graphqlFetch<{ mySessions: SessionInfo[] }>(
+        graphqlUrl,
+        `query MySessions {
+          mySessions {
+            id
+            ipAddress
+            userAgent
+            lastActiveAt
+            createdAt
+            isCurrent
+          }
+        }`,
+        undefined,
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.mySessions;
+    },
+
+    async revokeSession(sessionId: string, accessToken: string): Promise<boolean> {
+      const data = await graphqlFetch<{ revokeSession: boolean }>(
+        graphqlUrl,
+        `mutation RevokeSession($sessionId: String!) {
+          revokeSession(sessionId: $sessionId)
+        }`,
+        { sessionId },
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.revokeSession;
+    },
+
+    async revokeAllOtherSessions(accessToken: string): Promise<boolean> {
+      const data = await graphqlFetch<{ revokeAllOtherSessions: boolean }>(
+        graphqlUrl,
+        `mutation RevokeAllOtherSessions {
+          revokeAllOtherSessions
+        }`,
+        undefined,
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.revokeAllOtherSessions;
+    },
+
+    // Passkey mutations
     async generatePasskeyAuthOptions(): Promise<PasskeyAuthOptions> {
       const data = await graphqlFetch<{ generatePasskeyAuthOptions: PasskeyAuthOptions }>(
         graphqlUrl,
@@ -120,11 +228,7 @@ export function createAuthMutations(graphqlUrl: string) {
         graphqlUrl,
         `mutation VerifyPasskeyAuth($input: VerifyPasskeyAuthInput!) {
           verifyPasskeyAuth(input: $input) {
-            accessToken
-            refreshToken
-            user { id username email scope tenantId resellerId membershipId roleId abilityRules }
-            platformToken
-            memberships { tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
+            ${LOGIN_RESULT_FIELDS}
           }
         }`,
         { input: { challengeId, credential } },

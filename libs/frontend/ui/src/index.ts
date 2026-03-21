@@ -14,6 +14,7 @@ export {
   DataTableToolbar,
   type DataTableToolbarProps,
 } from './components/data-table/data-table-toolbar';
+export { InstituteSwitcher } from './components/institute-switcher';
 export { AdminLayout } from './components/layout/admin-layout';
 export {
   type ErrorBoundaryLabels,
@@ -29,6 +30,7 @@ export type {
   NotificationConfig,
   UserInfo,
 } from './components/layout/types';
+export { type SessionData, SessionsPage } from './components/sessions-page';
 export { ThemeProvider } from './components/theme-provider';
 export {
   AlertDialog,

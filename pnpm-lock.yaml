@@ -426,6 +426,8 @@ importers:
 
   libs/backend/audit: {}
 
+  libs/backend/auth: {}
+
   libs/backend/casl: {}
 
   libs/backend/nats-jetstream:
