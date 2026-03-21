@@ -44,6 +44,24 @@ async function graphqlFetch<T>(
 }
 
 export function createAuthMutations(graphqlUrl: string) {
+  function createScopedLogin(mutationName: string) {
+    const query = `mutation ${mutationName}($username: String!, $password: String!) {
+      ${mutationName}(username: $username, password: $password) { ${LOGIN_RESULT_FIELDS} }
+    }`;
+
+    return async (input: LoginInput): Promise<LoginResult> => {
+      const data = await graphqlFetch<Record<string, LoginResult>>(graphqlUrl, query, {
+        username: input.username,
+        password: input.password,
+      });
+      return data[mutationName];
+    };
+  }
+
+  const adminLogin = createScopedLogin('adminLogin');
+  const resellerLogin = createScopedLogin('resellerLogin');
+  const instituteLogin = createScopedLogin('instituteLogin');
+
   return {
     // Legacy login — kept for backward compatibility
     async login(input: LoginInput): Promise<LoginResult> {
@@ -68,44 +86,9 @@ export function createAuthMutations(graphqlUrl: string) {
     },
 
     // Scope-specific login mutations
-    async adminLogin(input: LoginInput): Promise<LoginResult> {
-      const data = await graphqlFetch<{ adminLogin: LoginResult }>(
-        graphqlUrl,
-        `mutation AdminLogin($username: String!, $password: String!) {
-          adminLogin(username: $username, password: $password) {
-            ${LOGIN_RESULT_FIELDS}
-          }
-        }`,
-        { username: input.username, password: input.password },
-      );
-      return data.adminLogin;
-    },
-
-    async resellerLogin(input: LoginInput): Promise<LoginResult> {
-      const data = await graphqlFetch<{ resellerLogin: LoginResult }>(
-        graphqlUrl,
-        `mutation ResellerLogin($username: String!, $password: String!) {
-          resellerLogin(username: $username, password: $password) {
-            ${LOGIN_RESULT_FIELDS}
-          }
-        }`,
-        { username: input.username, password: input.password },
-      );
-      return data.resellerLogin;
-    },
-
-    async instituteLogin(input: LoginInput): Promise<LoginResult> {
-      const data = await graphqlFetch<{ instituteLogin: LoginResult }>(
-        graphqlUrl,
-        `mutation InstituteLogin($username: String!, $password: String!) {
-          instituteLogin(username: $username, password: $password) {
-            ${LOGIN_RESULT_FIELDS}
-          }
-        }`,
-        { username: input.username, password: input.password },
-      );
-      return data.instituteLogin;
-    },
+    adminLogin,
+    resellerLogin,
+    instituteLogin,
 
     async selectInstitute(tenantId: string, platformToken: string): Promise<AuthResponse> {
       const data = await graphqlFetch<{ selectInstitute: AuthResponse }>(

@@ -10,21 +10,7 @@ import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { AuthService } from './auth.service';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
 import { RegisterInput } from './dto/register.input';
-
-interface GqlContext {
-  req: {
-    correlationId: string;
-    ip: string;
-    headers: Record<string, string | string[] | undefined>;
-  };
-}
-
-function extractMeta(ctx: GqlContext) {
-  return {
-    ip: ctx.req.ip,
-    userAgent: ctx.req.headers['user-agent'] as string | undefined,
-  };
-}
+import { extractMeta, type GqlContext } from './gql-context';
 
 @Resolver()
 export class AuthResolver {
@@ -203,9 +189,9 @@ export class AuthResolver {
   @Mutation(() => Boolean)
   @UseGuards(GqlAuthGuard)
   async revokeAllOtherSessions(@CurrentUser() user: AuthUser): Promise<boolean> {
-    // user.membershipId is the current session's membership, not the token ID
-    // For now, revoke all — will be refined when tokenId is available from context
-    await this.authService.revokeAllOtherSessions(user.userId, user.membershipId);
+    // TODO: pass current refresh token ID when available from context
+    // For now, revoke all sessions including current
+    await this.authService.logout(user.userId);
     return true;
   }
 

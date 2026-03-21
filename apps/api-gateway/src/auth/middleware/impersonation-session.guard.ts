@@ -11,6 +11,7 @@ import { DRIZZLE_DB, type DrizzleDB, impersonationSessions, withAdmin } from '@r
 import { REDIS_CLIENT } from '@roviq/redis';
 import { eq } from 'drizzle-orm';
 import type Redis from 'ioredis';
+import { REDIS_KEYS } from '../redis-keys';
 
 const SESSION_CACHE_TTL = 60; // 60 second cache
 
@@ -30,7 +31,7 @@ export class ImpersonationSessionGuard implements CanActivate {
     }
 
     const sessionId = user.impersonationSessionId;
-    const cacheKey = `impersonation-session:${sessionId}`;
+    const cacheKey = `${REDIS_KEYS.IMPERSONATION_SESSION}${sessionId}`;
 
     // Check Redis cache
     let sessionData = await this.redis.get(cacheKey);

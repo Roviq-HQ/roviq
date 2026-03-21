@@ -4,21 +4,8 @@ import { NoAudit } from '@roviq/audit';
 import { CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
 import type { AuthUser } from '@roviq/common-types';
 import { ImpersonationAuthPayload, StartImpersonationResult } from './dto/impersonation.dto';
+import { extractMeta, type GqlContext } from './gql-context';
 import { ImpersonationService } from './impersonation.service';
-
-interface GqlContext {
-  req: {
-    ip: string;
-    headers: Record<string, string | string[] | undefined>;
-  };
-}
-
-function extractMeta(ctx: GqlContext) {
-  return {
-    ip: ctx.req.ip,
-    userAgent: ctx.req.headers['user-agent'] as string | undefined,
-  };
-}
 
 @Resolver()
 export class ImpersonationResolver {
