@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { AdminResellerResolver } from './reseller/admin-reseller.resolver';
+import { AdminResellerService } from './reseller/admin-reseller.service';
 
 @Module({
   imports: [
-    // Admin-scoped feature modules will be added here (ROV-94+)
-    // Resolvers in this group use @PlatformScope() decorator
+    AuthModule, // provides AuthEventService
   ],
+  providers: [AdminResellerService, AdminResellerResolver],
 })
 export class AdminModule {}

@@ -4,6 +4,7 @@ import type { JwtService } from '@nestjs/jwt';
 import { hash } from '@node-rs/argon2';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from '../auth.service';
+import type { AuthEventService } from '../auth-event.service';
 import type { MembershipRepository } from '../repositories/membership.repository';
 import type { PlatformMembershipRepository } from '../repositories/platform-membership.repository';
 import type { RefreshTokenRepository } from '../repositories/refresh-token.repository';
@@ -57,6 +58,12 @@ function createMockJwtService() {
   };
 }
 
+function createMockAuthEventService() {
+  return {
+    emit: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 function createMockConfigService() {
   const envs: Record<string, string> = {
     JWT_SECRET: 'test-secret',
@@ -81,6 +88,7 @@ describe('AuthService', () => {
   let mockRefreshTokenRepo: ReturnType<typeof createMockRefreshTokenRepo>;
   let mockJwt: ReturnType<typeof createMockJwtService>;
   let mockConfig: ReturnType<typeof createMockConfigService>;
+  let mockAuthEventService: ReturnType<typeof createMockAuthEventService>;
 
   beforeEach(() => {
     mockUserRepo = createMockUserRepo();
@@ -90,6 +98,7 @@ describe('AuthService', () => {
     mockRefreshTokenRepo = createMockRefreshTokenRepo();
     mockJwt = createMockJwtService();
     mockConfig = createMockConfigService();
+    mockAuthEventService = createMockAuthEventService();
 
     authService = new AuthService(
       mockConfig as unknown as ConfigService,
@@ -99,6 +108,7 @@ describe('AuthService', () => {
       mockPlatformMembershipRepo as unknown as PlatformMembershipRepository,
       mockResellerMembershipRepo as unknown as ResellerMembershipRepository,
       mockRefreshTokenRepo as unknown as RefreshTokenRepository,
+      mockAuthEventService as unknown as AuthEventService,
     );
   });
 

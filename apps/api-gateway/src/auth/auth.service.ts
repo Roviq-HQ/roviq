@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import type { AuthScope } from '@roviq/common-types';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthEventService } from './auth-event.service';
 import type { AuthPayload, InstituteLoginResult } from './dto/auth-payload';
 import type { RegisterInput } from './dto/register.input';
 import { MembershipRepository } from './repositories/membership.repository';
@@ -61,6 +62,7 @@ export class AuthService {
     private readonly platformMembershipRepo: PlatformMembershipRepository,
     private readonly resellerMembershipRepo: ResellerMembershipRepository,
     private readonly refreshTokenRepo: RefreshTokenRepository,
+    private readonly authEventService: AuthEventService,
   ) {}
 
   // ── Registration ───────────────────────────────────────
@@ -80,14 +82,14 @@ export class AuthService {
   // ── Three login mutations ──────────────────────────────
 
   async adminLogin(username: string, password: string, meta?: RequestMeta): Promise<AuthPayload> {
-    const user = await this.verifyCredentials(username, password);
+    const user = await this.verifyCredentials(username, password, meta);
 
     const membership = await this.platformMembershipRepo.findByUserId(user.id);
     if (!membership) {
       throw new UnauthorizedException('No account found');
     }
 
-    return this.issueTokens({
+    const result = await this.issueTokens({
       user,
       scope: 'platform',
       membershipId: membership.id,
@@ -96,6 +98,20 @@ export class AuthService {
       membershipAbilities: membership.abilities as Record<string, unknown>[] | null,
       meta,
     });
+
+    this.authEventService
+      .emit({
+        userId: user.id,
+        type: 'login_success',
+        scope: 'platform',
+        authMethod: 'password',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+      })
+      .catch(() => {});
+
+    return result;
   }
 
   async resellerLogin(
@@ -103,7 +119,7 @@ export class AuthService {
     password: string,
     meta?: RequestMeta,
   ): Promise<AuthPayload> {
-    const user = await this.verifyCredentials(username, password);
+    const user = await this.verifyCredentials(username, password, meta);
 
     const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
     if (memberships.length === 0) {
@@ -116,7 +132,7 @@ export class AuthService {
       throw new UnauthorizedException('No account found');
     }
 
-    return this.issueTokens({
+    const result = await this.issueTokens({
       user,
       scope: 'reseller',
       resellerId: m.resellerId,
@@ -126,6 +142,21 @@ export class AuthService {
       membershipAbilities: m.abilities as Record<string, unknown>[] | null,
       meta,
     });
+
+    this.authEventService
+      .emit({
+        userId: user.id,
+        type: 'login_success',
+        scope: 'reseller',
+        resellerId: m.resellerId,
+        authMethod: 'password',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+      })
+      .catch(() => {});
+
+    return result;
   }
 
   async instituteLogin(
@@ -133,7 +164,7 @@ export class AuthService {
     password: string,
     meta?: RequestMeta,
   ): Promise<InstituteLoginResult> {
-    const user = await this.verifyCredentials(username, password);
+    const user = await this.verifyCredentials(username, password, meta);
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
@@ -152,6 +183,20 @@ export class AuthService {
         membershipAbilities: m.abilities as Record<string, unknown>[] | null,
         meta,
       });
+
+      this.authEventService
+        .emit({
+          userId: user.id,
+          type: 'login_success',
+          scope: 'institute',
+          tenantId: m.tenantId,
+          authMethod: 'password',
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+          deviceInfo: meta?.deviceInfo,
+        })
+        .catch(() => {});
+
       return result;
     }
 
@@ -186,7 +231,7 @@ export class AuthService {
 
     if (memberships.length === 1) {
       const m = memberships[0];
-      return this.issueTokens({
+      const result = await this.issueTokens({
         user,
         scope: 'institute',
         tenantId: m.tenantId,
@@ -196,6 +241,21 @@ export class AuthService {
         membershipAbilities: m.abilities as Record<string, unknown>[] | null,
         meta,
       });
+
+      this.authEventService
+        .emit({
+          userId: user.id,
+          type: 'login_success',
+          scope: 'institute',
+          tenantId: m.tenantId,
+          authMethod: 'passkey',
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+          deviceInfo: meta?.deviceInfo,
+        })
+        .catch(() => {});
+
+      return result;
     }
 
     return {
@@ -249,6 +309,7 @@ export class AuthService {
     targetMembershipId: string,
     currentRefreshTokenId: string | undefined,
     meta?: RequestMeta,
+    currentTenantId?: string,
   ): Promise<AuthPayload> {
     // Revoke the current refresh token
     if (currentRefreshTokenId) {
@@ -265,7 +326,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    return this.issueTokens({
+    const result = await this.issueTokens({
       user,
       scope: 'institute',
       tenantId: membership.tenantId,
@@ -275,6 +336,24 @@ export class AuthService {
       membershipAbilities: membership.abilities as Record<string, unknown>[] | null,
       meta,
     });
+
+    this.authEventService
+      .emit({
+        userId,
+        type: 'institute_switch',
+        scope: 'institute',
+        tenantId: membership.tenantId,
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+        metadata: {
+          from_tenant_id: currentTenantId,
+          to_tenant_id: membership.tenantId,
+        },
+      })
+      .catch(() => {});
+
+    return result;
   }
 
   // ── Token refresh ──────────────────────────────────────
@@ -330,12 +409,14 @@ export class AuthService {
     const scope = storedToken.membershipScope as AuthScope;
 
     // Re-issue based on scope
+    let result: AuthPayload;
+
     if (scope === 'platform') {
       const membership = await this.platformMembershipRepo.findByUserId(user.id);
       if (!membership) {
         throw new UnauthorizedException('No active platform membership');
       }
-      return this.issueTokens({
+      result = await this.issueTokens({
         user,
         scope: 'platform',
         membershipId: membership.id,
@@ -344,9 +425,7 @@ export class AuthService {
         membershipAbilities: membership.abilities as Record<string, unknown>[] | null,
         meta,
       });
-    }
-
-    if (scope === 'reseller') {
+    } else if (scope === 'reseller') {
       const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
       if (memberships.length === 0) {
         throw new UnauthorizedException('No active reseller membership');
@@ -355,7 +434,7 @@ export class AuthService {
       if (!m.reseller.isActive || m.reseller.status !== 'active') {
         throw new UnauthorizedException('Reseller account suspended');
       }
-      return this.issueTokens({
+      result = await this.issueTokens({
         user,
         scope: 'reseller',
         resellerId: m.resellerId,
@@ -365,12 +444,10 @@ export class AuthService {
         membershipAbilities: m.abilities as Record<string, unknown>[] | null,
         meta,
       });
-    }
-
-    // Institute scope
-    if (storedToken.membership) {
+    } else if (storedToken.membership) {
+      // Institute scope
       const m = storedToken.membership;
-      return this.issueTokens({
+      result = await this.issueTokens({
         user,
         scope: 'institute',
         tenantId: m.tenantId,
@@ -380,33 +457,56 @@ export class AuthService {
         membershipAbilities: m.abilities as Record<string, unknown>[] | null,
         meta,
       });
+    } else {
+      // Fallback: find first active institute membership
+      const firstMembership = await this.membershipRepo.findFirstActive(user.id);
+      if (!firstMembership) {
+        throw new UnauthorizedException('No active memberships');
+      }
+      result = await this.issueTokens({
+        user,
+        scope: 'institute',
+        tenantId: firstMembership.tenantId,
+        membershipId: firstMembership.id,
+        roleId: firstMembership.roleId,
+        roleAbilities: firstMembership.role.abilities as Record<string, unknown>[],
+        membershipAbilities: firstMembership.abilities as Record<string, unknown>[] | null,
+        meta,
+      });
     }
 
-    // Fallback: find first active institute membership
-    const firstMembership = await this.membershipRepo.findFirstActive(user.id);
-    if (!firstMembership) {
-      throw new UnauthorizedException('No active memberships');
-    }
-    return this.issueTokens({
-      user,
-      scope: 'institute',
-      tenantId: firstMembership.tenantId,
-      membershipId: firstMembership.id,
-      roleId: firstMembership.roleId,
-      roleAbilities: firstMembership.role.abilities as Record<string, unknown>[],
-      membershipAbilities: firstMembership.abilities as Record<string, unknown>[] | null,
-      meta,
-    });
+    this.authEventService
+      .emit({
+        userId: user.id,
+        type: 'token_refresh',
+        scope,
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+      })
+      .catch(() => {});
+
+    return result;
   }
 
   // ── Logout ─────────────────────────────────────────────
 
-  async logout(userId: string, refreshTokenId?: string): Promise<void> {
+  async logout(userId: string, refreshTokenId?: string, meta?: RequestMeta): Promise<void> {
     if (refreshTokenId) {
       await this.refreshTokenRepo.revoke(refreshTokenId);
     } else {
       await this.refreshTokenRepo.revokeAllForUser(userId);
     }
+
+    this.authEventService
+      .emit({
+        userId,
+        type: 'logout',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+      })
+      .catch(() => {});
   }
 
   // ── Session management ─────────────────────────────────
@@ -424,8 +524,23 @@ export class AuthService {
     await this.refreshTokenRepo.revoke(sessionId);
   }
 
-  async revokeAllOtherSessions(userId: string, currentTokenId: string): Promise<void> {
+  async revokeAllOtherSessions(
+    userId: string,
+    currentTokenId: string,
+    meta?: RequestMeta,
+  ): Promise<void> {
     await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentTokenId);
+
+    this.authEventService
+      .emit({
+        userId,
+        type: 'all_sessions_revoked',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+        metadata: { reason: 'user_initiated' },
+      })
+      .catch(() => {});
   }
 
   // ── User queries ───────────────────────────────────────
@@ -442,13 +557,27 @@ export class AuthService {
 
   // ── Private: credential verification ───────────────────
 
-  private async verifyCredentials(username: string, password: string): Promise<UserRecord> {
+  private async verifyCredentials(
+    username: string,
+    password: string,
+    meta?: RequestMeta,
+  ): Promise<UserRecord> {
     const user = await this.userRepo.findByUsername(username);
     if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid credentials');
     }
     const valid = await verify(user.passwordHash, password);
     if (!valid) {
+      this.authEventService
+        .emit({
+          userId: user.id,
+          type: 'login_failed',
+          failureReason: 'invalid_credentials',
+          ip: meta?.ip,
+          userAgent: meta?.userAgent,
+          deviceInfo: meta?.deviceInfo,
+        })
+        .catch(() => {});
       throw new UnauthorizedException('Invalid credentials');
     }
     return user;

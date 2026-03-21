@@ -1,17 +1,20 @@
 import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
-import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import { Logger, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ThrottlerModule } from '@nestjs/throttler';
+import type { AuthUser } from '@roviq/common-types';
 import { EeModule } from '@roviq/ee-gateway';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
-import { RedisModule } from '@roviq/redis';
+import { REDIS_CLIENT, RedisModule } from '@roviq/redis';
 import { TelemetryModule } from '@roviq/telemetry';
+import type Redis from 'ioredis';
 import { AdminModule } from '../admin/admin.module';
 import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { ImpersonationSessionGuard } from '../auth/middleware/impersonation-session.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
@@ -26,9 +29,12 @@ import { AppController } from './app.controller';
 import { AppResolver } from './app.resolver';
 import { AppService } from './app.service';
 
+const wsLogger = new Logger('WsTicketAuth');
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate }),
+    RedisModule,
     NatsJetStreamModule,
     TelemetryModule,
     ThrottlerModule.forRoot({
@@ -36,16 +42,46 @@ import { AppService } from './app.service';
     }),
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      inject: [ConfigService, REDIS_CLIENT],
+      useFactory: (config: ConfigService, redis: Redis) => ({
         autoSchemaFile: true,
         path: 'api/graphql',
         playground: config.get('NODE_ENV') !== 'production',
         introspection: config.get('NODE_ENV') !== 'production',
-        context: ({ req }: { req: unknown }) => ({ req }),
+        subscriptions: {
+          'graphql-ws': {
+            path: '/api/graphql',
+            onConnect: async (ctx) => {
+              const ticket = ctx.connectionParams?.ticket as string | undefined;
+              if (!ticket) {
+                wsLogger.warn('WebSocket connection rejected: no ticket provided');
+                return false;
+              }
+
+              const key = `ws-ticket:${ticket}`;
+              const data = await redis.get(key);
+              if (!data) {
+                wsLogger.warn('WebSocket connection rejected: invalid or expired ticket');
+                return false;
+              }
+
+              await redis.del(key); // single-use: delete immediately
+              const extra = ctx.extra as Record<string, unknown>;
+              extra.user = JSON.parse(data) as AuthUser;
+              return true;
+            },
+          },
+        },
+        context: ({ req, extra }: { req?: { user?: AuthUser }; extra?: { user?: AuthUser } }) => {
+          // For WebSocket subscriptions, user is on extra.user (set by onConnect)
+          // For HTTP requests, user is on req.user (set by Passport)
+          if (extra?.user) {
+            return { req: { user: extra.user } };
+          }
+          return { req };
+        },
       }),
     }),
-    RedisModule,
     AuthModule,
     CaslModule,
     HealthModule,
@@ -62,6 +98,10 @@ import { AppService } from './app.service';
     AppService,
     AppResolver,
     I18nTextScalar,
+    {
+      provide: APP_GUARD,
+      useClass: ImpersonationSessionGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,

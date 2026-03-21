@@ -8,6 +8,7 @@ export const AppAction = {
   Read: 'read',
   Update: 'update',
   Delete: 'delete',
+  Impersonate: 'impersonate',
 } as const;
 
 export type AppAction = (typeof AppAction)[keyof typeof AppAction];
