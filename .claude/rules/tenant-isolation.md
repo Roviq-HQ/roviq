@@ -1,7 +1,7 @@
 ---
-paths:
-  - "apps/api-gateway/**"
-  - "libs/database/**"
+# paths:
+#   - "apps/api-gateway/**"
+#   - "libs/database/**"
 ---
 
 # Tenant Isolation & Authorization (Security-Critical)
@@ -44,11 +44,13 @@ await withAdmin(db, async (tx) => { ... });
 ## Drizzle Schema Change Checklist
 
 Every tenant-scoped table MUST have ALL of these:
+
 - `tenantId: uuid('tenant_id').notNull()` — use `tenantColumns` spread for standard tables
 - Index on `tenant_id` — without this, RLS does full table scans
 - RLS policies via `tenantPolicies('table_name')` helper (includes tenant isolation + admin bypass + soft-delete filter)
 
 After ANY schema change:
+
 - Run `pnpm db:push` to sync schema to DB
 - Update `scripts/seed.ts` to match the new schema
 - Grep for old field names / unique constraints across `scripts/`, `e2e/`, and test files

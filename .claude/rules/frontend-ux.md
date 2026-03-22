@@ -1,8 +1,8 @@
 ---
-paths: 
-  - apps/admin-portal/**
-  - apps/institute-portal/**
-  - libs/frontend/**
+# paths: 
+#   - apps/admin-portal/**
+#   - apps/institute-portal/**
+#   - libs/frontend/**
 ---
 
 # Frontend UX Rules
