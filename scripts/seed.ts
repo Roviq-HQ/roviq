@@ -9,6 +9,7 @@ import {
   memberships,
   paymentGatewayConfigs,
   platformMemberships,
+  resellerMemberships,
   resellers,
   roles,
   SYSTEM_USER_ID,
@@ -253,8 +254,9 @@ async function main() {
       );
     }
 
-    // 3. Create test users (platform-level, no tenantId/roleId)
+    // 3. Create test users
     const adminPassword = await hash('admin123');
+    const resellerPassword = await hash('reseller123');
     const teacherPassword = await hash('teacher123');
     const studentPassword = await hash('student123');
 
@@ -265,11 +267,10 @@ async function main() {
         username: 'admin',
         email: 'admin@demo-institute.com',
         passwordHash: adminPassword,
-        isPlatformAdmin: true,
       })
       .onConflictDoUpdate({
         target: users.username,
-        set: { updatedAt: new Date(), isPlatformAdmin: true },
+        set: { updatedAt: new Date() },
       })
       .returning();
 
@@ -294,6 +295,20 @@ async function main() {
         username: 'student1',
         email: 'student1@demo-institute.com',
         passwordHash: studentPassword,
+      })
+      .onConflictDoUpdate({
+        target: users.username,
+        set: { updatedAt: new Date() },
+      })
+      .returning();
+
+    const [resellerUser] = await tx
+      .insert(users)
+      .values({
+        id: SEED_IDS.USER_RESELLER,
+        username: 'reseller1',
+        email: 'reseller1@roviq.com',
+        passwordHash: resellerPassword,
       })
       .onConflictDoUpdate({
         target: users.username,
@@ -341,6 +356,32 @@ async function main() {
         set: { updatedAt: new Date() },
       });
     console.log(`  User: ${admin.username} / admin123 (institute_admin in both institutes)`);
+
+    // reseller — linked to "Roviq Direct" reseller
+    await tx
+      .insert(resellerMemberships)
+      .values({
+        userId: resellerUser.id,
+        resellerId: SEED_IDS.RESELLER_DIRECT,
+        roleId: SEED_IDS.ROLE_RESELLER_FULL_ADMIN,
+      })
+      .onConflictDoUpdate({
+        target: [resellerMemberships.userId, resellerMemberships.resellerId],
+        set: { updatedAt: new Date() },
+      });
+    // Auth provider for reseller
+    await tx
+      .insert(authProviders)
+      .values({
+        userId: resellerUser.id,
+        provider: 'password',
+        providerUserId: resellerUser.id,
+      })
+      .onConflictDoUpdate({
+        target: [authProviders.provider, authProviders.providerUserId],
+        set: { updatedAt: new Date() },
+      });
+    console.log(`  User: ${resellerUser.username} / reseller123 (reseller_full_admin)`);
 
     // teacher — single institute (tests direct login)
     await tx
@@ -397,11 +438,12 @@ async function main() {
 
   console.log('\nSeed complete!');
   console.log('\nTest login with:');
-  console.log(
-    '  username: admin      password: admin123   (2 institutes — shows institute picker)',
-  );
-  console.log('  username: teacher1   password: teacher123 (1 institute — direct login)');
-  console.log('  username: student1   password: student123 (1 institute — direct login)');
+  console.log('  Admin portal   (admin.localhost):     admin / admin123');
+  console.log('  Reseller portal (reseller.localhost):  reseller1 / reseller123');
+  console.log('  Institute portal (localhost):');
+  console.log('    admin / admin123       (multi-institute picker)');
+  console.log('    teacher1 / teacher123  (single institute)');
+  console.log('    student1 / student123  (single institute)');
 
   await pool.end();
   process.exit(0);

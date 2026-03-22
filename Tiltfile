@@ -77,9 +77,18 @@ local_resource(
   serve_dir='.',
   deps=['.env'],
   resource_deps=['pnpm-install'],
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
   links=['http://localhost:4200'],
+)
+
+# Notification Service (NestJS) — async event processing via NATS
+local_resource(
+  'notification-service',
+  labels=['dev'],
+  serve_cmd='pnpm run dev:notifications',
+  serve_dir='.',
+  deps=[],
+  resource_deps=['db-push', 'nats'],
+  auto_init=False,
 )
 
 # ─── Infra ────────────────────────────────────────────────────────────────────
@@ -168,8 +177,8 @@ local_resource(
 )
 
 local_resource(
-  'e2e-admin-portal',
-  cmd='pnpm run e2e:admin-portal',
+  'e2e-web-admin',
+  cmd='pnpm run e2e:web-admin',
   resource_deps=['web'],
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,
@@ -177,8 +186,8 @@ local_resource(
 )
 
 local_resource(
-  'e2e-institute-portal',
-  cmd='pnpm run e2e:institute-portal',
+  'e2e-web-institute',
+  cmd='pnpm run e2e:web-institute',
   resource_deps=['web'],
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,

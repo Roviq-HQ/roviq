@@ -43,7 +43,7 @@ USER node
 FROM base AS build
 
 COPY . .
-RUN pnpm nx run-many -t build --parallel=3
+RUN pnpm nx run-many -t build -p api-gateway notification-service --parallel=3
 
 # ── Production: api-gateway ──────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS api-gateway
