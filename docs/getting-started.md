@@ -42,7 +42,7 @@ open http://localhost:3000/api/graphql
 # Health check
 curl http://localhost:3000/api/health
 
-# Observability (also accessible via admin-portal → Observability)
+# Observability (also accessible via web app → Observability)
 open http://localhost:3001/d/roviq-overview  # Grafana dashboard
 open http://localhost:9090                   # Prometheus
 open http://localhost:3200                   # Tempo
@@ -86,8 +86,7 @@ tilt down                # Stop everything
 
 # Individual apps (if not using Tilt)
 pnpm run dev:gateway      # API gateway               (port 3000)
-pnpm run dev:admin        # Admin portal               (port 4200)
-pnpm run dev:portal       # Institute portal            (port 4300)
+pnpm run dev:web          # Web app                     (port 4200)
 
 # Database (handled automatically by Tilt, but available manually)
 pnpm run db:push          # Push Drizzle schema to DB

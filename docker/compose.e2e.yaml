@@ -53,12 +53,13 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.backend
       target: dev
-    command: sh -c "pnpm run db:push && pnpm run db:seed"
+    command: sh -c "pnpm run db:reset --seed"
     env_file: ../.env
     environment:
-      # Override DB to use roviq_test instead of dev roviq
+      # Override ALL DB URLs to use roviq_test on Docker postgres
       DATABASE_URL: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+      DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,8 +79,7 @@ services:
     env_file: ../.env
     environment:
       # Override DB to use roviq_test
-      DATABASE_URL: postgresql://roviq_app:roviq_app_dev@postgres:5432/roviq_test
-      DATABASE_URL_ADMIN: postgresql://roviq_admin:roviq_admin_dev@postgres:5432/roviq_test
+      DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
       # Override service URLs to use Docker network hostnames
       NATS_URL: nats://nats:4222
       REDIS_URL: redis://redis:6379
@@ -120,7 +120,7 @@ services:
       "
     env_file: ../.env
     environment:
-      DATABASE_URL: postgresql://roviq_app:roviq_app_dev@postgres:5432/roviq_test
+      DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
       NATS_URL: nats://nats:4222
       NODE_ENV: test
     depends_on:
@@ -161,7 +161,7 @@ services:
     environment:
       API_URL: http://api-gateway:3004/api/graphql
       WS_URL: ws://api-gateway:3004/api/graphql
-      DATABASE_URL_ADMIN: postgresql://roviq_admin:roviq_admin_dev@postgres:5432/roviq_test
+      DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
     depends_on:
       api-gateway:
         condition: service_healthy
