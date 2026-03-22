@@ -122,6 +122,62 @@ export class MembershipDrizzleRepository extends MembershipRepository {
     };
   }
 
+  async findByIdAndUser(
+    membershipId: string,
+    userId: string,
+  ): Promise<MembershipWithInstituteAndRole | null> {
+    const [row] = await withAdmin(this.db, (tx) =>
+      tx
+        .select({
+          id: memberships.id,
+          tenantId: memberships.tenantId,
+          roleId: memberships.roleId,
+          status: memberships.status,
+          abilities: memberships.abilities,
+          instituteId: institutes.id,
+          instituteName: institutes.name,
+          instituteSlug: institutes.slug,
+          instituteLogoUrl: institutes.logoUrl,
+          roleIdFk: roles.id,
+          roleName: roles.name,
+          roleAbilities: roles.abilities,
+        })
+        .from(memberships)
+        .innerJoin(institutes, eq(memberships.tenantId, institutes.id))
+        .innerJoin(roles, eq(memberships.roleId, roles.id))
+        .where(
+          and(
+            eq(memberships.id, membershipId),
+            eq(memberships.userId, userId),
+            eq(memberships.status, 'ACTIVE'),
+            isNull(memberships.deletedAt),
+          ),
+        )
+        .limit(1),
+    );
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      roleId: row.roleId,
+      status: row.status,
+      abilities: row.abilities,
+      institute: {
+        id: row.instituteId,
+        name: row.instituteName,
+        slug: row.instituteSlug,
+        logoUrl: row.instituteLogoUrl,
+      },
+      role: {
+        id: row.roleIdFk,
+        name: row.roleName,
+        abilities: row.roleAbilities,
+      },
+    };
+  }
+
   async findFirstActive(userId: string): Promise<MembershipWithRole | null> {
     const [row] = await withAdmin(this.db, (tx) =>
       tx

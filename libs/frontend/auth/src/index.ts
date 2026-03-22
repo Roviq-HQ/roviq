@@ -16,7 +16,7 @@ export type {
   SessionExpiredDialogProps,
 } from './lib/session-expired-dialog';
 export { SessionExpiredDialog } from './lib/session-expired-dialog';
-export { createScopedTokenStorage, tokenStorage } from './lib/token-storage';
+export { createScopedTokenStorage } from './lib/token-storage';
 export type {
   AuthScope,
   AuthState,

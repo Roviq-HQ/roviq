@@ -239,12 +239,11 @@ export class ImpersonationService {
   // ── Exchange one-time code ───────────────────────────────
 
   async exchangeCode(code: string): Promise<ImpersonationAuthPayload> {
-    // Read and delete atomically (single-use)
-    const stored = await this.redis.get(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
+    // Atomic read-and-delete (GETDEL, Redis 6.2+) — prevents TOCTOU race on concurrent exchanges
+    const stored = await this.redis.getdel(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
     if (!stored) {
       throw new UnauthorizedException('Impersonation code expired or already used');
     }
-    await this.redis.del(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
 
     const { sessionId, targetUserId, tenantId } = JSON.parse(stored) as CodePayload;
 
@@ -381,6 +380,9 @@ export class ImpersonationService {
         })
         .where(eq(impersonationSessions.id, sessionId)),
     );
+
+    // Invalidate session cache so ImpersonationSessionGuard rejects immediately
+    await this.redis.del(`${REDIS_KEYS.IMPERSONATION_SESSION}${sessionId}`);
 
     // Emit impersonation_end event
     this.authEventService

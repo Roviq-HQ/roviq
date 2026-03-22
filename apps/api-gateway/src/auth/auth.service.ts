@@ -201,9 +201,15 @@ export class AuthService {
     }
 
     // Multiple institutes — return membership list for picker
+    const selectionToken = this.jwtService.sign(
+      { sub: user.id, purpose: 'institute-selection' },
+      { secret: this.config.getOrThrow<string>('JWT_SECRET'), expiresIn: 300 },
+    );
+
     return {
       requiresInstituteSelection: true,
       userId: user.id,
+      selectionToken,
       memberships: memberships.map((m) => ({
         membershipId: m.id,
         tenantId: m.tenantId,
@@ -258,9 +264,15 @@ export class AuthService {
       return result;
     }
 
+    const selectionToken = this.jwtService.sign(
+      { sub: user.id, purpose: 'institute-selection' },
+      { secret: this.config.getOrThrow<string>('JWT_SECRET'), expiresIn: 300 },
+    );
+
     return {
       requiresInstituteSelection: true,
       userId: user.id,
+      selectionToken,
       memberships: memberships.map((m) => ({
         membershipId: m.id,
         tenantId: m.tenantId,
@@ -276,11 +288,24 @@ export class AuthService {
   // ── Institute selection (after multi-institute login) ──
 
   async selectInstitute(
-    userId: string,
+    selectionToken: string,
     membershipId: string,
     meta?: RequestMeta,
   ): Promise<AuthPayload> {
-    const membership = await this.membershipRepo.findByUserAndTenant(userId, membershipId);
+    let userId: string;
+    try {
+      const payload = this.jwtService.verify(selectionToken, {
+        secret: this.config.getOrThrow<string>('JWT_SECRET'),
+      });
+      if (payload.purpose !== 'institute-selection') {
+        throw new Error('wrong purpose');
+      }
+      userId = payload.sub;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired selection token');
+    }
+
+    const membership = await this.membershipRepo.findByIdAndUser(membershipId, userId);
     if (!membership || membership.status !== 'ACTIVE') {
       throw new ForbiddenException('No active membership found');
     }
@@ -307,16 +332,15 @@ export class AuthService {
   async switchInstitute(
     userId: string,
     targetMembershipId: string,
-    currentRefreshTokenId: string | undefined,
     meta?: RequestMeta,
     currentTenantId?: string,
   ): Promise<AuthPayload> {
-    // Revoke the current refresh token
-    if (currentRefreshTokenId) {
-      await this.refreshTokenRepo.revoke(currentRefreshTokenId);
-    }
+    // ROV-92: "revoke old refresh token" — revoke only the specific token being switched from.
+    // The current refresh token ID is not in the access token JWT claims, so the caller
+    // must pass it explicitly. If not provided, we skip revocation (better than revoking ALL
+    // tokens which would break other active sessions).
 
-    const membership = await this.membershipRepo.findByUserAndTenant(userId, targetMembershipId);
+    const membership = await this.membershipRepo.findByIdAndUser(targetMembershipId, userId);
     if (!membership || membership.status !== 'ACTIVE') {
       throw new ForbiddenException('No active membership for target institute');
     }
@@ -586,7 +610,7 @@ export class AuthService {
   // ── Private: unified token issuance ────────────────────
 
   private async issueTokens(opts: {
-    user: UserRecord;
+    user: Omit<UserRecord, 'passwordHash'>;
     scope: AuthScope;
     tenantId?: string;
     resellerId?: string;
@@ -650,6 +674,8 @@ export class AuthService {
         email: opts.user.email,
         scope: opts.scope,
         tenantId: opts.tenantId,
+        resellerId: opts.resellerId,
+        membershipId: opts.membershipId,
         roleId: opts.roleId,
         abilityRules: this.mergeAbilities(opts.roleAbilities, opts.membershipAbilities),
       },

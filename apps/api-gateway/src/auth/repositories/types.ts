@@ -9,7 +9,6 @@ export interface UserRecord {
   email: string;
   passwordHash: string;
   status: UserStatus;
-  isPlatformAdmin: boolean;
   passwordChangedAt: Date | null;
 }
 
@@ -102,7 +101,7 @@ export interface RefreshTokenWithRelations {
   ipAddress: string | null;
   userAgent: string | null;
   lastUsedAt: Date | null;
-  user: UserRecord;
+  user: Omit<UserRecord, 'passwordHash'>;
   membership: {
     id: string;
     tenantId: string;

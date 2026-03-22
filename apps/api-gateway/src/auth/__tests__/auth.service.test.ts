@@ -23,6 +23,7 @@ function createMockMembershipRepo() {
   return {
     findActiveByUserId: vi.fn(),
     findByUserAndTenant: vi.fn(),
+    findByIdAndUser: vi.fn(),
     findFirstActive: vi.fn(),
   };
 }
@@ -170,11 +171,13 @@ describe('AuthService', () => {
 
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership, secondMembership]);
+      mockJwt.sign.mockReturnValue('mock-selection-token');
 
       const result = await authService.instituteLogin('admin', 'correct-password');
 
       expect(result.requiresInstituteSelection).toBe(true);
       expect(result.userId).toBe('user-1');
+      expect(result.selectionToken).toBe('mock-selection-token');
       expect(result.memberships).toHaveLength(2);
       expect(result.memberships?.[0]?.instituteName).toBe('Test Institute');
       expect(result.memberships?.[1]?.instituteName).toBe('Other Institute');
@@ -356,10 +359,12 @@ describe('AuthService', () => {
 
       mockUserRepo.findById.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership, secondMembership]);
+      mockJwt.sign.mockReturnValue('mock-selection-token');
 
       const result = await authService.instituteLoginByUserId('user-1');
 
       expect(result.requiresInstituteSelection).toBe(true);
+      expect(result.selectionToken).toBe('mock-selection-token');
       expect(result.memberships).toHaveLength(2);
     });
 
@@ -413,6 +418,10 @@ describe('AuthService', () => {
   });
 
   describe('selectInstitute', () => {
+    beforeEach(() => {
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', purpose: 'institute-selection' });
+    });
+
     it('should issue tenant-scoped JWT for valid membership', async () => {
       const membership = {
         id: 'membership-1',
@@ -436,12 +445,12 @@ describe('AuthService', () => {
         status: 'ACTIVE',
       };
 
-      mockMembershipRepo.findByUserAndTenant.mockResolvedValue(membership);
+      mockMembershipRepo.findByIdAndUser.mockResolvedValue(membership);
       mockUserRepo.findById.mockResolvedValue(user);
       mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('access-jwt');
 
-      const result = await authService.selectInstitute('user-1', 'membership-1');
+      const result = await authService.selectInstitute('mock-selection-token', 'membership-1');
 
       expect(result.accessToken).toBe('access-jwt');
       expect(result.user?.tenantId).toBe('tenant-1');
@@ -449,24 +458,42 @@ describe('AuthService', () => {
     });
 
     it('should reject if no active membership found', async () => {
-      mockMembershipRepo.findByUserAndTenant.mockResolvedValue(null);
+      mockMembershipRepo.findByIdAndUser.mockResolvedValue(null);
 
-      await expect(authService.selectInstitute('user-1', 'membership-999')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        authService.selectInstitute('mock-selection-token', 'membership-999'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should reject inactive membership', async () => {
-      mockMembershipRepo.findByUserAndTenant.mockResolvedValue({
+      mockMembershipRepo.findByIdAndUser.mockResolvedValue({
         id: 'membership-1',
         status: 'SUSPENDED',
         institute: {},
         role: {},
       });
 
-      await expect(authService.selectInstitute('user-1', 'membership-1')).rejects.toThrow(
-        ForbiddenException,
+      await expect(
+        authService.selectInstitute('mock-selection-token', 'membership-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject invalid selection token', async () => {
+      mockJwt.verify.mockImplementation(() => {
+        throw new Error('invalid');
+      });
+
+      await expect(authService.selectInstitute('bad-token', 'membership-1')).rejects.toThrow(
+        'Invalid or expired selection token',
       );
+    });
+
+    it('should reject token with wrong purpose', async () => {
+      mockJwt.verify.mockReturnValue({ sub: 'user-1', purpose: 'other' });
+
+      await expect(
+        authService.selectInstitute('wrong-purpose-token', 'membership-1'),
+      ).rejects.toThrow('Invalid or expired selection token');
     });
   });
 

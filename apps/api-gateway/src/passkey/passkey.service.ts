@@ -68,6 +68,7 @@ export class PasskeyService {
       rpName: this.rpName,
       rpID: this.rpId,
       userName: user.username,
+      userDisplayName: user.username,
       attestationType: 'none',
       excludeCredentials: existingPasskeys
         .filter((p) => p.providerUserId !== null)

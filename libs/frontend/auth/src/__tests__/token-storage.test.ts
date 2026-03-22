@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createScopedTokenStorage, tokenStorage } from '../lib/token-storage';
+import { createScopedTokenStorage } from '../lib/token-storage';
 import type { AuthUser, MembershipInfo } from '../lib/types';
 
 const mockUser: AuthUser = {
@@ -13,6 +13,7 @@ const mockUser: AuthUser = {
 
 const mockMemberships: MembershipInfo[] = [
   {
+    membershipId: 'm1',
     tenantId: 't1',
     roleId: 'r1',
     instituteName: { en: 'Institute 1' },
@@ -20,6 +21,7 @@ const mockMemberships: MembershipInfo[] = [
     roleName: { en: 'admin' },
   },
   {
+    membershipId: 'm2',
     tenantId: 't2',
     roleId: 'r2',
     instituteName: { en: 'Institute 2' },
@@ -28,7 +30,7 @@ const mockMemberships: MembershipInfo[] = [
   },
 ];
 
-describe('tokenStorage (legacy)', () => {
+describe('createScopedTokenStorage', () => {
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
@@ -36,164 +38,130 @@ describe('tokenStorage (legacy)', () => {
 
   describe('tokens', () => {
     it('stores and retrieves access and refresh tokens', () => {
-      tokenStorage.setTokens({ accessToken: 'access-1', refreshToken: 'refresh-1' });
-      expect(tokenStorage.getAccessToken()).toBe('access-1');
-      expect(tokenStorage.getRefreshToken()).toBe('refresh-1');
+      const storage = createScopedTokenStorage('institute');
+      storage.setTokens({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+      expect(storage.getAccessToken()).toBe('access-1');
+      expect(storage.getRefreshToken()).toBe('refresh-1');
     });
 
     it('returns null when no tokens are set', () => {
-      expect(tokenStorage.getAccessToken()).toBeNull();
-      expect(tokenStorage.getRefreshToken()).toBeNull();
+      const storage = createScopedTokenStorage('institute');
+      expect(storage.getAccessToken()).toBeNull();
+      expect(storage.getRefreshToken()).toBeNull();
     });
   });
 
   describe('user', () => {
     it('stores and retrieves user object', () => {
-      tokenStorage.setUser(mockUser);
-      expect(tokenStorage.getUser()).toEqual(mockUser);
+      const storage = createScopedTokenStorage('institute');
+      storage.setUser(mockUser);
+      expect(storage.getUser()).toEqual(mockUser);
     });
 
     it('returns null when no user is set', () => {
-      expect(tokenStorage.getUser()).toBeNull();
+      const storage = createScopedTokenStorage('institute');
+      expect(storage.getUser()).toBeNull();
     });
 
     it('returns null for invalid JSON in storage', () => {
-      localStorage.setItem('roviq_user', '{invalid json');
-      expect(tokenStorage.getUser()).toBeNull();
-    });
-  });
-
-  describe('platform token', () => {
-    it('stores and retrieves platform token', () => {
-      tokenStorage.setPlatformToken('platform-123');
-      expect(tokenStorage.getPlatformToken()).toBe('platform-123');
-    });
-
-    it('returns null when no platform token is set', () => {
-      expect(tokenStorage.getPlatformToken()).toBeNull();
+      localStorage.setItem('roviq-institute-user', '{invalid json');
+      const storage = createScopedTokenStorage('institute');
+      expect(storage.getUser()).toBeNull();
     });
   });
 
   describe('memberships', () => {
     it('stores and retrieves memberships', () => {
-      tokenStorage.setMemberships(mockMemberships);
-      expect(tokenStorage.getMemberships()).toEqual(mockMemberships);
+      const storage = createScopedTokenStorage('institute');
+      storage.setMemberships(mockMemberships);
+      expect(storage.getMemberships()).toEqual(mockMemberships);
     });
 
     it('returns null when no memberships are set', () => {
-      expect(tokenStorage.getMemberships()).toBeNull();
+      const storage = createScopedTokenStorage('institute');
+      expect(storage.getMemberships()).toBeNull();
     });
 
     it('returns null for invalid JSON in storage', () => {
-      sessionStorage.setItem('roviq_memberships', 'not-json');
-      expect(tokenStorage.getMemberships()).toBeNull();
+      sessionStorage.setItem('roviq-institute-memberships', 'not-json');
+      const storage = createScopedTokenStorage('institute');
+      expect(storage.getMemberships()).toBeNull();
     });
   });
 
   describe('clear', () => {
     it('removes all stored data', () => {
-      tokenStorage.setTokens({ accessToken: 'a', refreshToken: 'r' });
-      tokenStorage.setUser(mockUser);
-      tokenStorage.setPlatformToken('p');
-      tokenStorage.setMemberships(mockMemberships);
+      const storage = createScopedTokenStorage('institute');
+      storage.setTokens({ accessToken: 'a', refreshToken: 'r' });
+      storage.setUser(mockUser);
+      storage.setMemberships(mockMemberships);
 
-      tokenStorage.clear();
+      storage.clear();
 
-      expect(tokenStorage.getAccessToken()).toBeNull();
-      expect(tokenStorage.getRefreshToken()).toBeNull();
-      expect(tokenStorage.getUser()).toBeNull();
-      expect(tokenStorage.getPlatformToken()).toBeNull();
-      expect(tokenStorage.getMemberships()).toBeNull();
+      expect(storage.getAccessToken()).toBeNull();
+      expect(storage.getRefreshToken()).toBeNull();
+      expect(storage.getUser()).toBeNull();
+      expect(storage.getMemberships()).toBeNull();
     });
   });
 
-  describe('clearPlatform', () => {
-    it('removes platform token but keeps memberships and access/refresh tokens', () => {
-      tokenStorage.setTokens({ accessToken: 'a', refreshToken: 'r' });
-      tokenStorage.setPlatformToken('p');
-      tokenStorage.setMemberships(mockMemberships);
+  describe('clearMemberships', () => {
+    it('removes memberships but keeps access/refresh tokens', () => {
+      const storage = createScopedTokenStorage('institute');
+      storage.setTokens({ accessToken: 'a', refreshToken: 'r' });
+      storage.setMemberships(mockMemberships);
 
-      tokenStorage.clearPlatform();
+      storage.clearMemberships();
 
-      expect(tokenStorage.getPlatformToken()).toBeNull();
-      expect(tokenStorage.getMemberships()).toEqual(mockMemberships);
-      expect(tokenStorage.getAccessToken()).toBe('a');
-      expect(tokenStorage.getRefreshToken()).toBe('r');
+      expect(storage.getMemberships()).toBeNull();
+      expect(storage.getAccessToken()).toBe('a');
+      expect(storage.getRefreshToken()).toBe('r');
     });
   });
-});
 
-describe('createScopedTokenStorage', () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-    localStorage.clear();
-  });
+  describe('scope isolation', () => {
+    it('isolates tokens by scope', () => {
+      const platformStorage = createScopedTokenStorage('platform');
+      const instituteStorage = createScopedTokenStorage('institute');
 
-  it('isolates tokens by scope', () => {
-    const platformStorage = createScopedTokenStorage('platform');
-    const instituteStorage = createScopedTokenStorage('institute');
+      platformStorage.setTokens({
+        accessToken: 'platform-access',
+        refreshToken: 'platform-refresh',
+      });
+      instituteStorage.setTokens({
+        accessToken: 'institute-access',
+        refreshToken: 'institute-refresh',
+      });
 
-    platformStorage.setTokens({ accessToken: 'platform-access', refreshToken: 'platform-refresh' });
-    instituteStorage.setTokens({
-      accessToken: 'institute-access',
-      refreshToken: 'institute-refresh',
+      expect(platformStorage.getAccessToken()).toBe('platform-access');
+      expect(instituteStorage.getAccessToken()).toBe('institute-access');
     });
 
-    expect(platformStorage.getAccessToken()).toBe('platform-access');
-    expect(platformStorage.getRefreshToken()).toBe('platform-refresh');
-    expect(instituteStorage.getAccessToken()).toBe('institute-access');
-    expect(instituteStorage.getRefreshToken()).toBe('institute-refresh');
-  });
+    it('isolates user data by scope', () => {
+      const platformStorage = createScopedTokenStorage('platform');
+      const resellerStorage = createScopedTokenStorage('reseller');
 
-  it('isolates user data by scope', () => {
-    const platformStorage = createScopedTokenStorage('platform');
-    const resellerStorage = createScopedTokenStorage('reseller');
+      const platformUser = { ...mockUser, scope: 'platform' as const };
+      const resellerUser = { ...mockUser, scope: 'reseller' as const, id: 'u2' };
 
-    const platformUser = { ...mockUser, scope: 'platform' as const };
-    const resellerUser = { ...mockUser, scope: 'reseller' as const, id: 'u2' };
+      platformStorage.setUser(platformUser);
+      resellerStorage.setUser(resellerUser);
 
-    platformStorage.setUser(platformUser);
-    resellerStorage.setUser(resellerUser);
+      expect(platformStorage.getUser()).toEqual(platformUser);
+      expect(resellerStorage.getUser()).toEqual(resellerUser);
+    });
 
-    expect(platformStorage.getUser()).toEqual(platformUser);
-    expect(resellerStorage.getUser()).toEqual(resellerUser);
-  });
+    it('clearing one scope does not affect another', () => {
+      const platformStorage = createScopedTokenStorage('platform');
+      const instituteStorage = createScopedTokenStorage('institute');
 
-  it('clearing one scope does not affect another', () => {
-    const platformStorage = createScopedTokenStorage('platform');
-    const instituteStorage = createScopedTokenStorage('institute');
+      platformStorage.setTokens({ accessToken: 'pa', refreshToken: 'pr' });
+      instituteStorage.setTokens({ accessToken: 'ia', refreshToken: 'ir' });
 
-    platformStorage.setTokens({ accessToken: 'pa', refreshToken: 'pr' });
-    instituteStorage.setTokens({ accessToken: 'ia', refreshToken: 'ir' });
+      platformStorage.clear();
 
-    platformStorage.clear();
-
-    expect(platformStorage.getAccessToken()).toBeNull();
-    expect(instituteStorage.getAccessToken()).toBe('ia');
-  });
-
-  it('does not collide with legacy storage', () => {
-    const scopedStorage = createScopedTokenStorage('institute');
-
-    tokenStorage.setTokens({ accessToken: 'legacy-a', refreshToken: 'legacy-r' });
-    scopedStorage.setTokens({ accessToken: 'scoped-a', refreshToken: 'scoped-r' });
-
-    expect(tokenStorage.getAccessToken()).toBe('legacy-a');
-    expect(scopedStorage.getAccessToken()).toBe('scoped-a');
-  });
-
-  it('stores and retrieves memberships per scope', () => {
-    const storage = createScopedTokenStorage('institute');
-    storage.setMemberships(mockMemberships);
-    expect(storage.getMemberships()).toEqual(mockMemberships);
-  });
-
-  it('stores and retrieves platform token per scope', () => {
-    const storage = createScopedTokenStorage('institute');
-    storage.setPlatformToken('pt-123');
-    expect(storage.getPlatformToken()).toBe('pt-123');
-
-    storage.clearPlatform();
-    expect(storage.getPlatformToken()).toBeNull();
+      expect(platformStorage.getAccessToken()).toBeNull();
+      expect(instituteStorage.getAccessToken()).toBe('ia');
+    });
   });
 });

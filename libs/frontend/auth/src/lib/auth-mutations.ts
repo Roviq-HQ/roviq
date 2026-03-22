@@ -1,11 +1,4 @@
-import type {
-  AuthUser,
-  LoginInput,
-  LoginResult,
-  MembershipInfo,
-  PasskeyAuthOptions,
-  SessionInfo,
-} from './types';
+import type { AuthUser, LoginInput, LoginResult, PasskeyAuthOptions, SessionInfo } from './types';
 
 interface AuthResponse {
   accessToken: string;
@@ -14,12 +7,23 @@ interface AuthResponse {
 }
 
 const USER_FIELDS = 'id username email scope tenantId resellerId membershipId roleId abilityRules';
-const LOGIN_RESULT_FIELDS = `
+
+// AuthPayload fields — used by adminLogin, resellerLogin
+const AUTH_PAYLOAD_FIELDS = `
   accessToken
   refreshToken
   user { ${USER_FIELDS} }
-  platformToken
-  memberships { tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
+`;
+
+// InstituteLoginResult fields — used by instituteLogin (superset of AuthPayload)
+const INSTITUTE_LOGIN_FIELDS = `
+  accessToken
+  refreshToken
+  user { ${USER_FIELDS} }
+  requiresInstituteSelection
+  userId
+  selectionToken
+  memberships { membershipId tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
 `;
 
 async function graphqlFetch<T>(
@@ -44,9 +48,9 @@ async function graphqlFetch<T>(
 }
 
 export function createAuthMutations(graphqlUrl: string) {
-  function createScopedLogin(mutationName: string) {
+  function createScopedLogin(mutationName: string, fields: string) {
     const query = `mutation ${mutationName}($username: String!, $password: String!) {
-      ${mutationName}(username: $username, password: $password) { ${LOGIN_RESULT_FIELDS} }
+      ${mutationName}(username: $username, password: $password) { ${fields} }
     }`;
 
     return async (input: LoginInput): Promise<LoginResult> => {
@@ -58,50 +62,26 @@ export function createAuthMutations(graphqlUrl: string) {
     };
   }
 
-  const adminLogin = createScopedLogin('adminLogin');
-  const resellerLogin = createScopedLogin('resellerLogin');
-  const instituteLogin = createScopedLogin('instituteLogin');
+  const adminLogin = createScopedLogin('adminLogin', AUTH_PAYLOAD_FIELDS);
+  const resellerLogin = createScopedLogin('resellerLogin', AUTH_PAYLOAD_FIELDS);
+  const instituteLogin = createScopedLogin('instituteLogin', INSTITUTE_LOGIN_FIELDS);
 
   return {
-    // Legacy login — kept for backward compatibility
-    async login(input: LoginInput): Promise<LoginResult> {
-      const data = await graphqlFetch<{
-        login: {
-          accessToken?: string;
-          refreshToken?: string;
-          user?: AuthUser;
-          platformToken?: string;
-          memberships?: MembershipInfo[];
-        };
-      }>(
-        graphqlUrl,
-        `mutation Login($username: String!, $password: String!) {
-          login(username: $username, password: $password) {
-            ${LOGIN_RESULT_FIELDS}
-          }
-        }`,
-        { username: input.username, password: input.password },
-      );
-      return data.login;
-    },
-
-    // Scope-specific login mutations
     adminLogin,
     resellerLogin,
     instituteLogin,
 
-    async selectInstitute(tenantId: string, platformToken: string): Promise<AuthResponse> {
+    async selectInstitute(selectionToken: string, membershipId: string): Promise<AuthResponse> {
       const data = await graphqlFetch<{ selectInstitute: AuthResponse }>(
         graphqlUrl,
-        `mutation SelectInstitute($tenantId: String!) {
-          selectInstitute(tenantId: $tenantId) {
+        `mutation SelectInstitute($selectionToken: String!, $membershipId: String!) {
+          selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) {
             accessToken
             refreshToken
             user { ${USER_FIELDS} }
           }
         }`,
-        { tenantId },
-        { Authorization: `Bearer ${platformToken}` },
+        { selectionToken, membershipId },
       );
       return data.selectInstitute;
     },
@@ -211,7 +191,7 @@ export function createAuthMutations(graphqlUrl: string) {
         graphqlUrl,
         `mutation VerifyPasskeyAuth($input: VerifyPasskeyAuthInput!) {
           verifyPasskeyAuth(input: $input) {
-            ${LOGIN_RESULT_FIELDS}
+            ${INSTITUTE_LOGIN_FIELDS}
           }
         }`,
         { input: { challengeId, credential } },

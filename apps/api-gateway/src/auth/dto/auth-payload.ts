@@ -21,6 +21,12 @@ export class UserType {
   tenantId?: string;
 
   @Field({ nullable: true })
+  resellerId?: string;
+
+  @Field({ nullable: true })
+  membershipId?: string;
+
+  @Field({ nullable: true })
   roleId?: string;
 
   @Field(() => [GraphQLJSONObject], { nullable: true })
@@ -78,6 +84,9 @@ export class InstituteLoginResult {
   // Multi-institute path
   @Field({ nullable: true })
   requiresInstituteSelection?: boolean;
+
+  @Field({ nullable: true })
+  selectionToken?: string;
 
   @Field({ nullable: true })
   userId?: string;

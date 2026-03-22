@@ -20,8 +20,8 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   getAccessToken: () => string | null;
-  selectInstitute: (tenantId: string) => Promise<void>;
-  switchInstitute: (tenantId: string) => Promise<void>;
+  selectInstitute: (membershipId: string) => Promise<void>;
+  switchInstitute: (membershipId: string) => Promise<void>;
   notifyImpersonationEnded: () => void;
   clearImpersonationEnded: () => void;
 }
@@ -33,8 +33,8 @@ interface AuthProviderProps {
   loginMutation: (input: LoginInput) => Promise<LoginResult>;
   passkeyLoginMutation?: () => Promise<LoginResult>;
   selectInstituteMutation: (
-    tenantId: string,
-    platformToken: string,
+    selectionToken: string,
+    membershipId: string,
   ) => Promise<{
     accessToken: string;
     refreshToken: string;
@@ -76,6 +76,7 @@ export function AuthProvider({
 
   const [sessionExpired, setSessionExpired] = React.useState(false);
   const [needsInstituteSelection, setNeedsInstituteSelection] = React.useState(false);
+  const [pendingSelectionToken, setPendingSelectionToken] = React.useState<string | null>(null);
   const [memberships, setMemberships] = React.useState<MembershipInfo[] | null>(null);
   const [impersonationEnded, setImpersonationEnded] = React.useState(false);
 
@@ -176,19 +177,8 @@ export function AuthProvider({
     const refreshToken = tokenStorage.getRefreshToken();
     const user = tokenStorage.getUser();
 
-    // Check for pending institute selection
-    const platformToken = tokenStorage.getPlatformToken();
-    const storedMemberships = tokenStorage.getMemberships();
-    if (platformToken && storedMemberships) {
-      setMemberships(storedMemberships);
-      setNeedsInstituteSelection(true);
-      setState((s) => ({ ...s, isLoading: false }));
-      return;
-    }
-
+    // If valid tokens exist, restore authenticated state (even if memberships are stored)
     if (accessToken && user && !isTokenExpired(accessToken)) {
-      const storedMems = tokenStorage.getMemberships();
-      if (storedMems) setMemberships(storedMems);
       setState({
         user,
         tokens: { accessToken, refreshToken: refreshToken ?? '' },
@@ -225,6 +215,12 @@ export function AuthProvider({
           });
         });
     } else {
+      // No valid tokens — check for pending institute selection (multi-institute login in progress)
+      const storedMemberships = tokenStorage.getMemberships();
+      if (storedMemberships) {
+        setMemberships(storedMemberships);
+        setNeedsInstituteSelection(true);
+      }
       setState((s) => ({ ...s, isLoading: false }));
     }
 
@@ -253,44 +249,15 @@ export function AuthProvider({
           isLoading: false,
         });
         scheduleRefresh(result.accessToken);
-      } else if (result.platformToken && result.memberships) {
-        // Session expired re-login: auto-select the same institute the user was in
-        const prevTenantId = prevTenantIdRef.current;
-        if (prevTenantId) {
-          try {
-            const orgResult = await selectInstituteMutation(prevTenantId, result.platformToken);
-            tokenStorage.setTokens({
-              accessToken: orgResult.accessToken,
-              refreshToken: orgResult.refreshToken,
-            });
-            tokenStorage.setUser(orgResult.user);
-            setState({
-              user: orgResult.user,
-              tokens: {
-                accessToken: orgResult.accessToken,
-                refreshToken: orgResult.refreshToken,
-              },
-              isAuthenticated: true,
-              isLoading: false,
-            });
-            scheduleRefresh(orgResult.accessToken);
-          } catch {
-            // Auto-select failed (e.g. membership revoked) — fall back to institute selection
-            tokenStorage.setPlatformToken(result.platformToken);
-            tokenStorage.setMemberships(result.memberships);
-            setMemberships(result.memberships);
-            setNeedsInstituteSelection(true);
-            setSessionExpired(false);
-          }
-        } else {
-          tokenStorage.setPlatformToken(result.platformToken);
-          tokenStorage.setMemberships(result.memberships);
-          setMemberships(result.memberships);
-          setNeedsInstituteSelection(true);
-        }
+      } else if (result.requiresInstituteSelection && result.memberships && result.selectionToken) {
+        // Multi-institute login — store memberships + selectionToken for institute picker
+        tokenStorage.setMemberships(result.memberships);
+        setMemberships(result.memberships);
+        setPendingSelectionToken(result.selectionToken);
+        setNeedsInstituteSelection(true);
       }
     },
-    [scheduleRefresh, selectInstituteMutation, tokenStorage],
+    [scheduleRefresh, tokenStorage],
   );
 
   const login = React.useCallback(
@@ -325,21 +292,21 @@ export function AuthProvider({
   }, [tokenStorage]);
 
   const selectInstitute = React.useCallback(
-    async (tenantId: string) => {
-      const platformToken = tokenStorage.getPlatformToken();
-      if (!platformToken || isTokenExpired(platformToken)) {
+    async (membershipId: string) => {
+      if (!pendingSelectionToken) {
         clearAllState();
         throw new Error('Session expired');
       }
 
-      const result = await selectInstituteMutation(tenantId, platformToken);
-      tokenStorage.clearPlatform();
+      const result = await selectInstituteMutation(pendingSelectionToken, membershipId);
       tokenStorage.setTokens({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       });
       tokenStorage.setUser(result.user);
+      tokenStorage.clearMemberships();
       setNeedsInstituteSelection(false);
+      setPendingSelectionToken(null);
       setState({
         user: result.user,
         tokens: {
@@ -351,17 +318,16 @@ export function AuthProvider({
       });
       scheduleRefresh(result.accessToken);
     },
-    [selectInstituteMutation, scheduleRefresh, clearAllState, tokenStorage],
+    [selectInstituteMutation, pendingSelectionToken, scheduleRefresh, clearAllState, tokenStorage],
   );
 
   const switchInstitute = React.useCallback(
-    async (tenantId: string) => {
+    async (membershipId: string) => {
       const accessToken = tokenStorage.getAccessToken();
       if (!accessToken) throw new Error('No access token');
 
       if (switchInstituteMutation) {
-        // Use dedicated switchInstitute mutation with membershipId
-        const result = await switchInstituteMutation(tenantId, accessToken);
+        const result = await switchInstituteMutation(membershipId, accessToken);
         tokenStorage.setTokens({
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
@@ -378,26 +344,10 @@ export function AuthProvider({
         });
         scheduleRefresh(result.accessToken);
       } else {
-        // Fallback: use selectInstitute mutation with current access token
-        const result = await selectInstituteMutation(tenantId, accessToken);
-        tokenStorage.setTokens({
-          accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
-        });
-        tokenStorage.setUser(result.user);
-        setState({
-          user: result.user,
-          tokens: {
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-          },
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        scheduleRefresh(result.accessToken);
+        throw new Error('switchInstituteMutation is required for institute switching');
       }
     },
-    [selectInstituteMutation, switchInstituteMutation, scheduleRefresh, tokenStorage],
+    [switchInstituteMutation, scheduleRefresh, tokenStorage],
   );
 
   const logout = React.useCallback(async () => {

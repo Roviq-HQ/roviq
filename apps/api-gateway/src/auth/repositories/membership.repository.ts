@@ -6,5 +6,9 @@ export abstract class MembershipRepository {
     userId: string,
     tenantId: string,
   ): Promise<MembershipWithInstituteAndRole | null>;
+  abstract findByIdAndUser(
+    membershipId: string,
+    userId: string,
+  ): Promise<MembershipWithInstituteAndRole | null>;
   abstract findFirstActive(userId: string): Promise<MembershipWithRole | null>;
 }
