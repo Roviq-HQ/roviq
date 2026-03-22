@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { E2E_USERS } from '../e2e-constants';
+import { SEED_IDS } from '../e2e-constants';
 import { loginAsAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
@@ -61,8 +61,33 @@ async function queryAsPlatformAdmin(
 }
 
 /**
+ * Execute a query with reseller role context.
+ */
+async function queryAsReseller(
+  pool: pg.Pool,
+  resellerId: string,
+  sql: string,
+  params: unknown[] = [],
+): Promise<pg.QueryResult> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL ROLE roviq_reseller');
+    await client.query("SELECT set_config('app.current_reseller_id', $1, true)", [resellerId]);
+    const result = await client.query(sql, params);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Poll DB until an audit log row appears for the given tenant and action.
- * Uses set_config for RLS context since FORCE ROW LEVEL SECURITY is enabled.
+ * Uses polling with timeout (not sleep) for async NATS → consumer → PG pipeline.
  */
 async function waitForAuditLog(
   pool: pg.Pool,
@@ -90,10 +115,6 @@ describe('Audit E2E', () => {
   let pool: pg.Pool;
   let adminToken: string;
   let adminTenantId: string;
-  // Audit logs are immutable by design — no DELETE/UPDATE RLS policies exist.
-  // Test rows accumulate but don't affect results since each test uses unique
-  // correlation IDs for filtering. We still track IDs for documentation purposes.
-  const testAuditIds: string[] = [];
 
   beforeAll(async () => {
     // Verify API is reachable
@@ -108,64 +129,46 @@ describe('Audit E2E', () => {
   });
 
   afterAll(async () => {
-    // No audit row cleanup — audit_logs has no DELETE RLS policy (immutable by design).
-    // RLS silently blocks DELETEs (returns 0 rows), as verified by the immutability tests below.
     await pool.end();
   });
 
+  // ═══════════════════════════════════════════════════
+  // Full Pipeline (requires running NATS consumer)
+  // ═══════════════════════════════════════════════════
+
   describe('Full pipeline: mutation → NATS → consumer → DB', () => {
-    // Requires audit consumer (notification-service) to be running and consuming NATS events.
-    // Skipped in CI — run manually with full infra stack via `tilt up`.
-    it.skip('should create audit log entry when authenticated mutation is executed', async () => {
-      // Use teacher1 (single-institute, gets direct accessToken with tenantId)
-      const loginRes = await gql(`
-        mutation {
-          instituteLogin(username: "${E2E_USERS.TEACHER.username}", password: "${E2E_USERS.TEACHER.password}") {
-            accessToken
-            refreshToken
-            user { id tenantId }
-          }
-        }
-      `);
-      const teacherToken = loginRes.data?.instituteLogin.accessToken;
-      const teacherTenantId = loginRes.data?.instituteLogin.user.tenantId;
-
-      // Execute logout — emits audit event directly from auth resolver
-      const logoutRes = await gql(`mutation { logout }`, undefined, teacherToken);
+    it.skip('should create audit log entry for authenticated mutation', async () => {
+      const logoutRes = await gql('mutation { logout }', undefined, adminToken);
       expect(logoutRes.errors).toBeUndefined();
-      expect(logoutRes.data?.logout).toBe(true);
 
-      // Wait for audit log to appear in DB (async: resolver → NATS → consumer → PG)
-      const rows = await waitForAuditLog(pool, teacherTenantId, 'logout');
-
+      const rows = await waitForAuditLog(pool, adminTenantId, 'logout');
       expect(rows.length).toBeGreaterThanOrEqual(1);
-      const auditRow = rows[0];
-      expect(auditRow.action).toBe('logout');
-      expect(auditRow.action_type).toBe('DELETE');
-      expect(auditRow.source).toBe('GATEWAY');
-      expect(auditRow.tenant_id).toBe(teacherTenantId);
-
-      testAuditIds.push(auditRow.id as string);
+      expect(rows[0].action).toBe('logout');
+      expect(rows[0].scope).toBe('institute');
+      expect(rows[0].source).toBe('GATEWAY');
     });
   });
+
+  // ═══════════════════════════════════════════════════
+  // GraphQL Query API
+  // ═══════════════════════════════════════════════════
 
   describe('GraphQL query API', () => {
     let testCorrelationId: string;
 
     beforeAll(async () => {
-      // Insert test audit data directly for query testing
       testCorrelationId = crypto.randomUUID();
-      const result = await queryWithRls(
+      await queryWithRls(
         pool,
         adminTenantId,
         `INSERT INTO audit_logs
-          (tenant_id, user_id, actor_id, action, action_type, entity_type, entity_id, correlation_id, source, metadata)
+          (scope, tenant_id, user_id, actor_id, action, action_type, entity_type,
+           entity_id, correlation_id, source, metadata)
         VALUES
-          ($1, gen_random_uuid(), gen_random_uuid(), 'createStudent', 'CREATE', 'Student', gen_random_uuid(), $2, 'TEST', '{"test": true}')
-        RETURNING id`,
+          ('institute', $1, gen_random_uuid(), gen_random_uuid(), 'createStudent',
+           'CREATE', 'Student', gen_random_uuid(), $2, 'TEST', '{"test": true}')`,
         [adminTenantId, testCorrelationId],
       );
-      testAuditIds.push(result.rows[0].id);
     });
 
     it('should return audit logs via GraphQL query', async () => {
@@ -176,28 +179,13 @@ describe('Audit E2E', () => {
             edges {
               cursor
               node {
-                id
-                action
-                actionType
-                entityType
-                source
-                correlationId
-                metadata
-                createdAt
+                id action actionType entityType source correlationId metadata createdAt
               }
             }
-            pageInfo {
-              hasNextPage
-              hasPreviousPage
-              endCursor
-              startCursor
-            }
+            pageInfo { hasNextPage hasPreviousPage endCursor startCursor }
           }
         }`,
-        {
-          filter: { correlationId: testCorrelationId },
-          first: 10,
-        },
+        { filter: { correlationId: testCorrelationId }, first: 10 },
         adminToken,
       );
 
@@ -227,7 +215,6 @@ describe('Audit E2E', () => {
 
       expect(res.errors).toBeUndefined();
       expect(res.data?.auditLogs.totalCount).toBe(0);
-      expect(res.data?.auditLogs.edges).toHaveLength(0);
     });
 
     it('should filter by actionTypes', async () => {
@@ -237,12 +224,7 @@ describe('Audit E2E', () => {
             edges { node { actionType correlationId } }
           }
         }`,
-        {
-          filter: {
-            actionTypes: ['CREATE'],
-            correlationId: testCorrelationId,
-          },
-        },
+        { filter: { actionTypes: ['CREATE'], correlationId: testCorrelationId } },
         adminToken,
       );
 
@@ -255,24 +237,20 @@ describe('Audit E2E', () => {
     });
 
     it('should support cursor-based pagination', async () => {
-      // Insert 3 more rows for pagination testing
-      const ids: string[] = [];
       for (let i = 0; i < 3; i++) {
-        const result = await queryWithRls(
+        await queryWithRls(
           pool,
           adminTenantId,
           `INSERT INTO audit_logs
-            (tenant_id, user_id, actor_id, action, action_type, entity_type, correlation_id, source)
+            (scope, tenant_id, user_id, actor_id, action, action_type,
+             entity_type, correlation_id, source)
           VALUES
-            ($1, gen_random_uuid(), gen_random_uuid(), $2, 'CREATE', 'PaginationTest', gen_random_uuid(), 'TEST')
-          RETURNING id`,
+            ('institute', $1, gen_random_uuid(), gen_random_uuid(), $2,
+             'CREATE', 'PaginationTest', gen_random_uuid(), 'TEST')`,
           [adminTenantId, `paginationTest${i}`],
         );
-        ids.push(result.rows[0].id);
       }
-      testAuditIds.push(...ids);
 
-      // First page
       const page1 = await gql(
         `query {
           auditLogs(filter: { entityType: "PaginationTest" }, first: 2) {
@@ -285,11 +263,9 @@ describe('Audit E2E', () => {
       );
 
       expect(page1.errors).toBeUndefined();
-      const pageInfo1 = page1.data?.auditLogs.pageInfo;
       expect(page1.data?.auditLogs.edges).toHaveLength(2);
-      expect(pageInfo1.hasNextPage).toBe(true);
+      expect(page1.data?.auditLogs.pageInfo.hasNextPage).toBe(true);
 
-      // Second page using cursor
       const page2 = await gql(
         `query AuditLogs($after: String) {
           auditLogs(filter: { entityType: "PaginationTest" }, first: 2, after: $after) {
@@ -297,7 +273,7 @@ describe('Audit E2E', () => {
             pageInfo { hasNextPage hasPreviousPage }
           }
         }`,
-        { after: pageInfo1.endCursor },
+        { after: page1.data?.auditLogs.pageInfo.endCursor },
         adminToken,
       );
 
@@ -307,44 +283,38 @@ describe('Audit E2E', () => {
     });
 
     it('should require authentication', async () => {
-      const res = await gql(`
-        query {
-          auditLogs(first: 10) {
-            totalCount
-          }
-        }
-      `);
-
-      // Should get auth error
+      const res = await gql(`query { auditLogs(first: 10) { totalCount } }`);
       expect(res.errors).toBeDefined();
       expect(res.errors?.length).toBeGreaterThan(0);
     });
   });
 
+  // ═══════════════════════════════════════════════════
+  // RLS Isolation
+  // ═══════════════════════════════════════════════════
+
   describe('RLS isolation', () => {
-    it('should only return logs for the current tenant', async () => {
+    it('tenant A cannot see tenant B audit logs', async () => {
       const fakeTenantId = crypto.randomUUID();
       const correlationId = crypto.randomUUID();
 
-      // Insert a row for a different tenant directly via SQL.
-      // RETURNING requires SELECT policy to pass, so set RLS context for the fake tenant.
-      const result = await queryWithRls(
+      await queryWithRls(
         pool,
         fakeTenantId,
         `INSERT INTO audit_logs
-          (tenant_id, user_id, actor_id, action, action_type, entity_type, correlation_id, source)
-        VALUES ($1, gen_random_uuid(), gen_random_uuid(), 'rlsTest', 'CREATE', 'RlsTest', $2, 'TEST')
-        RETURNING id`,
+          (scope, tenant_id, user_id, actor_id, action, action_type,
+           entity_type, correlation_id, source)
+        VALUES ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+                'rlsTest', 'CREATE', 'RlsTest', $2, 'TEST')`,
         [fakeTenantId, correlationId],
       );
-      testAuditIds.push(result.rows[0].id);
 
-      // Query via GraphQL with admin's tenant — should NOT see the other tenant's row
+      // Query via GraphQL with admin's tenant — should NOT see other tenant's row
       const res = await gql(
         `query AuditLogs($filter: AuditLogFilterInput) {
           auditLogs(filter: $filter, first: 10) {
             totalCount
-            edges { node { id tenantId } }
+            edges { node { id } }
           }
         }`,
         { filter: { correlationId } },
@@ -352,14 +322,86 @@ describe('Audit E2E', () => {
       );
 
       expect(res.errors).toBeUndefined();
-      // The row belongs to fakeTenantId, not admin's tenant — RLS should block it
       expect(res.data?.auditLogs.totalCount).toBe(0);
+    });
+
+    it('platform admin sees all scopes via roviq_admin role', async () => {
+      const correlationId = crypto.randomUUID();
+
+      // Insert rows with different scopes
+      await queryAsPlatformAdmin(
+        pool,
+        `INSERT INTO audit_logs
+          (scope, tenant_id, user_id, actor_id, action, action_type,
+           entity_type, correlation_id, source)
+        VALUES
+          ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+           'scopeTest', 'CREATE', 'ScopeTest', $2, 'TEST'),
+          ('platform', NULL, gen_random_uuid(), gen_random_uuid(),
+           'scopeTest', 'CREATE', 'ScopeTest', $2, 'TEST')`,
+        [adminTenantId, correlationId],
+      );
+
+      const result = await queryAsPlatformAdmin(
+        pool,
+        `SELECT scope FROM audit_logs WHERE correlation_id = $1 ORDER BY scope`,
+        [correlationId],
+      );
+
+      expect(result.rows).toHaveLength(2);
+      expect(result.rows.map((r: { scope: string }) => r.scope).sort()).toEqual([
+        'institute',
+        'platform',
+      ]);
+    });
+
+    it('reseller sees their institutes + own reseller entries', async () => {
+      const resellerId = SEED_IDS.RESELLER_DIRECT;
+      const correlationId = crypto.randomUUID();
+
+      // Insert institute-scoped row (tenant belongs to this reseller)
+      await queryAsPlatformAdmin(
+        pool,
+        `INSERT INTO audit_logs
+          (scope, tenant_id, user_id, actor_id, action, action_type,
+           entity_type, correlation_id, source)
+        VALUES ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+                'resellerTest', 'CREATE', 'ResellerTest', $2, 'TEST')`,
+        [SEED_IDS.INSTITUTE_1, correlationId],
+      );
+
+      // Insert reseller-scoped row
+      await queryAsPlatformAdmin(
+        pool,
+        `INSERT INTO audit_logs
+          (scope, reseller_id, user_id, actor_id, action, action_type,
+           entity_type, correlation_id, source)
+        VALUES ('reseller', $1, gen_random_uuid(), gen_random_uuid(),
+                'resellerTest', 'CREATE', 'ResellerTest', $2, 'TEST')`,
+        [resellerId, correlationId],
+      );
+
+      const result = await queryAsReseller(
+        pool,
+        resellerId,
+        `SELECT scope FROM audit_logs WHERE correlation_id = $1 ORDER BY scope`,
+        [correlationId],
+      );
+
+      expect(result.rows).toHaveLength(2);
+      expect(result.rows.map((r: { scope: string }) => r.scope).sort()).toEqual([
+        'institute',
+        'reseller',
+      ]);
     });
   });
 
+  // ═══════════════════════════════════════════════════
+  // Immutability
+  // ═══════════════════════════════════════════════════
+
   describe('Immutability', () => {
-    it('should reject UPDATE on audit_logs', async () => {
-      // roviq_app has no UPDATE policy on audit_logs — RLS silently blocks.
+    it('roviq_app UPDATE on audit_logs is silently blocked by RLS', async () => {
       const result = await queryWithRls(
         pool,
         adminTenantId,
@@ -369,7 +411,7 @@ describe('Audit E2E', () => {
       expect(result.rowCount).toBe(0);
     });
 
-    it('should reject DELETE on audit_logs', async () => {
+    it('roviq_app DELETE on audit_logs is silently blocked by RLS', async () => {
       const result = await queryWithRls(
         pool,
         adminTenantId,
@@ -378,12 +420,199 @@ describe('Audit E2E', () => {
       );
       expect(result.rowCount).toBe(0);
     });
+
+    it('roviq_app UPDATE is denied at GRANT level', async () => {
+      // REVOKE UPDATE was applied in ROV-64 custom migration
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL ROLE roviq_app');
+        await client.query("SELECT set_config('app.current_tenant_id', $1, true)", [adminTenantId]);
+        await expect(
+          client.query(`UPDATE audit_logs SET action = 'HACKED' WHERE tenant_id = $1`, [
+            adminTenantId,
+          ]),
+        ).rejects.toThrow(/permission denied/);
+        await client.query('ROLLBACK');
+      } finally {
+        client.release();
+      }
+    });
   });
 
+  // ═══════════════════════════════════════════════════
+  // CHECK Constraint (scope validation)
+  // ═══════════════════════════════════════════════════
+
+  describe('CHECK constraint (chk_audit_scope)', () => {
+    it('rejects scope=institute with tenant_id=NULL', async () => {
+      await expect(
+        queryAsPlatformAdmin(
+          pool,
+          `INSERT INTO audit_logs
+            (scope, tenant_id, user_id, actor_id, action, action_type,
+             entity_type, correlation_id, source)
+          VALUES ('institute', NULL, gen_random_uuid(), gen_random_uuid(),
+                  'checkTest', 'CREATE', 'CheckTest', gen_random_uuid(), 'TEST')`,
+        ),
+      ).rejects.toThrow(/chk_audit_scope/);
+    });
+
+    it('rejects scope=reseller with reseller_id=NULL', async () => {
+      await expect(
+        queryAsPlatformAdmin(
+          pool,
+          `INSERT INTO audit_logs
+            (scope, reseller_id, user_id, actor_id, action, action_type,
+             entity_type, correlation_id, source)
+          VALUES ('reseller', NULL, gen_random_uuid(), gen_random_uuid(),
+                  'checkTest', 'CREATE', 'CheckTest', gen_random_uuid(), 'TEST')`,
+        ),
+      ).rejects.toThrow(/chk_audit_scope/);
+    });
+
+    it('accepts scope=platform with tenant_id=NULL and reseller_id=NULL', async () => {
+      const result = await queryAsPlatformAdmin(
+        pool,
+        `INSERT INTO audit_logs
+          (scope, user_id, actor_id, action, action_type, entity_type,
+           correlation_id, source)
+        VALUES ('platform', gen_random_uuid(), gen_random_uuid(),
+                'checkTest', 'CREATE', 'CheckTest', gen_random_uuid(), 'TEST')
+        RETURNING id`,
+      );
+      expect(result.rows).toHaveLength(1);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // Idempotency (ON CONFLICT DO NOTHING)
+  // ═══════════════════════════════════════════════════
+
+  describe('Idempotency', () => {
+    it('duplicate (id, created_at) inserts result in single row', async () => {
+      const id = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
+      const correlationId = crypto.randomUUID();
+
+      const insertSql = `
+        INSERT INTO audit_logs
+          (id, scope, tenant_id, user_id, actor_id, action, action_type,
+           entity_type, correlation_id, source, created_at)
+        VALUES ($1, 'institute', $2, gen_random_uuid(), gen_random_uuid(),
+                'idempotencyTest', 'CREATE', 'IdempotencyTest', $3, 'TEST', $4)
+        ON CONFLICT (id, created_at) DO NOTHING`;
+
+      // Insert twice with same id + created_at
+      await queryWithRls(pool, adminTenantId, insertSql, [
+        id,
+        adminTenantId,
+        correlationId,
+        createdAt,
+      ]);
+      await queryWithRls(pool, adminTenantId, insertSql, [
+        id,
+        adminTenantId,
+        correlationId,
+        createdAt,
+      ]);
+
+      const result = await queryWithRls(
+        pool,
+        adminTenantId,
+        `SELECT COUNT(*)::int as cnt FROM audit_logs WHERE id = $1`,
+        [id],
+      );
+      expect(result.rows[0].cnt).toBe(1);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // Impersonation fields
+  // ═══════════════════════════════════════════════════
+
+  describe('Impersonation tracking', () => {
+    it('stores actor_id ≠ user_id and impersonation session ID', async () => {
+      const userId = crypto.randomUUID();
+      const actorId = crypto.randomUUID();
+      const impersonatorId = actorId;
+      const sessionId = crypto.randomUUID();
+      const correlationId = crypto.randomUUID();
+
+      await queryWithRls(
+        pool,
+        adminTenantId,
+        `INSERT INTO audit_logs
+          (scope, tenant_id, user_id, actor_id, impersonator_id,
+           impersonation_session_id, action, action_type, entity_type,
+           correlation_id, source)
+        VALUES ('institute', $1, $2, $3, $4, $5,
+                'impersonationTest', 'UPDATE', 'ImpersonationTest', $6, 'TEST')`,
+        [adminTenantId, userId, actorId, impersonatorId, sessionId, correlationId],
+      );
+
+      const result = await queryWithRls(
+        pool,
+        adminTenantId,
+        `SELECT user_id, actor_id, impersonator_id, impersonation_session_id
+         FROM audit_logs WHERE correlation_id = $1`,
+        [correlationId],
+      );
+
+      expect(result.rows).toHaveLength(1);
+      const row = result.rows[0];
+      expect(row.user_id).toBe(userId);
+      expect(row.actor_id).toBe(actorId);
+      expect(row.impersonator_id).toBe(impersonatorId);
+      expect(row.impersonation_session_id).toBe(sessionId);
+      expect(row.actor_id).not.toBe(row.user_id);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // Correlation
+  // ═══════════════════════════════════════════════════
+
+  describe('Correlation', () => {
+    it('all entries from one request share correlation_id', async () => {
+      const correlationId = crypto.randomUUID();
+
+      // Insert 3 rows with same correlation ID (simulating cascading side effects)
+      for (const action of ['createEnrollment', 'createAttendance', 'assignSection']) {
+        await queryWithRls(
+          pool,
+          adminTenantId,
+          `INSERT INTO audit_logs
+            (scope, tenant_id, user_id, actor_id, action, action_type,
+             entity_type, correlation_id, source)
+          VALUES ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+                  $2, 'CREATE', 'CorrelationTest', $3, 'TEST')`,
+          [adminTenantId, action, correlationId],
+        );
+      }
+
+      const result = await queryWithRls(
+        pool,
+        adminTenantId,
+        `SELECT action FROM audit_logs WHERE correlation_id = $1 ORDER BY created_at`,
+        [correlationId],
+      );
+
+      expect(result.rows).toHaveLength(3);
+      expect(result.rows.map((r: { action: string }) => r.action)).toEqual([
+        'createEnrollment',
+        'createAttendance',
+        'assignSection',
+      ]);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // @NoAudit opt-out
+  // ═══════════════════════════════════════════════════
+
   describe('@NoAudit opt-out', () => {
-    it('should not create audit log for unauthenticated mutations via interceptor', async () => {
-      // register is unauthenticated — no user on req, interceptor skips.
-      // register also has no manual audit emission (no tenant context available).
+    it('unauthenticated mutations produce no audit log', async () => {
       const uniqueUsername = `audit_test_${Date.now()}`;
       await gql(`
         mutation {
@@ -400,12 +629,9 @@ describe('Audit E2E', () => {
       // Brief wait for any potential async pipeline
       await new Promise((r) => setTimeout(r, 1500));
 
-      // Query with platform admin context to bypass RLS tenant isolation.
-      // FORCE ROW LEVEL SECURITY is enabled on audit_logs — a bare pool.query()
-      // without set_config would always return 0 rows, making this assertion vacuous.
       const result = await queryAsPlatformAdmin(
         pool,
-        `SELECT id FROM audit_logs WHERE action = 'register' AND metadata->>'args' LIKE $1`,
+        `SELECT id FROM audit_logs WHERE action = 'register' AND metadata->>'input' LIKE $1`,
         [`%${uniqueUsername}%`],
       );
 

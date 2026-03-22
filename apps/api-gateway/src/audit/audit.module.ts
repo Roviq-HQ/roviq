@@ -18,6 +18,6 @@ import { AuditRepositoryModule } from './repositories/audit-repository.module';
     AuditService,
     AuditInterceptor,
   ],
-  exports: [AuditInterceptor],
+  exports: [AuditInterceptor, AuditLibModule],
 })
 export class AuditModule {}
