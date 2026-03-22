@@ -34,6 +34,7 @@ export interface LoginInput {
 }
 
 export interface MembershipInfo {
+  membershipId: string;
   tenantId: string;
   roleId: string;
   instituteName: I18nContent;
@@ -46,7 +47,9 @@ export interface LoginResult {
   accessToken?: string;
   refreshToken?: string;
   user?: AuthUser;
-  platformToken?: string;
+  requiresInstituteSelection?: boolean;
+  userId?: string;
+  selectionToken?: string;
   memberships?: MembershipInfo[];
 }
 

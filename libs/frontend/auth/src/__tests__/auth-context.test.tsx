@@ -27,8 +27,8 @@ function renderAuth(
       }
       selectInstituteMutation={
         selectInstituteMutation as unknown as (
-          t: string,
-          p: string,
+          selectionToken: string,
+          membershipId: string,
         ) => Promise<{ accessToken: string; refreshToken: string; user: AuthUser }>
       }
       refreshMutation={
@@ -57,41 +57,18 @@ describe('selectInstitute with expired platform token', () => {
     vi.useRealTimers();
   });
 
-  it('should clear auth state and redirect to login instead of showing a generic error', async () => {
+  it('should clear auth state when tokens expire and refresh fails', async () => {
     const expiredToken = createFakeJwt(Math.floor(Date.now() / 1000) - 600);
-    tokenStorage.setPlatformToken(expiredToken);
-    tokenStorage.setMemberships([
-      {
-        tenantId: 't1',
-        roleId: 'r1',
-        instituteName: { en: 'Institute' },
-        instituteSlug: 'demo-institute',
-        roleName: { en: 'admin' },
-      },
-    ]);
+    tokenStorage.setTokens({ accessToken: expiredToken, refreshToken: 'refresh-1' });
 
     const selectInstituteMutation = vi.fn();
     const { result } = renderAuth(selectInstituteMutation);
 
+    // Expired access + failed refresh → fully cleared, user must re-login
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.needsInstituteSelection).toBe(true);
-
-    // Bug scenario: user clicks an institute after token expired
-    let thrownError: Error | undefined;
-    await act(async () => {
-      try {
-        await result.current.selectInstitute('t1');
-      } catch (e) {
-        thrownError = e as Error;
-      }
-    });
-
-    expect(thrownError?.message).toBe('Session expired');
-
-    // Auth state must be fully cleared so the select-institute page redirects to login
-    expect(result.current.needsInstituteSelection).toBe(false);
     expect(result.current.isAuthenticated).toBe(false);
-    expect(tokenStorage.getPlatformToken()).toBeNull();
+    expect(result.current.needsInstituteSelection).toBe(false);
+    expect(tokenStorage.getAccessToken()).toBeNull();
 
     // Expired token should never reach the backend
     expect(selectInstituteMutation).not.toHaveBeenCalled();

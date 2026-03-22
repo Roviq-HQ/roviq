@@ -107,16 +107,17 @@ export class AuthResolver {
   }
 
   // ── Institute selection (multi-institute flow) ─────────
+  // No auth guard — called after instituteLogin returns requiresInstituteSelection.
+  // The user is identified by userId + membershipId (membership is proof of access).
 
   @NoAudit()
   @Mutation(() => AuthPayload)
-  @UseGuards(GqlAuthGuard)
   async selectInstitute(
+    @Args('selectionToken') selectionToken: string,
     @Args('membershipId') membershipId: string,
-    @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
-    return this.authService.selectInstitute(user.userId, membershipId, extractMeta(ctx));
+    return this.authService.selectInstitute(selectionToken, membershipId, extractMeta(ctx));
   }
 
   // ── Institute switching ────────────────────────────────
@@ -129,12 +130,7 @@ export class AuthResolver {
     @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
-    return this.authService.switchInstitute(
-      user.userId,
-      membershipId,
-      undefined, // currentRefreshTokenId — will be passed via header in future
-      extractMeta(ctx),
-    );
+    return this.authService.switchInstitute(user.userId, membershipId, extractMeta(ctx));
   }
 
   // ── Token refresh ──────────────────────────────────────
