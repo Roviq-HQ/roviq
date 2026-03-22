@@ -1,12 +1,12 @@
 ---
-paths:
-  - "libs/database/src/schema/**"
-  - "apps/**/models/**"
-  - "apps/**/dto/**"
-  - "libs/frontend/**"
+# paths:
+#   - "libs/database/src/schema/**"
+#   - "apps/**/models/**"
+#   - "apps/**/dto/**"
+#   - "libs/frontend/**"
 ---
 
-## Multi-Language (i18n) Fields
+# Multi-Language (i18n) Fields
 
 1. **DB stores full JSONB, API returns full JSONB, frontend resolves locale** — `i18nText('name')` stores `{ "en": "Science", "hi": "विज्ञान" }`. GraphQL returns the whole object (NOT a resolved string). Frontend uses `useI18nField()` hook to pick the right locale with fallback chain: current → `en` → first available. NEVER resolve locale in resolvers or services.
 

@@ -1,7 +1,7 @@
 ---
-paths:
-  - "apps/api-gateway/**"
-  - "libs/backend/**"
+# paths:
+#   - "apps/api-gateway/**"
+#   - "libs/backend/**"
 ---
 
 # Backend Code Patterns (NestJS / api-gateway)
@@ -11,7 +11,6 @@ paths:
 - DI for same-process communication, NestJS microservices (NATS) for inter-service
 - `ConfigService` for all config — never `process.env`
 - All NestJS app modules must have `ConfigModule.forRoot({ isGlobal: true })`
-
 
 ## Naming Conventions
 

@@ -1,13 +1,13 @@
 ---
-paths:
-  - "e2e/api-gateway-e2e/**"
-  - "ee/e2e/api-gateway-e2e/**"
-  - "docker/compose.e2e.yaml"
-  - "scripts/seed.ts"
-  - "package.json"
+# paths:
+#   - "e2e/api-gateway-e2e/**"
+#   - "ee/e2e/api-gateway-e2e/**"
+#   - "docker/compose.e2e.yaml"
+#   - "scripts/seed.ts"
+#   - "package.json"
 ---
 
-## Backend E2E Testing Rules
+# Backend E2E Testing Rules
 
 1. **Isolated environment** — E2E runs via Docker Compose profiles: `docker compose -f docker/compose.e2e.yaml --profile hurl up --build --abort-on-container-exit`. Uses `roviq_test` database (created by `docker/init-db.sh`). NEVER run E2E against dev database. `down -v` on exit guarantees clean state. No shell scripts — Docker handles everything.
 

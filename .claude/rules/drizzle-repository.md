@@ -1,20 +1,24 @@
 ---
-paths:
-  - "apps/**/*repository.ts"
-  - "apps/**/*repository.test.ts"
-  - "ee/apps/**/*repository.ts"
-  - "ee/apps/**/*repository.test.ts"
-  - "libs/database/**"
-  - "ee/libs/database/**"
+# paths:
+#   - "apps/**/*repository.ts"
+#   - "apps/**/*repository.test.ts"
+#   - "ee/apps/**/*repository.ts"
+#   - "ee/apps/**/*repository.test.ts"
+#   - "libs/database/**"
+#   - "ee/libs/database/**"
 ---
 
-## Database: Drizzle ORM v1 beta
+# Database
+
+## Drizzle ORM v1 beta
 
 ### Version
+
 - drizzle-orm@beta, drizzle-kit@beta
 - NEVER use stable v0.x APIs — we are on v1 beta track
 
 ### Critical rules
+
 - ALWAYS `strict: true` in drizzle.config.ts
 - NEVER use `drizzle-kit push` on any shared database
 - NEVER use `serial()` — use `integer().primaryKey().generatedAlwaysAsIdentity()`
@@ -24,6 +28,7 @@ paths:
 - `$onUpdate` is an alias for `$onUpdateFn` — both accept `() => TData | SQL`
 
 ### Three query APIs — know which to use
+
 - `db.query` is RQBv2 (object-based filters, `with:` for relations): `db.query.users.findMany({ with: { posts: true } })`
 - `db.select().from(table).where()` is SQL-like (joins, aggregations, raw control)
 - `db._query` is legacy RQBv1 (callback-based). NEVER use `db._query`.
@@ -31,6 +36,7 @@ paths:
 - Complex JOINs do NOT work in `db.query` — use `db.select()` with `.innerJoin()`
 
 ### RLS & multi-tenancy
+
 - Single Drizzle instance (DRIZZLE_DB), not separate admin/tenant instances
 - Tenant queries: wrap in `withTenant(db, tenantId, async (tx) => {...})`
 - Admin queries: wrap in `withAdmin(db, async (tx) => {...})`
@@ -43,6 +49,7 @@ paths:
 - Hard DELETE blocked for `roviq_app` — policy `USING (false)`. Only `roviq_admin` can hard delete
 
 ### Column conventions
+
 - Tenant-scoped business tables: spread `...tenantColumns` (tenantId + timestamps + tracking + soft delete + version)
 - Auth/platform tables (users, refresh_tokens, auth_providers): spread `...timestamps` only
 - audit_logs: NO common columns — immutable append-only with its own `created_at`
@@ -55,6 +62,7 @@ paths:
 - For tables with `tenantColumns` spread, add tenant FK via `foreignKey()` in constraints
 
 ### Status & deletion — separate concerns
+
 - **NEVER `isActive: boolean()`** — use domain-specific `pgEnum` status. Each entity owns its enum
 - **Status ≠ deletion.** Delete = "created by mistake." Deactivate = "still referenced but disabled"
 - Separate mutations: `deletePlan` vs `deactivatePlan`. Explicit status transitions, not generic `updateStatus()`
@@ -62,6 +70,7 @@ paths:
 - Status enums per domain: `plan_status`, `user_status`, `membership_status`, `institute_status`, `role_status`, etc.
 
 ### Soft delete
+
 - **Automatic via RLS** — `roviq_app` SELECT/UPDATE policies include `deleted_at IS NULL`. NEVER add `.where(isNull(deletedAt))` manually
 - NEVER use `db.delete()` — always use `softDelete(db, table, id)` which throws `NotFoundException`/`ConflictException` directly
 - `softDelete()` checks FK references via savepoint before soft-deleting — throws `ConflictException` if referenced
@@ -69,6 +78,7 @@ paths:
 - Restore: `restoreDeleted(db, table, id)` — must be called inside `withTrash()`
 
 ### Schema patterns
+
 - All schema files in libs/database/src/schema/ organized by domain
 - Use reusable helpers from common/columns.ts (timestamps, trackingColumns, entityColumns, tenantColumns, i18nText)
 - Cross-file references use lazy evaluation: `.references(() => otherTable.id)`
@@ -78,10 +88,12 @@ paths:
 - drizzle.config.ts `schema` points to barrel `./src/schema/index.ts` (NOT glob `**/*.ts` — causes duplicates)
 
 ### Types
+
 - `DrizzleDB` type requires TWO generics: `NodePgDatabase<typeof schema, typeof relations>`
 - Without the second generic, `db.query.*` won't have relational query types
 
 ### Migration commands
+
 - Generate: `nx run database:db:generate`
 - Apply: `nx run database:db:migrate`
 - Reset: `pnpm db:reset` (drop all + push) or `pnpm db:reset --seed`
@@ -90,6 +102,7 @@ paths:
 - Migration folder uses v3 structure (folder-per-migration). There is NO `meta/_journal.json` file.
 
 ### Testing
+
 - Unit tests: mock DRIZZLE_DB provider with jest/vitest mocks
 - Wrap tests with `withTestContext()` from `@roviq/common-types` for request context
 - Integration tests: use PGlite for speed, Testcontainers for RLS testing
