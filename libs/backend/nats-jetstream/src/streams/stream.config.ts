@@ -48,3 +48,17 @@ export const STREAMS: Record<string, StreamConfig> = {
 // biome-ignore lint/style/noNonNullAssertion: DLQ is always defined in STREAMS above
 // biome-ignore lint/complexity/useLiteralKeys: TS noPropertyAccessFromIndexSignature requires bracket access
 export const DEFAULT_DLQ_STREAM: StreamConfig = STREAMS['DLQ']!;
+
+/** Consumer config for the audit log writer (used by AuditConsumer in api-gateway) */
+export const AUDIT_LOG_CONSUMER = {
+  /** Durable name — survives consumer restarts */
+  durable_name: 'audit-log-consumer',
+  /** Only process audit.log events (not audit.error, audit.dlq) */
+  filter_subject: 'audit.log',
+  /** Each message must be explicitly acked */
+  ack_policy: 'explicit',
+  /** Max unacked messages before back-pressure kicks in */
+  max_ack_pending: 1000,
+  /** Max delivery attempts before terminal (sent to DLQ) */
+  max_deliver: 5,
+} as const;

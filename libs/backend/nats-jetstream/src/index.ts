@@ -20,5 +20,5 @@ export { DeserializationError, HandlerTimeoutError } from './server/errors';
 // Server
 export { JetStreamServer } from './server/jetstream.server';
 // Streams
-export { DEFAULT_DLQ_STREAM, STREAMS } from './streams/stream.config';
+export { AUDIT_LOG_CONSUMER, DEFAULT_DLQ_STREAM, STREAMS } from './streams/stream.config';
 export { ensureStreams } from './streams/stream.manager';
