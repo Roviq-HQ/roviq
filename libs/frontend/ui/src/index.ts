@@ -1,6 +1,10 @@
 export {
   AuditDiffRenderer,
   type AuditDiffRendererProps,
+  EntityTimeline,
+  type EntityTimelineData,
+  type EntityTimelineEvent,
+  type EntityTimelineProps,
   ImpersonationBadge,
   type ImpersonationBadgeProps,
 } from './components/audit';

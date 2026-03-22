@@ -81,5 +81,11 @@
   },
   "accessDenied": "You do not have permission to view audit logs.",
   "errorTitle": "Failed to load audit logs",
-  "errorRetry": "Retry"
+  "errorRetry": "Retry",
+  "entityTimeline": {
+    "title": "Activity History",
+    "noHistory": "No activity history for this entity.",
+    "changes": "View changes",
+    "loadMore": "Load older events"
+  }
 }
