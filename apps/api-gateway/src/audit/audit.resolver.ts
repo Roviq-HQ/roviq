@@ -1,7 +1,7 @@
 import { ForbiddenException, UseGuards } from '@nestjs/common';
 import { Args, Int, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
-import { CheckAbility } from '@roviq/casl';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { AuditService } from './audit.service';
 import { AuditLogFilterInput } from './dto/audit-log-filter.input';
@@ -13,7 +13,7 @@ export class AuditResolver {
   constructor(private readonly auditService: AuditService) {}
 
   @Query(() => AuditLogConnection)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, AbilityGuard)
   @CheckAbility('read', 'AuditLog')
   async auditLogs(
     @CurrentUser() user: AuthUser,
@@ -33,7 +33,7 @@ export class AuditResolver {
   }
 
   @Query(() => [AuthEventModel])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, AbilityGuard)
   @CheckAbility('read', 'AuditLog')
   async authEvents(
     @CurrentUser() user: AuthUser,

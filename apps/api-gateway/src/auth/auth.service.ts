@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto';
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import type { ClientProxy } from '@nestjs/microservices';
 import { hash, verify } from '@node-rs/argon2';
-import type { AuthScope } from '@roviq/common-types';
+import { AbilityFactory } from '@roviq/casl';
+import type { AbilityRule, AuthScope } from '@roviq/common-types';
+import type { AuthSecurityEvent } from '@roviq/notifications';
+import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthEventService } from './auth-event.service';
 import type { AuthPayload, InstituteLoginResult } from './dto/auth-payload';
@@ -63,6 +67,8 @@ export class AuthService {
     private readonly resellerMembershipRepo: ResellerMembershipRepository,
     private readonly refreshTokenRepo: RefreshTokenRepository,
     private readonly authEventService: AuthEventService,
+    private readonly abilityFactory: AbilityFactory,
+    @Inject('JETSTREAM_CLIENT') private readonly jetStreamClient: ClientProxy,
   ) {}
 
   // ── Registration ───────────────────────────────────────
@@ -89,6 +95,10 @@ export class AuthService {
       throw new UnauthorizedException('No account found');
     }
 
+    if (!membership.isActive) {
+      throw new UnauthorizedException('No account found');
+    }
+
     const result = await this.issueTokens({
       user,
       scope: 'platform',
@@ -98,6 +108,16 @@ export class AuthService {
       membershipAbilities: membership.abilities as Record<string, unknown>[] | null,
       meta,
     });
+
+    if (result.user) {
+      result.user.abilityRules = await this.getAbilityRules(
+        user.id,
+        'platform',
+        undefined,
+        membership.id,
+        membership.roleId,
+      );
+    }
 
     this.authEventService
       .emit({
@@ -110,6 +130,7 @@ export class AuthService {
         deviceInfo: meta?.deviceInfo,
       })
       .catch(() => {});
+    this.emitLoginNotification(user.id, null, meta);
 
     return result;
   }
@@ -156,6 +177,17 @@ export class AuthService {
       })
       .catch(() => {});
 
+    if (result.user) {
+      result.user.abilityRules = await this.getAbilityRules(
+        user.id,
+        'reseller',
+        undefined,
+        m.id,
+        m.roleId,
+      );
+    }
+    this.emitLoginNotification(user.id, null, meta);
+
     return result;
   }
 
@@ -196,6 +228,17 @@ export class AuthService {
           deviceInfo: meta?.deviceInfo,
         })
         .catch(() => {});
+
+      if (result.user) {
+        result.user.abilityRules = await this.getAbilityRules(
+          user.id,
+          'institute',
+          m.tenantId,
+          m.id,
+          m.roleId,
+        );
+      }
+      this.emitLoginNotification(user.id, m.tenantId, meta);
 
       return result;
     }
@@ -332,13 +375,15 @@ export class AuthService {
   async switchInstitute(
     userId: string,
     targetMembershipId: string,
+    currentRefreshToken: string,
     meta?: RequestMeta,
-    currentTenantId?: string,
   ): Promise<AuthPayload> {
-    // ROV-92: "revoke old refresh token" — revoke only the specific token being switched from.
-    // The current refresh token ID is not in the access token JWT claims, so the caller
-    // must pass it explicitly. If not provided, we skip revocation (better than revoking ALL
-    // tokens which would break other active sessions).
+    // ROV-92: "revoke old refresh token" — hash the raw token, find the row, revoke that ONE row
+    const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
+    const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
+    if (currentToken) {
+      await this.refreshTokenRepo.revoke(currentToken.id);
+    }
 
     const membership = await this.membershipRepo.findByIdAndUser(targetMembershipId, userId);
     if (!membership || membership.status !== 'ACTIVE') {
@@ -371,7 +416,7 @@ export class AuthService {
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
         metadata: {
-          from_tenant_id: currentTenantId,
+          from_tenant_id: currentToken?.id,
           to_tenant_id: membership.tenantId,
         },
       })
@@ -550,10 +595,15 @@ export class AuthService {
 
   async revokeAllOtherSessions(
     userId: string,
-    currentTokenId: string,
+    currentRefreshToken: string,
     meta?: RequestMeta,
   ): Promise<void> {
-    await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentTokenId);
+    const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
+    const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
+    if (!currentToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentToken.id);
 
     this.authEventService
       .emit({
@@ -605,6 +655,40 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
     return user;
+  }
+
+  // ── Ability rules (CASL) ──────────────────────────────
+
+  async getAbilityRules(
+    userId: string,
+    scope: AuthScope,
+    tenantId: string | undefined,
+    membershipId: string,
+    roleId: string,
+  ): Promise<AbilityRule[]> {
+    const ability = await this.abilityFactory.createForUser({
+      userId,
+      scope,
+      tenantId,
+      membershipId,
+      roleId,
+    });
+    return ability.rules as AbilityRule[];
+  }
+
+  // ── Login notification (NATS) ────────────────────────
+
+  emitLoginNotification(userId: string, tenantId: string | null, meta?: RequestMeta): void {
+    const event: AuthSecurityEvent = {
+      tenantId,
+      userId,
+      eventType: 'LOGIN',
+      metadata: {
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+      },
+    };
+    this.jetStreamClient.emit(NOTIFICATION_SUBJECTS.AUTH_SECURITY, event);
   }
 
   // ── Private: unified token issuance ────────────────────
@@ -685,10 +769,10 @@ export class AuthService {
   private mergeAbilities(
     roleAbilities: Record<string, unknown>[] | unknown,
     membershipAbilities: Record<string, unknown>[] | null | unknown,
-  ): Record<string, unknown>[] {
+  ): AbilityRule[] {
     const role = Array.isArray(roleAbilities) ? roleAbilities : [];
     const member = Array.isArray(membershipAbilities) ? membershipAbilities : [];
-    return [...role, ...member];
+    return [...role, ...member] as AbilityRule[];
   }
 
   private hashToken(token: string): string {

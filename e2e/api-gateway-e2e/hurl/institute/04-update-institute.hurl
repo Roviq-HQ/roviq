@@ -4,35 +4,19 @@
 #        timezone, currency fields updated independently.
 # ============================================================
 
-# Step 1: Institute login
+# Step 1: Admin login (platform scope — returns accessToken directly)
 POST {{base_url}}/graphql
 Content-Type: application/json
 {
-  "query": "mutation { instituteLogin(username: \"{{username}}\", password: \"{{password}}\") { requiresInstituteSelection selectionToken userId memberships { membershipId tenantId } } }"
+  "query": "mutation { adminLogin(username: \"{{username}}\", password: \"{{password}}\") { accessToken } }"
 }
 HTTP 200
 [Captures]
-membership_id: jsonpath "$.data.instituteLogin.memberships[0].membershipId"
-selection_token: jsonpath "$.data.instituteLogin.selectionToken"
-user_id: jsonpath "$.data.instituteLogin.userId"
-tenant_id: jsonpath "$.data.instituteLogin.memberships[0].tenantId"
+access_token: jsonpath "$.data.adminLogin.accessToken"
 [Asserts]
-jsonpath "$.data.instituteLogin.requiresInstituteSelection" == true
+jsonpath "$.data.adminLogin.accessToken" != null
 
-# Step 2: Select institute → get access_token
-POST {{base_url}}/graphql
-Content-Type: application/json
-{
-  "query": "mutation SelectInstitute($selectionToken: String!, $membershipId: String!) { selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) { accessToken } }",
-  "variables": { "selectionToken": "{{selection_token}}", "membershipId": "{{membership_id}}" }
-}
-HTTP 200
-[Captures]
-access_token: jsonpath "$.data.selectInstitute.accessToken"
-[Asserts]
-jsonpath "$.data.selectInstitute.accessToken" != null
-
-# Step 3: Create a new institute to update
+# Step 2: Create a new institute to update
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -53,7 +37,7 @@ institute_id: jsonpath "$.data.createInstitute.id"
 jsonpath "$.data.createInstitute.id" != null
 jsonpath "$.data.createInstitute.name.en" == "Hurl Update Test"
 
-# Step 4: Update name (English + Hindi)
+# Step 3: Update name (English + Hindi)
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -72,7 +56,7 @@ jsonpath "$.data.updateInstituteInfo.id" == "{{institute_id}}"
 jsonpath "$.data.updateInstituteInfo.name.en" == "Hurl Updated Name"
 jsonpath "$.data.updateInstituteInfo.name.hi" == "हर्ल अपडेट टेस्ट"
 
-# Step 5: Update contact
+# Step 4: Update contact
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -91,7 +75,7 @@ jsonpath "$.data.updateInstituteInfo.id" == "{{institute_id}}"
 jsonpath "$.data.updateInstituteInfo.contact.email" == "updated@roviq.com"
 jsonpath "$.data.updateInstituteInfo.contact.phone" == "+910000000001"
 
-# Step 6: Update address
+# Step 5: Update address
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -113,7 +97,7 @@ jsonpath "$.data.updateInstituteInfo.address.state" == "MH"
 jsonpath "$.data.updateInstituteInfo.address.country" == "IN"
 jsonpath "$.data.updateInstituteInfo.address.postalCode" == "400001"
 
-# Step 7: Update timezone and currency
+# Step 6: Update timezone and currency
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}

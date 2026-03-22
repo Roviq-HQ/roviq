@@ -11,5 +11,6 @@
   "fee": "Fee Notifications",
   "attendance": "Attendance Notifications",
   "approval": "Approval Notifications",
-  "saved": "Notification preferences saved"
+  "saved": "Notification preferences saved",
+  "saveFailed": "Failed to save notification preferences"
 }

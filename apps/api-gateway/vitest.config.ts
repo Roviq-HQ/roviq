@@ -22,6 +22,10 @@ export default defineConfig({
         __dirname,
         '../../ee/libs/shared/billing-types/src/index.ts',
       ),
+      '@roviq/notifications': path.resolve(
+        __dirname,
+        '../../libs/backend/notifications/src/index.ts',
+      ),
       '@roviq/ee-payments': path.resolve(__dirname, '../../ee/libs/backend/payments/src/index.ts'),
       '@roviq/ee-gateway': path.resolve(__dirname, '../../ee/apps/api-gateway/src/index.ts'),
     },

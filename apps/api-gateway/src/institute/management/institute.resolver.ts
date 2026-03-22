@@ -1,6 +1,7 @@
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, InstituteScope } from '@roviq/auth-backend';
-import { CheckAbility } from '@roviq/casl';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CreateInstituteInput } from './dto/create-institute.input';
 import { InstituteFilterInput } from './dto/institute-filter.input';
@@ -10,6 +11,7 @@ import { InstituteModel } from './models/institute.model';
 import { InstituteConnection } from './models/institute-connection.model';
 
 @InstituteScope()
+@UseGuards(AbilityGuard)
 @Resolver(() => InstituteModel)
 export class InstituteResolver {
   constructor(private readonly instituteService: InstituteService) {}

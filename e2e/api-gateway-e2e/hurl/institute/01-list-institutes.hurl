@@ -3,35 +3,19 @@
 # Tests: institutes query with search, status filter, pagination
 # ============================================================
 
-# Step 1: Institute login
+# Step 1: Admin login (platform scope — returns accessToken directly)
 POST {{base_url}}/graphql
 Content-Type: application/json
 {
-  "query": "mutation { instituteLogin(username: \"{{username}}\", password: \"{{password}}\") { requiresInstituteSelection selectionToken userId memberships { membershipId tenantId } } }"
+  "query": "mutation { adminLogin(username: \"{{username}}\", password: \"{{password}}\") { accessToken } }"
 }
 HTTP 200
 [Captures]
-membership_id: jsonpath "$.data.instituteLogin.memberships[0].membershipId"
-selection_token: jsonpath "$.data.instituteLogin.selectionToken"
-user_id: jsonpath "$.data.instituteLogin.userId"
-tenant_id: jsonpath "$.data.instituteLogin.memberships[0].tenantId"
+access_token: jsonpath "$.data.adminLogin.accessToken"
 [Asserts]
-jsonpath "$.data.instituteLogin.requiresInstituteSelection" == true
+jsonpath "$.data.adminLogin.accessToken" != null
 
-# Step 2: Select institute → get accessToken
-POST {{base_url}}/graphql
-Content-Type: application/json
-{
-  "query": "mutation SelectInstitute($selectionToken: String!, $membershipId: String!) { selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) { accessToken } }",
-  "variables": { "selectionToken": "{{selection_token}}", "membershipId": "{{membership_id}}" }
-}
-HTTP 200
-[Captures]
-access_token: jsonpath "$.data.selectInstitute.accessToken"
-[Asserts]
-jsonpath "$.data.selectInstitute.accessToken" != null
-
-# Step 3: List all institutes (no filter)
+# Step 2: List all institutes (no filter)
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -47,7 +31,7 @@ jsonpath "$.data.institutes.pageInfo.hasPreviousPage" == false
 jsonpath "$.data.institutes.edges[0].node.id" != null
 jsonpath "$.data.institutes.edges[0].cursor" != null
 
-# Step 4: Filter by status ACTIVE
+# Step 3: Filter by status ACTIVE
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -59,7 +43,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.institutes.edges" not isEmpty
 
-# Step 5: Filter by type SCHOOL
+# Step 4: Filter by type SCHOOL
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -71,7 +55,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.institutes" != null
 
-# Step 6: Paginate — first=1
+# Step 5: Paginate — first=1
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -86,7 +70,7 @@ end_cursor: jsonpath "$.data.institutes.pageInfo.endCursor"
 jsonpath "$.data.institutes.edges" count == 1
 jsonpath "$.data.institutes.pageInfo.hasNextPage" == true
 
-# Step 7: Fetch second page using cursor
+# Step 6: Fetch second page using cursor
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -98,7 +82,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.institutes.pageInfo.hasPreviousPage" == true
 
-# Step 8: Search by name
+# Step 7: Search by name
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
