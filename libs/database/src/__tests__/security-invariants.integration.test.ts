@@ -420,8 +420,8 @@ describe('System protection', () => {
     const testId = 'ffffffff-0000-0000-0000-000000000030';
     await superPool.query(
       `INSERT INTO audit_logs
-       (id, tenant_id, user_id, actor_id, action, action_type, entity_type, entity_id, correlation_id, source)
-       VALUES ($1, $2, $3, $3, 'test', 'CREATE', 'Test', $1, gen_random_uuid(), 'TEST')
+       (id, scope, tenant_id, user_id, actor_id, action, action_type, entity_type, entity_id, correlation_id, source)
+       VALUES ($1, 'institute', $2, $3, $3, 'test', 'CREATE', 'Test', $1, gen_random_uuid(), 'TEST')
        ON CONFLICT DO NOTHING`,
       [testId, SEED.INSTITUTE_1, SEED.USER_ADMIN],
     );
