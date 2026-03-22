@@ -2,16 +2,29 @@ import type { CallHandler, ExecutionContext } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  computeDiff,
+  extractActionType,
+  extractEntityType,
+  maskChanges,
+  snapshotForDelete,
+} from '../audit.helpers';
 
-// Hoist shared mock values so they're available inside vi.mock factories
-const { mockEmitAuditEvent, mockNoAudit } = vi.hoisted(() => ({
-  mockEmitAuditEvent: vi.fn().mockResolvedValue(undefined),
+// ── Mock AuditEmitter ──
+const mockEmit = vi.fn().mockResolvedValue(undefined);
+const mockAuditEmitter = { emit: mockEmit };
+
+// ── Mock NoAudit decorator (Reflector.createDecorator returns a symbol-like ref) ──
+const { mockNoAudit } = vi.hoisted(() => ({
   mockNoAudit: Symbol('NoAudit'),
 }));
 
 vi.mock('@roviq/audit', () => ({
-  emitAuditEvent: mockEmitAuditEvent,
+  AuditEmitter: vi.fn(),
+  AuditModule: vi.fn(),
   NoAudit: mockNoAudit,
+  AuditMask: vi.fn(),
+  getAuditMaskedFields: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('@nestjs/graphql', () => ({
@@ -41,26 +54,29 @@ function createMockGqlContext(
     fieldName?: string;
     user?: Record<string, unknown> | null;
     correlationId?: string;
-    ip?: string;
-    userAgent?: string;
     args?: Record<string, unknown>;
   } = {},
 ) {
   const {
     parentType = 'Mutation',
-    fieldName = 'createUser',
-    user = { userId: 'user-1', tenantId: 'tenant-1' },
+    fieldName = 'createStudent',
+    user = {
+      userId: 'user-1',
+      scope: 'institute',
+      tenantId: 'tenant-1',
+      membershipId: 'mem-1',
+      roleId: 'role-1',
+      type: 'access',
+    },
     correlationId = 'corr-123',
-    ip = '127.0.0.1',
-    userAgent = 'test-agent',
     args = { input: { name: 'Test' } },
   } = overrides;
 
   const req = {
     user,
     correlationId,
-    ip,
-    headers: { 'user-agent': userAgent },
+    ip: '127.0.0.1',
+    headers: { 'user-agent': 'test-agent' },
   };
 
   const context = {
@@ -91,7 +107,7 @@ function createErrorCallHandler(error: Error): CallHandler {
   return { handle: () => throwError(() => error) };
 }
 
-/** Helper: subscribe and wait for the audit emit on next tick */
+/** Subscribe and wait for audit emit on next tick */
 function subscribeAndExpect(observable: Observable<unknown>, expectFn: () => void): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     observable.subscribe({
@@ -110,6 +126,106 @@ function subscribeAndExpect(observable: Observable<unknown>, expectFn: () => voi
   });
 }
 
+// ═══════════════════════════════════════════════════════
+// Helper Unit Tests
+// ═══════════════════════════════════════════════════════
+
+describe('extractActionType', () => {
+  it.each([
+    ['createStudent', 'CREATE'],
+    ['updateInstitute', 'UPDATE'],
+    ['deleteRole', 'DELETE'],
+    ['restoreMembership', 'RESTORE'],
+    ['assignTeacherToSection', 'ASSIGN'],
+    ['revokeSession', 'REVOKE'],
+    ['suspendInstitute', 'SUSPEND'],
+    ['activateUser', 'ACTIVATE'],
+    ['doSomething', 'UPDATE'], // fallback
+  ])('%s → %s', (input, expected) => {
+    expect(extractActionType(input)).toBe(expected);
+  });
+});
+
+describe('extractEntityType', () => {
+  it.each([
+    ['createStudent', 'Student'],
+    ['updateInstitute', 'Institute'],
+    ['deleteRole', 'Role'],
+    ['adminCreateInstitute', 'Institute'],
+    ['resellerSuspendInstitute', 'Institute'],
+    ['instituteUpdateSection', 'Section'],
+  ])('%s → %s', (input, expected) => {
+    expect(extractEntityType(input)).toBe(expected);
+  });
+});
+
+describe('computeDiff', () => {
+  it('excludes unchanged fields', () => {
+    const diff = computeDiff(
+      { name: 'Raj', email: 'a@b.com' },
+      { name: 'Rajesh', email: 'a@b.com' },
+    );
+    expect(diff).toEqual({ name: { old: 'Raj', new: 'Rajesh' } });
+  });
+
+  it('returns null when nothing changed', () => {
+    expect(computeDiff({ a: 1 }, { a: 1 })).toBeNull();
+  });
+
+  it('handles new keys', () => {
+    const diff = computeDiff({}, { name: 'New' });
+    expect(diff).toEqual({ name: { old: null, new: 'New' } });
+  });
+
+  it('handles removed keys', () => {
+    const diff = computeDiff({ name: 'Old' }, {});
+    expect(diff).toEqual({ name: { old: 'Old', new: null } });
+  });
+
+  it('handles null values', () => {
+    const diff = computeDiff({ x: null }, { x: 'set' });
+    expect(diff).toEqual({ x: { old: null, new: 'set' } });
+  });
+
+  it('compares objects by value', () => {
+    expect(computeDiff({ a: { b: 1 } }, { a: { b: 1 } })).toBeNull();
+    expect(computeDiff({ a: { b: 1 } }, { a: { b: 2 } })).toEqual({
+      a: { old: { b: 1 }, new: { b: 2 } },
+    });
+  });
+});
+
+describe('snapshotForDelete', () => {
+  it('maps every field to { old: value, new: null }', () => {
+    expect(snapshotForDelete({ name: 'Raj', email: 'a@b.com' })).toEqual({
+      name: { old: 'Raj', new: null },
+      email: { old: 'a@b.com', new: null },
+    });
+  });
+});
+
+describe('maskChanges', () => {
+  it('replaces masked field values with [REDACTED]', () => {
+    const changes = {
+      name: { old: 'Raj', new: 'Rajesh' },
+      password: { old: 'secret', new: 'newsecret' },
+    };
+    expect(maskChanges(changes, ['password'])).toEqual({
+      name: { old: 'Raj', new: 'Rajesh' },
+      password: { old: '[REDACTED]', new: '[REDACTED]' },
+    });
+  });
+
+  it('returns unchanged when no masked fields', () => {
+    const changes = { name: { old: 'a', new: 'b' } };
+    expect(maskChanges(changes, [])).toBe(changes);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// Interceptor Tests
+// ═══════════════════════════════════════════════════════
+
 describe('AuditInterceptor', () => {
   let interceptor: AuditInterceptor;
   let mockReflector: ReturnType<typeof createMockReflector>;
@@ -117,105 +233,187 @@ describe('AuditInterceptor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReflector = createMockReflector();
-    interceptor = new AuditInterceptor(mockReflector as never, {} as never);
+    interceptor = new AuditInterceptor(mockReflector as never, mockAuditEmitter as never);
   });
 
-  it('should skip non-graphql contexts', async () => {
+  it('skips non-graphql contexts', async () => {
     const { context, gqlContext } = createMockGqlContext();
     context.getType.mockReturnValue('http');
     mockedGqlCreate.mockReturnValue(gqlContext as never);
 
     await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      expect(mockEmitAuditEvent).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
   });
 
-  it('should skip Query operations (only intercept Mutations)', async () => {
+  it('skips Query operations', async () => {
     const { context, gqlContext } = createMockGqlContext({ parentType: 'Query' });
     mockedGqlCreate.mockReturnValue(gqlContext as never);
 
     await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      expect(mockEmitAuditEvent).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
   });
 
-  it('should not publish when @NoAudit() is set', async () => {
-    const { context, gqlContext } = createMockGqlContext();
+  it('skips Subscription operations', async () => {
+    const { context, gqlContext } = createMockGqlContext({ parentType: 'Subscription' });
     mockedGqlCreate.mockReturnValue(gqlContext as never);
-    mockReflector.get.mockImplementation((key: unknown) => {
-      if (key === mockNoAudit) return true;
-      return undefined;
-    });
 
     await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      expect(mockEmitAuditEvent).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
   });
 
-  it('should skip when no user is present', async () => {
+  it('skips mutations with @NoAudit()', async () => {
+    const { context, gqlContext } = createMockGqlContext();
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+    mockReflector.get.mockImplementation((key: unknown) =>
+      key === mockNoAudit ? true : undefined,
+    );
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit).not.toHaveBeenCalled();
+    });
+  });
+
+  it('skips when no user is present', async () => {
     const { context, gqlContext } = createMockGqlContext({ user: null });
     mockedGqlCreate.mockReturnValue(gqlContext as never);
 
     await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      expect(mockEmitAuditEvent).not.toHaveBeenCalled();
+      expect(mockEmit).not.toHaveBeenCalled();
     });
   });
 
-  it('should publish audit event for successful mutation', async () => {
+  // ── Scope-Aware Payload ──
+
+  it('emits scope=institute with tenantId when user.scope=institute', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: {
+        userId: 'u1',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        membershipId: 'm1',
+        roleId: 'r1',
+        type: 'access',
+      },
+    });
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit).toHaveBeenCalledOnce();
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.scope).toBe('institute');
+      expect(payload.tenantId).toBe('tenant-1');
+      expect(payload.resellerId).toBeNull();
+    });
+  });
+
+  it('emits scope=platform with tenantId=null when user.scope=platform', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: {
+        userId: 'admin-1',
+        scope: 'platform',
+        membershipId: 'm1',
+        roleId: 'r1',
+        type: 'access',
+      },
+    });
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.scope).toBe('platform');
+      expect(payload.tenantId).toBeNull();
+      expect(payload.resellerId).toBeNull();
+    });
+  });
+
+  it('emits scope=reseller with resellerId when user.scope=reseller', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: {
+        userId: 'reseller-user-1',
+        scope: 'reseller',
+        resellerId: 'reseller-1',
+        membershipId: 'm1',
+        roleId: 'r1',
+        type: 'access',
+      },
+    });
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.scope).toBe('reseller');
+      expect(payload.tenantId).toBeNull();
+      expect(payload.resellerId).toBe('reseller-1');
+    });
+  });
+
+  // ── Impersonation ──
+
+  it('sets actorId=impersonatorId during impersonation', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: {
+        userId: 'target-user',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        membershipId: 'm1',
+        roleId: 'r1',
+        type: 'access',
+        isImpersonated: true,
+        impersonatorId: 'admin-user',
+        impersonationSessionId: 'session-1',
+      },
+    });
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.userId).toBe('target-user');
+      expect(payload.actorId).toBe('admin-user');
+      expect(payload.impersonatorId).toBe('admin-user');
+      expect(payload.impersonationSessionId).toBe('session-1');
+    });
+  });
+
+  it('sets actorId=userId when NOT impersonated', async () => {
+    const { context, gqlContext } = createMockGqlContext();
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.userId).toBe('user-1');
+      expect(payload.actorId).toBe('user-1');
+      expect(payload.impersonatorId).toBeNull();
+      expect(payload.impersonationSessionId).toBeNull();
+    });
+  });
+
+  // ── Success & Error ──
+
+  it('publishes audit event with entityId from result', async () => {
     const { context, gqlContext } = createMockGqlContext();
     mockedGqlCreate.mockReturnValue(gqlContext as never);
 
     await subscribeAndExpect(
-      interceptor.intercept(context, createMockCallHandler({ id: 'new-entity-1' })),
+      interceptor.intercept(context, createMockCallHandler({ id: 'new-id' })),
       () => {
-        expect(mockEmitAuditEvent).toHaveBeenCalledOnce();
-        const [, event] = mockEmitAuditEvent.mock.calls[0];
-        expect(event).toMatchObject({
-          tenantId: 'tenant-1',
-          userId: 'user-1',
-          actorId: 'user-1',
-          action: 'createUser',
-          actionType: 'CREATE',
-          entityType: 'User',
-          entityId: 'new-entity-1',
-          ipAddress: '127.0.0.1',
-          userAgent: 'test-agent',
-          source: 'GATEWAY',
-        });
+        const payload = mockEmit.mock.calls[0][0];
+        expect(payload.entityId).toBe('new-id');
+        expect(payload.action).toBe('createStudent');
+        expect(payload.actionType).toBe('CREATE');
+        expect(payload.entityType).toBe('Student');
+        expect(payload.source).toBe('GATEWAY');
+        expect(payload.correlationId).toBe('corr-123');
       },
     );
   });
 
-  it('should extract correct actionType from mutation name', async () => {
-    const testCases = [
-      { fieldName: 'createUser', expectedType: 'CREATE', expectedEntity: 'User' },
-      { fieldName: 'updateInstitute', expectedType: 'UPDATE', expectedEntity: 'Institute' },
-      { fieldName: 'deleteRole', expectedType: 'DELETE', expectedEntity: 'Role' },
-      { fieldName: 'restoreMembership', expectedType: 'RESTORE', expectedEntity: 'Membership' },
-      { fieldName: 'assignRole', expectedType: 'ASSIGN', expectedEntity: 'Role' },
-      { fieldName: 'revokePermission', expectedType: 'REVOKE', expectedEntity: 'Permission' },
-      { fieldName: 'doSomething', expectedType: 'UPDATE', expectedEntity: 'doSomething' },
-    ];
-
-    for (const { fieldName, expectedType, expectedEntity } of testCases) {
-      vi.clearAllMocks();
-      const { context, gqlContext } = createMockGqlContext({ fieldName });
-      mockedGqlCreate.mockReturnValue(gqlContext as never);
-
-      await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-        expect(mockEmitAuditEvent).toHaveBeenCalledOnce();
-        const event = mockEmitAuditEvent.mock.calls[0][1];
-        expect(event.actionType).toBe(expectedType);
-        expect(event.entityType).toBe(expectedEntity);
-      });
-    }
-  });
-
-  it('should publish audit event for failed mutation', async () => {
-    const { context, gqlContext } = createMockGqlContext({ fieldName: 'deleteUser' });
+  it('publishes audit event on failed mutation with error details', async () => {
+    const { context, gqlContext } = createMockGqlContext({ fieldName: 'deleteStudent' });
     mockedGqlCreate.mockReturnValue(gqlContext as never);
-
-    const error = new Error('Forbidden: insufficient permissions');
+    const error = new Error('Forbidden');
 
     await new Promise<void>((resolve, reject) => {
       interceptor.intercept(context, createErrorCallHandler(error)).subscribe({
@@ -223,15 +421,13 @@ describe('AuditInterceptor', () => {
           expect(err).toBe(error);
           setTimeout(() => {
             try {
-              expect(mockEmitAuditEvent).toHaveBeenCalledOnce();
-              const event = mockEmitAuditEvent.mock.calls[0][1];
-              expect(event.actionType).toBe('DELETE');
-              expect(event.entityType).toBe('User');
-              expect(event.entityId).toBeUndefined();
-              expect(event.metadata).toMatchObject({
-                error: 'Forbidden: insufficient permissions',
-                errorName: 'Error',
-                failed: true,
+              expect(mockEmit).toHaveBeenCalledOnce();
+              const payload = mockEmit.mock.calls[0][0];
+              expect(payload.actionType).toBe('DELETE');
+              expect(payload.entityType).toBe('Student');
+              expect(payload.entityId).toBeNull();
+              expect(payload.metadata).toMatchObject({
+                error: { code: 'Error', message: 'Forbidden' },
               });
               resolve();
             } catch (e) {
@@ -239,68 +435,28 @@ describe('AuditInterceptor', () => {
             }
           }, 0);
         },
-        complete: () => reject(new Error('Expected error but got complete')),
+        complete: () => reject(new Error('Expected error')),
       });
     });
   });
 
-  it('should include mutation args in metadata', async () => {
-    const { context, gqlContext } = createMockGqlContext({
-      args: { input: { name: 'New Institute', slug: 'new-inst' } },
+  it('does not crash when auditEmitter.emit rejects', async () => {
+    const { context, gqlContext } = createMockGqlContext();
+    mockedGqlCreate.mockReturnValue(gqlContext as never);
+    mockEmit.mockRejectedValueOnce(new Error('NATS down'));
+
+    // Should complete without throwing
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit).toHaveBeenCalledOnce();
     });
+  });
+
+  it('includes correlationId from req', async () => {
+    const { context, gqlContext } = createMockGqlContext({ correlationId: 'my-corr-id' });
     mockedGqlCreate.mockReturnValue(gqlContext as never);
 
     await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      const event = mockEmitAuditEvent.mock.calls[0][1];
-      expect(event.metadata).toEqual({
-        args: { input: { name: 'New Institute', slug: 'new-inst' } },
-      });
+      expect(mockEmit.mock.calls[0][0].correlationId).toBe('my-corr-id');
     });
-  });
-
-  it('should set changes to null (diff not yet implemented)', async () => {
-    const { context, gqlContext } = createMockGqlContext();
-    mockedGqlCreate.mockReturnValue(gqlContext as never);
-
-    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      const event = mockEmitAuditEvent.mock.calls[0][1];
-      expect(event.changes).toBeNull();
-    });
-  });
-
-  it('should not crash when emitAuditEvent rejects', async () => {
-    const { context, gqlContext } = createMockGqlContext();
-    mockedGqlCreate.mockReturnValue(gqlContext as never);
-    mockEmitAuditEvent.mockRejectedValueOnce(new Error('NATS down'));
-
-    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
-      // Mutation completes normally despite audit failure — no error thrown to client
-    });
-  });
-
-  it('should extract entityId from result when available', async () => {
-    const { context, gqlContext } = createMockGqlContext();
-    mockedGqlCreate.mockReturnValue(gqlContext as never);
-
-    await subscribeAndExpect(
-      interceptor.intercept(context, createMockCallHandler({ id: 'uuid-abc' })),
-      () => {
-        const event = mockEmitAuditEvent.mock.calls[0][1];
-        expect(event.entityId).toBe('uuid-abc');
-      },
-    );
-  });
-
-  it('should handle result without id gracefully', async () => {
-    const { context, gqlContext } = createMockGqlContext();
-    mockedGqlCreate.mockReturnValue(gqlContext as never);
-
-    await subscribeAndExpect(
-      interceptor.intercept(context, createMockCallHandler({ success: true })),
-      () => {
-        const event = mockEmitAuditEvent.mock.calls[0][1];
-        expect(event.entityId).toBeUndefined();
-      },
-    );
   });
 });

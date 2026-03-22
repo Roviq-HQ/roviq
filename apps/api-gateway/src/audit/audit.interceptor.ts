@@ -1,44 +1,40 @@
 import {
   type CallHandler,
   type ExecutionContext,
-  Inject,
   Injectable,
+  Logger,
   type NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlContextType, GqlExecutionContext } from '@nestjs/graphql';
-import type { ClientProxy } from '@nestjs/microservices';
-import { type AuditEvent, emitAuditEvent, NoAudit } from '@roviq/audit';
+import { AuditEmitter, type AuditEventPayload, NoAudit } from '@roviq/audit';
+import type { AuthUser } from '@roviq/common-types';
 import { catchError, type Observable, tap } from 'rxjs';
+import { extractActionType, extractEntityType } from './audit.helpers';
 
-type ActionType = AuditEvent['actionType'];
-
-const ACTION_PREFIX_MAP: Record<string, ActionType> = {
-  create: 'CREATE',
-  update: 'UPDATE',
-  delete: 'DELETE',
-  restore: 'RESTORE',
-  assign: 'ASSIGN',
-  revoke: 'REVOKE',
-};
-
-function extractActionMeta(fieldName: string): { type: ActionType; entity: string } {
-  for (const [prefix, type] of Object.entries(ACTION_PREFIX_MAP)) {
-    if (fieldName.startsWith(prefix)) {
-      return { type, entity: fieldName.slice(prefix.length) };
-    }
-  }
-  return { type: 'UPDATE', entity: fieldName };
-}
-
+/**
+ * Global interceptor that captures all GraphQL mutations and emits
+ * scope-aware audit events via NATS JetStream.
+ *
+ * - Skips queries, subscriptions, and @NoAudit() mutations
+ * - Builds scope-aware payload based on req.user.scope
+ * - Handles impersonation (actor_id vs user_id split)
+ * - Publishes to 'AUDIT.log' on success, 'AUDIT.error' on failure
+ * - Non-blocking — publish happens after response is sent
+ *
+ * Must run AFTER GqlAuthGuard (needs req.user populated).
+ */
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuditInterceptor.name);
+
   constructor(
     private readonly reflector: Reflector,
-    @Inject('JETSTREAM_CLIENT') private readonly client: ClientProxy,
+    private readonly auditEmitter: AuditEmitter,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    // Only intercept GraphQL requests
     if (context.getType<GqlContextType>() !== 'graphql') {
       return next.handle();
     }
@@ -46,66 +42,124 @@ export class AuditInterceptor implements NestInterceptor {
     const gqlContext = GqlExecutionContext.create(context);
     const info = gqlContext.getInfo();
 
+    // Skip queries and subscriptions — only intercept mutations
     if (info.parentType.name !== 'Mutation') {
       return next.handle();
     }
 
+    // Skip @NoAudit() decorated mutations
     const noAudit = this.reflector.get(NoAudit, context.getHandler());
     if (noAudit) {
       return next.handle();
     }
 
     const req = gqlContext.getContext().req;
-    const user = req.user;
+    const user: AuthUser | undefined = req.user;
+
+    // No user = unauthenticated (shouldn't happen for mutations, but guard)
     if (!user) {
       return next.handle();
     }
 
-    const actionMeta = extractActionMeta(info.fieldName);
+    const actionType = extractActionType(info.fieldName);
+    const entityType = extractEntityType(info.fieldName);
+    const correlationId: string = req.correlationId ?? crypto.randomUUID();
 
     return next.handle().pipe(
       tap({
         next: (result) => {
-          emitAuditEvent(this.client, {
-            tenantId: user.tenantId,
-            userId: user.userId,
-            actorId: user.userId,
-            impersonatorId: user.impersonatorId,
+          const payload = this.buildPayload(user, {
             action: info.fieldName,
-            actionType: actionMeta.type,
-            entityType: actionMeta.entity,
-            entityId: (result as Record<string, unknown>)?.id as string | undefined,
+            actionType,
+            entityType,
+            entityId: ((result as Record<string, unknown>)?.id as string) ?? null,
             changes: null,
-            metadata: { args: gqlContext.getArgs() },
-            ipAddress: req.ip,
-            userAgent: req.headers?.['user-agent'],
-            source: 'GATEWAY',
+            metadata: { input: gqlContext.getArgs() },
+            correlationId,
+          });
+
+          // Non-blocking — fire and forget
+          void this.auditEmitter.emit(payload).catch((err) => {
+            this.logger.error(
+              `Failed to emit audit event for ${info.fieldName}`,
+              err instanceof Error ? err.stack : String(err),
+            );
           });
         },
       }),
       catchError((err) => {
-        emitAuditEvent(this.client, {
-          tenantId: user.tenantId,
-          userId: user.userId,
-          actorId: user.userId,
-          impersonatorId: user.impersonatorId,
+        const payload = this.buildPayload(user, {
           action: info.fieldName,
-          actionType: actionMeta.type,
-          entityType: actionMeta.entity,
-          entityId: undefined,
+          actionType,
+          entityType,
+          entityId: null,
           changes: null,
           metadata: {
-            error: err instanceof Error ? err.message : String(err),
-            errorName: err instanceof Error ? err.name : undefined,
-            args: gqlContext.getArgs(),
-            failed: true,
+            input: gqlContext.getArgs(),
+            error: {
+              code: err instanceof Error ? err.name : 'UnknownError',
+              message: err instanceof Error ? err.message : String(err),
+            },
           },
-          ipAddress: req.ip,
-          userAgent: req.headers?.['user-agent'],
-          source: 'GATEWAY',
+          correlationId,
         });
+
+        // Non-blocking error audit — don't let audit failure mask the real error
+        void this.auditEmitter.emit(payload).catch((auditErr) => {
+          this.logger.error(
+            `Failed to emit audit.error for ${info.fieldName}`,
+            auditErr instanceof Error ? auditErr.stack : String(auditErr),
+          );
+        });
+
         throw err;
       }),
     );
+  }
+
+  /**
+   * Build a scope-aware audit payload from the authenticated user context.
+   *
+   * - platform → tenantId=null, resellerId=null
+   * - reseller → tenantId=null, resellerId from user
+   * - institute → tenantId from user, resellerId=null
+   * - Impersonation: actorId = impersonatorId, userId = sub (the target)
+   */
+  private buildPayload(
+    user: AuthUser,
+    event: {
+      action: string;
+      actionType: AuditEventPayload['actionType'];
+      entityType: string;
+      entityId: string | null;
+      changes: AuditEventPayload['changes'];
+      metadata: AuditEventPayload['metadata'];
+      correlationId: string;
+    },
+  ): AuditEventPayload {
+    const base = {
+      action: event.action,
+      actionType: event.actionType,
+      entityType: event.entityType,
+      entityId: event.entityId,
+      changes: event.changes,
+      metadata: event.metadata,
+      correlationId: event.correlationId,
+      source: 'GATEWAY' as const,
+      // Actor tracking — CRITICAL for impersonation
+      userId: user.userId,
+      actorId: user.isImpersonated ? (user.impersonatorId ?? user.userId) : user.userId,
+      impersonatorId: user.isImpersonated ? (user.impersonatorId ?? null) : null,
+      impersonationSessionId: user.impersonationSessionId ?? null,
+    };
+
+    switch (user.scope) {
+      case 'platform':
+        return { ...base, scope: 'platform', tenantId: null, resellerId: null };
+      case 'reseller':
+        return { ...base, scope: 'reseller', tenantId: null, resellerId: user.resellerId ?? null };
+      default:
+        return { ...base, scope: 'institute', tenantId: user.tenantId ?? null, resellerId: null };
+    }
   }
 }
