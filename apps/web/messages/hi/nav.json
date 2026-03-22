@@ -10,5 +10,13 @@
   "system": "सिस्टम",
   "account": "खाता",
   "notifications": "सूचनाएँ",
-  "notificationPreferences": "सूचना प्राथमिकताएँ"
+  "notificationPreferences": "सूचना प्राथमिकताएँ",
+  "institutes": "संस्थान",
+  "roles": "भूमिकाएँ",
+  "auditLogs": "ऑडिट लॉग",
+  "billing": "बिलिंग",
+  "plans": "योजनाएँ",
+  "subscriptions": "सदस्यताएँ",
+  "invoices": "चालान",
+  "observability": "निगरानी"
 }

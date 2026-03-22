@@ -10,5 +10,13 @@
   "system": "System",
   "account": "Account",
   "notifications": "Notifications",
-  "notificationPreferences": "Notification Preferences"
+  "notificationPreferences": "Notification Preferences",
+  "institutes": "Institutes",
+  "roles": "Roles",
+  "auditLogs": "Audit Logs",
+  "billing": "Billing",
+  "plans": "Plans",
+  "subscriptions": "Subscriptions",
+  "invoices": "Invoices",
+  "observability": "Observability"
 }
