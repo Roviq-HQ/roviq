@@ -79,5 +79,7 @@
     "copied": "Copied!",
     "copyId": "Copy correlation ID"
   },
-  "accessDenied": "You do not have permission to view audit logs."
+  "accessDenied": "You do not have permission to view audit logs.",
+  "errorTitle": "Failed to load audit logs",
+  "errorRetry": "Retry"
 }

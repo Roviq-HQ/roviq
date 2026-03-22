@@ -3,35 +3,19 @@
 # Tests: create, get, update, list, filter, delete
 # ============================================================
 
-# Step 1: Institute login
+# Step 1: Admin login (platform scope — returns accessToken directly)
 POST {{base_url}}/graphql
 Content-Type: application/json
 {
-  "query": "mutation { instituteLogin(username: \"{{username}}\", password: \"{{password}}\") { requiresInstituteSelection selectionToken userId memberships { membershipId tenantId } } }"
+  "query": "mutation { adminLogin(username: \"{{username}}\", password: \"{{password}}\") { accessToken } }"
 }
 HTTP 200
 [Captures]
-membership_id: jsonpath "$.data.instituteLogin.memberships[0].membershipId"
-selection_token: jsonpath "$.data.instituteLogin.selectionToken"
-user_id: jsonpath "$.data.instituteLogin.userId"
-tenant_id: jsonpath "$.data.instituteLogin.memberships[0].tenantId"
+access_token: jsonpath "$.data.adminLogin.accessToken"
 [Asserts]
-jsonpath "$.data.instituteLogin.requiresInstituteSelection" == true
+jsonpath "$.data.adminLogin.accessToken" != null
 
-# Step 2: Select institute -> get accessToken
-POST {{base_url}}/graphql
-Content-Type: application/json
-{
-  "query": "mutation SelectInstitute($selectionToken: String!, $membershipId: String!) { selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) { accessToken } }",
-  "variables": { "selectionToken": "{{selection_token}}", "membershipId": "{{membership_id}}" }
-}
-HTTP 200
-[Captures]
-access_token: jsonpath "$.data.selectInstitute.accessToken"
-[Asserts]
-jsonpath "$.data.selectInstitute.accessToken" != null
-
-# Step 3: Create an institute group
+# Step 2: Create an institute group
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -57,7 +41,7 @@ jsonpath "$.data.createInstituteGroup.status" == "ACTIVE"
 jsonpath "$.data.createInstituteGroup.createdAt" != null
 jsonpath "$.data.createInstituteGroup.updatedAt" != null
 
-# Step 4: Get the created group by id
+# Step 3: Get the created group by id
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -73,7 +57,7 @@ jsonpath "$.data.instituteGroup.code" == "test-trust-e2e"
 jsonpath "$.data.instituteGroup.type" == "TRUST"
 jsonpath "$.data.instituteGroup.status" == "ACTIVE"
 
-# Step 5: Update the group
+# Step 4: Update the group
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -95,7 +79,7 @@ jsonpath "$.data.updateInstituteGroup.registrationNo" == "REG-2026-001"
 jsonpath "$.data.updateInstituteGroup.code" == "test-trust-e2e"
 jsonpath "$.data.updateInstituteGroup.type" == "TRUST"
 
-# Step 6: List institute groups (no filter)
+# Step 5: List institute groups (no filter)
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -110,7 +94,7 @@ jsonpath "$.data.instituteGroups.pageInfo.hasNextPage" isBoolean
 jsonpath "$.data.instituteGroups.edges[0].node.id" != null
 jsonpath "$.data.instituteGroups.edges[0].cursor" != null
 
-# Step 7: List with search filter matching "test-trust"
+# Step 6: List with search filter matching "test-trust"
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -122,7 +106,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.instituteGroups.totalCount" >= 1
 
-# Step 8: Delete the group
+# Step 7: Delete the group
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}

@@ -1,6 +1,7 @@
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, InstituteScope } from '@roviq/auth-backend';
-import { CheckAbility } from '@roviq/casl';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CreateInstituteGroupInput } from './dto/create-institute-group.input';
 import { InstituteGroupFilterInput } from './dto/institute-group-filter.input';
@@ -11,6 +12,7 @@ import { InstituteGroupModel } from './models/institute-group.model';
 import { InstituteGroupConnection } from './models/institute-group-connection.model';
 
 @InstituteScope()
+@UseGuards(AbilityGuard)
 @Resolver(() => InstituteGroupModel)
 export class InstituteGroupResolver {
   constructor(private readonly instituteGroupService: InstituteGroupService) {}

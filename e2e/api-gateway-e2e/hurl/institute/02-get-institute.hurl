@@ -3,35 +3,19 @@
 # Tests: institute(id), myInstitute, and not-found error
 # ============================================================
 
-# Step 1: Institute login
+# Step 1: Admin login (platform scope — returns accessToken directly)
 POST {{base_url}}/graphql
 Content-Type: application/json
 {
-  "query": "mutation { instituteLogin(username: \"{{username}}\", password: \"{{password}}\") { requiresInstituteSelection selectionToken userId memberships { membershipId tenantId } } }"
+  "query": "mutation { adminLogin(username: \"{{username}}\", password: \"{{password}}\") { accessToken } }"
 }
 HTTP 200
 [Captures]
-membership_id: jsonpath "$.data.instituteLogin.memberships[0].membershipId"
-selection_token: jsonpath "$.data.instituteLogin.selectionToken"
-user_id: jsonpath "$.data.instituteLogin.userId"
-tenant_id: jsonpath "$.data.instituteLogin.memberships[0].tenantId"
+access_token: jsonpath "$.data.adminLogin.accessToken"
 [Asserts]
-jsonpath "$.data.instituteLogin.requiresInstituteSelection" == true
+jsonpath "$.data.adminLogin.accessToken" != null
 
-# Step 2: Select institute → get accessToken
-POST {{base_url}}/graphql
-Content-Type: application/json
-{
-  "query": "mutation SelectInstitute($selectionToken: String!, $membershipId: String!) { selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) { accessToken } }",
-  "variables": { "selectionToken": "{{selection_token}}", "membershipId": "{{membership_id}}" }
-}
-HTTP 200
-[Captures]
-access_token: jsonpath "$.data.selectInstitute.accessToken"
-[Asserts]
-jsonpath "$.data.selectInstitute.accessToken" != null
-
-# Step 3: Get institute by known seed ID
+# Step 2: Get institute by known seed ID
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -51,7 +35,7 @@ jsonpath "$.data.institute.timezone" != null
 jsonpath "$.data.institute.currency" != null
 jsonpath "$.data.institute.contact" != null
 
-# Step 4: myInstitute — resolves from JWT context
+# Step 3: myInstitute — resolves from JWT context
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -64,7 +48,7 @@ jsonpath "$.data.myInstitute.id" != null
 jsonpath "$.data.myInstitute.name" != null
 jsonpath "$.data.myInstitute.slug" != null
 
-# Step 5: Get non-existent institute — expect GraphQL errors
+# Step 4: Get non-existent institute — expect GraphQL errors
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}

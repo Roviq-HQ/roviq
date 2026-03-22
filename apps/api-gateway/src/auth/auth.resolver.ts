@@ -1,12 +1,8 @@
-import { Inject, UseGuards } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
-import type { ClientProxy } from '@nestjs/microservices';
 import { NoAudit } from '@roviq/audit';
 import { CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
-import { AbilityFactory } from '@roviq/casl';
-import type { AbilityRule, AuthUser } from '@roviq/common-types';
-import type { AuthSecurityEvent } from '@roviq/notifications';
-import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
+import type { AuthUser } from '@roviq/common-types';
 import { AuthService } from './auth.service';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
 import { RegisterInput } from './dto/register.input';
@@ -14,11 +10,7 @@ import { extractMeta, type GqlContext } from './gql-context';
 
 @Resolver()
 export class AuthResolver {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly abilityFactory: AbilityFactory,
-    @Inject('JETSTREAM_CLIENT') private readonly jetStreamClient: ClientProxy,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   // ── Registration ───────────────────────────────────────
 
@@ -37,21 +29,7 @@ export class AuthResolver {
     @Args('password') password: string,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
-    const result = await this.authService.adminLogin(username, password, extractMeta(ctx));
-
-    if (result.user) {
-      const rules = await this.getAbilityRules(
-        result.user.id,
-        'platform',
-        undefined,
-        '',
-        result.user.roleId ?? '',
-      );
-      result.user.abilityRules = rules as unknown as Record<string, unknown>[];
-    }
-
-    this.emitLoginNotification(ctx, result.user?.id ?? '', null);
-    return result;
+    return this.authService.adminLogin(username, password, extractMeta(ctx));
   }
 
   @NoAudit()
@@ -61,21 +39,7 @@ export class AuthResolver {
     @Args('password') password: string,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
-    const result = await this.authService.resellerLogin(username, password, extractMeta(ctx));
-
-    if (result.user) {
-      const rules = await this.getAbilityRules(
-        result.user.id,
-        'reseller',
-        undefined,
-        '',
-        result.user.roleId ?? '',
-      );
-      result.user.abilityRules = rules as unknown as Record<string, unknown>[];
-    }
-
-    this.emitLoginNotification(ctx, result.user?.id ?? '', null);
-    return result;
+    return this.authService.resellerLogin(username, password, extractMeta(ctx));
   }
 
   @NoAudit()
@@ -85,30 +49,10 @@ export class AuthResolver {
     @Args('password') password: string,
     @Context() ctx: GqlContext,
   ): Promise<InstituteLoginResult> {
-    const result = await this.authService.instituteLogin(username, password, extractMeta(ctx));
-
-    if (result.user?.tenantId && result.user?.roleId) {
-      const rules = await this.getAbilityRules(
-        result.user.id,
-        'institute',
-        result.user.tenantId,
-        '',
-        result.user.roleId,
-      );
-      result.user.abilityRules = rules as unknown as Record<string, unknown>[];
-    }
-
-    const loginUserId = result.user?.id ?? result.userId;
-    if (loginUserId) {
-      this.emitLoginNotification(ctx, loginUserId, result.user?.tenantId ?? null);
-    }
-
-    return result;
+    return this.authService.instituteLogin(username, password, extractMeta(ctx));
   }
 
   // ── Institute selection (multi-institute flow) ─────────
-  // No auth guard — called after instituteLogin returns requiresInstituteSelection.
-  // The user is identified by userId + membershipId (membership is proof of access).
 
   @NoAudit()
   @Mutation(() => AuthPayload)
@@ -127,10 +71,16 @@ export class AuthResolver {
   @UseGuards(GqlAuthGuard)
   async switchInstitute(
     @Args('membershipId') membershipId: string,
+    @Args('currentRefreshToken') currentRefreshToken: string,
     @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
-    return this.authService.switchInstitute(user.userId, membershipId, extractMeta(ctx));
+    return this.authService.switchInstitute(
+      user.userId,
+      membershipId,
+      currentRefreshToken,
+      extractMeta(ctx),
+    );
   }
 
   // ── Token refresh ──────────────────────────────────────
@@ -168,7 +118,7 @@ export class AuthResolver {
       lastUsedAt: s.lastUsedAt ?? undefined,
       createdAt: s.createdAt,
       expiresAt: s.expiresAt,
-      isCurrent: false, // will be refined when tokenId is available from context
+      isCurrent: false,
     }));
   }
 
@@ -184,10 +134,16 @@ export class AuthResolver {
 
   @Mutation(() => Boolean)
   @UseGuards(GqlAuthGuard)
-  async revokeAllOtherSessions(@CurrentUser() user: AuthUser): Promise<boolean> {
-    // TODO: pass current refresh token ID when available from context
-    // For now, revoke all sessions including current
-    await this.authService.logout(user.userId);
+  async revokeAllOtherSessions(
+    @Args('currentRefreshToken') currentRefreshToken: string,
+    @CurrentUser() user: AuthUser,
+    @Context() ctx: GqlContext,
+  ): Promise<boolean> {
+    await this.authService.revokeAllOtherSessions(
+      user.userId,
+      currentRefreshToken,
+      extractMeta(ctx),
+    );
     return true;
   }
 
@@ -197,8 +153,7 @@ export class AuthResolver {
   @UseGuards(GqlAuthGuard)
   async me(@CurrentUser() user: AuthUser): Promise<UserType> {
     const dbUser = await this.authService.getUserById(user.userId);
-
-    const rules = await this.getAbilityRules(
+    const abilityRules = await this.authService.getAbilityRules(
       user.userId,
       user.scope,
       user.tenantId,
@@ -213,39 +168,7 @@ export class AuthResolver {
       scope: user.scope,
       tenantId: user.tenantId,
       roleId: user.roleId,
-      abilityRules: rules as unknown as Record<string, unknown>[],
+      abilityRules,
     };
-  }
-
-  // ── Private helpers ────────────────────────────────────
-
-  private emitLoginNotification(ctx: GqlContext, userId: string, tenantId: string | null): void {
-    const event: AuthSecurityEvent = {
-      tenantId,
-      userId,
-      eventType: 'LOGIN',
-      metadata: {
-        ip: ctx.req.ip,
-        userAgent: ctx.req.headers['user-agent'],
-      },
-    };
-    this.jetStreamClient.emit(NOTIFICATION_SUBJECTS.AUTH_SECURITY, event);
-  }
-
-  private async getAbilityRules(
-    userId: string,
-    scope: import('@roviq/common-types').AuthScope,
-    tenantId: string | undefined,
-    membershipId: string,
-    roleId: string,
-  ): Promise<AbilityRule[]> {
-    const ability = await this.abilityFactory.createForUser({
-      userId,
-      scope,
-      tenantId,
-      membershipId,
-      roleId,
-    });
-    return ability.rules as AbilityRule[];
   }
 }

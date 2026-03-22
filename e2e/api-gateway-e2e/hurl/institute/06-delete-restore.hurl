@@ -4,35 +4,19 @@
 #        restoreInstitute mutation, and not-found error handling
 # ============================================================
 
-# Step 1: Institute login (multi-institute admin)
+# Step 1: Admin login (platform scope — returns accessToken directly)
 POST {{base_url}}/graphql
 Content-Type: application/json
 {
-  "query": "mutation { instituteLogin(username: \"{{username}}\", password: \"{{password}}\") { requiresInstituteSelection selectionToken userId memberships { membershipId tenantId } } }"
+  "query": "mutation { adminLogin(username: \"{{username}}\", password: \"{{password}}\") { accessToken } }"
 }
 HTTP 200
 [Captures]
-membership_id: jsonpath "$.data.instituteLogin.memberships[0].membershipId"
-selection_token: jsonpath "$.data.instituteLogin.selectionToken"
-user_id: jsonpath "$.data.instituteLogin.userId"
-tenant_id: jsonpath "$.data.instituteLogin.memberships[0].tenantId"
+access_token: jsonpath "$.data.adminLogin.accessToken"
 [Asserts]
-jsonpath "$.data.instituteLogin.requiresInstituteSelection" == true
+jsonpath "$.data.adminLogin.accessToken" != null
 
-# Step 2: Select institute → get accessToken
-POST {{base_url}}/graphql
-Content-Type: application/json
-{
-  "query": "mutation SelectInstitute($selectionToken: String!, $membershipId: String!) { selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) { accessToken } }",
-  "variables": { "selectionToken": "{{selection_token}}", "membershipId": "{{membership_id}}" }
-}
-HTTP 200
-[Captures]
-access_token: jsonpath "$.data.selectInstitute.accessToken"
-[Asserts]
-jsonpath "$.data.selectInstitute.accessToken" != null
-
-# Step 3: Create a fresh institute to be deleted
+# Step 2: Create a fresh institute to be deleted
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -54,7 +38,7 @@ jsonpath "$.data.createInstitute.id" != null
 jsonpath "$.data.createInstitute.name.en" == "Hurl Delete Test"
 jsonpath "$.data.createInstitute.slug" == "hurl-delete-test"
 
-# Step 4: Delete the institute — expect true
+# Step 3: Delete the institute — expect true
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -66,7 +50,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.deleteInstitute" == true
 
-# Step 5: Attempt to fetch the soft-deleted institute — expect errors
+# Step 4: Attempt to fetch the soft-deleted institute — expect errors
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -78,7 +62,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.errors" count >= 1
 
-# Step 6: Restore the institute — expect id and non-null status
+# Step 5: Restore the institute — expect id and non-null status
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -91,7 +75,7 @@ HTTP 200
 jsonpath "$.data.restoreInstitute.id" == {{delete_institute_id}}
 jsonpath "$.data.restoreInstitute.status" != null
 
-# Step 7: Verify restored institute is accessible
+# Step 6: Verify restored institute is accessible
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -104,7 +88,7 @@ HTTP 200
 jsonpath "$.data.institute.id" == {{delete_institute_id}}
 jsonpath "$.data.institute.name.en" == "Hurl Delete Test"
 
-# Step 8: Attempt to delete a non-existent institute — expect errors
+# Step 7: Attempt to delete a non-existent institute — expect errors
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}

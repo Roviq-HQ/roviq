@@ -105,6 +105,17 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
     });
   }
 
+  async findByHash(tokenHash: string): Promise<{ id: string; userId: string } | null> {
+    return withAdmin(this.db, async (tx) => {
+      const rows = await tx
+        .select({ id: refreshTokens.id, userId: refreshTokens.userId })
+        .from(refreshTokens)
+        .where(and(eq(refreshTokens.tokenHash, tokenHash), isNull(refreshTokens.revokedAt)))
+        .limit(1);
+      return rows[0] ?? null;
+    });
+  }
+
   async findActiveByUserId(userId: string): Promise<RefreshTokenWithRelations[]> {
     return withAdmin(this.db, async (tx) => {
       const rows = await tx

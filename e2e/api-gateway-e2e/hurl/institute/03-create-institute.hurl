@@ -4,35 +4,19 @@
 #        and duplicate slug error handling
 # ============================================================
 
-# Step 1: Institute login
+# Step 1: Admin login (platform scope — returns accessToken directly)
 POST {{base_url}}/graphql
 Content-Type: application/json
 {
-  "query": "mutation { instituteLogin(username: \"{{username}}\", password: \"{{password}}\") { requiresInstituteSelection selectionToken userId memberships { membershipId tenantId } } }"
+  "query": "mutation { adminLogin(username: \"{{username}}\", password: \"{{password}}\") { accessToken } }"
 }
 HTTP 200
 [Captures]
-membership_id: jsonpath "$.data.instituteLogin.memberships[0].membershipId"
-selection_token: jsonpath "$.data.instituteLogin.selectionToken"
-user_id: jsonpath "$.data.instituteLogin.userId"
-tenant_id: jsonpath "$.data.instituteLogin.memberships[0].tenantId"
+access_token: jsonpath "$.data.adminLogin.accessToken"
 [Asserts]
-jsonpath "$.data.instituteLogin.requiresInstituteSelection" == true
+jsonpath "$.data.adminLogin.accessToken" != null
 
-# Step 2: Select institute → get accessToken
-POST {{base_url}}/graphql
-Content-Type: application/json
-{
-  "query": "mutation SelectInstitute($selectionToken: String!, $membershipId: String!) { selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) { accessToken } }",
-  "variables": { "selectionToken": "{{selection_token}}", "membershipId": "{{membership_id}}" }
-}
-HTTP 200
-[Captures]
-access_token: jsonpath "$.data.selectInstitute.accessToken"
-[Asserts]
-jsonpath "$.data.selectInstitute.accessToken" != null
-
-# Step 3: Create institute with minimal required fields
+# Step 2: Create institute with minimal required fields
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -57,7 +41,7 @@ jsonpath "$.data.createInstitute.type" == "SCHOOL"
 jsonpath "$.data.createInstitute.status" == "PENDING"
 jsonpath "$.data.createInstitute.setupStatus" != null
 
-# Step 4: Create institute with all fields
+# Step 3: Create institute with all fields
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
@@ -86,7 +70,7 @@ jsonpath "$.data.createInstitute.structureFramework" == "NEP"
 jsonpath "$.data.createInstitute.setupStatus" != null
 jsonpath "$.data.createInstitute.status" == "PENDING"
 
-# Step 5: Create with duplicate slug — expect errors
+# Step 4: Create with duplicate slug — expect errors
 POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}

@@ -108,6 +108,9 @@ export default function NotificationPreferencesPage() {
     onCompleted: () => {
       toast.success(t('saved'));
     },
+    onError: () => {
+      toast.error(t('saveFailed'));
+    },
   });
 
   function getConfig(notificationType: string): NotificationConfig {

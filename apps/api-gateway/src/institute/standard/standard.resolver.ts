@@ -1,12 +1,14 @@
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { InstituteScope } from '@roviq/auth-backend';
-import { CheckAbility } from '@roviq/casl';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { CreateStandardInput } from './dto/create-standard.input';
 import { UpdateStandardInput } from './dto/update-standard.input';
 import { StandardModel } from './models/standard.model';
 import { StandardService } from './standard.service';
 
 @InstituteScope()
+@UseGuards(AbilityGuard)
 @Resolver(() => StandardModel)
 export class StandardResolver {
   constructor(private readonly standardService: StandardService) {}

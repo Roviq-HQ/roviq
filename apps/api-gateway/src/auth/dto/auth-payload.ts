@@ -1,4 +1,5 @@
 import { Field, ObjectType } from '@nestjs/graphql';
+import type { AbilityRule } from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import { GraphQLJSONObject } from 'graphql-type-json';
@@ -30,7 +31,7 @@ export class UserType {
   roleId?: string;
 
   @Field(() => [GraphQLJSONObject], { nullable: true })
-  abilityRules?: Record<string, unknown>[];
+  abilityRules?: AbilityRule[];
 }
 
 @ObjectType()

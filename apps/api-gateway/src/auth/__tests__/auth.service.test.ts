@@ -1,7 +1,9 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { JwtService } from '@nestjs/jwt';
+import type { ClientProxy } from '@nestjs/microservices';
 import { hash } from '@node-rs/argon2';
+import type { AbilityFactory } from '@roviq/casl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from '../auth.service';
 import type { AuthEventService } from '../auth-event.service';
@@ -45,6 +47,7 @@ function createMockRefreshTokenRepo() {
   return {
     create: vi.fn(),
     findByIdWithRelations: vi.fn(),
+    findByHash: vi.fn(),
     findActiveByUserId: vi.fn(),
     revoke: vi.fn(),
     revokeAllForUser: vi.fn(),
@@ -101,6 +104,9 @@ describe('AuthService', () => {
     mockConfig = createMockConfigService();
     mockAuthEventService = createMockAuthEventService();
 
+    const mockAbilityFactory = { createForUser: vi.fn().mockResolvedValue({ rules: [] }) };
+    const mockJetStreamClient = { emit: vi.fn() };
+
     authService = new AuthService(
       mockConfig as unknown as ConfigService,
       mockJwt as unknown as JwtService,
@@ -110,6 +116,8 @@ describe('AuthService', () => {
       mockResellerMembershipRepo as unknown as ResellerMembershipRepository,
       mockRefreshTokenRepo as unknown as RefreshTokenRepository,
       mockAuthEventService as unknown as AuthEventService,
+      mockAbilityFactory as unknown as AbilityFactory,
+      mockJetStreamClient as unknown as ClientProxy,
     );
   });
 
@@ -268,6 +276,7 @@ describe('AuthService', () => {
       id: 'pm-1',
       userId: 'user-1',
       roleId: 'platform-role-1',
+      isActive: true,
       abilities: null,
       role: { id: 'platform-role-1', name: 'PlatformAdmin', abilities: [] },
     };

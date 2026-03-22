@@ -4,6 +4,7 @@
 USE MULTIPLE AGENTS frequently to speed up things.
 
 **Always use `tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Examples:
+
 - `tilt trigger db-push` — push schema
 - `tilt trigger db-seed` — seed data
 - `tilt trigger db-clean` — reset DB + re-seed
