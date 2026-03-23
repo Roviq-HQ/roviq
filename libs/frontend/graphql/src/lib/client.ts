@@ -1,7 +1,9 @@
-import { ApolloClient, from, HttpLink, InMemoryCache, split } from '@apollo/client/core';
+import { ApolloClient, InMemoryCache } from '@apollo/client/core';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { setContext } from '@apollo/client/link/context';
-import { onError } from '@apollo/client/link/error';
+import { ApolloLink } from '@apollo/client/link';
+import { SetContextLink } from '@apollo/client/link/context';
+import { ErrorLink } from '@apollo/client/link/error';
+import { HttpLink } from '@apollo/client/link/http';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition, relayStylePagination } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
@@ -16,22 +18,24 @@ export interface ApolloClientConfig {
   onImpersonationEnded?: () => void;
   /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
   apiUrl?: string;
+  /** Called to refresh the access token. If provided, auth errors retry once after refresh. */
+  onTokenRefresh?: () => Promise<string | null>;
 }
 
 export function createApolloClient(config: ApolloClientConfig) {
   const httpLink = new HttpLink({ uri: config.httpUrl });
 
-  const authLink = setContext((_, { headers }) => {
+  const authLink = new SetContextLink((prevContext) => {
     const token = config.getAccessToken();
     return {
       headers: {
-        ...headers,
+        ...prevContext.headers,
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
     };
   });
 
-  const errorLink = onError(({ error }) => {
+  const errorLink = new ErrorLink(({ error, forward, operation }) => {
     if (CombinedGraphQLErrors.is(error)) {
       for (const err of error.errors) {
         if (err.extensions?.code === 'IMPERSONATION_ENDED') {
@@ -42,6 +46,22 @@ export function createApolloClient(config: ApolloClientConfig) {
           return;
         }
         if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
+          if (config.onTokenRefresh) {
+            // Refresh the token and retry the operation once (ErrorLink auto-prevents infinite loops)
+            config.onTokenRefresh().then((newToken) => {
+              if (newToken) {
+                operation.setContext({
+                  headers: {
+                    ...(operation.getContext().headers as Record<string, string>),
+                    authorization: `Bearer ${newToken}`,
+                  },
+                });
+              } else {
+                config.onAuthError();
+              }
+            });
+            return forward(operation);
+          }
           config.onAuthError();
           return;
         }
@@ -49,6 +69,7 @@ export function createApolloClient(config: ApolloClientConfig) {
     } else {
       config.onNetworkError(error instanceof Error ? error.message : String(error));
     }
+    return undefined;
   });
 
   const wsLink = new GraphQLWsLink(
@@ -56,7 +77,6 @@ export function createApolloClient(config: ApolloClientConfig) {
       url: config.wsUrl,
       connectionParams: async () => {
         if (config.apiUrl) {
-          // Use ws-ticket pattern: exchange access token for a short-lived ticket
           const accessToken = config.getAccessToken();
           if (accessToken) {
             const response = await fetch(`${config.apiUrl}/auth/ws-ticket`, {
@@ -68,7 +88,6 @@ export function createApolloClient(config: ApolloClientConfig) {
             }
           }
         }
-        // No fallback — ws-ticket is required
         return {};
       },
       shouldRetry: () => true,
@@ -80,13 +99,15 @@ export function createApolloClient(config: ApolloClientConfig) {
     }),
   );
 
-  const splitLink = split(
+  const httpChain = errorLink.concat(authLink).concat(httpLink);
+
+  const link = ApolloLink.split(
     ({ query }) => {
       const definition = getMainDefinition(query);
       return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
     },
     wsLink,
-    from([errorLink, authLink, httpLink]),
+    httpChain,
   );
 
   const cache = new InMemoryCache({
@@ -111,7 +132,7 @@ export function createApolloClient(config: ApolloClientConfig) {
   });
 
   return new ApolloClient({
-    link: splitLink,
+    link,
     cache,
     defaultOptions: {
       watchQuery: {

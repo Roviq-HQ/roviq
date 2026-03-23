@@ -14,6 +14,8 @@ interface GraphQLProviderProps {
   onImpersonationEnded?: () => void;
   /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
   apiUrl?: string;
+  /** Called to refresh the access token on auth error. Returns the new token or null. */
+  onTokenRefresh?: () => Promise<string | null>;
   children: React.ReactNode;
 }
 
@@ -23,6 +25,7 @@ export function GraphQLProvider({
   getAccessToken,
   onAuthError,
   onImpersonationEnded,
+  onTokenRefresh,
   apiUrl,
   children,
 }: GraphQLProviderProps) {
@@ -35,6 +38,7 @@ export function GraphQLProvider({
       getAccessToken,
       onAuthError,
       onImpersonationEnded,
+      onTokenRefresh,
       apiUrl,
       onNetworkError: (message) => {
         toast.error('Network Error', { description: message });

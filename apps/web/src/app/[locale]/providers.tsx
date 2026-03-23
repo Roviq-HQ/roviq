@@ -50,11 +50,20 @@ function GraphQLBridge({
   scopedStorage: ReturnType<typeof createScopedTokenStorage>;
   children: React.ReactNode;
 }) {
-  const { notifyImpersonationEnded } = useAuth();
+  const { notifyImpersonationEnded, refreshSession } = useAuth();
 
   const handleImpersonationEnded = React.useCallback(() => {
     notifyImpersonationEnded();
   }, [notifyImpersonationEnded]);
+
+  const handleTokenRefresh = React.useCallback(async () => {
+    try {
+      await refreshSession();
+      return scopedStorage.getAccessToken();
+    } catch {
+      return null;
+    }
+  }, [refreshSession, scopedStorage]);
 
   return (
     <GraphQLProvider
@@ -62,7 +71,6 @@ function GraphQLBridge({
       wsUrl={GRAPHQL_WS}
       apiUrl={API_URL}
       getAccessToken={() => {
-        // Prefer impersonation token if present
         if (typeof window !== 'undefined') {
           const impToken = sessionStorage.getItem('roviq-impersonation-token');
           if (impToken) return impToken;
@@ -72,6 +80,7 @@ function GraphQLBridge({
       onAuthError={() => {
         // Handled by AuthProvider's session expired dialog
       }}
+      onTokenRefresh={handleTokenRefresh}
       onImpersonationEnded={handleImpersonationEnded}
     >
       {children}
