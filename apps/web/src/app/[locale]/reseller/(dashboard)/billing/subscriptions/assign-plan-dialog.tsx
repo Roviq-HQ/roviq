@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useAuth } from '@roviq/auth';
 import { Money } from '@roviq/domain';
 import { extractGraphQLError, gql, useQuery } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
@@ -55,6 +56,7 @@ interface AssignPlanDialogProps {
 
 export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) {
   const t = useTranslations('billing');
+  const { user } = useAuth();
   const locale = useLocale();
   const ti = useI18nField();
   const { plans } = useSubscriptionPlans();
@@ -68,7 +70,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
   const assignSchema = React.useMemo(
     () =>
       z.object({
-        instituteId: z.string().min(1, t('subscriptions.assign.instituteRequired')),
+        tenantId: z.string().min(1, t('subscriptions.assign.instituteRequired')),
         planId: z.string().min(1, t('subscriptions.assign.planRequired')),
         provider: z.enum(PROVIDERS, {
           message: t('subscriptions.assign.providerRequired'),
@@ -91,7 +93,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
   } = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
     defaultValues: {
-      instituteId: '',
+      tenantId: '',
       planId: '',
       provider: undefined,
       customerEmail: '',
@@ -102,7 +104,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
   React.useEffect(() => {
     if (open) {
       reset({
-        instituteId: '',
+        tenantId: '',
         planId: '',
         provider: undefined,
         customerEmail: '',
@@ -117,7 +119,8 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
       const { data } = await assignPlan({
         variables: {
           input: {
-            instituteId: values.instituteId,
+            tenantId: values.tenantId,
+            resellerId: user?.resellerId ?? '',
             planId: values.planId,
             provider: values.provider,
             customerEmail: values.customerEmail,
@@ -146,7 +149,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
     }
   };
 
-  const instituteId = watch('instituteId');
+  const tenantId = watch('tenantId');
   const planId = watch('planId');
   const provider = watch('provider');
 
@@ -155,7 +158,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>{t('subscriptions.assign.title')}</DialogTitle>
-          <DialogDescription>{t('subscriptions.assign.title')}</DialogDescription>
+          <DialogDescription>{t('subscriptions.assign.description')}</DialogDescription>
         </DialogHeader>
 
         {checkoutUrl ? (
@@ -178,10 +181,10 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
         ) : (
           <form onSubmit={handleSubmit(onSubmit)}>
             <FieldGroup>
-              <Field data-invalid={!!errors.instituteId}>
+              <Field data-invalid={!!errors.tenantId}>
                 <FieldLabel>{t('subscriptions.assign.institute')}</FieldLabel>
-                <Select value={instituteId} onValueChange={(v) => setValue('instituteId', v)}>
-                  <SelectTrigger aria-invalid={!!errors.instituteId}>
+                <Select value={tenantId} onValueChange={(v) => setValue('tenantId', v)}>
+                  <SelectTrigger aria-invalid={!!errors.tenantId}>
                     <SelectValue placeholder={t('subscriptions.assign.selectInstitute')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -192,7 +195,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.instituteId && <FieldError errors={[errors.instituteId]} />}
+                {errors.tenantId && <FieldError errors={[errors.tenantId]} />}
               </Field>
 
               <Field data-invalid={!!errors.planId}>
@@ -207,9 +210,9 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
                         <div className="flex items-center gap-2">
                           <span>{ti(plan.name)}</span>
                           <span className="text-muted-foreground">
-                            {plan.amount === 0
+                            {Number(plan.amount) === 0
                               ? t('subscriptions.assign.free')
-                              : `${Money.tryCreate(plan.amount, plan.currency)?.format(locale) ?? '—'} / ${t(`plans.intervals.${plan.billingInterval}`)}`}
+                              : `${Money.tryCreate(Number(plan.amount), plan.currency)?.format(locale) ?? '—'} / ${t(`plans.intervals.${plan.interval}`)}`}
                           </span>
                         </div>
                       </SelectItem>

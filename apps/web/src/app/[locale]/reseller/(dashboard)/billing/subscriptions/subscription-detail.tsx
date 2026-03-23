@@ -71,8 +71,8 @@ function ActionButtons({
   t: (key: string) => string;
 }) {
   const { status } = subscription;
-  const hasProvider = !!subscription.providerSubscriptionId;
-  const isTerminal = status === 'CANCELED' || status === 'COMPLETED';
+  const hasProvider = !!subscription.gatewaySubscriptionId;
+  const isTerminal = status === 'CANCELLED' || status === 'EXPIRED';
   const canCancel = !isTerminal;
   const canPause = hasProvider && status === 'ACTIVE';
   const canResume = hasProvider && status === 'PAUSED';
@@ -153,7 +153,7 @@ function SubscriptionFields({
         </DetailRow>
         <DetailRow label={t('subscriptions.detail.plan')}>
           {ti(subscription.plan?.name)} &mdash;{' '}
-          {formatCurrency((subscription.plan?.amount ?? 0) / 100)}
+          {formatCurrency(Number(subscription.plan?.amount ?? '0') / 100)}
         </DetailRow>
 
         <Separator className="my-2" />
@@ -161,11 +161,11 @@ function SubscriptionFields({
         <DetailRow label={t('subscriptions.detail.status')}>
           <Badge>{t(`subscriptions.statuses.${subscription.status}`)}</Badge>
         </DetailRow>
-        <DetailRow label={t('subscriptions.detail.providerSubscriptionId')}>
-          <MonoValue value={subscription.providerSubscriptionId} />
+        <DetailRow label={t('subscriptions.detail.gatewaySubscriptionId')}>
+          <MonoValue value={subscription.gatewaySubscriptionId} />
         </DetailRow>
-        <DetailRow label={t('subscriptions.detail.providerCustomerId')}>
-          <MonoValue value={subscription.providerCustomerId} />
+        <DetailRow label={t('subscriptions.detail.gatewayProvider')}>
+          <MonoValue value={subscription.gatewayProvider} />
         </DetailRow>
 
         <Separator className="my-2" />
@@ -176,8 +176,8 @@ function SubscriptionFields({
         <DetailRow label={t('subscriptions.detail.currentPeriodEnd')}>
           <OptionalValue value={subscription.currentPeriodEnd} formatDate={formatDate} />
         </DetailRow>
-        <DetailRow label={t('subscriptions.detail.canceledAt')}>
-          <OptionalValue value={subscription.canceledAt} formatDate={formatDate} />
+        <DetailRow label={t('subscriptions.detail.cancelledAt')}>
+          <OptionalValue value={subscription.cancelledAt} formatDate={formatDate} />
         </DetailRow>
         <DetailRow label={t('subscriptions.detail.trialEndsAt')}>
           <OptionalValue value={subscription.trialEndsAt} formatDate={formatDate} />

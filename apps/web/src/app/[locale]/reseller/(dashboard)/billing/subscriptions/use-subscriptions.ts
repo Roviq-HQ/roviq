@@ -32,14 +32,14 @@ const SUBSCRIPTIONS_QUERY = gql`
             name
             amount
             currency
-            billingInterval
+            interval
           }
           status
-          providerSubscriptionId
-          providerCustomerId
+          gatewaySubscriptionId
+          gatewayProvider
           currentPeriodStart
           currentPeriodEnd
-          canceledAt
+          cancelledAt
           trialEndsAt
           createdAt
         }

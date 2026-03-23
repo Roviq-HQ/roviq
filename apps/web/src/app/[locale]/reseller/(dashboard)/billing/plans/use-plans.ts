@@ -19,8 +19,8 @@ const SUBSCRIPTION_PLANS_QUERY = gql`
       description
       amount
       currency
-      billingInterval
-      featureLimits
+      interval
+      entitlements
       status
       createdAt
       updatedAt
@@ -36,8 +36,8 @@ const CREATE_PLAN_MUTATION = gql`
       description
       amount
       currency
-      billingInterval
-      featureLimits
+      interval
+      entitlements
       status
       createdAt
       updatedAt
@@ -53,8 +53,8 @@ const UPDATE_PLAN_MUTATION = gql`
       description
       amount
       currency
-      billingInterval
-      featureLimits
+      interval
+      entitlements
       status
       createdAt
       updatedAt

@@ -43,10 +43,10 @@ export function createPlanColumns(
       ),
     },
     {
-      accessorKey: 'billingInterval',
+      accessorKey: 'interval',
       header: t('plans.columns.interval'),
       cell: ({ row }) => {
-        const interval = row.getValue<string>('billingInterval');
+        const interval = row.getValue<string>('interval');
         return <span>{t(`plans.intervals.${interval}`)}</span>;
       },
     },
@@ -76,7 +76,7 @@ export function createPlanColumns(
       id: 'actions',
       cell: ({ row }) => {
         const plan = row.original;
-        const isArchived = plan.status === 'ARCHIVED';
+        const isArchived = plan.status === 'INACTIVE';
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

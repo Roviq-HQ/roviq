@@ -1,9 +1,30 @@
+type AcademicYearModel {
+  boardExamDates: JSON
+  createdAt: DateTime!
+  endDate: String!
+  id: ID!
+  isActive: Boolean!
+  label: String!
+  startDate: String!
+  status: AcademicYearStatus!
+  termStructure: JSON
+  updatedAt: DateTime!
+}
+
+enum AcademicYearStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETING
+  PLANNING
+}
+
 input AssignPlanInput {
   customerEmail: String!
   customerPhone: String!
-  instituteId: String!
   planId: String!
   provider: PaymentProvider!
+  resellerId: String!
+  tenantId: String!
 }
 
 type AssignPlanResult {
@@ -26,7 +47,7 @@ type AuditLog {
   ipAddress: String
   metadata: JSON
   source: String!
-  tenantId: String!
+  tenantId: String
   tenantName: I18nText
   userAgent: String
   userId: String!
@@ -53,11 +74,37 @@ input AuditLogFilterInput {
   userId: String
 }
 
+type AuthEventModel {
+  authMethod: String
+  createdAt: DateTime!
+  eventType: String!
+  failureReason: String
+  id: ID!
+  ipAddress: String
+  metadata: JSON
+  resellerId: String
+  scope: String
+  tenantId: String
+  userAgent: String
+  userId: String
+}
+
 type AuthPayload {
   accessToken: String
   refreshToken: String
   user: UserType
 }
+
+enum BatchStatus {
+  ACTIVE
+  COMPLETED
+  UPCOMING
+}
+
+"""
+The `BigInt` scalar type represents non-fractional signed whole numeric values.
+"""
+scalar BigInt
 
 input BillingFilterInput {
   from: DateTime
@@ -69,18 +116,97 @@ input BillingFilterInput {
 Billing cycle frequency for subscription plans.
 """
 enum BillingInterval {
+  ANNUAL
   MONTHLY
   QUARTERLY
-  YEARLY
+  SEMI_ANNUAL
+}
+
+input CreateAcademicYearInput {
+  endDate: String!
+  label: String!
+  startDate: String!
+  termStructure: JSON
+}
+
+input CreateInstituteGroupInput {
+  address: JSON
+  code: String!
+  contact: JSON
+  name: String!
+  registrationNo: String
+  registrationState: String
+  type: GroupType!
+}
+
+input CreateInstituteInput {
+  address: JSON
+  board: String
+  code: String
+  contact: JSON
+  departments: [String!]
+  isDemo: Boolean = false
+  name: JSON!
+  slug: String!
+  structureFramework: StructureFramework = TRADITIONAL
+  type: InstituteType = SCHOOL
 }
 
 input CreatePlanInput {
-  amount: Int!
-  billingInterval: BillingInterval!
+  amount: BigInt!
+  code: String!
   currency: String! = "INR"
   description: I18nText
-  featureLimits: JSON!
+  entitlements: JSON!
+  interval: BillingInterval!
   name: I18nText!
+  resellerId: String!
+}
+
+input CreateSectionInput {
+  academicYearId: ID!
+  capacity: Int = 40
+  displayLabel: String
+  displayOrder: Int = 0
+  endTime: String
+  genderRestriction: GenderRestriction = CO_ED
+  medium: String
+  name: String!
+  room: String
+  shift: String
+  standardId: ID!
+  startTime: String
+  stream: StreamType
+}
+
+input CreateStandardInput {
+  academicYearId: ID!
+  department: String
+  isBoardExamClass: Boolean = false
+  level: EducationLevel
+  maxSectionsAllowed: Int
+  maxStudentsPerSection: Int = 40
+  name: String!
+  nepStage: NepStage
+  numericOrder: Int!
+  streamApplicable: Boolean = false
+  udiseClassCode: Int
+}
+
+input CreateSubjectInput {
+  boardCode: String
+  electiveGroup: String
+  hasPractical: Boolean = false
+  internalMarks: Int
+  isElective: Boolean = false
+  isMandatory: Boolean = false
+  name: String!
+  practicalMarks: Int
+  sectionIds: [ID!]
+  shortName: String
+  standardIds: [ID!]
+  theoryMarks: Int
+  type: SubjectType = ACADEMIC
 }
 
 input DateRangeInput {
@@ -93,8 +219,45 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+enum EducationLevel {
+  PRE_PRIMARY
+  PRIMARY
+  SECONDARY
+  SENIOR_SECONDARY
+  UPPER_PRIMARY
+}
+
+enum GenderRestriction {
+  BOYS_ONLY
+  CO_ED
+  GIRLS_ONLY
+}
+
 input GeneratePasskeyRegistrationInput {
   password: String!
+}
+
+type GroupMembershipModel {
+  createdAt: DateTime!
+  groupId: String!
+  id: ID!
+  isActive: Boolean!
+  roleId: String!
+  updatedAt: DateTime!
+  userId: String!
+}
+
+enum GroupStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum GroupType {
+  CHAIN
+  FRANCHISE
+  SOCIETY
+  TRUST
 }
 
 """
@@ -102,9 +265,121 @@ Multi-language text stored as { locale: text }
 """
 scalar I18nText
 
+type ImpersonationAuthPayload {
+  accessToken: String!
+  institute: ImpersonationInstituteInfo!
+  user: ImpersonationUserInfo!
+}
+
+type ImpersonationInstituteInfo {
+  id: String!
+  name: I18nText!
+}
+
+type ImpersonationUserInfo {
+  id: String!
+  username: String!
+}
+
+type InstituteConnection {
+  edges: [InstituteEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type InstituteEdge {
+  cursor: String!
+  node: InstituteModel!
+}
+
+input InstituteFilterInput {
+  after: String
+  first: Int = 20
+  search: String
+  status: InstituteStatus
+  type: InstituteType
+}
+
+type InstituteGroupConnection {
+  edges: [InstituteGroupEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type InstituteGroupEdge {
+  cursor: String!
+  node: InstituteGroupModel!
+}
+
+input InstituteGroupFilterInput {
+  after: String
+  first: Int = 20
+  search: String
+  status: GroupStatus
+  type: GroupType
+}
+
+type InstituteGroupModel {
+  address: JSON
+  code: String!
+  contact: JSON!
+  createdAt: DateTime!
+  createdById: String!
+  id: ID!
+  name: String!
+  registrationNo: String
+  registrationState: String
+  status: GroupStatus!
+  type: GroupType!
+  updatedAt: DateTime!
+}
+
+type InstituteLoginResult {
+  accessToken: String
+  memberships: [MembershipInfo!]
+  refreshToken: String
+  requiresInstituteSelection: Boolean
+  selectionToken: String
+  user: UserType
+  userId: String
+}
+
+type InstituteModel {
+  address: JSON
+  code: String
+  contact: JSON!
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  logoUrl: String
+  name: JSON!
+  settings: JSON!
+  setupStatus: SetupStatus!
+  slug: String!
+  status: InstituteStatus!
+  structureFramework: StructureFramework!
+  timezone: String!
+  type: InstituteType!
+  updatedAt: DateTime!
+}
+
 type InstituteRef {
   id: ID!
   name: I18nText!
+}
+
+enum InstituteStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  REJECTED
+  SUSPENDED
+}
+
+enum InstituteType {
+  COACHING
+  LIBRARY
+  SCHOOL
 }
 
 type InvoiceConnection {
@@ -114,20 +389,26 @@ type InvoiceConnection {
 }
 
 type InvoiceModel {
-  amount: Int!
-  billingPeriodEnd: DateTime!
-  billingPeriodStart: DateTime!
   createdAt: DateTime!
   currency: String!
-  dueDate: DateTime!
+  dueAt: DateTime!
   id: ID!
-  instituteId: String!
+  invoiceNumber: String!
+  issuedAt: DateTime
+  lineItems: JSON
+  notes: String
+  paidAmount: BigInt!
   paidAt: DateTime
-  providerInvoiceId: String
-  providerPaymentId: String
+  periodEnd: DateTime
+  periodStart: DateTime
+  resellerId: String!
   status: InvoiceStatus!
   subscription: SubscriptionRef
   subscriptionId: String!
+  subtotalAmount: BigInt!
+  taxAmount: BigInt!
+  tenantId: String!
+  totalAmount: BigInt!
 }
 
 type InvoiceModelEdge {
@@ -139,11 +420,13 @@ type InvoiceModelEdge {
 Payment status of an invoice.
 """
 enum InvoiceStatus {
-  FAILED
+  CANCELLED
+  DRAFT
   OVERDUE
   PAID
-  PENDING
+  PARTIALLY_PAID
   REFUNDED
+  SENT
 }
 
 """
@@ -156,14 +439,6 @@ The `JSONObject` scalar type represents JSON objects as specified by [ECMA-404](
 """
 scalar JSONObject
 
-type LoginResult {
-  accessToken: String
-  memberships: [MembershipInfo!]
-  platformToken: String
-  refreshToken: String
-  user: UserType
-}
-
 input ManageSubscriptionInput {
   atCycleEnd: Boolean = true
   subscriptionId: String!
@@ -173,30 +448,100 @@ type MembershipInfo {
   instituteLogoUrl: String
   instituteName: I18nText!
   instituteSlug: String!
+  membershipId: String!
   roleId: String!
   roleName: I18nText!
   tenantId: String!
 }
 
 type Mutation {
+  activateAcademicYear(id: ID!): AcademicYearModel!
+  activateInstitute(id: ID!): InstituteModel!
+  activateInstituteGroup(id: ID!): InstituteGroupModel!
+  addGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
+  addInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
+
+  """
+  Delete a suspended reseller after 30-day grace period
+  """
+  adminDeleteReseller(resellerId: String!): Boolean!
+  adminLogin(password: String!, username: String!): AuthPayload!
+
+  """
+  Suspend a reseller and revoke all staff sessions
+  """
+  adminSuspendReseller(resellerId: String!): Boolean!
+  archiveAcademicYear(id: ID!): AcademicYearModel!
+  archivePlan(id: ID!): SubscriptionPlanModel!
   assignPlanToInstitute(input: AssignPlanInput!): AssignPlanResult!
+  assignSubjectToSection(sectionId: ID!, subjectId: ID!): Boolean!
+  assignSubjectToStandard(standardId: ID!, subjectId: ID!): Boolean!
   cancelSubscription(input: ManageSubscriptionInput!): SubscriptionModel!
+  createAcademicYear(input: CreateAcademicYearInput!): AcademicYearModel!
+  createInstitute(input: CreateInstituteInput!): InstituteModel!
+  createInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
+  createSection(input: CreateSectionInput!): SectionModel!
+  createStandard(input: CreateStandardInput!): StandardModel!
+  createSubject(input: CreateSubjectInput!): SubjectModel!
   createSubscriptionPlan(input: CreatePlanInput!): SubscriptionPlanModel!
+  deactivateInstitute(id: ID!): InstituteModel!
+  deactivateInstituteGroup(id: ID!): InstituteGroupModel!
+  deleteInstitute(id: ID!): Boolean!
+  deleteInstituteGroup(id: ID!): Boolean!
+  deletePlan(id: ID!): Boolean!
+  deleteSection(id: ID!): Boolean!
+  deleteStandard(id: ID!): Boolean!
+  deleteSubject(id: ID!): Boolean!
+  endImpersonation(sessionId: String!): Boolean!
+  exchangeImpersonationCode(code: String!): ImpersonationAuthPayload!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
   generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
-  login(password: String!, username: String!): LoginResult!
+  impersonateUser(reason: String!, targetUserId: String!): StartImpersonationResult!
+  instituteLogin(password: String!, username: String!): InstituteLoginResult!
   logout: Boolean!
   pauseSubscription(subscriptionId: ID!): SubscriptionModel!
   refreshToken(token: String!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
   registerDeviceToken(token: String!): Boolean!
+  rejectInstitute(id: ID!): InstituteModel!
+  removeGroupMember(groupId: ID!, userId: ID!): Boolean!
+  removeInstituteFromGroup(instituteId: ID!): Boolean!
   removePasskey(passkeyId: String!): Boolean!
+  removeSubjectFromSection(sectionId: ID!, subjectId: ID!): Boolean!
+  removeSubjectFromStandard(standardId: ID!, subjectId: ID!): Boolean!
+  resellerLogin(password: String!, username: String!): AuthPayload!
+  restoreInstitute(id: ID!): InstituteModel!
+  restorePlan(id: ID!): SubscriptionPlanModel!
   resumeSubscription(subscriptionId: ID!): SubscriptionModel!
-  selectInstitute(tenantId: String!): AuthPayload!
+  revokeAllOtherSessions(currentRefreshToken: String!): Boolean!
+  revokeSession(sessionId: String!): Boolean!
+  selectInstitute(membershipId: String!, selectionToken: String!): AuthPayload!
+  startImpersonation(
+    reason: String!
+    targetTenantId: String!
+    targetUserId: String!
+  ): StartImpersonationResult!
+  suspendInstitute(id: ID!): InstituteModel!
+  suspendInstituteGroup(id: ID!): InstituteGroupModel!
+  switchInstitute(currentRefreshToken: String!, membershipId: String!): AuthPayload!
+  updateAcademicYear(id: ID!, input: UpdateAcademicYearInput!): AcademicYearModel!
+  updateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
+  updateInstituteInfo(id: ID!, input: UpdateInstituteInfoInput!): InstituteModel!
   updateNotificationConfig(input: UpdateNotificationConfigInput!): NotificationConfigModel!
+  updateSection(id: ID!, input: UpdateSectionInput!): SectionModel!
+  updateStandard(id: ID!, input: UpdateStandardInput!): StandardModel!
+  updateSubject(id: ID!, input: UpdateSubjectInput!): SubjectModel!
   updateSubscriptionPlan(id: ID!, input: UpdatePlanInput!): SubscriptionPlanModel!
-  verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): LoginResult!
+  verifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
+  verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): InstituteLoginResult!
   verifyPasskeyRegistration(input: VerifyPasskeyRegistrationInput!): PasskeyInfo!
+}
+
+enum NepStage {
+  FOUNDATIONAL
+  MIDDLE
+  PREPARATORY
+  SECONDARY
 }
 
 type NotificationConfigModel {
@@ -245,18 +590,32 @@ Lifecycle status of a subscription plan.
 """
 enum PlanStatus {
   ACTIVE
-  ARCHIVED
   INACTIVE
 }
 
 type Query {
+  academicYear(id: ID!): AcademicYearModel!
+  academicYears: [AcademicYearModel!]!
+  activeAcademicYear: AcademicYearModel
+  adminAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
   auditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  authEvents(first: Int = 50): [AuthEventModel!]!
+  billingInstitutes: [InstituteRef!]!
 
   """
   Returns the current Roviq edition: ce or ee
   """
   edition: String!
-  institutes: [InstituteRef!]!
+  entityAuditTimeline(
+    after: String
+    entityId: String!
+    entityType: String!
+    first: Int = 20
+  ): AuditLogConnection!
+  institute(id: ID!): InstituteModel!
+  instituteGroup(id: ID!): InstituteGroupModel!
+  instituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
+  institutes(filter: InstituteFilterInput): InstituteConnection!
   invoices(
     after: String
     filter: BillingFilterInput
@@ -264,8 +623,23 @@ type Query {
     instituteId: ID
   ): InvoiceConnection!
   me: UserType!
+  myGroups: [GroupMembershipModel!]!
+  myInstitute: InstituteModel!
   myPasskeys: [PasskeyInfo!]!
+  mySessions: [SessionInfo!]!
   notificationConfigs: [NotificationConfigModel!]!
+  resellerAuditLogs(
+    after: String
+    filter: AuditLogFilterInput
+    first: Int = 20
+  ): AuditLogConnection!
+  section(id: ID!): SectionModel!
+  sections(standardId: ID!): [SectionModel!]!
+  standard(id: ID!): StandardModel!
+  standards(academicYearId: ID!): [StandardModel!]!
+  subject(id: ID!): SubjectModel!
+  subjects: [SubjectModel!]!
+  subjectsByStandard(standardId: ID!): [SubjectModel!]!
   subscription(instituteId: ID!): SubscriptionModel
   subscriptionPlan(id: ID!): SubscriptionPlanModel!
   subscriptionPlans: [SubscriptionPlanModel!]!
@@ -282,6 +656,104 @@ input RegisterInput {
   username: String!
 }
 
+type SectionModel {
+  academicYearId: String!
+  batchStatus: BatchStatus
+  capacity: Int
+  classTeacherId: String
+  createdAt: DateTime!
+  currentStrength: Int!
+  displayLabel: String
+  displayOrder: Int!
+  endTime: String
+  genderRestriction: GenderRestriction!
+  id: ID!
+  medium: String
+  name: String!
+  room: String
+  shift: String
+  standardId: String!
+  startTime: String
+  stream: StreamType
+  updatedAt: DateTime!
+}
+
+type SessionInfo {
+  createdAt: DateTime!
+  deviceInfo: String
+  expiresAt: DateTime!
+  id: String!
+  ipAddress: String
+  isCurrent: Boolean!
+  lastUsedAt: DateTime
+  userAgent: String
+}
+
+enum SetupStatus {
+  COMPLETED
+  FAILED
+  IN_PROGRESS
+  PENDING
+}
+
+type StandardModel {
+  academicYearId: String!
+  createdAt: DateTime!
+  department: String
+  id: ID!
+  isBoardExamClass: Boolean!
+  level: EducationLevel
+  maxSectionsAllowed: Int
+  maxStudentsPerSection: Int
+  name: String!
+  nepStage: NepStage
+  numericOrder: Int!
+  streamApplicable: Boolean!
+  udiseClassCode: Int
+  updatedAt: DateTime!
+}
+
+type StartImpersonationResult {
+  code: String!
+  requiresOtp: Boolean
+}
+
+enum StreamType {
+  ARTS
+  COMMERCE
+  SCIENCE
+}
+
+enum StructureFramework {
+  NEP
+  TRADITIONAL
+}
+
+type SubjectModel {
+  boardCode: String
+  createdAt: DateTime!
+  electiveGroup: String
+  hasPractical: Boolean!
+  id: ID!
+  internalMarks: Int
+  isElective: Boolean!
+  isMandatory: Boolean!
+  name: String!
+  practicalMarks: Int
+  shortName: String
+  theoryMarks: Int
+  type: SubjectType!
+  updatedAt: DateTime!
+}
+
+enum SubjectType {
+  ACADEMIC
+  EXTRACURRICULAR
+  INTERNAL_ASSESSMENT
+  LANGUAGE
+  SKILL
+}
+
 type SubscriptionConnection {
   edges: [SubscriptionModelEdge!]!
   pageInfo: PageInfo!
@@ -293,18 +765,19 @@ input SubscriptionFilterInput {
 }
 
 type SubscriptionModel {
-  canceledAt: DateTime
+  cancelledAt: DateTime
   createdAt: DateTime!
   currentPeriodEnd: DateTime
   currentPeriodStart: DateTime
+  gatewayProvider: String
+  gatewaySubscriptionId: String
   id: ID!
   institute: InstituteRef
-  instituteId: String!
   plan: SubscriptionPlanModel
   planId: String!
-  providerCustomerId: String
-  providerSubscriptionId: String
+  resellerId: String!
   status: SubscriptionStatus!
+  tenantId: String!
   trialEndsAt: DateTime
   updatedAt: DateTime!
 }
@@ -315,13 +788,13 @@ type SubscriptionModelEdge {
 }
 
 type SubscriptionPlanModel {
-  amount: Int!
-  billingInterval: BillingInterval!
+  amount: BigInt!
   createdAt: DateTime!
   currency: String!
   description: I18nText
-  featureLimits: JSON!
+  entitlements: JSON!
   id: ID!
+  interval: BillingInterval!
   name: I18nText!
   status: PlanStatus!
   updatedAt: DateTime!
@@ -337,11 +810,36 @@ Current state of a subscription.
 """
 enum SubscriptionStatus {
   ACTIVE
-  CANCELED
-  COMPLETED
+  CANCELLED
+  EXPIRED
   PAST_DUE
   PAUSED
-  PENDING_PAYMENT
+  TRIALING
+}
+
+input UpdateAcademicYearInput {
+  boardExamDates: JSON
+  endDate: String
+  label: String
+  startDate: String
+  termStructure: JSON
+}
+
+input UpdateInstituteGroupInput {
+  address: JSON
+  contact: JSON
+  name: String
+  registrationNo: String
+  registrationState: String
+}
+
+input UpdateInstituteInfoInput {
+  address: JSON
+  code: String
+  contact: JSON
+  currency: String
+  name: JSON
+  timezone: String
 }
 
 input UpdateNotificationConfigInput {
@@ -355,19 +853,64 @@ input UpdateNotificationConfigInput {
 }
 
 input UpdatePlanInput {
-  amount: Int
-  billingInterval: BillingInterval
+  amount: BigInt
   description: I18nText
-  featureLimits: JSON
+  entitlements: JSON
+  interval: BillingInterval
   name: I18nText
-  status: PlanStatus
+}
+
+input UpdateSectionInput {
+  batchStatus: BatchStatus
+  capacity: Int
+  classTeacherId: ID
+  displayLabel: String
+  displayOrder: Int
+  endTime: String
+  genderRestriction: GenderRestriction
+  medium: String
+  name: String
+  room: String
+  shift: String
+  startTime: String
+  stream: StreamType
+}
+
+input UpdateStandardInput {
+  department: String
+  isBoardExamClass: Boolean
+  level: EducationLevel
+  maxSectionsAllowed: Int
+  maxStudentsPerSection: Int
+  name: String
+  nepStage: NepStage
+  numericOrder: Int
+  streamApplicable: Boolean
+  udiseClassCode: Int
+}
+
+input UpdateSubjectInput {
+  boardCode: String
+  electiveGroup: String
+  hasPractical: Boolean
+  internalMarks: Int
+  isElective: Boolean
+  isMandatory: Boolean
+  name: String
+  practicalMarks: Int
+  shortName: String
+  theoryMarks: Int
+  type: SubjectType
 }
 
 type UserType {
   abilityRules: [JSONObject!]
   email: String!
   id: String!
+  membershipId: String
+  resellerId: String
   roleId: String
+  scope: String
   tenantId: String
   username: String!
 }

@@ -19,14 +19,17 @@ const INVOICES_QUERY = gql`
               name
             }
           }
-          amount
+          invoiceNumber
+          subtotalAmount
+          taxAmount
+          totalAmount
+          paidAmount
           currency
           status
-          providerInvoiceId
-          providerPaymentId
-          billingPeriodStart
-          billingPeriodEnd
-          dueDate
+          periodStart
+          periodEnd
+          issuedAt
+          dueAt
           paidAt
           createdAt
         }

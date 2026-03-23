@@ -15,21 +15,27 @@
     "intervals": {
       "MONTHLY": "मासिक",
       "QUARTERLY": "त्रैमासिक",
-      "YEARLY": "वार्षिक"
+      "SEMI_ANNUAL": "अर्धवार्षिक",
+      "ANNUAL": "वार्षिक"
     },
     "form": {
       "name": "योजना का नाम",
       "namePlaceholder": "उदा. प्रो प्लान",
       "description": "विवरण",
       "descriptionPlaceholder": "वैकल्पिक योजना विवरण",
+      "code": "योजना कोड",
+      "codePlaceholder": "उदा. PRO",
+      "codeRequired": "योजना कोड आवश्यक है",
       "amount": "राशि (₹)",
       "amountPlaceholder": "उदा. 999",
       "currency": "मुद्रा",
       "interval": "बिलिंग अंतराल",
       "selectInterval": "अंतराल चुनें",
-      "maxUsers": "अधिकतम उपयोगकर्ता",
-      "maxSections": "अधिकतम अनुभाग",
+      "maxStudents": "अधिकतम छात्र",
+      "maxStaff": "अधिकतम कर्मचारी",
       "isActive": "सक्रिय",
+      "createDescription": "अपने संस्थानों के लिए एक नई सदस्यता योजना बनाएँ।",
+      "editDescription": "योजना विवरण अपडेट करें। परिवर्तन केवल नई सदस्यताओं पर लागू होंगे।",
       "save": "योजना सहेजें",
       "saveChanges": "परिवर्तन सहेजें",
       "createPlan": "योजना बनाएँ",
@@ -41,7 +47,7 @@
       "createError": "योजना बनाने में विफल।",
       "updateError": "योजना अपडेट करने में विफल।"
     },
-    "statuses": { "ACTIVE": "सक्रिय", "ARCHIVED": "संग्रहीत" },
+    "statuses": { "ACTIVE": "सक्रिय", "INACTIVE": "निष्क्रिय" },
     "actions": {
       "edit": "योजना संपादित करें",
       "archive": "संग्रह करें",
@@ -82,15 +88,16 @@
       "createdAt": "निर्मित"
     },
     "statuses": {
+      "TRIALING": "परीक्षण",
       "ACTIVE": "सक्रिय",
-      "PAST_DUE": "अतिदेय",
-      "CANCELED": "रद्द",
-      "PENDING_PAYMENT": "भुगतान लंबित",
       "PAUSED": "रुका हुआ",
-      "COMPLETED": "पूर्ण"
+      "PAST_DUE": "अतिदेय",
+      "CANCELLED": "रद्द",
+      "EXPIRED": "समाप्त"
     },
     "assign": {
       "title": "संस्थान को योजना असाइन करें",
+      "description": "एक संस्थान और योजना चुनें, फिर भुगतान प्रदाता चुनें।",
       "institute": "संस्थान",
       "selectInstitute": "संस्थान चुनें",
       "plan": "सदस्यता योजना",

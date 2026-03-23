@@ -27,11 +27,11 @@ export function createInvoiceColumns(
       ),
     },
     {
-      accessorKey: 'amount',
+      accessorKey: 'totalAmount',
       header: t('invoices.columns.amount'),
       cell: ({ row }) => (
         <span className="whitespace-nowrap">
-          {formatCurrency(row.getValue<number>('amount') / 100)}
+          {formatCurrency(Number(row.getValue<string>('totalAmount')) / 100)}
         </span>
       ),
     },
@@ -50,21 +50,28 @@ export function createInvoiceColumns(
     {
       id: 'billingPeriod',
       header: t('invoices.columns.billingPeriod'),
-      cell: ({ row }) => (
-        <span className="whitespace-nowrap text-xs">
-          {formatDate(new Date(row.original.billingPeriodStart))} –{' '}
-          {formatDate(new Date(row.original.billingPeriodEnd))}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const start = row.original.periodStart;
+        const end = row.original.periodEnd;
+        if (!start || !end) return <span className="text-muted-foreground">—</span>;
+        return (
+          <span className="whitespace-nowrap text-xs">
+            {formatDate(new Date(start))} – {formatDate(new Date(end))}
+          </span>
+        );
+      },
     },
     {
-      accessorKey: 'dueDate',
+      accessorKey: 'dueAt',
       header: t('invoices.columns.dueDate'),
-      cell: ({ row }) => (
-        <span className="whitespace-nowrap text-xs">
-          {formatDate(new Date(row.getValue('dueDate')))}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const dueAt = row.getValue<string | null>('dueAt');
+        return dueAt ? (
+          <span className="whitespace-nowrap text-xs">{formatDate(new Date(dueAt))}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
     },
     {
       accessorKey: 'paidAt',

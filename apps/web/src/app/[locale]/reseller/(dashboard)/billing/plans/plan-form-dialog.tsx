@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useAuth } from '@roviq/auth';
 import type { FeatureLimits } from '@roviq/common-types';
 import { extractGraphQLError } from '@roviq/graphql';
 import { i18nTextSchema } from '@roviq/i18n';
@@ -32,13 +33,21 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { type SubscriptionPlanNode, useCreatePlan, useUpdatePlan } from './use-plans';
 
-function getFeatureLimits(
-  plan: { featureLimits: Record<string, unknown> } | null | undefined,
+const DEFAULT_ENTITLEMENTS: FeatureLimits = {
+  maxStudents: null,
+  maxStaff: null,
+  maxStorageMb: null,
+  auditLogRetentionDays: 90,
+  features: [],
+};
+
+function getEntitlements(
+  plan: { entitlements: Record<string, unknown> } | null | undefined,
 ): FeatureLimits {
-  return (plan?.featureLimits ?? {}) as FeatureLimits;
+  return { ...DEFAULT_ENTITLEMENTS, ...(plan?.entitlements as Partial<FeatureLimits>) };
 }
 
-const BILLING_INTERVALS = ['MONTHLY', 'QUARTERLY', 'YEARLY'] as const;
+const BILLING_INTERVALS = ['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL'] as const;
 
 interface PlanFormDialogProps {
   open: boolean;
@@ -48,6 +57,7 @@ interface PlanFormDialogProps {
 
 export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps) {
   const t = useTranslations('billing');
+  const { user } = useAuth();
   const isEditing = !!plan;
   const [createPlan] = useCreatePlan();
   const [updatePlan] = useUpdatePlan();
@@ -56,11 +66,12 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
     () =>
       z.object({
         name: i18nTextSchema,
+        code: z.string().min(1).max(50).optional(),
         description: z.record(z.string().min(2).max(5), z.string().max(500)).optional(),
         amount: z.number().nonnegative(t('plans.form.amountRequired')),
-        billingInterval: z.enum(BILLING_INTERVALS),
-        maxUsers: z.number().int().min(0).optional(),
-        maxSections: z.number().int().min(0).optional(),
+        interval: z.enum(BILLING_INTERVALS),
+        maxStudents: z.number().int().min(0).optional(),
+        maxStaff: z.number().int().min(0).optional(),
       }),
     [t],
   );
@@ -74,11 +85,12 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
     resolver: zodResolver(planSchema) as Resolver<PlanFormValues>,
     defaultValues: {
       name: planName ?? { en: '' },
+      code: '',
       description: planDescription ?? { en: '' },
-      amount: plan ? plan.amount / 100 : 0,
-      billingInterval: plan?.billingInterval ?? 'MONTHLY',
-      maxUsers: getFeatureLimits(plan).maxUsers ?? undefined,
-      maxSections: getFeatureLimits(plan).maxSections ?? undefined,
+      amount: plan ? Number(plan.amount) / 100 : 0,
+      interval: plan?.interval ?? 'MONTHLY',
+      maxStudents: getEntitlements(plan).maxStudents ?? undefined,
+      maxStaff: getEntitlements(plan).maxStaff ?? undefined,
     },
   });
 
@@ -95,19 +107,22 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
     if (open) {
       reset({
         name: planName ?? { en: '' },
+        code: '',
         description: planDescription ?? { en: '' },
-        amount: plan ? plan.amount / 100 : 0,
-        billingInterval: plan?.billingInterval ?? 'MONTHLY',
-        maxUsers: getFeatureLimits(plan).maxUsers ?? undefined,
-        maxSections: getFeatureLimits(plan).maxSections ?? undefined,
+        amount: plan ? Number(plan.amount) / 100 : 0,
+        interval: plan?.interval ?? 'MONTHLY',
+        maxStudents: getEntitlements(plan).maxStudents ?? undefined,
+        maxStaff: getEntitlements(plan).maxStaff ?? undefined,
       });
     }
   }, [open, plan, planName, planDescription, reset]);
 
   const onSubmit = async (values: PlanFormValues) => {
-    const featureLimits: FeatureLimits = {};
-    if (values.maxUsers != null) featureLimits.maxUsers = values.maxUsers;
-    if (values.maxSections != null) featureLimits.maxSections = values.maxSections;
+    const entitlements: FeatureLimits = {
+      ...DEFAULT_ENTITLEMENTS,
+      maxStudents: values.maxStudents ?? null,
+      maxStaff: values.maxStaff ?? null,
+    };
 
     try {
       if (isEditing && plan) {
@@ -117,22 +132,32 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
             input: {
               name: values.name,
               description: values.description || undefined,
-              amount: Math.round(values.amount * 100),
-              billingInterval: values.billingInterval,
-              featureLimits,
+              amount: String(Math.round(values.amount * 100)),
+              interval: values.interval,
+              entitlements: { ...entitlements },
             },
           },
         });
         toast.success(t('plans.form.updateSuccess'));
       } else {
+        const code =
+          values.code ||
+          (values.name.en ?? '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 50) ||
+          'plan';
         await createPlan({
           variables: {
             input: {
               name: values.name,
+              code,
+              resellerId: user?.resellerId ?? '',
               description: values.description || undefined,
-              amount: Math.round(values.amount * 100),
-              billingInterval: values.billingInterval,
-              featureLimits,
+              amount: String(Math.round(values.amount * 100)),
+              interval: values.interval,
+              entitlements: { ...entitlements },
             },
           },
         });
@@ -145,7 +170,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
     }
   };
 
-  const billingInterval = watch('billingInterval');
+  const currentInterval = watch('interval');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -153,7 +178,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
         <DialogHeader>
           <DialogTitle>{isEditing ? t('plans.editPlan') : t('plans.createPlan')}</DialogTitle>
           <DialogDescription>
-            {isEditing ? t('plans.editPlan') : t('plans.createPlan')}
+            {isEditing ? t('plans.form.editDescription') : t('plans.form.createDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -166,6 +191,19 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
                 required
                 placeholder={t('plans.form.namePlaceholder')}
               />
+
+              {!isEditing && (
+                <Field data-invalid={!!errors.code}>
+                  <FieldLabel htmlFor="code">{t('plans.form.code')}</FieldLabel>
+                  <Input
+                    id="code"
+                    placeholder={t('plans.form.codePlaceholder')}
+                    aria-invalid={!!errors.code}
+                    {...register('code')}
+                  />
+                  {errors.code && <FieldError errors={[errors.code]} />}
+                </Field>
+              )}
 
               <I18nInput<PlanFormValues>
                 name="description"
@@ -191,10 +229,8 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
                 <Field>
                   <FieldLabel>{t('plans.form.interval')}</FieldLabel>
                   <Select
-                    value={billingInterval}
-                    onValueChange={(v) =>
-                      setValue('billingInterval', v as PlanFormValues['billingInterval'])
-                    }
+                    value={currentInterval}
+                    onValueChange={(v) => setValue('interval', v as PlanFormValues['interval'])}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={t('plans.form.selectInterval')} />
@@ -212,21 +248,21 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
 
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel htmlFor="maxUsers">{t('plans.form.maxUsers')}</FieldLabel>
+                  <FieldLabel htmlFor="maxStudents">{t('plans.form.maxStudents')}</FieldLabel>
                   <Input
-                    id="maxUsers"
+                    id="maxStudents"
                     type="number"
                     min="0"
-                    {...register('maxUsers', { valueAsNumber: true })}
+                    {...register('maxStudents', { valueAsNumber: true })}
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="maxSections">{t('plans.form.maxSections')}</FieldLabel>
+                  <FieldLabel htmlFor="maxStaff">{t('plans.form.maxStaff')}</FieldLabel>
                   <Input
-                    id="maxSections"
+                    id="maxStaff"
                     type="number"
                     min="0"
-                    {...register('maxSections', { valueAsNumber: true })}
+                    {...register('maxStaff', { valueAsNumber: true })}
                   />
                 </Field>
               </div>
