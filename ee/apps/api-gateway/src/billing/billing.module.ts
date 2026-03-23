@@ -6,6 +6,11 @@ import { JetStreamClient } from '@roviq/nats-jetstream';
 import './billing.enums';
 import { BillingRepository } from './billing.repository';
 import { BillingService } from './billing.service';
+import { BillingEventConsumer } from './billing-event.consumer';
+import {
+  InstituteBillingSubscriptions,
+  ResellerBillingSubscriptions,
+} from './billing-subscriptions.resolver';
 import { EntitlementCacheConsumer } from './entitlement-cache.consumer';
 import { InstituteBillingResolver } from './institute/institute-billing.resolver';
 import { GatewayConfigRepository } from './repositories/gateway-config.repository';
@@ -13,6 +18,7 @@ import { InvoiceRepository } from './repositories/invoice.repository';
 import { PaymentRepository } from './repositories/payment.repository';
 import { PlanRepository } from './repositories/plan.repository';
 import { SubscriptionRepository } from './repositories/subscription.repository';
+import { DashboardService } from './reseller/dashboard.service';
 import { GatewayConfigService } from './reseller/gateway-config.service';
 import { InvoiceService } from './reseller/invoice.service';
 import { PaymentService } from './reseller/payment.service';
@@ -50,10 +56,14 @@ import { RazorpayWebhookController } from './webhook/razorpay-webhook.controller
     InvoiceService,
     PaymentService,
     GatewayConfigService,
+    DashboardService,
     { provide: SUBSCRIPTION_READER, useClass: SubscriptionReaderImpl },
     EntitlementCacheConsumer,
+    BillingEventConsumer,
     ResellerBillingResolver,
     InstituteBillingResolver,
+    InstituteBillingSubscriptions,
+    ResellerBillingSubscriptions,
   ],
   exports: [SUBSCRIPTION_READER],
 })

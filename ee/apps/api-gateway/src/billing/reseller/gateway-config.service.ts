@@ -1,14 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRequestContext } from '@roviq/common-types';
+import type { gatewayConfigs } from '@roviq/ee-database';
 import { CryptoService } from '@roviq/ee-payments';
 import { billingError } from '../billing.errors';
 import { GatewayConfigRepository } from '../repositories/gateway-config.repository';
 
+type GatewayConfigRow = typeof gatewayConfigs.$inferSelect;
+
 @Injectable()
 export class GatewayConfigService {
-  private readonly logger = new Logger(GatewayConfigService.name);
-
   constructor(
     private readonly repo: GatewayConfigRepository,
     private readonly crypto: CryptoService,
@@ -75,19 +76,19 @@ export class GatewayConfigService {
       status?: string;
     },
   ) {
-    const data: Record<string, unknown> = {};
-    if (input.displayName !== undefined) data['displayName'] = input.displayName;
-    if (input.isDefault !== undefined) data['isDefault'] = input.isDefault;
-    if (input.testMode !== undefined) data['testMode'] = input.testMode;
-    if (input.supportedMethods !== undefined) data['supportedMethods'] = input.supportedMethods;
-    if (input.status !== undefined) data['status'] = input.status;
+    const data: Partial<GatewayConfigRow> = {};
+    if (input.displayName !== undefined) data.displayName = input.displayName;
+    if (input.isDefault !== undefined) data.isDefault = input.isDefault;
+    if (input.testMode !== undefined) data.testMode = input.testMode;
+    if (input.supportedMethods !== undefined) data.supportedMethods = input.supportedMethods;
+    if (input.status !== undefined) data.status = input.status as GatewayConfigRow['status'];
 
     // Re-encrypt if credentials updated
     if (input.credentials !== undefined) {
-      data['credentials'] = this.crypto.encrypt(input.credentials);
+      data.credentials = this.crypto.encrypt(input.credentials);
     }
     if (input.webhookSecret !== undefined) {
-      data['webhookSecret'] = this.crypto.encrypt(input.webhookSecret);
+      data.webhookSecret = this.crypto.encrypt(input.webhookSecret);
     }
 
     const config = await this.repo.update(resellerId, id, data);
@@ -100,22 +101,21 @@ export class GatewayConfigService {
   }
 
   /** Strip credentials from config — GraphQL output NEVER includes credentials */
-  private toPublicConfig(config: Record<string, unknown>, resellerId: string) {
+  private toPublicConfig(config: GatewayConfigRow, resellerId: string) {
     const apiBaseUrl = this.config.get<string>('API_BASE_URL', 'https://api.roviq.com');
-    const provider = String(config['provider'] ?? '').toLowerCase();
+    const provider = config.provider.toLowerCase();
     return {
-      id: config['id'],
-      resellerId: config['resellerId'],
-      provider: config['provider'],
-      status: config['status'],
-      displayName: config['displayName'],
-      isDefault: config['isDefault'],
-      testMode: config['testMode'],
-      supportedMethods: config['supportedMethods'],
-      /** Computed webhook URL */
+      id: config.id,
+      resellerId: config.resellerId,
+      provider: config.provider,
+      status: config.status,
+      displayName: config.displayName,
+      isDefault: config.isDefault,
+      testMode: config.testMode,
+      supportedMethods: config.supportedMethods,
       webhookUrl: `${apiBaseUrl}/webhooks/${provider}/${resellerId}`,
-      createdAt: config['createdAt'],
-      updatedAt: config['updatedAt'],
+      createdAt: config.createdAt,
+      updatedAt: config.updatedAt,
     };
   }
 }

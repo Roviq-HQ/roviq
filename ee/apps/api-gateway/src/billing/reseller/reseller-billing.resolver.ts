@@ -16,11 +16,13 @@ import { PauseSubscriptionInput } from '../dto/pause-subscription.input';
 import { RefundInput } from '../dto/refund.input';
 import { UpdateGatewayConfigInput } from '../dto/update-gateway-config.input';
 import { UpdatePlanInput } from '../dto/update-plan.input';
+import { BillingDashboardModel } from '../models/billing-dashboard.model';
 import { InstituteRef } from '../models/institute-ref.model';
 import { InvoiceModel } from '../models/invoice.model';
 import { PaymentGatewayConfigModel } from '../models/payment-gateway-config.model';
 import { SubscriptionModel } from '../models/subscription.model';
 import { SubscriptionPlanModel } from '../models/subscription-plan.model';
+import { DashboardService } from './dashboard.service';
 import { GatewayConfigService } from './gateway-config.service';
 import { InvoiceService } from './invoice.service';
 import { PaymentService } from './payment.service';
@@ -48,6 +50,7 @@ export class ResellerBillingResolver {
     private readonly invoiceService: InvoiceService,
     private readonly paymentService: PaymentService,
     private readonly gatewayConfigService: GatewayConfigService,
+    private readonly dashboardService: DashboardService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -291,6 +294,17 @@ export class ResellerBillingResolver {
   ) {
     await this.gatewayConfigService.deleteConfig(rid(user), id);
     return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dashboard (ROV-127)
+  // ---------------------------------------------------------------------------
+
+  @Query(() => BillingDashboardModel, { name: 'resellerBillingDashboard' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('read', 'BillingDashboard')
+  async resellerBillingDashboard(@CurrentUser() user: AuthUser) {
+    return this.dashboardService.getDashboard(rid(user));
   }
 
   // ---------------------------------------------------------------------------
