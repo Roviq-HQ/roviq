@@ -8,16 +8,20 @@ import { billingError } from '../billing.errors';
 import { BillingFilterInput } from '../dto/billing-filter.input';
 import { CancelSubscriptionInput } from '../dto/cancel-subscription.input';
 import { ChangePlanInput } from '../dto/change-plan.input';
+import { CreateGatewayConfigInput } from '../dto/create-gateway-config.input';
 import { CreatePlanInput } from '../dto/create-plan.input';
 import { GenerateInvoiceInput } from '../dto/generate-invoice.input';
 import { ManualPaymentInput } from '../dto/manual-payment.input';
 import { PauseSubscriptionInput } from '../dto/pause-subscription.input';
 import { RefundInput } from '../dto/refund.input';
+import { UpdateGatewayConfigInput } from '../dto/update-gateway-config.input';
 import { UpdatePlanInput } from '../dto/update-plan.input';
 import { InstituteRef } from '../models/institute-ref.model';
 import { InvoiceModel } from '../models/invoice.model';
+import { PaymentGatewayConfigModel } from '../models/payment-gateway-config.model';
 import { SubscriptionModel } from '../models/subscription.model';
 import { SubscriptionPlanModel } from '../models/subscription-plan.model';
+import { GatewayConfigService } from './gateway-config.service';
 import { InvoiceService } from './invoice.service';
 import { PaymentService } from './payment.service';
 import { PlanService } from './plan.service';
@@ -43,6 +47,7 @@ export class ResellerBillingResolver {
     private readonly subscriptionService: SubscriptionService,
     private readonly invoiceService: InvoiceService,
     private readonly paymentService: PaymentService,
+    private readonly gatewayConfigService: GatewayConfigService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -244,6 +249,53 @@ export class ResellerBillingResolver {
   ) {
     return this.paymentService.issueRefund(rid(user), paymentId, input);
   }
+
+  // ---------------------------------------------------------------------------
+  // Gateway configs (ROV-122)
+  // ---------------------------------------------------------------------------
+
+  @Query(() => [PaymentGatewayConfigModel], { name: 'gatewayConfigs' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('read', 'PaymentGatewayConfig')
+  async resellerListGatewayConfigs(@CurrentUser() user: AuthUser) {
+    return this.gatewayConfigService.listConfigs(rid(user));
+  }
+
+  @Mutation(() => PaymentGatewayConfigModel, { name: 'createGatewayConfig' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('create', 'PaymentGatewayConfig')
+  async resellerCreateGatewayConfig(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: CreateGatewayConfigInput,
+  ) {
+    return this.gatewayConfigService.createConfig(rid(user), input);
+  }
+
+  @Mutation(() => PaymentGatewayConfigModel, { name: 'updateGatewayConfig' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('update', 'PaymentGatewayConfig')
+  async resellerUpdateGatewayConfig(
+    @CurrentUser() user: AuthUser,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('input') input: UpdateGatewayConfigInput,
+  ) {
+    return this.gatewayConfigService.updateConfig(rid(user), id, input);
+  }
+
+  @Mutation(() => Boolean, { name: 'deleteGatewayConfig' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('delete', 'PaymentGatewayConfig')
+  async resellerDeleteGatewayConfig(
+    @CurrentUser() user: AuthUser,
+    @Args('id', { type: () => ID }) id: string,
+  ) {
+    await this.gatewayConfigService.deleteConfig(rid(user), id);
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Institutes
+  // ---------------------------------------------------------------------------
 
   @Query(() => [InstituteRef], { name: 'billingInstitutes' })
   @UseGuards(AbilityGuard)
