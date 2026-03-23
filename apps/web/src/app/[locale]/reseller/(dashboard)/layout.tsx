@@ -3,7 +3,16 @@
 import { ProtectedRoute, useAuth } from '@roviq/auth';
 import type { LayoutConfig } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
-import { Building2, LayoutDashboard, Settings, UserCog, Users } from 'lucide-react';
+import {
+  Building2,
+  CreditCard,
+  FileText,
+  LayoutDashboard,
+  ScrollText,
+  Settings,
+  UserCog,
+  Users,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
@@ -53,8 +62,17 @@ export default function ResellerDashboardLayout({ children }: { children: React.
         ],
       },
       {
+        title: t('billing'),
+        items: [
+          { title: t('plans'), href: '/billing/plans', icon: CreditCard },
+          { title: t('subscriptions'), href: '/billing/subscriptions', icon: CreditCard },
+          { title: t('invoices'), href: '/billing/invoices', icon: FileText },
+        ],
+      },
+      {
         title: t('system'),
         items: [
+          { title: t('auditLogs'), href: '/audit', icon: ScrollText },
           { title: t('settings'), href: '/settings', icon: Settings },
           { title: t('account'), href: '/account', icon: UserCog },
         ],
