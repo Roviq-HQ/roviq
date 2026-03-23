@@ -6,6 +6,8 @@ import './billing.enums';
 import { BillingRepository } from './billing.repository';
 import { BillingService } from './billing.service';
 import { InstituteBillingResolver } from './institute/institute-billing.resolver';
+import { PlanRepository } from './repositories/plan.repository';
+import { PlanService } from './reseller/plan.service';
 import { ResellerBillingResolver } from './reseller/reseller-billing.resolver';
 import { WebhookController } from './webhook.controller';
 
@@ -25,7 +27,9 @@ import { WebhookController } from './webhook.controller';
       inject: [ConfigService],
     },
     BillingRepository,
+    PlanRepository,
     BillingService,
+    PlanService,
     ResellerBillingResolver,
     InstituteBillingResolver,
   ],

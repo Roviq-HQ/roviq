@@ -1,8 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { ResellerScope } from '@roviq/auth-backend';
+import { CurrentUser, ResellerScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
-import type { AppAbility } from '@roviq/common-types';
+import type { AppAbility, AuthUser } from '@roviq/common-types';
 import { BillingService } from '../billing.service';
 import { AssignPlanInput } from '../dto/assign-plan.input';
 import { BillingFilterInput } from '../dto/billing-filter.input';
@@ -15,78 +15,87 @@ import { InstituteRef } from '../models/institute-ref.model';
 import { InvoiceConnection } from '../models/invoice.model';
 import { SubscriptionConnection, SubscriptionModel } from '../models/subscription.model';
 import { SubscriptionPlanModel } from '../models/subscription-plan.model';
+import { PlanService } from './plan.service';
+
+/** Extract resellerId from JWT — guaranteed present by @ResellerScope() guard */
+function resellerId(user: AuthUser): string {
+  if (!user.resellerId)
+    throw new Error('resellerId missing — ResellerScope guard should prevent this');
+  return user.resellerId;
+}
 
 /**
  * Reseller-scoped billing resolver.
  * Plan CRUD, subscription assignment, invoices — all reseller operations.
+ * resellerId auto-extracted from JWT via @CurrentUser().
  */
 @Resolver()
 @ResellerScope()
 export class ResellerBillingResolver {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly planService: PlanService,
+  ) {}
 
   // ---------------------------------------------------------------------------
-  // Plans
+  // Plans (ROV-114 — PlanRepository + PlanService, withReseller)
   // ---------------------------------------------------------------------------
 
-  @Mutation(() => SubscriptionPlanModel)
+  @Query(() => [SubscriptionPlanModel], { name: 'subscriptionPlans' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'SubscriptionPlan')
-  async createSubscriptionPlan(@Args('input') input: CreatePlanInput) {
-    return this.billingService.createPlan(input);
+  @CheckAbility('read', 'SubscriptionPlan')
+  async resellerListPlans(
+    @CurrentUser() user: AuthUser,
+    @Args('status', { nullable: true }) status?: string,
+    @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first?: number,
+    @Args('after', { nullable: true }) after?: string,
+  ) {
+    const { items } = await this.planService.listPlans(resellerId(user), {
+      status,
+      first: first ?? 20,
+      after,
+    });
+    return items;
   }
 
-  @Mutation(() => SubscriptionPlanModel)
+  @Query(() => SubscriptionPlanModel, { name: 'subscriptionPlan' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('read', 'SubscriptionPlan')
+  async resellerGetPlan(@CurrentUser() user: AuthUser, @Args('id', { type: () => ID }) id: string) {
+    return this.planService.getPlan(resellerId(user), id);
+  }
+
+  @Mutation(() => SubscriptionPlanModel, { name: 'createSubscriptionPlan' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('create', 'SubscriptionPlan')
+  async resellerCreatePlan(@CurrentUser() user: AuthUser, @Args('input') input: CreatePlanInput) {
+    return this.planService.createPlan(resellerId(user), input);
+  }
+
+  @Mutation(() => SubscriptionPlanModel, { name: 'updateSubscriptionPlan' })
   @UseGuards(AbilityGuard)
   @CheckAbility('update', 'SubscriptionPlan')
-  async updateSubscriptionPlan(
+  async resellerUpdatePlan(
+    @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdatePlanInput,
   ) {
-    return this.billingService.updatePlan(id, input);
+    return this.planService.updatePlan(resellerId(user), id, input);
   }
 
-  @Mutation(() => SubscriptionPlanModel)
-  @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'SubscriptionPlan')
-  async archivePlan(@Args('id', { type: () => ID }) id: string) {
-    return this.billingService.archivePlan(id);
-  }
-
-  @Mutation(() => SubscriptionPlanModel)
-  @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'SubscriptionPlan')
-  async restorePlan(@Args('id', { type: () => ID }) id: string) {
-    return this.billingService.restorePlan(id);
-  }
-
-  @Mutation(() => Boolean)
+  @Mutation(() => Boolean, { name: 'deletePlan' })
   @UseGuards(AbilityGuard)
   @CheckAbility('delete', 'SubscriptionPlan')
-  async deletePlan(@Args('id', { type: () => ID }) id: string) {
-    await this.billingService.deletePlan(id);
+  async resellerDeletePlan(
+    @CurrentUser() user: AuthUser,
+    @Args('id', { type: () => ID }) id: string,
+  ) {
+    await this.planService.deletePlan(resellerId(user), id);
     return true;
   }
 
-  @Query(() => [SubscriptionPlanModel])
-  @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'SubscriptionPlan')
-  async subscriptionPlans(@CurrentAbility() ability: AppAbility) {
-    return this.billingService.findAllPlans(ability);
-  }
-
-  @Query(() => SubscriptionPlanModel)
-  @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'SubscriptionPlan')
-  async subscriptionPlan(
-    @Args('id', { type: () => ID }) id: string,
-    @CurrentAbility() ability: AppAbility,
-  ) {
-    return this.billingService.findPlan(id, ability);
-  }
-
   // ---------------------------------------------------------------------------
-  // Subscriptions
+  // Subscriptions (will be refactored to SubscriptionService in ROV-116)
   // ---------------------------------------------------------------------------
 
   @Mutation(() => AssignPlanResult)
