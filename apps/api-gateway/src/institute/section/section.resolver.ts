@@ -42,6 +42,15 @@ export class SectionResolver {
     return this.sectionService.update(id, input);
   }
 
+  @Mutation(() => SectionModel)
+  @CheckAbility('update', 'Section')
+  async assignClassTeacher(
+    @Args('sectionId', { type: () => ID }) sectionId: string,
+    @Args('classTeacherId', { type: () => ID }) classTeacherId: string,
+  ): Promise<SectionModel> {
+    return this.sectionService.assignClassTeacher(sectionId, classTeacherId);
+  }
+
   @Mutation(() => Boolean)
   @CheckAbility('delete', 'Section')
   async deleteSection(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
