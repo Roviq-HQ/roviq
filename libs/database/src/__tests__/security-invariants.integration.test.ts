@@ -426,19 +426,18 @@ describe('System protection', () => {
       [testId, SEED.INSTITUTE_1, SEED.USER_ADMIN],
     );
 
-    // roviq_app cannot UPDATE audit logs (no UPDATE policy)
+    // roviq_app cannot UPDATE audit logs (GRANT revoked — permission denied)
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query(`UPDATE audit_logs SET action = 'HACKED' WHERE id = $1`, [
-        testId,
-      ]);
-      // RLS silently blocks — 0 rows affected
-      expect(res.rowCount).toBe(0);
+      await expect(
+        client.query(`UPDATE audit_logs SET action = 'HACKED' WHERE id = $1`, [testId]),
+      ).rejects.toThrow(/permission denied/);
     });
 
-    // roviq_app cannot DELETE audit logs
+    // roviq_app cannot DELETE audit logs (GRANT revoked — permission denied)
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('DELETE FROM audit_logs WHERE id = $1', [testId]);
-      expect(res.rowCount).toBe(0);
+      await expect(client.query('DELETE FROM audit_logs WHERE id = $1', [testId])).rejects.toThrow(
+        /permission denied/,
+      );
     });
 
     // Cleanup
@@ -464,10 +463,9 @@ describe('Auth events', () => {
       expect(selectRes.rows.length).toBeGreaterThanOrEqual(1);
     });
 
-    // roviq_app cannot SELECT auth events (default deny — no SELECT policy for roviq_app)
+    // roviq_app cannot SELECT auth events (GRANT revoked — permission denied)
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM auth_events');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM auth_events')).rejects.toThrow(/permission denied/);
     });
   });
 });
