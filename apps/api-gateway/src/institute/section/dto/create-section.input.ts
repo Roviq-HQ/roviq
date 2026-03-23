@@ -81,4 +81,9 @@ export class CreateSectionInput {
   @Matches(/^\d{2}:\d{2}(:\d{2})?$/, { message: 'must be HH:mm or HH:mm:ss' })
   @Field({ nullable: true })
   endTime?: string;
+
+  @IsUUID()
+  @IsOptional()
+  @Field(() => ID, { nullable: true })
+  classTeacherId?: string;
 }

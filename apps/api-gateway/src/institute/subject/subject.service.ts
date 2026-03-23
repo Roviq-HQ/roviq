@@ -65,6 +65,9 @@ export class SubjectService {
 
   async removeFromStandard(subjectId: string, standardId: string): Promise<boolean> {
     await this.repo.removeFromStandard(subjectId, standardId);
+
+    this.emitEvent('SUBJECT.removed_from_standard', { subjectId, standardId });
+
     return true;
   }
 

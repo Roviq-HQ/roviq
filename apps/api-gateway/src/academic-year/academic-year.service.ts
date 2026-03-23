@@ -44,6 +44,13 @@ export class AcademicYearService {
   }
 
   async create(input: CreateAcademicYearInput): Promise<AcademicYearModel> {
+    if (input.startDate >= input.endDate) {
+      throw new BusinessException(
+        ErrorCode.INVALID_DATE_RANGE,
+        'Start date must be before end date',
+      );
+    }
+
     // Overlap validation — schools only (coaching allows overlapping academic years)
     await this.validateNoOverlap(input.startDate, input.endDate);
 
@@ -80,6 +87,13 @@ export class AcademicYearService {
   async activate(id: string): Promise<AcademicYearModel> {
     const target = await this.repo.findById(id);
     if (!target) throw new NotFoundException(`Academic year ${id} not found`);
+
+    if (target.isActive) {
+      throw new BusinessException(
+        ErrorCode.YEAR_ALREADY_ACTIVE,
+        'This academic year is already active',
+      );
+    }
 
     const allowed = STATUS_TRANSITIONS[target.status];
     if (!allowed?.includes('ACTIVE')) {

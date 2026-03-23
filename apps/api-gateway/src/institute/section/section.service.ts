@@ -26,6 +26,7 @@ export class SectionService {
   }
 
   async create(input: CreateSectionInput): Promise<SectionModel> {
+    // TODO: Validate stream is required when parent standard has streamApplicable=true (STREAM_REQUIRED error)
     const record = await this.repo.create(input);
 
     this.emitEvent('SECTION.created', {
@@ -46,6 +47,17 @@ export class SectionService {
     });
 
     return record as unknown as SectionModel;
+  }
+
+  async assignClassTeacher(sectionId: string, classTeacherId: string): Promise<SectionModel> {
+    const record = await this.repo.update(sectionId, { classTeacherId });
+    const section = record as unknown as SectionModel;
+    this.emitEvent('SECTION.teacher_assigned', {
+      sectionId: section.id,
+      tenantId: record.tenantId,
+      classTeacherId,
+    });
+    return section;
   }
 
   async delete(id: string): Promise<boolean> {
