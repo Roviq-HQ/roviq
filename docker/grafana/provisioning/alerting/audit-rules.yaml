@@ -1,0 +1,187 @@
+# Grafana provisioned alerting rules for the audit logging pipeline.
+# Loaded via Grafana's unified alerting provisioning system.
+# Docs: https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Audit Pipeline Alerts
+    folder: Roviq
+    interval: 1m
+    rules:
+      # 1. DLQ depth > 0 — audit data loss risk
+      - uid: audit-dlq-depth
+        title: "Audit DLQ depth > 0"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: "sum(roviq_audit_events_dlq_total) or vector(0)"
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Audit DLQ has unprocessed events — possible audit data loss"
+          description: "DLQ depth is {{ $value }}. Check consumer logs and inspect DLQ messages."
+
+      # 2. Consumer lag > 30s for 5 minutes
+      - uid: audit-consumer-lag
+        title: "Audit consumer lag > 30s"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 'nats_consumer_num_pending{stream="AUDIT", consumer="audit-log-writer"}'
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [30]
+                  operator:
+                    type: and
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Audit consumer lag exceeds 30 pending messages for 5+ minutes"
+          description: "Consumer lag is {{ $value }}. Check consumer health and possible backpressure."
+
+      # 3. DELETE spike — 3x 7-day average in 1-hour window
+      - uid: audit-delete-spike
+        title: "Unusual DELETE event spike"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 'sum(increase(roviq_audit_events_published_total{entity_type=~".+"}[$__rate_interval])) by (scope)'
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 604800
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 'avg_over_time(sum(increase(roviq_audit_events_published_total{entity_type=~".+"}[1h]))[7d:1h])'
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "$A > $B * 3"
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DELETE events exceed 3x the 7-day hourly average"
+          description: "Current: {{ $value }}. Investigate possible unauthorized bulk deletion."
+
+      # 4. Impersonation volume — 10+ entries/hour for any single reseller
+      - uid: audit-impersonation-volume
+        title: "High impersonation volume"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: "sum(increase(roviq_audit_impersonation_total[1h])) by (scope)"
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+                  operator:
+                    type: and
+              refId: C
+        for: 0s
+        labels:
+          severity: info
+        annotations:
+          summary: "10+ impersonation audit events in the last hour"
+          description: "Scope {{ $labels.scope }} has {{ $value }} impersonation events. Investigate unusual admin activity."
+
+      # 5. Partition creation not detected by 28th of month
+      - uid: audit-partition-missing
+        title: "Audit partition creation may have failed"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: "day_of_month() >= 28 and absent(roviq_audit_events_consumed_total)"
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+              refId: C
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No audit events consumed — partition creation may have failed"
+          description: "It is the 28th+ of the month and no events are being consumed. Check Temporal partition workflow."

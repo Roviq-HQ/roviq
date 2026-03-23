@@ -7,10 +7,26 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlContextType, GqlExecutionContext } from '@nestjs/graphql';
+import { metrics } from '@opentelemetry/api';
 import { AuditEmitter, type AuditEventPayload, NoAudit } from '@roviq/audit';
 import type { AuthUser } from '@roviq/common-types';
 import { catchError, type Observable, tap } from 'rxjs';
 import { extractActionType, extractEntityType } from './audit.helpers';
+
+/**
+ * JSON-safe serialization of mutation args.
+ * BigInt values (e.g., billing paise amounts) are converted to strings
+ * since JSON.stringify throws on BigInt.
+ */
+function safeSerializeArgs(args: unknown): Record<string, unknown> | null {
+  try {
+    return JSON.parse(
+      JSON.stringify(args, (_key, value) => (typeof value === 'bigint' ? value.toString() : value)),
+    );
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Global interceptor that captures all GraphQL mutations and emits
@@ -27,6 +43,16 @@ import { extractActionType, extractEntityType } from './audit.helpers';
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   private readonly logger = new Logger(AuditInterceptor.name);
+  private readonly meter = metrics.getMeter('audit');
+  private readonly publishedCounter = this.meter.createCounter('audit_events_published_total', {
+    description: 'Total audit events published to NATS',
+  });
+  private readonly errorCounter = this.meter.createCounter('audit_events_error_total', {
+    description: 'Total audit event publish errors',
+  });
+  private readonly impersonationCounter = this.meter.createCounter('audit_impersonation_total', {
+    description: 'Total audit events during impersonation',
+  });
 
   constructor(
     private readonly reflector: Reflector,
@@ -74,17 +100,30 @@ export class AuditInterceptor implements NestInterceptor {
             entityType,
             entityId: ((result as Record<string, unknown>)?.id as string) ?? null,
             changes: null,
-            metadata: { input: gqlContext.getArgs() },
+            metadata: { input: safeSerializeArgs(gqlContext.getArgs()) },
             correlationId,
           });
 
           // Non-blocking — fire and forget
-          void this.auditEmitter.emit(payload).catch((err) => {
-            this.logger.error(
-              `Failed to emit audit event for ${info.fieldName}`,
-              err instanceof Error ? err.stack : String(err),
-            );
-          });
+          void this.auditEmitter
+            .emit(payload)
+            .then(() => {
+              this.publishedCounter.add(1, {
+                scope: payload.scope,
+                source: payload.source,
+                entity_type: payload.entityType,
+              });
+              if (payload.impersonatorId) {
+                this.impersonationCounter.add(1, { scope: payload.scope });
+              }
+            })
+            .catch((err) => {
+              this.errorCounter.add(1, { error_type: 'publish_failure' });
+              this.logger.error(
+                `Failed to emit audit event for ${info.fieldName}`,
+                err instanceof Error ? err.stack : String(err),
+              );
+            });
         },
       }),
       catchError((err) => {
@@ -105,12 +144,18 @@ export class AuditInterceptor implements NestInterceptor {
         });
 
         // Non-blocking error audit — don't let audit failure mask the real error
-        void this.auditEmitter.emit(payload).catch((auditErr) => {
-          this.logger.error(
-            `Failed to emit audit.error for ${info.fieldName}`,
-            auditErr instanceof Error ? auditErr.stack : String(auditErr),
-          );
-        });
+        void this.auditEmitter
+          .emit(payload)
+          .then(() => {
+            this.errorCounter.add(1, { error_type: 'mutation_failure' });
+          })
+          .catch((auditErr) => {
+            this.errorCounter.add(1, { error_type: 'publish_failure' });
+            this.logger.error(
+              `Failed to emit audit.error for ${info.fieldName}`,
+              auditErr instanceof Error ? auditErr.stack : String(auditErr),
+            );
+          });
 
         throw err;
       }),

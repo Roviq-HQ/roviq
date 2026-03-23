@@ -13,6 +13,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
+import { metrics } from '@opentelemetry/api';
 import { publishToDlq } from '@roviq/nats-jetstream';
 import type pg from 'pg';
 import { AUDIT_DB_POOL } from './audit-db.provider';
@@ -91,6 +92,13 @@ const CONSUMER_NAME = 'audit-log-writer';
 @Injectable()
 export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuditConsumer.name);
+  private readonly meter = metrics.getMeter('audit');
+  private readonly consumedCounter = this.meter.createCounter('audit_events_consumed_total', {
+    description: 'Total audit events written to PostgreSQL',
+  });
+  private readonly dlqCounter = this.meter.createCounter('audit_events_dlq_total', {
+    description: 'Total events sent to DLQ',
+  });
   private buffer: BufferedMessage[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
   private consumerMessages: ConsumerMessages | null = null;
@@ -168,6 +176,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
             correlationId,
             tenantId,
           );
+          this.dlqCounter.add(1, { error_type: 'malformed_json' });
           msg.term();
           continue;
         }
@@ -200,6 +209,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.batchInsert(batch.map((b) => b.event));
+      this.consumedCounter.add(batch.length);
       for (const msg of batch) msg.ack();
     } catch (err) {
       // Batch failed — handle each message individually
@@ -215,6 +225,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
             msg.correlationId,
             msg.tenantId,
           );
+          this.dlqCounter.add(1, { error_type: 'db_write_failure' });
           msg.term();
         } else {
           msg.nak();
