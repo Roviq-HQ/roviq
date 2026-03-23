@@ -457,6 +457,8 @@ importers:
 
   libs/backend/casl: {}
 
+  libs/backend/entitlements: {}
+
   libs/backend/nats-jetstream:
     dependencies:
       tslib:
