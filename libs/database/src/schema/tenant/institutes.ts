@@ -1,9 +1,26 @@
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgPolicy, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  pgPolicy,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { entityColumns, i18nText } from '../common/columns';
-import { instituteStatus, instituteType, setupStatus, structureFramework } from '../common/enums';
+import {
+  educationLevel,
+  instituteStatus,
+  instituteType,
+  setupStatus,
+  structureFramework,
+} from '../common/enums';
 import { entityPolicies, roviqReseller } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
+import { instituteGroups } from './institute-groups';
 
 // ── JSONB type definitions ─────────────────────────────
 
@@ -46,7 +63,7 @@ export const institutes = pgTable(
     id: uuid().defaultRandom().primaryKey(),
     name: i18nText('name').notNull(),
     slug: text().notNull(),
-    code: text(),
+    code: varchar({ length: 50 }),
     type: instituteType().default('SCHOOL').notNull(),
     structureFramework: structureFramework('structure_framework').default('TRADITIONAL').notNull(),
     setupStatus: setupStatus('setup_status').default('PENDING').notNull(),
@@ -57,12 +74,16 @@ export const institutes = pgTable(
     timezone: text().default('Asia/Kolkata').notNull(),
     currency: text().default('INR').notNull(),
     settings: jsonb().default({}).notNull(),
+    /** Whether this is a demo institute — sample data seeded, notifications disabled */
+    isDemo: boolean('is_demo').default(false).notNull(),
+    /** Education levels offered by this institute (e.g., primary + secondary) */
+    departments: educationLevel().array().notNull().default(sql`'{}'::\"EducationLevel\"[]`),
     status: instituteStatus().default('ACTIVE').notNull(),
     resellerId: uuid('reseller_id')
       .default(sql`'00000000-0000-0000-0000-000000000001'`)
       .notNull()
       .references(() => resellers.id),
-    groupId: uuid('group_id'),
+    groupId: uuid('group_id').references(() => instituteGroups.id),
     ...entityColumns,
   },
   (table) => [

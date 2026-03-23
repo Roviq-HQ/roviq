@@ -21,6 +21,7 @@ export enum SetupStatusEnum {
 }
 
 export enum InstituteStatusEnum {
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
   PENDING = 'PENDING',
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',

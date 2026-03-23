@@ -10,15 +10,17 @@ export const userStatus = pgEnum('UserStatus', [
   'LOCKED',
 ]);
 export const instituteStatus = pgEnum('InstituteStatus', [
-  // Institute registered but awaiting platform admin approval before going live
+  // Reseller-created institute awaiting platform admin review — no setup or logins until approved
+  'PENDING_APPROVAL',
+  // Approved by platform admin — Temporal setup workflow running, no logins yet
   'PENDING',
-  // Fully operational — tenant database provisioned, users can log in
+  // Fully operational — tenant database provisioned, setup complete, users can log in
   'ACTIVE',
   // Voluntarily deactivated by the institute or platform admin — data preserved, logins blocked
   'INACTIVE',
   // Forcibly blocked by platform admin (e.g., policy violation) — all access revoked, data preserved
   'SUSPENDED',
-  // Platform admin denied the registration request — institute cannot proceed
+  // Platform admin denied the registration request — terminal state, institute cannot proceed
   'REJECTED',
 ]);
 export const membershipStatus = pgEnum('MembershipStatus', [

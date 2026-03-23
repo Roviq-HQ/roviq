@@ -23,6 +23,15 @@ export type TermConfig = {
   endDate: string;
 };
 
+export type SectionStrengthNorms = {
+  /** Ideal number of students per section (e.g., 40 for CBSE) */
+  optimal: number;
+  /** Absolute maximum students allowed per section (e.g., 45 for CBSE through 2025-26) */
+  hardMax: number;
+  /** Whether the institute can request exemptions to exceed hardMax */
+  exemptionAllowed: boolean;
+};
+
 // ── Table definition ───────────────────────────────────
 
 export const instituteConfigs = pgTable(
@@ -39,6 +48,10 @@ export const instituteConfigs = pgTable(
     payrollConfig: jsonb('payroll_config').$type<Record<string, unknown>>().default({}),
     gradingSystem: jsonb('grading_system').$type<Record<string, unknown>>().default({}),
     termStructure: jsonb('term_structure').$type<TermConfig[]>().default([]),
+    /** CBSE/board-mandated section size constraints — optimal, hard max, and exemption rules */
+    sectionStrengthNorms: jsonb('section_strength_norms')
+      .$type<SectionStrengthNorms>()
+      .default({ optimal: 40, hardMax: 45, exemptionAllowed: true }),
     ...tenantColumns,
   },
   (table) => [

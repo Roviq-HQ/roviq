@@ -12,7 +12,7 @@ export const instituteBranding = pgTable(
     faviconUrl: text('favicon_url'),
     primaryColor: text('primary_color'),
     secondaryColor: text('secondary_color'),
-    theme: text(),
+    themeIdentifier: text('theme_identifier'),
     coverImageUrl: text('cover_image_url'),
     ...tenantColumns,
   },

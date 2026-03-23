@@ -21,10 +21,9 @@ enum AcademicYearStatus {
 input AssignPlanInput {
   customerEmail: String!
   customerPhone: String!
+  instituteId: String!
   planId: String!
   provider: PaymentProvider!
-  resellerId: String!
-  tenantId: String!
 }
 
 type AssignPlanResult {
@@ -47,7 +46,7 @@ type AuditLog {
   ipAddress: String
   metadata: JSON
   source: String!
-  tenantId: String
+  tenantId: String!
   tenantName: I18nText
   userAgent: String
   userId: String!
@@ -101,11 +100,6 @@ enum BatchStatus {
   UPCOMING
 }
 
-"""
-The `BigInt` scalar type represents non-fractional signed whole numeric values.
-"""
-scalar BigInt
-
 input BillingFilterInput {
   from: DateTime
   status: InvoiceStatus
@@ -116,10 +110,9 @@ input BillingFilterInput {
 Billing cycle frequency for subscription plans.
 """
 enum BillingInterval {
-  ANNUAL
   MONTHLY
   QUARTERLY
-  SEMI_ANNUAL
+  YEARLY
 }
 
 input CreateAcademicYearInput {
@@ -153,14 +146,12 @@ input CreateInstituteInput {
 }
 
 input CreatePlanInput {
-  amount: BigInt!
-  code: String!
+  amount: Int!
+  billingInterval: BillingInterval!
   currency: String! = "INR"
   description: I18nText
-  entitlements: JSON!
-  interval: BillingInterval!
+  featureLimits: JSON!
   name: I18nText!
-  resellerId: String!
 }
 
 input CreateSectionInput {
@@ -324,7 +315,7 @@ type InstituteGroupModel {
   code: String!
   contact: JSON!
   createdAt: DateTime!
-  createdById: String!
+  createdBy: String!
   id: ID!
   name: String!
   registrationNo: String
@@ -372,6 +363,7 @@ enum InstituteStatus {
   ACTIVE
   INACTIVE
   PENDING
+  PENDING_APPROVAL
   REJECTED
   SUSPENDED
 }
@@ -389,26 +381,20 @@ type InvoiceConnection {
 }
 
 type InvoiceModel {
+  amount: Int!
+  billingPeriodEnd: DateTime!
+  billingPeriodStart: DateTime!
   createdAt: DateTime!
   currency: String!
-  dueAt: DateTime!
+  dueDate: DateTime!
   id: ID!
-  invoiceNumber: String!
-  issuedAt: DateTime
-  lineItems: JSON
-  notes: String
-  paidAmount: BigInt!
+  instituteId: String!
   paidAt: DateTime
-  periodEnd: DateTime
-  periodStart: DateTime
-  resellerId: String!
+  providerInvoiceId: String
+  providerPaymentId: String
   status: InvoiceStatus!
   subscription: SubscriptionRef
   subscriptionId: String!
-  subtotalAmount: BigInt!
-  taxAmount: BigInt!
-  tenantId: String!
-  totalAmount: BigInt!
 }
 
 type InvoiceModelEdge {
@@ -420,13 +406,11 @@ type InvoiceModelEdge {
 Payment status of an invoice.
 """
 enum InvoiceStatus {
-  CANCELLED
-  DRAFT
+  FAILED
   OVERDUE
   PAID
-  PARTIALLY_PAID
+  PENDING
   REFUNDED
-  SENT
 }
 
 """
@@ -590,7 +574,7 @@ Lifecycle status of a subscription plan.
 """
 enum PlanStatus {
   ACTIVE
-  INACTIVE
+  ARCHIVED
 }
 
 type Query {
@@ -765,19 +749,18 @@ input SubscriptionFilterInput {
 }
 
 type SubscriptionModel {
-  cancelledAt: DateTime
+  canceledAt: DateTime
   createdAt: DateTime!
   currentPeriodEnd: DateTime
   currentPeriodStart: DateTime
-  gatewayProvider: String
-  gatewaySubscriptionId: String
   id: ID!
   institute: InstituteRef
+  instituteId: String!
   plan: SubscriptionPlanModel
   planId: String!
-  resellerId: String!
+  providerCustomerId: String
+  providerSubscriptionId: String
   status: SubscriptionStatus!
-  tenantId: String!
   trialEndsAt: DateTime
   updatedAt: DateTime!
 }
@@ -788,13 +771,13 @@ type SubscriptionModelEdge {
 }
 
 type SubscriptionPlanModel {
-  amount: BigInt!
+  amount: Int!
+  billingInterval: BillingInterval!
   createdAt: DateTime!
   currency: String!
   description: I18nText
-  entitlements: JSON!
+  featureLimits: JSON!
   id: ID!
-  interval: BillingInterval!
   name: I18nText!
   status: PlanStatus!
   updatedAt: DateTime!
@@ -810,11 +793,11 @@ Current state of a subscription.
 """
 enum SubscriptionStatus {
   ACTIVE
-  CANCELLED
-  EXPIRED
+  CANCELED
+  COMPLETED
   PAST_DUE
   PAUSED
-  TRIALING
+  PENDING_PAYMENT
 }
 
 input UpdateAcademicYearInput {
@@ -853,10 +836,10 @@ input UpdateNotificationConfigInput {
 }
 
 input UpdatePlanInput {
-  amount: BigInt
+  amount: Int
+  billingInterval: BillingInterval
   description: I18nText
-  entitlements: JSON
-  interval: BillingInterval
+  featureLimits: JSON
   name: I18nText
 }
 
