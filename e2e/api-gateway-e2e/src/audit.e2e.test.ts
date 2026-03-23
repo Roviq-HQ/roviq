@@ -5,6 +5,9 @@ import { SEED_IDS } from '../e2e-constants';
 import { loginAsAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
+/** Valid user ID for FK constraints — all audit_logs inserts must reference a real user */
+const AUDIT_USER_ID = SEED_IDS.USER_ADMIN;
+
 // Use roviq_pooler (not superuser) — RLS applies to pooler via SET LOCAL ROLE
 const DATABASE_URL =
   process.env.DATABASE_URL || 'postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq';
@@ -165,9 +168,9 @@ describe('Audit E2E', () => {
           (scope, tenant_id, user_id, actor_id, action, action_type, entity_type,
            entity_id, correlation_id, source, metadata)
         VALUES
-          ('institute', $1, gen_random_uuid(), gen_random_uuid(), 'createStudent',
+          ('institute', $1, $3, $3, 'createStudent',
            'CREATE', 'Student', gen_random_uuid(), $2, 'TEST', '{"test": true}')`,
-        [adminTenantId, testCorrelationId],
+        [adminTenantId, testCorrelationId, AUDIT_USER_ID],
       );
     });
 
@@ -245,9 +248,9 @@ describe('Audit E2E', () => {
             (scope, tenant_id, user_id, actor_id, action, action_type,
              entity_type, correlation_id, source)
           VALUES
-            ('institute', $1, gen_random_uuid(), gen_random_uuid(), $2,
+            ('institute', $1, $3, $3, $2,
              'CREATE', 'PaginationTest', gen_random_uuid(), 'TEST')`,
-          [adminTenantId, `paginationTest${i}`],
+          [adminTenantId, `paginationTest${i}`, AUDIT_USER_ID],
         );
       }
 
@@ -295,18 +298,18 @@ describe('Audit E2E', () => {
 
   describe('RLS isolation', () => {
     it('tenant A cannot see tenant B audit logs', async () => {
-      const fakeTenantId = crypto.randomUUID();
+      const otherTenantId = SEED_IDS.INSTITUTE_2;
       const correlationId = crypto.randomUUID();
 
-      await queryWithRls(
+      // Insert as admin (bypasses RLS) into the OTHER tenant
+      await queryAsPlatformAdmin(
         pool,
-        fakeTenantId,
         `INSERT INTO audit_logs
           (scope, tenant_id, user_id, actor_id, action, action_type,
            entity_type, correlation_id, source)
-        VALUES ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+        VALUES ('institute', $1, $3, $3,
                 'rlsTest', 'CREATE', 'RlsTest', $2, 'TEST')`,
-        [fakeTenantId, correlationId],
+        [otherTenantId, correlationId, AUDIT_USER_ID],
       );
 
       // Query via GraphQL with admin's tenant — should NOT see other tenant's row
@@ -335,11 +338,11 @@ describe('Audit E2E', () => {
           (scope, tenant_id, user_id, actor_id, action, action_type,
            entity_type, correlation_id, source)
         VALUES
-          ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+          ('institute', $1, $3, $3,
            'scopeTest', 'CREATE', 'ScopeTest', $2, 'TEST'),
-          ('platform', NULL, gen_random_uuid(), gen_random_uuid(),
+          ('platform', NULL, $3, $3,
            'scopeTest', 'CREATE', 'ScopeTest', $2, 'TEST')`,
-        [adminTenantId, correlationId],
+        [adminTenantId, correlationId, AUDIT_USER_ID],
       );
 
       const result = await queryAsPlatformAdmin(
@@ -365,9 +368,9 @@ describe('Audit E2E', () => {
         `INSERT INTO audit_logs
           (scope, tenant_id, user_id, actor_id, action, action_type,
            entity_type, correlation_id, source)
-        VALUES ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+        VALUES ('institute', $1, $3, $3,
                 'resellerTest', 'CREATE', 'ResellerTest', $2, 'TEST')`,
-        [SEED_IDS.INSTITUTE_1, correlationId],
+        [SEED_IDS.INSTITUTE_1, correlationId, AUDIT_USER_ID],
       );
 
       // Insert reseller-scoped row
@@ -376,9 +379,9 @@ describe('Audit E2E', () => {
         `INSERT INTO audit_logs
           (scope, reseller_id, user_id, actor_id, action, action_type,
            entity_type, correlation_id, source)
-        VALUES ('reseller', $1, gen_random_uuid(), gen_random_uuid(),
+        VALUES ('reseller', $1, $3, $3,
                 'resellerTest', 'CREATE', 'ResellerTest', $2, 'TEST')`,
-        [resellerId, correlationId],
+        [resellerId, correlationId, AUDIT_USER_ID],
       );
 
       const result = await queryAsReseller(
@@ -401,27 +404,26 @@ describe('Audit E2E', () => {
   // ═══════════════════════════════════════════════════
 
   describe('Immutability', () => {
-    it('roviq_app UPDATE on audit_logs is silently blocked by RLS', async () => {
-      const result = await queryWithRls(
-        pool,
-        adminTenantId,
-        `UPDATE audit_logs SET action = 'HACKED' WHERE tenant_id = $1`,
-        [adminTenantId],
-      );
-      expect(result.rowCount).toBe(0);
+    it('roviq_app UPDATE on audit_logs is denied by GRANT', async () => {
+      await expect(
+        queryWithRls(
+          pool,
+          adminTenantId,
+          `UPDATE audit_logs SET action = 'HACKED' WHERE tenant_id = $1`,
+          [adminTenantId],
+        ),
+      ).rejects.toThrow(/permission denied/);
     });
 
-    it('roviq_app DELETE on audit_logs is silently blocked by RLS', async () => {
-      const result = await queryWithRls(
-        pool,
-        adminTenantId,
-        `DELETE FROM audit_logs WHERE tenant_id = $1`,
-        [adminTenantId],
-      );
-      expect(result.rowCount).toBe(0);
+    it('roviq_app DELETE on audit_logs is denied by GRANT', async () => {
+      await expect(
+        queryWithRls(pool, adminTenantId, `DELETE FROM audit_logs WHERE tenant_id = $1`, [
+          adminTenantId,
+        ]),
+      ).rejects.toThrow(/permission denied/);
     });
 
-    it('roviq_app UPDATE is denied at GRANT level', async () => {
+    it('roviq_app UPDATE is also denied at GRANT level via raw client', async () => {
       // REVOKE UPDATE was applied in ROV-64 custom migration
       const client = await pool.connect();
       try {
@@ -452,8 +454,9 @@ describe('Audit E2E', () => {
           `INSERT INTO audit_logs
             (scope, tenant_id, user_id, actor_id, action, action_type,
              entity_type, correlation_id, source)
-          VALUES ('institute', NULL, gen_random_uuid(), gen_random_uuid(),
+          VALUES ('institute', NULL, $1, $1,
                   'checkTest', 'CREATE', 'CheckTest', gen_random_uuid(), 'TEST')`,
+          [AUDIT_USER_ID],
         ),
       ).rejects.toThrow(/chk_audit_scope/);
     });
@@ -465,8 +468,9 @@ describe('Audit E2E', () => {
           `INSERT INTO audit_logs
             (scope, reseller_id, user_id, actor_id, action, action_type,
              entity_type, correlation_id, source)
-          VALUES ('reseller', NULL, gen_random_uuid(), gen_random_uuid(),
+          VALUES ('reseller', NULL, $1, $1,
                   'checkTest', 'CREATE', 'CheckTest', gen_random_uuid(), 'TEST')`,
+          [AUDIT_USER_ID],
         ),
       ).rejects.toThrow(/chk_audit_scope/);
     });
@@ -477,9 +481,10 @@ describe('Audit E2E', () => {
         `INSERT INTO audit_logs
           (scope, user_id, actor_id, action, action_type, entity_type,
            correlation_id, source)
-        VALUES ('platform', gen_random_uuid(), gen_random_uuid(),
+        VALUES ('platform', $1, $1,
                 'checkTest', 'CREATE', 'CheckTest', gen_random_uuid(), 'TEST')
         RETURNING id`,
+        [AUDIT_USER_ID],
       );
       expect(result.rows).toHaveLength(1);
     });
@@ -499,7 +504,7 @@ describe('Audit E2E', () => {
         INSERT INTO audit_logs
           (id, scope, tenant_id, user_id, actor_id, action, action_type,
            entity_type, correlation_id, source, created_at)
-        VALUES ($1, 'institute', $2, gen_random_uuid(), gen_random_uuid(),
+        VALUES ($1, 'institute', $2, $5, $5,
                 'idempotencyTest', 'CREATE', 'IdempotencyTest', $3, 'TEST', $4)
         ON CONFLICT (id, created_at) DO NOTHING`;
 
@@ -509,12 +514,14 @@ describe('Audit E2E', () => {
         adminTenantId,
         correlationId,
         createdAt,
+        AUDIT_USER_ID,
       ]);
       await queryWithRls(pool, adminTenantId, insertSql, [
         id,
         adminTenantId,
         correlationId,
         createdAt,
+        AUDIT_USER_ID,
       ]);
 
       const result = await queryWithRls(
@@ -533,10 +540,10 @@ describe('Audit E2E', () => {
 
   describe('Impersonation tracking', () => {
     it('stores actor_id ≠ user_id and impersonation session ID', async () => {
-      const userId = crypto.randomUUID();
-      const actorId = crypto.randomUUID();
+      // Use two real seed users for the FK constraints
+      const userId = SEED_IDS.USER_TEACHER;
+      const actorId = SEED_IDS.USER_ADMIN;
       const impersonatorId = actorId;
-      const sessionId = crypto.randomUUID();
       const correlationId = crypto.randomUUID();
 
       await queryWithRls(
@@ -544,17 +551,17 @@ describe('Audit E2E', () => {
         adminTenantId,
         `INSERT INTO audit_logs
           (scope, tenant_id, user_id, actor_id, impersonator_id,
-           impersonation_session_id, action, action_type, entity_type,
+           action, action_type, entity_type,
            correlation_id, source)
-        VALUES ('institute', $1, $2, $3, $4, $5,
-                'impersonationTest', 'UPDATE', 'ImpersonationTest', $6, 'TEST')`,
-        [adminTenantId, userId, actorId, impersonatorId, sessionId, correlationId],
+        VALUES ('institute', $1, $2, $3, $4,
+                'impersonationTest', 'UPDATE', 'ImpersonationTest', $5, 'TEST')`,
+        [adminTenantId, userId, actorId, impersonatorId, correlationId],
       );
 
       const result = await queryWithRls(
         pool,
         adminTenantId,
-        `SELECT user_id, actor_id, impersonator_id, impersonation_session_id
+        `SELECT user_id, actor_id, impersonator_id
          FROM audit_logs WHERE correlation_id = $1`,
         [correlationId],
       );
@@ -564,7 +571,6 @@ describe('Audit E2E', () => {
       expect(row.user_id).toBe(userId);
       expect(row.actor_id).toBe(actorId);
       expect(row.impersonator_id).toBe(impersonatorId);
-      expect(row.impersonation_session_id).toBe(sessionId);
       expect(row.actor_id).not.toBe(row.user_id);
     });
   });
@@ -585,9 +591,9 @@ describe('Audit E2E', () => {
           `INSERT INTO audit_logs
             (scope, tenant_id, user_id, actor_id, action, action_type,
              entity_type, correlation_id, source)
-          VALUES ('institute', $1, gen_random_uuid(), gen_random_uuid(),
+          VALUES ('institute', $1, $4, $4,
                   $2, 'CREATE', 'CorrelationTest', $3, 'TEST')`,
-          [adminTenantId, action, correlationId],
+          [adminTenantId, action, correlationId, AUDIT_USER_ID],
         );
       }
 

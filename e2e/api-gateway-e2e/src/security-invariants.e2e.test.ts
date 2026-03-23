@@ -174,14 +174,14 @@ describe('Security Invariant E2E Tests', () => {
 
       // Switch to second institute
       const switchRes = await gql(
-        `mutation SwitchInstitute($membershipId: String!) {
-          switchInstitute(membershipId: $membershipId) {
+        `mutation SwitchInstitute($membershipId: String!, $currentRefreshToken: String!) {
+          switchInstitute(membershipId: $membershipId, currentRefreshToken: $currentRefreshToken) {
             accessToken
             refreshToken
             user { tenantId }
           }
         }`,
-        { membershipId: secondMembership.membershipId },
+        { membershipId: secondMembership.membershipId, currentRefreshToken: firstRefreshToken },
         firstAccessToken,
       );
 
