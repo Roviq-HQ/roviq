@@ -4,8 +4,9 @@ import { PaymentsModule } from '@roviq/ee-payments';
 import { JetStreamClient } from '@roviq/nats-jetstream';
 import './billing.enums';
 import { BillingRepository } from './billing.repository';
-import { BillingResolver } from './billing.resolver';
 import { BillingService } from './billing.service';
+import { InstituteBillingResolver } from './institute/institute-billing.resolver';
+import { ResellerBillingResolver } from './reseller/reseller-billing.resolver';
 import { WebhookController } from './webhook.controller';
 
 @Module({
@@ -25,7 +26,8 @@ import { WebhookController } from './webhook.controller';
     },
     BillingRepository,
     BillingService,
-    BillingResolver,
+    ResellerBillingResolver,
+    InstituteBillingResolver,
   ],
 })
 export class BillingModule {}
