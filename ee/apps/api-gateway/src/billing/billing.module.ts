@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SUBSCRIPTION_READER } from '@roviq/common-types';
 import { PaymentsModule } from '@roviq/ee-payments';
 import { JetStreamClient } from '@roviq/nats-jetstream';
 import './billing.enums';
 import { BillingRepository } from './billing.repository';
 import { BillingService } from './billing.service';
+import { EntitlementCacheConsumer } from './entitlement-cache.consumer';
 import { InstituteBillingResolver } from './institute/institute-billing.resolver';
 import { GatewayConfigRepository } from './repositories/gateway-config.repository';
 import { InvoiceRepository } from './repositories/invoice.repository';
@@ -17,6 +19,7 @@ import { PaymentService } from './reseller/payment.service';
 import { PlanService } from './reseller/plan.service';
 import { ResellerBillingResolver } from './reseller/reseller-billing.resolver';
 import { SubscriptionService } from './reseller/subscription.service';
+import { SubscriptionReaderImpl } from './subscription-reader.impl';
 import { CashfreeWebhookController } from './webhook/cashfree-webhook.controller';
 import { RazorpayWebhookController } from './webhook/razorpay-webhook.controller';
 
@@ -47,8 +50,11 @@ import { RazorpayWebhookController } from './webhook/razorpay-webhook.controller
     InvoiceService,
     PaymentService,
     GatewayConfigService,
+    { provide: SUBSCRIPTION_READER, useClass: SubscriptionReaderImpl },
+    EntitlementCacheConsumer,
     ResellerBillingResolver,
     InstituteBillingResolver,
   ],
+  exports: [SUBSCRIPTION_READER],
 })
 export class BillingModule {}
