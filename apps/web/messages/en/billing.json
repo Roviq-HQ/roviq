@@ -15,21 +15,27 @@
     "intervals": {
       "MONTHLY": "Monthly",
       "QUARTERLY": "Quarterly",
-      "YEARLY": "Yearly"
+      "SEMI_ANNUAL": "Semi-Annual",
+      "ANNUAL": "Annual"
     },
     "form": {
       "name": "Plan Name",
       "namePlaceholder": "e.g. Pro Plan",
       "description": "Description",
       "descriptionPlaceholder": "Optional plan description",
+      "code": "Plan Code",
+      "codePlaceholder": "e.g. PRO",
+      "codeRequired": "Plan code is required",
       "amount": "Amount (₹)",
       "amountPlaceholder": "e.g. 999",
       "currency": "Currency",
       "interval": "Billing Interval",
       "selectInterval": "Select interval",
-      "maxUsers": "Max Users",
-      "maxSections": "Max Sections",
+      "maxStudents": "Max Students",
+      "maxStaff": "Max Staff",
       "isActive": "Active",
+      "createDescription": "Set up a new subscription plan for your institutes.",
+      "editDescription": "Update plan details. Changes apply to new subscriptions only.",
       "save": "Save Plan",
       "saveChanges": "Save Changes",
       "createPlan": "Create Plan",
@@ -41,7 +47,7 @@
       "createError": "Failed to create plan.",
       "updateError": "Failed to update plan."
     },
-    "statuses": { "ACTIVE": "Active", "ARCHIVED": "Archived" },
+    "statuses": { "ACTIVE": "Active", "INACTIVE": "Inactive" },
     "actions": {
       "edit": "Edit Plan",
       "archive": "Archive",
@@ -82,15 +88,16 @@
       "createdAt": "Created"
     },
     "statuses": {
+      "TRIALING": "Trial",
       "ACTIVE": "Active",
-      "PAST_DUE": "Past Due",
-      "CANCELED": "Canceled",
-      "PENDING_PAYMENT": "Pending Payment",
       "PAUSED": "Paused",
-      "COMPLETED": "Completed"
+      "PAST_DUE": "Past Due",
+      "CANCELLED": "Cancelled",
+      "EXPIRED": "Expired"
     },
     "assign": {
       "title": "Assign Plan to Institute",
+      "description": "Select an institute and plan, then choose a payment provider.",
       "institute": "Institute",
       "selectInstitute": "Select institute",
       "plan": "Subscription Plan",

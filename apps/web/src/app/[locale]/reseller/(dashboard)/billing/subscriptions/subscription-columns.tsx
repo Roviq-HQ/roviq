@@ -5,12 +5,12 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { SubscriptionNode } from './use-subscriptions';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  TRIALING: 'outline',
   ACTIVE: 'default',
-  PENDING_PAYMENT: 'outline',
-  PAST_DUE: 'destructive',
-  CANCELED: 'secondary',
   PAUSED: 'secondary',
-  COMPLETED: 'outline',
+  PAST_DUE: 'destructive',
+  CANCELLED: 'secondary',
+  EXPIRED: 'outline',
 };
 
 export function createSubscriptionColumns(
@@ -35,7 +35,7 @@ export function createSubscriptionColumns(
           <div className="flex flex-col">
             <span className="text-sm">{ti(plan.name)}</span>
             <span className="text-xs text-muted-foreground">
-              {formatCurrency(plan.amount / 100)}/{t(`plans.intervals.${plan.billingInterval}`)}
+              {formatCurrency(Number(plan.amount) / 100)}/{t(`plans.intervals.${plan.interval}`)}
             </span>
           </div>
         );

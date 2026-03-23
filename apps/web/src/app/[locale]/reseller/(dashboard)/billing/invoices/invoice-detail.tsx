@@ -61,7 +61,7 @@ export function InvoiceDetail({ invoice, open, onOpenChange }: InvoiceDetailProp
                 <Separator className="my-2" />
 
                 <DetailRow label={t('invoices.detail.amount')}>
-                  {formatCurrency(invoice.amount / 100)}
+                  {formatCurrency(Number(invoice.totalAmount) / 100)}
                 </DetailRow>
                 <DetailRow label={t('invoices.detail.currency')}>{invoice.currency}</DetailRow>
                 <DetailRow label={t('invoices.detail.status')}>
@@ -71,13 +71,13 @@ export function InvoiceDetail({ invoice, open, onOpenChange }: InvoiceDetailProp
                 <Separator className="my-2" />
 
                 <DetailRow label={t('invoices.detail.billingPeriodStart')}>
-                  {formatDate(new Date(invoice.billingPeriodStart))}
+                  {invoice.periodStart ? formatDate(new Date(invoice.periodStart)) : '—'}
                 </DetailRow>
                 <DetailRow label={t('invoices.detail.billingPeriodEnd')}>
-                  {formatDate(new Date(invoice.billingPeriodEnd))}
+                  {invoice.periodEnd ? formatDate(new Date(invoice.periodEnd)) : '—'}
                 </DetailRow>
                 <DetailRow label={t('invoices.detail.dueDate')}>
-                  {formatDate(new Date(invoice.dueDate))}
+                  {invoice.dueAt ? formatDate(new Date(invoice.dueAt)) : '—'}
                 </DetailRow>
                 <DetailRow label={t('invoices.detail.paidAt')}>
                   {invoice.paidAt ? formatDate(new Date(invoice.paidAt)) : '—'}
@@ -85,20 +85,6 @@ export function InvoiceDetail({ invoice, open, onOpenChange }: InvoiceDetailProp
 
                 <Separator className="my-2" />
 
-                <DetailRow label={t('invoices.detail.providerInvoiceId')}>
-                  {invoice.providerInvoiceId ? (
-                    <span className="font-mono text-xs">{invoice.providerInvoiceId}</span>
-                  ) : (
-                    '—'
-                  )}
-                </DetailRow>
-                <DetailRow label={t('invoices.detail.providerPaymentId')}>
-                  {invoice.providerPaymentId ? (
-                    <span className="font-mono text-xs">{invoice.providerPaymentId}</span>
-                  ) : (
-                    '—'
-                  )}
-                </DetailRow>
                 <DetailRow label={t('invoices.detail.createdAt')}>
                   {formatDate(new Date(invoice.createdAt))}
                 </DetailRow>
