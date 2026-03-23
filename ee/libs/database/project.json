@@ -1,0 +1,19 @@
+{
+  "name": "ee-database",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "ee/libs/database/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/ee-database",
+        "main": "ee/libs/database/src/index.ts",
+        "tsConfig": "ee/libs/database/tsconfig.lib.json",
+        "assets": ["ee/libs/database/*.md"]
+      }
+    }
+  },
+  "tags": ["scope:ee"]
+}

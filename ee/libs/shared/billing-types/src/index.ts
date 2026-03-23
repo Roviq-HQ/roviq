@@ -1,34 +1,55 @@
 export enum BillingInterval {
   MONTHLY = 'MONTHLY',
   QUARTERLY = 'QUARTERLY',
-  YEARLY = 'YEARLY',
+  SEMI_ANNUAL = 'SEMI_ANNUAL',
+  ANNUAL = 'ANNUAL',
 }
 
 export enum SubscriptionStatus {
+  TRIALING = 'TRIALING',
   ACTIVE = 'ACTIVE',
-  PAST_DUE = 'PAST_DUE',
-  CANCELED = 'CANCELED',
-  PENDING_PAYMENT = 'PENDING_PAYMENT',
   PAUSED = 'PAUSED',
-  COMPLETED = 'COMPLETED',
+  PAST_DUE = 'PAST_DUE',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED',
 }
 
 export enum InvoiceStatus {
+  DRAFT = 'DRAFT',
+  SENT = 'SENT',
   PAID = 'PAID',
-  PENDING = 'PENDING',
+  PARTIALLY_PAID = 'PARTIALLY_PAID',
   OVERDUE = 'OVERDUE',
-  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
   REFUNDED = 'REFUNDED',
 }
 
-export enum PaymentProvider {
-  CASHFREE = 'CASHFREE',
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
+}
+
+export enum PaymentMethod {
   RAZORPAY = 'RAZORPAY',
+  CASHFREE = 'CASHFREE',
+  UPI = 'UPI',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CASH = 'CASH',
+  CHEQUE = 'CHEQUE',
 }
 
 export enum PlanStatus {
   ACTIVE = 'ACTIVE',
-  ARCHIVED = 'ARCHIVED',
+  INACTIVE = 'INACTIVE',
+}
+
+export enum PaymentProvider {
+  RAZORPAY = 'RAZORPAY',
+  CASHFREE = 'CASHFREE',
 }
 
 export enum GatewayConfigStatus {
@@ -37,8 +58,9 @@ export enum GatewayConfigStatus {
 }
 
 export interface FeatureLimits {
-  [key: string]: number | undefined;
-  maxUsers?: number;
-  maxSections?: number;
-  maxStorageGb?: number;
+  maxStudents: number | null;
+  maxStaff: number | null;
+  maxStorageMb: number | null;
+  auditLogRetentionDays: number;
+  features: string[];
 }
