@@ -57,6 +57,16 @@ export class PaymentRepository {
     });
   }
 
+  async findByGatewayOrderId(resellerId: string, gatewayOrderId: string) {
+    return withReseller(this.db, resellerId, async (tx) => {
+      return tx
+        .select()
+        .from(payments)
+        .where(eq(payments.gatewayOrderId, gatewayOrderId))
+        .orderBy(desc(payments.createdAt));
+    });
+  }
+
   async findByInvoiceId(resellerId: string, invoiceId: string) {
     return withReseller(this.db, resellerId, async (tx) => {
       return tx

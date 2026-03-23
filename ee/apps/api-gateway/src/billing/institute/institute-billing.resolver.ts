@@ -1,18 +1,21 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Int, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, InstituteScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { BillingFilterInput } from '../dto/billing-filter.input';
+import { VerifyPaymentGqlInput } from '../dto/verify-payment.input';
+import { InitiatePaymentResult } from '../models/initiate-payment-result.model';
 import { InvoiceModel } from '../models/invoice.model';
+import { PaymentModel } from '../models/payment.model';
 import { SubscriptionModel } from '../models/subscription.model';
 import { InvoiceService } from '../reseller/invoice.service';
+import { PaymentService } from '../reseller/payment.service';
 import { SubscriptionService } from '../reseller/subscription.service';
 
 /**
  * Institute-scoped billing resolver.
- * Institutes can view their own subscription, invoices, and payment history — read-only.
- * Payment initiation/verification will be added in ROV-112.
+ * Institutes can view their own subscription, invoices, initiate/verify payments.
  */
 @Resolver()
 @InstituteScope()
@@ -20,6 +23,7 @@ export class InstituteBillingResolver {
   constructor(
     private readonly subscriptionService: SubscriptionService,
     private readonly invoiceService: InvoiceService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   /** Returns current subscription with plan details. Returns null when no subscription (not error). */
@@ -58,8 +62,58 @@ export class InstituteBillingResolver {
   async myInvoice(@CurrentUser() user: AuthUser, @Args('id', { type: () => ID }) id: string) {
     if (!user.resellerId) return null;
     const invoice = await this.invoiceService.getInvoice(user.resellerId, id);
-    // Only return if it belongs to this tenant
     if (invoice.tenantId !== user.tenantId) return null;
     return invoice;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Payment flow (ROV-119 — gateway payment via institute)
+  // ---------------------------------------------------------------------------
+
+  @Mutation(() => InitiatePaymentResult, { name: 'initiatePayment' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('create', 'Payment')
+  async initiatePayment(
+    @CurrentUser() user: AuthUser,
+    @Args('invoiceId', { type: () => ID }) invoiceId: string,
+  ) {
+    if (!user.resellerId || !user.tenantId) {
+      throw new Error('Missing reseller or tenant context');
+    }
+    // Verify invoice belongs to this tenant
+    const invoice = await this.invoiceService.getInvoice(user.resellerId, invoiceId);
+    if (invoice.tenantId !== user.tenantId) {
+      throw new Error('Invoice does not belong to this institute');
+    }
+    // Customer details are minimal from JWT — gateway adapters enrich from order context
+    return this.paymentService.initiatePayment(user.resellerId, invoiceId, {
+      name: user.tenantId ?? '',
+      email: `billing+${user.tenantId}@roviq.com`,
+      phone: '',
+    });
+  }
+
+  @Mutation(() => PaymentModel, { name: 'verifyPayment' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('create', 'Payment')
+  async verifyPayment(@CurrentUser() user: AuthUser, @Args('input') input: VerifyPaymentGqlInput) {
+    if (!user.resellerId) throw new Error('Missing reseller context');
+    return this.paymentService.verifyPayment(user.resellerId, input);
+  }
+
+  @Query(() => [PaymentModel], { name: 'myPaymentHistory' })
+  @UseGuards(AbilityGuard)
+  @CheckAbility('read', 'Payment')
+  async myPaymentHistory(
+    @CurrentUser() user: AuthUser,
+    @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first?: number,
+    @Args('after', { nullable: true }) after?: string,
+  ) {
+    if (!user.tenantId || !user.resellerId) return [];
+    const { items } = await this.paymentService.getPaymentHistory(user.resellerId, user.tenantId, {
+      first: first ?? 20,
+      after,
+    });
+    return items;
   }
 }

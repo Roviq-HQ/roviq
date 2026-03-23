@@ -3,7 +3,9 @@ import {
   BillingInterval,
   GatewayConfigStatus,
   InvoiceStatus,
+  PaymentMethod,
   PaymentProvider,
+  PaymentStatus,
   PlanStatus,
   SubscriptionStatus,
 } from '@roviq/ee-billing-types';
@@ -36,4 +38,14 @@ registerEnumType(PlanStatus, {
 registerEnumType(GatewayConfigStatus, {
   name: 'GatewayConfigStatus',
   description: 'Status of a payment gateway configuration.',
+});
+
+registerEnumType(PaymentStatus, {
+  name: 'PaymentStatus',
+  description: 'Current state of a payment record.',
+});
+
+registerEnumType(PaymentMethod, {
+  name: 'PaymentMethod',
+  description: 'Payment method used (gateway or manual).',
 });
