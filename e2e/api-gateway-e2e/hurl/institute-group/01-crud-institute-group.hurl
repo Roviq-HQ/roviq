@@ -20,7 +20,7 @@ POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
-  "query": "mutation CreateInstituteGroup($input: CreateInstituteGroupInput!) { createInstituteGroup(input: $input) { id name code type status registrationNo registrationState contact address createdById createdAt updatedAt } }",
+  "query": "mutation CreateInstituteGroup($input: CreateInstituteGroupInput!) { createInstituteGroup(input: $input) { id name code type status registrationNumber registrationState contact address createdById createdAt updatedAt } }",
   "variables": {
     "input": {
       "name": "Test Trust",
@@ -46,7 +46,7 @@ POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
-  "query": "query GetInstituteGroup($id: ID!) { instituteGroup(id: $id) { id name code type status registrationNo registrationState contact address createdById createdAt updatedAt } }",
+  "query": "query GetInstituteGroup($id: ID!) { instituteGroup(id: $id) { id name code type status registrationNumber registrationState contact address createdById createdAt updatedAt } }",
   "variables": { "id": "{{group_id}}" }
 }
 HTTP 200
@@ -62,12 +62,12 @@ POST {{base_url}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 {
-  "query": "mutation UpdateInstituteGroup($id: ID!, $input: UpdateInstituteGroupInput!) { updateInstituteGroup(id: $id, input: $input) { id name code type status registrationNo registrationState } }",
+  "query": "mutation UpdateInstituteGroup($id: ID!, $input: UpdateInstituteGroupInput!) { updateInstituteGroup(id: $id, input: $input) { id name code type status registrationNumber registrationState } }",
   "variables": {
     "id": "{{group_id}}",
     "input": {
       "name": "Updated Trust",
-      "registrationNo": "REG-2026-001"
+      "registrationNumber": "REG-2026-001"
     }
   }
 }
@@ -75,7 +75,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.data.updateInstituteGroup.id" == {{group_id}}
 jsonpath "$.data.updateInstituteGroup.name" == "Updated Trust"
-jsonpath "$.data.updateInstituteGroup.registrationNo" == "REG-2026-001"
+jsonpath "$.data.updateInstituteGroup.registrationNumber" == "REG-2026-001"
 jsonpath "$.data.updateInstituteGroup.code" == "test-trust-e2e"
 jsonpath "$.data.updateInstituteGroup.type" == "TRUST"
 

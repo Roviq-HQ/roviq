@@ -4,6 +4,7 @@ import { users } from '../auth/users';
 import { entityColumns } from '../common/columns';
 import { groupStatus, groupType } from '../common/enums';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
+import type { InstituteAddress, InstituteContact } from './institutes';
 
 export const instituteGroups = pgTable(
   'institute_groups',
@@ -12,10 +13,10 @@ export const instituteGroups = pgTable(
     name: text().notNull(),
     code: text().notNull(),
     type: groupType().notNull(),
-    registrationNo: text('registration_no'),
+    registrationNumber: text('registration_number'),
     registrationState: text('registration_state'),
-    contact: jsonb().default({ phones: [], emails: [] }).notNull(),
-    address: jsonb(),
+    contact: jsonb().$type<InstituteContact>().default({ phones: [], emails: [] }).notNull(),
+    address: jsonb().$type<InstituteAddress>(),
     status: groupStatus().default('ACTIVE').notNull(),
     ...entityColumns,
   },

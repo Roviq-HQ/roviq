@@ -1,4 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
+import type { InstituteAddress, InstituteContact } from '@roviq/database';
 import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, Matches } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
 import { GroupTypeEnum } from '../models/institute-group.model';
@@ -23,7 +24,7 @@ export class CreateInstituteGroupInput {
   @Field({ nullable: true })
   @IsString()
   @IsOptional()
-  registrationNo?: string;
+  registrationNumber?: string;
 
   @Field({ nullable: true })
   @IsString()
@@ -33,10 +34,10 @@ export class CreateInstituteGroupInput {
   @Field(() => GraphQLJSON, { nullable: true })
   @IsObject()
   @IsOptional()
-  contact?: Record<string, unknown>;
+  contact?: InstituteContact;
 
   @Field(() => GraphQLJSON, { nullable: true })
   @IsObject()
   @IsOptional()
-  address?: Record<string, unknown>;
+  address?: InstituteAddress;
 }
