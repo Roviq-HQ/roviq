@@ -8,6 +8,7 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  FileText,
   GraduationCap,
   LayoutDashboard,
   Settings,
@@ -138,6 +139,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {
         title: t('system'),
         items: [
+          { title: t('auditLogs'), href: '/audit', icon: FileText },
           { title: t('settings'), href: '/settings', icon: Settings },
           {
             title: t('notificationPreferences'),
