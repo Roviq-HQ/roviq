@@ -26,7 +26,9 @@
     "DELETE": "Delete",
     "RESTORE": "Restore",
     "ASSIGN": "Assign",
-    "REVOKE": "Revoke"
+    "REVOKE": "Revoke",
+    "SUSPEND": "Suspend",
+    "ACTIVATE": "Activate"
   },
   "pagination": {
     "loadMore": "Load more",

@@ -91,6 +91,53 @@ Not granted to: `teacher`, `student`, `parent`
 | `DATABASE_URL_AUDIT` | pg Pool for audit consumer writes | `postgresql://roviq:roviq_dev@localhost:5432/roviq` |
 | `TEMPORAL_ADDRESS` | Temporal server for partition workflow | `localhost:7233` |
 
+## Institute Portal (ROV-76)
+
+Route: `apps/web/src/app/[locale]/institute/(dashboard)/audit/`
+
+- Uses `auditLogs` query (institute scope, RLS enforced by `roviq_app`)
+- Frontend does NOT filter by tenant — RLS handles isolation
+- `<ImpersonationBadge>` on all impersonated entries (purple=platform, blue=reseller, grey=intra-institute)
+- `<AuditDiffRenderer>` in detail sheet for changes visualization
+- Filters via nuqs: entityType, actionType, userId, dateRange (dateFrom/dateTo)
+- Changes preview column: first changed field + count of additional fields
+- `<Can I="read" a="AuditLog">` authorization guard
+- i18n: en + hi (shared `auditLogs` namespace)
+
+## Observability (ROV-78)
+
+### OTel Metrics
+
+| Metric | Type | Labels | Location |
+|--------|------|--------|----------|
+| `audit_events_published_total` | Counter | scope, source, entity_type | AuditInterceptor |
+| `audit_events_error_total` | Counter | error_type | AuditInterceptor |
+| `audit_impersonation_total` | Counter | scope | AuditInterceptor |
+| `audit_events_consumed_total` | Counter | — | AuditConsumer |
+| `audit_events_dlq_total` | Counter | error_type | AuditConsumer |
+
+### Grafana Dashboard
+
+File: `docker/grafana/dashboards/audit-logging.json` (auto-provisioned)
+
+11 panels across 4 rows:
+1. Pipeline Health: Throughput (by scope), Consumer Lag (thresholds), DLQ Depth (red if >0)
+2. Error & Scope: Error Rate, Scope Distribution (donut), Source Distribution (donut)
+3. Impersonation & Entity: Impersonation Volume, Top Entity Types (bar), Bulk Operations
+4. Storage: Partition Sizes, Index Sizes (PostgreSQL SQL references)
+
+### Alerting Rules
+
+File: `docker/grafana/provisioning/alerting/audit-rules.yaml`
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| DLQ depth > 0 | `roviq_audit_events_dlq_total > 0` for 1 min | CRITICAL |
+| Consumer lag > 30 | `nats_consumer_num_pending > 30` for 5 min | WARNING |
+| DELETE spike | DELETE events > 3x 7-day average | WARNING |
+| Impersonation volume | 10+ impersonation entries/hour | INFO |
+| Partition missing | No events consumed by 28th of month | WARNING |
+
 ## Testing
 
 - **Unit tests**: `pnpm test` (interceptor: 38, consumer: 12, emitter: 9, helpers: 17)
