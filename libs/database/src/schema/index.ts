@@ -12,6 +12,7 @@ export * from './auth/refresh-tokens';
 export * from './auth/users';
 export * from './common/columns';
 export * from './common/enums';
+export * from './common/validators';
 // Notification
 export * from './notification/notification-configs';
 // Reseller
