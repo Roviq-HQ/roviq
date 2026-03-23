@@ -127,6 +127,30 @@ export interface FeatureLimits {
   features: string[];
 }
 
+/** Entitlements when EE is disabled — everything unlimited */
+export const UNLIMITED_ENTITLEMENTS: FeatureLimits = {
+  maxStudents: null,
+  maxStaff: null,
+  maxStorageMb: null,
+  auditLogRetentionDays: 1095,
+  features: [],
+};
+
+/** Sensible defaults for plans without explicit entitlements */
+export const DEFAULT_ENTITLEMENTS: FeatureLimits = {
+  maxStudents: 500,
+  maxStaff: 50,
+  maxStorageMb: 5120,
+  auditLogRetentionDays: 90,
+  features: [],
+};
+
+/** OSS interface for reading subscription entitlements. EE provides the implementation. */
+export interface SubscriptionReader {
+  findActiveByTenant(tenantId: string): Promise<{ plan: { entitlements: FeatureLimits } } | null>;
+}
+export const SUBSCRIPTION_READER = Symbol('SUBSCRIPTION_READER');
+
 export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // Full control — manages users, roles, billing, academic structure, and settings
   institute_admin: [{ action: 'manage', subject: 'all' }],
