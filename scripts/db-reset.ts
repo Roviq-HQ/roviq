@@ -133,20 +133,41 @@ async function main() {
     await adminPool.query(`ALTER TABLE "${tablename}" FORCE ROW LEVEL SECURITY`);
   }
 
-  // Audit-specific: immutable for non-admin roles (ROV-64)
-  const hasAuditLogs = tablesForRls.rows.some(
-    (r: { tablename: string }) => r.tablename === 'audit_logs',
-  );
-  if (hasAuditLogs) {
-    console.log('Applying audit_logs REVOKE...');
-    await adminPool.query(`
-      GRANT SELECT, INSERT ON audit_logs TO roviq_app;
-      GRANT SELECT, INSERT ON audit_logs TO roviq_reseller;
-      GRANT SELECT, INSERT, UPDATE, DELETE ON audit_logs TO roviq_admin;
-      REVOKE UPDATE, DELETE ON audit_logs FROM roviq_app;
-      REVOKE UPDATE, DELETE ON audit_logs FROM roviq_reseller;
-    `);
-  }
+  // 5b. Fix role inheritance (roviq_app/reseller must NOT inherit from superuser)
+  await adminPool.query(`
+    DO $$ BEGIN
+      -- Remove superuser inheritance that Docker init may have added
+      IF EXISTS (
+        SELECT 1 FROM pg_auth_members am
+        JOIN pg_roles r ON r.oid = am.roleid
+        JOIN pg_roles m ON m.oid = am.member
+        WHERE m.rolname = 'roviq_app' AND r.rolname = 'roviq' AND am.inherit_option = true
+      ) THEN
+        REVOKE roviq FROM roviq_app;
+        REVOKE roviq FROM roviq_reseller;
+        REVOKE roviq FROM roviq_admin;
+        -- Re-grant without INHERIT for admin (needs SET for withAdmin wrapper)
+        GRANT roviq TO roviq_admin WITH INHERIT FALSE, SET TRUE;
+      END IF;
+    END $$;
+  `);
+
+  // 5c. Table-specific GRANT overrides (tighten broad grants above)
+  console.log('Applying table-specific GRANT restrictions...');
+  await adminPool.query(`
+    -- institutes: roviq_app gets SELECT only (tenant root — read own institute)
+    REVOKE INSERT, UPDATE, DELETE ON institutes FROM roviq_app;
+
+    -- institutes: roviq_reseller can INSERT + UPDATE (create with approval, suspend/reactivate)
+    GRANT INSERT, UPDATE ON institutes TO roviq_reseller;
+
+    -- audit_logs: immutable for non-admin roles (SELECT + INSERT only)
+    REVOKE UPDATE, DELETE ON audit_logs FROM roviq_app;
+    REVOKE UPDATE, DELETE ON audit_logs FROM roviq_reseller;
+
+    -- auth_events: roviq_app can INSERT but not SELECT (admin-only readable)
+    REVOKE SELECT ON auth_events FROM roviq_app;
+  `);
 
   await adminPool.end();
 

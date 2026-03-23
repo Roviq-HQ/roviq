@@ -18,7 +18,7 @@ import {
   setupStatus,
   structureFramework,
 } from '../common/enums';
-import { entityPolicies, roviqReseller } from '../common/rls-policies';
+import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
 import { instituteGroups } from './institute-groups';
 
@@ -95,13 +95,40 @@ export const institutes = pgTable(
     index('institutes_type_idx').on(table.type),
     index('institutes_reseller_id_idx').on(table.resellerId),
     index('institutes_status_idx').on(table.status),
-    ...entityPolicies('institutes'),
-    // roviq_reseller: ALL for their reseller's institutes
+    // ── RLS policies (PRD §9.3 — institutes is the tenant root, special case) ──
+
+    // roviq_app: SELECT only — institute users can read their own institute
+    pgPolicy('institutes_app_select', {
+      for: 'select',
+      to: roviqApp,
+      using: sql`id = current_setting('app.current_tenant_id', true)::uuid AND deleted_at IS NULL`,
+    }),
+
+    // roviq_app: trash view (admin-only via CASL, RLS allows when app.include_deleted is set)
+    pgPolicy('institutes_app_select_trash', {
+      for: 'select',
+      to: roviqApp,
+      using: sql`
+        id = current_setting('app.current_tenant_id', true)::uuid
+        AND deleted_at IS NOT NULL
+        AND current_setting('app.include_deleted', true) = 'true'
+      `,
+    }),
+
+    // roviq_reseller: ALL on their reseller's institutes (GRANTs limit to SELECT + INSERT + UPDATE)
     pgPolicy('institutes_reseller_all', {
       for: 'all',
       to: roviqReseller,
       using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
       withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
+    }),
+
+    // roviq_admin: full access
+    pgPolicy('institutes_admin_all', {
+      for: 'all',
+      to: roviqAdmin,
+      using: sql`true`,
+      withCheck: sql`true`,
     }),
   ],
 );
