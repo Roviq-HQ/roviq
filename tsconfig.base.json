@@ -35,6 +35,8 @@
       "@roviq/nestjs-graphql": ["libs/backend/nestjs-graphql/src/index.ts"],
       "@roviq/domain": ["libs/shared/domain/src/index.ts"],
       "@roviq/database": ["libs/database/src/index.ts"],
+      "@roviq/database/schema": ["libs/database/src/schema/index.ts"],
+      "@roviq/ee-database": ["ee/libs/database/src/index.ts"],
       "@roviq/ee-billing-types": ["ee/libs/shared/billing-types/src/index.ts"]
     }
   },

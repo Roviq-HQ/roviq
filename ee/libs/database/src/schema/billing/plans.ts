@@ -1,0 +1,93 @@
+import {
+  entityColumns,
+  i18nText,
+  resellers,
+  roviqAdmin,
+  roviqApp,
+  roviqReseller,
+} from '@roviq/database';
+import { sql } from 'drizzle-orm';
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgPolicy,
+  pgTable,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+import { billingInterval, planStatus } from './enums';
+import { money } from './helpers';
+import type { PlanEntitlements } from './types';
+
+export const plans = pgTable(
+  'plans',
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    resellerId: uuid('reseller_id')
+      .notNull()
+      .references(() => resellers.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
+    name: i18nText('name').notNull(),
+    description: i18nText('description'),
+    code: varchar({ length: 50 }).notNull(),
+    status: planStatus().default('ACTIVE').notNull(),
+    interval: billingInterval().notNull(),
+    amount: money('amount'),
+    currency: varchar({ length: 3 }).default('INR').notNull(),
+    trialDays: integer('trial_days').default(0).notNull(),
+    entitlements: jsonb()
+      .$type<PlanEntitlements>()
+      .default({
+        maxStudents: null,
+        maxStaff: null,
+        maxStorageMb: null,
+        auditLogRetentionDays: 90,
+        features: [],
+      })
+      .notNull(),
+    sortOrder: integer('sort_order').default(0).notNull(),
+    isSystem: boolean('is_system').default(false).notNull(),
+    ...entityColumns,
+  },
+  (table) => [
+    index('plans_reseller_id_idx').on(table.resellerId),
+    index('plans_status_idx').on(table.status),
+    // Reseller: full CRUD on own plans (live rows)
+    pgPolicy('plan_reseller_all', {
+      for: 'all',
+      to: roviqReseller,
+      using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid AND deleted_at IS NULL`,
+      withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
+    }),
+    // Reseller: trash view for soft-deleted plans
+    pgPolicy('plan_reseller_trash', {
+      for: 'select',
+      to: roviqReseller,
+      using: sql`
+        reseller_id = current_setting('app.current_reseller_id', true)::uuid
+        AND deleted_at IS NOT NULL
+        AND current_setting('app.include_deleted', true) = 'true'
+      `,
+    }),
+    // App: can only see plans that their institute is subscribed to
+    pgPolicy('plan_app_read', {
+      for: 'select',
+      to: roviqApp,
+      using: sql`
+        id IN (
+          SELECT plan_id FROM subscriptions
+          WHERE tenant_id = current_setting('app.current_tenant_id', true)::uuid
+        )
+        AND deleted_at IS NULL
+      `,
+    }),
+    // Admin: break-glass full access
+    pgPolicy('plan_admin_all', {
+      for: 'all',
+      to: roviqAdmin,
+      using: sql`true`,
+      withCheck: sql`true`,
+    }),
+  ],
+);
