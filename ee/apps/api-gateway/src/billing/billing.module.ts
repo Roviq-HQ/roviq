@@ -6,10 +6,12 @@ import './billing.enums';
 import { BillingRepository } from './billing.repository';
 import { BillingService } from './billing.service';
 import { InstituteBillingResolver } from './institute/institute-billing.resolver';
+import { GatewayConfigRepository } from './repositories/gateway-config.repository';
 import { InvoiceRepository } from './repositories/invoice.repository';
 import { PaymentRepository } from './repositories/payment.repository';
 import { PlanRepository } from './repositories/plan.repository';
 import { SubscriptionRepository } from './repositories/subscription.repository';
+import { GatewayConfigService } from './reseller/gateway-config.service';
 import { InvoiceService } from './reseller/invoice.service';
 import { PaymentService } from './reseller/payment.service';
 import { PlanService } from './reseller/plan.service';
@@ -38,11 +40,13 @@ import { RazorpayWebhookController } from './webhook/razorpay-webhook.controller
     SubscriptionRepository,
     InvoiceRepository,
     PaymentRepository,
+    GatewayConfigRepository,
     BillingService,
     PlanService,
     SubscriptionService,
     InvoiceService,
     PaymentService,
+    GatewayConfigService,
     ResellerBillingResolver,
     InstituteBillingResolver,
   ],
