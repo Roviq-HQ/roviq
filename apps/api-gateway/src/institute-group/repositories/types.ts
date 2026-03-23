@@ -1,12 +1,14 @@
+import type { InstituteAddress, InstituteContact } from '@roviq/database';
+
 export interface InstituteGroupRecord {
   id: string;
   name: string;
   code: string;
   type: string;
-  registrationNo: string | null;
+  registrationNumber: string | null;
   registrationState: string | null;
-  contact: Record<string, unknown>;
-  address: Record<string, unknown> | null;
+  contact: InstituteContact;
+  address: InstituteAddress | null;
   status: string;
   createdBy: string;
   createdAt: Date;
@@ -17,18 +19,18 @@ export interface CreateInstituteGroupData {
   name: string;
   code: string;
   type: string;
-  registrationNo?: string;
+  registrationNumber?: string;
   registrationState?: string;
-  contact?: Record<string, unknown>;
-  address?: Record<string, unknown>;
+  contact?: InstituteContact;
+  address?: InstituteAddress;
 }
 
 export interface UpdateInstituteGroupData {
   name?: string;
-  registrationNo?: string;
+  registrationNumber?: string;
   registrationState?: string;
-  contact?: Record<string, unknown>;
-  address?: Record<string, unknown>;
+  contact?: InstituteContact;
+  address?: InstituteAddress;
 }
 
 export interface InstituteGroupSearchParams {

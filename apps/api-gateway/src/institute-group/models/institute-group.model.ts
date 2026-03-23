@@ -32,7 +32,7 @@ export class InstituteGroupModel {
   type!: GroupTypeEnum;
 
   @Field(() => String, { nullable: true })
-  registrationNo?: string | null;
+  registrationNumber?: string | null;
 
   @Field(() => String, { nullable: true })
   registrationState?: string | null;

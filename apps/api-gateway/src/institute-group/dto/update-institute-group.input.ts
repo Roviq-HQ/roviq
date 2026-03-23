@@ -1,4 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
+import type { InstituteAddress, InstituteContact } from '@roviq/database';
 import { IsObject, IsOptional, IsString } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
 
@@ -12,7 +13,7 @@ export class UpdateInstituteGroupInput {
   @Field({ nullable: true })
   @IsString()
   @IsOptional()
-  registrationNo?: string;
+  registrationNumber?: string;
 
   @Field({ nullable: true })
   @IsString()
@@ -22,10 +23,10 @@ export class UpdateInstituteGroupInput {
   @Field(() => GraphQLJSON, { nullable: true })
   @IsObject()
   @IsOptional()
-  contact?: Record<string, unknown>;
+  contact?: InstituteContact;
 
   @Field(() => GraphQLJSON, { nullable: true })
   @IsObject()
   @IsOptional()
-  address?: Record<string, unknown>;
+  address?: InstituteAddress;
 }

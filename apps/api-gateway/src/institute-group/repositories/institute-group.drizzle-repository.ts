@@ -24,7 +24,7 @@ const groupColumns = {
   name: instituteGroups.name,
   code: instituteGroups.code,
   type: instituteGroups.type,
-  registrationNo: instituteGroups.registrationNo,
+  registrationNumber: instituteGroups.registrationNumber,
   registrationState: instituteGroups.registrationState,
   contact: instituteGroups.contact,
   address: instituteGroups.address,
@@ -120,7 +120,7 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
           name: data.name,
           code: data.code,
           type: data.type as 'TRUST' | 'SOCIETY' | 'CHAIN' | 'FRANCHISE',
-          registrationNo: data.registrationNo,
+          registrationNumber: data.registrationNumber,
           registrationState: data.registrationState,
           contact: data.contact ?? { phones: [], emails: [] },
           address: data.address,
@@ -142,7 +142,9 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .update(instituteGroups)
         .set({
           ...(data.name !== undefined && { name: data.name }),
-          ...(data.registrationNo !== undefined && { registrationNo: data.registrationNo }),
+          ...(data.registrationNumber !== undefined && {
+            registrationNumber: data.registrationNumber,
+          }),
           ...(data.registrationState !== undefined && {
             registrationState: data.registrationState,
           }),
