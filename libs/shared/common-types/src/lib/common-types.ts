@@ -51,8 +51,12 @@ export const AppSubject = {
   Subscription: 'Subscription',
   /** A billing invoice generated for a subscription period. Tracks payment status and due dates */
   Invoice: 'Invoice',
-  /** Razorpay or Cashfree gateway credentials configured for an institute or the platform */
+  /** A payment record created when a gateway processes a charge (immutable, append-only) */
+  Payment: 'Payment',
+  /** Razorpay or Cashfree gateway credentials configured for a reseller */
   PaymentGatewayConfig: 'PaymentGatewayConfig',
+  /** Reseller billing dashboard — aggregate metrics, revenue, MRR */
+  BillingDashboard: 'BillingDashboard',
   /** A logical group of institutes managed together (e.g. a franchise or trust with multiple branches) */
   InstituteGroup: 'InstituteGroup',
 } as const;
