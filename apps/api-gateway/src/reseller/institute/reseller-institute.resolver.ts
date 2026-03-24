@@ -1,6 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { ResellerScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, ResellerScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import GraphQLJSON from 'graphql-type-json';
 import { InstituteFilterInput } from '../../institute/management/dto/institute-filter.input';
@@ -9,8 +9,7 @@ import { InstituteConnection } from '../../institute/management/models/institute
 import { ResellerCreateInstituteRequestInput } from './dto/reseller-create-institute-request.input';
 import { ResellerInstituteService } from './reseller-institute.service';
 
-@ResellerScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
 export class ResellerInstituteResolver {
   constructor(private readonly resellerInstituteService: ResellerInstituteService) {}

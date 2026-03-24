@@ -1,13 +1,12 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { ResellerScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, ResellerScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import GraphQLJSON from 'graphql-type-json';
 import { CreateInstituteGroupInput } from '../../institute-group/dto/create-institute-group.input';
 import { ResellerInstituteGroupService } from './reseller-institute-group.service';
 
-@ResellerScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver()
 export class ResellerInstituteGroupResolver {
   constructor(private readonly groupService: ResellerInstituteGroupService) {}

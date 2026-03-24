@@ -1,6 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { InstituteScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { CreateSectionInput } from './dto/create-section.input';
 import { UpdateSectionInput } from './dto/update-section.input';
@@ -8,8 +8,7 @@ import { SectionModel } from './models/section.model';
 import type { SectionRecord } from './repositories/types';
 import { SectionService } from './section.service';
 
-@InstituteScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => SectionModel)
 export class SectionResolver {
   constructor(private readonly sectionService: SectionService) {}

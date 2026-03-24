@@ -1,6 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { InstituteScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { CreateSubjectInput } from './dto/create-subject.input';
 import { UpdateSubjectInput } from './dto/update-subject.input';
@@ -8,8 +8,7 @@ import { SubjectModel } from './models/subject.model';
 import type { SubjectRecord } from './repositories/types';
 import { SubjectService } from './subject.service';
 
-@InstituteScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => SubjectModel)
 export class SubjectResolver {
   constructor(private readonly subjectService: SubjectService) {}
