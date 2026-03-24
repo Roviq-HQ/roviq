@@ -224,6 +224,9 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
       pino-http:
         specifier: ^11.0.0
         version: 11.0.0
@@ -468,6 +471,8 @@ importers:
   libs/backend/nestjs-graphql: {}
 
   libs/backend/notifications: {}
+
+  libs/backend/pubsub: {}
 
   libs/backend/redis: {}
 
