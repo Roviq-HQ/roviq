@@ -1,10 +1,13 @@
-import { Field, InputType } from '@nestjs/graphql';
+import { Field, InputType, Int } from '@nestjs/graphql';
 import type { InstituteAddress, InstituteContact } from '@roviq/database';
-import { IsObject, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsObject, IsOptional, IsString } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
 
 @InputType()
 export class UpdateInstituteGroupInput {
+  @Field(() => Int)
+  @IsInt()
+  version!: number;
   @Field({ nullable: true })
   @IsString()
   @IsOptional()

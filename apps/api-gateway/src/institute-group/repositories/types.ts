@@ -31,6 +31,7 @@ export interface UpdateInstituteGroupData {
   registrationState?: string;
   contact?: InstituteContact;
   address?: InstituteAddress;
+  version: number;
 }
 
 export interface InstituteGroupSearchParams {
