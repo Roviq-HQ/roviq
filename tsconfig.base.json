@@ -38,6 +38,7 @@
       "@roviq/database/schema": ["libs/database/src/schema/index.ts"],
       "@roviq/ee-database": ["ee/libs/database/src/index.ts"],
       "@roviq/entitlements": ["libs/backend/entitlements/src/index.ts"],
+      "@roviq/pubsub": ["libs/backend/pubsub/src/index.ts"],
       "@roviq/ee-billing-types": ["ee/libs/shared/billing-types/src/index.ts"]
     }
   },

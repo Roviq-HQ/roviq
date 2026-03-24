@@ -1,10 +1,7 @@
 /**
- * Shared PubSub instance for GraphQL subscriptions.
- *
- * Uses in-memory PubSub from graphql-subscriptions.
- * For production with multiple API gateway instances, replace with
- * a NATS-backed or Redis-backed PubSub implementation.
+ * @deprecated Use `import { pubSub } from '@roviq/pubsub'` instead.
+ * This local instance will be removed once all consumers migrate to the shared lib.
  */
-import { PubSub } from 'graphql-subscriptions';
+import { pubSub } from '@roviq/pubsub';
 
-export const pubSub = new PubSub();
+export { pubSub };
