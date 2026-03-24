@@ -2,6 +2,8 @@ import type {
   CreateInstituteData,
   InstituteRecord,
   InstituteSearchParams,
+  UpdateInstituteBrandingData,
+  UpdateInstituteConfigData,
   UpdateInstituteInfoData,
 } from './types';
 
@@ -14,6 +16,8 @@ export abstract class InstituteRepository {
   abstract create(data: CreateInstituteData): Promise<InstituteRecord>;
   abstract updateInfo(id: string, data: UpdateInstituteInfoData): Promise<InstituteRecord>;
   abstract updateStatus(id: string, status: string): Promise<InstituteRecord>;
+  abstract updateBranding(id: string, data: UpdateInstituteBrandingData): Promise<InstituteRecord>;
+  abstract updateConfig(id: string, data: UpdateInstituteConfigData): Promise<InstituteRecord>;
   abstract softDelete(id: string): Promise<void>;
   abstract restore(id: string): Promise<InstituteRecord>;
 }

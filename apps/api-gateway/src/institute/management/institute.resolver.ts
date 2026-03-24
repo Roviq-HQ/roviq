@@ -5,6 +5,8 @@ import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CreateInstituteInput } from './dto/create-institute.input';
 import { InstituteFilterInput } from './dto/institute-filter.input';
+import { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
+import { UpdateInstituteConfigInput } from './dto/update-institute-config.input';
 import { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
 import { InstituteService } from './institute.service';
 import { InstituteModel } from './models/institute.model';
@@ -30,6 +32,8 @@ export class InstituteResolver {
     return this.instituteService.findById(id);
   }
 
+  // TODO: Add @ResolveField() resolvers for branding, config, identifiers, affiliations
+  // to allow myInstitute to return full nested institute data via GraphQL field resolution
   @Query(() => InstituteModel)
   @CheckAbility('read', 'Institute')
   async myInstitute(@CurrentUser() user: AuthUser): Promise<InstituteModel> {
@@ -46,12 +50,32 @@ export class InstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update', 'Institute')
+  @CheckAbility('update_info', 'Institute')
   async updateInstituteInfo(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateInstituteInfoInput,
   ): Promise<InstituteModel> {
     return this.instituteService.updateInfo(id, input);
+  }
+
+  @Mutation(() => InstituteModel)
+  @CheckAbility('update_branding', 'Institute')
+  async updateInstituteBranding(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: UpdateInstituteBrandingInput,
+  ): Promise<InstituteModel> {
+    if (!user.tenantId) throw new Error('Institute scope required');
+    return this.instituteService.updateBranding(user.tenantId, input);
+  }
+
+  @Mutation(() => InstituteModel)
+  @CheckAbility('update_config', 'Institute')
+  async updateInstituteConfig(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: UpdateInstituteConfigInput,
+  ): Promise<InstituteModel> {
+    if (!user.tenantId) throw new Error('Institute scope required');
+    return this.instituteService.updateConfig(user.tenantId, input);
   }
 
   @Mutation(() => InstituteModel)
