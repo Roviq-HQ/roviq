@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { AdminInstituteSubscriptionResolver } from './institute/admin-institute.subscription';
 import { AdminResellerResolver } from './reseller/admin-reseller.resolver';
 import { AdminResellerService } from './reseller/admin-reseller.service';
 
@@ -7,6 +8,6 @@ import { AdminResellerService } from './reseller/admin-reseller.service';
   imports: [
     AuthModule, // provides AuthEventService
   ],
-  providers: [AdminResellerService, AdminResellerResolver],
+  providers: [AdminResellerService, AdminResellerResolver, AdminInstituteSubscriptionResolver],
 })
 export class AdminModule {}
