@@ -23,16 +23,22 @@
         "command": "docker compose -f docker/compose.e2e.yaml --profile vitest up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
       }
     },
+    "e2e:rls": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose -f docker/compose.e2e.yaml --profile rls up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm rls-tests"
+      }
+    },
     "e2e:all": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm hurl-tests && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest --profile rls up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm rls-tests && docker compose -f docker/compose.e2e.yaml run --rm hurl-tests && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
       }
     },
     "e2e:down": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest down -v --remove-orphans"
+        "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest --profile rls down -v --remove-orphans"
       }
     }
   },

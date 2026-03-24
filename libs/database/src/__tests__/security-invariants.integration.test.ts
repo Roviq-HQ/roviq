@@ -479,10 +479,9 @@ describe('Auth events', () => {
       expect(selectRes.rows.length).toBeGreaterThanOrEqual(1);
     });
 
-    // roviq_app cannot SELECT auth events (default deny — no SELECT policy for roviq_app)
+    // roviq_app cannot SELECT auth events (REVOKE SELECT enforced by db:reset)
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM auth_events');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM auth_events')).rejects.toThrow(/permission denied/);
     });
   });
 });

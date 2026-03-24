@@ -8,6 +8,7 @@
 #   pnpm e2e:all      — clean data + run all tests
 #   pnpm e2e:hurl     — clean data + run hurl tests
 #   pnpm e2e:vitest   — clean data + run vitest tests
+#   pnpm e2e:rls      — clean data + run RLS integration tests
 #   pnpm e2e:down     — full teardown (volumes removed)
 
 services:
@@ -166,3 +167,22 @@ services:
       api-gateway:
         condition: service_healthy
     profiles: [vitest]
+
+  rls-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    command: pnpm vitest run --project integration
+    working_dir: /app/libs/database
+    volumes:
+      - ../libs:/app/libs:ro
+      - ../scripts/seed-ids.ts:/app/scripts/seed-ids.ts:ro
+    env_file: ../.env
+    environment:
+      DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
+      DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+    depends_on:
+      migrate-and-seed:
+        condition: service_completed_successfully
+    profiles: [rls]
