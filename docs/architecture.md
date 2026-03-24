@@ -6,27 +6,49 @@
 roviq/
 ├── apps/
 │   ├── api-gateway/          # NestJS — GraphQL API entry point
-│   ├── admin-portal/         # Next.js — platform admin UI
-│   └── institute-portal/     # Next.js — institute-facing UI
+│   │   └── src/
+│   │       ├── admin/            # Platform-scope resolvers (@PlatformScope)
+│   │       │   ├── institute/    # Admin institute CRUD, lifecycle, statistics
+│   │       │   └── reseller/     # Admin reseller management
+│   │       ├── reseller/         # Reseller-scope resolvers (@ResellerScope)
+│   │       │   ├── institute/    # Reseller institute requests, suspend/reactivate
+│   │       │   └── institute-group/  # Reseller group management
+│   │       ├── institute/        # Institute-scope resolvers (@InstituteScope)
+│   │       │   ├── management/   # Institute CRUD, branding, config
+│   │       │   ├── standard/     # Grade levels
+│   │       │   ├── section/      # Class sections
+│   │       │   ├── subject/      # Subjects & curriculum
+│   │       │   └── setup/        # Temporal InstituteSetupWorkflow
+│   │       ├── academic-year/    # Academic year lifecycle
+│   │       ├── institute-group/  # Institute group CRUD
+│   │       ├── auth/             # JWT, login, impersonation
+│   │       ├── audit/            # Audit logging + Temporal partition workflow
+│   │       └── common/           # Pagination, pubsub, event bus
+│   └── web/                  # Next.js 16 — unified web app (admin/reseller/institute)
 ├── libs/
 │   ├── shared/
-│   │   └── common-types/        # @roviq/common-types — CASL types, AuthUser
-│   ├── database/                  # @roviq/database — Drizzle schema, RLS policies, tenant helpers
+│   │   └── common-types/     # @roviq/common-types — CASL, AuthUser, ErrorCodes, events
+│   ├── database/             # @roviq/database — Drizzle schema, RLS, tenant helpers
+│   │   ├── src/schema/       # Table definitions organized by domain
+│   │   ├── migrations/       # Custom SQL migrations (FORCE RLS, GRANTs, indexes)
+│   │   └── seed/board-catalogs/  # CBSE/BSEH/RBSE subject seed data (JSON)
 │   ├── backend/
-│   │   ├── casl/                # @roviq/casl — ability factory, decorators, role seeding
-│   │   ├── redis/               # @roviq/redis — NestJS DI module for ioredis
-│   │   └── nats-utils/          # @roviq/nats-utils — NATS JetStream wrappers
+│   │   ├── auth/             # @roviq/auth-backend — scope guards, JWT strategy
+│   │   ├── casl/             # @roviq/casl — ability factory, guards, decorators
+│   │   ├── nats-jetstream/   # @roviq/nats-jetstream — NATS JetStream client
+│   │   └── telemetry/        # @roviq/telemetry — OpenTelemetry, Pino logger
 │   └── frontend/
-│       ├── auth/                # @roviq/auth — React auth context, login, JWT decode
-│       ├── graphql/             # @roviq/graphql — Apollo Client setup
-│       ├── i18n/                # @roviq/i18n — next-intl config, routing, formatting
-│       └── ui/                  # @roviq/ui — shadcn/ui components, layout
+│       ├── auth/             # @roviq/auth — React auth context, login
+│       ├── graphql/          # @roviq/graphql — Apollo Client, codegen
+│       ├── i18n/             # @roviq/i18n — next-intl, formatting
+│       └── ui/               # @roviq/ui — shadcn/ui components
+├── ee/                       # Enterprise Edition (billing, payment gateways)
 ├── e2e/
-│   └── api-gateway-e2e/      # E2E tests for API gateway
+│   └── api-gateway-e2e/      # E2E tests (Hurl + Vitest)
 ├── scripts/
-│   └── seed.ts               # Test data seeder
-├── docker/
-│   ├── init-db.sh            # PostgreSQL role setup (runs in Docker entrypoint)
+│   ├── seed.ts               # Test data seeder
+│   ├── seed-ids.ts           # Deterministic UUIDs for seeding
+│   └── db-reset.ts           # Drop + push + FORCE RLS + GRANTs + seed
 └── docs/
 ```
 
@@ -49,17 +71,19 @@ roviq/
 ### Multi-Tenancy: RLS over Schema-per-Tenant
 - PostgreSQL Row Level Security on all tenant-scoped tables
 - `app.current_tenant_id` session variable set via `withTenant()` helper
-- Policy-based admin bypass: `roviq_admin` does NOT have `BYPASSRLS`. Instead, `withAdmin()` sets `app.is_platform_admin = 'true'` and each tenant-scoped table has an `admin_platform_access` policy that checks this variable.
-- `institutes` table has no RLS (it is the tenant registry)
+- Policy-based admin bypass: `roviq_admin` does NOT have `BYPASSRLS`. Instead, policies explicitly grant `roviq_admin` access via `FOR ALL USING (true) WITH CHECK (true)`.
+- `FORCE ROW LEVEL SECURITY` on every table — without it, the table owner bypasses policies silently.
+- `institutes` table has custom RLS: `roviq_app` gets SELECT only (read own institute), `roviq_reseller` gets FOR ALL (GRANTs limit to SELECT + INSERT + UPDATE), `roviq_admin` gets full access.
 
 ### Platform vs Tenant Tables
-- **Platform-level (no RLS):** `users`, `phone_numbers`, `auth_providers` — User is a global identity with unique username/email
-- **Tenant-scoped (RLS):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, and all business data
+- **Platform-level (custom RLS):** `users`, `institutes`, `institute_groups`, `resellers` — have per-role policies instead of tenant-scoped policies
+- **Tenant-scoped (RLS via `tenantPolicies()`):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, `academic_years`, `standards`, `sections`, `subjects`, `institute_branding`, `institute_configs`, `institute_identifiers`, `institute_affiliations`, and all business data
 - Membership links User↔Institute. One user can have memberships in multiple institutes.
 
-### Two DB Contexts
-- **`withTenant(db, tenantId, fn)`**: sets `SET LOCAL app.current_tenant_id` before every query. Used for tenant-scoped operations.
-- **`withAdmin(db, fn)`**: sets `app.is_platform_admin = 'true'` before every query, enabling the `admin_platform_access` RLS policy. Used for auth (user lookup at login is platform-level) and platform admin operations.
+### Three DB Contexts
+- **`withTenant(db, tenantId, fn)`**: sets `SET LOCAL ROLE roviq_app` + `app.current_tenant_id`. Used for institute-scope operations.
+- **`withReseller(db, resellerId, fn)`**: sets `SET LOCAL ROLE roviq_reseller` + `app.current_reseller_id`. Used for reseller-scope operations.
+- **`withAdmin(db, fn)`**: sets `SET LOCAL ROLE roviq_admin`. Used for platform admin operations and cross-tenant queries.
 
 ### CASL Authorization
 - Role abilities stored as JSON in the `roles` table, cached in Redis (5min TTL)
@@ -75,3 +99,17 @@ roviq/
 ### GraphQL Schema: In-Memory
 - `autoSchemaFile: true` — schema generated in memory, no file written to disk
 - Avoids file watcher loops with NX dev server
+
+### Event Architecture
+- **EventBusService**: publishes to both NATS JetStream (for cross-service) and GraphQL PubSub (for subscriptions) in a single `emit()` call
+- **GraphQL Subscriptions**: 8 subscriptions across 3 scopes with tenant/reseller filtering via `graphql-ws`
+- **Temporal**: used for long-running workflows (institute setup pipeline, audit partition management)
+
+### Service Layer Rules
+- Services ONLY talk to repositories — never import `DRIZZLE_DB`, `withAdmin`, or Drizzle tables
+- Services return repository `Record` types — GraphQL handles mapping via `@ObjectType` decorators
+- Each status transition is a named domain mutation (`suspend()`, not `updateStatus('SUSPENDED')`)
+- `BusinessException` with `ErrorCode` enum for all business errors (not generic `BadRequestException`)
+
+### Institute Service
+See `docs/institute-service.md` for full documentation of the institute module including schema, resolvers, RLS, events, and Temporal workflow.
