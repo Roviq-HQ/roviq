@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { instituteContactSchema } from '@roviq/database';
 import { EventBusService } from '../../common/event-bus.service';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
@@ -7,9 +8,8 @@ import type { InstituteFilterInput } from './dto/institute-filter.input';
 import type { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
 import type { UpdateInstituteConfigInput } from './dto/update-institute-config.input';
 import type { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
-import type { InstituteModel } from './models/institute.model';
 import { InstituteRepository } from './repositories/institute.repository';
-import type { UpdateInstituteConfigData } from './repositories/types';
+import type { InstituteRecord, UpdateInstituteConfigData } from './repositories/types';
 import { InstituteSetupService } from './seed/institute-setup.service';
 
 // Valid status transitions: from → [allowed targets]
@@ -49,7 +49,7 @@ export class InstituteService {
     const nodes = hasNextPage ? records.slice(0, limit) : records;
 
     const edges = nodes.map((record) => ({
-      node: record as unknown as InstituteModel,
+      node: record,
       cursor: encodeCursor({ id: record.id }),
     }));
 
@@ -65,22 +65,21 @@ export class InstituteService {
     };
   }
 
-  async findById(id: string): Promise<InstituteModel> {
+  async findById(id: string): Promise<InstituteRecord> {
     const record = await this.instituteRepo.findById(id);
     if (!record) {
       throw new NotFoundException(`Institute ${id} not found`);
     }
-    return record as unknown as InstituteModel;
+    return record;
   }
 
-  async create(input: CreateInstituteInput): Promise<InstituteModel> {
+  async create(input: CreateInstituteInput): Promise<InstituteRecord> {
     const record = await this.instituteRepo.create(input);
-    const institute = record as unknown as InstituteModel;
 
     // Trigger async setup — runs synchronously for now, will be Temporal workflow later
     this.setupService
       .runSetup({
-        instituteId: institute.id,
+        instituteId: record.id,
         type: input.type ?? 'SCHOOL',
         departments: input.departments ?? [
           'PRIMARY',
@@ -92,15 +91,15 @@ export class InstituteService {
         isDemo: input.isDemo,
       })
       .catch((err) => {
-        this.logger.error(`Setup failed for institute ${institute.id}`, err);
+        this.logger.error(`Setup failed for institute ${record.id}`, err);
       });
 
-    this.emitEvent('INSTITUTE.created', { instituteId: institute.id, type: input.type });
+    this.emitEvent('INSTITUTE.created', { instituteId: record.id, type: input.type });
 
-    return institute;
+    return record;
   }
 
-  async updateInfo(id: string, input: UpdateInstituteInfoInput): Promise<InstituteModel> {
+  async updateInfo(id: string, input: UpdateInstituteInfoInput): Promise<InstituteRecord> {
     if (input.contact) {
       const result = instituteContactSchema.safeParse(input.contact);
       if (!result.success) {
@@ -108,23 +107,22 @@ export class InstituteService {
       }
     }
 
-    const record = await this.instituteRepo.updateInfo(id, input);
-    return record as unknown as InstituteModel;
+    return this.instituteRepo.updateInfo(id, input);
   }
 
   async updateBranding(
     instituteId: string,
     input: UpdateInstituteBrandingInput,
-  ): Promise<InstituteModel> {
+  ): Promise<InstituteRecord> {
     const record = await this.instituteRepo.updateBranding(instituteId, input);
     this.emitEvent('INSTITUTE.branding_updated', { instituteId, branding: input });
-    return record as unknown as InstituteModel;
+    return record;
   }
 
   async updateConfig(
     instituteId: string,
     input: UpdateInstituteConfigInput,
-  ): Promise<InstituteModel> {
+  ): Promise<InstituteRecord> {
     const record = await this.instituteRepo.updateConfig(
       instituteId,
       input as UpdateInstituteConfigData,
@@ -133,74 +131,83 @@ export class InstituteService {
       instituteId,
       changedFields: Object.keys(input),
     });
-    return record as unknown as InstituteModel;
+    return record;
   }
 
-  async activate(id: string): Promise<InstituteModel> {
+  async activate(id: string): Promise<InstituteRecord> {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'ACTIVE');
 
     if (institute.setupStatus !== 'COMPLETED') {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.SETUP_NOT_COMPLETE,
         `Cannot activate institute: setup_status is ${institute.setupStatus}, must be COMPLETED`,
       );
     }
 
     const record = await this.instituteRepo.updateStatus(id, 'ACTIVE');
-
     this.emitEvent('INSTITUTE.activated', { instituteId: id, previousStatus: institute.status });
-
-    return record as unknown as InstituteModel;
+    return record;
   }
 
-  async deactivate(id: string): Promise<InstituteModel> {
+  async deactivate(id: string): Promise<InstituteRecord> {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'INACTIVE');
     const record = await this.instituteRepo.updateStatus(id, 'INACTIVE');
-
     this.emitEvent('INSTITUTE.deactivated', { instituteId: id, previousStatus: institute.status });
-
-    return record as unknown as InstituteModel;
+    return record;
   }
 
-  async suspend(id: string): Promise<InstituteModel> {
+  async suspend(id: string, reason?: string): Promise<InstituteRecord> {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'SUSPENDED');
     const record = await this.instituteRepo.updateStatus(id, 'SUSPENDED');
-
-    this.emitEvent('INSTITUTE.suspended', { instituteId: id, previousStatus: institute.status });
-
-    return record as unknown as InstituteModel;
+    this.emitEvent('INSTITUTE.suspended', {
+      instituteId: id,
+      previousStatus: institute.status,
+      reason,
+    });
+    return record;
   }
 
-  async reject(id: string): Promise<InstituteModel> {
+  async reject(id: string): Promise<InstituteRecord> {
     const institute = await this.requireInstitute(id);
     this.validateTransition(institute.status, 'REJECTED');
     const record = await this.instituteRepo.updateStatus(id, 'REJECTED');
-
     this.emitEvent('INSTITUTE.rejected', { instituteId: id, previousStatus: institute.status });
-
-    return record as unknown as InstituteModel;
+    return record;
   }
 
   async delete(id: string): Promise<boolean> {
     await this.requireInstitute(id);
     await this.instituteRepo.softDelete(id);
-
     this.emitEvent('INSTITUTE.deleted', { instituteId: id });
-
     return true;
   }
 
-  async restore(id: string): Promise<InstituteModel> {
+  async restore(id: string): Promise<InstituteRecord> {
     const record = await this.instituteRepo.restore(id);
-
     this.emitEvent('INSTITUTE.restored', { instituteId: id });
-
-    return record as unknown as InstituteModel;
+    return record;
   }
 
-  private async requireInstitute(id: string) {
+  async findBranding(instituteId: string) {
+    return this.instituteRepo.findBranding(instituteId);
+  }
+
+  async findConfig(instituteId: string) {
+    return this.instituteRepo.findConfig(instituteId);
+  }
+
+  async findIdentifiers(instituteId: string) {
+    return this.instituteRepo.findIdentifiers(instituteId);
+  }
+
+  async findAffiliations(instituteId: string) {
+    return this.instituteRepo.findAffiliations(instituteId);
+  }
+
+  private async requireInstitute(id: string): Promise<InstituteRecord> {
     const record = await this.instituteRepo.findById(id);
     if (!record) {
       throw new NotFoundException(`Institute ${id} not found`);

@@ -1,7 +1,8 @@
-import { BadRequestException, UseGuards } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { PlatformScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import GraphQLJSON from 'graphql-type-json';
 import { InstituteService } from '../../institute/management/institute.service';
 import {
@@ -10,8 +11,8 @@ import {
 } from '../../institute/management/models/institute.model';
 import { InstituteConnection } from '../../institute/management/models/institute-connection.model';
 import { AdminInstituteService } from './admin-institute.service';
-import { InstituteFilterInput } from '../../institute/management/dto/institute-filter.input';
 import { AdminCreateInstituteInput } from './dto/admin-create-institute.input';
+import { AdminListInstitutesFilterInput } from './dto/admin-list-institutes-filter.input';
 
 @PlatformScope()
 @UseGuards(AbilityGuard)
@@ -25,9 +26,9 @@ export class AdminInstituteResolver {
   @Query(() => InstituteConnection)
   @CheckAbility('read', 'Institute')
   async adminListInstitutes(
-    @Args('filter', { nullable: true }) filter?: InstituteFilterInput,
+    @Args('filter', { nullable: true }) filter?: AdminListInstitutesFilterInput,
   ) {
-    return this.instituteService.search(filter ?? {});
+    return this.adminService.list(filter ?? {});
   }
 
   @Query(() => InstituteModel)
@@ -71,9 +72,9 @@ export class AdminInstituteResolver {
       case InstituteStatusEnum.INACTIVE:
         return this.instituteService.deactivate(id);
       case InstituteStatusEnum.SUSPENDED:
-        return this.instituteService.suspend(id);
+        return this.instituteService.suspend(id, reason);
       default:
-        throw new BadRequestException(`Unsupported target status: ${status}`);
+        throw new BusinessException(ErrorCode.FORBIDDEN, `Unsupported target status: ${status}`);
     }
   }
 
@@ -84,13 +85,13 @@ export class AdminInstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('manage', 'Institute')
+  @CheckAbility('restore', 'Institute')
   async adminRestoreInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.restore(id);
   }
 
   @Query(() => GraphQLJSON)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility('view_statistics', 'Institute')
   async adminInstituteStatistics() {
     return this.adminService.getStatistics();
   }
