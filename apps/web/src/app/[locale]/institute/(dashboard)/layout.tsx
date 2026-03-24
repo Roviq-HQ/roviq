@@ -8,6 +8,7 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  CalendarRange,
   CreditCard,
   FileText,
   GraduationCap,
@@ -136,6 +137,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {
         title: t('academic'),
         items: [
+          { title: t('academicYears'), href: '/academic-years', icon: CalendarRange },
           { title: t('standards'), href: '/standards', icon: GraduationCap },
           { title: t('subjects'), href: '/subjects', icon: BookOpen },
           { title: t('timetable'), href: '/timetable', icon: Calendar },
