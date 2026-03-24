@@ -7,6 +7,10 @@ echo "=== Roviq Dev Container: postCreate ==="
 corepack enable
 corepack install
 
+# Point pnpm store to the container's home dir (not the workspace bind mount)
+# to avoid creating a 2GB .pnpm-store in the project root.
+pnpm config set store-dir /home/node/.local/share/pnpm/store
+
 # Install dependencies (CI=true avoids TTY prompts in non-interactive shells)
 echo "Installing dependencies..."
 CI=true pnpm install
