@@ -16,6 +16,9 @@ export abstract class InstituteGroupRepository {
   abstract updateStatus(id: string, status: string): Promise<InstituteGroupRecord>;
   abstract softDelete(id: string): Promise<void>;
 
+  /** Count institutes per group (for list views) */
+  abstract countInstitutesByGroup(groupIds: string[]): Promise<Record<string, number>>;
+
   // Institute <-> Group linking
   abstract addInstituteToGroup(instituteId: string, groupId: string): Promise<void>;
   abstract removeInstituteFromGroup(instituteId: string): Promise<void>;

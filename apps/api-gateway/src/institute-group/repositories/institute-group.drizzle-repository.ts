@@ -8,7 +8,7 @@ import {
   institutes,
   withAdmin,
 } from '@roviq/database';
-import { and, asc, count, eq, ilike, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { decodeCursor } from '../../common/pagination/relay-pagination.model';
 import { InstituteGroupRepository } from './institute-group.repository';
 import type {
@@ -195,6 +195,24 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
       if (rows.length === 0) {
         throw new NotFoundException(`Institute group ${id} not found`);
       }
+    });
+  }
+
+  async countInstitutesByGroup(groupIds: string[]): Promise<Record<string, number>> {
+    if (groupIds.length === 0) return {};
+
+    return withAdmin(this.db, async (tx) => {
+      const rows = await tx
+        .select({ groupId: institutes.groupId, count: count() })
+        .from(institutes)
+        .where(and(inArray(institutes.groupId, groupIds), isNull(institutes.deletedAt)))
+        .groupBy(institutes.groupId);
+
+      const result: Record<string, number> = {};
+      for (const row of rows) {
+        if (row.groupId) result[row.groupId] = row.count;
+      }
+      return result;
     });
   }
 

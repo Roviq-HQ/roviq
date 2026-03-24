@@ -12,6 +12,7 @@ export class ResellerInstituteGroupService {
 
   async list() {
     // RLS via roviq_reseller policy scopes to groups containing their institutes
-    return this.groupService.search({});
+    // Includes institute count per group
+    return this.groupService.searchWithInstituteCounts({});
   }
 }
