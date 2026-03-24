@@ -53,6 +53,40 @@ export class InstituteGroupService {
     };
   }
 
+  /** Search groups and include institute count per group */
+  async searchWithInstituteCounts(filter: InstituteGroupFilterInput) {
+    const { records, total } = await this.groupRepo.search({
+      search: filter.search,
+      status: filter.status,
+      type: filter.type,
+      first: (filter.first ?? 20) + 1,
+      after: filter.after,
+    });
+
+    const limit = filter.first ?? 20;
+    const hasNextPage = records.length > limit;
+    const nodes = hasNextPage ? records.slice(0, limit) : records;
+
+    const groupIds = nodes.map((r) => r.id);
+    const counts = await this.groupRepo.countInstitutesByGroup(groupIds);
+
+    const edges = nodes.map((record) => ({
+      node: { ...record, instituteCount: counts[record.id] ?? 0 },
+      cursor: encodeCursor({ id: record.id }),
+    }));
+
+    return {
+      edges,
+      pageInfo: {
+        hasNextPage,
+        hasPreviousPage: !!filter.after,
+        startCursor: edges[0]?.cursor,
+        endCursor: edges[edges.length - 1]?.cursor,
+      },
+      totalCount: total,
+    };
+  }
+
   async findById(id: string): Promise<InstituteGroupModel> {
     const record = await this.groupRepo.findById(id);
     if (!record) {
