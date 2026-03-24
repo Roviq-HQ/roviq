@@ -1,6 +1,13 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { getRequestContext } from '@roviq/common-types';
-import { DRIZZLE_DB, type DrizzleDB, institutes, withAdmin } from '@roviq/database';
+import { BusinessException, ErrorCode, getRequestContext } from '@roviq/common-types';
+import {
+  DRIZZLE_DB,
+  type DrizzleDB,
+  instituteBranding,
+  instituteConfigs,
+  institutes,
+  withAdmin,
+} from '@roviq/database';
 import { and, asc, count, eq, ilike, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { decodeCursor } from '../../../common/pagination/relay-pagination.model';
 import { InstituteRepository } from './institute.repository';
@@ -8,6 +15,8 @@ import type {
   CreateInstituteData,
   InstituteRecord,
   InstituteSearchParams,
+  UpdateInstituteBrandingData,
+  UpdateInstituteConfigData,
   UpdateInstituteInfoData,
 } from './types';
 
@@ -140,13 +149,17 @@ export class InstituteDrizzleRepository extends InstituteRepository {
           ...(data.address !== undefined && { address: data.address }),
           ...(data.timezone !== undefined && { timezone: data.timezone }),
           ...(data.currency !== undefined && { currency: data.currency }),
+          version: sql`${institutes.version} + 1`,
           updatedBy: userId,
         })
-        .where(eq(institutes.id, id))
+        .where(and(eq(institutes.id, id), eq(institutes.version, data.version)))
         .returning(instituteColumns);
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute ${id} not found`);
+        throw new BusinessException(
+          ErrorCode.CONCURRENT_MODIFICATION,
+          'Record was modified by another user. Please refresh and try again.',
+        );
       }
       return rows[0] as InstituteRecord;
     });
@@ -170,6 +183,100 @@ export class InstituteDrizzleRepository extends InstituteRepository {
       }
       return rows[0] as InstituteRecord;
     });
+  }
+
+  async updateBranding(id: string, data: UpdateInstituteBrandingData): Promise<InstituteRecord> {
+    const { userId } = getRequestContext();
+
+    await withAdmin(this.db, async (tx) => {
+      await tx
+        .insert(instituteBranding)
+        .values({
+          tenantId: id,
+          ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
+          ...(data.faviconUrl !== undefined && { faviconUrl: data.faviconUrl }),
+          ...(data.primaryColor !== undefined && { primaryColor: data.primaryColor }),
+          ...(data.secondaryColor !== undefined && { secondaryColor: data.secondaryColor }),
+          ...(data.themeIdentifier !== undefined && { themeIdentifier: data.themeIdentifier }),
+          ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
+          createdBy: userId,
+          updatedBy: userId,
+        })
+        .onConflictDoUpdate({
+          target: instituteBranding.tenantId,
+          set: {
+            ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
+            ...(data.faviconUrl !== undefined && { faviconUrl: data.faviconUrl }),
+            ...(data.primaryColor !== undefined && { primaryColor: data.primaryColor }),
+            ...(data.secondaryColor !== undefined && { secondaryColor: data.secondaryColor }),
+            ...(data.themeIdentifier !== undefined && { themeIdentifier: data.themeIdentifier }),
+            ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
+            updatedBy: userId,
+          },
+        });
+    });
+
+    const record = await this.findById(id);
+    if (!record) {
+      throw new NotFoundException(`Institute ${id} not found`);
+    }
+    return record;
+  }
+
+  async updateConfig(id: string, data: UpdateInstituteConfigData): Promise<InstituteRecord> {
+    const { userId } = getRequestContext();
+
+    await withAdmin(this.db, async (tx) => {
+      await tx
+        .insert(instituteConfigs)
+        .values({
+          tenantId: id,
+          ...(data.attendanceType !== undefined && {
+            attendanceType: data.attendanceType as 'LECTURE_WISE' | 'DAILY',
+          }),
+          ...(data.openingTime !== undefined && { openingTime: data.openingTime }),
+          ...(data.closingTime !== undefined && { closingTime: data.closingTime }),
+          ...(data.shifts !== undefined && { shifts: data.shifts }),
+          ...(data.notificationPreferences !== undefined && {
+            notificationPreferences: data.notificationPreferences,
+          }),
+          ...(data.payrollConfig !== undefined && { payrollConfig: data.payrollConfig }),
+          ...(data.gradingSystem !== undefined && { gradingSystem: data.gradingSystem }),
+          ...(data.termStructure !== undefined && { termStructure: data.termStructure }),
+          ...(data.sectionStrengthNorms !== undefined && {
+            sectionStrengthNorms: data.sectionStrengthNorms,
+          }),
+          createdBy: userId,
+          updatedBy: userId,
+        })
+        .onConflictDoUpdate({
+          target: instituteConfigs.tenantId,
+          set: {
+            ...(data.attendanceType !== undefined && {
+              attendanceType: data.attendanceType as 'LECTURE_WISE' | 'DAILY',
+            }),
+            ...(data.openingTime !== undefined && { openingTime: data.openingTime }),
+            ...(data.closingTime !== undefined && { closingTime: data.closingTime }),
+            ...(data.shifts !== undefined && { shifts: data.shifts }),
+            ...(data.notificationPreferences !== undefined && {
+              notificationPreferences: data.notificationPreferences,
+            }),
+            ...(data.payrollConfig !== undefined && { payrollConfig: data.payrollConfig }),
+            ...(data.gradingSystem !== undefined && { gradingSystem: data.gradingSystem }),
+            ...(data.termStructure !== undefined && { termStructure: data.termStructure }),
+            ...(data.sectionStrengthNorms !== undefined && {
+              sectionStrengthNorms: data.sectionStrengthNorms,
+            }),
+            updatedBy: userId,
+          },
+        });
+    });
+
+    const record = await this.findById(id);
+    if (!record) {
+      throw new NotFoundException(`Institute ${id} not found`);
+    }
+    return record;
   }
 
   async findByIdIncludeDeleted(id: string): Promise<InstituteRecord | null> {

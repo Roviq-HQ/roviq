@@ -1,4 +1,10 @@
-import type { InstituteAddress, InstituteContact } from '@roviq/database';
+import type {
+  InstituteAddress,
+  InstituteContact,
+  SectionStrengthNorms,
+  ShiftConfig,
+  TermConfig,
+} from '@roviq/database';
 
 export interface InstituteRecord {
   id: string;
@@ -44,4 +50,26 @@ export interface UpdateInstituteInfoData {
   address?: InstituteAddress;
   timezone?: string;
   currency?: string;
+  version: number;
+}
+
+export interface UpdateInstituteBrandingData {
+  logoUrl?: string;
+  faviconUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  themeIdentifier?: string;
+  coverImageUrl?: string;
+}
+
+export interface UpdateInstituteConfigData {
+  attendanceType?: string;
+  openingTime?: string;
+  closingTime?: string;
+  shifts?: ShiftConfig[];
+  notificationPreferences?: Record<string, unknown>;
+  payrollConfig?: Record<string, unknown>;
+  gradingSystem?: Record<string, unknown>;
+  termStructure?: TermConfig[];
+  sectionStrengthNorms?: SectionStrengthNorms;
 }

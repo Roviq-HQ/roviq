@@ -13,6 +13,22 @@ export const AppAction = {
   Update: 'update',
   /** Permanently remove or soft-delete a resource. Typically restricted to admin roles */
   Delete: 'delete',
+  /** Update institute basic info (name, code, contact, address) — more restricted than full Update */
+  UpdateInfo: 'update_info',
+  /** Update institute visual branding (logo, colors, theme) */
+  UpdateBranding: 'update_branding',
+  /** Update institute operational config (attendance type, shifts, grading, strength norms) */
+  UpdateConfig: 'update_config',
+  /** Change an entity's lifecycle status (activate, suspend, deactivate) — distinct from field updates */
+  UpdateStatus: 'update_status',
+  /** Activate an academic year or entity — named domain mutation per entity-lifecycle.md */
+  Activate: 'activate',
+  /** Archive an academic year — transition to read-only state */
+  Archive: 'archive',
+  /** Assign a teacher to a section */
+  AssignTeacher: 'assign_teacher',
+  /** View aggregate statistics for an entity (dashboard metrics) */
+  ViewStatistics: 'view_statistics',
   /** Allows a platform admin to act as another user within an institute for debugging/support purposes */
   Impersonate: 'impersonate',
 } as const;

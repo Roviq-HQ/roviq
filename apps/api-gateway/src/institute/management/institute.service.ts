@@ -1,11 +1,15 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { ClientProxy } from '@nestjs/microservices';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { instituteContactSchema } from '@roviq/database';
+import { EventBusService } from '../../common/event-bus.service';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { CreateInstituteInput } from './dto/create-institute.input';
 import type { InstituteFilterInput } from './dto/institute-filter.input';
+import type { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
+import type { UpdateInstituteConfigInput } from './dto/update-institute-config.input';
 import type { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
 import type { InstituteModel } from './models/institute.model';
 import { InstituteRepository } from './repositories/institute.repository';
+import type { UpdateInstituteConfigData } from './repositories/types';
 import { InstituteSetupService } from './seed/institute-setup.service';
 
 // Valid status transitions: from → [allowed targets]
@@ -24,13 +28,11 @@ export class InstituteService {
   constructor(
     private readonly instituteRepo: InstituteRepository,
     private readonly setupService: InstituteSetupService,
-    @Inject('JETSTREAM_CLIENT') private readonly natsClient: ClientProxy,
+    private readonly eventBus: EventBusService,
   ) {}
 
   private emitEvent(pattern: string, data: Record<string, unknown>) {
-    this.natsClient.emit(pattern, data).subscribe({
-      error: (err) => this.logger.warn(`Failed to emit ${pattern}`, err),
-    });
+    this.eventBus.emit(pattern, data);
   }
 
   async search(filter: InstituteFilterInput) {
@@ -99,7 +101,38 @@ export class InstituteService {
   }
 
   async updateInfo(id: string, input: UpdateInstituteInfoInput): Promise<InstituteModel> {
+    if (input.contact) {
+      const result = instituteContactSchema.safeParse(input.contact);
+      if (!result.success) {
+        throw new BadRequestException(result.error.message);
+      }
+    }
+
     const record = await this.instituteRepo.updateInfo(id, input);
+    return record as unknown as InstituteModel;
+  }
+
+  async updateBranding(
+    instituteId: string,
+    input: UpdateInstituteBrandingInput,
+  ): Promise<InstituteModel> {
+    const record = await this.instituteRepo.updateBranding(instituteId, input);
+    this.emitEvent('INSTITUTE.branding_updated', { instituteId, branding: input });
+    return record as unknown as InstituteModel;
+  }
+
+  async updateConfig(
+    instituteId: string,
+    input: UpdateInstituteConfigInput,
+  ): Promise<InstituteModel> {
+    const record = await this.instituteRepo.updateConfig(
+      instituteId,
+      input as UpdateInstituteConfigData,
+    );
+    this.emitEvent('INSTITUTE.config_updated', {
+      instituteId,
+      changedFields: Object.keys(input),
+    });
     return record as unknown as InstituteModel;
   }
 
