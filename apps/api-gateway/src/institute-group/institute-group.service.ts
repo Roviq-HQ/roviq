@@ -151,8 +151,21 @@ export class InstituteGroupService {
     await this.requireGroup(groupId);
     await this.groupRepo.addInstituteToGroup(instituteId, groupId);
 
+    // Warn if group's institutes now span multiple resellers (application-level check)
+    await this.warnIfMultiReseller(groupId);
+
     this.emitEvent('INSTITUTE.group.institute_added', { groupId, instituteId });
     return true;
+  }
+
+  /** Log a warning if a group's institutes belong to different resellers */
+  private async warnIfMultiReseller(groupId: string): Promise<void> {
+    const counts = await this.groupRepo.countInstitutesByGroup([groupId]);
+    if ((counts[groupId] ?? 0) > 1) {
+      this.logger.warn(
+        `Institute group ${groupId} has institutes from potentially different resellers — verify assignment`,
+      );
+    }
   }
 
   async removeInstituteFromGroup(instituteId: string): Promise<boolean> {

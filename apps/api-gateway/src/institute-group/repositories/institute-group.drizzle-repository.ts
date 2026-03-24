@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { getRequestContext } from '@roviq/common-types';
+import { BusinessException, ErrorCode, getRequestContext } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -150,13 +150,23 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
           }),
           ...(data.contact !== undefined && { contact: data.contact }),
           ...(data.address !== undefined && { address: data.address }),
+          version: sql`${instituteGroups.version} + 1`,
           updatedBy: userId,
         })
-        .where(and(eq(instituteGroups.id, id), isNull(instituteGroups.deletedAt)))
+        .where(
+          and(
+            eq(instituteGroups.id, id),
+            eq(instituteGroups.version, data.version),
+            isNull(instituteGroups.deletedAt),
+          ),
+        )
         .returning(groupColumns);
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute group ${id} not found`);
+        throw new BusinessException(
+          ErrorCode.CONCURRENT_MODIFICATION,
+          'Record was modified by another user. Please refresh and try again.',
+        );
       }
       return rows[0] as InstituteGroupRecord;
     });
@@ -186,6 +196,12 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
     const { userId } = getRequestContext();
 
     await withAdmin(this.db, async (tx) => {
+      // Unset group_id on all associated institutes before deleting the group
+      await tx
+        .update(institutes)
+        .set({ groupId: null, updatedBy: userId })
+        .where(eq(institutes.groupId, id));
+
       const rows = await tx
         .update(instituteGroups)
         .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
