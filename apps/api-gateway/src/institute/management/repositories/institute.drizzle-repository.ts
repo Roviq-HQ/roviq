@@ -3,8 +3,10 @@ import { BusinessException, ErrorCode, getRequestContext } from '@roviq/common-t
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  instituteAffiliations,
   instituteBranding,
   instituteConfigs,
+  instituteIdentifiers,
   institutes,
   withAdmin,
 } from '@roviq/database';
@@ -316,6 +318,48 @@ export class InstituteDrizzleRepository extends InstituteRepository {
         throw new NotFoundException(`Institute ${id} not found or not deleted`);
       }
       return rows[0] as InstituteRecord;
+    });
+  }
+
+  async findBranding(instituteId: string): Promise<Record<string, unknown> | null> {
+    return withAdmin(this.db, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(instituteBranding)
+        .where(eq(instituteBranding.tenantId, instituteId));
+      return (rows[0] as Record<string, unknown> | undefined) ?? null;
+    });
+  }
+
+  async findConfig(instituteId: string): Promise<Record<string, unknown> | null> {
+    return withAdmin(this.db, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(instituteConfigs)
+        .where(eq(instituteConfigs.tenantId, instituteId));
+      return (rows[0] as Record<string, unknown> | undefined) ?? null;
+    });
+  }
+
+  async findIdentifiers(instituteId: string): Promise<Record<string, unknown>[]> {
+    return withAdmin(this.db, async (tx) => {
+      return tx
+        .select()
+        .from(instituteIdentifiers)
+        .where(eq(instituteIdentifiers.tenantId, instituteId)) as Promise<
+        Record<string, unknown>[]
+      >;
+    });
+  }
+
+  async findAffiliations(instituteId: string): Promise<Record<string, unknown>[]> {
+    return withAdmin(this.db, async (tx) => {
+      return tx
+        .select()
+        .from(instituteAffiliations)
+        .where(eq(instituteAffiliations.tenantId, instituteId)) as Promise<
+        Record<string, unknown>[]
+      >;
     });
   }
 }

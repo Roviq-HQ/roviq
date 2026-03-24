@@ -1,8 +1,9 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { CurrentUser, InstituteScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
+import GraphQLJSON from 'graphql-type-json';
 import { CreateInstituteInput } from './dto/create-institute.input';
 import { InstituteFilterInput } from './dto/institute-filter.input';
 import { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
@@ -20,23 +21,39 @@ export class InstituteResolver {
 
   @Query(() => InstituteConnection)
   @CheckAbility('read', 'Institute')
-  async institutes(
-    @Args('filter', { nullable: true }) filter?: InstituteFilterInput,
-  ): Promise<InstanceType<typeof InstituteConnection>> {
+  async institutes(@Args('filter', { nullable: true }) filter?: InstituteFilterInput) {
     return this.instituteService.search(filter ?? {});
   }
 
   @Query(() => InstituteModel)
   @CheckAbility('read', 'Institute')
-  async institute(@Args('id', { type: () => ID }) id: string): Promise<InstituteModel> {
+  async institute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.findById(id);
   }
 
-  // TODO: Add @ResolveField() resolvers for branding, config, identifiers, affiliations
-  // to allow myInstitute to return full nested institute data via GraphQL field resolution
+  @ResolveField(() => GraphQLJSON, { nullable: true })
+  async branding(@Parent() institute: { id: string }) {
+    return this.instituteService.findBranding(institute.id);
+  }
+
+  @ResolveField(() => GraphQLJSON, { nullable: true })
+  async config(@Parent() institute: { id: string }) {
+    return this.instituteService.findConfig(institute.id);
+  }
+
+  @ResolveField(() => [GraphQLJSON], { nullable: true })
+  async identifiers(@Parent() institute: { id: string }) {
+    return this.instituteService.findIdentifiers(institute.id);
+  }
+
+  @ResolveField(() => [GraphQLJSON], { nullable: true })
+  async affiliations(@Parent() institute: { id: string }) {
+    return this.instituteService.findAffiliations(institute.id);
+  }
+
   @Query(() => InstituteModel)
   @CheckAbility('read', 'Institute')
-  async myInstitute(@CurrentUser() user: AuthUser): Promise<InstituteModel> {
+  async myInstitute(@CurrentUser() user: AuthUser) {
     if (!user.tenantId) {
       throw new Error('Institute scope required to access myInstitute');
     }
@@ -45,7 +62,7 @@ export class InstituteResolver {
 
   @Mutation(() => InstituteModel)
   @CheckAbility('create', 'Institute')
-  async createInstitute(@Args('input') input: CreateInstituteInput): Promise<InstituteModel> {
+  async createInstitute(@Args('input') input: CreateInstituteInput) {
     return this.instituteService.create(input);
   }
 
@@ -54,7 +71,7 @@ export class InstituteResolver {
   async updateInstituteInfo(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateInstituteInfoInput,
-  ): Promise<InstituteModel> {
+  ) {
     return this.instituteService.updateInfo(id, input);
   }
 
@@ -63,7 +80,7 @@ export class InstituteResolver {
   async updateInstituteBranding(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateInstituteBrandingInput,
-  ): Promise<InstituteModel> {
+  ) {
     if (!user.tenantId) throw new Error('Institute scope required');
     return this.instituteService.updateBranding(user.tenantId, input);
   }
@@ -73,44 +90,44 @@ export class InstituteResolver {
   async updateInstituteConfig(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateInstituteConfigInput,
-  ): Promise<InstituteModel> {
+  ) {
     if (!user.tenantId) throw new Error('Institute scope required');
     return this.instituteService.updateConfig(user.tenantId, input);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update', 'Institute')
-  async activateInstitute(@Args('id', { type: () => ID }) id: string): Promise<InstituteModel> {
+  @CheckAbility('update_status', 'Institute')
+  async activateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.activate(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update', 'Institute')
-  async deactivateInstitute(@Args('id', { type: () => ID }) id: string): Promise<InstituteModel> {
+  @CheckAbility('update_status', 'Institute')
+  async deactivateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.deactivate(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update', 'Institute')
-  async suspendInstitute(@Args('id', { type: () => ID }) id: string): Promise<InstituteModel> {
+  @CheckAbility('update_status', 'Institute')
+  async suspendInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.suspend(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update', 'Institute')
-  async rejectInstitute(@Args('id', { type: () => ID }) id: string): Promise<InstituteModel> {
+  @CheckAbility('update_status', 'Institute')
+  async rejectInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.reject(id);
   }
 
   @Mutation(() => Boolean)
   @CheckAbility('delete', 'Institute')
-  async deleteInstitute(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
+  async deleteInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.delete(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('manage', 'Institute')
-  async restoreInstitute(@Args('id', { type: () => ID }) id: string): Promise<InstituteModel> {
+  @CheckAbility('restore', 'Institute')
+  async restoreInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.restore(id);
   }
 }

@@ -29,6 +29,8 @@ export const AppAction = {
   AssignTeacher: 'assign_teacher',
   /** View aggregate statistics for an entity (dashboard metrics) */
   ViewStatistics: 'view_statistics',
+  /** Restore a soft-deleted resource from trash — typically platform admin only */
+  Restore: 'restore',
   /** Allows a platform admin to act as another user within an institute for debugging/support purposes */
   Impersonate: 'impersonate',
 } as const;
