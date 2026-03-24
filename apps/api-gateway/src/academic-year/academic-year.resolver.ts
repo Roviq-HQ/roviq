@@ -1,6 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { InstituteScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { AcademicYearService } from './academic-year.service';
 import { CreateAcademicYearInput } from './dto/create-academic-year.input';
@@ -8,8 +8,7 @@ import { UpdateAcademicYearInput } from './dto/update-academic-year.input';
 import { AcademicYearModel } from './models/academic-year.model';
 import type { AcademicYearRecord } from './repositories/types';
 
-@InstituteScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => AcademicYearModel)
 export class AcademicYearResolver {
   constructor(private readonly academicYearService: AcademicYearService) {}

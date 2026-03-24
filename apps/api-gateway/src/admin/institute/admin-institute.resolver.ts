@@ -1,6 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PlatformScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import GraphQLJSON from 'graphql-type-json';
@@ -14,8 +14,7 @@ import { AdminInstituteService } from './admin-institute.service';
 import { AdminCreateInstituteInput } from './dto/admin-create-institute.input';
 import { AdminListInstitutesFilterInput } from './dto/admin-list-institutes-filter.input';
 
-@PlatformScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
 export class AdminInstituteResolver {
   constructor(

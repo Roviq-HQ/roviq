@@ -1,6 +1,6 @@
 import { ForbiddenException, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
-import { CurrentUser, InstituteScope } from '@roviq/auth-backend';
+import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import GraphQLJSON from 'graphql-type-json';
@@ -13,8 +13,7 @@ import { InstituteService } from './institute.service';
 import { InstituteModel } from './models/institute.model';
 import { InstituteConnection } from './models/institute-connection.model';
 
-@InstituteScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
 export class InstituteResolver {
   constructor(private readonly instituteService: InstituteService) {}
