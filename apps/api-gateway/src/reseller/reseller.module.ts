@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
+import { ResellerInstituteSubscriptionResolver } from './institute/reseller-institute.subscription';
 
 @Module({
-  imports: [
-    // Reseller-scoped feature modules will be added here (ROV-94+)
-    // Resolvers in this group use @ResellerScope() decorator
-  ],
+  providers: [ResellerInstituteSubscriptionResolver],
 })
 export class ResellerModule {}

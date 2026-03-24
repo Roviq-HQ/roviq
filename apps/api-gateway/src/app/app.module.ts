@@ -17,6 +17,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ImpersonationSessionGuard } from '../auth/middleware/impersonation-session.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
+import { EventBusModule } from '../common/event-bus.module';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { validate } from '../config/env.validation';
 import { HealthModule } from '../health/health.module';
@@ -36,6 +37,7 @@ const wsLogger = new Logger('WsTicketAuth');
     ConfigModule.forRoot({ isGlobal: true, validate }),
     RedisModule,
     NatsJetStreamModule,
+    EventBusModule,
     TelemetryModule,
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 20 }],
