@@ -18,17 +18,29 @@ enum AcademicYearStatus {
   PLANNING
 }
 
-input AssignPlanInput {
-  customerEmail: String!
-  customerPhone: String!
-  instituteId: String!
-  planId: String!
-  provider: PaymentProvider!
+input AdminCreateInstituteInput {
+  address: JSON
+  board: String
+  code: String
+  contact: JSON
+  departments: [String!]
+  groupId: String
+  isDemo: Boolean = false
+  name: JSON!
+  resellerId: String
+  slug: String!
+  structureFramework: StructureFramework = TRADITIONAL
+  type: InstituteType = SCHOOL
 }
 
-type AssignPlanResult {
-  checkoutUrl: String
-  subscription: SubscriptionModel!
+input AdminListInstitutesFilterInput {
+  after: String
+  first: Int = 20
+  groupId: String
+  resellerId: String
+  search: String
+  status: [InstituteStatus!]
+  type: InstituteType
 }
 
 type AuditLog {
@@ -46,7 +58,7 @@ type AuditLog {
   ipAddress: String
   metadata: JSON
   source: String!
-  tenantId: String!
+  tenantId: String
   tenantName: I18nText
   userAgent: String
   userId: String!
@@ -100,19 +112,42 @@ enum BatchStatus {
   UPCOMING
 }
 
+"""
+The `BigInt` scalar type represents non-fractional signed whole numeric values.
+"""
+scalar BigInt
+
+type BillingDashboardModel {
+  activeSubscriptions: Int!
+  churnRate: Float!
+  churnedLast30Days: Int!
+  mrr: BigInt!
+  overdueInvoiceCount: Int!
+  subscriptionsByStatus: JSON!
+}
+
 input BillingFilterInput {
   from: DateTime
   status: InvoiceStatus
   to: DateTime
 }
 
-"""
-Billing cycle frequency for subscription plans.
-"""
+"""Billing cycle frequency for subscription plans."""
 enum BillingInterval {
+  ANNUAL
   MONTHLY
   QUARTERLY
-  YEARLY
+  SEMI_ANNUAL
+}
+
+input CancelSubscriptionInput {
+  reason: String
+  subscriptionId: ID!
+}
+
+input ChangePlanInput {
+  newPlanId: ID!
+  subscriptionId: ID!
 }
 
 input CreateAcademicYearInput {
@@ -122,12 +157,22 @@ input CreateAcademicYearInput {
   termStructure: JSON
 }
 
+input CreateGatewayConfigInput {
+  credentials: JSON!
+  displayName: String
+  isDefault: Boolean = false
+  provider: String!
+  supportedMethods: [String!]
+  testMode: Boolean = false
+  webhookSecret: String
+}
+
 input CreateInstituteGroupInput {
   address: JSON
   code: String!
   contact: JSON
   name: String!
-  registrationNo: String
+  registrationNumber: String
   registrationState: String
   type: GroupType!
 }
@@ -146,28 +191,32 @@ input CreateInstituteInput {
 }
 
 input CreatePlanInput {
-  amount: Int!
-  billingInterval: BillingInterval!
+  amount: BigInt!
+  code: String!
   currency: String! = "INR"
   description: I18nText
-  featureLimits: JSON!
+  entitlements: JSON!
+  interval: BillingInterval!
   name: I18nText!
+  sortOrder: Int
+  trialDays: Int! = 0
 }
 
 input CreateSectionInput {
   academicYearId: ID!
   capacity: Int = 40
+  classTeacherId: ID
   displayLabel: String
   displayOrder: Int = 0
   endTime: String
   genderRestriction: GenderRestriction = CO_ED
-  medium: String
+  mediumOfInstruction: String
   name: String!
   room: String
   shift: String
   standardId: ID!
   startTime: String
-  stream: StreamType
+  stream: JSON
 }
 
 input CreateStandardInput {
@@ -218,10 +267,21 @@ enum EducationLevel {
   UPPER_PRIMARY
 }
 
+"""Status of a payment gateway configuration."""
+enum GatewayConfigStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum GenderRestriction {
   BOYS_ONLY
   CO_ED
   GIRLS_ONLY
+}
+
+input GenerateInvoiceInput {
+  subscriptionId: ID!
+  tenantId: ID!
 }
 
 input GeneratePasskeyRegistrationInput {
@@ -251,9 +311,7 @@ enum GroupType {
   TRUST
 }
 
-"""
-Multi-language text stored as { locale: text }
-"""
+"""Multi-language text stored as { locale: text }"""
 scalar I18nText
 
 type ImpersonationAuthPayload {
@@ -270,6 +328,13 @@ type ImpersonationInstituteInfo {
 type ImpersonationUserInfo {
   id: String!
   username: String!
+}
+
+type InitiatePaymentResult {
+  checkoutPayload: JSON
+  checkoutUrl: String
+  gatewayOrderId: String!
+  paymentId: ID!
 }
 
 type InstituteConnection {
@@ -318,7 +383,7 @@ type InstituteGroupModel {
   createdBy: String!
   id: ID!
   name: String!
-  registrationNo: String
+  registrationNumber: String
   registrationState: String
   status: GroupStatus!
   type: GroupType!
@@ -337,11 +402,15 @@ type InstituteLoginResult {
 
 type InstituteModel {
   address: JSON
+  affiliations: [JSON!]
+  branding: JSON
   code: String
+  config: JSON
   contact: JSON!
   createdAt: DateTime!
   currency: String!
   id: ID!
+  identifiers: [JSON!]
   logoUrl: String
   name: JSON!
   settings: JSON!
@@ -374,27 +443,28 @@ enum InstituteType {
   SCHOOL
 }
 
-type InvoiceConnection {
-  edges: [InvoiceModelEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
 type InvoiceModel {
-  amount: Int!
-  billingPeriodEnd: DateTime!
-  billingPeriodStart: DateTime!
   createdAt: DateTime!
   currency: String!
-  dueDate: DateTime!
+  dueAt: DateTime!
   id: ID!
-  instituteId: String!
+  invoiceNumber: String!
+  issuedAt: DateTime
+  lineItems: JSON
+  notes: String
+  paidAmount: BigInt!
   paidAt: DateTime
-  providerInvoiceId: String
-  providerPaymentId: String
+  periodEnd: DateTime
+  periodStart: DateTime
+  resellerId: String!
   status: InvoiceStatus!
   subscription: SubscriptionRef
   subscriptionId: String!
+  subtotalAmount: BigInt!
+  taxAmount: BigInt!
+  taxBreakdown: JSON
+  tenantId: String!
+  totalAmount: BigInt!
 }
 
 type InvoiceModelEdge {
@@ -402,15 +472,15 @@ type InvoiceModelEdge {
   node: InvoiceModel!
 }
 
-"""
-Payment status of an invoice.
-"""
+"""Payment status of an invoice."""
 enum InvoiceStatus {
-  FAILED
+  CANCELLED
+  DRAFT
   OVERDUE
   PAID
-  PENDING
+  PARTIALLY_PAID
   REFUNDED
+  SENT
 }
 
 """
@@ -423,9 +493,11 @@ The `JSONObject` scalar type represents JSON objects as specified by [ECMA-404](
 """
 scalar JSONObject
 
-input ManageSubscriptionInput {
-  atCycleEnd: Boolean = true
-  subscriptionId: String!
+input ManualPaymentInput {
+  amountPaise: BigInt!
+  method: PaymentMethod!
+  notes: String
+  receiptNumber: String
 }
 
 type MembershipInfo {
@@ -444,24 +516,31 @@ type Mutation {
   activateInstituteGroup(id: ID!): InstituteGroupModel!
   addGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
   addInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
+  adminApproveInstitute(id: ID!): InstituteModel!
+  adminCreateInstitute(input: AdminCreateInstituteInput!): InstituteModel!
+  adminCreateInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
+  adminDeleteInstitute(id: ID!): Boolean!
+  adminDeleteInstituteGroup(id: ID!): Boolean!
 
-  """
-  Delete a suspended reseller after 30-day grace period
-  """
+  """Delete a suspended reseller after 30-day grace period"""
   adminDeleteReseller(resellerId: String!): Boolean!
   adminLogin(password: String!, username: String!): AuthPayload!
+  adminRejectInstitute(id: ID!, reason: String!): InstituteModel!
+  adminRestoreInstitute(id: ID!): InstituteModel!
 
-  """
-  Suspend a reseller and revoke all staff sessions
-  """
+  """Suspend a reseller and revoke all staff sessions"""
   adminSuspendReseller(resellerId: String!): Boolean!
+  adminUpdateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
+  adminUpdateInstituteStatus(id: ID!, reason: String, status: InstituteStatus!): InstituteModel!
   archiveAcademicYear(id: ID!): AcademicYearModel!
-  archivePlan(id: ID!): SubscriptionPlanModel!
-  assignPlanToInstitute(input: AssignPlanInput!): AssignPlanResult!
+  assignClassTeacher(classTeacherId: ID!, sectionId: ID!): SectionModel!
+  assignPlanToInstitute(planId: ID!, tenantId: ID!): SubscriptionModel!
   assignSubjectToSection(sectionId: ID!, subjectId: ID!): Boolean!
   assignSubjectToStandard(standardId: ID!, subjectId: ID!): Boolean!
-  cancelSubscription(input: ManageSubscriptionInput!): SubscriptionModel!
+  cancelSubscription(input: CancelSubscriptionInput!): SubscriptionModel!
+  changePlan(input: ChangePlanInput!): SubscriptionModel!
   createAcademicYear(input: CreateAcademicYearInput!): AcademicYearModel!
+  createGatewayConfig(input: CreateGatewayConfigInput!): PaymentGatewayConfigModel!
   createInstitute(input: CreateInstituteInput!): InstituteModel!
   createInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
   createSection(input: CreateSectionInput!): SectionModel!
@@ -470,6 +549,8 @@ type Mutation {
   createSubscriptionPlan(input: CreatePlanInput!): SubscriptionPlanModel!
   deactivateInstitute(id: ID!): InstituteModel!
   deactivateInstituteGroup(id: ID!): InstituteGroupModel!
+  deleteAcademicYear(id: ID!): Boolean!
+  deleteGatewayConfig(id: ID!): Boolean!
   deleteInstitute(id: ID!): Boolean!
   deleteInstituteGroup(id: ID!): Boolean!
   deletePlan(id: ID!): Boolean!
@@ -478,12 +559,16 @@ type Mutation {
   deleteSubject(id: ID!): Boolean!
   endImpersonation(sessionId: String!): Boolean!
   exchangeImpersonationCode(code: String!): ImpersonationAuthPayload!
+  generateInvoice(input: GenerateInvoiceInput!): InvoiceModel!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
   generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
   impersonateUser(reason: String!, targetUserId: String!): StartImpersonationResult!
+  initiatePayment(invoiceId: ID!): InitiatePaymentResult!
   instituteLogin(password: String!, username: String!): InstituteLoginResult!
+  issueRefund(input: RefundInput!, paymentId: ID!): InvoiceModel!
   logout: Boolean!
-  pauseSubscription(subscriptionId: ID!): SubscriptionModel!
+  pauseSubscription(input: PauseSubscriptionInput!): SubscriptionModel!
+  recordManualPayment(input: ManualPaymentInput!, invoiceId: ID!): InvoiceModel!
   refreshToken(token: String!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
   registerDeviceToken(token: String!): Boolean!
@@ -493,22 +578,24 @@ type Mutation {
   removePasskey(passkeyId: String!): Boolean!
   removeSubjectFromSection(sectionId: ID!, subjectId: ID!): Boolean!
   removeSubjectFromStandard(standardId: ID!, subjectId: ID!): Boolean!
+  resellerCreateInstituteGroup(input: CreateInstituteGroupInput!): JSON!
+  resellerCreateInstituteRequest(input: ResellerCreateInstituteRequestInput!): InstituteModel!
   resellerLogin(password: String!, username: String!): AuthPayload!
+  resellerReactivateInstitute(id: ID!): InstituteModel!
+  resellerSuspendInstitute(id: ID!, reason: String): InstituteModel!
   restoreInstitute(id: ID!): InstituteModel!
-  restorePlan(id: ID!): SubscriptionPlanModel!
   resumeSubscription(subscriptionId: ID!): SubscriptionModel!
   revokeAllOtherSessions(currentRefreshToken: String!): Boolean!
   revokeSession(sessionId: String!): Boolean!
   selectInstitute(membershipId: String!, selectionToken: String!): AuthPayload!
-  startImpersonation(
-    reason: String!
-    targetTenantId: String!
-    targetUserId: String!
-  ): StartImpersonationResult!
+  startImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
   suspendInstitute(id: ID!): InstituteModel!
   suspendInstituteGroup(id: ID!): InstituteGroupModel!
   switchInstitute(currentRefreshToken: String!, membershipId: String!): AuthPayload!
   updateAcademicYear(id: ID!, input: UpdateAcademicYearInput!): AcademicYearModel!
+  updateGatewayConfig(id: ID!, input: UpdateGatewayConfigInput!): PaymentGatewayConfigModel!
+  updateInstituteBranding(input: UpdateInstituteBrandingInput!): InstituteModel!
+  updateInstituteConfig(input: UpdateInstituteConfigInput!): InstituteModel!
   updateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
   updateInstituteInfo(id: ID!, input: UpdateInstituteInfoInput!): InstituteModel!
   updateNotificationConfig(input: UpdateNotificationConfigInput!): NotificationConfigModel!
@@ -519,6 +606,7 @@ type Mutation {
   verifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
   verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): InstituteLoginResult!
   verifyPasskeyRegistration(input: VerifyPasskeyRegistrationInput!): PasskeyInfo!
+  verifyPayment(input: VerifyPaymentGqlInput!): PaymentModel!
 }
 
 enum NepStage {
@@ -561,20 +649,64 @@ type PasskeyInfo {
   registeredAt: DateTime!
 }
 
-"""
-Supported payment gateway providers.
-"""
-enum PaymentProvider {
-  CASHFREE
-  RAZORPAY
+input PauseSubscriptionInput {
+  reason: String
+  subscriptionId: ID!
 }
 
-"""
-Lifecycle status of a subscription plan.
-"""
+type PaymentGatewayConfigModel {
+  createdAt: DateTime!
+  displayName: String
+  id: ID!
+  isDefault: Boolean!
+  provider: String!
+  resellerId: String!
+  status: GatewayConfigStatus!
+  supportedMethods: JSON!
+  testMode: Boolean!
+  updatedAt: DateTime!
+  webhookUrl: String!
+}
+
+"""Payment method used (gateway or manual)."""
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CASHFREE
+  CHEQUE
+  RAZORPAY
+  UPI
+}
+
+type PaymentModel {
+  amountPaise: BigInt!
+  createdAt: DateTime!
+  currency: String!
+  gatewayPaymentId: String
+  gatewayProvider: String
+  id: ID!
+  invoiceId: String!
+  method: PaymentMethod!
+  paidAt: DateTime
+  receiptNumber: String
+  status: PaymentStatus!
+  tenantId: String!
+}
+
+"""Current state of a payment record."""
+enum PaymentStatus {
+  FAILED
+  PARTIALLY_REFUNDED
+  PENDING
+  PROCESSING
+  REFUNDED
+  SUCCEEDED
+}
+
+"""Lifecycle status of a subscription plan."""
 enum PlanStatus {
   ACTIVE
-  ARCHIVED
+  INACTIVE
 }
 
 type Query {
@@ -582,41 +714,39 @@ type Query {
   academicYears: [AcademicYearModel!]!
   activeAcademicYear: AcademicYearModel
   adminAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  adminGetInstitute(id: ID!): InstituteModel!
+  adminInstituteStatistics: JSON!
+  adminListInstituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
+  adminListInstitutes(filter: AdminListInstitutesFilterInput): InstituteConnection!
   auditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
   authEvents(first: Int = 50): [AuthEventModel!]!
   billingInstitutes: [InstituteRef!]!
 
-  """
-  Returns the current Roviq edition: ce or ee
-  """
+  """Returns the current Roviq edition: ce or ee"""
   edition: String!
-  entityAuditTimeline(
-    after: String
-    entityId: String!
-    entityType: String!
-    first: Int = 20
-  ): AuditLogConnection!
+  entityAuditTimeline(after: String, entityId: String!, entityType: String!, first: Int = 20): AuditLogConnection!
+  gatewayConfigs: [PaymentGatewayConfigModel!]!
   institute(id: ID!): InstituteModel!
   instituteGroup(id: ID!): InstituteGroupModel!
   instituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
   institutes(filter: InstituteFilterInput): InstituteConnection!
-  invoices(
-    after: String
-    filter: BillingFilterInput
-    first: Int = 20
-    instituteId: ID
-  ): InvoiceConnection!
+  invoices(after: String, filter: BillingFilterInput, first: Int = 20, instituteId: ID): [InvoiceModel!]!
   me: UserType!
   myGroups: [GroupMembershipModel!]!
   myInstitute: InstituteModel!
+  myInvoice(id: ID!): InvoiceModel
+  myInvoices(after: String, filter: BillingFilterInput, first: Int = 20): [InvoiceModel!]!
   myPasskeys: [PasskeyInfo!]!
+  myPaymentHistory(after: String, first: Int = 20): [PaymentModel!]!
   mySessions: [SessionInfo!]!
+  mySubscription: SubscriptionModel
   notificationConfigs: [NotificationConfigModel!]!
-  resellerAuditLogs(
-    after: String
-    filter: AuditLogFilterInput
-    first: Int = 20
-  ): AuditLogConnection!
+  resellerAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  resellerBillingDashboard: BillingDashboardModel!
+  resellerGetInstitute(id: ID!): InstituteModel!
+  resellerInstituteStatistics: JSON!
+  resellerListInstituteGroups: JSON!
+  resellerListInstitutes(filter: InstituteFilterInput): InstituteConnection!
   section(id: ID!): SectionModel!
   sections(standardId: ID!): [SectionModel!]!
   standard(id: ID!): StandardModel!
@@ -624,20 +754,33 @@ type Query {
   subject(id: ID!): SubjectModel!
   subjects: [SubjectModel!]!
   subjectsByStandard(standardId: ID!): [SubjectModel!]!
-  subscription(instituteId: ID!): SubscriptionModel
   subscriptionPlan(id: ID!): SubscriptionPlanModel!
-  subscriptionPlans: [SubscriptionPlanModel!]!
-  subscriptions(
-    after: String
-    filter: SubscriptionFilterInput
-    first: Int = 20
-  ): SubscriptionConnection!
+  subscriptionPlans(after: String, first: Int = 20, status: String): [SubscriptionPlanModel!]!
+  subscriptions(after: String, first: Int = 20, status: String): [SubscriptionModel!]!
+}
+
+input RefundInput {
+  amountPaise: BigInt!
+  reason: String
 }
 
 input RegisterInput {
   email: String!
   password: String!
   username: String!
+}
+
+input ResellerCreateInstituteRequestInput {
+  address: JSON
+  board: String
+  code: String
+  contact: JSON
+  departments: [String!]
+  groupId: String
+  name: JSON!
+  slug: String!
+  structureFramework: StructureFramework = TRADITIONAL
+  type: InstituteType = SCHOOL
 }
 
 type SectionModel {
@@ -652,13 +795,13 @@ type SectionModel {
   endTime: String
   genderRestriction: GenderRestriction!
   id: ID!
-  medium: String
+  mediumOfInstruction: String
   name: String!
   room: String
   shift: String
   standardId: String!
   startTime: String
-  stream: StreamType
+  stream: JSON
   updatedAt: DateTime!
 }
 
@@ -702,12 +845,6 @@ type StartImpersonationResult {
   requiresOtp: Boolean
 }
 
-enum StreamType {
-  ARTS
-  COMMERCE
-  SCIENCE
-}
-
 enum StructureFramework {
   NEP
   TRADITIONAL
@@ -738,29 +875,37 @@ enum SubjectType {
   SKILL
 }
 
-type SubscriptionConnection {
-  edges: [SubscriptionModelEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-input SubscriptionFilterInput {
-  status: SubscriptionStatus
+type Subscription {
+  adminInstituteApprovalRequested: JSON!
+  adminInstituteCreated: JSON!
+  instituteBrandingUpdated: InstituteModel!
+  instituteConfigUpdated: InstituteModel!
+  instituteSetupProgress: JSON!
+  instituteUpdated: InstituteModel!
+  myInvoiceGenerated: JSON!
+  myPaymentStatusChanged: JSON!
+  mySubscriptionStatusChanged: JSON!
+  resellerInstituteCreated: JSON!
+  resellerInstituteStatusChanged: JSON!
+  resellerInvoiceGenerated: JSON!
+  resellerPaymentReceived: JSON!
+  resellerSubscriptionChanged: JSON!
 }
 
 type SubscriptionModel {
-  canceledAt: DateTime
+  cancelledAt: DateTime
   createdAt: DateTime!
   currentPeriodEnd: DateTime
   currentPeriodStart: DateTime
+  gatewayProvider: String
+  gatewaySubscriptionId: String
   id: ID!
   institute: InstituteRef
-  instituteId: String!
   plan: SubscriptionPlanModel
   planId: String!
-  providerCustomerId: String
-  providerSubscriptionId: String
+  resellerId: String!
   status: SubscriptionStatus!
+  tenantId: String!
   trialEndsAt: DateTime
   updatedAt: DateTime!
 }
@@ -771,15 +916,17 @@ type SubscriptionModelEdge {
 }
 
 type SubscriptionPlanModel {
-  amount: Int!
-  billingInterval: BillingInterval!
+  amount: BigInt!
   createdAt: DateTime!
   currency: String!
   description: I18nText
-  featureLimits: JSON!
+  entitlements: JSON!
   id: ID!
+  interval: BillingInterval!
   name: I18nText!
+  sortOrder: Int
   status: PlanStatus!
+  trialDays: Int!
   updatedAt: DateTime!
 }
 
@@ -788,16 +935,14 @@ type SubscriptionRef {
   institute: InstituteRef
 }
 
-"""
-Current state of a subscription.
-"""
+"""Current state of a subscription."""
 enum SubscriptionStatus {
   ACTIVE
-  CANCELED
-  COMPLETED
+  CANCELLED
+  EXPIRED
   PAST_DUE
   PAUSED
-  PENDING_PAYMENT
+  TRIALING
 }
 
 input UpdateAcademicYearInput {
@@ -808,12 +953,44 @@ input UpdateAcademicYearInput {
   termStructure: JSON
 }
 
+input UpdateGatewayConfigInput {
+  credentials: JSON
+  displayName: String
+  isDefault: Boolean
+  status: GatewayConfigStatus
+  supportedMethods: [String!]
+  testMode: Boolean
+  webhookSecret: String
+}
+
+input UpdateInstituteBrandingInput {
+  coverImageUrl: String
+  faviconUrl: String
+  logoUrl: String
+  primaryColor: String
+  secondaryColor: String
+  themeIdentifier: String
+}
+
+input UpdateInstituteConfigInput {
+  attendanceType: String
+  closingTime: String
+  gradingSystem: JSON
+  notificationPreferences: JSON
+  openingTime: String
+  payrollConfig: JSON
+  sectionStrengthNorms: JSON
+  shifts: JSON
+  termStructure: JSON
+}
+
 input UpdateInstituteGroupInput {
   address: JSON
   contact: JSON
   name: String
-  registrationNo: String
+  registrationNumber: String
   registrationState: String
+  version: Int!
 }
 
 input UpdateInstituteInfoInput {
@@ -823,6 +1000,7 @@ input UpdateInstituteInfoInput {
   currency: String
   name: JSON
   timezone: String
+  version: Int!
 }
 
 input UpdateNotificationConfigInput {
@@ -836,11 +1014,14 @@ input UpdateNotificationConfigInput {
 }
 
 input UpdatePlanInput {
-  amount: Int
-  billingInterval: BillingInterval
+  amount: BigInt
   description: I18nText
-  featureLimits: JSON
+  entitlements: JSON
+  interval: BillingInterval
   name: I18nText
+  sortOrder: Int
+  trialDays: Int
+  version: Int!
 }
 
 input UpdateSectionInput {
@@ -851,12 +1032,12 @@ input UpdateSectionInput {
   displayOrder: Int
   endTime: String
   genderRestriction: GenderRestriction
-  medium: String
+  mediumOfInstruction: String
   name: String
   room: String
   shift: String
   startTime: String
-  stream: StreamType
+  stream: JSON
 }
 
 input UpdateStandardInput {
@@ -906,4 +1087,10 @@ input VerifyPasskeyAuthInput {
 input VerifyPasskeyRegistrationInput {
   credential: JSON!
   name: String
+}
+
+input VerifyPaymentGqlInput {
+  gatewayOrderId: String!
+  gatewayPaymentId: String!
+  signature: String!
 }

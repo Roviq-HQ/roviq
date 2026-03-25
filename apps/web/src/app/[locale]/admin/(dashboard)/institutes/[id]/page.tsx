@@ -131,7 +131,7 @@ export default function InstituteDetailPage() {
   }
 
   if (!institute) {
-    return <p className="py-12 text-center text-muted-foreground">Institute not found.</p>;
+    return <p className="py-12 text-center text-muted-foreground">{td('notFound')}</p>;
   }
 
   const canActivate = institute.setupStatus === 'COMPLETED';
@@ -244,27 +244,27 @@ export default function InstituteDetailPage() {
             <CardContent>
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="text-muted-foreground">Name</dt>
+                  <dt className="text-muted-foreground">{td('fieldName')}</dt>
                   <dd className="font-medium">{resolveI18n(institute.name)}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Code</dt>
+                  <dt className="text-muted-foreground">{td('fieldCode')}</dt>
                   <dd className="font-mono">{institute.code ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Type</dt>
+                  <dt className="text-muted-foreground">{td('fieldType')}</dt>
                   <dd>{t(`types.${institute.type}`)}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Framework</dt>
+                  <dt className="text-muted-foreground">{td('fieldFramework')}</dt>
                   <dd>{institute.structureFramework}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Timezone</dt>
+                  <dt className="text-muted-foreground">{td('fieldTimezone')}</dt>
                   <dd>{institute.timezone}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Currency</dt>
+                  <dt className="text-muted-foreground">{td('fieldCurrency')}</dt>
                   <dd>{institute.currency}</dd>
                 </div>
               </dl>
@@ -356,10 +356,10 @@ export default function InstituteDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead>Issued By</TableHead>
-                      <TableHead>Valid Until</TableHead>
+                      <TableHead>{td('identifierType')}</TableHead>
+                      <TableHead>{td('identifierValue')}</TableHead>
+                      <TableHead>{td('identifierIssuedBy')}</TableHead>
+                      <TableHead>{td('identifierValidUntil')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -387,11 +387,11 @@ export default function InstituteDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Board</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Number</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead>Valid Until</TableHead>
+                      <TableHead>{td('affiliationBoard')}</TableHead>
+                      <TableHead>{td('affiliationStatus')}</TableHead>
+                      <TableHead>{td('affiliationNumber')}</TableHead>
+                      <TableHead>{td('affiliationLevel')}</TableHead>
+                      <TableHead>{td('affiliationValidUntil')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -499,9 +499,7 @@ export default function InstituteDetailPage() {
               <CardTitle>{td('tabs.audit')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Audit logs for this institute will be displayed here.
-              </p>
+              <p className="text-sm text-muted-foreground">{td('auditPlaceholder')}</p>
             </CardContent>
           </Card>
         </TabsContent>
