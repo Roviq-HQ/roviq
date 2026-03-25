@@ -1,9 +1,9 @@
 'use client';
 
 import { gql, useQuery } from '@roviq/graphql';
-import type { AdminAuditLogsQuery, AdminAuditLogsQueryVariables } from './use-audit-logs.generated';
+import type { AuditLogsQuery, AuditLogsQueryVariables } from './use-audit-logs.generated';
 
-export type AuditLogNode = AdminAuditLogsQuery['adminAuditLogs']['edges'][number]['node'];
+export type AuditLogNode = AuditLogsQuery['adminAuditLogs']['edges'][number]['node'];
 
 const ADMIN_AUDIT_LOGS_QUERY = gql`
   query AdminAuditLogs($filter: AuditLogFilterInput, $first: Int, $after: String) {
@@ -43,10 +43,10 @@ const ADMIN_AUDIT_LOGS_QUERY = gql`
   }
 `;
 
-export function useAuditLogs(variables: AdminAuditLogsQueryVariables) {
+export function useAuditLogs(variables: AuditLogsQueryVariables) {
   const { data, loading, error, fetchMore } = useQuery<
-    AdminAuditLogsQuery,
-    AdminAuditLogsQueryVariables
+    AuditLogsQuery,
+    AuditLogsQueryVariables
   >(ADMIN_AUDIT_LOGS_QUERY, {
     variables,
     notifyOnNetworkStatusChange: true,

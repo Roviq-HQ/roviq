@@ -45,22 +45,20 @@ const INSTITUTE_DETAIL_FIELDS = gql`
     currency
     settings
     status
-    version
     createdAt
     updatedAt
     branding
     config
     identifiers
     affiliations
-    departments
   }
 `;
 
 // ─── List Query ──────────────────────────────────────────────────────────────
 
 const INSTITUTES_QUERY = gql`
-  query AdminInstitutes($filter: InstituteFilterInput, $first: Int, $after: String) {
-    institutes(filter: $filter, first: $first, after: $after) {
+  query AdminInstitutes($filter: InstituteFilterInput) {
+    institutes(filter: $filter) {
       edges {
         cursor
         node {
@@ -81,13 +79,13 @@ const INSTITUTES_QUERY = gql`
 
 export function useInstitutes(variables: {
   filter?: Record<string, unknown>;
-  first?: number;
-  after?: string;
 }) {
+  const filterWithPagination = { first: 20, ...variables.filter };
+
   const { data, loading, error, fetchMore, refetch } = useQuery<InstitutesConnectionData>(
     INSTITUTES_QUERY,
     {
-      variables: { first: 20, ...variables },
+      variables: { filter: filterWithPagination },
       notifyOnNetworkStatusChange: true,
     },
   );
@@ -96,7 +94,7 @@ export function useInstitutes(variables: {
     const endCursor = data?.institutes.pageInfo.endCursor;
     if (!endCursor) return;
     return fetchMore({
-      variables: { ...variables, first: 20, after: endCursor },
+      variables: { filter: { ...filterWithPagination, after: endCursor } },
     });
   };
 
@@ -216,12 +214,12 @@ export function useRestoreInstitute() {
 
 // ─── Subscriptions ───────────────────────────────────────────────────────────
 
-const INSTITUTE_SETUP_PROGRESS = gql`
-  subscription InstituteSetupProgress {
-    instituteSetupProgress
-  }
-`;
+// const INSTITUTE_SETUP_PROGRESS = gql`
+//   subscription InstituteSetupProgress {
+//     instituteSetupProgress
+//   }
+// `;
 
-export function useSetupProgressSubscription() {
-  return useSubscription<SetupProgressPayload>(INSTITUTE_SETUP_PROGRESS);
-}
+// export function useSetupProgressSubscription() {
+//   return useSubscription<SetupProgressPayload>(INSTITUTE_SETUP_PROGRESS);
+// }

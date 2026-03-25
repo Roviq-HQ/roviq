@@ -26,14 +26,12 @@ const INSTITUTE_FIELDS = gql`
     currency
     settings
     status
-    version
     createdAt
     updatedAt
     branding
     config
     identifiers
     affiliations
-    departments
   }
 `;
 
