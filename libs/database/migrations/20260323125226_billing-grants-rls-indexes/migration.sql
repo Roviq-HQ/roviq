@@ -66,9 +66,10 @@ BEGIN
     ON invoices (reseller_id, invoice_number)';
 
   -- One default gateway config per reseller+provider
-  EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS uq_gwc_default
+  EXECUTE 'DROP INDEX IF EXISTS uq_gwc_default';
+  EXECUTE 'CREATE UNIQUE INDEX uq_gwc_default
     ON payment_gateway_configs (reseller_id, provider)
-    WHERE is_default = true';
+    WHERE is_default = true AND deleted_at IS NULL';
 
   -- ============================================================
   -- Performance Indexes

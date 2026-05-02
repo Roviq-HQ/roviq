@@ -4,13 +4,13 @@
  *   - Playwright UI suites (e2e/web-{admin,institute,reseller}-e2e/**)
  *   - The seed script itself (scripts/seed.ts)
  *
- * IDs are the canonical source of truth in `scripts/seed-ids.ts` (zero
+ * IDs are the canonical source of truth in `libs/database/src/seed/ids.ts` (zero
  * @roviq/* imports, Vitest-resolvable from any project). They are
  * re-exported here for callers that want everything from one path.
  *
  * Rules:
  *   - NEVER hardcode a seed name, slug, password, or username outside this
- *     file. Hardcoded IDs go in `scripts/seed-ids.ts`.
+ *     file. Hardcoded IDs go in `libs/database/src/seed/ids.ts`.
  *   - Passwords stay plaintext; the seeder hashes them at run time. They
  *     must each be at least `NEW_PASSWORD_MIN_LENGTH` characters
  *     (`@roviq/common-types`) so the password-change suite can roll any
@@ -21,7 +21,7 @@
  *     resolvability under Vitest. NEW_PASSWORD_MIN_LENGTH is duplicated
  *     as a literal constant below — kept honest by the runtime guard.
  */
-import { SEED_IDS } from '../../scripts/seed-ids';
+import { SEED_IDS } from '../../libs/database/src/seed/ids';
 
 // Re-export so `import { SEED_IDS } from '.../seed-fixtures'` works.
 export { SEED_IDS };
@@ -129,4 +129,88 @@ export const E2E_USERS = {
   TEACHER: SEED_CREDENTIALS.TEACHER,
   STUDENT: SEED_CREDENTIALS.STUDENT,
   GUARDIAN: SEED_CREDENTIALS.GUARDIAN,
+} as const;
+
+// People fixtures — used by Playwright + Vitest E2E tests that assert on
+// list/detail data. Mirrors the rows seedDemo() and seedE2e() create in
+// libs/database/src/seed/{demo,e2e}/.
+export const SEED_PEOPLE = {
+  STUDENTS: [
+    {
+      id: SEED_IDS.USER_STUDENT,
+      username: 'student1',
+      name: 'Priya Singh',
+      admissionNumber: 'S-2026/0001',
+      academicStatus: 'ENROLLED',
+      socialCategory: 'GENERAL',
+      rte: false,
+    },
+    {
+      id: SEED_IDS.USER_STUDENT_2,
+      username: 'student2',
+      name: 'Priya Patel',
+      admissionNumber: '2025/0002',
+      academicStatus: 'ENROLLED',
+      socialCategory: 'OBC',
+      rte: false,
+    },
+    {
+      id: SEED_IDS.USER_STUDENT_3,
+      username: 'student3',
+      name: 'Rahul Verma',
+      admissionNumber: '2025/0003',
+      academicStatus: 'ENROLLED',
+      socialCategory: 'SC',
+      rte: true,
+    },
+    {
+      id: SEED_IDS.USER_STUDENT_4,
+      username: 'student4',
+      name: 'Kavya Singh',
+      admissionNumber: '2025/0004',
+      academicStatus: 'GRADUATED',
+      socialCategory: 'GENERAL',
+      rte: false,
+    },
+    {
+      id: SEED_IDS.USER_STUDENT_5,
+      username: 'student5',
+      name: 'Amit Kumar',
+      admissionNumber: '2025/0005',
+      academicStatus: 'TRANSFERRED_OUT',
+      socialCategory: 'ST',
+      rte: false,
+    },
+  ],
+  STAFF: [
+    {
+      id: SEED_IDS.USER_TEACHER,
+      username: 'teacher1',
+      name: 'Rajesh Sharma',
+      employeeId: 'SVM/STAFF/001',
+      designation: 'PGT Mathematics',
+      employmentType: 'REGULAR',
+    },
+    {
+      id: SEED_IDS.USER_STAFF_2,
+      username: 'staff2',
+      name: 'Vikram Joshi',
+      employeeId: 'SVM/STAFF/002',
+      designation: 'PRT English',
+      employmentType: 'CONTRACTUAL',
+    },
+    {
+      id: SEED_IDS.USER_STAFF_3,
+      username: 'staff3',
+      name: 'Meera Nair',
+      employeeId: 'SVM/STAFF/003',
+      designation: 'Admin Officer',
+      employmentType: 'REGULAR',
+    },
+  ],
+  GUARDIANS: [
+    { id: SEED_IDS.USER_GUARDIAN, username: 'guardian1', name: 'Suresh Kumar' },
+    { id: SEED_IDS.USER_GUARDIAN_2, username: 'guardian2', name: 'Sunita Patel' },
+    { id: SEED_IDS.USER_GUARDIAN_3, username: 'guardian3', name: 'Anil Verma' },
+  ],
 } as const;

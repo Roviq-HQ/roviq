@@ -50,7 +50,7 @@ export const approvalRequestWorkflow = workflow(
         body: `Approval needed: ${payload.requesterName} submitted a ${payload.requestType} request. ${payload.summary}`,
       }),
       {
-        skip: () => !payload.config.whatsapp,
+        skip: () => !payload.config?.whatsapp,
       },
     );
 
@@ -62,7 +62,7 @@ export const approvalRequestWorkflow = workflow(
         body: `${payload.requesterName} submitted a ${payload.requestType} request: ${payload.summary}. <a href="${payload.actionUrl}">Review now</a>`,
       }),
       {
-        skip: () => !payload.config.email,
+        skip: () => !payload.config?.email,
       },
     );
 
@@ -74,7 +74,7 @@ export const approvalRequestWorkflow = workflow(
         body: `${payload.requesterName} — ${payload.summary}`,
       }),
       {
-        skip: () => !payload.config.push,
+        skip: () => !payload.config?.push,
       },
     );
   },

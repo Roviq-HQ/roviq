@@ -48,7 +48,7 @@ local_resource(
 # Database seed — auto-runs after schema push, skips if already seeded
 local_resource(
   'db-seed',
-  cmd='pnpm run db:seed',
+  cmd='pnpm run db:seed:demo',
   resource_deps=['db-push'],
   labels=['dev'],
 )

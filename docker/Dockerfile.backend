@@ -79,7 +79,7 @@ COPY --chown=node:node libs ./libs
 COPY --chown=node:node ee ./ee
 COPY --chown=node:node scripts ./scripts
 
-# e2e shared helpers — scripts/seed.ts imports from e2e/shared/seed-fixtures
+# e2e shared helpers — seed scripts import from e2e/shared/seed-fixtures
 # at runtime in migrate-and-seed (no bind mount for e2e/ in that service).
 COPY --chown=node:node e2e ./e2e
 

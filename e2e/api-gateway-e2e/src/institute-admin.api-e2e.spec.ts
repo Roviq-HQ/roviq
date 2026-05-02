@@ -961,7 +961,7 @@ describe('Institute Admin (platform scope) E2E', () => {
       expect(tree.academicYearId).toBeNull();
       expect(tree.standards).toHaveLength(0);
 
-      // cleanup
+      // Cleanup
       await gql<{ adminDeleteInstitute: boolean }>(ADMIN_DELETE, { id }, adminToken);
     });
 

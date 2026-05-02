@@ -28,7 +28,7 @@ import { gql } from './helpers/gql-client';
 // audit.api-e2e.spec.ts but uses the `roviq` superuser.
 const SUPERUSER_URL =
   process.env.DATABASE_URL_E2E_MIGRATE ??
-  process.env.DATABASE_URL_MIGRATE ??
+  process.env.DATABASE_URL_TEST_MIGRATE ??
   'postgresql://roviq:roviq_dev@localhost:5435/roviq_test';
 
 // Fixed test UUIDs so re-runs are idempotent (we DELETE by ID in afterAll).

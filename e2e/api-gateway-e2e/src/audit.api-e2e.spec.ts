@@ -31,7 +31,7 @@ const AUDIT_USER_ID = SEED_IDS.USER_ADMIN;
 //   3. hardcoded dev fallback for ad-hoc local runs.
 const DATABASE_URL =
   process.env.DATABASE_URL_E2E ??
-  process.env.DATABASE_URL ??
+  process.env.DATABASE_URL_TEST ??
   'postgresql://roviq_pooler:roviq_pooler_dev@localhost:5435/roviq_test';
 
 /**

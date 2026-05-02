@@ -1,0 +1,135 @@
+// libs/database/src/seed/demo/data/inst1-standards.ts
+import type { StandardDef } from './types';
+
+// ─── NEP Standards for Institute 1 (Nursery through Class 12) ────────
+export const INST1_STANDARDS: StandardDef[] = [
+  // PRE_PRIMARY — Foundational stage (NEP)
+  {
+    name: 'Nursery',
+    order: -3,
+    level: 'PRE_PRIMARY',
+    nep: 'FOUNDATIONAL',
+    sections: ['A', 'B'],
+    udise: -3,
+  },
+  {
+    name: 'LKG',
+    order: -2,
+    level: 'PRE_PRIMARY',
+    nep: 'FOUNDATIONAL',
+    sections: ['A', 'B'],
+    udise: -2,
+  },
+  {
+    name: 'UKG',
+    order: -1,
+    level: 'PRE_PRIMARY',
+    nep: 'FOUNDATIONAL',
+    sections: ['A', 'B'],
+    udise: -1,
+  },
+  // PRIMARY — Foundational (1-2) + Preparatory (3-5) stages
+  {
+    name: 'Class 1',
+    order: 1,
+    level: 'PRIMARY',
+    nep: 'FOUNDATIONAL',
+    sections: ['A', 'B', 'C'],
+    udise: 1,
+  },
+  {
+    name: 'Class 2',
+    order: 2,
+    level: 'PRIMARY',
+    nep: 'FOUNDATIONAL',
+    sections: ['A', 'B', 'C'],
+    udise: 2,
+  },
+  {
+    name: 'Class 3',
+    order: 3,
+    level: 'PRIMARY',
+    nep: 'PREPARATORY',
+    sections: ['A', 'B', 'C'],
+    udise: 3,
+  },
+  {
+    name: 'Class 4',
+    order: 4,
+    level: 'PRIMARY',
+    nep: 'PREPARATORY',
+    sections: ['A', 'B'],
+    udise: 4,
+  },
+  {
+    name: 'Class 5',
+    order: 5,
+    level: 'PRIMARY',
+    nep: 'PREPARATORY',
+    sections: ['A', 'B'],
+    udise: 5,
+  },
+  // UPPER_PRIMARY — Middle stage
+  {
+    name: 'Class 6',
+    order: 6,
+    level: 'UPPER_PRIMARY',
+    nep: 'MIDDLE',
+    sections: ['A', 'B'],
+    udise: 6,
+  },
+  {
+    name: 'Class 7',
+    order: 7,
+    level: 'UPPER_PRIMARY',
+    nep: 'MIDDLE',
+    sections: ['A', 'B'],
+    udise: 7,
+  },
+  {
+    name: 'Class 8',
+    order: 8,
+    level: 'UPPER_PRIMARY',
+    nep: 'MIDDLE',
+    sections: ['A', 'B'],
+    udise: 8,
+  },
+  // SECONDARY — Secondary stage
+  {
+    name: 'Class 9',
+    order: 9,
+    level: 'SECONDARY',
+    nep: 'SECONDARY',
+    sections: ['A', 'B'],
+    udise: 9,
+  },
+  {
+    name: 'Class 10',
+    order: 10,
+    level: 'SECONDARY',
+    nep: 'SECONDARY',
+    sections: ['A', 'B'],
+    udise: 10,
+    boardExam: true,
+  },
+  // SENIOR_SECONDARY — Secondary stage, streams apply
+  {
+    name: 'Class 11',
+    order: 11,
+    level: 'SENIOR_SECONDARY',
+    nep: 'SECONDARY',
+    sections: ['Science', 'Commerce', 'Arts'],
+    udise: 11,
+    stream: true,
+  },
+  {
+    name: 'Class 12',
+    order: 12,
+    level: 'SENIOR_SECONDARY',
+    nep: 'SECONDARY',
+    sections: ['Science', 'Commerce', 'Arts'],
+    udise: 12,
+    stream: true,
+    boardExam: true,
+  },
+];
