@@ -138,6 +138,7 @@ services:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ../docs/observability/alerts:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - '9090:9090'
@@ -162,6 +163,7 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../docs/observability/dashboards:/var/lib/grafana/dashboards_docs:ro
       - grafana_data:/var/lib/grafana
     ports:
       - '3001:3000'
