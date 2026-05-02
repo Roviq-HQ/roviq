@@ -80,11 +80,7 @@ export function Toolbar({
       <div className="flex-1" />
 
       <Button variant="outline" size="sm" asChild className="gap-2">
-        <a
-          href={`${grafanaUrl}/d/roviq-overview?orgId=1`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href={`${grafanaUrl}/explore?orgId=1`} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="size-4" />
           Open in Grafana
         </a>

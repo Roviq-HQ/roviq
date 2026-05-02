@@ -3,7 +3,7 @@
 ## Symptom
 
 Grafana alert `EventBusEmitFailuresWarning` (or `…Critical`) firing —
-sustained `event_bus_emit_failed_total` rate above threshold for one or
+sustained `roviq_event_bus_emit_failed_total` rate above threshold for one or
 more `subject_prefix` labels.
 
 User-facing impact depends on which prefix is failing — if it's
@@ -98,7 +98,7 @@ NATS_URL=$NATS_URL pnpm check:jetstream-drift
 
 ## After the incident
 
-1. Confirm `event_bus_emit_failed_total` rate has returned to baseline
+1. Confirm `roviq_event_bus_emit_failed_total` rate has returned to baseline
    for ~15 minutes.
 2. If the cause was a stream-config issue, file a follow-up PR to make
    the misconfig impossible (e.g. tightening `check:jetstream-drift`

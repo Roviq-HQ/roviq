@@ -13,7 +13,7 @@
         "label": "Subject Prefix",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-        "query": "label_values(event_bus_emit_total, subject_prefix)",
+        "query": "label_values(roviq_event_bus_emit_total, subject_prefix)",
         "includeAll": true,
         "multi": true,
         "current": { "selected": false, "text": "All", "value": "$__all" }
@@ -30,7 +30,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "sum(rate(event_bus_emit_failed_total[5m]))",
+          "expr": "sum(rate(roviq_event_bus_emit_failed_total[5m]))",
           "legendFormat": "fail/s"
         }
       ],
@@ -57,7 +57,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "sum(rate(event_bus_emit_total[5m])) - sum(rate(event_bus_emit_failed_total[5m]))",
+          "expr": "sum(rate(roviq_event_bus_emit_total[5m])) - sum(rate(roviq_event_bus_emit_failed_total[5m]))",
           "legendFormat": "ok/s"
         }
       ],
@@ -72,7 +72,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "sum by (subject_prefix) (rate(event_bus_emit_failed_total{subject_prefix=~\"$subject_prefix\"}[5m]))",
+          "expr": "sum by (subject_prefix) (rate(roviq_event_bus_emit_failed_total{subject_prefix=~\"$subject_prefix\"}[5m]))",
           "legendFormat": "{{ subject_prefix }}"
         }
       ],
@@ -92,7 +92,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "sum by (subject_prefix) (rate(event_bus_emit_total{subject_prefix=~\"$subject_prefix\"}[5m]))",
+          "expr": "sum by (subject_prefix) (rate(roviq_event_bus_emit_total{subject_prefix=~\"$subject_prefix\"}[5m]))",
           "legendFormat": "{{ subject_prefix }}"
         }
       ],
@@ -112,7 +112,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "topk(10, sum by (subject_prefix) (increase(event_bus_emit_failed_total[1h])))",
+          "expr": "topk(10, sum by (subject_prefix) (increase(roviq_event_bus_emit_failed_total[1h])))",
           "format": "table",
           "instant": true
         }

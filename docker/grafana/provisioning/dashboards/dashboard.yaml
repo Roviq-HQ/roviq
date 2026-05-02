@@ -10,3 +10,13 @@ providers:
     options:
       path: /var/lib/grafana/dashboards
       foldersFromFilesStructure: false
+
+  - name: 'docs'
+    orgId: 1
+    folder: 'Roviq'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards_docs
+      foldersFromFilesStructure: false

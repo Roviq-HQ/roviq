@@ -18,7 +18,7 @@ groups:
       # ping (not a page) — likely transient: brief NATS hiccup, restart.
       - alert: EventBusEmitFailuresWarning
         expr: |
-          sum by (subject_prefix) (rate(event_bus_emit_failed_total[5m])) > 1 / 60
+          sum by (subject_prefix) (rate(roviq_event_bus_emit_failed_total[5m])) > 1 / 60
         for: 5m
         labels:
           severity: warning
@@ -38,7 +38,7 @@ groups:
       # change that broke publish (e.g. retention drift on boot).
       - alert: EventBusEmitFailuresCritical
         expr: |
-          sum by (subject_prefix) (rate(event_bus_emit_failed_total[5m])) > 10 / 60
+          sum by (subject_prefix) (rate(roviq_event_bus_emit_failed_total[5m])) > 10 / 60
         for: 10m
         labels:
           severity: critical
