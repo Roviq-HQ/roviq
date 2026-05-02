@@ -574,6 +574,8 @@ importers:
 
   libs/backend/entitlements: {}
 
+  libs/backend/event-bus: {}
+
   libs/backend/groups: {}
 
   libs/backend/nats-jetstream:

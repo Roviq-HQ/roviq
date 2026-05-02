@@ -192,8 +192,9 @@ export async function deleteNovuSubscriber(subscriberId: string): Promise<void> 
 }
 
 export async function listNovuNotifications(subscriberId: string): Promise<{ data: unknown[] }> {
+  // Use the subscriber in-app feed endpoint (not the admin /v1/notifications activity log).
   const res = await novuFetch(
-    `/v1/notifications?subscriberIds=${encodeURIComponent(subscriberId)}`,
+    `/v1/subscribers/${encodeURIComponent(subscriberId)}/notifications/feed`,
   );
   if (!res.ok) {
     throw new Error(`listNovuNotifications(${subscriberId}) failed: ${res.status}`);

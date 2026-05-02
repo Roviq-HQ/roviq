@@ -30,8 +30,10 @@ if (process.env.NODE_ENV === 'production') {
 const useTestDb = process.argv.includes('--test');
 const connectionString = useTestDb
   ? process.env.DATABASE_URL_TEST_MIGRATE ||
-    'postgresql://roviq:roviq_dev@localhost:5434/roviq_test'
+    'postgresql://roviq:roviq_dev@localhost:5435/roviq_test'
   : process.env.DATABASE_URL_MIGRATE || 'postgresql://roviq:roviq_dev@localhost:5434/roviq';
+ 
+
 
 // Test DB always seeds — integration tests reference seed IDs (SEED.INSTITUTE_1
 // etc.) and a schema-only test DB silently breaks 16+ test files with cryptic

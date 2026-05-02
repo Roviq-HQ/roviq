@@ -60,7 +60,7 @@ export const feeOverdueWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config.whatsapp,
+        skip: () => !payload.config?.whatsapp,
       },
     );
 
@@ -72,7 +72,7 @@ export const feeOverdueWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config.email,
+        skip: () => !payload.config?.email,
       },
     );
 
@@ -84,7 +84,7 @@ export const feeOverdueWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config.push,
+        skip: () => !payload.config?.push,
       },
     );
   },

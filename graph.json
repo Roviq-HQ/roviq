@@ -1,0 +1,2434 @@
+{
+  "graph": {
+    "nodes": {
+      "ee-billing-types": {
+        "name": "ee-billing-types",
+        "type": "lib",
+        "data": {
+          "root": "ee/libs/shared/billing-types",
+          "name": "ee-billing-types",
+          "tags": ["npm:private", "scope:ee"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/ee-billing-types",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/ee-billing-types",
+                "main": "ee/libs/shared/billing-types/src/index.ts",
+                "tsConfig": "ee/libs/shared/billing-types/tsconfig.lib.json",
+                "assets": ["ee/libs/shared/billing-types/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "ee/libs/shared/billing-types/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "nats-jetstream": {
+        "name": "nats-jetstream",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/nats-jetstream",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/nats-jetstream",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/backend/nats-jetstream",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/nats-jetstream",
+                "main": "libs/backend/nats-jetstream/src/index.ts",
+                "tsConfig": "libs/backend/nats-jetstream/tsconfig.lib.json",
+                "assets": ["libs/backend/nats-jetstream/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "nats-jetstream",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/nats-jetstream/src",
+          "implicitDependencies": []
+        }
+      },
+      "nestjs-graphql": {
+        "name": "nestjs-graphql",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/nestjs-graphql",
+          "name": "nestjs-graphql",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/nestjs-graphql",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/nestjs-graphql",
+                "main": "libs/backend/nestjs-graphql/src/index.ts",
+                "tsConfig": "libs/backend/nestjs-graphql/tsconfig.lib.json",
+                "assets": ["libs/backend/nestjs-graphql/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/nestjs-graphql/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "request-context": {
+        "name": "request-context",
+        "type": "lib",
+        "data": {
+          "root": "libs/shared/request-context",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/request-context",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/shared/request-context",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/libs/shared/request-context"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/request-context",
+                "main": "libs/shared/request-context/src/index.ts",
+                "tsConfig": "libs/shared/request-context/tsconfig.lib.json",
+                "assets": ["libs/shared/request-context/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "request-context",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/shared/request-context/src",
+          "implicitDependencies": []
+        }
+      },
+      "notifications": {
+        "name": "notifications",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/notifications",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/notifications",
+              "packageVersion": "0.0.0",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "executor": "@nx/vite:test",
+              "options": {
+                "config": "libs/backend/notifications/vitest.config.ts"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "inputs": ["default", "^production"]
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/notifications",
+                "main": "libs/backend/notifications/src/index.ts",
+                "tsConfig": "libs/backend/notifications/tsconfig.lib.json",
+                "assets": ["libs/backend/notifications/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "notifications",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/notifications/src",
+          "implicitDependencies": []
+        }
+      },
+      "entitlements": {
+        "name": "entitlements",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/entitlements",
+          "name": "entitlements",
+          "tags": ["npm:private", "scope:backend"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/entitlements",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.ts",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {},
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/entitlements/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "notification-service": {
+        "name": "notification-service",
+        "type": "app",
+        "data": {
+          "root": "apps/notification-service",
+          "projectType": "application",
+          "metadata": {},
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "apps/notification-service",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/apps/notification-service",
+                "main": "apps/notification-service/src/main.ts",
+                "tsConfig": "apps/notification-service/tsconfig.app.json",
+                "assets": ["apps/notification-service/src/assets"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            },
+            "serve": {
+              "continuous": true,
+              "executor": "@nx/js:node",
+              "defaultConfiguration": "development",
+              "dependsOn": ["build"],
+              "options": {
+                "buildTarget": "notification-service:build",
+                "runBuildTargetDependencies": false,
+                "watch": true
+              },
+              "configurations": {
+                "development": {
+                  "buildTarget": "notification-service:build"
+                },
+                "production": {
+                  "buildTarget": "notification-service:build"
+                }
+              },
+              "parallelism": true
+            }
+          },
+          "name": "notification-service",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "apps/notification-service/src",
+          "tags": [],
+          "implicitDependencies": []
+        }
+      },
+      "common-types": {
+        "name": "common-types",
+        "type": "lib",
+        "data": {
+          "root": "libs/shared/common-types",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/common-types",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/shared/common-types",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/common-types",
+                "main": "libs/shared/common-types/src/index.ts",
+                "tsConfig": "libs/shared/common-types/tsconfig.lib.json",
+                "assets": ["libs/shared/common-types/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "common-types",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/shared/common-types/src",
+          "implicitDependencies": []
+        }
+      },
+      "ee-payments": {
+        "name": "ee-payments",
+        "type": "lib",
+        "data": {
+          "root": "ee/libs/backend/payments",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/ee-payments",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "ee/libs/backend/payments",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/ee-payments",
+                "main": "ee/libs/backend/payments/src/index.ts",
+                "tsConfig": "ee/libs/backend/payments/tsconfig.lib.json",
+                "assets": ["ee/libs/backend/payments/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "ee-payments",
+          "tags": ["npm:private", "scope:ee"],
+          "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "ee/libs/backend/payments/src",
+          "implicitDependencies": []
+        }
+      },
+      "compliance": {
+        "name": "compliance",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/compliance",
+          "name": "compliance",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/compliance",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/compliance",
+                "main": "libs/backend/compliance/src/index.ts",
+                "tsConfig": "libs/backend/compliance/tsconfig.lib.json",
+                "assets": ["libs/backend/compliance/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/compliance/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "integration-tests": {
+        "name": "integration-tests",
+        "type": "app",
+        "data": {
+          "root": "tools/integration-tests",
+          "name": "integration-tests",
+          "tags": ["npm:private", "scope:tools", "type:test"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "integration-tests",
+              "packageVersion": "0.0.0",
+              "isInPackageManagerWorkspaces": false
+            }
+          },
+          "targets": {
+            "test:int": {
+              "executor": "nx:run-commands",
+              "cache": true,
+              "parallelism": false,
+              "inputs": ["integrationSources"],
+              "options": {
+                "command": "vitest run --project integration"
+              },
+              "configurations": {}
+            }
+          },
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "tools/integration-tests",
+          "projectType": "application",
+          "implicitDependencies": []
+        }
+      },
+      "resilience": {
+        "name": "resilience",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/resilience",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/resilience",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "executor": "@nx/vite:test",
+              "options": {
+                "config": "libs/backend/resilience/vitest.config.ts"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "inputs": ["default", "^production"]
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/resilience",
+                "main": "libs/backend/resilience/src/index.ts",
+                "tsConfig": "libs/backend/resilience/tsconfig.lib.json",
+                "assets": ["libs/backend/resilience/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "resilience",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/resilience/src",
+          "implicitDependencies": []
+        }
+      },
+      "event-bus": {
+        "name": "event-bus",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/event-bus",
+          "name": "event-bus",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/event-bus",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/event-bus",
+                "main": "libs/backend/event-bus/src/index.ts",
+                "tsConfig": "libs/backend/event-bus/tsconfig.lib.json",
+                "assets": ["libs/backend/event-bus/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/event-bus/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "telemetry": {
+        "name": "telemetry",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/telemetry",
+          "name": "telemetry",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/telemetry",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/telemetry",
+                "main": "libs/backend/telemetry/src/index.ts",
+                "tsConfig": "libs/backend/telemetry/tsconfig.lib.json",
+                "assets": ["libs/backend/telemetry/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/telemetry/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "graphql": {
+        "name": "graphql",
+        "type": "lib",
+        "data": {
+          "root": "libs/frontend/graphql",
+          "name": "graphql",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/graphql",
+              "packageVersion": "0.0.1",
+              "packageExports": {
+                ".": "./src/index.ts",
+                "./generated": "./src/generated/graphql.ts"
+              },
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {},
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/frontend/graphql/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "web-institute-e2e": {
+        "name": "web-institute-e2e",
+        "type": "e2e",
+        "data": {
+          "root": "e2e/web-institute-e2e",
+          "name": "web-institute-e2e",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "e2e/web-institute-e2e/src",
+          "projectType": "application",
+          "tags": ["e2e"],
+          "implicitDependencies": ["web"],
+          "targets": {
+            "e2e": {
+              "options": {
+                "cwd": "e2e/web-institute-e2e",
+                "command": "playwright test --reporter=list"
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            }
+          }
+        }
+      },
+      "testing": {
+        "name": "testing",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/testing",
+          "name": "testing",
+          "tags": ["npm:private", "scope:test-utilities"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/testing",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {},
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/testing/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "web-reseller-e2e": {
+        "name": "web-reseller-e2e",
+        "type": "e2e",
+        "data": {
+          "root": "e2e/web-reseller-e2e",
+          "name": "web-reseller-e2e",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "e2e/web-reseller-e2e/src",
+          "projectType": "application",
+          "tags": ["e2e"],
+          "implicitDependencies": ["web"],
+          "targets": {
+            "e2e": {
+              "options": {
+                "cwd": "e2e/web-reseller-e2e",
+                "command": "playwright test --reporter=list"
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            }
+          }
+        }
+      },
+      "api-gateway-e2e": {
+        "name": "api-gateway-e2e",
+        "type": "e2e",
+        "data": {
+          "root": "e2e/api-gateway-e2e",
+          "name": "api-gateway-e2e",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "e2e/api-gateway-e2e",
+          "projectType": "application",
+          "tags": ["e2e"],
+          "implicitDependencies": ["api-gateway"],
+          "targets": {
+            "e2e": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "vitest run --project e2e-api"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test-e2e": {
+              "executor": "nx:run-commands",
+              "cache": true,
+              "parallelism": false,
+              "inputs": ["e2eBackend"],
+              "options": {
+                "command": "vitest run --config e2e/api-gateway-e2e/vitest.config.ts"
+              },
+              "configurations": {}
+            },
+            "e2e:hurl": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "docker compose -f docker/compose.e2e.yaml --profile hurl up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm hurl-tests"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "e2e:vitest": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "docker compose -f docker/compose.e2e.yaml --profile vitest up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "e2e:rls": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "docker compose -f docker/compose.e2e.yaml --profile rls up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm rls-tests"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "e2e:all": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest --profile rls up -d --build --wait && docker compose -f docker/compose.e2e.yaml run --rm rls-tests && docker compose -f docker/compose.e2e.yaml run --rm hurl-tests && docker compose -f docker/compose.e2e.yaml run --rm vitest-e2e"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "e2e:down": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "docker compose -f docker/compose.e2e.yaml --profile hurl --profile vitest --profile rls down -v --remove-orphans"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          }
+        }
+      },
+      "crypto": {
+        "name": "crypto",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/crypto",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/crypto",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/backend/crypto",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/crypto",
+                "main": "libs/backend/crypto/src/index.ts",
+                "tsConfig": "libs/backend/crypto/tsconfig.lib.json",
+                "assets": ["libs/backend/crypto/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "crypto",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/crypto/src",
+          "implicitDependencies": []
+        }
+      },
+      "ee-gateway": {
+        "name": "ee-gateway",
+        "type": "lib",
+        "data": {
+          "root": "ee/apps/api-gateway",
+          "name": "ee-gateway",
+          "tags": ["npm:private", "scope:ee"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/ee-gateway",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/ee-gateway",
+                "main": "ee/apps/api-gateway/src/index.ts",
+                "tsConfig": "ee/apps/api-gateway/tsconfig.lib.json",
+                "assets": []
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "ee/apps/api-gateway/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "groups": {
+        "name": "groups",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/groups",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/groups",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/backend/groups",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/groups",
+                "main": "libs/backend/groups/src/index.ts",
+                "tsConfig": "libs/backend/groups/tsconfig.lib.json",
+                "assets": ["libs/backend/groups/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "groups",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/groups/src",
+          "implicitDependencies": []
+        }
+      },
+      "pubsub": {
+        "name": "pubsub",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/pubsub",
+          "name": "pubsub",
+          "tags": ["npm:private", "scope:backend"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/pubsub",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/pubsub",
+                "main": "libs/backend/pubsub/src/index.ts",
+                "tsConfig": "libs/backend/pubsub/tsconfig.lib.json",
+                "assets": []
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/pubsub/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "web-e2e-suite": {
+        "name": "web-e2e-suite",
+        "type": "app",
+        "data": {
+          "root": "tools/web-e2e-suite",
+          "name": "web-e2e-suite",
+          "tags": ["npm:private", "scope:tools", "type:e2e"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "web-e2e-suite",
+              "packageVersion": "0.0.0",
+              "isInPackageManagerWorkspaces": false
+            }
+          },
+          "targets": {
+            "e2e": {
+              "executor": "nx:run-commands",
+              "cache": true,
+              "parallelism": false,
+              "inputs": ["e2eFrontend"],
+              "options": {
+                "command": "playwright test --reporter=list --config e2e/playwright.config.ts"
+              },
+              "configurations": {}
+            }
+          },
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "tools/web-e2e-suite",
+          "projectType": "application",
+          "implicitDependencies": []
+        }
+      },
+      "audit": {
+        "name": "audit",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/audit",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/audit",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/backend/audit",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/audit",
+                "main": "libs/backend/audit/src/index.ts",
+                "tsConfig": "libs/backend/audit/tsconfig.lib.json",
+                "assets": ["libs/backend/audit/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "audit",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/audit/src",
+          "implicitDependencies": []
+        }
+      },
+      "auth": {
+        "name": "auth",
+        "type": "lib",
+        "data": {
+          "root": "libs/frontend/auth",
+          "projectType": "library",
+          "metadata": {},
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/frontend/auth",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "auth",
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/frontend/auth/src",
+          "tags": [],
+          "implicitDependencies": []
+        }
+      },
+      "domain": {
+        "name": "domain",
+        "type": "lib",
+        "data": {
+          "root": "libs/shared/domain",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/domain",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/shared/domain",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/domain",
+                "main": "libs/shared/domain/src/index.ts",
+                "tsConfig": "libs/shared/domain/tsconfig.lib.json",
+                "assets": ["libs/shared/domain/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "domain",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/shared/domain/src",
+          "implicitDependencies": []
+        }
+      },
+      "i18n": {
+        "name": "i18n",
+        "type": "lib",
+        "data": {
+          "root": "libs/frontend/i18n",
+          "projectType": "library",
+          "metadata": {},
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/frontend/i18n",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "i18n",
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/frontend/i18n/src",
+          "tags": [],
+          "implicitDependencies": []
+        }
+      },
+      "redis": {
+        "name": "redis",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/redis",
+          "name": "redis",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/redis",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/redis",
+                "main": "libs/backend/redis/src/index.ts",
+                "tsConfig": "libs/backend/redis/tsconfig.lib.json",
+                "assets": ["libs/backend/redis/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/redis/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "auth-backend": {
+        "name": "auth-backend",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/auth",
+          "name": "auth-backend",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/auth-backend",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/auth-backend",
+                "main": "libs/backend/auth/src/index.ts",
+                "tsConfig": "libs/backend/auth/tsconfig.lib.json",
+                "assets": ["libs/backend/auth/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/auth/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "casl": {
+        "name": "casl",
+        "type": "lib",
+        "data": {
+          "root": "libs/backend/casl",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/casl",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/backend/casl",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/casl",
+                "main": "libs/backend/casl/src/index.ts",
+                "tsConfig": "libs/backend/casl/tsconfig.lib.json",
+                "assets": ["libs/backend/casl/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "name": "casl",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/backend/casl/src",
+          "implicitDependencies": []
+        }
+      },
+      "web-admin-e2e": {
+        "name": "web-admin-e2e",
+        "type": "e2e",
+        "data": {
+          "root": "e2e/web-admin-e2e",
+          "name": "web-admin-e2e",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "e2e/web-admin-e2e/src",
+          "projectType": "application",
+          "tags": ["e2e"],
+          "implicitDependencies": ["web"],
+          "targets": {
+            "e2e": {
+              "options": {
+                "cwd": "e2e/web-admin-e2e",
+                "command": "playwright test --reporter=list"
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            }
+          }
+        }
+      },
+      "api-gateway": {
+        "name": "api-gateway",
+        "type": "app",
+        "data": {
+          "root": "apps/api-gateway",
+          "projectType": "application",
+          "metadata": {},
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "apps/api-gateway",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/apps/api-gateway",
+                "main": "apps/api-gateway/src/main.ts",
+                "tsConfig": "apps/api-gateway/tsconfig.app.json",
+                "assets": ["apps/api-gateway/src/assets"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            },
+            "serve": {
+              "continuous": true,
+              "executor": "@nx/js:node",
+              "defaultConfiguration": "development",
+              "dependsOn": ["build"],
+              "options": {
+                "buildTarget": "api-gateway:build",
+                "runBuildTargetDependencies": false,
+                "runtimeArgs": [
+                  "--trace-warnings",
+                  "--require",
+                  "./dist/libs/telemetry/src/init-telemetry.js"
+                ],
+                "watch": true
+              },
+              "configurations": {
+                "development": {
+                  "buildTarget": "api-gateway:build"
+                },
+                "production": {
+                  "buildTarget": "api-gateway:build"
+                }
+              },
+              "parallelism": true
+            }
+          },
+          "name": "api-gateway",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "apps/api-gateway/src",
+          "tags": [],
+          "implicitDependencies": ["ee-gateway"]
+        }
+      },
+      "ee-database": {
+        "name": "ee-database",
+        "type": "lib",
+        "data": {
+          "root": "ee/libs/database",
+          "name": "ee-database",
+          "tags": ["npm:private", "scope:ee"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/ee-database",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/ee-database",
+                "main": "ee/libs/database/src/index.ts",
+                "tsConfig": "ee/libs/database/tsconfig.lib.json",
+                "assets": ["ee/libs/database/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            }
+          },
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "ee/libs/database/src",
+          "projectType": "library",
+          "implicitDependencies": []
+        }
+      },
+      "ui": {
+        "name": "ui",
+        "type": "lib",
+        "data": {
+          "root": "libs/frontend/ui",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/ui",
+              "packageVersion": "0.0.0",
+              "packageExports": {
+                ".": "./src/index.ts",
+                "./*": "./src/*"
+              },
+              "packageMain": "./src/index.ts",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/frontend/ui",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "ui",
+          "tags": ["npm:private"],
+          "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/frontend/ui/src",
+          "implicitDependencies": []
+        }
+      },
+      "database": {
+        "name": "database",
+        "type": "lib",
+        "data": {
+          "root": "libs/database",
+          "projectType": "library",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@roviq/database",
+              "packageVersion": "0.0.1",
+              "packageMain": "./src/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "test": {
+              "options": {
+                "cwd": "libs/database",
+                "command": "vitest run"
+              },
+              "cache": true,
+              "inputs": ["default", "^production"],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "@nx/js:tsc",
+              "outputs": ["{options.outputPath}"],
+              "options": {
+                "outputPath": "dist/libs/database",
+                "main": "libs/database/src/index.ts",
+                "tsConfig": "libs/database/tsconfig.lib.json",
+                "assets": ["libs/database/*.md"]
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": ["production", "^production"]
+            },
+            "db:pull": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "drizzle-kit pull --config=drizzle.config.ts",
+                "cwd": "libs/database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "db:generate": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "drizzle-kit generate --config=drizzle.config.ts",
+                "cwd": "libs/database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "db:migrate": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "drizzle-kit migrate --config=drizzle.config.ts",
+                "cwd": "libs/database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "db:push": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "drizzle-kit push --force --config=drizzle.config.ts",
+                "cwd": "libs/database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "db:check": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "drizzle-kit check --config=drizzle.config.ts",
+                "cwd": "libs/database"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "db:studio": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "drizzle-kit studio --config=drizzle.config.ts",
+                "cwd": "libs/database"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "database",
+          "tags": ["npm:private"],
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "libs/database/src",
+          "implicitDependencies": []
+        }
+      },
+      "web": {
+        "name": "web",
+        "type": "app",
+        "data": {
+          "root": "apps/web",
+          "targets": {
+            "build": {
+              "dependsOn": ["codegen", "^build"],
+              "cache": true,
+              "inputs": [
+                "default",
+                "^production",
+                {
+                  "externalDependencies": ["next"]
+                }
+              ],
+              "outputs": [
+                "{workspaceRoot}/apps/web/.next/!(cache)/**/*",
+                "{workspaceRoot}/apps/web/.next/!(cache)"
+              ],
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/web",
+                "tty": false,
+                "command": "next build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/web",
+                "command": "next dev"
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "start": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/web",
+                "command": "next start"
+              },
+              "dependsOn": ["build"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/web",
+                "command": "next start"
+              },
+              "dependsOn": ["build"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": ["^build"],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "continuous": true,
+              "dependsOn": ["build-deps"],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "pnpm exec nx watch --projects web --includeDependentProjects -- pnpm exec nx build-deps web"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "codegen": {
+              "configurations": {},
+              "options": {
+                "command": "pnpm codegen",
+                "cwd": ""
+              },
+              "parallelism": true,
+              "cache": true,
+              "inputs": [
+                "{workspaceRoot}/codegen.ts",
+                "{workspaceRoot}/libs/frontend/graphql/src/generated/schema.graphql",
+                "{workspaceRoot}/apps/web/src/**/*.{ts,tsx}",
+                "!{workspaceRoot}/apps/web/src/**/*.generated.ts",
+                "{workspaceRoot}/e2e/api-gateway-e2e/src/operations/**/*.graphql"
+              ],
+              "outputs": [
+                "{workspaceRoot}/libs/frontend/graphql/src/generated",
+                "{workspaceRoot}/e2e/api-gateway-e2e/src/__generated__",
+                "{workspaceRoot}/apps/web/src/**/*.generated.ts"
+              ],
+              "executor": "nx:run-commands"
+            }
+          },
+          "name": "web",
+          "$schema": "../../node_modules/nx/schemas/project-schema.json",
+          "sourceRoot": "apps/web",
+          "projectType": "application",
+          "tags": [],
+          "implicitDependencies": []
+        }
+      },
+      "tests": {
+        "name": "tests",
+        "type": "lib",
+        "data": {
+          "root": "tests",
+          "projectType": "library",
+          "metadata": {},
+          "targets": {
+            "test": {
+              "cache": true,
+              "inputs": [
+                "default",
+                "{workspaceRoot}/.claude/rules/**/*",
+                "{workspaceRoot}/.claude/skills/**/SKILL.md",
+                "{workspaceRoot}/docs/references/**/*",
+                "{workspaceRoot}/CLAUDE.md"
+              ],
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "metadata": {
+                "technologies": ["vitest"],
+                "description": "Run Vitest tests",
+                "help": {
+                  "command": "pnpm exec vitest --help",
+                  "example": {
+                    "options": {
+                      "bail": 1,
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "tests",
+                "command": "vitest run"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "tests",
+          "implicitDependencies": [],
+          "tags": []
+        }
+      }
+    },
+    "dependencies": {
+      "ee-billing-types": [],
+      "nats-jetstream": [
+        {
+          "source": "nats-jetstream",
+          "target": "request-context",
+          "type": "static"
+        },
+        {
+          "source": "nats-jetstream",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "nats-jetstream",
+          "target": "common-types",
+          "type": "static"
+        }
+      ],
+      "nestjs-graphql": [],
+      "request-context": [
+        {
+          "source": "request-context",
+          "target": "common-types",
+          "type": "static"
+        }
+      ],
+      "notifications": [
+        {
+          "source": "notifications",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "notifications",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "notifications",
+          "target": "nats-jetstream",
+          "type": "static"
+        }
+      ],
+      "entitlements": [
+        {
+          "source": "entitlements",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "entitlements",
+          "target": "redis",
+          "type": "static"
+        }
+      ],
+      "notification-service": [
+        {
+          "source": "notification-service",
+          "target": "telemetry",
+          "type": "static"
+        },
+        {
+          "source": "notification-service",
+          "target": "nats-jetstream",
+          "type": "static"
+        },
+        {
+          "source": "notification-service",
+          "target": "notifications",
+          "type": "static"
+        },
+        {
+          "source": "notification-service",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "notification-service",
+          "target": "database",
+          "type": "static"
+        },
+        {
+          "source": "notification-service",
+          "target": "ee-database",
+          "type": "static"
+        }
+      ],
+      "common-types": [],
+      "ee-payments": [
+        {
+          "source": "ee-payments",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "ee-payments",
+          "target": "database",
+          "type": "static"
+        },
+        {
+          "source": "ee-payments",
+          "target": "ee-database",
+          "type": "static"
+        }
+      ],
+      "compliance": [],
+      "integration-tests": [],
+      "resilience": [],
+      "event-bus": [
+        {
+          "source": "event-bus",
+          "target": "nats-jetstream",
+          "type": "static"
+        },
+        {
+          "source": "event-bus",
+          "target": "pubsub",
+          "type": "static"
+        }
+      ],
+      "telemetry": [],
+      "graphql": [],
+      "web-institute-e2e": [
+        {
+          "source": "web-institute-e2e",
+          "target": "web",
+          "type": "implicit"
+        },
+        {
+          "source": "web-institute-e2e",
+          "target": "ui",
+          "type": "static"
+        }
+      ],
+      "testing": [
+        {
+          "source": "testing",
+          "target": "database",
+          "type": "static"
+        },
+        {
+          "source": "testing",
+          "target": "nats-jetstream",
+          "type": "static"
+        },
+        {
+          "source": "testing",
+          "target": "redis",
+          "type": "static"
+        }
+      ],
+      "web-reseller-e2e": [
+        {
+          "source": "web-reseller-e2e",
+          "target": "web",
+          "type": "implicit"
+        }
+      ],
+      "api-gateway-e2e": [
+        {
+          "source": "api-gateway-e2e",
+          "target": "api-gateway",
+          "type": "implicit"
+        },
+        {
+          "source": "api-gateway-e2e",
+          "target": "graphql",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway-e2e",
+          "target": "i18n",
+          "type": "dynamic"
+        },
+        {
+          "source": "api-gateway-e2e",
+          "target": "common-types",
+          "type": "static"
+        }
+      ],
+      "crypto": [],
+      "ee-gateway": [
+        {
+          "source": "ee-gateway",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "database",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "ee-billing-types",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "ee-payments",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "event-bus",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "request-context",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "ee-database",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "pubsub",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "auth-backend",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "domain",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "nats-jetstream",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "nestjs-graphql",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "audit",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "redis",
+          "type": "static"
+        },
+        {
+          "source": "ee-gateway",
+          "target": "casl",
+          "type": "static"
+        }
+      ],
+      "groups": [],
+      "pubsub": [],
+      "web-e2e-suite": [],
+      "audit": [
+        {
+          "source": "audit",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "audit",
+          "target": "nats-jetstream",
+          "type": "static"
+        }
+      ],
+      "auth": [
+        {
+          "source": "auth",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "auth",
+          "target": "ui",
+          "type": "static"
+        },
+        {
+          "source": "auth",
+          "target": "i18n",
+          "type": "static"
+        }
+      ],
+      "domain": [],
+      "i18n": [],
+      "redis": [],
+      "auth-backend": [
+        {
+          "source": "auth-backend",
+          "target": "common-types",
+          "type": "static"
+        }
+      ],
+      "casl": [
+        {
+          "source": "casl",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "casl",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "casl",
+          "target": "redis",
+          "type": "static"
+        },
+        {
+          "source": "casl",
+          "target": "database",
+          "type": "static"
+        }
+      ],
+      "web-admin-e2e": [
+        {
+          "source": "web-admin-e2e",
+          "target": "web",
+          "type": "implicit"
+        },
+        {
+          "source": "web-admin-e2e",
+          "target": "ui",
+          "type": "static"
+        }
+      ],
+      "api-gateway": [
+        {
+          "source": "api-gateway",
+          "target": "ee-gateway",
+          "type": "implicit"
+        },
+        {
+          "source": "api-gateway",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "database",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "ee-billing-types",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "ee-database",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "testing",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "auth-backend",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "casl",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "event-bus",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "nats-jetstream",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "request-context",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "nestjs-graphql",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "audit",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "redis",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "ee-gateway",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "telemetry",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "notifications",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "pubsub",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "compliance",
+          "type": "static"
+        },
+        {
+          "source": "api-gateway",
+          "target": "groups",
+          "type": "static"
+        }
+      ],
+      "ee-database": [
+        {
+          "source": "ee-database",
+          "target": "database",
+          "type": "static"
+        }
+      ],
+      "ui": [
+        {
+          "source": "ui",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "ui",
+          "target": "graphql",
+          "type": "static"
+        },
+        {
+          "source": "ui",
+          "target": "i18n",
+          "type": "static"
+        }
+      ],
+      "database": [
+        {
+          "source": "database",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "database",
+          "target": "request-context",
+          "type": "static"
+        }
+      ],
+      "web": [
+        {
+          "source": "web",
+          "target": "common-types",
+          "type": "static"
+        },
+        {
+          "source": "web",
+          "target": "i18n",
+          "type": "static"
+        },
+        {
+          "source": "web",
+          "target": "i18n",
+          "type": "dynamic"
+        },
+        {
+          "source": "web",
+          "target": "ui",
+          "type": "static"
+        },
+        {
+          "source": "web",
+          "target": "auth",
+          "type": "static"
+        },
+        {
+          "source": "web",
+          "target": "graphql",
+          "type": "static"
+        },
+        {
+          "source": "web",
+          "target": "domain",
+          "type": "static"
+        }
+      ],
+      "tests": []
+    }
+  }
+}

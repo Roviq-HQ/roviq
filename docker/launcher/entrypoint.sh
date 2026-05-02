@@ -50,7 +50,7 @@ log "✓ Migrations applied"
 
 # 4. Run seed (one-shot migrator container with seed command)
 log "Seeding database..."
-docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm -w /app migrator pnpx tsx scripts/seed.ts
+docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm -w /app migrator pnpx tsx scripts/seed-demo.ts
 log "✓ Seed data loaded"
 
 # 5. Start app containers
