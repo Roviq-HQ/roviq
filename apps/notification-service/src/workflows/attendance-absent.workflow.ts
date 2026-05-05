@@ -15,17 +15,22 @@ const payloadSchema = {
   properties: {
     sessionId: { type: 'string' },
     studentId: { type: 'string' },
+    studentName: { type: 'string' },
+    sectionName: { type: ['string', 'null'] },
+    standardName: { type: ['string', 'null'] },
+    sessionDate: { type: ['string', 'null'] },
     status: { type: 'string', enum: ['ABSENT', 'LATE'] },
     remarks: { type: ['string', 'null'] },
     markedAt: { type: 'string' },
     config: {
       type: 'object',
       properties: {
+        inApp: { type: 'boolean', default: true },
         whatsapp: { type: 'boolean', default: false },
         email: { type: 'boolean', default: false },
         push: { type: 'boolean', default: false },
       },
-      required: ['whatsapp', 'email', 'push'],
+      required: ['inApp', 'whatsapp', 'email', 'push'],
       additionalProperties: false,
     },
     digestCron: { type: 'string' },
@@ -68,7 +73,7 @@ export const attendanceAbsentWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config?.whatsapp,
+        skip: () => !payload.config.whatsapp,
       },
     );
 
@@ -80,7 +85,7 @@ export const attendanceAbsentWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config?.email,
+        skip: () => !payload.config.email,
       },
     );
 
@@ -92,7 +97,7 @@ export const attendanceAbsentWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config?.push,
+        skip: () => !payload.config.push,
       },
     );
   },

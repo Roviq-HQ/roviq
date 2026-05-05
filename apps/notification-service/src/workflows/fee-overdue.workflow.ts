@@ -12,22 +12,26 @@ const payloadSchema = {
   type: 'object',
   properties: {
     studentName: { type: 'string' },
+    feeId: { type: 'string' },
     feeType: { type: 'string' },
-    amountDue: { type: 'number' },
+    amount: { type: 'number' },
     currency: { type: 'string', default: 'INR' },
     dueDate: { type: 'string' },
+    daysOverdue: { type: 'number' },
+    digestCron: { type: 'string' },
     config: {
       type: 'object',
       properties: {
+        inApp: { type: 'boolean', default: true },
         whatsapp: { type: 'boolean', default: false },
         email: { type: 'boolean', default: false },
         push: { type: 'boolean', default: false },
       },
-      required: ['whatsapp', 'email', 'push'],
+      required: ['inApp', 'whatsapp', 'email', 'push'],
       additionalProperties: false,
     },
   },
-  required: ['studentName', 'feeType', 'amountDue', 'dueDate', 'config'],
+  required: ['studentName', 'feeId', 'feeType', 'amount', 'dueDate', 'daysOverdue', 'config'],
   additionalProperties: false,
 } as const;
 
@@ -37,7 +41,7 @@ export const feeOverdueWorkflow = workflow(
     // Immediate in-app notification
     await step.inApp('fee-overdue-in-app', async () => ({
       subject: 'Fee Overdue',
-      body: `${payload.studentName} has an overdue ${payload.feeType} fee of ${payload.currency} ${payload.amountDue} (due ${payload.dueDate}).`,
+      body: `${payload.studentName} has an overdue ${payload.feeType} fee of ${payload.currency} ${payload.amount} (due ${payload.dueDate}).`,
     }));
 
     // Weekly digest — aggregate overdue fee events
@@ -50,7 +54,7 @@ export const feeOverdueWorkflow = workflow(
     const totalOverdue = events.length;
     const summary =
       totalOverdue === 1
-        ? `${payload.studentName} has an overdue ${payload.feeType} fee of ${payload.currency} ${payload.amountDue}.`
+        ? `${payload.studentName} has an overdue ${payload.feeType} fee of ${payload.currency} ${payload.amount}.`
         : `${totalOverdue} overdue fee reminder(s) this week.`;
 
     // WhatsApp — skip if disabled
@@ -60,7 +64,7 @@ export const feeOverdueWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config?.whatsapp,
+        skip: () => !payload.config.whatsapp,
       },
     );
 
@@ -72,7 +76,7 @@ export const feeOverdueWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config?.email,
+        skip: () => !payload.config.email,
       },
     );
 
@@ -84,7 +88,7 @@ export const feeOverdueWorkflow = workflow(
         body: summary,
       }),
       {
-        skip: () => !payload.config?.push,
+        skip: () => !payload.config.push,
       },
     );
   },

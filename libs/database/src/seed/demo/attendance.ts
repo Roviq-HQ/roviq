@@ -23,7 +23,6 @@ export async function seedAttendanceAndLeaves(tx: DrizzleDB, inst1Id: string) {
     ),
   );
   if ((exists as { rows: unknown[] }).rows.length === 0) {
-    console.log('Skipping attendance/leaves seed — tables not found (pending db-push)');
     return;
   }
 
@@ -40,7 +39,6 @@ export async function seedAttendanceAndLeaves(tx: DrizzleDB, inst1Id: string) {
     .limit(1);
   const section = sectionRows[0];
   if (!section) {
-    console.log('Skipping attendance/leaves seed — no sections found for Institute 1');
     return;
   }
   const sectionId = section.id;
@@ -60,7 +58,6 @@ export async function seedAttendanceAndLeaves(tx: DrizzleDB, inst1Id: string) {
       ),
     );
   if (membershipCheckRows.length < 2) {
-    console.log('Skipping attendance/leaves seed — teacher/student memberships not yet present');
     return;
   }
 

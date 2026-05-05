@@ -49,10 +49,9 @@ export class ApprovalListener {
       to: { subscriberId: event.approverId },
       payload: {
         requesterName: event.requesterName,
-        approverName: event.approverName,
         approvalType: event.approvalType,
-        entityId: event.entityId,
         summary: event.summary,
+        actionUrl: this.approvalActionUrl(event.approvalType),
         config: {
           inApp: config.inApp,
           whatsapp: config.whatsapp,
@@ -77,10 +76,9 @@ export class ApprovalListener {
       to: { subscriberId: event.requesterId },
       payload: {
         requesterName: event.requesterName,
-        reviewerName: event.reviewerName,
         approvalType: event.approvalType,
-        status: event.status,
-        remarks: event.remarks,
+        summary: this.resolvedSummary(event),
+        actionUrl: this.approvalActionUrl(event.approvalType),
         config: {
           inApp: config.inApp,
           whatsapp: config.whatsapp,
@@ -90,5 +88,16 @@ export class ApprovalListener {
       },
       tenantId: event.tenantId,
     });
+  }
+
+  private approvalActionUrl(approvalType: string): string {
+    if (approvalType === 'LEAVE') return '/en/institute/leave';
+    return '/en/institute/dashboard';
+  }
+
+  private resolvedSummary(event: ApprovalResolvedEvent): string {
+    const status = event.status.toLowerCase();
+    const remarks = event.remarks ? ` Remarks: ${event.remarks}` : '';
+    return `${event.approvalType} request was ${status} by ${event.reviewerName}.${remarks}`;
   }
 }

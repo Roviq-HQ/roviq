@@ -14,10 +14,10 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
+import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
-const STUDENT_PASSWORD_PLAIN = 'student123';
 
 interface StudentFixture {
   userId: string;
@@ -73,15 +73,13 @@ export async function seedE2eStudents(
     throw new Error('Section "Class 5-A" not found — run demo seed first');
   }
 
-  const studentPassword = await hash(STUDENT_PASSWORD_PLAIN);
-
   const fixtures: StudentFixture[] = [
     {
       userId: SEED_IDS.USER_STUDENT_2,
       membershipId: SEED_IDS.MEMBERSHIP_STUDENT_2,
       profileId: SEED_IDS.STUDENT_PROFILE_2,
       academicId: SEED_IDS.STUDENT_ACADEMIC_2,
-      username: 'student2',
+      username: SEED_CREDENTIALS.STUDENT_2.username,
       email: 'student2@svm-ggn.edu.in',
       firstName: { en: 'Priya', hi: 'प्रिया' },
       lastName: { en: 'Patel', hi: 'पटेल' },
@@ -95,7 +93,7 @@ export async function seedE2eStudents(
       membershipId: SEED_IDS.MEMBERSHIP_STUDENT_3,
       profileId: SEED_IDS.STUDENT_PROFILE_3,
       academicId: SEED_IDS.STUDENT_ACADEMIC_3,
-      username: 'student3',
+      username: SEED_CREDENTIALS.STUDENT_3.username,
       email: 'student3@svm-ggn.edu.in',
       firstName: { en: 'Rahul', hi: 'राहुल' },
       lastName: { en: 'Verma', hi: 'वर्मा' },
@@ -109,7 +107,7 @@ export async function seedE2eStudents(
       membershipId: SEED_IDS.MEMBERSHIP_STUDENT_4,
       profileId: SEED_IDS.STUDENT_PROFILE_4,
       academicId: SEED_IDS.STUDENT_ACADEMIC_4,
-      username: 'student4',
+      username: SEED_CREDENTIALS.STUDENT_4.username,
       email: 'student4@svm-ggn.edu.in',
       firstName: { en: 'Kavya', hi: 'काव्या' },
       lastName: { en: 'Singh', hi: 'सिंह' },
@@ -123,7 +121,7 @@ export async function seedE2eStudents(
       membershipId: SEED_IDS.MEMBERSHIP_STUDENT_5,
       profileId: SEED_IDS.STUDENT_PROFILE_5,
       academicId: SEED_IDS.STUDENT_ACADEMIC_5,
-      username: 'student5',
+      username: SEED_CREDENTIALS.STUDENT_5.username,
       email: 'student5@svm-ggn.edu.in',
       firstName: { en: 'Amit', hi: 'अमित' },
       lastName: { en: 'Kumar', hi: 'कुमार' },
@@ -133,6 +131,8 @@ export async function seedE2eStudents(
       isRteAdmitted: false,
     },
   ];
+
+  const studentPassword = await hash(SEED_CREDENTIALS.STUDENT_2.password);
 
   await tx
     .insert(users)
@@ -216,6 +216,4 @@ export async function seedE2eStudents(
       })),
     )
     .onConflictDoNothing({ target: studentAcademics.id });
-
-  console.log('  E2E students: student2–5 (3 ENROLLED, 1 GRADUATED, 1 TRANSFERRED_OUT)');
 }

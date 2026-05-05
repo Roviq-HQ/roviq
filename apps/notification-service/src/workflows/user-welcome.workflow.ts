@@ -30,14 +30,14 @@ const payloadSchema = {
 export const userWelcomeWorkflow = workflow(
   'user-welcome',
   async ({ step, payload }) => {
-    const displayName = payload.firstName ?? payload.username ?? '';
+    const displayName = payload.firstName ?? payload.username;
     const subject = 'Welcome to Roviq — your account is ready';
     const body = [
       `Hi ${displayName},`,
       '',
       'Your Roviq account has been set up.',
-      `Username: ${payload.username ?? ''}`,
-      `Temporary password: ${payload.tempPassword ?? ''}`,
+      `Username: ${payload.username}`,
+      `Temporary password: ${payload.tempPassword}`,
       '',
       'Log in and change your password on first sign-in.',
     ].join('\n');
@@ -49,7 +49,7 @@ export const userWelcomeWorkflow = workflow(
     await step.sms(
       'welcome-sms',
       async () => ({
-        body: `Roviq: Account ready. Username: ${payload.username ?? ''} | Temp password: ${payload.tempPassword ?? ''}. Change it on first login.`,
+        body: `Roviq: Account ready. Username: ${payload.username} | Temp password: ${payload.tempPassword}. Change it on first login.`,
       }),
       { skip: () => !payload.phone },
     );
@@ -57,7 +57,7 @@ export const userWelcomeWorkflow = workflow(
     // In-app — always
     await step.inApp('welcome-in-app', async () => ({
       subject: 'Welcome to Roviq',
-      body: `Your account is ready. Log in with username ${payload.username ?? ''} and change your password on first sign-in.`,
+      body: `Your account is ready. Log in with username ${payload.username} and change your password on first sign-in.`,
     }));
   },
   {

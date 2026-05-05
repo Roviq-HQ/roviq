@@ -3,7 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   academicYears,
   institutes,
-  memberships,
   staffProfiles,
   studentGuardianLinks,
   studentProfiles,

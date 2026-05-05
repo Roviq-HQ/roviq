@@ -1,5 +1,4 @@
-// libs/database/src/seed/essential/system-roles.ts
-
+import { sql } from 'drizzle-orm';
 import { roles, SYSTEM_USER_ID } from '../..';
 import type { DrizzleDB } from '../../providers';
 import { SEED_IDS } from '../ids';
@@ -86,7 +85,14 @@ export async function seedSystemRoles(tx: DrizzleDB): Promise<void> {
         ...BY,
       })),
     )
-    .onConflictDoUpdate({ target: roles.id, set: { updatedAt: new Date() } });
-
-  console.log(`  System roles: ${systemRoles.length} seeded`);
+    .onConflictDoUpdate({
+      target: roles.id,
+      set: {
+        updatedAt: new Date(),
+        abilities: sql`excluded.abilities`,
+        name: sql`excluded.name`,
+        resellerId: sql`excluded.reseller_id`,
+        scope: sql`excluded.scope`,
+      },
+    });
 }

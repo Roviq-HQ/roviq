@@ -2,7 +2,7 @@
  * ROV-243 H5 — integration coverage for the synthetic_origin column.
  *
  * Two-path verification against the live test DB:
- *   1. Synthetic-context write (mkAdminCtx with origin) → audit row carries
+ *   1. Synthetic-context write with origin → audit row carries
  *      the originating workflow / consumer / seeder string.
  *   2. JWT-driven write (synthetic_origin absent on event) → audit row's
  *      synthetic_origin column is NULL.

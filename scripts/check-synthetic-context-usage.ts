@@ -23,6 +23,7 @@ const SCAN_ROOTS = [join(ROOT, 'apps'), join(ROOT, 'ee'), join(ROOT, 'libs')];
 export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/billing.integration.spec.ts',
   'apps/api-gateway/src/__tests__/integration-app.integration.spec.ts',
+  'apps/api-gateway/src/__tests__/rls-cross-scope-isolation.integration.spec.ts',
   'apps/api-gateway/src/academic-year/academic-year.service.ts',
   'apps/api-gateway/src/academic-year/repositories/academic-year.drizzle-repository.ts',
   'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
@@ -114,6 +115,9 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'libs/backend/testing/src/integration/data-factories.ts',
   'libs/database/src/__tests__/branded-context.spec.ts',
   'libs/database/src/index.ts',
+  'libs/database/src/seed/demo/index.ts',
+  'libs/database/src/seed/e2e/index.ts',
+  'libs/database/src/seed/essential/index.ts',
   'libs/database/src/tenant-db.ts',
 ]);
 
