@@ -12,10 +12,10 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
+import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
-const STAFF_PASSWORD_PLAIN = 'staff123';
 
 interface StaffFixture {
   userId: string;
@@ -37,7 +37,7 @@ export async function seedE2eStaff(tx: DrizzleDB, instituteId: string): Promise<
       userId: SEED_IDS.USER_STAFF_2,
       membershipId: SEED_IDS.MEMBERSHIP_STAFF_2,
       profileId: SEED_IDS.STAFF_PROFILE_2,
-      username: 'staff2',
+      username: SEED_CREDENTIALS.STAFF_2.username,
       email: 'staff2@svm-ggn.edu.in',
       firstName: { en: 'Vikram', hi: 'विक्रम' },
       lastName: { en: 'Joshi', hi: 'जोशी' },
@@ -50,7 +50,7 @@ export async function seedE2eStaff(tx: DrizzleDB, instituteId: string): Promise<
       userId: SEED_IDS.USER_STAFF_3,
       membershipId: SEED_IDS.MEMBERSHIP_STAFF_3,
       profileId: SEED_IDS.STAFF_PROFILE_3,
-      username: 'staff3',
+      username: SEED_CREDENTIALS.STAFF_3.username,
       email: 'staff3@svm-ggn.edu.in',
       firstName: { en: 'Meera', hi: 'मीरा' },
       lastName: { en: 'Nair', hi: 'नायर' },
@@ -81,7 +81,7 @@ export async function seedE2eStaff(tx: DrizzleDB, instituteId: string): Promise<
     }
   }
 
-  const staffPassword = await hash(STAFF_PASSWORD_PLAIN);
+  const staffPassword = await hash(SEED_CREDENTIALS.STAFF_2.password);
 
   await tx
     .insert(users)
@@ -152,6 +152,4 @@ export async function seedE2eStaff(tx: DrizzleDB, instituteId: string): Promise<
       })),
     )
     .onConflictDoNothing({ target: staffProfiles.id });
-
-  console.log('  E2E staff: staff2, staff3');
 }

@@ -22,5 +22,4 @@ export async function seedDemoStaffProfiles(tx: DrizzleDB, inst1Id: string): Pro
       ...BY,
     })
     .onConflictDoNothing({ target: staffProfiles.id });
-  console.log('  Staff profile: teacher1 (PGT Mathematics)');
 }

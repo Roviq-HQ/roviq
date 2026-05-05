@@ -29,7 +29,6 @@ export async function seedBillingData(tx: DrizzleDB) {
       ...BY,
     })
     .onConflictDoUpdate({ target: plans.id, set: { updatedAt: new Date() } });
-  console.log(`  Plan: Free`);
 
   await tx
     .insert(plans)
@@ -52,5 +51,4 @@ export async function seedBillingData(tx: DrizzleDB) {
       ...BY,
     })
     .onConflictDoUpdate({ target: plans.id, set: { updatedAt: new Date() } });
-  console.log(`  Plan: Pro`);
 }

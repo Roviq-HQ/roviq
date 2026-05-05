@@ -13,5 +13,4 @@ export async function seedSystemUser(tx: DrizzleDB): Promise<void> {
       passwordHash: 'disabled-system-user-no-login',
     })
     .onConflictDoNothing({ target: users.id });
-  console.log('  System user: system@roviq.internal');
 }

@@ -20,6 +20,7 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
+import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -68,8 +69,6 @@ export async function seedInstituteRoles(tx: DrizzleDB, inst1Id: string, inst2Id
       })
       .returning();
     roleIds2[roleName] = role2.id;
-
-    console.log(`  Role: ${roleName}`);
   }
 
   return { roleIds, roleIds2 };
@@ -87,15 +86,6 @@ export async function seedUsersAndMemberships(
     if (!id) throw new Error(`Role "${role}" not found in seeded roles`);
     return id;
   }
-
-  // Inlined from e2e/shared/seed-fixtures.ts to avoid cross-layer imports.
-  const SEED_CREDENTIALS = {
-    ADMIN: { username: 'admin', password: 'admin123' },
-    RESELLER: { username: 'reseller1', password: 'reseller123' },
-    TEACHER: { username: 'teacher1', password: 'teacher123' },
-    STUDENT: { username: 'student1', password: 'student123' },
-    GUARDIAN: { username: 'guardian1', password: 'guardian123' },
-  };
 
   const adminPassword = await hash(SEED_CREDENTIALS.ADMIN.password);
   const resellerPassword = await hash(SEED_CREDENTIALS.RESELLER.password);
@@ -210,7 +200,6 @@ export async function seedUsersAndMemberships(
     .insert(platformMemberships)
     .values({ userId: admin.id, roleId: SEED_IDS.ROLE_PLATFORM_ADMIN })
     .onConflictDoUpdate({ target: platformMemberships.userId, set: { updatedAt: new Date() } });
-  console.log(`  User: ${admin.username} / admin123 (institute_admin both + platform_admin)`);
 
   // reseller
   await tx
@@ -224,7 +213,6 @@ export async function seedUsersAndMemberships(
       target: [resellerMemberships.userId, resellerMemberships.resellerId],
       set: { updatedAt: new Date() },
     });
-  console.log(`  User: ${resellerUser.username} / reseller123 (reseller_full_admin)`);
 
   // teacher — single institute
   await tx
@@ -240,7 +228,6 @@ export async function seedUsersAndMemberships(
       target: [memberships.userId, memberships.tenantId, memberships.roleId],
       set: { updatedAt: new Date() },
     });
-  console.log(`  User: ${teacher.username} / teacher123 (class_teacher)`);
 
   // student — single institute
   await tx
@@ -256,7 +243,6 @@ export async function seedUsersAndMemberships(
       target: [memberships.userId, memberships.tenantId, memberships.roleId],
       set: { updatedAt: new Date() },
     });
-  console.log(`  User: ${student.username} / student123 (student)`);
 
   // guardian — parent role, linked to student1
   await tx
@@ -314,7 +300,6 @@ export async function seedUsersAndMemberships(
       isEmergencyContact: true,
     })
     .onConflictDoNothing();
-  console.log(`  User: ${guardianUser.username} / guardian123 (parent, linked to student1)`);
 
   // Auth providers (password-based)
   for (const user of [admin, teacher, student, resellerUser, guardianUser]) {

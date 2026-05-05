@@ -11,22 +11,23 @@ import { workflow } from '@novu/framework';
 const payloadSchema = {
   type: 'object',
   properties: {
-    requestType: { type: 'string' },
+    approvalType: { type: 'string' },
     requesterName: { type: 'string' },
     summary: { type: 'string' },
     actionUrl: { type: 'string' },
     config: {
       type: 'object',
       properties: {
+        inApp: { type: 'boolean', default: true },
         whatsapp: { type: 'boolean', default: false },
         email: { type: 'boolean', default: false },
         push: { type: 'boolean', default: false },
       },
-      required: ['whatsapp', 'email', 'push'],
+      required: ['inApp', 'whatsapp', 'email', 'push'],
       additionalProperties: false,
     },
   },
-  required: ['requestType', 'requesterName', 'summary', 'actionUrl', 'config'],
+  required: ['approvalType', 'requesterName', 'summary', 'actionUrl', 'config'],
   additionalProperties: false,
 } as const;
 
@@ -35,8 +36,8 @@ export const approvalRequestWorkflow = workflow(
   async ({ step, payload }) => {
     // Immediate in-app notification
     await step.inApp('approval-request-in-app', async () => ({
-      subject: `Approval Needed: ${payload.requestType}`,
-      body: `${payload.requesterName} submitted a ${payload.requestType} request: ${payload.summary}`,
+      subject: `Approval Needed: ${payload.approvalType}`,
+      body: `${payload.requesterName} submitted a ${payload.approvalType} request: ${payload.summary}`,
       primaryAction: {
         label: 'Review',
         redirect: { url: payload.actionUrl },
@@ -47,10 +48,10 @@ export const approvalRequestWorkflow = workflow(
     await step.chat(
       'approval-request-whatsapp',
       async () => ({
-        body: `Approval needed: ${payload.requesterName} submitted a ${payload.requestType} request. ${payload.summary}`,
+        body: `Approval needed: ${payload.requesterName} submitted a ${payload.approvalType} request. ${payload.summary}`,
       }),
       {
-        skip: () => !payload.config?.whatsapp,
+        skip: () => !payload.config.whatsapp,
       },
     );
 
@@ -58,11 +59,11 @@ export const approvalRequestWorkflow = workflow(
     await step.email(
       'approval-request-email',
       async () => ({
-        subject: `Approval Needed: ${payload.requestType}`,
-        body: `${payload.requesterName} submitted a ${payload.requestType} request: ${payload.summary}. <a href="${payload.actionUrl}">Review now</a>`,
+        subject: `Approval Needed: ${payload.approvalType}`,
+        body: `${payload.requesterName} submitted a ${payload.approvalType} request: ${payload.summary}. <a href="${payload.actionUrl}">Review now</a>`,
       }),
       {
-        skip: () => !payload.config?.email,
+        skip: () => !payload.config.email,
       },
     );
 
@@ -70,11 +71,11 @@ export const approvalRequestWorkflow = workflow(
     await step.push(
       'approval-request-push',
       async () => ({
-        subject: `Approval Needed: ${payload.requestType}`,
+        subject: `Approval Needed: ${payload.approvalType}`,
         body: `${payload.requesterName} — ${payload.summary}`,
       }),
       {
-        skip: () => !payload.config?.push,
+        skip: () => !payload.config.push,
       },
     );
   },

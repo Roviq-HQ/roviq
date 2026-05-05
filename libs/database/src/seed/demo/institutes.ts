@@ -10,17 +10,8 @@ import {
   SYSTEM_USER_ID,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
+import { SEED_NAMES, SEED_SLUGS } from '../fixtures';
 import { SEED_IDS } from '../ids';
-
-// Inlined from e2e/shared/seed-fixtures.ts to avoid cross-layer imports.
-const SEED_NAMES = {
-  INSTITUTE_1: { en: 'Saraswati Vidya Mandir', hi: 'सरस्वती विद्या मंदिर' },
-  INSTITUTE_2: { en: 'Rajasthan Public School', hi: 'राजस्थान पब्लिक स्कूल' },
-};
-const SEED_SLUGS = {
-  INSTITUTE_1: 'saraswati-vidya-mandir',
-  INSTITUTE_2: 'rajasthan-public-school',
-};
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 
@@ -80,7 +71,6 @@ export async function seedInstitutes(tx: DrizzleDB) {
       set: { status: 'ACTIVE', setupStatus: 'COMPLETED', updatedAt: new Date() },
     })
     .returning();
-  console.log(`  Institute 1: ${inst1.name.en} (NEP + CBSE)`);
 
   const [inst2] = await tx
     .insert(institutes)
@@ -127,7 +117,6 @@ export async function seedInstitutes(tx: DrizzleDB) {
       set: { status: 'ACTIVE', setupStatus: 'COMPLETED', updatedAt: new Date() },
     })
     .returning();
-  console.log(`  Institute 2: ${inst2.name.en} (Traditional + BSEH)`);
 
   return { inst1, inst2 };
 }
@@ -158,7 +147,6 @@ export async function seedBrandingAndConfigs(tx: DrizzleDB, inst1Id: string, ins
       },
     ])
     .onConflictDoNothing();
-  console.log('  Branding seeded for both institutes');
 
   // Configs
   await tx
@@ -226,7 +214,6 @@ export async function seedBrandingAndConfigs(tx: DrizzleDB, inst1Id: string, ins
       ...BY,
     })
     .onConflictDoNothing();
-  console.log('  Configs seeded for both institutes');
 }
 
 export async function seedIdentifiersAndAffiliations(
@@ -275,7 +262,6 @@ export async function seedIdentifiersAndAffiliations(
       },
     ])
     .onConflictDoNothing();
-  console.log('  Identifiers seeded (UDISE + board affiliation codes)');
 
   await tx
     .insert(instituteAffiliations)
@@ -304,7 +290,6 @@ export async function seedIdentifiersAndAffiliations(
       },
     ])
     .onConflictDoNothing();
-  console.log('  Affiliations seeded (CBSE for Inst1, BSEH for Inst2)');
 }
 
 export async function seedNotificationConfigs(tx: DrizzleDB, instituteIds: string[]) {
@@ -332,5 +317,4 @@ export async function seedNotificationConfigs(tx: DrizzleDB, instituteIds: strin
         });
     }
   }
-  console.log('  Notification configs seeded');
 }

@@ -2,15 +2,16 @@
  * Names, slugs, credentials, and rich-shape SEED / E2E_USERS objects shared by:
  *   - Vitest E2E suites (e2e/api-gateway-e2e/**)
  *   - Playwright UI suites (e2e/web-{admin,institute,reseller}-e2e/**)
- *   - The seed script itself (scripts/seed.ts)
+ *   - Seed entrypoints in scripts/seed-*.ts
  *
- * IDs are the canonical source of truth in `libs/database/src/seed/ids.ts` (zero
+ * IDs and literals are canonical in `libs/database/src/seed/` (zero
  * @roviq/* imports, Vitest-resolvable from any project). They are
  * re-exported here for callers that want everything from one path.
  *
  * Rules:
- *   - NEVER hardcode a seed name, slug, password, or username outside this
- *     file. Hardcoded IDs go in `libs/database/src/seed/ids.ts`.
+ *   - NEVER hardcode a seed name, slug, password, or username outside
+ *     `libs/database/src/seed/fixtures.ts`. Hardcoded IDs go in
+ *     `libs/database/src/seed/ids.ts`.
  *   - Passwords stay plaintext; the seeder hashes them at run time. They
  *     must each be at least `NEW_PASSWORD_MIN_LENGTH` characters
  *     (`@roviq/common-types`) so the password-change suite can roll any
@@ -21,32 +22,11 @@
  *     resolvability under Vitest. NEW_PASSWORD_MIN_LENGTH is duplicated
  *     as a literal constant below — kept honest by the runtime guard.
  */
+import { SEED_CREDENTIALS, SEED_NAMES, SEED_SLUGS } from '../../libs/database/src/seed/fixtures';
 import { SEED_IDS } from '../../libs/database/src/seed/ids';
 
 // Re-export so `import { SEED_IDS } from '.../seed-fixtures'` works.
-export { SEED_IDS };
-
-// ─── Names (human-readable, may be localised) ────────────────────────────
-export const SEED_NAMES = {
-  RESELLER_DIRECT: 'Roviq Direct',
-  INSTITUTE_1: { en: 'Saraswati Vidya Mandir', hi: 'सरस्वती विद्या मंदिर' },
-  INSTITUTE_2: { en: 'Rajasthan Public School', hi: 'राजस्थान पब्लिक स्कूल' },
-} as const;
-
-// ─── Slugs (URL-safe, used by seed insert + lookup queries) ──────────────
-export const SEED_SLUGS = {
-  INSTITUTE_1: 'saraswati-vidya-mandir',
-  INSTITUTE_2: 'rajasthan-public-school',
-} as const;
-
-// ─── Credentials (plaintext; seeder hashes at runtime) ───────────────────
-export const SEED_CREDENTIALS = {
-  ADMIN: { username: 'admin', password: 'admin123' },
-  RESELLER: { username: 'reseller1', password: 'reseller123' },
-  TEACHER: { username: 'teacher1', password: 'teacher123' },
-  STUDENT: { username: 'student1', password: 'student123' },
-  GUARDIAN: { username: 'guardian1', password: 'guardian123' },
-} as const;
+export { SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_SLUGS };
 
 // Mirrors `NEW_PASSWORD_MIN_LENGTH` from
 // `libs/shared/common-types/src/lib/policy/password-policy.ts`. Duplicated

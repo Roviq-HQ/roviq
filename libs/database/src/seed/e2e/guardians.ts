@@ -13,10 +13,10 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
+import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
-const GUARDIAN_PASSWORD_PLAIN = 'guardian123';
 
 export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Promise<void> {
   const parentRoleRows = await tx
@@ -35,14 +35,14 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
     throw new Error(`parent role not found for institute ${instituteId} — run demo seed first`);
   }
 
-  const guardianPassword = await hash(GUARDIAN_PASSWORD_PLAIN);
+  const guardianPassword = await hash(SEED_CREDENTIALS.GUARDIAN_2.password);
 
   const newGuardians = [
     {
       userId: SEED_IDS.USER_GUARDIAN_2,
       membershipId: SEED_IDS.MEMBERSHIP_GUARDIAN_2,
       profileId: SEED_IDS.GUARDIAN_PROFILE_2,
-      username: 'guardian2',
+      username: SEED_CREDENTIALS.GUARDIAN_2.username,
       email: 'guardian2@example.com',
       firstName: { en: 'Sunita', hi: 'सुनीता' },
       lastName: { en: 'Patel', hi: 'पटेल' },
@@ -52,7 +52,7 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
       userId: SEED_IDS.USER_GUARDIAN_3,
       membershipId: SEED_IDS.MEMBERSHIP_GUARDIAN_3,
       profileId: SEED_IDS.GUARDIAN_PROFILE_3,
-      username: 'guardian3',
+      username: SEED_CREDENTIALS.GUARDIAN_3.username,
       email: 'guardian3@example.com',
       firstName: { en: 'Anil', hi: 'अनिल' },
       lastName: { en: 'Verma', hi: 'वर्मा' },
@@ -173,6 +173,4 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
       },
     ])
     .onConflictDoNothing();
-
-  console.log('  E2E guardians: guardian2, guardian3 + 4 student-guardian links');
 }

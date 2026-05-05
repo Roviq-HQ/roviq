@@ -90,7 +90,6 @@ export async function seedAcademicStructure(
       }
     }
   }
-  console.log(`  ${label}: ${stdDefs.length} standards, sections seeded`);
   return ay;
 }
 
@@ -120,7 +119,6 @@ export async function seedSubjects(
       .returning({ id: subjects.id });
     if (sub) idMap[s.shortName] = sub.id;
   }
-  console.log(`  Subjects: ${Object.keys(idMap).length} created for ${instId.slice(-3)}`);
   return idMap;
 }
 
@@ -164,5 +162,4 @@ export async function linkSubjectsToStructure(
       }
     }
   }
-  console.log(`  Subject links created for ${instId.slice(-3)}`);
 }

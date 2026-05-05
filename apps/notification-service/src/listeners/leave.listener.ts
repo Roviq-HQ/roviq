@@ -33,6 +33,7 @@ export class LeaveListener {
       workflowId: 'leave-decided',
       to: { subscriberId: event.userId },
       payload: {
+        tenantId: event.tenantId,
         leaveId: event.leaveId,
         userId: event.userId,
         status: event.status,

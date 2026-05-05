@@ -1,9 +1,9 @@
-// libs/database/src/seed/demo/index.ts
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { DrizzleDB } from '../../providers';
 import { institutes } from '../../schema';
 import { mkAdminCtx, withAdmin } from '../../tenant-db';
 import { seedEssential } from '../essential';
+import { SEED_SLUGS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { linkSubjectsToStructure, seedAcademicStructure, seedSubjects } from './academics';
 import { seedAttendanceAndLeaves } from './attendance';
@@ -35,14 +35,13 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
     const exists = await tx
       .select({ id: institutes.id })
       .from(institutes)
-      .where(eq(institutes.slug, 'saraswati-vidya-mandir'))
+      .where(eq(institutes.slug, SEED_SLUGS.INSTITUTE_1))
       .limit(1);
     if (exists.length > 0) {
-      console.log('⏭ demo already seeded, skipping');
+      await seedDemoStaffProfiles(tx, exists[0].id);
+      await seedAttendanceAndLeaves(tx, exists[0].id);
       return;
     }
-
-    console.log('Seeding demo...');
 
     const { inst1, inst2 } = await seedInstitutes(tx);
     await seedBrandingAndConfigs(tx, inst1.id, inst2.id);
@@ -77,7 +76,5 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
     await seedDemoStaffProfiles(tx, inst1.id);
 
     await seedAttendanceAndLeaves(tx, inst1.id);
-
-    console.log('✓ demo seed complete');
   });
 }
