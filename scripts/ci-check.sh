@@ -240,6 +240,8 @@ launch() {
 (( run_e2e )) && launch e2e bash -c 'set -e
   pnpm -s check:jetstream-drift
   pnpm -s nx run api-gateway-e2e:test-e2e
+  NEXT_PUBLIC_API_URL=http://localhost:3004 \
+  NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='\'''\'' \
   pnpm -s nx run web-e2e-suite:e2e'
 
 # Schema-coverage gates — fast (<1s total), always run regardless of affected
