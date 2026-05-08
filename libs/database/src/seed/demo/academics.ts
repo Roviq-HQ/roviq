@@ -24,26 +24,38 @@ export async function seedAcademicStructure(
   const now = new Date();
   const startYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
 
+  const academicYearValues = {
+    id: ayId,
+    tenantId: instId,
+    label: `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`,
+    startDate: `${startYear}-04-01`,
+    endDate: `${startYear + 1}-03-31`,
+    isActive: true,
+    status: 'ACTIVE' as const,
+    termStructure: [
+      { label: 'Term 1', startDate: `${startYear}-04-01`, endDate: `${startYear}-09-30` },
+      { label: 'Term 2', startDate: `${startYear}-10-01`, endDate: `${startYear + 1}-03-31` },
+    ],
+    ...BY,
+  };
+
   const [ay] = await tx
     .insert(academicYears)
-    .values({
-      id: ayId,
-      tenantId: instId,
-      label: `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`,
-      startDate: `${startYear}-04-01`,
-      endDate: `${startYear + 1}-03-31`,
-      isActive: true,
-      status: 'ACTIVE',
-      termStructure: [
-        { label: 'Term 1', startDate: `${startYear}-04-01`, endDate: `${startYear}-09-30` },
-        { label: 'Term 2', startDate: `${startYear}-10-01`, endDate: `${startYear + 1}-03-31` },
-      ],
-      ...BY,
+    .values(academicYearValues)
+    .onConflictDoUpdate({
+      target: academicYears.id,
+      set: {
+        label: academicYearValues.label,
+        startDate: academicYearValues.startDate,
+        endDate: academicYearValues.endDate,
+        isActive: true,
+        status: 'ACTIVE',
+        termStructure: academicYearValues.termStructure,
+        updatedAt: new Date(),
+        updatedBy: SYSTEM_USER_ID,
+      },
     })
-    .onConflictDoNothing()
     .returning({ id: academicYears.id });
-
-  if (!ay) return null;
 
   const streamConfigs: Record<string, { name: string; code: string }> = {
     Science: { name: 'Science PCM/PCB', code: 'science' },

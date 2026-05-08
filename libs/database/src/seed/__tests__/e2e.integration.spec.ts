@@ -1,4 +1,4 @@
-import { count, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   guardianProfiles,
@@ -10,6 +10,33 @@ import { seedE2e } from '../e2e';
 import { SEED_IDS } from '../ids';
 import { makeSeedTestDb } from './seed-test-helpers';
 
+const SEEDED_STUDENT_PROFILE_IDS = [
+  SEED_IDS.STUDENT_PROFILE_1,
+  SEED_IDS.STUDENT_PROFILE_2,
+  SEED_IDS.STUDENT_PROFILE_3,
+  SEED_IDS.STUDENT_PROFILE_4,
+  SEED_IDS.STUDENT_PROFILE_5,
+] as const;
+
+const SEEDED_STAFF_PROFILE_IDS = [
+  SEED_IDS.STAFF_PROFILE_1,
+  SEED_IDS.STAFF_PROFILE_2,
+  SEED_IDS.STAFF_PROFILE_3,
+] as const;
+
+const SEEDED_GUARDIAN_PROFILE_IDS = [
+  SEED_IDS.GUARDIAN_PROFILE_1,
+  SEED_IDS.GUARDIAN_PROFILE_2,
+  SEED_IDS.GUARDIAN_PROFILE_3,
+] as const;
+
+const SEEDED_E2E_LINK_IDS = [
+  SEED_IDS.LINK_G1_S2,
+  SEED_IDS.LINK_G2_S2,
+  SEED_IDS.LINK_G2_S3,
+  SEED_IDS.LINK_G3_S4,
+] as const;
+
 describe('seedE2e', () => {
   const { pool, db } = makeSeedTestDb();
   afterAll(async () => {
@@ -20,36 +47,55 @@ describe('seedE2e', () => {
     await seedE2e(db);
   });
 
-  it('creates 5 student_profiles in Institute 1', async () => {
-    const [{ value: total }] = await db
-      .select({ value: count() })
+  it('creates the seed-owned student_profiles in Institute 1', async () => {
+    const rows = await db
+      .select({ id: studentProfiles.id, tenantId: studentProfiles.tenantId })
       .from(studentProfiles)
-      .where(eq(studentProfiles.tenantId, SEED_IDS.INSTITUTE_1));
-    expect(total).toBe(5);
+      .where(inArray(studentProfiles.id, [...SEEDED_STUDENT_PROFILE_IDS]));
+
+    expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_STUDENT_PROFILE_IDS].sort());
+    expect(rows.every((row) => row.tenantId === SEED_IDS.INSTITUTE_1)).toBe(true);
   });
 
-  it('creates 3 staff_profiles in Institute 1', async () => {
-    const [{ value: total }] = await db
-      .select({ value: count() })
+  it('creates the seed-owned staff_profiles in Institute 1', async () => {
+    const rows = await db
+      .select({ id: staffProfiles.id, tenantId: staffProfiles.tenantId })
       .from(staffProfiles)
-      .where(eq(staffProfiles.tenantId, SEED_IDS.INSTITUTE_1));
-    expect(total).toBe(3);
+      .where(inArray(staffProfiles.id, [...SEEDED_STAFF_PROFILE_IDS]));
+
+    expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_STAFF_PROFILE_IDS].sort());
+    expect(rows.every((row) => row.tenantId === SEED_IDS.INSTITUTE_1)).toBe(true);
   });
 
-  it('creates 3 guardian_profiles in Institute 1', async () => {
-    const [{ value: total }] = await db
-      .select({ value: count() })
+  it('creates the seed-owned guardian_profiles in Institute 1', async () => {
+    const rows = await db
+      .select({ id: guardianProfiles.id, tenantId: guardianProfiles.tenantId })
       .from(guardianProfiles)
-      .where(eq(guardianProfiles.tenantId, SEED_IDS.INSTITUTE_1));
-    expect(total).toBe(3);
+      .where(inArray(guardianProfiles.id, [...SEEDED_GUARDIAN_PROFILE_IDS]));
+
+    expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_GUARDIAN_PROFILE_IDS].sort());
+    expect(rows.every((row) => row.tenantId === SEED_IDS.INSTITUTE_1)).toBe(true);
   });
 
-  it('creates 5 student-guardian links (1 demo + 4 e2e)', async () => {
-    const [{ value: total }] = await db
-      .select({ value: count() })
+  it('creates the seed-owned student-guardian links', async () => {
+    const e2eLinks = await db
+      .select({ id: studentGuardianLinks.id, tenantId: studentGuardianLinks.tenantId })
       .from(studentGuardianLinks)
-      .where(eq(studentGuardianLinks.tenantId, SEED_IDS.INSTITUTE_1));
-    expect(total).toBe(5);
+      .where(inArray(studentGuardianLinks.id, [...SEEDED_E2E_LINK_IDS]));
+
+    const demoLink = await db
+      .select({ id: studentGuardianLinks.id })
+      .from(studentGuardianLinks)
+      .where(
+        and(
+          eq(studentGuardianLinks.studentProfileId, SEED_IDS.STUDENT_PROFILE_1),
+          eq(studentGuardianLinks.guardianProfileId, SEED_IDS.GUARDIAN_PROFILE_1),
+        ),
+      );
+
+    expect(e2eLinks.map((row) => row.id).sort()).toEqual([...SEEDED_E2E_LINK_IDS].sort());
+    expect(e2eLinks.every((row) => row.tenantId === SEED_IDS.INSTITUTE_1)).toBe(true);
+    expect(demoLink.length).toBeGreaterThanOrEqual(1);
   });
 
   it('links guardian1 to both student1 and student2 (cross-family)', async () => {
@@ -63,10 +109,11 @@ describe('seedE2e', () => {
 
   it('is idempotent — running twice yields same row counts', async () => {
     await seedE2e(db);
-    const [{ value: total }] = await db
-      .select({ value: count() })
+    const rows = await db
+      .select({ id: studentProfiles.id })
       .from(studentProfiles)
-      .where(eq(studentProfiles.tenantId, SEED_IDS.INSTITUTE_1));
-    expect(total).toBe(5);
+      .where(inArray(studentProfiles.id, [...SEEDED_STUDENT_PROFILE_IDS]));
+
+    expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_STUDENT_PROFILE_IDS].sort());
   });
 });

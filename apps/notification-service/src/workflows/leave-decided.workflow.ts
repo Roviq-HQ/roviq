@@ -24,7 +24,12 @@ const payloadSchema = {
 export const leaveDecidedWorkflow = workflow(
   'leave-decided',
   async ({ step, payload }) => {
-    const statusLower = payload.status.toLowerCase();
+    const statusLower =
+      payload.status === 'APPROVED'
+        ? 'approved'
+        : payload.status === 'REJECTED'
+          ? 'rejected'
+          : 'updated';
     const subject = `Your leave was ${statusLower}`;
     const body = `Your leave application (${payload.leaveId}) has been ${statusLower}.`;
 

@@ -1,16 +1,16 @@
 /**
  * Novu test helpers — used by `notifications.api-e2e.spec.ts`.
  *
- * Credential resolution (first hit wins):
- *   1. Environment: `NOVU_API_URL`, `NOVU_SECRET_KEY`, `NOVU_APPLICATION_IDENTIFIER`.
- *      If the URL points at the in-network hostname (`novu-api:3000`), it is
- *      rewritten to the host-published URL below so Vitest running on the host
- *      can still reach it.
- *   2. The shared docker volume `roviq-e2e_novu_creds` — populated by the
+ * Credential resolution:
+ *   1. The shared docker volume `roviq-e2e_novu_creds` — populated by the
  *      `novu-bootstrap` service on first boot. We read it via
  *      `docker run --rm -v ... alpine cat`, parse the `export KEY="VAL"` lines,
  *      and substitute the in-network hostname with `http://localhost:3443`
  *      (see compose.e2e.yaml — `novu-api` now publishes 3000 → host 3443).
+ *   2. Environment: `NOVU_API_URL`, `NOVU_SECRET_KEY`, `NOVU_APPLICATION_IDENTIFIER`.
+ *      If the URL points at the in-network hostname (`novu-api:3000`), it is
+ *      rewritten to the host-published URL below so Vitest running on the host
+ *      can still reach it.
  *
  * If neither source produces a full credential set, `getNovuCreds()` throws;
  * the spec catches and converts to `describe.skip`.
@@ -74,15 +74,12 @@ export function getNovuCreds(): NovuCreds {
     appId: process.env.NOVU_APPLICATION_IDENTIFIER,
   };
 
-  let creds: Partial<NovuCreds> = fromEnv;
-  if (!creds.apiUrl || !creds.apiKey || !creds.appId) {
-    const fromVol = readFromVolume();
-    creds = {
-      apiUrl: creds.apiUrl || fromVol.apiUrl,
-      apiKey: creds.apiKey || fromVol.apiKey,
-      appId: creds.appId || fromVol.appId,
-    };
-  }
+  const fromVol = readFromVolume();
+  const creds: Partial<NovuCreds> = {
+    apiUrl: fromVol.apiUrl || fromEnv.apiUrl,
+    apiKey: fromVol.apiKey || fromEnv.apiKey,
+    appId: fromVol.appId || fromEnv.appId,
+  };
 
   if (!creds.apiUrl || !creds.apiKey || !creds.appId) {
     throw new Error(

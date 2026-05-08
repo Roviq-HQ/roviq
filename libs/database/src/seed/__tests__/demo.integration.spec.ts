@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   academicYears,
@@ -70,7 +70,12 @@ describe('seedDemo', () => {
         isPrimary: studentGuardianLinks.isPrimaryContact,
       })
       .from(studentGuardianLinks)
-      .where(eq(studentGuardianLinks.studentProfileId, SEED_IDS.STUDENT_PROFILE_1));
+      .where(
+        and(
+          eq(studentGuardianLinks.studentProfileId, SEED_IDS.STUDENT_PROFILE_1),
+          eq(studentGuardianLinks.guardianProfileId, SEED_IDS.GUARDIAN_PROFILE_1),
+        ),
+      );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.relationship).toBe('FATHER');
     expect(rows[0]?.isPrimary).toBe(true);
