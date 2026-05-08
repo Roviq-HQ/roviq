@@ -21,6 +21,7 @@ declare global {
       DATABASE_URL_E2E?: string;
       CI?: string;
       API_URL?: string;
+      E2E_VISUAL_SNAPSHOTS?: string;
       WEB_URL?: string;
       WS_URL?: string;
       MAX_LOGIN_ATTEMPTS?: string;

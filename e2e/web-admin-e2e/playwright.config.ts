@@ -48,6 +48,7 @@ export default defineConfig({
     cwd: workspaceRoot,
     timeout: 30_000,
     env: {
+      E2E_PROBE: '1',
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004',
       // Disable Novu Inbox in E2E — Novu API is not exposed to the host
       NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: '',

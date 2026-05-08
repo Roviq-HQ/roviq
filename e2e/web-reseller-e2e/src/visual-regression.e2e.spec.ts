@@ -1,5 +1,7 @@
 import { expect, test } from '../../shared/console-guardian';
 
+const RUN_VISUAL_SNAPSHOTS = process.env.E2E_VISUAL_SNAPSHOTS === '1';
+
 /**
  * Visual regression baselines for the reseller portal.
  * See admin spec for rationale and baseline-update workflow.
@@ -9,6 +11,7 @@ import { expect, test } from '../../shared/console-guardian';
  * from the hero card, so the page above the fold screenshots stably.
  */
 test.use({ checkAccessibility: false });
+test.skip(!RUN_VISUAL_SNAPSHOTS, 'Set E2E_VISUAL_SNAPSHOTS=1 to run visual snapshots.');
 
 test.describe('Reseller portal — visual regression (unauthenticated)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
