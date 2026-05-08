@@ -55,7 +55,8 @@
     {
       "includes": ["**/next-env.d.ts", ".github/**", "**/generated/**", "**/__generated__/**"],
       "formatter": { "enabled": false },
-      "linter": { "enabled": false }
+      "linter": { "enabled": false },
+      "assist": { "enabled": false }
     },
     {
       "includes": ["libs/frontend/ui/src/components/ui/**"],

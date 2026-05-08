@@ -212,13 +212,13 @@ else
 
   # Resolve bridge URL per-mode
   if [ "$MODE" = "host" ]; then
-    BRIDGE_HEALTH="http://localhost:3002/api/novu"
+    BRIDGE_HEALTH="http://localhost:3002/health"
     # Host IP reachable from Docker containers — interface-agnostic
     HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')
     if [ -z "$HOST_IP" ]; then HOST_IP="host.docker.internal"; fi
     BRIDGE_URL="http://${HOST_IP}:3002/api/novu"
   else
-    BRIDGE_HEALTH="$NOTIF_SVC/api/novu"
+    BRIDGE_HEALTH="$NOTIF_SVC/health"
     BRIDGE_URL="$NOTIF_SVC/api/novu"
   fi
 

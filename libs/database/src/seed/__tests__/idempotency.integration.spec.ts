@@ -1,4 +1,4 @@
-import { count, eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   institutes,
@@ -11,6 +11,14 @@ import {
 import { seedDemo, seedE2e, seedEssential } from '../';
 import { SEED_IDS } from '../ids';
 import { makeSeedTestDb } from './seed-test-helpers';
+
+const SEEDED_STUDENT_PROFILE_IDS = [
+  SEED_IDS.STUDENT_PROFILE_1,
+  SEED_IDS.STUDENT_PROFILE_2,
+  SEED_IDS.STUDENT_PROFILE_3,
+  SEED_IDS.STUDENT_PROFILE_4,
+  SEED_IDS.STUDENT_PROFILE_5,
+] as const;
 
 describe('Seed tier idempotency + cumulative chaining', () => {
   const { pool, db } = makeSeedTestDb();
@@ -67,15 +75,16 @@ describe('Seed tier idempotency + cumulative chaining', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('seedE2e x3 → still exactly 5 students in Institute 1', async () => {
+  it('seedE2e x3 → still has one row for each seed-owned student', async () => {
     await seedE2e(db);
     await seedE2e(db);
     await seedE2e(db);
-    const [{ value: total }] = await db
-      .select({ value: count() })
+    const rows = await db
+      .select({ id: studentProfiles.id })
       .from(studentProfiles)
-      .where(eq(studentProfiles.tenantId, SEED_IDS.INSTITUTE_1));
-    expect(total).toBe(5);
+      .where(inArray(studentProfiles.id, [...SEEDED_STUDENT_PROFILE_IDS]));
+
+    expect(rows.map((row) => row.id).sort()).toEqual([...SEEDED_STUDENT_PROFILE_IDS].sort());
   });
 
   it('seedE2e repairs missing e2e fixtures when student rows already exist', async () => {

@@ -1,9 +1,6 @@
-import { eq } from 'drizzle-orm';
 import type { DrizzleDB } from '../../providers';
-import { institutes } from '../../schema';
 import { mkAdminCtx, withAdmin } from '../../tenant-db';
 import { seedEssential } from '../essential';
-import { SEED_SLUGS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { linkSubjectsToStructure, seedAcademicStructure, seedSubjects } from './academics';
 import { seedAttendanceAndLeaves } from './attendance';
@@ -32,17 +29,6 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
   await seedEssential(db);
 
   await withAdmin(db, mkAdminCtx('seeder:demo'), async (tx) => {
-    const exists = await tx
-      .select({ id: institutes.id })
-      .from(institutes)
-      .where(eq(institutes.slug, SEED_SLUGS.INSTITUTE_1))
-      .limit(1);
-    if (exists.length > 0) {
-      await seedDemoStaffProfiles(tx, exists[0].id);
-      await seedAttendanceAndLeaves(tx, exists[0].id);
-      return;
-    }
-
     const { inst1, inst2 } = await seedInstitutes(tx);
     await seedBrandingAndConfigs(tx, inst1.id, inst2.id);
     await seedIdentifiersAndAffiliations(tx, inst1.id, inst2.id);

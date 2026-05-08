@@ -72,12 +72,16 @@ describe('Billing RLS Invariants', () => {
 
   it('1. roviq_app sees only plans assigned via own subscription (subquery policy)', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      // Without an active subscription, institute should see 0 plans
-      // (unless seeded subscription exists — test verifies RLS filters correctly)
-      const result = await client.query('SELECT id FROM plans');
-      // Plans are only visible if institute has a subscription referencing them
-      // The number depends on seed state — the important thing is RLS doesn't leak ALL plans
-      expect(result.rows.length).toBeLessThanOrEqual(2);
+      const result = await client.query<{ id: string }>('SELECT id FROM plans ORDER BY id');
+      const expected = await client.query<{ planId: string }>(
+        `SELECT DISTINCT plan_id AS "planId"
+         FROM subscriptions
+         WHERE tenant_id = $1
+         ORDER BY plan_id`,
+        [SEED.INSTITUTE_1],
+      );
+
+      expect(result.rows.map((row) => row.id)).toEqual(expected.rows.map((row) => row.planId));
     });
   });
 
@@ -152,12 +156,20 @@ describe('Billing RLS Invariants', () => {
       await client.query('BEGIN');
       await client.query('SET LOCAL ROLE roviq_admin');
       const actor = randomUUID();
+      const tenantId = randomUUID();
+      const slug = `billing-rls-${tenantId}`;
+
+      await client.query(
+        `INSERT INTO institutes (id, name, slug, status, setup_status, reseller_id, created_by, updated_by)
+         VALUES ($1, '{"en":"Billing RLS Test"}'::jsonb, $2, 'ACTIVE', 'COMPLETED', $3, $4, $4)`,
+        [tenantId, slug, SEED.RESELLER_DIRECT, actor],
+      );
 
       // Insert first active subscription
       await client.query(
         `INSERT INTO subscriptions (tenant_id, plan_id, reseller_id, status, created_by, updated_by)
          VALUES ($1, $2, $3, 'ACTIVE', $4, $4)`,
-        [SEED.INSTITUTE_1, SEED.PLAN_FREE, SEED.RESELLER_DIRECT, actor],
+        [tenantId, SEED.PLAN_FREE, SEED.RESELLER_DIRECT, actor],
       );
 
       // Second active subscription for same tenant should violate partial unique index
@@ -165,7 +177,7 @@ describe('Billing RLS Invariants', () => {
         client.query(
           `INSERT INTO subscriptions (tenant_id, plan_id, reseller_id, status, created_by, updated_by)
            VALUES ($1, $2, $3, 'ACTIVE', $4, $4)`,
-          [SEED.INSTITUTE_1, SEED.PLAN_PRO, SEED.RESELLER_DIRECT, actor],
+          [tenantId, SEED.PLAN_PRO, SEED.RESELLER_DIRECT, actor],
         ),
       ).rejects.toThrow(/uq_sub_active_tenant|unique/i);
     } finally {
