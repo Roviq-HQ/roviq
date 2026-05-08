@@ -163,3 +163,17 @@ Append-only log of testing-infrastructure issues (slow pre-push, Docker rebuilds
 - Remove the `E2E_VISUAL_SNAPSHOTS=1` gate from visual specs without replacing it with another explicit opt-in.
 
 ---
+
+## 2026-05-08 — `fixed` — `ci:check` passes E2E web env to the Nx UI target
+
+**Scope:** [scripts/ci-check.sh](../../scripts/ci-check.sh), [docs/changelogs/testing-troubleshooting.md](./testing-troubleshooting.md).
+
+**Context:** Running `pnpm ci:check` failed in `web-env-check` with `Expected: "http://localhost:3005"` and `Received: "http://localhost:3004"` after the E2E UI fixes landed.
+
+**Root cause:** `ci:check` prebuilt the Next E2E web app with `NEXT_PUBLIC_API_URL=http://localhost:3004`, but later invoked `pnpm -s nx run web-e2e-suite:e2e` without exporting the same env. Nx loaded the repo `.env`, where `NEXT_PUBLIC_API_URL=http://localhost:3005`, so `web-env-check` compared the already-built E2E server against the dev API default.
+
+**Fix:** Export `NEXT_PUBLIC_API_URL=http://localhost:3004` and empty `NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER` on the `web-e2e-suite:e2e` invocation inside `ci:check`, matching the host-side E2E web build and the package `test:e2e:ui` script.
+
+**Verification:** `pnpm ci:check` passes.
+
+---
