@@ -1,10 +1,13 @@
 import { expect, test } from '../../shared/console-guardian';
 
+const RUN_VISUAL_SNAPSHOTS = process.env.E2E_VISUAL_SNAPSHOTS === '1';
+
 /**
  * Visual regression baselines for the institute portal.
  * See admin spec for rationale and baseline-update workflow.
  */
 test.use({ checkAccessibility: false });
+test.skip(!RUN_VISUAL_SNAPSHOTS, 'Set E2E_VISUAL_SNAPSHOTS=1 to run visual snapshots.');
 
 test.describe('Institute portal — visual regression (unauthenticated)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });

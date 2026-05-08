@@ -44,7 +44,7 @@ export default defineConfig({
   },
 
   // ── Project graph ──
-  // 1. `web-env-check` runs first — fetches /api/__e2e-ready and asserts the
+  // 1. `web-env-check` runs first — fetches /api/e2e-ready and asserts the
   //    web server was built with the env vars E2E expects. With
   //    `reuseExistingServer: !CI`, this catches the silent-stale-build trap
   //    where a port-bound server from a different scope would otherwise be
@@ -133,13 +133,14 @@ export default defineConfig({
     command: 'pnpm run dev:web:e2e',
     // Point readiness at the build-fingerprint probe so a port-bound but
     // mis-built server fails fast instead of being treated as ready.
-    url: `${INSTITUTE_URL}/api/__e2e-ready`,
+    url: `${INSTITUTE_URL}/api/e2e-ready`,
     name: 'Web',
     // Reuse a warm server locally; CI manages the lifecycle itself.
     reuseExistingServer: !process.env.CI,
     cwd: workspaceRoot,
     timeout: 120_000,
     env: {
+      E2E_PROBE: '1',
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004',
       NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: '',
     },

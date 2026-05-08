@@ -14,7 +14,7 @@ const EXPECTED = {
 const PROBE_BASE = process.env.WEB_URL_INSTITUTE || 'http://localhost:4201';
 
 setup('web env matches E2E expectations', async ({ request }) => {
-  const url = `${PROBE_BASE}/api/__e2e-ready`;
+  const url = `${PROBE_BASE}/api/e2e-ready`;
   const res = await request.get(url, { timeout: 5_000 });
   expect(res.status(), `${url} returned non-200`).toBe(200);
   const body = (await res.json()) as { env: Record<string, string | null> };

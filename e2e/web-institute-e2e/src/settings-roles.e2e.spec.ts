@@ -38,10 +38,10 @@ async function findRoleRow(
   page: Page,
   roleName: string,
 ): Promise<{ row: ReturnType<Page['getByTestId']>; roleId: string }> {
-  const row = page
-    .locator('[data-testid^="role-row-"]')
-    .filter({ hasText: new RegExp(`^\\s*${roleName}\\b`, 'i') })
-    .first();
+  const escapedRoleName = roleName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const row = page.getByRole('row', {
+    name: new RegExp(`^${escapedRoleName}\\s+Default\\b`, 'i'),
+  });
   await expect(row).toBeVisible({ timeout: 15_000 });
 
   const testId = await row.getAttribute('data-testid');
@@ -57,12 +57,31 @@ async function openCustomizeSheet(page: Page, roleName: string): Promise<string>
   return roleId;
 }
 
+async function loginAsInstituteUser(page: Page, username: string, password: string): Promise<void> {
+  const loginPage = new LoginPage(page);
+  await loginPage.goto('/en/login');
+  await loginPage.login(username, password);
+  await page.waitForURL(/\/(dashboard|select-institute)/, { timeout: 15_000 });
+  if (page.url().includes('/select-institute')) {
+    await page.locator(`[data-institute-name="${SEED.INSTITUTE_1.name}"]`).click();
+  }
+  await loginPage.expectRedirectToDashboard();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Authenticated suite — institute_admin storage state from auth.setup.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('Settings — Role Bottom Nav (/settings/roles)', () => {
+  test.describe.configure({ mode: 'serial' });
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test.beforeEach(async ({ page }) => {
+    await loginAsInstituteUser(
+      page,
+      E2E_USERS.INSTITUTE_ADMIN.username,
+      E2E_USERS.INSTITUTE_ADMIN.password,
+    );
     await page.goto('/en/settings/roles');
     // The PageHeader title doubles as the load signal.
     await expect(page.getByRole('heading', { name: 'Role Bottom Nav' })).toBeVisible({
@@ -127,9 +146,10 @@ test.describe('Settings — Role Bottom Nav (/settings/roles)', () => {
     await expect(page.getByTestId('slug-position-groups')).toBeVisible();
     await expect(page.getByTestId('slug-position-audit')).toHaveCount(0);
 
-    // Restore so the row matches its seeded state for downstream specs.
-    await page.getByTestId('slug-checkbox-audit').click();
-    await page.getByTestId('slug-checkbox-groups').click();
+    // Restore so the row matches its seeded state for downstream specs. Remove
+    // the temporary 4th slug first, otherwise the cap rejects adding audit back.
+    if (!wasGroupsSelected) await page.getByTestId('slug-checkbox-groups').click();
+    if (wasAuditSelected) await page.getByTestId('slug-checkbox-audit').click();
     await page.getByTestId('customize-save').click();
     await expect(page.getByTestId('customize-sheet')).toBeHidden();
   });
@@ -149,7 +169,10 @@ test.describe('Settings — Role Bottom Nav (/settings/roles)', () => {
     // sonner renders into a portal at `[data-sonner-toaster]`. The error
     // toast has the localized "Pick at most {max}" string from
     // `messages/en/settings.json` -> `roles.maxFour`.
-    const toast = page.locator('[data-sonner-toaster]').getByText(/Pick at most 4/i);
+    const toast = page
+      .locator('[data-sonner-toaster]')
+      .getByText(/^Pick at most 4$/i)
+      .first();
     await expect(toast).toBeVisible({ timeout: 5_000 });
 
     // The selection must remain at 4 — toggle was rejected.
@@ -177,11 +200,7 @@ teacherTest('renders the forbidden state for a non-admin (teacher) role', async 
   // Fresh login as teacher1 against the same institute. Mirrors the auth
   // setup pattern in `auth.setup.ts` so the access token ends up in
   // localStorage where `console-guardian` can rehydrate it.
-  const loginPage = new LoginPage(page);
-  await loginPage.goto('/en/login');
-  await loginPage.login(E2E_USERS.TEACHER.username, E2E_USERS.TEACHER.password);
-  await loginPage.selectInstitute(SEED.INSTITUTE_1.name);
-  await loginPage.expectRedirectToDashboard();
+  await loginAsInstituteUser(page, E2E_USERS.TEACHER.username, E2E_USERS.TEACHER.password);
   await persistSessionStorage(page);
   await page.context().storageState({ path: teacherAuthFile });
 

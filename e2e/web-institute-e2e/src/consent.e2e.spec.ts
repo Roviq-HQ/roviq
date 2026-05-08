@@ -8,7 +8,7 @@
  */
 
 import { expect, test } from '../../shared/console-guardian';
-import { E2E_USERS } from '../../shared/seed-fixtures';
+import { E2E_USERS, SEED } from '../../shared/seed-fixtures';
 
 // ── Non-guardian (default storageState = admin) ─────────────────────
 
@@ -74,7 +74,8 @@ test.describe('Data Consent — guardian', () => {
       timeout: 15_000,
     });
 
-    const toggles = page.locator('[data-testid^="consent-toggle-"]');
+    const childCard = page.getByTestId(`consent-child-${SEED.STUDENT_PROFILE_1.id}`);
+    const toggles = childCard.locator('[data-testid^="consent-toggle-"]');
     await expect(toggles.first()).toBeVisible({ timeout: 10_000 });
     expect(await toggles.count()).toBe(11);
   });
@@ -85,7 +86,8 @@ test.describe('Data Consent — guardian', () => {
       timeout: 15_000,
     });
 
-    const toggle = page.getByTestId('consent-toggle-academic_data_processing');
+    const childCard = page.getByTestId(`consent-child-${SEED.STUDENT_PROFILE_1.id}`);
+    const toggle = childCard.getByTestId('consent-toggle-academic_data_processing');
     await expect(toggle).toBeVisible({ timeout: 10_000 });
 
     // Click to grant
