@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { addSessionRestoreInitScript } from '../../shared/auth-helpers';
+import { expect, test } from '../../shared/console-guardian';
 import { SEED } from '../../shared/seed-fixtures';
 
 /**
@@ -21,6 +22,9 @@ test.describe('Cross-portal: institute visibility', () => {
   test('seeded institute visible to admin is also listed for reseller', async ({ browser }) => {
     // ── Admin portal: confirm institute exists ──
     const adminCtx = await browser.newContext({ storageState: adminAuth });
+    // storageState only ships cookies + localStorage; the app's auth tokens live
+    // in sessionStorage. Wire the auto-restore on every navigation in this context.
+    await addSessionRestoreInitScript(adminCtx);
     const adminPage = await adminCtx.newPage();
 
     await adminPage.goto(`${ADMIN_URL}/en/admin/institutes`);
@@ -37,6 +41,7 @@ test.describe('Cross-portal: institute visibility', () => {
 
     // ── Reseller portal: same institute appears ──
     const resellerCtx = await browser.newContext({ storageState: resellerAuth });
+    await addSessionRestoreInitScript(resellerCtx);
     const resellerPage = await resellerCtx.newPage();
 
     await resellerPage.goto(`${RESELLER_URL}/en/reseller/institutes`);
