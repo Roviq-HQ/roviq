@@ -80,10 +80,10 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
-      nats:
-        image: nats:2.10-alpine
-        ports:
-          - 4222:4222
+    # NATS is started manually as a step (not a service) so we can pass `-js`
+    # to enable JetStream. GitHub Actions `services:` does not support
+    # overriding the container CMD, and the default nats:2.10-alpine entrypoint
+    # runs without JetStream — which breaks the stream-config integration test.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,6 +91,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+      - name: Start NATS with JetStream
+        run: |
+          docker run -d --name ci-nats -p 4222:4222 -p 8222:8222 \
+            nats:2.10-alpine -js -m 8222
+          # Wait for JetStream to come up (varz endpoint reports `jetstream`).
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8222/varz | grep -q '"jetstream"'; then
+              echo "JetStream is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "JetStream failed to come up within 30s"
+          docker logs ci-nats
+          exit 1
       - uses: pnpm/action-setup@v4
       - uses: nrwl/nx-set-shas@v4
       - uses: actions/cache@v4
@@ -126,6 +141,8 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.CI_JWT_REFRESH_SECRET }}
           JWT_EXPIRATION: 15m
           JWT_REFRESH_EXPIRATION: 7d
+          BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+          IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       - name: Security Invariant Tests (integration)
         run: pnpm test:int
         env:
@@ -133,6 +150,10 @@ jobs:
           DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
           DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
           DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+          REDIS_URL: redis://localhost:6379
+          NATS_URL: nats://localhost:4222
+          BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+          IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
 
   build:
     name: Build
@@ -175,6 +196,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Provision .env for docker compose
         run: cp .env.example .env
+      - name: Make bind-mounted sources writable by container node user
+        # The api-gateway/notification-service containers run as `node`
+        # (UID 1000) but checkout-action writes files as `runner` (UID 1001).
+        # @nx/vitest writes `.timestamp-*.mjs` files next to vitest configs;
+        # without group/world write on the bind-mounted dirs the container
+        # can't create them and crashes during project-graph inference.
+        run: chmod -R a+w libs ee apps scripts e2e
       - name: Start E2E stack
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
@@ -236,6 +264,9 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Provision .env for docker compose
         run: cp .env.example .env
+      - name: Make bind-mounted sources writable by container node user
+        # See e2e-api job for explanation — UID 1001 (runner) vs UID 1000 (node).
+        run: chmod -R a+w libs ee apps scripts e2e
       - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
