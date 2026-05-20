@@ -1175,8 +1175,9 @@ export class StudentService {
   }
 
   private async createUser(input: CreateStudentInput, _actorId: string): Promise<string> {
-    const email = `student-${Date.now()}@roviq.placeholder`;
-    const username = `student-${Date.now()}`;
+    const suffix = crypto.randomUUID().slice(0, 12);
+    const email = `student-${suffix}@roviq.placeholder`;
+    const username = `student-${suffix}`;
     const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
 
     const { userId } = await this.identityService.createUser({
