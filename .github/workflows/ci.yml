@@ -57,6 +57,28 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: [lint]
+    # Job-level env so every step (Run affected tests, Security Invariant Tests,
+    # codegen, db:reset, etc.) sees the same env without per-step duplication.
+    # NestJS ConfigModule.forRoot validates these at app-module import time —
+    # any missing one fails the entire `pnpm test:int` before tests can run.
+    env:
+      DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
+      DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      DATABASE_URL_AUDIT: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
+      DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      REDIS_URL: redis://localhost:6379
+      NATS_URL: nats://localhost:4222
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.CI_JWT_REFRESH_SECRET }}
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_NAME: Roviq
+      ALLOWED_ORIGINS: http://localhost:4200,http://admin.localhost:4200,http://reseller.localhost:4200
+      BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      ROVIQ_EE: "true"
     services:
       postgres:
         image: postgres:18-alpine
@@ -129,31 +151,8 @@ jobs:
           DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
       - name: Run affected tests
         run: pnpx nx affected -t test
-        env:
-          DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
-          DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-          DATABASE_URL_AUDIT: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-          DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
-          DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-          REDIS_URL: redis://localhost:6379
-          NATS_URL: nats://localhost:4222
-          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
-          JWT_REFRESH_SECRET: ${{ secrets.CI_JWT_REFRESH_SECRET }}
-          JWT_EXPIRATION: 15m
-          JWT_REFRESH_EXPIRATION: 7d
-          BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
-          IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       - name: Security Invariant Tests (integration)
         run: pnpm test:int
-        env:
-          DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
-          DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-          DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
-          DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-          REDIS_URL: redis://localhost:6379
-          NATS_URL: nats://localhost:4222
-          BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
-          IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
 
   build:
     name: Build
@@ -206,6 +205,13 @@ jobs:
       - name: Start E2E stack
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
+      - name: Reclaim file ownership for runner
+        # The api-gateway/notification-service containers run as `node` (UID 1000)
+        # and create files (e.g. `libs/**/node_modules/.vite-temp/*.mjs`) during
+        # nx project-graph inference. Host runner is UID 1001 — without this step,
+        # subsequent host-side `nx`/playwright calls hit EACCES trying to write
+        # new timestamp files in container-owned dirs.
+        run: sudo chown -R "$(id -u):$(id -g)" libs ee apps scripts e2e
       - name: Check resolver→schema drift (regenerate from live api-gateway)
         # CI deliberately unset (empty string) so codegen.ts introspects the
         # live api-gateway on port 3004 rather than reading the committed
@@ -270,6 +276,10 @@ jobs:
       - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
+      - name: Reclaim file ownership for runner
+        # See e2e-api job for explanation — container runs as UID 1000, runner is
+        # UID 1001; chown after compose-up so host-side nx/playwright can write.
+        run: sudo chown -R "$(id -u):$(id -g)" libs ee apps scripts e2e
       - name: Run codegen (Next.js dev:web needs fresh GraphQL types)
         run: pnpm codegen
       - name: Playwright E2E tests
