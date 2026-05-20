@@ -79,6 +79,16 @@ jobs:
       BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       ROVIQ_EE: "true"
+      # Novu — NotificationConfigService boots via configService.getOrThrow at
+      # AppModule load time. Integration tests boot the module → these are
+      # required even without a live Novu server.
+      NOVU_SECRET_KEY: placeholder
+      NOVU_APPLICATION_IDENTIFIER: placeholder
+      NOVU_MODE: local
+      NOVU_API_URL: http://localhost:3340
+      NOVU_WS_URL: http://localhost:3342
+      NOVU_JWT_SECRET: novu-local-jwt-secret-change-me
+      NOVU_STORE_ENCRYPTION_KEY: novulocalstoreencrkey12345678abc
     services:
       postgres:
         image: postgres:18-alpine
@@ -195,13 +205,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Provision .env for docker compose
         run: cp .env.example .env
-      - name: Make bind-mounted sources writable by container node user
+      - name: Make bind-mounted sources writable + pre-create vite-temp dirs
         # The api-gateway/notification-service containers run as `node`
         # (UID 1000) but checkout-action writes files as `runner` (UID 1001).
-        # @nx/vitest writes `.timestamp-*.mjs` files next to vitest configs;
-        # without group/world write on the bind-mounted dirs the container
-        # can't create them and crashes during project-graph inference.
-        run: chmod -R a+w libs ee apps scripts e2e
+        # @nx/vitest writes `.timestamp-*.mjs` files into
+        # `<lib>/node_modules/.vite-temp/` next to vitest configs during
+        # project-graph inference at container boot. Without pre-existing
+        # 777-mode `.vite-temp/` dirs the container hits EACCES and never
+        # reaches healthy state. Find every vitest config and pre-create its
+        # adjacent `.vite-temp/` so the container can write timestamp files.
+        run: |
+          find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
+            -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
+          chmod -R 777 libs ee apps scripts e2e
       - name: Start E2E stack
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
@@ -270,9 +286,12 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Provision .env for docker compose
         run: cp .env.example .env
-      - name: Make bind-mounted sources writable by container node user
-        # See e2e-api job for explanation — UID 1001 (runner) vs UID 1000 (node).
-        run: chmod -R a+w libs ee apps scripts e2e
+      - name: Make bind-mounted sources writable + pre-create vite-temp dirs
+        # See e2e-api job for explanation.
+        run: |
+          find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
+            -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
+          chmod -R 777 libs ee apps scripts e2e
       - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
