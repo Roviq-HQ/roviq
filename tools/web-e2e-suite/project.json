@@ -4,11 +4,20 @@
   "sourceRoot": "tools/web-e2e-suite",
   "projectType": "application",
   "targets": {
+    "e2e-seed": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "options": {
+        "command": "pnpm e2e:clean"
+      }
+    },
     "e2e": {
       "executor": "nx:run-commands",
       "cache": true,
       "parallelism": false,
       "inputs": ["e2eFrontend"],
+      "dependsOn": ["e2e-seed"],
       "options": {
         "command": "playwright test --reporter=list --config e2e/playwright.config.ts"
       }

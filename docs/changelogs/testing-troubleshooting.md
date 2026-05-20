@@ -177,3 +177,34 @@ Append-only log of testing-infrastructure issues (slow pre-push, Docker rebuilds
 **Verification:** `pnpm ci:check` passes.
 
 ---
+
+## 2026-05-20 — `fixed` — UI E2E suite re-seeds between API E2E mutations
+
+**Scope:** [tools/web-e2e-suite/project.json](../../tools/web-e2e-suite/project.json), [package.json](../../package.json), [apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/reseller-combobox.tsx](../../apps/web/src/app/[locale]/admin/(dashboard)/institutes/_components/reseller-combobox.tsx), [apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx](../../apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx).
+
+**Context:** Five Playwright tests failed under direct `nx run web-e2e-suite:e2e` invocation: two admin `forms-improved.e2e.spec.ts` cases timed out waiting for `create-institute-submit-btn` to enable; three `students-create.e2e.spec.ts` cases timed out waiting for `students-new-standard-select` to enable.
+
+**Root cause (two independent bugs):**
+
+1. **Reseller combobox auto-default poisons `canSubmit`.** `ResellerCombobox` runs a `useEffect` that calls `onChange(systemReseller.id)` once resellers load. In the admin create form that `onChange` is `field.handleChange`, which marks the field touched. TanStack Form v1.29 computes `canSubmit = (submissionAttempts===0 && !isTouched && !hasOnMountError) || (!isValidating && !isSubmitting && isValid)`; once touched flips, the first clause is false and the second is false on a blank form, so the shared `<form.SubmitButton>` stays disabled forever. The two tests that click submit on a blank form to surface inline errors observed the perma-disabled button.
+2. **API E2E academic-year mutation polluted INSTITUTE_1.** `institute.api-e2e.spec.ts` calls `createAcademicYear` + `activateAcademicYear` on INSTITUTE_1, flipping the seed year `…000501` (which holds every seeded standard) to inactive and a new year `2031-32` to active. The student create form picks the active year via `useAcademicYearsForStudents`, queries `useStandardsForYear`, gets zero results, and keeps the standard select disabled. The `pnpm e2e:clean` pre-run before `pnpm test:e2e:api` was gone by the time UI tests started, and a direct `nx run web-e2e-suite:e2e` invocation never re-seeded.
+
+**Fix:**
+
+- Added an `onDefault?: (id) => void` prop to `ResellerCombobox`. The admin create form passes `(id) => form.setFieldValue('resellerId', id, { dontUpdateMeta: true })`, so the auto-default writes the value without flipping `isTouched`. The shared filter/edit callers keep falling back to `onChange`.
+- Added an uncached `e2e-seed` target on `web-e2e-suite` that runs `pnpm e2e:clean`, and wired `e2e` `dependsOn: ["e2e-seed"]`. Calling the Nx target directly (CI, `pnpm test:e2e:ui`, ad-hoc `nx run web-e2e-suite:e2e`) now re-seeds before Playwright starts, clearing any state mutated by an earlier `api-gateway-e2e` run.
+- Dropped the now-redundant `pnpm e2e:clean` from `test:e2e:ui` to avoid double-seeding.
+
+**Why this is safe despite the 2026-04-16 "Do NOT" entry:** `ci-check.sh` no longer launches `api-gateway-e2e` and `web-e2e-suite` as separate parallel jobs — they share one launched bash slot and run sequentially. Only `web-e2e-suite` (not `api-gateway-e2e`) gets the dependsOn, so at most one `migrate-and-seed` container runs at a time. The original race scenario (two parallel suites racing the seed) cannot occur in the current `ci-check.sh` layout.
+
+**Verification:**
+
+- `PGPASSWORD=roviq_dev psql -h localhost -p 5435 -U roviq -d roviq_test` showed two `academic_years` rows for INSTITUTE_1 (the inactive seed year and the test-created active `2031-32`); after `pnpm e2e:clean` only the seed row remains.
+- All 5 previously failing tests pass; `pnpm lint:fix` and `pnpm typecheck` pass.
+
+**Do NOT:**
+
+- Re-add `pnpm e2e:clean` to `test:e2e:ui` — the Nx target's `e2e-seed` dependency already covers it; two seeds add ~30s with no benefit.
+- Add `e2e-seed` as a dependency to `api-gateway-e2e:test-e2e`. The `ci-check.sh` Phase 2 already seeds before the API suite, and adding a second dependency would race with `web-e2e-suite:e2e-seed` if a future refactor parallelises the two e2e suites.
+
+---

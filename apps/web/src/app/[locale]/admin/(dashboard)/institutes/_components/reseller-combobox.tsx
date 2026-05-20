@@ -48,6 +48,18 @@ interface Data {
 export interface ResellerComboboxProps {
   value?: string | null;
   onChange: (value: string | null) => void;
+  /**
+   * Programmatic default setter used by the auto-default effect. Forms back
+   * this with
+   * `form.setFieldValue(name, id, { dontUpdateMeta: true, dontValidate: true })`
+   * so the pre-fill does not mark the field touched — `canSubmit` stays true on
+   * a pristine form. BOTH flags are mandatory: TanStack Form's `validateField`
+   * marks the field touched unconditionally before running, so `dontUpdateMeta`
+   * alone still flips the form to a touched state. Falls back to `onChange`
+   * when omitted (non-form callers, e.g. filters, where touched-state is
+   * irrelevant).
+   */
+  onDefault?: (id: string) => void;
   placeholder?: string;
   /** If true (default), the user cannot clear the selection. */
   required?: boolean;
@@ -62,6 +74,7 @@ export interface ResellerComboboxProps {
 export function ResellerCombobox({
   value,
   onChange,
+  onDefault,
   placeholder,
   required = false,
   disabled,
@@ -79,13 +92,17 @@ export function ResellerCombobox({
   const options = data?.adminListResellers.edges.map((e) => e.node) ?? [];
   const selected = options.find((o) => o.id === value);
 
-  // Default to Roviq Direct on first load if no value set
+  // Default to Roviq Direct on first load if no value set. The setter
+  // is the form-provided `onDefault` when present (writes without marking
+  // the field touched, so a pristine form stays `canSubmit=true`); else
+  // `onChange` for non-form callers (filters, etc.) where touched-state is
+  // irrelevant.
   React.useEffect(() => {
     if (!value && options.length > 0) {
       const system = options.find((o) => o.isSystem);
-      if (system) onChange(system.id);
+      if (system) (onDefault ?? onChange)(system.id);
     }
-  }, [value, options, onChange]);
+  }, [value, options, onChange, onDefault]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
