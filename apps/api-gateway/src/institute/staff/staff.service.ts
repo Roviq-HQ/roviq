@@ -151,8 +151,9 @@ export class StaffService {
       }
     }
 
-    const email = input.email ?? `staff-${Date.now()}@roviq.placeholder`;
-    const username = `staff-${tenantId.slice(0, 8)}-${Date.now()}`;
+    const suffix = crypto.randomUUID().slice(0, 12);
+    const email = input.email ?? `staff-${suffix}@roviq.placeholder`;
+    const username = `staff-${tenantId.slice(0, 8)}-${suffix}`;
     const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
 
     const { userId: newUserId } = await this.identityService.createUser({
