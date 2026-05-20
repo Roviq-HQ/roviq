@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 /**
  * Playwright's `storageState` only persists cookies + localStorage, NOT sessionStorage.
@@ -22,6 +22,27 @@ export async function persistSessionStorage(page: Page): Promise<void> {
         const val = sessionStorage.getItem(key);
         if (val !== null) localStorage.setItem(`${prefix}${key}`, val);
       }
+    }
+  }, E2E_SESSION_PREFIX);
+}
+
+/**
+ * Wire the auto-restore on every navigation in a context — needed for manually-created
+ * contexts (browser.newContext) that don't get the console-guardian page-fixture init script.
+ */
+export async function addSessionRestoreInitScript(context: BrowserContext): Promise<void> {
+  await context.addInitScript((prefix) => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(prefix)) {
+          const realKey = key.slice(prefix.length);
+          const val = localStorage.getItem(key);
+          if (val !== null) sessionStorage.setItem(realKey, val);
+        }
+      }
+    } catch {
+      // Cross-origin contexts deny localStorage access — safe to ignore
     }
   }, E2E_SESSION_PREFIX);
 }
