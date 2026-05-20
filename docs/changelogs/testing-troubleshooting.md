@@ -208,3 +208,48 @@ Append-only log of testing-infrastructure issues (slow pre-push, Docker rebuilds
 - Add `e2e-seed` as a dependency to `api-gateway-e2e:test-e2e`. The `ci-check.sh` Phase 2 already seeds before the API suite, and adding a second dependency would race with `web-e2e-suite:e2e-seed` if a future refactor parallelises the two e2e suites.
 
 ---
+
+## 2026-05-20 — `fixed` — 2-month CI gap on `develop` exposes 8 accumulated breakages at release PR
+
+**Scope:** [.github/workflows/ci.yml](../../.github/workflows/ci.yml), [docker/compose.e2e.yaml](../../docker/compose.e2e.yaml), [libs/database/migrations/20260501061000_billing-soft-delete-views/migration.sql](../../libs/database/migrations/20260501061000_billing-soft-delete-views/migration.sql), [apps/api-gateway/src/institute/staff/staff.service.ts](../../apps/api-gateway/src/institute/staff/staff.service.ts), [apps/api-gateway/src/institute/student/student.service.ts](../../apps/api-gateway/src/institute/student/student.service.ts), [e2e/shared/auth-helpers.ts](../../e2e/shared/auth-helpers.ts), [e2e/cross-portal/src/admin-creates-institute-visible-to-reseller.e2e.spec.ts](../../e2e/cross-portal/src/admin-creates-institute-visible-to-reseller.e2e.spec.ts).
+
+**Context:** Release PR #208 (`develop` → `main`, 421 commits) was the first CI run against `develop` since 2026-03-11 because `.github/workflows/ci.yml` triggers only on `push`/`pull_request` to `main`. Eight independent breakages surfaced at once.
+
+**Root causes (each independent):**
+
+1. `pnpm/action-setup@v4` refuses to start when both `version: 10` (workflow) and `packageManager: pnpm@10.33.0` (package.json) are set — the action was upgraded but the redundant `with: version:` blocks were never removed.
+2. Custom migration `20260501061000_billing-soft-delete-views` dropped/recreated policies on `plans` and `payment_gateway_configs` unconditionally; both are EE tables that don't exist when `ROVIQ_EE=false` (CI). The older `20260323125226_billing-grants-rls-indexes` migration already had the right guard pattern.
+3. `docker/compose.e2e.yaml` declares `env_file: ../.env` on five services. `.env` is gitignored; CI had no step that created it from `.env.example`. Newer docker compose versions hard-fail on missing `env_file`.
+4. Test job's `nats:2.10-alpine` service ran without `-js`, so the integration test at `libs/backend/nats-jetstream/src/streams/__tests__/stream.config.integration.spec.ts` calling `jetstreamManager()` got `NoResponders: $JS.API.INFO`. GitHub Actions `services:` does not support overriding CMD, so a `docker run` step is required.
+5. api-gateway/notification-service containers run as `node` (UID 1000); GitHub runner checks out files as `runner` (UID 1001); bind-mounted `../libs:/app/libs` preserves host ownership. `@nx/vitest`'s project-graph inference writes `.timestamp-*.mjs` next to vitest configs (notably the recently-added `libs/shared/request-context/vitest.config.mts` and `libs/frontend/ui/vitest.config.ts`) — EACCES, container fails health check.
+6. `IDENTITY_ENCRYPTION_KEY` is read via `configService.getOrThrow` in `libs/backend/crypto/src/encrypted-field.ts` and `BILLING_ENCRYPTION_KEY` by the billing integration spec — neither was in the `test` job env block.
+7. `apps/api-gateway/src/institute/staff/staff.service.ts` and `apps/api-gateway/src/institute/student/student.service.ts` generated email/username with `Date.now()`, colliding within the same millisecond during E2E bursts → duplicate-key on `users.username` → `INTERNAL_SERVER_ERROR` returned to the client. `guardian.service.ts` already used `crypto.randomUUID().slice(0, 12)` — only staff and student were left on `Date.now()`.
+8. Cross-portal test created its own contexts via `browser.newContext({ storageState })` and never restored sessionStorage. The console-guardian fixture's `addInitScript` only runs on the default `page` fixture; manually-created contexts/pages don't get it. Result: admin landed on `/en/login`, `institutes-title` never appeared.
+
+**Fix:**
+
+- Removed `with: version: 10` from all six `pnpm/action-setup@v4` blocks — defer to `packageManager` in `package.json`.
+- Wrapped the entire `billing-soft-delete-views` migration in a `DO $billing_views$ ... IF NOT EXISTS plans THEN RETURN ... END $billing_views$;` block with `EXECUTE` for each DROP POLICY / CREATE POLICY / CREATE VIEW / GRANT statement.
+- Added `cp .env.example .env` step before `docker compose up` in both e2e jobs.
+- Replaced `services: nats:` with a manual `docker run -d --name ci-nats -p 4222:4222 -p 8222:8222 nats:2.10-alpine -js -m 8222` step + a `/varz` poll loop.
+- Added `chmod -R a+w libs ee apps scripts e2e` before `docker compose up` in both e2e jobs (CI runners are throwaway VMs; the bind-mounted dirs need write for both UID 1000 and 1001).
+- Added `BILLING_ENCRYPTION_KEY` and `IDENTITY_ENCRYPTION_KEY` (64-char hex zeros, matching `.env.example`) to both the `Run affected tests` and `Security Invariant Tests` env blocks; also propagated `REDIS_URL`/`NATS_URL` to the integration env block.
+- Replaced `Date.now()` with `crypto.randomUUID().slice(0, 12)` in `staff.service.ts:154-155` and `student.service.ts:1178-1179`, matching the existing pattern in `guardian.service.ts:252`.
+- Extracted the sessionStorage-restore init script from `console-guardian.ts:134-147` into a reusable `addSessionRestoreInitScript(context)` in `auth-helpers.ts`; cross-portal test now calls it after each `browser.newContext()`.
+
+**Verification:**
+
+- `pnpm test:e2e:ui`: 213 passed, 19 skipped (visual-regression opt-in), 0 failed. Specific previously-failing tests confirmed green: `staff-create.e2e.spec.ts:67`, `tenant-isolation.e2e.spec.ts:64`, `admin-creates-institute-visible-to-reseller.e2e.spec.ts:22`.
+- `pnpm lint:fix`: no fixes applied (clean).
+- `tenant-isolation.e2e.spec.ts:64` (switch back to Institute 1) passed without an `auth-context.tsx` change despite an investigation agent suspecting a `setMemberships` omission — the original failure was a downstream effect of api-gateway being in a bad state from a prior zombie process, not a real bug in `switchInstitute`.
+
+**Do NOT:**
+
+- Re-introduce `with: version: 10` on `pnpm/action-setup` — keeps two sources of truth in lockstep; `corepack`/`pnpm` will read `package.json#packageManager` and break if they disagree.
+- Skip the EE guard pattern on new billing migrations. Every custom migration touching `plans`, `subscriptions`, `invoices`, `payments`, `payment_gateway_configs`, or `reseller_invoice_sequences` MUST wrap its body in `DO $tag$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'plans') THEN RETURN; END IF; ... END $tag$;` and issue DDL via `EXECUTE`.
+- Use `Date.now()` for username/email uniqueness on any new identity-creating service. Use `crypto.randomUUID().slice(0, 12)` (12 hex chars is collision-safe for the lifetime of a single tenant).
+- Trust the console-guardian `page` fixture to cover contexts created via `browser.newContext(...)`. Call `addSessionRestoreInitScript(context)` on every manually-created context (or refactor to use the default fixture).
+
+**Follow-up (separate Linear issue):** `.github/workflows/ci.yml` `on:` trigger should also include `develop` (`push: branches: [main, develop]`, `pull_request: branches: [main, develop]`) so future drift is caught at merge-to-develop time, not 8 weeks later at release.
+
+---
