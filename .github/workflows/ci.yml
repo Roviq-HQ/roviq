@@ -173,6 +173,8 @@ jobs:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
+      - name: Provision .env for docker compose
+        run: cp .env.example .env
       - name: Start E2E stack
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
@@ -232,6 +234,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
+      - name: Provision .env for docker compose
+        run: cp .env.example .env
       - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
