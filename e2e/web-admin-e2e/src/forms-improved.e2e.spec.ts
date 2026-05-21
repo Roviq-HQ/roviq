@@ -104,11 +104,35 @@ test.describe('Admin · new institute form', () => {
   });
 
   test('PIN code 122001 auto-fills city and district (HBCFO)', async ({ page }) => {
+    // Stub api.postalpincode.in — CI runners can't reach the public API
+    // reliably (rate limits, network egress restrictions). The route
+    // signature mirrors what the real API returns for PIN 122001 (Gurugram).
+    await page.route('**/api.postalpincode.in/pincode/122001', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            Status: 'Success',
+            Message: 'Number of pincode(s) found:1',
+            PostOffice: [
+              {
+                Name: 'Sector-14',
+                District: 'Gurgaon',
+                State: 'Haryana',
+                Country: 'India',
+                Pincode: '122001',
+              },
+            ],
+          },
+        ]),
+      });
+    });
+
     const pin = page.getByTestId('admin-institute-new-postal-code-input');
     await pin.fill('122001');
     await pin.blur();
 
-    // The lookup hits a public API; allow up to 8s
     await expect(page.getByTestId('admin-institute-new-city-input')).not.toHaveValue('', {
       timeout: 8_000,
     });
