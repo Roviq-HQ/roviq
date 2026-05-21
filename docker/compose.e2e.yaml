@@ -197,6 +197,13 @@ services:
       # Override host-side REDIS_URL from .env so db-reset can flush the
       # Redis-backed lockout cache (auth rate-limit) on test reset.
       REDIS_URL: redis://redis:6379
+      # drizzle.config.ts conditionally pulls in ee/libs/database/src/schema
+      # when ROVIQ_EE=true. CI's .env is provisioned from .env.example which
+      # doesn't set ROVIQ_EE, so EE billing tables (plans, subscriptions,
+      # invoices, ...) wouldn't be created — api-gateway starts with
+      # ROVIQ_EE=true and the schema-drift check fails because the EE GraphQL
+      # types aren't registered against existing tables.
+      ROVIQ_EE: "true"
     depends_on:
       postgres:
         condition: service_healthy
