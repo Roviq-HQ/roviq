@@ -217,7 +217,14 @@ jobs:
         run: |
           find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
             -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
-          chmod -R 777 libs ee apps scripts e2e
+          # a+rwX: add rw for all, exec ONLY on dirs (or files already exec).
+          # Plain 777 would set 100755 on regular files, which git interprets
+          # as a mode change — codegen then re-writes those files keeping the
+          # 100755 bit, and the schema-drift gate diffs `old mode 100644 → new
+          # mode 100755` with zero content delta. Capital X preserves committed
+          # file modes while still making dirs traversable+writable for both
+          # the runner (UID 1001) and the container (UID 1000).
+          chmod -R a+rwX libs ee apps scripts e2e
       - name: Start E2E stack
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
@@ -303,7 +310,14 @@ jobs:
         run: |
           find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
             -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
-          chmod -R 777 libs ee apps scripts e2e
+          # a+rwX: add rw for all, exec ONLY on dirs (or files already exec).
+          # Plain 777 would set 100755 on regular files, which git interprets
+          # as a mode change — codegen then re-writes those files keeping the
+          # 100755 bit, and the schema-drift gate diffs `old mode 100644 → new
+          # mode 100755` with zero content delta. Capital X preserves committed
+          # file modes while still making dirs traversable+writable for both
+          # the runner (UID 1001) and the container (UID 1000).
+          chmod -R a+rwX libs ee apps scripts e2e
       - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
         run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
         timeout-minutes: 12
