@@ -923,18 +923,39 @@ describe('Institute Admin (platform scope) E2E', () => {
   // 12: adminGetInstituteAcademicTree
   // ─────────────────────────────────────────────────────────────
   describe('adminGetInstituteAcademicTree', () => {
-    it('returns empty standards array for a freshly-created institute (no academic year)', async () => {
+    it('returns empty standards array for a COACHING institute (year created, no standards)', async () => {
+      // COACHING type: setupService creates an academic year (Phase 1 runs
+      // unconditionally) but neither the LIBRARY nor SCHOOL seeding branches
+      // fire — so the institute ends up with a year and zero standards. This
+      // is the resolver's deterministic "empty standards" case.
+      //
+      // Earlier wording asserted academicYearId=null for a freshly-created
+      // SCHOOL institute — that was a race against the fire-and-forget
+      // setupService.runSetup() in institute.service.create(). It passed
+      // locally because dev setup was slow; CI consistently lost the race.
       const slug = `e2e-tree-${Date.now()}`;
       const createRes = await gql<{ adminCreateInstitute: InstituteModel }>(
         `mutation AdminCreate($input: AdminCreateInstituteInput!) {
           adminCreateInstitute(input: $input) { id slug }
         }`,
-        { input: { name: { en: 'E2E Academic Tree Test' }, slug, type: 'SCHOOL' } },
+        { input: { name: { en: 'E2E Academic Tree Test' }, slug, type: 'COACHING' } },
         adminToken,
       );
       expect(createRes.errors).toBeUndefined();
       assert(createRes.data);
       const id = createRes.data.adminCreateInstitute.id;
+
+      // Poll until setupService.runSetup() finishes — avoids querying mid-setup.
+      const deadline = Date.now() + 15_000;
+      while (Date.now() < deadline) {
+        const statusRes = await gql<{ adminGetInstitute: { setupStatus: string } }>(
+          `query Status($id: ID!) { adminGetInstitute(id: $id) { setupStatus } }`,
+          { id },
+          adminToken,
+        );
+        if (statusRes.data?.adminGetInstitute.setupStatus === 'COMPLETED') break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
 
       const treeRes = await gql<{
         adminGetInstituteAcademicTree: {
@@ -958,7 +979,9 @@ describe('Institute Admin (platform scope) E2E', () => {
       assert(treeRes.data);
       const tree = treeRes.data.adminGetInstituteAcademicTree;
       expect(tree.instituteId).toBe(id);
-      expect(tree.academicYearId).toBeNull();
+      // COACHING setup creates an academic year (createFirstAcademicYear runs
+      // unconditionally) but does NOT seed standards (no LIBRARY/SCHOOL branch).
+      expect(tree.academicYearId).not.toBeNull();
       expect(tree.standards).toHaveLength(0);
 
       // Cleanup
