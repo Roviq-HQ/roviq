@@ -242,11 +242,23 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:3004
         run: |
           pnpm codegen
-          git diff --quiet \
-            libs/frontend/graphql/src/generated/schema.graphql \
-            libs/frontend/graphql/src/generated/graphql.ts \
-            e2e/api-gateway-e2e/src/__generated__/graphql.ts \
-            || (echo "Generated GraphQL artifacts are stale — run 'pnpm codegen' locally and commit the update" && exit 1)
+          if ! git diff --quiet \
+              libs/frontend/graphql/src/generated/schema.graphql \
+              libs/frontend/graphql/src/generated/graphql.ts \
+              e2e/api-gateway-e2e/src/__generated__/graphql.ts; then
+            echo "::error::Generated GraphQL artifacts are stale — run 'pnpm codegen' locally and commit the update"
+            echo "--- files changed ---"
+            git diff --stat \
+              libs/frontend/graphql/src/generated/schema.graphql \
+              libs/frontend/graphql/src/generated/graphql.ts \
+              e2e/api-gateway-e2e/src/__generated__/graphql.ts
+            echo "--- first 200 lines of diff ---"
+            git --no-pager diff \
+              libs/frontend/graphql/src/generated/schema.graphql \
+              libs/frontend/graphql/src/generated/graphql.ts \
+              e2e/api-gateway-e2e/src/__generated__/graphql.ts | head -200
+            exit 1
+          fi
       - name: Check JetStream stream-config drift (source vs deployed)
         # Diff source `STREAMS` vs the e2e NATS cluster (already up). Catches
         # retention/storage/subjects drift BEFORE prod's boot-time
