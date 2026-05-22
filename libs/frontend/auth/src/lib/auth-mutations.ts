@@ -1,16 +1,36 @@
 import type {
-  AuthUser,
-  LoginInput,
-  LoginResult,
-  MembershipInfo,
-  PasskeyAuthOptions,
-} from './types';
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/browser';
+import type { AuthUser, LoginInput, LoginResult, PasskeyAuthOptions, SessionInfo } from './types';
 
 interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   user: AuthUser;
 }
+
+const USER_FIELDS =
+  'id username email scope tenantId resellerId membershipId roleId abilityRules primaryNavSlugs';
+
+// AuthPayload fields — used by adminLogin, resellerLogin
+const AUTH_PAYLOAD_FIELDS = `
+  accessToken
+  refreshToken
+  user { ${USER_FIELDS} }
+`;
+
+// InstituteLoginResult fields — used by instituteLogin (superset of AuthPayload)
+const INSTITUTE_LOGIN_FIELDS = `
+  accessToken
+  refreshToken
+  user { ${USER_FIELDS} }
+  requiresInstituteSelection
+  userId
+  selectionToken
+  memberships { membershipId tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
+`;
 
 async function graphqlFetch<T>(
   url: string,
@@ -34,46 +54,62 @@ async function graphqlFetch<T>(
 }
 
 export function createAuthMutations(graphqlUrl: string) {
+  function createScopedLogin(mutationName: string, fields: string) {
+    const query = `mutation ${mutationName}($username: String!, $password: String!) {
+      ${mutationName}(username: $username, password: $password) { ${fields} }
+    }`;
+
+    return async (input: LoginInput): Promise<LoginResult> => {
+      const data = await graphqlFetch<Record<string, LoginResult>>(graphqlUrl, query, {
+        username: input.username,
+        password: input.password,
+      });
+      return data[mutationName];
+    };
+  }
+
+  const adminLogin = createScopedLogin('adminLogin', AUTH_PAYLOAD_FIELDS);
+  const resellerLogin = createScopedLogin('resellerLogin', AUTH_PAYLOAD_FIELDS);
+  const instituteLogin = createScopedLogin('instituteLogin', INSTITUTE_LOGIN_FIELDS);
+
   return {
-    async login(input: LoginInput): Promise<LoginResult> {
-      const data = await graphqlFetch<{
-        login: {
-          accessToken?: string;
-          refreshToken?: string;
-          user?: AuthUser;
-          platformToken?: string;
-          memberships?: MembershipInfo[];
-        };
-      }>(
+    adminLogin,
+    resellerLogin,
+    instituteLogin,
+
+    async selectInstitute(selectionToken: string, membershipId: string): Promise<AuthResponse> {
+      const data = await graphqlFetch<{ selectInstitute: AuthResponse }>(
         graphqlUrl,
-        `mutation Login($username: String!, $password: String!) {
-          login(username: $username, password: $password) {
+        `mutation SelectInstitute($selectionToken: String!, $membershipId: String!) {
+          selectInstitute(selectionToken: $selectionToken, membershipId: $membershipId) {
             accessToken
             refreshToken
-            user { id username email tenantId roleId abilityRules }
-            platformToken
-            memberships { tenantId roleId orgName orgSlug orgLogoUrl roleName }
+            user { ${USER_FIELDS} }
           }
         }`,
-        { username: input.username, password: input.password },
+        { selectionToken, membershipId },
       );
-      return data.login;
+      return data.selectInstitute;
     },
 
-    async selectOrganization(tenantId: string, platformToken: string): Promise<AuthResponse> {
-      const data = await graphqlFetch<{ selectOrganization: AuthResponse }>(
+    async switchInstitute(
+      membershipId: string,
+      accessToken: string,
+      currentRefreshToken: string,
+    ): Promise<AuthResponse> {
+      const data = await graphqlFetch<{ switchInstitute: AuthResponse }>(
         graphqlUrl,
-        `mutation SelectOrganization($tenantId: String!) {
-          selectOrganization(tenantId: $tenantId) {
+        `mutation SwitchInstitute($membershipId: String!, $currentRefreshToken: String!) {
+          switchInstitute(membershipId: $membershipId, currentRefreshToken: $currentRefreshToken) {
             accessToken
             refreshToken
-            user { id username email tenantId roleId abilityRules }
+            user { ${USER_FIELDS} }
           }
         }`,
-        { tenantId },
-        { Authorization: `Bearer ${platformToken}` },
+        { membershipId, currentRefreshToken },
+        { Authorization: `Bearer ${accessToken}` },
       );
-      return data.selectOrganization;
+      return data.switchInstitute;
     },
 
     async refresh(refreshToken: string): Promise<AuthResponse> {
@@ -83,7 +119,7 @@ export function createAuthMutations(graphqlUrl: string) {
           refreshToken(token: $token) {
             accessToken
             refreshToken
-            user { id username email tenantId roleId abilityRules }
+            user { ${USER_FIELDS} }
           }
         }`,
         { token: refreshToken },
@@ -99,6 +135,51 @@ export function createAuthMutations(graphqlUrl: string) {
       }
     },
 
+    // Session management
+    async mySessions(accessToken: string): Promise<SessionInfo[]> {
+      const data = await graphqlFetch<{ mySessions: SessionInfo[] }>(
+        graphqlUrl,
+        `query MySessions {
+          mySessions {
+            id
+            ipAddress
+            userAgent
+            lastUsedAt
+            createdAt
+            isCurrent
+          }
+        }`,
+        undefined,
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.mySessions;
+    },
+
+    async revokeSession(sessionId: string, accessToken: string): Promise<boolean> {
+      const data = await graphqlFetch<{ revokeSession: boolean }>(
+        graphqlUrl,
+        `mutation RevokeSession($sessionId: String!) {
+          revokeSession(sessionId: $sessionId)
+        }`,
+        { sessionId },
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.revokeSession;
+    },
+
+    async revokeAllOtherSessions(accessToken: string): Promise<boolean> {
+      const data = await graphqlFetch<{ revokeAllOtherSessions: boolean }>(
+        graphqlUrl,
+        `mutation RevokeAllOtherSessions {
+          revokeAllOtherSessions
+        }`,
+        undefined,
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.revokeAllOtherSessions;
+    },
+
+    // Passkey mutations
     async generatePasskeyAuthOptions(): Promise<PasskeyAuthOptions> {
       const data = await graphqlFetch<{ generatePasskeyAuthOptions: PasskeyAuthOptions }>(
         graphqlUrl,
@@ -114,17 +195,13 @@ export function createAuthMutations(graphqlUrl: string) {
 
     async verifyPasskeyAuth(
       challengeId: string,
-      credential: Record<string, unknown>,
+      credential: AuthenticationResponseJSON,
     ): Promise<LoginResult> {
       const data = await graphqlFetch<{ verifyPasskeyAuth: LoginResult }>(
         graphqlUrl,
         `mutation VerifyPasskeyAuth($input: VerifyPasskeyAuthInput!) {
           verifyPasskeyAuth(input: $input) {
-            accessToken
-            refreshToken
-            user { id username email tenantId roleId abilityRules }
-            platformToken
-            memberships { tenantId roleId orgName orgSlug orgLogoUrl roleName }
+            ${INSTITUTE_LOGIN_FIELDS}
           }
         }`,
         { input: { challengeId, credential } },
@@ -135,9 +212,9 @@ export function createAuthMutations(graphqlUrl: string) {
     async generatePasskeyRegistrationOptions(
       password: string,
       accessToken: string,
-    ): Promise<Record<string, unknown>> {
+    ): Promise<PublicKeyCredentialCreationOptionsJSON> {
       const data = await graphqlFetch<{
-        generatePasskeyRegistrationOptions: Record<string, unknown>;
+        generatePasskeyRegistrationOptions: PublicKeyCredentialCreationOptionsJSON;
       }>(
         graphqlUrl,
         `mutation GeneratePasskeyRegistrationOptions($input: GeneratePasskeyRegistrationInput!) {
@@ -150,7 +227,7 @@ export function createAuthMutations(graphqlUrl: string) {
     },
 
     async verifyPasskeyRegistration(
-      credential: Record<string, unknown>,
+      credential: RegistrationResponseJSON,
       name: string | undefined,
       accessToken: string,
     ): Promise<{
@@ -232,6 +309,22 @@ export function createAuthMutations(graphqlUrl: string) {
         { Authorization: `Bearer ${accessToken}` },
       );
       return data.removePasskey;
+    },
+
+    async changePassword(
+      currentPassword: string,
+      newPassword: string,
+      accessToken: string,
+    ): Promise<boolean> {
+      const data = await graphqlFetch<{ changePassword: boolean }>(
+        graphqlUrl,
+        `mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+          changePassword(currentPassword: $currentPassword, newPassword: $newPassword)
+        }`,
+        { currentPassword, newPassword },
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.changePassword;
     },
   };
 }

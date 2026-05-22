@@ -1,0 +1,242 @@
+import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import {
+  AcademicStatus,
+  AdmissionType,
+  Gender,
+  MinorityType,
+  SocialCategory,
+  StudentStream,
+} from '@roviq/common-types';
+import type { I18nContent } from '@roviq/database';
+import { DateOnlyScalar, DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
+import { createConnectionType } from '../../../common/pagination/relay-pagination.model';
+
+@ObjectType({ description: 'Emergency contact within medical info' })
+export class EmergencyContactObject {
+  @Field({ nullable: true })
+  name?: string;
+
+  @Field({ nullable: true })
+  phone?: string;
+
+  @Field({ nullable: true })
+  relationship?: string;
+}
+
+@ObjectType({ description: 'Student medical information' })
+export class MedicalInfoObject {
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Known allergies (food, drug, environmental)',
+  })
+  allergies?: string[];
+
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Chronic conditions (asthma, diabetes, epilepsy, etc.)',
+  })
+  conditions?: string[];
+
+  @Field(() => [String], { nullable: true, description: 'Current medications' })
+  medications?: string[];
+
+  @Field(() => EmergencyContactObject, {
+    nullable: true,
+    description: 'Emergency contact (separate from guardian)',
+  })
+  emergency_contact?: EmergencyContactObject;
+}
+
+registerEnumType(Gender, { name: 'Gender' });
+registerEnumType(AcademicStatus, {
+  name: 'AcademicStatus',
+  description: 'Student lifecycle state at an institute.',
+});
+registerEnumType(AdmissionType, {
+  name: 'AdmissionType',
+  description: 'How the student was admitted.',
+});
+registerEnumType(SocialCategory, {
+  name: 'SocialCategory',
+  description: 'Social category for government reporting (UDISE+, RTE Act).',
+});
+registerEnumType(MinorityType, {
+  name: 'MinorityType',
+  description: 'Religious minority community per National Commission for Minorities Act.',
+});
+registerEnumType(StudentStream, {
+  name: 'StudentStream',
+  description: 'Academic stream for senior secondary students (Class 11–12).',
+});
+
+@ObjectType({
+  description: 'Student profile with resolved user profile and current academic record',
+})
+export class StudentModel {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  tenantId!: string;
+
+  @Field()
+  userId!: string;
+
+  @Field()
+  membershipId!: string;
+
+  // ── Personal (from user_profiles) ───────────────────────
+  /** Multilingual via i18nText; resolved via useI18nField() on the frontend. */
+  @Field(() => I18nTextScalar)
+  firstName!: I18nContent;
+
+  /** Multilingual via i18nText; resolved via useI18nField() on the frontend. */
+  @Field(() => I18nTextScalar, { nullable: true })
+  lastName?: I18nContent | null;
+
+  @Field(() => Gender, { nullable: true })
+  gender?: Gender | null;
+
+  @Field(() => DateOnlyScalar, { nullable: true })
+  dateOfBirth?: string | null;
+
+  @Field(() => String, { nullable: true })
+  bloodGroup?: string | null;
+
+  @Field(() => String, { nullable: true })
+  religion?: string | null;
+
+  @Field(() => String, { nullable: true })
+  motherTongue?: string | null;
+
+  @Field(() => String, { nullable: true })
+  profileImageUrl?: string | null;
+
+  // ── Admission ───────────────────────────────────────────
+  @Field()
+  admissionNumber!: string;
+
+  @Field(() => DateOnlyScalar)
+  admissionDate!: string;
+
+  @Field(() => String, { nullable: true })
+  admissionClass?: string | null;
+
+  @Field(() => AdmissionType)
+  admissionType!: AdmissionType;
+
+  // ── Academic status ─────────────────────────────────────
+  @Field(() => AcademicStatus)
+  academicStatus!: AcademicStatus;
+
+  // ── Regulatory ──────────────────────────────────────────
+  @Field(() => SocialCategory)
+  socialCategory!: SocialCategory;
+
+  @Field(() => String, { nullable: true })
+  caste?: string | null;
+
+  @Field()
+  isMinority!: boolean;
+
+  @Field(() => MinorityType, { nullable: true })
+  minorityType?: MinorityType | null;
+
+  @Field()
+  isBpl!: boolean;
+
+  @Field()
+  isCwsn!: boolean;
+
+  @Field(() => String, { nullable: true })
+  cwsnType?: string | null;
+
+  @Field()
+  isRteAdmitted!: boolean;
+
+  @Field(() => String, { nullable: true })
+  rteCertificate?: string | null;
+
+  // ── TC ──────────────────────────────────────────────────
+  @Field()
+  tcIssued!: boolean;
+
+  @Field(() => String, { nullable: true })
+  tcNumber?: string | null;
+
+  @Field(() => DateOnlyScalar, { nullable: true })
+  tcIssuedDate?: string | null;
+
+  @Field(() => String, { nullable: true })
+  tcReason?: string | null;
+
+  @Field(() => DateOnlyScalar, { nullable: true })
+  dateOfLeaving?: string | null;
+
+  // ── Previous school ─────────────────────────────────────
+  @Field(() => String, { nullable: true })
+  previousSchoolName?: string | null;
+
+  @Field(() => String, { nullable: true })
+  previousSchoolBoard?: string | null;
+
+  // ── Current academic record ─────────────────────────────
+  /**
+   * Id of the student_academics row for the currently-active academic year.
+   * Needed by mutations that target the academic record (e.g. section
+   * change) so clients don't have to re-query. Null when the student has no
+   * row in the active year (e.g. just-created student, archived year).
+   */
+  @Field(() => String, { nullable: true })
+  currentStudentAcademicId?: string | null;
+
+  @Field(() => String, { nullable: true })
+  currentStandardId?: string | null;
+
+  @Field(() => String, { nullable: true })
+  currentSectionId?: string | null;
+
+  @Field(() => String, { nullable: true })
+  currentAcademicYearId?: string | null;
+
+  @Field(() => String, { nullable: true })
+  rollNumber?: string | null;
+
+  /** Denormalised standard/section names for list view. */
+  @Field(() => I18nTextScalar, { nullable: true })
+  currentStandardName?: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true })
+  currentSectionName?: I18nContent | null;
+
+  /**
+   * Primary guardian (is_primary_contact = true) display name — denormalised
+   * onto the list row to avoid N+1 lookups on the students table.
+   * Resolved from user_profiles joined through guardian_profiles.
+   */
+  @Field(() => I18nTextScalar, { nullable: true })
+  primaryGuardianFirstName?: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true })
+  primaryGuardianLastName?: I18nContent | null;
+
+  // ── Medical ─────────────────────────────────────────────
+  @Field(() => MedicalInfoObject, { nullable: true, description: 'Student medical information' })
+  medicalInfo?: MedicalInfoObject | null;
+
+  // ── Metadata ────────────────────────────────────────────
+  @Field(() => Int)
+  version!: number;
+
+  @Field(() => DateTimeScalar)
+  createdAt!: Date;
+
+  @Field(() => DateTimeScalar)
+  updatedAt!: Date;
+}
+
+/** Relay-style StudentConnection for paginated list */
+export const { ConnectionType: StudentConnection, EdgeType: StudentEdge } = createConnectionType(
+  StudentModel,
+  'Student',
+);

@@ -1,33 +1,50 @@
 'use client';
 
+import type { AuthScope } from '@roviq/common-types';
 import * as React from 'react';
-import { isTokenExpired } from './jwt-decode';
+import { checkIsImpersonated, isTokenExpired } from './jwt-decode';
 import type { SessionExpiredDialogProps } from './session-expired-dialog';
 import { SessionExpiredDialog } from './session-expired-dialog';
-import { tokenStorage } from './token-storage';
+import { createScopedTokenStorage } from './token-storage';
 import type { AuthState, AuthUser, LoginInput, LoginResult, MembershipInfo } from './types';
 
 interface AuthContextValue extends AuthState {
+  scope: AuthScope;
   sessionExpired: boolean;
-  needsOrgSelection: boolean;
+  needsInstituteSelection: boolean;
   memberships: MembershipInfo[] | null;
+  isImpersonated: boolean;
+  impersonationEnded: boolean;
   login: (input: LoginInput) => Promise<void>;
   loginWithPasskey: () => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   getAccessToken: () => string | null;
-  selectOrganization: (tenantId: string) => Promise<void>;
-  switchOrganization: (tenantId: string) => Promise<void>;
+  selectInstitute: (membershipId: string) => Promise<void>;
+  switchInstitute: (membershipId: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  notifyImpersonationEnded: () => void;
+  clearImpersonationEnded: () => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 interface AuthProviderProps {
+  scope?: AuthScope;
   loginMutation: (input: LoginInput) => Promise<LoginResult>;
   passkeyLoginMutation?: () => Promise<LoginResult>;
-  selectOrgMutation: (
-    tenantId: string,
-    platformToken: string,
+  selectInstituteMutation: (
+    selectionToken: string,
+    membershipId: string,
+  ) => Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUser;
+  }>;
+  switchInstituteMutation?: (
+    membershipId: string,
+    accessToken: string,
+    currentRefreshToken: string,
   ) => Promise<{
     accessToken: string;
     refreshToken: string;
@@ -38,6 +55,11 @@ interface AuthProviderProps {
     refreshToken: string;
     user: AuthUser;
   }>;
+  changePasswordMutation?: (
+    currentPassword: string,
+    newPassword: string,
+    accessToken: string,
+  ) => Promise<boolean>;
   logoutMutation: () => Promise<void>;
   onAuthError?: () => void;
   sessionExpiredLabels?: SessionExpiredDialogProps['labels'];
@@ -45,18 +67,31 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({
+  scope = 'institute',
   loginMutation,
   passkeyLoginMutation,
-  selectOrgMutation,
+  selectInstituteMutation,
+  switchInstituteMutation,
   refreshMutation,
+  changePasswordMutation,
   logoutMutation,
   onAuthError,
   sessionExpiredLabels,
   children,
 }: AuthProviderProps) {
+  // Use scoped storage so tokens from different scopes don't collide
+  const tokenStorage = React.useMemo(() => createScopedTokenStorage(scope), [scope]);
+
   const [sessionExpired, setSessionExpired] = React.useState(false);
-  const [needsOrgSelection, setNeedsOrgSelection] = React.useState(false);
+  const [needsInstituteSelection, setNeedsInstituteSelection] = React.useState(false);
+  const [pendingSelectionToken, setPendingSelectionToken] = React.useState<string | null>(null);
   const [memberships, setMemberships] = React.useState<MembershipInfo[] | null>(null);
+  const [impersonationEnded, setImpersonationEnded] = React.useState(false);
+
+  // Check for impersonation session first (sessionStorage, dies with tab)
+  const impersonationToken =
+    typeof window !== 'undefined' ? sessionStorage.getItem('roviq-impersonation-token') : null;
+
   const [state, setState] = React.useState<AuthState>({
     user: null,
     tokens: null,
@@ -67,7 +102,15 @@ export function AuthProvider({
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevTenantIdRef = React.useRef<string | undefined>(undefined);
 
-  // Capture tenantId when session expires so re-login can auto-select the same org
+  // Derive isImpersonated from impersonation token or current access token
+  const isImpersonated = React.useMemo(
+    () =>
+      checkIsImpersonated(impersonationToken) ||
+      checkIsImpersonated(state.tokens?.accessToken ?? null),
+    [impersonationToken, state.tokens?.accessToken],
+  );
+
+  // Capture tenantId when session expires so re-login can auto-select the same institute
   React.useEffect(() => {
     if (sessionExpired) {
       prevTenantIdRef.current = state.user?.tenantId;
@@ -110,7 +153,21 @@ export function AuthProvider({
               isLoading: false,
             });
             scheduleRefresh(result.accessToken);
-          } catch {
+          } catch (err) {
+            // If password was changed, clear all state and force re-login
+            const message = err instanceof Error ? err.message : '';
+            if (message.includes('Password changed') || message.includes('PASSWORD_CHANGED')) {
+              tokenStorage.clear();
+              if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+              setState({
+                user: null,
+                tokens: null,
+                isAuthenticated: false,
+                isLoading: false,
+              });
+              onAuthError?.();
+              return;
+            }
             setSessionExpired(true);
             onAuthError?.();
           }
@@ -119,7 +176,7 @@ export function AuthProvider({
         // Invalid token, ignore
       }
     },
-    [refreshMutation, onAuthError],
+    [refreshMutation, onAuthError, tokenStorage],
   );
 
   // Restore session on mount
@@ -128,25 +185,15 @@ export function AuthProvider({
     const refreshToken = tokenStorage.getRefreshToken();
     const user = tokenStorage.getUser();
 
-    // Check for pending org selection
-    const platformToken = tokenStorage.getPlatformToken();
-    const storedMemberships = tokenStorage.getMemberships();
-    if (platformToken && storedMemberships) {
-      setMemberships(storedMemberships);
-      setNeedsOrgSelection(true);
-      setState((s) => ({ ...s, isLoading: false }));
-      return;
-    }
-
+    // If valid tokens exist, restore authenticated state and memberships
     if (accessToken && user && !isTokenExpired(accessToken)) {
-      const storedMems = tokenStorage.getMemberships();
-      if (storedMems) setMemberships(storedMems);
       setState({
         user,
         tokens: { accessToken, refreshToken: refreshToken ?? '' },
         isAuthenticated: true,
         isLoading: false,
       });
+      setMemberships(tokenStorage.getMemberships());
       scheduleRefresh(accessToken);
     } else if (refreshToken) {
       refreshMutation(refreshToken)
@@ -177,6 +224,12 @@ export function AuthProvider({
           });
         });
     } else {
+      // No valid tokens — check for pending institute selection (multi-institute login in progress)
+      const storedMemberships = tokenStorage.getMemberships();
+      if (storedMemberships) {
+        setMemberships(storedMemberships);
+        setNeedsInstituteSelection(true);
+      }
       setState((s) => ({ ...s, isLoading: false }));
     }
 
@@ -185,7 +238,7 @@ export function AuthProvider({
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [refreshMutation, scheduleRefresh]);
+  }, [refreshMutation, scheduleRefresh, tokenStorage]);
 
   const handleLoginResult = React.useCallback(
     async (result: LoginResult) => {
@@ -205,44 +258,15 @@ export function AuthProvider({
           isLoading: false,
         });
         scheduleRefresh(result.accessToken);
-      } else if (result.platformToken && result.memberships) {
-        // Session expired re-login: auto-select the same org the user was in
-        const prevTenantId = prevTenantIdRef.current;
-        if (prevTenantId) {
-          try {
-            const orgResult = await selectOrgMutation(prevTenantId, result.platformToken);
-            tokenStorage.setTokens({
-              accessToken: orgResult.accessToken,
-              refreshToken: orgResult.refreshToken,
-            });
-            tokenStorage.setUser(orgResult.user);
-            setState({
-              user: orgResult.user,
-              tokens: {
-                accessToken: orgResult.accessToken,
-                refreshToken: orgResult.refreshToken,
-              },
-              isAuthenticated: true,
-              isLoading: false,
-            });
-            scheduleRefresh(orgResult.accessToken);
-          } catch {
-            // Auto-select failed (e.g. membership revoked) — fall back to org selection
-            tokenStorage.setPlatformToken(result.platformToken);
-            tokenStorage.setMemberships(result.memberships);
-            setMemberships(result.memberships);
-            setNeedsOrgSelection(true);
-            setSessionExpired(false);
-          }
-        } else {
-          tokenStorage.setPlatformToken(result.platformToken);
-          tokenStorage.setMemberships(result.memberships);
-          setMemberships(result.memberships);
-          setNeedsOrgSelection(true);
-        }
+      } else if (result.requiresInstituteSelection && result.memberships && result.selectionToken) {
+        // Multi-institute login — store memberships + selectionToken for institute picker
+        tokenStorage.setMemberships(result.memberships);
+        setMemberships(result.memberships);
+        setPendingSelectionToken(result.selectionToken);
+        setNeedsInstituteSelection(true);
       }
     },
-    [scheduleRefresh, selectOrgMutation],
+    [scheduleRefresh, tokenStorage],
   );
 
   const login = React.useCallback(
@@ -266,7 +290,7 @@ export function AuthProvider({
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
-    setNeedsOrgSelection(false);
+    setNeedsInstituteSelection(false);
     setMemberships(null);
     setState({
       user: null,
@@ -274,24 +298,25 @@ export function AuthProvider({
       isAuthenticated: false,
       isLoading: false,
     });
-  }, []);
+  }, [tokenStorage]);
 
-  const selectOrganization = React.useCallback(
-    async (tenantId: string) => {
-      const platformToken = tokenStorage.getPlatformToken();
-      if (!platformToken || isTokenExpired(platformToken)) {
+  const selectInstitute = React.useCallback(
+    async (membershipId: string) => {
+      if (!pendingSelectionToken) {
         clearAllState();
         throw new Error('Session expired');
       }
 
-      const result = await selectOrgMutation(tenantId, platformToken);
-      tokenStorage.clearPlatform();
+      const result = await selectInstituteMutation(pendingSelectionToken, membershipId);
       tokenStorage.setTokens({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       });
       tokenStorage.setUser(result.user);
-      setNeedsOrgSelection(false);
+      // Keep memberships in storage — needed by the institute switcher
+      // after page reload. Only clear the selection state.
+      setNeedsInstituteSelection(false);
+      setPendingSelectionToken(null);
       setState({
         user: result.user,
         tokens: {
@@ -303,33 +328,37 @@ export function AuthProvider({
       });
       scheduleRefresh(result.accessToken);
     },
-    [selectOrgMutation, scheduleRefresh, clearAllState],
+    [selectInstituteMutation, pendingSelectionToken, scheduleRefresh, clearAllState, tokenStorage],
   );
 
-  const switchOrganization = React.useCallback(
-    async (tenantId: string) => {
-      // Re-login flow: use current access token to call selectOrganization
+  const switchInstitute = React.useCallback(
+    async (membershipId: string) => {
       const accessToken = tokenStorage.getAccessToken();
-      if (!accessToken) throw new Error('No access token');
+      const refreshToken = tokenStorage.getRefreshToken();
+      if (!accessToken || !refreshToken) throw new Error('No access token');
 
-      const result = await selectOrgMutation(tenantId, accessToken);
-      tokenStorage.setTokens({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      });
-      tokenStorage.setUser(result.user);
-      setState({
-        user: result.user,
-        tokens: {
+      if (switchInstituteMutation) {
+        const result = await switchInstituteMutation(membershipId, accessToken, refreshToken);
+        tokenStorage.setTokens({
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
-        },
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      scheduleRefresh(result.accessToken);
+        });
+        tokenStorage.setUser(result.user);
+        setState({
+          user: result.user,
+          tokens: {
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        scheduleRefresh(result.accessToken);
+      } else {
+        throw new Error('switchInstituteMutation is required for institute switching');
+      }
     },
-    [selectOrgMutation, scheduleRefresh],
+    [switchInstituteMutation, scheduleRefresh, tokenStorage],
   );
 
   const logout = React.useCallback(async () => {
@@ -342,7 +371,7 @@ export function AuthProvider({
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
-    setNeedsOrgSelection(false);
+    setNeedsInstituteSelection(false);
     setMemberships(null);
     setState({
       user: null,
@@ -350,7 +379,25 @@ export function AuthProvider({
       isAuthenticated: false,
       isLoading: false,
     });
-  }, [logoutMutation]);
+  }, [logoutMutation, tokenStorage]);
+
+  const changePassword = React.useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      if (!changePasswordMutation) {
+        throw new Error('changePasswordMutation is required to change password');
+      }
+      const accessToken = tokenStorage.getAccessToken();
+      if (!accessToken) throw new Error('No access token');
+      await changePasswordMutation(currentPassword, newPassword, accessToken);
+      // ROV-96 — server revoked ALL refresh tokens (including this session's).
+      // Drop local tokens + state so the UI bounces the user back to login;
+      // they re-authenticate with the new password. clearAllState mirrors
+      // logout() but skips the no-op server call (token is already revoked).
+      clearAllState();
+      onAuthError?.();
+    },
+    [changePasswordMutation, clearAllState, onAuthError, tokenStorage],
+  );
 
   const refreshSession = React.useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
@@ -371,42 +418,75 @@ export function AuthProvider({
       isLoading: false,
     });
     scheduleRefresh(result.accessToken);
-  }, [refreshMutation, scheduleRefresh]);
+  }, [refreshMutation, scheduleRefresh, tokenStorage]);
 
   const getAccessToken = React.useCallback(() => {
+    // Prefer impersonation token if present (sessionStorage, dies with tab)
+    if (typeof window !== 'undefined') {
+      const impToken = sessionStorage.getItem('roviq-impersonation-token');
+      if (impToken) return impToken;
+    }
     return tokenStorage.getAccessToken();
+  }, [tokenStorage]);
+
+  const notifyImpersonationEnded = React.useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('roviq-impersonation-token');
+    }
+    setImpersonationEnded(true);
+  }, []);
+
+  const clearImpersonationEnded = React.useCallback(() => {
+    setImpersonationEnded(false);
   }, []);
 
   const handleReLoginSuccess = React.useCallback(() => {
     setSessionExpired(false);
   }, []);
 
+  const handleSwitchAccount = React.useCallback(async () => {
+    setSessionExpired(false);
+    await logout();
+  }, [logout]);
+
   const value = React.useMemo<AuthContextValue>(
     () => ({
       ...state,
+      scope,
       sessionExpired,
-      needsOrgSelection,
+      needsInstituteSelection,
       memberships,
+      isImpersonated,
+      impersonationEnded,
       login,
       loginWithPasskey,
       logout,
       refreshSession,
       getAccessToken,
-      selectOrganization,
-      switchOrganization,
+      selectInstitute,
+      switchInstitute,
+      changePassword,
+      notifyImpersonationEnded,
+      clearImpersonationEnded,
     }),
     [
       state,
+      scope,
       sessionExpired,
-      needsOrgSelection,
+      needsInstituteSelection,
       memberships,
+      isImpersonated,
+      impersonationEnded,
       login,
       loginWithPasskey,
       logout,
       refreshSession,
       getAccessToken,
-      selectOrganization,
-      switchOrganization,
+      selectInstitute,
+      switchInstitute,
+      changePassword,
+      notifyImpersonationEnded,
+      clearImpersonationEnded,
     ],
   );
 
@@ -417,6 +497,7 @@ export function AuthProvider({
         open={sessionExpired}
         username={state.user?.username}
         onLoginSuccess={handleReLoginSuccess}
+        onSwitchAccount={handleSwitchAccount}
         labels={sessionExpiredLabels}
       />
     </AuthContext.Provider>

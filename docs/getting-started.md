@@ -18,7 +18,7 @@ Tilt handles everything automatically:
 - Creates `.env` from `.env.example` on first run
 - Installs dependencies (`pnpm install`)
 - Starts infra (Postgres, Redis, NATS, MinIO, Temporal, OTel/Grafana stack) in Docker
-- Runs database migrations, generates Prisma client, and seeds test data
+- Pushes Drizzle schema to database and seeds test data
 - Starts all apps locally
 
 Open the Tilt UI at http://localhost:10350 to monitor all resources.
@@ -27,49 +27,57 @@ Open the Tilt UI at http://localhost:10350 to monitor all resources.
 
 | Username | Password | Role | Orgs |
 |----------|----------|------|------|
-| admin | admin123 | institute_admin | 2 orgs (shows org picker) |
-| teacher1 | teacher123 | teacher | 1 org (direct login) |
-| student1 | student123 | student | 1 org (direct login) |
+| admin | admin123 | institute_admin | 2 institutes (shows institute picker) |
+| teacher1 | teacher123 | teacher | 1 institute (direct login) |
+| student1 | student123 | student | 1 institute (direct login) |
 
-Login requires only username + password — no Organization ID.
+Login requires only username + password — no Institute ID.
 
 ## Quick Verification
 
 ```bash
 # GraphQL playground
-open http://localhost:3000/api/graphql
+open http://localhost:3005/api/graphql
 
 # Health check
-curl http://localhost:3000/api/health
+curl http://localhost:3005/api/health
 
-# Observability (also accessible via admin-portal → Observability)
+# Observability (also accessible via web app → Observability)
 open http://localhost:3001/d/roviq-overview  # Grafana dashboard
 open http://localhost:9090                   # Prometheus
 open http://localhost:3200                   # Tempo
 
-# Login mutation (single-org user → direct JWT)
-curl -s http://localhost:3000/api/graphql -X POST \
+# Institute login (single institute → direct JWT)
+curl -s http://localhost:3005/api/graphql -X POST \
   -H "Content-Type: application/json" \
-  -d '{"query":"mutation { login(username: \"teacher1\", password: \"teacher123\") { accessToken user { username } } }"}'
+  -d '{"query":"mutation { instituteLogin(username: \"teacher1\", password: \"teacher123\") { accessToken user { username } } }"}'
 
-# Login mutation (multi-org user → platform token + membership list)
-curl -s http://localhost:3000/api/graphql -X POST \
+# Institute login (multi-institute → membership picker)
+curl -s http://localhost:3005/api/graphql -X POST \
   -H "Content-Type: application/json" \
-  -d '{"query":"mutation { login(username: \"admin\", password: \"admin123\") { platformToken memberships { orgName roleName tenantId } } }"}'
+  -d '{"query":"mutation { instituteLogin(username: \"admin\", password: \"admin123\") { requiresInstituteSelection memberships { membershipId instituteName roleName tenantId } } }"}'
 
-# Select organization (use platformToken from above)
-curl -s http://localhost:3000/api/graphql -X POST \
+# Select institute (use any valid token from above)
+curl -s http://localhost:3005/api/graphql -X POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <PLATFORM_TOKEN>" \
-  -d '{"query":"mutation { selectOrganization(tenantId: \"<TENANT_ID>\") { accessToken user { username } } }"}'
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{"query":"mutation { selectInstitute(membershipId: \"<MEMBERSHIP_ID>\") { accessToken user { username } } }"}'
+
+# Admin login (platform scope)
+curl -s http://localhost:3005/api/graphql -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"query":"mutation { adminLogin(username: \"admin\", password: \"admin123\") { accessToken user { username scope } } }"}'
 ```
 
 ## Running Tests
 
 ```bash
-pnpm run test                     # all unit tests
-pnpm run e2e                      # e2e tests (requires running API)
-nx affected -t test              # only changed projects
+pnpm run test                     # unit + integration (nx run-many -t test)
+pnpm run test:int                 # integration tests only (real DB, roviq_test)
+pnpm run test:e2e:api             # Vitest E2E API (requires pnpm e2e:up)
+pnpm run test:e2e:ui              # Playwright UI tests across 3 portals (requires pnpm e2e:up)
+pnpm run test:all                 # full pipeline: unit + int + e2e:api + e2e:ui
+nx affected -t test               # only changed projects
 ```
 
 ## Dev Scripts
@@ -80,16 +88,15 @@ tilt up                  # Start everything (infra + apps)
 tilt down                # Stop everything
 
 # Individual apps (if not using Tilt)
-pnpm run dev:gateway      # API gateway               (port 3000)
-pnpm run dev:admin        # Admin portal               (port 4200)
-pnpm run dev:portal       # Institute portal            (port 4300)
+pnpm run dev:gateway      # API gateway               (port 3005)
+pnpm run dev:web          # Web app                     (port 4200)
 
 # Database (handled automatically by Tilt, but available manually)
-pnpm run db:migrate:dev   # Interactive dev migrations
-pnpm run db:migrate       # Deploy migrations (CI)
-pnpm run db:generate      # Regenerate Prisma client
+pnpm run db:push          # Push Drizzle schema to DB
 pnpm run db:seed          # Seed test data
-pnpm run db:reset         # Nuke DB + re-migrate (or use db-clean in Tilt UI)
+pnpm run db:reset         # Nuke DB + re-push schema
+pnpm run db:reset --seed  # Nuke + push + seed in one step
+pnpm run db:studio        # Drizzle Studio (visual DB browser)
 
 # Code quality
 pnpm run lint             # Biome lint check

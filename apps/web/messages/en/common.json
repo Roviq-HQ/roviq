@@ -1,0 +1,24 @@
+{
+  "appName": "Roviq",
+  "appNameAdmin": "Roviq Admin",
+  "appNameReseller": "Roviq Reseller",
+  "appNameInstitute": "Roviq Institute",
+  "loading": "Loading...",
+  "save": "Save",
+  "saving": "Saving...",
+  "cancel": "Cancel",
+  "clear": "Clear",
+  "delete": "Delete",
+  "edit": "Edit",
+  "create": "Create",
+  "search": "Search...",
+  "noResults": "No results found",
+  "confirm": "Confirm",
+  "back": "Back",
+  "draft": {
+    "found": "Unsaved draft found — continue where you left off?",
+    "foundDescription": "Your earlier edits are saved locally. Restore to pick them up, or discard to start fresh.",
+    "restore": "Restore",
+    "discard": "Discard"
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "title": "Guardians",
+  "description": "Directory of parents and legal guardians linked to students at this institute",
+  "new": {
+    "title": "Add Guardian",
+    "description": "Create a new guardian record. You can link this guardian to students after creation.",
+    "submit": "Create Guardian",
+    "submitting": "Creating...",
+    "cancel": "Cancel",
+    "back": "Back to guardians",
+    "accessDenied": "You do not have permission to create guardians",
+    "success": "Guardian created",
+    "sections": {
+      "personal": "Personal details",
+      "contact": "Contact",
+      "professional": "Professional"
+    },
+    "fields": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "gender": "Gender",
+      "email": "Email",
+      "phone": "Phone",
+      "occupation": "Occupation",
+      "organization": "Organization",
+      "educationLevel": "Education level"
+    },
+    "placeholders": {
+      "firstName": "e.g. Sanjay",
+      "lastName": "e.g. Verma",
+      "gender": "Select gender",
+      "email": "name@example.com",
+      "phone": "98765 43210",
+      "occupation": "e.g. Engineer",
+      "organization": "e.g. TCS",
+      "educationLevel": "e.g. B.Tech"
+    },
+    "fieldDescriptions": {
+      "phoneFormat": "10-digit Indian mobile, stored without country code"
+    },
+    "fieldHelp": {
+      "educationLevelTitle": "Education level",
+      "educationLevelBody": "The highest qualification the guardian has completed. Used for UDISE+ parent-education census and to tailor parent communication (e.g. sending PDF newsletters vs. audio bulletins). Only the category is stored — not the specific degree or university.",
+      "educationLevelOptions": "No formal education — never enrolled in school. Primary — up to Class 5. Secondary — Class 10 or 12 pass. Graduate — any 3 or 4 year bachelor's degree. Post-graduate — master's or above. Professional — MBBS, LLB, CA, and similar chartered qualifications."
+    },
+    "genders": {
+      "MALE": "Male",
+      "FEMALE": "Female",
+      "OTHER": "Other"
+    },
+    "educationLevels": {
+      "ILLITERATE": "No formal education",
+      "PRIMARY": "Primary (up to Class 5)",
+      "SECONDARY": "Secondary (Class 10 / 12)",
+      "GRADUATE": "Graduate",
+      "POST_GRADUATE": "Post-graduate",
+      "PROFESSIONAL": "Professional (MBBS, LLB, CA, etc.)"
+    },
+    "errors": {
+      "firstNameRequired": "Please enter the guardian's first name",
+      "lastNameRequired": "Please enter the guardian's last name",
+      "emailInvalid": "Enter a valid email address",
+      "phoneInvalid": "Enter a valid 10-digit Indian mobile number",
+      "generic": "Could not create guardian"
+    }
+  },
+  "filters": {
+    "searchByNameOrPhone": "Search by name or phone number"
+  },
+  "columns": {
+    "name": "Name",
+    "photo": "Photo",
+    "phone": "Phone",
+    "linkedStudents": "Linked students",
+    "occupation": "Occupation",
+    "organization": "Organization",
+    "designation": "Designation",
+    "educationLevel": "Education level",
+    "actions": "Actions"
+  },
+  "detail": {
+    "children": {
+      "consentTitle": "Consent",
+      "consentSummary": "{granted}/{total} purposes granted",
+      "empty": "No linked children",
+      "emptyDescription": "Use the Link student button to attach this guardian to a student record.",
+      "linkButton": "Link student",
+      "count": "{count, plural, one {# linked student} other {# linked students}}",
+      "relationships": {
+        "FATHER": "Father",
+        "MOTHER": "Mother",
+        "LEGAL_GUARDIAN": "Legal guardian",
+        "GRANDPARENT_PATERNAL": "Grandparent (paternal)",
+        "GRANDPARENT_MATERNAL": "Grandparent (maternal)",
+        "UNCLE": "Uncle",
+        "AUNT": "Aunt",
+        "SIBLING": "Sibling",
+        "OTHER": "Other"
+      },
+      "linkDialog": {
+        "title": "Link a student",
+        "description": "Attach this guardian to a student and record the relationship.",
+        "studentLabel": "Student",
+        "studentPlaceholder": "Select a student",
+        "searchPlaceholder": "Search by name or admission number",
+        "searchLoading": "Searching…",
+        "searchNoResults": "No students match",
+        "relationshipLabel": "Relationship",
+        "relationshipPlaceholder": "Select relationship",
+        "isPrimaryContact": "Primary contact",
+        "isEmergencyContact": "Emergency contact",
+        "canPickup": "Can pick up",
+        "livesWith": "Lives with",
+        "submit": "Link student",
+        "submitting": "Linking…",
+        "cancel": "Cancel",
+        "linked": "Student linked to guardian",
+        "primaryWarning": "If the selected student already has a primary contact, marking this guardian as primary will replace the existing one."
+      }
+    },
+    "back": "Back to guardians",
+    "notFound": "Guardian not found",
+    "notFoundDescription": "This guardian record no longer exists or has been removed.",
+    "tabs": {
+      "profile": "Profile",
+      "children": "Children",
+      "audit": "Audit log"
+    },
+    "sidebar": {
+      "primaryFor": "{count, plural, one {Primary contact for # child} other {Primary contact for # children}}"
+    },
+    "profile": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "occupation": "Occupation",
+      "organization": "Organization",
+      "designation": "Designation",
+      "educationLevel": "Education level",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "saved": "Guardian profile updated",
+      "concurrencyError": "Someone else modified this guardian. Refresh and try again.",
+      "refresh": "Refresh"
+    }
+  },
+  "fields": {
+    "firstName": "First name",
+    "lastName": "Last name",
+    "email": "Email",
+    "phone": "Phone",
+    "occupation": "Occupation",
+    "organization": "Organization",
+    "educationLevel": "Education level",
+    "designation": "Designation"
+  },
+  "linkedChildren": {
+    "title": "Linked children",
+    "description": "Students linked to this guardian",
+    "primaryBadge": "Primary contact",
+    "empty": "No children linked yet"
+  },
+  "consent": {
+    "title": "Consent status",
+    "description": "DPDP Act 2023 consent state per child per purpose",
+    "viewAll": "View consent dashboard",
+    "empty": "No consent records yet",
+    "todoNotice": "Per-child consent matrix is shown on the consent dashboard",
+    "purposes": {
+      "academic_data_processing": "Academic data",
+      "photo_video_marketing": "Photo/video",
+      "whatsapp_communication": "WhatsApp",
+      "sms_communication": "SMS",
+      "aadhaar_collection": "Aadhaar",
+      "biometric_collection": "Biometric",
+      "third_party_edtech": "EdTech",
+      "board_exam_registration": "Board exam",
+      "transport_tracking": "Transport",
+      "health_data_processing": "Health",
+      "cctv_monitoring": "CCTV"
+    }
+  },
+  "educationLevels": {
+    "ILLITERATE": "No formal education",
+    "PRIMARY": "Primary (up to Class 5)",
+    "SECONDARY": "Secondary (Class 10 / 12)",
+    "GRADUATE": "Graduate",
+    "POST_GRADUATE": "Post-graduate",
+    "PROFESSIONAL": "Professional (MBBS, LLB, CA, etc.)"
+  },
+  "loading": "Loading guardians...",
+  "errorLoading": "Failed to load guardians",
+  "empty": {
+    "title": "No guardians yet",
+    "description": "Guardians are added when students are enrolled",
+    "filteredTitle": "No guardians match your search",
+    "filteredDescription": "Try a different name or phone number"
+  },
+  "notSet": "Not set",
+  "noChildren": "No linked children",
+  "addGuardian": "Add Guardian",
+  "totalCount": "{count, plural, one {# guardian} other {# guardians}}",
+  "accessDenied": "You do not have permission to view guardians"
+}

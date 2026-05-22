@@ -1,9 +1,15 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../../../dist/out-tsc",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "declaration": true,
-    "types": []
+    "composite": true,
+    "declarationMap": true,
+    "types": ["node"],
+    "target": "es2021",
+    "moduleResolution": "node16"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/**/__tests__/**"]
 }

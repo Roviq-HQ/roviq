@@ -1,0 +1,46 @@
+import path from 'node:path';
+import { workspaceRoot } from '@nx/devkit';
+import { nxE2EPreset } from '@nx/playwright/preset';
+import { defineConfig, devices } from '@playwright/test';
+
+const baseURL = process.env.WEB_URL || 'http://reseller.localhost:4201';
+const resellerAuthFile = path.join(__dirname, '../playwright/.auth/reseller.json');
+
+export default defineConfig({
+  ...nxE2EPreset(__filename, { testDir: './src' }),
+  globalSetup: require.resolve('../shared/preflight.ts'),
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+    },
+  },
+  use: {
+    baseURL,
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: resellerAuthFile,
+      },
+      testIgnore: /.*\.setup\.ts/,
+      dependencies: ['setup'],
+    },
+  ],
+  webServer: {
+    command: 'pnpm run dev:web:e2e',
+    url: baseURL,
+    name: 'Web',
+    reuseExistingServer: !process.env.CI,
+    cwd: workspaceRoot,
+    timeout: 30_000,
+    env: {
+      E2E_PROBE: '1',
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004',
+      NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: '',
+    },
+  },
+});

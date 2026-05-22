@@ -1,0 +1,105 @@
+{
+  "title": "Audit Logs",
+  "description": "System-wide audit trail of all actions across institutes.",
+  "columns": {
+    "timestamp": "Timestamp",
+    "actor": "Actor",
+    "action": "Action",
+    "actionType": "Type",
+    "entityType": "Entity",
+    "entityId": "Entity ID",
+    "source": "Source",
+    "ipAddress": "IP Address",
+    "institute": "Institute"
+  },
+  "filters": {
+    "entityType": "Entity type",
+    "actionType": "Action type",
+    "userId": "User ID",
+    "search": "Search...",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "clearFilters": "Clear filters"
+  },
+  "actionTypes": {
+    "CREATE": "Create",
+    "UPDATE": "Update",
+    "DELETE": "Delete",
+    "RESTORE": "Restore",
+    "ASSIGN": "Assign",
+    "REVOKE": "Revoke",
+    "SUSPEND": "Suspend",
+    "ACTIVATE": "Activate"
+  },
+  "pagination": {
+    "loadMore": "Load more",
+    "showing": "Showing",
+    "of": "of"
+  },
+  "empty": "No audit logs found.",
+  "emptyTitle": "No audit logs yet",
+  "emptyDescription": "Audit logs will appear here as actions are performed across the platform.",
+  "emptyFilteredTitle": "No matching audit logs",
+  "emptyFilteredDescription": "No audit logs match your current filters. Try adjusting or clearing them.",
+  "detail": {
+    "title": "Audit Log Details",
+    "description": "Full details of the audit event.",
+    "id": "ID",
+    "tenantId": "Institute ID",
+    "userId": "User ID",
+    "actorId": "Actor ID",
+    "impersonatorId": "Impersonator ID",
+    "action": "Action",
+    "actionType": "Action Type",
+    "entityType": "Entity Type",
+    "entityId": "Entity ID",
+    "changes": "Changes",
+    "metadata": "Metadata",
+    "correlationId": "Correlation ID",
+    "ipAddress": "IP Address",
+    "userAgent": "User Agent",
+    "source": "Source",
+    "createdAt": "Created At",
+    "impersonated": "Impersonated",
+    "noChanges": "No changes recorded.",
+    "noMetadata": "No metadata.",
+    "viewTrace": "View trace",
+    "sections": {
+      "identity": "Identity",
+      "request": "Request"
+    }
+  },
+  "trace": {
+    "title": "Correlation Trace",
+    "description": "All audit events from a single correlated request.",
+    "correlationId": "Correlation ID",
+    "eventCount": "{count, plural, =1 {1 event} other {# events}}",
+    "duration": "Duration",
+    "timeline": "Timeline",
+    "actor": "Actor",
+    "emptyState": "No events found for this correlation ID.",
+    "backToLogs": "Back to audit logs",
+    "copied": "Copied!",
+    "copyId": "Copy correlation ID"
+  },
+  "tabs": {
+    "all": "All Events",
+    "impersonation": "Impersonation",
+    "resellerActivity": "Reseller Activity"
+  },
+  "search": {
+    "placeholder": "Search by entity ID...",
+    "button": "Search",
+    "invalidId": "Please enter a valid UUID",
+    "noResults": "No changes found for this entity"
+  },
+  "accessDenied": "You do not have permission to view audit logs.",
+  "errorTitle": "Failed to load audit logs",
+  "errorRetry": "Retry",
+  "entityTimeline": {
+    "title": "Activity History",
+    "noHistory": "No activity history for this entity.",
+    "changes": "View changes",
+    "loadMore": "Load older events"
+  }
+}

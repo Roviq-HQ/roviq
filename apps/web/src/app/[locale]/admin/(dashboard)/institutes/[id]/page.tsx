@@ -1,0 +1,744 @@
+'use client';
+
+import { extractGraphQLError } from '@roviq/graphql';
+import { useI18nField } from '@roviq/i18n';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Field,
+  FieldLabel,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  useBreadcrumbOverride,
+} from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { CheckCircle2, Pause, Play, ShieldOff, Trash2, Undo, Users, XCircle } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { parseAsString, useQueryState } from 'nuqs';
+import * as React from 'react';
+import { toast } from 'sonner';
+import { AcademicTreeTab } from '../_components/academic-tree';
+import { InstituteAuditTab } from '../_components/audit-tab';
+import { BrandingDisplay, type InstituteBranding } from '../_components/branding-display';
+import { ConfigDisplay, type InstituteConfig } from '../_components/config-display';
+import { InstituteGroupCombobox } from '../_components/institute-group-combobox';
+import { ResellerCombobox } from '../_components/reseller-combobox';
+import { SetupProgressPanel } from '../_components/setup-progress';
+import { InstituteUsersTab } from '../_components/users-tab';
+import type { InstituteStatus } from '../types';
+import {
+  useActivateInstitute,
+  useApproveInstitute,
+  useAssignGroup,
+  useDeactivateInstitute,
+  useDeleteInstitute,
+  useInstitute,
+  useReassignReseller,
+  useRejectInstitute,
+  useRemoveGroup,
+  useRestoreInstitute,
+  useSuspendInstitute,
+} from '../use-institutes';
+
+const STATUS_COLOR: Record<InstituteStatus, string> = {
+  PENDING_APPROVAL: 'border-amber-300 text-amber-700',
+  PENDING: 'bg-blue-100 text-blue-700',
+  ACTIVE: 'bg-green-100 text-green-700',
+  INACTIVE: 'bg-gray-100 text-gray-600',
+  SUSPENDED: 'bg-red-100 text-red-700',
+  REJECTED: 'line-through opacity-60',
+};
+
+type ActionType =
+  | 'approve' // PENDING_APPROVAL → PENDING + kick Temporal setup
+  | 'activate' // PENDING/INACTIVE/SUSPENDED → ACTIVE (requires setup COMPLETED)
+  | 'deactivate'
+  | 'suspend'
+  | 'reject'
+  | 'delete'
+  | 'restore'
+  | 'reassignReseller'
+  | 'assignGroup'
+  | 'removeGroup';
+type ActionDialog = {
+  type: ActionType;
+  needsReason?: boolean;
+  needsResellerPick?: boolean;
+  needsGroupPick?: boolean;
+} | null;
+
+// Infer the institute type from the hook return
+type InstituteData = NonNullable<ReturnType<typeof useInstitute>['data']>['adminGetInstitute'];
+
+// ── Action Buttons (extracted to reduce cognitive complexity) ──
+
+function ActionButtons({
+  institute,
+  canActivate,
+  ta,
+  setActionDialog,
+}: {
+  institute: NonNullable<InstituteData>;
+  canActivate: boolean;
+  ta: ReturnType<typeof useTranslations<'adminInstitutes.actions'>>;
+  setActionDialog: (d: ActionDialog) => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      {institute.status === 'INACTIVE' && (
+        <ActivateWithTooltip canActivate={canActivate} ta={ta} setActionDialog={setActionDialog} />
+      )}
+      {institute.status === 'ACTIVE' && (
+        <ActiveStatusActions ta={ta} setActionDialog={setActionDialog} />
+      )}
+      {institute.status === 'SUSPENDED' && (
+        <Button
+          variant="outline"
+          size="sm"
+          title={ta('activateDescription')}
+          onClick={() => setActionDialog({ type: 'activate' })}
+        >
+          <Play className="size-4" />
+          {ta('activate')}
+        </Button>
+      )}
+      {institute.status === 'PENDING_APPROVAL' && (
+        <Button
+          size="sm"
+          title={ta('approveDescription')}
+          onClick={() => setActionDialog({ type: 'approve' })}
+          data-testid={testIds.adminInstituteDetail.actionApprove}
+        >
+          <CheckCircle2 className="size-4" />
+          {ta('approve')}
+        </Button>
+      )}
+      {(institute.status === 'PENDING' || institute.status === 'PENDING_APPROVAL') && (
+        <Button
+          variant="destructive"
+          size="sm"
+          title={ta('rejectDescription')}
+          onClick={() => setActionDialog({ type: 'reject', needsReason: true })}
+        >
+          <XCircle className="size-4" />
+          {ta('reject')}
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        title={ta('reassignResellerDescription')}
+        onClick={() => setActionDialog({ type: 'reassignReseller', needsResellerPick: true })}
+        data-testid={testIds.adminInstituteDetail.actionReassignReseller}
+      >
+        <Users className="size-4" />
+        {ta('reassignReseller')}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        title={institute.groupId ? ta('removeGroupDescription') : ta('assignGroupDescription')}
+        onClick={() =>
+          setActionDialog({
+            type: institute.groupId ? 'removeGroup' : 'assignGroup',
+            needsGroupPick: !institute.groupId,
+          })
+        }
+        data-testid={
+          institute.groupId
+            ? testIds.adminInstituteDetail.actionRemoveGroup
+            : testIds.adminInstituteDetail.actionAssignGroup
+        }
+      >
+        {institute.groupId ? ta('removeGroup') : ta('assignGroup')}
+      </Button>
+      {institute.status === 'REJECTED' || institute.status === 'INACTIVE' ? (
+        <Button
+          variant="outline"
+          size="sm"
+          title={ta('restoreDescription')}
+          onClick={() => setActionDialog({ type: 'restore' })}
+          data-testid={testIds.adminInstituteDetail.actionRestore}
+        >
+          <Undo className="size-4" />
+          {ta('restore')}
+        </Button>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="sm"
+        title={ta('deleteDescription')}
+        onClick={() => setActionDialog({ type: 'delete' })}
+      >
+        <Trash2 className="size-4" />
+        {ta('delete')}
+      </Button>
+    </div>
+  );
+}
+
+function ActivateWithTooltip({
+  canActivate,
+  ta,
+  setActionDialog,
+}: {
+  canActivate: boolean;
+  ta: ReturnType<typeof useTranslations<'adminInstitutes.actions'>>;
+  setActionDialog: (d: ActionDialog) => void;
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canActivate}
+              onClick={() => setActionDialog({ type: 'activate' })}
+            >
+              <Play className="size-4" />
+              {ta('activate')}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {!canActivate && <TooltipContent>{ta('activateDisabled')}</TooltipContent>}
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function ActiveStatusActions({
+  ta,
+  setActionDialog,
+}: {
+  ta: ReturnType<typeof useTranslations<'adminInstitutes.actions'>>;
+  setActionDialog: (d: ActionDialog) => void;
+}) {
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        title={ta('deactivateDescription')}
+        onClick={() => setActionDialog({ type: 'deactivate' })}
+      >
+        <Pause className="size-4" />
+        {ta('deactivate')}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        title={ta('suspendDescription')}
+        onClick={() => setActionDialog({ type: 'suspend', needsReason: true })}
+      >
+        <ShieldOff className="size-4" />
+        {ta('suspend')}
+      </Button>
+    </>
+  );
+}
+
+// ── Overview Tab Cards (extracted to reduce cognitive complexity) ──
+
+function ContactCard({
+  contact,
+  td,
+}: {
+  contact: NonNullable<NonNullable<InstituteData>['contact']>;
+  td: ReturnType<typeof useTranslations<'adminInstitutes.detail'>>;
+}) {
+  return (
+    <Card data-testid={testIds.adminInstituteDetail.contactCard}>
+      <CardHeader>
+        <CardTitle data-testid={testIds.adminInstituteDetail.contactTitle}>
+          {td('contact')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {contact.phones.length > 0 && (
+          <div>
+            <h4 className="mb-2 text-sm font-medium text-muted-foreground">{td('phones')}</h4>
+            <div className="space-y-1">
+              {contact.phones.map((phone) => (
+                <div
+                  key={`${phone.countryCode}${phone.number}`}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <span>
+                    {phone.countryCode} {phone.number}
+                  </span>
+                  {phone.isPrimary && <Badge variant="secondary">{td('primary')}</Badge>}
+                  {phone.isWhatsappEnabled && <Badge variant="outline">{td('whatsapp')}</Badge>}
+                  {phone.label && <span className="text-muted-foreground">({phone.label})</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {contact.emails.length > 0 && (
+          <div>
+            <h4 className="mb-2 text-sm font-medium text-muted-foreground">{td('emails')}</h4>
+            <div className="space-y-1">
+              {contact.emails.map((email) => (
+                <div key={email.address} className="flex items-center gap-2 text-sm">
+                  <span>{email.address}</span>
+                  {email.isPrimary && <Badge variant="secondary">{td('primary')}</Badge>}
+                  {email.label && <span className="text-muted-foreground">({email.label})</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function OverviewTab({
+  institute,
+  t,
+  td,
+  resolveI18n,
+}: {
+  institute: NonNullable<InstituteData>;
+  t: ReturnType<typeof useTranslations<'adminInstitutes'>>;
+  td: ReturnType<typeof useTranslations<'adminInstitutes.detail'>>;
+  resolveI18n: ReturnType<typeof useI18nField>;
+}) {
+  return (
+    <TabsContent value="overview" className="mt-6 space-y-6">
+      {/* Identity */}
+      <Card data-testid={testIds.adminInstituteDetail.identityCard}>
+        <CardHeader>
+          <CardTitle data-testid={testIds.adminInstituteDetail.identityTitle}>
+            {td('identity')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-muted-foreground">{td('fieldName')}</dt>
+              <dd className="font-medium">{resolveI18n(institute.name)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{td('fieldCode')}</dt>
+              <dd className="font-mono">{institute.code ?? '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{td('fieldType')}</dt>
+              <dd>{t(`types.${institute.type}`)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{td('fieldFramework')}</dt>
+              <dd>{institute.structureFramework}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{td('fieldTimezone')}</dt>
+              <dd>{institute.timezone}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{td('fieldCurrency')}</dt>
+              <dd>{institute.currency}</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      {institute.contact && <ContactCard contact={institute.contact} td={td} />}
+
+      {/* Address */}
+      {institute.address && (
+        <Card data-testid={testIds.adminInstituteDetail.addressCard}>
+          <CardHeader>
+            <CardTitle data-testid={testIds.adminInstituteDetail.addressTitle}>
+              {td('address')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">
+              {[institute.address.line1, institute.address.line2, institute.address.line3]
+                .filter(Boolean)
+                .join(', ')}
+            </p>
+            <p className="text-sm">
+              {institute.address.city}, {institute.address.district}, {institute.address.state} —{' '}
+              {institute.address.postalCode}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Identifiers */}
+      {institute.identifiers && institute.identifiers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{td('identifiers')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{td('identifierType')}</TableHead>
+                  <TableHead>{td('identifierValue')}</TableHead>
+                  <TableHead>{td('identifierIssuedBy')}</TableHead>
+                  <TableHead>{td('identifierValidUntil')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {institute.identifiers.map((id) => (
+                  <TableRow key={`${id.type}-${id.value}`}>
+                    <TableCell className="font-medium">{id.type}</TableCell>
+                    <TableCell>{id.value}</TableCell>
+                    <TableCell>{id.issuingAuthority ?? '—'}</TableCell>
+                    <TableCell>{id.validTo ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Affiliations */}
+      {institute.affiliations && institute.affiliations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{td('affiliations')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{td('affiliationBoard')}</TableHead>
+                  <TableHead>{td('affiliationStatus')}</TableHead>
+                  <TableHead>{td('affiliationNumber')}</TableHead>
+                  <TableHead>{td('affiliationLevel')}</TableHead>
+                  <TableHead>{td('affiliationValidUntil')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {institute.affiliations.map((aff) => (
+                  <TableRow key={`${aff.board}-${aff.affiliationNumber}`}>
+                    <TableCell className="font-medium">{aff.board.toUpperCase()}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{aff.affiliationStatus}</Badge>
+                    </TableCell>
+                    <TableCell>{aff.affiliationNumber ?? '—'}</TableCell>
+                    <TableCell>{aff.grantedLevel ?? '—'}</TableCell>
+                    <TableCell>{aff.validTo ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </TabsContent>
+  );
+}
+
+// ── Action Confirmation Dialog (extracted to reduce cognitive complexity) ──
+
+function ActionConfirmationDialog({
+  actionDialog,
+  actionReason,
+  pickedResellerId,
+  pickedGroupId,
+  setActionDialog,
+  setActionReason,
+  setPickedResellerId,
+  setPickedGroupId,
+  executeAction,
+  ta,
+}: {
+  actionDialog: ActionDialog;
+  actionReason: string;
+  pickedResellerId: string | null;
+  pickedGroupId: string | null;
+  setActionDialog: (d: ActionDialog) => void;
+  setActionReason: (r: string) => void;
+  setPickedResellerId: (id: string | null) => void;
+  setPickedGroupId: (id: string | null) => void;
+  executeAction: () => void;
+  ta: ReturnType<typeof useTranslations<'adminInstitutes.actions'>>;
+}) {
+  const confirmDisabled =
+    (actionDialog?.needsResellerPick && !pickedResellerId) ||
+    (actionDialog?.needsGroupPick && !pickedGroupId);
+
+  return (
+    <AlertDialog open={!!actionDialog} onOpenChange={(o) => !o && setActionDialog(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{actionDialog ? ta(`${actionDialog.type}Title`) : ''}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {actionDialog ? ta(`${actionDialog.type}Description`) : ''}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {actionDialog?.needsReason && (
+          <Field>
+            <FieldLabel>
+              {actionDialog.type === 'suspend' ? ta('suspendReason') : ta('rejectTitle')}
+            </FieldLabel>
+            <Textarea
+              value={actionReason}
+              onChange={(e) => setActionReason(e.target.value)}
+              placeholder={actionDialog.type === 'suspend' ? ta('suspendReasonPlaceholder') : ''}
+              rows={3}
+            />
+          </Field>
+        )}
+        {actionDialog?.needsResellerPick && (
+          <Field>
+            <FieldLabel>{ta('pickReseller')}</FieldLabel>
+            <ResellerCombobox
+              value={pickedResellerId}
+              onChange={setPickedResellerId}
+              required
+              data-testid={testIds.adminInstituteDetail.reassignResellerCombobox}
+            />
+          </Field>
+        )}
+        {actionDialog?.needsGroupPick && (
+          <Field>
+            <FieldLabel>{ta('pickGroup')}</FieldLabel>
+            <InstituteGroupCombobox
+              value={pickedGroupId}
+              onChange={setPickedGroupId}
+              data-testid={testIds.adminInstituteDetail.assignGroupCombobox}
+            />
+          </Field>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel>{ta('cancel')}</AlertDialogCancel>
+          <AlertDialogAction onClick={executeAction} disabled={confirmDisabled}>
+            {ta('confirm')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+export default function InstituteDetailPage() {
+  const params = useParams<{ id: string }>();
+  const t = useTranslations('adminInstitutes');
+  const td = useTranslations('adminInstitutes.detail');
+  const ta = useTranslations('adminInstitutes.actions');
+  const resolveI18n = useI18nField();
+  const [activeTab, setActiveTab] = useQueryState('tab', parseAsString.withDefault('overview'));
+
+  const { data, loading, refetch } = useInstitute(params.id);
+  const institute = data?.adminGetInstitute;
+
+  // Action mutations
+  const [approve] = useApproveInstitute();
+  const [activate] = useActivateInstitute();
+  const [deactivate] = useDeactivateInstitute();
+  const [suspend] = useSuspendInstitute();
+  const [reject] = useRejectInstitute();
+  const [deleteInst] = useDeleteInstitute();
+  const [restore] = useRestoreInstitute();
+  const [reassignReseller] = useReassignReseller();
+  const [assignGroup] = useAssignGroup();
+  const [removeGroup] = useRemoveGroup();
+  const [pickedResellerId, setPickedResellerId] = React.useState<string | null>(null);
+  const [pickedGroupId, setPickedGroupId] = React.useState<string | null>(null);
+
+  // Breadcrumb label for [id] segment
+  const instituteName = institute ? resolveI18n(institute.name) : '';
+  useBreadcrumbOverride(instituteName ? { [params.id]: instituteName } : {});
+
+  // Action dialog state
+  const [actionDialog, setActionDialog] = React.useState<ActionDialog>(null);
+  const [actionReason, setActionReason] = React.useState('');
+
+  const actionMutations: Record<ActionType, (id: string, reason?: string) => Promise<unknown>> = {
+    approve: (id) => approve({ variables: { id } }),
+    activate: (id) => activate({ variables: { id } }),
+    deactivate: (id) => deactivate({ variables: { id } }),
+    suspend: (id, reason) => suspend({ variables: { id, reason } }),
+    reject: (id, reason) => reject({ variables: { id, reason: reason || 'Rejected' } }),
+    delete: (id) => deleteInst({ variables: { id } }),
+    restore: (id) => restore({ variables: { id } }),
+    reassignReseller: (id) => {
+      if (!pickedResellerId) return Promise.reject(new Error('No reseller selected'));
+      return reassignReseller({ variables: { id, newResellerId: pickedResellerId } });
+    },
+    assignGroup: (id) => {
+      if (!pickedGroupId) return Promise.reject(new Error('No group selected'));
+      return assignGroup({ variables: { id, groupId: pickedGroupId } });
+    },
+    removeGroup: (id) => removeGroup({ variables: { id } }),
+  };
+
+  const executeAction = async () => {
+    if (!institute || !actionDialog) return;
+    try {
+      await actionMutations[actionDialog.type](institute.id, actionReason || undefined);
+      toast.success(ta('success'));
+      setActionDialog(null);
+      setActionReason('');
+      setPickedResellerId(null);
+      setPickedGroupId(null);
+      refetch();
+    } catch (err) {
+      toast.error(ta('error'), { description: extractGraphQLError(err, ta('error')) });
+    }
+  };
+
+  if (loading && !institute) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (!institute) {
+    return <p className="py-12 text-center text-muted-foreground">{td('notFound')}</p>;
+  }
+
+  const canActivate = institute.setupStatus === 'COMPLETED';
+  const showSetupTab = institute.status === 'PENDING' || institute.setupStatus !== 'COMPLETED';
+
+  return (
+    <div className="space-y-6" data-testid={testIds.adminInstituteDetail.page}>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1
+            className="text-2xl font-bold tracking-tight"
+            data-testid={testIds.adminInstituteDetail.title}
+          >
+            {resolveI18n(institute.name)}
+          </h1>
+          <div className="mt-1 flex items-center gap-2">
+            <Badge variant="secondary">{t(`types.${institute.type}`)}</Badge>
+            <Badge variant="outline" className={STATUS_COLOR[institute.status]}>
+              {t(`statuses.${institute.status}`)}
+            </Badge>
+            {institute.code && (
+              <span className="font-mono text-xs text-muted-foreground">{institute.code}</span>
+            )}
+          </div>
+        </div>
+
+        <ActionButtons
+          institute={institute}
+          canActivate={canActivate}
+          ta={ta}
+          setActionDialog={setActionDialog}
+        />
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview" data-testid={testIds.adminInstituteDetail.tab('overview')}>
+            {td('tabs.overview')}
+          </TabsTrigger>
+          {showSetupTab && (
+            <TabsTrigger value="setup" data-testid={testIds.adminInstituteDetail.tab('setup')}>
+              {td('tabs.setup')}
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="academic" data-testid={testIds.adminInstituteDetail.tab('academic')}>
+            {td('tabs.academic')}
+          </TabsTrigger>
+          <TabsTrigger value="users" data-testid={testIds.adminInstituteDetail.tab('users')}>
+            {td('tabs.users')}
+          </TabsTrigger>
+          <TabsTrigger value="config" data-testid={testIds.adminInstituteDetail.tab('config')}>
+            {td('tabs.config')}
+          </TabsTrigger>
+          <TabsTrigger value="branding" data-testid={testIds.adminInstituteDetail.tab('branding')}>
+            {td('tabs.branding')}
+          </TabsTrigger>
+          <TabsTrigger value="audit" data-testid={testIds.adminInstituteDetail.tab('audit')}>
+            {td('tabs.audit')}
+          </TabsTrigger>
+        </TabsList>
+
+        <OverviewTab institute={institute} t={t} td={td} resolveI18n={resolveI18n} />
+
+        {/* ── Setup Progress Tab ── */}
+        {showSetupTab && (
+          <TabsContent value="setup" className="mt-6">
+            <SetupProgressPanel
+              instituteId={institute.id}
+              initialSetupStatus={institute.setupStatus}
+            />
+          </TabsContent>
+        )}
+
+        {/* ── Academic Structure Tab ── */}
+        <TabsContent value="academic" className="mt-6">
+          <AcademicTreeTab instituteId={institute.id} />
+        </TabsContent>
+
+        {/* ── Users Tab ── */}
+        <TabsContent value="users" className="mt-6">
+          <InstituteUsersTab instituteId={institute.id} />
+        </TabsContent>
+
+        {/* ── Configuration Tab ── */}
+        <TabsContent value="config" className="mt-6">
+          <ConfigDisplay config={institute.config as InstituteConfig | null | undefined} />
+        </TabsContent>
+
+        {/* ── Branding Tab ── */}
+        <TabsContent value="branding" className="mt-6">
+          <BrandingDisplay branding={institute.branding as InstituteBranding | null | undefined} />
+        </TabsContent>
+
+        {/* ── Audit Tab ── */}
+        <TabsContent value="audit" className="mt-6">
+          <InstituteAuditTab instituteId={institute.id} />
+        </TabsContent>
+      </Tabs>
+
+      <ActionConfirmationDialog
+        actionDialog={actionDialog}
+        actionReason={actionReason}
+        pickedResellerId={pickedResellerId}
+        pickedGroupId={pickedGroupId}
+        setActionDialog={setActionDialog}
+        setActionReason={setActionReason}
+        setPickedResellerId={setPickedResellerId}
+        setPickedGroupId={setPickedGroupId}
+        executeAction={executeAction}
+        ta={ta}
+      />
+    </div>
+  );
+}

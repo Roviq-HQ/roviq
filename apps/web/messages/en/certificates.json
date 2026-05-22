@@ -1,0 +1,202 @@
+{
+  "tc": {
+    "title": "Transfer Certificates",
+    "description": "Manage Transfer Certificate requests, approvals, and issuance.",
+    "requestButton": "Request TC",
+    "empty": {
+      "noData": "No transfer certificates yet",
+      "noDataDescription": "Requested transfer certificates will appear here."
+    },
+    "requestDialog": {
+      "title": "Request Transfer Certificate",
+      "description": "Start a new TC request for a student. Reason must be at least 10 characters.",
+      "studentLabel": "Student",
+      "studentSearchPlaceholder": "Search by name or admission number…",
+      "studentSelectPlaceholder": "Select a student",
+      "noStudents": "No students found",
+      "academicYearLabel": "Academic Year",
+      "academicYearPlaceholder": "Select academic year",
+      "reasonLabel": "Reason for leaving",
+      "reasonPlaceholder": "Explain why the student is leaving (shown on TC)",
+      "submit": "Request TC",
+      "submitting": "Requesting…",
+      "fieldHelp": {
+        "academicYearTitle": "Academic year",
+        "academicYearBody": "The last academic session the student completed at your institute. This is printed on the TC and used to compute the 'Class studying in' field. Usually this is the current active year — pick a past year only if you are issuing a TC for a previously-withdrawn student whose record was reopened.",
+        "reasonTitle": "Reason for leaving",
+        "reasonBody": "Printed on the TC and visible to the receiving institute — be factual and neutral. Boards reject TCs with subjective or punitive wording ('ill-discipline', 'failed repeatedly') because they prejudice the student's next admission. Stick to objective facts: relocation, financial reasons, family circumstances, change of curriculum.",
+        "reasonExample": "Good: 'Parents have relocated to Pune due to job transfer.' 'Parents wish to shift child to a residential school.' Avoid: 'Poor academic performance', 'Disciplinary issues' — use the separate remarks field or suspension records instead."
+      }
+    },
+    "rejectDialog": {
+      "title": "Reject Transfer Certificate",
+      "description": "Provide a reason for rejection. This is recorded in the audit log.",
+      "reasonLabel": "Reason for rejection",
+      "reasonPlaceholder": "Explain why this TC is being rejected",
+      "submit": "Reject TC",
+      "submitting": "Rejecting…",
+      "fieldHelp": {
+        "reasonTitle": "Reason for rejection",
+        "reasonBody": "Visible to the requester and the principal's reviewer log. Since a rejected TC blocks the student's next admission until resolved, be specific enough that the requester knows exactly what to fix — 'fee dues not cleared', 'library book not returned (Ref LIB-2891)', 'TC request needs Principal signature'. Vague rejections like 'Not eligible' cause repeat submissions and back-and-forth."
+      }
+    },
+    "duplicateDialog": {
+      "title": "Request Duplicate TC",
+      "description": "Provide a reason (FIR reference, affidavit details) for the duplicate.",
+      "reasonLabel": "Reason for duplicate",
+      "reasonPlaceholder": "Original lost — FIR #12345 filed on …",
+      "submit": "Request Duplicate",
+      "submitting": "Requesting…",
+      "fieldHelp": {
+        "reasonTitle": "Reason for duplicate",
+        "reasonBody": "Duplicate TCs are watermarked 'Duplicate' and the serial number is suffixed with -D. Because the receiving institute will scrutinise duplicates, include the legal evidence: FIR number and date for lost originals, affidavit details for damaged originals, or court order references. Without these, boards may reject the duplicate outright.",
+        "reasonExamples": "Good: 'Original TC lost in transit. FIR #DEL/2025/048291 filed on 14 March 2025 at Hauz Khas PS. Affidavit by father attached as ANX-1.' 'Original TC destroyed in house fire. Loss certificate from fire brigade attached.'"
+      }
+    },
+    "reasonLabel": "Reason",
+    "requestedOn": "Requested on {date}",
+    "clearanceTitle": "Department Clearances",
+    "tcDataTitle": "TC Data (CBSE 20-field)",
+    "noClearances": "No clearance data recorded yet.",
+    "noTcData": "No TC data snapshot available.",
+    "clearanceStatus": {
+      "cleared": "Cleared",
+      "pending": "Pending",
+      "blocked": "Blocked"
+    },
+    "approve": "Approve",
+    "approving": "Approving…",
+    "reject": "Reject",
+    "issue": "Issue TC",
+    "issuing": "Issuing…",
+    "requestDuplicate": "Request Duplicate",
+    "approveSuccess": "TC approved successfully",
+    "approveError": "Failed to approve TC",
+    "issueSuccess": "TC issued successfully",
+    "issueError": "Failed to issue TC",
+    "rejectSuccess": "TC rejected",
+    "rejectError": "Failed to reject TC",
+    "duplicateSuccess": "Duplicate TC request submitted",
+    "duplicateError": "Failed to request duplicate",
+    "requestSuccess": "TC request submitted",
+    "requestError": "Failed to request TC",
+    "notFound": "Transfer certificate not found."
+  },
+  "other": {
+    "title": "Certificates",
+    "description": "Bonafide, character, migration and other institute certificates.",
+    "issueButton": "Issue {type}",
+    "issue": "Issue",
+    "issueSuccess": "Certificate issued successfully",
+    "issueError": "Failed to issue certificate",
+    "requestSuccess": "Certificate request submitted",
+    "requestError": "Failed to request certificate",
+    "empty": {
+      "noData": "No certificates yet",
+      "noDataDescription": "Certificates of this type will appear here."
+    },
+    "dialog": {
+      "title": "Issue {type} Certificate",
+      "description": "Select the template, student, and purpose for this certificate.",
+      "templateLabel": "Template ID",
+      "templatePlaceholder": "Paste template UUID",
+      "studentLabel": "Student",
+      "studentSearchPlaceholder": "Search by name or admission number…",
+      "studentSelectPlaceholder": "Select a student",
+      "noStudents": "No students found",
+      "purposeLabel": "Purpose",
+      "purposePlaceholder": "e.g. Scholarship application, railway pass",
+      "submit": "Request Certificate",
+      "submitting": "Requesting…",
+      "issue": "Issue",
+      "preview": "Preview",
+      "previewing": "Rendering…",
+      "previewTitle": "Certificate preview",
+      "previewDescription": "This is how the certificate will look once issued.",
+      "previewClose": "Close preview",
+      "previewMissing": "Select a template and a student first",
+      "previewError": "Failed to render preview",
+      "autoPopulatedTitle": "Auto-populated from student record",
+      "fields": {
+        "studentName": "Student name",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "admissionNumber": "Admission number",
+        "class": "Class",
+        "section": "Section",
+        "dateOfIssue": "Date of issue",
+        "purpose": "Purpose"
+      },
+      "fieldHelp": {
+        "templateTitle": "Template",
+        "templateBody": "The pre-approved certificate template determines the letterhead, seal, signatures, and legal wording. Templates are set up by the super-admin and cannot be edited here — if the template looks wrong, ask them to publish a new version. The same template can be shared by multiple certificate types (e.g. one generic template for bonafide/character/migration).",
+        "purposeTitle": "Purpose",
+        "purposeBody": "Why the student or parent is asking for this certificate. Printed on the certificate body (e.g. 'issued for the purpose of applying to …'). Being specific protects the institute — a certificate issued 'for all official purposes' is sometimes rejected by government offices, while 'for railway concession pass renewal' is accepted immediately.",
+        "purposeExamples": "Good: 'Scholarship application — National Means-cum-Merit', 'Railway concession pass renewal', 'Passport application', 'Change of surname after court decree #DEL/2025/4412'. Avoid 'official purpose' or 'personal use'."
+      }
+    }
+  },
+  "tcStatuses": {
+    "REQUESTED": "Requested",
+    "CLEARANCE_PENDING": "Clearance Pending",
+    "CLEARED": "Cleared",
+    "APPROVED": "Approved",
+    "COUNTERSIGNED": "Countersigned",
+    "ISSUED": "Issued",
+    "DUPLICATE_ISSUED": "Duplicate Issued",
+    "REJECTED": "Rejected",
+    "RETURNED": "Returned",
+    "CANCELLED": "Cancelled"
+  },
+  "certificateStatuses": {
+    "REQUESTED": "Requested",
+    "ISSUED": "Issued",
+    "REJECTED": "Rejected",
+    "CANCELLED": "Cancelled"
+  },
+  "types": {
+    "BONAFIDE_CERTIFICATE": "Bonafide",
+    "CHARACTER_CERTIFICATE": "Character",
+    "SCHOOL_LEAVING_CERTIFICATE": "School Leaving",
+    "RAILWAY_CONCESSION": "Railway Concession",
+    "CUSTOM": "Custom"
+  },
+  "columns": {
+    "serialNumber": "Serial No.",
+    "studentName": "Student Name",
+    "class": "Class",
+    "status": "Status",
+    "reason": "Reason",
+    "type": "Type",
+    "student": "Student",
+    "purpose": "Purpose",
+    "createdAt": "Created",
+    "issuedDate": "Issued Date"
+  },
+  "filters": {
+    "searchPlaceholder": "Search serial number or reason…",
+    "allStatuses": "All statuses",
+    "statusesSelected": "{count, plural, one {# status} other {# statuses}}",
+    "clear": "Clear",
+    "activeYearMarker": "Active"
+  },
+  "pagination": {
+    "window": "{start, number}–{end, number} of {total, number}",
+    "rowsPerPage": "Rows per page",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "back": "Back",
+    "print": "Print",
+    "downloadPdf": "Download PDF",
+    "verifyQr": "Verify"
+  },
+  "empty": {
+    "noMatch": "No matching certificates",
+    "noMatchDescription": "Try adjusting your filters or search terms."
+  },
+  "duplicate": "Duplicate",
+  "original": "Original"
+}

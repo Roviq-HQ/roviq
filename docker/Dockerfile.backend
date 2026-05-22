@@ -1,31 +1,108 @@
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 
 # ── Base: install dependencies ───────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS base
+# Use slim (Debian) instead of alpine — @temporalio/core-bridge requires glibc,
+# which is incompatible with Alpine's musl libc.
+# See: https://github.com/temporalio/sdk-typescript/issues/1271
+FROM node:${NODE_VERSION}-slim AS base
 WORKDIR /app
 
-RUN npm install -g pnpm@latest
+# ca-certificates: TLS in slim images (Temporal SDK requirement)
+# curl: healthcheck probes in Docker Compose
+# procps: nx's continuous task runner (`serve`) shells out to
+#   `ps -o pid --no-headers --ppid <pid>` to track child processes. Without it,
+#   dev-mode api-gateway crashes with `spawn ps ENOENT` immediately after
+#   "Nest application successfully started".
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl procps && rm -rf /var/lib/apt/lists/*
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# Use corepack (built into Node) to manage pnpm — reads version from packageManager field
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV COREPACK_HOME="/app/.corepack"
+RUN corepack enable
 
-# ── Dev: source + Prisma generate ────────────────────────────
+# Copy only the lockfile first — it changes only when deps change.
+# Extract just the dependency fields from package.json so script-only
+# edits don't invalidate the install cache.
+COPY pnpm-lock.yaml ./
+COPY package.json ./tmp-package.json
+# pnpm-lock.yaml references patches/*.patch by path; pnpm install reads them
+# during dependency resolution, so they must exist in the build context.
+COPY patches ./patches
+RUN node -e " \
+  const pkg = require('./tmp-package.json'); \
+  const keep = { name: pkg.name, version: pkg.version, packageManager: pkg.packageManager, \
+    dependencies: pkg.dependencies, devDependencies: pkg.devDependencies, \
+    peerDependencies: pkg.peerDependencies, pnpm: pkg.pnpm, \
+    optionalDependencies: pkg.optionalDependencies, overrides: pkg.overrides }; \
+  require('fs').writeFileSync('package.json', JSON.stringify(keep, null, 2));" \
+  && rm tmp-package.json \
+  && corepack install
+
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Now copy the real package.json (with scripts, metadata, etc.)
+COPY package.json pnpm-workspace.yaml ./
+
+# ── Dev: source + all tooling ──────────────────────────────
+# Granular COPYs so unrelated edits (apps/web, docs, e2e specs filtered via
+# Dockerfile.backend.dockerignore) don't bust the backend cache. Several
+# directories below are also bind-mounted at runtime by compose.e2e.yaml
+# (apps/api-gateway/src, libs, ee, scripts) — the in-image copies make the
+# image self-contained for non-bind-mount uses (e.g. `docker run` ad-hoc) and
+# are immediately shadowed when run under compose.
 FROM base AS dev
 
-COPY --chown=node:node . .
-RUN pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
+# Workspace-level configs nx, tsc, vitest, biome read at startup.
+COPY --chown=node:node nx.json tsconfig.base.json tsconfig.json ./
+COPY --chown=node:node vitest.config.ts vitest.setup.ts vitest.shared.ts vitest.workspace.ts ./
+COPY --chown=node:node codegen.ts biome.json global.d.ts ./
+
+# api-gateway: project metadata + src/ (src is bind-mounted at runtime, so the
+# baked copy is just a self-contained fallback).
+COPY --chown=node:node apps/api-gateway ./apps/api-gateway
+
+# notification-service: NOT bind-mounted in any service — must be in image.
+COPY --chown=node:node apps/notification-service ./apps/notification-service
+
+# apps/web: project metadata only. The Nx graph in the api-gateway container
+# discovers e2e/web-*-e2e/project.json (baked via e2e/), which declares
+# implicitDependencies: ["web"]. Without web's project.json + next.config.js
+# the @nx/next plugin errors with "implicitDependencies point to non-existent
+# project". Source code (apps/web/src) intentionally NOT copied — it's a
+# frontend, not part of the backend runtime.
+COPY --chown=node:node apps/web/project.json apps/web/next.config.js apps/web/tsconfig.json ./apps/web/
+
+# Workspace libraries — bind-mounted at runtime, baked for non-mount uses.
+COPY --chown=node:node libs ./libs
+COPY --chown=node:node ee ./ee
+COPY --chown=node:node scripts ./scripts
+
+# e2e shared helpers — seed scripts import from e2e/shared/seed-fixtures
+# at runtime in migrate-and-seed (no bind mount for e2e/ in that service).
+COPY --chown=node:node e2e ./e2e
+
+RUN mkdir -p .nx/cache dist tmp && chown -R node:node .nx dist tmp node_modules/.cache 2>/dev/null; true
 
 USER node
 
 # ── Build: production artifacts ──────────────────────────────
+# `nx run-many` resolves the project graph across every workspace project,
+# including apps/web's @nx/next plugin and root vitest configs. Splitting
+# the COPY breaks graph resolution — keep full-tree COPY here. The
+# `.dockerignore` still trims apps/web/.next, dist/, .nx/cache, docs, etc.,
+# so this stage isn't carrying obvious bloat. Cache mount on .nx/cache lets
+# single-app changes replay the other app from Nx cache.
 FROM base AS build
 
 COPY . .
-RUN pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
-RUN pnpx nx run-many -t build --parallel=3
+
+RUN --mount=type=cache,id=nx-build-cache,target=/app/.nx/cache \
+    pnpm nx run-many -t build -p api-gateway notification-service --parallel=3
 
 # ── Production: api-gateway ──────────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS api-gateway
+FROM node:${NODE_VERSION}-slim AS api-gateway
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -39,11 +116,30 @@ USER node
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]
 
-# ── Migrator: Prisma CLI + seed for one-shot operations ────
+# ── Production: notification-service ─────────────────────────
+# Mirrors the api-gateway stage. The dist/libs → node_modules/@roviq copy
+# replaces the runtime symlink dance previously inlined in compose.e2e.yaml.
+FROM node:${NODE_VERSION}-slim AS notification-service
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=build /app/dist/apps/notification-service ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist/libs ./node_modules/@roviq
+COPY --from=build /app/package.json ./
+
+USER node
+EXPOSE 3002
+CMD ["node", "dist/src/main.js"]
+
+# ── Migrator: Drizzle migrations ─────────────────────────────
+# drizzle.config.ts conditionally pulls in ee/libs/database when ROVIQ_EE=true
+# and may transitively reference other workspace libs. Stay on full-tree COPY
+# here; this stage isn't in the dev-loop hot path.
 FROM base AS migrator
 
 COPY . .
-RUN pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
 
-WORKDIR /app/libs/backend/prisma-client
-CMD ["pnpx", "prisma", "migrate", "deploy"]
+WORKDIR /app/libs/database
+CMD ["pnpm", "drizzle-kit", "migrate", "--config=drizzle.config.ts"]

@@ -1,10 +1,11 @@
 'use client';
 
-import { Bell, Building2, Check, ChevronsUpDown, Moon, Sun } from 'lucide-react';
+import { Bell, Building2, Check, ChevronsUpDown, Monitor, Moon, Sun } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
+import { testIds } from '../../testing/testid-registry';
 import { Button } from '../ui/button';
 import {
   DropdownMenu,
@@ -16,38 +17,50 @@ import {
 } from '../ui/dropdown-menu';
 import { Breadcrumbs } from './breadcrumbs';
 import { LocaleSwitcher } from './locale-switcher';
+import { NotificationBell } from './notification-bell';
 import { MobileSidebar } from './sidebar';
-import type { LayoutConfig, OrgSwitcherConfig } from './types';
+import type { InstituteSwitcherConfig, LayoutConfig } from './types';
 
-function OrgSwitcher({ config }: { config: OrgSwitcherConfig }) {
+const { layout } = testIds;
+
+function InstituteSwitcherInline({ config }: { config: InstituteSwitcherConfig }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Building2 className="size-4" />
-          <span className="max-w-[120px] truncate text-xs">{config.currentOrgName}</span>
-          <ChevronsUpDown className="size-3 opacity-50" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden xl:inline-flex gap-1.5 max-w-[220px]"
+          data-testid={layout.instituteSwitcher}
+        >
+          <Building2 className="size-4 shrink-0" />
+          <span className="truncate text-xs">{config.currentInstituteName}</span>
+          <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
+      <DropdownMenuContent
+        align="start"
+        className="w-56"
+        data-testid={layout.instituteSwitcherMenu}
+      >
         {config.memberships.map((m) => (
           <DropdownMenuItem key={m.tenantId} onClick={() => config.onSwitch(m.tenantId)}>
             <div className="flex w-full items-center gap-2">
-              {m.orgLogoUrl ? (
+              {m.instituteLogoUrl ? (
                 <Image
-                  src={m.orgLogoUrl}
-                  alt={m.orgName}
+                  src={m.instituteLogoUrl}
+                  alt={m.instituteName}
                   width={24}
                   height={24}
                   className="h-6 w-6 rounded object-cover"
                 />
               ) : (
                 <div className="bg-primary/10 text-primary flex h-6 w-6 items-center justify-center rounded text-xs font-bold">
-                  {m.orgName.charAt(0).toUpperCase()}
+                  {m.instituteName.charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{m.orgName}</div>
+                <div className="truncate text-sm font-medium">{m.instituteName}</div>
                 <div className="text-muted-foreground truncate text-xs">{m.roleName}</div>
               </div>
               {m.tenantId === config.currentTenantId && <Check className="size-4 shrink-0" />}
@@ -59,19 +72,44 @@ function OrgSwitcher({ config }: { config: OrgSwitcherConfig }) {
   );
 }
 
+/**
+ * 3-state theme toggle: System → Light → Dark. Standalone button (used in
+ * topbar at xl+) and a sub-menu variant (used inside UserMenu on mobile).
+ */
 function ThemeToggle() {
   const { setTheme, theme } = useTheme();
-
+  const ActiveIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-    >
-      <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Toggle theme</span>
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Theme" data-testid={layout.themeToggle}>
+          <ActiveIcon className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuItem
+          onClick={() => setTheme('system')}
+          data-testid={layout.themeOption('system')}
+        >
+          <Monitor className="me-2 size-4" />
+          System
+          {theme === 'system' && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setTheme('light')}
+          data-testid={layout.themeOption('light')}
+        >
+          <Sun className="me-2 size-4" />
+          Light
+          {theme === 'light' && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme('dark')} data-testid={layout.themeOption('dark')}>
+          <Moon className="me-2 size-4" />
+          Dark
+          {theme === 'dark' && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -83,7 +121,12 @@ function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: st
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full"
+          data-testid={layout.userMenuTrigger}
+        >
           <div className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">
             {initial}
           </div>
@@ -93,10 +136,14 @@ function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: st
         <DropdownMenuLabel>{t('myAccount')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={`/${locale}/account`}>{t('profile')}</Link>
+          <Link href={`/${locale}/account`} data-testid={layout.userMenuProfile}>
+            {t('profile')}
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onLogout}>{t('logout')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onLogout} data-testid={layout.userMenuLogout}>
+          {t('logout')}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -105,17 +152,28 @@ function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: st
 export function Topbar({ config }: { config: LayoutConfig }) {
   const tNav = useTranslations('nav');
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4">
+    <header
+      data-testid={layout.topbar}
+      className="flex h-14 min-w-0 items-center gap-3 overflow-hidden border-b bg-background px-4"
+    >
       <MobileSidebar config={config} />
-      {config.orgSwitcher && <OrgSwitcher config={config.orgSwitcher} />}
-      <Breadcrumbs />
-      <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="icon" aria-label={tNav('notifications')}>
-          <Bell className="size-4" />
-          <span className="sr-only">{tNav('notifications')}</span>
-        </Button>
-        <LocaleSwitcher />
+      {config.instituteSwitcher && <InstituteSwitcherInline config={config.instituteSwitcher} />}
+      <div className="min-w-0 flex-1">
+        <Breadcrumbs />
+      </div>
+      <div className="ms-auto flex shrink-0 items-center gap-1">
+        {config.notifications ? (
+          <NotificationBell config={config.notifications} />
+        ) : (
+          <Button variant="ghost" size="icon" aria-label={tNav('notifications')}>
+            <Bell className="size-4" />
+            <span className="sr-only">{tNav('notifications')}</span>
+          </Button>
+        )}
         <ThemeToggle />
+        <div className="hidden xl:block">
+          <LocaleSwitcher />
+        </div>
         <UserMenu onLogout={config.onLogout} username={config.user?.username} />
       </div>
     </header>

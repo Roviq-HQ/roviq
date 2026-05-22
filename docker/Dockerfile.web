@@ -1,48 +1,57 @@
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 
 # ── Base: install dependencies ───────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS base
+# Use slim (Debian) for parity with Dockerfile.backend, even though @temporalio/core-bridge
+# is not used by web. corepack-managed pnpm reads version from packageManager field.
+FROM node:${NODE_VERSION}-slim AS base
 WORKDIR /app
 
-RUN npm install -g pnpm@latest
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV COREPACK_HOME="/app/.corepack"
+RUN corepack enable
+
+COPY pnpm-lock.yaml ./
+COPY package.json ./tmp-package.json
+RUN node -e " \
+  const pkg = require('./tmp-package.json'); \
+  const keep = { name: pkg.name, version: pkg.version, packageManager: pkg.packageManager, \
+    dependencies: pkg.dependencies, devDependencies: pkg.devDependencies, \
+    peerDependencies: pkg.peerDependencies, pnpm: pkg.pnpm, \
+    optionalDependencies: pkg.optionalDependencies, overrides: pkg.overrides }; \
+  require('fs').writeFileSync('package.json', JSON.stringify(keep, null, 2));" \
+  && rm tmp-package.json \
+  && corepack install
+
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY package.json ./
 
 # ── Build: production artifacts ──────────────────────────────
 FROM base AS build
 
 COPY . .
 ENV STANDALONE=true
-RUN pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
-RUN pnpx nx run-many -t build --parallel=3
+# CI=true makes codegen read from the committed schema.graphql instead of trying
+# to introspect a running gateway. See codegen.ts SCHEMA_SOURCE selector.
+ENV CI=true
+RUN pnpm codegen
+RUN pnpm nx run web:build --skip-nx-cache
 
-# ── Production: admin-portal ─────────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS admin-portal
+# ── Production: web ───────────────────────────────────────────
+FROM node:${NODE_VERSION}-slim AS web
 
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=build /app/apps/admin-portal/.next/standalone ./
-COPY --from=build /app/apps/admin-portal/.next/static ./apps/admin-portal/.next/static
-COPY --from=build /app/apps/admin-portal/public ./apps/admin-portal/public
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
 
 USER node
 EXPOSE 4200
 ENV PORT=4200
-CMD ["node", "apps/admin-portal/server.js"]
-
-# ── Production: institute-portal ─────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS institute-portal
-
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY --from=build /app/apps/institute-portal/.next/standalone ./
-COPY --from=build /app/apps/institute-portal/.next/static ./apps/institute-portal/.next/static
-COPY --from=build /app/apps/institute-portal/public ./apps/institute-portal/public
-
-USER node
-EXPOSE 4300
-ENV PORT=4300
-CMD ["node", "apps/institute-portal/server.js"]
+CMD ["node", "apps/web/server.js"]

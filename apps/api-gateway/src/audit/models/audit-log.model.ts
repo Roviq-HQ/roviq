@@ -1,4 +1,6 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
+import type { I18nContent } from '@roviq/database';
+import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import { GraphQLJSON } from 'graphql-type-json';
 
 @ObjectType()
@@ -6,8 +8,9 @@ export class AuditLog {
   @Field(() => ID)
   id!: string;
 
-  @Field()
-  tenantId!: string;
+  /** NULL for platform and reseller-scoped actions */
+  @Field(() => String, { nullable: true })
+  tenantId!: string | null;
 
   @Field()
   userId!: string;
@@ -48,7 +51,11 @@ export class AuditLog {
   @Field()
   source!: string;
 
-  @Field()
+  /** Tags rows written by the synthetic-user actor with their originating workflow / consumer / seeder. NULL for normal JWT-driven requests. */
+  @Field(() => String, { nullable: true })
+  syntheticOrigin!: string | null;
+
+  @Field(() => DateTimeScalar)
   createdAt!: Date;
 
   @Field(() => String, { nullable: true })
@@ -57,6 +64,6 @@ export class AuditLog {
   @Field(() => String, { nullable: true })
   userName!: string | null;
 
-  @Field(() => String, { nullable: true })
-  tenantName!: string | null;
+  @Field(() => I18nTextScalar, { nullable: true })
+  tenantName!: I18nContent | null;
 }

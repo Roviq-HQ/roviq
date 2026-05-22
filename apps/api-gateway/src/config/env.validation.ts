@@ -3,10 +3,8 @@ import { z } from 'zod';
 const envSchema = z.looseObject({
   // Database
   DATABASE_URL: z.string({
-    error: 'DATABASE_URL — PostgreSQL connection string for the application runtime role',
-  }),
-  DATABASE_URL_ADMIN: z.string({
-    error: 'DATABASE_URL_ADMIN — PostgreSQL connection string for the admin role (RLS bypass)',
+    error:
+      'DATABASE_URL — PostgreSQL connection string for the pooler role (roviq_pooler, assumes roles via SET LOCAL ROLE)',
   }),
 
   // Redis
@@ -36,7 +34,7 @@ const envSchema = z.looseObject({
   }),
   ALLOWED_ORIGINS: z.string({
     error:
-      'ALLOWED_ORIGINS — comma-separated allowed origins for CORS and WebAuthn (e.g. http://localhost:4200,http://localhost:4300)',
+      'ALLOWED_ORIGINS — comma-separated allowed origins for CORS and WebAuthn (e.g. http://localhost:4200)',
   }),
 
   // Optional
@@ -46,6 +44,17 @@ const envSchema = z.looseObject({
   JWT_EXPIRATION: z.string().optional(),
   JWT_REFRESH_EXPIRATION: z.string().optional(),
   ROVIQ_EE: z.string().optional(),
+  NOTIFICATION_SERVICE_URL: z.string().optional(),
+  NOVU_MODE: z.enum(['local', 'cloud']).optional(),
+  NOVU_API_URL: z.string().url().optional(),
+  BILLING_RETURN_URL: z.string().url().optional(),
+
+  // Temporal — used by certificate (TC issuance) and admission workflows.
+  // Address defaults to localhost:7233 inside services; CE-002 made the
+  // task-queue name configurable so the worker queue can be renamed without
+  // a code change in concert with the worker side.
+  TEMPORAL_ADDRESS: z.string().optional(),
+  TEMPORAL_TC_TASK_QUEUE: z.string().optional(),
 });
 
 export function validate(config: Record<string, unknown>) {

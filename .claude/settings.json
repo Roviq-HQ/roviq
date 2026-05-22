@@ -1,6 +1,134 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "attribution": {
     "commit": "",
     "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Bash(pnpm e2e*)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm vitest*)",
+      "Bash(mkdir -p *)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail *)",
+      "Bash(tilt *)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(tree:*)",
+      "Bash(find *)",
+      "Bash(cut *)",
+      "Bash(sed *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(xargs *)",
+      "Bash(for *)",
+      "Bash(do *)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(echo:*)",
+      "Bash(tee:*)",
+      "Bash(sleep:*)",
+      "Bash(kill:*)",
+      "Bash(wait:*)",
+      "Bash(npx nx:*)",
+      "Bash(npx tsc --project apps:*)",
+      "Bash(git log *)",
+      "Bash(pnpx exec playwright test *)",
+      "Read",
+      "WebFetch",
+      "Agent",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_drag",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_file_upload",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_handle_dialog",
+      "mcp__plugin_playwright_playwright__browser_hover",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_navigate_back",
+      "mcp__plugin_playwright_playwright__browser_network_requests",
+      "mcp__plugin_playwright_playwright__browser_press_key",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "mcp__plugin_playwright_playwright__browser_select_option",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_tabs",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_type",
+      "mcp__plugin_playwright_playwright__browser_wait_for"
+    ],
+    "deny": [
+      "Bash(git stash*)",
+      "Bash(git checkout *)",
+      "Bash(git checkout -- *)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
+      "Bash(git branch -D *)",
+      "Bash(git restore .)",
+      "Bash(git restore *)",
+      "Bash(rm *)",
+      "Bash(rm -rf *)",
+      "Bash(rmdir *)",
+      "Bash(docker system prune*)",
+      "Bash(docker volume prune*)",
+      "Bash(docker volume rm*)",
+      "Bash(docker image prune*)",
+      "Bash(docker builder prune*)",
+      "Bash(docker container prune*)",
+      "Bash(docker network prune*)",
+      "Bash(docker rmi*)",
+      "Bash(docker stop $(*))",
+      "Bash(docker kill $(*))",
+      "Bash(systemctl *)",
+      "Bash(service *)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(mkfs*)",
+      "Bash(fdisk*)",
+      "Bash(dd *)",
+      "Bash(mount *)",
+      "Bash(umount *)",
+      "Bash(chmod -R 777*)",
+      "Bash(chown -R *)",
+      "Bash(pkill *)",
+      "Bash(killall *)",
+      "Bash(kill -9 *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-project-dir.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "nx-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "nrwl/nx-ai-agents-config"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "nx@nx-claude-plugins": true
   }
 }

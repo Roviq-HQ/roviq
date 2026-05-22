@@ -1,36 +1,15 @@
-import path from 'node:path';
-import { defineConfig } from 'vitest/config';
+import swc from 'unplugin-swc';
+import { defineConfig, mergeConfig } from 'vitest/config';
+import shared from '../../../../vitest.shared';
 
-export default defineConfig({
-  esbuild: {
-    tsconfigRaw: {
-      compilerOptions: {
-        experimentalDecorators: true,
-        emitDecoratorMetadata: true,
-      },
+export default mergeConfig(
+  shared,
+  defineConfig({
+    root: __dirname,
+    plugins: [swc.vite({ module: { type: 'es6' } })],
+    test: {
+      include: ['src/**/*.spec.ts'],
+      exclude: ['**/*.integration.spec.ts', '**/node_modules/**'],
     },
-  },
-  resolve: {
-    alias: {
-      '@roviq/ee-payments': path.resolve(__dirname, 'src/index.ts'),
-      '@roviq/prisma-client': path.resolve(
-        __dirname,
-        '../../../../libs/backend/prisma-client/src/index.ts',
-      ),
-      '@roviq/nestjs-prisma': path.resolve(
-        __dirname,
-        '../../../../libs/backend/nestjs-prisma/src/index.ts',
-      ),
-      '@roviq/nats-utils': path.resolve(
-        __dirname,
-        '../../../../libs/backend/nats-utils/src/index.ts',
-      ),
-    },
-  },
-  test: {
-    globals: true,
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
-    passWithNoTests: true,
-  },
-});
+  }),
+);

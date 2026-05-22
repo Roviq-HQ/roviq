@@ -16,10 +16,10 @@ Tilt UI: http://localhost:10350
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| PostgreSQL 16 | 5432 | Primary database with RLS |
+| PostgreSQL 18 | 5434 | Primary database with RLS |
 | Redis 7 | 6379 | CASL ability caching |
 | NATS 2.10 | 4222 (client), 8222 (monitoring) | Inter-service messaging (JetStream) |
-| MinIO | 9000 (API), 9001 (console) | S3-compatible object storage |
+| MinIO | 9002 (API), 9003 (console) | S3-compatible object storage |
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
 | OTel Collector | 4317 (gRPC), 4318 (HTTP), 13133 (health) | OpenTelemetry collector — receives traces/metrics/logs, fans out to Tempo/Loki/Prometheus |
@@ -48,9 +48,11 @@ App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
 ## Database
 
 ### Roles
-- `roviq` — bootstrap superuser, owns all tables. Used for **migrations only**, never at runtime.
-- `roviq_app` — application runtime user (non-superuser, RLS enforced). Inherits table permissions from `roviq`.
-- `roviq_admin` — admin operations (non-superuser, policy-based RLS bypass via `app.is_platform_admin`). Inherits table permissions from `roviq`.
+- `roviq` — bootstrap superuser, owns all tables. Used for **migrations only** (`DATABASE_URL_MIGRATE`), never at runtime.
+- `roviq_pooler` — NOINHERIT login role used by the connection pool (`DATABASE_URL`). Assumes one of the three scoped roles below via `SET LOCAL ROLE` per request.
+- `roviq_app` — institute-scoped runtime role (NOLOGIN, RLS enforced via `app.current_tenant_id`).
+- `roviq_reseller` — reseller-scoped runtime role (NOLOGIN, RLS enforced via `app.current_reseller_id`).
+- `roviq_admin` — platform admin runtime role (NOLOGIN, policy-based RLS bypass via `app.is_platform_admin`).
 
 ### RLS Policies
 Tenant-scoped tables (`memberships`, `roles`, `refresh_tokens`, `profiles`, `student_guardians`) have:
@@ -58,18 +60,18 @@ Tenant-scoped tables (`memberships`, `roles`, `refresh_tokens`, `profiles`, `stu
 - Tenant isolation policy: `tenant_id = current_setting('app.current_tenant_id', true)::uuid`
 - Admin bypass policy: `current_setting('app.is_platform_admin', true) = 'true'`
 
-Platform tables (`users`, `organizations`, `phone_numbers`, `auth_providers`) have **no RLS**.
+Platform tables (`users`, `institutes`, `phone_numbers`, `auth_providers`) have **no RLS**.
 
 ### Migrations
 
-Tilt runs migrations, client generation, and seeding automatically on `tilt up`. For manual use:
+Tilt runs schema push and seeding automatically on `tilt up`. For manual use:
 
 ```bash
-pnpm run db:migrate:dev   # Interactive dev migrations
-pnpm run db:migrate       # Deploy migrations (CI/production)
-pnpm run db:generate      # Regenerate Prisma client
+pnpm run db:push          # Push Drizzle schema to DB
 pnpm run db:seed          # Seed test data
-pnpm run db:reset         # Nuke DB + re-migrate (or use db-clean in Tilt UI)
+pnpm run db:reset         # Nuke DB + re-push schema (or use db-clean in Tilt UI)
+pnpm run db:reset --seed  # Nuke + push + seed in one step
+pnpm run db:studio        # Open Drizzle Studio (visual DB browser)
 ```
 
 ## NATS JetStream Streams
@@ -109,10 +111,10 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | STRIPE_WEBHOOK_SECRET | Validates incoming Stripe webhook signatures |
 | SENTRY_DSN | Sentry error tracking (leave empty to disable) |
 | ALLOWED_ORIGINS | Comma-separated allowed origins for CORS and WebAuthn |
-| API_GATEWAY_PORT | API Gateway port (optional, defaults to 3000) |
+| API_GATEWAY_PORT | API Gateway port (optional, defaults to 3005) |
 | OTEL_EXPORTER_OTLP_ENDPOINT | OTel Collector gRPC endpoint (default: http://localhost:4317) |
 | OTEL_SERVICE_NAME | Service name reported in traces and metrics |
 | OTEL_SERVICE_VERSION | Service version reported in traces and metrics |
 | LOG_LEVEL | Pino log level (default: info) |
-| NEXT_PUBLIC_API_URL | Public API base URL for browser-side requests (default: http://localhost:3000) |
+| NEXT_PUBLIC_API_URL | Public API base URL for browser-side requests (default: http://localhost:3005) |
 | NEXT_PUBLIC_GRAFANA_URL | Grafana base URL for the admin-portal Observability iframe (default: http://localhost:3001) |

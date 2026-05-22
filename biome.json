@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
   "root": true,
   "vcs": {
     "enabled": true,
@@ -14,11 +14,19 @@
       "complexity": {
         "noExcessiveCognitiveComplexity": {
           "level": "warn",
-          "options": { "maxAllowedComplexity": 15 }
+          "options": { "maxAllowedComplexity": 25 }
         }
       },
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noUnknownAtRules": "off",
+        "noTemplateCurlyInString": "off",
+        "noExplicitAny": "error",
+        "noConsole": {
+          "level": "warn",
+          "options": {
+            "allow": ["assert", "error", "info", "warn"]
+          }
+        }
       },
       "style": {
         "noNonNullAssertion": "warn"
@@ -45,12 +53,34 @@
   },
   "overrides": [
     {
-      "includes": ["**/next-env.d.ts"],
+      "includes": ["**/next-env.d.ts", ".github/**", "**/generated/**", "**/__generated__/**"],
       "formatter": { "enabled": false },
-      "linter": { "enabled": false }
+      "linter": { "enabled": false },
+      "assist": { "enabled": false }
     },
     {
-      "includes": ["apps/api-gateway/**", "libs/backend/**"],
+      "includes": ["libs/frontend/ui/src/components/ui/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useSemanticElements": "off",
+            "useKeyWithClickEvents": "off",
+            "noRedundantRoles": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/api-gateway/**",
+        "apps/notification-service/**",
+        "libs/backend/**",
+        "ee/apps/api-gateway/**",
+        "ee/libs/backend/**"
+      ],
       "javascript": {
         "parser": {
           "unsafeParameterDecoratorsEnabled": true
@@ -63,6 +93,49 @@
           },
           "style": {
             "useImportType": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["scripts/**/*.ts", "e2e/**/global-setup.ts", "e2e/**/preflight.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["libs/backend/telemetry/src/init-telemetry.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          },
+          "complexity": {
+            "useLiteralKeys": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "date-fns": {
+                    "importNames": ["format"],
+                    "message": "Use useFormatDate() from @roviq/i18n instead of importing `format` directly from date-fns. Only libs/frontend/i18n may import `format`. Other date-fns named imports (parseISO, formatDistance, differenceInDays, isAfter, etc.) are allowed."
+                  }
+                }
+              }
+            }
           }
         }
       }

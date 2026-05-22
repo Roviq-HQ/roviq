@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "node"],
+    "module": "node16",
+    "target": "es2024",
+    "moduleResolution": "node16"
+  },
+  "include": [
+    "src/**/*.spec.ts",
+    "src/**/__tests__/**/*.ts",
+    "src/**/*.ts",
+    "src/express.d.ts",
+    "../../global.d.ts"
+  ]
+}

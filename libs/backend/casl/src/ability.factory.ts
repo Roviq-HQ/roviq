@@ -1,10 +1,11 @@
 import { createMongoAbility } from '@casl/ability';
 import { Inject, Injectable } from '@nestjs/common';
 import type { AbilityRule, AppAbility } from '@roviq/common-types';
-import { ADMIN_PRISMA_CLIENT } from '@roviq/nestjs-prisma';
-import type { AdminPrismaClient } from '@roviq/prisma-client';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type Redis from 'ioredis';
+import { MembershipAbilityRepository } from './repositories/membership-ability.repository';
+import { RoleRepository } from './repositories/role.repository';
+import { substituteUserVars, type UserContext } from './substitute-user-vars';
 
 const ROLE_CACHE_PREFIX = 'casl:role:';
 const ROLE_CACHE_TTL = 300; // 5 minutes
@@ -13,28 +14,52 @@ const ROLE_CACHE_TTL = 300; // 5 minutes
 export class AbilityFactory {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    @Inject(ADMIN_PRISMA_CLIENT) private readonly prisma: AdminPrismaClient,
+    private readonly roleRepo: RoleRepository,
+    private readonly membershipAbilityRepo: MembershipAbilityRepository,
   ) {}
 
   async createForUser(user: {
     userId: string;
-    tenantId: string;
+    scope: import('@roviq/common-types').AuthScope;
+    tenantId?: string;
+    membershipId: string;
     roleId: string;
+    /** Optional context for variable substitution in CASL conditions */
+    assignedSections?: string[];
+    assignedSubjects?: string[];
+    assignedDepartments?: string[];
   }): Promise<AppAbility> {
+    // Platform admins get manage:all — no DB lookup needed
+    if (user.scope === 'platform') {
+      return createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]);
+    }
+
     const roleAbilities = await this.getRoleAbilities(user.roleId);
 
-    // Fetch membership-specific abilities
-    const membership = await this.prisma.membership.findUnique({
-      where: { userId_tenantId: { userId: user.userId, tenantId: user.tenantId } },
-      select: { abilities: true },
+    // Fetch membership-specific abilities (only for institute scope where tenantId exists)
+    const membership = user.tenantId
+      ? await this.membershipAbilityRepo.findAbilities(user.userId, user.tenantId)
+      : null;
+
+    const memberAbilities = membership?.abilities ?? [];
+
+    // Build substitution context from user data
+    const context: UserContext = {
+      userId: user.userId,
+      tenantId: user.tenantId,
+      assignedSections: user.assignedSections,
+      assignedSubjects: user.assignedSubjects,
+      assignedDepartments: user.assignedDepartments,
+    };
+
+    // Resolve $user.* placeholders in conditions using substituteUserVars
+    const resolvedRules = [...roleAbilities, ...memberAbilities].map((rule) => {
+      if (!rule.conditions) return rule;
+      return {
+        ...rule,
+        conditions: substituteUserVars(rule.conditions as Record<string, unknown>, context),
+      };
     });
-
-    const memberAbilities = (membership?.abilities as unknown as AbilityRule[] | null) ?? [];
-
-    // Resolve placeholders in conditions (e.g., ${user.id})
-    const resolvedRules = [...roleAbilities, ...memberAbilities].map((rule) =>
-      this.resolveConditions(rule, user),
-    );
 
     return createMongoAbility<AppAbility>(resolvedRules);
   }
@@ -47,12 +72,9 @@ export class AbilityFactory {
       return JSON.parse(cached) as AbilityRule[];
     }
 
-    const role = await this.prisma.role.findUnique({
-      where: { id: roleId },
-      select: { abilities: true },
-    });
+    const role = await this.roleRepo.findAbilities(roleId);
 
-    const abilities = (role?.abilities as unknown as AbilityRule[]) ?? [];
+    const abilities = role?.abilities ?? [];
 
     await this.redis.set(cacheKey, JSON.stringify(abilities), 'EX', ROLE_CACHE_TTL);
 
@@ -63,18 +85,7 @@ export class AbilityFactory {
     await this.redis.del(`${ROLE_CACHE_PREFIX}${roleId}`);
   }
 
-  private resolveConditions(
-    rule: AbilityRule,
-    user: { userId: string; tenantId: string; roleId: string },
-  ): AbilityRule {
-    if (!rule.conditions) return rule;
-
-    const resolved = JSON.parse(
-      JSON.stringify(rule.conditions)
-        .replace(/\$\{user\.id\}/g, user.userId)
-        .replace(/\$\{user\.tenantId\}/g, user.tenantId),
-    );
-
-    return { ...rule, conditions: resolved };
+  async getPrimaryNavSlugs(roleId: string): Promise<string[]> {
+    return this.roleRepo.findPrimaryNavSlugs(roleId);
   }
 }

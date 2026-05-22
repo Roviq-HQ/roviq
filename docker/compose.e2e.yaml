@@ -1,0 +1,383 @@
+# E2E test environment — persistent infra, fast iteration.
+# Infra + api-gateway stay running between test runs.
+# Code changes auto-reload via nx serve + volume mounts.
+# Data is reset via `pnpm e2e:clean` (not container teardown).
+#
+# Usage:
+#   pnpm e2e:up                          — start infra (once, stays running)
+#   nx run api-gateway-e2e:e2e:vitest    — clean data + run vitest E2E in Docker
+#   nx run api-gateway-e2e:e2e:rls       — clean data + run RLS integration tests in Docker
+#   nx run api-gateway-e2e:e2e:all       — clean data + run all three suites
+#   pnpm e2e:down                        — full teardown (volumes removed)
+
+services:
+  # --- Minimal infra (no observability, no mongodb/minio) ---
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: roviq
+      POSTGRES_PASSWORD: roviq_dev
+      POSTGRES_DB: roviq
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roviq"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    # Expose 4222 (client) + 8222 (HTTP monitoring) to host so the
+    # `check:jetstream-drift` and `check:schema-drift` scripts (which run
+    # on the host, outside the docker network) can connect.
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Temporal — workflow engine required by admission approval, TC clearance,
+  # institute setup, bulk student import, and compliance export workflows.
+  # Internal-only (no host port exposure) — api-gateway reaches it via
+  # `temporal:7233` on the Docker network.
+  temporal:
+    image: temporalio/auto-setup:latest
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: roviq
+      POSTGRES_PWD: roviq_dev
+      POSTGRES_SEEDS: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # auto-setup provisions namespaces asynchronously — use the Temporal
+      # CLI against the container's own hostname (the server binds to that
+      # IP, not 127.0.0.1, so nc/tctl against localhost fail). Longer retry
+      # budget absorbs the 20-30s schema-init window.
+      test: ["CMD-SHELL", "temporal operator cluster describe --address temporal:7233 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # --- Novu self-hosted (mirrors compose.novu.yaml, internal ports only) ---
+
+  mongodb:
+    image: mongo:8.0.17
+    environment:
+      # Prevent MongoDB 8 segfaults on newer Linux kernels with rseq enabled.
+      GLIBC_TUNABLES: glibc.pthread.rseq=1
+    volumes:
+      - mongo_e2e_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  novu-api:
+    image: ghcr.io/novuhq/novu/api:3.14.0
+    environment:
+      NODE_ENV: local
+      MONGO_URL: mongodb://mongodb:27017/novu
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: novu-e2e-jwt-secret-not-a-real-secret
+      STORE_ENCRYPTION_KEY: novue2estoreencrkey1234567890abc
+      API_ROOT_URL: http://novu-api:3000
+      FRONT_BASE_URL: http://novu-api:3000
+    # Host-side publish so Vitest running on the host (not in compose) can
+    # reach Novu at http://localhost:3443. Container-to-container traffic
+    # continues to use the internal `novu-api:3000` hostname.
+    ports:
+      - "127.0.0.1:3443:3000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/v1/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  novu-worker:
+    image: ghcr.io/novuhq/novu/worker:3.14.0
+    environment:
+      NODE_ENV: local
+      MONGO_URL: mongodb://mongodb:27017/novu
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: novu-e2e-jwt-secret-not-a-real-secret
+      STORE_ENCRYPTION_KEY: novue2estoreencrkey1234567890abc
+    depends_on:
+      novu-api:
+        condition: service_healthy
+
+  # Phase 1: register admin + fetch creds + write shared volume (no bridge sync).
+  # Completes BEFORE notification-service starts so it can source the creds.
+  novu-bootstrap:
+    image: alpine:3.21
+    volumes:
+      - ../scripts/novu-setup.sh:/usr/local/bin/novu-setup.sh:ro
+      - novu_creds:/shared
+    environment:
+      SHARED_CREDS_PATH: /shared/novu-creds.env
+      NOVU_API: http://novu-api:3000
+      NOTIF_SVC: http://notification-service:3002
+    # bash from alpine is fine; script uses POSIX-compatible constructs
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache bash curl jq >/dev/null &&
+        bash /usr/local/bin/novu-setup.sh --docker --skip-bridge
+    depends_on:
+      novu-api:
+        condition: service_healthy
+
+  # Phase 2: bridge sync — runs AFTER notification-service is up.
+  # Idempotent: re-running steps 1-5 is a no-op because the admin already exists.
+  novu-bridge-sync:
+    image: alpine:3.21
+    volumes:
+      - ../scripts/novu-setup.sh:/usr/local/bin/novu-setup.sh:ro
+      - novu_creds:/shared
+    environment:
+      SHARED_CREDS_PATH: /shared/novu-creds.env
+      NOVU_API: http://novu-api:3000
+      NOTIF_SVC: http://notification-service:3002
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache bash curl jq >/dev/null &&
+        bash /usr/local/bin/novu-setup.sh --docker
+    depends_on:
+      notification-service:
+        condition: service_healthy
+
+  # --- Migrate & seed (one-shot, exits on completion) ---
+
+  migrate-and-seed:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    command: sh -c "pnpm run db:reset --test && DATABASE_URL_MIGRATE=$$DATABASE_URL_TEST_MIGRATE pnpm run db:seed:e2e"
+    volumes:
+      - ../libs:/app/libs
+      - ../scripts:/app/scripts
+      # Shared with api-gateway so built schema/seed outputs persist to the
+      # same volume. No host bind mount — see docs/troubleshooting.md.
+      - e2e_dist:/app/dist
+      - e2e_nx_cache:/app/.nx/cache
+    env_file: ../.env
+    environment:
+      DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
+      DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+      # Override host-side REDIS_URL from .env so db-reset can flush the
+      # Redis-backed lockout cache (auth rate-limit) on test reset.
+      REDIS_URL: redis://redis:6379
+      # drizzle.config.ts conditionally pulls in ee/libs/database/src/schema
+      # when ROVIQ_EE=true. CI's .env is provisioned from .env.example which
+      # doesn't set ROVIQ_EE, so EE billing tables (plans, subscriptions,
+      # invoices, ...) wouldn't be created — api-gateway starts with
+      # ROVIQ_EE=true and the schema-drift check fails because the EE GraphQL
+      # types aren't registered against existing tables.
+      ROVIQ_EE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --- Application services (dev mode with auto-reload) ---
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    # Cap restart attempts so a container that fails its own build (e.g. stale
+    # image, missing dep) doesn't storm-restart. `unless-stopped` produced a
+    # 636-restart loop on 2026-04-17 — the container's tsc watcher rmSynced
+    # /app/dist/apps/api-gateway at every start. Do NOT revert to
+    # `unless-stopped`. See docs/troubleshooting.md.
+    restart: on-failure:3
+    # Source Novu creds (written by novu-bootstrap) before starting the server.
+    # The creds file is a shell script with `export NOVU_* = ...` lines.
+    command: >
+      sh -c '. /shared/novu-creds.env && exec npx nx serve api-gateway'
+    volumes:
+      # Source bind mounts — the container picks up host edits for HMR.
+      - ../apps/api-gateway/src:/app/apps/api-gateway/src
+      - ../libs:/app/libs
+      - ../ee:/app/ee
+      - ../scripts:/app/scripts
+      # Build output + nx cache isolated from host via named volumes.
+      # A bind mount here caused the container's tsc rmSync to delete the
+      # host's running dev-server output. `e2e_nx_cache` keeps cold starts
+      # fast (~10s restore vs ~90s full rebuild) across `e2e:down`+`e2e:up`
+      # cycles that don't use `-v`. See docs/troubleshooting.md.
+      - e2e_dist:/app/dist
+      - e2e_nx_cache:/app/.nx/cache
+      - novu_creds:/shared:ro
+    env_file: ../.env
+    environment:
+      # Override ALL DB URLs to use roviq_test on Docker postgres
+      DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
+      # Audit consumer uses superuser role for direct INSERT to audit_logs
+      # (bypasses RLS via policy; requires DATABASE_URL_AUDIT)
+      DATABASE_URL_AUDIT: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+      DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+      # Override service URLs to use Docker network hostnames
+      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://redis:6379
+      NOTIFICATION_SERVICE_URL: http://notification-service:3002
+      TEMPORAL_ADDRESS: temporal:7233
+      # Worker registration is tracked in ROV-232. Leaving STUDENT_IMPORT_WORKER_ENABLED
+      # unset (default OFF) until the webpack workflowsPath resolution is fixed as
+      # part of that issue — enabling it here currently breaks the api-gateway boot
+      # (bundler can't resolve the workflows index from the dev container).
+      # E2E-specific overrides
+      API_GATEWAY_PORT: "3004"
+      ALLOWED_ORIGINS: "http://localhost:3004,http://localhost:4201,http://admin.localhost:4201,http://reseller.localhost:4201"
+      NODE_ENV: test
+      # Enable EE modules — the frontend references EE billing operations and the
+      # schema-drift gate compares them against the running api-gateway's schema.
+      ROVIQ_EE: "true"
+    depends_on:
+      migrate-and-seed:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      novu-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "3004:3004"
+    # Real GraphQL probe — nx serve binds the HTTP port before its module
+    # graph is compiled, so /api/health returns 200 while early queries still
+    # hit UND_ERR_SOCKET. Probing the actual GraphQL endpoint defers "healthy"
+    # until the resolver chain is wired up. start_period gives the lazy
+    # compile its full window before retry counting begins.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -X POST -H 'Content-Type: application/json' -d '{\"query\":\"{ __typename }\"}' http://localhost:3004/api/graphql | grep -q '\"Query\"'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: notification-service
+    restart: on-failure:3
+    # Source Novu creds before exec. Notification-service requires
+    # NOVU_SECRET_KEY + NOVU_APPLICATION_IDENTIFIER at boot (zod validation).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        . /shared/novu-creds.env && exec node dist/src/main.js
+    volumes:
+      - novu_creds:/shared:ro
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
+      NATS_URL: nats://nats:4222
+      NODE_ENV: test
+    depends_on:
+      migrate-and-seed:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+      novu-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:3002/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # --- Test runners (activated via profiles) ---
+
+  vitest-e2e:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    command: pnpm vitest run --config e2e/api-gateway-e2e/vitest.config.ts
+    volumes:
+      - ../e2e:/app/e2e:ro
+      - ../libs/database/src/seed/ids.ts:/app/libs/database/src/seed/ids.ts:ro
+    env_file: ../.env
+    environment:
+      API_URL: http://api-gateway:3004/api/graphql
+      WS_URL: ws://api-gateway:3004/api/graphql
+      DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    profiles: [vitest]
+
+  rls-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: dev
+    command: pnpm vitest run --project integration
+    working_dir: /app/libs/database
+    volumes:
+      - ../libs:/app/libs:ro
+      - ../libs/database/src/seed/ids.ts:/app/libs/database/src/seed/ids.ts:ro
+    env_file: ../.env
+    environment:
+      DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
+      DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+    depends_on:
+      migrate-and-seed:
+        condition: service_completed_successfully
+    profiles: [rls]
+
+volumes:
+  mongo_e2e_data:
+  novu_creds:
+  # Container's own dist/, isolated from host. See docs/troubleshooting.md for
+  # why this is NOT a bind mount of `../dist:/app/dist`.
+  e2e_dist:
+  # Nx's local cache. Persisted across stop/start so cold boots restore cached
+  # build outputs (seconds) instead of full rebuilds (~90s). Wiped by `pnpm
+  # e2e:nuke` when you explicitly want a clean slate.
+  e2e_nx_cache:

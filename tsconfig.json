@@ -4,20 +4,23 @@
   "include": [],
   "references": [
     { "path": "apps/api-gateway" },
-    { "path": "apps/admin-portal" },
-    { "path": "apps/institute-portal" },
+    { "path": "apps/web" },
     { "path": "libs/shared/common-types" },
-    { "path": "libs/backend/prisma-client" },
-    { "path": "libs/backend/nestjs-prisma" },
+    { "path": "libs/database" },
     { "path": "libs/backend/casl" },
     { "path": "libs/backend/redis" },
-    { "path": "libs/backend/nats-utils" },
+    { "path": "libs/backend/nats-jetstream" },
+    { "path": "libs/backend/resilience" },
+    { "path": "libs/backend/nestjs-graphql" },
     { "path": "libs/backend/telemetry" },
     { "path": "libs/frontend/ui" },
     { "path": "libs/frontend/graphql" },
     { "path": "libs/frontend/auth" },
     { "path": "libs/frontend/i18n" },
     { "path": "libs/backend/audit" },
-    { "path": "ee/libs/backend/payments" }
+    { "path": "ee/libs/backend/payments" },
+    { "path": "ee/apps/api-gateway" },
+    { "path": "libs/shared/domain" },
+    { "path": "scripts" }
   ]
 }

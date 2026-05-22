@@ -44,7 +44,6 @@ Tilt handles everything — dependencies, environment setup, database migrations
 
 Then open http://localhost:4200 (Admin Portal) or http://localhost:4300 (Institute Portal).
 
-Full guide: [Getting Started](docs/getting-started.md)
 
 ## Documentation
 
@@ -78,9 +77,10 @@ roviq/
 │   ├── admin-portal/           # Super admin UI (Next.js)
 │   └── institute-portal/       # Institute-facing UI (Next.js)
 ├── libs/
-│   ├── prisma-client/          # Prisma + RLS tenant extensions
+│   ├── database/               # Drizzle ORM schema, RLS policies, tenant helpers
 │   ├── common-types/           # Shared types, CASL subjects/actions
-│   ├── nats-utils/             # JetStream helpers, circuit breakers
+│   ├── nats-jetstream/         # NestJS JetStream custom transport
+│   ├── resilience/            # Circuit breaker (opossum)
 │   ├── ui/                     # shadcn/ui component library
 │   ├── graphql/                # Apollo Client config
 │   ├── auth/                   # Auth context, guards, token utils

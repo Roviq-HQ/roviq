@@ -1,16 +1,17 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Input, Label } from '@roviq/ui';
+import type { AuthScope } from '@roviq/common-types';
+import { Button, useAppForm } from '@roviq/ui';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
 
 type LoginFormValues = { username: string; password: string };
 
 export interface LoginFormProps {
+  /** Auth scope — determines which login mutation is called. Default: 'institute'. */
+  scope?: AuthScope;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
   labels?: {
@@ -31,7 +32,6 @@ export interface LoginFormProps {
 
 export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
   const { login, loginWithPasskey } = useAuth();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -60,32 +60,21 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
     [l.usernameRequired, l.passwordRequired],
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: '',
-      password: '',
+  const form = useAppForm({
+    defaultValues: { username: '', password: '' } satisfies LoginFormValues,
+    validators: { onChange: loginSchema, onSubmit: loginSchema },
+    onSubmit: async ({ value }) => {
+      setError(null);
+      try {
+        await login(value);
+        onSuccess?.();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : l.loginFailed;
+        setError(message);
+        onError?.(err instanceof Error ? err : new Error(message));
+      }
     },
   });
-
-  const onSubmit = async (values: LoginFormValues) => {
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await login(values);
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : l.loginFailed;
-      setError(message);
-      onError?.(err instanceof Error ? err : new Error(message));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handlePasskeyLogin = async () => {
     setIsPasskeyLoading(true);
@@ -108,53 +97,64 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
     }
   };
 
-  const isBusy = isSubmitting || isPasskeyLoading;
-
   return (
     <div className="space-y-5">
       {error && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div
+          className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          data-testid="login-error"
+        >
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="username">{l.username}</Label>
-          <Input
-            id="username"
-            type="text"
-            autoComplete="username webauthn"
-            placeholder={l.enterUsername}
-            disabled={isBusy}
-            {...register('username')}
-          />
-          {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">{l.password}</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder={l.enterPassword}
-            disabled={isBusy}
-            {...register('password')}
-          />
-          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-        </div>
-
-        <Button type="submit" disabled={isBusy} className="w-full">
-          {isSubmitting ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              {l.signingIn}
-            </>
-          ) : (
-            l.signIn
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          void form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <form.AppField name="username">
+          {(field) => (
+            <field.TextField
+              label={l.username}
+              type="text"
+              autoComplete="username webauthn"
+              placeholder={l.enterUsername}
+              disabled={isPasskeyLoading}
+              testId="login-username-input"
+              errorTestId="login-username-error"
+            />
           )}
-        </Button>
+        </form.AppField>
+
+        <form.AppField name="password">
+          {(field) => (
+            <field.TextField
+              label={l.password}
+              type="password"
+              autoComplete="current-password"
+              placeholder={l.enterPassword}
+              disabled={isPasskeyLoading}
+              testId="login-password-input"
+              errorTestId="login-password-error"
+            />
+          )}
+        </form.AppField>
+
+        <form.AppForm>
+          <form.SubmitButton
+            testId="login-submit-btn"
+            disabled={isPasskeyLoading}
+            submittingLabel={l.signingIn}
+            className="w-full"
+          >
+            {l.signIn}
+          </form.SubmitButton>
+        </form.AppForm>
       </form>
 
       <div className="relative flex items-center">
@@ -166,7 +166,7 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
       <Button
         type="button"
         variant="outline"
-        disabled={isBusy}
+        disabled={isPasskeyLoading}
         className="w-full gap-2.5"
         onClick={handlePasskeyLogin}
       >

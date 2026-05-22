@@ -2,7 +2,17 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+rule_files:
+  - "/etc/prometheus/rules/*.yaml"
+
 scrape_configs:
   - job_name: 'otel-collector'
     static_configs:
       - targets: ['otel-collector:8889']
+
+  # NATS + JetStream stream/consumer stats. Powers the admin observability
+  # "Streams" tab. Container is `nats-exporter`, see compose.infra.yaml.
+  - job_name: 'nats-jetstream'
+    static_configs:
+      - targets: ['nats-exporter:7777']
+    metrics_path: /metrics

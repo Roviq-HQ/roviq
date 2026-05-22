@@ -1,0 +1,8 @@
+{
+  "name": "@roviq/notifications",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts"
+}

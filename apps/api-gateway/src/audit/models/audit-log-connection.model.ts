@@ -1,5 +1,5 @@
 import { ObjectType } from '@nestjs/graphql';
-import { Paginated } from '../../common/pagination';
+import { Paginated } from '@roviq/nestjs-graphql';
 import { AuditLog } from './audit-log.model';
 
 @ObjectType()

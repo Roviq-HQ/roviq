@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -20,10 +20,24 @@ jobs:
         with:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
+      - name: Check integration tests use real DB
+        run: pnpm run test:check-integration
+      - name: Check for ambiguous slash-separated date literals
+        run: pnpm run test:check-dates
+      - name: Check live-views (no base-table reads in app code)
+        run: pnpm run check:live-views
+      - name: Check live-views coverage (every soft-deletable table has a *Live view)
+        run: pnpm run check:live-views-coverage
+      - name: Check RLS coverage (every pgTable opts into RLS or is exempt)
+        run: pnpm run check:rls-coverage
+      - name: Check synthetic-context usage (mk*Ctx allowlist — security backdoor gate)
+        run: pnpm run check:synthetic-context-usage
+      - name: Check direct NATS emit usage (registry-bypass allowlist)
+        run: pnpm run check:direct-nats-emit
+      - name: Check testid literals (registry-migrated files use testIds)
+        run: pnpm run check:testids
 
   typecheck:
     name: Typecheck
@@ -35,19 +49,49 @@ jobs:
         with:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
-      - run: pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
+      - run: pnpm codegen
       - run: pnpm run typecheck
 
   test:
     name: Test
     runs-on: ubuntu-latest
     needs: [lint]
+    # Job-level env so every step (Run affected tests, Security Invariant Tests,
+    # codegen, db:reset, etc.) sees the same env without per-step duplication.
+    # NestJS ConfigModule.forRoot validates these at app-module import time —
+    # any missing one fails the entire `pnpm test:int` before tests can run.
+    env:
+      DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
+      DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      DATABASE_URL_AUDIT: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
+      DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      REDIS_URL: redis://localhost:6379
+      NATS_URL: nats://localhost:4222
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.CI_JWT_REFRESH_SECRET }}
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_NAME: Roviq
+      ALLOWED_ORIGINS: http://localhost:4200,http://admin.localhost:4200,http://reseller.localhost:4200
+      BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      ROVIQ_EE: "true"
+      # Novu — NotificationConfigService boots via configService.getOrThrow at
+      # AppModule load time. Integration tests boot the module → these are
+      # required even without a live Novu server.
+      NOVU_SECRET_KEY: placeholder
+      NOVU_APPLICATION_IDENTIFIER: placeholder
+      NOVU_MODE: local
+      NOVU_API_URL: http://localhost:3340
+      NOVU_WS_URL: http://localhost:3342
+      NOVU_JWT_SECRET: novu-local-jwt-secret-change-me
+      NOVU_STORE_ENCRYPTION_KEY: novulocalstoreencrkey12345678abc
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: roviq
           POSTGRES_PASSWORD: roviq_dev
@@ -68,10 +112,10 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
-      nats:
-        image: nats:2.10-alpine
-        ports:
-          - 4222:4222
+    # NATS is started manually as a step (not a service) so we can pass `-js`
+    # to enable JetStream. GitHub Actions `services:` does not support
+    # overriding the container CMD, and the default nats:2.10-alpine entrypoint
+    # runs without JetStream — which breaks the stream-config integration test.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,9 +123,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+      - name: Start NATS with JetStream
+        run: |
+          docker run -d --name ci-nats -p 4222:4222 -p 8222:8222 \
+            nats:2.10-alpine -js -m 8222
+          # Wait for JetStream to come up (varz endpoint reports `jetstream`).
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8222/varz | grep -q '"jetstream"'; then
+              echo "JetStream is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "JetStream failed to come up within 30s"
+          docker logs ci-nats
+          exit 1
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: nrwl/nx-set-shas@v4
       - uses: actions/cache@v4
         with:
@@ -96,24 +153,16 @@ jobs:
           PGHOST: localhost
           PGPASSWORD: roviq_dev
         run: bash docker/init-db.sh
-      - run: pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
-      - name: Run migrations
-        run: pnpx prisma migrate deploy --schema=prisma/schema.prisma
-        working-directory: libs/backend/prisma-client
+      - name: Run codegen (must be fresh before tests)
+        run: pnpm codegen
+      - name: Reset test database (push schema + roles + RLS + grants)
+        run: pnpm db:reset --test
         env:
-          DATABASE_URL: postgresql://roviq_app:roviq_app_dev@localhost:5432/roviq?schema=public
-          DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq?schema=public
+          DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
       - name: Run affected tests
         run: pnpx nx affected -t test
-        env:
-          DATABASE_URL: postgresql://roviq_app:roviq_app_dev@localhost:5432/roviq?schema=public
-          DATABASE_URL_ADMIN: postgresql://roviq_admin:roviq_admin_dev@localhost:5432/roviq?schema=public
-          REDIS_URL: redis://localhost:6379
-          NATS_URL: nats://localhost:4222
-          JWT_SECRET: ci-test-secret
-          JWT_REFRESH_SECRET: ci-test-refresh-secret
-          JWT_EXPIRATION: 15m
-          JWT_REFRESH_EXPIRATION: 7d
+      - name: Security Invariant Tests (integration)
+        run: pnpm test:int
 
   build:
     name: Build
@@ -127,8 +176,6 @@ jobs:
         with:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: nrwl/nx-set-shas@v4
       - uses: actions/cache@v4
         with:
@@ -138,6 +185,166 @@ jobs:
             nx-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-build-
             nx-cache-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
-      - run: pnpx prisma generate --schema=libs/backend/prisma-client/prisma/schema.prisma
+      - run: pnpm codegen
       - name: Build affected projects
         run: pnpx nx affected -t build
+
+  e2e-api:
+    name: E2E API (Vitest)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Provision .env for docker compose
+        run: cp .env.example .env
+      - name: Make bind-mounted sources writable + pre-create vite-temp dirs
+        # The api-gateway/notification-service containers run as `node`
+        # (UID 1000) but checkout-action writes files as `runner` (UID 1001).
+        # @nx/vitest writes `.timestamp-*.mjs` files into
+        # `<lib>/node_modules/.vite-temp/` next to vitest configs during
+        # project-graph inference at container boot. Without pre-existing
+        # 777-mode `.vite-temp/` dirs the container hits EACCES and never
+        # reaches healthy state. Find every vitest config and pre-create its
+        # adjacent `.vite-temp/` so the container can write timestamp files.
+        run: |
+          find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
+            -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
+          # a+rwX: add rw for all, exec ONLY on dirs (or files already exec).
+          # Plain 777 would set 100755 on regular files, which git interprets
+          # as a mode change — codegen then re-writes those files keeping the
+          # 100755 bit, and the schema-drift gate diffs `old mode 100644 → new
+          # mode 100755` with zero content delta. Capital X preserves committed
+          # file modes while still making dirs traversable+writable for both
+          # the runner (UID 1001) and the container (UID 1000).
+          chmod -R a+rwX libs ee apps scripts e2e
+      - name: Start E2E stack
+        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
+        timeout-minutes: 12
+      - name: Reclaim file ownership for runner
+        # The api-gateway/notification-service containers run as `node` (UID 1000)
+        # and create files (e.g. `libs/**/node_modules/.vite-temp/*.mjs`) during
+        # nx project-graph inference. Host runner is UID 1001 — without this step,
+        # subsequent host-side `nx`/playwright calls hit EACCES trying to write
+        # new timestamp files in container-owned dirs.
+        run: sudo chown -R "$(id -u):$(id -g)" libs ee apps scripts e2e
+      - name: Check resolver→schema drift (regenerate from live api-gateway)
+        # CI deliberately unset (empty string) so codegen.ts introspects the
+        # live api-gateway on port 3004 rather than reading the committed
+        # schema.graphql. GitHub Actions sets CI=true automatically, so we
+        # must explicitly clear it for this step. This catches the class
+        # where a resolver change ships without `pnpm codegen` being rerun
+        # locally — the committed schema.graphql would be stale and the
+        # lint-job drift gate would silently pass.
+        timeout-minutes: 3
+        env:
+          CI: ''
+          NEXT_PUBLIC_API_URL: http://localhost:3004
+        run: |
+          pnpm codegen
+          if ! git diff --quiet \
+              libs/frontend/graphql/src/generated/schema.graphql \
+              libs/frontend/graphql/src/generated/graphql.ts \
+              e2e/api-gateway-e2e/src/__generated__/graphql.ts; then
+            echo "::error::Generated GraphQL artifacts are stale — run 'pnpm codegen' locally and commit the update"
+            echo "--- files changed ---"
+            git diff --stat \
+              libs/frontend/graphql/src/generated/schema.graphql \
+              libs/frontend/graphql/src/generated/graphql.ts \
+              e2e/api-gateway-e2e/src/__generated__/graphql.ts
+            echo "--- first 200 lines of diff ---"
+            git --no-pager diff \
+              libs/frontend/graphql/src/generated/schema.graphql \
+              libs/frontend/graphql/src/generated/graphql.ts \
+              e2e/api-gateway-e2e/src/__generated__/graphql.ts | head -200
+            exit 1
+          fi
+      - name: Check JetStream stream-config drift (source vs deployed)
+        # Diff source `STREAMS` vs the e2e NATS cluster (already up). Catches
+        # retention/storage/subjects drift BEFORE prod's boot-time
+        # `assertDriftRecreateAllowed` would crash or destructively recreate.
+        # Linear: ROV-255.
+        timeout-minutes: 2
+        env:
+          NATS_URL: nats://localhost:4222
+        run: pnpm check:jetstream-drift
+      - name: Vitest E2E API tests
+        run: pnpm test:e2e:api
+        env:
+          API_URL: http://localhost:3004/api/graphql
+          WS_URL: ws://localhost:3004/api/graphql
+      - name: Show docker logs on failure
+        if: failure()
+        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml logs --tail=200
+      - name: Stop E2E stack
+        if: always()
+        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml down -v
+
+  e2e-ui:
+    name: E2E UI (Playwright)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Provision .env for docker compose
+        run: cp .env.example .env
+      - name: Make bind-mounted sources writable + pre-create vite-temp dirs
+        # See e2e-api job for explanation.
+        run: |
+          find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
+            -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
+          # a+rwX: add rw for all, exec ONLY on dirs (or files already exec).
+          # Plain 777 would set 100755 on regular files, which git interprets
+          # as a mode change — codegen then re-writes those files keeping the
+          # 100755 bit, and the schema-drift gate diffs `old mode 100644 → new
+          # mode 100755` with zero content delta. Capital X preserves committed
+          # file modes while still making dirs traversable+writable for both
+          # the runner (UID 1001) and the container (UID 1000).
+          chmod -R a+rwX libs ee apps scripts e2e
+      - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
+        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
+        timeout-minutes: 12
+      - name: Reclaim file ownership for runner
+        # See e2e-api job for explanation — container runs as UID 1000, runner is
+        # UID 1001; chown after compose-up so host-side nx/playwright can write.
+        run: sudo chown -R "$(id -u):$(id -g)" libs ee apps scripts e2e
+      - name: Run codegen (Next.js dev:web needs fresh GraphQL types)
+        run: pnpm codegen
+      - name: Playwright E2E tests
+        run: pnpm test:e2e:ui
+        env:
+          # Playwright webServer reuses these — points API at the Docker stack
+          API_URL: http://localhost:3004/api/graphql
+          WS_URL: ws://localhost:3004/api/graphql
+          NEXT_PUBLIC_API_URL: http://localhost:3004
+          NEXT_PUBLIC_WS_URL: ws://localhost:3004
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/*/playwright-report/
+          retention-days: 7
+      - name: Show docker logs on failure
+        if: failure()
+        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml logs --tail=200
+      - name: Stop E2E stack
+        if: always()
+        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml down -v

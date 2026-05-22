@@ -1,0 +1,19 @@
+{
+  "name": "nats-jetstream",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/nats-jetstream/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/nats-jetstream",
+        "main": "libs/backend/nats-jetstream/src/index.ts",
+        "tsConfig": "libs/backend/nats-jetstream/tsconfig.lib.json",
+        "assets": ["libs/backend/nats-jetstream/*.md"]
+      }
+    }
+  },
+  "tags": []
+}

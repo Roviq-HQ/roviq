@@ -1,2 +1,15 @@
-pnpm exec lint-staged
-pnpm run typecheck
+set -e
+
+run() {
+  echo "[pre-commit] → $*"
+  if ! "$@"; then
+    rc=$?
+    echo "[pre-commit] ✗ exit $rc on: $*" >&2
+    exit "$rc"
+  fi
+}
+
+run pnpm biome check --write --error-on-warnings .
+run pnpm exec lint-staged
+run pnpm nx run-many -t build -p api-gateway,web,notification-service --parallel=3 --nxBail
+run pnpm exec vitest run --project unit-node --project unit-dom --bail 1

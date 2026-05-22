@@ -1,0 +1,5305 @@
+"""
+Per-student absentee report row — aggregates a student's attendance across all sessions in the requested date range.
+"""
+type AbsenteeReportItem {
+  """Number of sessions marked ABSENT for this student."""
+  absentCount: Int!
+
+  """
+  Sorted, distinct list of ISO YYYY-MM-DD dates on which the student was marked ABSENT.
+  """
+  absentDates: [String!]!
+
+  """Number of sessions marked LATE for this student."""
+  lateCount: Int!
+
+  """Number of sessions marked LEAVE for this student."""
+  leaveCount: Int!
+
+  """Number of sessions marked PRESENT for this student."""
+  presentCount: Int!
+
+  """Student membership id."""
+  studentId: ID!
+
+  """
+  Total number of attendance sessions this student had an entry in across the range.
+  """
+  totalSessions: Int!
+}
+
+"""Student lifecycle state at an institute."""
+enum AcademicStatus {
+  DETAINED
+  DROPPED_OUT
+  ENROLLED
+  EXPELLED
+  GRADUATED
+  PASSOUT
+  PROMOTED
+  RE_ENROLLED
+  SUSPENDED
+  TRANSFERRED_OUT
+  WITHDRAWN
+}
+
+"""
+Read-only tree of an institute’s academic structure — standards → sections + subjects. Returned by adminGetInstituteAcademicTree. Admin-only view; institute portal owns CRUD.
+"""
+type AcademicTreeModel {
+  """
+  Academic-year id this tree was snapshotted against (current active year when null)
+  """
+  academicYearId: String
+  instituteId: ID!
+  standards: [AcademicTreeStandardNode!]!
+}
+
+"""A section node inside the admin academic-structure tree"""
+type AcademicTreeSectionNode {
+  id: ID!
+  name: I18nText!
+
+  """
+  Optional stream config for 11th/12th (SCIENCE, COMMERCE, ARTS, NEP combos)
+  """
+  stream: JSON
+}
+
+"""A standard (grade) node inside the admin academic-structure tree"""
+type AcademicTreeStandardNode {
+  """Education level (PRIMARY, SECONDARY, …) this grade belongs to"""
+  department: String
+  id: ID!
+  name: I18nText!
+  sections: [AcademicTreeSectionNode!]!
+  subjects: [AcademicTreeSubjectNode!]!
+}
+
+"""A subject node inside the admin academic-structure tree"""
+type AcademicTreeSubjectNode {
+  """Board code (e.g. CBSE 041 for Mathematics)"""
+  boardCode: String
+  id: ID!
+
+  """Plain-text subject name (not i18n JSONB — subjects.name is text)"""
+  name: String!
+  shortName: String
+
+  """Subject category — ACADEMIC, SPORT, LANGUAGE, …"""
+  type: String!
+}
+
+type AcademicYearModel {
+  """Board exam dates keyed by board name"""
+  boardExamDates: JSON
+  createdAt: DateTime!
+  endDate: DateOnly!
+  id: ID!
+  isActive: Boolean!
+
+  """
+  Academic-year label in YYYY-YY format (e.g. 2025-26). Leading 4 digits = start year; trailing 2 digits = end year mod 100.
+  """
+  label: String!
+  startDate: DateOnly!
+  status: AcademicYearStatus!
+
+  """Term/semester breakdown for this year"""
+  termStructure: [TermConfigModel!]
+  updatedAt: DateTime!
+}
+
+enum AcademicYearStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETING
+  PLANNING
+}
+
+"""
+Per-institute attendance totals for a single date, aggregated across every attendance session in the tenant.
+"""
+type AdminAttendanceSummaryModel {
+  """Number of ABSENT attendance entries across all sessions."""
+  absentCount: Int!
+  instituteId: ID!
+
+  """Full i18n blob for the institute name — frontend picks the locale."""
+  instituteName: I18nText!
+
+  """Number of LATE attendance entries across all sessions."""
+  lateCount: Int!
+
+  """Number of LEAVE attendance entries across all sessions."""
+  leaveCount: Int!
+
+  """Number of PRESENT attendance entries across all sessions."""
+  presentCount: Int!
+
+  """
+  Total number of attendance sessions recorded for the institute on this date.
+  """
+  sessionCount: Int!
+}
+
+"""
+Platform-admin input for creating a new institute. Supports assigning to a specific reseller and group.
+"""
+input AdminCreateInstituteInput {
+  address: InstituteAddressInput
+  board: BoardType
+
+  """
+  Short internal code for the institute, e.g. "SAJ". Unique per reseller.
+  """
+  code: String
+  contact: InstituteContactInput
+
+  """Education levels offered, e.g. [PRIMARY, UPPER_PRIMARY]."""
+  departments: [EducationLevel!]
+
+  """
+  Institute group (trust, chain, or society) to assign this institute to.
+  """
+  groupId: String
+
+  """
+  Whether this is a demo/sandbox institute — excludes it from production reports.
+  """
+  isDemo: Boolean = false
+
+  """
+  Localised institute name, e.g. { en: "Sunrise Academy", hi: "सनराइज़ अकैडमी" }.
+  """
+  name: I18nText!
+
+  """
+  Reseller to assign this institute to. Defaults to the platform "Roviq Direct" reseller when omitted.
+  """
+  resellerId: String
+
+  """
+  URL-safe slug — globally unique, lowercase alphanumerics and hyphens, e.g. "sunrise-academy-jaipur".
+  """
+  slug: String!
+
+  """Academic structure — NEP 2020 (5+3+3+4 stages) or legacy 10+2."""
+  structureFramework: StructureFramework = TRADITIONAL
+  type: InstituteType = SCHOOL
+}
+
+"""Payload for adminCreateReseller"""
+input AdminCreateResellerInput {
+  branding: AdminResellerBrandingInput
+  customDomain: String
+  initialAdminEmail: String!
+  name: String!
+  slug: String
+  tier: ResellerTier!
+}
+
+"""Filters for the adminListInstitutes query"""
+input AdminListInstitutesFilterInput {
+  """
+  Board affiliation filter — case-insensitive match on InstituteAffiliation.board
+  """
+  affiliationBoard: String
+  after: String
+  createdAfter: DateTime
+  createdBefore: DateTime
+
+  """Match on institute address district (exact, case-insensitive)"""
+  district: String
+  first: Int = 20
+  groupId: String
+  resellerId: String
+
+  """Full-text search over name + code (tsvector/trigram)"""
+  search: String
+
+  """Match on institute address state (exact, case-insensitive)"""
+  state: String
+  status: [InstituteStatus!]
+  type: InstituteType
+}
+
+"""Filters for the adminListResellers query"""
+input AdminListResellersFilterInput {
+  after: String
+  first: Int = 20
+  isSystem: Boolean
+  search: String
+  status: [ResellerStatus!]
+  tier: [ResellerTier!]
+}
+
+"""Filters for the adminListUsers query"""
+input AdminListUsersFilterInput {
+  after: String
+  first: Int = 20
+
+  """If true, only users with institute memberships"""
+  hasInstituteMembership: Boolean
+  search: String
+  status: [UserStatus!]
+
+  """
+  Return only users with at least one membership in this institute (tenant id)
+  """
+  tenantId: String
+}
+
+"""Optional branding configuration stored on reseller.branding (JSONB)"""
+input AdminResellerBrandingInput {
+  faviconUrl: String
+  logoUrl: String
+
+  """Hex colour (e.g. #1677FF)"""
+  primaryColor: String
+
+  """Hex colour (e.g. #5BC0EB)"""
+  secondaryColor: String
+}
+
+type AdminResellerConnection {
+  edges: [AdminResellerEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AdminResellerEdge {
+  cursor: String!
+  node: AdminResellerModel!
+}
+
+"""Platform-admin view of a reseller account"""
+type AdminResellerModel {
+  branding: ResellerBrandingModel
+  createdAt: DateTime!
+
+  """Custom vanity domain (deferred — placeholder for PRD §23.4)"""
+  customDomain: String
+
+  """Soft-delete timestamp; set when status=DELETED"""
+  deletedAt: DateTime
+  id: ID!
+
+  """Number of non-deleted institutes currently assigned to this reseller"""
+  instituteCount: Int!
+  isActive: Boolean!
+
+  """
+  True for the built-in "Roviq Direct" reseller — cannot be suspended, deleted, or have its tier changed
+  """
+  isSystem: Boolean!
+  name: String!
+
+  """
+  URL-safe slug, globally unique. Immutable after creation (changing it breaks URLs).
+  """
+  slug: String!
+  status: ResellerStatus!
+
+  """Timestamp of most recent suspension; null when active"""
+  suspendedAt: DateTime
+
+  """
+  Number of active reseller_memberships (staff accounts) for this reseller
+  """
+  teamSize: Int!
+  tier: ResellerTier!
+  updatedAt: DateTime!
+}
+
+"""Payload for adminUpdateReseller — slug and tier are not updatable here"""
+input AdminUpdateResellerInput {
+  branding: AdminResellerBrandingInput
+  customDomain: String
+  name: String
+}
+
+type AdminUserConnection {
+  edges: [AdminUserEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AdminUserEdge {
+  cursor: String!
+  node: AdminUserModel!
+}
+
+"""
+Membership record showing which institute a user belongs to and in what role
+"""
+type AdminUserMembershipModel {
+  id: ID!
+  instituteName: String
+  roleId: ID!
+  status: MembershipStatus!
+  tenantId: ID!
+}
+
+"""Admin view of a user with profile and membership details"""
+type AdminUserModel {
+  createdAt: DateTime!
+  email: String!
+  id: ID!
+  memberships: [AdminUserMembershipModel!]!
+  profile: AdminUserProfileModel
+  status: UserStatus!
+  username: String!
+}
+
+"""User profile snapshot returned in admin user listings"""
+type AdminUserProfileModel {
+  firstName: I18nText!
+  lastName: I18nText
+  profileImageUrl: String
+}
+
+enum AdmissionApplicationStatus {
+  DOCUMENTS_PENDING
+  DOCUMENTS_VERIFIED
+  DRAFT
+  ENROLLED
+  EXPIRED
+  FEE_PAID
+  FEE_PENDING
+  INTERVIEW_COMPLETED
+  INTERVIEW_SCHEDULED
+  MERIT_LISTED
+  OFFER_ACCEPTED
+  OFFER_MADE
+  REJECTED
+  SUBMITTED
+  TEST_COMPLETED
+  TEST_SCHEDULED
+  UNDER_REVIEW
+  WAITLISTED
+  WITHDRAWN
+}
+
+type AdmissionNumberConfigModel {
+  format: String!
+  noPrefixFromClass: Float!
+  prefixes: JSON!
+  yearFormat: String!
+}
+
+"""Date-range filter for admissionStatistics (ROV-168)"""
+input AdmissionStatisticsFilterInput {
+  """Inclusive lower bound (ISO date YYYY-MM-DD)"""
+  from: String
+
+  """Inclusive upper bound (ISO date YYYY-MM-DD)"""
+  to: String
+}
+
+"""Admission funnel statistics (ROV-159)"""
+type AdmissionStatisticsModel {
+  applicationToEnrolledRate: Float!
+
+  """Breakdown by enquiry source"""
+  bySource: [SourceBreakdown!]!
+  enquiryToApplicationRate: Float!
+
+  """Funnel counts at each stage"""
+  funnel: [FunnelStage!]!
+  totalApplications: Int!
+  totalEnquiries: Int!
+}
+
+"""How the student was admitted."""
+enum AdmissionType {
+  LATERAL_ENTRY
+  NEW
+  RE_ADMISSION
+  TRANSFER
+}
+
+enum AffiliationStatus {
+  EXTENSION_PENDING
+  PROVISIONAL
+  REGULAR
+  REVOKED
+}
+
+type ApplicationConnection {
+  edges: [ApplicationEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ApplicationEdge {
+  cursor: String!
+  node: ApplicationModel!
+}
+
+"""Filter for listApplications (ROV-159)"""
+input ApplicationFilterInput {
+  academicYearId: ID
+  after: String
+  first: Int = 25
+  isRteApplication: Boolean
+  search: String
+  standardId: ID
+  status: AdmissionApplicationStatus
+}
+
+"""Admission application"""
+type ApplicationModel {
+  academicYearId: String!
+  createdAt: DateTime!
+  enquiryId: String
+  formData: JSON!
+  id: ID!
+  interviewScore: String
+  isRteApplication: Boolean!
+  meritRank: Int
+  offerAcceptedAt: DateTime
+  offerExpiresAt: DateTime
+  offeredAt: DateTime
+  rteLotteryRank: Int
+  sectionId: String
+  standardId: String!
+  status: String!
+  studentProfileId: String
+  tenantId: String!
+  testScore: String
+  updatedAt: DateTime!
+  version: Int!
+}
+
+type ApplicationStatusUpdate {
+  applicationId: String!
+  newStatus: String!
+  oldStatus: String!
+}
+
+input AssignPlanInput {
+  planId: String!
+  tenantId: String!
+}
+
+type AssignPlanResult {
+  checkoutUrl: String
+  subscription: SubscriptionModel!
+}
+
+"""A single student's attendance mark within a session."""
+type AttendanceEntryModel {
+  createdAt: DateTime!
+  id: ID!
+
+  """Timestamp the mark was first set or last corrected."""
+  markedAt: DateTime!
+  mode: AttendanceMode!
+  remarks: String
+  sessionId: ID!
+  status: AttendanceStatus!
+
+  """Student membership id."""
+  studentId: ID!
+  updatedAt: DateTime!
+}
+
+"""
+How an attendance entry was captured (MANUAL by teacher, APP check-in, BIOMETRIC device, IMPORT bulk).
+"""
+enum AttendanceMode {
+  APP
+  BIOMETRIC
+  IMPORT
+  MANUAL
+}
+
+"""
+One attendance sitting for a section on a given date — whole-day when period is null, otherwise per lecture/period.
+"""
+type AttendanceSessionModel {
+  academicYearId: ID!
+  createdAt: DateTime!
+
+  """Date of attendance as ISO YYYY-MM-DD."""
+  date: String!
+  id: ID!
+
+  """Membership id of the staff who owns this session."""
+  lecturerId: ID!
+
+  """Flag set when another teacher requests override confirmation."""
+  overrideCheck: Boolean!
+
+  """Period / lecture slot number. Null means whole-day (DAILY) attendance."""
+  period: Int
+  sectionId: ID!
+
+  """Subject / lecture being taught in this period (null for DAILY mode)."""
+  subjectId: ID
+  updatedAt: DateTime!
+}
+
+"""
+Per-student attendance mark for a given session (PRESENT, ABSENT, LEAVE, LATE).
+"""
+enum AttendanceStatus {
+  ABSENT
+  LATE
+  LEAVE
+  PRESENT
+}
+
+"""Count of attendance entries bucketed by status."""
+type AttendanceStatusCount {
+  count: Int!
+  status: AttendanceStatus!
+}
+
+enum AttendanceType {
+  DAILY
+  LECTURE_WISE
+}
+
+type AuditLog {
+  action: String!
+  actionType: String!
+  actorId: String!
+  actorName: String
+  changes: JSON
+  correlationId: String!
+  createdAt: DateTime!
+  entityId: String
+  entityType: String!
+  id: ID!
+  impersonatorId: String
+  ipAddress: String
+  metadata: JSON
+  source: String!
+  syntheticOrigin: String
+  tenantId: String
+  tenantName: I18nText
+  userAgent: String
+  userId: String!
+  userName: String
+}
+
+type AuditLogConnection {
+  edges: [AuditLogEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AuditLogEdge {
+  cursor: String!
+  node: AuditLog!
+}
+
+"""
+Filter criteria for the audit log. All fields are optional and combine with AND.
+"""
+input AuditLogFilterInput {
+  """
+  Filter by one or more action types, e.g. ["CREATE", "UPDATE", "DELETE"].
+  """
+  actionTypes: [String!]
+
+  """Filter by correlation ID to trace all changes in a single request."""
+  correlationId: String
+
+  """Restrict results to audit events within this date/time range."""
+  dateRange: DateRangeInput
+
+  """Filter by the specific entity UUIDv7 that was mutated."""
+  entityId: String
+
+  """Filter by entity type, e.g. "Student", "Staff", "Section"."""
+  entityType: String
+
+  """
+  Filter by synthetic-context origin (e.g. "workflow:tc-issuance", "consumer:billing-event"). Only set for rows written by the synthetic-user actor.
+  """
+  syntheticOrigin: String
+
+  """Filter by institute (tenant) — platform admins only."""
+  tenantId: ID
+
+  """Filter by the user who performed the action."""
+  userId: String
+}
+
+type AuthEventModel {
+  authMethod: String
+  createdAt: DateTime!
+  eventType: String!
+  failureReason: String
+  id: ID!
+  ipAddress: String
+  metadata: JSON
+  resellerId: String
+  scope: String
+  tenantId: String
+  userAgent: String
+  userId: String
+}
+
+type AuthPayload {
+  accessToken: String
+  refreshToken: String
+  user: UserType
+}
+
+"""Lifecycle state of a section batch within an academic year."""
+enum BatchStatus {
+  ACTIVE
+  COMPLETED
+  UPCOMING
+}
+
+"""
+The `BigInt` scalar type represents non-fractional signed whole numeric values.
+"""
+scalar BigInt
+
+type BillingDashboardModel {
+  activeSubscriptions: Int!
+  churnRate: Float!
+  churnedLast30Days: Int!
+  mrr: BigInt!
+  overdueInvoiceCount: Int!
+  subscriptionsByStatus: JSON!
+}
+
+input BillingFilterInput {
+  from: DateTime
+  status: InvoiceStatus
+  to: DateTime
+}
+
+"""Billing cycle frequency for subscription plans."""
+enum BillingInterval {
+  ANNUAL
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+}
+
+enum BoardType {
+  BSEH
+  CBSE
+  ICSE
+  RBSE
+}
+
+type BotModel {
+  """API key prefix for identification in logs ('skbot_' + first 8 chars)"""
+  apiKeyPrefix: String
+
+  """Bot purpose category"""
+  botType: BotType!
+
+  """
+  Bot-specific configuration (schedule, templates, AI model config, etc.)
+  """
+  config: JSON
+  createdAt: DateTime!
+  id: ID!
+
+  """Whether this is a cross-tenant platform bot"""
+  isSystemBot: Boolean!
+
+  """Last time the bot made an API call"""
+  lastActiveAt: DateTime
+
+  """Rate limit tier for API calls"""
+  rateLimitTier: BotRateLimitTier
+
+  """Bot lifecycle state"""
+  status: BotStatus!
+  updatedAt: DateTime!
+
+  """Webhook URL for outbound event delivery"""
+  webhookUrl: String
+}
+
+"""Rate limit tier for bot API calls."""
+enum BotRateLimitTier {
+  HIGH
+  LOW
+  MEDIUM
+}
+
+"""Bot lifecycle state."""
+enum BotStatus {
+  ACTIVE
+  DEACTIVATED
+  SUSPENDED
+}
+
+"""
+Bot purpose category — determines which automated tasks this bot performs.
+"""
+enum BotType {
+  ADMISSION_CHATBOT
+  AI_CHATBOT_PARENT
+  AI_CHATBOT_STUDENT
+  ATTENDANCE_NOTIFICATION
+  BULK_OPERATION
+  FEE_REMINDER
+  HOMEWORK_REMINDER
+  INTEGRATION
+  REPORT_GENERATION
+  SYSTEM_NOTIFICATION
+}
+
+"""Input for bulk student import via CSV file"""
+input BulkCreateStudentsInput {
+  """Academic year for enrollment"""
+  academicYearId: ID!
+
+  """
+  Maps CSV column headers to internal field names. Example: { "Student Name": "first_name", "DOB": "date_of_birth" }
+  """
+  fieldMapping: JSON!
+
+  """MinIO/S3 URL of the uploaded CSV file"""
+  fileUrl: String!
+
+  """Default section for all rows unless overridden"""
+  sectionId: ID!
+
+  """Default standard (grade level) for all rows unless overridden"""
+  standardId: ID!
+}
+
+"""Progress/result of a bulk student import workflow"""
+type BulkImportProgressModel {
+  """Number of students successfully created"""
+  created: Int!
+
+  """Number of validation/insert errors"""
+  errors: Int!
+
+  """Number of rows processed so far"""
+  processed: Int!
+
+  """URL of the error report CSV (available when status = COMPLETED)"""
+  reportUrl: String
+
+  """Number of rows skipped (duplicates)"""
+  skipped: Int!
+
+  """Current workflow status"""
+  status: BulkImportStatus!
+
+  """Total data rows in the CSV (excluding header)"""
+  totalRows: Int!
+}
+
+"""
+Result of starting a bulk student import — contains the workflow ID for progress tracking
+"""
+type BulkImportStartResult {
+  """
+  Temporal workflow ID — use with bulkImportProgress query to track status
+  """
+  workflowId: String!
+}
+
+enum BulkImportStatus {
+  COMPLETED
+  FAILED
+  GENERATING_REPORT
+  INSERTING
+  PARSING
+  VALIDATING
+}
+
+"""
+Bulk mark multiple students in one session. Useful for end-of-class submission.
+"""
+input BulkMarkAttendanceInput {
+  entries: [MarkAttendanceItem!]!
+  sessionId: ID!
+}
+
+input CancelSubscriptionInput {
+  reason: String
+  subscriptionId: ID!
+}
+
+type CategoryCount {
+  category: String!
+  count: Int!
+}
+
+"""Issued certificate (bonafide, character, etc.)"""
+type CertificateModel {
+  certificateData: JSON!
+  createdAt: DateTime!
+  id: ID!
+  pdfUrl: String
+  purpose: String
+  serialNumber: String!
+  staffProfileId: String
+  status: CertificateStatus!
+  studentProfileId: String
+  templateId: String!
+}
+
+enum CertificateStatus {
+  APPROVED
+  CANCELLED
+  DRAFT
+  ISSUED
+  PENDING_APPROVAL
+}
+
+input ChangePlanInput {
+  newPlanId: ID!
+  subscriptionId: ID!
+}
+
+"""Department clearance record for TC workflow"""
+type ClearanceEntryObject {
+  """ISO timestamp when cleared"""
+  at: String
+
+  """User ID who cleared"""
+  by: String
+
+  """Whether this department has cleared the student"""
+  cleared: Boolean!
+
+  """Department name (e.g. accounts, library, lab, transport)"""
+  department: String!
+
+  """Optional notes from the department"""
+  notes: String
+}
+
+"""Government/board compliance report format to export."""
+enum ComplianceReportType {
+  AWR
+  CBSE_LOC
+  CBSE_REGISTRATION
+  RTE_REPORT
+  TC_REGISTER
+  UDISE_DCF
+}
+
+"""DPDP Act 2023 verifiable parental consent record (append-only)"""
+type ConsentRecordModel {
+  """When this consent record was created"""
+  createdAt: DateTime!
+
+  """Timestamp when consent was granted (null for withdrawals)"""
+  grantedAt: DateTime
+  id: ID!
+
+  """true = consent granted, false = consent withdrawn"""
+  isGranted: Boolean!
+
+  """
+  Data processing purpose (e.g. academic_data_processing, photo_video_marketing)
+  """
+  purpose: String!
+
+  """
+  How the guardian was verified: digilocker_token, aadhaar_otp, in_person_id_check, signed_form_uploaded, school_erp_verified_account
+  """
+  verificationMethod: String
+
+  """Timestamp when consent was withdrawn (null for grants)"""
+  withdrawnAt: DateTime
+}
+
+"""Current consent state for one purpose for one child"""
+type ConsentStatus {
+  """Whether consent is currently granted"""
+  isGranted: Boolean!
+
+  """When the consent state last changed"""
+  lastUpdatedAt: DateTime
+
+  """Data processing purpose (e.g. academic_data_processing)"""
+  purpose: String!
+
+  """The student profile this consent applies to"""
+  studentProfileId: String!
+}
+
+"""Geographic coordinates (WGS 84) for the institute location."""
+input CoordinatesInput {
+  """Latitude in decimal degrees (−90 to +90)."""
+  lat: Float!
+
+  """Longitude in decimal degrees (−180 to +180)."""
+  lng: Float!
+}
+
+type CoordinatesObject {
+  lat: Float!
+  lng: Float!
+}
+
+"""Fields required to create a new academic year for the institute."""
+input CreateAcademicYearInput {
+  """
+  Last day of the academic year (ISO date YYYY-MM-DD), e.g. "2026-03-31".
+  """
+  endDate: String!
+
+  """Academic year label in YYYY-YY format, e.g. "2025-26"."""
+  label: String!
+
+  """
+  First day of the academic year (ISO date YYYY-MM-DD), e.g. "2025-04-01".
+  """
+  startDate: String!
+
+  """Optional term or semester breakdown within this academic year."""
+  termStructure: [TermConfigInput!]
+}
+
+"""Input for creating an admission application (ROV-159)"""
+input CreateApplicationInput {
+  academicYearId: ID!
+
+  """Source enquiry ID (null for direct applications)"""
+  enquiryId: ID
+
+  """Institute-specific admission form data"""
+  formData: JSON!
+
+  """
+  Whether this is an RTE (Right to Education Act) admission — triggers RTE-specific fee waiver and reporting.
+  """
+  isRteApplication: Boolean
+  sectionId: ID
+  standardId: ID!
+}
+
+"""
+Open an attendance session for a section on a given date. Period is optional — omit for whole-day DAILY mode.
+"""
+input CreateAttendanceSessionInput {
+  academicYearId: ID!
+
+  """Attendance date as ISO YYYY-MM-DD."""
+  date: String!
+
+  """Membership id of the lecturer taking this session."""
+  lecturerId: ID!
+
+  """
+  Period / lecture slot number. Omit or pass null for whole-day attendance.
+  """
+  period: Int
+  sectionId: ID!
+
+  """Subject being taught (for lecture-wise mode)."""
+  subjectId: ID
+}
+
+"""Fields required to create a new institute bot integration."""
+input CreateBotInput {
+  """Bot purpose category"""
+  botType: BotType!
+
+  """Bot-specific configuration as JSON string"""
+  config: String
+
+  """Rate limit tier for API calls"""
+  rateLimitTier: BotRateLimitTier
+
+  """Webhook URL for outbound event delivery"""
+  webhookUrl: String
+}
+
+type CreateBotResponse {
+  """Plain API key — returned ONCE at creation, never stored"""
+  apiKey: String!
+
+  """The created bot profile"""
+  bot: BotModel!
+}
+
+"""Input for creating a pre-admission enquiry."""
+input CreateEnquiryInput {
+  """Academic year the admission is being sought for."""
+  academicYearId: ID
+
+  """Staff member assigned to follow up on this enquiry."""
+  assignedTo: ID
+
+  """Requested class or grade, e.g. "Nursery", "LKG", "Class 5"."""
+  classRequested: String!
+
+  """Date of birth of the prospective student (ISO date YYYY-MM-DD)."""
+  dateOfBirth: String
+
+  """Scheduled follow-up date (ISO date YYYY-MM-DD)."""
+  followUpDate: String
+
+  """Gender of the prospective student."""
+  gender: Gender
+
+  """Additional internal notes for the admissions team."""
+  notes: String
+
+  """Parent contact email address."""
+  parentEmail: String
+
+  """Full name of the parent or guardian submitting the enquiry."""
+  parentName: String!
+
+  """10-digit Indian mobile number (without +91 prefix)."""
+  parentPhone: String!
+
+  """Relationship of the contact person to the student."""
+  parentRelation: GuardianRelationship
+
+  """Board of the student's previous institute, e.g. "CBSE"."""
+  previousBoard: String
+
+  """Name of the student's current or previous institute."""
+  previousSchool: String
+
+  """Name of the person or campaign who referred the enquiry."""
+  referredBy: String
+
+  """Admission number of the enrolled sibling (if siblingInSchool is true)."""
+  siblingAdmissionNo: String
+
+  """Whether the student has a sibling already enrolled in this institute."""
+  siblingInSchool: Boolean
+
+  """Channel through which this enquiry was received."""
+  source: EnquirySource
+
+  """
+  Any special educational needs or disabilities to note for the admissions team.
+  """
+  specialNeeds: String
+
+  """Full name of the prospective student."""
+  studentName: String!
+}
+
+input CreateGatewayConfigInput {
+  credentials: JSON!
+  displayName: String
+  isDefault: Boolean = false
+  provider: String!
+  supportedMethods: [String!]
+  testMode: Boolean = false
+  webhookSecret: String
+}
+
+"""
+Input for creating a student/staff group for messaging, permissions, or reporting (ROV-163).
+"""
+input CreateGroupInput {
+  """
+  Child group IDs for composite groups. Used when membershipType is STATIC and groups are nested.
+  """
+  childGroupIds: [ID!]
+
+  """Optional description of the group's purpose."""
+  description: String
+
+  """Domain category this group belongs to."""
+  groupType: DomainGroupType!
+
+  """
+  Whether this is a system-managed group that cannot be deleted by institute admins.
+  """
+  isSystem: Boolean
+
+  """
+  Member entity types this group can contain, e.g. ["student"] or ["staff"].
+  """
+  memberTypes: [String!] = ["student"]
+
+  """
+  Whether membership is dynamic (rule-based), static (manually managed), or hybrid.
+  """
+  membershipType: GroupMembershipType = DYNAMIC
+
+  """
+  Human-readable group name, e.g. "Science Stream Class 11" or "Fee Defaulters".
+  """
+  name: String!
+
+  """Parent group ID for nested group hierarchies."""
+  parentGroupId: ID
+
+  """
+  JsonLogic rule object used to compute dynamic membership. Required when membershipType is DYNAMIC or HYBRID.
+  """
+  rule: JSON
+
+  """
+  Human-readable explanation of the JsonLogic rule, e.g. "Students in Class 11 Science with fees overdue > 30 days".
+  """
+  ruleDescription: String
+}
+
+"""Input for creating a guardian."""
+input CreateGuardianInput {
+  """
+  Guardian's highest completed education level. Constrained enum — mirrors the chk_education_level DB constraint.
+  """
+  educationLevel: GuardianEducationLevel
+
+  """Contact email address. Must be RFC-5322 valid when provided."""
+  email: String
+
+  """
+  Guardian first name as an i18nText map. The default locale (`en`) is required; additional locales are optional.
+  """
+  firstName: I18nText!
+  gender: Gender
+
+  """
+  When linking to a student, mark this guardian as the primary contact. Exactly one primary per student is enforced by the service.
+  """
+  isPrimaryContact: Boolean = false
+
+  """
+  Guardian last name as an i18nText map. Omit entirely for single-name cultures.
+  """
+  lastName: I18nText
+
+  """Guardian occupation (free text, e.g. "Engineer", "Shopkeeper")."""
+  occupation: String
+
+  """Employer / organisation the guardian works at (free text)."""
+  organization: String
+
+  """10-digit Indian mobile number (without +91 prefix)."""
+  phone: String
+
+  """
+  Relationship of the guardian to the student. Required when `studentProfileId` is supplied.
+  """
+  relationship: GuardianRelationship
+
+  """
+  Optional student_profiles.id — when provided the guardian is created AND immediately linked to that student.
+  """
+  studentProfileId: ID
+}
+
+"""
+Fields required to publish a new holiday. Single-day holidays set startDate = endDate.
+"""
+input CreateHolidayInput {
+  """Optional free-text notes (circular reference, background, etc.)."""
+  description: String
+
+  """
+  Inclusive end date (ISO YYYY-MM-DD). For a single-day holiday, pass the same value as startDate.
+  """
+  endDate: String!
+
+  """
+  Whether the holiday is visible to non-admin users. `false` means draft/admin-only — still blocks attendance.
+  """
+  isPublic: Boolean = true
+
+  """
+  Localised name, e.g. { en: "Diwali", hi: "दिवाली" }. English is required.
+  """
+  name: I18nText!
+
+  """Inclusive start date (ISO YYYY-MM-DD)."""
+  startDate: String!
+
+  """Optional tags for filtering/theming (e.g. ["gazetted", "restricted"])."""
+  tags: [String!]
+
+  """Classification of the holiday."""
+  type: HolidayType!
+}
+
+"""
+Fields required to create an institute group (chain, trust, or society).
+"""
+input CreateInstituteGroupInput {
+  """Registered address of the group."""
+  address: InstituteAddressInput
+
+  """
+  Unique URL-safe code for the group — lowercase alphanumerics and hyphens, e.g. "sunrise-trust".
+  """
+  code: String!
+
+  """Primary contact details for the group."""
+  contact: InstituteContactInput
+
+  """Display name of the group, e.g. "Sunrise Education Trust"."""
+  name: String!
+
+  """
+  Society/trust registration number issued by the Registrar of Societies.
+  """
+  registrationNumber: String
+  registrationState: IndianState
+
+  """Legal or organisational type of this group."""
+  type: GroupType!
+}
+
+"""
+Fields required to create a new institute. Slug must be globally unique.
+"""
+input CreateInstituteInput {
+  """Physical address of the institute."""
+  address: InstituteAddressInput
+  board: BoardType
+
+  """
+  Short internal code for the institute, e.g. "SAJ". Unique per reseller.
+  """
+  code: String
+
+  """Phone and email contact details."""
+  contact: InstituteContactInput
+
+  """Education levels offered, e.g. ["PRIMARY", "UPPER_PRIMARY"]."""
+  departments: [EducationLevel!]
+
+  """
+  Whether this is a demo/sandbox institute — excludes it from production reports.
+  """
+  isDemo: Boolean = false
+
+  """
+  Localised institute name, e.g. { en: "Sunrise Academy", hi: "सनराइज़ अकैडमी" }.
+  """
+  name: I18nText!
+
+  """
+  URL-safe slug — globally unique, lowercase alphanumerics and hyphens only, e.g. "sunrise-academy-jaipur".
+  """
+  slug: String!
+
+  """Academic structure — NEP 2020 (5+3+3+4 stages) or legacy 10+2."""
+  structureFramework: StructureFramework = TRADITIONAL
+
+  """Type of educational institution."""
+  type: InstituteType = SCHOOL
+}
+
+"""Apply for a new leave. Submits in PENDING status awaiting approval."""
+input CreateLeaveInput {
+  """Inclusive leave end date (ISO YYYY-MM-DD)."""
+  endDate: String!
+
+  """
+  Optional supporting documents. Leaves spanning more than 2 calendar days should attach at least one file.
+  """
+  fileUrls: [String!]
+
+  """Short explanation visible to the approver."""
+  reason: String!
+
+  """Inclusive leave start date (ISO YYYY-MM-DD)."""
+  startDate: String!
+  type: LeaveType!
+
+  """Membership the leave is for (student or staff)."""
+  userId: ID!
+}
+
+input CreatePlanInput {
+  amount: BigInt!
+  code: String!
+  currency: String! = "INR"
+  description: I18nText
+  entitlements: JSON!
+  interval: BillingInterval!
+  name: I18nText!
+  sortOrder: Int
+  trialDays: Int! = 0
+}
+
+"""Fields required to create a new class section under a standard."""
+input CreateSectionInput {
+  """Academic year this section is created under."""
+  academicYearId: ID!
+
+  """Maximum number of students allowed in this section."""
+  capacity: Int = 40
+
+  """Membership ID of the staff member assigned as class teacher."""
+  classTeacherId: ID
+
+  """Short display label shown in timetables, e.g. "A" or "Blue"."""
+  displayLabel: String
+
+  """Sort order among siblings of the same standard (ascending)."""
+  displayOrder: Int = 0
+
+  """Section end time in HH:mm or HH:mm:ss (24-hour format)."""
+  endTime: String
+
+  """Gender enrollment restriction for this section."""
+  genderRestriction: GenderRestriction = CO_ED
+
+  """Primary language of instruction, e.g. "English" or "Hindi"."""
+  mediumOfInstruction: String
+
+  """Localised section name, e.g. { en: "5-A", hi: "5-अ" }."""
+  name: I18nText!
+
+  """Room or classroom identifier, e.g. "Room 12" or "Lab B"."""
+  room: String
+
+  """
+  Shift identifier when the institute runs multiple shifts, e.g. "Morning" or "Evening".
+  """
+  shift: String
+
+  """Standard (grade level) this section belongs to."""
+  standardId: ID!
+
+  """Section start time in HH:mm or HH:mm:ss (24-hour format)."""
+  startTime: String
+
+  """
+  Stream (specialisation) for this section. Only applies when streamApplicable is true on the parent standard.
+  """
+  stream: StreamInput
+}
+
+"""Input for creating a new staff member"""
+input CreateStaffInput {
+  """Date of birth (YYYY-MM-DD)"""
+  dateOfBirth: String
+
+  """Date of joining (YYYY-MM-DD)"""
+  dateOfJoining: String
+
+  """Department (e.g., Science, Commerce, Administration)"""
+  department: String
+
+  """Job title (e.g., PGT Physics, TGT Mathematics)"""
+  designation: String
+
+  """Email address"""
+  email: String
+  employmentType: EmploymentType
+
+  """First name of the staff member"""
+  firstName: I18nText!
+  gender: Gender
+  lastName: I18nText
+
+  """10-digit Indian mobile number"""
+  phone: String
+
+  """Subject specialization (coaching-specific)"""
+  specialization: String
+}
+
+"""Input for creating a staff qualification record."""
+input CreateStaffQualificationInput {
+  """Examining board or university name."""
+  boardUniversity: String
+
+  """MinIO/S3 URL of the uploaded certificate scan."""
+  certificateUrl: String
+
+  """
+  Name of the degree or certification, e.g. "B.Ed", "CTET", "M.Sc Physics".
+  """
+  degreeName: String!
+
+  """
+  Grade, percentage, or GPA as reported on the certificate, e.g. "85.5%", "A+".
+  """
+  gradePercentage: String
+
+  """Institution or university that awarded this qualification."""
+  institution: String
+
+  """Staff profile to attach this qualification to."""
+  staffProfileId: ID!
+
+  """Whether this is an academic degree or a professional certification."""
+  type: QualificationType!
+
+  """Year of passing/graduation (1900–2100)."""
+  yearOfPassing: Int
+}
+
+"""
+Fields required to create a new grade/class level (standard) within an academic year.
+"""
+input CreateStandardInput {
+  """Academic year this standard belongs to."""
+  academicYearId: ID!
+
+  """
+  Department for this standard, e.g. "Science". Relevant for senior-secondary only.
+  """
+  department: String
+
+  """Whether students in this standard appear in board examinations."""
+  isBoardExamClass: Boolean = false
+
+  """
+  Education level this standard falls under (pre-primary through senior secondary).
+  """
+  level: EducationLevel
+
+  """
+  Maximum number of sections allowed for this standard. Null means unlimited.
+  """
+  maxSectionsAllowed: Int
+
+  """Default maximum students per section. Can be overridden per section."""
+  maxStudentsPerSection: Int = 40
+
+  """Localised name, e.g. { en: "Class 5", hi: "कक्षा 5" }."""
+  name: I18nText!
+
+  """
+  NEP 2020 stage. Required when the institute uses the NEP structure framework.
+  """
+  nepStage: NepStage
+
+  """Sort order used for display in timetables and reports (0 = first)."""
+  numericOrder: Int!
+
+  """
+  Whether stream selection (Science/Commerce/Arts) applies to sections in this standard.
+  """
+  streamApplicable: Boolean = false
+
+  """UDISE+ class code for Ministry of Education government reporting."""
+  udiseClassCode: Int
+}
+
+"""Input for creating a new student (ROV-154)"""
+input CreateStudentInput {
+  """Academic year for enrollment"""
+  academicYearId: ID!
+  admissionClass: String
+  admissionDate: String
+  admissionType: AdmissionType
+  bloodGroup: String
+  caste: String
+  cwsnType: String
+  dateOfBirth: String
+  firstName: I18nText!
+  gender: Gender
+  incomingTcDate: String
+  incomingTcNumber: String
+  isBpl: Boolean
+  isCwsn: Boolean
+  isMinority: Boolean
+  isRteAdmitted: Boolean
+  lastName: I18nText
+  minorityType: MinorityType
+  motherTongue: String
+
+  """10-digit Indian mobile number (without +91)"""
+  phone: String
+  previousSchoolBoard: String
+  previousSchoolName: String
+  previousSchoolUdise: String
+  religion: String
+  rteCertificate: String
+
+  """Section for initial enrollment"""
+  sectionId: ID!
+  socialCategory: SocialCategory
+
+  """Standard (grade) for initial enrollment"""
+  standardId: ID!
+}
+
+"""Fields required to create a new subject in this institute."""
+input CreateSubjectInput {
+  """Board-assigned subject code used in marksheets and result uploads."""
+  boardCode: String
+
+  """
+  Groups elective subjects so the system enforces one-per-group selection.
+  """
+  electiveGroup: String
+
+  """Whether a separate practical component exists alongside theory."""
+  hasPractical: Boolean = false
+
+  """Maximum marks for internal/continuous assessment."""
+  internalMarks: Int
+
+  """Whether students can opt into or out of this subject."""
+  isElective: Boolean = false
+
+  """Whether attendance in this subject is compulsory for promotion."""
+  isMandatory: Boolean = false
+
+  """Display name of the subject, e.g. "Mathematics" or "Hindi"."""
+  name: String!
+
+  """Maximum marks allocated to the practical component."""
+  practicalMarks: Int
+
+  """
+  Sections this subject is directly assigned to (overrides standard-level assignment).
+  """
+  sectionIds: [ID!]
+
+  """Abbreviated label shown in timetables, e.g. "Math"."""
+  shortName: String
+
+  """Standards (grade levels) this subject is assigned to."""
+  standardIds: [ID!]
+
+  """Maximum marks allocated to the theory component."""
+  theoryMarks: Int
+
+  """
+  Subject category that controls grading rules and report card placement.
+  """
+  type: SubjectType = ACADEMIC
+}
+
+"""
+A local date string (i.e., with no associated timezone) in `YYYY-MM-DD` format, e.g. `2020-01-01`.
+"""
+scalar DateOnly
+
+"""Inclusive date range for filtering audit log entries."""
+input DateRangeInput {
+  """Start of the range (inclusive)."""
+  from: DateTime!
+
+  """End of the range (inclusive)."""
+  to: DateTime!
+}
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.This scalar is serialized to a string in ISO 8601 format and parsed from a string in ISO 8601 format.
+"""
+scalar DateTime
+
+type DepartmentCount {
+  count: Int!
+  department: String!
+}
+
+enum DomainGroupType {
+  ACTIVITY
+  BUS_ROUTE
+  CLASS
+  CLUB
+  COMMITTEE
+  COMPOSITE
+  CUSTOM
+  DEPARTMENT
+  EXAM
+  FEE
+  HOUSE
+  NOTIFICATION
+  SECTION
+  SPORTS_TEAM
+  STREAM
+  SUBJECT
+}
+
+"""Dynamic group (Groups Engine) lifecycle state."""
+enum DynamicGroupStatus {
+  ACTIVE
+  ARCHIVED
+  INACTIVE
+}
+
+"""
+Department (education level) of a standard — pre-primary through senior secondary.
+"""
+enum EducationLevel {
+  PRE_PRIMARY
+  PRIMARY
+  SECONDARY
+  SENIOR_SECONDARY
+  UPPER_PRIMARY
+}
+
+"""Emergency contact within medical info"""
+type EmergencyContactObject {
+  name: String
+  phone: String
+  relationship: String
+}
+
+"""Staff employment arrangement with the institute."""
+enum EmploymentType {
+  CONTRACTUAL
+  GUEST
+  PART_TIME
+  REGULAR
+  VOLUNTEER
+}
+
+type EnquiryConnection {
+  edges: [EnquiryEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EnquiryEdge {
+  cursor: String!
+  node: EnquiryModel!
+}
+
+"""Filter + pagination for listEnquiries (ROV-159)"""
+input EnquiryFilterInput {
+  after: String
+  assignedTo: ID
+  classRequested: String
+  first: Int = 25
+  followUpFrom: String
+  followUpTo: String
+
+  """Show overdue follow-ups (follow_up_date < today)"""
+  overdueOnly: Boolean
+
+  """Full-text search on student_name + parent_name"""
+  search: String
+  source: EnquirySource
+  status: EnquiryStatus
+}
+
+"""Pre-admission enquiry"""
+type EnquiryModel {
+  academicYearId: String
+  assignedTo: String
+  classRequested: String!
+  convertedToApplicationId: String
+  createdAt: DateTime!
+  dateOfBirth: DateOnly
+  enquiryNumber: String
+  followUpDate: DateOnly
+  gender: String
+  id: ID!
+  isDuplicate: Boolean
+  lastContactedAt: DateTime
+  notes: String
+  parentEmail: String
+  parentName: String!
+  parentPhone: String!
+  parentRelation: String
+  previousBoard: String
+  previousSchool: String
+  referredBy: String
+  siblingAdmissionNo: String
+  siblingInSchool: Boolean!
+  source: String!
+  specialNeeds: String
+  status: String!
+  studentName: String!
+  tenantId: String!
+  updatedAt: DateTime!
+}
+
+enum EnquirySource {
+  ALUMNI
+  GOOGLE
+  HOARDING
+  NEWSPAPER_AD
+  OTHER
+  PHONE
+  REFERRAL
+  SCHOOL_EVENT
+  SOCIAL_MEDIA
+  WALK_IN
+  WEBSITE
+  WHATSAPP
+}
+
+enum EnquiryStatus {
+  APPLICATION_ISSUED
+  APPLICATION_SUBMITTED
+  CAMPUS_VISITED
+  CAMPUS_VISIT_SCHEDULED
+  CONTACTED
+  DROPPED
+  ENROLLED
+  FEE_PAID
+  LOST
+  NEW
+  OFFER_MADE
+  TEST_SCHEDULED
+}
+
+"""Input for enrolling a student in a section (ROV-154)"""
+input EnrollStudentInput {
+  academicYearId: ID!
+
+  """Required reason when overriding capacity hard limit"""
+  overrideReason: String
+  sectionId: ID!
+  standardId: ID!
+  studentProfileId: ID!
+}
+
+"""Input for generating and downloading a compliance export report."""
+input ExportComplianceReportInput {
+  """Academic year the report data is drawn from."""
+  academicYearId: ID!
+
+  """Report format to generate."""
+  reportType: ComplianceReportType!
+}
+
+"""A generated compliance report with download URL"""
+type ExportReportModel {
+  academicYearId: String!
+  completedAt: DateTime
+  fileSize: Int
+  fileUrl: String
+  id: ID!
+  reportType: String!
+  requestedAt: DateTime!
+  status: String!
+}
+
+"""Result of starting a compliance export — workflow ID for tracking"""
+type ExportStartResult {
+  """Temporal workflow ID for progress tracking"""
+  workflowId: String!
+}
+
+type FunnelStage {
+  count: Int!
+  stage: String!
+}
+
+"""Status of a payment gateway configuration."""
+enum GatewayConfigStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+}
+
+type GenderCount {
+  count: Int!
+  gender: String!
+}
+
+"""Gender enrollment restriction on a section or institute."""
+enum GenderRestriction {
+  BOYS_ONLY
+  CO_ED
+  GIRLS_ONLY
+}
+
+input GenerateInvoiceInput {
+  subscriptionId: ID!
+  tenantId: ID!
+}
+
+"""
+Password confirmation required before issuing a WebAuthn registration challenge.
+"""
+input GeneratePasskeyRegistrationInput {
+  """
+  User's current account password — confirmed before issuing a passkey challenge.
+  """
+  password: String!
+}
+
+"""
+Input for granting parental consent for a specific data processing purpose
+"""
+input GrantConsentInput {
+  """
+  Data processing purpose: academic_data_processing, photo_video_marketing, whatsapp_communication, sms_communication, aadhaar_collection, biometric_collection, third_party_edtech, board_exam_registration, transport_tracking, health_data_processing, cctv_monitoring
+  """
+  purpose: String!
+
+  """The student profile to grant consent for"""
+  studentProfileId: ID!
+
+  """
+  How the guardian was verified: digilocker_token, aadhaar_otp, in_person_id_check, signed_form_uploaded, school_erp_verified_account
+  """
+  verificationMethod: String
+}
+
+"""Filter for listing groups."""
+input GroupFilterInput {
+  """Filter by group domain category."""
+  groupType: DomainGroupType
+
+  """Filter by membership management type."""
+  membershipType: GroupMembershipType
+
+  """Full-text search over group name and description."""
+  search: String
+
+  """Filter by group lifecycle status."""
+  status: DynamicGroupStatus
+}
+
+"""Group member row (membership-scoped) with exclusion flag"""
+type GroupMemberModel {
+  displayName: String
+  groupId: ID!
+  id: ID!
+  isExcluded: Boolean!
+  membershipId: ID!
+  resolvedAt: DateTime
+
+  """How this member was added to the group."""
+  source: GroupMemberSource!
+}
+
+"""
+How a group member was added: manually, via a rule, or inherited from a parent group.
+"""
+enum GroupMemberSource {
+  INHERITED
+  MANUAL
+  RULE
+}
+
+type GroupMembershipModel {
+  createdAt: DateTime!
+  groupId: String!
+  id: ID!
+  isActive: Boolean!
+  roleId: String!
+  updatedAt: DateTime!
+  userId: String!
+}
+
+enum GroupMembershipType {
+  DYNAMIC
+  HYBRID
+  STATIC
+}
+
+"""Dynamic group entity (ROV-163)"""
+type GroupModel {
+  createdAt: DateTime!
+  description: String
+  groupType: DomainGroupType!
+  id: ID!
+  isSystem: Boolean!
+  memberCount: Int!
+  memberTypes: [String!]!
+  membershipType: GroupMembershipType!
+  name: String!
+  parentGroupId: String
+  resolvedAt: DateTime
+
+  """Group lifecycle state: ACTIVE, INACTIVE, or ARCHIVED."""
+  status: DynamicGroupStatus!
+  tenantId: String!
+  updatedAt: DateTime!
+  version: Int!
+}
+
+"""Group resolution update for subscriptions"""
+type GroupResolutionUpdate {
+  groupId: ID!
+  memberCount: Int!
+  resolvedAt: DateTime
+}
+
+"""Lifecycle state of an institute group."""
+enum GroupStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+"""Legal or organisational type of an institute group."""
+enum GroupType {
+  CHAIN
+  FRANCHISE
+  SOCIETY
+  TRUST
+}
+
+"""Guardian's highest completed education level."""
+enum GuardianEducationLevel {
+  GRADUATE
+  ILLITERATE
+  POST_GRADUATE
+  PRIMARY
+  PROFESSIONAL
+  SECONDARY
+}
+
+"""Student-guardian link with relationship details"""
+type GuardianLinkModel {
+  """
+  True if this guardian is authorised to pick the student up from campus.
+  """
+  canPickup: Boolean!
+
+  """Linked guardian_profiles.id."""
+  guardianProfileId: String!
+
+  """student_guardian_links row id — stable UUIDv7."""
+  id: ID!
+
+  """
+  True if this guardian should be contacted in case of emergencies. Multiple emergency contacts are allowed.
+  """
+  isEmergencyContact: Boolean!
+
+  """
+  True if this guardian is the primary contact for the student. Exactly one primary per student is enforced at the service layer.
+  """
+  isPrimaryContact: Boolean!
+
+  """True if the student lives in the same household as this guardian."""
+  livesWith: Boolean!
+
+  """Relationship of the guardian to the student."""
+  relationship: GuardianRelationship!
+
+  """Linked student_profiles.id."""
+  studentProfileId: String!
+}
+
+"""
+Student linked to a guardian, with resolved name/class/section and link metadata
+"""
+type GuardianLinkedStudentModel {
+  """Institute-issued admission number. Plain string — never translated."""
+  admissionNumber: String!
+
+  """True if the linked guardian is authorised to pick the student up."""
+  canPickup: Boolean!
+
+  """
+  Current-year section name as i18nText. Null when the student has no active enrollment.
+  """
+  currentSectionName: I18nText
+
+  """
+  Current-year standard (class) name as i18nText. Null when the student has no active enrollment.
+  """
+  currentStandardName: I18nText
+
+  """Student's first name (i18nText) from user_profiles."""
+  firstName: I18nText!
+
+  """True if the linked guardian should be contacted in emergencies."""
+  isEmergencyContact: Boolean!
+
+  """True if the linked guardian is the primary contact for this student."""
+  isPrimaryContact: Boolean!
+
+  """Student's last name (i18nText) from user_profiles; optional."""
+  lastName: I18nText
+
+  """student_guardian_links row id — used by the unlink mutation."""
+  linkId: ID!
+
+  """True if the student lives with the linked guardian."""
+  livesWith: Boolean!
+
+  """Student profile photo URL, or null before upload."""
+  profileImageUrl: String
+
+  """Relationship of the guardian to the student."""
+  relationship: GuardianRelationship!
+
+  """student_profiles.id for the linked student."""
+  studentProfileId: ID!
+}
+
+"""
+Guardian profile with occupation, joined display name, and linked students
+"""
+type GuardianModel {
+  """Guardian profile creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Guardian job title inside their organisation (free text)."""
+  designation: String
+
+  """
+  Guardian's highest completed education level — constrained enum mirroring the chk_education_level DB check.
+  """
+  educationLevel: GuardianEducationLevel
+
+  """
+  Guardian first name as an i18nText map. Always includes `en`; frontend resolves via useI18nField().
+  """
+  firstName: I18nText!
+  gender: Gender
+
+  """Guardian profile UUIDv7 — stable primary key."""
+  id: ID!
+
+  """
+  Guardian last name as an i18nText map. Nullable because single-name cultures exist.
+  """
+  lastName: I18nText
+
+  """
+  Number of students linked to this guardian via student_guardian_links — precomputed to avoid an N+1 on the list page.
+  """
+  linkedStudentCount: Int!
+
+  """
+  Membership row linking this guardian to the current institute (tenant) and role.
+  """
+  membershipId: String!
+
+  """
+  Guardian occupation (free text, e.g. "Engineer", "Shopkeeper", "Homemaker").
+  """
+  occupation: String
+
+  """Employer / organisation the guardian works at (free text)."""
+  organization: String
+
+  """
+  Primary phone number (is_primary=true) surfaced for quick-dial and search. Null when the guardian has no phone on file.
+  """
+  primaryPhone: String
+
+  """Absolute URL of the guardian profile photo, or null before any upload."""
+  profileImageUrl: String
+
+  """Most recent update timestamp (UTC)."""
+  updatedAt: DateTime!
+
+  """Underlying user account id — shared with other profile types."""
+  userId: String!
+
+  """
+  Optimistic-concurrency version. Increments on every write; clients must send the expected value on update.
+  """
+  version: Int!
+}
+
+"""Relationship of a guardian to a student."""
+enum GuardianRelationship {
+  AUNT
+  FATHER
+  GRANDPARENT_MATERNAL
+  GRANDPARENT_PATERNAL
+  LEGAL_GUARDIAN
+  MOTHER
+  OTHER
+  SIBLING
+  UNCLE
+}
+
+"""
+An institute-published holiday or break. When a session-open date falls inside [startDate, endDate], attendance refuses to create the session.
+"""
+type HolidayModel {
+  createdAt: DateTime!
+
+  """Optional notes — circular reference, history, or context."""
+  description: String
+
+  """Inclusive end date as ISO YYYY-MM-DD."""
+  endDate: String!
+  id: ID!
+
+  """
+  Whether the holiday is visible to non-admin users. `false` means draft/admin-only — still blocks attendance sessions.
+  """
+  isPublic: Boolean!
+
+  """Localised holiday name, e.g. { en: "Diwali", hi: "दिवाली" }."""
+  name: I18nText!
+
+  """Inclusive start date as ISO YYYY-MM-DD."""
+  startDate: String!
+
+  """
+  Free-form tags for filtering/theming (e.g. ["gazetted", "restricted"]).
+  """
+  tags: [String!]!
+  type: HolidayType!
+  updatedAt: DateTime!
+}
+
+"""
+Classification of a holiday — NATIONAL, STATE, RELIGIOUS, INSTITUTE, SUMMER_BREAK, WINTER_BREAK, or OTHER.
+"""
+enum HolidayType {
+  INSTITUTE
+  NATIONAL
+  OTHER
+  RELIGIOUS
+  STATE
+  SUMMER_BREAK
+  WINTER_BREAK
+}
+
+"""Multi-language text stored as { locale: text }"""
+scalar I18nText
+
+enum IdentifierType {
+  BSEH_AFFILIATION
+  CBSE_AFFILIATION
+  CBSE_SCHOOL_CODE
+  RBSE_REGISTRATION
+  SHALA_DARPAN_ID
+  SOCIETY_REGISTRATION
+  STATE_RECOGNITION
+  UDISE_PLUS
+}
+
+type ImpersonationAuthPayload {
+  accessToken: String!
+  institute: ImpersonationInstituteInfo!
+  user: ImpersonationUserInfo!
+}
+
+type ImpersonationInstituteInfo {
+  id: String!
+  name: I18nText!
+}
+
+type ImpersonationUserInfo {
+  id: String!
+  username: String!
+}
+
+"""Indian state or union territory."""
+enum IndianState {
+  ANDAMAN_AND_NICOBAR_ISLANDS
+  ANDHRA_PRADESH
+  ARUNACHAL_PRADESH
+  ASSAM
+  BIHAR
+  CHANDIGARH
+  CHHATTISGARH
+  DADRA_AND_NAGAR_HAVELI_AND_DAMAN_AND_DIU
+  DELHI
+  GOA
+  GUJARAT
+  HARYANA
+  HIMACHAL_PRADESH
+  JAMMU_AND_KASHMIR
+  JHARKHAND
+  KARNATAKA
+  KERALA
+  LADAKH
+  LAKSHADWEEP
+  MADHYA_PRADESH
+  MAHARASHTRA
+  MANIPUR
+  MEGHALAYA
+  MIZORAM
+  NAGALAND
+  ODISHA
+  PUDUCHERRY
+  PUNJAB
+  RAJASTHAN
+  SIKKIM
+  TAMIL_NADU
+  TELANGANA
+  TRIPURA
+  UTTARAKHAND
+  UTTAR_PRADESH
+  WEST_BENGAL
+}
+
+type InitiatePaymentResult {
+  checkoutPayload: JSON
+  checkoutUrl: String
+  gatewayOrderId: String!
+  paymentId: ID!
+}
+
+"""Physical address of the institute."""
+input InstituteAddressInput {
+  """City or town name."""
+  city: String!
+
+  """WGS 84 coordinates — used for distance-based RTE verification."""
+  coordinates: CoordinatesInput
+
+  """Country name, e.g. "India"."""
+  country: String!
+
+  """District name (used for government reporting and UDISE+)."""
+  district: String!
+
+  """First line of street address, e.g. building name or plot number."""
+  line1: String!
+
+  """Second address line, e.g. sector or locality name."""
+  line2: String
+
+  """Third address line (optional additional detail)."""
+  line3: String
+
+  """PIN code (6-digit Indian postal code)."""
+  postalCode: String!
+
+  """State name, e.g. "Rajasthan" or "Haryana"."""
+  state: String!
+}
+
+type InstituteAddressObject {
+  city: String!
+  coordinates: CoordinatesObject
+  country: String!
+  district: String!
+  line1: String!
+  line2: String
+  line3: String
+  postalCode: String!
+  state: String!
+}
+
+type InstituteAffiliationModel {
+  affiliationNumber: String
+  affiliationStatus: AffiliationStatus!
+  board: BoardType!
+  grantedLevel: String
+  id: ID!
+  nocDate: DateOnly
+  nocNumber: String
+  validFrom: String!
+  validTo: String!
+}
+
+type InstituteBrandingModel {
+  coverImageUrl: String
+  faviconUrl: String
+  id: ID!
+  logoUrl: String
+  primaryColor: String
+  secondaryColor: String
+  themeIdentifier: String
+}
+
+type InstituteConfigModel {
+  admissionNumberConfig: AdmissionNumberConfigModel
+  attendanceType: AttendanceType!
+  closingTime: String
+  gradingSystem: JSON
+  id: ID!
+  notificationPreferences: JSON
+  openingTime: String
+  payrollConfig: JSON
+  sectionStrengthNorms: SectionStrengthNormsModel
+  shifts: [ShiftConfigModel!]
+  termStructure: [TermConfigModel!]
+}
+
+type InstituteConnection {
+  edges: [InstituteEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"""Combined phone and email contact details for the institute."""
+input InstituteContactInput {
+  """List of email addresses. At least one should be marked isPrimary."""
+  emails: [InstituteEmailInput!]!
+
+  """List of phone numbers. At least one should be marked isPrimary."""
+  phones: [InstitutePhoneInput!]!
+}
+
+type InstituteContactObject {
+  emails: [InstituteEmailObject!]!
+  phones: [InstitutePhoneObject!]!
+}
+
+type InstituteEdge {
+  cursor: String!
+  node: InstituteModel!
+}
+
+"""A single email address entry for the institute contact."""
+input InstituteEmailInput {
+  """RFC-5322 email address."""
+  address: String!
+
+  """Whether this is the primary email for official correspondence."""
+  isPrimary: Boolean!
+
+  """Human-readable label, e.g. "General", "Admissions", "Finance"."""
+  label: String!
+}
+
+type InstituteEmailObject {
+  address: String!
+  isPrimary: Boolean!
+  label: String!
+}
+
+"""Filter and pagination input for listing institutes within a reseller."""
+input InstituteFilterInput {
+  """Relay-style cursor for forward pagination."""
+  after: String
+
+  """Number of records to return (1–100)."""
+  first: Int = 20
+
+  """Full-text search over institute name and code."""
+  search: String
+
+  """Filter by institute lifecycle status."""
+  status: InstituteStatus
+
+  """Filter by institution type (school, coaching, library)."""
+  type: InstituteType
+}
+
+type InstituteGroupConnection {
+  edges: [InstituteGroupEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type InstituteGroupEdge {
+  cursor: String!
+  node: InstituteGroupModel!
+}
+
+"""Filters for listing institute groups (trusts, chains, societies)."""
+input InstituteGroupFilterInput {
+  after: String
+  first: Int = 20
+  search: String
+  status: GroupStatus
+  type: GroupType
+}
+
+type InstituteGroupModel {
+  address: InstituteAddressObject
+  code: String!
+  contact: InstituteContactObject!
+  createdAt: DateTime!
+  createdBy: String!
+  id: ID!
+
+  """Number of institutes in this group (populated by list queries)"""
+  instituteCount: Int
+  name: String!
+  registrationNumber: String
+  registrationState: IndianState
+  status: GroupStatus!
+  type: GroupType!
+  updatedAt: DateTime!
+
+  """Optimistic concurrency version counter"""
+  version: Int!
+}
+
+type InstituteIdentifierModel {
+  id: ID!
+  issuingAuthority: String
+  type: IdentifierType!
+  validFrom: String
+  validTo: String
+  value: String!
+}
+
+type InstituteLoginResult {
+  accessToken: String
+  memberships: [MembershipInfo!]
+  refreshToken: String
+  requiresInstituteSelection: Boolean
+  selectionToken: String
+  user: UserType
+  userId: String
+}
+
+type InstituteModel {
+  address: InstituteAddressObject
+  affiliations: [InstituteAffiliationModel!]
+  branding: InstituteBrandingModel
+  code: String
+  config: InstituteConfigModel
+  contact: InstituteContactObject!
+  createdAt: DateTime!
+  currency: String!
+  departments: [String!]
+  groupId: String
+
+  """
+  Institute group display name — joined on institute_groups.name (English key of i18nText). Platform-admin scope only; batched via DataLoader.
+  """
+  groupName: String
+  id: ID!
+  identifiers: [InstituteIdentifierModel!]
+  isDemo: Boolean
+  logoUrl: String
+  name: I18nText!
+  resellerId: String
+
+  """
+  Reseller display name — joined on resellers.name. Platform-admin scope only; batched via DataLoader.
+  """
+  resellerName: String
+  settings: JSON!
+  setupStatus: SetupStatus!
+  slug: String!
+  status: InstituteStatus!
+  structureFramework: StructureFramework!
+  timezone: String!
+  type: InstituteType!
+  updatedAt: DateTime!
+  version: Int!
+}
+
+"""A single phone number entry for the institute contact."""
+input InstitutePhoneInput {
+  """ITU-T E.164 country code, e.g. "+91" for India."""
+  countryCode: String!
+
+  """Whether this is the main/primary contact number."""
+  isPrimary: Boolean!
+
+  """
+  Whether WhatsApp is active on this number — used for parent communication.
+  """
+  isWhatsappEnabled: Boolean!
+
+  """Human-readable label, e.g. "Office", "Principal", "Admissions"."""
+  label: String!
+
+  """Local phone number without country code."""
+  number: String!
+}
+
+type InstitutePhoneObject {
+  countryCode: String!
+  isPrimary: Boolean!
+  isWhatsappEnabled: Boolean!
+  label: String!
+  number: String!
+}
+
+type InstituteRef {
+  id: ID!
+  name: I18nText!
+}
+
+"""Aggregate institute statistics for dashboard charts"""
+type InstituteStatisticsModel {
+  """Institute count per reseller (admin scope only)"""
+  byReseller: [ResellerInstituteCount!]
+
+  """Institute count grouped by InstituteStatus"""
+  byStatus: [KeyCountEntry!]!
+
+  """Institute count grouped by InstituteType (admin scope only)"""
+  byType: [KeyCountEntry!]
+
+  """Institutes created in the last 30 days (admin scope only)"""
+  recentlyCreated: Int
+  totalInstitutes: Int!
+}
+
+enum InstituteStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  PENDING_APPROVAL
+  REJECTED
+  SUSPENDED
+}
+
+enum InstituteType {
+  COACHING
+  LIBRARY
+  SCHOOL
+}
+
+type InvoiceModel {
+  createdAt: DateTime!
+  currency: String!
+  dueAt: DateTime!
+  id: ID!
+  invoiceNumber: String!
+  issuedAt: DateTime
+  lineItems: JSON
+  notes: String
+  paidAmount: BigInt!
+  paidAt: DateTime
+  periodEnd: DateTime
+  periodStart: DateTime
+  resellerId: String!
+  status: InvoiceStatus!
+  subscription: SubscriptionRef
+  subscriptionId: String!
+  subtotalAmount: BigInt!
+  taxAmount: BigInt!
+  taxBreakdown: JSON
+  tenantId: String!
+  totalAmount: BigInt!
+  upiPaymentUri: String
+}
+
+type InvoiceModelEdge {
+  cursor: String!
+  node: InvoiceModel!
+}
+
+"""Payment status of an invoice."""
+enum InvoiceStatus {
+  CANCELLED
+  DRAFT
+  OVERDUE
+  PAID
+  PARTIALLY_PAID
+  REFUNDED
+  SENT
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+"""
+The `JSONObject` scalar type represents JSON objects as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSONObject
+
+"""Grouped count entry for statistics charts (status→count, type→count)"""
+type KeyCountEntry {
+  """Number of institutes in this group"""
+  count: Int!
+
+  """Grouping key (e.g. ACTIVE, SCHOOL)"""
+  key: String!
+}
+
+"""
+A leave application for a student or staff member. When status=APPROVED and the date is in range, attendance seeds LEAVE for the student.
+"""
+type LeaveModel {
+  createdAt: DateTime!
+
+  """Membership id that approved or rejected."""
+  decidedBy: ID
+
+  """Inclusive end date as ISO YYYY-MM-DD."""
+  endDate: String!
+
+  """URLs of supporting documents (e.g. medical certificate)."""
+  fileUrls: [String!]!
+  id: ID!
+  reason: String!
+
+  """Inclusive start date as ISO YYYY-MM-DD."""
+  startDate: String!
+  status: LeaveStatus!
+  type: LeaveType!
+  updatedAt: DateTime!
+
+  """Membership id the leave belongs to."""
+  userId: ID!
+}
+
+"""
+Workflow state of a leave application (PENDING → APPROVED/REJECTED/CANCELLED).
+"""
+enum LeaveStatus {
+  APPROVED
+  CANCELLED
+  PENDING
+  REJECTED
+}
+
+"""Category of leave — MEDICAL, CASUAL, BEREAVEMENT, EXAM or OTHER."""
+enum LeaveType {
+  BEREAVEMENT
+  CASUAL
+  EXAM
+  MEDICAL
+  OTHER
+}
+
+"""Input for linking a guardian to a student with relationship metadata"""
+input LinkGuardianInput {
+  """
+  Whether this guardian is authorized to pick up the student from campus. Gate guards verify against this flag at the front gate.
+  """
+  canPickup: Boolean = true
+
+  """Guardian profile to link (tenant-scoped)"""
+  guardianProfileId: ID!
+
+  """
+  Marks this guardian as an emergency contact. Distinct from primary — used for medical incidents, early pickup, school closures, etc.
+  """
+  isEmergencyContact: Boolean = false
+
+  """
+  Marks this guardian as the primary point of contact for the student. Only one primary is allowed per student — the service throws ConflictException if another guardian is already primary.
+  """
+  isPrimaryContact: Boolean = false
+
+  """
+  Whether the student lives with this guardian. Used for address resolution, transport routing, and RTE home-distance verification.
+  """
+  livesWith: Boolean = true
+  relationship: GuardianRelationship!
+
+  """Student profile to link to (tenant-scoped)"""
+  studentProfileId: ID!
+}
+
+type LinkedChild {
+  firstName: I18nText
+  isPrimaryContact: Boolean!
+  lastName: I18nText
+  relationship: String!
+  studentProfileId: ID!
+}
+
+"""Filter for listing issued certificates."""
+input ListCertificateFilterInput {
+  """Filter by certificate lifecycle status."""
+  status: CertificateStatus
+
+  """Filter to certificates for a specific student profile."""
+  studentProfileId: ID
+
+  """Filter by certificate template type."""
+  type: String
+}
+
+"""Filter for listing guardians in an institute"""
+input ListGuardiansFilterInput {
+  """
+  Full-text search across first/last name via the generated `user_profiles.search_vector` column (English + Hindi tokens). Uses plainto_tsquery, so input is treated as literal text (no operator parsing) which protects against query injection.
+  """
+  search: String
+}
+
+"""Filter for listing staff members"""
+input ListStaffFilterInput {
+  """Cursor for pagination"""
+  after: String
+
+  """Filter by department"""
+  department: String
+
+  """Filter by designation"""
+  designation: String
+
+  """Filter by employment type"""
+  employmentType: EmploymentType
+  first: Int = 20
+
+  """Filter class teachers only"""
+  isClassTeacher: Boolean
+
+  """Search by name"""
+  search: String
+}
+
+"""Filter for listing Transfer Certificates."""
+input ListTCFilterInput {
+  """Filter by TC lifecycle status."""
+  status: TcStatus
+
+  """Filter to TCs for a specific student profile."""
+  studentProfileId: ID
+}
+
+input ManualPaymentInput {
+  amountPaise: BigInt!
+  collectedById: String
+  collectionDate: String
+  method: PaymentMethod!
+  notes: String
+  receiptNumber: String
+}
+
+"""
+Set a single student's attendance status for a session. Upserts — creating the entry if missing or updating otherwise.
+"""
+input MarkAttendanceInput {
+  mode: AttendanceMode = MANUAL
+  remarks: String
+  sessionId: ID!
+  status: AttendanceStatus!
+
+  """Student membership id."""
+  studentId: ID!
+}
+
+input MarkAttendanceItem {
+  mode: AttendanceMode = MANUAL
+  remarks: String
+  status: AttendanceStatus!
+  studentId: ID!
+}
+
+"""Student medical information"""
+type MedicalInfoObject {
+  """Known allergies (food, drug, environmental)"""
+  allergies: [String!]
+
+  """Chronic conditions (asthma, diabetes, epilepsy, etc.)"""
+  conditions: [String!]
+
+  """Emergency contact (separate from guardian)"""
+  emergency_contact: EmergencyContactObject
+
+  """Current medications"""
+  medications: [String!]
+}
+
+type MembershipInfo {
+  instituteLogoUrl: String
+  instituteName: I18nText!
+  instituteSlug: String!
+  membershipId: String!
+  primaryNavSlugs: [String!]
+  roleId: String!
+  roleName: I18nText!
+  tenantId: String!
+}
+
+"""Membership lifecycle state within an institute."""
+enum MembershipStatus {
+  ACTIVE
+  REVOKED
+  SUSPENDED
+}
+
+"""
+Religious minority community per National Commission for Minorities Act.
+"""
+enum MinorityType {
+  BUDDHIST
+  CHRISTIAN
+  JAIN
+  MUSLIM
+  OTHER
+  PARSI
+  SIKH
+}
+
+type Mutation {
+  activateAcademicYear(id: ID!): AcademicYearModel!
+  activateInstitute(id: ID!): InstituteModel!
+  activateInstituteGroup(id: ID!): InstituteGroupModel!
+  addGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
+  addInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
+
+  """
+  Activate institute (PENDING/INACTIVE/SUSPENDED → ACTIVE). Requires setup_status COMPLETED.
+  """
+  adminActivateInstitute(id: ID!): InstituteModel!
+  adminApproveInstitute(id: ID!): InstituteModel!
+
+  """Assign an institute to a group (franchise/trust)"""
+  adminAssignInstituteGroup(groupId: ID!, id: ID!): InstituteModel!
+
+  """
+  Change reseller tier. Cascades to all reseller_memberships: their role_id is updated so staff abilities change on next token refresh.
+  """
+  adminChangeResellerTier(id: ID!, newTier: ResellerTier!): AdminResellerModel!
+  adminCreateInstitute(input: AdminCreateInstituteInput!): InstituteModel!
+  adminCreateInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
+
+  """Create a new reseller + initial admin user attached to the tier role"""
+  adminCreateReseller(input: AdminCreateResellerInput!): AdminResellerModel!
+  adminDeactivateInstitute(id: ID!): InstituteModel!
+  adminDeleteInstitute(id: ID!): Boolean!
+  adminDeleteInstituteGroup(id: ID!): Boolean!
+
+  """Delete a suspended reseller after 30-day grace period"""
+  adminDeleteReseller(resellerId: String!): Boolean!
+  adminEndImpersonation(sessionId: String!): Boolean!
+  adminLogin(password: String!, username: String!): AuthPayload!
+
+  """Reassign an institute to a different active reseller"""
+  adminReassignInstituteReseller(id: ID!, newResellerId: ID!): InstituteModel!
+  adminRejectInstitute(id: ID!, reason: String!): InstituteModel!
+
+  """Remove an institute from its group (clears the group assignment)"""
+  adminRemoveInstituteGroup(id: ID!): InstituteModel!
+  adminRestoreInstitute(id: ID!): InstituteModel!
+
+  """
+  Retry the institute setup workflow for an institute whose setup failed or is stuck. Idempotent.
+  """
+  adminRetryInstituteSetup(id: ID!): InstituteModel!
+  adminStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
+  adminSuspendInstitute(id: ID!, reason: String): InstituteModel!
+
+  """Suspend a reseller and revoke all staff sessions"""
+  adminSuspendReseller(reason: String, resellerId: String!): Boolean!
+
+  """Unsuspend a previously suspended reseller (reactivates staff login)"""
+  adminUnsuspendReseller(resellerId: String!): Boolean!
+  adminUpdateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
+
+  """Update mutable reseller fields (name, branding, customDomain)"""
+  adminUpdateReseller(id: ID!, input: AdminUpdateResellerInput!): AdminResellerModel!
+  adminVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
+
+  """Submit a new leave application (PENDING)."""
+  applyLeave(input: CreateLeaveInput!): LeaveModel!
+
+  """Approve application → triggers StudentAdmissionWorkflow"""
+  approveApplication(id: ID!): ApplicationModel!
+
+  """Approve a PENDING leave."""
+  approveLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
+
+  """Approve a TC (principal only)"""
+  approveTC(id: ID!): TCModel!
+  archiveAcademicYear(id: ID!): AcademicYearModel!
+
+  """
+  Archive (deactivate) a subscription plan. Blocks new subscriptions but does not affect existing ones.
+  """
+  archivePlan(id: ID!): SubscriptionPlanModel!
+
+  """Set the class teacher for a section. Returns the updated section."""
+  assignClassTeacher(classTeacherId: ID!, sectionId: ID!): SectionModel!
+  assignPlanToInstitute(input: AssignPlanInput!): AssignPlanResult!
+
+  """
+  Link the subject to a section (idempotent). Returns the subject for cache-update parity.
+  """
+  assignSubjectToSection(sectionId: ID!, subjectId: ID!): SubjectModel!
+
+  """
+  Link the subject to a standard (idempotent). Returns the subject for cache-update parity.
+  """
+  assignSubjectToStandard(standardId: ID!, subjectId: ID!): SubjectModel!
+
+  """Start bulk student import from CSV"""
+  bulkCreateStudents(input: BulkCreateStudentsInput!): BulkImportStartResult!
+
+  """
+  Bulk-mark a roster. Same past-day guard as markAttendance — admins must explicitly opt in with `overridePastDay: true`.
+  """
+  bulkMarkAttendance(input: BulkMarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): [AttendanceEntryModel!]!
+
+  """Cancel an own / pending leave."""
+  cancelLeave(cancellerMembershipId: ID!, id: ID!): LeaveModel!
+  cancelSubscription(input: CancelSubscriptionInput!): SubscriptionModel!
+
+  """
+  Rotate the authenticated user password. Revokes ALL sessions (caller must re-login). Allowed even when must_change_password is set so first-login enforcement can complete.
+  """
+  changePassword(currentPassword: String!, newPassword: String!): Boolean!
+  changePlan(input: ChangePlanInput!): SubscriptionModel!
+
+  """Convert enquiry to a formal application"""
+  convertEnquiryToApplication(academicYearId: ID!, enquiryId: ID!, standardId: ID!): ApplicationModel!
+  createAcademicYear(input: CreateAcademicYearInput!): AcademicYearModel!
+
+  """Create a direct admission application"""
+  createApplication(input: CreateApplicationInput!): ApplicationModel!
+  createBot(input: CreateBotInput!): CreateBotResponse!
+
+  """Create a pre-admission enquiry"""
+  createEnquiry(input: CreateEnquiryInput!): EnquiryModel!
+  createGatewayConfig(input: CreateGatewayConfigInput!): PaymentGatewayConfigModel!
+
+  """Create a new group (static, dynamic, hybrid, or composite)"""
+  createGroup(input: CreateGroupInput!): GroupModel!
+
+  """Create guardian, optionally link to a student"""
+  createGuardian(input: CreateGuardianInput!): GuardianModel!
+
+  """Publish a new holiday or break."""
+  createHoliday(input: CreateHolidayInput!): HolidayModel!
+  createInstitute(input: CreateInstituteInput!): InstituteModel!
+  createInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
+
+  """
+  Create a section. When the parent standard has `streamApplicable=true`, `stream` is required (SS-003).
+  """
+  createSection(input: CreateSectionInput!): SectionModel!
+
+  """Create a new staff member"""
+  createStaffMember(input: CreateStaffInput!): StaffModel!
+
+  """Add a qualification record to a staff profile"""
+  createStaffQualification(input: CreateStaffQualificationInput!): StaffQualificationModel!
+  createStandard(input: CreateStandardInput!): StandardModel!
+
+  """Create a new student with admission"""
+  createStudent(input: CreateStudentInput!): StudentModel!
+
+  """Create a subject in the current institute."""
+  createSubject(input: CreateSubjectInput!): SubjectModel!
+  createSubscriptionPlan(input: CreatePlanInput!): SubscriptionPlanModel!
+  deactivateInstitute(id: ID!): InstituteModel!
+  deactivateInstituteGroup(id: ID!): InstituteGroupModel!
+  deleteAcademicYear(id: ID!): Boolean!
+  deleteAttendanceSession(id: ID!): Boolean!
+  deleteBot(id: ID!): Boolean!
+  deleteGatewayConfig(id: ID!): Boolean!
+
+  """Soft delete a group"""
+  deleteGroup(id: ID!): Boolean!
+
+  """Soft-delete a guardian"""
+  deleteGuardian(id: ID!): Boolean!
+
+  """Soft-delete a holiday."""
+  deleteHoliday(id: ID!): Boolean!
+  deleteInstitute(id: ID!): Boolean!
+  deleteInstituteGroup(id: ID!): Boolean!
+
+  """
+  Soft-delete a leave application. Returns true on success. Mirrors `deleteHoliday`.
+  """
+  deleteLeave(id: ID!): Boolean!
+  deletePlan(id: ID!): Boolean!
+
+  """Soft-delete a section. Returns true on success."""
+  deleteSection(id: ID!): Boolean!
+
+  """Soft-delete staff member, sets date_of_leaving"""
+  deleteStaffMember(id: ID!): Boolean!
+
+  """Delete a staff qualification record"""
+  deleteStaffQualification(id: ID!): Boolean!
+  deleteStandard(id: ID!): Boolean!
+
+  """Soft delete a student profile"""
+  deleteStudent(id: ID!): Boolean!
+
+  """Soft-delete a subject. Returns true on success."""
+  deleteSubject(id: ID!): Boolean!
+  endImpersonation(sessionId: String!): Boolean!
+
+  """Enroll a student in a section with capacity check"""
+  enrollStudent(input: EnrollStudentInput!): ID!
+  exchangeImpersonationCode(code: String!): ImpersonationAuthPayload!
+
+  """
+  Start a compliance export workflow — returns workflowId for progress tracking
+  """
+  exportComplianceReport(input: ExportComplianceReportInput!): ExportStartResult!
+  generateInvoice(input: GenerateInvoiceInput!): InvoiceModel!
+  generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
+  generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
+
+  """Grant parental consent for a data processing purpose (DPDP Act 2023)"""
+  grantConsent(input: GrantConsentInput!): ConsentRecordModel!
+  impersonateUser(reason: String!, targetUserId: String!): StartImpersonationResult!
+  initiatePayment(invoiceId: ID!): InitiatePaymentResult!
+  instituteLogin(password: String!, username: String!): InstituteLoginResult!
+
+  """Issue certificate — generates serial, renders PDF"""
+  issueCertificate(id: ID!): CertificateModel!
+  issueRefund(input: RefundInput!, paymentId: ID!): InvoiceModel!
+
+  """Issue TC — generates serial, PDF, marks student transferred_out"""
+  issueTC(id: ID!): TCModel!
+
+  """Link a guardian to a student"""
+  linkGuardianToStudent(input: LinkGuardianInput!): GuardianLinkModel!
+  logout: Boolean!
+
+  """
+  Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true` AND has the `manage` permission on Attendance (admins). Overrides are audited.
+  """
+  markAttendance(input: MarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): AttendanceEntryModel!
+  openAttendanceSession(input: CreateAttendanceSessionInput!): AttendanceSessionModel!
+
+  """
+  Override an existing attendance session — replaces lecturer and/or subject.
+  """
+  overrideAttendanceSession(lecturerId: ID!, sessionId: ID!, subjectId: ID): AttendanceSessionModel!
+  pauseSubscription(input: PauseSubscriptionInput!): SubscriptionModel!
+  recordManualPayment(input: ManualPaymentInput!, invoiceId: ID!): InvoiceModel!
+  refreshToken(token: String!): AuthPayload!
+  register(input: RegisterInput!): AuthPayload!
+  registerDeviceToken(token: String!): Boolean!
+
+  """Reject an application"""
+  rejectApplication(id: ID!, reason: String): ApplicationModel!
+  rejectInstitute(id: ID!): InstituteModel!
+
+  """Reject a PENDING leave."""
+  rejectLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
+
+  """Reject a transfer certificate request"""
+  rejectTC(id: ID!, reason: String!): TCModel!
+  rejectUpiPayment(input: RejectUpiInput!): PaymentModel!
+  removeGroupMember(groupId: ID!, userId: ID!): Boolean!
+  removeInstituteFromGroup(instituteId: ID!): Boolean!
+  removePasskey(passkeyId: String!): Boolean!
+
+  """Remove the subject from a section (idempotent). Returns the subject."""
+  removeSubjectFromSection(sectionId: ID!, subjectId: ID!): SubjectModel!
+
+  """Remove the subject from a standard (idempotent). Returns the subject."""
+  removeSubjectFromStandard(standardId: ID!, subjectId: ID!): SubjectModel!
+
+  """Request a certificate from template — auto-populates fields"""
+  requestCertificate(input: RequestCertificateInput!): CertificateModel!
+
+  """
+  Request duplicate TC (PRD §5.3) — is_duplicate=true, references original
+  """
+  requestDuplicateTC(input: RequestDuplicateTCInput!): TCModel!
+
+  """Request a Transfer Certificate — starts TCIssuanceWorkflow"""
+  requestTC(input: RequestTCInput!): TCModel!
+  resellerCreateInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
+  resellerCreateInstituteRequest(input: ResellerCreateInstituteRequestInput!): InstituteModel!
+  resellerEndImpersonation(sessionId: String!): Boolean!
+
+  """
+  Create a new user and assign them a reseller-scope membership. A welcome notification with a temporary password is dispatched automatically.
+  """
+  resellerInviteTeamMember(input: ResellerInviteTeamMemberInput!): ResellerInviteTeamMemberResult!
+  resellerLogin(password: String!, username: String!): AuthPayload!
+  resellerReactivateInstitute(id: ID!): InstituteModel!
+
+  """
+  Deactivate a team member's reseller-scope membership. The user account is preserved.
+  """
+  resellerRemoveTeamMember(membershipId: ID!): Boolean!
+  resellerStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
+  resellerSuspendInstitute(id: ID!, reason: String): InstituteModel!
+  resellerVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
+
+  """Resolve group members (triggers rule evaluation + cache refresh)"""
+  resolveGroupMembers(groupId: ID!): GroupResolutionUpdate!
+  restoreInstitute(id: ID!): InstituteModel!
+
+  """
+  Restore an archived plan back to active. New subscriptions can be created against it again.
+  """
+  restorePlan(id: ID!): SubscriptionPlanModel!
+  resumeSubscription(subscriptionId: ID!): SubscriptionModel!
+  revokeAllOtherSessions(currentRefreshToken: String!): Boolean!
+
+  """
+  Revoke guardian access (divorce/separation). Sets can_pickup=false, preserves link for TC history.
+  """
+  revokeGuardianAccess(input: RevokeGuardianAccessInput!): GuardianLinkModel!
+  revokeSession(sessionId: String!): Boolean!
+  rotateBotApiKey(botId: ID!): CreateBotResponse!
+  selectInstitute(membershipId: String!, selectionToken: String!): AuthPayload!
+
+  """
+  Toggle the exclusion flag on a hybrid-group member (admin override for rule-resolved rows)
+  """
+  setGroupMemberExcluded(excluded: Boolean!, groupId: ID!, memberId: ID!): GroupMemberModel!
+  submitUpiProof(input: SubmitUpiProofInput!): PaymentModel!
+  suspendInstitute(id: ID!): InstituteModel!
+  suspendInstituteGroup(id: ID!): InstituteGroupModel!
+  switchInstitute(currentRefreshToken: String!, membershipId: String!): AuthPayload!
+
+  """
+  Explicit academic status transition (named domain mutation). Validates against the status state machine and emits STUDENT.statusChanged.
+  """
+  transitionStudentStatus(id: ID!, newStatus: AcademicStatus!, reason: String): StudentModel!
+
+  """
+  Unlink a guardian from a student. If primary, must provide newPrimaryGuardianId
+  """
+  unlinkGuardianFromStudent(input: UnlinkGuardianInput!): Boolean!
+  updateAcademicYear(id: ID!, input: UpdateAcademicYearInput!): AcademicYearModel!
+
+  """Update application status (state machine validated)"""
+  updateApplication(id: ID!, input: UpdateApplicationInput!): ApplicationModel!
+  updateBot(id: ID!, input: UpdateBotInput!): BotModel!
+
+  """Update an enquiry"""
+  updateEnquiry(id: ID!, input: UpdateEnquiryInput!): EnquiryModel!
+  updateGatewayConfig(id: ID!, input: UpdateGatewayConfigInput!): PaymentGatewayConfigModel!
+
+  """Update a group"""
+  updateGroup(id: ID!, input: UpdateGroupInput!): GroupModel!
+
+  """Update guardian with optimistic concurrency"""
+  updateGuardian(id: ID!, input: UpdateGuardianInput!): GuardianModel!
+
+  """Edit an existing holiday."""
+  updateHoliday(id: ID!, input: UpdateHolidayInput!): HolidayModel!
+  updateInstituteBranding(input: UpdateInstituteBrandingInput!): InstituteModel!
+  updateInstituteConfig(input: UpdateInstituteConfigInput!): InstituteModel!
+  updateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
+  updateInstituteInfo(id: ID!, input: UpdateInstituteInfoInput!): InstituteModel!
+
+  """Edit a PENDING leave before it is decided."""
+  updateLeave(id: ID!, input: UpdateLeaveInput!): LeaveModel!
+
+  """Update own profile (phone, photo, nationality)"""
+  updateMyProfile(input: UpdateMyProfileInput!): UserProfileData!
+  updateNotificationConfig(input: UpdateNotificationConfigInput!): NotificationConfigModel!
+
+  """Set a role's phone bottom tab bar destinations."""
+  updateRolePrimaryNav(input: UpdateRolePrimaryNavInput!): Role!
+
+  """Update an existing section by id."""
+  updateSection(id: ID!, input: UpdateSectionInput!): SectionModel!
+
+  """Update staff member with optimistic concurrency"""
+  updateStaffMember(id: ID!, input: UpdateStaffInput!): StaffModel!
+
+  """Update an existing staff qualification"""
+  updateStaffQualification(id: ID!, input: UpdateStaffQualificationInput!): StaffQualificationModel!
+  updateStandard(id: ID!, input: UpdateStandardInput!): StandardModel!
+
+  """Update student profile (optimistic concurrency)"""
+  updateStudent(id: ID!, input: UpdateStudentInput!): StudentModel!
+
+  """Change student section with capacity check"""
+  updateStudentSection(input: UpdateStudentSectionInput!): ID!
+
+  """Update an existing subject by id."""
+  updateSubject(id: ID!, input: UpdateSubjectInput!): SubjectModel!
+  updateSubscriptionPlan(id: ID!, input: UpdatePlanInput!): SubscriptionPlanModel!
+
+  """
+  Records an uploaded document (client uploads file bytes to object storage first, then calls this mutation with the resulting URLs).
+  """
+  uploadStudentDocument(input: UploadStudentDocumentInput!): StudentDocumentModel!
+  verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): InstituteLoginResult!
+  verifyPasskeyRegistration(input: VerifyPasskeyRegistrationInput!): PasskeyInfo!
+  verifyPayment(input: VerifyPaymentGqlInput!): PaymentModel!
+  verifyUpiPayment(paymentId: ID!): PaymentModel!
+
+  """
+  Withdraw parental consent for a data processing purpose (creates a new append-only record)
+  """
+  withdrawConsent(input: WithdrawConsentInput!): ConsentRecordModel!
+}
+
+"""My profile as a guardian"""
+type MyGuardianProfile {
+  """Children linked to this guardian"""
+  children: [LinkedChild!]
+
+  """Guardian-specific domain data"""
+  guardianProfile: JSON
+  type: String!
+  userProfile: UserProfileData!
+}
+
+union MyProfile = MyGuardianProfile | MyStaffProfile | MyStudentProfile
+
+"""My profile as a staff member"""
+type MyStaffProfile {
+  """Staff-specific domain data"""
+  staffProfile: JSON
+  type: String!
+  userProfile: UserProfileData!
+}
+
+"""My profile as a student"""
+type MyStudentProfile {
+  """Current academic placement"""
+  academics: JSON
+
+  """Student-specific domain data"""
+  studentProfile: JSON
+  type: String!
+  userProfile: UserProfileData!
+}
+
+"""NEP 2020 stage a standard belongs to (Foundational → Secondary)."""
+enum NepStage {
+  FOUNDATIONAL
+  MIDDLE
+  PREPARATORY
+  SECONDARY
+}
+
+type NotificationConfigModel {
+  digestCron: String
+  digestEnabled: Boolean!
+  emailEnabled: Boolean!
+  id: ID!
+  inAppEnabled: Boolean!
+  notificationType: String!
+  pushEnabled: Boolean!
+  tenantId: String!
+  whatsappEnabled: Boolean!
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+}
+
+type PasskeyAuthOptions {
+  challengeId: String!
+  optionsJSON: JSON!
+}
+
+type PasskeyInfo {
+  backedUp: Boolean!
+  deviceType: String!
+  id: String!
+  lastUsedAt: DateTime
+  name: String!
+  registeredAt: DateTime!
+}
+
+input PauseSubscriptionInput {
+  reason: String
+  subscriptionId: ID!
+}
+
+type PaymentGatewayConfigModel {
+  createdAt: DateTime!
+  displayName: String
+  id: ID!
+  isDefault: Boolean!
+  provider: String!
+  resellerId: String!
+  status: GatewayConfigStatus!
+  supportedMethods: JSON!
+  testMode: Boolean!
+  updatedAt: DateTime!
+  upiVpa: String
+  webhookUrl: String
+}
+
+"""Payment method used (gateway or manual)."""
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CASHFREE
+  CHEQUE
+  RAZORPAY
+  UPI
+  UPI_P2P
+}
+
+type PaymentModel {
+  amountPaise: BigInt!
+  collectedById: String
+  collectionDate: String
+  createdAt: DateTime!
+  currency: String!
+  failedAt: DateTime
+  failureReason: String
+  gatewayOrderId: String
+  gatewayPaymentId: String
+  gatewayProvider: String
+  id: ID!
+  invoiceId: String!
+  method: PaymentMethod!
+  notes: String
+  paidAt: DateTime
+  receiptNumber: String
+  refundGatewayId: String
+  refundReason: String
+  refundedAmountPaise: BigInt
+  refundedAt: DateTime
+  resellerId: String!
+  status: PaymentStatus!
+  tenantId: String!
+  utrNumber: String
+  verificationDeadline: DateTime
+  verificationStatus: String
+  verifiedAt: DateTime
+  verifiedById: String
+}
+
+"""Current state of a payment record."""
+enum PaymentStatus {
+  FAILED
+  PARTIALLY_REFUNDED
+  PENDING
+  PROCESSING
+  REFUNDED
+  SUCCEEDED
+}
+
+"""Lifecycle status of a subscription plan."""
+enum PlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+"""
+Input for previewing a certificate template with a student's data, without persisting an issued certificate row.
+"""
+input PreviewCertificateInput {
+  """
+  Purpose string substituted into the certificate body, e.g. "Bank Loan", "Scholarship".
+  """
+  purpose: String
+
+  """Student profile ID whose data populates the template fields."""
+  studentProfileId: ID!
+
+  """Certificate template ID to render."""
+  templateId: ID!
+}
+
+"""
+Whether a staff qualification is an academic degree or a professional certification.
+"""
+enum QualificationType {
+  ACADEMIC
+  PROFESSIONAL
+}
+
+type Query {
+  academicYear(id: ID!): AcademicYearModel!
+  academicYears: [AcademicYearModel!]!
+  activeAcademicYear: AcademicYearModel
+
+  """
+  Platform admin: cross-tenant attendance roll-up for a single date. One row per institute with totals for each status + session count.
+  """
+  adminAttendanceSummary(
+    """ISO YYYY-MM-DD date to roll up."""
+    date: String!
+  ): [AdminAttendanceSummaryModel!]!
+  adminAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  adminGetInstitute(id: ID!): InstituteModel!
+
+  """
+  Read-only academic structure (standards → sections + subjects) for an institute — admin-view only, institute portal owns CRUD
+  """
+  adminGetInstituteAcademicTree(instituteId: ID!): AcademicTreeModel!
+
+  """Fetch a single reseller by id with computed counts"""
+  adminGetReseller(id: ID!): AdminResellerModel!
+  adminInstituteStatistics: InstituteStatisticsModel!
+  adminListInstituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
+  adminListInstitutes(filter: AdminListInstitutesFilterInput): InstituteConnection!
+
+  """
+  Platform admin: list resellers with cursor pagination, search, and filters
+  """
+  adminListResellers(filter: AdminListResellersFilterInput): AdminResellerConnection!
+
+  """List all users with pagination, search, and filters (platform admin)"""
+  adminListUsers(filter: AdminListUsersFilterInput): AdminUserConnection!
+
+  """
+  Typeahead search for users by name, username, or phone (platform admin)
+  """
+  adminSearchUsers(limit: Int! = 10, query: String!): [AdminUserModel!]!
+
+  """Admission funnel statistics"""
+  admissionStatistics(filter: AdmissionStatisticsFilterInput): AdmissionStatisticsModel!
+
+  """
+  Per-student absentee report aggregated across sessions. Pass sectionId to scope to one section, or null for a tenant-wide report.
+  """
+  attendanceAbsenteesReport(endDate: String!, sectionId: ID, startDate: String!): [AbsenteeReportItem!]!
+  attendanceCounts(sessionId: ID!): [AttendanceStatusCount!]!
+  attendanceCountsForDate(date: String!): [AttendanceStatusCount!]!
+  attendanceEntries(sessionId: ID!): [AttendanceEntryModel!]!
+
+  """
+  One row per attendance session on the given date — aggregate counts plus the list of ABSENT membership ids.
+  """
+  attendanceSectionDailyBreakdown(date: String!): [SectionDailyBreakdown!]!
+  attendanceSession(id: ID!): AttendanceSessionModel!
+  attendanceSessionsForSection(endDate: String!, sectionId: ID!, startDate: String!): [AttendanceSessionModel!]!
+
+  """
+  Per-student attendance history — every mark for this student across the requested date range, newest first.
+  """
+  attendanceStudentHistory(endDate: String!, startDate: String!, studentId: ID!): [StudentHistoryItem!]!
+  auditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  authEvents(first: Int = 50): [AuthEventModel!]!
+
+  """Get bulk import progress by workflow ID"""
+  bulkImportProgress(workflowId: String!): BulkImportProgressModel!
+
+  """
+  Get current consent status for every DPDP purpose for a single student. Used by the guardian detail page to show per-child consent badges.
+  """
+  consentStatusForStudent(studentProfileId: ID!): [ConsentStatus!]!
+
+  """Returns the current Roviq edition: ce or ee"""
+  edition: String!
+  entityAuditTimeline(after: String, entityId: String!, entityType: String!, first: Int = 20): AuditLogConnection!
+  gatewayConfigs: [PaymentGatewayConfigModel!]!
+
+  """Returns base64-encoded PDF"""
+  generateInvoicePdf(invoiceId: ID!): String!
+
+  """Get application by ID"""
+  getApplication(id: ID!): ApplicationModel!
+
+  """Get a certificate by id"""
+  getCertificate(id: ID!): CertificateModel!
+
+  """
+  Placeholder field names for a certificate template (auto-populate driver for the Issue Certificate dialog).
+  """
+  getCertificateTemplateFields(templateId: ID!): [String!]!
+
+  """Get a group by ID"""
+  getGroup(id: ID!): GroupModel!
+
+  """Get a guardian by ID"""
+  getGuardian(id: ID!): GuardianModel!
+
+  """Get a single staff member by ID"""
+  getStaffMember(id: ID!): StaffModel!
+
+  """Get a student by ID"""
+  getStudent(id: ID!): StudentModel!
+
+  """Get TC details including 20-field CBSE data snapshot"""
+  getTCDetails(id: ID!): TCModel!
+  holiday(id: ID!): HolidayModel!
+
+  """
+  List holidays, ordered by `startDate` ASC (calendar order — clients render upcoming first). Optional filters narrow by type, overlapping date range, or visibility.
+  """
+  holidays(endDate: String, isPublic: Boolean, startDate: String, type: HolidayType): [HolidayModel!]!
+
+  """Return every holiday whose inclusive range contains the given date."""
+  holidaysOnDate(
+    """ISO YYYY-MM-DD date to look up."""
+    date: String!
+  ): [HolidayModel!]!
+  institute(id: ID!): InstituteModel!
+  instituteGroup(id: ID!): InstituteGroupModel!
+  instituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
+
+  """List institute roles available for primary-nav customization."""
+  instituteRoles: [Role!]!
+  institutes(filter: InstituteFilterInput): InstituteConnection!
+  invoices(after: String, filter: BillingFilterInput, first: Int = 20, instituteId: ID): [InvoiceModel!]!
+  leave(id: ID!): LeaveModel!
+
+  """
+  List leave applications, ordered by `startDate` DESC (most recent first — leave UIs are decision-driven, not calendar-driven). Optional filters narrow by user, status, type, and overlapping date range.
+  """
+  leaves(endDate: String, startDate: String, status: LeaveStatus, type: LeaveType, userId: ID): [LeaveModel!]!
+
+  """List applications with filters"""
+  listApplications(filter: ApplicationFilterInput): ApplicationConnection!
+  listBots: [BotModel!]!
+
+  """List certificates with optional filters"""
+  listCertificates(filter: ListCertificateFilterInput): [CertificateModel!]!
+
+  """List enquiries with filters and pagination"""
+  listEnquiries(filter: EnquiryFilterInput): EnquiryConnection!
+
+  """
+  List past compliance export reports (stub — returns empty until export history table is added)
+  """
+  listExportReports: [ExportReportModel!]!
+
+  """List all members (including excluded) of a group"""
+  listGroupMembers(groupId: ID!): [GroupMemberModel!]!
+
+  """List groups with optional filters"""
+  listGroups(filter: GroupFilterInput): [GroupModel!]!
+
+  """List all guardians in this institute, with optional free-text search"""
+  listGuardians(filter: ListGuardiansFilterInput): [GuardianModel!]!
+
+  """
+  List students linked to a single guardian, with resolved class/section + link metadata. Used by the Linked Children tab on the guardian detail page.
+  """
+  listLinkedStudents(guardianProfileId: ID!): [GuardianLinkedStudentModel!]!
+
+  """List staff with optional filters"""
+  listStaff(filter: ListStaffFilterInput): [StaffModel!]!
+
+  """List qualifications for a given staff profile"""
+  listStaffQualifications(staffProfileId: ID!): [StaffQualificationModel!]!
+
+  """
+  Year-by-year academic history for a single student (Academics tab on detail page).
+  """
+  listStudentAcademics(studentProfileId: ID!): [StudentAcademicHistoryModel!]!
+
+  """
+  List uploaded documents for a single student (Documents tab on detail page).
+  """
+  listStudentDocuments(studentProfileId: ID!): [StudentDocumentModel!]!
+
+  """
+  List guardians linked to a single student, with relationship and contact metadata. Used by the Guardians tab on the student detail page.
+  """
+  listStudentGuardians(studentProfileId: ID!): [StudentGuardianModel!]!
+
+  """List students with filters and pagination"""
+  listStudents(filter: StudentFilterInput): StudentConnection!
+
+  """List TCs with optional filters"""
+  listTCs(filter: ListTCFilterInput): [TCModel!]!
+  me: UserType!
+
+  """Guardian-specific: returns linked children (sibling discovery)"""
+  myChildren: MyGuardianProfile
+
+  """Get current consent status for all linked children and purposes"""
+  myConsentStatus: [ConsentStatus!]!
+  myGroups: [GroupMembershipModel!]!
+  myInstitute: InstituteModel!
+  myInvoice(id: ID!): InvoiceModel
+  myInvoices(after: String, filter: BillingFilterInput, first: Int = 20): [InvoiceModel!]!
+  myPasskeys: [PasskeyInfo!]!
+  myPaymentHistory(after: String, first: Int = 20): [PaymentModel!]!
+
+  """Get current user profile based on membership type"""
+  myProfile: MyProfile!
+  mySessions: [SessionInfo!]!
+  mySubscription: SubscriptionModel
+  notificationConfigs: [NotificationConfigModel!]!
+
+  """
+  Renders a preview HTML for a certificate by substituting student data into the template. No row is persisted.
+  """
+  previewCertificate(input: PreviewCertificateInput!): String!
+
+  """Dry-run rule evaluation without saving — returns count + sample"""
+  previewGroupRule(rule: JSON!): RulePreviewResult!
+  resellerAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  resellerBillingDashboard: BillingDashboardModel!
+  resellerGetInstitute(id: ID!): InstituteModel!
+  resellerInstituteStatistics: InstituteStatisticsModel!
+  resellerListInstituteGroups: InstituteGroupConnection!
+  resellerListInstitutes(filter: InstituteFilterInput): InstituteConnection!
+
+  """
+  List team members with a reseller-scope membership in this reseller organisation
+  """
+  resellerListTeamMembers(filter: ResellerTeamFilterInput): ResellerTeamMemberConnection!
+
+  """List users with memberships in institutes belonging to this reseller"""
+  resellerListUsers(filter: ResellerListUsersFilterInput): ResellerUserConnection!
+
+  """Fetch a section by id."""
+  section(id: ID!): SectionModel!
+
+  """List sections under a standard, ordered by `displayOrder`."""
+  sections(standardId: ID!): [SectionModel!]!
+
+  """Staff statistics aggregated by department"""
+  staffStatistics: StaffStatistics!
+  standard(id: ID!): StandardModel!
+  standards(academicYearId: ID!): [StandardModel!]!
+
+  """Aggregate student statistics"""
+  studentStatistics: StudentStatisticsModel!
+
+  """Fetch a subject by id."""
+  subject(id: ID!): SubjectModel!
+
+  """List every subject in the current institute."""
+  subjects: [SubjectModel!]!
+
+  """Subjects linked to the given standard via `standard_subjects`."""
+  subjectsByStandard(standardId: ID!): [SubjectModel!]!
+  subscriptionPlan(id: ID!): SubscriptionPlanModel!
+  subscriptionPlans(after: String, first: Int = 20, status: String): [SubscriptionPlanModel!]!
+  subscriptions(after: String, first: Int = 20, status: String): [SubscriptionModel!]!
+  unverifiedPayments(after: String, first: Int = 20): [PaymentModel!]!
+}
+
+input RefundInput {
+  amountPaise: BigInt!
+  reason: String
+}
+
+"""Credentials for creating a new Roviq account."""
+input RegisterInput {
+  """
+  Email address used for account recovery and transactional notifications.
+  """
+  email: String!
+
+  """Account password — minimum 8 characters, maximum 128."""
+  password: String!
+
+  """
+  Roviq ID (username) — 3–50 characters, alphanumeric, dashes, and underscores only.
+  """
+  username: String!
+}
+
+input RejectUpiInput {
+  paymentId: ID!
+  reason: String!
+}
+
+"""Input for requesting a bonafide or custom certificate from a template."""
+input RequestCertificateInput {
+  """
+  Purpose of the certificate — printed on the document, e.g. "Bank Loan", "Scholarship Application".
+  """
+  purpose: String!
+
+  """
+  Staff profile to populate template fields with. Mutually exclusive with studentProfileId.
+  """
+  staffProfileId: ID
+
+  """
+  Student profile to populate template fields with. Mutually exclusive with staffProfileId.
+  """
+  studentProfileId: ID
+
+  """Certificate template to use for generation."""
+  templateId: ID!
+}
+
+"""
+Input for requesting a duplicate TC when the original is lost or damaged.
+"""
+input RequestDuplicateTCInput {
+  """
+  Duplicate issuance fee in paise (100 paise = ₹1), stored as a BIGINT string to avoid floating-point loss.
+  """
+  duplicateFee: String
+
+  """ID of the original issued TC being duplicated."""
+  originalTcId: ID!
+
+  """
+  Reason for the duplicate request, e.g. FIR reference number or affidavit details.
+  """
+  reason: String!
+}
+
+"""
+Input for requesting a Transfer Certificate (TC) for a student leaving the institute.
+"""
+input RequestTCInput {
+  """Academic year in which the student is leaving."""
+  academicYearId: ID!
+
+  """
+  Reason for leaving — printed verbatim on the TC, e.g. "Family relocated to another city".
+  """
+  reason: String!
+
+  """Student profile to issue the TC for."""
+  studentProfileId: ID!
+}
+
+"""Reseller branding configuration (logo, colors, favicon)"""
+type ResellerBrandingModel {
+  """URL of the reseller favicon"""
+  faviconUrl: String
+
+  """URL of the reseller logo image"""
+  logoUrl: String
+
+  """Primary brand colour as a hex code (e.g. "#1677FF")"""
+  primaryColor: String
+
+  """Secondary/accent brand colour as a hex code"""
+  secondaryColor: String
+}
+
+"""
+Fields required for a reseller to submit an institute creation request.
+"""
+input ResellerCreateInstituteRequestInput {
+  """Physical address of the institute."""
+  address: InstituteAddressInput
+
+  """Affiliated board name, e.g. "CBSE", "RBSE"."""
+  board: String
+
+  """Short internal code for the institute, e.g. "SA-JDH"."""
+  code: String
+
+  """Primary contact details for the institute."""
+  contact: InstituteContactInput
+
+  """Education departments offered, e.g. ["primary", "secondary"]."""
+  departments: [String!]
+
+  """
+  ID of the institute group (trust/chain/society) this institute belongs to.
+  """
+  groupId: String
+
+  """
+  Multilingual institute name, e.g. { "en": "Sunrise Academy", "hi": "सनराइज अकादमी" }.
+  """
+  name: I18nText!
+
+  """
+  Unique URL-safe slug — lowercase alphanumerics and hyphens, e.g. "sunrise-academy".
+  """
+  slug: String!
+
+  """Curriculum structure framework. Defaults to TRADITIONAL."""
+  structureFramework: StructureFramework = TRADITIONAL
+
+  """Legal/organisational type of the institute. Defaults to SCHOOL."""
+  type: InstituteType = SCHOOL
+}
+
+"""Per-reseller institute count"""
+type ResellerInstituteCount {
+  count: Int!
+  resellerId: String!
+}
+
+"""Invite a new team member to the reseller organisation"""
+input ResellerInviteTeamMemberInput {
+  """Email address for the new team member"""
+  email: String!
+
+  """First name — sent in the welcome notification"""
+  firstName: String
+
+  """Last name — sent in the welcome notification"""
+  lastName: String
+
+  """Reseller-scope role to assign. Must belong to this reseller."""
+  roleId: ID!
+
+  """Roviq ID (username) for the new team member — must be globally unique"""
+  username: String!
+}
+
+"""Result of inviting a new reseller team member"""
+type ResellerInviteTeamMemberResult {
+  membershipId: ID!
+}
+
+"""Filters for the resellerListUsers query."""
+input ResellerListUsersFilterInput {
+  """Relay cursor for forward pagination."""
+  after: String
+
+  """Number of records to return (1–100). Default 20."""
+  first: Int = 20
+
+  """
+  Filter by institute — only shows users with memberships in this specific institute.
+  """
+  instituteId: String
+
+  """Filter by membership status within the reseller's institutes."""
+  membershipStatus: [MembershipStatus!]
+
+  """Full-text search against user profile names and username."""
+  search: String
+}
+
+"""Lifecycle state of a reseller account"""
+enum ResellerStatus {
+  ACTIVE
+  DELETED
+  SUSPENDED
+}
+
+"""Filters for the resellerListTeamMembers query"""
+input ResellerTeamFilterInput {
+  """Relay-cursor for forward pagination"""
+  after: String
+  first: Int = 20
+
+  """Search against username, first name, or last name"""
+  search: String
+}
+
+type ResellerTeamMemberConnection {
+  edges: [ResellerTeamMemberEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ResellerTeamMemberEdge {
+  cursor: String!
+  node: ResellerTeamMemberModel!
+}
+
+"""
+A user who holds a reseller-scope membership in this reseller organisation (i.e. a team member, not a managed institute user)
+"""
+type ResellerTeamMemberModel {
+  createdAt: DateTime!
+  email: String!
+  id: ID!
+
+  """False when the membership has been deactivated"""
+  isActive: Boolean!
+
+  """Reseller membership row ID"""
+  membershipId: ID!
+  profile: ResellerTeamMemberProfileModel
+  roleId: ID!
+  username: String!
+}
+
+"""Profile snapshot for a reseller team member"""
+type ResellerTeamMemberProfileModel {
+  firstName: I18nText
+  lastName: I18nText
+  profileImageUrl: String
+}
+
+"""Tier controlling what a reseller can do with its assigned institutes"""
+enum ResellerTier {
+  FULL_MANAGEMENT
+  READ_ONLY
+  SUPPORT_MANAGEMENT
+}
+
+type ResellerUserConnection {
+  edges: [ResellerUserEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ResellerUserEdge {
+  cursor: String!
+  node: ResellerUserModel!
+}
+
+"""Membership record visible to the reseller — scoped to their institutes"""
+type ResellerUserMembershipModel {
+  id: ID!
+  instituteName: String
+  roleId: ID!
+  status: MembershipStatus!
+  tenantId: ID!
+}
+
+"""
+Reseller view of a user — limited to users with memberships in their institutes
+"""
+type ResellerUserModel {
+  createdAt: DateTime!
+  email: String!
+  id: ID!
+  memberships: [ResellerUserMembershipModel!]!
+  profile: ResellerUserProfileModel
+  status: UserStatus!
+  username: String!
+}
+
+"""User profile snapshot returned in reseller user listings"""
+type ResellerUserProfileModel {
+  firstName: I18nText!
+  lastName: I18nText
+  profileImageUrl: String
+}
+
+"""
+Input for revoking a guardian's access to a student (divorce/separation/custody scenario). Unlike Unlink, this preserves the link row for audit purposes and sets access flags to false — the guardian can still be viewed in the student's guardian history but cannot pick up, receive notifications, or make payments.
+"""
+input RevokeGuardianAccessInput {
+  guardianProfileId: ID!
+
+  """
+  Reason for revocation (logged to audit). Examples: "custody transferred by family court order 2026-03-15", "restraining order", "guardian deceased".
+  """
+  reason: String
+  studentProfileId: ID!
+}
+
+type Role {
+  id: ID!
+  isDefault: Boolean!
+  isSystem: Boolean!
+  name: I18nText!
+
+  """
+  Symbolic NAV_SLUGS promoted to the phone bottom tab bar for users with this role. Empty → frontend uses per-portal defaultSlugs.
+  """
+  primaryNavSlugs: [String!]!
+}
+
+"""Preview result from dry-run rule evaluation"""
+type RulePreviewResult {
+  count: Int!
+
+  """Sample of up to 10 matching membership IDs"""
+  sampleMembershipIds: [String!]!
+}
+
+type SectionCount {
+  count: Int!
+  sectionId: String!
+}
+
+"""
+One row per attendance session on the requested date — counts of marks plus the membership ids of absentees for the session.
+"""
+type SectionDailyBreakdown {
+  """Number of ABSENT marks for this session."""
+  absentCount: Int!
+
+  """Membership ids of students marked ABSENT in this session."""
+  absenteeIds: [ID!]!
+
+  """Number of LATE marks for this session."""
+  lateCount: Int!
+
+  """Number of LEAVE marks for this session."""
+  leaveCount: Int!
+
+  """Membership id of the staff who owned this session."""
+  lecturerId: ID!
+
+  """Period / lecture slot number. Null for whole-day (DAILY) attendance."""
+  period: Int
+
+  """Number of PRESENT marks for this session."""
+  presentCount: Int!
+
+  """Section the session belongs to."""
+  sectionId: ID!
+
+  """Multi-language section name resolved server-side via a JOIN."""
+  sectionName: I18nText!
+
+  """Subject being taught in this session (null for DAILY mode)."""
+  subjectId: ID
+}
+
+type SectionModel {
+  academicYearId: String!
+  batchStatus: BatchStatus
+  capacity: Int
+  classTeacherId: String
+  createdAt: DateTime!
+  currentStrength: Int!
+  displayLabel: String
+  displayOrder: Int!
+  endTime: String
+  genderRestriction: GenderRestriction!
+  id: ID!
+  mediumOfInstruction: String
+  name: I18nText!
+  room: String
+  shift: String
+  standardId: String!
+  startTime: String
+  stream: StreamObject
+  updatedAt: DateTime!
+}
+
+"""CBSE/board section size constraints"""
+input SectionStrengthNormsInput {
+  """Whether the hard max can be exceeded with principal approval"""
+  exemptionAllowed: Boolean!
+
+  """Absolute max students (with exemption)"""
+  hardMax: Float!
+
+  """Ideal students per section (e.g. 40 for CBSE)"""
+  optimal: Float!
+}
+
+type SectionStrengthNormsModel {
+  exemptionAllowed: Boolean!
+  hardMax: Float!
+  optimal: Float!
+}
+
+type SessionInfo {
+  createdAt: DateTime!
+  deviceInfo: String
+  expiresAt: DateTime!
+  id: String!
+  ipAddress: String
+  isCurrent: Boolean!
+  lastUsedAt: DateTime
+  userAgent: String
+}
+
+"""
+A single progress update emitted by the institute-setup Temporal workflow
+"""
+type SetupProgressModel {
+  completedSteps: Int!
+  instituteId: ID!
+
+  """Human-readable progress message"""
+  message: String
+  status: SetupStepStatus!
+
+  """Current step name (e.g., 'identity', 'academic_structure')"""
+  step: String!
+  totalSteps: Int!
+}
+
+enum SetupStatus {
+  COMPLETED
+  FAILED
+  IN_PROGRESS
+  PENDING
+}
+
+"""
+Status of a single institute setup step emitted by the InstituteSetupWorkflow — lifecycle: pending → in_progress → (completed | failed)
+"""
+enum SetupStepStatus {
+  COMPLETED
+  FAILED
+  IN_PROGRESS
+  PENDING
+}
+
+"""A named shift period, e.g. "Morning 8:00–12:30"."""
+input ShiftConfigInput {
+  """HH:mm format"""
+  end: String!
+
+  """Human-readable shift label, e.g. "Morning Shift" or "Evening Shift"."""
+  name: String!
+
+  """HH:mm format"""
+  start: String!
+}
+
+type ShiftConfigModel {
+  end: String!
+  name: String!
+  start: String!
+}
+
+"""Social category for government reporting (UDISE+, RTE Act)."""
+enum SocialCategory {
+  EWS
+  GENERAL
+  OBC
+  SC
+  ST
+}
+
+type SourceBreakdown {
+  applicationCount: Int!
+  enquiryCount: Int!
+  source: String!
+}
+
+"""Staff member profile with employment details"""
+type StaffModel {
+  createdAt: DateTime!
+  dateOfBirth: DateOnly
+  dateOfJoining: DateOnly
+  dateOfLeaving: DateOnly
+  department: String
+  designation: String
+
+  """Institute-assigned employee ID"""
+  employeeId: String
+  employmentType: EmploymentType
+  firstName: I18nText!
+  gender: Gender
+  id: ID!
+  isClassTeacher: Boolean!
+  lastName: I18nText
+  membershipId: String!
+  profileImageUrl: String
+  socialCategory: SocialCategory
+  specialization: String
+  updatedAt: DateTime!
+  userId: String!
+  version: Int!
+}
+
+"""Structured staff qualification (academic degree or certification)"""
+type StaffQualificationModel {
+  boardUniversity: String
+  certificateUrl: String
+  createdAt: DateTime!
+  degreeName: String!
+  gradePercentage: String
+  id: ID!
+  institution: String
+  staffProfileId: ID!
+  type: QualificationType!
+  yearOfPassing: Int
+}
+
+"""Staff statistics by department"""
+type StaffStatistics {
+  active: Int!
+  byDepartment: [DepartmentCount!]!
+  classTeachers: Int!
+  total: Int!
+}
+
+type StandardCount {
+  count: Int!
+  standardId: String!
+}
+
+type StandardModel {
+  academicYearId: String!
+  createdAt: DateTime!
+  department: String
+  id: ID!
+  isBoardExamClass: Boolean!
+  level: EducationLevel
+  maxSectionsAllowed: Int
+  maxStudentsPerSection: Int
+  name: I18nText!
+  nepStage: NepStage
+  numericOrder: Int!
+  streamApplicable: Boolean!
+  udiseClassCode: Int
+  updatedAt: DateTime!
+}
+
+type StartImpersonationResult {
+  code: String
+  requiresOtp: Boolean
+  sessionId: String
+}
+
+type StatusCount {
+  count: Int!
+  status: String!
+}
+
+"""Stream (specialisation) for a section — name and short code."""
+input StreamInput {
+  """Short code used in reports, e.g. "SC", "CO", "AR"."""
+  code: String!
+
+  """Human-readable stream name, e.g. "Science" or "Commerce"."""
+  name: String!
+}
+
+type StreamObject {
+  code: String!
+  name: String!
+}
+
+enum StructureFramework {
+  NEP
+  TRADITIONAL
+}
+
+"""
+A single academic-year record for a student (year, class, section, roll number)
+"""
+type StudentAcademicHistoryModel {
+  academicYearId: String!
+  academicYearLabel: String!
+  createdAt: DateTime!
+  id: ID!
+  isCurrentYear: Boolean!
+  promotionStatus: String
+  rollNumber: String
+  sectionId: String
+  sectionName: I18nText
+  standardId: String
+  standardName: I18nText
+  studentProfileId: String!
+  updatedAt: DateTime!
+}
+
+type StudentConnection {
+  edges: [StudentEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"""A user document upload (birth certificate, TC, report card, etc.)"""
+type StudentDocumentModel {
+  createdAt: DateTime!
+  description: String
+  expiryDate: DateOnly
+  fileUrls: [String!]!
+  id: ID!
+  isVerified: Boolean!
+  referenceNumber: String
+  rejectionReason: String
+  type: String!
+  updatedAt: DateTime!
+  userId: String!
+  verifiedAt: String
+  verifiedBy: String
+}
+
+type StudentEdge {
+  cursor: String!
+  node: StudentModel!
+}
+
+"""Filter + pagination input for listStudents (ROV-154)"""
+input StudentFilterInput {
+  """Filter by academic_status (multi)"""
+  academicStatus: [AcademicStatus!]
+
+  """Filter by academic year (defaults to active year)"""
+  academicYearId: ID
+  after: String
+  first: Int = 25
+  gender: Gender
+  isRteAdmitted: Boolean
+
+  """Sort directive (e.g. admissionNumber:asc)"""
+  orderBy: String
+
+  """Full-text search on name + admission number"""
+  search: String
+  sectionId: ID
+  socialCategory: SocialCategory
+  standardId: ID
+}
+
+"""
+Guardian linked to a student, joined with display name and link metadata
+"""
+type StudentGuardianModel {
+  """True if this guardian is authorised to pick the student up."""
+  canPickup: Boolean!
+
+  """
+  Guardian's first name (i18nText); resolved client-side via useI18nField().
+  """
+  firstName: I18nText!
+
+  """guardian_profiles.id for the linked guardian."""
+  guardianProfileId: String!
+
+  """True if this guardian should be contacted in emergencies."""
+  isEmergencyContact: Boolean!
+
+  """True if this guardian is the primary contact for the student."""
+  isPrimaryContact: Boolean!
+
+  """Guardian's last name (i18nText); optional."""
+  lastName: I18nText
+
+  """
+  student_guardian_links row id — needed for unlink / update-link mutations.
+  """
+  linkId: ID!
+
+  """True if the student lives with this guardian."""
+  livesWith: Boolean!
+
+  """Guardian occupation (free text)."""
+  occupation: String
+
+  """Employer / organisation (free text)."""
+  organization: String
+
+  """Profile photo URL, or null before upload."""
+  profileImageUrl: String
+
+  """Relationship of the guardian to the student."""
+  relationship: GuardianRelationship!
+
+  """Underlying user account id of the guardian."""
+  userId: String!
+}
+
+"""
+One row per attendance entry belonging to a single student across a date range — used for per-student attendance history.
+"""
+type StudentHistoryItem {
+  """ISO YYYY-MM-DD date of the session."""
+  date: String!
+  markedAt: DateTime!
+  period: Int
+  remarks: String
+  sectionId: ID!
+  sessionId: ID!
+  status: AttendanceStatus!
+  subjectId: ID
+}
+
+"""Student profile with resolved user profile and current academic record"""
+type StudentModel {
+  academicStatus: AcademicStatus!
+  admissionClass: String
+  admissionDate: DateOnly!
+  admissionNumber: String!
+  admissionType: AdmissionType!
+  bloodGroup: String
+  caste: String
+  createdAt: DateTime!
+  currentAcademicYearId: String
+  currentSectionId: String
+  currentSectionName: I18nText
+  currentStandardId: String
+  currentStandardName: I18nText
+  currentStudentAcademicId: String
+  cwsnType: String
+  dateOfBirth: DateOnly
+  dateOfLeaving: DateOnly
+  firstName: I18nText!
+  gender: Gender
+  id: ID!
+  isBpl: Boolean!
+  isCwsn: Boolean!
+  isMinority: Boolean!
+  isRteAdmitted: Boolean!
+  lastName: I18nText
+
+  """Student medical information"""
+  medicalInfo: MedicalInfoObject
+  membershipId: String!
+  minorityType: MinorityType
+  motherTongue: String
+  previousSchoolBoard: String
+  previousSchoolName: String
+  primaryGuardianFirstName: I18nText
+  primaryGuardianLastName: I18nText
+  profileImageUrl: String
+  religion: String
+  rollNumber: String
+  rteCertificate: String
+  socialCategory: SocialCategory!
+  tcIssued: Boolean!
+  tcIssuedDate: DateOnly
+  tcNumber: String
+  tcReason: String
+  tenantId: String!
+  updatedAt: DateTime!
+  userId: String!
+  version: Int!
+}
+
+"""Aggregate student statistics for the current institute (ROV-154)"""
+type StudentStatisticsModel {
+  byCategory: [CategoryCount!]!
+  byGender: [GenderCount!]!
+  bySection: [SectionCount!]!
+  byStandard: [StandardCount!]!
+  byStatus: [StatusCount!]!
+  total: Int!
+}
+
+type SubjectModel {
+  boardCode: String
+  createdAt: DateTime!
+  electiveGroup: String
+  hasPractical: Boolean!
+  id: ID!
+  internalMarks: Int
+  isElective: Boolean!
+  isMandatory: Boolean!
+  name: String!
+  practicalMarks: Int
+  shortName: String
+  theoryMarks: Int
+  type: SubjectType!
+  updatedAt: DateTime!
+}
+
+"""Category of a subject — determines how it is graded and reported."""
+enum SubjectType {
+  ACADEMIC
+  EXTRACURRICULAR
+  INTERNAL_ASSESSMENT
+  LANGUAGE
+  SKILL
+}
+
+input SubmitUpiProofInput {
+  invoiceId: ID!
+  utrNumber: String!
+}
+
+type Subscription {
+  adminInstituteApprovalRequested: InstituteModel!
+  adminInstituteCreated: InstituteModel!
+
+  """
+  Platform-admin setup progress stream for a specific institute — emits on every step transition
+  """
+  adminInstituteSetupProgress(instituteId: ID!): SetupProgressModel!
+  adminResellerCreated: AdminResellerModel!
+  adminResellerStatusChanged: AdminResellerModel!
+  adminResellerTierChanged: AdminResellerModel!
+  adminResellerUpdated: AdminResellerModel!
+
+  """Real-time application status changes"""
+  applicationStatusChanged: ApplicationStatusUpdate!
+
+  """Real-time new enquiry notifications"""
+  enquiryCreated: EnquiryModel!
+
+  """Real-time group resolution updates, filtered by groupId + tenant"""
+  groupMembershipResolved(groupId: ID!): GroupResolutionUpdate!
+  instituteBrandingUpdated: InstituteModel!
+  instituteConfigUpdated: InstituteModel!
+  instituteSetupProgress: JSON!
+  instituteUpdated: InstituteModel!
+  myInvoiceGenerated: InvoiceModel!
+  myPaymentStatusChanged: PaymentModel!
+  mySubscriptionStatusChanged: SubscriptionModel!
+  resellerInstituteCreated: InstituteModel!
+  resellerInstituteStatusChanged: InstituteModel!
+  resellerInvoiceGenerated: InvoiceModel!
+  resellerPaymentReceived: PaymentModel!
+  resellerSubscriptionChanged: SubscriptionModel!
+  studentUpdated(studentId: ID!): StudentModel!
+  studentsInTenantUpdated: StudentModel!
+}
+
+type SubscriptionModel {
+  cancelReason: String
+  cancelledAt: DateTime
+  createdAt: DateTime!
+  currentPeriodEnd: DateTime
+  currentPeriodStart: DateTime
+  gatewayProvider: String
+  gatewaySubscriptionId: String
+  id: ID!
+  institute: InstituteRef
+  pauseReason: String
+  pausedAt: DateTime
+  plan: SubscriptionPlanModel
+  planId: String!
+  resellerId: String!
+  status: SubscriptionStatus!
+  tenantId: String!
+  trialEndsAt: DateTime
+  updatedAt: DateTime!
+}
+
+type SubscriptionModelEdge {
+  cursor: String!
+  node: SubscriptionModel!
+}
+
+type SubscriptionPlanModel {
+  amount: BigInt!
+  createdAt: DateTime!
+  currency: String!
+  description: I18nText
+  entitlements: JSON!
+  id: ID!
+  interval: BillingInterval!
+  name: I18nText!
+  sortOrder: Int
+  status: PlanStatus!
+  subscriberCount: Int!
+  trialDays: Int!
+  updatedAt: DateTime!
+
+  """Optimistic concurrency version counter"""
+  version: Int!
+}
+
+type SubscriptionRef {
+  id: ID!
+  institute: InstituteRef
+}
+
+"""Current state of a subscription."""
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+  PAUSED
+  TRIALING
+}
+
+"""Transfer Certificate register entry"""
+type TCModel {
+  academicYearId: String!
+
+  """Department clearance records"""
+  clearances: [ClearanceEntryObject!]
+  createdAt: DateTime!
+
+  """Class/standard studied snapshot from tcData->>'class_studied'"""
+  currentStandardName: String
+  id: ID!
+  isCounterSigned: Boolean
+  isDuplicate: Boolean!
+  originalTcId: String
+  pdfUrl: String
+  qrVerificationUrl: String
+  reason: String!
+  status: TcStatus!
+
+  """Student first name (i18n) joined from user_profiles"""
+  studentFirstName: I18nText!
+
+  """Student last name (i18n) joined from user_profiles"""
+  studentLastName: I18nText
+  studentProfileId: String!
+
+  """CBSE 20-field TC data snapshot"""
+  tcData: JSON
+  tcSerialNumber: String!
+}
+
+enum TcStatus {
+  APPROVED
+  CANCELLED
+  CLEARANCE_COMPLETE
+  CLEARANCE_PENDING
+  DUPLICATE_ISSUED
+  DUPLICATE_REQUESTED
+  GENERATED
+  ISSUED
+  REQUESTED
+  REVIEW_PENDING
+}
+
+"""Term/semester period within an academic year"""
+input TermConfigInput {
+  """ISO date YYYY-MM-DD"""
+  endDate: String!
+
+  """Display label (e.g. "Term 1", "Semester 2")"""
+  label: String!
+
+  """ISO date YYYY-MM-DD"""
+  startDate: String!
+}
+
+type TermConfigModel {
+  endDate: DateOnly!
+  label: String!
+  startDate: DateOnly!
+}
+
+"""
+Input for unlinking a guardian from a student. If the unlinked guardian is the current primary contact, `newPrimaryGuardianId` MUST be provided — the service enforces that every student has exactly one primary.
+"""
+input UnlinkGuardianInput {
+  guardianProfileId: ID!
+
+  """
+  Required only when unlinking the current primary contact — must reference another guardian already linked to this student who will become the new primary.
+  """
+  newPrimaryGuardianId: ID
+  studentProfileId: ID!
+}
+
+"""
+Fields that can be updated on an existing academic year. All fields are optional.
+"""
+input UpdateAcademicYearInput {
+  """
+  Board exam dates keyed by board name, e.g. { "CBSE": "2026-03-01", "BSEH": "2026-03-10" }.
+  """
+  boardExamDates: JSON
+
+  """Last day of the academic year (ISO date YYYY-MM-DD)."""
+  endDate: String
+
+  """Academic year label in YYYY-YY format, e.g. "2025-26"."""
+  label: String
+
+  """First day of the academic year (ISO date YYYY-MM-DD)."""
+  startDate: String
+
+  """Optional term or semester breakdown within this academic year."""
+  termStructure: [TermConfigInput!]
+}
+
+"""Input for updating an application status (ROV-159)"""
+input UpdateApplicationInput {
+  """Updated form data (partial merge)"""
+  formData: JSON
+  interviewScore: String
+  meritRank: Float
+  sectionId: ID
+
+  """New status (validated by state machine)"""
+  status: AdmissionApplicationStatus!
+  testScore: String
+}
+
+"""
+Fields that can be updated on an existing bot. All fields are optional.
+"""
+input UpdateBotInput {
+  """Bot-specific configuration as JSON string"""
+  config: String
+
+  """Rate limit tier for API calls"""
+  rateLimitTier: BotRateLimitTier
+
+  """Bot lifecycle state"""
+  status: BotStatus
+
+  """Webhook URL for outbound event delivery"""
+  webhookUrl: String
+}
+
+"""
+Fields that can be updated on an existing admission enquiry. All fields are optional.
+"""
+input UpdateEnquiryInput {
+  """Staff member responsible for following up on this enquiry."""
+  assignedTo: ID
+
+  """Requested class or grade, e.g. "Nursery", "LKG", "Class 5"."""
+  classRequested: String
+
+  """Scheduled follow-up date (ISO date YYYY-MM-DD)."""
+  followUpDate: String
+
+  """Internal notes for the admissions team."""
+  notes: String
+
+  """Parent contact email address."""
+  parentEmail: String
+
+  """Name of the parent or guardian who submitted the enquiry."""
+  parentName: String
+
+  """10-digit Indian mobile number (without +91 prefix)."""
+  parentPhone: String
+
+  """Name of the person or campaign who referred the enquiry."""
+  referredBy: String
+
+  """Admission number of the enrolled sibling (if siblingInSchool is true)."""
+  siblingAdmissionNo: String
+
+  """Whether the prospective student has a sibling already enrolled."""
+  siblingInSchool: Boolean
+
+  """Channel through which this enquiry was received."""
+  source: EnquirySource
+
+  """Any special educational needs or disabilities to note."""
+  specialNeeds: String
+
+  """Lifecycle status of this enquiry."""
+  status: EnquiryStatus
+
+  """Name of the prospective student."""
+  studentName: String
+}
+
+input UpdateGatewayConfigInput {
+  credentials: JSON
+  displayName: String
+  isDefault: Boolean
+  status: GatewayConfigStatus
+  supportedMethods: [String!]
+  testMode: Boolean
+  webhookSecret: String
+}
+
+"""
+Fields that can be updated on an existing group. All fields are optional.
+"""
+input UpdateGroupInput {
+  """Optional description of the group's purpose."""
+  description: String
+
+  """Human-readable group name."""
+  name: String
+
+  """Updated JsonLogic rule object for dynamic membership."""
+  rule: JSON
+
+  """Human-readable explanation of the updated rule."""
+  ruleDescription: String
+
+  """Lifecycle status of the group."""
+  status: DynamicGroupStatus
+}
+
+"""
+Input for updating a guardian profile. All fields are optional; only dirty fields are sent. Optimistic concurrency enforced via the `version` field.
+"""
+input UpdateGuardianInput {
+  """Guardian job title inside their organisation (free text)."""
+  designation: String
+
+  """
+  Guardian's highest completed education level. Constrained enum — mirrors the chk_education_level DB constraint.
+  """
+  educationLevel: GuardianEducationLevel
+
+  """
+  Guardian first name as an i18nText map. Only sent when the form dirties this field.
+  """
+  firstName: I18nText
+  lastName: I18nText
+
+  """Guardian occupation (free text)."""
+  occupation: String
+
+  """Employer / organisation the guardian works at (free text)."""
+  organization: String
+
+  """
+  Current version the client read. The update fails with a ConflictException when the stored row has a higher version.
+  """
+  version: Int!
+}
+
+"""Edit a holiday — any subset of fields may be supplied."""
+input UpdateHolidayInput {
+  description: String
+  endDate: String
+  isPublic: Boolean
+
+  """Localised name. English key must remain populated."""
+  name: I18nText
+  startDate: String
+  tags: [String!]
+  type: HolidayType
+}
+
+"""
+Visual branding fields for the institute portal. All fields are optional.
+"""
+input UpdateInstituteBrandingInput {
+  """
+  MinIO/S3 URL of a cover/banner image shown on login and dashboard hero sections.
+  """
+  coverImageUrl: String
+
+  """MinIO/S3 URL of the favicon (16×16 or 32×32 PNG/ICO)."""
+  faviconUrl: String
+
+  """MinIO/S3 URL of the institute logo shown in the portal header."""
+  logoUrl: String
+
+  """
+  Primary brand colour in hex format, e.g. "#1677FF". Used for buttons, links, and highlights.
+  """
+  primaryColor: String
+
+  """
+  Secondary brand colour in hex format, e.g. "#5BC0EB". Used for accents and secondary actions.
+  """
+  secondaryColor: String
+
+  """Theme identifier key for switching between pre-built UI theme presets."""
+  themeIdentifier: String
+}
+
+"""
+Fields that can be updated on the institute configuration. All fields are optional.
+"""
+input UpdateInstituteConfigInput {
+  """
+  How attendance is recorded — once per day (DAILY) or per lecture/period (LECTURE_WISE).
+  """
+  attendanceType: AttendanceType
+
+  """HH:mm format"""
+  closingTime: String
+  gradingSystem: JSON
+  notificationPreferences: JSON
+
+  """HH:mm format"""
+  openingTime: String
+  payrollConfig: JSON
+  sectionStrengthNorms: SectionStrengthNormsInput
+  shifts: [ShiftConfigInput!]
+  termStructure: [TermConfigInput!]
+}
+
+"""
+Fields that can be updated on an existing institute group. All fields are optional.
+"""
+input UpdateInstituteGroupInput {
+  """Updated registered address of the group."""
+  address: InstituteAddressInput
+
+  """Updated primary contact details for the group."""
+  contact: InstituteContactInput
+  name: String
+  registrationNumber: String
+  registrationState: IndianState
+
+  """
+  Optimistic concurrency version counter — must match current server value.
+  """
+  version: Int!
+}
+
+"""
+Updatable identity fields for an institute. Requires version for optimistic concurrency.
+"""
+input UpdateInstituteInfoInput {
+  """Physical address of the institute."""
+  address: InstituteAddressInput
+
+  """
+  Short internal code for the institute, e.g. "SAJ". Unique per reseller.
+  """
+  code: String
+
+  """Phone and email contact details."""
+  contact: InstituteContactInput
+
+  """ISO 4217 currency code (exactly 3 characters), e.g. "INR"."""
+  currency: String
+
+  """
+  Localised institute name, e.g. { en: "Sunrise Academy", hi: "सनराइज़ अकैडमी" }.
+  """
+  name: I18nText
+
+  """
+  IANA timezone identifier, e.g. "Asia/Kolkata". Defaults to Asia/Kolkata if not set.
+  """
+  timezone: String
+
+  """
+  Current version — used for optimistic concurrency. Fails with ConflictException if stale.
+  """
+  version: Int!
+}
+
+"""Edit a PENDING leave — dates, type, reason, or supporting files."""
+input UpdateLeaveInput {
+  endDate: String
+  fileUrls: [String!]
+  reason: String
+  startDate: String
+  type: LeaveType
+}
+
+"""
+Self-service profile update — users can change contact info and personal metadata. Cannot change name, DOB, gender, or identity documents (admin-only fields).
+"""
+input UpdateMyProfileInput {
+  """Mother tongue (free text, e.g. "Hindi"). Null to clear."""
+  motherTongue: String
+
+  """Nationality (free text, e.g. "Indian"). Null to clear."""
+  nationality: String
+
+  """10-digit Indian mobile number (starts with 6-9). Null to clear."""
+  phone: String
+
+  """Absolute URL to the profile photo hosted on MinIO/S3. Null to clear."""
+  profileImageUrl: String
+
+  """Religion (free text). Null to clear."""
+  religion: String
+}
+
+"""Enable/disable delivery channels for a specific notification type."""
+input UpdateNotificationConfigInput {
+  """
+  Cron expression controlling digest delivery schedule, e.g. "0 8 * * *" for 08:00 daily.
+  """
+  digestCron: String
+
+  """
+  Whether to batch and deliver this notification as a daily/weekly digest instead of immediately.
+  """
+  digestEnabled: Boolean
+
+  """Whether to deliver this notification via email."""
+  emailEnabled: Boolean
+
+  """Whether to show this notification as an in-app bell/feed notification."""
+  inAppEnabled: Boolean
+
+  """
+  Notification type key, e.g. "FEE_REMINDER", "ATTENDANCE_ALERT". Must match a registered Novu event slug.
+  """
+  notificationType: String!
+
+  """Whether to deliver this notification via push (FCM/APNS)."""
+  pushEnabled: Boolean
+
+  """Whether to deliver this notification via WhatsApp."""
+  whatsappEnabled: Boolean
+}
+
+input UpdatePlanInput {
+  amount: BigInt
+  description: I18nText
+  entitlements: JSON
+  interval: BillingInterval
+  name: I18nText
+  sortOrder: Int
+  trialDays: Int
+  version: Int!
+}
+
+"""
+Set a role's bottom-tab-bar destinations. Empty array clears the customization (frontend falls back to per-portal defaults).
+"""
+input UpdateRolePrimaryNavInput {
+  roleId: ID!
+
+  """
+  Up to 4 symbolic NAV_SLUGS, in display order. Slugs the user has no ability for are silently skipped at render time.
+  """
+  slugs: [String!]!
+}
+
+"""
+Fields that can be updated on an existing section. All fields are optional.
+"""
+input UpdateSectionInput {
+  """Lifecycle state of this section batch (Upcoming → Active → Completed)."""
+  batchStatus: BatchStatus
+
+  """Maximum number of students allowed in this section."""
+  capacity: Int
+
+  """
+  Membership ID of the staff member assigned as class teacher. Pass null to unassign.
+  """
+  classTeacherId: ID
+
+  """Short display label shown in timetables, e.g. "A" or "Blue"."""
+  displayLabel: String
+
+  """Sort order among siblings of the same standard (ascending)."""
+  displayOrder: Int
+
+  """Section end time in HH:mm or HH:mm:ss (24-hour format)."""
+  endTime: String
+
+  """Gender enrollment restriction for this section."""
+  genderRestriction: GenderRestriction
+
+  """Primary language of instruction, e.g. "English" or "Hindi"."""
+  mediumOfInstruction: String
+
+  """Localised section name, e.g. { en: "5-A", hi: "5-अ" }."""
+  name: I18nText
+
+  """Room or classroom identifier, e.g. "Room 12" or "Lab B"."""
+  room: String
+
+  """
+  Shift identifier when the institute runs multiple shifts, e.g. "Morning" or "Evening".
+  """
+  shift: String
+
+  """Section start time in HH:mm or HH:mm:ss (24-hour format)."""
+  startTime: String
+
+  """
+  Stream (specialisation) for this section. Only applies when streamApplicable is true on the parent standard.
+  """
+  stream: StreamInput
+}
+
+"""Input for updating staff member — optimistic concurrency via version"""
+input UpdateStaffInput {
+  department: String
+  designation: String
+  employmentType: EmploymentType
+  isClassTeacher: Boolean
+  socialCategory: SocialCategory
+  specialization: String
+
+  """
+  Current version the client read. The update fails with a ConflictException when the stored row has a higher version.
+  """
+  version: Int!
+}
+
+"""
+Input for updating an existing staff qualification record. All fields are optional.
+"""
+input UpdateStaffQualificationInput {
+  """Examining board or university name."""
+  boardUniversity: String
+
+  """MinIO/S3 URL of the uploaded certificate scan."""
+  certificateUrl: String
+
+  """
+  Name of the degree or certification, e.g. "B.Ed", "CTET", "M.Sc Physics".
+  """
+  degreeName: String
+
+  """
+  Grade, percentage, or GPA as reported on the certificate, e.g. "85.5%", "A+".
+  """
+  gradePercentage: String
+
+  """Institution or university that awarded this qualification."""
+  institution: String
+
+  """Whether this is an academic degree or a professional certification."""
+  type: QualificationType
+
+  """Year of passing/graduation (1900–2100)."""
+  yearOfPassing: Int
+}
+
+"""
+Fields that can be updated on an existing standard. All fields are optional.
+"""
+input UpdateStandardInput {
+  """
+  Department for this standard, e.g. "Science". Relevant for senior-secondary only.
+  """
+  department: String
+
+  """Whether students in this standard appear in board examinations."""
+  isBoardExamClass: Boolean
+
+  """
+  Education level this standard falls under (pre-primary through senior secondary).
+  """
+  level: EducationLevel
+
+  """
+  Maximum number of sections allowed for this standard. Null means unlimited.
+  """
+  maxSectionsAllowed: Int
+
+  """Default maximum students per section. Can be overridden per section."""
+  maxStudentsPerSection: Int
+
+  """Localised name, e.g. { en: "Class 5", hi: "कक्षा 5" }."""
+  name: I18nText
+
+  """
+  NEP 2020 stage. Required when the institute uses the NEP structure framework.
+  """
+  nepStage: NepStage
+
+  """Sort order used for display in timetables and reports (0 = first)."""
+  numericOrder: Int
+
+  """
+  Whether stream selection (Science/Commerce/Arts) applies to sections in this standard.
+  """
+  streamApplicable: Boolean
+
+  """UDISE+ class code for Ministry of Education government reporting."""
+  udiseClassCode: Int
+}
+
+"""
+Input for updating a student (ROV-154). Optimistic concurrency via version.
+"""
+input UpdateStudentInput {
+  """
+  New academic status — validated against the state machine before persisting.
+  """
+  academicStatus: AcademicStatus
+  bloodGroup: String
+  caste: String
+  cwsnType: String
+  dateOfBirth: String
+  dateOfLeaving: String
+  firstName: I18nText
+  gender: Gender
+  isBpl: Boolean
+  isCwsn: Boolean
+  isMinority: Boolean
+  isRteAdmitted: Boolean
+  lastName: I18nText
+  minorityType: MinorityType
+  motherTongue: String
+  religion: String
+  rteCertificate: String
+  socialCategory: SocialCategory
+  tcIssued: Boolean
+  tcIssuedDate: String
+  tcNumber: String
+  tcReason: String
+
+  """Expected version for optimistic concurrency"""
+  version: Int!
+}
+
+"""Input for changing a student section (ROV-154)"""
+input UpdateStudentSectionInput {
+  """Target section to move the student to"""
+  newSectionId: ID!
+
+  """Required reason when overriding capacity hard limit"""
+  overrideReason: String
+  studentAcademicId: ID!
+}
+
+"""
+Fields that can be updated on an existing subject. All fields are optional.
+"""
+input UpdateSubjectInput {
+  """Board-assigned subject code used in marksheets and result uploads."""
+  boardCode: String
+
+  """
+  Groups elective subjects so the system enforces one-per-group selection.
+  """
+  electiveGroup: String
+
+  """Whether a separate practical component exists alongside theory."""
+  hasPractical: Boolean
+
+  """Maximum marks for internal/continuous assessment."""
+  internalMarks: Int
+
+  """Whether students can opt into or out of this subject."""
+  isElective: Boolean
+
+  """Whether attendance in this subject is compulsory for promotion."""
+  isMandatory: Boolean
+
+  """Display name of the subject."""
+  name: String
+
+  """Maximum marks allocated to the practical component."""
+  practicalMarks: Int
+
+  """Abbreviated label shown in timetables, e.g. "Math". Max 10 characters."""
+  shortName: String
+
+  """Maximum marks allocated to the theory component."""
+  theoryMarks: Int
+
+  """
+  Subject category that controls grading rules and report card placement.
+  """
+  type: SubjectType
+}
+
+"""
+Input for uploading document metadata (with pre-uploaded MinIO/S3 URLs) against a student profile.
+"""
+input UploadStudentDocumentInput {
+  """Optional human-readable description of the document contents."""
+  description: String
+
+  """One or more MinIO/S3 URLs — one URL per page for multi-page scans."""
+  fileUrls: [String!]!
+
+  """
+  Document reference number for traceability, e.g. TC number, certificate serial number.
+  """
+  referenceNumber: String
+
+  """Target student profile ID (tenant-scoped UUIDv7)."""
+  studentProfileId: ID!
+
+  """
+  Document category — must match one of the 17 values enforced by the user_documents.type CHECK constraint.
+  """
+  type: UserDocumentType!
+}
+
+"""
+Document category — mirrors the 17 values enforced by the user_documents.type CHECK constraint.
+"""
+enum UserDocumentType {
+  AADHAAR_CARD
+  ADDRESS_PROOF
+  AFFIDAVIT
+  BIRTH_CERTIFICATE
+  BPL_CARD
+  CASTE_CERTIFICATE
+  DISABILITY_CERTIFICATE
+  EWS_CERTIFICATE
+  FAMILY_PHOTO
+  INCOME_CERTIFICATE
+  MEDICAL_CERTIFICATE
+  NOC
+  OTHER
+  PASSPORT_PHOTO
+  REPORT_CARD
+  TC_INCOMING
+  TRANSFER_ORDER
+}
+
+"""Common user profile data (platform-level)"""
+type UserProfileData {
+  bloodGroup: String
+  dateOfBirth: DateOnly
+  firstName: I18nText!
+  gender: String
+  id: ID!
+  lastName: I18nText
+  nationality: String
+  profileImageUrl: String
+  userId: String!
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+  SUSPENDED
+}
+
+type UserType {
+  abilityRules: [JSONObject!]
+  email: String!
+  id: String!
+  membershipId: String
+  primaryNavSlugs: [String!]
+  resellerId: String
+  roleId: String
+  scope: String
+  tenantId: String
+  username: String!
+}
+
+"""
+WebAuthn authentication response returned by the browser authenticator.
+"""
+input VerifyPasskeyAuthInput {
+  """Challenge ID returned by the generatePasskeyAuthentication query."""
+  challengeId: String!
+
+  """
+  Public-key credential response object from navigator.credentials.get() — pass the full JSON as-is.
+  """
+  credential: JSON!
+}
+
+"""WebAuthn registration response returned by the browser authenticator."""
+input VerifyPasskeyRegistrationInput {
+  """
+  Public-key credential response object from navigator.credentials.create() — pass the full JSON as-is.
+  """
+  credential: JSON!
+
+  """
+  Human-readable label for this passkey, e.g. "MacBook Touch ID". Max 100 chars.
+  """
+  name: String
+}
+
+input VerifyPaymentGqlInput {
+  gatewayOrderId: String!
+  gatewayPaymentId: String!
+  signature: String!
+}
+
+"""
+Input for withdrawing parental consent for a specific data processing purpose
+"""
+input WithdrawConsentInput {
+  """
+  Data processing purpose to withdraw: academic_data_processing, photo_video_marketing, whatsapp_communication, sms_communication, aadhaar_collection, biometric_collection, third_party_edtech, board_exam_registration, transport_tracking, health_data_processing, cctv_monitoring
+  """
+  purpose: String!
+
+  """The student profile to withdraw consent for"""
+  studentProfileId: ID!
+}

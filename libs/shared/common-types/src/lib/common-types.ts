@@ -1,29 +1,136 @@
+// biome-ignore-all lint/suspicious/noTemplateCurlyInString: '${user.id}' strings are CASL condition placeholders, not JS templates
 import type { MongoAbility, RawRuleOf } from '@casl/ability';
 
 // CASL Actions
 export const AppAction = {
+  /** Superuser action — implies all other actions; granted only to institute admins and platform admins */
   Manage: 'manage',
+  /** Create a new resource (e.g. enroll a student, add a section). Checked before INSERT operations */
   Create: 'create',
+  /** View/list a resource. The most common action; almost every role has Read on some subjects */
   Read: 'read',
+  /** Modify an existing resource (e.g. mark attendance, edit timetable). Checked before UPDATE operations */
   Update: 'update',
+  /** Permanently remove or soft-delete a resource. Typically restricted to admin roles */
   Delete: 'delete',
+  /** Update institute basic info (name, code, contact, address) — more restricted than full Update */
+  UpdateInfo: 'update_info',
+  /** Update institute visual branding (logo, colors, theme) */
+  UpdateBranding: 'update_branding',
+  /** Update institute operational config (attendance type, shifts, grading, strength norms) */
+  UpdateConfig: 'update_config',
+  /** Approve a pending entity (e.g. PENDING_APPROVAL → PENDING for institutes) */
+  Approve: 'approve',
+  /** Activate an entity (PENDING/INACTIVE/SUSPENDED → ACTIVE) — requires setup completion */
+  Activate: 'activate',
+  /** Deactivate an active entity (ACTIVE → INACTIVE) */
+  Deactivate: 'deactivate',
+  /** Suspend an entity for policy/compliance reasons (any → SUSPENDED) */
+  Suspend: 'suspend',
+  /** Reject a pending entity (PENDING_APPROVAL → REJECTED) — terminal state */
+  Reject: 'reject',
+  /** Archive an academic year — transition to read-only state */
+  Archive: 'archive',
+  /** Assign a teacher to a section */
+  AssignTeacher: 'assign_teacher',
+  /** View aggregate statistics for an entity (dashboard metrics) */
+  ViewStatistics: 'view_statistics',
+  /** Restore a soft-deleted resource from trash — typically platform admin only */
+  Restore: 'restore',
+  /** Allows a platform admin to act as another user within an institute for debugging/support purposes */
+  Impersonate: 'impersonate',
 } as const;
 
 export type AppAction = (typeof AppAction)[keyof typeof AppAction];
 
-// CASL Subjects — must match Prisma model names
+// CASL Subjects — must match Drizzle table/entity names
 export const AppSubject = {
+  /** Wildcard subject — when paired with Manage, grants full access to every resource */
   All: 'all',
-  Organization: 'Organization',
+  /** Academic year / session (e.g. 2025-26). Controls term dates, fee cycles, and promotions */
+  AcademicYear: 'AcademicYear',
+  /** The institute (tenant) itself — settings, branding, onboarding status */
+  Institute: 'Institute',
+  /** Any user account (staff, teacher, parent). Distinct from Student, which is an enrollment record */
   User: 'User',
+  /** Custom or default role within an institute — controls which abilities a membership carries */
   Role: 'Role',
+  /** Student enrollment record linked to a section and academic year */
   Student: 'Student',
+  /** A class section (e.g. "10-A"). Students and timetables are scoped to sections */
   Section: 'Section',
+  /** A grade/class level (e.g. "Class 10"). Sections belong to a standard */
   Standard: 'Standard',
+  /** An academic subject (e.g. "Mathematics"). Linked to timetable slots and teachers */
   Subject: 'Subject',
+  /** Weekly timetable grid — maps time slots to subjects, teachers, and sections */
   Timetable: 'Timetable',
+  /** Daily attendance records for students. Teachers create/update; students can only read their own */
   Attendance: 'Attendance',
+  /** Leave applications (student + staff) — apply, approve, reject, cancel. Feeds attendance auto-seed */
+  Leave: 'Leave',
+  /** Institute holiday calendar — admins publish, attendance consults to block session creation */
+  Holiday: 'Holiday',
+  /** Immutable log of user actions for compliance and debugging. Read-only for all roles */
   AuditLog: 'AuditLog',
+  /** Platform-level pricing plan that institutes subscribe to (e.g. Starter, Pro) */
+  SubscriptionPlan: 'SubscriptionPlan',
+  /** An institute's active subscription to a plan — tracks billing interval, status, and renewal */
+  Subscription: 'Subscription',
+  /** A billing invoice generated for a subscription period. Tracks payment status and due dates */
+  Invoice: 'Invoice',
+  /** A payment record created when a gateway processes a charge (immutable, append-only) */
+  Payment: 'Payment',
+  /** Razorpay or Cashfree gateway credentials configured for a reseller */
+  PaymentGatewayConfig: 'PaymentGatewayConfig',
+  /** Reseller billing dashboard — aggregate metrics, revenue, MRR */
+  BillingDashboard: 'BillingDashboard',
+  /** Reseller account itself — platform admin manages tier, suspension, branding, assigned institutes */
+  Reseller: 'Reseller',
+  /** A logical group of institutes managed together (e.g. a franchise or trust with multiple branches) */
+  InstituteGroup: 'InstituteGroup',
+  /** DPDP Act 2023 parental consent record — append-only audit trail for data processing purposes */
+  Consent: 'Consent',
+  /** Automated service account for notifications, integrations, chatbots, and bulk operations */
+  Bot: 'Bot',
+  /** Pre-admission enquiry from a prospective parent/student */
+  Enquiry: 'Enquiry',
+  /** Formal admission application with form data and status lifecycle */
+  Application: 'Application',
+  /** Guardian/parent linked to one or more students */
+  Guardian: 'Guardian',
+  /** Dynamic group — rule-based, composite, or static membership */
+  Group: 'Group',
+  /** Staff member profile — teacher, admin, support staff */
+  Staff: 'Staff',
+  /** Confidential counselor session notes — restricted to counselor + admin */
+  CounselorNotes: 'CounselorNotes',
+  /** Student health/medical records — restricted to nurse + admin + counselor */
+  HealthRecord: 'HealthRecord',
+  /** Transfer Certificate — issue/approve for outgoing students */
+  TC: 'TC',
+  /** Extracurricular activity or time-bound event */
+  Activity: 'Activity',
+  /** Fee structure, transactions, and concessions */
+  Fee: 'Fee',
+  /** Examination scheduling, marks entry, and results */
+  Exam: 'Exam',
+  /** Student report card / progress report */
+  ReportCard: 'ReportCard',
+  /** System configuration and infrastructure settings */
+  SystemConfig: 'SystemConfig',
+  /** Sports team roster and competitions */
+  SportsTeam: 'SportsTeam',
+  /** Library book transactions */
+  LibraryTransaction: 'LibraryTransaction',
+  /** Bus transport routes and student assignments */
+  BusRoute: 'BusRoute',
+  /** Hostel room assignments */
+  HostelRoom: 'HostelRoom',
+  /** General certificate (bonafide, character, study, etc.) from template */
+  Certificate: 'Certificate',
+  /** Compliance data export — UDISE+ DCF, CBSE Registration, RTE, AWR reports */
+  Export: 'Export',
 } as const;
 
 export type AppSubject = (typeof AppSubject)[keyof typeof AppSubject];
@@ -34,45 +141,504 @@ export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 // Raw rule shape stored in DB and sent to frontend
 export type AbilityRule = RawRuleOf<AppAbility>;
 
-// Default role names
+// Default role names — 22 institute roles (ROV-166)
 export const DefaultRoles = {
+  /** Full control over the institute — manages users, roles, billing, and settings */
   InstituteAdmin: 'institute_admin',
-  Teacher: 'teacher',
+  /** Senior academic leader — manages students, staff, sections; approves TCs */
+  Principal: 'principal',
+  /** Same as principal minus TC approval */
+  VicePrincipal: 'vice_principal',
+  /** Manages academic structure — standards, subjects; reads students and staff */
+  AcademicCoordinator: 'academic_coordinator',
+  /** Front office — manages student CRUD, enquiries, applications; reads Aadhaar/income */
+  AdminClerk: 'admin_clerk',
+  /** Finance — reads students, manages fees, reads TC for dues clearance */
+  Accountant: 'accountant',
+  /** Manages own section's students, attendance, and guardian contact */
+  ClassTeacher: 'class_teacher',
+  /** @deprecated Use ClassTeacher. Kept for backward compatibility with existing code. */
+  Teacher: 'class_teacher',
+  /** Reads students in own subject sections, manages assessments */
+  SubjectTeacher: 'subject_teacher',
+  /** Reads students, manages activities */
+  ActivityTeacher: 'activity_teacher',
+  /** Reads students in own subject sections, reads timetable */
+  LabAssistant: 'lab_assistant',
+  /** Reads students, manages library transactions */
+  Librarian: 'librarian',
+  /** Reads student bus route fields, manages routes */
+  TransportIncharge: 'transport_incharge',
+  /** Reads student hostel fields, manages rooms */
+  HostelWarden: 'hostel_warden',
+  /** Manages confidential counselor notes — NOT visible to principal */
+  Counselor: 'counselor',
+  /** Reads students, manages sports teams */
+  SportsCoach: 'sports_coach',
+  /** Manages bots and system configuration */
+  ITAdmin: 'it_admin',
+  /** Front desk — manages enquiries, reads basic student info only */
+  Receptionist: 'receptionist',
+  /** Reads students, manages exams and report cards */
+  ExamCoordinator: 'exam_coordinator',
+  /** Reads student medical info, manages health records */
+  Nurse: 'nurse',
+  /** Reads student name + photo only */
+  SupportStaff: 'support_staff',
+  /** Enrolled learner — reads own data only */
   Student: 'student',
+  /** Guardian — reads linked children, manages consent */
   Parent: 'parent',
 } as const;
 
 export type DefaultRole = (typeof DefaultRoles)[keyof typeof DefaultRoles];
 
-// Default abilities per role
-// Authenticated user shape attached by JWT strategy
-export interface AuthUser {
+// Auth scopes are now exported from `./enums/auth` (canonical X_VALUES + type
+// + const-object pattern, per the backend-service skill enum convention).
+// Existing `import type { AuthScope } from '@roviq/common-types'` keeps working
+// because `enums/auth` is re-exported by the package's barrel.
+
+/**
+ * Origin string for synthetic (non-JWT) request contexts. Tagged with the
+ * caller's class so audit reviewers can trace causality even though the
+ * actor UUID is the placeholder. Required by the `mk*Ctx` factories.
+ *   - `workflow:<temporal-workflow-name>`     — Temporal activity / worker
+ *   - `consumer:<event-pattern-name>`         — NATS / event-handler consumer
+ *   - `seeder:<seed-script-name>`             — bootstrap / migration seeder
+ *   - `test:<suite-or-fixture-name>`          — integration / e2e test fixtures
+ *   - `service:<service-name>`                — internal cross-scope service call
+ *   - `repository:<repo-name>`                — repository helper outside a JWT
+ *   - `loader:<loader-name>`                  — GraphQL DataLoader cross-scope read
+ */
+export type SyntheticOrigin =
+  | `workflow:${string}`
+  | `consumer:${string}`
+  | `seeder:${string}`
+  | `test:${string}`
+  | `service:${string}`
+  | `repository:${string}`
+  | `loader:${string}`;
+
+// Authenticated user shape attached by JWT strategy.
+// Discriminated branded union — the readonly `_scope` brand forces narrowing
+// (via the assert helpers in @roviq/auth-backend) before the DB wrappers will
+// accept the context, giving compile-time scope/RLS-role alignment.
+interface AuthUserBase {
   userId: string;
-  tenantId: string;
+  membershipId: string;
   roleId: string;
-  type: 'access' | 'platform';
+  type: 'access';
+  /** ROV-96 — true when the user was created with a temp password and must rotate it before any other operation. */
+  mustChangePassword?: boolean;
+  // Impersonation fields
+  isImpersonated?: boolean;
+  impersonatorId?: string;
+  impersonationSessionId?: string;
 }
 
+export interface PlatformContext extends AuthUserBase {
+  readonly _scope: 'platform';
+  scope: 'platform';
+}
+
+export interface ResellerContext extends AuthUserBase {
+  readonly _scope: 'reseller';
+  scope: 'reseller';
+  resellerId: string;
+}
+
+export interface InstituteContext extends AuthUserBase {
+  readonly _scope: 'institute';
+  scope: 'institute';
+  tenantId: string;
+  resellerId?: string;
+}
+
+export type AuthUser = PlatformContext | ResellerContext | InstituteContext;
+
+/**
+ * Marker mixed into the return type of `mk*Ctx` factories. Identifies the
+ * originating workflow / consumer / seeder so audit rows produced inside a
+ * synthetic context are attributable even though `actorId` is the
+ * placeholder UUID. Absent on JWT-driven contexts — narrow with
+ * `isSyntheticContext` before reading.
+ */
+export interface SyntheticContextMarker {
+  syntheticOrigin: SyntheticOrigin;
+}
+
+export type SyntheticPlatformContext = PlatformContext & SyntheticContextMarker;
+export type SyntheticResellerContext = ResellerContext & SyntheticContextMarker;
+export type SyntheticInstituteContext = InstituteContext & SyntheticContextMarker;
+export type SyntheticAuthUser =
+  | SyntheticPlatformContext
+  | SyntheticResellerContext
+  | SyntheticInstituteContext;
+
+/** Type guard — narrows AuthUser to its synthetic-context subtype if tagged. */
+export function isSyntheticContext(u: AuthUser): u is SyntheticAuthUser {
+  return (
+    'syntheticOrigin' in u &&
+    typeof (u as { syntheticOrigin?: unknown }).syntheticOrigin === 'string'
+  );
+}
+
+// Billing feature limits (JSON scalar in GraphQL, used by both frontend and backend)
+// Canonical source: @roviq/ee-billing-types FeatureLimits
+export interface FeatureLimits {
+  maxStudents: number | null;
+  maxStaff: number | null;
+  maxStorageMb: number | null;
+  auditLogRetentionDays: number;
+  features: string[];
+}
+
+/** Entitlements when EE is disabled — everything unlimited */
+export const UNLIMITED_ENTITLEMENTS: FeatureLimits = {
+  maxStudents: null,
+  maxStaff: null,
+  maxStorageMb: null,
+  auditLogRetentionDays: 1095,
+  features: [],
+};
+
+/** Sensible defaults for plans without explicit entitlements */
+export const DEFAULT_ENTITLEMENTS: FeatureLimits = {
+  maxStudents: 500,
+  maxStaff: 50,
+  maxStorageMb: 5120,
+  auditLogRetentionDays: 90,
+  features: [],
+};
+
+/** OSS interface for reading subscription entitlements. EE provides the implementation. */
+export interface SubscriptionReader {
+  findActiveByTenant(tenantId: string): Promise<{ plan: { entitlements: FeatureLimits } } | null>;
+}
+export const SUBSCRIPTION_READER = Symbol('SUBSCRIPTION_READER');
+
+/**
+ * CASL ability definitions for 22 institute roles (ROV-166).
+ *
+ * Key field-level restrictions:
+ * - CounselorNotes: ONLY counselor + institute_admin (NOT principal)
+ * - Aadhaar/PAN: ONLY admin_clerk + principal (via fields property)
+ * - Annual income: ONLY admin_clerk (RTE eligibility)
+ * - Medical info: ONLY nurse + institute_admin + counselor
+ * - class_teacher: section-scoped via $user.assignedSections condition
+ * - student: own data only via $user.sub condition
+ * - guardian: linked children only (handled in resolver, not CASL condition)
+ */
+/**
+ * Self-service abilities granted to every institute role. Every user can
+ * read and update their own profile — scoped by userId condition so they
+ * cannot access other users' data.
+ */
+const SELF_SERVICE_ABILITIES: AbilityRule[] = [
+  { action: 'read', subject: 'User', conditions: { userId: '$user.sub' } },
+  { action: 'update', subject: 'User', conditions: { userId: '$user.sub' } },
+];
+
 export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
+  // ── 1. institute_admin — full control ──────────────────
   institute_admin: [{ action: 'manage', subject: 'all' }],
-  teacher: [
+
+  // ── 2. principal — manages students, staff, sections; approves TCs ──
+  principal: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'Student' },
+    { action: 'manage', subject: 'Staff' },
+    { action: 'manage', subject: 'Section' },
+    { action: 'manage', subject: 'Standard' },
+    { action: 'manage', subject: 'Subject' },
+    { action: 'manage', subject: 'TC' },
+    { action: 'read', subject: 'AuditLog' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'Guardian' },
+    { action: 'read', subject: 'Group' },
+    // Principal can read Aadhaar/PAN (via fields)
+    { action: 'read', subject: 'Student', fields: ['aadhaar', 'pan'] },
+    // Principal manages leave approvals + institute-wide holidays.
+    { action: 'manage', subject: 'Leave' },
+    { action: 'manage', subject: 'Holiday' },
+  ],
+
+  // ── 3. vice_principal — same as principal minus TC approval ──
+  vice_principal: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'Student' },
+    { action: 'manage', subject: 'Staff' },
+    { action: 'manage', subject: 'Section' },
+    { action: 'manage', subject: 'Standard' },
+    { action: 'manage', subject: 'Subject' },
+    { action: 'read', subject: 'TC' },
+    { action: 'read', subject: 'AuditLog' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'Guardian' },
+    { action: 'read', subject: 'Group' },
+    // Vice-principal can approve/reject leaves and publish holidays.
+    { action: 'manage', subject: 'Leave' },
+    { action: 'manage', subject: 'Holiday' },
+  ],
+
+  // ── 4. academic_coordinator ─────────────────────────────
+  academic_coordinator: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'Standard' },
+    { action: 'manage', subject: 'Subject' },
     { action: 'read', subject: 'Student' },
+    { action: 'read', subject: 'Staff' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'Group' },
+    // Coordinator views (but does not approve) leaves + published holidays.
+    { action: 'read', subject: 'Leave' },
+    { action: 'read', subject: 'Holiday' },
+  ],
+
+  // ── 5. admin_clerk — CRUD students, enquiries, applications; reads Aadhaar/income ──
+  admin_clerk: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'Student' },
+    { action: 'manage', subject: 'Enquiry' },
+    { action: 'manage', subject: 'Application' },
+    { action: 'read', subject: 'Staff' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'Institute' },
+    // Aadhaar + annual income access for RTE verification
+    { action: 'read', subject: 'Student', fields: ['aadhaar', 'pan', 'annual_income'] },
+    // Clerks file leave applications on behalf of users + read holiday list.
+    { action: 'create', subject: 'Leave' },
+    { action: 'read', subject: 'Leave' },
+    { action: 'read', subject: 'Holiday' },
+  ],
+
+  // ── 6. accountant ───────────────────────────────────────
+  accountant: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'Fee' },
+    { action: 'read', subject: 'TC' },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'AcademicYear' },
+  ],
+
+  // ── 7. class_teacher — section-scoped ───────────────────
+  class_teacher: [
+    ...SELF_SERVICE_ABILITIES,
+    {
+      action: 'read',
+      subject: 'Student',
+      conditions: { sectionId: { $in: '$user.assignedSections' } },
+    },
+    {
+      action: 'manage',
+      subject: 'Attendance',
+      conditions: { sectionId: { $in: '$user.assignedSections' } },
+    },
+    {
+      action: 'read',
+      subject: 'Guardian',
+      conditions: { sectionId: { $in: '$user.assignedSections' } },
+    },
     { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Standard' },
     { action: 'read', subject: 'Subject' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
     { action: 'read', subject: 'Timetable' },
-    { action: 'create', subject: 'Attendance' },
-    { action: 'read', subject: 'Attendance' },
-    { action: 'update', subject: 'Attendance' },
+    { action: 'read', subject: 'Group' },
+    // Class teacher approves leaves for students in their assigned sections.
+    {
+      action: 'manage',
+      subject: 'Leave',
+      conditions: { sectionId: { $in: '$user.assignedSections' } },
+    },
+    { action: 'read', subject: 'Holiday' },
   ],
-  student: [
+
+  // ── 8. subject_teacher ──────────────────────────────────
+  subject_teacher: [
+    ...SELF_SERVICE_ABILITIES,
+    {
+      action: 'read',
+      subject: 'Student',
+      conditions: { sectionId: { $in: '$user.assignedSections' } },
+    },
+    { action: 'manage', subject: 'Exam' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Subject' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'Timetable' },
+    // Subject teachers file own leave + read the holiday calendar.
+    { action: 'create', subject: 'Leave', conditions: { userId: '$user.sub' } },
+    { action: 'read', subject: 'Leave', conditions: { userId: '$user.sub' } },
+    { action: 'read', subject: 'Holiday' },
+  ],
+
+  // ── 9. activity_teacher ─────────────────────────────────
+  activity_teacher: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'Activity' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 10. lab_assistant ───────────────────────────────────
+  lab_assistant: [
+    ...SELF_SERVICE_ABILITIES,
+    {
+      action: 'read',
+      subject: 'Student',
+      conditions: { sectionId: { $in: '$user.assignedSections' } },
+    },
     { action: 'read', subject: 'Timetable' },
     { action: 'read', subject: 'Subject' },
-    { action: 'read', subject: 'Attendance', conditions: { studentId: '${user.id}' } },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
   ],
-  parent: [
-    { action: 'read', subject: 'Timetable' },
-    { action: 'read', subject: 'Attendance' },
+
+  // ── 11. librarian ───────────────────────────────────────
+  librarian: [
+    ...SELF_SERVICE_ABILITIES,
     { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'LibraryTransaction' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 12. transport_incharge ──────────────────────────────
+  transport_incharge: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'BusRoute' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 13. hostel_warden ───────────────────────────────────
+  hostel_warden: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'HostelRoom' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 14. counselor — manages confidential notes (NOT visible to principal) ──
+  counselor: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'CounselorNotes' },
+    { action: 'read', subject: 'Student' },
+    { action: 'read', subject: 'HealthRecord' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 15. sports_coach ────────────────────────────────────
+  sports_coach: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'SportsTeam' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 16. it_admin ────────────────────────────────────────
+  it_admin: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'Bot' },
+    { action: 'read', subject: 'SystemConfig' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 17. receptionist — manages enquiries, reads basic student info ──
+  receptionist: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'manage', subject: 'Enquiry' },
+    {
+      action: 'read',
+      subject: 'Student',
+      fields: ['id', 'firstName', 'lastName', 'admissionNumber', 'academicStatus'],
+    },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 18. exam_coordinator ────────────────────────────────
+  exam_coordinator: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'manage', subject: 'Exam' },
+    { action: 'manage', subject: 'ReportCard' },
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 19. nurse — reads student medical info ──────────────
+  nurse: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student', fields: ['id', 'firstName', 'lastName', 'medicalInfo'] },
+    { action: 'manage', subject: 'HealthRecord' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 20. support_staff — reads student name + photo only ──
+  support_staff: [
+    ...SELF_SERVICE_ABILITIES,
+    {
+      action: 'read',
+      subject: 'Student',
+      fields: ['id', 'firstName', 'lastName', 'profileImageUrl'],
+    },
+    { action: 'read', subject: 'Institute' },
+  ],
+
+  // ── 21. student — reads own data only ───────────────────
+  student: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student', conditions: { userId: '$user.sub' } },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'Subject' },
+    { action: 'read', subject: 'Timetable' },
+    { action: 'read', subject: 'Attendance', conditions: { studentId: '${user.id}' } },
+    // Students can file own leaves + read the holiday calendar.
+    { action: 'create', subject: 'Leave', conditions: { userId: '$user.sub' } },
+    { action: 'read', subject: 'Leave', conditions: { userId: '$user.sub' } },
+    { action: 'read', subject: 'Holiday' },
+  ],
+
+  // ── 22. parent (guardian) — reads linked children + manages consent ──
+  parent: [
+    ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Student' },
+    { action: 'read', subject: 'Attendance' },
+    { action: 'manage', subject: 'Consent' },
+    { action: 'read', subject: 'Institute' },
+    { action: 'read', subject: 'AcademicYear' },
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
+    { action: 'read', subject: 'Subject' },
+    { action: 'read', subject: 'Timetable' },
+    // Guardians read their children's leave + the institute holiday list.
+    { action: 'read', subject: 'Leave' },
+    { action: 'read', subject: 'Holiday' },
   ],
 };

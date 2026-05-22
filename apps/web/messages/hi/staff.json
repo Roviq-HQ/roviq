@@ -1,0 +1,324 @@
+{
+  "title": "स्टाफ",
+  "description": "इस इंस्टीट्यूट के शिक्षकों, प्रशासकों और सहायक कर्मचारियों का प्रबंधन करें",
+  "newStaff": "नया स्टाफ",
+  "addStaff": "स्टाफ जोड़ें",
+  "accessDenied": "आपके पास स्टाफ देखने की अनुमति नहीं है",
+  "create": {
+    "title": "स्टाफ सदस्य जोड़ें",
+    "description": "नया स्टाफ प्रोफ़ाइल बनाएँ।",
+    "submit": "स्टाफ सदस्य बनाएँ",
+    "creating": "बनाया जा रहा है...",
+    "success": "स्टाफ सदस्य बनाया गया"
+  },
+  "new": {
+    "title": "स्टाफ सदस्य जोड़ें",
+    "description": "नया स्टाफ प्रोफ़ाइल बनाएँ।",
+    "submit": "स्टाफ सदस्य बनाएँ",
+    "submitting": "बनाया जा रहा है...",
+    "cancel": "रद्द करें",
+    "success": "स्टाफ सदस्य बनाया गया",
+    "sections": {
+      "personal": "व्यक्तिगत विवरण",
+      "contact": "संपर्क",
+      "employment": "रोजगार"
+    },
+    "fields": {
+      "firstName": "प्रथम नाम",
+      "lastName": "अंतिम नाम",
+      "gender": "लिंग",
+      "dateOfBirth": "जन्म तिथि",
+      "socialCategory": "सामाजिक श्रेणी",
+      "email": "ईमेल",
+      "phone": "फ़ोन",
+      "employeeId": "कर्मचारी आईडी",
+      "designation": "पदनाम",
+      "department": "विभाग",
+      "employmentType": "रोजगार प्रकार",
+      "dateOfJoining": "कार्यग्रहण तिथि"
+    },
+    "placeholders": {
+      "firstName": "जैसे अनीता",
+      "lastName": "जैसे शर्मा",
+      "gender": "लिंग चुनें",
+      "socialCategory": "श्रेणी चुनें",
+      "email": "name@example.com",
+      "phone": "98765 43210",
+      "employeeId": "जैसे EMP-1001",
+      "designation": "जैसे PGT भौतिकी",
+      "department": "जैसे विज्ञान",
+      "employmentType": "रोजगार प्रकार चुनें"
+    },
+    "fieldDescriptions": {
+      "dateFormat": "DD/MM/YYYY",
+      "phoneFormat": "10-अंकीय भारतीय मोबाइल, देश कोड के बिना सहेजा गया"
+    },
+    "fieldHelp": {
+      "socialCategoryTitle": "सामाजिक श्रेणी",
+      "socialCategoryBody": "UDISE+ शिक्षक जनगणना रिपोर्ट और आरक्षण-संबंधी भर्ती अनुपालन के लिए सरकार द्वारा परिभाषित वर्गीकरण। यह कभी भी रोस्टर या ID कार्ड पर नहीं दिखाया जाता और ऑडिट-एडमिन अनुमति के बिना एक्सपोर्ट में मास्क कर दिया जाता है।",
+      "socialCategoryOptions": "सामान्य — कोई आरक्षण नहीं। OBC — अन्य पिछड़ा वर्ग। SC — अनुसूचित जाति। ST — अनुसूचित जनजाति। EWS — आर्थिक रूप से कमज़ोर वर्ग।",
+      "employeeIdTitle": "कर्मचारी ID",
+      "employeeIdBody": "आपके संस्थान का आंतरिक कर्मचारी कोड — पेस्लिप, उपस्थिति रजिस्टर और एक्सपोर्ट पर उपयोग होता है। यह आधार, PAN या कोई सरकारी ID नहीं है। संस्थान में अद्वितीय रखें और इतना छोटा रखें कि ID कार्ड पर प्रिंट हो सके।",
+      "employeeIdExample": "उदाहरण: EMP-1001, T-2025-045, HR/7812। एक बार असाइन होने के बाद इसे बदलने से बचें ताकि पुराने पेरोल और उपस्थिति रिकॉर्ड जुड़े रहें।",
+      "designationTitle": "पद",
+      "designationBody": "आधिकारिक दस्तावेज़ों — पेस्लिप, अनुभव पत्र और UDISE+ रिपोर्ट — पर दिखाया जाने वाला पद नाम। उपनाम के बजाय बोर्ड द्वारा मान्य शीर्षक का उपयोग करें।",
+      "designationExample": "उदाहरण: PGT भौतिकी, TGT अंग्रेज़ी, प्रधानाचार्य, लेखाकार, पुस्तकालयाध्यक्ष, प्रयोगशाला सहायक, चपरासी।",
+      "departmentTitle": "विभाग",
+      "departmentBody": "यह व्यक्ति जिस शैक्षणिक या प्रशासनिक समूह से संबंधित है। उपस्थिति, पेरोल और आंतरिक निर्देशिकाओं को फ़िल्टर करने के लिए उपयोग होता है। शिक्षकों के लिए विषय विभाग और गैर-शैक्षणिक कर्मचारियों के लिए कार्यात्मक इकाई चुनें।",
+      "departmentExample": "शैक्षणिक: विज्ञान, गणित, मानविकी, वाणिज्य। गैर-शैक्षणिक: प्रशासन, लेखा, परिवहन, छात्रावास, पुस्तकालय।",
+      "employmentTypeTitle": "रोज़गार प्रकार",
+      "employmentTypeBody": "पेरोल, PF/ESIC पात्रता, छुट्टी हकदारी और UDISE+ शिक्षक रिपोर्टिंग इसी से तय होती है। वही विकल्प चुनें जो आप जारी करने वाले अनुबंध से मेल खाता हो — बाद में बदलना कठिन होता है क्योंकि यह वेतन इतिहास को प्रभावित करता है।",
+      "employmentTypeRegular": "नियमित — स्थायी पूर्णकालिक कर्मचारी। PF, ESIC, ग्रेच्युटी और पूर्ण छुट्टी कोटा के योग्य।",
+      "employmentTypeContractual": "संविदा — निश्चित समाप्ति तिथि वाला तय अवधि अनुबंध। आमतौर पर PF के योग्य लेकिन ग्रेच्युटी नहीं।",
+      "employmentTypePartTime": "अंशकालिक — नियमित कर्मचारियों से कम साप्ताहिक घंटे। आनुपातिक वेतन और छुट्टी।",
+      "employmentTypeGuest": "अतिथि — प्रति व्याख्यान या प्रति विज़िट भुगतान। PF, ESIC या छुट्टी हकदारी नहीं।",
+      "employmentTypeVolunteer": "स्वयंसेवक — अवैतनिक या मानदेय-आधारित। उपस्थिति के लिए दर्ज, पेरोल से बाहर।"
+    },
+    "genders": {
+      "MALE": "पुरुष",
+      "FEMALE": "महिला",
+      "OTHER": "अन्य"
+    },
+    "socialCategories": {
+      "GENERAL": "सामान्य",
+      "OBC": "ओबीसी",
+      "SC": "एससी",
+      "ST": "एसटी",
+      "EWS": "ईडब्ल्यूएस"
+    },
+    "employmentTypes": {
+      "REGULAR": "नियमित",
+      "CONTRACTUAL": "संविदा",
+      "PART_TIME": "अंशकालिक",
+      "GUEST": "अतिथि",
+      "VOLUNTEER": "स्वयंसेवक"
+    },
+    "errors": {
+      "firstNameRequired": "कृपया स्टाफ सदस्य का प्रथम नाम दर्ज करें",
+      "lastNameRequired": "कृपया स्टाफ सदस्य का अंतिम नाम दर्ज करें",
+      "emailInvalid": "मान्य ईमेल दर्ज करें",
+      "phoneInvalid": "मान्य 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें",
+      "dateInvalid": "DD/MM/YYYY प्रारूप में दिनांक दर्ज करें",
+      "generic": "स्टाफ सदस्य नहीं बनाया जा सका",
+      "duplicate": "इस ईमेल से एक स्टाफ सदस्य पहले से मौजूद है"
+    }
+  },
+  "filters": {
+    "search": "नाम या कर्मचारी आईडी से खोजें",
+    "department": "विभाग",
+    "designation": "पदनाम",
+    "employmentType": "रोजगार प्रकार",
+    "isClassTeacher": "कक्षा शिक्षक",
+    "allDepartments": "सभी विभाग",
+    "allDesignations": "सभी पदनाम",
+    "allEmploymentTypes": "सभी रोजगार प्रकार",
+    "classTeacherAny": "कोई भी",
+    "classTeacherYes": "केवल कक्षा शिक्षक",
+    "classTeacherNo": "कक्षा शिक्षक नहीं",
+    "clear": "फ़िल्टर साफ़ करें"
+  },
+  "columns": {
+    "employeeId": "कर्मचारी आईडी",
+    "name": "नाम",
+    "designation": "पदनाम",
+    "department": "विभाग",
+    "employmentType": "रोजगार प्रकार",
+    "isClassTeacher": "कक्षा शिक्षक",
+    "actions": "कार्रवाइयाँ",
+    "notSet": "—"
+  },
+  "employmentTypes": {
+    "REGULAR": "नियमित",
+    "CONTRACTUAL": "संविदा",
+    "PART_TIME": "अंशकालिक",
+    "GUEST": "अतिथि",
+    "VOLUNTEER": "स्वयंसेवक"
+  },
+  "fields": {
+    "firstName": "प्रथम नाम",
+    "lastName": "उपनाम",
+    "email": "ईमेल",
+    "phone": "फ़ोन",
+    "dateOfBirth": "जन्म तिथि",
+    "dateOfJoining": "नियुक्ति तिथि",
+    "gender": "लिंग",
+    "department": "विभाग",
+    "designation": "पदनाम",
+    "employmentType": "रोजगार प्रकार",
+    "specialization": "विशेषज्ञता",
+    "socialCategory": "सामाजिक श्रेणी",
+    "employeeId": "कर्मचारी आईडी",
+    "isClassTeacher": "कक्षा शिक्षक"
+  },
+  "fieldDescriptions": {
+    "department": "वह शैक्षणिक या प्रशासनिक इकाई जिसमें यह व्यक्ति आता है (जैसे विज्ञान, प्रशासन)।",
+    "designation": "इस इंस्टीट्यूट में व्यक्ति का पदनाम (जैसे प्रधानाचार्य, वरिष्ठ शिक्षक)।",
+    "specialization": "विशेषज्ञता क्षेत्र या जिन विषयों में वे पढ़ाने में विशेषज्ञ हैं।"
+  },
+  "tabs": {
+    "profile": "प्रोफ़ाइल",
+    "qualifications": "योग्यताएँ",
+    "assignedSections": "नियत अनुभाग",
+    "audit": "ऑडिट"
+  },
+  "tabsDescription": {
+    "profile": "व्यक्तिगत और रोजगार विवरण",
+    "qualifications": "शैक्षिक और पेशेवर योग्यताएँ",
+    "assignedSections": "वे अनुभाग जिन्हें यह स्टाफ सदस्य पढ़ाता है",
+    "audit": "इस स्टाफ रिकॉर्ड में परिवर्तनों का इतिहास"
+  },
+  "detail": {
+    "back": "स्टाफ पर वापस जाएँ",
+    "notFound": "स्टाफ सदस्य नहीं मिला",
+    "notFoundDescription": "यह स्टाफ सदस्य हटा दिया गया हो सकता है या आपके पास इसे देखने की अनुमति नहीं है।",
+    "sidebar": {
+      "employeeId": "कर्मचारी आईडी",
+      "designation": "पदनाम",
+      "department": "विभाग",
+      "employmentType": "रोजगार प्रकार",
+      "joined": "नियुक्त हुए",
+      "classTeacher": "कक्षा शिक्षक",
+      "notSet": "निर्धारित नहीं"
+    },
+    "profile": {
+      "title": "प्रोफ़ाइल",
+      "personal": "व्यक्तिगत विवरण",
+      "employment": "रोजगार विवरण",
+      "other": "अन्य विवरण",
+      "firstName": "प्रथम नाम",
+      "lastName": "उपनाम",
+      "gender": "लिंग",
+      "genderPlaceholder": "लिंग चुनें",
+      "dateOfBirth": "जन्म तिथि",
+      "employeeId": "कर्मचारी आईडी",
+      "designation": "पदनाम",
+      "designationPlaceholder": "जैसे वरिष्ठ शिक्षक",
+      "department": "विभाग",
+      "departmentPlaceholder": "जैसे विज्ञान",
+      "employmentType": "रोजगार प्रकार",
+      "employmentTypePlaceholder": "रोजगार प्रकार चुनें",
+      "dateOfJoining": "नियुक्ति तिथि",
+      "isClassTeacher": "कक्षा शिक्षक",
+      "isClassTeacherDescription": "सक्षम करें यदि यह स्टाफ सदस्य किसी अनुभाग का कक्षा शिक्षक है।",
+      "socialCategory": "सामाजिक श्रेणी",
+      "socialCategoryPlaceholder": "श्रेणी चुनें",
+      "specialization": "विशेषज्ञता",
+      "specializationPlaceholder": "जैसे भौतिकी, रसायन शास्त्र",
+      "save": "परिवर्तन सहेजें",
+      "saving": "सहेजा जा रहा है...",
+      "saved": "स्टाफ प्रोफ़ाइल अपडेट हो गई",
+      "concurrencyError": "यह स्टाफ रिकॉर्ड किसी और के द्वारा बदल दिया गया था। नवीनतम संस्करण देखने के लिए रीलोड करें।",
+      "draftFound": "सहेजे न गए परिवर्तन मिले",
+      "draftFoundDescription": "आपने पहले इस स्टाफ प्रोफ़ाइल का संपादन शुरू किया था। पुनर्स्थापित करें या हटाएँ?",
+      "draftRestore": "पुनर्स्थापित करें",
+      "draftDiscard": "हटाएँ"
+    },
+    "qualifications": {
+      "title": "योग्यताएँ",
+      "description": "शैक्षिक डिग्री और पेशेवर प्रमाणन।",
+      "add": "योग्यता जोड़ें",
+      "edit": "संपादित करें",
+      "delete": "हटाएँ",
+      "empty": "अभी तक कोई योग्यता दर्ज नहीं की गई",
+      "dialogTitle": "योग्यता",
+      "dialogCreateTitle": "योग्यता जोड़ें",
+      "dialogEditTitle": "योग्यता संपादित करें",
+      "dialogDescription": "एक शैक्षिक डिग्री या पेशेवर प्रमाणन दर्ज करें।",
+      "deleteConfirmTitle": "योग्यता हटाएँ?",
+      "deleteConfirmDescription": "यह इस योग्यता को स्टाफ प्रोफ़ाइल से स्थायी रूप से हटा देगा।",
+      "deleteConfirm": "हटाएँ",
+      "cancel": "रद्द करें",
+      "save": "सहेजें",
+      "saving": "सहेजा जा रहा है...",
+      "createSuccess": "योग्यता जोड़ी गई",
+      "updateSuccess": "योग्यता अपडेट की गई",
+      "deleteSuccess": "योग्यता हटा दी गई",
+      "fields": {
+        "type": "प्रकार",
+        "typePlaceholder": "प्रकार चुनें",
+        "degreeName": "डिग्री / प्रमाणन नाम",
+        "degreeNamePlaceholder": "जैसे B.Ed, M.Sc भौतिकी",
+        "institution": "संस्थान",
+        "institutionPlaceholder": "जैसे दिल्ली विश्वविद्यालय",
+        "boardUniversity": "बोर्ड / विश्वविद्यालय",
+        "boardUniversityPlaceholder": "जैसे CBSE, मुंबई विश्वविद्यालय",
+        "yearOfPassing": "उत्तीर्ण वर्ष",
+        "yearOfPassingPlaceholder": "जैसे 2018",
+        "gradePercentage": "ग्रेड / प्रतिशत",
+        "gradePercentagePlaceholder": "जैसे 78%, A+"
+      },
+      "types": {
+        "ACADEMIC": "शैक्षिक",
+        "PROFESSIONAL": "पेशेवर"
+      },
+      "validation": {
+        "degreeNameRequired": "डिग्री का नाम आवश्यक है",
+        "yearInvalid": "वैध वर्ष दर्ज करें"
+      }
+    },
+    "assignedSections": {
+      "title": "नियत अनुभाग",
+      "empty": "यह स्टाफ सदस्य वर्तमान में किसी भी अनुभाग के लिए कक्षा शिक्षक के रूप में नियुक्त नहीं है।"
+    },
+    "audit": {
+      "title": "ऑडिट इतिहास"
+    }
+  },
+  "qualifications": {
+    "empty": "अभी तक कोई योग्यता दर्ज नहीं की गई"
+  },
+  "assignedSections": {
+    "empty": "किसी अनुभाग को नहीं सौंपा गया",
+    "classTeacherOf": "का कक्षा शिक्षक"
+  },
+  "pagination": {
+    "window": "{total, plural, =0 {0 में से 0} one {# में से {start}–{end}} other {# में से {start}–{end}}}",
+    "rowsPerPage": "प्रति पृष्ठ पंक्तियाँ",
+    "prev": "पिछला पृष्ठ",
+    "next": "अगला पृष्ठ"
+  },
+  "export": {
+    "buttonAll": "CSV निर्यात करें",
+    "buttonSelected": "{count, plural, one {# चयनित} other {# चयनित}} निर्यात करें",
+    "loading": "निर्यात हो रहा है...",
+    "success": "{count, plural, one {# पंक्ति} other {# पंक्तियाँ}} निर्यात की गईं",
+    "noRows": "निर्यात करने के लिए कुछ नहीं"
+  },
+  "bulk": {
+    "barLabel": "बल्क कार्रवाइयाँ",
+    "selected": "{count, plural, one {# स्टाफ सदस्य चयनित} other {# स्टाफ सदस्य चयनित}}",
+    "clearSelection": "चयन साफ़ करें",
+    "selectAllOnPage": "इस पृष्ठ पर सभी चुनें",
+    "selectRow": "स्टाफ सदस्य चुनें"
+  },
+  "classTeacher": {
+    "yes": "हाँ",
+    "no": "नहीं"
+  },
+  "yes": "हाँ",
+  "no": "नहीं",
+  "notSet": "निर्धारित नहीं",
+  "loading": "स्टाफ लोड हो रहा है...",
+  "errorLoading": "स्टाफ लोड करने में विफल",
+  "empty": {
+    "title": "अभी कोई स्टाफ नहीं",
+    "description": "शुरू करने के लिए अपना पहला स्टाफ सदस्य जोड़ें",
+    "filteredTitle": "आपके फ़िल्टर से मेल खाने वाला कोई स्टाफ नहीं",
+    "filteredDescription": "अधिक परिणाम देखने के लिए कुछ फ़िल्टर हटाएँ",
+    "noData": "अभी कोई स्टाफ नहीं",
+    "noDataDescription": "शुरू करने के लिए अपना पहला स्टाफ सदस्य जोड़ें",
+    "noMatch": "आपके फ़िल्टर से मेल खाने वाला कोई स्टाफ नहीं",
+    "noMatchDescription": "अधिक परिणाम देखने के लिए कुछ फ़िल्टर हटाएँ"
+  },
+  "validation": {
+    "firstNameRequired": "प्रथम नाम आवश्यक है",
+    "phoneInvalid": "वैध 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें",
+    "emailInvalid": "वैध ईमेल पता दर्ज करें"
+  },
+  "errors": {
+    "createFailed": "स्टाफ सदस्य नहीं बनाया जा सका",
+    "loadFailed": "स्टाफ डेटा लोड नहीं किया जा सका",
+    "emailInvalid": "मान्य ईमेल पता दर्ज करें",
+    "phoneInvalid": "मान्य 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें"
+  }
+}
