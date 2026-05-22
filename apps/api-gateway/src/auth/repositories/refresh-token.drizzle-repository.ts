@@ -135,6 +135,11 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
         lastUsedAt: row.lastUsedAt,
         user: row.user,
         membership:
+          // The guards on every institute field are TS-driven, not just
+          // defensive: drizzle's LEFT JOIN inference marks all joined columns
+          // as nullable even though name/slug/reseller_id are NOT NULL in the
+          // schema. The runtime checks are what narrow the type so the
+          // `institute: { ... }` literal below satisfies `InstituteInfo`.
           row.membershipId &&
           row.membershipTenantId &&
           row.membershipRoleId &&
@@ -240,6 +245,11 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
         lastUsedAt: row.lastUsedAt,
         user: row.user,
         membership:
+          // The guards on every institute field are TS-driven, not just
+          // defensive: drizzle's LEFT JOIN inference marks all joined columns
+          // as nullable even though name/slug/reseller_id are NOT NULL in the
+          // schema. The runtime checks are what narrow the type so the
+          // `institute: { ... }` literal below satisfies `InstituteInfo`.
           row.membershipId &&
           row.membershipTenantId &&
           row.membershipRoleId &&

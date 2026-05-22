@@ -198,8 +198,10 @@ describe('AuthService', () => {
 
       await authService.instituteLogin('admin', 'correct-password');
 
-      // First sign() call is the access token. Verify resellerId is present
-      // and matches the institute's reseller_id.
+      // issueTokens signs access then refresh — locking call ordering so a
+      // future refactor that swaps them doesn't silently invalidate the
+      // [0] index used below.
+      expect(mockJwt.sign).toHaveBeenCalledTimes(2);
       const [accessPayload] = mockJwt.sign.mock.calls[0];
       expect(accessPayload).toMatchObject({
         scope: 'institute',
