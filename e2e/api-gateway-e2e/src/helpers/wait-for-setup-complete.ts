@@ -18,6 +18,10 @@ import { gql } from './gql-client';
  *   running out the clock on a setup that will never reach COMPLETED.
  * - Tolerates transient network errors (api-gateway restart mid-test,
  *   socket hiccups) — a single failed poll does not abort the wait.
+ * - On timeout, the assertion message includes the last-observed status
+ *   AND the last network error — without these, "did not complete in 15s"
+ *   masks the actual failure mode (stuck-in-IN_PROGRESS vs api-gateway
+ *   never reachable).
  *
  * Tracked by ROV-262 — surfaced after the institute-admin academic-tree
  * test flaked in CI for PR #208 while passing locally.
@@ -28,6 +32,8 @@ export async function waitForSetupComplete(
   timeoutMs = 15_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  let lastStatus: SetupStatus | undefined;
+  let lastError: unknown;
   while (Date.now() < deadline) {
     let status: SetupStatus | undefined;
     try {
@@ -39,9 +45,12 @@ export async function waitForSetupComplete(
         adminToken,
       );
       status = res.data?.adminGetInstitute.setupStatus;
-    } catch {
-      // Transient — keep polling until the deadline.
+      lastError = undefined;
+    } catch (err) {
+      // Transient — keep polling until the deadline. Stash for diagnostics.
+      lastError = err;
     }
+    if (status !== undefined) lastStatus = status;
     if (status === SetupStatus.COMPLETED) return;
     if (status === SetupStatus.FAILED) {
       assert.fail(
@@ -50,5 +59,15 @@ export async function waitForSetupComplete(
     }
     await new Promise((r) => setTimeout(r, 200));
   }
-  assert.fail(`Setup did not complete within ${timeoutMs}ms for institute ${instituteId}`);
+  const tail = [
+    `lastStatus=${lastStatus ?? '<never observed>'}`,
+    lastError
+      ? `lastError=${lastError instanceof Error ? lastError.message : String(lastError)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  assert.fail(
+    `Setup did not complete within ${timeoutMs}ms for institute ${instituteId} (${tail})`,
+  );
 }
