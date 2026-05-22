@@ -66,7 +66,6 @@
       "mcp__plugin_playwright_playwright__browser_wait_for"
     ],
     "deny": [
-      "Bash(git commit *)",
       "Bash(git stash*)",
       "Bash(git checkout *)",
       "Bash(git checkout -- *)",
