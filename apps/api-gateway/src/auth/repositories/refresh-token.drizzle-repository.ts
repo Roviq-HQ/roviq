@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  institutes,
   memberships,
   mkAdminCtx,
   refreshTokens,
@@ -99,11 +100,20 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           membershipAbilities: memberships.abilities,
           roleId: roles.id,
           roleAbilities: roles.abilities,
+          // Institute fields — required so the refresh flow can mint an
+          // institute-scope JWT containing `resellerId` (ROV-261) without
+          // an extra round-trip to membershipRepo.findByIdAndUser.
+          instituteId: institutes.id,
+          instituteName: institutes.name,
+          instituteSlug: institutes.slug,
+          instituteLogoUrl: institutes.logoUrl,
+          instituteResellerId: institutes.resellerId,
         })
         .from(refreshTokens)
         .innerJoin(users, eq(refreshTokens.userId, users.id))
         .leftJoin(memberships, eq(refreshTokens.membershipId, memberships.id))
         .leftJoin(roles, eq(memberships.roleId, roles.id))
+        .leftJoin(institutes, eq(memberships.tenantId, institutes.id))
         .where(eq(refreshTokens.id, id))
         .limit(1);
 
@@ -125,7 +135,14 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
         lastUsedAt: row.lastUsedAt,
         user: row.user,
         membership:
-          row.membershipId && row.membershipTenantId && row.membershipRoleId && row.roleId
+          row.membershipId &&
+          row.membershipTenantId &&
+          row.membershipRoleId &&
+          row.roleId &&
+          row.instituteId &&
+          row.instituteName &&
+          row.instituteSlug !== null &&
+          row.instituteResellerId
             ? {
                 id: row.membershipId,
                 tenantId: row.membershipTenantId,
@@ -134,6 +151,13 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
                 role: {
                   id: row.roleId,
                   abilities: row.roleAbilities,
+                },
+                institute: {
+                  id: row.instituteId,
+                  name: row.instituteName,
+                  slug: row.instituteSlug,
+                  logoUrl: row.instituteLogoUrl,
+                  resellerId: row.instituteResellerId,
                 },
               }
             : null,
@@ -182,11 +206,17 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           membershipAbilities: memberships.abilities,
           roleId: roles.id,
           roleAbilities: roles.abilities,
+          instituteId: institutes.id,
+          instituteName: institutes.name,
+          instituteSlug: institutes.slug,
+          instituteLogoUrl: institutes.logoUrl,
+          instituteResellerId: institutes.resellerId,
         })
         .from(refreshTokens)
         .innerJoin(users, eq(refreshTokens.userId, users.id))
         .leftJoin(memberships, eq(refreshTokens.membershipId, memberships.id))
         .leftJoin(roles, eq(memberships.roleId, roles.id))
+        .leftJoin(institutes, eq(memberships.tenantId, institutes.id))
         .where(
           and(
             eq(refreshTokens.userId, userId),
@@ -210,7 +240,14 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
         lastUsedAt: row.lastUsedAt,
         user: row.user,
         membership:
-          row.membershipId && row.membershipTenantId && row.membershipRoleId && row.roleId
+          row.membershipId &&
+          row.membershipTenantId &&
+          row.membershipRoleId &&
+          row.roleId &&
+          row.instituteId &&
+          row.instituteName &&
+          row.instituteSlug !== null &&
+          row.instituteResellerId
             ? {
                 id: row.membershipId,
                 tenantId: row.membershipTenantId,
@@ -219,6 +256,13 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
                 role: {
                   id: row.roleId,
                   abilities: row.roleAbilities,
+                },
+                institute: {
+                  id: row.instituteId,
+                  name: row.instituteName,
+                  slug: row.instituteSlug,
+                  logoUrl: row.instituteLogoUrl,
+                  resellerId: row.instituteResellerId,
                 },
               }
             : null,

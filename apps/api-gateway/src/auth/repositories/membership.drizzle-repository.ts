@@ -10,7 +10,7 @@ import {
 } from '@roviq/database';
 import { and, asc, eq } from 'drizzle-orm';
 import { MembershipRepository } from './membership.repository';
-import type { MembershipWithInstituteAndRole, MembershipWithRole } from './types';
+import type { MembershipWithInstituteAndRole } from './types';
 
 @Injectable()
 export class MembershipDrizzleRepository extends MembershipRepository {
@@ -173,39 +173,6 @@ export class MembershipDrizzleRepository extends MembershipRepository {
       role: {
         id: row.roleIdFk,
         name: row.roleName,
-        abilities: row.roleAbilities,
-      },
-    };
-  }
-
-  async findFirstActive(userId: string): Promise<MembershipWithRole | null> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('repository:membership'), (tx) =>
-      tx
-        .select({
-          id: membershipsLive.id,
-          tenantId: membershipsLive.tenantId,
-          roleId: membershipsLive.roleId,
-          status: membershipsLive.status,
-          abilities: membershipsLive.abilities,
-          roleIdFk: rolesLive.id,
-          roleAbilities: rolesLive.abilities,
-        })
-        .from(membershipsLive)
-        .innerJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
-        .where(and(eq(membershipsLive.userId, userId), eq(membershipsLive.status, 'ACTIVE')))
-        .limit(1),
-    );
-
-    if (!row) return null;
-
-    return {
-      id: row.id,
-      tenantId: row.tenantId,
-      roleId: row.roleId,
-      status: row.status,
-      abilities: row.abilities,
-      role: {
-        id: row.roleIdFk,
         abilities: row.roleAbilities,
       },
     };
