@@ -39,7 +39,6 @@ function createMockMembershipRepo() {
     findActiveByUserId: vi.fn(),
     findManyByUserAndTenant: vi.fn(),
     findByIdAndUser: vi.fn(),
-    findFirstActive: vi.fn(),
   });
 }
 
@@ -187,6 +186,26 @@ describe('AuthService', () => {
       expect(result.user?.username).toBe('admin');
       expect(result.user?.tenantId).toBe('tenant-1');
       expect(result.requiresInstituteSelection).toBeUndefined();
+    });
+
+    it('signs the access token with resellerId in the payload (ROV-261)', async () => {
+      // The access token MUST carry `resellerId` so EE billing operations
+      // gated by `assertInstituteWithReseller` succeed for institute users.
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([mockMembership]);
+      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
+      mockJwt.sign.mockReturnValue('jwt-token');
+
+      await authService.instituteLogin('admin', 'correct-password');
+
+      // First sign() call is the access token. Verify resellerId is present
+      // and matches the institute's reseller_id.
+      const [accessPayload] = mockJwt.sign.mock.calls[0];
+      expect(accessPayload).toMatchObject({
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        resellerId: '00000000-0000-7000-a000-000000000011',
+      });
     });
 
     it('should return membership list when user has multiple memberships', async () => {
@@ -647,6 +666,13 @@ describe('AuthService', () => {
           roleId: 'role-1',
           abilities: null,
           role: { id: 'role-1', abilities: [] },
+          institute: {
+            id: 'tenant-1',
+            name: { en: 'Test Institute' },
+            slug: 'test-institute',
+            logoUrl: null,
+            resellerId: '00000000-0000-7000-a000-000000000011',
+          },
         },
       });
 
@@ -1031,14 +1057,23 @@ describe('AuthService', () => {
 
       const roleAbilities = [{ action: 'manage', subject: 'all' }];
       const memberAbilities = [{ action: 'read', subject: 'Profile' }];
-      mockMembershipRepo.findFirstActive.mockResolvedValue({
-        id: 'membership-1',
-        tenantId: 'tenant-1',
-        roleId: 'role-1',
-        status: 'ACTIVE',
-        abilities: memberAbilities,
-        role: { id: 'role-1', abilities: roleAbilities },
-      });
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([
+        {
+          id: 'membership-1',
+          tenantId: 'tenant-1',
+          roleId: 'role-1',
+          status: 'ACTIVE',
+          abilities: memberAbilities,
+          role: { id: 'role-1', name: { en: 'Admin' }, abilities: roleAbilities },
+          institute: {
+            id: 'tenant-1',
+            name: { en: 'Test Institute' },
+            slug: 'test-institute',
+            logoUrl: null,
+            resellerId: '00000000-0000-7000-a000-000000000011',
+          },
+        },
+      ]);
 
       mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
       mockRefreshTokenRepo.create.mockResolvedValue(undefined);

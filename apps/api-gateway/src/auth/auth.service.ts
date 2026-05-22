@@ -535,13 +535,11 @@ export class AuthService {
         meta,
       });
     } else if (storedToken.membership) {
-      // Institute scope. storedToken.membership lacks institute info (refresh
-      // token table doesn't JOIN institutes), so re-fetch through the
-      // membership repo to get `institute.resellerId` for the JWT.
-      const m = await this.membershipRepo.findByIdAndUser(storedToken.membership.id, user.id);
-      if (!m) {
-        throw new UnauthorizedException('Membership not found');
-      }
+      // Institute scope. `storedToken.membership` carries the joined
+      // institute (see refresh-token.drizzle-repository.ts), so
+      // `institute.resellerId` is available without an extra DB hop —
+      // required to mint a JWT containing the claim (ROV-261).
+      const m = storedToken.membership;
       result = await this.issueTokens({
         user,
         scope: 'institute',
@@ -556,8 +554,9 @@ export class AuthService {
     } else {
       // Fallback: find first active institute membership.
       // findActiveByUserId returns memberships ordered by createdAt asc, so [0]
-      // matches the previous findFirstActive semantics and additionally carries
-      // `institute.resellerId` for the JWT.
+      // is deterministic AND carries `institute.resellerId` for the JWT.
+      // Replaces the previous `findFirstActive` (no orderBy → DB-order
+      // non-determinism; no institute JOIN).
       const memberships = await this.membershipRepo.findActiveByUserId(user.id);
       const firstMembership = memberships[0];
       if (!firstMembership) {

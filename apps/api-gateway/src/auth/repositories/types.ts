@@ -52,15 +52,6 @@ export interface MembershipWithInstituteAndRole {
   role: RoleInfo;
 }
 
-export interface MembershipWithRole {
-  id: string;
-  tenantId: string;
-  roleId: string;
-  status: MembershipStatus;
-  abilities: unknown;
-  role: Pick<RoleInfo, 'id' | 'abilities'>;
-}
-
 export interface PlatformMembershipWithRole {
   id: string;
   userId: string;
@@ -127,5 +118,11 @@ export interface RefreshTokenWithRelations {
     roleId: string;
     abilities: unknown;
     role: Pick<RoleInfo, 'id' | 'abilities'>;
+    /**
+     * Joined institute info — required so the refresh flow can mint a new
+     * institute-scope JWT containing `resellerId` (ROV-261) without an
+     * extra round-trip to `membershipRepo`.
+     */
+    institute: InstituteInfo;
   } | null;
 }
