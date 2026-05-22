@@ -15,6 +15,7 @@ import {
 } from './__generated__/graphql';
 import { loginAsPlatformAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
+import { waitForSetupComplete } from './helpers/wait-for-setup-complete';
 
 /**
  * Institute platform-scope E2E (migrated from hurl/institute/01-10).
@@ -945,17 +946,7 @@ describe('Institute Admin (platform scope) E2E', () => {
       assert(createRes.data);
       const id = createRes.data.adminCreateInstitute.id;
 
-      // Poll until setupService.runSetup() finishes — avoids querying mid-setup.
-      const deadline = Date.now() + 15_000;
-      while (Date.now() < deadline) {
-        const statusRes = await gql<{ adminGetInstitute: { setupStatus: string } }>(
-          `query Status($id: ID!) { adminGetInstitute(id: $id) { setupStatus } }`,
-          { id },
-          adminToken,
-        );
-        if (statusRes.data?.adminGetInstitute.setupStatus === 'COMPLETED') break;
-        await new Promise((r) => setTimeout(r, 200));
-      }
+      await waitForSetupComplete(id, adminToken);
 
       const treeRes = await gql<{
         adminGetInstituteAcademicTree: {
