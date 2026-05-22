@@ -164,6 +164,7 @@ describe('AuthService', () => {
         name: { en: 'Test Institute' },
         slug: 'test-institute',
         logoUrl: null,
+        resellerId: '00000000-0000-7000-a000-000000000011',
       },
       role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
     };
@@ -198,6 +199,7 @@ describe('AuthService', () => {
           name: { en: 'Other Institute' },
           slug: 'other-institute',
           logoUrl: null,
+          resellerId: '00000000-0000-7000-a000-000000000011',
         },
         role: { id: 'role-2', name: { en: 'Teacher' }, abilities: [] },
       };
@@ -369,6 +371,7 @@ describe('AuthService', () => {
         name: { en: 'Test Institute' },
         slug: 'test-institute',
         logoUrl: null,
+        resellerId: '00000000-0000-7000-a000-000000000011',
       },
       role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
     };
@@ -396,6 +399,7 @@ describe('AuthService', () => {
           name: { en: 'Other Institute' },
           slug: 'other-institute',
           logoUrl: null,
+          resellerId: '00000000-0000-7000-a000-000000000011',
         },
         role: { id: 'role-2', name: { en: 'Teacher' }, abilities: [] },
       };
@@ -488,6 +492,7 @@ describe('AuthService', () => {
           name: { en: 'Test Institute' },
           slug: 'test-institute',
           logoUrl: null,
+          resellerId: '00000000-0000-7000-a000-000000000011',
         },
         role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
       };
@@ -533,6 +538,7 @@ describe('AuthService', () => {
           name: { en: 'Test Institute' },
           slug: 'test-institute',
           logoUrl: null,
+          resellerId: '00000000-0000-7000-a000-000000000011',
         },
         role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
       });
@@ -1266,6 +1272,7 @@ describe('AuthService', () => {
             name: { en: 'Test' },
             slug: 'test',
             logoUrl: null,
+            resellerId: '00000000-0000-7000-a000-000000000011',
           },
           role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
         },

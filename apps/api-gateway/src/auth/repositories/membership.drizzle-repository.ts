@@ -31,6 +31,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
           instituteLogoUrl: institutesLive.logoUrl,
+          instituteResellerId: institutesLive.resellerId,
           roleIdFk: rolesLive.id,
           roleName: rolesLive.name,
           roleAbilities: rolesLive.abilities,
@@ -56,6 +57,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         name: row.instituteName,
         slug: row.instituteSlug,
         logoUrl: row.instituteLogoUrl,
+        resellerId: row.instituteResellerId,
       },
       role: {
         id: row.roleIdFk,
@@ -81,6 +83,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
           instituteLogoUrl: institutesLive.logoUrl,
+          instituteResellerId: institutesLive.resellerId,
           roleIdFk: rolesLive.id,
           roleName: rolesLive.name,
           roleAbilities: rolesLive.abilities,
@@ -108,6 +111,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         name: row.instituteName,
         slug: row.instituteSlug,
         logoUrl: row.instituteLogoUrl,
+        resellerId: row.instituteResellerId,
       },
       role: {
         id: row.roleIdFk,
@@ -133,6 +137,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
           instituteLogoUrl: institutesLive.logoUrl,
+          instituteResellerId: institutesLive.resellerId,
           roleIdFk: rolesLive.id,
           roleName: rolesLive.name,
           roleAbilities: rolesLive.abilities,
@@ -163,6 +168,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         name: row.instituteName,
         slug: row.instituteSlug,
         logoUrl: row.instituteLogoUrl,
+        resellerId: row.instituteResellerId,
       },
       role: {
         id: row.roleIdFk,

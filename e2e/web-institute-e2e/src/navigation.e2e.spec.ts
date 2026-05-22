@@ -38,12 +38,7 @@ test.describe('Navigation', () => {
   }
 
   test('breadcrumbs render on subpages', async ({ page }) => {
-    // `/en/billing/invoices` is omitted because the institute JWT currently
-    // lacks `resellerId`, so the `myInvoices` query 403s and Console
-    // Guardian rejects the test. Tracked separately (see follow-up Linear
-    // issue) — institute scope login should embed `resellerId` from the
-    // institute's `reseller_id` column at JWT mint time.
-    const subpages = ['/en/settings/institute', '/en/people/students', '/en/academics'];
+    const subpages = ['/en/settings/institute', '/en/billing/invoices', '/en/academics'];
 
     // Desktop variant — the mobile breadcrumb is also in DOM but hidden via CSS.
     const breadcrumb = page.getByTestId(testIds.layout.breadcrumbsDesktop);

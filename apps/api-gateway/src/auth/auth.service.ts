@@ -220,6 +220,7 @@ export class AuthService {
         user,
         scope: 'institute',
         tenantId: m.tenantId,
+        resellerId: m.institute.resellerId,
         membershipId: m.id,
         roleId: m.roleId,
         roleAbilities: m.role.abilities as Record<string, unknown>[],
@@ -296,6 +297,7 @@ export class AuthService {
         user,
         scope: 'institute',
         tenantId: m.tenantId,
+        resellerId: m.institute.resellerId,
         membershipId: m.id,
         roleId: m.roleId,
         roleAbilities: m.role.abilities as Record<string, unknown>[],
@@ -374,6 +376,7 @@ export class AuthService {
       user,
       scope: 'institute',
       tenantId: membership.tenantId,
+      resellerId: membership.institute.resellerId,
       membershipId: membership.id,
       roleId: membership.roleId,
       roleAbilities: membership.role.abilities as Record<string, unknown>[],
@@ -446,6 +449,7 @@ export class AuthService {
       user,
       scope: 'institute',
       tenantId: membership.tenantId,
+      resellerId: membership.institute.resellerId,
       membershipId: membership.id,
       roleId: membership.roleId,
       roleAbilities: membership.role.abilities as Record<string, unknown>[],
@@ -531,12 +535,18 @@ export class AuthService {
         meta,
       });
     } else if (storedToken.membership) {
-      // Institute scope
-      const m = storedToken.membership;
+      // Institute scope. storedToken.membership lacks institute info (refresh
+      // token table doesn't JOIN institutes), so re-fetch through the
+      // membership repo to get `institute.resellerId` for the JWT.
+      const m = await this.membershipRepo.findByIdAndUser(storedToken.membership.id, user.id);
+      if (!m) {
+        throw new UnauthorizedException('Membership not found');
+      }
       result = await this.issueTokens({
         user,
         scope: 'institute',
         tenantId: m.tenantId,
+        resellerId: m.institute.resellerId,
         membershipId: m.id,
         roleId: m.roleId,
         roleAbilities: m.role.abilities as Record<string, unknown>[],
@@ -544,8 +554,12 @@ export class AuthService {
         meta,
       });
     } else {
-      // Fallback: find first active institute membership
-      const firstMembership = await this.membershipRepo.findFirstActive(user.id);
+      // Fallback: find first active institute membership.
+      // findActiveByUserId returns memberships ordered by createdAt asc, so [0]
+      // matches the previous findFirstActive semantics and additionally carries
+      // `institute.resellerId` for the JWT.
+      const memberships = await this.membershipRepo.findActiveByUserId(user.id);
+      const firstMembership = memberships[0];
       if (!firstMembership) {
         throw new UnauthorizedException('No active memberships');
       }
@@ -553,6 +567,7 @@ export class AuthService {
         user,
         scope: 'institute',
         tenantId: firstMembership.tenantId,
+        resellerId: firstMembership.institute.resellerId,
         membershipId: firstMembership.id,
         roleId: firstMembership.roleId,
         roleAbilities: firstMembership.role.abilities as Record<string, unknown>[],

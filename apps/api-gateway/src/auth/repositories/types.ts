@@ -26,6 +26,14 @@ export interface InstituteInfo {
   name: I18nContent;
   slug: string;
   logoUrl: string | null;
+  /**
+   * The reseller that owns this institute. Read at JWT mint time so
+   * institute-scope tokens carry `resellerId` — required for EE billing
+   * operations gated by `assertInstituteWithReseller` (myInvoices,
+   * assignPlan, cancelSubscription, etc.). Always populated because
+   * `institutes.reseller_id` is NOT NULL with a default of RESELLER_DIRECT.
+   */
+  resellerId: string;
 }
 
 export interface RoleInfo {
