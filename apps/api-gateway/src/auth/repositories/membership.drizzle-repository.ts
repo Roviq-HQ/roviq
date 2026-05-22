@@ -156,7 +156,6 @@ export class MembershipDrizzleRepository extends MembershipRepository {
     );
 
     if (!row) return null;
-
     return {
       id: row.id,
       tenantId: row.tenantId,
