@@ -34,6 +34,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
+import { TenantThemeProvider } from './tenant-theme-provider';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
@@ -396,7 +397,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        <AdminLayout config={config}>{children}</AdminLayout>
+        <TenantThemeProvider>
+          <AdminLayout config={config}>{children}</AdminLayout>
+        </TenantThemeProvider>
       </AbilityProvider>
     </ProtectedRoute>
   );
