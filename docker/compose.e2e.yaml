@@ -40,12 +40,14 @@ services:
   nats:
     image: nats:2.10-alpine
     command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
-    # Expose 4222 (client) + 8222 (HTTP monitoring) to host so the
-    # `check:jetstream-drift` and `check:schema-drift` scripts (which run
-    # on the host, outside the docker network) can connect.
+    # Host ports offset off dev infra (compose.infra.yaml NATS owns 4222/8222)
+    # so the e2e stack coexists with a running dev stack — same convention as
+    # postgres (5435 vs dev 5434) and api-gateway (3004 vs dev 3005). The
+    # host-side `check:jetstream-drift` script connects via localhost:4223;
+    # in-network clients still use `nats:4222` (the container-internal port).
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "4223:4222"
+      - "8223:8222"
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
       interval: 5s
