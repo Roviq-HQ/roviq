@@ -273,7 +273,9 @@ jobs:
         # Linear: ROV-255.
         timeout-minutes: 2
         env:
-          NATS_URL: nats://localhost:4222
+          # e2e NATS publishes on host 4223 (offset off dev's 4222) — see
+          # docker/compose.e2e.yaml.
+          NATS_URL: nats://localhost:4223
         run: pnpm check:jetstream-drift
       - name: Vitest E2E API tests
         run: pnpm test:e2e:api

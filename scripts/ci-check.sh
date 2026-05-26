@@ -238,7 +238,7 @@ launch() {
 # fails fast so a stream-config PR doesn't waste a full e2e run before the
 # drift becomes the obvious fix.
 (( run_e2e )) && launch e2e bash -c 'set -e
-  pnpm -s check:jetstream-drift
+  NATS_URL=nats://localhost:4223 pnpm -s check:jetstream-drift
   pnpm -s nx run api-gateway-e2e:test-e2e
   NEXT_PUBLIC_API_URL=http://localhost:3004 \
   NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='\'''\'' \
