@@ -815,6 +815,11 @@ export const testIds = {
     wizardDescriptionInput: 'timetable-wizard-description-input',
     wizardYearSelect: 'timetable-wizard-year-select',
     wizardSection: (id: string) => `timetable-wizard-section-${id}`,
+    sectionPicker: 'timetable-section-picker',
+    sectionPickerSelectAll: 'timetable-section-picker-select-all',
+    sectionPickerToggleDept: (deptKey: string) => `timetable-section-picker-dept-${deptKey}`,
+    sectionPickerToggleAll: (standardId: string) =>
+      `timetable-section-picker-toggle-all-${standardId}`,
     wizardDayStartInput: 'timetable-wizard-day-start-input',
     wizardPeriodDurationInput: 'timetable-wizard-period-duration-input',
     wizardPeriodsCountInput: 'timetable-wizard-periods-count-input',
