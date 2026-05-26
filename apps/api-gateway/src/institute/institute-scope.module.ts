@@ -18,6 +18,7 @@ import { StaffModule } from './staff/staff.module';
 import { StandardModule } from './standard/standard.module';
 import { StudentModule } from './student/student.module';
 import { SubjectModule } from './subject/subject.module';
+import { TimetableModule } from './timetable/timetable.module';
 import { ProfileModule } from './user/profile.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { ProfileModule } from './user/profile.module';
     StandardModule,
     StudentModule,
     SubjectModule,
+    TimetableModule,
   ],
 })
 export class InstituteScopeModule {}

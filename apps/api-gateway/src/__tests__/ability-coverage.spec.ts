@@ -180,9 +180,6 @@ describe('CASL ability coverage', () => {
       // documented future-feature placeholders pass through. Drop entries
       // from this list as resolvers land.
       'manage:Fee',
-      'read:Timetable',
-      // Removed once the timetable resolvers land in this feature (Phase 5).
-      'manage:Timetable',
       'manage:Exam',
       'manage:ReportCard',
       'manage:Activity',
