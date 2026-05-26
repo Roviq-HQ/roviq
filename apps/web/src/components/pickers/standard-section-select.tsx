@@ -10,9 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@roviq/ui';
+import {
+  useSections,
+  useStandards,
+} from '@web/app/[locale]/institute/(dashboard)/academics/use-academics';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
-import { useSections, useStandards } from '../academics/use-academics';
 
 /**
  * Cascading Standard → Section selector reused by the section-timetable and

@@ -24,12 +24,12 @@ import {
   Textarea,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { StandardSectionSelect } from '@web/components/pickers/standard-section-select';
 import { CalendarClock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { AcademicYearSelector, useSelectedAcademicYear } from '../../academic-years/year-selector';
-import { StandardSectionSelect } from '../standard-section-select';
 import { mapError } from '../timetable-shared';
 import {
   type DayScheduleSlot,

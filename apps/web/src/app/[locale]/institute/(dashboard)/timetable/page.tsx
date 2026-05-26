@@ -5,8 +5,6 @@ import {
   Badge,
   Button,
   Can,
-  Card,
-  CardContent,
   Checkbox,
   DataTable,
   Dialog,
@@ -34,15 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { SectionPicker } from '@web/components/pickers/section-picker';
 import { CalendarClock, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -53,7 +47,6 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { AcademicYearSelector, useSelectedAcademicYear } from '../academic-years/year-selector';
 import { useStandards } from '../academics/use-academics';
-import { SectionPicker } from './section-picker';
 import { mapError, TimeInput } from './timetable-shared';
 import {
   type CreateTimetableInput,
@@ -63,7 +56,6 @@ import {
   useCreateTimetable,
   useDeleteTimetable,
   useRestoreTimetable,
-  useTimetableStatistics,
   useTimetables,
   useUpdateTimetableStatus,
   type Weekday,
@@ -115,7 +107,6 @@ export default function TimetablePage() {
 
   const [deleteTarget, setDeleteTarget] = React.useState<TimetableListItem | null>(null);
 
-  const { stats } = useTimetableStatistics(yearId);
   const { timetables, total, totalPages, loading } = useTimetables(yearId, {
     status: (status as TimetableStatus | null) ?? null,
     search,
@@ -266,19 +257,6 @@ export default function TimetablePage() {
         allowed ? (
           <div className="space-y-6" data-testid={instituteTimetable.page}>
             <PageHeader yearId={yearId} />
-
-            {stats && (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                {(['total', 'draft', 'active', 'inactive', 'archived'] as const).map((key) => (
-                  <Card key={key} data-testid={instituteTimetable.statCard(key)}>
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground">{t(`stats.${key}`)}</p>
-                      <p className="text-2xl font-semibold tabular-nums">{stats[key]}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
 
             <div className="flex flex-wrap items-center gap-2">
               <Input
@@ -538,7 +516,7 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
   });
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <Button
         size="sm"
         className="gap-2"
@@ -548,10 +526,14 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
         <Plus className="size-4" aria-hidden="true" />
         {t('create')}
       </Button>
-      <SheetContent className="overflow-y-auto sm:max-w-xl" data-testid={instituteTimetable.wizard}>
-        <SheetHeader>
-          <SheetTitle>{t('wizard.title')}</SheetTitle>
-        </SheetHeader>
+      <DialogContent
+        className="flex h-[90vh] max-h-[90vh] w-[92vw] max-w-[1400px] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-[1400px]"
+        data-testid={instituteTimetable.wizard}
+      >
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle>{t('wizard.title')}</DialogTitle>
+          <DialogDescription className="sr-only">{t('wizard.title')}</DialogDescription>
+        </DialogHeader>
         <form
           noValidate
           onSubmit={(e) => {
@@ -559,304 +541,328 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
             e.stopPropagation();
             void form.handleSubmit();
           }}
-          className="space-y-5 mt-4"
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <FieldGroup>
-            <I18nField
-              form={form}
-              name="name"
-              label={t('name')}
-              placeholder={t('namePlaceholder')}
-              testId={instituteTimetable.wizardNameInput}
-            />
-            <form.AppField name="description">
-              {(field) => (
-                <field.TextareaField
-                  label={t('descriptionLabel')}
-                  placeholder={t('descriptionPlaceholder')}
-                  testId={instituteTimetable.wizardDescriptionInput}
-                />
-              )}
-            </form.AppField>
-          </FieldGroup>
-
-          {/* Sections covered */}
-          <FieldSet>
-            <FieldLegend variant="label">{t('wizard.selectSections')}</FieldLegend>
-            <FieldDescription>{t('wizard.selectSectionsHint')}</FieldDescription>
-            <form.Field name="sectionIds">
-              {(field) => (
-                <SectionPicker
-                  standards={standards}
-                  selected={(field.state.value as string[]) ?? []}
-                  onToggle={(id) => {
-                    const current = (field.state.value as string[]) ?? [];
-                    field.handleChange(
-                      current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
-                    );
-                  }}
-                />
-              )}
-            </form.Field>
-          </FieldSet>
-
-          {/* Schedule setup */}
-          <FieldSet>
-            <FieldLegend variant="label">{t('wizard.scheduleSection')}</FieldLegend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <TimeInput
-                label={t('wizard.dayStartTime')}
-                value={form.state.values.dayStartTime}
-                onChange={(v) => form.setFieldValue('dayStartTime', v)}
-                testId={instituteTimetable.wizardDayStartInput}
-              />
-              <form.AppField name="defaultPeriodDurationMins">
-                {(field) => (
-                  <field.NumberField
-                    label={t('wizard.periodDuration')}
-                    min={1}
-                    testId={instituteTimetable.wizardPeriodDurationInput}
+          <div className="flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+            <div className="mx-auto grid w-full max-w-none grid-cols-1 items-start gap-x-12 gap-y-6 lg:grid-cols-2">
+              <div className="space-y-6">
+                <FieldGroup>
+                  <I18nField
+                    form={form}
+                    name="name"
+                    label={t('name')}
+                    placeholder={t('namePlaceholder')}
+                    testId={instituteTimetable.wizardNameInput}
                   />
-                )}
-              </form.AppField>
-              <form.AppField name="periodsCount">
-                {(field) => (
-                  <field.NumberField
-                    label={t('wizard.periodsCount')}
-                    min={1}
-                    testId={instituteTimetable.wizardPeriodsCountInput}
-                  />
-                )}
-              </form.AppField>
-            </div>
+                  <form.AppField name="description">
+                    {(field) => (
+                      <field.TextareaField
+                        label={t('descriptionLabel')}
+                        placeholder={t('descriptionPlaceholder')}
+                        testId={instituteTimetable.wizardDescriptionInput}
+                      />
+                    )}
+                  </form.AppField>
+                </FieldGroup>
 
-            <Field>
-              <FieldLabel>{t('wizard.workingDays')}</FieldLabel>
-              <form.Field name="workingDays">
-                {(field) => {
-                  const selected = (field.state.value as Weekday[]) ?? [];
-                  return (
-                    <div className="flex flex-wrap gap-3">
-                      {WEEKDAY_VALUES.map((day) => {
-                        const id = `tt-wizard-working-day-${day}`;
+                {/* Sections covered */}
+                <FieldSet>
+                  <FieldLegend variant="label">{t('wizard.selectSections')}</FieldLegend>
+                  <FieldDescription>{t('wizard.selectSectionsHint')}</FieldDescription>
+                  <form.Field name="sectionIds">
+                    {(field) => (
+                      <SectionPicker
+                        standards={standards}
+                        selected={(field.state.value as string[]) ?? []}
+                        onToggle={(id) => {
+                          const current = (field.state.value as string[]) ?? [];
+                          field.handleChange(
+                            current.includes(id)
+                              ? current.filter((x) => x !== id)
+                              : [...current, id],
+                          );
+                        }}
+                        onSetMany={(ids, select) => {
+                          const set = new Set((field.state.value as string[]) ?? []);
+                          for (const id of ids) {
+                            if (select) set.add(id);
+                            else set.delete(id);
+                          }
+                          field.handleChange([...set]);
+                        }}
+                      />
+                    )}
+                  </form.Field>
+                </FieldSet>
+              </div>
+              <div className="space-y-6">
+                {/* Schedule setup */}
+                <FieldSet>
+                  <FieldLegend variant="label">{t('wizard.scheduleSection')}</FieldLegend>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <TimeInput
+                      label={t('wizard.dayStartTime')}
+                      value={form.state.values.dayStartTime}
+                      onChange={(v) => form.setFieldValue('dayStartTime', v)}
+                      testId={instituteTimetable.wizardDayStartInput}
+                    />
+                    <form.AppField name="defaultPeriodDurationMins">
+                      {(field) => (
+                        <field.NumberField
+                          label={t('wizard.periodDuration')}
+                          min={1}
+                          testId={instituteTimetable.wizardPeriodDurationInput}
+                        />
+                      )}
+                    </form.AppField>
+                    <form.AppField name="periodsCount">
+                      {(field) => (
+                        <field.NumberField
+                          label={t('wizard.periodsCount')}
+                          min={1}
+                          testId={instituteTimetable.wizardPeriodsCountInput}
+                        />
+                      )}
+                    </form.AppField>
+                  </div>
+
+                  <Field>
+                    <FieldLabel>{t('wizard.workingDays')}</FieldLabel>
+                    <form.Field name="workingDays">
+                      {(field) => {
+                        const selected = (field.state.value as Weekday[]) ?? [];
                         return (
-                          <div key={day} className="flex items-center gap-1.5 text-sm">
-                            <Checkbox
-                              id={id}
-                              checked={selected.includes(day)}
-                              onCheckedChange={(next) =>
-                                field.handleChange(
-                                  next === true
-                                    ? [...selected, day]
-                                    : selected.filter((d) => d !== day),
-                                )
-                              }
-                              data-testid={instituteTimetable.wizardWorkingDay(day)}
-                            />
-                            <FieldLabel htmlFor={id} className="cursor-pointer">
-                              {t(`weekdaysShort.${day}`)}
-                            </FieldLabel>
+                          <div className="flex flex-wrap gap-3">
+                            {WEEKDAY_VALUES.map((day) => {
+                              const id = `tt-wizard-working-day-${day}`;
+                              return (
+                                <div key={day} className="flex items-center gap-1.5 text-sm">
+                                  <Checkbox
+                                    id={id}
+                                    checked={selected.includes(day)}
+                                    onCheckedChange={(next) =>
+                                      field.handleChange(
+                                        next === true
+                                          ? [...selected, day]
+                                          : selected.filter((d) => d !== day),
+                                      )
+                                    }
+                                    data-testid={instituteTimetable.wizardWorkingDay(day)}
+                                  />
+                                  <FieldLabel htmlFor={id} className="cursor-pointer">
+                                    {t(`weekdaysShort.${day}`)}
+                                  </FieldLabel>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
-                      })}
-                    </div>
-                  );
-                }}
-              </form.Field>
-            </Field>
-          </FieldSet>
+                      }}
+                    </form.Field>
+                  </Field>
+                </FieldSet>
 
-          <Separator />
+                <Separator />
 
-          {/* Lunch breaks */}
-          <FieldSet>
-            <div className="flex items-center justify-between">
-              <FieldLegend variant="label">{t('wizard.lunchBreaks')}</FieldLegend>
-              <form.Field name="lunch" mode="array">
-                {(field) => (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs"
-                    onClick={() => field.pushValue({ name: '', afterPeriod: 3, duration: 30 })}
-                    data-testid={instituteTimetable.wizardAddLunchBtn}
-                  >
-                    <Plus className="size-3" /> {t('wizard.addLunch')}
-                  </Button>
-                )}
-              </form.Field>
-            </div>
-            <FieldDescription>{t('wizard.lunchBreaksHint')}</FieldDescription>
-            <form.Field name="lunch" mode="array">
-              {(field) => {
-                const rows = (field.state.value as LunchRow[]) ?? [];
-                if (rows.length === 0) {
-                  return <p className="text-sm text-muted-foreground">{t('wizard.lunchEmpty')}</p>;
-                }
-                return (
-                  <div className="space-y-2">
-                    {rows.map((_, i) => (
-                      <div
-                        // biome-ignore lint/suspicious/noArrayIndexKey: positional row identity inside an editable array.
-                        key={i}
-                        className="flex items-end gap-2 rounded-lg border bg-muted/30 p-2"
-                      >
-                        <form.AppField name={`lunch[${i}].name`}>
-                          {(f) => (
-                            <f.TextField
-                              label={t('wizard.lunchName')}
-                              placeholder="Lunch"
-                              testId={instituteTimetable.wizardLunchNameInput(i)}
-                            />
-                          )}
-                        </form.AppField>
-                        <form.AppField name={`lunch[${i}].afterPeriod`}>
-                          {(f) => (
-                            <f.NumberField
-                              label={t('wizard.lunchAfter')}
-                              min={1}
-                              testId={instituteTimetable.wizardLunchAfterInput(i)}
-                            />
-                          )}
-                        </form.AppField>
-                        <form.AppField name={`lunch[${i}].duration`}>
-                          {(f) => (
-                            <f.NumberField
-                              label={t('wizard.lunchDuration')}
-                              min={1}
-                              testId={instituteTimetable.wizardLunchDurationInput(i)}
-                            />
-                          )}
-                        </form.AppField>
+                {/* Lunch breaks */}
+                <FieldSet>
+                  <div className="flex items-center justify-between">
+                    <FieldLegend variant="label">{t('wizard.lunchBreaks')}</FieldLegend>
+                    <form.Field name="lunch" mode="array">
+                      {(field) => (
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => field.removeValue(i)}
-                          title={t('wizard.removeLunch')}
-                          aria-label={t('wizard.removeLunch')}
-                          data-testid={instituteTimetable.wizardRemoveLunchBtn(i)}
+                          className="gap-1.5 text-xs"
+                          onClick={() =>
+                            field.pushValue({ name: '', afterPeriod: 3, duration: 30 })
+                          }
+                          data-testid={instituteTimetable.wizardAddLunchBtn}
                         >
-                          <Trash2 className="size-3.5" />
+                          <Plus className="size-3" /> {t('wizard.addLunch')}
                         </Button>
-                      </div>
-                    ))}
+                      )}
+                    </form.Field>
                   </div>
-                );
-              }}
-            </form.Field>
-          </FieldSet>
-
-          {/* Extra classes */}
-          <FieldSet>
-            <div className="flex items-center justify-between">
-              <FieldLegend variant="label">{t('wizard.extraClasses')}</FieldLegend>
-              <form.Field name="extraClass" mode="array">
-                {(field) => (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs"
-                    onClick={() =>
-                      field.pushValue({
-                        session: 'MORNING',
-                        startTime: '07:15',
-                        duration: 30,
-                        count: 1,
-                      })
-                    }
-                    data-testid={instituteTimetable.wizardAddExtraBtn}
-                  >
-                    <Plus className="size-3" /> {t('wizard.addExtra')}
-                  </Button>
-                )}
-              </form.Field>
-            </div>
-            <FieldDescription>{t('wizard.extraClassesHint')}</FieldDescription>
-            <form.Field name="extraClass" mode="array">
-              {(field) => {
-                const rows = (field.state.value as ExtraRow[]) ?? [];
-                if (rows.length === 0) {
-                  return <p className="text-sm text-muted-foreground">{t('wizard.extraEmpty')}</p>;
-                }
-                return (
-                  <div className="space-y-2">
-                    {rows.map((row, i) => (
-                      <div
-                        // biome-ignore lint/suspicious/noArrayIndexKey: positional row identity inside an editable array.
-                        key={i}
-                        className="flex items-end gap-2 rounded-lg border bg-muted/30 p-2"
-                      >
-                        <Field className="w-28">
-                          <FieldLabel>{t('wizard.extraSession')}</FieldLabel>
-                          <Select
-                            value={row.session}
-                            onValueChange={(v) =>
-                              field.replaceValue(i, { ...row, session: v as DaySession })
-                            }
-                          >
-                            <SelectTrigger
-                              data-testid={instituteTimetable.wizardExtraSessionSelect(i)}
+                  <FieldDescription>{t('wizard.lunchBreaksHint')}</FieldDescription>
+                  <form.Field name="lunch" mode="array">
+                    {(field) => {
+                      const rows = (field.state.value as LunchRow[]) ?? [];
+                      if (rows.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground">{t('wizard.lunchEmpty')}</p>
+                        );
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {rows.map((_, i) => (
+                            <div
+                              // biome-ignore lint/suspicious/noArrayIndexKey: positional row identity inside an editable array.
+                              key={i}
+                              className="flex items-end gap-2 rounded-lg border bg-muted/30 p-2"
                             >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {SESSION_VALUES.map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  {t(`sessions.${s}`)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                        <TimeInput
-                          label={t('wizard.extraStart')}
-                          value={row.startTime}
-                          onChange={(v) => field.replaceValue(i, { ...row, startTime: v })}
-                          testId={instituteTimetable.wizardExtraStartInput(i)}
-                        />
-                        <form.AppField name={`extraClass[${i}].duration`}>
-                          {(f) => (
-                            <f.NumberField
-                              label={t('wizard.extraDuration')}
-                              min={1}
-                              testId={instituteTimetable.wizardExtraDurationInput(i)}
-                            />
-                          )}
-                        </form.AppField>
-                        <form.AppField name={`extraClass[${i}].count`}>
-                          {(f) => (
-                            <f.NumberField
-                              label={t('wizard.extraCount')}
-                              min={1}
-                              testId={instituteTimetable.wizardExtraCountInput(i)}
-                            />
-                          )}
-                        </form.AppField>
+                              <form.AppField name={`lunch[${i}].name`}>
+                                {(f) => (
+                                  <f.TextField
+                                    label={t('wizard.lunchName')}
+                                    placeholder="Lunch"
+                                    testId={instituteTimetable.wizardLunchNameInput(i)}
+                                  />
+                                )}
+                              </form.AppField>
+                              <form.AppField name={`lunch[${i}].afterPeriod`}>
+                                {(f) => (
+                                  <f.NumberField
+                                    label={t('wizard.lunchAfter')}
+                                    min={1}
+                                    testId={instituteTimetable.wizardLunchAfterInput(i)}
+                                  />
+                                )}
+                              </form.AppField>
+                              <form.AppField name={`lunch[${i}].duration`}>
+                                {(f) => (
+                                  <f.NumberField
+                                    label={t('wizard.lunchDuration')}
+                                    min={1}
+                                    testId={instituteTimetable.wizardLunchDurationInput(i)}
+                                  />
+                                )}
+                              </form.AppField>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-destructive"
+                                onClick={() => field.removeValue(i)}
+                                title={t('wizard.removeLunch')}
+                                aria-label={t('wizard.removeLunch')}
+                                data-testid={instituteTimetable.wizardRemoveLunchBtn(i)}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }}
+                  </form.Field>
+                </FieldSet>
+
+                {/* Extra classes */}
+                <FieldSet>
+                  <div className="flex items-center justify-between">
+                    <FieldLegend variant="label">{t('wizard.extraClasses')}</FieldLegend>
+                    <form.Field name="extraClass" mode="array">
+                      {(field) => (
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => field.removeValue(i)}
-                          title={t('wizard.removeExtra')}
-                          aria-label={t('wizard.removeExtra')}
-                          data-testid={instituteTimetable.wizardRemoveExtraBtn(i)}
+                          className="gap-1.5 text-xs"
+                          onClick={() =>
+                            field.pushValue({
+                              session: 'MORNING',
+                              startTime: '07:15',
+                              duration: 30,
+                              count: 1,
+                            })
+                          }
+                          data-testid={instituteTimetable.wizardAddExtraBtn}
                         >
-                          <Trash2 className="size-3.5" />
+                          <Plus className="size-3" /> {t('wizard.addExtra')}
                         </Button>
-                      </div>
-                    ))}
+                      )}
+                    </form.Field>
                   </div>
-                );
-              }}
-            </form.Field>
-          </FieldSet>
-
-          <SheetFooter>
+                  <FieldDescription>{t('wizard.extraClassesHint')}</FieldDescription>
+                  <form.Field name="extraClass" mode="array">
+                    {(field) => {
+                      const rows = (field.state.value as ExtraRow[]) ?? [];
+                      if (rows.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground">{t('wizard.extraEmpty')}</p>
+                        );
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {rows.map((row, i) => (
+                            <div
+                              // biome-ignore lint/suspicious/noArrayIndexKey: positional row identity inside an editable array.
+                              key={i}
+                              className="flex items-end gap-2 rounded-lg border bg-muted/30 p-2"
+                            >
+                              <Field className="w-28">
+                                <FieldLabel>{t('wizard.extraSession')}</FieldLabel>
+                                <Select
+                                  value={row.session}
+                                  onValueChange={(v) =>
+                                    field.replaceValue(i, { ...row, session: v as DaySession })
+                                  }
+                                >
+                                  <SelectTrigger
+                                    data-testid={instituteTimetable.wizardExtraSessionSelect(i)}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {SESSION_VALUES.map((s) => (
+                                      <SelectItem key={s} value={s}>
+                                        {t(`sessions.${s}`)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </Field>
+                              <TimeInput
+                                label={t('wizard.extraStart')}
+                                value={row.startTime}
+                                onChange={(v) => field.replaceValue(i, { ...row, startTime: v })}
+                                testId={instituteTimetable.wizardExtraStartInput(i)}
+                              />
+                              <form.AppField name={`extraClass[${i}].duration`}>
+                                {(f) => (
+                                  <f.NumberField
+                                    label={t('wizard.extraDuration')}
+                                    min={1}
+                                    testId={instituteTimetable.wizardExtraDurationInput(i)}
+                                  />
+                                )}
+                              </form.AppField>
+                              <form.AppField name={`extraClass[${i}].count`}>
+                                {(f) => (
+                                  <f.NumberField
+                                    label={t('wizard.extraCount')}
+                                    min={1}
+                                    testId={instituteTimetable.wizardExtraCountInput(i)}
+                                  />
+                                )}
+                              </form.AppField>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-destructive"
+                                onClick={() => field.removeValue(i)}
+                                title={t('wizard.removeExtra')}
+                                aria-label={t('wizard.removeExtra')}
+                                data-testid={instituteTimetable.wizardRemoveExtraBtn(i)}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }}
+                  </form.Field>
+                </FieldSet>
+              </div>
+            </div>
+          </div>
+          {/* Plain footer (not DialogFooter — its -mx-4/-mb-4 negative margins
+              assume a p-4 dialog and misalign in this p-0 full-bleed layout). */}
+          <div className="mt-auto flex items-center justify-end gap-2 border-t bg-muted/30 px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -874,10 +880,10 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
                 {t('create')}
               </form.SubmitButton>
             </form.AppForm>
-          </SheetFooter>
+          </div>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

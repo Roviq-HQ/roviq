@@ -3,12 +3,12 @@
 import { useFormatDate } from '@roviq/i18n';
 import { Button, Can, Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { StandardSectionSelect } from '@web/components/pickers/standard-section-select';
 import { CalendarClock, Printer } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { AcademicYearSelector, useSelectedAcademicYear } from '../../academic-years/year-selector';
 import { ReadOnlyGrid } from '../read-only-grid';
-import { StandardSectionSelect } from '../standard-section-select';
 import { useSectionTimetable } from '../use-timetable';
 import { TimetableLookupsProvider } from '../use-timetable-lookups';
 
