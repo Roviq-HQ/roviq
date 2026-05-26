@@ -91,6 +91,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/student.service.ts',
   'apps/api-gateway/src/institute/student/workflows/bulk-student-import.activities.ts',
   'apps/api-gateway/src/institute/subject/repositories/subject.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/timetable/repositories/timetable.drizzle-repository.ts',
   'apps/api-gateway/src/institute/user/profile.service.ts',
   'apps/api-gateway/src/notification-config/repositories/notification-config.drizzle-repository.ts',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts',
