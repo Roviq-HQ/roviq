@@ -531,6 +531,69 @@ const RESELLER_SCHEMAS = {
   'RESELLER.updated': z.object({ scope: str }).catchall(z.unknown()),
 } as const;
 
+const TIMETABLE_SCHEMAS = {
+  'TIMETABLE.activated': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    academicYearId: uuid,
+    previousActiveId: uuid.nullable(),
+  }),
+  'TIMETABLE.archived': z.object({ timetableId: uuid, tenantId: uuid }),
+  'TIMETABLE.created': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    academicYearId: uuid,
+  }),
+  'TIMETABLE.day_overridden': z.object({
+    overrideId: uuid,
+    timetableId: uuid,
+    tenantId: uuid,
+    sectionId: uuid,
+    date: str,
+  }),
+  'TIMETABLE.deactivated': z.object({ timetableId: uuid, tenantId: uuid }),
+  'TIMETABLE.deleted': z.object({ timetableId: uuid, tenantId: uuid }),
+  'TIMETABLE.entry_assigned': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    sectionId: uuid,
+    periodId: uuid,
+  }),
+  'TIMETABLE.entry_cleared': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    sectionId: uuid,
+    periodId: uuid,
+  }),
+  'TIMETABLE.override_cleared': z.object({
+    overrideId: uuid,
+    timetableId: uuid,
+    tenantId: uuid,
+  }),
+  'TIMETABLE.period_added': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    periodId: uuid,
+  }),
+  'TIMETABLE.period_removed': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    periodId: uuid,
+  }),
+  'TIMETABLE.restored': z.object({ timetableId: uuid, tenantId: uuid }),
+  'TIMETABLE.section_added': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    sectionId: uuid,
+  }),
+  'TIMETABLE.section_removed': z.object({
+    timetableId: uuid,
+    tenantId: uuid,
+    sectionId: uuid,
+  }),
+  'TIMETABLE.updated': z.object({ timetableId: uuid, tenantId: uuid }),
+} as const;
+
 // ── Flat map: EventPattern → ZodTypeAny ──────────────────────────────────────
 //
 // TypeScript can't index a nested const object with a dot-path string, so we
@@ -566,6 +629,7 @@ export const _DOMAIN_SCHEMA_MAPS = [
   HOLIDAY_SCHEMAS,
   ENQUIRY_SCHEMAS,
   RESELLER_SCHEMAS,
+  TIMETABLE_SCHEMAS,
 ] as const;
 
 // Intersection preserves per-key → specific-schema mapping so `EventPayload<P>`

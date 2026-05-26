@@ -28,6 +28,7 @@ describe('STREAMS config', () => {
     'CONSENT',
     'CERTIFICATE',
     'TC',
+    'TIMETABLE',
     'EXPORT',
     'USER',
     'GUARDIAN',

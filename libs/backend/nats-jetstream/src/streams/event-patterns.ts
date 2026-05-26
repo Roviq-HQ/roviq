@@ -211,6 +211,23 @@ export const EVENT_PATTERNS = {
   TC: {
     issued: 'TC.issued',
   },
+  TIMETABLE: {
+    activated: 'TIMETABLE.activated',
+    archived: 'TIMETABLE.archived',
+    created: 'TIMETABLE.created',
+    day_overridden: 'TIMETABLE.day_overridden',
+    deactivated: 'TIMETABLE.deactivated',
+    deleted: 'TIMETABLE.deleted',
+    entry_assigned: 'TIMETABLE.entry_assigned',
+    entry_cleared: 'TIMETABLE.entry_cleared',
+    override_cleared: 'TIMETABLE.override_cleared',
+    period_added: 'TIMETABLE.period_added',
+    period_removed: 'TIMETABLE.period_removed',
+    restored: 'TIMETABLE.restored',
+    section_added: 'TIMETABLE.section_added',
+    section_removed: 'TIMETABLE.section_removed',
+    updated: 'TIMETABLE.updated',
+  },
   USER: {
     admission_created: 'USER.admission_created',
   },
