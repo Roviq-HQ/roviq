@@ -15,6 +15,7 @@ import {
   BOT_TYPE_VALUES,
   CERTIFICATE_STATUS_VALUES,
   CERTIFICATE_TEMPLATE_TYPE_VALUES,
+  DAY_SESSION_VALUES,
   DOMAIN_GROUP_TYPE_VALUES,
   DYNAMIC_GROUP_STATUS_VALUES,
   EDUCATION_LEVEL_VALUES,
@@ -38,6 +39,7 @@ import {
   MEMBERSHIP_STATUS_VALUES,
   MINORITY_TYPE_VALUES,
   NEP_STAGE_VALUES,
+  PERIOD_KIND_VALUES,
   PROMOTION_STATUS_VALUES,
   QUALIFICATION_TYPE_VALUES,
   RESELLER_STATUS_VALUES,
@@ -50,9 +52,12 @@ import {
   STUDENT_STREAM_VALUES,
   SUBJECT_TYPE_VALUES,
   TC_STATUS_VALUES,
+  TIMETABLE_OVERRIDE_TYPE_VALUES,
+  TIMETABLE_STATUS_VALUES,
   USER_DOCUMENT_TYPE_VALUES,
   USER_IDENTIFIER_TYPE_VALUES,
   USER_STATUS_VALUES,
+  WEEKDAY_VALUES,
 } from '@roviq/common-types';
 import { pgEnum } from 'drizzle-orm/pg-core';
 
@@ -93,6 +98,21 @@ export type GenderRestriction = (typeof genderRestriction.enumValues)[number];
 export const batchStatus = pgEnum('BatchStatus', BATCH_STATUS_VALUES);
 export const subjectType = pgEnum('SubjectType', SUBJECT_TYPE_VALUES);
 export type SubjectType = (typeof subjectType.enumValues)[number];
+
+// ── Timetable domain enums ─────────────────────────────
+export const timetableStatus = pgEnum('TimetableStatus', TIMETABLE_STATUS_VALUES);
+export type TimetableStatus = (typeof timetableStatus.enumValues)[number];
+export const weekday = pgEnum('Weekday', WEEKDAY_VALUES);
+export type Weekday = (typeof weekday.enumValues)[number];
+export const periodKind = pgEnum('PeriodKind', PERIOD_KIND_VALUES);
+export type PeriodKind = (typeof periodKind.enumValues)[number];
+export const daySession = pgEnum('DaySession', DAY_SESSION_VALUES);
+export type DaySession = (typeof daySession.enumValues)[number];
+export const timetableOverrideType = pgEnum(
+  'TimetableOverrideType',
+  TIMETABLE_OVERRIDE_TYPE_VALUES,
+);
+export type TimetableOverrideType = (typeof timetableOverrideType.enumValues)[number];
 
 export const groupType = pgEnum('GroupType', GROUP_TYPE_VALUES);
 

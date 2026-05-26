@@ -47,5 +47,10 @@ export * from './tenant/sections';
 export * from './tenant/standard-subjects';
 export * from './tenant/standards';
 export * from './tenant/subjects';
+export * from './tenant/timetable/timetable-day-overrides';
+export * from './tenant/timetable/timetable-entries';
+export * from './tenant/timetable/timetable-periods';
+export * from './tenant/timetable/timetable-sections';
+export * from './tenant/timetable/timetables';
 // User Profiles (platform-level, no RLS)
 export * from './user-profiles';
