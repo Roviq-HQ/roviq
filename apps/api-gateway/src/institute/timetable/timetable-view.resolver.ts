@@ -10,6 +10,7 @@ import {
   TimetableGridModel,
 } from './models/timetable.model';
 import type { TimetableDayOverrideRecord } from './repositories/types';
+import { TimetablePdfService } from './timetable-pdf.service';
 import {
   type DaySchedule,
   type DayScheduleSlot,
@@ -19,7 +20,10 @@ import {
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver()
 export class TimetableViewResolver {
-  constructor(private readonly view: TimetableViewService) {}
+  constructor(
+    private readonly view: TimetableViewService,
+    private readonly pdf: TimetablePdfService,
+  ) {}
 
   @Query(() => TimetableGridModel, {
     nullable: true,
@@ -51,6 +55,32 @@ export class TimetableViewResolver {
       teacherId,
       timetableId ?? undefined,
     ) as Promise<TimetableGridModel | null>;
+  }
+
+  @Query(() => String, {
+    name: 'sectionTimetablePdf',
+    description: "Base64-encoded PDF of a section's weekly timetable.",
+  })
+  @CheckAbility('read', 'Timetable')
+  async sectionTimetablePdf(
+    @Args('sectionId', { type: () => ID }) sectionId: string,
+    @Args('timetableId', { type: () => ID, nullable: true }) timetableId: string | null,
+  ): Promise<string> {
+    const buffer = await this.pdf.sectionTimetablePdf(sectionId, timetableId ?? undefined);
+    return buffer.toString('base64');
+  }
+
+  @Query(() => String, {
+    name: 'staffTimetablePdf',
+    description: "Base64-encoded PDF of a teacher's weekly timetable.",
+  })
+  @CheckAbility('read', 'Timetable')
+  async staffTimetablePdf(
+    @Args('teacherId', { type: () => ID }) teacherId: string,
+    @Args('timetableId', { type: () => ID, nullable: true }) timetableId: string | null,
+  ): Promise<string> {
+    const buffer = await this.pdf.staffTimetablePdf(teacherId, timetableId ?? undefined);
+    return buffer.toString('base64');
   }
 
   @Query(() => DayScheduleModel, {

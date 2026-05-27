@@ -3,8 +3,13 @@ import type { Weekday } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  i18nDisplay,
   mkInstituteCtx,
+  sectionsLive,
   softDelete,
+  staffProfilesLive,
+  standardsLive,
+  subjectsLive,
   timetableDayOverrides,
   timetableDayOverridesLive,
   timetableEntries,
@@ -15,10 +20,11 @@ import {
   timetableSectionsLive,
   timetables,
   timetablesLive,
+  userProfiles,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, asc, between, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, between, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { TimetableRepository } from './timetable.repository';
 import type {
   ClearEntryQuery,
@@ -29,6 +35,7 @@ import type {
   PaginatedTimetables,
   TimetableDayOverrideRecord,
   TimetableEntryRecord,
+  TimetableLabelMaps,
   TimetablePeriodRecord,
   TimetableRecord,
   TimetableSectionRecord,
@@ -814,6 +821,67 @@ export class TimetableDrizzleRepository extends TimetableRepository {
   async softDeleteOverride(id: string): Promise<void> {
     await withTenant(this.db, this.ctx(), async (tx) => {
       await softDelete(tx, timetableDayOverrides, id);
+    });
+  }
+
+  // ── Display labels ──────────────────────────────────────────────────────────
+
+  async resolveLabels(input: {
+    subjectIds: string[];
+    sectionIds: string[];
+    teacherIds: string[];
+  }): Promise<TimetableLabelMaps> {
+    const subjectIds = [...new Set(input.subjectIds)];
+    const sectionIds = [...new Set(input.sectionIds)];
+    const teacherIds = [...new Set(input.teacherIds)];
+
+    return withTenant(this.db, this.ctx(), async (tx) => {
+      const subjects: Record<string, string> = {};
+      const sections: Record<string, string> = {};
+      const teachers: Record<string, string> = {};
+
+      if (subjectIds.length > 0) {
+        const rows = await tx
+          .select({ id: subjectsLive.id, name: subjectsLive.name })
+          .from(subjectsLive)
+          .where(inArray(subjectsLive.id, subjectIds));
+        for (const r of rows) subjects[r.id] = r.name;
+      }
+
+      if (sectionIds.length > 0) {
+        const rows = await tx
+          .select({
+            id: sectionsLive.id,
+            name: sectionsLive.name,
+            displayLabel: sectionsLive.displayLabel,
+            standardName: standardsLive.name,
+          })
+          .from(sectionsLive)
+          .innerJoin(standardsLive, eq(standardsLive.id, sectionsLive.standardId))
+          .where(inArray(sectionsLive.id, sectionIds));
+        for (const r of rows) {
+          const section = r.displayLabel ?? i18nDisplay(r.name);
+          sections[r.id] = `${i18nDisplay(r.standardName)} - ${section}`;
+        }
+      }
+
+      if (teacherIds.length > 0) {
+        const rows = await tx
+          .select({
+            membershipId: staffProfilesLive.membershipId,
+            firstName: userProfiles.firstName,
+            lastName: userProfiles.lastName,
+          })
+          .from(staffProfilesLive)
+          .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+          .where(inArray(staffProfilesLive.membershipId, teacherIds));
+        for (const r of rows) {
+          teachers[r.membershipId] =
+            `${i18nDisplay(r.firstName)} ${i18nDisplay(r.lastName)}`.trim();
+        }
+      }
+
+      return { subjects, sections, teachers };
     });
   }
 }

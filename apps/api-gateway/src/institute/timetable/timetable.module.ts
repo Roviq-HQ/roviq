@@ -3,6 +3,7 @@ import { TimetableRepositoryModule } from './repositories/timetable-repository.m
 import { TimetableResolver } from './timetable.resolver';
 import { TimetableService } from './timetable.service';
 import { TimetableGenerationService } from './timetable-generation.service';
+import { TimetablePdfService } from './timetable-pdf.service';
 import { TimetableScheduleService } from './timetable-schedule.service';
 import { TimetableViewResolver } from './timetable-view.resolver';
 import { TimetableViewService } from './timetable-view.service';
@@ -14,6 +15,7 @@ import { TimetableViewService } from './timetable-view.service';
     TimetableGenerationService,
     TimetableScheduleService,
     TimetableViewService,
+    TimetablePdfService,
     TimetableResolver,
     TimetableViewResolver,
   ],

@@ -8,6 +8,7 @@ import type {
   PaginatedTimetables,
   TimetableDayOverrideRecord,
   TimetableEntryRecord,
+  TimetableLabelMaps,
   TimetablePeriodRecord,
   TimetableRecord,
   TimetableSectionRecord,
@@ -103,4 +104,12 @@ export abstract class TimetableRepository {
     endDate: string,
   ): Promise<TimetableDayOverrideRecord[]>;
   abstract softDeleteOverride(id: string): Promise<void>;
+
+  // Display labels (PDF / export rendering — subjects, sections, teachers live
+  // in other modules, so the repo resolves their names for read-only output).
+  abstract resolveLabels(input: {
+    subjectIds: string[];
+    sectionIds: string[];
+    teacherIds: string[];
+  }): Promise<TimetableLabelMaps>;
 }

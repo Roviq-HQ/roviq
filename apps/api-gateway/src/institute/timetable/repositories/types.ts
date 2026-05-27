@@ -189,3 +189,14 @@ export interface CreateOverrideData {
   originalTeacherId?: string | null;
   reason?: string | null;
 }
+
+// ── Display-label resolution (PDF / export rendering) ─────────────────────────
+
+/** id → human-readable label maps for the ids referenced by grid entries. */
+export interface TimetableLabelMaps {
+  subjects: Record<string, string>;
+  /** Section label includes the standard, e.g. "Class 5 - A". */
+  sections: Record<string, string>;
+  /** Teacher label keyed by membership id, e.g. "Rajesh Sharma". */
+  teachers: Record<string, string>;
+}
