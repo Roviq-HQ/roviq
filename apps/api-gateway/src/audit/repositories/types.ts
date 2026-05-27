@@ -27,6 +27,9 @@ export interface AuditLogRow {
   actorName: string | null;
   userName: string | null;
   tenantName: I18nContent | null;
+  /** Resolved reseller display name + tier (joined on resellers.id). Null when resellerId is null. */
+  resellerName: string | null;
+  resellerTier: string | null;
 }
 
 export interface AuditEventData {
@@ -65,6 +68,12 @@ export interface FindAuditLogsParams {
     correlationId?: string;
     dateRange?: { from: Date; to: Date };
     syntheticOrigin?: string;
+    /** When true, restrict to rows written during an impersonation session. */
+    impersonatedOnly?: boolean;
+    /** Restrict impersonated rows to these impersonator scopes (joins impersonation_sessions). */
+    impersonatorScope?: string[];
+    /** Restrict to rows recorded during a single impersonation session. */
+    impersonationSessionId?: string;
   };
   first: number;
   after?: string;

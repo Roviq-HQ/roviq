@@ -1,6 +1,9 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { DateTimeScalar } from '@roviq/nestjs-graphql';
-import { IsArray, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+
+/** Scopes an impersonator can act from — used by the impersonatorScope audit filter. */
+export const IMPERSONATOR_SCOPES = ['platform', 'reseller', 'institute'] as const;
 
 @InputType({ description: 'Inclusive date range for filtering audit log entries.' })
 export class DateRangeInput {
@@ -81,4 +84,30 @@ export class AuditLogFilterInput {
   @IsString()
   @MaxLength(200)
   syntheticOrigin?: string;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'When true, return only entries performed during an impersonation session.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  impersonatedOnly?: boolean;
+
+  @Field(() => [String], {
+    nullable: true,
+    description:
+      "Filter impersonated entries by the impersonator's originating scope (platform, reseller, institute).",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(IMPERSONATOR_SCOPES, { each: true })
+  impersonatorScope?: string[];
+
+  @Field(() => ID, {
+    nullable: true,
+    description: 'Return only entries recorded during this impersonation session.',
+  })
+  @IsOptional()
+  @IsUUID()
+  impersonationSessionId?: string;
 }

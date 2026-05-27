@@ -3,6 +3,7 @@ import { mkAdminCtx, withAdmin } from '../../tenant-db';
 import { seedDemo } from '../demo';
 import { SEED_IDS } from '../ids';
 import { seedE2eGuardians } from './guardians';
+import { seedE2eImpersonationSessions } from './impersonation';
 import { seedE2eStaff } from './staff';
 import { seedE2eStudents } from './students';
 
@@ -17,5 +18,6 @@ export async function seedE2e(db: DrizzleDB): Promise<void> {
     await seedE2eStaff(tx, SEED_IDS.INSTITUTE_1);
     await seedE2eStudents(tx, SEED_IDS.INSTITUTE_1, SEED_IDS.ACADEMIC_YEAR_INST1);
     await seedE2eGuardians(tx, SEED_IDS.INSTITUTE_1);
+    await seedE2eImpersonationSessions(tx);
   });
 }

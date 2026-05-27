@@ -217,7 +217,7 @@ The audit log provides a complete record of actions taken across the platform.
 1. From the sidebar or dashboard, open **Audit Logs**.
 2. The view has three tabs:
    - **All Events** -- every recorded action on the platform
-   - **Impersonation** -- logs of admin-initiated impersonation sessions
+   - **Impersonation** -- entries recorded during impersonation sessions
    - **Reseller Activity** -- actions performed by resellers
 
 ### Filtering Logs
@@ -228,11 +228,14 @@ Use the filter controls to narrow results by:
 - **Action type** -- e.g., created, updated, approved, suspended
 - **User ID** -- find all actions by a specific user
 
+On the **Impersonation** tab, an additional **scope** filter lets you show entries by the impersonator's origin -- platform, reseller, or institute (multi-select).
+
 ### Viewing Event Details
 
 1. Click on any log row to open its detail view.
 2. The detail shows the full event payload, including before/after values where applicable.
 3. The **Correlation ID** is displayed and links to a **trace page** showing a timeline of all related events in that operation.
+4. For an impersonated entry, **View session details** opens a panel with the session's impersonator, target user, institute, reason, IP, start/expiry/end times, OTP verifier, and every audit entry recorded during that session.
 
 ---
 

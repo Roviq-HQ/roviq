@@ -19,14 +19,16 @@ export function ProtectedRoute({
   React.useEffect(() => {
     if (isLoading) return;
 
+    const currentPath = window.location.pathname + window.location.search;
+    const returnUrl = encodeURIComponent(currentPath);
+
     if (needsInstituteSelection) {
-      window.location.href = selectInstitutePath;
+      // Preserve the requested page through institute selection.
+      window.location.href = `${selectInstitutePath}?returnUrl=${returnUrl}`;
       return;
     }
 
     if (!isAuthenticated) {
-      const currentPath = window.location.pathname + window.location.search;
-      const returnUrl = encodeURIComponent(currentPath);
       window.location.href = `${loginPath}?returnUrl=${returnUrl}`;
     }
   }, [isAuthenticated, isLoading, needsInstituteSelection, loginPath, selectInstitutePath]);

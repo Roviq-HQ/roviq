@@ -16,6 +16,7 @@ const ADMIN_AUDIT_LOGS_QUERY = gql`
           userId
           actorId
           impersonatorId
+          impersonationSessionId
           action
           actionType
           entityType
@@ -30,6 +31,8 @@ const ADMIN_AUDIT_LOGS_QUERY = gql`
           actorName
           userName
           tenantName
+          resellerName
+          resellerTier
         }
       }
       totalCount

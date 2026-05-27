@@ -167,6 +167,28 @@ export const testIds = {
     tabImpersonation: 'audit-logs-tab-impersonation',
     tabReseller: 'audit-logs-tab-reseller',
     table: 'audit-logs-table',
+    // Impersonation scope filter + session detail panel (ROV-144)
+    scopeFilter: 'audit-logs-scope-filter',
+    scopeFilterOption: (scope: string) => `audit-logs-scope-filter-${scope}`,
+    viewSessionBtn: 'audit-logs-view-session-btn',
+    sessionPanel: 'audit-logs-session-panel',
+    sessionAuditList: 'audit-logs-session-audit-list',
+  },
+
+  // ── Reseller: audit logs page (ROV-145) ───────────────────────────────
+  resellerAudit: {
+    resellerContext: 'reseller-audit-context',
+  },
+
+  // ── Reseller: impersonation sessions page (ROV-144) ───────────────────
+  resellerImpersonation: {
+    page: 'reseller-impersonation-page',
+    table: 'reseller-impersonation-table',
+    instituteFilter: 'reseller-impersonation-institute-filter',
+    row: (id: string) => `reseller-impersonation-row-${id}`,
+    terminateBtn: (id: string) => `reseller-impersonation-terminate-btn-${id}`,
+    terminateDialog: 'reseller-impersonation-terminate-dialog',
+    terminateConfirm: 'reseller-impersonation-terminate-confirm',
   },
 
   // ── Admin: observability → dead-letter queue (ROV-19) ─────────────────
@@ -328,6 +350,9 @@ export const testIds = {
     attendanceKpiByStatus: (status: string) => `dashboard-attendance-kpi-${status}`,
     todayScheduleCard: 'dashboard-today-schedule-card',
     todayScheduleLink: 'dashboard-today-schedule-link',
+    examsCard: 'dashboard-exams-card',
+    examsCardLink: 'dashboard-exams-card-link',
+    examsCardRow: (id: string) => `dashboard-exams-card-row-${id}`,
   },
 
   // ── Institute: students list + detail ──────────────────────────────────
@@ -368,6 +393,7 @@ export const testIds = {
     detailAcademicsEmpty: 'students-detail-academics-empty',
     detailTitle: 'students-detail-title',
     detailViewTimetableLink: 'students-detail-view-timetable-link',
+    detailViewExamsLink: 'students-detail-view-exams-link',
     detailDraftDiscardBtn: 'students-detail-draft-discard-btn',
     detailDraftRestoreBtn: 'students-detail-draft-restore-btn',
     detailResetBtn: 'students-detail-reset-btn',
@@ -952,6 +978,85 @@ export const testIds = {
     overrideReasonInput: 'timetable-override-reason-input',
     overrideCancelBtn: 'timetable-override-cancel-btn',
     overrideSubmitBtn: 'timetable-override-submit-btn',
+  },
+
+  // ── Institute: examinations + report cards ──────────────────────────────
+  instituteExaminations: {
+    page: 'examinations-page',
+    title: 'examinations-title',
+    createButton: 'examinations-create-btn',
+    table: 'examinations-table',
+    statusFilter: 'examinations-status-filter',
+    row: (id: string) => `exam-row-${id}`,
+    rowLink: (id: string) => `exam-row-${id}-link`,
+    deleteBtn: (id: string) => `exam-delete-${id}-btn`,
+    // Create wizard
+    wizard: 'exam-wizard',
+    wizardNameInput: 'exam-wizard-name-input',
+    wizardTypeSelect: 'exam-wizard-type-select',
+    wizardTermSelect: 'exam-wizard-term-select',
+    wizardSchemeSelect: 'exam-wizard-scheme-select',
+    wizardStartInput: 'exam-wizard-start-input',
+    wizardEndInput: 'exam-wizard-end-input',
+    wizardWeightInput: 'exam-wizard-weight-input',
+    wizardSubmitBtn: 'exam-wizard-submit-btn',
+    wizardCancelBtn: 'exam-wizard-cancel-btn',
+    // Exam detail / lifecycle
+    detailPage: 'exam-detail-page',
+    detailTitle: 'exam-detail-title',
+    backLink: 'exam-detail-back-link',
+    scheduleBtn: 'exam-schedule-btn',
+    openMarksBtn: 'exam-open-marks-btn',
+    lockBtn: 'exam-lock-btn',
+    publishResultsBtn: 'exam-publish-results-btn',
+    archiveBtn: 'exam-archive-btn',
+    // Datesheet
+    datesheet: 'exam-datesheet',
+    datesheetDownloadBtn: 'exam-datesheet-download-btn',
+    addScheduleBtn: 'exam-add-schedule-btn',
+    scheduleRow: (id: string) => `exam-schedule-row-${id}`,
+    scheduleStandardSelect: 'exam-schedule-standard-select',
+    scheduleSectionSelect: 'exam-schedule-section-select',
+    scheduleSubjectSelect: 'exam-schedule-subject-select',
+    scheduleComponentSelect: 'exam-schedule-component-select',
+    scheduleMaxMarksInput: 'exam-schedule-max-marks-input',
+    scheduleSubmitBtn: 'exam-schedule-submit-btn',
+    enterMarksLink: (id: string) => `exam-enter-marks-${id}-link`,
+    // Marks grid
+    marksPage: 'exam-marks-page',
+    marksGrid: 'exam-marks-grid',
+    marksInput: (studentId: string) => `exam-marks-${studentId}-input`,
+    marksAbsentToggle: (studentId: string) => `exam-marks-${studentId}-absent`,
+    marksSaveBtn: 'exam-marks-save-btn',
+    // Results
+    resultsPage: 'exam-results-page',
+    resultsTable: 'exam-results-table',
+    resultsSectionSelect: 'exam-results-section-select',
+    // Grading schemes
+    gradingPage: 'grading-page',
+    gradingTitle: 'grading-title',
+    gradingCreateBtn: 'grading-create-btn',
+    gradingRow: (id: string) => `grading-row-${id}`,
+    gradingNameInput: 'grading-name-input',
+    gradingKindSelect: 'grading-kind-select',
+    gradingSubmitBtn: 'grading-submit-btn',
+    // Report cards
+    reportCardsPage: 'report-cards-page',
+    reportCardsTitle: 'report-cards-title',
+    reportCardsCreateBtn: 'report-cards-create-btn',
+    reportCardRow: (id: string) => `report-card-row-${id}`,
+    reportCardNameInput: 'report-card-name-input',
+    reportCardTermSelect: 'report-card-term-select',
+    reportCardSubmitBtn: 'report-card-submit-btn',
+    reportCardGenerateBtn: (id: string) => `report-card-generate-${id}-btn`,
+    reportCardPublishBtn: (id: string) => `report-card-publish-${id}-btn`,
+    reportCardDownloadBtn: (id: string) => `report-card-download-${id}-btn`,
+    reportCardInstanceRow: (id: string) => `report-card-instance-${id}-row`,
+    myReportCardsPage: 'my-report-cards-page',
+    myReportCardsTitle: 'my-report-cards-title',
+    myReportCardRow: (id: string) => `my-report-card-row-${id}`,
+    myReportCardDownloadBtn: (id: string) => `my-report-card-download-${id}-btn`,
+    myReportCardsEmpty: 'my-report-cards-empty',
   },
 
   // ── Institute: select institute ────────────────────────────────────────

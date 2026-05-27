@@ -185,6 +185,30 @@ Because `APP_GUARD` runs BEFORE the per-resolver `GqlAuthGuard` has populated `r
 
 `endImpersonation` writes both a cache `del` AND a `${key}:tombstone` marker (TTL > session cache TTL) so a concurrent guard mid-lookup can't repopulate a stale "not-ended" entry. The tombstone is checked before the cache read.
 
+### Session Management UI (ROV-144)
+
+Read models over `impersonation_sessions` surface sessions for review and termination:
+
+| Query | Scope | Returns |
+|---|---|---|
+| `impersonationSessions(activeOnly, sessionId, first)` | platform | All sessions across scopes (newest first) |
+| `resellerImpersonationSessions(activeOnly, sessionId, first)` | reseller | Sessions started by the reseller's own team |
+
+Both return `ImpersonationSessionModel` — the row plus resolved display names (impersonator, target user, OTP verifier) and the target institute name, with a derived `status` of `ACTIVE` / `ENDED` / `EXPIRED` (from `endedAt` then `expiresAt`). RLS on `impersonation_sessions` grants resellers full read, so `listSessions` enforces the team scope explicitly by filtering impersonators to the reseller's `reseller_memberships`.
+
+The audit-log filter (`AuditLogFilterInput`) gained three impersonation fields, used by the admin audit page:
+
+- `impersonatedOnly` — rows written during any impersonation session (`impersonation_session_id IS NOT NULL`).
+- `impersonatorScope: [String!]` — restrict to impersonator scopes (joins `impersonation_sessions`; the join is added only when this filter is set).
+- `impersonationSessionId` — the audit entries recorded during one session (powers the detail panel).
+
+Frontend:
+
+- **Admin** (`/admin/audit-logs`, Impersonation tab) — an impersonator-scope multi-select filter, and a session detail side-panel (opened from an audit row) showing session metadata plus every audit entry recorded during that session.
+- **Reseller** (`/reseller/audit/impersonation`) — a sessions table with status badges, a **Terminate** action on active sessions (`resellerEndImpersonation`), and an institute filter sourced from `resellerInstitutes`.
+
+E2E fixtures live in `libs/database/src/seed/e2e/impersonation.ts` (one active + one ended reseller-scoped session, one active platform session).
+
 ## IdentityService Boundary (ROV-209)
 
 Institute services (student, staff, guardian, admission, …) and Temporal activities **must not** write to `users`, `memberships`, `platform_memberships`, or `reseller_memberships` directly. All identity writes go through `IdentityService` (DI provider in `AuthModule`):

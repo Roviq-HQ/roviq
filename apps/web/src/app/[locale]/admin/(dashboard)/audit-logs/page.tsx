@@ -23,6 +23,8 @@ import * as React from 'react';
 import { createAuditLogColumns } from './audit-log-columns';
 import { AuditLogDetail } from './audit-log-detail';
 import { AuditLogFilters, useAuditLogFilters } from './audit-log-filters';
+import { ImpersonationScopeFilter, useImpersonatorScopeFilter } from './impersonation-scope-filter';
+import { ImpersonationSessionPanel } from './impersonation-session-panel';
 import { type AuditLogNode, useAuditLogs } from './use-audit-logs';
 
 const { adminAuditLogs } = testIds;
@@ -35,6 +37,8 @@ export default function AuditLogsPage() {
   const [selectedLog, setSelectedLog] = React.useState<AuditLogNode | null>(null);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [activeTab, setActiveTab] = useQueryState('tab', parseAsString.withDefault('all'));
+  const [impScope] = useImpersonatorScopeFilter();
+  const [sessionPanelId, setSessionPanelId] = React.useState<string | null>(null);
   const hasFilters = Object.values(filters).some(Boolean);
 
   const queryFilter = React.useMemo(() => {
@@ -46,12 +50,13 @@ export default function AuditLogsPage() {
     // Tab-specific preset filters
     if (activeTab === 'impersonation') {
       f.impersonatedOnly = true;
+      if (impScope.length > 0) f.impersonatorScope = impScope;
     } else if (activeTab === 'reseller') {
       f.scopes = ['RESELLER'];
     }
 
     return Object.keys(f).length > 0 ? f : undefined;
-  }, [filters, activeTab]);
+  }, [filters, activeTab, impScope]);
 
   const { logs, totalCount, hasNextPage, loading, loadMore } = useAuditLogs({
     filter: queryFilter as Parameters<typeof useAuditLogs>[0]['filter'],
@@ -63,7 +68,10 @@ export default function AuditLogsPage() {
     [format],
   );
 
-  const columns = React.useMemo(() => createAuditLogColumns(t, formatDate), [t, formatDate]);
+  const columns = React.useMemo(
+    () => createAuditLogColumns(t, formatDate, activeTab === 'reseller'),
+    [t, formatDate, activeTab],
+  );
 
   const handleLoadMore = async () => {
     setIsLoadingMore(true);
@@ -111,6 +119,8 @@ export default function AuditLogsPage() {
               {/* All three tabs share the same content — only the filter preset changes */}
               <TabsContent value={activeTab} forceMount className="mt-4 space-y-4">
                 <AuditLogFilters />
+
+                {activeTab === 'impersonation' && <ImpersonationScopeFilter />}
 
                 <DataTable
                   data-testid={adminAuditLogs.table}
@@ -173,6 +183,18 @@ export default function AuditLogsPage() {
                   open={selectedLog !== null}
                   onOpenChange={(open) => {
                     if (!open) setSelectedLog(null);
+                  }}
+                  onViewSession={(id) => {
+                    setSelectedLog(null);
+                    setSessionPanelId(id);
+                  }}
+                />
+
+                <ImpersonationSessionPanel
+                  sessionId={sessionPanelId}
+                  open={sessionPanelId !== null}
+                  onOpenChange={(open) => {
+                    if (!open) setSessionPanelId(null);
                   }}
                 />
               </TabsContent>

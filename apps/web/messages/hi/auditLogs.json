@@ -10,7 +10,14 @@
     "entityId": "इकाई ID",
     "source": "स्रोत",
     "ipAddress": "IP पता",
-    "institute": "संस्थान"
+    "institute": "संस्थान",
+    "reseller": "रिसेलर",
+    "resellerTier": "स्तर"
+  },
+  "resellerTier": {
+    "FULL_MANAGEMENT": "पूर्ण प्रबंधन",
+    "SUPPORT_MANAGEMENT": "सहायता",
+    "READ_ONLY": "केवल-पढ़ने योग्य"
   },
   "filters": {
     "entityType": "इकाई प्रकार",
@@ -19,7 +26,13 @@
     "search": "खोजें...",
     "dateFrom": "से",
     "dateTo": "तक",
-    "clearFilters": "फ़िल्टर हटाएँ"
+    "clearFilters": "फ़िल्टर हटाएँ",
+    "impersonatorScope": "प्रतिरूपक स्कोप"
+  },
+  "scopes": {
+    "platform": "प्लेटफ़ॉर्म",
+    "reseller": "रिसेलर",
+    "institute": "संस्थान"
   },
   "actionTypes": {
     "CREATE": "बनाएँ",
@@ -61,12 +74,37 @@
     "source": "स्रोत",
     "createdAt": "बनाया गया",
     "impersonated": "प्रतिरूपित",
+    "viewSession": "सत्र विवरण देखें",
     "noChanges": "कोई परिवर्तन दर्ज नहीं।",
     "noMetadata": "कोई मेटाडेटा नहीं।",
     "viewTrace": "ट्रेस देखें",
     "sections": {
       "identity": "पहचान",
       "request": "अनुरोध"
+    }
+  },
+  "session": {
+    "title": "प्रतिरूपण सत्र",
+    "description": "प्रतिरूपण सत्र और उसके दौरान की गई कार्रवाइयों का पूर्ण विवरण।",
+    "loading": "सत्र लोड हो रहा है…",
+    "notFound": "सत्र नहीं मिला।",
+    "impersonator": "प्रतिरूपक",
+    "targetUser": "लक्ष्य उपयोगकर्ता",
+    "institute": "संस्थान",
+    "reason": "कारण",
+    "ip": "IP पता",
+    "startedAt": "आरंभ समय",
+    "expiresAt": "समाप्ति समय",
+    "endedAt": "समाप्त समय",
+    "endedReason": "समाप्ति कारण",
+    "otpVerified": "OTP सत्यापित समय",
+    "otpVerifiedBy": "OTP सत्यापनकर्ता",
+    "auditEntries": "इस सत्र के दौरान {count, plural, =1 {1 ऑडिट प्रविष्टि} other {# ऑडिट प्रविष्टियाँ}}",
+    "noAuditEntries": "इस सत्र के दौरान कोई ऑडिट प्रविष्टि दर्ज नहीं।",
+    "status": {
+      "ACTIVE": "सक्रिय",
+      "ENDED": "समाप्त",
+      "EXPIRED": "अवधि समाप्त"
     }
   },
   "trace": {

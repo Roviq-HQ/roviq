@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { Check, Clock, Copy, ExternalLink, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -20,6 +21,8 @@ interface AuditLogDetailProps {
   log: AuditLogNode | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When provided and the entry has a session id, shows a button to open the session panel. */
+  onViewSession?: (sessionId: string) => void;
 }
 
 const ACTION_TYPE_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -182,7 +185,7 @@ function JsonBlock({
   );
 }
 
-export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps) {
+export function AuditLogDetail({ log, open, onOpenChange, onViewSession }: AuditLogDetailProps) {
   const t = useTranslations('auditLogs');
   const { format } = useFormatDate();
   const formatDate = (date: Date) => format(date, 'dd MMM yyyy, HH:mm:ss');
@@ -247,6 +250,18 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
                 </div>
                 <CopyButton value={log.impersonatorId} label={t('detail.impersonatorId')} />
               </div>
+            )}
+
+            {log.impersonationSessionId && onViewSession && (
+              <button
+                type="button"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:underline dark:text-amber-300"
+                onClick={() => onViewSession(log.impersonationSessionId as string)}
+                data-testid={testIds.adminAuditLogs.viewSessionBtn}
+              >
+                <ShieldAlert className="size-3.5" />
+                {t('detail.viewSession')}
+              </button>
             )}
 
             {/* Identity Section */}

@@ -10,7 +10,14 @@
     "entityId": "Entity ID",
     "source": "Source",
     "ipAddress": "IP Address",
-    "institute": "Institute"
+    "institute": "Institute",
+    "reseller": "Reseller",
+    "resellerTier": "Tier"
+  },
+  "resellerTier": {
+    "FULL_MANAGEMENT": "Full management",
+    "SUPPORT_MANAGEMENT": "Support",
+    "READ_ONLY": "Read-only"
   },
   "filters": {
     "entityType": "Entity type",
@@ -19,7 +26,13 @@
     "search": "Search...",
     "dateFrom": "From",
     "dateTo": "To",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "impersonatorScope": "Impersonator scope"
+  },
+  "scopes": {
+    "platform": "Platform",
+    "reseller": "Reseller",
+    "institute": "Institute"
   },
   "actionTypes": {
     "CREATE": "Create",
@@ -61,12 +74,37 @@
     "source": "Source",
     "createdAt": "Created At",
     "impersonated": "Impersonated",
+    "viewSession": "View session details",
     "noChanges": "No changes recorded.",
     "noMetadata": "No metadata.",
     "viewTrace": "View trace",
     "sections": {
       "identity": "Identity",
       "request": "Request"
+    }
+  },
+  "session": {
+    "title": "Impersonation Session",
+    "description": "Full details of the impersonation session and the actions performed during it.",
+    "loading": "Loading session…",
+    "notFound": "Session not found.",
+    "impersonator": "Impersonator",
+    "targetUser": "Target user",
+    "institute": "Institute",
+    "reason": "Reason",
+    "ip": "IP address",
+    "startedAt": "Started at",
+    "expiresAt": "Expires at",
+    "endedAt": "Ended at",
+    "endedReason": "Ended reason",
+    "otpVerified": "OTP verified at",
+    "otpVerifiedBy": "OTP verified by",
+    "auditEntries": "{count, plural, =1 {1 audit entry} other {# audit entries}} during this session",
+    "noAuditEntries": "No audit entries recorded during this session.",
+    "status": {
+      "ACTIVE": "Active",
+      "ENDED": "Ended",
+      "EXPIRED": "Expired"
     }
   },
   "trace": {
