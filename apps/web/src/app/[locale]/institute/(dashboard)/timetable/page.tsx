@@ -276,7 +276,11 @@ export default function TimetablePage() {
                   void setPage(1);
                 }}
               >
-                <SelectTrigger className="w-40" data-testid={instituteTimetable.statusFilter}>
+                <SelectTrigger
+                  className="w-40"
+                  aria-label={t('filterStatus')}
+                  data-testid={instituteTimetable.statusFilter}
+                >
                   <SelectValue placeholder={t('filterStatus')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -381,7 +385,11 @@ function Pagination({
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">{t('rowsPerPage')}</span>
         <Select value={String(perPage)} onValueChange={(v) => onPerPage(Number(v))}>
-          <SelectTrigger className="w-20" data-testid={instituteTimetable.pageSizeSelect}>
+          <SelectTrigger
+            className="w-20"
+            aria-label={t('rowsPerPage')}
+            data-testid={instituteTimetable.pageSizeSelect}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -433,6 +441,8 @@ interface WizardForm {
   name: Record<string, string>;
   description: string;
   sectionIds: string[];
+  effectiveFrom: string;
+  effectiveTo: string;
   dayStartTime: string;
   defaultPeriodDurationMins: number;
   periodsCount: number;
@@ -445,6 +455,8 @@ const EMPTY_WIZARD: WizardForm = {
   name: { en: '', hi: '' },
   description: '',
   sectionIds: [],
+  effectiveFrom: '',
+  effectiveTo: '',
   dayStartTime: '08:00',
   defaultPeriodDurationMins: 45,
   periodsCount: 6,
@@ -453,11 +465,15 @@ const EMPTY_WIZARD: WizardForm = {
   extraClass: [],
 };
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 function buildWizardSchema(t: ReturnType<typeof useTranslations<'timetable'>>) {
   return z.object({
     name: buildI18nTextSchema(t('errors.TIMETABLE_NAME_DUPLICATE')),
     description: z.string(),
     sectionIds: z.array(z.string()).min(1),
+    effectiveFrom: z.string().regex(DATE_REGEX),
+    effectiveTo: z.string().regex(DATE_REGEX),
     dayStartTime: z.string().regex(TIME_REGEX),
     defaultPeriodDurationMins: z.number().int().min(1),
     periodsCount: z.number().int().min(1),
@@ -497,12 +513,24 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
         description: parsed.description || null,
         academicYearId: yearId,
         sectionIds: parsed.sectionIds,
+        effectiveFrom: parsed.effectiveFrom,
+        effectiveTo: parsed.effectiveTo,
         dayStartTime: parsed.dayStartTime,
         defaultPeriodDurationMins: parsed.defaultPeriodDurationMins,
         periodsCount: parsed.periodsCount,
         workingDays: parsed.workingDays,
-        lunch: parsed.lunch,
-        extraClass: parsed.extraClass,
+        // Form uses `duration`; the GraphQL input field is `durationMins`.
+        lunch: parsed.lunch.map((l) => ({
+          name: l.name,
+          afterPeriod: l.afterPeriod,
+          durationMins: l.duration,
+        })),
+        extraClass: parsed.extraClass.map((e) => ({
+          session: e.session,
+          startTime: e.startTime,
+          durationMins: e.duration,
+          count: e.count,
+        })),
       };
       try {
         await createTimetable(input);
@@ -599,6 +627,28 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
                 {/* Schedule setup */}
                 <FieldSet>
                   <FieldLegend variant="label">{t('wizard.scheduleSection')}</FieldLegend>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="tt-effective-from">{t('effectiveFrom')}</FieldLabel>
+                      <Input
+                        id="tt-effective-from"
+                        type="date"
+                        value={form.state.values.effectiveFrom}
+                        onChange={(e) => form.setFieldValue('effectiveFrom', e.target.value)}
+                        data-testid={instituteTimetable.wizardEffectiveFromInput}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="tt-effective-to">{t('effectiveTo')}</FieldLabel>
+                      <Input
+                        id="tt-effective-to"
+                        type="date"
+                        value={form.state.values.effectiveTo}
+                        onChange={(e) => form.setFieldValue('effectiveTo', e.target.value)}
+                        data-testid={instituteTimetable.wizardEffectiveToInput}
+                      />
+                    </Field>
+                  </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <TimeInput
                       label={t('wizard.dayStartTime')}

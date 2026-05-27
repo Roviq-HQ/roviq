@@ -820,6 +820,8 @@ export const testIds = {
     sectionPickerToggleDept: (deptKey: string) => `timetable-section-picker-dept-${deptKey}`,
     sectionPickerToggleAll: (standardId: string) =>
       `timetable-section-picker-toggle-all-${standardId}`,
+    wizardEffectiveFromInput: 'timetable-wizard-effective-from-input',
+    wizardEffectiveToInput: 'timetable-wizard-effective-to-input',
     wizardDayStartInput: 'timetable-wizard-day-start-input',
     wizardPeriodDurationInput: 'timetable-wizard-period-duration-input',
     wizardPeriodsCountInput: 'timetable-wizard-periods-count-input',

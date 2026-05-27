@@ -156,13 +156,13 @@ export interface PaginatedTimetables {
 export interface LunchInput {
   name: string;
   afterPeriod: number;
-  duration: number;
+  durationMins: number;
 }
 
 export interface ExtraClassInput {
   session: DaySession;
   startTime: string;
-  duration: number;
+  durationMins: number;
   count: number;
 }
 
@@ -171,6 +171,8 @@ export interface CreateTimetableInput {
   description?: string | null;
   academicYearId: string;
   sectionIds: string[];
+  effectiveFrom: string;
+  effectiveTo: string;
   dayStartTime: string;
   defaultPeriodDurationMins: number;
   periodsCount: number;
