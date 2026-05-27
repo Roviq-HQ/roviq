@@ -1,8 +1,11 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import { AlertsBanner } from './_components/alerts-banner';
+import { DlqTab } from './_components/dlq-tab';
 import { GaugePanel } from './_components/gauge-panel';
 import { RecentLogsPanel } from './_components/logs-panel';
 import { PanelMenu } from './_components/panel-menu';
@@ -24,6 +27,7 @@ const ERROR_THRESHOLDS = [
 ];
 
 export function ObservabilityDashboard() {
+  const t = useTranslations('dlq');
   const { range, setRange, refresh, setRefresh, tab, setTab, services, setServices } =
     useDashboardUrlState();
   const refreshMs = refresh.ms;
@@ -54,6 +58,9 @@ export function ObservabilityDashboard() {
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="streams">Streams</TabsTrigger>
           <TabsTrigger value="traces-logs">Traces &amp; Logs</TabsTrigger>
+          <TabsTrigger value="dlq" data-testid={testIds.dlq.tab}>
+            {t('tabTitle')}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-3">
@@ -191,6 +198,10 @@ export function ObservabilityDashboard() {
               headerRight={<PanelMenu logsQuery='{exported_job=~".+"}' grafanaUrl={GRAFANA_URL} />}
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="dlq" className="mt-3">
+          <DlqTab />
         </TabsContent>
       </Tabs>
     </div>

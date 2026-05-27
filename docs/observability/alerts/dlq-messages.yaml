@@ -1,0 +1,60 @@
+# Grafana alert rules for dead-letter-queue message rate.
+#
+# Source metric: `nats_dlq_messages_total` (OTel counter, attribute
+# `origin_stream`). Emitted by the DLQ reader when a message exhausts
+# its JetStream retries and is persisted to `dlq_messages`. See ROV-19.
+#
+# Import via Grafana → Alerting → Alert rules → Import (or via the HTTP
+# API: `POST /api/ruler/grafana/api/v1/rules/<folder>` with this YAML).
+# Targets the Prometheus datasource that scrapes the api-gateway OTel
+# collector. Adjust `datasourceUid` to match your environment.
+#
+# Linear: ROV-19.
+
+groups:
+  - name: dlq
+    interval: 1m
+    rules:
+      # Warning: 1+ dead-letters/min sustained for 5m. On-call gets a Slack
+      # ping (not a page) — likely a transient downstream blip that the
+      # consumer retried past its limit. Inspect + replay from the admin tab.
+      - alert: DlqMessagesWarning
+        expr: |
+          sum by (origin_stream) (rate(roviq_nats_dlq_messages_total[5m])) > 1 / 60
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+          component: dlq
+        annotations:
+          summary: "Messages dead-lettering from {{ $labels.origin_stream }} ({{ $value | humanize }} msg/s over 5m)"
+          description: |
+            Messages from the `{{ $labels.origin_stream }}` stream have
+            exhausted their JetStream retries and are being dead-lettered to
+            `dlq_messages`. Sustained 5-min rate crossed 1/min. Inspect the
+            payload + error and replay via the admin observability Dead Letter
+            Queue tab. Likely causes: a downstream dependency is down (e.g.
+            Novu circuit open), a bad payload, or a bug in the handler.
+          runbook_url: https://github.com/Roviq-HQ/roviq/blob/main/docs/runbooks/dlq-messages.md
+
+      # Critical: 10+ dead-letters/min sustained for 10m. Pages on-call —
+      # a downstream dependency is almost certainly hard-down or a handler
+      # is systematically failing for an entire institute's traffic.
+      - alert: DlqMessagesCritical
+        expr: |
+          sum by (origin_stream) (rate(roviq_nats_dlq_messages_total[5m])) > 10 / 60
+        for: 10m
+        labels:
+          severity: critical
+          service: api-gateway
+          component: dlq
+        annotations:
+          summary: "Messages critically dead-lettering from {{ $labels.origin_stream }} ({{ $value | humanize }} msg/s)"
+          description: |
+            Sustained high dead-letter rate for the `{{ $labels.origin_stream }}`
+            stream. A downstream dependency is likely hard-down (check the
+            `circuit_breaker_state` gauge) or a handler is failing for every
+            message — institute-facing side effects (notifications, billing,
+            audit) are not happening. Investigate and replay from the admin
+            Dead Letter Queue tab immediately.
+          runbook_url: https://github.com/Roviq-HQ/roviq/blob/main/docs/runbooks/dlq-messages.md

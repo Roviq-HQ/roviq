@@ -22,6 +22,7 @@ import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { validate } from '../config/env.validation';
+import { DlqModule } from '../dlq/dlq.module';
 import { HealthModule } from '../health/health.module';
 import { InstituteScopeModule } from '../institute/institute-scope.module';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
@@ -117,6 +118,7 @@ const wsLogger = new Logger('WsTicketAuth');
     CaslModule,
     HealthModule,
     AuditModule,
+    DlqModule,
     PasskeyModule,
     AdminModule,
     ResellerModule,

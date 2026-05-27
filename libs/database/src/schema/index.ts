@@ -4,6 +4,7 @@
 export * from './admission';
 // Audit
 export * from './audit/audit-logs';
+export * from './audit/dlq-messages';
 // Auth
 export * from './auth/auth-events';
 export * from './auth/auth-providers';

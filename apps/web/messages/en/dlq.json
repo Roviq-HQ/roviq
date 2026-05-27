@@ -1,0 +1,87 @@
+{
+  "tabTitle": "Dead Letter Queue",
+  "title": "Dead-lettered messages",
+  "description": "Messages that failed processing after all retries. Inspect the payload, then replay to re-process or discard to drop permanently.",
+  "columns": {
+    "originStream": "Stream",
+    "subject": "Subject",
+    "error": "Error",
+    "tenant": "Institute",
+    "retries": "Retries",
+    "failedAt": "Failed at",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "PENDING": "Pending",
+    "REPLAYED": "Replayed",
+    "DISCARDED": "Discarded"
+  },
+  "filters": {
+    "originStream": "Stream",
+    "originStreamPlaceholder": "Filter by stream",
+    "status": "Status",
+    "statusPlaceholder": "Any status",
+    "clearFilters": "Clear filters"
+  },
+  "actions": {
+    "replay": "Replay",
+    "discard": "Discard",
+    "inspect": "Inspect",
+    "openMenu": "Open actions menu"
+  },
+  "replayDialog": {
+    "title": "Replay this message?",
+    "description": "The message will be re-published to its original subject and processed again. If it still fails, it returns to the dead-letter queue.",
+    "confirm": "Replay message",
+    "cancel": "Cancel"
+  },
+  "discardDialog": {
+    "title": "Discard this message?",
+    "description": "The message will be permanently dropped from the dead-letter queue and will not be processed. This cannot be undone.",
+    "confirm": "Discard message",
+    "cancel": "Cancel"
+  },
+  "toasts": {
+    "replaySuccess": "Message queued for replay.",
+    "replayError": "Could not replay the message. Please try again.",
+    "discardSuccess": "Message discarded.",
+    "discardError": "Could not discard the message. Please try again."
+  },
+  "inspect": {
+    "title": "Message details",
+    "description": "Full payload and error for this dead-lettered message.",
+    "subject": "Original subject",
+    "stream": "Stream",
+    "correlationId": "Correlation ID",
+    "tenant": "Institute ID",
+    "retryCount": "Retry count",
+    "replayCount": "Replay count",
+    "failedAt": "Failed at",
+    "replayedAt": "Last replayed at",
+    "payload": "Payload",
+    "noPayload": "No payload recorded.",
+    "error": "Error",
+    "noError": "No error message recorded."
+  },
+  "pagination": {
+    "loadMore": "Load more",
+    "showing": "Showing",
+    "of": "of"
+  },
+  "empty": {
+    "title": "No dead-lettered messages",
+    "description": "Failed messages will appear here when processing exhausts all retries. An empty queue is a healthy queue."
+  },
+  "emptyFiltered": {
+    "title": "No matching messages",
+    "description": "No dead-lettered messages match your current filters. Try adjusting or clearing them."
+  },
+  "loading": "Loading dead-lettered messages...",
+  "error": {
+    "title": "Failed to load the dead-letter queue",
+    "description": "Something went wrong while fetching dead-lettered messages.",
+    "retry": "Retry"
+  },
+  "none": "—"
+}
