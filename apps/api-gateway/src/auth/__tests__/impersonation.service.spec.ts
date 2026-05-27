@@ -31,6 +31,7 @@ import { getTableName } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthEventService } from '../auth-event.service';
+import { ImpersonationSessionStatus } from '../dto/impersonation-session.model';
 import { ImpersonationService } from '../impersonation.service';
 import { REDIS_KEYS } from '../redis-keys';
 
@@ -137,6 +138,7 @@ function createTx(opts: TxStubOpts = {}): TxStub {
     chain.innerJoin = () => wrap(chain);
     chain.leftJoin = () => wrap(chain);
     chain.where = () => wrap(chain);
+    chain.orderBy = () => wrap(chain);
     chain.limit = () => Promise.resolve(resolveSelect(table));
     return wrap(chain);
   };
@@ -891,6 +893,106 @@ describe('ImpersonationService', () => {
           metadata: expect.objectContaining({ session_id: 'session-1', ended_reason: 'manual' }),
         }),
       );
+    });
+  });
+
+  describe('listSessions', () => {
+    const baseRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 'session-1',
+      impersonatorId: 'imp-1',
+      impersonatorScope: 'platform',
+      impersonatorName: 'Admin User',
+      targetUserId: 'tgt-1',
+      targetUserName: 'Teacher One',
+      targetTenantId: 'tenant-1',
+      targetTenantName: { en: 'Greenfield Institute' },
+      reason: REASON_VALID,
+      ipAddress: '10.0.0.1',
+      userAgent: 'vitest',
+      startedAt: new Date('2026-01-01T10:00:00Z'),
+      expiresAt: new Date('2999-01-01T10:00:00Z'),
+      endedAt: null,
+      endedReason: null,
+      otpVerified: null,
+      otpVerifiedByName: null,
+      ...overrides,
+    });
+
+    it('derives ACTIVE / ENDED / EXPIRED status from endedAt and expiresAt', async () => {
+      const { service } = createSubject();
+      const { tx } = createTx({
+        selects: [
+          {
+            table: 'impersonation_sessions',
+            rows: [
+              baseRow({ id: 'active', expiresAt: new Date('2999-01-01T00:00:00Z'), endedAt: null }),
+              baseRow({ id: 'ended', endedAt: new Date('2026-01-01T11:00:00Z') }),
+              baseRow({
+                id: 'expired',
+                expiresAt: new Date('2020-01-01T00:00:00Z'),
+                endedAt: null,
+              }),
+            ],
+          },
+        ],
+      });
+      setTx(tx);
+
+      const result = await service.listSessions({ limit: 50 });
+
+      expect(result.map((s) => [s.id, s.status])).toEqual([
+        ['active', ImpersonationSessionStatus.ACTIVE],
+        ['ended', ImpersonationSessionStatus.ENDED],
+        ['expired', ImpersonationSessionStatus.EXPIRED],
+      ]);
+    });
+
+    it('passes through resolved display fields and normalises a null institute name', async () => {
+      const { service } = createSubject();
+      const { tx } = createTx({
+        selects: [{ table: 'impersonation_sessions', rows: [baseRow({ targetTenantName: null })] }],
+      });
+      setTx(tx);
+
+      const [session] = await service.listSessions({ limit: 50 });
+
+      expect(session.impersonatorName).toBe('Admin User');
+      expect(session.targetUserName).toBe('Teacher One');
+      expect(session.reason).toBe(REASON_VALID);
+      expect(session.targetTenantName).toBeNull();
+    });
+
+    it('reseller scope with no team members returns [] without querying sessions', async () => {
+      const { service } = createSubject();
+      const { tx, consumed } = createTx({
+        selects: [{ table: 'reseller_memberships', rows: [] }],
+      });
+      setTx(tx);
+
+      const result = await service.listSessions({ resellerId: 'reseller-1', limit: 50 });
+
+      expect(result).toEqual([]);
+      expect(consumed.map((s) => s.table)).toEqual(['reseller_memberships']);
+    });
+
+    it('reseller scope returns sessions started by the reseller team', async () => {
+      const { service } = createSubject();
+      const { tx, consumed } = createTx({
+        selects: [
+          { table: 'reseller_memberships', rows: [{ userId: 'imp-1' }] },
+          { table: 'impersonation_sessions', rows: [baseRow({ impersonatorScope: 'reseller' })] },
+        ],
+      });
+      setTx(tx);
+
+      const result = await service.listSessions({ resellerId: 'reseller-1', limit: 50 });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].impersonatorScope).toBe('reseller');
+      expect(consumed.map((s) => s.table)).toEqual([
+        'reseller_memberships',
+        'impersonation_sessions',
+      ]);
     });
   });
 });

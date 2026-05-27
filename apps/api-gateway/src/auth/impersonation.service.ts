@@ -27,10 +27,15 @@ import { EventBusService } from '@roviq/event-bus';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type Redis from 'ioredis';
 import { AuthEventService } from './auth-event.service';
 import type { ImpersonationAuthPayload } from './dto/impersonation.dto';
+import {
+  type ImpersonationSessionModel,
+  ImpersonationSessionStatus,
+} from './dto/impersonation-session.model';
 import { REDIS_KEYS } from './redis-keys';
 
 // ── Constants ──────────────────────────────────────────────
@@ -83,6 +88,17 @@ const MAX_OTP_ATTEMPTS = 3;
 // institute → institute (intra-institute: admin impersonating a member)
 
 const ALLOWED_IMPERSONATOR_SCOPES = new Set(['platform', 'reseller', 'institute']);
+
+/** Derives session lifecycle status: ended (manual/revoked) → expired (past TTL) → active. */
+function deriveSessionStatus(
+  endedAt: Date | null,
+  expiresAt: Date,
+  now: number,
+): ImpersonationSessionStatus {
+  if (endedAt) return ImpersonationSessionStatus.ENDED;
+  if (expiresAt.getTime() <= now) return ImpersonationSessionStatus.EXPIRED;
+  return ImpersonationSessionStatus.ACTIVE;
+}
 
 @Injectable()
 export class ImpersonationService {
@@ -513,6 +529,76 @@ export class ImpersonationService {
         metadata: { session_id: sessionId, ended_reason: 'manual' },
       })
       .catch(() => {});
+  }
+
+  // ── List impersonation sessions ──────────────────────────
+
+  /**
+   * Lists impersonation sessions with resolved display names, newest first. When `resellerId`
+   * is set, results are scoped to sessions started by that reseller's team — RLS on
+   * impersonation_sessions does not narrow by reseller, so the scoping is enforced here.
+   */
+  async listSessions(opts: {
+    resellerId?: string;
+    sessionId?: string;
+    activeOnly?: boolean;
+    limit: number;
+  }): Promise<ImpersonationSessionModel[]> {
+    return withAdmin(this.db, mkAdminCtx('service:impersonation-list'), async (tx) => {
+      const conditions: SQL[] = [];
+
+      if (opts.resellerId) {
+        const staff = await tx
+          .select({ userId: resellerMemberships.userId })
+          .from(resellerMemberships)
+          .where(eq(resellerMemberships.resellerId, opts.resellerId));
+        const staffIds = staff.map((s) => s.userId);
+        if (staffIds.length === 0) return [];
+        conditions.push(inArray(impersonationSessions.impersonatorId, staffIds));
+      }
+      if (opts.sessionId) conditions.push(eq(impersonationSessions.id, opts.sessionId));
+      if (opts.activeOnly) conditions.push(isNull(impersonationSessions.endedAt));
+
+      const impersonator = alias(users, 'impersonator');
+      const target = alias(users, 'target_user');
+      const verifier = alias(users, 'otp_verifier');
+
+      const rows = await tx
+        .select({
+          id: impersonationSessions.id,
+          impersonatorId: impersonationSessions.impersonatorId,
+          impersonatorScope: impersonationSessions.impersonatorScope,
+          impersonatorName: impersonator.username,
+          targetUserId: impersonationSessions.targetUserId,
+          targetUserName: target.username,
+          targetTenantId: impersonationSessions.targetTenantId,
+          targetTenantName: institutesLive.name,
+          reason: impersonationSessions.reason,
+          ipAddress: impersonationSessions.ipAddress,
+          userAgent: impersonationSessions.userAgent,
+          startedAt: impersonationSessions.startedAt,
+          expiresAt: impersonationSessions.expiresAt,
+          endedAt: impersonationSessions.endedAt,
+          endedReason: impersonationSessions.endedReason,
+          otpVerified: impersonationSessions.otpVerified,
+          otpVerifiedByName: verifier.username,
+        })
+        .from(impersonationSessions)
+        .leftJoin(impersonator, eq(impersonator.id, impersonationSessions.impersonatorId))
+        .leftJoin(target, eq(target.id, impersonationSessions.targetUserId))
+        .leftJoin(verifier, eq(verifier.id, impersonationSessions.otpVerifiedBy))
+        .leftJoin(institutesLive, eq(institutesLive.id, impersonationSessions.targetTenantId))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(impersonationSessions.startedAt))
+        .limit(opts.limit);
+
+      const now = Date.now();
+      return rows.map((row) => ({
+        ...row,
+        targetTenantName: row.targetTenantName ?? null,
+        status: deriveSessionStatus(row.endedAt, row.expiresAt, now),
+      }));
+    });
   }
 
   // ── Private: intra-institute validation ──────────────────

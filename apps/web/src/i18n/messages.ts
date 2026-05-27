@@ -16,10 +16,12 @@ import enConsent from '../../messages/en/consent.json';
 import enDashboard from '../../messages/en/dashboard.json';
 import enDlq from '../../messages/en/dlq.json';
 import enError from '../../messages/en/error.json';
+import enExaminations from '../../messages/en/examinations.json';
 import enGeography from '../../messages/en/geography.json';
 import enGroups from '../../messages/en/groups.json';
 import enGuardians from '../../messages/en/guardians.json';
 import enHoliday from '../../messages/en/holiday.json';
+import enImpersonationSessions from '../../messages/en/impersonationSessions.json';
 import enInstituteBilling from '../../messages/en/instituteBilling.json';
 import enInstituteGroups from '../../messages/en/instituteGroups.json';
 import enInstituteSettings from '../../messages/en/instituteSettings.json';
@@ -53,10 +55,12 @@ import hiConsent from '../../messages/hi/consent.json';
 import hiDashboard from '../../messages/hi/dashboard.json';
 import hiDlq from '../../messages/hi/dlq.json';
 import hiError from '../../messages/hi/error.json';
+import hiExaminations from '../../messages/hi/examinations.json';
 import hiGeography from '../../messages/hi/geography.json';
 import hiGroups from '../../messages/hi/groups.json';
 import hiGuardians from '../../messages/hi/guardians.json';
 import hiHoliday from '../../messages/hi/holiday.json';
+import hiImpersonationSessions from '../../messages/hi/impersonationSessions.json';
 import hiInstituteBilling from '../../messages/hi/instituteBilling.json';
 import hiInstituteGroups from '../../messages/hi/instituteGroups.json';
 import hiInstituteSettings from '../../messages/hi/instituteSettings.json';
@@ -92,10 +96,12 @@ const en = {
   dashboard: enDashboard,
   dlq: enDlq,
   error: enError,
+  examinations: enExaminations,
   geography: enGeography,
   groups: enGroups,
   guardians: enGuardians,
   holiday: enHoliday,
+  impersonationSessions: enImpersonationSessions,
   instituteBilling: enInstituteBilling,
   instituteGroups: enInstituteGroups,
   instituteSettings: enInstituteSettings,
@@ -132,10 +138,12 @@ const hi = {
   dashboard: hiDashboard,
   dlq: hiDlq,
   error: hiError,
+  examinations: hiExaminations,
   geography: hiGeography,
   groups: hiGroups,
   guardians: hiGuardians,
   holiday: hiHoliday,
+  impersonationSessions: hiImpersonationSessions,
   instituteBilling: hiInstituteBilling,
   instituteGroups: hiInstituteGroups,
   instituteSettings: hiInstituteSettings,

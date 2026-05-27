@@ -11,8 +11,9 @@ This guide walks you through the key features of the Roviq Reseller Portal. It i
 3. [Institute Management](#institute-management)
 4. [Billing](#billing)
 5. [Audit Logs](#audit-logs)
-6. [Sessions](#sessions)
-7. [Account -- Passkeys](#account--passkeys)
+6. [Impersonation Sessions](#impersonation-sessions)
+7. [Sessions](#sessions)
+8. [Account -- Passkeys](#account--passkeys)
 
 ---
 
@@ -228,6 +229,17 @@ Audit Logs record every significant action taken in the reseller portal.
    - **Action Type** -- filter by the kind of action (e.g. Created, Updated, Deleted).
    - **Date** -- filter by date range.
 3. Click any row to open a **detail side-sheet** showing the full audit record, including who made the change, when, and what was changed.
+
+---
+
+## Impersonation Sessions
+
+Review and control the impersonation sessions started by your team (when a team member logs in as an institute user).
+
+1. Open **Audit Logs > Impersonation** (`/reseller/audit/impersonation`).
+2. The table lists each session with the team member, target user, institute, start time, and a **status** badge (Active, Ended, or Expired).
+3. Use the **Institute** dropdown to filter sessions to a single managed institute.
+4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm).
 
 ---
 
