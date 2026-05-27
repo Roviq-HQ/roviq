@@ -169,6 +169,38 @@ export const testIds = {
     table: 'audit-logs-table',
   },
 
+  // ── Admin: observability → dead-letter queue (ROV-19) ─────────────────
+  dlq: {
+    tab: 'observability-tab-dlq',
+    content: 'observability-tab-content-dlq',
+    table: 'dlq-table',
+    row: (id: string) => `dlq-row-${id}`,
+    statusBadge: (id: string) => `dlq-status-badge-${id}`,
+    replayBtn: (id: string) => `dlq-replay-btn-${id}`,
+    actionsMenu: (id: string) => `dlq-actions-menu-${id}`,
+    discardAction: (id: string) => `dlq-discard-action-${id}`,
+    // Inspect sheet (payload + full error)
+    inspectBtn: (id: string) => `dlq-inspect-btn-${id}`,
+    inspectSheet: 'dlq-inspect-sheet',
+    // Filters
+    streamFilter: 'dlq-stream-filter',
+    statusFilter: 'dlq-status-filter',
+    clearFilters: 'dlq-clear-filters',
+    // Confirm dialogs
+    replayDialog: 'dlq-replay-dialog',
+    replayConfirmBtn: 'dlq-replay-confirm-btn',
+    replayCancelBtn: 'dlq-replay-cancel-btn',
+    discardDialog: 'dlq-discard-dialog',
+    discardConfirmBtn: 'dlq-discard-confirm-btn',
+    discardCancelBtn: 'dlq-discard-cancel-btn',
+    // States
+    empty: 'dlq-empty',
+    emptyFiltered: 'dlq-empty-filtered',
+    loading: 'dlq-loading',
+    error: 'dlq-error',
+    errorRetryBtn: 'dlq-error-retry-btn',
+  },
+
   // ── Admin: attendance ─────────────────────────────────────────────────
   adminAttendance: {
     page: 'admin-attendance-page',
@@ -802,6 +834,7 @@ export const testIds = {
     prevPageBtn: 'timetable-prev-page-btn',
     nextPageBtn: 'timetable-next-page-btn',
     createButton: 'timetable-create-btn',
+    emptyCreateButton: 'timetable-empty-create-btn',
     emptyState: 'timetable-empty-state',
     accessDenied: 'timetable-access-denied',
     // Statistics cards

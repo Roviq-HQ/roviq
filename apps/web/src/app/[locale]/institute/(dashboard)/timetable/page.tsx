@@ -310,7 +310,10 @@ export default function TimetablePage() {
                     <EmptyDescription>{t('noTimetablesDescription')}</EmptyDescription>
                   </EmptyHeader>
                   <Can I="create" a="Timetable">
-                    <CreateTimetableWizard yearId={yearId} />
+                    <CreateTimetableWizard
+                      yearId={yearId}
+                      triggerTestId={instituteTimetable.emptyCreateButton}
+                    />
                   </Can>
                 </Empty>
               }
@@ -496,7 +499,13 @@ function buildWizardSchema(t: ReturnType<typeof useTranslations<'timetable'>>) {
   });
 }
 
-function CreateTimetableWizard({ yearId }: { yearId: string }) {
+function CreateTimetableWizard({
+  yearId,
+  triggerTestId = instituteTimetable.createButton,
+}: {
+  yearId: string;
+  triggerTestId?: string;
+}) {
   const t = useTranslations('timetable');
   const [open, setOpen] = React.useState(false);
   const { createTimetable, loading } = useCreateTimetable();
@@ -545,12 +554,7 @@ function CreateTimetableWizard({ yearId }: { yearId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        size="sm"
-        className="gap-2"
-        onClick={() => setOpen(true)}
-        data-testid={instituteTimetable.createButton}
-      >
+      <Button size="sm" className="gap-2" onClick={() => setOpen(true)} data-testid={triggerTestId}>
         <Plus className="size-4" aria-hidden="true" />
         {t('create')}
       </Button>

@@ -58,7 +58,7 @@ export function StandardSectionSelect({
             onSectionChange(null);
           }}
         >
-          <SelectTrigger data-testid={standardTestId}>
+          <SelectTrigger data-testid={standardTestId} aria-label={t('view.selectStandard')}>
             <SelectValue placeholder={t('view.selectStandard')} />
           </SelectTrigger>
           <SelectContent>
@@ -77,7 +77,7 @@ export function StandardSectionSelect({
           onValueChange={(v) => onSectionChange(v)}
           disabled={!standardId}
         >
-          <SelectTrigger data-testid={sectionTestId}>
+          <SelectTrigger data-testid={sectionTestId} aria-label={t('view.selectSection')}>
             <SelectValue placeholder={t('view.selectSection')} />
           </SelectTrigger>
           <SelectContent>

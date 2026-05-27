@@ -136,7 +136,10 @@ function StaffTimetableInner() {
         <Field className="w-64">
           <FieldLabel>{t('view.selectTeacher')}</FieldLabel>
           <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger data-testid={instituteTimetable.staffTeacherSelect}>
+            <SelectTrigger
+              data-testid={instituteTimetable.staffTeacherSelect}
+              aria-label={t('view.selectTeacher')}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

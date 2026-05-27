@@ -131,6 +131,7 @@ function DayScheduleInner({ academicYearId }: { academicYearId: string | null })
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+            aria-label={t('day.date')}
             data-testid={instituteTimetable.dayDateInput}
           />
         </Field>
@@ -375,7 +376,10 @@ function OverrideDialog({
           <Field>
             <FieldLabel>{t('override.type')}</FieldLabel>
             <Select value={type} onValueChange={(v) => setType(v as TimetableOverrideType)}>
-              <SelectTrigger data-testid={instituteTimetable.overrideTypeSelect}>
+              <SelectTrigger
+                data-testid={instituteTimetable.overrideTypeSelect}
+                aria-label={t('override.type')}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -390,7 +394,10 @@ function OverrideDialog({
           <Field>
             <FieldLabel>{t('override.subject')}</FieldLabel>
             <Select value={subjectId || undefined} onValueChange={setSubjectId}>
-              <SelectTrigger data-testid={instituteTimetable.overrideSubjectSelect}>
+              <SelectTrigger
+                data-testid={instituteTimetable.overrideSubjectSelect}
+                aria-label={t('override.subject')}
+              >
                 <SelectValue placeholder={t('assign.selectSubject')} />
               </SelectTrigger>
               <SelectContent>
@@ -405,7 +412,10 @@ function OverrideDialog({
           <Field>
             <FieldLabel>{t('override.teacher')}</FieldLabel>
             <Select value={teacherId || undefined} onValueChange={setTeacherId}>
-              <SelectTrigger data-testid={instituteTimetable.overrideTeacherSelect}>
+              <SelectTrigger
+                data-testid={instituteTimetable.overrideTeacherSelect}
+                aria-label={t('override.teacher')}
+              >
                 <SelectValue placeholder={t('assign.selectTeacher')} />
               </SelectTrigger>
               <SelectContent>

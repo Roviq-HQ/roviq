@@ -1,7 +1,11 @@
 import type { Page } from '@playwright/test';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { expect, test } from '../../shared/console-guardian';
-import { SEED } from '../../shared/seed-fixtures';
+import { SEED, SEED_IDS } from '../../shared/seed-fixtures';
+
+// Only one timetable can be ACTIVE per academic year, and every test here
+// activates against the same seeded year — so they must not run concurrently.
+test.describe.configure({ mode: 'serial' });
 
 const { instituteTimetable: tt } = testIds;
 const YEAR = SEED.ACADEMIC_YEAR_INST1.id;
@@ -213,10 +217,9 @@ test.describe('Timetable — cross-app wiring', () => {
   });
 
   test('staff detail links to the staff timetable', async ({ page }) => {
-    await page.goto('/en/people/staff');
-    await expect(page.getByTestId(testIds.instituteStaff.table)).toBeVisible({ timeout: 15_000 });
-    // Rows navigate via onRowClick; the first data row is row index 1 (0 = header).
-    await page.getByTestId(testIds.instituteStaff.table).getByRole('row').nth(1).click();
+    // Navigate straight to a seeded staff member's detail page (row-click
+    // selection vs. navigation is ambiguous in the list DataTable).
+    await page.goto(`/en/people/staff/${SEED_IDS.STAFF_PROFILE_1}`);
     const link = page.getByTestId(testIds.instituteStaff.detailViewTimetableBtn);
     await expect(link).toBeVisible({ timeout: 15_000 });
     await expect(link).toHaveAttribute('href', /\/timetable\/staff-timetable\?teacher=/);

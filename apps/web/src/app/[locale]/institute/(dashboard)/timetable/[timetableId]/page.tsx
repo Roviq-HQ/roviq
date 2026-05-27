@@ -24,6 +24,7 @@ import {
   SelectValue,
   Separator,
   Tabs,
+  TabsContent,
   TabsList,
   TabsTrigger,
 } from '@roviq/ui';
@@ -191,21 +192,23 @@ function PeriodAndGridEditor({ timetableId }: { timetableId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <Tabs
+      value={activeSectionId ?? undefined}
+      onValueChange={setActiveSectionId}
+      className="space-y-4"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs value={activeSectionId ?? undefined} onValueChange={setActiveSectionId}>
-          <TabsList>
-            {sections.map((s) => (
-              <TabsTrigger
-                key={s.sectionId}
-                value={s.sectionId}
-                data-testid={instituteTimetable.sectionTab(s.sectionId)}
-              >
-                {lookups.sectionLabel(s.sectionId)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <TabsList>
+          {sections.map((s) => (
+            <TabsTrigger
+              key={s.sectionId}
+              value={s.sectionId}
+              data-testid={instituteTimetable.sectionTab(s.sectionId)}
+            >
+              {lookups.sectionLabel(s.sectionId)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
         <Can I="update" a="Timetable">
           <PeriodActions
             timetableId={timetableId}
@@ -214,15 +217,19 @@ function PeriodAndGridEditor({ timetableId }: { timetableId: string }) {
         </Can>
       </div>
 
-      {activeSectionId && (
-        <SectionGrid
-          timetableId={timetableId}
-          sectionId={activeSectionId}
-          periods={timetable.periods}
-          workingDays={timetable.workingDays}
-        />
-      )}
-    </div>
+      {/* One content panel per section so each tab trigger's aria-controls
+          resolves (Radix mounts only the active panel). */}
+      {sections.map((s) => (
+        <TabsContent key={s.sectionId} value={s.sectionId}>
+          <SectionGrid
+            timetableId={timetableId}
+            sectionId={s.sectionId}
+            periods={timetable.periods}
+            workingDays={timetable.workingDays}
+          />
+        </TabsContent>
+      ))}
+    </Tabs>
   );
 }
 
@@ -358,7 +365,10 @@ function AddPeriodDialog({
               <Field>
                 <FieldLabel>{t('period.session')}</FieldLabel>
                 <Select value={session} onValueChange={(v) => setSession(v as DaySession)}>
-                  <SelectTrigger data-testid={instituteTimetable.periodSessionSelect}>
+                  <SelectTrigger
+                    data-testid={instituteTimetable.periodSessionSelect}
+                    aria-label={t('period.session')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -619,7 +629,7 @@ function AssignDialog({
         timetableId,
         sectionId,
         periodId: period.id,
-        days: days.map((dayOfWeek) => ({ dayOfWeek })),
+        days,
         splits: splits.map((s, idx) => ({
           splitIndex: idx,
           splitLabel: s.splitLabel || null,
@@ -738,7 +748,10 @@ function AssignDialog({
                       value={split.subjectId || undefined}
                       onValueChange={(v) => updateSplit(i, { subjectId: v })}
                     >
-                      <SelectTrigger data-testid={instituteTimetable.assignSubjectSelect(i)}>
+                      <SelectTrigger
+                        data-testid={instituteTimetable.assignSubjectSelect(i)}
+                        aria-label={t('assign.subject')}
+                      >
                         <SelectValue placeholder={t('assign.selectSubject')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -756,7 +769,10 @@ function AssignDialog({
                       value={split.teacherId || undefined}
                       onValueChange={(v) => updateSplit(i, { teacherId: v })}
                     >
-                      <SelectTrigger data-testid={instituteTimetable.assignTeacherSelect(i)}>
+                      <SelectTrigger
+                        data-testid={instituteTimetable.assignTeacherSelect(i)}
+                        aria-label={t('assign.teacher')}
+                      >
                         <SelectValue placeholder={t('assign.selectTeacher')} />
                       </SelectTrigger>
                       <SelectContent>

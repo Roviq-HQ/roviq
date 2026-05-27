@@ -201,7 +201,8 @@ export interface AssignTimetableEntryInput {
   timetableId: string;
   sectionId: string;
   periodId: string;
-  days: Array<{ dayOfWeek: Weekday }>;
+  // Schema expects `[Weekday!]` (e.g. ["MONDAY"]), not an array of objects.
+  days: Weekday[];
   splits: AssignSplitInput[];
 }
 

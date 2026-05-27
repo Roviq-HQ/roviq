@@ -22,9 +22,11 @@ import { useI18nField } from '@roviq/i18n';
 import * as React from 'react';
 import { useSections, useStandards, useSubjectsByStandard } from '../academics/use-academics';
 
+// `first` is capped at 100 by the listStaff resolver; 100 covers a single
+// institute's teaching staff for label lookups (subject/section/teacher names).
 const STAFF_FOR_TIMETABLE = gql`
   query TimetableStaff {
-    listStaff(filter: { first: 1000 }) {
+    listStaff(filter: { first: 100 }) {
       membershipId
       firstName
       lastName
