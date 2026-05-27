@@ -6,3 +6,7 @@ export {
   getCircuitBreaker,
   removeCircuitBreaker,
 } from './circuit-breaker';
+export {
+  circuitBreakerStateValue,
+  registerCircuitBreakerGauge,
+} from './circuit-breaker-metrics';

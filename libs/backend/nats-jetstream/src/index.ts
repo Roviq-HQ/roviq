@@ -29,5 +29,10 @@ export {
 // Zod payload schemas paired to every EVENT_PATTERNS leaf.
 export { type EventPayload, flatEventSchemas } from './streams/event-schemas';
 // Streams
-export { AUDIT_LOG_CONSUMER, DEFAULT_DLQ_STREAM, STREAMS } from './streams/stream.config';
+export {
+  AUDIT_LOG_CONSUMER,
+  DEFAULT_DLQ_STREAM,
+  DLQ_READER_CONSUMER,
+  STREAMS,
+} from './streams/stream.config';
 export { ensureStreams } from './streams/stream.manager';

@@ -14,6 +14,7 @@ import enCertificates from '../../messages/en/certificates.json';
 import enCommon from '../../messages/en/common.json';
 import enConsent from '../../messages/en/consent.json';
 import enDashboard from '../../messages/en/dashboard.json';
+import enDlq from '../../messages/en/dlq.json';
 import enError from '../../messages/en/error.json';
 import enGeography from '../../messages/en/geography.json';
 import enGroups from '../../messages/en/groups.json';
@@ -50,6 +51,7 @@ import hiCertificates from '../../messages/hi/certificates.json';
 import hiCommon from '../../messages/hi/common.json';
 import hiConsent from '../../messages/hi/consent.json';
 import hiDashboard from '../../messages/hi/dashboard.json';
+import hiDlq from '../../messages/hi/dlq.json';
 import hiError from '../../messages/hi/error.json';
 import hiGeography from '../../messages/hi/geography.json';
 import hiGroups from '../../messages/hi/groups.json';
@@ -88,6 +90,7 @@ const en = {
   common: enCommon,
   consent: enConsent,
   dashboard: enDashboard,
+  dlq: enDlq,
   error: enError,
   geography: enGeography,
   groups: enGroups,
@@ -127,6 +130,7 @@ const hi = {
   common: hiCommon,
   consent: hiConsent,
   dashboard: hiDashboard,
+  dlq: hiDlq,
   error: hiError,
   geography: hiGeography,
   groups: hiGroups,
