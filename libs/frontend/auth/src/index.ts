@@ -16,6 +16,7 @@ export type {
 export { PasswordChangeForm } from './lib/password-change-form';
 export { ProtectedRoute } from './lib/protected-route';
 export type { ReAuthFormLabels } from './lib/reauth-form';
+export { sanitizeReturnUrl } from './lib/safe-return-url';
 export type {
   SessionExpiredDialogLabels,
   SessionExpiredDialogProps,

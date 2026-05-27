@@ -1,7 +1,7 @@
 'use client';
 
 import type { MembershipInfo } from '@roviq/auth';
-import { useAuth } from '@roviq/auth';
+import { sanitizeReturnUrl, useAuth } from '@roviq/auth';
 import { useI18nField } from '@roviq/i18n';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
 import Image from 'next/image';
@@ -21,7 +21,10 @@ export default function SelectInstitutePage() {
   React.useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated && !needsInstituteSelection) {
-      router.replace('/dashboard');
+      const returnUrl = sanitizeReturnUrl(
+        new URLSearchParams(window.location.search).get('returnUrl'),
+      );
+      router.replace(returnUrl ?? '/dashboard');
     }
     if (!isAuthenticated && !needsInstituteSelection) {
       router.replace('/login');
@@ -33,7 +36,11 @@ export default function SelectInstitutePage() {
     setError(null);
     try {
       await selectInstitute(membership.membershipId);
-      router.replace('/dashboard');
+      // Return to the originally-requested page (carried via ?returnUrl), else dashboard.
+      const returnUrl = sanitizeReturnUrl(
+        new URLSearchParams(window.location.search).get('returnUrl'),
+      );
+      router.replace(returnUrl ?? '/dashboard');
     } catch {
       setError(t('selectFailed'));
       setSelecting(null);

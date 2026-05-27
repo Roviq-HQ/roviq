@@ -1,25 +1,61 @@
 'use client';
 
-import { LoginForm, useAuth } from '@roviq/auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
+import { LoginForm, sanitizeReturnUrl, useAuth } from '@roviq/auth';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
+import { toast } from 'sonner';
 
 const { auth } = testIds;
 export default function LoginPage() {
   const t = useTranslations('auth');
-  const { isAuthenticated, needsInstituteSelection } = useAuth();
+  const { isAuthenticated, needsInstituteSelection, login } = useAuth();
   const router = useRouter();
+  const [quickLoading, setQuickLoading] = React.useState<string | null>(null);
+
+  // Dev-only one-click sign-in for the seeded accounts (gated to non-production below).
+  const devUsers = [
+    { role: t('devRoleAdmin'), username: 'admin', password: 'admin123', hint: t('devHintPicker') },
+    {
+      role: t('devRoleTeacher'),
+      username: 'teacher1',
+      password: 'teacher123',
+      hint: t('devHintDirect'),
+    },
+    {
+      role: t('devRoleStudent'),
+      username: 'student1',
+      password: 'student123',
+      hint: t('devHintDirect'),
+    },
+  ];
+  const quickLogin = async (user: { username: string; password: string }) => {
+    setQuickLoading(user.username);
+    try {
+      await login({ username: user.username, password: user.password });
+    } catch {
+      setQuickLoading(null);
+      toast.error(t('loginFailed'));
+    }
+  };
 
   React.useEffect(() => {
+    const returnUrl = sanitizeReturnUrl(
+      new URLSearchParams(window.location.search).get('returnUrl'),
+    );
     if (needsInstituteSelection) {
-      router.replace('/select-institute');
+      // Carry the post-login target through institute selection so the user lands
+      // on the page they originally requested, not a hardcoded dashboard.
+      router.replace(
+        returnUrl
+          ? `/select-institute?returnUrl=${encodeURIComponent(returnUrl)}`
+          : '/select-institute',
+      );
       return;
     }
     if (isAuthenticated) {
-      const params = new URLSearchParams(window.location.search);
-      router.replace(params.get('returnUrl') ?? '/dashboard');
+      router.replace(returnUrl ?? '/dashboard');
     }
   }, [isAuthenticated, needsInstituteSelection, router]);
 
@@ -51,14 +87,9 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LoginForm
-              scope="institute"
-              labels={labels}
-              onSuccess={() => {
-                const params = new URLSearchParams(window.location.search);
-                router.replace(params.get('returnUrl') ?? '/dashboard');
-              }}
-            />
+            {/* Post-login navigation (incl. multi-institute selection + returnUrl) is
+                handled by the effect above, which reacts to the auth state reliably. */}
+            <LoginForm scope="institute" labels={labels} />
           </CardContent>
         </Card>
         {process.env.NODE_ENV !== 'production' && (
@@ -67,19 +98,26 @@ export default function LoginPage() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {t('devCredentials')}
               </p>
-              <div className="space-y-1 font-mono text-xs text-muted-foreground">
-                <div>
-                  <span className="font-medium text-foreground">admin</span> / admin123
-                  <span className="ms-2 text-[10px]">({t('multiInstitutePicker')})</span>
-                </div>
-                <div>
-                  <span className="font-medium text-foreground">teacher1</span> / teacher123
-                  <span className="ms-2 text-[10px]">({t('singleInstitute')})</span>
-                </div>
-                <div>
-                  <span className="font-medium text-foreground">student1</span> / student123
-                  <span className="ms-2 text-[10px]">({t('singleInstitute')})</span>
-                </div>
+              <div className="space-y-1.5">
+                {devUsers.map((user) => (
+                  <Button
+                    key={user.username}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={quickLoading !== null}
+                    onClick={() => quickLogin(user)}
+                    className="flex h-auto w-full items-center justify-between gap-2 font-mono text-xs"
+                    data-testid={auth.devQuickLogin(user.username)}
+                  >
+                    <span>
+                      <span className="font-medium">{user.username}</span> / {user.password}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {quickLoading === user.username ? t('signingIn') : user.hint}
+                    </span>
+                  </Button>
+                ))}
               </div>
             </CardContent>
           </Card>
