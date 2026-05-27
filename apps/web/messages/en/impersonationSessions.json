@@ -1,0 +1,28 @@
+{
+  "title": "Impersonation Sessions",
+  "description": "Sessions where your team logged in as an institute user.",
+  "instituteFilter": "Institute",
+  "allInstitutes": "All institutes",
+  "emptyTitle": "No impersonation sessions",
+  "emptyDescription": "Sessions started by your team will appear here.",
+  "columns": {
+    "impersonator": "Team member",
+    "targetUser": "Target user",
+    "institute": "Institute",
+    "startedAt": "Started",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "ENDED": "Ended",
+    "EXPIRED": "Expired"
+  },
+  "terminate": "Terminate",
+  "terminateSuccess": "Impersonation session terminated.",
+  "terminateError": "Could not terminate the session. Please try again.",
+  "terminateConfirmTitle": "Terminate this session?",
+  "terminateConfirmDescription": "The team member will be signed out of the impersonated account immediately.",
+  "cancel": "Cancel",
+  "accessDenied": "You do not have permission to view impersonation sessions."
+}

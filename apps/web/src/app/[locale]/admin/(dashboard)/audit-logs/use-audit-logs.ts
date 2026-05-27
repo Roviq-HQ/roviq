@@ -16,6 +16,7 @@ const ADMIN_AUDIT_LOGS_QUERY = gql`
           userId
           actorId
           impersonatorId
+          impersonationSessionId
           action
           actionType
           entityType

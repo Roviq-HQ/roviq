@@ -21,6 +21,10 @@ export class AuditLog {
   @Field(() => String, { nullable: true })
   impersonatorId!: string | null;
 
+  /** FK to impersonation_sessions — set only for rows written during impersonation. */
+  @Field(() => String, { nullable: true })
+  impersonationSessionId!: string | null;
+
   @Field()
   action!: string;
 

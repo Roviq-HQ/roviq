@@ -1,0 +1,28 @@
+{
+  "title": "प्रतिरूपण सत्र",
+  "description": "वे सत्र जहाँ आपकी टीम ने किसी संस्थान उपयोगकर्ता के रूप में लॉगिन किया।",
+  "instituteFilter": "संस्थान",
+  "allInstitutes": "सभी संस्थान",
+  "emptyTitle": "कोई प्रतिरूपण सत्र नहीं",
+  "emptyDescription": "आपकी टीम द्वारा आरंभ किए गए सत्र यहाँ दिखाई देंगे।",
+  "columns": {
+    "impersonator": "टीम सदस्य",
+    "targetUser": "लक्ष्य उपयोगकर्ता",
+    "institute": "संस्थान",
+    "startedAt": "आरंभ",
+    "status": "स्थिति",
+    "actions": "कार्रवाइयाँ"
+  },
+  "status": {
+    "ACTIVE": "सक्रिय",
+    "ENDED": "समाप्त",
+    "EXPIRED": "अवधि समाप्त"
+  },
+  "terminate": "समाप्त करें",
+  "terminateSuccess": "प्रतिरूपण सत्र समाप्त किया गया।",
+  "terminateError": "सत्र समाप्त नहीं किया जा सका। कृपया पुनः प्रयास करें।",
+  "terminateConfirmTitle": "यह सत्र समाप्त करें?",
+  "terminateConfirmDescription": "टीम सदस्य को तुरंत प्रतिरूपित खाते से साइन आउट कर दिया जाएगा।",
+  "cancel": "रद्द करें",
+  "accessDenied": "आपको प्रतिरूपण सत्र देखने की अनुमति नहीं है।"
+}

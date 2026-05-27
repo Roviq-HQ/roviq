@@ -65,6 +65,12 @@ export interface FindAuditLogsParams {
     correlationId?: string;
     dateRange?: { from: Date; to: Date };
     syntheticOrigin?: string;
+    /** When true, restrict to rows written during an impersonation session. */
+    impersonatedOnly?: boolean;
+    /** Restrict impersonated rows to these impersonator scopes (joins impersonation_sessions). */
+    impersonatorScope?: string[];
+    /** Restrict to rows recorded during a single impersonation session. */
+    impersonationSessionId?: string;
   };
   first: number;
   after?: string;
