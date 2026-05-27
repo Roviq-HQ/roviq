@@ -10,7 +10,14 @@
     "entityId": "Entity ID",
     "source": "Source",
     "ipAddress": "IP Address",
-    "institute": "Institute"
+    "institute": "Institute",
+    "reseller": "Reseller",
+    "resellerTier": "Tier"
+  },
+  "resellerTier": {
+    "FULL_MANAGEMENT": "Full management",
+    "SUPPORT_MANAGEMENT": "Support",
+    "READ_ONLY": "Read-only"
   },
   "filters": {
     "entityType": "Entity type",

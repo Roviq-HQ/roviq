@@ -10,7 +10,14 @@
     "entityId": "इकाई ID",
     "source": "स्रोत",
     "ipAddress": "IP पता",
-    "institute": "संस्थान"
+    "institute": "संस्थान",
+    "reseller": "रिसेलर",
+    "resellerTier": "स्तर"
+  },
+  "resellerTier": {
+    "FULL_MANAGEMENT": "पूर्ण प्रबंधन",
+    "SUPPORT_MANAGEMENT": "सहायता",
+    "READ_ONLY": "केवल-पढ़ने योग्य"
   },
   "filters": {
     "entityType": "इकाई प्रकार",

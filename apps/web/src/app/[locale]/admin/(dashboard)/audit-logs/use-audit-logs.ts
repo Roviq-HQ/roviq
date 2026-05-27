@@ -31,6 +31,8 @@ const ADMIN_AUDIT_LOGS_QUERY = gql`
           actorName
           userName
           tenantName
+          resellerName
+          resellerTier
         }
       }
       totalCount
