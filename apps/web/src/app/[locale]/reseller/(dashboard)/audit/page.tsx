@@ -2,6 +2,7 @@
 
 import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
+  Badge,
   Button,
   Can,
   DataTable,
@@ -12,12 +13,20 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { ScrollText, SearchX, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { createResellerAuditLogColumns } from './audit-log-columns';
 import { ResellerAuditLogFilters, useResellerAuditLogFilters } from './audit-log-filters';
 import { useResellerAuditLogs } from './use-reseller-audit-logs';
+
+/** Tier badge colour: full=green, support=blue, read-only=grey. */
+const TIER_BADGE_CLASS: Record<string, string> = {
+  FULL_MANAGEMENT: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
+  SUPPORT_MANAGEMENT: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  READ_ONLY: 'bg-muted text-muted-foreground',
+};
 
 export default function ResellerAuditLogsPage() {
   const t = useTranslations('auditLogs');
@@ -67,6 +76,20 @@ export default function ResellerAuditLogsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">{t('description')}</p>
+        {logs[0]?.resellerName && (
+          <div
+            className="mt-1 flex items-center gap-2 text-sm"
+            data-testid={testIds.resellerAudit.resellerContext}
+          >
+            <span className="text-muted-foreground">{t('columns.reseller')}:</span>
+            <span className="font-medium">{logs[0].resellerName}</span>
+            {logs[0].resellerTier && (
+              <Badge variant="outline" className={TIER_BADGE_CLASS[logs[0].resellerTier] ?? ''}>
+                {t(`resellerTier.${logs[0].resellerTier}`)}
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       <Can I="read" a="AuditLog" passThrough>

@@ -9,6 +9,7 @@ import {
   mkAdminCtx,
   mkInstituteCtx,
   mkResellerCtx,
+  resellersLive,
   users,
   withAdmin,
   withReseller,
@@ -139,11 +140,14 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
           actorName: actor.username,
           userName: userAlias.username,
           tenantName: institutes.name,
+          resellerName: resellersLive.name,
+          resellerTier: resellersLive.tier,
         })
         .from(auditLogs)
         .leftJoin(actor, eq(actor.id, auditLogs.actorId))
         .leftJoin(userAlias, eq(userAlias.id, auditLogs.userId))
         .leftJoin(institutes, eq(institutes.id, auditLogs.tenantId))
+        .leftJoin(resellersLive, eq(resellersLive.id, auditLogs.resellerId))
         .$dynamic();
 
       let countQuery = tx.select({ total: count() }).from(auditLogs).$dynamic();
@@ -247,6 +251,8 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
     actorName: string | null;
     userName: string | null;
     tenantName: Record<string, string> | null;
+    resellerName: string | null;
+    resellerTier: string | null;
   }): AuditLogRow {
     return {
       id: row.id,
@@ -272,6 +278,8 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
       actorName: row.actorName ?? null,
       userName: row.userName ?? null,
       tenantName: row.tenantName ?? null,
+      resellerName: row.resellerName ?? null,
+      resellerTier: row.resellerTier ?? null,
     };
   }
 }

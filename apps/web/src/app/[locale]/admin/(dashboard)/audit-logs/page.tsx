@@ -68,7 +68,10 @@ export default function AuditLogsPage() {
     [format],
   );
 
-  const columns = React.useMemo(() => createAuditLogColumns(t, formatDate), [t, formatDate]);
+  const columns = React.useMemo(
+    () => createAuditLogColumns(t, formatDate, activeTab === 'reseller'),
+    [t, formatDate, activeTab],
+  );
 
   const handleLoadMore = async () => {
     setIsLoadingMore(true);
