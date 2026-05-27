@@ -6,7 +6,7 @@ import { REFRESH_INTERVALS, type RefreshInterval, TIME_RANGES, type TimeRange } 
 
 const RANGE_VALUES = TIME_RANGES.map((r) => r.shortLabel);
 const REFRESH_VALUES = REFRESH_INTERVALS.map((r) => r.label);
-const TAB_VALUES = ['overview', 'events', 'streams', 'traces-logs'] as const;
+const TAB_VALUES = ['overview', 'events', 'streams', 'traces-logs', 'dlq'] as const;
 
 export type Tab = (typeof TAB_VALUES)[number];
 

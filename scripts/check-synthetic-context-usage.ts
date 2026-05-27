@@ -45,6 +45,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts',
   'apps/api-gateway/src/auth/role/__tests__/role.integration.spec.ts',
   'apps/api-gateway/src/auth/role/repositories/role.drizzle-repository.ts',
+  // ROV-19: platform-admin DLQ reader — no repository layer; admin tool mirrors admin-reseller.service.
+  'apps/api-gateway/src/dlq/dlq.service.ts',
   'apps/api-gateway/src/institute-group/repositories/institute-group.drizzle-repository.ts',
   'apps/api-gateway/src/institute/admission/__tests__/application.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/__tests__/enquiry.integration.spec.ts',

@@ -74,13 +74,16 @@ describe('STREAMS config', () => {
     });
   });
 
-  it('DLQ stream uses limits retention and maxDeliver 1', () => {
+  it('DLQ stream uses limits retention and maxDeliver 5', () => {
+    // maxDeliver is 5 (not 1) since ROV-19: the dlq-reader consumer redelivers
+    // on a transient persist failure, and DLQ_READER_CONSUMER.max_deliver derives
+    // from this value, so the stream is the single source for the delivery cap.
     expect(STREAMS.DLQ).toMatchObject({
       name: 'DLQ',
       subjects: ['DLQ.>'],
       retention: 'limits',
       storage: 'file',
-      maxDeliver: 1,
+      maxDeliver: 5,
     });
   });
 });

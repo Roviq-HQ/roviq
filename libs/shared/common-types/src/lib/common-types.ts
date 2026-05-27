@@ -39,6 +39,8 @@ export const AppAction = {
   Restore: 'restore',
   /** Allows a platform admin to act as another user within an institute for debugging/support purposes */
   Impersonate: 'impersonate',
+  /** Re-publish or discard a dead-lettered NATS message — platform admin DLQ reader (ROV-19) */
+  Replay: 'replay',
 } as const;
 
 export type AppAction = (typeof AppAction)[keyof typeof AppAction];
@@ -131,6 +133,8 @@ export const AppSubject = {
   Certificate: 'Certificate',
   /** Compliance data export — UDISE+ DCF, CBSE Registration, RTE, AWR reports */
   Export: 'Export',
+  /** Dead-lettered NATS message — platform admin inspects, replays, or discards (ROV-19) */
+  DlqMessage: 'DlqMessage',
 } as const;
 
 export type AppSubject = (typeof AppSubject)[keyof typeof AppSubject];

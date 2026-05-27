@@ -213,7 +213,9 @@ export const STREAMS: Record<string, StreamConfig> = {
     subjects: ['DLQ.>'],
     retention: 'limits',
     storage: 'file',
-    maxDeliver: 1,
+    // Upper bound for the dlq-reader consumer, which redelivers on a transient
+    // persist failure (DB down) so a dead-letter is never silently lost.
+    maxDeliver: 5,
   },
 };
 
@@ -236,4 +238,21 @@ export const AUDIT_LOG_CONSUMER = {
   max_ack_pending: 1000,
   /** Max delivery attempts before terminal (sent to DLQ) */
   max_deliver: 5,
+} as const;
+
+/**
+ * Consumer config for the DLQ reader (used by DlqConsumer in api-gateway, ROV-19).
+ * Canonical source so the stream name, subject filter, and delivery cap live in
+ * one place instead of being hardcoded in the consumer.
+ */
+export const DLQ_READER_CONSUMER = {
+  /** Durable name — survives consumer restarts */
+  durable_name: 'dlq-reader',
+  /** Matches every dead-letter subject (DLQ.<ORIGIN_STREAM>) */
+  filter_subject: 'DLQ.>',
+  /** Each message must be explicitly acked */
+  ack_policy: 'explicit',
+  // Derived from the stream contract so the consumer can never exceed it
+  // (the jetstream-drift gate enforces consumer max_deliver <= stream maxDeliver).
+  max_deliver: DEFAULT_DLQ_STREAM.maxDeliver,
 } as const;
