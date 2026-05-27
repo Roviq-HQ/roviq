@@ -14,6 +14,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -81,10 +82,11 @@ export class CreateTimetableInput {
   @Field(() => String, { nullable: true })
   description?: string | null;
 
-  @Matches(TIME_REGEX, { message: 'effectiveFrom must be YYYY-MM-DD' })
+  @IsDateString()
   @Field(() => String, { description: 'First date in effect (YYYY-MM-DD).' })
   effectiveFrom!: string;
 
+  @IsDateString()
   @Field(() => String, { description: 'Last date in effect (YYYY-MM-DD).' })
   effectiveTo!: string;
 
@@ -142,10 +144,12 @@ export class UpdateTimetableInput {
   description?: string | null;
 
   @IsOptional()
+  @IsDateString()
   @Field(() => String, { nullable: true, description: 'First date in effect (YYYY-MM-DD).' })
   effectiveFrom?: string;
 
   @IsOptional()
+  @IsDateString()
   @Field(() => String, { nullable: true, description: 'Last date in effect (YYYY-MM-DD).' })
   effectiveTo?: string;
 
@@ -309,6 +313,7 @@ export class CreateTimetableDayOverrideInput {
   @Field(() => ID)
   timetableId!: string;
 
+  @IsDateString()
   @Field(() => String, { description: 'The date this override applies to (YYYY-MM-DD).' })
   date!: string;
 
