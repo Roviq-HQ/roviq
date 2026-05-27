@@ -32,6 +32,18 @@ const SEED = {
 let poolerPool: pg.Pool;
 let superPool: pg.Pool;
 
+/** Expected RLS role coverage + scope label for a table in the structural sweep. */
+function scopeExpectation(opts: {
+  isPlatformFacet: boolean;
+  hasTenantId: boolean;
+  hasResellerId: boolean;
+}): { roles: string[]; scope: string } {
+  if (opts.isPlatformFacet) return { roles: ['roviq_admin'], scope: 'platform-facet' };
+  if (opts.hasTenantId) return { roles: ['roviq_app', 'roviq_admin'], scope: 'tenant' };
+  if (opts.hasResellerId) return { roles: ['roviq_reseller', 'roviq_admin'], scope: 'reseller' };
+  return { roles: ['roviq_admin'], scope: 'platform' };
+}
+
 /**
  * Execute a callback as a specific role within a transaction.
  * The transaction is always rolled back — no test data leaks.
@@ -457,6 +469,15 @@ describe('System protection', () => {
 // ── Structural sweep (20) ─────────────────────────────────────
 
 describe('Structural invariants — RLS sweep', () => {
+  // Platform-scoped tables that carry a `tenant_id` column purely as a filter
+  // facet (nullable FK to institutes), NOT as a tenant-isolation boundary. They
+  // are accessed exclusively via @PlatformScope() + withAdmin(), never by
+  // roviq_app/roviq_reseller, so a single roviq_admin policy + FORCE RLS is the
+  // correct posture (it denies every non-admin role). The "has tenant_id ⇒
+  // tenant-readable + ≥3 policies" heuristic below does not apply to them.
+  //   - dlq_messages: dead-letter inspect/replay, platform-admin only (ROV-19).
+  const PLATFORM_TENANT_FACET_TABLES = new Set(['dlq_messages']);
+
   it('20. every table with tenant_id has FORCE RLS and ≥3 policies', async () => {
     const tables = await superPool.query<{
       relname: string;
@@ -488,8 +509,11 @@ describe('Structural invariants — RLS sweep', () => {
         [row.relname],
       );
       const policyCount = Number(policies.rows[0]?.count ?? '0');
-      if (policyCount < 3) {
-        violations.push(`${row.relname}: ${policyCount} policies (expected ≥3)`);
+      // Platform-facet tables need only their roviq_admin policy; everyone else
+      // is denied by FORCE RLS. Tenant-scoped tables need app+reseller+admin (≥3).
+      const minPolicies = PLATFORM_TENANT_FACET_TABLES.has(row.relname) ? 1 : 3;
+      if (policyCount < minPolicies) {
+        violations.push(`${row.relname}: ${policyCount} policies (expected ≥${minPolicies})`);
       }
     }
 
@@ -577,19 +601,16 @@ describe('Structural invariants — RLS sweep', () => {
         continue;
       }
 
-      // Determine required roles based on scope
-      const requiredRoles: string[] = [];
-      if (row.has_tenant_id) {
-        requiredRoles.push('roviq_app', 'roviq_admin');
-      } else if (row.has_reseller_id) {
-        requiredRoles.push('roviq_reseller', 'roviq_admin');
-      } else {
-        requiredRoles.push('roviq_admin');
-      }
+      // Determine required roles + scope label. Platform-facet tables carry a
+      // tenant_id/reseller_id column for filtering only — they are admin-only.
+      const { roles: requiredRoles, scope } = scopeExpectation({
+        isPlatformFacet: PLATFORM_TENANT_FACET_TABLES.has(row.relname),
+        hasTenantId: row.has_tenant_id,
+        hasResellerId: row.has_reseller_id,
+      });
 
       const missing = requiredRoles.filter((r) => !row.covered_roles.includes(r));
       if (missing.length > 0) {
-        const scope = row.has_tenant_id ? 'tenant' : row.has_reseller_id ? 'reseller' : 'platform';
         violations.push(`${row.relname} (${scope}): missing policies for [${missing.join(', ')}]`);
       }
     }
