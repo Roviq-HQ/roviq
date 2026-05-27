@@ -24,10 +24,11 @@ Migration: `libs/database/migrations/20260526224039_thankful_ravenous` (tables, 
 - `timetable.service.ts` — master CRUD; **named status transitions** `activate`/`deactivate`/`archive` via `TIMETABLE_STATE_MACHINE` (no raw `updateStatus`); `activate` is a transactional single-active swap; sections add/remove; period add/update/remove; statistics; soft-delete/restore. Create is atomic (`createWithGrid`).
 - `timetable-schedule.service.ts` — entry assign/clear with two-phase conflict detection: teacher double-booking + room clash, validated against DB state **and** within the batch, before any write.
 - `timetable-view.service.ts` — section/staff weekly grids; per-date `daySchedule` (master entries for the weekday overlaid with that date's overrides — substitution replaces, cancellation hides); override create/clear.
+- `timetable-pdf.service.ts` — renders a section or staff weekly grid to a **real downloadable PDF** (pdfkit, A4 landscape, manual table layout with page-break-aware row heights). Display labels (subject / "Standard - Section" / teacher name) are resolved server-side by `TimetableRepository.resolveLabels()`, which reads `subjectsLive`, `sectionsLive`+`standardsLive`, and `staffProfilesLive`+`userProfiles` (teacher = membership id) under tenant RLS. Returns a `Buffer`; the resolver base64-encodes it. Follows the EE invoice-PDF pattern. 4 unit tests.
 
 ## GraphQL surface (institute scope, `@CheckAbility(..., 'Timetable')`)
 
-Queries: `timetables` (paginated), `timetable`, `timetableStatistics`, `sectionTimetable`, `staffTimetable`, `timetableDaySchedule`, `staffDaySchedule`, `timetableDayOverrides`.
+Queries: `timetables` (paginated), `timetable`, `timetableStatistics`, `sectionTimetable`, `staffTimetable`, `timetableDaySchedule`, `staffDaySchedule`, `timetableDayOverrides`, **`sectionTimetablePdf` / `staffTimetablePdf`** (return a base64-encoded PDF `String`, mirror the EE `generateInvoicePdf` shape).
 Mutations: `createTimetable`, `updateTimetable`, **`activateTimetable` / `deactivateTimetable` / `archiveTimetable`** (named transitions), `deleteTimetable`, `restoreTimetable`, `addTimetableSection`, `removeTimetableSection`, `addTimetablePeriod`, `updateTimetablePeriod`, `removeTimetablePeriod`, `assignTimetableEntry`, `clearTimetableEntry`, `createTimetableDayOverride`, `clearTimetableDayOverride`.
 
 ## Events
@@ -40,7 +41,18 @@ Subject `Timetable`. `read` granted to class_teacher, subject_teacher, lab_assis
 
 ## Frontend
 
-Pages: list + full-screen create dialog (`page.tsx`), grid editor (`[timetableId]/`), section/staff read-only grids with print, and a day-schedule + override page. Shared pickers (`SectionPicker`, `StandardSectionSelect`) live in `apps/web/src/components/pickers/`. PDF = client-side print (no backend base64).
+Pages: list + full-screen create dialog (`page.tsx`), grid editor (`[timetableId]/`), section/staff read-only grids, and a day-schedule + override page. Shared pickers (`SectionPicker`, `StandardSectionSelect`) live in `apps/web/src/components/pickers/`.
+
+- **PDF + print** — the section and staff views offer **Download PDF** (server-rendered via `useSectionTimetablePdf` / `useStaffTimetablePdf` → base64 → Blob download, shared `downloadBase64Pdf` helper) alongside browser **Print** (`@media print` chrome hiding).
+- **Deep-links** — `section-timetable?section=&standard=` and `staff-timetable?teacher=` pre-select the view; `StandardSectionSelect` accepts `initialStandardId` and emits `onStandardChange`.
+
+### Cross-app wiring
+
+- **Dashboard** — `today-schedule-card.tsx`: the signed-in teacher's resolved classes for today (`staffDaySchedule`), gated `read:Timetable`, hidden when there are no classes (so label lookups only mount for teachers). A **Timetable** feature link is also added to the dashboard.
+- **Academics → section** — each section row on the standard-detail page has a **View timetable** link to `section-timetable`.
+- **People → staff** — staff detail header links to that teacher's `staff-timetable`.
+- **People → student** — student detail sidebar links to the student's section `section-timetable` (the student/parent read-only view; `read:Timetable` is granted to student/parent roles).
+- **Attendance** — each non-break slot on the day-schedule page links to `/institute/attendance` pre-filled with `date`/`standard`/`section`/`period` (the numeric period label maps to the attendance period; the attendance page already reads these via nuqs).
 
 ## Deviations from the legacy (Mongo) module — intentional
 
@@ -51,9 +63,9 @@ Pages: list + full-screen create dialog (`page.tsx`), grid editor (`[timetableId
 
 ## Tests
 
-- Unit: `timetable-generation`, `timetable-schedule` (conflict detection), `timetable-view` (day resolution) — 20 cases.
+- Unit: `timetable-generation`, `timetable-schedule` (conflict detection), `timetable-view` (day resolution), `timetable-pdf` (PDF buffer + label resolution) — 24 cases.
 - E2E API: `e2e/api-gateway-e2e/src/timetable.api-e2e.spec.ts` — lifecycle, teacher conflict, tenant isolation, auth (4 cases, green on the live stack).
-- E2E UI: `e2e/web-institute-e2e/src/timetable.e2e.spec.ts` — list, wizard, create-through-wizard.
+- E2E UI: `e2e/web-institute-e2e/src/timetable.e2e.spec.ts` — list & wizard, lifecycle (activate/deactivate/archive), grid cell assignment, period add, section/staff views + PDF download, day-schedule + attendance deep-link, day override create/clear, and cross-app wiring links (dashboard, staff detail, academics section).
 
 ## RLS audit
 
