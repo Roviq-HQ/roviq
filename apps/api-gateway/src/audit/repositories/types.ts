@@ -27,6 +27,9 @@ export interface AuditLogRow {
   actorName: string | null;
   userName: string | null;
   tenantName: I18nContent | null;
+  /** Resolved reseller display name + tier (joined on resellers.id). Null when resellerId is null. */
+  resellerName: string | null;
+  resellerTier: string | null;
 }
 
 export interface AuditEventData {

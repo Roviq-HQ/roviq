@@ -23,10 +23,46 @@ const ACTION_TYPE_VARIANT: Record<string, 'default' | 'secondary' | 'destructive
   ACTIVATE: 'default',
 };
 
+/** Tier badge colour: full=green, support=blue, read-only=grey. */
+const TIER_BADGE_CLASS: Record<string, string> = {
+  FULL_MANAGEMENT: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
+  SUPPORT_MANAGEMENT: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  READ_ONLY: 'bg-muted text-muted-foreground',
+};
+
 export function createAuditLogColumns(
   t: (key: string) => string,
   formatDate: (date: Date) => string,
+  showReseller = false,
 ): ColumnDef<AuditLogNode, unknown>[] {
+  const resellerColumns: ColumnDef<AuditLogNode, unknown>[] = showReseller
+    ? [
+        {
+          accessorKey: 'resellerName',
+          header: t('columns.reseller'),
+          cell: ({ row }) => (
+            <span className="max-w-[160px] truncate text-sm">
+              {row.original.resellerName ?? '—'}
+            </span>
+          ),
+        },
+        {
+          accessorKey: 'resellerTier',
+          header: t('columns.resellerTier'),
+          cell: ({ row }) => {
+            const tier = row.original.resellerTier;
+            return tier ? (
+              <Badge variant="outline" className={TIER_BADGE_CLASS[tier] ?? ''}>
+                {t(`resellerTier.${tier}`)}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            );
+          },
+        },
+      ]
+    : [];
+
   return [
     {
       accessorKey: 'createdAt',
@@ -57,6 +93,7 @@ export function createAuditLogColumns(
         );
       },
     },
+    ...resellerColumns,
     {
       accessorKey: 'action',
       header: t('columns.action'),

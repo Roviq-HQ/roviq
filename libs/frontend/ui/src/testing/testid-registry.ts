@@ -175,6 +175,11 @@ export const testIds = {
     sessionAuditList: 'audit-logs-session-audit-list',
   },
 
+  // ── Reseller: audit logs page (ROV-145) ───────────────────────────────
+  resellerAudit: {
+    resellerContext: 'reseller-audit-context',
+  },
+
   // ── Reseller: impersonation sessions page (ROV-144) ───────────────────
   resellerImpersonation: {
     page: 'reseller-impersonation-page',
@@ -345,6 +350,9 @@ export const testIds = {
     attendanceKpiByStatus: (status: string) => `dashboard-attendance-kpi-${status}`,
     todayScheduleCard: 'dashboard-today-schedule-card',
     todayScheduleLink: 'dashboard-today-schedule-link',
+    examsCard: 'dashboard-exams-card',
+    examsCardLink: 'dashboard-exams-card-link',
+    examsCardRow: (id: string) => `dashboard-exams-card-row-${id}`,
   },
 
   // ── Institute: students list + detail ──────────────────────────────────
@@ -385,6 +393,7 @@ export const testIds = {
     detailAcademicsEmpty: 'students-detail-academics-empty',
     detailTitle: 'students-detail-title',
     detailViewTimetableLink: 'students-detail-view-timetable-link',
+    detailViewExamsLink: 'students-detail-view-exams-link',
     detailDraftDiscardBtn: 'students-detail-draft-discard-btn',
     detailDraftRestoreBtn: 'students-detail-draft-restore-btn',
     detailResetBtn: 'students-detail-reset-btn',
@@ -1003,6 +1012,7 @@ export const testIds = {
     archiveBtn: 'exam-archive-btn',
     // Datesheet
     datesheet: 'exam-datesheet',
+    datesheetDownloadBtn: 'exam-datesheet-download-btn',
     addScheduleBtn: 'exam-add-schedule-btn',
     scheduleRow: (id: string) => `exam-schedule-row-${id}`,
     scheduleStandardSelect: 'exam-schedule-standard-select',
@@ -1043,6 +1053,10 @@ export const testIds = {
     reportCardDownloadBtn: (id: string) => `report-card-download-${id}-btn`,
     reportCardInstanceRow: (id: string) => `report-card-instance-${id}-row`,
     myReportCardsPage: 'my-report-cards-page',
+    myReportCardsTitle: 'my-report-cards-title',
+    myReportCardRow: (id: string) => `my-report-card-row-${id}`,
+    myReportCardDownloadBtn: (id: string) => `my-report-card-download-${id}-btn`,
+    myReportCardsEmpty: 'my-report-cards-empty',
   },
 
   // ── Institute: select institute ────────────────────────────────────────

@@ -70,4 +70,12 @@ export class AuditLog {
 
   @Field(() => I18nTextScalar, { nullable: true })
   tenantName!: I18nContent | null;
+
+  /** Reseller display name (joined on resellers.id). Null for non-reseller-scoped entries. */
+  @Field(() => String, { nullable: true })
+  resellerName!: string | null;
+
+  /** Reseller tier (FULL_MANAGEMENT / SUPPORT_MANAGEMENT / READ_ONLY). Null when no reseller. */
+  @Field(() => String, { nullable: true })
+  resellerTier!: string | null;
 }
