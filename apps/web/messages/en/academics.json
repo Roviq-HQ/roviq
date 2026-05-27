@@ -123,5 +123,6 @@
   "deleting": "Deleting...",
   "auditTimeline": "Activity Timeline",
   "saveChanges": "Save Changes",
-  "updated": "Updated successfully"
+  "updated": "Updated successfully",
+  "viewTimetable": "View timetable"
 }

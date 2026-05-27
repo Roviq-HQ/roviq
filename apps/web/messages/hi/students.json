@@ -11,7 +11,7 @@
     "cancel": "रद्द करें",
     "success": "विद्यार्थी बनाया गया",
     "active": "सक्रिय",
-    "loading": "फ़ॉर्म लोड हो रहा है\u2026",
+    "loading": "फ़ॉर्म लोड हो रहा है…",
     "sections": {
       "personal": "व्यक्तिगत विवरण",
       "contact": "संपर्क",
@@ -298,7 +298,8 @@
       "admittedOn": "प्रवेश तिथि",
       "dateOfBirth": "जन्म तिथि",
       "gender": "लिंग",
-      "notAssigned": "निर्दिष्ट नहीं"
+      "notAssigned": "निर्दिष्ट नहीं",
+      "viewTimetable": "समय-सारणी देखें"
     },
     "status": {
       "label": "स्थिति",

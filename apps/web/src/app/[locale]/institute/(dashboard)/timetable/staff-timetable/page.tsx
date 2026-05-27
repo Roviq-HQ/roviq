@@ -18,12 +18,15 @@ import {
   SelectValue,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { CalendarClock, Printer } from 'lucide-react';
+import { CalendarClock, Download, Loader2, Printer } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
+import { toast } from 'sonner';
 import { AcademicYearSelector, useSelectedAcademicYear } from '../../academic-years/year-selector';
 import { ReadOnlyGrid } from '../read-only-grid';
-import { useStaffTimetable } from '../use-timetable';
+import { downloadBase64Pdf } from '../timetable-shared';
+import { useStaffTimetable, useStaffTimetablePdf } from '../use-timetable';
 import { TimetableLookupsProvider, useTimetableLookups } from '../use-timetable-lookups';
 
 const { instituteTimetable } = testIds;
@@ -66,9 +69,24 @@ function StaffTimetableInner() {
         ?.membershipId ?? null
     );
   }, [getAccessToken, memberships]);
-  const [selected, setSelected] = React.useState<string>(SELF);
+  // Deep-link support: ?teacher=<membershipId> (from staff detail page).
+  const searchParams = useSearchParams();
+  const [selected, setSelected] = React.useState<string>(() => searchParams.get('teacher') ?? SELF);
   const teacherId = selected === SELF ? selfMembershipId : selected;
   const { grid, loading } = useStaffTimetable(teacherId);
+  const [fetchPdf, { loading: pdfLoading }] = useStaffTimetablePdf();
+
+  const handleDownloadPdf = React.useCallback(async () => {
+    if (!teacherId) return;
+    try {
+      const { data } = await fetchPdf({ variables: { teacherId } });
+      if (data?.staffTimetablePdf) {
+        downloadBase64Pdf(data.staffTimetablePdf, 'staff-timetable.pdf');
+      }
+    } catch {
+      toast.error(t('view.downloadFailed'));
+    }
+  }, [fetchPdf, teacherId, t]);
 
   return (
     <div className="space-y-6" data-testid={instituteTimetable.staffTimetablePage}>
@@ -82,15 +100,34 @@ function StaffTimetableInner() {
         <div className="flex items-center gap-3">
           <AcademicYearSelector />
           {grid && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => window.print()}
-              data-testid={instituteTimetable.printButton}
-            >
-              <Printer className="size-4" /> {t('view.print')}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleDownloadPdf}
+                disabled={pdfLoading}
+                title={t('view.downloadPdf')}
+                data-testid={instituteTimetable.downloadPdfButton}
+              >
+                {pdfLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                {t('view.downloadPdf')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => window.print()}
+                title={t('view.print')}
+                data-testid={instituteTimetable.printButton}
+              >
+                <Printer className="size-4" /> {t('view.print')}
+              </Button>
+            </>
           )}
         </div>
       </div>

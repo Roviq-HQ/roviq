@@ -25,19 +25,25 @@ export function StandardSectionSelect({
   academicYearId,
   sectionId,
   onSectionChange,
+  onStandardChange,
+  initialStandardId,
   standardTestId,
   sectionTestId,
 }: {
   academicYearId: string | null;
   sectionId: string | null;
   onSectionChange: (sectionId: string | null) => void;
+  /** Fired when the standard changes — lets callers build standard-scoped links. */
+  onStandardChange?: (standardId: string | null) => void;
+  /** Seeds the standard dropdown for deep-links (e.g. ?standard=…&section=…). */
+  initialStandardId?: string | null;
   standardTestId?: string;
   sectionTestId?: string;
 }) {
   const t = useTranslations('timetable');
   const resolveI18n = useI18nField();
   const { standards } = useStandards(academicYearId);
-  const [standardId, setStandardId] = React.useState<string | null>(null);
+  const [standardId, setStandardId] = React.useState<string | null>(initialStandardId ?? null);
   const { sections } = useSections(standardId);
 
   return (
@@ -48,6 +54,7 @@ export function StandardSectionSelect({
           value={standardId ?? undefined}
           onValueChange={(v) => {
             setStandardId(v);
+            onStandardChange?.(v);
             onSectionChange(null);
           }}
         >

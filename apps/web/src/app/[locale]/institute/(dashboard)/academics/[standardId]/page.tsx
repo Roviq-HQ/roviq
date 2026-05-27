@@ -2,7 +2,7 @@
 
 import { extractGraphQLError } from '@roviq/graphql';
 import type { StreamObject } from '@roviq/graphql/generated';
-import { buildI18nTextSchema, useI18nField, zodValidator } from '@roviq/i18n';
+import { buildI18nTextSchema, Link as LocaleLink, useI18nField, zodValidator } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -31,7 +31,16 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ArrowLeft, BookOpen, Check, Download, Layers, Plus, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  CalendarClock,
+  Check,
+  Download,
+  Layers,
+  Plus,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -277,6 +286,22 @@ function SectionsTab({
           hardMax={45}
           className="w-32"
         />
+      ),
+    }) as ColumnDef<Section, unknown>,
+    sectionColumnHelper.display({
+      id: 'timetable',
+      header: '',
+      cell: ({ row }) => (
+        <Can I="read" a="Timetable">
+          <Button variant="ghost" size="sm" className="gap-1.5" asChild title={t('viewTimetable')}>
+            <LocaleLink
+              href={`/institute/timetable/section-timetable?section=${row.original.id}&standard=${standardId}`}
+              data-testid={instituteAcademics.sectionViewTimetableBtn(row.original.id)}
+            >
+              <CalendarClock className="size-4" /> {t('viewTimetable')}
+            </LocaleLink>
+          </Button>
+        </Can>
       ),
     }) as ColumnDef<Section, unknown>,
   ];

@@ -7,6 +7,7 @@ import {
   Award,
   BookOpen,
   CalendarCheck,
+  CalendarClock,
   FileText,
   GraduationCap,
   Settings,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { type AttendanceStatus, useDateCounts } from '../attendance/use-attendance';
+import { TodayScheduleCard } from './today-schedule-card';
 
 // Same palette as the attendance page's STATUS_COLORS — kept intentionally
 // consistent so the dashboard KPI reads as a preview of that screen.
@@ -190,6 +192,12 @@ export default function DashboardPage() {
       icon: Users2,
     },
     {
+      title: t('timetableTitle'),
+      description: t('timetableDescription'),
+      href: '/timetable',
+      icon: CalendarClock,
+    },
+    {
       title: t('tcTitle'),
       description: t('tcDescription'),
       href: '/certificates/tc',
@@ -223,11 +231,14 @@ export default function DashboardPage() {
           <CardDescription>{t('instituteWelcomeDescription')}</CardDescription>
         </CardHeader>
       </Card>
-      <Can I="read" a="Attendance">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Can I="read" a="Attendance">
           <AttendanceKpiCard />
-        </div>
-      </Can>
+        </Can>
+        <Can I="read" a="Timetable">
+          <TodayScheduleCard />
+        </Can>
+      </div>
       <div data-testid={testIds.instituteDashboard.getStarted}>
         <CardTitle className="mb-4 text-lg">{t('getStarted')}</CardTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

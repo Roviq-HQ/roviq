@@ -294,6 +294,8 @@ export const testIds = {
     attendanceKpiCard: 'dashboard-attendance-kpi-card',
     attendanceKpiLink: 'dashboard-attendance-kpi-link',
     attendanceKpiByStatus: (status: string) => `dashboard-attendance-kpi-${status}`,
+    todayScheduleCard: 'dashboard-today-schedule-card',
+    todayScheduleLink: 'dashboard-today-schedule-link',
   },
 
   // ── Institute: students list + detail ──────────────────────────────────
@@ -333,6 +335,7 @@ export const testIds = {
     detailAuditEmpty: 'students-detail-audit-empty',
     detailAcademicsEmpty: 'students-detail-academics-empty',
     detailTitle: 'students-detail-title',
+    detailViewTimetableLink: 'students-detail-view-timetable-link',
     detailDraftDiscardBtn: 'students-detail-draft-discard-btn',
     detailDraftRestoreBtn: 'students-detail-draft-restore-btn',
     detailResetBtn: 'students-detail-reset-btn',
@@ -421,6 +424,7 @@ export const testIds = {
     // Sections
     sectionNewBtn: 'academics-section-new-btn',
     sectionsTable: 'academics-sections-table',
+    sectionViewTimetableBtn: (id: string) => `academics-section-view-timetable-${id}-btn`,
     sectionCreateCancelBtn: 'academics-section-create-cancel-btn',
     // Subjects
     subjectNewBtn: 'academics-subject-new-btn',
@@ -700,6 +704,7 @@ export const testIds = {
     newBtn: 'staff-new-btn',
     // Detail page
     detailTitle: 'staff-detail-title',
+    detailViewTimetableBtn: 'staff-detail-view-timetable-btn',
     detailTabProfile: 'staff-detail-tab-profile',
     detailTabQualifications: 'staff-detail-tab-qualifications',
     detailTabSections: 'staff-detail-tab-sections',
@@ -887,6 +892,7 @@ export const testIds = {
     sectionSelect: 'section-timetable-section-select',
     sectionGrid: 'section-timetable-grid',
     printButton: 'timetable-print-btn',
+    downloadPdfButton: 'timetable-download-pdf-btn',
 
     // ── Staff timetable view (staff-timetable/page.tsx) ──
     staffTimetablePage: 'staff-timetable-page',
@@ -902,6 +908,7 @@ export const testIds = {
     daySectionSelect: 'timetable-day-section-select',
     daySchedule: 'timetable-day-schedule',
     daySlot: (periodId: string) => `timetable-day-slot-${periodId}`,
+    dayTakeAttendanceLink: (periodId: string) => `timetable-day-take-attendance-${periodId}`,
     dayOverrideBtn: (periodId: string) => `timetable-day-override-${periodId}-btn`,
     dayClearOverrideBtn: (id: string) => `timetable-day-clear-override-${id}-btn`,
     overrideDialog: 'timetable-override-dialog',

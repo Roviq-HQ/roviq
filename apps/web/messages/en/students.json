@@ -11,7 +11,7 @@
     "cancel": "Cancel",
     "success": "Student created",
     "active": "active",
-    "loading": "Loading form\u2026",
+    "loading": "Loading form…",
     "sections": {
       "personal": "Personal details",
       "contact": "Contact",
@@ -298,7 +298,8 @@
       "admittedOn": "Admitted on",
       "dateOfBirth": "Date of birth",
       "gender": "Gender",
-      "notAssigned": "Not assigned"
+      "notAssigned": "Not assigned",
+      "viewTimetable": "View timetable"
     },
     "status": {
       "label": "Status",

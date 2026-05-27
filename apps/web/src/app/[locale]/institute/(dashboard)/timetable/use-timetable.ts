@@ -14,7 +14,7 @@
  * i18n: `name` fields come back as raw `i18nText` JSONB — resolve with
  * `useI18nField()` at the render site, never here.
  */
-import { gql, useMutation, useQuery } from '@roviq/graphql';
+import { gql, useLazyQuery, useMutation, useQuery } from '@roviq/graphql';
 import type { I18nText } from '@roviq/i18n';
 
 // ── Enum unions (mirror @roviq/common-types value arrays) ───────────────
@@ -352,6 +352,18 @@ const STAFF_TIMETABLE_QUERY = gql`
   }
 `;
 
+const SECTION_TIMETABLE_PDF_QUERY = gql`
+  query SectionTimetablePdf($sectionId: ID!, $timetableId: ID) {
+    sectionTimetablePdf(sectionId: $sectionId, timetableId: $timetableId)
+  }
+`;
+
+const STAFF_TIMETABLE_PDF_QUERY = gql`
+  query StaffTimetablePdf($teacherId: ID!, $timetableId: ID) {
+    staffTimetablePdf(teacherId: $teacherId, timetableId: $timetableId)
+  }
+`;
+
 const TIMETABLE_DAY_SCHEDULE_QUERY = gql`
   query TimetableDaySchedule($date: String!, $sectionId: ID!) {
     timetableDaySchedule(date: $date, sectionId: $sectionId) {
@@ -603,6 +615,22 @@ export function useStaffTimetable(teacherId: string | null, timetableId?: string
     { variables: { teacherId, timetableId: timetableId ?? null }, skip: !teacherId },
   );
   return { grid: data?.staffTimetable ?? null, loading, error, refetch };
+}
+
+/** On-demand fetch of a section timetable PDF (base64). Returns Apollo lazy tuple. */
+export function useSectionTimetablePdf() {
+  return useLazyQuery<
+    { sectionTimetablePdf: string },
+    { sectionId: string; timetableId?: string | null }
+  >(SECTION_TIMETABLE_PDF_QUERY);
+}
+
+/** On-demand fetch of a staff timetable PDF (base64). Returns Apollo lazy tuple. */
+export function useStaffTimetablePdf() {
+  return useLazyQuery<
+    { staffTimetablePdf: string },
+    { teacherId: string; timetableId?: string | null }
+  >(STAFF_TIMETABLE_PDF_QUERY);
 }
 
 export function useTimetableDaySchedule(date: string | null, sectionId: string | null) {

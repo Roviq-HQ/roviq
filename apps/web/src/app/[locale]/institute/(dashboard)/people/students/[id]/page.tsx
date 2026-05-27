@@ -14,6 +14,7 @@ import type { MinorityType, UpdateStudentInput } from '@roviq/graphql/generated'
 import {
   buildI18nTextSchema,
   emptyStringToUndefined,
+  Link as LocaleLink,
   useFormatDate,
   useI18nField,
   zodValidator,
@@ -86,6 +87,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarCheck,
+  CalendarClock,
   Check,
   CheckCircle2,
   ChevronsUpDown,
@@ -476,6 +478,25 @@ function StudentSidebar({ student }: { student: StudentDetailNode }) {
               {t('detail.sidebar.currentPlacement')}
             </p>
             <p className="font-medium">{placementLabel}</p>
+            {currentEnrollment?.sectionId && (
+              <Can I="read" a="Timetable">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto gap-1.5 p-0"
+                  asChild
+                  title={t('detail.sidebar.viewTimetable')}
+                >
+                  <LocaleLink
+                    href={`/institute/timetable/section-timetable?section=${currentEnrollment.sectionId}&standard=${currentEnrollment.standardId}`}
+                    data-testid={testIds.instituteStudents.detailViewTimetableLink}
+                  >
+                    <CalendarClock className="size-3.5" />
+                    {t('detail.sidebar.viewTimetable')}
+                  </LocaleLink>
+                </Button>
+              </Can>
+            )}
           </div>
 
           <div>

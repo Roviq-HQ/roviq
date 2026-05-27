@@ -4,12 +4,15 @@ import { useFormatDate } from '@roviq/i18n';
 import { Button, Can, Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { StandardSectionSelect } from '@web/components/pickers/standard-section-select';
-import { CalendarClock, Printer } from 'lucide-react';
+import { CalendarClock, Download, Loader2, Printer } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
+import { toast } from 'sonner';
 import { AcademicYearSelector, useSelectedAcademicYear } from '../../academic-years/year-selector';
 import { ReadOnlyGrid } from '../read-only-grid';
-import { useSectionTimetable } from '../use-timetable';
+import { downloadBase64Pdf } from '../timetable-shared';
+import { useSectionTimetable, useSectionTimetablePdf } from '../use-timetable';
 import { TimetableLookupsProvider } from '../use-timetable-lookups';
 
 const { instituteTimetable } = testIds;
@@ -18,8 +21,26 @@ export default function SectionTimetablePage() {
   const t = useTranslations('timetable');
   const { yearId } = useSelectedAcademicYear();
   const { format } = useFormatDate();
-  const [sectionId, setSectionId] = React.useState<string | null>(null);
+  const searchParams = useSearchParams();
+  // Deep-link support: ?section=…&standard=… (from academics / student detail).
+  const [sectionId, setSectionId] = React.useState<string | null>(() =>
+    searchParams.get('section'),
+  );
+  const initialStandardId = searchParams.get('standard');
   const { grid, loading } = useSectionTimetable(sectionId);
+  const [fetchPdf, { loading: pdfLoading }] = useSectionTimetablePdf();
+
+  const handleDownloadPdf = React.useCallback(async () => {
+    if (!sectionId) return;
+    try {
+      const { data } = await fetchPdf({ variables: { sectionId } });
+      if (data?.sectionTimetablePdf) {
+        downloadBase64Pdf(data.sectionTimetablePdf, 'section-timetable.pdf');
+      }
+    } catch {
+      toast.error(t('view.downloadFailed'));
+    }
+  }, [fetchPdf, sectionId, t]);
 
   return (
     <Can I="read" a="Timetable" passThrough>
@@ -37,15 +58,34 @@ export default function SectionTimetablePage() {
                 <div className="flex items-center gap-3">
                   <AcademicYearSelector />
                   {grid && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => window.print()}
-                      data-testid={instituteTimetable.printButton}
-                    >
-                      <Printer className="size-4" /> {t('view.print')}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={handleDownloadPdf}
+                        disabled={pdfLoading}
+                        title={t('view.downloadPdf')}
+                        data-testid={instituteTimetable.downloadPdfButton}
+                      >
+                        {pdfLoading ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Download className="size-4" />
+                        )}
+                        {t('view.downloadPdf')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => window.print()}
+                        title={t('view.print')}
+                        data-testid={instituteTimetable.printButton}
+                      >
+                        <Printer className="size-4" /> {t('view.print')}
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -55,6 +95,7 @@ export default function SectionTimetablePage() {
                   academicYearId={yearId}
                   sectionId={sectionId}
                   onSectionChange={setSectionId}
+                  initialStandardId={initialStandardId}
                   standardTestId={instituteTimetable.sectionStandardSelect}
                   sectionTestId={instituteTimetable.sectionSelect}
                 />

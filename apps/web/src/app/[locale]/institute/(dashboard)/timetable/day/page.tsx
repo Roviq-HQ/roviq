@@ -1,5 +1,6 @@
 'use client';
 
+import { Link } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -25,7 +26,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { StandardSectionSelect } from '@web/components/pickers/standard-section-select';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, ClipboardCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -55,6 +56,27 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Deep-link to the attendance page pre-filled for this period. The attendance
+ * `period` is an integer; generated timetable periods are labelled "1".."N", so
+ * a numeric label maps straight through. Non-numeric labels (extra/named blocks)
+ * fall back to daily (no period param).
+ */
+function attendanceHref(
+  date: string,
+  standardId: string | null,
+  sectionId: string,
+  periodLabel: string,
+): string {
+  const params = new URLSearchParams({ date, section: sectionId });
+  if (standardId) params.set('standard', standardId);
+  const periodNum = Number.parseInt(periodLabel, 10);
+  if (String(periodNum) === periodLabel.trim() && periodNum > 0) {
+    params.set('period', String(periodNum));
+  }
+  return `/institute/attendance?${params.toString()}`;
+}
+
 export default function DaySchedulePage() {
   const t = useTranslations('timetable');
   const { yearId } = useSelectedAcademicYear();
@@ -80,6 +102,7 @@ function DayScheduleInner({ academicYearId }: { academicYearId: string | null })
   const t = useTranslations('timetable');
   const lookups = useTimetableLookups();
   const [date, setDate] = React.useState<string>(todayIso());
+  const [standardId, setStandardId] = React.useState<string | null>(null);
   const [sectionId, setSectionId] = React.useState<string | null>(null);
 
   const { schedule, loading } = useTimetableDaySchedule(date, sectionId);
@@ -115,6 +138,7 @@ function DayScheduleInner({ academicYearId }: { academicYearId: string | null })
           academicYearId={academicYearId}
           sectionId={sectionId}
           onSectionChange={setSectionId}
+          onStandardChange={setStandardId}
           standardTestId={instituteTimetable.dayStandardSelect}
           sectionTestId={instituteTimetable.daySectionSelect}
         />
@@ -170,17 +194,37 @@ function DayScheduleInner({ academicYearId }: { academicYearId: string | null })
                   {slot.room && <span className="text-muted-foreground"> · {slot.room}</span>}
                 </div>
               </div>
-              <Can I="update" a="Timetable">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!timetableId}
-                  onClick={() => setOverrideSlot(slot)}
-                  data-testid={instituteTimetable.dayOverrideBtn(slot.periodId)}
-                >
-                  {t('day.override')}
-                </Button>
-              </Can>
+              <div className="flex items-center gap-2">
+                {slot.kind !== 'BREAK' && sectionId && (
+                  <Can I="create" a="Attendance">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5"
+                      asChild
+                      data-testid={instituteTimetable.dayTakeAttendanceLink(slot.periodId)}
+                    >
+                      <Link
+                        href={attendanceHref(date, standardId, sectionId, slot.label)}
+                        title={t('day.takeAttendance')}
+                      >
+                        <ClipboardCheck className="size-4" /> {t('day.takeAttendance')}
+                      </Link>
+                    </Button>
+                  </Can>
+                )}
+                <Can I="update" a="Timetable">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!timetableId}
+                    onClick={() => setOverrideSlot(slot)}
+                    data-testid={instituteTimetable.dayOverrideBtn(slot.periodId)}
+                  >
+                    {t('day.override')}
+                  </Button>
+                </Can>
+              </div>
             </div>
           ))}
         </div>
