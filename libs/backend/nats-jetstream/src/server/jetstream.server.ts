@@ -16,6 +16,7 @@ import { Logger } from '@nestjs/common';
 import { ServerNats } from '@nestjs/microservices';
 import { AuthScope } from '@roviq/common-types';
 import { type RequestContext, requestContext } from '@roviq/request-context';
+import { RESILIENT_NATS_OPTIONS } from '../connection-options';
 import { JetStreamContext, type JetStreamMeta } from '../context/jetstream.context';
 import { publishToDlq } from '../dlq/dlq.handler';
 import type {
@@ -80,6 +81,7 @@ export class JetStreamServer extends ServerNats {
   override createNatsClient(): Promise<NatsConnection> {
     return connect({
       servers: this.jsOptions.servers,
+      ...RESILIENT_NATS_OPTIONS,
     });
   }
 

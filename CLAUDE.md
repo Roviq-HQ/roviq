@@ -107,6 +107,13 @@ apps/web/src/app/[locale]/
 middleware.ts        — hostname → scope rewrite (admin.* → /admin/, default → /institute/)
 ```
 
+### Common UI components
+
+App-wide reusable components live in `apps/web/src/components/` (import via the `@web/components/*` alias) — prefer these over re-building per feature. Data-coupled ones fetch via `@roviq/graphql` (inline `gql`/`useQuery`) or reuse existing feature hooks through the `@web/*` alias; they must NOT live in `@roviq/ui` (a lib cannot import app code). **Add one concise line here per new common component.**
+
+- `pickers/SectionPicker` — multi-select of class sections grouped by department → standard, with per-class / per-department / global "select all" and a live count.
+- `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
+
 ## Workflow
 
 ### Runtime Verification

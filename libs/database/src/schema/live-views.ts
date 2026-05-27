@@ -30,6 +30,11 @@ import { sections } from './tenant/sections';
 import { standardSubjects } from './tenant/standard-subjects';
 import { standards } from './tenant/standards';
 import { subjects } from './tenant/subjects';
+import { timetableDayOverrides } from './tenant/timetable/timetable-day-overrides';
+import { timetableEntries } from './tenant/timetable/timetable-entries';
+import { timetablePeriods } from './tenant/timetable/timetable-periods';
+import { timetableSections } from './tenant/timetable/timetable-sections';
+import { timetables } from './tenant/timetable/timetables';
 import { botProfiles } from './user-profiles/bot-profiles';
 import { guardianProfiles } from './user-profiles/guardian-profiles';
 import { staffProfiles } from './user-profiles/staff-profiles';
@@ -111,6 +116,23 @@ export const standardSubjectsLive = liveView('standard_subjects_live').as((qb) =
 );
 export const subjectsLive = liveView('subjects_live').as((qb) =>
   qb.select().from(subjects).where(isNull(subjects.deletedAt)),
+);
+
+// Timetable domain.
+export const timetablesLive = liveView('timetables_live').as((qb) =>
+  qb.select().from(timetables).where(isNull(timetables.deletedAt)),
+);
+export const timetableSectionsLive = liveView('timetable_sections_live').as((qb) =>
+  qb.select().from(timetableSections).where(isNull(timetableSections.deletedAt)),
+);
+export const timetablePeriodsLive = liveView('timetable_periods_live').as((qb) =>
+  qb.select().from(timetablePeriods).where(isNull(timetablePeriods.deletedAt)),
+);
+export const timetableEntriesLive = liveView('timetable_entries_live').as((qb) =>
+  qb.select().from(timetableEntries).where(isNull(timetableEntries.deletedAt)),
+);
+export const timetableDayOverridesLive = liveView('timetable_day_overrides_live').as((qb) =>
+  qb.select().from(timetableDayOverrides).where(isNull(timetableDayOverrides.deletedAt)),
 );
 
 // Admission domain.

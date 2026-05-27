@@ -34,6 +34,7 @@ import enSessions from '../../messages/en/sessions.json';
 import enSettings from '../../messages/en/settings.json';
 import enStaff from '../../messages/en/staff.json';
 import enStudents from '../../messages/en/students.json';
+import enTimetable from '../../messages/en/timetable.json';
 import hiAcademics from '../../messages/hi/academics.json';
 import hiAcademicYears from '../../messages/hi/academicYears.json';
 import hiAccount from '../../messages/hi/account.json';
@@ -69,6 +70,7 @@ import hiSessions from '../../messages/hi/sessions.json';
 import hiSettings from '../../messages/hi/settings.json';
 import hiStaff from '../../messages/hi/staff.json';
 import hiStudents from '../../messages/hi/students.json';
+import hiTimetable from '../../messages/hi/timetable.json';
 
 const en = {
   academicYears: enAcademicYears,
@@ -106,6 +108,7 @@ const en = {
   settings: enSettings,
   staff: enStaff,
   students: enStudents,
+  timetable: enTimetable,
 } as const;
 
 const hi = {
@@ -144,6 +147,7 @@ const hi = {
   settings: hiSettings,
   staff: hiStaff,
   students: hiStudents,
+  timetable: hiTimetable,
 } as const;
 
 const MESSAGES: Record<Locale, Record<string, unknown>> = { en, hi };

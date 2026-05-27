@@ -34,6 +34,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
+import { TenantThemeProvider } from './tenant-theme-provider';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
@@ -318,6 +319,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           { title: t('academicYears'), href: '/academic-years', icon: CalendarRange },
           { title: t('standards'), href: '/academics', icon: GraduationCap },
           { title: t('timetable'), href: '/timetable', icon: Calendar },
+          {
+            title: t('sectionTimetable'),
+            href: '/timetable/section-timetable',
+            icon: CalendarRange,
+          },
+          { title: t('staffTimetable'), href: '/timetable/staff-timetable', icon: CalendarRange },
+          { title: t('dayTimetable'), href: '/timetable/day', icon: CalendarDays },
           { title: t('attendance'), href: '/attendance', icon: ClipboardCheck },
           { title: t('attendanceHistory'), href: '/attendance/history', icon: History },
           { title: t('leave'), href: '/leave', icon: CalendarOff },
@@ -396,7 +404,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        <AdminLayout config={config}>{children}</AdminLayout>
+        <TenantThemeProvider>
+          <AdminLayout config={config}>{children}</AdminLayout>
+        </TenantThemeProvider>
       </AbilityProvider>
     </ProtectedRoute>
   );

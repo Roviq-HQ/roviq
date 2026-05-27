@@ -75,6 +75,24 @@ export const ErrorCode = {
   // ── Student ────────────────────────────────────────────
   /** Cannot mark a student TRANSFERRED_OUT before issuing a Transfer Certificate */
   TC_REQUIRED_FOR_TRANSFER: 'TC_REQUIRED_FOR_TRANSFER',
+
+  // ── Timetable ──────────────────────────────────────────
+  /** Timetable not found or soft-deleted */
+  TIMETABLE_NOT_FOUND: 'TIMETABLE_NOT_FOUND',
+  /** A timetable with this name already exists in the same academic year */
+  TIMETABLE_NAME_DUPLICATE: 'TIMETABLE_NAME_DUPLICATE',
+  /** Generation/period config is invalid (bad period count, lunch position, duration) */
+  TIMETABLE_INVALID_CONFIG: 'TIMETABLE_INVALID_CONFIG',
+  /** Another timetable is already ACTIVE for this institute + academic year */
+  TIMETABLE_ALREADY_ACTIVE: 'TIMETABLE_ALREADY_ACTIVE',
+  /** The teacher is already assigned to another section in the same period + weekday */
+  TIMETABLE_TEACHER_CONFLICT: 'TIMETABLE_TEACHER_CONFLICT',
+  /** The room is already in use by another section in the same period + weekday */
+  TIMETABLE_ROOM_CONFLICT: 'TIMETABLE_ROOM_CONFLICT',
+  /** Cannot assign a subject/teacher to a BREAK period */
+  TIMETABLE_PERIOD_NOT_ASSIGNABLE: 'TIMETABLE_PERIOD_NOT_ASSIGNABLE',
+  /** The section is not covered by this timetable */
+  TIMETABLE_SECTION_NOT_COVERED: 'TIMETABLE_SECTION_NOT_COVERED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -120,4 +138,12 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   STREAM_REQUIRED: HttpStatus.BAD_REQUEST,
   SECTION_CAPACITY_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   SUBJECT_CODE_DUPLICATE: HttpStatus.CONFLICT,
+  TIMETABLE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TIMETABLE_NAME_DUPLICATE: HttpStatus.CONFLICT,
+  TIMETABLE_INVALID_CONFIG: HttpStatus.BAD_REQUEST,
+  TIMETABLE_ALREADY_ACTIVE: HttpStatus.CONFLICT,
+  TIMETABLE_TEACHER_CONFLICT: HttpStatus.CONFLICT,
+  TIMETABLE_ROOM_CONFLICT: HttpStatus.CONFLICT,
+  TIMETABLE_PERIOD_NOT_ASSIGNABLE: HttpStatus.UNPROCESSABLE_ENTITY,
+  TIMETABLE_SECTION_NOT_COVERED: HttpStatus.UNPROCESSABLE_ENTITY,
 };

@@ -6,3 +6,4 @@ export * from './leave';
 export * from './student-academic';
 export * from './subscription';
 export * from './tc';
+export * from './timetable';

@@ -173,6 +173,13 @@ export const STREAMS: Record<string, StreamConfig> = {
     storage: 'file',
     maxDeliver: 3,
   },
+  TIMETABLE: {
+    name: 'TIMETABLE',
+    subjects: ['TIMETABLE.>'],
+    retention: 'workqueue',
+    storage: 'file',
+    maxDeliver: 3,
+  },
   EXPORT: {
     name: 'EXPORT',
     subjects: ['EXPORT.>'],

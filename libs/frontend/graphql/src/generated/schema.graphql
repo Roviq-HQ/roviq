@@ -117,6 +117,23 @@ enum AcademicYearStatus {
   PLANNING
 }
 
+"""Append a period, break, or extra slot to a timetable."""
+input AddTimetablePeriodInput {
+  """Defaults to the timetable period duration."""
+  durationMins: Int
+
+  """PERIOD, BREAK, or EXTRA."""
+  kind: String!
+
+  """Custom label (defaults sensibly per kind)."""
+  label: String
+  session: String
+
+  """Defaults to the end of the last main period."""
+  startTime: String
+  timetableId: ID!
+}
+
 """
 Per-institute attendance totals for a single date, aggregated across every attendance session in the tenant.
 """
@@ -486,6 +503,33 @@ input AssignPlanInput {
 type AssignPlanResult {
   checkoutUrl: String
   subscription: SubscriptionModel!
+}
+
+"""
+One parallel group within a cell (class-split). Whole class = single split, index 0.
+"""
+input AssignSplitInput {
+  room: String
+  splitIndex: Int!
+
+  """Group label, e.g. "Group A"."""
+  splitLabel: String
+  subjectId: ID
+
+  """Membership id of the teacher."""
+  teacherId: ID
+}
+
+"""Assign subject/teacher/room to a period cell for one or more weekdays."""
+input AssignTimetableEntryInput {
+  """Weekdays to apply these splits to."""
+  days: [String!]!
+  periodId: ID!
+  sectionId: ID!
+
+  """Parallel groups (one for a whole-class assignment)."""
+  splits: [AssignSplitInput!]!
+  timetableId: ID!
 }
 
 """A single student's attendance mark within a session."""
@@ -859,6 +903,15 @@ enum CertificateStatus {
 input ChangePlanInput {
   newPlanId: ID!
   subscriptionId: ID!
+}
+
+"""Clear one assignment cell."""
+input ClearTimetableEntryInput {
+  dayOfWeek: String!
+  periodId: ID!
+  sectionId: ID!
+  splitIndex: Int = 0
+  timetableId: ID!
 }
 
 """Department clearance record for TC workflow"""
@@ -1573,6 +1626,63 @@ input CreateSubjectInput {
 }
 
 """
+Create a per-date override (substitution, cancellation, room/subject change, extra).
+"""
+input CreateTimetableDayOverrideInput {
+  """The date this override applies to (YYYY-MM-DD)."""
+  date: String!
+
+  """SUBSTITUTION, CANCELLATION, ROOM_CHANGE, SUBJECT_CHANGE, EXTRA."""
+  overrideType: String!
+  periodId: ID!
+  reason: String
+  room: String
+  sectionId: ID!
+  splitIndex: Int = 0
+  subjectId: ID
+
+  """Substitute teacher membership id."""
+  teacherId: ID
+  timetableId: ID!
+}
+
+"""Create a timetable and auto-generate its period grid."""
+input CreateTimetableInput {
+  academicYearId: ID!
+
+  """Start time of the first regular period (HH:mm)."""
+  dayStartTime: String!
+
+  """Default minutes per regular period."""
+  defaultPeriodDurationMins: Int!
+  description: String
+
+  """First date in effect (YYYY-MM-DD)."""
+  effectiveFrom: String!
+
+  """Last date in effect (YYYY-MM-DD)."""
+  effectiveTo: String!
+
+  """Morning/evening extra periods (can be empty)."""
+  extraClass: [ExtraClassSlotInput!]!
+
+  """Lunch/recess breaks (can be empty)."""
+  lunch: [LunchSlotInput!]!
+
+  """Localised name, e.g. { en: "Summer 2026" }."""
+  name: I18nText!
+
+  """How many regular periods per day."""
+  periodsCount: Int!
+
+  """Sections this timetable covers."""
+  sectionIds: [ID!]!
+
+  """Days the timetable runs (subset of Mon–Sun)."""
+  workingDays: [String!]!
+}
+
+"""
 A local date string (i.e., with no associated timezone) in `YYYY-MM-DD` format, e.g. `2020-01-01`.
 """
 scalar DateOnly
@@ -1591,9 +1701,119 @@ A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `dat
 """
 scalar DateTime
 
+"""The resolved schedule for one section on one date."""
+type DayScheduleModel {
+  date: String!
+  dayOfWeek: Weekday!
+  sectionId: ID!
+  slots: [DayScheduleSlotModel!]!
+  timetableId: ID
+}
+
+"""
+One resolved cell for a specific date (master entry with overrides applied).
+"""
+type DayScheduleSlotModel {
+  endTime: String!
+
+  """True when a day override changed this cell."""
+  isOverride: Boolean!
+  kind: PeriodKind!
+  label: String!
+  overrideType: TimetableOverrideType
+  periodId: ID!
+  room: String
+  sectionId: ID!
+  splitIndex: Int!
+  splitLabel: String
+  startTime: String!
+  subjectId: ID
+  teacherId: ID
+}
+
+"""
+Where the period sits in the day: MORNING (extra), MAIN, or EVENING (extra).
+"""
+enum DaySession {
+  EVENING
+  MAIN
+  MORNING
+}
+
 type DepartmentCount {
   count: Int!
   department: String!
+}
+
+type DlqMessageConnection {
+  edges: [DlqMessageEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type DlqMessageEdge {
+  cursor: String!
+  node: DlqMessageModel!
+}
+
+"""Filters + cursor pagination for the DLQ message list"""
+input DlqMessageFilterInput {
+  """Opaque cursor from a previous page"""
+  after: String
+
+  """Page size (max 100, default 25)"""
+  first: Int
+
+  """Filter by origin stream prefix"""
+  originStream: String
+
+  """Filter by lifecycle status"""
+  status: DlqStatus
+
+  """Filter by tenant id"""
+  tenantId: ID
+}
+
+"""Platform-admin view of a dead-lettered NATS message"""
+type DlqMessageModel {
+  """Correlation id carried from the original message"""
+  correlationId: String!
+
+  """Error message that triggered the dead-letter"""
+  error: String!
+
+  """When the message was dead-lettered"""
+  failedAt: DateTime!
+  id: ID!
+
+  """First subject segment (e.g. 'NOTIFICATION') — filter facet"""
+  originStream: String!
+
+  """Original NATS subject the message failed on"""
+  originalSubject: String!
+
+  """Original message payload (JSONB)"""
+  payload: JSON
+
+  """Number of times this message has been replayed"""
+  replayCount: Int!
+
+  """When the message was last replayed"""
+  replayedAt: DateTime
+
+  """Delivery attempts before dead-lettering"""
+  retryCount: Int!
+  status: DlqStatus!
+
+  """Tenant the message belonged to; null if cross-tenant"""
+  tenantId: ID
+}
+
+"""Lifecycle state of a dead-lettered NATS message"""
+enum DlqStatus {
+  DISCARDED
+  PENDING
+  REPLAYED
 }
 
 enum DomainGroupType {
@@ -1776,6 +1996,21 @@ type ExportReportModel {
 type ExportStartResult {
   """Temporal workflow ID for progress tracking"""
   workflowId: String!
+}
+
+"""A block of morning (prepended) or evening (appended) extra periods."""
+input ExtraClassSlotInput {
+  """How many extra periods in this block."""
+  count: Int!
+
+  """Minutes per extra period."""
+  durationMins: Int!
+
+  """MORNING (prepended) or EVENING (appended)."""
+  session: String!
+
+  """When this block of extra periods starts (HH:mm)."""
+  startTime: String!
 }
 
 type FunnelStage {
@@ -2725,6 +2960,18 @@ input ListTCFilterInput {
   studentProfileId: ID
 }
 
+"""A lunch/recess break inserted after a given regular period."""
+input LunchSlotInput {
+  """Insert the break after this 1-based regular period."""
+  afterPeriod: Int!
+
+  """Break duration in minutes."""
+  durationMins: Int!
+
+  """Break display name, e.g. "Lunch"."""
+  name: String!
+}
+
 input ManualPaymentInput {
   amountPaise: BigInt!
   collectedById: String
@@ -2804,8 +3051,13 @@ type Mutation {
   activateAcademicYear(id: ID!): AcademicYearModel!
   activateInstitute(id: ID!): InstituteModel!
   activateInstituteGroup(id: ID!): InstituteGroupModel!
+
+  """Publish a timetable (DRAFT/INACTIVE → ACTIVE)."""
+  activateTimetable(id: ID!): TimetableModel!
   addGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
   addInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
+  addTimetablePeriod(input: AddTimetablePeriodInput!): TimetablePeriodModel!
+  addTimetableSection(sectionId: ID!, timetableId: ID!): TimetableSectionModel!
 
   """
   Activate institute (PENDING/INACTIVE/SUSPENDED → ACTIVE). Requires setup_status COMPLETED.
@@ -2878,6 +3130,9 @@ type Mutation {
   """
   archivePlan(id: ID!): SubscriptionPlanModel!
 
+  """Permanently retire a timetable (→ ARCHIVED)."""
+  archiveTimetable(id: ID!): TimetableModel!
+
   """Set the class teacher for a section. Returns the updated section."""
   assignClassTeacher(classTeacherId: ID!, sectionId: ID!): SectionModel!
   assignPlanToInstitute(input: AssignPlanInput!): AssignPlanResult!
@@ -2891,6 +3146,11 @@ type Mutation {
   Link the subject to a standard (idempotent). Returns the subject for cache-update parity.
   """
   assignSubjectToStandard(standardId: ID!, subjectId: ID!): SubjectModel!
+
+  """
+  Assign subject/teacher/room to a cell for one or more weekdays (supports class-split).
+  """
+  assignTimetableEntry(input: AssignTimetableEntryInput!): [TimetableEntryModel!]!
 
   """Start bulk student import from CSV"""
   bulkCreateStudents(input: BulkCreateStudentsInput!): BulkImportStartResult!
@@ -2909,6 +3169,8 @@ type Mutation {
   """
   changePassword(currentPassword: String!, newPassword: String!): Boolean!
   changePlan(input: ChangePlanInput!): SubscriptionModel!
+  clearTimetableDayOverride(id: ID!): Boolean!
+  clearTimetableEntry(input: ClearTimetableEntryInput!): Boolean!
 
   """Convert enquiry to a formal application"""
   convertEnquiryToApplication(academicYearId: ID!, enquiryId: ID!, standardId: ID!): ApplicationModel!
@@ -2951,8 +3213,17 @@ type Mutation {
   """Create a subject in the current institute."""
   createSubject(input: CreateSubjectInput!): SubjectModel!
   createSubscriptionPlan(input: CreatePlanInput!): SubscriptionPlanModel!
+  createTimetable(input: CreateTimetableInput!): TimetableModel!
+
+  """
+  Add a per-date override (substitution, cancellation, room/subject change, extra).
+  """
+  createTimetableDayOverride(input: CreateTimetableDayOverrideInput!): TimetableDayOverrideModel!
   deactivateInstitute(id: ID!): InstituteModel!
   deactivateInstituteGroup(id: ID!): InstituteGroupModel!
+
+  """Retire the active timetable (ACTIVE → INACTIVE)."""
+  deactivateTimetable(id: ID!): TimetableModel!
   deleteAcademicYear(id: ID!): Boolean!
   deleteAttendanceSession(id: ID!): Boolean!
   deleteBot(id: ID!): Boolean!
@@ -2990,6 +3261,12 @@ type Mutation {
 
   """Soft-delete a subject. Returns true on success."""
   deleteSubject(id: ID!): Boolean!
+
+  """Soft-delete timetables. Returns the count removed."""
+  deleteTimetable(ids: [ID!]!): Int!
+
+  """Discard a dead-lettered message without replaying it"""
+  discardDlqMessage(id: ID!): DlqMessageModel!
   endImpersonation(sessionId: String!): Boolean!
 
   """Enroll a student in a section with capacity check"""
@@ -3056,6 +3333,11 @@ type Mutation {
 
   """Remove the subject from a standard (idempotent). Returns the subject."""
   removeSubjectFromStandard(standardId: ID!, subjectId: ID!): SubjectModel!
+  removeTimetablePeriod(periodId: ID!, timetableId: ID!): Boolean!
+  removeTimetableSection(sectionId: ID!, timetableId: ID!): Boolean!
+
+  """Re-publish a dead-lettered message to its original subject"""
+  replayDlqMessage(id: ID!): DlqMessageModel!
 
   """Request a certificate from template — auto-populates fields"""
   requestCertificate(input: RequestCertificateInput!): CertificateModel!
@@ -3094,6 +3376,9 @@ type Mutation {
   Restore an archived plan back to active. New subscriptions can be created against it again.
   """
   restorePlan(id: ID!): SubscriptionPlanModel!
+
+  """Restore soft-deleted timetables. Returns the count restored."""
+  restoreTimetable(ids: [ID!]!): Int!
   resumeSubscription(subscriptionId: ID!): SubscriptionModel!
   revokeAllOtherSessions(currentRefreshToken: String!): Boolean!
 
@@ -3175,6 +3460,8 @@ type Mutation {
   """Update an existing subject by id."""
   updateSubject(id: ID!, input: UpdateSubjectInput!): SubjectModel!
   updateSubscriptionPlan(id: ID!, input: UpdatePlanInput!): SubscriptionPlanModel!
+  updateTimetable(id: ID!, input: UpdateTimetableInput!): TimetableModel!
+  updateTimetablePeriod(input: UpdateTimetablePeriodInput!, periodId: ID!, timetableId: ID!): TimetablePeriodModel!
 
   """
   Records an uploaded document (client uploads file bytes to object storage first, then calls this mutation with the resulting URLs).
@@ -3248,6 +3535,15 @@ type PageInfo {
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
   startCursor: String
+}
+
+"""A page of timetables."""
+type PaginatedTimetablesModel {
+  docs: [TimetableModel!]!
+  page: Int!
+  perPage: Int!
+  total: Int!
+  totalPages: Int!
 }
 
 type PasskeyAuthOptions {
@@ -3336,6 +3632,15 @@ enum PaymentStatus {
   SUCCEEDED
 }
 
+"""
+Period type: PERIOD (teaching, assignable), BREAK (lunch/recess), EXTRA (zero/evening).
+"""
+enum PeriodKind {
+  BREAK
+  EXTRA
+  PERIOD
+}
+
 """Lifecycle status of a subscription plan."""
 enum PlanStatus {
   ACTIVE
@@ -3389,6 +3694,9 @@ type Query {
   """Fetch a single reseller by id with computed counts"""
   adminGetReseller(id: ID!): AdminResellerModel!
   adminInstituteStatistics: InstituteStatisticsModel!
+
+  """Platform admin: list dead-lettered NATS messages (ROV-19)"""
+  adminListDlqMessages(filter: DlqMessageFilterInput): DlqMessageConnection!
   adminListInstituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
   adminListInstitutes(filter: AdminListInstitutesFilterInput): InstituteConnection!
 
@@ -3598,11 +3906,30 @@ type Query {
   """Fetch a section by id."""
   section(id: ID!): SectionModel!
 
+  """
+  Weekly grid for a section. Defaults to the active timetable covering the section.
+  """
+  sectionTimetable(sectionId: ID!, timetableId: ID): TimetableGridModel
+
+  """Base64-encoded PDF of a section's weekly timetable."""
+  sectionTimetablePdf(sectionId: ID!, timetableId: ID): String!
+
   """List sections under a standard, ordered by `displayOrder`."""
   sections(standardId: ID!): [SectionModel!]!
 
+  """Resolved schedule for a teacher on a date."""
+  staffDaySchedule(date: String!, teacherId: ID!): [DayScheduleSlotModel!]!
+
   """Staff statistics aggregated by department"""
   staffStatistics: StaffStatistics!
+
+  """
+  Weekly grid for a teacher (membership id). Defaults to the institute's active timetable.
+  """
+  staffTimetable(teacherId: ID!, timetableId: ID): TimetableGridModel
+
+  """Base64-encoded PDF of a teacher's weekly timetable."""
+  staffTimetablePdf(teacherId: ID!, timetableId: ID): String!
   standard(id: ID!): StandardModel!
   standards(academicYearId: ID!): [StandardModel!]!
 
@@ -3620,6 +3947,15 @@ type Query {
   subscriptionPlan(id: ID!): SubscriptionPlanModel!
   subscriptionPlans(after: String, first: Int = 20, status: String): [SubscriptionPlanModel!]!
   subscriptions(after: String, first: Int = 20, status: String): [SubscriptionModel!]!
+  timetable(id: ID!): TimetableModel!
+  timetableDayOverrides(date: String!, timetableId: ID!): [TimetableDayOverrideModel!]!
+
+  """
+  Resolved schedule for a section on a date (master entries with overrides applied).
+  """
+  timetableDaySchedule(date: String!, sectionId: ID!): DayScheduleModel!
+  timetableStatistics(academicYearId: ID): TimetableStatisticsModel!
+  timetables(academicYearId: ID!, page: Int = 1, perPage: Int = 20, search: String, sectionId: ID, status: TimetableStatus): PaginatedTimetablesModel!
   unverifiedPayments(after: String, first: Int = 20): [PaymentModel!]!
 }
 
@@ -4583,6 +4919,159 @@ type TermConfigModel {
   startDate: DateOnly!
 }
 
+"""A per-date deviation from the master timetable."""
+type TimetableDayOverrideModel {
+  createdAt: DateTime!
+
+  """The date this override applies to (YYYY-MM-DD)."""
+  date: String!
+  id: ID!
+
+  """Subject originally scheduled (snapshot for audit)."""
+  originalSubjectId: ID
+
+  """Teacher originally scheduled (snapshot for audit)."""
+  originalTeacherId: ID
+  overrideType: TimetableOverrideType!
+  periodId: ID!
+  reason: String
+  room: String
+  sectionId: ID!
+  splitIndex: Int!
+  subjectId: ID
+  teacherId: ID
+  timetableId: ID!
+  updatedAt: DateTime!
+}
+
+"""
+One assignment cell: a subject/teacher/room for a section, period, weekday, split.
+"""
+type TimetableEntryModel {
+  createdAt: DateTime!
+  dayOfWeek: Weekday!
+  id: ID!
+  notes: String
+  periodId: ID!
+  room: String
+  sectionId: ID!
+
+  """Parallel-group index (0 = whole class / first group)."""
+  splitIndex: Int!
+
+  """Class-split group label, e.g. "Group A"."""
+  splitLabel: String
+  subjectId: ID
+
+  """Membership id of the assigned teacher."""
+  teacherId: ID
+  timetableId: ID!
+  updatedAt: DateTime!
+}
+
+"""
+A weekly grid (section or staff view): the period rows, working days, and cells.
+"""
+type TimetableGridModel {
+  entries: [TimetableEntryModel!]!
+  periods: [TimetablePeriodModel!]!
+  timetableId: ID!
+  workingDays: [Weekday!]!
+}
+
+"""
+A weekly schedule template for a set of sections within an academic year.
+"""
+type TimetableModel {
+  academicYearId: ID!
+  createdAt: DateTime!
+
+  """Start time of the first regular period (HH:mm:ss)."""
+  dayStartTime: String!
+
+  """Default minutes per regular period."""
+  defaultPeriodDurationMins: Int!
+  description: String
+
+  """First date the timetable is in effect (YYYY-MM-DD)."""
+  effectiveFrom: String!
+
+  """Last date the timetable is in effect (YYYY-MM-DD)."""
+  effectiveTo: String!
+  id: ID!
+
+  """Localised timetable name, e.g. { en: "Summer 2026" }."""
+  name: I18nText!
+  periods: [TimetablePeriodModel!]!
+  sections: [TimetableSectionModel!]!
+  status: TimetableStatus!
+  updatedAt: DateTime!
+
+  """Days the timetable runs (subset of Mon–Sun)."""
+  workingDays: [Weekday!]!
+}
+
+"""
+Per-date deviation: SUBSTITUTION, CANCELLATION, ROOM_CHANGE, SUBJECT_CHANGE, EXTRA.
+"""
+enum TimetableOverrideType {
+  CANCELLATION
+  EXTRA
+  ROOM_CHANGE
+  SUBJECT_CHANGE
+  SUBSTITUTION
+}
+
+"""One row in the timetable time grid (period, break, or extra)."""
+type TimetablePeriodModel {
+  createdAt: DateTime!
+
+  """Period end (HH:mm:ss)."""
+  endTime: String!
+  id: ID!
+  kind: PeriodKind!
+
+  """Display label: "1","2",…, the break name, or "Morning Extra 1"."""
+  label: String!
+
+  """Ordering within the day (lower = earlier)."""
+  sequence: Int!
+  session: DaySession!
+
+  """Period start (HH:mm:ss)."""
+  startTime: String!
+  timetableId: ID!
+  updatedAt: DateTime!
+}
+
+"""A class section covered by a timetable."""
+type TimetableSectionModel {
+  createdAt: DateTime!
+  id: ID!
+  sectionId: ID!
+  timetableId: ID!
+  updatedAt: DateTime!
+}
+
+"""Counts of timetables by status for the dashboard."""
+type TimetableStatisticsModel {
+  active: Int!
+  archived: Int!
+  draft: Int!
+  inactive: Int!
+  total: Int!
+}
+
+"""
+Lifecycle of a timetable: DRAFT → ACTIVE → INACTIVE/ARCHIVED. One ACTIVE per year.
+"""
+enum TimetableStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+  INACTIVE
+}
+
 """
 Input for unlinking a guardian from a student. If the unlinked guardian is the current primary contact, `newPrimaryGuardianId` MUST be provided — the service enforces that every student has exactly one primary.
 """
@@ -5180,6 +5669,26 @@ input UpdateSubjectInput {
   type: SubjectType
 }
 
+"""Update a timetable's metadata (not its grid or assignments)."""
+input UpdateTimetableInput {
+  description: String
+
+  """First date in effect (YYYY-MM-DD)."""
+  effectiveFrom: String
+
+  """Last date in effect (YYYY-MM-DD)."""
+  effectiveTo: String
+  name: I18nText
+  workingDays: [String!]
+}
+
+"""Adjust a period's label or times."""
+input UpdateTimetablePeriodInput {
+  endTime: String
+  label: String
+  startTime: String
+}
+
 """
 Input for uploading document metadata (with pre-uploaded MinIO/S3 URLs) against a student profile.
 """
@@ -5289,6 +5798,17 @@ input VerifyPaymentGqlInput {
   gatewayOrderId: String!
   gatewayPaymentId: String!
   signature: String!
+}
+
+"""Day of the week a period runs (Sunday supported via workingDays)."""
+enum Weekday {
+  FRIDAY
+  MONDAY
+  SATURDAY
+  SUNDAY
+  THURSDAY
+  TUESDAY
+  WEDNESDAY
 }
 
 """

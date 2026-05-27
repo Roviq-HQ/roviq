@@ -169,6 +169,38 @@ export const testIds = {
     table: 'audit-logs-table',
   },
 
+  // ── Admin: observability → dead-letter queue (ROV-19) ─────────────────
+  dlq: {
+    tab: 'observability-tab-dlq',
+    content: 'observability-tab-content-dlq',
+    table: 'dlq-table',
+    row: (id: string) => `dlq-row-${id}`,
+    statusBadge: (id: string) => `dlq-status-badge-${id}`,
+    replayBtn: (id: string) => `dlq-replay-btn-${id}`,
+    actionsMenu: (id: string) => `dlq-actions-menu-${id}`,
+    discardAction: (id: string) => `dlq-discard-action-${id}`,
+    // Inspect sheet (payload + full error)
+    inspectBtn: (id: string) => `dlq-inspect-btn-${id}`,
+    inspectSheet: 'dlq-inspect-sheet',
+    // Filters
+    streamFilter: 'dlq-stream-filter',
+    statusFilter: 'dlq-status-filter',
+    clearFilters: 'dlq-clear-filters',
+    // Confirm dialogs
+    replayDialog: 'dlq-replay-dialog',
+    replayConfirmBtn: 'dlq-replay-confirm-btn',
+    replayCancelBtn: 'dlq-replay-cancel-btn',
+    discardDialog: 'dlq-discard-dialog',
+    discardConfirmBtn: 'dlq-discard-confirm-btn',
+    discardCancelBtn: 'dlq-discard-cancel-btn',
+    // States
+    empty: 'dlq-empty',
+    emptyFiltered: 'dlq-empty-filtered',
+    loading: 'dlq-loading',
+    error: 'dlq-error',
+    errorRetryBtn: 'dlq-error-retry-btn',
+  },
+
   // ── Admin: attendance ─────────────────────────────────────────────────
   adminAttendance: {
     page: 'admin-attendance-page',
@@ -294,6 +326,8 @@ export const testIds = {
     attendanceKpiCard: 'dashboard-attendance-kpi-card',
     attendanceKpiLink: 'dashboard-attendance-kpi-link',
     attendanceKpiByStatus: (status: string) => `dashboard-attendance-kpi-${status}`,
+    todayScheduleCard: 'dashboard-today-schedule-card',
+    todayScheduleLink: 'dashboard-today-schedule-link',
   },
 
   // ── Institute: students list + detail ──────────────────────────────────
@@ -333,6 +367,7 @@ export const testIds = {
     detailAuditEmpty: 'students-detail-audit-empty',
     detailAcademicsEmpty: 'students-detail-academics-empty',
     detailTitle: 'students-detail-title',
+    detailViewTimetableLink: 'students-detail-view-timetable-link',
     detailDraftDiscardBtn: 'students-detail-draft-discard-btn',
     detailDraftRestoreBtn: 'students-detail-draft-restore-btn',
     detailResetBtn: 'students-detail-reset-btn',
@@ -421,6 +456,7 @@ export const testIds = {
     // Sections
     sectionNewBtn: 'academics-section-new-btn',
     sectionsTable: 'academics-sections-table',
+    sectionViewTimetableBtn: (id: string) => `academics-section-view-timetable-${id}-btn`,
     sectionCreateCancelBtn: 'academics-section-create-cancel-btn',
     // Subjects
     subjectNewBtn: 'academics-subject-new-btn',
@@ -700,6 +736,7 @@ export const testIds = {
     newBtn: 'staff-new-btn',
     // Detail page
     detailTitle: 'staff-detail-title',
+    detailViewTimetableBtn: 'staff-detail-view-timetable-btn',
     detailTabProfile: 'staff-detail-tab-profile',
     detailTabQualifications: 'staff-detail-tab-qualifications',
     detailTabSections: 'staff-detail-tab-sections',
@@ -783,6 +820,138 @@ export const testIds = {
     addressLatError: 'settings-address-lat-error',
     addressLngInput: 'settings-address-lng-input',
     addressLngError: 'settings-address-lng-error',
+  },
+
+  // ── Institute: timetable ───────────────────────────────────────────────
+  instituteTimetable: {
+    // List page (page.tsx)
+    page: 'timetable-page',
+    title: 'timetable-title',
+    table: 'timetable-table',
+    searchInput: 'timetable-search-input',
+    statusFilter: 'timetable-status-filter',
+    pageSizeSelect: 'timetable-page-size-select',
+    prevPageBtn: 'timetable-prev-page-btn',
+    nextPageBtn: 'timetable-next-page-btn',
+    createButton: 'timetable-create-btn',
+    emptyCreateButton: 'timetable-empty-create-btn',
+    emptyState: 'timetable-empty-state',
+    accessDenied: 'timetable-access-denied',
+    // Statistics cards
+    statCard: (key: 'total' | 'draft' | 'active' | 'inactive' | 'archived') =>
+      `timetable-stat-${key}`,
+    // Row + row-level actions
+    row: (id: string) => `timetable-row-${id}`,
+    rowLink: (id: string) => `timetable-row-${id}-link`,
+    statusToggle: (id: string) => `timetable-status-toggle-${id}`,
+    editBtn: (id: string) => `timetable-edit-btn-${id}`,
+    deleteBtn: (id: string) => `timetable-delete-btn-${id}`,
+    restoreBtn: (id: string) => `timetable-restore-btn-${id}`,
+    // Create / edit wizard (Sheet)
+    wizard: 'timetable-wizard',
+    wizardNameInput: 'timetable-wizard-name-input',
+    wizardDescriptionInput: 'timetable-wizard-description-input',
+    wizardYearSelect: 'timetable-wizard-year-select',
+    wizardSection: (id: string) => `timetable-wizard-section-${id}`,
+    sectionPicker: 'timetable-section-picker',
+    sectionPickerSelectAll: 'timetable-section-picker-select-all',
+    sectionPickerToggleDept: (deptKey: string) => `timetable-section-picker-dept-${deptKey}`,
+    sectionPickerToggleAll: (standardId: string) =>
+      `timetable-section-picker-toggle-all-${standardId}`,
+    wizardEffectiveFromInput: 'timetable-wizard-effective-from-input',
+    wizardEffectiveToInput: 'timetable-wizard-effective-to-input',
+    wizardDayStartInput: 'timetable-wizard-day-start-input',
+    wizardPeriodDurationInput: 'timetable-wizard-period-duration-input',
+    wizardPeriodsCountInput: 'timetable-wizard-periods-count-input',
+    wizardWorkingDay: (day: string) => `timetable-wizard-working-day-${day}`,
+    wizardAddLunchBtn: 'timetable-wizard-add-lunch-btn',
+    wizardLunchNameInput: (i: number) => `timetable-wizard-lunch-${i}-name-input`,
+    wizardLunchAfterInput: (i: number) => `timetable-wizard-lunch-${i}-after-input`,
+    wizardLunchDurationInput: (i: number) => `timetable-wizard-lunch-${i}-duration-input`,
+    wizardRemoveLunchBtn: (i: number) => `timetable-wizard-remove-lunch-${i}-btn`,
+    wizardAddExtraBtn: 'timetable-wizard-add-extra-btn',
+    wizardExtraSessionSelect: (i: number) => `timetable-wizard-extra-${i}-session-select`,
+    wizardExtraStartInput: (i: number) => `timetable-wizard-extra-${i}-start-input`,
+    wizardExtraDurationInput: (i: number) => `timetable-wizard-extra-${i}-duration-input`,
+    wizardExtraCountInput: (i: number) => `timetable-wizard-extra-${i}-count-input`,
+    wizardRemoveExtraBtn: (i: number) => `timetable-wizard-remove-extra-${i}-btn`,
+    wizardCancelBtn: 'timetable-wizard-cancel-btn',
+    wizardSubmitBtn: 'timetable-wizard-submit-btn',
+    // Delete dialog
+    deleteDialog: 'timetable-delete-dialog',
+    deleteCancelBtn: 'timetable-delete-cancel-btn',
+    deleteConfirmBtn: 'timetable-delete-confirm-btn',
+
+    // ── Grid editor ([timetableId]/page.tsx) ──
+    editorPage: 'timetable-editor-page',
+    editorTitle: 'timetable-editor-title',
+    editorBackLink: 'timetable-editor-back-link',
+    sectionTab: (id: string) => `timetable-section-tab-${id}`,
+    grid: 'timetable-grid',
+    gridCell: (periodId: string, day: string) => `timetable-cell-${periodId}-${day}`,
+    activateBtn: 'timetable-activate-btn',
+    deactivateBtn: 'timetable-deactivate-btn',
+    archiveBtn: 'timetable-archive-btn',
+    // Period management
+    addPeriodBtn: 'timetable-add-period-btn',
+    addBreakBtn: 'timetable-add-break-btn',
+    addExtraBtn: 'timetable-add-extra-btn',
+    periodDialog: 'timetable-period-dialog',
+    periodKindSelect: 'timetable-period-kind-select',
+    periodLabelInput: 'timetable-period-label-input',
+    periodDurationInput: 'timetable-period-duration-input',
+    periodStartInput: 'timetable-period-start-input',
+    periodSessionSelect: 'timetable-period-session-select',
+    periodCancelBtn: 'timetable-period-cancel-btn',
+    periodSubmitBtn: 'timetable-period-submit-btn',
+    removePeriodBtn: (periodId: string) => `timetable-remove-period-${periodId}-btn`,
+    // Assign dialog
+    assignDialog: 'timetable-assign-dialog',
+    assignDay: (day: string) => `timetable-assign-day-${day}`,
+    assignAddSplitBtn: 'timetable-assign-add-split-btn',
+    assignRemoveSplitBtn: (i: number) => `timetable-assign-remove-split-${i}-btn`,
+    assignSplitLabelInput: (i: number) => `timetable-assign-split-${i}-label-input`,
+    assignSubjectSelect: (i: number) => `timetable-assign-split-${i}-subject-select`,
+    assignTeacherSelect: (i: number) => `timetable-assign-split-${i}-teacher-select`,
+    assignRoomInput: (i: number) => `timetable-assign-split-${i}-room-input`,
+    assignCancelBtn: 'timetable-assign-cancel-btn',
+    assignSubmitBtn: 'timetable-assign-submit-btn',
+    assignClearBtn: 'timetable-assign-clear-btn',
+
+    // ── Section timetable view (section-timetable/page.tsx) ──
+    sectionTimetablePage: 'section-timetable-page',
+    sectionTimetableTitle: 'section-timetable-title',
+    sectionStandardSelect: 'section-timetable-standard-select',
+    sectionSelect: 'section-timetable-section-select',
+    sectionGrid: 'section-timetable-grid',
+    printButton: 'timetable-print-btn',
+    downloadPdfButton: 'timetable-download-pdf-btn',
+
+    // ── Staff timetable view (staff-timetable/page.tsx) ──
+    staffTimetablePage: 'staff-timetable-page',
+    staffTimetableTitle: 'staff-timetable-title',
+    staffTeacherSelect: 'staff-timetable-teacher-select',
+    staffGrid: 'staff-timetable-grid',
+
+    // ── Day schedule + overrides (day/page.tsx) ──
+    dayPage: 'timetable-day-page',
+    dayTitle: 'timetable-day-title',
+    dayDateInput: 'timetable-day-date-input',
+    dayStandardSelect: 'timetable-day-standard-select',
+    daySectionSelect: 'timetable-day-section-select',
+    daySchedule: 'timetable-day-schedule',
+    daySlot: (periodId: string) => `timetable-day-slot-${periodId}`,
+    dayTakeAttendanceLink: (periodId: string) => `timetable-day-take-attendance-${periodId}`,
+    dayOverrideBtn: (periodId: string) => `timetable-day-override-${periodId}-btn`,
+    dayClearOverrideBtn: (id: string) => `timetable-day-clear-override-${id}-btn`,
+    overrideDialog: 'timetable-override-dialog',
+    overrideTypeSelect: 'timetable-override-type-select',
+    overrideSubjectSelect: 'timetable-override-subject-select',
+    overrideTeacherSelect: 'timetable-override-teacher-select',
+    overrideRoomInput: 'timetable-override-room-input',
+    overrideReasonInput: 'timetable-override-reason-input',
+    overrideCancelBtn: 'timetable-override-cancel-btn',
+    overrideSubmitBtn: 'timetable-override-submit-btn',
   },
 
   // ── Institute: select institute ────────────────────────────────────────

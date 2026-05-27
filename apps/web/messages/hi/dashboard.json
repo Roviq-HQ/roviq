@@ -63,5 +63,13 @@
     "late": "देर से",
     "viewDetails": "विवरण देखें",
     "noData": "आज अभी तक कोई उपस्थिति दर्ज नहीं हुई है।"
+  },
+  "timetableTitle": "समय-सारणी",
+  "timetableDescription": "साप्ताहिक कक्षा समय-सारणी बनाएँ और प्रबंधित करें।",
+  "todaySchedule": {
+    "title": "आज की कक्षाएँ",
+    "subtitle": "{count, plural, one {आज # कक्षा} other {आज # कक्षाएँ}}",
+    "unassigned": "अनिर्धारित",
+    "viewMyTimetable": "मेरी समय-सारणी देखें"
   }
 }

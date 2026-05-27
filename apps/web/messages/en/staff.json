@@ -262,7 +262,8 @@
     },
     "audit": {
       "title": "Audit history"
-    }
+    },
+    "viewTimetable": "View timetable"
   },
   "qualifications": {
     "empty": "No qualifications recorded yet"

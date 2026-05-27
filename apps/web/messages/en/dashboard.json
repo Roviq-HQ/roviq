@@ -63,5 +63,13 @@
     "late": "Late",
     "viewDetails": "View details",
     "noData": "No attendance recorded today yet."
+  },
+  "timetableTitle": "Timetable",
+  "timetableDescription": "Build and manage weekly class schedules.",
+  "todaySchedule": {
+    "title": "Today's classes",
+    "subtitle": "{count, plural, one {# class today} other {# classes today}}",
+    "unassigned": "Unassigned",
+    "viewMyTimetable": "View my timetable"
   }
 }

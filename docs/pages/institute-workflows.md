@@ -12,6 +12,7 @@ This guide is for institute administrators, teachers, clerks, and staff who use 
 4. [Academics](#academics)
    - [Academic Years](#academic-years)
    - [Standards](#standards)
+   - [Timetable](#timetable)
 5. [Admissions](#admissions)
    - [Enquiries](#enquiries)
    - [Applications](#applications)
@@ -71,11 +72,14 @@ The dashboard shows a welcome message and highlights areas that need your attent
 | **No Teachers Assigned** | No teachers have been added yet | Go to Users and add teachers |
 | **No Standards Configured** | Grade levels have not been set up | Go to Standards and create them |
 
+If you are a teacher with classes scheduled today, a **Today's classes** card shows your day's timetable (with a link to your full timetable).
+
 Below the cards you will find **Quick Links** for common tasks:
 
 - **Standards** -- set up grade levels
 - **Subjects** -- manage subjects
 - **Users** -- manage students, teachers, and staff
+- **Timetable** -- build and manage weekly class schedules
 - **Settings** -- configure your institute
 
 ---
@@ -141,6 +145,16 @@ Standards represent grade levels at your institute (for example, Class 1, Class 
    - **Subjects** assigned to this standard
 
 From here you can add or remove sections and subjects as needed.
+
+---
+
+### Timetable
+
+The **Timetable** module builds and manages weekly class schedules for your sections -- a grid of periods (with lunch breaks and optional extra classes) where each period on each working day is assigned a subject, teacher, and room. It also provides read-only section and staff views (with print / PDF download), a day schedule with one-off overrides (substitutions, cancellations), and a shortcut to take attendance for any period.
+
+Located in the sidebar under **Academic > Timetable**. Create/edit requires **Institute Admin, Principal, Vice Principal, or Academic Coordinator**; teachers, students, and parents can view timetables.
+
+**See the full step-by-step guide: [Timetable Help Guide](./timetable.md).**
 
 ---
 

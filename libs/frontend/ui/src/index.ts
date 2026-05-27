@@ -286,4 +286,13 @@ export {
 } from './form';
 export { useDebounce } from './hooks/use-debounce';
 export { useMediaQuery } from './hooks/use-media-query';
+export {
+  buildTenantThemeCss,
+  contrastForeground,
+  deriveDarkVariant,
+  formatOklch,
+  hexToOklch,
+  isValidHexColor,
+  type Oklch,
+} from './lib/tenant-theme';
 export { cn } from './lib/utils';

@@ -22,6 +22,7 @@ import { useStore } from '@tanstack/react-form';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { applyTenantTheme } from '../../tenant-theme-provider';
 import { BrandingPreview } from './components/branding-preview';
 import { type InstituteBrandingFormValues, instituteBrandingSchema } from './schemas';
 import type { MyInstituteData } from './types';
@@ -93,6 +94,16 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
   React.useEffect(() => {
     window.dispatchEvent(new CustomEvent('institute-form-dirty', { detail: { dirty: isDirty } }));
   }, [isDirty]);
+
+  // Live theme preview: paint the picked primary colour as the app accent
+  // while editing, then restore the saved colour on unmount so an abandoned
+  // edit doesn't leave the preview stuck. Reuses the layout provider's exact
+  // injection path (single source of truth).
+  const savedPrimary = branding?.primaryColor ?? null;
+  React.useEffect(() => {
+    applyTenantTheme(primaryColor);
+    return () => applyTenantTheme(savedPrimary);
+  }, [primaryColor, savedPrimary]);
 
   React.useEffect(() => {
     if (!branding) return;

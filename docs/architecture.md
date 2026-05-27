@@ -79,7 +79,7 @@ roviq/
 ### Platform vs Tenant Tables
 
 - **Platform-level (custom RLS):** `users`, `institutes`, `institute_groups`, `resellers` — have per-role policies instead of tenant-scoped policies
-- **Tenant-scoped (RLS via `tenantPolicies()`):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, `academic_years`, `standards`, `sections`, `subjects`, `institute_branding`, `institute_configs`, `institute_identifiers`, `institute_affiliations`, and all business data
+- **Tenant-scoped (RLS via `tenantPolicies()`):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, `academic_years`, `standards`, `sections`, `subjects`, `institute_branding`, `institute_configs`, `institute_identifiers`, `institute_affiliations`, `timetables`, `timetable_sections`, `timetable_periods`, `timetable_entries`, `timetable_day_overrides`, and all business data
 - Membership links User↔Institute. One user can have memberships in multiple institutes.
 
 ### Three DB Contexts
@@ -183,6 +183,10 @@ See `docs/institute-service.md` for full documentation of the institute module i
 ### Attendance, Leaves & Holidays
 
 See `docs/features/attendance.md` for the full attendance + leaves + holidays pipeline — schema, RLS, modules, GraphQL surface, events, integrations, the permissions matrix, and the same-day edit window / admin override semantics.
+
+### Timetable
+
+See `docs/features/timetable.md` for the timetable feature — the 5-table normalized model (`timetables`, `timetable_sections`, `timetable_periods`, `timetable_entries`, `timetable_day_overrides`), single-active + teacher-double-booking partial-unique backstops, the period-grid generation algorithm, named status transitions, conflict detection, and the per-date override model that replaces daily snapshots.
 
 ## Date & timezone contract
 

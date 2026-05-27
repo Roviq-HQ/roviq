@@ -1,10 +1,15 @@
 import * as coreSchema from '@roviq/database/schema';
-import { defineRelationsPart } from 'drizzle-orm';
+import { type AnyRelations, defineRelationsPart } from 'drizzle-orm';
 import * as eeSchema from './index';
 
 const schema = { ...coreSchema, ...eeSchema };
 
-export const billingRelations = defineRelationsPart(schema, (r) => ({
+// Explicit `AnyRelations` annotation: the inferred type spans every core + EE
+// table and exceeds TS's declaration-serialization limit (TS7056) once the core
+// schema grows. The precise per-table type isn't consumed anywhere (the DB
+// provider wires only the core `relations`; billing uses `db.select`), so the
+// annotation is lossless in practice and keeps `ee-database` cold-buildable.
+export const billingRelations: AnyRelations = defineRelationsPart(schema, (r) => ({
   // ── Plans ─────────────────────────────────────────────
   plans: {
     reseller: r.one.resellers({

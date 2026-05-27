@@ -4,6 +4,7 @@ import type { EmploymentType, SocialCategory as GqlSocialCategory } from '@roviq
 import {
   i18nTextOptionalSchema,
   i18nTextSchema,
+  Link as LocaleLink,
   useFormatDate,
   useI18nField,
   zodValidator,
@@ -62,6 +63,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Briefcase,
+  CalendarClock,
   CalendarDays,
   GraduationCap,
   History,
@@ -350,6 +352,23 @@ function StaffHeader({ staff, onBack }: { staff: StaffDetailNode; onBack: () => 
             ) : null}
           </div>
         </div>
+        <Can I="read" a="Timetable">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 print:hidden"
+            asChild
+            title={t('detail.viewTimetable')}
+          >
+            <LocaleLink
+              href={`/institute/timetable/staff-timetable?teacher=${staff.membershipId}`}
+              data-testid={instituteStaff.detailViewTimetableBtn}
+            >
+              <CalendarClock className="size-4" />
+              {t('detail.viewTimetable')}
+            </LocaleLink>
+          </Button>
+        </Can>
       </div>
     </div>
   );
