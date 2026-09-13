@@ -1,6 +1,6 @@
 'use client';
 
-import { useFormatDate } from '@roviq/i18n';
+import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   Button,
   Calendar,
@@ -15,9 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { CalendarIcon, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryStates } from 'nuqs';
+import { useResellerInstitutes } from '../institutes/use-reseller-institutes';
+
+const { resellerAudit } = testIds;
 
 const ACTION_TYPES = [
   'CREATE',
@@ -57,6 +61,8 @@ export function useResellerAuditLogFilters() {
 export function ResellerAuditLogFilters() {
   const t = useTranslations('auditLogs');
   const [filters, setFilters] = useQueryStates(filterParsers);
+  const resolveI18n = useI18nField();
+  const { institutes } = useResellerInstitutes();
 
   const { format: formatDate } = useFormatDate();
   const hasFilters = Object.values(filters).some(Boolean);
@@ -125,6 +131,33 @@ export function ResellerAuditLogFilters() {
         onChange={(e) => setFilters({ userId: e.target.value || null })}
         className="w-[200px]"
       />
+
+      <div className="relative">
+        <Select
+          value={filters.tenantId ?? ''}
+          onValueChange={(value) => setFilters({ tenantId: value || null })}
+        >
+          <SelectTrigger className="w-[200px]" data-testid={resellerAudit.instituteFilter}>
+            <SelectValue placeholder={t('filters.institute')} />
+          </SelectTrigger>
+          <SelectContent>
+            {institutes.map((inst) => (
+              <SelectItem key={inst.id} value={inst.id}>
+                {resolveI18n(inst.name)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {filters.tenantId && (
+          <button
+            type="button"
+            className="absolute right-7 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setFilters({ tenantId: null })}
+          >
+            <X className="size-3" />
+          </button>
+        )}
+      </div>
 
       <Popover>
         <PopoverTrigger asChild>

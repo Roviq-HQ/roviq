@@ -178,6 +178,7 @@ export const testIds = {
   // ── Reseller: audit logs page (ROV-145) ───────────────────────────────
   resellerAudit: {
     resellerContext: 'reseller-audit-context',
+    instituteFilter: 'reseller-audit-institute-filter',
   },
 
   // ── Reseller: impersonation sessions page (ROV-144) ───────────────────

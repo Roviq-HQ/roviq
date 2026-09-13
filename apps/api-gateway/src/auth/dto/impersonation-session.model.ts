@@ -34,6 +34,10 @@ export class ImpersonationSessionModel {
   @Field(() => String, { nullable: true })
   impersonatorName!: string | null;
 
+  /** Impersonator's role name, resolved from the membership table matching impersonatorScope. */
+  @Field(() => I18nTextScalar, { nullable: true })
+  impersonatorRole!: I18nContent | null;
+
   @Field()
   targetUserId!: string;
 

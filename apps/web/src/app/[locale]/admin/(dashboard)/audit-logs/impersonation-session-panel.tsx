@@ -87,6 +87,10 @@ export function ImpersonationSessionPanel({
 
               <dl className="grid grid-cols-1 gap-3 text-sm">
                 <Field label={t('session.impersonator')} value={session.impersonatorName} />
+                <Field
+                  label={t('session.impersonatorRole')}
+                  value={session.impersonatorRole ? resolveI18n(session.impersonatorRole) : '—'}
+                />
                 <Field label={t('session.targetUser')} value={session.targetUserName} />
                 <Field
                   label={t('session.institute')}

@@ -15,6 +15,7 @@ const IMPERSONATION_SESSIONS_QUERY = gql`
       impersonatorId
       impersonatorScope
       impersonatorName
+      impersonatorRole
       targetUserId
       targetUserName
       targetTenantId

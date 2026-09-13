@@ -994,5 +994,59 @@ describe('ImpersonationService', () => {
         'impersonation_sessions',
       ]);
     });
+
+    it('resolves a platform impersonator role from platform_memberships', async () => {
+      const { service } = createSubject();
+      const { tx } = createTx({
+        selects: [
+          { table: 'impersonation_sessions', rows: [baseRow({ impersonatorScope: 'platform' })] },
+          {
+            table: 'platform_memberships',
+            rows: [{ userId: 'imp-1', roleName: { en: 'Platform Admin' } }],
+          },
+        ],
+      });
+      setTx(tx);
+
+      const [session] = await service.listSessions({ limit: 50 });
+
+      expect(session.impersonatorRole).toEqual({ en: 'Platform Admin' });
+    });
+
+    it('resolves an institute impersonator role keyed by (user, target tenant)', async () => {
+      const { service } = createSubject();
+      const { tx } = createTx({
+        selects: [
+          {
+            table: 'impersonation_sessions',
+            rows: [baseRow({ impersonatorScope: 'institute', targetTenantId: 'tenant-1' })],
+          },
+          {
+            table: 'memberships_live',
+            rows: [{ userId: 'imp-1', tenantId: 'tenant-1', roleName: { en: 'Principal' } }],
+          },
+        ],
+      });
+      setTx(tx);
+
+      const [session] = await service.listSessions({ limit: 50 });
+
+      expect(session.impersonatorRole).toEqual({ en: 'Principal' });
+    });
+
+    it('returns a null impersonator role when no matching membership exists', async () => {
+      const { service } = createSubject();
+      const { tx } = createTx({
+        selects: [
+          { table: 'impersonation_sessions', rows: [baseRow({ impersonatorScope: 'platform' })] },
+          { table: 'platform_memberships', rows: [] },
+        ],
+      });
+      setTx(tx);
+
+      const [session] = await service.listSessions({ limit: 50 });
+
+      expect(session.impersonatorRole).toBeNull();
+    });
   });
 });

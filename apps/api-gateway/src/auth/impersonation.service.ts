@@ -13,11 +13,13 @@ import { DefaultRoles } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  type I18nContent,
   impersonationSessions,
   institutesLive,
   membershipsLive,
   mkAdminCtx,
   phoneNumbers,
+  platformMemberships,
   resellerMemberships,
   rolesLive,
   users,
@@ -592,13 +594,101 @@ export class ImpersonationService {
         .orderBy(desc(impersonationSessions.startedAt))
         .limit(opts.limit);
 
+      // Resolve each impersonator's role name from the membership table matching
+      // their scope (platform/reseller/institute). Batched per scope so the cost
+      // is at most three extra queries regardless of how many sessions returned.
+      const roleByScope = await this.resolveImpersonatorRoles(tx, rows);
+
       const now = Date.now();
       return rows.map((row) => ({
         ...row,
         targetTenantName: row.targetTenantName ?? null,
+        impersonatorRole: roleByScope(
+          row.impersonatorScope,
+          row.impersonatorId,
+          row.targetTenantId,
+        ),
         status: deriveSessionStatus(row.endedAt, row.expiresAt, now),
       }));
     });
+  }
+
+  /**
+   * Batch-resolves impersonator role names for a set of session rows. The role lives in a
+   * different membership table per scope: platform → platform_memberships, reseller →
+   * reseller_memberships, institute → memberships (scoped to the session's target tenant).
+   * Returns a lookup `(scope, userId, tenantId) => role name | null`.
+   */
+  private async resolveImpersonatorRoles(
+    tx: DrizzleDB,
+    rows: { impersonatorScope: string; impersonatorId: string; targetTenantId: string | null }[],
+  ): Promise<(scope: string, userId: string, tenantId: string | null) => I18nContent | null> {
+    const idsFor = (scope: string) => [
+      ...new Set(rows.filter((r) => r.impersonatorScope === scope).map((r) => r.impersonatorId)),
+    ];
+    const platformIds = idsFor('platform');
+    const resellerIds = idsFor('reseller');
+    const institutePairs = rows.filter(
+      (r) => r.impersonatorScope === 'institute' && r.targetTenantId,
+    );
+
+    const platformRoles = new Map<string, I18nContent>();
+    const resellerRoles = new Map<string, I18nContent>();
+    const instituteRoles = new Map<string, I18nContent>(); // key: `${userId}:${tenantId}`
+
+    if (platformIds.length) {
+      const found = await tx
+        .select({ userId: platformMemberships.userId, roleName: rolesLive.name })
+        .from(platformMemberships)
+        .innerJoin(rolesLive, eq(rolesLive.id, platformMemberships.roleId))
+        .where(inArray(platformMemberships.userId, platformIds));
+      for (const r of found) platformRoles.set(r.userId, r.roleName);
+    }
+
+    if (resellerIds.length) {
+      const found = await tx
+        .select({ userId: resellerMemberships.userId, roleName: rolesLive.name })
+        .from(resellerMemberships)
+        .innerJoin(rolesLive, eq(rolesLive.id, resellerMemberships.roleId))
+        .where(
+          and(
+            inArray(resellerMemberships.userId, resellerIds),
+            eq(resellerMemberships.isActive, true),
+          ),
+        );
+      // First active reseller membership wins — display only.
+      for (const r of found)
+        if (!resellerRoles.has(r.userId)) resellerRoles.set(r.userId, r.roleName);
+    }
+
+    if (institutePairs.length) {
+      const userIds = [...new Set(institutePairs.map((p) => p.impersonatorId))];
+      const tenantIds = [...new Set(institutePairs.map((p) => p.targetTenantId as string))];
+      const found = await tx
+        .select({
+          userId: membershipsLive.userId,
+          tenantId: membershipsLive.tenantId,
+          roleName: rolesLive.name,
+        })
+        .from(membershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
+        .where(
+          and(
+            inArray(membershipsLive.userId, userIds),
+            inArray(membershipsLive.tenantId, tenantIds),
+            eq(membershipsLive.status, 'ACTIVE'),
+          ),
+        );
+      for (const r of found) instituteRoles.set(`${r.userId}:${r.tenantId}`, r.roleName);
+    }
+
+    return (scope, userId, tenantId) => {
+      if (scope === 'platform') return platformRoles.get(userId) ?? null;
+      if (scope === 'reseller') return resellerRoles.get(userId) ?? null;
+      if (scope === 'institute' && tenantId)
+        return instituteRoles.get(`${userId}:${tenantId}`) ?? null;
+      return null;
+    };
   }
 
   // ── Private: intra-institute validation ──────────────────
