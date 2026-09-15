@@ -16,7 +16,12 @@ export class StandardResolver {
   @Query(() => [StandardModel])
   @CheckAbility('read', 'Standard')
   async standards(
-    @Args('academicYearId', { type: () => ID }) academicYearId: string,
+    @Args('academicYearId', {
+      type: () => ID,
+      nullable: true,
+      description: 'Defaults to the active academic year when omitted.',
+    })
+    academicYearId?: string | null,
   ): Promise<StandardRecord[]> {
     return this.standardService.findByAcademicYear(academicYearId);
   }

@@ -495,6 +495,15 @@ type ApplicationStatusUpdate {
   oldStatus: String!
 }
 
+"""Marks component: THEORY / PRACTICAL / INTERNAL / PROJECT / ORAL."""
+enum AssessmentComponent {
+  INTERNAL
+  ORAL
+  PRACTICAL
+  PROJECT
+  THEORY
+}
+
 input AssignPlanInput {
   planId: String!
   tenantId: String!
@@ -617,6 +626,7 @@ type AuditLog {
   entityId: String
   entityType: String!
   id: ID!
+  impersonationSessionId: String
   impersonatorId: String
   ipAddress: String
   metadata: JSON
@@ -660,6 +670,19 @@ input AuditLogFilterInput {
 
   """Filter by entity type, e.g. "Student", "Staff", "Section"."""
   entityType: String
+
+  """
+  When true, return only entries performed during an impersonation session.
+  """
+  impersonatedOnly: Boolean
+
+  """Return only entries recorded during this impersonation session."""
+  impersonationSessionId: ID
+
+  """
+  Filter impersonated entries by the impersonator's originating scope (platform, reseller, institute).
+  """
+  impersonatorScope: [String!]
 
   """
   Filter by synthetic-context origin (e.g. "workflow:tc-issuance", "consumer:billing-event"). Only set for rows written by the synthetic-user actor.
@@ -932,6 +955,31 @@ type ClearanceEntryObject {
   notes: String
 }
 
+"""A configurable co-scholastic domain."""
+type CoScholasticAreaModel {
+  gradingSchemeId: ID
+  id: ID!
+  name: I18nText!
+  sequence: Int!
+}
+
+"""One student's co-scholastic grade for a term."""
+input CoScholasticAssessmentInput {
+  coScholasticAreaId: ID!
+  descriptor: String
+  examTermId: ID!
+  grade: String!
+  studentId: ID!
+}
+
+"""NEP topic attainment: BEGINNER / PROGRESSING / PROFICIENT / ADVANCED."""
+enum CompetencyLevel {
+  ADVANCED
+  BEGINNER
+  PROFICIENT
+  PROGRESSING
+}
+
 """Government/board compliance report format to export."""
 enum ComplianceReportType {
   AWR
@@ -1079,6 +1127,14 @@ type CreateBotResponse {
   bot: BotModel!
 }
 
+"""Create a co-scholastic domain."""
+input CreateCoScholasticAreaInput {
+  """CO_SCHOLASTIC grade scheme."""
+  gradingSchemeId: ID
+  name: I18nText!
+  sequence: Int
+}
+
 """Input for creating a pre-admission enquiry."""
 input CreateEnquiryInput {
   """Academic year the admission is being sought for."""
@@ -1141,6 +1197,50 @@ input CreateEnquiryInput {
   studentName: String!
 }
 
+"""Create an exam."""
+input CreateExamInput {
+  academicYearId: ID!
+  description: String
+
+  """YYYY-MM-DD."""
+  endDate: String
+  examTermId: ID
+  gradingSchemeId: ID
+  name: I18nText!
+
+  """YYYY-MM-DD."""
+  startDate: String
+  type: ExamType!
+
+  """Weight within the term (percent)."""
+  weightInTerm: Float
+}
+
+"""Add a datesheet row to an exam."""
+input CreateExamScheduleInput {
+  component: AssessmentComponent!
+  endTime: String
+  examDate: String
+  examId: ID!
+  invigilatorId: ID
+  maxMarks: Float!
+  passMarks: Float
+  room: String
+  sectionId: ID!
+  startTime: String
+  subjectId: ID!
+}
+
+"""Create a term within an academic year."""
+input CreateExamTermInput {
+  academicYearId: ID!
+  name: I18nText!
+  sequence: Int
+
+  """Weight in the annual roll-up (percent)."""
+  weightInFinal: Float
+}
+
 input CreateGatewayConfigInput {
   credentials: JSON!
   displayName: String
@@ -1149,6 +1249,19 @@ input CreateGatewayConfigInput {
   supportedMethods: [String!]
   testMode: Boolean = false
   webhookSecret: String
+}
+
+"""Create a grade scheme with its bands."""
+input CreateGradingSchemeInput {
+  bands: [GradeBandInputDto!]!
+
+  """Board label, e.g. "CBSE"."""
+  board: String
+  isDefault: Boolean
+  kind: GradingSchemeKind!
+
+  """Localised scheme name."""
+  name: I18nText!
 }
 
 """
@@ -1378,6 +1491,19 @@ input CreatePlanInput {
   name: I18nText!
   sortOrder: Int
   trialDays: Int! = 0
+}
+
+"""Create a report-card template."""
+input CreateReportCardInput {
+  academicYearId: ID!
+
+  """Term to aggregate; null = annual."""
+  examTermId: ID
+  gradingSchemeId: ID
+  includeAttendance: Boolean
+  includeCoScholastic: Boolean
+  includeTopicWise: Boolean
+  name: I18nText!
 }
 
 """Fields required to create a new class section under a standard."""
@@ -1625,6 +1751,16 @@ input CreateSubjectInput {
   type: SubjectType = ACADEMIC
 }
 
+"""Create a NEP learning outcome / topic for a subject."""
+input CreateSubjectTopicInput {
+  code: String
+  learningOutcome: String
+  name: I18nText!
+  sequence: Int
+  standardId: ID
+  subjectId: ID!
+}
+
 """
 Create a per-date override (substitution, cancellation, room/subject change, extra).
 """
@@ -1648,7 +1784,8 @@ input CreateTimetableDayOverrideInput {
 
 """Create a timetable and auto-generate its period grid."""
 input CreateTimetableInput {
-  academicYearId: ID!
+  """Defaults to the active academic year when omitted."""
+  academicYearId: ID
 
   """Start time of the first regular period (HH:mm)."""
   dayStartTime: String!
@@ -1971,6 +2108,107 @@ input EnrollStudentInput {
   studentProfileId: ID!
 }
 
+"""Bulk-enter co-scholastic grades."""
+input EnterCoScholasticInput {
+  assessments: [CoScholasticAssessmentInput!]!
+}
+
+"""Bulk-enter marks for an exam (must be in MARKS_ENTRY)."""
+input EnterMarksInput {
+  examId: ID!
+  marks: [ExamMarkInput!]!
+}
+
+"""Bulk-enter NEP topic assessments."""
+input EnterTopicAssessmentsInput {
+  assessments: [TopicAssessmentInput!]!
+}
+
+"""One student's marks for a datesheet row."""
+input ExamMarkInput {
+  examScheduleId: ID!
+  isAbsent: Boolean
+  isExempted: Boolean
+
+  """Null when absent / not entered."""
+  obtainedMarks: Float
+  remarks: String
+
+  """Student membership id."""
+  studentId: ID!
+}
+
+"""An assessment event."""
+type ExamModel {
+  academicYearId: ID!
+  description: String
+  endDate: String
+  examTermId: ID
+  gradingSchemeId: ID
+  id: ID!
+  name: I18nText!
+  startDate: String
+  status: ExamStatus!
+  type: ExamType!
+
+  """This exam's weight within its term (percent)."""
+  weightInTerm: Float!
+}
+
+"""One datesheet row: what is examined, when, and for how many marks."""
+type ExamScheduleModel {
+  component: AssessmentComponent!
+  endTime: String
+  examDate: String
+  examId: ID!
+  id: ID!
+  invigilatorId: ID
+  maxMarks: Float!
+  passMarks: Float
+  room: String
+  sectionId: ID!
+  startTime: String
+  subjectId: ID!
+}
+
+"""
+DRAFT → SCHEDULED → MARKS_ENTRY → LOCKED → RESULTS_PUBLISHED → ARCHIVED.
+"""
+enum ExamStatus {
+  ARCHIVED
+  DRAFT
+  LOCKED
+  MARKS_ENTRY
+  RESULTS_PUBLISHED
+  SCHEDULED
+}
+
+"""A term within an academic year that report cards aggregate over."""
+type ExamTermModel {
+  academicYearId: ID!
+  id: ID!
+  name: I18nText!
+  sequence: Int!
+
+  """Weight in an annual roll-up (percent)."""
+  weightInFinal: Float!
+}
+
+"""Kind of assessment event."""
+enum ExamType {
+  ANNUAL
+  BOARD
+  FINAL_TERM
+  HALF_YEARLY
+  INTERNAL_ASSESSMENT
+  MID_TERM
+  OTHER
+  PERIODIC_TEST
+  PRACTICAL
+  PRE_BOARD
+  UNIT_TEST
+}
+
 """Input for generating and downloading a compliance export report."""
 input ExportComplianceReportInput {
   """Academic year the report data is drawn from."""
@@ -2055,6 +2293,47 @@ input GeneratePasskeyRegistrationInput {
   User's current account password — confirmed before issuing a passkey challenge.
   """
   password: String!
+}
+
+"""One grade band. Scholastic bands set min/max/gradePoint."""
+input GradeBandInputDto {
+  descriptor: String
+
+  """Grade label, e.g. "A1"."""
+  grade: String!
+  gradePoint: Float
+  isPassing: Boolean
+  maxPercent: Float
+  minPercent: Float
+  sequence: Int
+}
+
+"""One band of a grade scheme (mark range → grade + grade point)."""
+type GradeBandModel {
+  descriptor: String
+  grade: String!
+  gradePoint: Float
+  id: ID!
+  isPassing: Boolean!
+  maxPercent: Float
+  minPercent: Float
+  sequence: Int!
+}
+
+"""SCHOLASTIC (marks→grade) or CO_SCHOLASTIC (qualitative)."""
+enum GradingSchemeKind {
+  CO_SCHOLASTIC
+  SCHOLASTIC
+}
+
+"""A configurable grade scheme."""
+type GradingSchemeModel {
+  bands: [GradeBandModel!]
+  board: String
+  id: ID!
+  isDefault: Boolean!
+  kind: GradingSchemeKind!
+  name: I18nText!
 }
 
 """
@@ -2410,6 +2689,35 @@ type ImpersonationAuthPayload {
 type ImpersonationInstituteInfo {
   id: String!
   name: I18nText!
+}
+
+type ImpersonationSessionModel {
+  endedAt: DateTime
+  endedReason: String
+  expiresAt: DateTime!
+  id: ID!
+  impersonatorId: String!
+  impersonatorName: String
+  impersonatorRole: I18nText
+  impersonatorScope: String!
+  ipAddress: String
+  otpVerified: DateTime
+  otpVerifiedByName: String
+  reason: String!
+  startedAt: DateTime!
+  status: ImpersonationSessionStatus!
+  targetTenantId: String
+  targetTenantName: I18nText
+  targetUserId: String!
+  targetUserName: String
+  userAgent: String
+}
+
+"""Lifecycle state of an impersonation session."""
+enum ImpersonationSessionStatus {
+  ACTIVE
+  ENDED
+  EXPIRED
 }
 
 type ImpersonationUserInfo {
@@ -3001,6 +3309,24 @@ input MarkAttendanceItem {
   studentId: ID!
 }
 
+"""The marks-entry grid for one datesheet row."""
+type MarksSheetModel {
+  rows: [MarksSheetRowModel!]!
+  schedule: ExamScheduleModel!
+}
+
+"""A student's editable row in a marks sheet."""
+type MarksSheetRowModel {
+  isAbsent: Boolean!
+  isExempted: Boolean!
+  name: String!
+  obtainedMarks: Float
+  remarks: String
+  rollNumber: String
+  studentId: ID!
+  studentProfileId: ID!
+}
+
 """Student medical information"""
 type MedicalInfoObject {
   """Known allergies (food, drug, environmental)"""
@@ -3054,6 +3380,7 @@ type Mutation {
 
   """Publish a timetable (DRAFT/INACTIVE → ACTIVE)."""
   activateTimetable(id: ID!): TimetableModel!
+  addExamSchedule(input: CreateExamScheduleInput!): ExamScheduleModel!
   addGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
   addInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
   addTimetablePeriod(input: AddTimetablePeriodInput!): TimetablePeriodModel!
@@ -3124,6 +3451,7 @@ type Mutation {
   """Approve a TC (principal only)"""
   approveTC(id: ID!): TCModel!
   archiveAcademicYear(id: ID!): AcademicYearModel!
+  archiveExam(id: ID!): ExamModel!
 
   """
   Archive (deactivate) a subscription plan. Blocks new subscriptions but does not affect existing ones.
@@ -3179,10 +3507,14 @@ type Mutation {
   """Create a direct admission application"""
   createApplication(input: CreateApplicationInput!): ApplicationModel!
   createBot(input: CreateBotInput!): CreateBotResponse!
+  createCoScholasticArea(input: CreateCoScholasticAreaInput!): CoScholasticAreaModel!
 
   """Create a pre-admission enquiry"""
   createEnquiry(input: CreateEnquiryInput!): EnquiryModel!
+  createExam(input: CreateExamInput!): ExamModel!
+  createExamTerm(input: CreateExamTermInput!): ExamTermModel!
   createGatewayConfig(input: CreateGatewayConfigInput!): PaymentGatewayConfigModel!
+  createGradingScheme(input: CreateGradingSchemeInput!): GradingSchemeModel!
 
   """Create a new group (static, dynamic, hybrid, or composite)"""
   createGroup(input: CreateGroupInput!): GroupModel!
@@ -3194,6 +3526,7 @@ type Mutation {
   createHoliday(input: CreateHolidayInput!): HolidayModel!
   createInstitute(input: CreateInstituteInput!): InstituteModel!
   createInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
+  createReportCard(input: CreateReportCardInput!): ReportCardModel!
 
   """
   Create a section. When the parent standard has `streamApplicable=true`, `stream` is required (SS-003).
@@ -3212,6 +3545,7 @@ type Mutation {
 
   """Create a subject in the current institute."""
   createSubject(input: CreateSubjectInput!): SubjectModel!
+  createSubjectTopic(input: CreateSubjectTopicInput!): SubjectTopicModel!
   createSubscriptionPlan(input: CreatePlanInput!): SubscriptionPlanModel!
   createTimetable(input: CreateTimetableInput!): TimetableModel!
 
@@ -3227,7 +3561,11 @@ type Mutation {
   deleteAcademicYear(id: ID!): Boolean!
   deleteAttendanceSession(id: ID!): Boolean!
   deleteBot(id: ID!): Boolean!
+  deleteCoScholasticArea(id: ID!): Boolean!
+  deleteExam(id: ID!): Boolean!
+  deleteExamTerm(id: ID!): Boolean!
   deleteGatewayConfig(id: ID!): Boolean!
+  deleteGradingScheme(id: ID!): Boolean!
 
   """Soft delete a group"""
   deleteGroup(id: ID!): Boolean!
@@ -3245,6 +3583,7 @@ type Mutation {
   """
   deleteLeave(id: ID!): Boolean!
   deletePlan(id: ID!): Boolean!
+  deleteReportCard(id: ID!): Boolean!
 
   """Soft-delete a section. Returns true on success."""
   deleteSection(id: ID!): Boolean!
@@ -3261,6 +3600,7 @@ type Mutation {
 
   """Soft-delete a subject. Returns true on success."""
   deleteSubject(id: ID!): Boolean!
+  deleteSubjectTopic(id: ID!): Boolean!
 
   """Soft-delete timetables. Returns the count removed."""
   deleteTimetable(ids: [ID!]!): Int!
@@ -3271,6 +3611,13 @@ type Mutation {
 
   """Enroll a student in a section with capacity check"""
   enrollStudent(input: EnrollStudentInput!): ID!
+  enterCoScholasticAssessments(input: EnterCoScholasticInput!): Int!
+
+  """Bulk-enter marks; returns the count saved."""
+  enterExamMarks(input: EnterMarksInput!): Int!
+
+  """Bulk-enter NEP topic competency assessments."""
+  enterTopicAssessments(input: EnterTopicAssessmentsInput!): Int!
   exchangeImpersonationCode(code: String!): ImpersonationAuthPayload!
 
   """
@@ -3280,6 +3627,9 @@ type Mutation {
   generateInvoice(input: GenerateInvoiceInput!): InvoiceModel!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
   generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
+
+  """Generate per-student instances for a section."""
+  generateReportCards(reportCardId: ID!, sectionId: ID!): Int!
 
   """Grant parental consent for a data processing purpose (DPDP Act 2023)"""
   grantConsent(input: GrantConsentInput!): ConsentRecordModel!
@@ -3296,6 +3646,7 @@ type Mutation {
 
   """Link a guardian to a student"""
   linkGuardianToStudent(input: LinkGuardianInput!): GuardianLinkModel!
+  lockExam(id: ID!): ExamModel!
   logout: Boolean!
 
   """
@@ -3303,12 +3654,17 @@ type Mutation {
   """
   markAttendance(input: MarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): AttendanceEntryModel!
   openAttendanceSession(input: CreateAttendanceSessionInput!): AttendanceSessionModel!
+  openExamMarksEntry(id: ID!): ExamModel!
 
   """
   Override an existing attendance session — replaces lecturer and/or subject.
   """
   overrideAttendanceSession(lecturerId: ID!, sessionId: ID!, subjectId: ID): AttendanceSessionModel!
   pauseSubscription(input: PauseSubscriptionInput!): SubscriptionModel!
+  publishExamResults(id: ID!): ExamModel!
+
+  """Publish all generated instances; returns the count."""
+  publishReportCards(reportCardId: ID!): Int!
   recordManualPayment(input: ManualPaymentInput!, invoiceId: ID!): InvoiceModel!
   refreshToken(token: String!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
@@ -3324,6 +3680,7 @@ type Mutation {
   """Reject a transfer certificate request"""
   rejectTC(id: ID!, reason: String!): TCModel!
   rejectUpiPayment(input: RejectUpiInput!): PaymentModel!
+  removeExamSchedule(id: ID!): Boolean!
   removeGroupMember(groupId: ID!, userId: ID!): Boolean!
   removeInstituteFromGroup(instituteId: ID!): Boolean!
   removePasskey(passkeyId: String!): Boolean!
@@ -3335,6 +3692,7 @@ type Mutation {
   removeSubjectFromStandard(standardId: ID!, subjectId: ID!): SubjectModel!
   removeTimetablePeriod(periodId: ID!, timetableId: ID!): Boolean!
   removeTimetableSection(sectionId: ID!, timetableId: ID!): Boolean!
+  replaceGradeBands(input: ReplaceGradeBandsInput!): [GradeBandModel!]!
 
   """Re-publish a dead-lettered message to its original subject"""
   replayDlqMessage(id: ID!): DlqMessageModel!
@@ -3370,6 +3728,7 @@ type Mutation {
 
   """Resolve group members (triggers rule evaluation + cache refresh)"""
   resolveGroupMembers(groupId: ID!): GroupResolutionUpdate!
+  restoreExam(id: ID!): ExamModel!
   restoreInstitute(id: ID!): InstituteModel!
 
   """
@@ -3388,6 +3747,7 @@ type Mutation {
   revokeGuardianAccess(input: RevokeGuardianAccessInput!): GuardianLinkModel!
   revokeSession(sessionId: String!): Boolean!
   rotateBotApiKey(botId: ID!): CreateBotResponse!
+  scheduleExam(id: ID!): ExamModel!
   selectInstitute(membershipId: String!, selectionToken: String!): AuthPayload!
 
   """
@@ -3403,6 +3763,7 @@ type Mutation {
   Explicit academic status transition (named domain mutation). Validates against the status state machine and emits STUDENT.statusChanged.
   """
   transitionStudentStatus(id: ID!, newStatus: AcademicStatus!, reason: String): StudentModel!
+  unarchiveExam(id: ID!): ExamModel!
 
   """
   Unlink a guardian from a student. If primary, must provide newPrimaryGuardianId
@@ -3416,7 +3777,11 @@ type Mutation {
 
   """Update an enquiry"""
   updateEnquiry(id: ID!, input: UpdateEnquiryInput!): EnquiryModel!
+  updateExam(id: ID!, input: UpdateExamInput!): ExamModel!
+  updateExamSchedule(id: ID!, input: UpdateExamScheduleInput!): ExamScheduleModel!
+  updateExamTerm(id: ID!, input: UpdateExamTermInput!): ExamTermModel!
   updateGatewayConfig(id: ID!, input: UpdateGatewayConfigInput!): PaymentGatewayConfigModel!
+  updateGradingScheme(id: ID!, input: UpdateGradingSchemeInput!): GradingSchemeModel!
 
   """Update a group"""
   updateGroup(id: ID!, input: UpdateGroupInput!): GroupModel!
@@ -3437,6 +3802,7 @@ type Mutation {
   """Update own profile (phone, photo, nationality)"""
   updateMyProfile(input: UpdateMyProfileInput!): UserProfileData!
   updateNotificationConfig(input: UpdateNotificationConfigInput!): NotificationConfigModel!
+  updateReportCard(id: ID!, input: UpdateReportCardInput!): ReportCardModel!
 
   """Set a role's phone bottom tab bar destinations."""
   updateRolePrimaryNav(input: UpdateRolePrimaryNavInput!): Role!
@@ -3535,6 +3901,15 @@ type PageInfo {
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
   startCursor: String
+}
+
+"""Paginated exams."""
+type PaginatedExamsModel {
+  docs: [ExamModel!]!
+  page: Int!
+  perPage: Int!
+  total: Int!
+  totalPages: Int!
 }
 
 """A page of timetables."""
@@ -3740,6 +4115,7 @@ type Query {
 
   """Get bulk import progress by workflow ID"""
   bulkImportProgress(workflowId: String!): BulkImportProgressModel!
+  coScholasticAreas: [CoScholasticAreaModel!]!
 
   """
   Get current consent status for every DPDP purpose for a single student. Used by the guardian detail page to show per-child consent badges.
@@ -3749,6 +4125,31 @@ type Query {
   """Returns the current Roviq edition: ce or ee"""
   edition: String!
   entityAuditTimeline(after: String, entityId: String!, entityType: String!, first: Int = 20): AuditLogConnection!
+  exam(id: ID!): ExamModel!
+
+  """An exam's datesheet rows."""
+  examDatesheet(examId: ID!): [ExamScheduleModel!]!
+
+  """Base64-encoded datesheet PDF."""
+  examDatesheetPdf(
+    examId: ID!
+
+    """Filter to one section."""
+    sectionId: ID
+
+    """Render one invigilator's duty roster."""
+    staffId: ID
+  ): String!
+
+  """Roster + existing marks for a datesheet row."""
+  examMarksSheet(examScheduleId: ID!): MarksSheetModel!
+
+  """Computed results for an exam + section, with rank."""
+  examResults(examId: ID!, sectionId: ID!): [StudentExamResultModel!]!
+  examTerms(academicYearId: ID!): [ExamTermModel!]!
+
+  """Paginated exams for an academic year."""
+  examsList(academicYearId: ID!, examTermId: ID, page: Int, perPage: Int, search: String, sectionId: ID, status: ExamStatus): PaginatedExamsModel!
   gatewayConfigs: [PaymentGatewayConfigModel!]!
 
   """Returns base64-encoded PDF"""
@@ -3779,6 +4180,12 @@ type Query {
 
   """Get TC details including 20-field CBSE data snapshot"""
   getTCDetails(id: ID!): TCModel!
+
+  """A grade scheme with its bands."""
+  gradingScheme(id: ID!): GradingSchemeModel!
+
+  """List grade schemes (optionally by kind)."""
+  gradingSchemes(kind: String): [GradingSchemeModel!]!
   holiday(id: ID!): HolidayModel!
 
   """
@@ -3791,6 +4198,7 @@ type Query {
     """ISO YYYY-MM-DD date to look up."""
     date: String!
   ): [HolidayModel!]!
+  impersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   institute(id: ID!): InstituteModel!
   instituteGroup(id: ID!): InstituteGroupModel!
   instituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
@@ -3877,6 +4285,9 @@ type Query {
 
   """Get current user profile based on membership type"""
   myProfile: MyProfile!
+
+  """Published report cards for the signed-in student."""
+  myReportCards: [ReportCardInstanceModel!]!
   mySessions: [SessionInfo!]!
   mySubscription: SubscriptionModel
   notificationConfigs: [NotificationConfigModel!]!
@@ -3888,9 +4299,19 @@ type Query {
 
   """Dry-run rule evaluation without saving — returns count + sample"""
   previewGroupRule(rule: JSON!): RulePreviewResult!
+  reportCard(id: ID!): ReportCardModel!
+  reportCardInstance(reportCardId: ID!, studentProfileId: ID!): ReportCardInstanceModel!
+
+  """Instances of a report card."""
+  reportCardInstances(reportCardId: ID!): [ReportCardInstanceModel!]!
+
+  """Base64-encoded report-card PDF."""
+  reportCardPdf(instanceId: ID!): String!
+  reportCards(academicYearId: ID!): [ReportCardModel!]!
   resellerAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
   resellerBillingDashboard: BillingDashboardModel!
   resellerGetInstitute(id: ID!): InstituteModel!
+  resellerImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   resellerInstituteStatistics: InstituteStatisticsModel!
   resellerListInstituteGroups: InstituteGroupConnection!
   resellerListInstitutes(filter: InstituteFilterInput): InstituteConnection!
@@ -3917,6 +4338,9 @@ type Query {
   """List sections under a standard, ordered by `displayOrder`."""
   sections(standardId: ID!): [SectionModel!]!
 
+  """All sections in an academic year, for grids/datesheets."""
+  sectionsByAcademicYear(academicYearId: ID!): [SectionModel!]!
+
   """Resolved schedule for a teacher on a date."""
   staffDaySchedule(date: String!, teacherId: ID!): [DayScheduleSlotModel!]!
 
@@ -3931,13 +4355,19 @@ type Query {
   """Base64-encoded PDF of a teacher's weekly timetable."""
   staffTimetablePdf(teacherId: ID!, timetableId: ID): String!
   standard(id: ID!): StandardModel!
-  standards(academicYearId: ID!): [StandardModel!]!
+  standards(
+    """Defaults to the active academic year when omitted."""
+    academicYearId: ID
+  ): [StandardModel!]!
 
   """Aggregate student statistics"""
   studentStatistics: StudentStatisticsModel!
 
   """Fetch a subject by id."""
   subject(id: ID!): SubjectModel!
+
+  """NEP topics for a subject."""
+  subjectTopics(standardId: ID, subjectId: ID!): [SubjectTopicModel!]!
 
   """List every subject in the current institute."""
   subjects: [SubjectModel!]!
@@ -3955,7 +4385,15 @@ type Query {
   """
   timetableDaySchedule(date: String!, sectionId: ID!): DayScheduleModel!
   timetableStatistics(academicYearId: ID): TimetableStatisticsModel!
-  timetables(academicYearId: ID!, page: Int = 1, perPage: Int = 20, search: String, sectionId: ID, status: TimetableStatus): PaginatedTimetablesModel!
+  timetables(
+    """Defaults to the active academic year when omitted."""
+    academicYearId: ID
+    page: Int = 1
+    perPage: Int = 20
+    search: String
+    sectionId: ID
+    status: TimetableStatus
+  ): PaginatedTimetablesModel!
   unverifiedPayments(after: String, first: Int = 20): [PaymentModel!]!
 }
 
@@ -3983,6 +4421,93 @@ input RegisterInput {
 input RejectUpiInput {
   paymentId: ID!
   reason: String!
+}
+
+"""Replace all bands of a grade scheme."""
+input ReplaceGradeBandsInput {
+  bands: [GradeBandInputDto!]!
+  gradingSchemeId: ID!
+}
+
+type ReportCardCoScholasticModel {
+  area: String!
+  descriptor: String
+  grade: String!
+}
+
+type ReportCardExamBreakdownModel {
+  examName: String!
+  percentage: Float!
+  weight: Float!
+}
+
+"""A materialised per-student report card."""
+type ReportCardInstanceModel {
+  attendancePercent: Float
+  classTeacherRemark: String
+  gpa: Float
+  grade: String
+  id: ID!
+  payload: ReportCardPayloadModel!
+  percentage: Float
+  principalRemark: String
+  rank: Int
+  reportCardId: ID!
+  resultStatus: ResultStatus!
+  sectionId: ID
+  status: ReportCardStatus!
+  studentProfileId: ID!
+}
+
+"""A report-card template/config."""
+type ReportCardModel {
+  academicYearId: ID!
+  examTermId: ID
+  gradingSchemeId: ID
+  id: ID!
+  includeAttendance: Boolean!
+  includeCoScholastic: Boolean!
+  includeTopicWise: Boolean!
+  name: I18nText!
+  status: ReportCardStatus!
+}
+
+"""The computed report-card snapshot."""
+type ReportCardPayloadModel {
+  coScholastic: [ReportCardCoScholasticModel!]!
+  student: ReportCardStudentModel!
+  subjects: [ReportCardSubjectModel!]!
+  termName: String
+}
+
+"""DRAFT → GENERATED → PUBLISHED → ARCHIVED."""
+enum ReportCardStatus {
+  ARCHIVED
+  DRAFT
+  GENERATED
+  PUBLISHED
+}
+
+type ReportCardStudentModel {
+  name: String!
+  rollNumber: String
+}
+
+type ReportCardSubjectModel {
+  exams: [ReportCardExamBreakdownModel!]!
+  grade: String
+  gradePoint: Float
+  isAbsent: Boolean!
+  percentage: Float!
+  subjectId: ID!
+  subjectName: String!
+  topics: [ReportCardTopicModel!]!
+}
+
+type ReportCardTopicModel {
+  competency: String!
+  descriptor: String
+  name: String!
 }
 
 """Input for requesting a bonafide or custom certificate from a template."""
@@ -4245,6 +4770,15 @@ type ResellerUserProfileModel {
   profileImageUrl: String
 }
 
+"""PASS / FAIL / COMPARTMENT / ABSENT / PENDING."""
+enum ResultStatus {
+  ABSENT
+  COMPARTMENT
+  FAIL
+  PASS
+  PENDING
+}
+
 """
 Input for revoking a guardian's access to a student (divorce/separation/custody scenario). Unlike Unlink, this preserves the link row for audit purposes and sets access flags to false — the guardian can still be viewed in the student's guardian history but cannot pick up, receive notifications, or make payments.
 """
@@ -4334,7 +4868,9 @@ type SectionModel {
   name: I18nText!
   room: String
   shift: String
-  standardId: String!
+
+  """Parent standard (class) id — clients group sections by this."""
+  standardId: ID!
   startTime: String
   stream: StreamObject
   updatedAt: DateTime!
@@ -4582,6 +5118,21 @@ type StudentEdge {
   node: StudentModel!
 }
 
+"""A student's full result for an exam (with rank)."""
+type StudentExamResultModel {
+  gpa: Float
+  maxMarks: Float!
+  name: String!
+  obtainedMarks: Float!
+  percentage: Float!
+  rank: Int
+  resultStatus: ResultStatus!
+  rollNumber: String
+  studentId: ID!
+  studentProfileId: ID!
+  subjects: [SubjectResultModel!]!
+}
+
 """Filter + pagination input for listStudents (ROV-154)"""
 input StudentFilterInput {
   """Filter by academic_status (multi)"""
@@ -4744,6 +5295,30 @@ type SubjectModel {
   theoryMarks: Int
   type: SubjectType!
   updatedAt: DateTime!
+}
+
+"""A subject's aggregated result for one student."""
+type SubjectResultModel {
+  grade: String
+  gradePoint: Float
+  isAbsent: Boolean!
+  isPassing: Boolean!
+  maxMarks: Float!
+  obtainedMarks: Float!
+  percentage: Float!
+  subjectId: ID!
+  subjectName: String!
+}
+
+"""A NEP learning outcome / topic for a subject."""
+type SubjectTopicModel {
+  code: String
+  id: ID!
+  learningOutcome: String
+  name: I18nText!
+  sequence: Int!
+  standardId: ID
+  subjectId: ID!
 }
 
 """Category of a subject — determines how it is graded and reported."""
@@ -4975,6 +5550,9 @@ A weekly grid (section or staff view): the period rows, working days, and cells.
 type TimetableGridModel {
   entries: [TimetableEntryModel!]!
   periods: [TimetablePeriodModel!]!
+
+  """Display name of the teacher (staff view only; null for section view)."""
+  teacherName: String
   timetableId: ID!
   workingDays: [Weekday!]!
 }
@@ -5070,6 +5648,15 @@ enum TimetableStatus {
   ARCHIVED
   DRAFT
   INACTIVE
+}
+
+"""One student's competency for a topic in an exam."""
+input TopicAssessmentInput {
+  competencyLevel: CompetencyLevel!
+  descriptor: String
+  examScheduleId: ID!
+  studentId: ID!
+  subjectTopicId: ID!
 }
 
 """
@@ -5184,6 +5771,34 @@ input UpdateEnquiryInput {
   studentName: String
 }
 
+input UpdateExamInput {
+  description: String
+  endDate: String
+  examTermId: ID
+  gradingSchemeId: ID
+  name: I18nText
+  startDate: String
+  type: ExamType
+  weightInTerm: Float
+}
+
+input UpdateExamScheduleInput {
+  component: AssessmentComponent
+  endTime: String
+  examDate: String
+  invigilatorId: ID
+  maxMarks: Float
+  passMarks: Float
+  room: String
+  startTime: String
+}
+
+input UpdateExamTermInput {
+  name: I18nText
+  sequence: Int
+  weightInFinal: Float
+}
+
 input UpdateGatewayConfigInput {
   credentials: JSON
   displayName: String
@@ -5192,6 +5807,13 @@ input UpdateGatewayConfigInput {
   supportedMethods: [String!]
   testMode: Boolean
   webhookSecret: String
+}
+
+"""Update a grade scheme (bands replaced separately)."""
+input UpdateGradingSchemeInput {
+  board: String
+  isDefault: Boolean
+  name: I18nText
 }
 
 """
@@ -5429,6 +6051,15 @@ input UpdatePlanInput {
   sortOrder: Int
   trialDays: Int
   version: Int!
+}
+
+input UpdateReportCardInput {
+  examTermId: ID
+  gradingSchemeId: ID
+  includeAttendance: Boolean
+  includeCoScholastic: Boolean
+  includeTopicWise: Boolean
+  name: I18nText
 }
 
 """

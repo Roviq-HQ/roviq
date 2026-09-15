@@ -53,6 +53,8 @@ export const ErrorCode = {
   LAST_ACADEMIC_YEAR: 'LAST_ACADEMIC_YEAR',
   /** Another academic year is already active for this institute */
   YEAR_ALREADY_ACTIVE: 'YEAR_ALREADY_ACTIVE',
+  /** No academic year is currently active — callers that omit the year need one */
+  NO_ACTIVE_ACADEMIC_YEAR: 'NO_ACTIVE_ACADEMIC_YEAR',
   /** Academic year label (YYYY-YY) does not match the start/end date range */
   LABEL_DATE_MISMATCH: 'LABEL_DATE_MISMATCH',
 
@@ -93,6 +95,32 @@ export const ErrorCode = {
   TIMETABLE_PERIOD_NOT_ASSIGNABLE: 'TIMETABLE_PERIOD_NOT_ASSIGNABLE',
   /** The section is not covered by this timetable */
   TIMETABLE_SECTION_NOT_COVERED: 'TIMETABLE_SECTION_NOT_COVERED',
+
+  // ── Examination & report cards ─────────────────────────
+  /** Exam not found or soft-deleted */
+  EXAM_NOT_FOUND: 'EXAM_NOT_FOUND',
+  /** An exam with this name already exists in the academic year */
+  EXAM_NAME_DUPLICATE: 'EXAM_NAME_DUPLICATE',
+  /** Exam scope/schedule/config is invalid */
+  EXAM_INVALID_CONFIG: 'EXAM_INVALID_CONFIG',
+  /** Obtained marks exceed the component max (or are negative) */
+  EXAM_MARKS_OUT_OF_RANGE: 'EXAM_MARKS_OUT_OF_RANGE',
+  /** Marks can only be entered while the exam is in MARKS_ENTRY */
+  EXAM_NOT_IN_MARKS_ENTRY: 'EXAM_NOT_IN_MARKS_ENTRY',
+  /** Two exam schedule rows clash on room + date + time */
+  EXAM_SCHEDULE_CONFLICT: 'EXAM_SCHEDULE_CONFLICT',
+  /** Grading scheme not found or soft-deleted */
+  GRADING_SCHEME_NOT_FOUND: 'GRADING_SCHEME_NOT_FOUND',
+  /** Grade bands overlap or leave a gap in 0–100 */
+  GRADING_SCHEME_INVALID_BANDS: 'GRADING_SCHEME_INVALID_BANDS',
+  /** Grading scheme is referenced by an exam/report card and cannot be deleted */
+  GRADING_SCHEME_IN_USE: 'GRADING_SCHEME_IN_USE',
+  /** Report card not found or soft-deleted */
+  REPORT_CARD_NOT_FOUND: 'REPORT_CARD_NOT_FOUND',
+  /** Report card has not been published to students/parents yet */
+  REPORT_CARD_NOT_PUBLISHED: 'REPORT_CARD_NOT_PUBLISHED',
+  /** Report card generation failed (missing marks / no covered exams) */
+  REPORT_CARD_GENERATION_FAILED: 'REPORT_CARD_GENERATION_FAILED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -129,6 +157,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INVALID_DATE_RANGE: HttpStatus.BAD_REQUEST,
   LAST_ACADEMIC_YEAR: HttpStatus.UNPROCESSABLE_ENTITY,
   YEAR_ALREADY_ACTIVE: HttpStatus.CONFLICT,
+  NO_ACTIVE_ACADEMIC_YEAR: HttpStatus.UNPROCESSABLE_ENTITY,
   LABEL_DATE_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
   STANDARD_NAME_DUPLICATE: HttpStatus.CONFLICT,
   SECTION_NAME_DUPLICATE: HttpStatus.CONFLICT,
@@ -146,4 +175,16 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   TIMETABLE_ROOM_CONFLICT: HttpStatus.CONFLICT,
   TIMETABLE_PERIOD_NOT_ASSIGNABLE: HttpStatus.UNPROCESSABLE_ENTITY,
   TIMETABLE_SECTION_NOT_COVERED: HttpStatus.UNPROCESSABLE_ENTITY,
+  EXAM_NOT_FOUND: HttpStatus.NOT_FOUND,
+  EXAM_NAME_DUPLICATE: HttpStatus.CONFLICT,
+  EXAM_INVALID_CONFIG: HttpStatus.BAD_REQUEST,
+  EXAM_MARKS_OUT_OF_RANGE: HttpStatus.BAD_REQUEST,
+  EXAM_NOT_IN_MARKS_ENTRY: HttpStatus.UNPROCESSABLE_ENTITY,
+  EXAM_SCHEDULE_CONFLICT: HttpStatus.CONFLICT,
+  GRADING_SCHEME_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GRADING_SCHEME_INVALID_BANDS: HttpStatus.BAD_REQUEST,
+  GRADING_SCHEME_IN_USE: HttpStatus.CONFLICT,
+  REPORT_CARD_NOT_FOUND: HttpStatus.NOT_FOUND,
+  REPORT_CARD_NOT_PUBLISHED: HttpStatus.UNPROCESSABLE_ENTITY,
+  REPORT_CARD_GENERATION_FAILED: HttpStatus.UNPROCESSABLE_ENTITY,
 };
