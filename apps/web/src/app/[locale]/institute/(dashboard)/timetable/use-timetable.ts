@@ -101,6 +101,7 @@ export interface GridEntry {
 
 export interface SectionTimetableGrid {
   timetableId: string;
+  teacherName: string | null;
   periods: Array<Omit<TimetablePeriod, 'session'>>;
   workingDays: Weekday[];
   entries: GridEntry[];
@@ -169,7 +170,7 @@ export interface ExtraClassInput {
 export interface CreateTimetableInput {
   name: I18nText;
   description?: string | null;
-  academicYearId: string;
+  academicYearId?: string;
   sectionIds: string[];
   effectiveFrom: string;
   effectiveTo: string;
@@ -223,7 +224,7 @@ export interface CreateTimetableDayOverrideInput {
 
 const TIMETABLES_QUERY = gql`
   query Timetables(
-    $academicYearId: ID!
+    $academicYearId: ID
     $status: TimetableStatus
     $sectionId: ID
     $search: String
@@ -301,6 +302,7 @@ const SECTION_TIMETABLE_QUERY = gql`
   query SectionTimetable($sectionId: ID!, $timetableId: ID) {
     sectionTimetable(sectionId: $sectionId, timetableId: $timetableId) {
       timetableId
+      teacherName
       periods {
         id
         kind
@@ -329,6 +331,7 @@ const STAFF_TIMETABLE_QUERY = gql`
   query StaffTimetable($teacherId: ID!, $timetableId: ID) {
     staffTimetable(teacherId: $teacherId, timetableId: $timetableId) {
       timetableId
+      teacherName
       periods {
         id
         kind
@@ -550,8 +553,8 @@ const CLEAR_TIMETABLE_DAY_OVERRIDE = gql`
 // ── Query hooks ─────────────────────────────────────────────────────────
 
 export function useTimetables(
-  academicYearId: string | null,
   opts: {
+    academicYearId?: string | null;
     status?: TimetableStatus | null;
     sectionId?: string | null;
     search?: string | null;
@@ -563,14 +566,13 @@ export function useTimetables(
     TIMETABLES_QUERY,
     {
       variables: {
-        academicYearId,
+        academicYearId: opts.academicYearId ?? null,
         status: opts.status ?? null,
         sectionId: opts.sectionId ?? null,
         search: opts.search ?? null,
         page: opts.page ?? 1,
         perPage: opts.perPage ?? 20,
       },
-      skip: !academicYearId,
       notifyOnNetworkStatusChange: true,
     },
   );

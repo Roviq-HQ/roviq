@@ -36,6 +36,10 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  ControlledAcademicYearSelector,
+  useLocalAcademicYear,
+} from '@web/components/pickers/academic-year-picker';
 import { SectionPicker } from '@web/components/pickers/section-picker';
 import { CalendarClock, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -45,7 +49,6 @@ import { parseAsInteger, parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { AcademicYearSelector, useSelectedAcademicYear } from '../academic-years/year-selector';
 import { useStandards } from '../academics/use-academics';
 import { mapError, TimeInput } from './timetable-shared';
 import {
@@ -98,7 +101,6 @@ export default function TimetablePage() {
   const locale = params.locale as string;
   const resolveI18n = useI18nField();
   const { format } = useFormatDate();
-  const { yearId } = useSelectedAcademicYear();
 
   const [status, setStatus] = useQueryState('status', parseAsString);
   const [search, setSearch] = useQueryState('q', parseAsString);
@@ -107,7 +109,7 @@ export default function TimetablePage() {
 
   const [deleteTarget, setDeleteTarget] = React.useState<TimetableListItem | null>(null);
 
-  const { timetables, total, totalPages, loading } = useTimetables(yearId, {
+  const { timetables, total, totalPages, loading } = useTimetables({
     status: (status as TimetableStatus | null) ?? null,
     search,
     page,
@@ -235,28 +237,12 @@ export default function TimetablePage() {
     }) as ColumnDef<TimetableListItem, unknown>,
   ];
 
-  if (!yearId) {
-    return (
-      <div className="space-y-6">
-        <PageHeader />
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CalendarClock />
-            </EmptyMedia>
-            <EmptyTitle>{t('selectYear')}</EmptyTitle>
-          </EmptyHeader>
-        </Empty>
-      </div>
-    );
-  }
-
   return (
     <Can I="read" a="Timetable" passThrough>
       {(allowed: boolean) =>
         allowed ? (
           <div className="space-y-6" data-testid={instituteTimetable.page}>
-            <PageHeader yearId={yearId} />
+            <PageHeader />
 
             <div className="flex flex-wrap items-center gap-2">
               <Input
@@ -310,10 +296,7 @@ export default function TimetablePage() {
                     <EmptyDescription>{t('noTimetablesDescription')}</EmptyDescription>
                   </EmptyHeader>
                   <Can I="create" a="Timetable">
-                    <CreateTimetableWizard
-                      yearId={yearId}
-                      triggerTestId={instituteTimetable.emptyCreateButton}
-                    />
+                    <CreateTimetableWizard triggerTestId={instituteTimetable.emptyCreateButton} />
                   </Can>
                 </Empty>
               }
@@ -349,7 +332,7 @@ export default function TimetablePage() {
   );
 }
 
-function PageHeader({ yearId }: { yearId?: string | null }) {
+function PageHeader() {
   const t = useTranslations('timetable');
   return (
     <div className="flex items-center justify-between">
@@ -357,9 +340,8 @@ function PageHeader({ yearId }: { yearId?: string | null }) {
         {t('title')}
       </h1>
       <div className="flex items-center gap-3">
-        <AcademicYearSelector />
         <Can I="create" a="Timetable">
-          {yearId && <CreateTimetableWizard yearId={yearId} />}
+          <CreateTimetableWizard />
         </Can>
       </div>
     </div>
@@ -500,15 +482,16 @@ function buildWizardSchema(t: ReturnType<typeof useTranslations<'timetable'>>) {
 }
 
 function CreateTimetableWizard({
-  yearId,
   triggerTestId = instituteTimetable.createButton,
 }: {
-  yearId: string;
   triggerTestId?: string;
 }) {
   const t = useTranslations('timetable');
   const [open, setOpen] = React.useState(false);
   const { createTimetable, loading } = useCreateTimetable();
+  // Creation picks its own year (planning next year's grid while the current
+  // session runs). Local state — the list page itself stays year-free.
+  const { yearId, setYearId } = useLocalAcademicYear();
   const { standards } = useStandards(yearId);
   const schema = React.useMemo(() => buildWizardSchema(t), [t]);
 
@@ -520,7 +503,7 @@ function CreateTimetableWizard({
       const input: CreateTimetableInput = {
         name: parsed.name,
         description: parsed.description || null,
-        academicYearId: yearId,
+        academicYearId: yearId ?? undefined,
         sectionIds: parsed.sectionIds,
         effectiveFrom: parsed.effectiveFrom,
         effectiveTo: parsed.effectiveTo,
@@ -552,6 +535,15 @@ function CreateTimetableWizard({
     },
   });
 
+  // Sections belong to a year — switching year invalidates the selection.
+  const handleYearChange = React.useCallback(
+    (id: string) => {
+      setYearId(id);
+      form.setFieldValue('sectionIds', []);
+    },
+    [setYearId, form],
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button size="sm" className="gap-2" onClick={() => setOpen(true)} data-testid={triggerTestId}>
@@ -579,6 +571,10 @@ function CreateTimetableWizard({
             <div className="mx-auto grid w-full max-w-none grid-cols-1 items-start gap-x-12 gap-y-6 lg:grid-cols-2">
               <div className="space-y-6">
                 <FieldGroup>
+                  <Field>
+                    <FieldLabel>{t('wizard.academicYear')}</FieldLabel>
+                    <ControlledAcademicYearSelector value={yearId} onChange={handleYearChange} />
+                  </Field>
                   <I18nField
                     form={form}
                     name="name"

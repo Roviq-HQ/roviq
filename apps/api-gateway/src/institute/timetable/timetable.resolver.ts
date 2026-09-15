@@ -39,7 +39,12 @@ export class TimetableResolver {
   @Query(() => PaginatedTimetablesModel)
   @CheckAbility('read', 'Timetable')
   timetables(
-    @Args('academicYearId', { type: () => ID }) academicYearId: string,
+    @Args('academicYearId', {
+      type: () => ID,
+      nullable: true,
+      description: 'Defaults to the active academic year when omitted.',
+    })
+    academicYearId: string | null,
     @Args('status', { type: () => TimetableStatus, nullable: true }) status: TimetableStatus | null,
     @Args('sectionId', { type: () => ID, nullable: true }) sectionId: string | null,
     @Args('search', { type: () => String, nullable: true }) search: string | null,
@@ -47,7 +52,7 @@ export class TimetableResolver {
     @Args('perPage', { type: () => Int, nullable: true, defaultValue: 20 }) perPage: number,
   ): Promise<PaginatedTimetablesModel> {
     return this.service.list({
-      academicYearId,
+      academicYearId: academicYearId ?? undefined,
       status: status ?? undefined,
       sectionId: sectionId ?? undefined,
       search: search ?? undefined,

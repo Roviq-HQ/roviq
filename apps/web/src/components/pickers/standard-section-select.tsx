@@ -30,7 +30,7 @@ export function StandardSectionSelect({
   standardTestId,
   sectionTestId,
 }: {
-  academicYearId: string | null;
+  academicYearId?: string | null;
   sectionId: string | null;
   onSectionChange: (sectionId: string | null) => void;
   /** Fired when the standard changes — lets callers build standard-scoped links. */

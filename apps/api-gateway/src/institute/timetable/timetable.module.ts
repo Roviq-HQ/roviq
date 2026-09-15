@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AcademicYearRepositoryModule } from '../../academic-year/repositories/academic-year-repository.module';
 import { TimetableRepositoryModule } from './repositories/timetable-repository.module';
 import { TimetableResolver } from './timetable.resolver';
 import { TimetableService } from './timetable.service';
@@ -9,7 +10,7 @@ import { TimetableViewResolver } from './timetable-view.resolver';
 import { TimetableViewService } from './timetable-view.service';
 
 @Module({
-  imports: [TimetableRepositoryModule],
+  imports: [TimetableRepositoryModule, AcademicYearRepositoryModule],
   providers: [
     TimetableService,
     TimetableGenerationService,

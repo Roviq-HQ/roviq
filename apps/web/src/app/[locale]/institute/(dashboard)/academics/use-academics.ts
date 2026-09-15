@@ -6,7 +6,7 @@ import type { SectionModel, StandardModel, SubjectModel } from '@roviq/graphql/g
 // ── Standards ──
 
 const STANDARDS_QUERY = gql`
-  query Standards($academicYearId: ID!) {
+  query Standards($academicYearId: ID) {
     standards(academicYearId: $academicYearId) {
       id
       name
@@ -74,6 +74,31 @@ const SECTIONS_QUERY = gql`
       startTime
       endTime
       batchStatus
+    }
+  }
+`;
+
+// Bulk variant: every section across the academic year in one request, grouped
+// client-side by standardId. Avoids the N+1 fan-out of one Sections query per class.
+const SECTIONS_BY_ACADEMIC_YEAR_QUERY = gql`
+  query SectionsByAcademicYear($academicYearId: ID!) {
+    sectionsByAcademicYear(academicYearId: $academicYearId) {
+      id
+      name
+      displayLabel
+      stream { name code }
+      mediumOfInstruction
+      shift
+      classTeacherId
+      room
+      capacity
+      currentStrength
+      genderRestriction
+      displayOrder
+      startTime
+      endTime
+      batchStatus
+      standardId
     }
   }
 `;
@@ -152,12 +177,11 @@ export type Subject = SubjectModel;
 
 // ── Hooks ──
 
-export function useStandards(academicYearId: string | null) {
+export function useStandards(academicYearId?: string | null) {
   const { data, loading, error, refetch } = useQuery<{
     standards: Standard[];
   }>(STANDARDS_QUERY, {
-    variables: { academicYearId },
-    skip: !academicYearId,
+    variables: { academicYearId: academicYearId ?? null },
   });
   return { standards: data?.standards ?? [], loading, error, refetch };
 }
@@ -199,9 +223,21 @@ export function useSections(standardId: string | null) {
   }>(SECTIONS_QUERY, {
     variables: { standardId },
     skip: !standardId,
-    pollInterval: 30000, // Poll every 30 seconds for strength changes
+    // No pollInterval: the datesheet designer mounts one of these per class, so a
+    // 30s poll fans out into a request burst. Strength refetches on mutations.
   });
   return { sections: data?.sections ?? [], loading, error, refetch };
+}
+
+// One query for all sections in the academic year; callers group by `standardId`.
+export function useSectionsByAcademicYear(academicYearId: string | null) {
+  const { data, loading, error } = useQuery<{
+    sectionsByAcademicYear: Section[];
+  }>(SECTIONS_BY_ACADEMIC_YEAR_QUERY, {
+    variables: { academicYearId },
+    skip: !academicYearId,
+  });
+  return { sections: data?.sectionsByAcademicYear ?? [], loading, error };
 }
 
 export function useCreateSection() {

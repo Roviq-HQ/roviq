@@ -6,7 +6,6 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } fro
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { CalendarClock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useAcademicYears } from '../academic-years/use-academic-years';
 import type { DayScheduleSlot } from '../timetable/use-timetable';
 import { useStaffDaySchedule } from '../timetable/use-timetable';
 import { TimetableLookupsProvider, useTimetableLookups } from '../timetable/use-timetable-lookups';
@@ -36,10 +35,8 @@ export function TodayScheduleCard() {
 }
 
 function TodayScheduleInner({ slots }: { slots: DayScheduleSlot[] }) {
-  const { years } = useAcademicYears();
-  const activeYearId = years.find((y) => y.status === 'ACTIVE')?.id ?? null;
   return (
-    <TimetableLookupsProvider academicYearId={activeYearId}>
+    <TimetableLookupsProvider>
       <TodayScheduleBody slots={slots} />
     </TimetableLookupsProvider>
   );

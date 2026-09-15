@@ -9,6 +9,7 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
+import { AcademicYearRepository } from '../../academic-year/repositories/academic-year.repository';
 import { TimetableRepository } from './repositories/timetable.repository';
 import type {
   ListTimetablesQuery,
@@ -22,7 +23,7 @@ import { TimetableGenerationService } from './timetable-generation.service';
 
 /** Service-layer input for creating a timetable + generating its grid. */
 export interface CreateTimetableServiceInput {
-  academicYearId: string;
+  academicYearId?: string;
   name: Record<string, string>;
   description?: string | null;
   effectiveFrom: string;
@@ -70,6 +71,7 @@ export class TimetableService {
     private readonly repo: TimetableRepository,
     private readonly generation: TimetableGenerationService,
     private readonly eventBus: EventBusService,
+    private readonly academicYearRepo: AcademicYearRepository,
   ) {}
 
   private tenantId(): string {
@@ -79,6 +81,7 @@ export class TimetableService {
   }
 
   async create(input: CreateTimetableServiceInput): Promise<TimetableRecord> {
+    const academicYearId = await this.resolveAcademicYearId(input.academicYearId);
     if (!isValidDateRange(input.effectiveFrom, input.effectiveTo)) {
       throw new BusinessException(
         ErrorCode.INVALID_DATE_RANGE,
@@ -106,7 +109,7 @@ export class TimetableService {
       // Atomic: timetable + sections + period grid in one transaction.
       timetable = await this.repo.createWithGrid(
         {
-          academicYearId: input.academicYearId,
+          academicYearId,
           name: input.name,
           description: input.description ?? null,
           effectiveFrom: input.effectiveFrom,
@@ -142,12 +145,27 @@ export class TimetableService {
     return record;
   }
 
-  list(query: ListTimetablesQuery): Promise<PaginatedTimetables> {
-    return this.repo.listTimetables(query);
+  async list(query: ListTimetablesQuery): Promise<PaginatedTimetables> {
+    const academicYearId = await this.resolveAcademicYearId(query.academicYearId);
+    return this.repo.listTimetables({ ...query, academicYearId });
   }
 
-  statistics(academicYearId?: string): Promise<TimetableStatisticsRow> {
-    return this.repo.statistics(academicYearId);
+  // An omitted year means the current session: the single ACTIVE year.
+  // Explicit years stay for planning flows working on non-active years.
+  private async resolveAcademicYearId(academicYearId?: string | null): Promise<string> {
+    if (academicYearId) return academicYearId;
+    const active = await this.academicYearRepo.findActive();
+    if (!active) {
+      throw new BusinessException(
+        ErrorCode.NO_ACTIVE_ACADEMIC_YEAR,
+        'No academic year is currently active for this institute',
+      );
+    }
+    return active.id;
+  }
+
+  async statistics(academicYearId?: string): Promise<TimetableStatisticsRow> {
+    return this.repo.statistics(await this.resolveAcademicYearId(academicYearId));
   }
 
   getPeriods(timetableId: string): Promise<TimetablePeriodRecord[]> {

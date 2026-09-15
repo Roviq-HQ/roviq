@@ -14,8 +14,9 @@
  * Sections/subjects are per-standard queries, so we fan out one query per
  * standard through `<StandardLoader>` child components (hooks can't loop) and
  * register results into a shared map exposed via context. Wrap a page subtree
- * in `<TimetableLookupsProvider academicYearId={…}>` and read with
- * `useTimetableLookups()`.
+ * in `<TimetableLookupsProvider>` and read with `useTimetableLookups()`.
+ * The year is optional: omitted means the active year (pass an explicit id
+ * only when labeling a non-active year's entity, like a historic timetable).
  */
 import { gql, useQuery } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
@@ -74,7 +75,7 @@ export function TimetableLookupsProvider({
   academicYearId,
   children,
 }: {
-  academicYearId: string | null;
+  academicYearId?: string | null;
   children: React.ReactNode;
 }) {
   const { standards } = useStandards(academicYearId);

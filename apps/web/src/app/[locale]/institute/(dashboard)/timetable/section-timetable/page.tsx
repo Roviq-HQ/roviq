@@ -9,7 +9,6 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { AcademicYearSelector, useSelectedAcademicYear } from '../../academic-years/year-selector';
 import { ReadOnlyGrid } from '../read-only-grid';
 import { downloadBase64Pdf } from '../timetable-shared';
 import { useSectionTimetable, useSectionTimetablePdf } from '../use-timetable';
@@ -19,7 +18,6 @@ const { instituteTimetable } = testIds;
 
 export default function SectionTimetablePage() {
   const t = useTranslations('timetable');
-  const { yearId } = useSelectedAcademicYear();
   const { format } = useFormatDate();
   const searchParams = useSearchParams();
   // Deep-link support: ?section=…&standard=… (from academics / student detail).
@@ -46,8 +44,11 @@ export default function SectionTimetablePage() {
     <Can I="read" a="Timetable" passThrough>
       {(allowed: boolean) =>
         allowed ? (
-          <TimetableLookupsProvider academicYearId={yearId}>
-            <div className="space-y-6" data-testid={instituteTimetable.sectionTimetablePage}>
+          <TimetableLookupsProvider>
+            <div
+              className="space-y-6 print-document"
+              data-testid={instituteTimetable.sectionTimetablePage}
+            >
               <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
                 <h1
                   className="text-2xl font-semibold tracking-tight"
@@ -56,7 +57,6 @@ export default function SectionTimetablePage() {
                   {t('view.sectionTitle')}
                 </h1>
                 <div className="flex items-center gap-3">
-                  <AcademicYearSelector />
                   {grid && (
                     <>
                       <Button
@@ -92,7 +92,6 @@ export default function SectionTimetablePage() {
 
               <div className="print:hidden">
                 <StandardSectionSelect
-                  academicYearId={yearId}
                   sectionId={sectionId}
                   onSectionChange={setSectionId}
                   initialStandardId={initialStandardId}
@@ -122,9 +121,15 @@ export default function SectionTimetablePage() {
                 </Empty>
               ) : (
                 <div className="space-y-3">
-                  <p className="hidden text-sm text-muted-foreground print:block">
-                    {t('view.printedOn', { date: format(new Date(), 'dd/MM/yyyy') })}
-                  </p>
+                  <div
+                    className="hidden print:block"
+                    data-testid={instituteTimetable.sectionPrintHeader}
+                  >
+                    <h2 className="text-lg font-semibold">{t('view.sectionTitle')}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {t('view.printedOn', { date: format(new Date(), 'dd/MM/yyyy') })}
+                    </p>
+                  </div>
                   <ReadOnlyGrid grid={grid} testId={instituteTimetable.sectionGrid} />
                 </div>
               )}

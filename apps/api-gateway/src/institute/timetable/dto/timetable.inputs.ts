@@ -69,9 +69,13 @@ export class ExtraClassSlotInput {
 
 @InputType({ description: 'Create a timetable and auto-generate its period grid.' })
 export class CreateTimetableInput {
+  @IsOptional()
   @IsUUID()
-  @Field(() => ID)
-  academicYearId!: string;
+  @Field(() => ID, {
+    nullable: true,
+    description: 'Defaults to the active academic year when omitted.',
+  })
+  academicYearId?: string;
 
   @IsNotEmpty()
   @Field(() => I18nTextScalar, { description: 'Localised name, e.g. { en: "Summer 2026" }.' })

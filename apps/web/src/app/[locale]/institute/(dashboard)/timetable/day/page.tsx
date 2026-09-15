@@ -30,7 +30,6 @@ import { CalendarClock, ClipboardCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { AcademicYearSelector, useSelectedAcademicYear } from '../../academic-years/year-selector';
 import { mapError } from '../timetable-shared';
 import {
   type DayScheduleSlot,
@@ -79,14 +78,13 @@ function attendanceHref(
 
 export default function DaySchedulePage() {
   const t = useTranslations('timetable');
-  const { yearId } = useSelectedAcademicYear();
 
   return (
     <Can I="read" a="Timetable" passThrough>
       {(allowed: boolean) =>
         allowed ? (
-          <TimetableLookupsProvider academicYearId={yearId}>
-            <DayScheduleInner academicYearId={yearId} />
+          <TimetableLookupsProvider>
+            <DayScheduleInner />
           </TimetableLookupsProvider>
         ) : (
           <div className="flex items-center justify-center min-h-[400px]">
@@ -98,7 +96,7 @@ export default function DaySchedulePage() {
   );
 }
 
-function DayScheduleInner({ academicYearId }: { academicYearId: string | null }) {
+function DayScheduleInner() {
   const t = useTranslations('timetable');
   const lookups = useTimetableLookups();
   const [date, setDate] = React.useState<string>(todayIso());
@@ -121,7 +119,6 @@ function DayScheduleInner({ academicYearId }: { academicYearId: string | null })
         >
           {t('day.title')}
         </h1>
-        <AcademicYearSelector />
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -136,7 +133,6 @@ function DayScheduleInner({ academicYearId }: { academicYearId: string | null })
           />
         </Field>
         <StandardSectionSelect
-          academicYearId={academicYearId}
           sectionId={sectionId}
           onSectionChange={setSectionId}
           onStandardChange={setStandardId}

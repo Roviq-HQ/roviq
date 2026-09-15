@@ -82,6 +82,7 @@
   "updated": "Timetable updated",
   "wizard": {
     "title": "New Timetable",
+    "academicYear": "Academic year",
     "scheduleSection": "Schedule setup",
     "selectSections": "Sections covered",
     "selectSectionsHint": "Pick the classes this timetable applies to.",
@@ -190,6 +191,8 @@
     "downloadFailed": "Failed to download the timetable PDF. Please try again.",
     "printedOn": "Printed on {date}",
     "noTimetable": "No active timetable found for this selection.",
+    "loadFailed": "Couldn't load the timetable. Check your connection and try again.",
+    "retry": "Retry",
     "pickSection": "Pick a section to view its timetable.",
     "pickTeacher": "Pick a teacher to view their timetable.",
     "free": "Free"
