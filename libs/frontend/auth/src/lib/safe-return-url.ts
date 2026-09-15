@@ -6,7 +6,7 @@
  * origin, enabling open-redirect attacks.
  */
 export function sanitizeReturnUrl(raw: string | null | undefined): string | null {
-  if (!raw || !raw.startsWith('/')) return null;
+  if (!raw?.startsWith('/')) return null;
   const second = raw[1];
   if (second === '/' || second === '\\') return null;
   return raw;

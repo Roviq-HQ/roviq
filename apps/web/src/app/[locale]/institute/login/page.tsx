@@ -2,6 +2,7 @@
 
 import { LoginForm, sanitizeReturnUrl, useAuth } from '@roviq/auth';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
+import { LogIn } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -103,18 +104,23 @@ export default function LoginPage() {
                   <Button
                     key={user.username}
                     type="button"
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     disabled={quickLoading !== null}
                     onClick={() => quickLogin(user)}
-                    className="flex h-auto w-full items-center justify-between gap-2 font-mono text-xs"
+                    className="flex h-auto w-full items-center justify-between gap-3 border px-3 py-2 text-start hover:bg-accent hover:text-accent-foreground"
                     data-testid={auth.devQuickLogin(user.username)}
                   >
-                    <span>
-                      <span className="font-medium">{user.username}</span> / {user.password}
+                    <span className="flex flex-col items-start">
+                      <span className="text-sm font-semibold">{user.role}</span>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {user.username} / {user.password}
+                      </span>
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {quickLoading === user.username ? t('signingIn') : user.hint}
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className={quickLoading === user.username ? '' : 'hidden sm:inline'}>
+                        {quickLoading === user.username ? t('signingIn') : user.hint}
+                      </span>
+                      <LogIn className="size-4 shrink-0" aria-hidden />
                     </span>
                   </Button>
                 ))}
