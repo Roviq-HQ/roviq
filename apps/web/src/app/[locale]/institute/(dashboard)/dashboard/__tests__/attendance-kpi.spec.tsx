@@ -37,6 +37,13 @@ vi.mock('nuqs', () => ({
   ],
 }));
 
+// TodayScheduleCard calls `useAuth()` for the signed-in teacher's schedule.
+// Stub a signed-out user so the card renders nothing (its documented empty
+// state) without needing an AuthProvider.
+vi.mock('@roviq/auth', () => ({
+  useAuth: () => ({ user: null }),
+}));
+
 interface Count {
   status: 'PRESENT' | 'ABSENT' | 'LEAVE' | 'LATE';
   count: number;
