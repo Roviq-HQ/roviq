@@ -37,7 +37,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     networks: [roviq-net]
     command: server /data --console-address ":9001"
     environment:

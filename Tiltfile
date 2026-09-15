@@ -114,7 +114,7 @@ dc_resource('nats', labels=['infra'],
             links=['http://localhost:8222'])
 dc_resource('mongodb', labels=['infra'])
 dc_resource('minio', labels=['infra'],
-            links=['http://localhost:9001'])
+            links=['http://localhost:9003'])
 
 # Temporal — workflow engine, only needed when working on async workflows
 dc_resource('temporal', labels=['infra'], resource_deps=['postgres'])

@@ -28,6 +28,14 @@ Tilt UI: http://localhost:10350
 | Prometheus | 9090 | Metrics scraping and storage |
 | Grafana | 3001 | Observability dashboards — also embedded in admin-portal at `/observability` |
 
+### MinIO Image
+
+Both Compose stacks use `quay.io/minio/minio:latest`, the upstream Quay image. The
+Docker Hub reference `minio/minio:latest` no longer permits pulls. See the
+[upstream container documentation](https://github.com/minio/minio/blob/master/docs/docker/README.md).
+Retry a failed deployment with `tilt trigger minio`, then check `tilt logs minio`.
+The local API is at `http://localhost:9002`; the console is at `http://localhost:9003`.
+
 ## Observability
 
 The stack is wired end-to-end via OpenTelemetry:
