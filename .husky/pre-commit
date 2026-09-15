@@ -2,11 +2,10 @@ set -e
 
 run() {
   echo "[pre-commit] → $*"
-  if ! "$@"; then
-    rc=$?
-    echo "[pre-commit] ✗ exit $rc on: $*" >&2
-    exit "$rc"
-  fi
+  # `"$@" || { … }` so $? is the command's real exit code. The old
+  # `if ! "$@"; then rc=$?` captured the negation's status (always 0),
+  # so the hook printed "✗ exit 0" and never blocked the commit.
+  "$@" || { rc=$?; echo "[pre-commit] ✗ exit $rc on: $*" >&2; exit "$rc"; }
 }
 
 run pnpm biome check --write --error-on-warnings .

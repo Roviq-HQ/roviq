@@ -114,10 +114,10 @@ if (( ! IS_CI )); then
   fi
 fi
 
-run_lint=0; run_typecheck=0; run_unit=0
+run_typecheck=0; run_unit=0
 run_int=1; run_e2e=1
 if (( IS_CI )) || [[ -n "$affected" ]]; then
-  run_lint=1; run_typecheck=1; run_unit=1
+  run_typecheck=1; run_unit=1
 fi
 
 # ── Pre-warm: 4-way parallel infra/build, then sequential seed + app start ──
@@ -225,10 +225,13 @@ launch() {
   pids+=("$!"); names+=("$name")
 }
 
-(( run_lint ))      && launch lint      "${nx_prefix[@]}" -t lint --parallel=3
+# Biome (full repo, matches CI's `pnpm lint`) — catches diagnostics the nx eslint target misses.
+launch lint pnpm -s lint
 (( run_typecheck )) && launch typecheck "${nx_prefix[@]}" -t typecheck --parallel=3
-(( run_unit ))      && launch unit      "${nx_prefix[@]}" -t test \
-                              --exclude='integration-tests,*-e2e,web-e2e-suite' --parallel=3
+# Full unit suite (vitest unit-node + unit-dom) — matches the pre-commit gate.
+# `nx affected -t test` misses apps/web tests (no `test` target; the root vitest
+# `tests:test` cache doesn't track apps/web files), so it false-passes. (ROV-265)
+(( run_unit )) && launch unit pnpm -s test:unit
 (( run_int ))       && launch int       pnpm -s nx run integration-tests:test:int
 
 # e2e-api → e2e-ui run sequentially: they share roviq_test on port 5435.
