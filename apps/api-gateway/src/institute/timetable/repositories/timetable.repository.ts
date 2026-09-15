@@ -6,6 +6,7 @@ import type {
   CreateTimetableData,
   ListTimetablesQuery,
   PaginatedTimetables,
+  TeacherNameOption,
   TimetableDayOverrideRecord,
   TimetableEntryRecord,
   TimetableLabelMaps,
@@ -112,4 +113,8 @@ export abstract class TimetableRepository {
     sectionIds: string[];
     teacherIds: string[];
   }): Promise<TimetableLabelMaps>;
+
+  // Names-only staff options for timetable UIs. Teachers can read timetables
+  // but not the staff directory — this is the narrow alternative to listStaff.
+  abstract findTeacherNameOptions(): Promise<TeacherNameOption[]>;
 }

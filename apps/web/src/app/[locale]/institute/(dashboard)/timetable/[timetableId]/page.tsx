@@ -7,6 +7,7 @@ import {
   Can,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -27,6 +28,8 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  useAbility,
+  useBreadcrumbOverride,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { ArrowLeft, CalendarClock, Plus, Trash2 } from 'lucide-react';
@@ -51,7 +54,11 @@ import {
   useUpdateTimetableStatus,
   type Weekday,
 } from '../use-timetable';
-import { TimetableLookupsProvider, useTimetableLookups } from '../use-timetable-lookups';
+import {
+  type TimetableLookups,
+  TimetableLookupsProvider,
+  useTimetableLookups,
+} from '../use-timetable-lookups';
 
 const { instituteTimetable } = testIds;
 
@@ -62,6 +69,8 @@ export default function TimetableEditorPage() {
   const t = useTranslations('timetable');
   const resolveI18n = useI18nField();
   const { timetable, loading } = useTimetable(timetableId);
+  // Show the timetable name in the breadcrumb instead of the raw UUID segment.
+  useBreadcrumbOverride(timetable ? { [timetableId]: resolveI18n(timetable.name) } : {});
 
   if (loading) {
     return (
@@ -193,7 +202,8 @@ function PeriodAndGridEditor({ timetableId }: { timetableId: string }) {
 
   return (
     <Tabs
-      value={activeSectionId ?? undefined}
+      // '' keeps Tabs controlled before the default section resolves; undefined flips modes.
+      value={activeSectionId ?? ''}
       onValueChange={setActiveSectionId}
       className="space-y-4"
     >
@@ -333,6 +343,7 @@ function AddPeriodDialog({
       <DialogContent className="max-w-sm" data-testid={instituteTimetable.periodDialog}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">{t('period.dialogDescription')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <Field>
@@ -411,6 +422,41 @@ interface CellContext {
   entries: GridEntry[];
 }
 
+function GridCellContent({
+  entries,
+  lookups,
+  unassignedLabel,
+  showPlaceholder,
+}: {
+  entries: GridEntry[];
+  lookups: TimetableLookups;
+  unassignedLabel: string;
+  showPlaceholder: boolean;
+}) {
+  if (entries.length === 0) {
+    // The "+" invites a click — only editors see it.
+    return showPlaceholder ? <span className="text-xs text-muted-foreground">+</span> : null;
+  }
+  return (
+    <div className="space-y-1">
+      {entries.map((entry) => (
+        <div key={entry.id} className="text-xs">
+          {entry.splitLabel && <span className="font-medium">{entry.splitLabel}: </span>}
+          <span className="font-medium">
+            {lookups.subjectLabel(entry.subjectId) || unassignedLabel}
+          </span>
+          {entry.teacherId && (
+            <span className="block text-muted-foreground">
+              {lookups.teacherLabel(entry.teacherId)}
+            </span>
+          )}
+          {entry.room && <span className="block text-muted-foreground">{entry.room}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SectionGrid({
   timetableId,
   sectionId,
@@ -427,6 +473,7 @@ function SectionGrid({
   const { grid } = useSectionTimetable(sectionId, timetableId);
   const { removePeriod } = useRemoveTimetablePeriod();
   const [cell, setCell] = React.useState<CellContext | null>(null);
+  const editable = useAbility().can('update', 'Timetable');
 
   const sortedPeriods = React.useMemo(
     () => [...periods].sort((a, b) => a.sequence - b.sequence),
@@ -503,39 +550,34 @@ function SectionGrid({
                     );
                   }
                   const cellEntries = entriesFor(period.id, day);
+                  const cellTestId = instituteTimetable.gridCell(period.id, day);
+                  const cellBody = (
+                    <GridCellContent
+                      entries={cellEntries}
+                      lookups={lookups}
+                      unassignedLabel={t('assign.unassigned')}
+                      showPlaceholder={editable}
+                    />
+                  );
                   return (
                     <td key={day} className="p-1 align-top">
-                      <button
-                        type="button"
-                        className="w-full min-h-[3rem] rounded border border-dashed border-border p-1.5 text-start hover:border-primary hover:bg-accent/50 transition-colors"
-                        onClick={() => setCell({ period, day, entries: cellEntries })}
-                        data-testid={instituteTimetable.gridCell(period.id, day)}
-                      >
-                        {cellEntries.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">+</span>
-                        ) : (
-                          <div className="space-y-1">
-                            {cellEntries.map((entry) => (
-                              <div key={entry.id} className="text-xs">
-                                {entry.splitLabel && (
-                                  <span className="font-medium">{entry.splitLabel}: </span>
-                                )}
-                                <span className="font-medium">
-                                  {lookups.subjectLabel(entry.subjectId) || t('assign.unassigned')}
-                                </span>
-                                {entry.teacherId && (
-                                  <span className="block text-muted-foreground">
-                                    {lookups.teacherLabel(entry.teacherId)}
-                                  </span>
-                                )}
-                                {entry.room && (
-                                  <span className="block text-muted-foreground">{entry.room}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </button>
+                      {editable ? (
+                        <button
+                          type="button"
+                          className="w-full min-h-[3rem] rounded border border-dashed border-border p-1.5 text-start hover:border-primary hover:bg-accent/50 transition-colors"
+                          onClick={() => setCell({ period, day, entries: cellEntries })}
+                          data-testid={cellTestId}
+                        >
+                          {cellBody}
+                        </button>
+                      ) : (
+                        <div
+                          className="w-full min-h-[3rem] rounded border border-border/60 p-1.5 text-start"
+                          data-testid={cellTestId}
+                        >
+                          {cellBody}
+                        </div>
+                      )}
                     </td>
                   );
                 })}
@@ -606,7 +648,7 @@ function AssignDialog({
       : [{ splitIndex: 0, splitLabel: '', subjectId: '', teacherId: '', room: '' }],
   );
 
-  const subjectOptions = lookups.subjectGroups.flatMap((g) => g.options);
+  const subjectOptions = lookups.subjectOptions;
 
   const toggleDay = (day: Weekday) =>
     setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
@@ -675,6 +717,7 @@ function AssignDialog({
           <DialogTitle>
             {t('assign.dialogTitle')} · {period.label}
           </DialogTitle>
+          <DialogDescription className="sr-only">{t('assign.dialogDescription')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

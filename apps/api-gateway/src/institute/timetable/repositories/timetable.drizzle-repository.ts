@@ -33,6 +33,7 @@ import type {
   CreateTimetableData,
   ListTimetablesQuery,
   PaginatedTimetables,
+  TeacherNameOption,
   TimetableDayOverrideRecord,
   TimetableEntryRecord,
   TimetableLabelMaps,
@@ -882,6 +883,23 @@ export class TimetableDrizzleRepository extends TimetableRepository {
       }
 
       return { subjects, sections, teachers };
+    });
+  }
+
+  async findTeacherNameOptions(): Promise<TeacherNameOption[]> {
+    return withTenant(this.db, this.ctx(), async (tx) => {
+      // Same join as resolveLabels, unfiltered: the names-only alternative to
+      // listStaff for roles that read timetables but not the staff directory.
+      const rows = await tx
+        .select({
+          membershipId: staffProfilesLive.membershipId,
+          firstName: userProfiles.firstName,
+          lastName: userProfiles.lastName,
+        })
+        .from(staffProfilesLive)
+        .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+        .limit(100);
+      return rows;
     });
   }
 }

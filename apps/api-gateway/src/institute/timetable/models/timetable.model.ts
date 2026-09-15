@@ -241,6 +241,12 @@ export class TimetableGridModel {
 
   @Field(() => [TimetableEntryModel])
   entries!: TimetableEntryModel[];
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Display name of the teacher (staff view only; null for section view).',
+  })
+  teacherName!: string | null;
 }
 
 @ObjectType({

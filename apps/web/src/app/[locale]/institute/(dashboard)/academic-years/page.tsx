@@ -21,6 +21,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@roviq/ui';
+import { AcademicYearSelector } from '@web/components/pickers/academic-year-picker';
 import { parseISO } from 'date-fns';
 import {
   Archive,
@@ -44,7 +45,6 @@ import {
   useArchiveAcademicYear,
   useDeleteAcademicYear,
 } from './use-academic-years';
-import { AcademicYearSelector } from './year-selector';
 
 const { instituteAcademicYears } = testIds;
 const STATUS_CONFIG: Record<

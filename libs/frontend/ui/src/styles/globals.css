@@ -158,3 +158,17 @@
     transform: scale(1.25);
   }
 }
+
+/* Document printing (timetable grids, certificates): Chromium prints its
+   built-in header/footer (page URL, date, title) whenever the page margin
+   is non-zero. A named zero-margin page suppresses them; document pages
+   opt in with the `print-document` class so other pages keep defaults. */
+@page document-print {
+  margin: 0;
+}
+
+@media print {
+  .print-document {
+    page: document-print;
+  }
+}

@@ -71,6 +71,7 @@ const grid: TimetableGrid = {
   periods,
   workingDays: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
   entries: [entry()],
+  teacherName: 'Rajesh Sharma',
 };
 
 const labels: TimetableLabelMaps = {
@@ -135,6 +136,15 @@ describe('TimetablePdfService', () => {
         teacherIds: [TEACHER],
       }),
     );
+  });
+
+  it('keeps a small grid on a single page', async () => {
+    const buffer = await service.staffTimetablePdf(TEACHER);
+    // Each rendered page is a `/Type /Page` object (`/Pages` is the parent).
+    // The footer used to sit below the bottom margin, which auto-added a
+    // footer-only second page.
+    const pages = buffer.toString('latin1').match(/\/Type \/Page[^s]/g) ?? [];
+    expect(pages).toHaveLength(1);
   });
 
   it('throws when no timetable covers the section', async () => {

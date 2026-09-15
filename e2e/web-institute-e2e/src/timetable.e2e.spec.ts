@@ -7,7 +7,7 @@ import { SEED, SEED_IDS } from '../../shared/seed-fixtures';
 // activates against the same seeded year — so they must not run concurrently.
 test.describe.configure({ mode: 'serial' });
 
-const { instituteTimetable: tt } = testIds;
+const { instituteTimetable: tt, layout } = testIds;
 const YEAR = SEED.ACADEMIC_YEAR_INST1.id;
 
 // A weekday inside the timetables we create (effective 2026-04-01 → 2027-03-31).
@@ -164,6 +164,50 @@ test.describe('Timetable — read-only views & PDF', () => {
     await page.getByTestId(tt.downloadPdfButton).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toContain('.pdf');
+  });
+
+  test('print hides app chrome but keeps the staff grid', async ({ page }) => {
+    await page.goto(`/en/timetable/staff-timetable?year=${YEAR}`);
+    await expect(page.getByTestId(tt.staffTimetablePage)).toBeVisible({ timeout: 15_000 });
+
+    // Default selection is "Me"; pick an explicit teacher to guarantee a grid.
+    // The first option is the "Me" shortcut, which the header renders as the
+    // signed-in username — so prefer a listed teacher for the name assertion.
+    await page.getByTestId(tt.staffTeacherSelect).click();
+    const options = page.getByRole('option');
+    const pickIndex = (await options.count()) > 1 ? 1 : 0;
+    const teacherOption = options.nth(pickIndex);
+    const teacherName = ((await teacherOption.textContent()) ?? '').trim();
+    await teacherOption.click();
+    await expect(page.getByTestId(tt.staffGrid)).toBeVisible({ timeout: 15_000 });
+
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.getByTestId(layout.desktopSidebar)).toBeHidden();
+    await expect(page.getByTestId(layout.topbar)).toBeHidden();
+    await expect(page.getByTestId(tt.staffGrid)).toBeVisible();
+    // Print header names the teacher whose grid this is.
+    await expect(page.getByTestId(tt.staffPrintHeader)).toBeVisible();
+    await expect(page.getByTestId(tt.staffPrintHeader)).toContainText('Staff Timetable');
+    if (pickIndex > 0 && teacherName) {
+      await expect(page.getByTestId(tt.staffPrintHeader)).toContainText(teacherName);
+    }
+    // The named zero-margin page suppresses the browser URL/date header.
+    const hasCleanPage = await page.evaluate(() => {
+      const texts: string[] = [];
+      for (const sheet of Array.from(document.styleSheets)) {
+        let rules: CSSRuleList | null = null;
+        try {
+          rules = sheet.cssRules;
+        } catch {
+          rules = null;
+        }
+        if (!rules) continue;
+        for (const rule of Array.from(rules)) texts.push(rule.cssText);
+      }
+      return texts.some((css) => /@page\s+document-print\s*\{[^}]*margin:\s*0/.test(css));
+    });
+    expect(hasCleanPage).toBe(true);
+    await page.emulateMedia({ media: 'screen' });
   });
 
   test('day schedule renders and links to attendance for a period', async ({ page }) => {

@@ -3,6 +3,7 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { i18nDisplay } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { AcademicYearRepository } from '../../academic-year/repositories/academic-year.repository';
 import { StandardRepository } from '../standard/repositories/standard.repository';
 import type { CreateSectionInput } from './dto/create-section.input';
 import type { UpdateSectionInput } from './dto/update-section.input';
@@ -15,6 +16,7 @@ export class SectionService {
     private readonly repo: SectionRepository,
     private readonly standardRepo: StandardRepository,
     private readonly eventBus: EventBusService,
+    private readonly academicYearRepo: AcademicYearRepository,
   ) {}
 
   async findById(id: string): Promise<SectionRecord> {
@@ -25,6 +27,24 @@ export class SectionService {
 
   async findByStandard(standardId: string): Promise<SectionRecord[]> {
     return this.repo.findByStandard(standardId);
+  }
+
+  async findByAcademicYear(academicYearId?: string | null): Promise<SectionRecord[]> {
+    return this.repo.findByAcademicYear(await this.resolveAcademicYearId(academicYearId));
+  }
+
+  // An omitted year means the current session: the single ACTIVE year.
+  // Explicit years stay for planning flows working on non-active years.
+  private async resolveAcademicYearId(academicYearId?: string | null): Promise<string> {
+    if (academicYearId) return academicYearId;
+    const active = await this.academicYearRepo.findActive();
+    if (!active) {
+      throw new BusinessException(
+        ErrorCode.NO_ACTIVE_ACADEMIC_YEAR,
+        'No academic year is currently active for this institute',
+      );
+    }
+    return active.id;
   }
 
   async create(input: CreateSectionInput): Promise<SectionRecord> {

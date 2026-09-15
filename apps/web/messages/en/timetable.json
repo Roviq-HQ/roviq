@@ -147,6 +147,7 @@
     "dialogTitlePeriod": "Add period",
     "dialogTitleBreak": "Add break",
     "dialogTitleExtra": "Add extra period",
+    "dialogDescription": "Set the label, timing, and session for this period.",
     "kind": "Kind",
     "label": "Label",
     "labelPlaceholder": "e.g. Lunch",
@@ -177,7 +178,8 @@
     "cleared": "Slot cleared",
     "unassigned": "Unassigned",
     "selectSubject": "Select subject",
-    "selectTeacher": "Select teacher"
+    "selectTeacher": "Select teacher",
+    "dialogDescription": "Choose the days, then assign a subject, teacher, and room to each split."
   },
   "view": {
     "sectionTitle": "Section Timetable",

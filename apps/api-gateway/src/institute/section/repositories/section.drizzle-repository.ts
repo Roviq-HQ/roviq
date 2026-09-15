@@ -98,6 +98,20 @@ export class SectionDrizzleRepository extends SectionRepository {
     });
   }
 
+  async findByAcademicYear(academicYearId: string): Promise<SectionRecord[]> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:section'), async (tx) => {
+      return (
+        tx
+          .select(liveColumns)
+          .from(sectionsLive)
+          .where(eq(sectionsLive.academicYearId, academicYearId))
+          // id as stable secondary so paging/grids render deterministically.
+          .orderBy(asc(sectionsLive.displayOrder), asc(sectionsLive.id)) as Promise<SectionRecord[]>
+      );
+    });
+  }
+
   async create(data: CreateSectionData): Promise<SectionRecord> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();

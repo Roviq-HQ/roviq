@@ -192,6 +192,13 @@ export interface CreateOverrideData {
 
 // ── Display-label resolution (PDF / export rendering) ─────────────────────────
 
+/** A staff member reduced to assignment identity for teacher dropdowns/labels. */
+export interface TeacherNameOption {
+  membershipId: string;
+  firstName: I18nContent;
+  lastName: I18nContent | null;
+}
+
 /** id → human-readable label maps for the ids referenced by grid entries. */
 export interface TimetableLabelMaps {
   subjects: Record<string, string>;

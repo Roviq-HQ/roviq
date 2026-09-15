@@ -29,18 +29,28 @@ export function AdminLayout({
         >
           Skip to main
         </a>
-        <div className="flex h-screen overflow-hidden">
-          <DesktopSidebar config={config} />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <Topbar config={config} />
+        {/* App chrome hides in print so window.print() outputs page content
+            only. `contents` keeps flex layout untouched on screen. The scroll
+            containers below must also release their clipping, otherwise only
+            the visible viewport prints. */}
+        <div className="flex h-screen overflow-hidden print:block print:h-auto print:overflow-visible">
+          <div className="contents print:hidden">
+            <DesktopSidebar config={config} />
+          </div>
+          <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+            <div className="contents print:hidden">
+              <Topbar config={config} />
+            </div>
             {config.bottomNav && config.navRegistry && (
-              <BottomTabBar bottomNav={config.bottomNav} navRegistry={config.navRegistry} />
+              <div className="contents print:hidden">
+                <BottomTabBar bottomNav={config.bottomNav} navRegistry={config.navRegistry} />
+              </div>
             )}
             <main
               id="main-content"
               tabIndex={-1}
               className={cn(
-                'flex-1 overflow-y-auto p-4 md:p-6',
+                'flex-1 overflow-y-auto p-4 md:p-6 print:h-auto print:overflow-visible',
                 // Content scrolls all the way under the fixed bottom-tab bar
                 // so the bar's translucent backdrop-blur picks up the page
                 // content beneath it (matches iOS App Store behaviour). The
@@ -56,7 +66,9 @@ export function AdminLayout({
           </div>
         </div>
         <CommandPalette config={config} />
-        <Toaster position="bottom-right" richColors />
+        <div className="print:hidden">
+          <Toaster position="bottom-right" richColors />
+        </div>
       </SidebarProvider>
     </ThemeProvider>
   );

@@ -1,5 +1,12 @@
 import type { SubjectType } from '@roviq/database';
 
+/** A subject linked to a standard, reduced to label/dropdown identity. */
+export interface SubjectNameOption {
+  id: string;
+  name: string;
+  standardId: string;
+}
+
 export interface SubjectRecord {
   id: string;
   tenantId: string;

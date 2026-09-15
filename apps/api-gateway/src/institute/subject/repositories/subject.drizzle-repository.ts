@@ -7,6 +7,7 @@ import {
   softDelete,
   standardSubjects,
   standardSubjectsLive,
+  standardsLive,
   subjects,
   subjectsLive,
   withTenant,
@@ -14,7 +15,12 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { SubjectRepository } from './subject.repository';
-import type { CreateSubjectData, SubjectRecord, UpdateSubjectData } from './types';
+import type {
+  CreateSubjectData,
+  SubjectNameOption,
+  SubjectRecord,
+  UpdateSubjectData,
+} from './types';
 
 // Read-side columns are pulled from `subjects_live` (security_invoker view that
 // hides soft-deleted rows). Writes target the underlying `subjects` table.
@@ -103,6 +109,25 @@ export class SubjectDrizzleRepository extends SubjectRepository {
         .from(subjectsLive)
         .where(inArray(subjectsLive.id, subjectIds))
         .orderBy(asc(subjectsLive.name)) as Promise<SubjectRecord[]>;
+    });
+  }
+
+  async findByAcademicYear(academicYearId: string): Promise<SubjectNameOption[]> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+      // One batched read for label maps: every subject linked to the year's
+      // standards, each tagged with its standard for client-side grouping.
+      return tx
+        .select({
+          id: subjectsLive.id,
+          name: subjectsLive.name,
+          standardId: standardSubjectsLive.standardId,
+        })
+        .from(standardSubjectsLive)
+        .innerJoin(standardsLive, eq(standardsLive.id, standardSubjectsLive.standardId))
+        .innerJoin(subjectsLive, eq(subjectsLive.id, standardSubjectsLive.subjectId))
+        .where(eq(standardsLive.academicYearId, academicYearId))
+        .orderBy(asc(subjectsLive.name));
     });
   }
 

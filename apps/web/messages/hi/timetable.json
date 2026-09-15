@@ -147,6 +147,7 @@
     "dialogTitlePeriod": "कालांश जोड़ें",
     "dialogTitleBreak": "अवकाश जोड़ें",
     "dialogTitleExtra": "अतिरिक्त कालांश जोड़ें",
+    "dialogDescription": "इस कालांश के लिए लेबल, समय और सत्र निर्धारित करें।",
     "kind": "प्रकार",
     "label": "लेबल",
     "labelPlaceholder": "जैसे भोजनावकाश",
@@ -177,7 +178,8 @@
     "cleared": "स्लॉट साफ़ किया गया",
     "unassigned": "अनासाइन",
     "selectSubject": "विषय चुनें",
-    "selectTeacher": "शिक्षक चुनें"
+    "selectTeacher": "शिक्षक चुनें",
+    "dialogDescription": "दिन चुनें, फिर प्रत्येक विभाजन के लिए विषय, शिक्षक और कमरा असाइन करें।"
   },
   "view": {
     "sectionTitle": "सेक्शन समय-सारणी",

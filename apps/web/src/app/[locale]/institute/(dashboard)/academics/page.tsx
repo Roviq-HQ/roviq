@@ -30,6 +30,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { AcademicYearSelector } from '@web/components/pickers/academic-year-picker';
 import { Check, GraduationCap, Layers, List, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -38,7 +39,6 @@ import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { AcademicYearSelector } from '../academic-years/year-selector';
 import {
   type Standard,
   useCreateStandard,

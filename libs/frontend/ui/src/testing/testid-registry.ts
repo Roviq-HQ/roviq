@@ -959,6 +959,10 @@ export const testIds = {
     staffTimetableTitle: 'staff-timetable-title',
     staffTeacherSelect: 'staff-timetable-teacher-select',
     staffGrid: 'staff-timetable-grid',
+    staffGridError: 'staff-timetable-grid-error',
+    staffGridRetryBtn: 'staff-timetable-grid-retry-btn',
+    staffPrintHeader: 'staff-timetable-print-header',
+    sectionPrintHeader: 'section-timetable-print-header',
 
     // ── Day schedule + overrides (day/page.tsx) ──
     dayPage: 'timetable-day-page',

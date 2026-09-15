@@ -5,7 +5,8 @@ import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { CreateSubjectInput } from './dto/create-subject.input';
 import { UpdateSubjectInput } from './dto/update-subject.input';
 import { SubjectModel } from './models/subject.model';
-import type { SubjectRecord } from './repositories/types';
+import { SubjectOptionModel } from './models/subject-option.model';
+import type { SubjectNameOption, SubjectRecord } from './repositories/types';
 import { SubjectService } from './subject.service';
 
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
@@ -33,6 +34,22 @@ export class SubjectResolver {
     @Args('standardId', { type: () => ID }) standardId: string,
   ): Promise<SubjectRecord[]> {
     return this.subjectService.findByStandard(standardId);
+  }
+
+  @Query(() => [SubjectOptionModel], {
+    description:
+      'Every subject linked to the year’s standards, each tagged with its standard. One batched read replacing per-standard fan-out for label maps.',
+  })
+  @CheckAbility('read', 'Subject')
+  async subjectsByAcademicYear(
+    @Args('academicYearId', {
+      type: () => ID,
+      nullable: true,
+      description: 'Defaults to the active academic year when omitted.',
+    })
+    academicYearId?: string | null,
+  ): Promise<SubjectNameOption[]> {
+    return this.subjectService.findByAcademicYear(academicYearId);
   }
 
   @Mutation(() => SubjectModel, { description: 'Create a subject in the current institute.' })

@@ -19,6 +19,7 @@ import {
   seedNotificationConfigs,
 } from './institutes';
 import { seedDemoStaffProfiles } from './staff-profiles';
+import { seedTimetable } from './timetable';
 import { seedInstituteRoles, seedUsersAndMemberships } from './users';
 
 export async function seedDemo(db: DrizzleDB): Promise<void> {
@@ -62,5 +63,6 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
     await seedDemoStaffProfiles(tx, inst1.id);
 
     await seedAttendanceAndLeaves(tx, inst1.id);
+    await seedTimetable(tx, inst1.id);
   });
 }

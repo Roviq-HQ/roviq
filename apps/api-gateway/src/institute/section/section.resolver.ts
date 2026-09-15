@@ -23,6 +23,21 @@ export class SectionResolver {
     return this.sectionService.findByStandard(standardId);
   }
 
+  @Query(() => [SectionModel], {
+    description: 'All sections in an academic year, for grids/datesheets.',
+  })
+  @CheckAbility('read', 'Section')
+  async sectionsByAcademicYear(
+    @Args('academicYearId', {
+      type: () => ID,
+      nullable: true,
+      description: 'Defaults to the active academic year when omitted.',
+    })
+    academicYearId?: string | null,
+  ): Promise<SectionRecord[]> {
+    return this.sectionService.findByAcademicYear(academicYearId);
+  }
+
   @Query(() => SectionModel, { description: 'Fetch a section by id.' })
   @CheckAbility('read', 'Section')
   async section(@Args('id', { type: () => ID }) id: string): Promise<SectionRecord> {

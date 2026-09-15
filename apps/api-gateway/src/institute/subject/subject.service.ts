@@ -1,17 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
+import { AcademicYearRepository } from '../../academic-year/repositories/academic-year.repository';
 import type { CreateSubjectInput } from './dto/create-subject.input';
 import type { UpdateSubjectInput } from './dto/update-subject.input';
 import { SubjectRepository } from './repositories/subject.repository';
-import type { SubjectRecord } from './repositories/types';
+import type { SubjectNameOption, SubjectRecord } from './repositories/types';
 
 @Injectable()
 export class SubjectService {
   constructor(
     private readonly repo: SubjectRepository,
     private readonly eventBus: EventBusService,
+    private readonly academicYearRepo: AcademicYearRepository,
   ) {}
 
   private get tenantId(): string {
@@ -32,6 +35,24 @@ export class SubjectService {
 
   async findByStandard(standardId: string): Promise<SubjectRecord[]> {
     return this.repo.findByStandard(standardId);
+  }
+
+  async findByAcademicYear(academicYearId?: string | null): Promise<SubjectNameOption[]> {
+    return this.repo.findByAcademicYear(await this.resolveAcademicYearId(academicYearId));
+  }
+
+  // An omitted year means the current session: the single ACTIVE year.
+  // Explicit years stay for planning flows working on non-active years.
+  private async resolveAcademicYearId(academicYearId?: string | null): Promise<string> {
+    if (academicYearId) return academicYearId;
+    const active = await this.academicYearRepo.findActive();
+    if (!active) {
+      throw new BusinessException(
+        ErrorCode.NO_ACTIVE_ACADEMIC_YEAR,
+        'No academic year is currently active for this institute',
+      );
+    }
+    return active.id;
   }
 
   async create(input: CreateSubjectInput): Promise<SubjectRecord> {

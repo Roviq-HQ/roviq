@@ -179,3 +179,67 @@ describe('TimetableViewService.daySchedule', () => {
     expect(slot).toMatchObject({ teacherId: null, subjectId: null, isOverride: false });
   });
 });
+
+describe('TimetableViewService.staffTimetable teacherName', () => {
+  let repo: TimetableRepository;
+  let service: TimetableViewService;
+
+  beforeEach(() => {
+    repo = createMock<TimetableRepository>({
+      listTimetables: vi
+        .fn()
+        .mockResolvedValue({ docs: [timetable()], total: 1, page: 1, perPage: 1, totalPages: 1 }),
+      findPeriods: vi.fn().mockResolvedValue(periods),
+      findEntriesByTeacher: vi.fn().mockResolvedValue([entry()]),
+      findEntriesBySection: vi.fn().mockResolvedValue([entry()]),
+      resolveLabels: vi.fn().mockResolvedValue({
+        subjects: {},
+        sections: {},
+        teachers: { [TEACHER]: 'Rajesh Sharma' },
+      }),
+    });
+    service = new TimetableViewService(repo, createMock<EventBusService>({ emit: vi.fn() }));
+  });
+
+  it('resolves the teacher display name for the staff view', async () => {
+    const grid = await service.staffTimetable(TEACHER);
+    expect(grid?.teacherName).toBe('Rajesh Sharma');
+    expect(repo.resolveLabels).toHaveBeenCalledWith({
+      subjectIds: [],
+      sectionIds: [],
+      teacherIds: [TEACHER],
+    });
+  });
+
+  it('returns null teacherName when the teacher has no staff profile', async () => {
+    vi.mocked(repo.resolveLabels).mockResolvedValue({ subjects: {}, sections: {}, teachers: {} });
+    const grid = await service.staffTimetable(TEACHER);
+    expect(grid?.teacherName).toBeNull();
+  });
+
+  it('leaves teacherName null for the section view', async () => {
+    const grid = await service.sectionTimetable(SECTION);
+    expect(grid?.teacherName).toBeNull();
+  });
+});
+
+describe('TimetableViewService.teacherOptions', () => {
+  let repo: TimetableRepository;
+  let service: TimetableViewService;
+
+  beforeEach(() => {
+    repo = createMock<TimetableRepository>();
+    service = new TimetableViewService(repo, createMock<EventBusService>({ emit: vi.fn() }));
+  });
+
+  it('should return names-only staff options from the repository', async () => {
+    const rows = [
+      { membershipId: TEACHER, firstName: { en: 'Rajesh' }, lastName: { en: 'Sharma' } },
+      { membershipId: 'mem-2', firstName: { en: 'Aarav' }, lastName: null },
+    ];
+    vi.mocked(repo.findTeacherNameOptions).mockResolvedValue(rows);
+
+    await expect(service.teacherOptions()).resolves.toBe(rows);
+    expect(repo.findTeacherNameOptions).toHaveBeenCalledTimes(1);
+  });
+});

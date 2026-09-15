@@ -4,6 +4,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { TimetableRepository } from './repositories/timetable.repository';
 import type {
+  TeacherNameOption,
   TimetableDayOverrideRecord,
   TimetableEntryRecord,
   TimetablePeriodRecord,
@@ -16,6 +17,8 @@ export interface TimetableGrid {
   periods: TimetablePeriodRecord[];
   workingDays: Weekday[];
   entries: TimetableEntryRecord[];
+  /** Display name of the teacher (staff view only; null for section view). */
+  teacherName: string | null;
 }
 
 /** A single resolved cell for a specific date (master entry with overrides applied). */
@@ -93,7 +96,18 @@ export class TimetableViewService {
       this.repo.findPeriods(timetable.id),
       this.repo.findEntriesBySection(timetable.id, sectionId),
     ]);
-    return { timetableId: timetable.id, periods, workingDays: timetable.workingDays, entries };
+    return {
+      timetableId: timetable.id,
+      periods,
+      workingDays: timetable.workingDays,
+      entries,
+      teacherName: null,
+    };
+  }
+
+  /** Names-only staff options for timetable UIs (no Staff-directory read needed). */
+  async teacherOptions(): Promise<TeacherNameOption[]> {
+    return this.repo.findTeacherNameOptions();
   }
 
   async staffTimetable(teacherId: string, timetableId?: string): Promise<TimetableGrid | null> {
@@ -106,7 +120,20 @@ export class TimetableViewService {
       this.repo.findPeriods(timetable.id),
       this.repo.findEntriesByTeacher(timetable.id, teacherId),
     ]);
-    return { timetableId: timetable.id, periods, workingDays: timetable.workingDays, entries };
+    // Resolved server-side so teacher-role callers (who cannot read the
+    // staff directory) still get a display name for print headers.
+    const labels = await this.repo.resolveLabels({
+      subjectIds: [],
+      sectionIds: [],
+      teacherIds: [teacherId],
+    });
+    return {
+      timetableId: timetable.id,
+      periods,
+      workingDays: timetable.workingDays,
+      entries,
+      teacherName: labels.teachers[teacherId] ?? null,
+    };
   }
 
   async daySchedule(date: string, sectionId: string, timetableId?: string): Promise<DaySchedule> {

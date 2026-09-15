@@ -35,7 +35,7 @@ export class SectionModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => ID, { description: 'Parent standard (class) id — clients group sections by this.' })
   standardId!: string;
 
   @Field()

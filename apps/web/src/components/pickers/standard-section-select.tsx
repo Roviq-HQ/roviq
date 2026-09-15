@@ -51,7 +51,8 @@ export function StandardSectionSelect({
       <Field className="w-48">
         <FieldLabel>{t('view.selectStandard')}</FieldLabel>
         <Select
-          value={standardId ?? undefined}
+          // '' keeps the Select controlled while nothing is picked; undefined flips modes.
+          value={standardId ?? ''}
           onValueChange={(v) => {
             setStandardId(v);
             onStandardChange?.(v);
@@ -73,7 +74,8 @@ export function StandardSectionSelect({
       <Field className="w-48">
         <FieldLabel>{t('view.selectSection')}</FieldLabel>
         <Select
-          value={sectionId ?? undefined}
+          // '' keeps the Select controlled while nothing is picked; undefined flips modes.
+          value={sectionId ?? ''}
           onValueChange={(v) => onSectionChange(v)}
           disabled={!standardId}
         >

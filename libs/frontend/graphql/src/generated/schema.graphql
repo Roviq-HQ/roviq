@@ -4339,7 +4339,10 @@ type Query {
   sections(standardId: ID!): [SectionModel!]!
 
   """All sections in an academic year, for grids/datesheets."""
-  sectionsByAcademicYear(academicYearId: ID!): [SectionModel!]!
+  sectionsByAcademicYear(
+    """Defaults to the active academic year when omitted."""
+    academicYearId: ID
+  ): [SectionModel!]!
 
   """Resolved schedule for a teacher on a date."""
   staffDaySchedule(date: String!, teacherId: ID!): [DayScheduleSlotModel!]!
@@ -4372,11 +4375,24 @@ type Query {
   """List every subject in the current institute."""
   subjects: [SubjectModel!]!
 
+  """
+  Every subject linked to the year’s standards, each tagged with its standard. One batched read replacing per-standard fan-out for label maps.
+  """
+  subjectsByAcademicYear(
+    """Defaults to the active academic year when omitted."""
+    academicYearId: ID
+  ): [SubjectOptionModel!]!
+
   """Subjects linked to the given standard via `standard_subjects`."""
   subjectsByStandard(standardId: ID!): [SubjectModel!]!
   subscriptionPlan(id: ID!): SubscriptionPlanModel!
   subscriptionPlans(after: String, first: Int = 20, status: String): [SubscriptionPlanModel!]!
   subscriptions(after: String, first: Int = 20, status: String): [SubscriptionModel!]!
+
+  """
+  Staff id + display name for timetable grids and assignment dropdowns. Readable with Timetable read so teachers can label cells without Staff-directory access.
+  """
+  teacherOptions: [TeacherOptionModel!]!
   timetable(id: ID!): TimetableModel!
   timetableDayOverrides(date: String!, timetableId: ID!): [TimetableDayOverrideModel!]!
 
@@ -5297,6 +5313,17 @@ type SubjectModel {
   updatedAt: DateTime!
 }
 
+"""
+A subject linked to a standard, reduced to label/dropdown identity. Batched alternative to one subjectsByStandard call per standard.
+"""
+type SubjectOptionModel {
+  id: ID!
+  name: String!
+
+  """Standard this link belongs to — for client-side grouping."""
+  standardId: ID!
+}
+
 """A subject's aggregated result for one student."""
 type SubjectResultModel {
   grade: String
@@ -5474,6 +5501,17 @@ enum TcStatus {
   ISSUED
   REQUESTED
   REVIEW_PENDING
+}
+
+"""
+A staff member reduced to assignment identity: id plus display name. Served to roles with Timetable read (e.g. teachers) that must label grids and assignment dropdowns without Staff-directory access.
+"""
+type TeacherOptionModel {
+  firstName: I18nText!
+  lastName: I18nText
+
+  """Staff membership id — matches timetable entry teacherId."""
+  membershipId: ID!
 }
 
 """Term/semester period within an academic year"""

@@ -334,7 +334,7 @@ function OverrideDialog({
   const [room, setRoom] = React.useState<string>(slot.room ?? '');
   const [reason, setReason] = React.useState<string>('');
 
-  const subjectOptions = lookups.subjectGroups.flatMap((g) => g.options);
+  const subjectOptions = lookups.subjectOptions;
 
   const handleSubmit = async () => {
     try {

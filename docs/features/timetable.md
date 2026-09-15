@@ -67,6 +67,15 @@ Pages: list + full-screen create dialog (`page.tsx`), grid editor (`[timetableId
 - E2E API: `e2e/api-gateway-e2e/src/timetable.api-e2e.spec.ts` — lifecycle, teacher conflict, tenant isolation, auth (4 cases, green on the live stack).
 - E2E UI: `e2e/web-institute-e2e/src/timetable.e2e.spec.ts` — list & wizard, lifecycle (activate/deactivate/archive), grid cell assignment, period add, section/staff views + PDF download, day-schedule + attendance deep-link, day override create/clear, and cross-app wiring links (dashboard, staff detail, academics section).
 
+## Demo seed data
+
+`seedTimetable` (`libs/database/src/seed/demo/timetable.ts`) populates Institute 1 with an active weekly timetable so the grid editor, section/staff views, and day schedule render real data out of the box. It is idempotent (fixed `SEED_IDS` + `onConflictDoNothing`) and targets the **populated section** (`pickPopulatedSection` — the section with the most enrolled students, shared with the examination seeder). It creates:
+
+- **One timetable** — "Weekly Timetable 2026–27", effective 2026-04-01 → 2027-03-31, Mon–Fri working days, day start 08:00, default period 45 min. It claims `ACTIVE` when no other timetable is active for that academic year (the single-active partial-unique index), else falls back to `DRAFT` so the FK chain never breaks (e.g. on a test DB with an already-active timetable).
+- **One covered section** — a `timetable_sections` row linking the populated section.
+- **A 6-period day + lunch** — 7 `timetable_periods`: Period 1–3 (08:00–10:15), a `BREAK` "Lunch" (10:15–10:45), then Period 4–6 (10:45–13:00), all session `MAIN`.
+- **Mon–Fri entries** — one `timetable_entries` cell per (teaching period × working day), each assigning a rotated subject + the demo teacher (`MEMBERSHIP_TEACHER_INST1`) + a room. The single teacher never clashes because each cell is a distinct (period, day).
+
 ## RLS audit
 
 All 5 tables FORCE RLS via `tenantPolicies()` (app select/insert/update scoped to `current_setting('app.current_tenant_id')`, hard delete blocked, reseller read for owned institutes, admin all). Soft-delete visibility via `_live` views. No table is on `RLS_EXEMPT_BASENAMES`; `check:rls-coverage`, `check:live-views`, `check:live-views-coverage` all pass.

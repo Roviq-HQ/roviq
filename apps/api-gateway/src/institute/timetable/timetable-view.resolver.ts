@@ -3,6 +3,7 @@ import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { CreateTimetableDayOverrideInput } from './dto/timetable.inputs';
+import { TeacherOptionModel } from './models/teacher-option.model';
 import {
   DayScheduleModel,
   DayScheduleSlotModel,
@@ -55,6 +56,15 @@ export class TimetableViewResolver {
       teacherId,
       timetableId ?? undefined,
     ) as Promise<TimetableGridModel | null>;
+  }
+
+  @Query(() => [TeacherOptionModel], {
+    description:
+      'Staff id + display name for timetable grids and assignment dropdowns. Readable with Timetable read so teachers can label cells without Staff-directory access.',
+  })
+  @CheckAbility('read', 'Timetable')
+  teacherOptions(): Promise<TeacherOptionModel[]> {
+    return this.view.teacherOptions();
   }
 
   @Query(() => String, {
