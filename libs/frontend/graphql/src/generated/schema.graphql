@@ -630,6 +630,8 @@ type AuditLog {
   impersonatorId: String
   ipAddress: String
   metadata: JSON
+  resellerName: String
+  resellerTier: String
   source: String!
   syntheticOrigin: String
   tenantId: String
