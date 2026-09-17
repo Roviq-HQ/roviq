@@ -117,6 +117,8 @@ export const AppSubject = {
   Fee: 'Fee',
   /** Examination scheduling, marks entry, and results */
   Exam: 'Exam',
+  /** Configurable grade scheme (mark→grade bands) + co-scholastic scales */
+  GradingScheme: 'GradingScheme',
   /** Student report card / progress report */
   ReportCard: 'ReportCard',
   /** System configuration and infrastructure settings */
@@ -356,6 +358,9 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'manage', subject: 'Standard' },
     { action: 'manage', subject: 'Subject' },
     { action: 'manage', subject: 'Timetable' },
+    { action: 'manage', subject: 'Exam' },
+    { action: 'manage', subject: 'GradingScheme' },
+    { action: 'manage', subject: 'ReportCard' },
     { action: 'manage', subject: 'TC' },
     { action: 'read', subject: 'AuditLog' },
     { action: 'read', subject: 'AcademicYear' },
@@ -378,6 +383,9 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'manage', subject: 'Standard' },
     { action: 'manage', subject: 'Subject' },
     { action: 'manage', subject: 'Timetable' },
+    { action: 'manage', subject: 'Exam' },
+    { action: 'manage', subject: 'GradingScheme' },
+    { action: 'manage', subject: 'ReportCard' },
     { action: 'read', subject: 'TC' },
     { action: 'read', subject: 'AuditLog' },
     { action: 'read', subject: 'AcademicYear' },
@@ -395,6 +403,9 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'manage', subject: 'Standard' },
     { action: 'manage', subject: 'Subject' },
     { action: 'manage', subject: 'Timetable' },
+    { action: 'manage', subject: 'Exam' },
+    { action: 'manage', subject: 'GradingScheme' },
+    { action: 'manage', subject: 'ReportCard' },
     { action: 'read', subject: 'Student' },
     { action: 'read', subject: 'Staff' },
     { action: 'read', subject: 'Section' },
@@ -588,6 +599,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     ...SELF_SERVICE_ABILITIES,
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'Exam' },
+    { action: 'manage', subject: 'GradingScheme' },
     { action: 'manage', subject: 'ReportCard' },
     { action: 'read', subject: 'Standard' },
     { action: 'read', subject: 'Section' },
@@ -625,6 +637,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Subject' },
     { action: 'read', subject: 'Timetable' },
+    { action: 'read', subject: 'ReportCard' },
     { action: 'read', subject: 'Attendance', conditions: { studentId: '${user.id}' } },
     // Students can file own leaves + read the holiday calendar.
     { action: 'create', subject: 'Leave', conditions: { userId: '$user.sub' } },
@@ -644,6 +657,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Subject' },
     { action: 'read', subject: 'Timetable' },
+    { action: 'read', subject: 'ReportCard' },
     // Guardians read their children's leave + the institute holiday list.
     { action: 'read', subject: 'Leave' },
     { action: 'read', subject: 'Holiday' },

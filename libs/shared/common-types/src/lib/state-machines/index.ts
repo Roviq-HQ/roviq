@@ -1,6 +1,7 @@
 export * from './academic-year';
 export * from './admission-application';
 export * from './dlq-status';
+export * from './examination';
 export * from './institute';
 export * from './invoice';
 export * from './leave';

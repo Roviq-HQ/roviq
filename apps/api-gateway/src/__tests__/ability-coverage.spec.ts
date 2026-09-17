@@ -180,8 +180,6 @@ describe('CASL ability coverage', () => {
       // documented future-feature placeholders pass through. Drop entries
       // from this list as resolvers land.
       'manage:Fee',
-      'manage:Exam',
-      'manage:ReportCard',
       'manage:Activity',
       'manage:LibraryTransaction',
       'manage:BusRoute',

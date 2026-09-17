@@ -497,6 +497,23 @@ function StudentSidebar({ student }: { student: StudentDetailNode }) {
                 </Button>
               </Can>
             )}
+            <Can I="read" a="ReportCard">
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto gap-1.5 p-0"
+                asChild
+                title={t('detail.sidebar.viewExams')}
+              >
+                <LocaleLink
+                  href="/institute/examinations/report-cards"
+                  data-testid={testIds.instituteStudents.detailViewExamsLink}
+                >
+                  <GraduationCap className="size-3.5" />
+                  {t('detail.sidebar.viewExams')}
+                </LocaleLink>
+              </Button>
+            </Can>
           </div>
 
           <div>

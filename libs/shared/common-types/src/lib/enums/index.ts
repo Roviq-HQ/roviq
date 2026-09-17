@@ -2,6 +2,7 @@ export * from './admission';
 export * from './attendance';
 export * from './auth';
 export * from './billing';
+export * from './examination';
 export * from './geography';
 export * from './groups';
 export * from './holiday';

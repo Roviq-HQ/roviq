@@ -13,6 +13,7 @@ This guide is for institute administrators, teachers, clerks, and staff who use 
    - [Academic Years](#academic-years)
    - [Standards](#standards)
    - [Timetable](#timetable)
+   - [Examinations & Report Cards](#examinations--report-cards)
 5. [Admissions](#admissions)
    - [Enquiries](#enquiries)
    - [Applications](#applications)
@@ -155,6 +156,37 @@ The **Timetable** module builds and manages weekly class schedules for your sect
 Located in the sidebar under **Academic > Timetable**. Create/edit requires **Institute Admin, Principal, Vice Principal, or Academic Coordinator**; teachers, students, and parents can view timetables.
 
 **See the full step-by-step guide: [Timetable Help Guide](./timetable.md).**
+
+---
+
+### Examinations & Report Cards
+
+The **Examinations** module manages offline (paper-based) examinations end to end: configurable grade schemes, exam terms, exams with a per-section/subject datesheet, bulk marks entry, computed section results with ranks, NEP topic-wise competency, co-scholastic grades, and term-aggregated **report cards** that students and parents can download as a PDF. It is offline-exam management only — there is no online quiz/test-taking engine; staff enter marks after the paper exam.
+
+Three pages are grouped under **Academic** in the sidebar — **Examinations**, **Report Cards**, and **Grading Schemes**. Create/manage requires **Institute Admin, Principal, Vice Principal, Academic Coordinator, or Exam Coordinator** (subject teachers can also run the exam → marks → results flow). Students and parents can view their own published report cards.
+
+For the full technical reference (schema, enums, state machines, GraphQL surface), see **[Examinations & Report Cards feature doc](../features/examinations.md)**.
+
+#### End-to-end staff flow
+
+1. **Configure grading schemes** (one-time). On **Grading Schemes**, set up a scholastic scheme (e.g. CBSE 9-Point — grade bands tiling 0–100 with grade points) and, optionally, a co-scholastic A–E scheme. Scholastic bands are validated to cover 0–100 with no gaps or overlaps before they save.
+2. **Create exam terms**. Create a term per academic year (for example "Term 1", "Term 2"), each with a weight used in the annual roll-up.
+3. **Create an exam**. On **Examinations**, click create and pick the term, type (Unit Test, Mid-Term, Final, Practical, …), grade scheme, dates, and the term weight. A new exam starts in **Draft**.
+4. **Build the datesheet**. On the exam detail page, add one datesheet row per (section, subject, component — Theory / Practical / Internal / Project / Oral), setting the date, time, max marks, pass marks, and room.
+5. **Move the exam through its lifecycle**. The status flows `DRAFT → SCHEDULED → MARKS_ENTRY → LOCKED → RESULTS_PUBLISHED` (and finally `ARCHIVED`). Each step is a named action:
+   - **Schedule** publishes the datesheet (`DRAFT → SCHEDULED`).
+   - **Open marks entry** lets teachers record marks (`SCHEDULED → MARKS_ENTRY`).
+   - **Lock** freezes the marks (`MARKS_ENTRY → LOCKED`); a locked exam can be re-opened to `MARKS_ENTRY` for corrections.
+   - **Publish results** makes results visible (`LOCKED → RESULTS_PUBLISHED`).
+   - Invalid jumps are rejected — the buttons only offer valid next states, matching the backend state machine.
+6. **Enter marks**. While the exam is in **Marks Entry**, open the marks-entry grid for a datesheet row. The grid pre-loads the section roster; enter each student's obtained marks (or mark them absent / exempted). Every mark is range-checked against the row's max — out-of-range values are refused.
+7. **View results & ranks**. The results table computes each student's per-subject result (summing components, honouring exemptions and absences), the grade from the exam's scheme, GPA, an overall PASS / COMPARTMENT / FAIL / ABSENT outcome, and a dense rank by aggregate percentage.
+8. **Create a report card**. On **Report Cards**, create a template for a term: pick the grade scheme and toggle whether to include attendance %, co-scholastic grades, and NEP topic-wise competency. The template starts in **Draft**.
+9. **Generate report cards**. Generate per-student instances for a section. The system aggregates every non-draft, non-archived exam in the term (weighted by each exam's term weight), grades the aggregate, pulls attendance over the exam span, folds in NEP topics and co-scholastic grades, and saves one immutable snapshot per student with a dense rank. Generating flips the card from `DRAFT → GENERATED`; you can regenerate to recompute from the latest marks.
+10. **Publish report cards**. Publish releases all generated instances (`GENERATED → PUBLISHED`).
+11. **Student / parent view**. Once published, students and parents see their own report cards and can **download the PDF** (server-rendered A4: summary, scholastic table, NEP topic-wise block, co-scholastic table, remarks).
+
+> **Tip:** Co-scholastic areas (Discipline, Work Education, …) and NEP subject topics are configured once and reused; their per-student grades and competency levels are entered during the marks stage and flow into the report card automatically.
 
 ---
 
@@ -443,7 +475,7 @@ The sidebar is organised into groups for easy access:
 | Group | Pages |
 |-------|-------|
 | **Overview** | Dashboard, Users |
-| **Academic** | Academic Years, Standards, Timetable |
+| **Academic** | Academic Years, Standards, Timetable, Examinations, Report Cards, Grading Schemes |
 | **Billing** | Subscriptions, Invoices, Payments |
 | **System** | Audit Logs, Settings, Notification Preferences, Account |
 

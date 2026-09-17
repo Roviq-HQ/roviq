@@ -61,5 +61,9 @@
   "pinItem": "Pin",
   "unpinItem": "Unpin",
   "pinned": "Pinned",
-  "recents": "Recents"
+  "recents": "Recents",
+  "examinations": "Examinations",
+  "reportCards": "Report Cards",
+  "gradingSchemes": "Grading Schemes",
+  "myReportCards": "My Report Cards"
 }

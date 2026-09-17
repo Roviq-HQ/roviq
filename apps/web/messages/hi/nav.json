@@ -61,5 +61,9 @@
   "pinItem": "पिन करें",
   "unpinItem": "अनपिन करें",
   "pinned": "पिन किए गए",
-  "recents": "हाल ही में"
+  "recents": "हाल ही में",
+  "examinations": "परीक्षाएँ",
+  "reportCards": "रिपोर्ट कार्ड",
+  "gradingSchemes": "ग्रेडिंग योजनाएँ",
+  "myReportCards": "मेरे रिपोर्ट कार्ड"
 }

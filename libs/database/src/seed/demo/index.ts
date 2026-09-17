@@ -12,6 +12,7 @@ import {
   INST2_SUBJECT_MAPPINGS,
   INST2_SUBJECTS,
 } from './data';
+import { seedExaminations } from './examinations';
 import {
   seedBrandingAndConfigs,
   seedIdentifiersAndAffiliations,
@@ -63,6 +64,10 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
     await seedDemoStaffProfiles(tx, inst1.id);
 
     await seedAttendanceAndLeaves(tx, inst1.id);
+    // Config (schemes/terms/co-scholastic) seeds for both institutes; the graded
+    // exam chain only for inst1 (the institute with enrolled demo students).
+    if (ay1) await seedExaminations(tx, inst1.id, ay1.id, true);
+    if (ay2) await seedExaminations(tx, inst2.id, ay2.id, false);
     await seedTimetable(tx, inst1.id);
   });
 }

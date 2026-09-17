@@ -71,5 +71,13 @@
     "subtitle": "{count, plural, one {# class today} other {# classes today}}",
     "unassigned": "Unassigned",
     "viewMyTimetable": "View my timetable"
+  },
+  "examsTitle": "Examinations",
+  "examsDescription": "Create exams, enter marks, and issue report cards.",
+  "exams": {
+    "title": "Published results",
+    "subtitle": "{count, plural, =0 {No results published yet} one {# exam published} other {# exams published}}",
+    "noData": "No results published this year yet.",
+    "viewAll": "View examinations"
   }
 }

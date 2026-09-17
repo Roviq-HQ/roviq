@@ -188,6 +188,10 @@ See `docs/features/attendance.md` for the full attendance + leaves + holidays pi
 
 See `docs/features/timetable.md` for the timetable feature — the 5-table normalized model (`timetables`, `timetable_sections`, `timetable_periods`, `timetable_entries`, `timetable_day_overrides`), single-active + teacher-double-booking partial-unique backstops, the period-grid generation algorithm, named status transitions, conflict detection, and the per-date override model that replaces daily snapshots.
 
+### Examinations & Report Cards
+
+See `docs/features/examinations.md` for the offline-examination feature — the 12-table model (grade schemes + bands, exam terms, exams, datesheet, marks, NEP subject topics + topic assessments, co-scholastic areas + assessments, report-card templates + per-student instances), the `EXAM` / `REPORT_CARD` state machines, pure grading/aggregation math (weighted term percentage, GPA, dense ranking), the GraphQL surface with granular CASL, and the server-rendered report-card PDF.
+
 ## Date & timezone contract
 
 | Layer | Format | Notes |

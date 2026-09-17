@@ -299,7 +299,8 @@
       "dateOfBirth": "जन्म तिथि",
       "gender": "लिंग",
       "notAssigned": "निर्दिष्ट नहीं",
-      "viewTimetable": "समय-सारणी देखें"
+      "viewTimetable": "समय-सारणी देखें",
+      "viewExams": "परीक्षाएँ व रिपोर्ट कार्ड"
     },
     "status": {
       "label": "स्थिति",

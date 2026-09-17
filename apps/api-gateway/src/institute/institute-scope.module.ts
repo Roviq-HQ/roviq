@@ -7,6 +7,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { BotModule } from './bot/bot.module';
 import { CertificateModule } from './certificate/certificate.module';
 import { ConsentModule } from './consent/consent.module';
+import { ExaminationModule } from './examination/examination.module';
 import { GroupModule } from './group/group.module';
 import { GuardianModule } from './guardian/guardian.module';
 import { HolidayModule } from './holiday/holiday.module';
@@ -29,6 +30,7 @@ import { ProfileModule } from './user/profile.module';
     BotModule,
     CertificateModule,
     ConsentModule,
+    ExaminationModule,
     GroupModule,
     GuardianModule,
     HolidayModule,

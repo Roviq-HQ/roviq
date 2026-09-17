@@ -5,6 +5,7 @@ import {
   ADMISSION_APPLICATION_STATUS_VALUES,
   ADMISSION_TYPE_VALUES,
   AFFILIATION_STATUS_VALUES,
+  ASSESSMENT_COMPONENT_VALUES,
   ATTENDANCE_MODE_VALUES,
   ATTENDANCE_STATUS_VALUES,
   ATTENDANCE_TYPE_VALUES,
@@ -15,6 +16,7 @@ import {
   BOT_TYPE_VALUES,
   CERTIFICATE_STATUS_VALUES,
   CERTIFICATE_TEMPLATE_TYPE_VALUES,
+  COMPETENCY_LEVEL_VALUES,
   DAY_SESSION_VALUES,
   DOMAIN_GROUP_TYPE_VALUES,
   DYNAMIC_GROUP_STATUS_VALUES,
@@ -22,8 +24,11 @@ import {
   EMPLOYMENT_TYPE_VALUES,
   ENQUIRY_SOURCE_VALUES,
   ENQUIRY_STATUS_VALUES,
+  EXAM_STATUS_VALUES,
+  EXAM_TYPE_VALUES,
   GENDER_RESTRICTION_VALUES,
   GENDER_VALUES,
+  GRADING_SCHEME_KIND_VALUES,
   GROUP_MEMBER_SOURCE_VALUES,
   GROUP_MEMBERSHIP_TYPE_VALUES,
   GROUP_STATUS_VALUES,
@@ -42,8 +47,10 @@ import {
   PERIOD_KIND_VALUES,
   PROMOTION_STATUS_VALUES,
   QUALIFICATION_TYPE_VALUES,
+  REPORT_CARD_STATUS_VALUES,
   RESELLER_STATUS_VALUES,
   RESELLER_TIER_VALUES,
+  RESULT_STATUS_VALUES,
   ROLE_STATUS_VALUES,
   SETUP_STATUS_VALUES,
   SOCIAL_CATEGORY_VALUES,
@@ -108,6 +115,22 @@ export const periodKind = pgEnum('PeriodKind', PERIOD_KIND_VALUES);
 export type PeriodKind = (typeof periodKind.enumValues)[number];
 export const daySession = pgEnum('DaySession', DAY_SESSION_VALUES);
 export type DaySession = (typeof daySession.enumValues)[number];
+
+// ── Examination domain enums ───────────────────────────
+export const examType = pgEnum('ExamType', EXAM_TYPE_VALUES);
+export type ExamType = (typeof examType.enumValues)[number];
+export const examStatus = pgEnum('ExamStatus', EXAM_STATUS_VALUES);
+export type ExamStatus = (typeof examStatus.enumValues)[number];
+export const assessmentComponent = pgEnum('AssessmentComponent', ASSESSMENT_COMPONENT_VALUES);
+export type AssessmentComponent = (typeof assessmentComponent.enumValues)[number];
+export const gradingSchemeKind = pgEnum('GradingSchemeKind', GRADING_SCHEME_KIND_VALUES);
+export type GradingSchemeKind = (typeof gradingSchemeKind.enumValues)[number];
+export const competencyLevel = pgEnum('CompetencyLevel', COMPETENCY_LEVEL_VALUES);
+export type CompetencyLevel = (typeof competencyLevel.enumValues)[number];
+export const reportCardStatus = pgEnum('ReportCardStatus', REPORT_CARD_STATUS_VALUES);
+export type ReportCardStatus = (typeof reportCardStatus.enumValues)[number];
+export const resultStatus = pgEnum('ResultStatus', RESULT_STATUS_VALUES);
+export type ResultStatus = (typeof resultStatus.enumValues)[number];
 export const timetableOverrideType = pgEnum(
   'TimetableOverrideType',
   TIMETABLE_OVERRIDE_TYPE_VALUES,

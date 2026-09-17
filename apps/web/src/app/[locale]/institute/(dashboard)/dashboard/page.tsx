@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { type AttendanceStatus, useDateCounts } from '../attendance/use-attendance';
+import { ExamsSummaryCard } from './exams-summary-card';
 import { TodayScheduleCard } from './today-schedule-card';
 
 // Same palette as the attendance page's STATUS_COLORS — kept intentionally
@@ -198,6 +199,12 @@ export default function DashboardPage() {
       icon: CalendarClock,
     },
     {
+      title: t('examsTitle'),
+      description: t('examsDescription'),
+      href: '/examinations',
+      icon: GraduationCap,
+    },
+    {
       title: t('tcTitle'),
       description: t('tcDescription'),
       href: '/certificates/tc',
@@ -237,6 +244,9 @@ export default function DashboardPage() {
         </Can>
         <Can I="read" a="Timetable">
           <TodayScheduleCard />
+        </Can>
+        <Can I="read" a="Exam">
+          <ExamsSummaryCard />
         </Can>
       </div>
       <div data-testid={testIds.instituteDashboard.getStarted}>

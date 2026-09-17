@@ -54,7 +54,10 @@ services:
 
   mongodb:
     image: mongo:8
-    ports: ["27017:27017"]
+    # Host port is 27018 (not the default 27017) to avoid clashing with other
+    # local mongo instances. Novu connects via internal DNS (mongodb:27017),
+    # so only external tools (mongosh/compass) use localhost:27018.
+    ports: ["27018:27017"]
     volumes:
       - mongodb_data:/data/db
     healthcheck:

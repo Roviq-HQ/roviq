@@ -14,6 +14,18 @@ import { resellers } from './reseller/resellers';
 import { academicYears } from './tenant/academic-years';
 import { attendanceEntries } from './tenant/attendance/attendance-entries';
 import { attendanceSessions } from './tenant/attendance/attendance-sessions';
+import { coScholasticAreas } from './tenant/examination/co-scholastic-areas';
+import { coScholasticAssessments } from './tenant/examination/co-scholastic-assessments';
+import { examMarks } from './tenant/examination/exam-marks';
+import { examSchedules } from './tenant/examination/exam-schedules';
+import { examTerms } from './tenant/examination/exam-terms';
+import { examTopicAssessments } from './tenant/examination/exam-topic-assessments';
+import { exams } from './tenant/examination/exams';
+import { gradeBands } from './tenant/examination/grade-bands';
+import { gradingSchemes } from './tenant/examination/grading-schemes';
+import { reportCardInstances } from './tenant/examination/report-card-instances';
+import { reportCards } from './tenant/examination/report-cards';
+import { subjectTopics } from './tenant/examination/subject-topics';
 import { holidays } from './tenant/holidays';
 import { instituteAffiliations } from './tenant/institute-affiliations';
 import { instituteBranding } from './tenant/institute-branding';
@@ -133,6 +145,44 @@ export const timetableEntriesLive = liveView('timetable_entries_live').as((qb) =
 );
 export const timetableDayOverridesLive = liveView('timetable_day_overrides_live').as((qb) =>
   qb.select().from(timetableDayOverrides).where(isNull(timetableDayOverrides.deletedAt)),
+);
+
+// Examination & report cards.
+export const gradingSchemesLive = liveView('grading_schemes_live').as((qb) =>
+  qb.select().from(gradingSchemes).where(isNull(gradingSchemes.deletedAt)),
+);
+export const gradeBandsLive = liveView('grade_bands_live').as((qb) =>
+  qb.select().from(gradeBands).where(isNull(gradeBands.deletedAt)),
+);
+export const examTermsLive = liveView('exam_terms_live').as((qb) =>
+  qb.select().from(examTerms).where(isNull(examTerms.deletedAt)),
+);
+export const examsLive = liveView('exams_live').as((qb) =>
+  qb.select().from(exams).where(isNull(exams.deletedAt)),
+);
+export const examSchedulesLive = liveView('exam_schedules_live').as((qb) =>
+  qb.select().from(examSchedules).where(isNull(examSchedules.deletedAt)),
+);
+export const examMarksLive = liveView('exam_marks_live').as((qb) =>
+  qb.select().from(examMarks).where(isNull(examMarks.deletedAt)),
+);
+export const subjectTopicsLive = liveView('subject_topics_live').as((qb) =>
+  qb.select().from(subjectTopics).where(isNull(subjectTopics.deletedAt)),
+);
+export const examTopicAssessmentsLive = liveView('exam_topic_assessments_live').as((qb) =>
+  qb.select().from(examTopicAssessments).where(isNull(examTopicAssessments.deletedAt)),
+);
+export const coScholasticAreasLive = liveView('co_scholastic_areas_live').as((qb) =>
+  qb.select().from(coScholasticAreas).where(isNull(coScholasticAreas.deletedAt)),
+);
+export const coScholasticAssessmentsLive = liveView('co_scholastic_assessments_live').as((qb) =>
+  qb.select().from(coScholasticAssessments).where(isNull(coScholasticAssessments.deletedAt)),
+);
+export const reportCardsLive = liveView('report_cards_live').as((qb) =>
+  qb.select().from(reportCards).where(isNull(reportCards.deletedAt)),
+);
+export const reportCardInstancesLive = liveView('report_card_instances_live').as((qb) =>
+  qb.select().from(reportCardInstances).where(isNull(reportCardInstances.deletedAt)),
 );
 
 // Admission domain.

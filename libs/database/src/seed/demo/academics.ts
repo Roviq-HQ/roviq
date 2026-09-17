@@ -1,5 +1,5 @@
 // libs/database/src/seed/demo/academics.ts
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   academicYears,
   SYSTEM_USER_ID,
@@ -112,6 +112,23 @@ export async function seedSubjects(
 ): Promise<Record<string, string>> {
   const idMap: Record<string, string> = {};
   for (const s of subjectDefs) {
+    // Subjects have no natural unique key, so a blind insert mints new rows
+    // on every reseed (29 more each run). shortName is already the
+    // per-institute key for mappings — reuse the live row when present.
+    const [existing] = await tx
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.tenantId, instId),
+          eq(subjects.shortName, s.shortName),
+          isNull(subjects.deletedAt),
+        ),
+      );
+    if (existing) {
+      idMap[s.shortName] = existing.id;
+      continue;
+    }
     const [sub] = await tx
       .insert(subjects)
       .values({

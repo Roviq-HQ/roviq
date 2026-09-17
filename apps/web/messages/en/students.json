@@ -299,7 +299,8 @@
       "dateOfBirth": "Date of birth",
       "gender": "Gender",
       "notAssigned": "Not assigned",
-      "viewTimetable": "View timetable"
+      "viewTimetable": "View timetable",
+      "viewExams": "Exams & report cards"
     },
     "status": {
       "label": "Status",
