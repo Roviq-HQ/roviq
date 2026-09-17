@@ -253,3 +253,28 @@ Append-only log of testing-infrastructure issues (slow pre-push, Docker rebuilds
 **Follow-up (separate Linear issue):** `.github/workflows/ci.yml` `on:` trigger should also include `develop` (`push: branches: [main, develop]`, `pull_request: branches: [main, develop]`) so future drift is caught at merge-to-develop time, not 8 weeks later at release.
 
 ---
+
+## 2026-09-17 — `fixed` — Playwright browser install on Ubuntu 26.04
+
+**Scope:** Local Playwright browser cache for `@playwright/test@1.59.1`; no application or test code changed.
+
+**Context:** `pnpm test:e2e:ui` stopped before running tests because the expected Chromium headless-shell revision (`1217`) was absent. A normal `pnpm exec playwright install chromium` then failed with `Playwright does not support chromium on ubuntu26.04-x64`.
+
+**Root cause:** Playwright 1.59.1 recognises Ubuntu releases only through 24.04. This workstation runs Ubuntu 26.04, so the installer had no download mapping for the detected host even though the repository's CI browser environment remains Ubuntu 24.04-compatible.
+
+**Fix:** Installed the browser revision pinned by Playwright 1.59.1 using its host-platform override:
+
+```bash
+PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 pnpm exec playwright install chromium
+```
+
+Use the same environment variable when running Playwright on Ubuntu 26.04 until the repository upgrades to a Playwright release with native Ubuntu 26.04 support.
+
+**Verification:** `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 pnpm test:e2e:ui` passes with `244 passed, 19 skipped`.
+
+**Do NOT:**
+
+- Change the committed Playwright version only to bypass this workstation compatibility issue; dependency upgrades follow the release-age workflow in `docs/dependency-updates.md`.
+- Download an arbitrary Chromium build. Playwright must use the browser revision coupled to its installed package version.
+
+---
