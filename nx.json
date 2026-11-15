@@ -84,7 +84,6 @@
       "!{workspaceRoot}/apps/web/**/*",
       "!{workspaceRoot}/e2e/**/*",
       "!{workspaceRoot}/docs/**/*",
-      "!{workspaceRoot}/**/*.spec.ts",
       "!{workspaceRoot}/**/*.spec.tsx",
       "!{workspaceRoot}/**/*.api-e2e.spec.ts",
       "!{workspaceRoot}/**/__snapshots__/**",
