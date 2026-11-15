@@ -330,6 +330,7 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
   const nameByMembership = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const s of students) {
+      if (!s.membershipId) continue;
       const first = resolveI18n(s.firstName) ?? '';
       const last = s.lastName ? (resolveI18n(s.lastName) ?? '') : '';
       const fullName = [first, last].filter(Boolean).join(' ');

@@ -76,13 +76,13 @@ export class StudentModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => String, { nullable: true })
   tenantId!: string;
 
-  @Field()
+  @Field(() => String, { nullable: true })
   userId!: string;
 
-  @Field()
+  @Field(() => String, { nullable: true })
   membershipId!: string;
 
   // ── Personal (from user_profiles) ───────────────────────
@@ -113,7 +113,7 @@ export class StudentModel {
   profileImageUrl?: string | null;
 
   // ── Admission ───────────────────────────────────────────
-  @Field()
+  @Field(() => String, { nullable: true })
   admissionNumber!: string;
 
   @Field(() => DateOnlyScalar)
@@ -122,43 +122,43 @@ export class StudentModel {
   @Field(() => String, { nullable: true })
   admissionClass?: string | null;
 
-  @Field(() => AdmissionType)
+  @Field(() => AdmissionType, { nullable: true })
   admissionType!: AdmissionType;
 
   // ── Academic status ─────────────────────────────────────
-  @Field(() => AcademicStatus)
+  @Field(() => AcademicStatus, { nullable: true })
   academicStatus!: AcademicStatus;
 
   // ── Regulatory ──────────────────────────────────────────
-  @Field(() => SocialCategory)
+  @Field(() => SocialCategory, { nullable: true })
   socialCategory!: SocialCategory;
 
   @Field(() => String, { nullable: true })
   caste?: string | null;
 
-  @Field()
+  @Field(() => Boolean, { nullable: true })
   isMinority!: boolean;
 
   @Field(() => MinorityType, { nullable: true })
   minorityType?: MinorityType | null;
 
-  @Field()
+  @Field(() => Boolean, { nullable: true })
   isBpl!: boolean;
 
-  @Field()
+  @Field(() => Boolean, { nullable: true })
   isCwsn!: boolean;
 
   @Field(() => String, { nullable: true })
   cwsnType?: string | null;
 
-  @Field()
+  @Field(() => Boolean, { nullable: true })
   isRteAdmitted!: boolean;
 
   @Field(() => String, { nullable: true })
   rteCertificate?: string | null;
 
   // ── TC ──────────────────────────────────────────────────
-  @Field()
+  @Field(() => Boolean, { nullable: true })
   tcIssued!: boolean;
 
   @Field(() => String, { nullable: true })
@@ -225,13 +225,13 @@ export class StudentModel {
   medicalInfo?: MedicalInfoObject | null;
 
   // ── Metadata ────────────────────────────────────────────
-  @Field(() => Int)
+  @Field(() => Int, { nullable: true })
   version!: number;
 
-  @Field(() => DateTimeScalar)
+  @Field(() => DateTimeScalar, { nullable: true })
   createdAt!: Date;
 
-  @Field(() => DateTimeScalar)
+  @Field(() => DateTimeScalar, { nullable: true })
   updatedAt!: Date;
 }
 

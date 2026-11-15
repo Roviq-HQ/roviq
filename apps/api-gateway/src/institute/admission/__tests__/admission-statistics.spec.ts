@@ -1,5 +1,5 @@
 /**
- * ROV-168 — Unit tests for AdmissionService.statistics() (admission funnel).
+ * ROV-168 — Unit tests for AdmissionReadRepository.statistics() (admission funnel).
  *
  * Pure logic: verify funnel aggregation + conversion rate math without touching
  * the database. `@roviq/database` is mocked so `withTenant` runs its callback
@@ -11,9 +11,10 @@
  *   4) source breakdown from enquiries
  */
 
-import type { ConfigService } from '@nestjs/config';
+import { createMongoAbility } from '@casl/ability';
+import type { AppAbility } from '@roviq/common-types';
 import { AdmissionApplicationStatus } from '@roviq/common-types';
-import type { EventBusService } from '@roviq/event-bus';
+import { mkInstituteCtx } from '@roviq/database';
 import { withTestContext } from '@roviq/request-context';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -92,27 +93,23 @@ function setNextTx(tx: ReturnType<typeof buildMockTx>): void {
   nextTx = tx;
 }
 
-describe('AdmissionService.statistics() (unit)', () => {
+describe('AdmissionReadRepository.statistics() (unit)', () => {
   // Use dynamic import so the `vi.mock('@roviq/database', …)` call above is
   // hoisted before the service file pulls in `@roviq/database`.
-  let AdmissionService: typeof import('../admission.service').AdmissionService;
+  let AdmissionReadRepository: typeof import('../admission-read.repository').AdmissionReadRepository;
 
   beforeEach(async () => {
     nextTx = undefined;
-    ({ AdmissionService } = await import('../admission.service'));
+    ({ AdmissionReadRepository } = await import('../admission-read.repository'));
   });
 
+  const access = {
+    user: mkInstituteCtx('tenant-test', 'test:admission-statistics'),
+    ability: createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]),
+  };
   function makeService() {
-    // Drop the `as unknown as` cast banned by [NTESC]: ask `createMock` for
-    // the exact constructor parameter shape directly so the mock is typed
-    // correctly without escaping the type system.
-    type DbDep = ConstructorParameters<typeof AdmissionService>[0];
-    const db = createMock<DbDep>();
-    const eventBus = createMock<EventBusService>();
-    const config = createMock<ConfigService>({
-      get: vi.fn(),
-    });
-    return new AdmissionService(db, eventBus, config);
+    type DbDep = ConstructorParameters<typeof AdmissionReadRepository>[0];
+    return new AdmissionReadRepository(createMock<DbDep>());
   }
 
   it('returns zero counts and zero conversion rates when there are no rows', async () => {
@@ -126,7 +123,7 @@ describe('AdmissionService.statistics() (unit)', () => {
     );
     const service = makeService();
 
-    const stats = await withTestContext(() => service.statistics());
+    const stats = await withTestContext(() => service.statistics(access));
 
     expect(stats.totalEnquiries).toBe(0);
     expect(stats.totalApplications).toBe(0);
@@ -159,7 +156,7 @@ describe('AdmissionService.statistics() (unit)', () => {
     );
     const service = makeService();
 
-    const stats = await withTestContext(() => service.statistics());
+    const stats = await withTestContext(() => service.statistics(access));
 
     expect(stats.totalEnquiries).toBe(100);
     expect(stats.totalApplications).toBe(60);
@@ -194,7 +191,7 @@ describe('AdmissionService.statistics() (unit)', () => {
     );
     const service = makeService();
 
-    const stats = await withTestContext(() => service.statistics());
+    const stats = await withTestContext(() => service.statistics(access));
 
     // 50 / 200 = 0.25
     expect(stats.enquiryToApplicationRate).toBeCloseTo(0.25, 5);
@@ -230,7 +227,9 @@ describe('AdmissionService.statistics() (unit)', () => {
     setNextTx(tx);
     const service = makeService();
 
-    await withTestContext(() => service.statistics({ from: '2026-04-01', to: '2026-04-30' }));
+    await withTestContext(() =>
+      service.statistics(access, { from: '2026-04-01', to: '2026-04-30' }),
+    );
 
     // Every aggregate (totalEnq, totalApp, status counts, source breakdown)
     // is filtered — i.e. `.where(...)` is called once per select with a
@@ -268,7 +267,7 @@ describe('AdmissionService.statistics() (unit)', () => {
     setNextTx(tx);
     const service = makeService();
 
-    await withTestContext(() => service.statistics());
+    await withTestContext(() => service.statistics(access));
 
     // With no filter every aggregate still calls `.where(undefined)` (so
     // Drizzle no-ops the predicate). Verify the predicate is undefined.

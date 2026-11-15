@@ -45,6 +45,16 @@ local_resource(
   labels=['dev'],
 )
 
+# Data migrations require an explicit manual trigger.
+local_resource(
+  'db-migrate',
+  cmd='pnpm run db:migrate',
+  resource_deps=['pnpm-install', 'postgres'],
+  trigger_mode=TRIGGER_MODE_MANUAL,
+  auto_init=False,
+  labels=['dev'],
+)
+
 # Database seed — auto-runs after schema push, skips if already seeded
 local_resource(
   'db-seed',

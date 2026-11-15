@@ -7,12 +7,16 @@ import { StudentAcademicService } from './student-academic.service';
 import { StudentBulkImportResolver } from './student-bulk-import.resolver';
 import { StudentBulkImportService } from './student-bulk-import.service';
 import { StudentEventHandler } from './student-event.handler';
+import { StudentQueryService } from './student-query.service';
+import { StudentReadRepository } from './student-read.repository';
 import { BulkStudentImportWorkerService } from './workflows/bulk-student-import.worker';
 
 @Module({
   imports: [AuthModule],
   providers: [
     StudentService,
+    StudentQueryService,
+    StudentReadRepository,
     StudentResolver,
     StudentAcademicService,
     StudentAcademicResolver,

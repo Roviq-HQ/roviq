@@ -3,6 +3,11 @@ export { AbilityGuard } from './ability.guard';
 export { caslToSqlWhere } from './casl-to-sql';
 export { type AbilityCheck, CHECK_ABILITY_KEY, CheckAbility } from './check-ability.decorator';
 export { CurrentAbility } from './current-ability.decorator';
+export {
+  type AbilityRequestContext,
+  CurrentReadAccess,
+  type InstituteReadAccess,
+} from './read-access';
 export { MembershipAbilityDrizzleRepository } from './repositories/membership-ability.drizzle-repository';
 export { MembershipAbilityRepository } from './repositories/membership-ability.repository';
 export { RoleDrizzleRepository } from './repositories/role.drizzle-repository';

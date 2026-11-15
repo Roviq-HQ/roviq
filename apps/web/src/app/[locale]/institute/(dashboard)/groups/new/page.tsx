@@ -863,7 +863,7 @@ function StudentCandidates({
       {students.map((s) => {
         const first = ti(s.firstName) ?? '';
         const last = ti(s.lastName ?? undefined) ?? '';
-        const displayName = `${first} ${last}`.trim() || s.admissionNumber;
+        const displayName = `${first} ${last}`.trim() || s.admissionNumber || s.id;
         return (
           <CandidateRow
             key={s.id}

@@ -5,6 +5,7 @@
  */
 import { createMongoAbility } from '@casl/ability';
 import type { AbilityRule, AppAbility } from '@roviq/common-types';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { caslToSqlWhere } from '../casl-to-sql';
 import { substituteUserVars } from '../substitute-user-vars';
@@ -25,6 +26,48 @@ interface NestedCondition {
 }
 
 describe('caslToSqlWhere', () => {
+  it.each([
+    { condition: { sectionId: { $in: [] } }, expected: 'false' },
+    { condition: { sectionId: { $nin: [] } }, expected: 'true' },
+  ])('compiles empty membership conditions to $expected', ({ condition, expected }) => {
+    const ability = buildAbility([{ action: 'read', subject: 'Student', conditions: condition }]);
+    const result = caslToSqlWhere(ability, 'read', 'Student');
+    if (!result) throw new Error('Expected a constant predicate');
+    expect(new PgDialect().sqlToQuery(result)).toEqual({ sql: expected, params: [] });
+  });
+  it('qualifies joined columns without interpolating condition values', () => {
+    const ability = buildAbility([
+      { action: 'read', subject: 'Student', conditions: { userId: 'user-123' } },
+    ]);
+    const result = caslToSqlWhere(ability, 'read', 'Student', {
+      userId: 'student_profiles_live.user_id',
+    });
+    expect(result).toBeDefined();
+    if (!result) throw new Error('Expected a restricted query');
+    const query = new PgDialect().sqlToQuery(result);
+    expect(query.sql).toBe('"student_profiles_live"."user_id" = $1');
+    expect(query.params).toEqual(['user-123']);
+  });
+
+  it('keeps deny rules when compiling a joined row predicate', () => {
+    const ability = buildAbility([
+      { action: 'read', subject: 'Student' },
+      {
+        action: 'read',
+        subject: 'Student',
+        inverted: true,
+        conditions: { userId: 'blocked-user' },
+      },
+    ]);
+    const result = caslToSqlWhere(ability, 'read', 'Student', {
+      userId: 'student_profiles_live.user_id',
+    });
+    if (!result) throw new Error('Expected a deny predicate');
+    const query = new PgDialect().sqlToQuery(result);
+    expect(query.sql).toContain('"student_profiles_live"."user_id"');
+    expect(query.params).toEqual(['blocked-user']);
+  });
+
   it('manage:all (institute_admin) → undefined (no restriction)', () => {
     const ability = buildAbility([{ action: 'manage', subject: 'all' }]);
     const result = caslToSqlWhere(ability, 'read', 'Student');

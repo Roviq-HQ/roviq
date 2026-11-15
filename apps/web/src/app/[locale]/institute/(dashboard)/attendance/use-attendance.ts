@@ -127,7 +127,7 @@ export type StatusCount = AttendanceStatusCount;
 export type SectionStudent = Pick<
   StudentModel,
   'id' | 'membershipId' | 'firstName' | 'lastName' | 'admissionNumber' | 'profileImageUrl'
->;
+> & { membershipId: string };
 
 // ── Hooks ────────────────────────────────────────────────────────────
 
@@ -216,13 +216,20 @@ export function useBulkMarkAttendance() {
 
 export function useStudentsInSection(sectionId: string | null) {
   const { data, loading } = useQuery<{
-    listStudents: { edges: Array<{ node: SectionStudent }> };
+    listStudents: {
+      edges: Array<{
+        node: Omit<SectionStudent, 'membershipId'> & { membershipId: string | null };
+      }>;
+    };
   }>(LIST_STUDENTS_IN_SECTION, {
     variables: { sectionId },
     skip: !sectionId,
   });
   return {
-    students: data?.listStudents.edges.map((e) => e.node) ?? [],
+    students: (data?.listStudents.edges.map((e) => e.node) ?? []).filter(
+      (student): student is SectionStudent & { membershipId: string } =>
+        typeof student.membershipId === 'string',
+    ),
     loading,
   };
 }

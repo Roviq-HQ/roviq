@@ -1,0 +1,34 @@
+mutation E2eCreateReadAccessStudent($input: CreateStudentInput!) {
+  createStudent(input: $input) {
+    id
+    version
+  }
+}
+mutation E2eUpdateReadAccessStudent($id: ID!, $input: UpdateStudentInput!) {
+  updateStudent(id: $id, input: $input) {
+    id
+    version
+    medicalInfo {
+      allergies
+    }
+  }
+}
+mutation E2eDeleteReadAccessStudent($id: ID!) {
+  deleteStudent(id: $id)
+}
+query E2eReadAccessStandards($yearId: ID!) {
+  standards(academicYearId: $yearId) {
+    id
+  }
+}
+query E2eReadAccessSections($standardId: ID!) {
+  sections(standardId: $standardId) {
+    id
+  }
+}
+
+mutation E2eWithdrawReadAccessStudent($id: ID!) {
+  transitionStudentStatus(id: $id, newStatus: WITHDRAWN) {
+    id
+  }
+}

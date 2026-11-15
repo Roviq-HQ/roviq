@@ -17,6 +17,7 @@ export interface UserContext {
   assignedSubjects?: string[];
   /** Department IDs the user belongs to (department heads) */
   assignedDepartments?: string[];
+  linkedStudentIds?: string[];
 }
 
 /**
@@ -49,6 +50,8 @@ export function substituteUserVars<T extends Record<string, unknown>>(
         return context.assignedSubjects ?? [];
       case '$user.assignedDepartments':
         return context.assignedDepartments ?? [];
+      case '$user.linkedStudentIds':
+        return context.linkedStudentIds ?? [];
       default:
         return value;
     }

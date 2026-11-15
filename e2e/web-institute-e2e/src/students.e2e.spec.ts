@@ -158,3 +158,43 @@ test.describe('Student list — retrofit features', () => {
     await expect(page).toHaveURL(/size=50/);
   });
 });
+
+test('student list renders redacted fields on desktop and mobile', async ({ page }) => {
+  let redactedStudentId: string | undefined;
+  await page.route('**/api/graphql', async (route) => {
+    const request: { operationName?: string } = route.request().postDataJSON();
+    if (request.operationName !== 'InstituteStudents') {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    const body: { data?: { listStudents?: { edges: { node: Record<string, unknown> }[] } } } =
+      await response.json();
+    for (const { node } of body.data?.listStudents?.edges ?? []) {
+      if (typeof node.id === 'string') redactedStudentId = node.id;
+      for (const field of [
+        'membershipId',
+        'admissionNumber',
+        'academicStatus',
+        'socialCategory',
+        'admissionDate',
+        'createdAt',
+        'updatedAt',
+        'version',
+      ])
+        node[field] = null;
+    }
+    await route.fulfill({ response, json: body });
+  });
+  await page.goto('/en/people/students');
+  await expect(page.getByTestId(t.table)).toBeVisible();
+  await expect.poll(() => redactedStudentId).toBeDefined();
+  await expect(page.getByTestId(t.table)).toContainText('—');
+  await expect(page.getByTestId(t.table)).not.toContainText('academicStatuses.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  if (!redactedStudentId) throw new Error('Expected a redacted student fixture');
+  await expect(page.getByTestId(t.studentCard(redactedStudentId))).toBeVisible();
+  await expect(page.getByTestId(t.studentCard(redactedStudentId))).not.toContainText(
+    'academicStatuses.',
+  );
+});

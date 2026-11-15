@@ -1,7 +1,13 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
-import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import {
+  AbilityGuard,
+  type AbilityRequestContext,
+  CheckAbility,
+  CurrentReadAccess,
+  type InstituteReadAccess,
+} from '@roviq/casl';
 import { AcademicStatus } from '@roviq/common-types';
 import { pubSub } from '../../common/pubsub';
 import { CreateStudentInput } from './dto/create-student.input';
@@ -12,30 +18,40 @@ import { StudentConnection, StudentModel } from './models/student.model';
 import { StudentDocumentModel } from './models/student-document.model';
 import { StudentStatisticsModel } from './models/student-statistics.model';
 import { StudentService } from './student.service';
+import { StudentQueryService } from './student-query.service';
 
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => StudentModel)
 export class StudentResolver {
-  constructor(private readonly studentService: StudentService) {}
+  constructor(
+    private readonly studentService: StudentService,
+    private readonly queries: StudentQueryService,
+  ) {}
 
   @Query(() => StudentConnection, { description: 'List students with filters and pagination' })
   @CheckAbility('read', 'Student')
   async listStudents(
+    @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: StudentFilterInput,
   ): Promise<InstanceType<typeof StudentConnection>> {
-    return this.studentService.list(filter ?? {});
+    return this.queries.list(filter ?? {}, access);
   }
 
   @Query(() => StudentModel, { description: 'Get a student by ID' })
   @CheckAbility('read', 'Student')
-  async getStudent(@Args('id', { type: () => ID }) id: string): Promise<StudentModel> {
-    return this.studentService.findById(id);
+  async getStudent(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
+  ): Promise<StudentModel> {
+    return this.queries.findById(id, access);
   }
 
   @Query(() => StudentStatisticsModel, { description: 'Aggregate student statistics' })
   @CheckAbility('read', 'Student')
-  async studentStatistics(): Promise<StudentStatisticsModel> {
-    return this.studentService.statistics();
+  async studentStatistics(
+    @CurrentReadAccess() access: InstituteReadAccess,
+  ): Promise<StudentStatisticsModel> {
+    return this.queries.statistics(access);
   }
 
   @Query(() => [StudentDocumentModel], {
@@ -44,8 +60,9 @@ export class StudentResolver {
   @CheckAbility('read', 'Student')
   async listStudentDocuments(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentDocumentModel[]> {
-    return this.studentService.listDocumentsForStudent(studentProfileId);
+    return this.queries.listDocumentsForStudent(studentProfileId, access);
   }
 
   @Mutation(() => StudentModel, { description: 'Create a new student with admission' })
@@ -93,33 +110,43 @@ export class StudentResolver {
     return this.studentService.delete(id);
   }
 
-  /** Real-time student updates — filtered by tenantId from JWT */
   @Subscription(() => StudentModel, {
-    filter: (
-      payload: { studentUpdated: { tenantId: string } },
-      _variables: { studentId: string },
-      context: { req: { user: import('@roviq/common-types').InstituteContext } },
-    ) => payload.studentUpdated.tenantId === context.req.user.tenantId,
+    filter: async function (
+      this: StudentResolver,
+      payload: { studentUpdated: { id: string; tenantId: string } },
+      variables: { studentId: string },
+      context: AbilityRequestContext,
+    ) {
+      return (
+        context.req.user.scope === 'institute' &&
+        payload.studentUpdated.tenantId === context.req.user.tenantId &&
+        payload.studentUpdated.id === variables.studentId &&
+        this.queries.filterEvent(payload.studentUpdated.id, context)
+      );
+    },
   })
+  @CheckAbility('read', 'Student')
   studentUpdated(@Args('studentId', { type: () => ID }) _studentId: string) {
     return pubSub.asyncIterableIterator('STUDENT.updated');
   }
 
-  /**
-   * Tenant-wide student updates for list-page live refresh. Any student
-   * mutated within the viewer's tenant is pushed; the frontend uses this
-   * to trigger a refetch on the students table without arguments.
-   * Subscription payload reuses the single-student channel `STUDENT.updated`.
-   */
   @Subscription(() => StudentModel, {
     name: 'studentsInTenantUpdated',
     resolve: (payload: { studentUpdated: StudentModel }) => payload.studentUpdated,
-    filter: (
-      payload: { studentUpdated: { tenantId: string } },
+    filter: async function (
+      this: StudentResolver,
+      payload: { studentUpdated: { id: string; tenantId: string } },
       _variables: Record<string, never>,
-      context: { req: { user: import('@roviq/common-types').InstituteContext } },
-    ) => payload.studentUpdated.tenantId === context.req.user.tenantId,
+      context: AbilityRequestContext,
+    ) {
+      return (
+        context.req.user.scope === 'institute' &&
+        payload.studentUpdated.tenantId === context.req.user.tenantId &&
+        this.queries.filterEvent(payload.studentUpdated.id, context)
+      );
+    },
   })
+  @CheckAbility('read', 'Student')
   studentsInTenantUpdated() {
     return pubSub.asyncIterableIterator('STUDENT.updated');
   }

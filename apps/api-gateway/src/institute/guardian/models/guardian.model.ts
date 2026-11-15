@@ -236,6 +236,7 @@ export class GuardianLinkedStudentModel {
 
   @Field({
     description: 'Institute-issued admission number. Plain string — never translated.',
+    nullable: true,
   })
   admissionNumber!: string;
 
