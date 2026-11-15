@@ -38,6 +38,7 @@ function abilityForRole(
 
   const ctx = {
     userId: context?.userId ?? 'test-user-id',
+    membershipId: 'test-membership-id',
     assignedSections: context?.assignedSections,
   };
 
@@ -244,7 +245,7 @@ describe('substituteUserVars', () => {
         userId: '$user.sub',
         sectionId: { $in: '$user.assignedSections' },
       },
-      { userId: 'u-123', assignedSections: ['s-1', 's-2'] },
+      { userId: 'u-123', membershipId: 'm-123', assignedSections: ['s-1', 's-2'] },
     );
     expect(result.userId).toBe('u-123');
     expect(result.sectionId.$in).toEqual(['s-1', 's-2']);

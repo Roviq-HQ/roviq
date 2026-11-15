@@ -10,6 +10,8 @@
 
 export interface UserContext {
   userId: string;
+  /** Membership of the caller in the active institute; attendance entries reference it. */
+  membershipId: string;
   tenantId?: string;
   /** Section IDs the user is assigned to (class_teacher, subject_teacher) */
   assignedSections?: string[];
@@ -41,6 +43,8 @@ export function substituteUserVars<T extends Record<string, unknown>>(
       case '$user.sub':
       case '${user.id}':
         return context.userId;
+      case '$user.membershipId':
+        return context.membershipId;
       case '$user.tenantId':
       case '${user.tenantId}':
         return context.tenantId ?? '';

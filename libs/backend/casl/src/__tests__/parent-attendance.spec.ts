@@ -16,6 +16,7 @@ function parentAbility(linkedStudentIds: string[]): AppAbility {
             ...rule,
             conditions: substituteUserVars(rule.conditions, {
               userId: 'parent-user',
+              membershipId: 'parent-membership',
               linkedStudentIds,
             }),
           }

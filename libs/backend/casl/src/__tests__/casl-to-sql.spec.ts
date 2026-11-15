@@ -112,7 +112,7 @@ describe('caslToSqlWhere', () => {
   it('class_teacher with sectionId $in condition → SQL produced', () => {
     const conditions = substituteUserVars(
       { sectionId: { $in: '$user.assignedSections' } },
-      { userId: 'teacher-1', assignedSections: ['sec-a', 'sec-b'] },
+      { userId: 'teacher-1', membershipId: 'm-1', assignedSections: ['sec-a', 'sec-b'] },
     );
     const ability = buildAbility([{ action: 'read', subject: 'Student', conditions }]);
     const result = caslToSqlWhere(ability, 'read', 'Student', COLUMNS);
@@ -135,19 +135,33 @@ describe('caslToSqlWhere', () => {
 
 describe('substituteUserVars', () => {
   it('replaces $user.sub with userId', () => {
-    const result = substituteUserVars({ userId: '$user.sub' }, { userId: 'abc-123' });
+    const result = substituteUserVars(
+      { userId: '$user.sub' },
+      { userId: 'abc-123', membershipId: 'm-1' },
+    );
     expect(result.userId).toBe('abc-123');
   });
 
+  it('replaces $user.membershipId with the caller membership', () => {
+    const result = substituteUserVars(
+      { studentId: '$user.membershipId' },
+      { userId: 'abc-123', membershipId: 'membership-9' },
+    );
+    expect(result.studentId).toBe('membership-9');
+  });
+
   it('replaces ${user.id} (legacy format) with userId', () => {
-    const result = substituteUserVars({ studentId: '${user.id}' }, { userId: 'abc-123' });
+    const result = substituteUserVars(
+      { studentId: '${user.id}' },
+      { userId: 'abc-123', membershipId: 'm-1' },
+    );
     expect(result.studentId).toBe('abc-123');
   });
 
   it('replaces $user.assignedSections with array', () => {
     const result = substituteUserVars<{ sectionId: InCondition }>(
       { sectionId: { $in: '$user.assignedSections' } },
-      { userId: 'u1', assignedSections: ['sec-1', 'sec-2'] },
+      { userId: 'u1', membershipId: 'm-1', assignedSections: ['sec-1', 'sec-2'] },
     );
     expect(result.sectionId.$in).toEqual(['sec-1', 'sec-2']);
   });
@@ -155,13 +169,16 @@ describe('substituteUserVars', () => {
   it('$user.assignedSections defaults to empty array when not provided', () => {
     const result = substituteUserVars<{ sectionId: InCondition }>(
       { sectionId: { $in: '$user.assignedSections' } },
-      { userId: 'u1' },
+      { userId: 'u1', membershipId: 'm-1' },
     );
     expect(result.sectionId.$in).toEqual([]);
   });
 
   it('non-placeholder values are preserved', () => {
-    const result = substituteUserVars({ status: 'enrolled', name: 'test' }, { userId: 'u1' });
+    const result = substituteUserVars(
+      { status: 'enrolled', name: 'test' },
+      { userId: 'u1', membershipId: 'm-1' },
+    );
     expect(result.status).toBe('enrolled');
     expect(result.name).toBe('test');
   });
@@ -169,7 +186,7 @@ describe('substituteUserVars', () => {
   it('deeply nested substitution works', () => {
     const result = substituteUserVars<{ $and: NestedCondition[] }>(
       { $and: [{ userId: '$user.sub' }, { sectionId: { $in: '$user.assignedSections' } }] },
-      { userId: 'u1', assignedSections: ['s1'] },
+      { userId: 'u1', membershipId: 'm-1', assignedSections: ['s1'] },
     );
     expect(result.$and[0].userId).toBe('u1');
     expect(result.$and[1].sectionId?.$in).toEqual(['s1']);
