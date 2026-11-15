@@ -100,6 +100,47 @@ export class AttendanceStatusCount {
 }
 
 @ObjectType({
+  description:
+    "Attendance totals for one date within the caller's authorized sections, optionally narrowed to one section and academic year.",
+})
+export class AttendanceDateSummary {
+  @Field(() => Int, { description: 'Attendance sessions (daily or per period) on the date.' })
+  sessionCount!: number;
+
+  @Field(() => Int, { description: 'Distinct students with at least one mark on the date.' })
+  studentCount!: number;
+
+  @Field(() => [AttendanceStatusCount], {
+    description:
+      'Marks per status. With several sessions a student is counted once per session, so these are mark totals, not student totals.',
+  })
+  counts!: AttendanceStatusCount[];
+}
+
+@ObjectType({
+  description: 'A section the caller may read attendance for, with its standard for grouping.',
+})
+export class AttendanceSectionOption {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => I18nTextScalar)
+  name!: I18nContent;
+
+  @Field(() => String, { nullable: true })
+  displayLabel!: string | null;
+
+  @Field(() => ID)
+  standardId!: string;
+
+  @Field(() => I18nTextScalar)
+  standardName!: I18nContent;
+
+  @Field(() => ID, { nullable: true, description: 'Membership id of the class teacher.' })
+  classTeacherId!: string | null;
+}
+
+@ObjectType({
   description: 'An attendance session plus its per-student entries and aggregate counts.',
 })
 export class AttendanceSessionWithEntriesModel {

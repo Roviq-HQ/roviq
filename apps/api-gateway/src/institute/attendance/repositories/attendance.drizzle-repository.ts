@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { InstituteReadAccess } from '@roviq/casl';
 import {
   attendanceEntries,
   attendanceEntriesLive,
@@ -9,17 +10,37 @@ import {
   mkInstituteCtx,
   sectionsLive,
   softDelete,
+  standardsLive,
+  studentAcademicsLive,
+  studentProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, between, count, eq, isNull, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  between,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  isNull,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import { AttendanceRepository } from './attendance.repository';
+import { entryInScope, sectionInScope, sessionInScope } from './attendance-scope';
 import type {
   AbsenteeReportRow,
   AbsenteesReportQuery,
   AttendanceEntryRecord,
+  AttendanceSectionRow,
+  AttendanceSectionScope,
   AttendanceSessionRecord,
   CreateSessionData,
+  DateSummaryQuery,
+  DateSummaryRow,
+  SectionDailyBreakdownQuery,
   SectionDailyBreakdownRow,
   SessionDateRangeQuery,
   SessionQuery,
@@ -87,6 +108,9 @@ const entryWriteReturning = {
   updatedAt: attendanceEntries.updatedAt,
 } as const;
 
+const countWhere = (condition: SQL | undefined) =>
+  sql<number>`count(*) filter (where ${condition})`.mapWith(Number);
+
 @Injectable()
 export class AttendanceDrizzleRepository extends AttendanceRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -99,13 +123,20 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
     return tenantId;
   }
 
-  async findSessionById(id: string): Promise<AttendanceSessionRecord | null> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+  async findSessionById(
+    id: string,
+    access: InstituteReadAccess,
+  ): Promise<AttendanceSessionRecord | null> {
+    return withTenant(this.db, access.user, async (tx) => {
       const rows = await tx
         .select(sessionLiveColumns)
         .from(attendanceSessionsLive)
-        .where(eq(attendanceSessionsLive.id, id));
+        .where(
+          and(
+            eq(attendanceSessionsLive.id, id),
+            sessionInScope(access.ability, 'read', attendanceSessionsLive.id),
+          ),
+        );
       return (rows[0] as AttendanceSessionRecord | undefined) ?? null;
     });
   }
@@ -131,15 +162,98 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
     });
   }
 
-  async findSessionsInRange(query: SessionDateRangeQuery): Promise<AttendanceSessionRecord[]> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
-      const conditions = [between(attendanceSessionsLive.date, query.startDate, query.endDate)];
+  async findSessionsInRange(
+    query: SessionDateRangeQuery,
+    access: InstituteReadAccess,
+  ): Promise<AttendanceSessionRecord[]> {
+    return withTenant(this.db, access.user, async (tx) => {
+      const conditions = [
+        between(attendanceSessionsLive.date, query.startDate, query.endDate),
+        sessionInScope(access.ability, 'read', attendanceSessionsLive.id),
+      ];
       if (query.sectionId) conditions.push(eq(attendanceSessionsLive.sectionId, query.sectionId));
       return tx
         .select(sessionLiveColumns)
         .from(attendanceSessionsLive)
         .where(and(...conditions)) as Promise<AttendanceSessionRecord[]>;
+    });
+  }
+
+  async findSectionScope(sectionId: string): Promise<AttendanceSectionScope | null> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+      const rows = await tx
+        .select({
+          sectionId: sectionsLive.id,
+          standardId: sectionsLive.standardId,
+          academicYearId: sectionsLive.academicYearId,
+        })
+        .from(sectionsLive)
+        .where(eq(sectionsLive.id, sectionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  async listSections(
+    academicYearId: string,
+    access: InstituteReadAccess,
+  ): Promise<AttendanceSectionRow[]> {
+    return withTenant(this.db, access.user, async (tx) =>
+      tx
+        .select({
+          id: sectionsLive.id,
+          name: sectionsLive.name,
+          displayLabel: sectionsLive.displayLabel,
+          standardId: sectionsLive.standardId,
+          standardName: standardsLive.name,
+          classTeacherId: sectionsLive.classTeacherId,
+        })
+        .from(sectionsLive)
+        .innerJoin(standardsLive, eq(standardsLive.id, sectionsLive.standardId))
+        .where(
+          and(
+            eq(sectionsLive.academicYearId, academicYearId),
+            sectionInScope(access.ability, 'read', sectionsLive.id),
+          ),
+        )
+        .orderBy(
+          asc(standardsLive.numericOrder),
+          asc(sectionsLive.displayOrder),
+          asc(sectionsLive.id),
+        ),
+    );
+  }
+
+  async isStudentInSession(session: AttendanceSessionRecord, studentId: string): Promise<boolean> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+      const marked = await tx
+        .select({ id: attendanceEntriesLive.id })
+        .from(attendanceEntriesLive)
+        .where(
+          and(
+            eq(attendanceEntriesLive.sessionId, session.id),
+            eq(attendanceEntriesLive.studentId, studentId),
+          ),
+        )
+        .limit(1);
+      if (marked.length > 0) return true;
+      const enrolled = await tx
+        .select({ id: studentAcademicsLive.id })
+        .from(studentAcademicsLive)
+        .innerJoin(
+          studentProfilesLive,
+          eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
+        )
+        .where(
+          and(
+            eq(studentProfilesLive.membershipId, studentId),
+            eq(studentAcademicsLive.sectionId, session.sectionId),
+            eq(studentAcademicsLive.academicYearId, session.academicYearId),
+          ),
+        )
+        .limit(1);
+      return enrolled.length > 0;
     });
   }
 
@@ -175,7 +289,10 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
         .where(and(eq(attendanceSessions.id, sessionId), isNull(attendanceSessions.deletedAt)))
         .returning(sessionWriteReturning);
       if (rows.length === 0)
-        throw new NotFoundException(`Attendance session ${sessionId} not found`);
+        throw new NotFoundException({
+          message: `Attendance session ${sessionId} not found`,
+          code: 'ATTENDANCE_SESSION_NOT_FOUND',
+        });
       return rows[0] as AttendanceSessionRecord;
     });
   }
@@ -190,18 +307,28 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
         .where(and(eq(attendanceSessions.id, sessionId), isNull(attendanceSessions.deletedAt)))
         .returning(sessionWriteReturning);
       if (rows.length === 0)
-        throw new NotFoundException(`Attendance session ${sessionId} not found`);
+        throw new NotFoundException({
+          message: `Attendance session ${sessionId} not found`,
+          code: 'ATTENDANCE_SESSION_NOT_FOUND',
+        });
       return rows[0] as AttendanceSessionRecord;
     });
   }
 
-  async findEntriesBySession(sessionId: string): Promise<AttendanceEntryRecord[]> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+  async findEntriesBySession(
+    sessionId: string,
+    access: InstituteReadAccess,
+  ): Promise<AttendanceEntryRecord[]> {
+    return withTenant(this.db, access.user, async (tx) => {
       return tx
         .select(entryLiveColumns)
         .from(attendanceEntriesLive)
-        .where(eq(attendanceEntriesLive.sessionId, sessionId)) as Promise<AttendanceEntryRecord[]>;
+        .where(
+          and(
+            eq(attendanceEntriesLive.sessionId, sessionId),
+            entryInScope(access.ability, 'read', attendanceEntriesLive.id),
+          ),
+        ) as Promise<AttendanceEntryRecord[]>;
     });
   }
 
@@ -297,190 +424,198 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
     });
   }
 
-  async countByStatus(sessionId: string): Promise<Record<string, number>> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+  async countByStatus(
+    sessionId: string,
+    access: InstituteReadAccess,
+  ): Promise<Record<string, number>> {
+    return withTenant(this.db, access.user, async (tx) => {
       const rows = await tx
         .select({
           status: attendanceEntriesLive.status,
           count: count(),
         })
         .from(attendanceEntriesLive)
-        .where(eq(attendanceEntriesLive.sessionId, sessionId))
+        .where(
+          and(
+            eq(attendanceEntriesLive.sessionId, sessionId),
+            entryInScope(access.ability, 'read', attendanceEntriesLive.id),
+          ),
+        )
         .groupBy(attendanceEntriesLive.status);
       return Object.fromEntries(rows.map((r) => [r.status, Number(r.count)]));
     });
   }
 
-  async countForDate(date: string): Promise<Record<string, number>> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+  async dateSummary(query: DateSummaryQuery, access: InstituteReadAccess): Promise<DateSummaryRow> {
+    const sessionFilter = and(
+      eq(attendanceSessionsLive.date, query.date),
+      query.sectionId ? eq(attendanceSessionsLive.sectionId, query.sectionId) : undefined,
+      query.academicYearId
+        ? eq(attendanceSessionsLive.academicYearId, query.academicYearId)
+        : undefined,
+    );
+    const entryFilter = and(
+      sessionFilter,
+      entryInScope(access.ability, 'read', attendanceEntriesLive.id),
+    );
+    return withTenant(this.db, access.user, async (tx) => {
+      const [sessions] = await tx
+        .select({ total: count() })
+        .from(attendanceSessionsLive)
+        .where(
+          and(sessionFilter, sessionInScope(access.ability, 'read', attendanceSessionsLive.id)),
+        );
+      const [students] = await tx
+        .select({ total: countDistinct(attendanceEntriesLive.studentId) })
+        .from(attendanceEntriesLive)
+        .innerJoin(
+          attendanceSessionsLive,
+          eq(attendanceSessionsLive.id, attendanceEntriesLive.sessionId),
+        )
+        .where(entryFilter);
+      const marks = await tx
+        .select({ status: attendanceEntriesLive.status, total: count() })
+        .from(attendanceEntriesLive)
+        .innerJoin(
+          attendanceSessionsLive,
+          eq(attendanceSessionsLive.id, attendanceEntriesLive.sessionId),
+        )
+        .where(entryFilter)
+        .groupBy(attendanceEntriesLive.status);
+      return {
+        sessionCount: sessions?.total ?? 0,
+        studentCount: students?.total ?? 0,
+        counts: Object.fromEntries(marks.map((row) => [row.status, row.total])),
+      };
+    });
+  }
+
+  async absenteesReport(
+    query: AbsenteesReportQuery,
+    access: InstituteReadAccess,
+  ): Promise<AbsenteeReportRow[]> {
+    const status = attendanceEntriesLive.status;
+    return withTenant(this.db, access.user, async (tx) => {
       const rows = await tx
         .select({
+          studentId: attendanceEntriesLive.studentId,
+          totalSessions: count(),
+          presentCount: countWhere(eq(status, 'PRESENT')),
+          absentCount: countWhere(eq(status, 'ABSENT')),
+          leaveCount: countWhere(eq(status, 'LEAVE')),
+          lateCount: countWhere(eq(status, 'LATE')),
+          absentDates: sql<string[]>`coalesce(
+            array_agg(distinct ${attendanceSessionsLive.date}::text order by ${attendanceSessionsLive.date}::text)
+              filter (where ${eq(status, 'ABSENT')}),
+            array[]::text[]
+          )`,
+        })
+        .from(attendanceSessionsLive)
+        .innerJoin(
+          attendanceEntriesLive,
+          eq(attendanceEntriesLive.sessionId, attendanceSessionsLive.id),
+        )
+        .where(
+          and(
+            between(attendanceSessionsLive.date, query.startDate, query.endDate),
+            query.sectionId ? eq(attendanceSessionsLive.sectionId, query.sectionId) : undefined,
+            entryInScope(access.ability, 'read', attendanceEntriesLive.id),
+          ),
+        )
+        .groupBy(attendanceEntriesLive.studentId)
+        .orderBy(asc(attendanceEntriesLive.studentId));
+      return rows;
+    });
+  }
+
+  async sectionDailyBreakdown(
+    query: SectionDailyBreakdownQuery,
+    access: InstituteReadAccess,
+  ): Promise<SectionDailyBreakdownRow[]> {
+    const status = attendanceEntriesLive.status;
+    return withTenant(this.db, access.user, async (tx) => {
+      const rows = await tx
+        .select({
+          sessionId: attendanceSessionsLive.id,
+          sectionId: attendanceSessionsLive.sectionId,
+          sectionName: sectionsLive.name,
+          period: attendanceSessionsLive.period,
+          subjectId: attendanceSessionsLive.subjectId,
+          lecturerId: attendanceSessionsLive.lecturerId,
+          presentCount: countWhere(eq(status, 'PRESENT')),
+          absentCount: countWhere(eq(status, 'ABSENT')),
+          leaveCount: countWhere(eq(status, 'LEAVE')),
+          lateCount: countWhere(eq(status, 'LATE')),
+          absenteeIds: sql<string[]>`coalesce(
+            array_agg(${attendanceEntriesLive.studentId}) filter (where ${eq(status, 'ABSENT')}),
+            array[]::uuid[]
+          )`,
+        })
+        .from(attendanceSessionsLive)
+        .leftJoin(
+          attendanceEntriesLive,
+          and(
+            eq(attendanceEntriesLive.sessionId, attendanceSessionsLive.id),
+            entryInScope(access.ability, 'read', attendanceEntriesLive.id),
+          ),
+        )
+        .innerJoin(sectionsLive, eq(sectionsLive.id, attendanceSessionsLive.sectionId))
+        .where(
+          and(
+            eq(attendanceSessionsLive.date, query.date),
+            query.standardId ? eq(sectionsLive.standardId, query.standardId) : undefined,
+            sessionInScope(access.ability, 'read', attendanceSessionsLive.id),
+          ),
+        )
+        .groupBy(
+          attendanceSessionsLive.id,
+          attendanceSessionsLive.sectionId,
+          sectionsLive.name,
+          attendanceSessionsLive.period,
+          attendanceSessionsLive.subjectId,
+          attendanceSessionsLive.lecturerId,
+        )
+        .orderBy(
+          asc(attendanceSessionsLive.sectionId),
+          sql`${attendanceSessionsLive.period} asc nulls first`,
+        );
+      return rows;
+    });
+  }
+
+  async studentHistory(
+    query: StudentHistoryQuery,
+    access: InstituteReadAccess,
+  ): Promise<StudentHistoryRow[]> {
+    return withTenant(this.db, access.user, async (tx) =>
+      tx
+        .select({
+          sessionId: attendanceSessionsLive.id,
+          sectionId: attendanceSessionsLive.sectionId,
+          date: attendanceSessionsLive.date,
+          period: attendanceSessionsLive.period,
+          subjectId: attendanceSessionsLive.subjectId,
           status: attendanceEntriesLive.status,
-          count: count(),
+          remarks: attendanceEntriesLive.remarks,
+          markedAt: attendanceEntriesLive.markedAt,
         })
         .from(attendanceEntriesLive)
         .innerJoin(
           attendanceSessionsLive,
           eq(attendanceSessionsLive.id, attendanceEntriesLive.sessionId),
         )
-        .where(sql`${attendanceSessionsLive.date} = ${date}::date`)
-        .groupBy(attendanceEntriesLive.status);
-      return Object.fromEntries(rows.map((r) => [r.status, Number(r.count)]));
-    });
-  }
-
-  async absenteesReport(query: AbsenteesReportQuery): Promise<AbsenteeReportRow[]> {
-    const tenantId = this.getTenantId();
-    const { sectionId, startDate, endDate } = query;
-    // section filter is optional; we emit the predicate conditionally via sql fragments.
-    const sectionFilter = sectionId ? sql`AND s.section_id = ${sectionId}::uuid` : sql``;
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
-      const result = await tx.execute<{
-        student_id: string;
-        total_sessions: string | number;
-        present_count: string | number;
-        absent_count: string | number;
-        leave_count: string | number;
-        late_count: string | number;
-        absent_dates: string[] | null;
-      }>(
-        sql`
-          SELECT
-            e.student_id AS student_id,
-            COUNT(*) AS total_sessions,
-            COUNT(*) FILTER (WHERE e.status = 'PRESENT') AS present_count,
-            COUNT(*) FILTER (WHERE e.status = 'ABSENT') AS absent_count,
-            COUNT(*) FILTER (WHERE e.status = 'LEAVE') AS leave_count,
-            COUNT(*) FILTER (WHERE e.status = 'LATE') AS late_count,
-            COALESCE(
-              array_agg(DISTINCT to_char(s.date, 'YYYY-MM-DD') ORDER BY to_char(s.date, 'YYYY-MM-DD'))
-                FILTER (WHERE e.status = 'ABSENT'),
-              ARRAY[]::text[]
-            ) AS absent_dates
-          FROM ${attendanceSessionsLive} s
-          INNER JOIN ${attendanceEntriesLive} e ON e.session_id = s.id
-          WHERE s.date BETWEEN ${startDate}::date AND ${endDate}::date
-            ${sectionFilter}
-          GROUP BY e.student_id
-          ORDER BY e.student_id
-        `,
-      );
-
-      return result.rows.map((row) => ({
-        studentId: row.student_id,
-        totalSessions: Number(row.total_sessions),
-        presentCount: Number(row.present_count),
-        absentCount: Number(row.absent_count),
-        leaveCount: Number(row.leave_count),
-        lateCount: Number(row.late_count),
-        absentDates: row.absent_dates ?? [],
-      }));
-    });
-  }
-
-  async sectionDailyBreakdown(date: string): Promise<SectionDailyBreakdownRow[]> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
-      const result = await tx.execute<{
-        session_id: string;
-        section_id: string;
-        section_name: Record<string, string> | null;
-        period: number | null;
-        subject_id: string | null;
-        lecturer_id: string;
-        present_count: string | number;
-        absent_count: string | number;
-        leave_count: string | number;
-        late_count: string | number;
-        absentee_ids: string[] | null;
-      }>(
-        sql`
-          SELECT
-            s.id AS session_id,
-            s.section_id AS section_id,
-            sec.name AS section_name,
-            s.period AS period,
-            s.subject_id AS subject_id,
-            s.lecturer_id AS lecturer_id,
-            COUNT(e.id) FILTER (WHERE e.status = 'PRESENT') AS present_count,
-            COUNT(e.id) FILTER (WHERE e.status = 'ABSENT') AS absent_count,
-            COUNT(e.id) FILTER (WHERE e.status = 'LEAVE') AS leave_count,
-            COUNT(e.id) FILTER (WHERE e.status = 'LATE') AS late_count,
-            COALESCE(
-              array_agg(e.student_id) FILTER (WHERE e.status = 'ABSENT'),
-              ARRAY[]::uuid[]
-            ) AS absentee_ids
-          FROM ${attendanceSessionsLive} s
-          LEFT JOIN ${attendanceEntriesLive} e
-            ON e.session_id = s.id
-          INNER JOIN ${sectionsLive} sec
-            ON sec.id = s.section_id
-          WHERE s.date = ${date}::date
-          GROUP BY s.id, s.section_id, sec.name, s.period, s.subject_id, s.lecturer_id
-          ORDER BY s.section_id, s.period NULLS FIRST
-        `,
-      );
-
-      return result.rows.map((row) => ({
-        sessionId: row.session_id,
-        sectionId: row.section_id,
-        sectionName: row.section_name ?? {},
-        period: row.period,
-        subjectId: row.subject_id,
-        lecturerId: row.lecturer_id,
-        presentCount: Number(row.present_count),
-        absentCount: Number(row.absent_count),
-        leaveCount: Number(row.leave_count),
-        lateCount: Number(row.late_count),
-        absenteeIds: row.absentee_ids ?? [],
-      }));
-    });
-  }
-
-  async studentHistory(query: StudentHistoryQuery): Promise<StudentHistoryRow[]> {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
-      const result = await tx.execute<{
-        session_id: string;
-        section_id: string;
-        date: string;
-        period: number | null;
-        subject_id: string | null;
-        status: string;
-        remarks: string | null;
-        marked_at: Date;
-      }>(
-        sql`
-          SELECT
-            s.id AS session_id,
-            s.section_id AS section_id,
-            s.date AS date,
-            s.period AS period,
-            s.subject_id AS subject_id,
-            e.status AS status,
-            e.remarks AS remarks,
-            e.marked_at AS marked_at
-          FROM ${attendanceEntriesLive} e
-          INNER JOIN ${attendanceSessionsLive} s ON s.id = e.session_id
-          WHERE e.student_id = ${query.studentId}::uuid
-            AND s.date BETWEEN ${query.startDate}::date AND ${query.endDate}::date
-          ORDER BY s.date DESC, s.period NULLS FIRST
-        `,
-      );
-      return result.rows.map((row) => ({
-        sessionId: row.session_id,
-        sectionId: row.section_id,
-        date: typeof row.date === 'string' ? row.date : String(row.date),
-        period: row.period,
-        subjectId: row.subject_id,
-        status: row.status,
-        remarks: row.remarks,
-        markedAt: row.marked_at,
-      }));
-    });
+        .where(
+          and(
+            eq(attendanceEntriesLive.studentId, query.studentId),
+            between(attendanceSessionsLive.date, query.startDate, query.endDate),
+            entryInScope(access.ability, 'read', attendanceEntriesLive.id),
+          ),
+        )
+        .orderBy(
+          desc(attendanceSessionsLive.date),
+          sql`${attendanceSessionsLive.period} asc nulls first`,
+        ),
+    );
   }
 
   async softDeleteSession(id: string): Promise<void> {

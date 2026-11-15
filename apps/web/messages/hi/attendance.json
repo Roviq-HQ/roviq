@@ -93,5 +93,10 @@
     "viewHistory": "इतिहास देखें",
     "pickStudentHint": "उपस्थिति इतिहास देखने के लिए छात्र चुनें।",
     "back": "रिपोर्ट्स पर लौटें"
+  },
+  "noAssignedSections": "आपको कोई सेक्शन असाइन नहीं है",
+  "noAssignedSectionsHint": "इस शैक्षणिक वर्ष में किसी सेक्शन के कक्षा या विषय शिक्षक बनने पर उपस्थिति यहाँ दिखेगी।",
+  "daySummary": {
+    "scope": "{sessions, plural, one {# सत्र} other {# सत्र}} · {students, plural, one {# छात्र} other {# छात्र}} — गिनती प्रति सत्र अंकन है"
   }
 }

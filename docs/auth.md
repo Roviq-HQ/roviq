@@ -239,6 +239,18 @@ Default policies retain `institute_admin` and `admin_clerk` access. Principals r
 
 The `20261114164236_rov-204-read-permissions` migration updates existing default institute roles, narrows parent reads to linked students, and leaves custom roles and `admin_clerk` unchanged. After approval for the target database, apply it with `tilt trigger db-migrate` before admitting pilot traffic. The resource is manual and does not run automatically. Invalidate affected `casl:role:{roleId}` Redis entries or allow their five-minute TTL to expire before traffic resumes. No schema or RLS policy changes are required; the existing tenant policies and live views remain in force.
 
+### Attendance section scope
+
+Attendance reads and writes apply the caller's `Attendance` rules within the institute. `apps/api-gateway/src/institute/attendance/repositories/attendance-scope.ts` translates those rules into SQL against the section, session and entry. Session lists, session lookups, entries, session counts, date totals, absentee reports, daily breakdowns and student history apply this restriction before selecting or aggregating rows. When a section filter is omitted, the query still returns only authorized sections. A session in another section returns `ATTENDANCE_SESSION_NOT_FOUND`.
+
+Opening, overriding, marking, bulk-marking and deleting attendance load the session and section from the database and check `ability.can(action, subject('Attendance', …))`. Marking also requires that the student already has an entry in that session or is enrolled in its section for that academic year. Opening a session rejects an academic year that does not own the section.
+
+The default `parent` role reads attendance only for linked children: `{ studentProfileId: { $in: '$user.linkedStudentIds' } }`. Guardian links are loaded from the database each time the ability is built. A parent without a linked child sees no attendance. Migration `20261115140242_rov-268-parent-attendance-scope` adds this condition to existing default `parent` roles and leaves custom roles unchanged. Apply it with `tilt trigger db-migrate` after approval for the target database. Then invalidate the affected `casl:role:{roleId}` Redis entries or wait for their five-minute TTL to expire.
+
+`caslToSqlWhere(ability, action, subject, columns)` requires a Drizzle column for every CASL condition field. Use an `alias()` column when the predicate runs inside a correlated subquery. If a rule references an unmapped field, the predicate is `false`, which denies access instead of guessing an identifier. Build correlated predicates with Drizzle's `QueryBuilder` and `exists()`. Do not write SQL text with table or column names.
+
+`attendanceSections(academicYearId)` returns the sections the server permits. The attendance and report pages build their standard and section selectors from this list. They preselect the only permitted section, discard URL values the list does not contain, and send no section-scoped request until the list loads. `attendanceCountsForDate` returns `sessionCount`, `studentCount` and per-status mark counts. When a section has several periods, each session counts as a separate mark.
+
 ### Frontend
 - `AbilityProvider` hydrates CASL ability from login response
 - `<Can I="create" a="Student">` for conditional rendering

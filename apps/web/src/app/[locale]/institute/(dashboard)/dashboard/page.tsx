@@ -19,7 +19,7 @@ import {
   Users2,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { type AttendanceStatus, useDateCounts } from '../attendance/use-attendance';
+import { type AttendanceStatus, useDateSummary } from '../attendance/use-attendance';
 import { ExamsSummaryCard } from './exams-summary-card';
 import { TodayScheduleCard } from './today-schedule-card';
 
@@ -42,7 +42,13 @@ function todayIso(): string {
 
 function AttendanceKpiCard() {
   const t = useTranslations('dashboard.attendanceKpi');
-  const { counts, loading } = useDateCounts(todayIso());
+  const { summary, loading } = useDateSummary({
+    date: todayIso(),
+    sectionId: null,
+    academicYearId: null,
+    skip: false,
+  });
+  const counts = summary?.counts ?? [];
 
   const byStatus = new Map<AttendanceStatus, number>(counts.map((c) => [c.status, c.count]));
   const present = byStatus.get('PRESENT') ?? 0;
@@ -80,6 +86,12 @@ function AttendanceKpiCard() {
                 / {total} {t('total')}
               </span>
             </div>
+            <CardDescription data-testid={testIds.instituteDashboard.attendanceKpiScope}>
+              {t('scope', {
+                sessions: summary?.sessionCount ?? 0,
+                students: summary?.studentCount ?? 0,
+              })}
+            </CardDescription>
             <div className="flex flex-wrap gap-1.5">
               {badgeItems.map((item) => (
                 <span

@@ -14,6 +14,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  Label,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -36,7 +37,6 @@ import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { useAcademicYears } from '../../academic-years/use-academic-years';
-import { useSections, useStandards } from '../../academics/use-academics';
 import { useStudents } from '../../people/students/use-students';
 import {
   type AbsenteeReportItem,
@@ -45,6 +45,7 @@ import {
   useSectionDailyBreakdown,
   useStudentsInSection,
 } from '../use-attendance';
+import { type AttendanceScopeSelection, useAttendanceScope } from '../use-attendance-scope';
 
 const { instituteAttendance } = testIds;
 function todayIso(): string {
@@ -191,11 +192,28 @@ function AbsenteesByStudentTab() {
 
   const { years } = useAcademicYears();
   const activeYearId = years.find((y) => y.status === 'ACTIVE')?.id ?? null;
-  const { standards } = useStandards(activeYearId);
-  const { sections } = useSections(standardId);
+  const requested = React.useMemo(() => ({ standardId, sectionId }), [standardId, sectionId]);
+  const applyScope = React.useCallback(
+    (selection: AttendanceScopeSelection) => {
+      void setStandardId(selection.standardId);
+      void setSectionId(selection.sectionId);
+    },
+    [setStandardId, setSectionId],
+  );
+  const scope = useAttendanceScope({
+    academicYearId: activeYearId,
+    requested,
+    onResolved: applyScope,
+    selectsSection: true,
+  });
 
-  const { rows, loading } = useAbsenteesReport(sectionId, startDate, endDate);
-  const { students } = useStudentsInSection(sectionId);
+  const { rows, loading } = useAbsenteesReport({
+    sectionId: scope.sectionId,
+    startDate,
+    endDate,
+    skip: !scope.ready || scope.noAssignments,
+  });
+  const { students } = useStudentsInSection(scope.sectionId);
 
   // Build a membershipId → student map so the table can render names
   // without an extra round-trip. Only students in the selected section
@@ -334,10 +352,14 @@ function AbsenteesByStudentTab() {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              <Label
+                htmlFor={instituteAttendance.absenteesStartDateInput}
+                className="text-xs font-medium text-muted-foreground mb-1 block"
+              >
                 {t('reports.from')}
-              </span>
+              </Label>
               <Input
+                id={instituteAttendance.absenteesStartDateInput}
                 type="date"
                 value={startDate}
                 onChange={(e) => void setStartDate(e.target.value || daysAgoIso(30))}
@@ -345,10 +367,14 @@ function AbsenteesByStudentTab() {
               />
             </div>
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              <Label
+                htmlFor={instituteAttendance.absenteesEndDateInput}
+                className="text-xs font-medium text-muted-foreground mb-1 block"
+              >
                 {t('reports.to')}
-              </span>
+              </Label>
               <Input
+                id={instituteAttendance.absenteesEndDateInput}
                 type="date"
                 value={endDate}
                 onChange={(e) => void setEndDate(e.target.value || todayIso())}
@@ -356,23 +382,36 @@ function AbsenteesByStudentTab() {
               />
             </div>
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              <Label
+                htmlFor={instituteAttendance.absenteesStandardSelect}
+                className="text-xs font-medium text-muted-foreground mb-1 block"
+              >
                 {t('reports.pickStandard')}
-              </span>
+              </Label>
               <Select
-                value={standardId ?? '__all__'}
+                value={scope.standardId ?? '__all__'}
                 onValueChange={(v) => {
                   void setStandardId(v === '__all__' ? null : v);
                   void setSectionId(null);
                 }}
+                disabled={scope.standards.length === 0}
               >
-                <SelectTrigger data-testid={instituteAttendance.absenteesStandardSelect}>
+                <SelectTrigger
+                  id={instituteAttendance.absenteesStandardSelect}
+                  data-testid={instituteAttendance.absenteesStandardSelect}
+                >
                   <SelectValue placeholder={t('reports.allStandards')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t('reports.allStandards')}</SelectItem>
-                  {standards.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
+                  {scope.allowAllStandards ? (
+                    <SelectItem value="__all__">{t('reports.allStandards')}</SelectItem>
+                  ) : null}
+                  {scope.standards.map((s) => (
+                    <SelectItem
+                      key={s.id}
+                      value={s.id}
+                      data-testid={instituteAttendance.absenteesStandardOption(s.id)}
+                    >
                       {resolveI18n(s.name)}
                     </SelectItem>
                   ))}
@@ -380,21 +419,33 @@ function AbsenteesByStudentTab() {
               </Select>
             </div>
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                {t('reports.pickSection')}
-              </span>
-              <Select
-                value={sectionId ?? '__all__'}
-                onValueChange={(v) => void setSectionId(v === '__all__' ? null : v)}
-                disabled={!standardId}
+              <Label
+                htmlFor={instituteAttendance.absenteesSectionSelect}
+                className="text-xs font-medium text-muted-foreground mb-1 block"
               >
-                <SelectTrigger data-testid={instituteAttendance.absenteesSectionSelect}>
+                {t('reports.pickSection')}
+              </Label>
+              <Select
+                value={scope.sectionId ?? '__all__'}
+                onValueChange={(v) => void setSectionId(v === '__all__' ? null : v)}
+                disabled={!scope.standardId}
+              >
+                <SelectTrigger
+                  id={instituteAttendance.absenteesSectionSelect}
+                  data-testid={instituteAttendance.absenteesSectionSelect}
+                >
                   <SelectValue placeholder={t('reports.allSections')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t('reports.allSections')}</SelectItem>
-                  {sections.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
+                  {scope.allowAllSections ? (
+                    <SelectItem value="__all__">{t('reports.allSections')}</SelectItem>
+                  ) : null}
+                  {scope.sectionsForStandard.map((s) => (
+                    <SelectItem
+                      key={s.id}
+                      value={s.id}
+                      data-testid={instituteAttendance.absenteesSectionOption(s.id)}
+                    >
                       {s.displayLabel ?? resolveI18n(s.name)}
                     </SelectItem>
                   ))}
@@ -402,7 +453,7 @@ function AbsenteesByStudentTab() {
               </Select>
             </div>
           </div>
-          {!sectionId ? (
+          {!scope.sectionId && !scope.noAssignments ? (
             <p
               className="text-xs text-muted-foreground mt-3"
               data-testid={instituteAttendance.absenteesSectionHint}
@@ -413,7 +464,17 @@ function AbsenteesByStudentTab() {
         </CardContent>
       </Card>
 
-      {rows.length === 0 && !loading ? (
+      {scope.noAssignments ? (
+        <Empty data-testid={instituteAttendance.absenteesNoAssignedSections}>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users />
+            </EmptyMedia>
+            <EmptyTitle>{t('noAssignedSections')}</EmptyTitle>
+            <EmptyDescription>{t('noAssignedSectionsHint')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : rows.length === 0 && !loading ? (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -529,10 +590,23 @@ function DailyBreakdownTab() {
 
   const { years } = useAcademicYears();
   const activeYearId = years.find((y) => y.status === 'ACTIVE')?.id ?? null;
-  const { standards } = useStandards(activeYearId);
-  const { sections } = useSections(standardId);
+  const requested = React.useMemo(() => ({ standardId, sectionId: null }), [standardId]);
+  const applyScope = React.useCallback(
+    (selection: AttendanceScopeSelection) => void setStandardId(selection.standardId),
+    [setStandardId],
+  );
+  const scope = useAttendanceScope({
+    academicYearId: activeYearId,
+    requested,
+    onResolved: applyScope,
+    selectsSection: false,
+  });
 
-  const { rows, loading } = useSectionDailyBreakdown(date);
+  const { rows, loading } = useSectionDailyBreakdown({
+    date,
+    standardId: scope.standardId,
+    skip: !scope.ready || scope.noAssignments,
+  });
 
   // Resolve absentee membership ids → readable names. The query returns
   // membership ids; we fetch the first 200 students of the institute and
@@ -550,18 +624,13 @@ function DailyBreakdownTab() {
     return map;
   }, [students, resolveI18n]);
 
-  // Map sectionId → label using the sections-for-selected-standard query.
-  // When no standard is selected we show a masked id; picking a standard
-  // resolves names for rows under it (and hides others).
-  const sectionById = React.useMemo(() => {
-    const map = new Map<string, (typeof sections)[number]>();
-    for (const s of sections) map.set(s.id, s);
-    return map;
-  }, [sections]);
+  const sectionById = React.useMemo(
+    () => new Map(scope.sections.map((s) => [s.id, s])),
+    [scope.sections],
+  );
 
   const filteredRows: DailyBreakdownRow[] = React.useMemo(() => {
-    const list = standardId ? rows.filter((r) => sectionById.has(r.sectionId)) : rows;
-    return list.map((r) => {
+    return rows.map((r) => {
       // Prefer the backend-provided section name (always populated via the
       // server-side JOIN); fall back to the standard-scoped display label
       // when present, then to a masked id as a last resort.
@@ -573,7 +642,7 @@ function DailyBreakdownTab() {
         t('reports.unknownSection', { id: r.sectionId.slice(0, 8) });
       return { ...r, sectionLabel: label };
     });
-  }, [rows, sectionById, standardId, resolveI18n, t]);
+  }, [rows, sectionById, resolveI18n, t]);
 
   function handleExport() {
     const headers = [
@@ -605,10 +674,14 @@ function DailyBreakdownTab() {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              <Label
+                htmlFor={instituteAttendance.breakdownDateInput}
+                className="text-xs font-medium text-muted-foreground mb-1 block"
+              >
                 {t('reports.datePicker')}
-              </span>
+              </Label>
               <Input
+                id={instituteAttendance.breakdownDateInput}
                 type="date"
                 value={date}
                 onChange={(e) => void setDate(e.target.value || todayIso())}
@@ -616,20 +689,33 @@ function DailyBreakdownTab() {
               />
             </div>
             <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                {t('reports.pickStandard')}
-              </span>
-              <Select
-                value={standardId ?? '__all__'}
-                onValueChange={(v) => void setStandardId(v === '__all__' ? null : v)}
+              <Label
+                htmlFor={instituteAttendance.breakdownStandardSelect}
+                className="text-xs font-medium text-muted-foreground mb-1 block"
               >
-                <SelectTrigger data-testid={instituteAttendance.breakdownStandardSelect}>
+                {t('reports.pickStandard')}
+              </Label>
+              <Select
+                value={scope.standardId ?? '__all__'}
+                onValueChange={(v) => void setStandardId(v === '__all__' ? null : v)}
+                disabled={scope.standards.length === 0}
+              >
+                <SelectTrigger
+                  id={instituteAttendance.breakdownStandardSelect}
+                  data-testid={instituteAttendance.breakdownStandardSelect}
+                >
                   <SelectValue placeholder={t('reports.allStandards')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t('reports.allStandards')}</SelectItem>
-                  {standards.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
+                  {scope.allowAllStandards ? (
+                    <SelectItem value="__all__">{t('reports.allStandards')}</SelectItem>
+                  ) : null}
+                  {scope.standards.map((s) => (
+                    <SelectItem
+                      key={s.id}
+                      value={s.id}
+                      data-testid={instituteAttendance.breakdownStandardOption(s.id)}
+                    >
                       {resolveI18n(s.name)}
                     </SelectItem>
                   ))}
@@ -640,7 +726,17 @@ function DailyBreakdownTab() {
         </CardContent>
       </Card>
 
-      {filteredRows.length === 0 && !loading ? (
+      {scope.noAssignments ? (
+        <Empty data-testid={instituteAttendance.breakdownNoAssignedSections}>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users />
+            </EmptyMedia>
+            <EmptyTitle>{t('noAssignedSections')}</EmptyTitle>
+            <EmptyDescription>{t('noAssignedSectionsHint')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : filteredRows.length === 0 && !loading ? (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">

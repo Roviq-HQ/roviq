@@ -93,5 +93,10 @@
     "viewHistory": "View history",
     "pickStudentHint": "Choose a student to view their attendance history.",
     "back": "Back to reports"
+  },
+  "noAssignedSections": "No sections assigned to you",
+  "noAssignedSectionsHint": "Attendance appears here once you are assigned as class or subject teacher for a section in this academic year.",
+  "daySummary": {
+    "scope": "{sessions, plural, one {# session} other {# sessions}} · {students, plural, one {# student} other {# students}} — counts are marks per session"
   }
 }

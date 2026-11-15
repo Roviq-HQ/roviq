@@ -56,13 +56,14 @@
   "profileDescription": "अपने व्यक्तिगत संपर्क विवरण देखें और अपडेट करें।",
   "attendanceKpi": {
     "title": "आज की उपस्थिति",
-    "total": "कुल",
+    "total": "अंकन",
     "present": "उपस्थित",
     "absent": "अनुपस्थित",
     "leave": "अवकाश",
     "late": "देर से",
     "viewDetails": "विवरण देखें",
-    "noData": "आज अभी तक कोई उपस्थिति दर्ज नहीं हुई है।"
+    "noData": "आज अभी तक कोई उपस्थिति दर्ज नहीं हुई है।",
+    "scope": "{sessions, plural, one {# सत्र} other {# सत्र}} · {students, plural, one {# छात्र} other {# छात्र}} (आपकी पहुँच में)"
   },
   "timetableTitle": "समय-सारणी",
   "timetableDescription": "साप्ताहिक कक्षा समय-सारणी बनाएँ और प्रबंधित करें।",

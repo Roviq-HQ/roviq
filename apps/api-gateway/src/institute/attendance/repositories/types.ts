@@ -57,7 +57,7 @@ export interface SessionDateRangeQuery {
 }
 
 export interface AbsenteesReportQuery {
-  sectionId?: string | null;
+  sectionId: string | null;
   startDate: string;
   endDate: string;
 }
@@ -102,4 +102,37 @@ export interface StudentHistoryRow {
   status: string;
   remarks: string | null;
   markedAt: Date;
+}
+
+export interface DateSummaryQuery {
+  date: string;
+  sectionId: string | null;
+  academicYearId: string | null;
+}
+
+export interface DateSummaryRow {
+  sessionCount: number;
+  studentCount: number;
+  counts: Record<string, number>;
+}
+
+export interface SectionDailyBreakdownQuery {
+  date: string;
+  standardId: string | null;
+}
+
+export interface AttendanceSectionRow {
+  id: string;
+  name: Record<string, string>;
+  displayLabel: string | null;
+  standardId: string;
+  standardName: Record<string, string>;
+  classTeacherId: string | null;
+}
+
+/** Persisted fields CASL conditions may reference when authorizing a write. */
+export interface AttendanceSectionScope {
+  sectionId: string;
+  standardId: string;
+  academicYearId: string;
 }

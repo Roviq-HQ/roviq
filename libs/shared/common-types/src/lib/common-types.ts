@@ -649,7 +649,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   parent: [
     ...SELF_SERVICE_ABILITIES,
     { action: 'read', subject: 'Student', conditions: { id: { $in: '$user.linkedStudentIds' } } },
-    { action: 'read', subject: 'Attendance' },
+    {
+      action: 'read',
+      subject: 'Attendance',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
+    },
     { action: 'manage', subject: 'Consent' },
     { action: 'read', subject: 'Institute' },
     { action: 'read', subject: 'AcademicYear' },
