@@ -18,6 +18,14 @@
 
 Both apps share UI components from `@roviq/ui`, auth logic from `@roviq/auth`, and i18n from `@roviq/i18n`.
 
+## Common components
+
+App-wide reusable components live in `apps/web/src/components/` (import via the `@web/components/*` alias) — prefer these over re-building per feature. Data-coupled ones fetch via `@roviq/graphql` (inline `gql`/`useQuery`) or reuse existing feature hooks through the `@web/*` alias; they must NOT live in `@roviq/ui` (a lib cannot import app code). **Add one concise line here per new common component.**
+
+- `pickers/SectionPicker` — multi-select of class sections grouped by department → standard, with per-class / per-department / global "select all" and a live count.
+- `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
+- `pickers/AcademicYearSelector` + `useSelectedAcademicYear()` — persistent academic-year dropdown stored in the URL via nuqs (`?year=`); seeds the active year on load and exposes `loading`. Shared across academic-years, academics, and examinations pages. `ControlledAcademicYearSelector` + `useLocalAcademicYear()` is the same dropdown with caller-held state (no URL) — used only inside the timetable creation wizard; every other timetable read resolves the active year server-side.
+
 ## Shared Libraries
 
 ### @roviq/ui
