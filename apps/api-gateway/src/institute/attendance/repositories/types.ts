@@ -58,6 +58,7 @@ export interface SessionDateRangeQuery {
 
 export interface AbsenteesReportQuery {
   sectionId: string | null;
+  standardId: string | null;
   startDate: string;
   endDate: string;
 }

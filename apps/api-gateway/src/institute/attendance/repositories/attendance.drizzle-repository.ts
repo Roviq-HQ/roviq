@@ -515,10 +515,12 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
           attendanceEntriesLive,
           eq(attendanceEntriesLive.sessionId, attendanceSessionsLive.id),
         )
+        .innerJoin(sectionsLive, eq(sectionsLive.id, attendanceSessionsLive.sectionId))
         .where(
           and(
             between(attendanceSessionsLive.date, query.startDate, query.endDate),
             query.sectionId ? eq(attendanceSessionsLive.sectionId, query.sectionId) : undefined,
+            query.standardId ? eq(sectionsLive.standardId, query.standardId) : undefined,
             entryInScope(access.ability, 'read', attendanceEntriesLive.id),
           ),
         )

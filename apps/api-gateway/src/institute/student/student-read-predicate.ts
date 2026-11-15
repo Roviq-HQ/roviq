@@ -16,7 +16,11 @@ export function activeAcademicYearIds() {
     .where(eq(academicYearsLive.isActive, true));
 }
 
-export function studentReadPredicate(ability: AppAbility) {
+/**
+ * Section conditions are checked against the student's enrolment in `academicYearId`,
+ * or in the active year when null.
+ */
+export function studentReadPredicate(ability: AppAbility, academicYearId: string | null) {
   const restriction = caslToSqlWhere(ability, 'read', 'Student', {
     id: readStudent.id,
     userId: readStudent.userId,
@@ -36,7 +40,9 @@ export function studentReadPredicate(ability: AppAbility) {
         readAcademic,
         and(
           eq(readAcademic.studentProfileId, readStudent.id),
-          inArray(readAcademic.academicYearId, activeAcademicYearIds()),
+          academicYearId
+            ? eq(readAcademic.academicYearId, academicYearId)
+            : inArray(readAcademic.academicYearId, activeAcademicYearIds()),
         ),
       )
       .where(and(eq(readStudent.id, studentProfilesLive.id), restriction)),

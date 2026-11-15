@@ -209,11 +209,12 @@ function AbsenteesByStudentTab() {
 
   const { rows, loading } = useAbsenteesReport({
     sectionId: scope.sectionId,
+    standardId: scope.standardId,
     startDate,
     endDate,
     skip: !scope.ready || scope.noAssignments,
   });
-  const { students } = useStudentsInSection(scope.sectionId);
+  const { students } = useStudentsInSection(scope.sectionId, activeYearId);
 
   // Build a membershipId → student map so the table can render names
   // without an extra round-trip. Only students in the selected section

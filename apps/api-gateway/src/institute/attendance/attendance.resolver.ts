@@ -100,16 +100,17 @@ export class AttendanceResolver {
 
   @Query(() => [AbsenteeReportItem], {
     description:
-      "Per-student absentee report aggregated across sessions. Pass sectionId to scope to one section, or null for all of the caller's authorized sections.",
+      "Per-student absentee report aggregated across sessions. Pass sectionId for one section, standardId for one standard, or neither for all of the caller's authorized sections.",
   })
   @CheckAbility('read', 'Attendance')
   async attendanceAbsenteesReport(
     @Args('sectionId', { type: () => ID, nullable: true }) sectionId: string | null,
     @Args('startDate', { type: () => String }) startDate: string,
     @Args('endDate', { type: () => String }) endDate: string,
+    @Args('standardId', { type: () => ID, nullable: true }) standardId: string | null,
     @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<AbsenteeReportRow[]> {
-    return this.service.absenteesReport(sectionId, startDate, endDate, access);
+    return this.service.absenteesReport({ sectionId, standardId, startDate, endDate }, access);
   }
 
   @Query(() => [SectionDailyBreakdown], {
@@ -139,7 +140,10 @@ export class AttendanceResolver {
     return this.service.studentHistory(studentId, startDate, endDate, access);
   }
 
-  @Mutation(() => AttendanceSessionModel)
+  @Mutation(() => AttendanceSessionModel, {
+    description:
+      'Open a session and seed its roster. A date before today requires the AttendanceOverride permission (ATTENDANCE_OVERRIDE_FORBIDDEN otherwise).',
+  })
   @CheckAbility('create', 'Attendance')
   async openAttendanceSession(
     @Args('input') input: CreateAttendanceSessionInput,
@@ -149,7 +153,8 @@ export class AttendanceResolver {
   }
 
   @Mutation(() => AttendanceSessionModel, {
-    description: 'Override an existing attendance session — replaces lecturer and/or subject.',
+    description:
+      'Override an existing attendance session — replaces lecturer and/or subject. Past-dated sessions require the AttendanceOverride permission.',
   })
   @CheckAbility('update', 'Attendance')
   async overrideAttendanceSession(
@@ -163,7 +168,7 @@ export class AttendanceResolver {
 
   @Mutation(() => AttendanceEntryModel, {
     description:
-      'Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true` AND has the `manage` permission on Attendance (admins). Overrides are audited.',
+      'Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true`, and ATTENDANCE_OVERRIDE_FORBIDDEN unless the caller may `update` AttendanceOverride for the section. Overrides are audited.',
   })
   @CheckAbility('update', 'Attendance')
   async markAttendance(
@@ -183,7 +188,7 @@ export class AttendanceResolver {
 
   @Mutation(() => [AttendanceEntryModel], {
     description:
-      'Bulk-mark a roster. Same past-day guard as markAttendance — admins must explicitly opt in with `overridePastDay: true`.',
+      'Bulk-mark a roster. Same past-day guard as markAttendance: `overridePastDay: true` plus the AttendanceOverride permission.',
   })
   @CheckAbility('update', 'Attendance')
   async bulkMarkAttendance(
@@ -201,7 +206,10 @@ export class AttendanceResolver {
     );
   }
 
-  @Mutation(() => Boolean)
+  @Mutation(() => Boolean, {
+    description:
+      'Soft-delete a session. Past-dated sessions require the AttendanceOverride permission, so a past register cannot be deleted and re-seeded.',
+  })
   @CheckAbility('delete', 'Attendance')
   async deleteAttendanceSession(
     @Args('id', { type: () => ID }) id: string,

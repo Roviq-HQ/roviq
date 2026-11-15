@@ -19,6 +19,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import type { InstituteReadAccess } from '@roviq/casl';
 import {
   type AbilityRule,
+  AcademicStatus,
   type AppAbility,
   AttendanceMode,
   AttendanceStatus,
@@ -271,6 +272,13 @@ describe('AttendanceService (unit)', () => {
         subjectId: null,
         lecturerId: LECTURER_A,
       });
+      expect(studentService.list).toHaveBeenCalledWith({
+        sectionId: SECTION_ID,
+        academicYearId: ACADEMIC_YEAR_ID,
+        first: 1000,
+        after: undefined,
+        academicStatus: [AcademicStatus.ENROLLED],
+      });
       // Empty roster → no bulk insert call.
       expect(repo.bulkInsertEntries).not.toHaveBeenCalled();
       expect(eventBus.emit).toHaveBeenCalledWith(
@@ -449,6 +457,40 @@ describe('AttendanceService (unit)', () => {
       );
     });
 
+    it('rejects a past-day override from a section-scoped manager', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession({ date: '2020-01-01' }));
+
+      await expect(
+        service.markAttendance(baseInput, { overridePastDay: true, overrideReason: null }, TEACHER),
+      ).rejects.toThrow('Past-day attendance edits require the AttendanceOverride permission');
+      expect(repo.upsertEntry).not.toHaveBeenCalled();
+    });
+
+    it('allows a past-day override with a section-scoped AttendanceOverride grant', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession({ date: '2020-01-01' }));
+      repo.upsertEntry.mockResolvedValue(buildEntry());
+      const overrider = accessWith([
+        {
+          action: 'manage',
+          subject: 'Attendance',
+          conditions: { sectionId: { $in: [SECTION_ID] } },
+        },
+        {
+          action: 'update',
+          subject: 'AttendanceOverride',
+          conditions: { sectionId: { $in: [SECTION_ID] } },
+        },
+      ]);
+
+      await service.markAttendance(
+        baseInput,
+        { overridePastDay: true, overrideReason: null },
+        overrider,
+      );
+
+      expect(repo.upsertEntry).toHaveBeenCalled();
+    });
+
     it('looks the session up through the caller read scope', async () => {
       repo.findSessionById.mockResolvedValue(null);
 
@@ -499,6 +541,79 @@ describe('AttendanceService (unit)', () => {
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(repo.upsertEntry).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('bulkMark past-day override', () => {
+    it('rejects a past-day override from a section-scoped manager', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession({ date: '2020-01-01' }));
+
+      await expect(
+        service.bulkMark(
+          {
+            sessionId: SESSION_ID,
+            entries: [{ studentId: STUDENT_ID, status: AttendanceStatus.PRESENT }],
+          },
+          { overridePastDay: true, overrideReason: null },
+          TEACHER,
+        ),
+      ).rejects.toThrow('Past-day attendance edits require the AttendanceOverride permission');
+      expect(repo.upsertEntry).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('past-dated session writes', () => {
+    const PAST = '2020-01-01';
+    const OVERRIDE_REQUIRED = 'Past-day attendance edits require the AttendanceOverride permission';
+
+    it('rejects opening a past-dated session without the override permission', async () => {
+      repo.findSession.mockResolvedValue(null);
+
+      await expect(
+        service.openSession(
+          {
+            sectionId: SECTION_ID,
+            academicYearId: ACADEMIC_YEAR_ID,
+            date: PAST,
+            period: 1,
+            subjectId: null,
+            lecturerId: LECTURER_A,
+          },
+          TEACHER,
+        ),
+      ).rejects.toThrow(OVERRIDE_REQUIRED);
+      expect(repo.createSession).not.toHaveBeenCalled();
+      expect(repo.bulkInsertEntries).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a past-dated session without the override permission', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession({ date: PAST }));
+
+      await expect(service.deleteSession(SESSION_ID, TEACHER)).rejects.toThrow(OVERRIDE_REQUIRED);
+      expect(repo.softDeleteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects reassigning a past-dated session without the override permission', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession({ date: PAST }));
+
+      await expect(service.overrideSession(SESSION_ID, LECTURER_B, null, TEACHER)).rejects.toThrow(
+        OVERRIDE_REQUIRED,
+      );
+      expect(repo.assignLecturer).not.toHaveBeenCalled();
+    });
+
+    it('lets a caller with the override permission delete a past-dated session', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession({ date: PAST }));
+
+      await expect(service.deleteSession(SESSION_ID, ADMIN)).resolves.toBe(true);
+      expect(repo.softDeleteSession).toHaveBeenCalledWith(SESSION_ID);
+    });
+
+    it('still lets a section teacher delete a session dated today', async () => {
+      repo.findSessionById.mockResolvedValue(buildSession());
+
+      await expect(service.deleteSession(SESSION_ID, TEACHER)).resolves.toBe(true);
+      expect(repo.softDeleteSession).toHaveBeenCalledWith(SESSION_ID);
     });
   });
 

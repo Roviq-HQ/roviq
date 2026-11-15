@@ -33,7 +33,9 @@
   "accessDenied": "You do not have permission to view attendance.",
   "errors": {
     "SESSION_TAKEN": "This period was already opened by another lecturer. Use override to take over.",
-    "LECTURER_REQUIRED": "A lecturer membership is required to open the session."
+    "LECTURER_REQUIRED": "A lecturer membership is required to open the session.",
+    "ATTENDANCE_OVERRIDE_FORBIDDEN": "Only an administrator can change attendance for a past date.",
+    "FAILED": "Something went wrong. Please try again."
   },
   "override": "Take over",
   "overriding": "Taking over…",

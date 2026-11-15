@@ -1,4 +1,6 @@
-import { screen } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
 import AttendancePage from '../page';
@@ -65,13 +67,19 @@ const sessionsForSection = vi.fn((_sectionId: string | null) => ({
   refetch: vi.fn(),
 }));
 
+const { openSession, toastError } = vi.hoisted(() => ({
+  openSession: vi.fn(),
+  toastError: vi.fn(),
+}));
+vi.mock('sonner', () => ({ toast: { error: toastError, success: vi.fn() } }));
+
 vi.mock('../use-attendance', () => ({
   useSessionsForSection: (sectionId: string | null) => sessionsForSection(sectionId),
   useSessionEntries: () => ({ entries: hookState.entries, loading: false, refetch: vi.fn() }),
   useSessionCounts: () => ({ counts: hookState.sessionCounts }),
   useDateSummary: () => ({ summary: null, loading: false }),
   useAttendanceSections: () => ({ sections: hookState.sections, loading: false }),
-  useOpenSession: () => ({ openSession: vi.fn(), loading: false }),
+  useOpenSession: () => ({ openSession, loading: false }),
   useOverrideSession: () => ({ override: vi.fn(), loading: false }),
   useMarkAttendance: () => ({ mark: vi.fn(), loading: false }),
   useBulkMarkAttendance: () => ({ bulkMark: vi.fn(), loading: false }),
@@ -108,6 +116,24 @@ describe('AttendancePage', () => {
     renderWithProviders(<AttendancePage />);
     expect(screen.getByTestId('attendance-no-assigned-sections')).toBeInTheDocument();
     expect(sessionsForSection).not.toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('explains that a past-day register needs an administrator', async () => {
+    hookState.sections = [sectionOption('A')];
+    openSession.mockRejectedValueOnce(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'denied', extensions: { code: 'ATTENDANCE_OVERRIDE_FORBIDDEN' } }],
+      }),
+    );
+    renderWithProviders(<AttendancePage />);
+
+    await userEvent.click(screen.getByTestId('attendance-open-session-btn'));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'Only an administrator can change attendance for a past date.',
+      ),
+    );
   });
 
   it('hides the feature when the current ability denies read on Attendance', () => {

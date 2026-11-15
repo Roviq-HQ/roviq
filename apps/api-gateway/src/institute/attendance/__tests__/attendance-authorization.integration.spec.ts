@@ -58,6 +58,7 @@ interface DateSummary {
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 // The edit window compares against today's UTC date, so fixtures use it to keep marks editable.
 const TODAY = new Date().toISOString().slice(0, 10);
+const YESTERDAY = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
 const SUMMARY = 'sessionCount studentCount counts { status count }';
 
 describe('ROV-268 attendance section authorization through GraphQL and PostgreSQL', () => {
@@ -80,6 +81,9 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
   const ids = {
     year: '',
     oldYear: '',
+    standard: '',
+    oldStandard: '',
+    sessionPast: '',
     sectionA: '',
     sectionB: '',
     sectionC: '',
@@ -250,6 +254,8 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
       const foreign = await academicYear(tx, foreignTenant.tenantId, '2026-27', true);
       ids.year = current.yearId;
       ids.oldYear = old.yearId;
+      ids.standard = current.standardId;
+      ids.oldStandard = old.standardId;
       const t = tenant.tenantId;
       ids.sectionA = await section(tx, t, current, 'A', teacher.membershipId, [studentA]);
       ids.sectionB = await section(tx, t, current, 'B', multi.membershipId, [studentB]);
@@ -290,6 +296,25 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
         { sectionId: ids.sectionOld, yearId: ids.oldYear, period: null, lecturerId: lecturer },
         [[studentOld, AttendanceStatus.LEAVE]],
       );
+      const [past] = await tx
+        .insert(attendanceSessions)
+        .values({
+          tenantId: t,
+          sectionId: ids.sectionA,
+          academicYearId: ids.year,
+          date: YESTERDAY,
+          lecturerId: teacher.membershipId,
+          ...by,
+        })
+        .returning();
+      ids.sessionPast = past.id;
+      await tx.insert(attendanceEntries).values({
+        tenantId: t,
+        sessionId: past.id,
+        studentId: studentA.membershipId,
+        status: AttendanceStatus.ABSENT,
+        ...by,
+      });
       const [childProfile] = await tx
         .select({ id: studentProfiles.id })
         .from(studentProfiles)
@@ -526,6 +551,14 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
       expect(tampered.attendanceAbsenteesReport).toEqual([]);
       const all = await query<Rows>(admin, absentees, { s: null, d: TODAY });
       expect(all.attendanceAbsenteesReport).toHaveLength(4);
+      const oldStandard = await query<Rows>(
+        admin,
+        'query($std: ID, $d: String!) { attendanceAbsenteesReport(sectionId: null, standardId: $std, startDate: $d, endDate: $d) { studentId } }',
+        { std: ids.oldStandard, d: TODAY },
+      );
+      expect(oldStandard.attendanceAbsenteesReport.map((row) => row.studentId)).toEqual([
+        studentOld.membershipId,
+      ]);
     });
 
     it('limits daily breakdown rows and absentee ids', async () => {
@@ -640,6 +673,134 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
         st: studentA.membershipId,
       });
       expect(data.bulkMarkAttendance).toEqual([{ status: 'PRESENT' }]);
+    });
+  });
+
+  describe('students', () => {
+    it('see only their own attendance', async () => {
+      expect(await sectionIds(studentA)).toEqual([ids.sectionA]);
+      expect(await summary(studentA)).toEqual({
+        sessionCount: 1,
+        studentCount: 1,
+        counts: [{ status: 'PRESENT', count: 1 }],
+      });
+      type History = { attendanceStudentHistory: { status: string }[] };
+      const history =
+        'query($id: ID!, $d: String!) { attendanceStudentHistory(studentId: $id, startDate: $d, endDate: $d) { status } }';
+      const own = await query<History>(studentA, history, { id: studentA.membershipId, d: TODAY });
+      expect(own.attendanceStudentHistory).toEqual([{ status: 'PRESENT' }]);
+      const other = await query<History>(studentA, history, {
+        id: studentB.membershipId,
+        d: TODAY,
+      });
+      expect(other.attendanceStudentHistory).toEqual([]);
+    });
+  });
+
+  describe('past-day overrides', () => {
+    const openPast =
+      'mutation($s: ID!, $y: ID!, $d: String!, $l: ID!) { openAttendanceSession(input: { sectionId: $s, academicYearId: $y, date: $d, period: 6, lecturerId: $l }) { id } }';
+    const mark =
+      'mutation($s: ID!, $st: ID!, $o: Boolean) { markAttendance(input: { sessionId: $s, studentId: $st, status: PRESENT }, overridePastDay: $o) { status } }';
+
+    it('rejects a client override flag without the AttendanceOverride permission', async () => {
+      const variables = { s: ids.sessionPast, st: studentA.membershipId };
+      expect(await errorCodes(teacher, mark, { ...variables, o: false })).toEqual(['FORBIDDEN']);
+      expect(await errorCodes(teacher, mark, { ...variables, o: true })).toEqual([
+        'ATTENDANCE_OVERRIDE_FORBIDDEN',
+      ]);
+      expect(await storedStatus(ids.sessionPast, studentA)).toEqual(['ABSENT']);
+    });
+
+    it('rejects deleting, reassigning or re-opening a past register without the permission', async () => {
+      expect(
+        await errorCodes(teacher, 'mutation($id: ID!) { deleteAttendanceSession(id: $id) }', {
+          id: ids.sessionPast,
+        }),
+      ).toEqual(['ATTENDANCE_OVERRIDE_FORBIDDEN']);
+      expect(
+        await errorCodes(
+          teacher,
+          'mutation($id: ID!, $l: ID!) { overrideAttendanceSession(sessionId: $id, lecturerId: $l) { id } }',
+          { id: ids.sessionPast, l: admin.membershipId },
+        ),
+      ).toEqual(['ATTENDANCE_OVERRIDE_FORBIDDEN']);
+      expect(
+        await errorCodes(teacher, openPast, {
+          s: ids.sectionA,
+          y: ids.year,
+          d: YESTERDAY,
+          l: teacher.membershipId,
+        }),
+      ).toEqual(['ATTENDANCE_OVERRIDE_FORBIDDEN']);
+
+      const sessions = await withAdmin(app.db, mkAdminCtx('test:attendance-authorization'), (tx) =>
+        tx
+          .select({
+            id: attendanceSessions.id,
+            lecturerId: attendanceSessions.lecturerId,
+            deletedAt: attendanceSessions.deletedAt,
+          })
+          .from(attendanceSessions)
+          .where(
+            and(
+              eq(attendanceSessions.sectionId, ids.sectionA),
+              eq(attendanceSessions.date, YESTERDAY),
+            ),
+          ),
+      );
+      expect(sessions).toEqual([
+        { id: ids.sessionPast, lecturerId: teacher.membershipId, deletedAt: null },
+      ]);
+      expect(await storedStatus(ids.sessionPast, studentA)).toEqual(['ABSENT']);
+    });
+
+    it('lets a caller with the permission open a past-dated session', async () => {
+      const data = await query<{ openAttendanceSession: { id: string } }>(admin, openPast, {
+        s: ids.sectionA,
+        y: ids.year,
+        d: YESTERDAY,
+        l: teacher.membershipId,
+      });
+      expect(data.openAttendanceSession.id).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it('lets a caller with the AttendanceOverride permission edit a past day', async () => {
+      const data = await query<{ markAttendance: { status: string } }>(admin, mark, {
+        s: ids.sessionPast,
+        st: studentA.membershipId,
+        o: true,
+      });
+      expect(data.markAttendance.status).toBe('PRESENT');
+    });
+  });
+
+  describe('historical years', () => {
+    const roster =
+      'query($s: ID!, $y: ID!) { listStudents(filter: { sectionId: $s, academicYearId: $y }) { edges { node { membershipId } } } }';
+
+    it('lists the selected year roster for its assigned teacher', async () => {
+      type Roster = { listStudents: { edges: { node: { membershipId: string } }[] } };
+      const data = await query<Roster>(teacher, roster, { s: ids.sectionOld, y: ids.oldYear });
+      expect(data.listStudents.edges.map((edge) => edge.node.membershipId)).toEqual([
+        studentOld.membershipId,
+      ]);
+    });
+
+    it('seeds a session opened in a past year with that year roster', async () => {
+      const opened = await query<{ openAttendanceSession: { id: string } }>(
+        admin,
+        'mutation($s: ID!, $y: ID!, $l: ID!) { openAttendanceSession(input: { sectionId: $s, academicYearId: $y, date: "2026-03-02", lecturerId: $l }) { id } }',
+        { s: ids.sectionOld, y: ids.oldYear, l: teacher.membershipId },
+      );
+      const entries = await query<{ attendanceEntries: { studentId: string; status: string }[] }>(
+        admin,
+        'query($id: ID!) { attendanceEntries(sessionId: $id) { studentId status } }',
+        { id: opened.openAttendanceSession.id },
+      );
+      expect(entries.attendanceEntries).toEqual([
+        { studentId: studentOld.membershipId, status: 'PRESENT' },
+      ]);
     });
   });
 

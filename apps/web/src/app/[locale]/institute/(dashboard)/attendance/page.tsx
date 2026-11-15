@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@roviq/auth';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Avatar,
@@ -75,6 +75,16 @@ function todayIso(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function attendanceError(
+  err: unknown,
+  t: ReturnType<typeof useTranslations<'attendance'>>,
+  fallback: string,
+): string {
+  return extractGraphQLErrorCode(err) === 'ATTENDANCE_OVERRIDE_FORBIDDEN'
+    ? t('errors.ATTENDANCE_OVERRIDE_FORBIDDEN')
+    : extractGraphQLError(err, fallback);
+}
+
 export default function AttendancePage() {
   const t = useTranslations('attendance');
   const resolveI18n = useI18nField();
@@ -111,7 +121,10 @@ export default function AttendancePage() {
   const sections = scope.sectionsForStandard;
   // Only a server-permitted section ever reaches section-scoped queries.
   const scopedSectionId = scope.sectionId;
-  const { students, loading: studentsLoading } = useStudentsInSection(scopedSectionId);
+  const { students, loading: studentsLoading } = useStudentsInSection(
+    scopedSectionId,
+    activeYearId,
+  );
 
   const { sessions, refetch: refetchSessions } = useSessionsForSection(scopedSectionId, date, date);
   const currentSession = sessions.find((s) => (s.period ?? null) === (period ?? null)) ?? null;
@@ -163,7 +176,7 @@ export default function AttendancePage() {
       toast.success(t('sessionOpened'));
       await refetchSessions();
     } catch (err) {
-      const msg = extractGraphQLError(err, t('errors.SESSION_TAKEN'));
+      const msg = attendanceError(err, t, t('errors.SESSION_TAKEN'));
       toast.error(msg);
     }
   }
@@ -173,7 +186,7 @@ export default function AttendancePage() {
     try {
       await mark({ sessionId: currentSession.id, studentId: studentMembershipId, status });
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed'));
+      toast.error(attendanceError(err, t, t('errors.FAILED')));
     }
   }
 
@@ -188,7 +201,7 @@ export default function AttendancePage() {
       toast.success(t('markAllDone'));
       await refetchEntries();
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed'));
+      toast.error(attendanceError(err, t, t('errors.FAILED')));
     }
   }
 
@@ -335,7 +348,7 @@ export default function AttendancePage() {
                                   await refetchSessions();
                                   toast.success(t('overrideDone'));
                                 } catch (err) {
-                                  toast.error(extractGraphQLError(err, 'Failed'));
+                                  toast.error(attendanceError(err, t, t('errors.FAILED')));
                                 }
                               }}
                             >

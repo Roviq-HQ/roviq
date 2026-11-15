@@ -48,7 +48,7 @@ export class GuardianReadRepository {
           AND ${inArray(studentAcademicsLive.academicYearId, activeAcademicYearIds())}
         WHERE ${studentGuardianLinks.guardianProfileId} = ${guardianProfilesLive.id}
           AND ${guardianLinkedReadPredicate(access.ability) ?? sql`true`}
-          AND ${studentReadPredicate(access.ability) ?? sql`true`}
+          AND ${studentReadPredicate(access.ability, null) ?? sql`true`}
       )`.as('linked_student_count'),
     } as const;
   }
@@ -147,7 +147,7 @@ export class GuardianReadRepository {
           and(
             eq(studentGuardianLinks.guardianProfileId, guardianProfileId),
             guardianLinkedReadPredicate(access.ability),
-            studentReadPredicate(access.ability),
+            studentReadPredicate(access.ability, null),
           ),
         )
         .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);
@@ -193,7 +193,7 @@ export class GuardianReadRepository {
           and(
             eq(studentGuardianLinks.studentProfileId, studentProfileId),
             guardianLinkedReadPredicate(access.ability),
-            studentReadPredicate(access.ability),
+            studentReadPredicate(access.ability, null),
           ),
         )
         .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);

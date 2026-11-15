@@ -121,8 +121,8 @@ const BULK_MARK = gql`
 `;
 
 const LIST_STUDENTS_IN_SECTION = gql`
-  query StudentsInSection($sectionId: ID!) {
-    listStudents(filter: { sectionId: $sectionId, first: 1000 }) {
+  query StudentsInSection($sectionId: ID!, $academicYearId: ID!) {
+    listStudents(filter: { sectionId: $sectionId, academicYearId: $academicYearId, first: 1000 }) {
       edges {
         node {
           id
@@ -259,7 +259,8 @@ export function useBulkMarkAttendance() {
   };
 }
 
-export function useStudentsInSection(sectionId: string | null) {
+/** Roster of a section in a given academic year (the list API defaults to the active year). */
+export function useStudentsInSection(sectionId: string | null, academicYearId: string | null) {
   const { data, loading } = useQuery<{
     listStudents: {
       edges: Array<{
@@ -267,8 +268,8 @@ export function useStudentsInSection(sectionId: string | null) {
       }>;
     };
   }>(LIST_STUDENTS_IN_SECTION, {
-    variables: { sectionId },
-    skip: !sectionId,
+    variables: { sectionId, academicYearId },
+    skip: !sectionId || !academicYearId,
   });
   return {
     students: (data?.listStudents.edges.map((e) => e.node) ?? []).filter(
@@ -282,8 +283,18 @@ export function useStudentsInSection(sectionId: string | null) {
 // ── Reports ──────────────────────────────────────────────────────────
 
 const ABSENTEES_REPORT = gql`
-  query AttendanceAbsenteesReport($sectionId: ID, $startDate: String!, $endDate: String!) {
-    attendanceAbsenteesReport(sectionId: $sectionId, startDate: $startDate, endDate: $endDate) {
+  query AttendanceAbsenteesReport(
+    $sectionId: ID
+    $standardId: ID
+    $startDate: String!
+    $endDate: String!
+  ) {
+    attendanceAbsenteesReport(
+      sectionId: $sectionId
+      standardId: $standardId
+      startDate: $startDate
+      endDate: $endDate
+    ) {
       studentId
       totalSessions
       presentCount
@@ -313,20 +324,21 @@ const SECTION_DAILY_BREAKDOWN = gql`
 `;
 
 /**
- * Absentee report aggregated per-student for the given date range. A null
- * `sectionId` covers all of the caller's authorized sections.
+ * Absentee report aggregated per-student for the given date range. Null
+ * section and standard cover all of the caller's authorized sections.
  */
 export function useAbsenteesReport(options: {
   sectionId: string | null;
+  standardId: string | null;
   startDate: string;
   endDate: string;
   skip: boolean;
 }) {
-  const { sectionId, startDate, endDate, skip } = options;
+  const { sectionId, standardId, startDate, endDate, skip } = options;
   const { data, loading, error, refetch } = useQuery<{
     attendanceAbsenteesReport: AbsenteeReportItem[];
   }>(ABSENTEES_REPORT, {
-    variables: { sectionId, startDate, endDate },
+    variables: { sectionId, standardId, startDate, endDate },
     skip: skip || !startDate || !endDate,
   });
   return {

@@ -30,19 +30,23 @@ export class StudentReadRepository {
       tx
         .select({ id: studentProfilesLive.id })
         .from(studentProfilesLive)
-        .where(and(eq(studentProfilesLive.id, id), studentReadPredicate(access.ability)))
+        .where(and(eq(studentProfilesLive.id, id), studentReadPredicate(access.ability, null)))
         .limit(1),
     );
     return rows.length > 0;
   }
   findById(id: string, access: InstituteReadAccess) {
-    return this.loadById(id, access.user, studentReadPredicate(access.ability));
+    return this.loadById(id, access.user, studentReadPredicate(access.ability, null));
   }
   findForMutation(id: string, ctx: InstituteContext) {
     return this.loadById(id, ctx, undefined);
   }
   list(filter: StudentFilterInput, access: InstituteReadAccess) {
-    return this.loadList(filter, access.user, studentReadPredicate(access.ability));
+    return this.loadList(
+      filter,
+      access.user,
+      studentReadPredicate(access.ability, filter.academicYearId ?? null),
+    );
   }
   listForAttendance(filter: StudentFilterInput, ctx: InstituteContext) {
     return this.loadList(filter, ctx, undefined);
@@ -298,7 +302,7 @@ export class StudentReadRepository {
   // ── UPDATE ────────────────────────────────────────────────
 
   async statistics(access: InstituteReadAccess): Promise<StudentStatisticsModel> {
-    const restriction = studentReadPredicate(access.ability);
+    const restriction = studentReadPredicate(access.ability, null);
 
     return withTenant(this.db, access.user, async (tx) => {
       const [{ total }] = await tx
@@ -377,7 +381,10 @@ export class StudentReadRepository {
         .select({ userId: studentProfilesLive.userId })
         .from(studentProfilesLive)
         .where(
-          and(eq(studentProfilesLive.id, studentProfileId), studentReadPredicate(access.ability)),
+          and(
+            eq(studentProfilesLive.id, studentProfileId),
+            studentReadPredicate(access.ability, null),
+          ),
         )
         .limit(1);
     });

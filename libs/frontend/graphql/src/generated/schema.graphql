@@ -3515,7 +3515,7 @@ type Mutation {
   bulkCreateStudents(input: BulkCreateStudentsInput!): BulkImportStartResult!
 
   """
-  Bulk-mark a roster. Same past-day guard as markAttendance — admins must explicitly opt in with `overridePastDay: true`.
+  Bulk-mark a roster. Same past-day guard as markAttendance: `overridePastDay: true` plus the AttendanceOverride permission.
   """
   bulkMarkAttendance(input: BulkMarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): [AttendanceEntryModel!]!
 
@@ -3590,6 +3590,10 @@ type Mutation {
   """Retire the active timetable (ACTIVE → INACTIVE)."""
   deactivateTimetable(id: ID!): TimetableModel!
   deleteAcademicYear(id: ID!): Boolean!
+
+  """
+  Soft-delete a session. Past-dated sessions require the AttendanceOverride permission, so a past register cannot be deleted and re-seeded.
+  """
   deleteAttendanceSession(id: ID!): Boolean!
   deleteBot(id: ID!): Boolean!
   deleteCoScholasticArea(id: ID!): Boolean!
@@ -3681,14 +3685,18 @@ type Mutation {
   logout: Boolean!
 
   """
-  Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true` AND has the `manage` permission on Attendance (admins). Overrides are audited.
+  Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true`, and ATTENDANCE_OVERRIDE_FORBIDDEN unless the caller may `update` AttendanceOverride for the section. Overrides are audited.
   """
   markAttendance(input: MarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): AttendanceEntryModel!
+
+  """
+  Open a session and seed its roster. A date before today requires the AttendanceOverride permission (ATTENDANCE_OVERRIDE_FORBIDDEN otherwise).
+  """
   openAttendanceSession(input: CreateAttendanceSessionInput!): AttendanceSessionModel!
   openExamMarksEntry(id: ID!): ExamModel!
 
   """
-  Override an existing attendance session — replaces lecturer and/or subject.
+  Override an existing attendance session — replaces lecturer and/or subject. Past-dated sessions require the AttendanceOverride permission.
   """
   overrideAttendanceSession(lecturerId: ID!, sessionId: ID!, subjectId: ID): AttendanceSessionModel!
   pauseSubscription(input: PauseSubscriptionInput!): SubscriptionModel!
@@ -4123,9 +4131,9 @@ type Query {
   admissionStatistics(filter: AdmissionStatisticsFilterInput): AdmissionStatisticsModel!
 
   """
-  Per-student absentee report aggregated across sessions. Pass sectionId to scope to one section, or null for all of the caller's authorized sections.
+  Per-student absentee report aggregated across sessions. Pass sectionId for one section, standardId for one standard, or neither for all of the caller's authorized sections.
   """
-  attendanceAbsenteesReport(endDate: String!, sectionId: ID, startDate: String!): [AbsenteeReportItem!]!
+  attendanceAbsenteesReport(endDate: String!, sectionId: ID, standardId: ID, startDate: String!): [AbsenteeReportItem!]!
   attendanceCounts(sessionId: ID!): [AttendanceStatusCount!]!
 
   """
