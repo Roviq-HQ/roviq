@@ -105,7 +105,13 @@ After completing each phase/issue, before declaring done:
 
 ### Manual acceptance handoff
 
-Before handing off each issue, insert minimal, clearly named synthetic fixtures into the running local dev environment through a small Tilt task. Prepare the fixture script during implementation; the final insert should take seconds. Reuse existing apps and infra without a rebuild, full seed/reset, or separate review environment. Verify fixture availability, then include **Manual acceptance** in the Linear issue: login URL, credentials/roles, created records with IDs/direct links, and numbered actions with exact expected results. The reviewer must not need to create the setup. Production writes remain prohibited without explicit approval.
+- Prepare minimal, clearly named synthetic fixtures during implementation; insert into approved local dev via Tilt in seconds, using additive/idempotent writes.
+- Reuse running apps/infra. No rebuild, full seed/reset, or separate review environment just for handoff.
+- Verify fixtures and logins. In the Linear issue's **Manual acceptance**, list URL, credentials/roles, records with IDs/direct links, and numbered steps with exact expected results. The user performs checks, not setup.
+- Define observable acceptance criteria before coding. For UI changes, verify the normal browser flow, a boundary/forbidden case, and refresh/account switching. Add regression tests for discovered bugs.
+- Report what was verified, what remains unverified, and supporting evidence; distinguish automated results from pending manual acceptance.
+- Keep one-time scripts, hooks and generated review files out of the feature commit. Remove them after the user finishes review; retain regression tests. Delete database fixtures only when requested.
+- Preserve database approval scope; production writes require explicit approval.
 
 ### Deviations & Deferred Work
 
