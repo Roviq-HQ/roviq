@@ -160,6 +160,7 @@ vi.mock('drizzle-orm', () => ({
   desc: vi.fn((col: unknown) => col),
   ilike: vi.fn((a: unknown, b: unknown) => [a, b]),
   inArray: vi.fn((a: unknown, b: unknown) => [a, b]),
+  exists: vi.fn((query: unknown) => ['exists', query]),
   isNull: vi.fn((a: unknown) => ['isNull', a]),
   notInArray: vi.fn((a: unknown, b: unknown) => [a, b]),
   count: vi.fn(() => 'count'),
@@ -169,9 +170,17 @@ vi.mock('drizzle-orm', () => ({
   ),
 }));
 
-vi.mock('drizzle-orm/pg-core', () => ({
-  alias: vi.fn(() => col),
-}));
+vi.mock('drizzle-orm/pg-core', () => {
+  const chain = { from: () => chain, where: () => chain, leftJoin: () => chain };
+  return {
+    alias: vi.fn(() => col),
+    QueryBuilder: class {
+      select() {
+        return chain;
+      }
+    },
+  };
+});
 
 // Mock status-machine to isolate update() behavior from transition rules.
 vi.mock('../student.state-machine', () => ({
