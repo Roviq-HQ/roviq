@@ -33,6 +33,10 @@ pnpm e2e:down                     # remove Docker E2E containers + volumes
 nx run api-gateway:test --watch
 ```
 
+## CI runner
+
+- The `e2e-ui` job pins `ubuntu-24.04` because Playwright 1.59.1 supports Ubuntu 22.04/24.04, while `ubuntu-latest` can select unsupported Ubuntu 26.04. Recheck OS support when upgrading Playwright before changing this runner.
+
 ## Docker Compose Files
 
 Compose files live under `docker/` and are selected explicitly per use case — this project does not use named `--profile` flags.

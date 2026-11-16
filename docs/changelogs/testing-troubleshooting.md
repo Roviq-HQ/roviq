@@ -278,3 +278,15 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 - Download an arbitrary Chromium build. Playwright must use the browser revision coupled to its installed package version.
 
 ---
+
+## 2026-11-16 — `fixed` — CI Chromium installation failed on Ubuntu 26.04
+
+**Scope:** `e2e-ui` runner in `.github/workflows/ci.yml`.
+
+**Root cause:** `ubuntu-latest` selected Ubuntu 26.04, which the locked Playwright 1.59.1 release does not support. `playwright install --with-deps chromium` failed before the E2E stack or UI tests started.
+
+**Fix:** Pin the Playwright job to `ubuntu-24.04`, an OS supported by Playwright 1.59.1. Keep browser and system dependency installation enabled. Other jobs retain their existing runners.
+
+**Verification:** The failing GitHub job confirms browser installation failed and UI tests never ran. Playwright's versioned 1.59.1 system requirements list Ubuntu 22.04/24.04. A new GitHub Actions run is required to verify browser installation and the UI suite on the pinned runner.
+
+---
