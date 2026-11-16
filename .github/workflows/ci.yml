@@ -177,6 +177,9 @@ jobs:
           DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
       - name: Run affected tests
         run: pnpx nx affected -t test
+      # Named gate so a CASL-to-SQL / RLS regression is visible before the full suite runs.
+      - name: User & Groups Security Invariants
+        run: pnpm vitest run --project integration apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts
       - name: Security Invariant Tests (integration)
         run: pnpm test:int
 
