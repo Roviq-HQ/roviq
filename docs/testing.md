@@ -15,6 +15,7 @@ nx affected -t test               # only changed projects
 
 # Integration tests (real PostgreSQL, roviq_test DB on port 5434)
 pnpm test:int                     # vitest --project integration
+                                  # starts dev Postgres/Redis/NATS itself if they are stopped (scripts/int-infra.ts)
 
 # E2E tests (requires Docker stack: pnpm e2e:up)
 pnpm test:e2e:api                 # Vitest GraphQL tests against api-gateway:3004
@@ -27,7 +28,8 @@ pnpm test:all                     # unit + int + e2e:api + e2e:ui
 pnpm test:coverage                # unit-node + unit-dom with v8 coverage
 
 # Teardown
-pnpm e2e:down                     # remove Docker E2E containers + volumes
+pnpm e2e:down                     # stop Docker E2E containers (keeps volumes and .e2e/ build cache)
+pnpm e2e:nuke                     # also wipe volumes and .e2e/
 
 # Watch mode (single project)
 nx run api-gateway:test --watch
@@ -36,10 +38,15 @@ nx run api-gateway:test --watch
 ## CI and pre-push
 
 - `pnpm test:e2e:api` routes through the cacheable Nx target `api-gateway-e2e:test-e2e`; `pnpm test:e2e:ui` through `web-e2e-suite:e2e` (single invocation, single cache hash) covering web-admin-e2e, web-institute-e2e, web-reseller-e2e plus cross-portal.
+- The UI target's cache inputs (`e2eFrontend`) include `e2eStack`: gateway, notification-service, `libs`, `ee`, migrations, seed scripts and the e2e Docker files. A backend-only change therefore re-runs the Playwright suite on pre-push instead of replaying a cached pass.
 - `pnpm ci:check` — unified gate. Runs lint/typecheck/unit/integration/e2e in parallel; locally uses `nx affected` against `origin/main`, on CI runs the full suite. Invoked by `.husky/pre-push`. Bypass: `SKIP_PREPUSH=1 git push` or `git push --no-verify`.
-- CI runs **six blocking jobs**: `lint`, `typecheck`, `test` (unit — no DB), `build`, `e2e-api` (Docker stack + Vitest E2E), `e2e-ui` (Docker stack + Playwright). Integration tests (`pnpm test:int`) run as part of the `test` job against `roviq_test` via `DATABASE_URL_TEST`. E2E jobs spin up `compose.e2e.yaml` with `--wait` and tear it down via `if: always()`.
+- CI runs **five blocking jobs** on push/PR: `lint`, `typecheck`, `test` (unit — no DB), `build`, `e2e-api` (Docker stack + Vitest E2E). A sixth, `e2e-ui` (Docker stack + Playwright), is **paused on push/PR since 2026-11-16 (ROV-277)** and runs only on a manual trigger: `gh workflow run CI --ref <branch>`. Until it is re-enabled (remove the `if:` on the job), the Playwright suite is enforced only by the local pre-push gate; `git push --no-verify` or `SKIP_PREPUSH=1` skips it entirely. Integration tests (`pnpm test:int`) run as part of the `test` job against `roviq_test` via `DATABASE_URL_TEST`. E2E jobs spin up `compose.e2e.yaml` with `--wait` and tear it down via `if: always()`.
 
 - The `e2e-ui` job pins `ubuntu-24.04` because Playwright 1.59.1 supports Ubuntu 22.04/24.04, while `ubuntu-latest` can select unsupported Ubuntu 26.04. Recheck OS support when upgrading Playwright before changing this runner.
+- Both e2e jobs start the stack with `pnpm e2e:up` (the same command as local) and restore `.e2e/nx/cache` and `.e2e/nx/workspace-data` via `actions/cache` (Nx ignores the cache folder without its index in `workspace-data`), so the api-gateway and notification-service builds are cache hits on most runs.
+- After `pnpm e2e:up`, CI runs the Nx targets directly (`api-gateway-e2e:test-e2e`, `web-e2e-suite:e2e`). `pnpm test:e2e:api` / `pnpm test:e2e:ui` are for local use: they start and re-seed the stack first, which CI has already done.
+- The UI job starts the stack in the background and installs Playwright browsers and runs codegen meanwhile; `Wait for E2E stack` prints the start-up log and fails the job if start-up failed.
+- Playwright uses its default worker count everywhere (half the logical cores: 2 on a 4-vCPU GitHub runner). Tests must stay safe under `fullyParallel`.
 
 ## Docker Compose Files
 
@@ -57,10 +64,13 @@ Convenience scripts:
 
 ```bash
 pnpm infra:up       # docker compose -f docker/compose.infra.yaml up -d
-pnpm e2e:up         # docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
+pnpm e2e:up         # scripts/e2e-compose.sh up -d --build --wait, then run --rm novu-bridge-sync
 pnpm e2e:clean      # re-run migrate+seed on existing e2e stack
-pnpm e2e:down       # tear down e2e stack + volumes
+pnpm e2e:down       # stop e2e stack, keep volumes and .e2e/
+pnpm e2e:nuke       # stop e2e stack, wipe volumes and .e2e/
 ```
+
+Every e2e compose call goes through `scripts/e2e-compose.sh`. It sets `E2E_WORKSPACE`/`E2E_UID`/`E2E_GID` and pre-creates the bind-mount targets; calling `docker compose -f docker/compose.e2e.yaml` directly fails with "run via scripts/e2e-compose.sh".
 
 **Database per test type:**
 
@@ -78,13 +88,48 @@ docker/compose.e2e.yaml
 ├── postgres (clean roviq_test DB via init-db.sh)
 ├── nats
 ├── redis
-├── migrate-and-seed (runs drizzle-kit migrate + seed.ts, exits)
-├── api-gateway (waits for migrate-and-seed)
-├── notification-service (waits for migrate-and-seed)
+├── migrate-and-seed (db:reset --test + seed-e2e, exits)
+├── api-gateway (waits for migrate-and-seed; builds api-gateway + notification-service, then `nx serve`)
+├── notification-service (waits for api-gateway healthy; runs the output it built)
 └── [profile: vitest] vitest-e2e
 ```
 
-One command spins up infra, migrates, seeds, runs tests, and propagates the exit code. No shell scripts needed — Docker Compose profiles handle everything.
+Backend services share one toolchain-only image (`roviq-e2e-backend`, target `e2e` in `docker/Dockerfile.backend`: Node, curl, procps, pnpm). Nothing is installed or copied at image build time:
+
+- The host checkout, including the host's `node_modules`, is bind-mounted at its **host path** (pnpm's bin shims embed absolute paths, so mounting at `/app` breaks module resolution).
+- Containers run as the invoking user, so files they write stay owned by you (or the CI runner).
+- `.e2e/dist` and `.e2e/nx` (git-ignored) are mounted over `dist/` and `.nx/` inside the containers. The host's `dist/` and `.nx/` are never touched, so Tilt's dev gateway and the e2e stack run side by side.
+- Only `migrate-and-seed` declares the image `build`; the other services reference the tag. Several build definitions for one tag give it a new ID on every `up --build`, which recreates the containers.
+- `novu-bridge-sync` is in the `setup` profile and is run by `pnpm e2e:up` after the stack is healthy. As a plain service it made `up --wait` fail intermittently with `exited (0)`.
+- Requires a Linux host on the Node major in `.nvmrc`; run `pnpm install` on the host after dependency changes — there is no image rebuild.
+
+### E2E stack decisions (ROV-277, 2026-11-16)
+
+Each row is a decision with its reason. Evidence and timings: `docs/changelogs/testing-troubleshooting.md`, entries dated 2026-11-16.
+
+| Decision | Why | Do not |
+|---|---|---|
+| One toolchain-only image (`e2e` target) for all backend services; host checkout and `node_modules` bind-mounted | The old three ~2 GB images cost 4-8 minutes per CI job to install, build and export what the runner already had | Bake source or `node_modules` back into the e2e image |
+| Mount the checkout at its host path | pnpm's `.bin` shims hard-code the host path in `NODE_PATH`; at `/app` the gateway failed with `Cannot find module 'axios'` | Mount at `/app` |
+| Container `dist/` and `.nx/` live in git-ignored `.e2e/` | Keeps the host's `dist/` and Nx state untouched so Tilt's dev gateway and the e2e stack run together; CI can cache the folder directly | Point the mount at the host's `dist/` |
+| Containers run as the invoking user | Files written into the bind mount stay owned by the developer or the CI runner, so no `chmod`/`chown` steps | Hard-code a UID |
+| api-gateway is the only Nx builder; notification-service runs its output | Two Nx processes writing `dist/libs` at once race | Run `nx serve` in a second container on the same `dist` |
+| Only `migrate-and-seed` declares the image `build` | Several build definitions for one tag gave it a new ID on every `up --build`, recreating the containers | Add `build:` to another service using the shared tag |
+| `novu-bridge-sync` is in the `setup` profile and run by `pnpm e2e:up` | `up --wait` fails intermittently with `exited (0)` on a one-shot service nothing depends on | Start a leaf one-shot service from `up --wait` |
+| Every compose call goes through `scripts/e2e-compose.sh` | It sets the workspace path and UID the compose file requires and creates the mount targets | Call `docker compose -f docker/compose.e2e.yaml` directly |
+| CI caches `.e2e/nx/cache` together with `.e2e/nx/workspace-data` | Nx ignores the cache folder without its index (`machine.db`) | Cache the cache folder alone |
+| CI runs the Nx test targets directly after `pnpm e2e:up` | `pnpm test:e2e:*` start and re-seed the stack a second time | Use `pnpm test:e2e:*` in CI steps |
+| Playwright uses its default worker count (no CI override) | One worker made the suite fully serial; tests are `fullyParallel`-safe | Reintroduce `workers: 1` to hide a flaky test |
+| Preflight polls 20s, prints the gateway log, runs `e2e:up`, then restarts the api-gateway container | A single 1s probe misfired; and a gateway that boots during a DB reset exits and `nx serve` parks until restarted | Shorten it back to a single probe |
+| **The Playwright CI job is paused on push/PR** (manual `workflow_dispatch` only) | Owner decision for a single-developer repo: the job took ~11.5 min and the suite already runs on every push via pre-push. Planned for a few months | Delete the job; re-enable by removing its `if:` |
+| The UI target's cache hashes backend sources (`e2eStack`) | With the CI job paused, a backend-only change would otherwise replay a cached UI pass and never run the suite | Remove `e2eStack` from `e2eFrontend` while the CI job is paused |
+
+Known gaps accepted with these decisions:
+
+- `git push --no-verify` or `SKIP_PREPUSH=1` skips the Playwright suite with no CI backstop.
+- Re-seeding (`e2e:clean`, `e2e-seed`) resets the database under a live gateway; a gateway reload during it crashes the gateway until preflight restarts it.
+- The e2e stack needs a Linux host on the Node major in `.nvmrc`.
+- The `build` and `test` CI jobs now cache the Nx index (`.nx/workspace-data/*.db*`) with `.nx/cache`. On the host that index is named after `/etc/machine-id`, so it only helps if GitHub runners share a machine id; the `Report Nx cache index` step in each job says whether it did. Nx's supported way to share a cache across machines is a remote cache (Nx Cloud or `@nx/shared-fs-cache`), not adopted here.
 
 ### Deterministic Seed Data
 
@@ -286,4 +331,4 @@ Both scripts are pure grep — fast enough to run in the `lint` job without extr
 | Query from Docker | `docker exec roviq-e2e-postgres-1 psql -U roviq -d roviq_test` |
 | Full reset | `pnpm e2e:down && pnpm e2e:up` |
 | Re-seed only | `pnpm e2e:clean` |
-| Code changes | `pnpm nx build api-gateway` locally — Docker mounts `dist/`, `libs/`, `apps/api-gateway/src/` so `nx serve` inside Docker picks up changes automatically |
+| Code changes | Edit files on the host — the checkout is bind-mounted, so `nx serve` inside the api-gateway container rebuilds and restarts. notification-service changes need `scripts/e2e-compose.sh restart api-gateway notification-service` |

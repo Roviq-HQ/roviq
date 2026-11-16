@@ -1,10 +1,10 @@
 ARG NODE_VERSION=24
 
-# ── Base: install dependencies ───────────────────────────────
+# ── Toolchain: Node + system packages, no source, no dependencies ──
 # Use slim (Debian) instead of alpine — @temporalio/core-bridge requires glibc,
 # which is incompatible with Alpine's musl libc.
 # See: https://github.com/temporalio/sdk-typescript/issues/1271
-FROM node:${NODE_VERSION}-slim AS base
+FROM node:${NODE_VERSION}-slim AS toolchain
 WORKDIR /app
 
 # ca-certificates: TLS in slim images (Temporal SDK requirement)
@@ -18,8 +18,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # Use corepack (built into Node) to manage pnpm — reads version from packageManager field
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ENV COREPACK_HOME="/app/.corepack"
 RUN corepack enable
+
+# ── E2E: toolchain only; compose.e2e.yaml bind-mounts the host checkout ──
+# Source and node_modules come from the host, so this image stays small and
+# never needs a rebuild for code or dependency changes.
+FROM toolchain AS e2e
+
+# Containers run as the host user (E2E_UID), which has no passwd entry here,
+# so HOME and the corepack cache must be usable by any UID.
+ENV COREPACK_HOME="/opt/corepack"
+ENV HOME="/tmp/home"
+COPY package.json /tmp/pm/package.json
+RUN cd /tmp/pm && corepack install && rm -rf /tmp/pm \
+  && mkdir -p "$HOME" && chmod 1777 "$HOME" \
+  && chmod -R a+rwX /opt/corepack
+
+# ── Base: install dependencies ───────────────────────────────
+FROM toolchain AS base
+ENV COREPACK_HOME="/app/.corepack"
 
 # Copy only the lockfile first — it changes only when deps change.
 # Extract just the dependency fields from package.json so script-only

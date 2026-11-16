@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .nx/
+.e2e/
 *.tsbuildinfo
 .superpowers/
 .worktrees/
