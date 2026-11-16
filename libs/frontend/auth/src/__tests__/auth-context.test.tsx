@@ -12,6 +12,9 @@ function createFakeJwt(expUnix: number): string {
   return `${header}.${body}.sig`;
 }
 
+const getPreferredLocale = vi.fn().mockResolvedValue(null);
+const savePreferredLocaleMutation = vi.fn().mockResolvedValue(null);
+
 const noop = vi.fn<() => Promise<never>>().mockRejectedValue(new Error('should not be called'));
 
 function renderAuth(
@@ -20,6 +23,8 @@ function renderAuth(
 ) {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AuthProvider
+      getPreferredLocale={getPreferredLocale}
+      savePreferredLocaleMutation={savePreferredLocaleMutation}
       scope={scope}
       loginMutation={noop}
       selectInstituteMutation={selectInstituteMutation}

@@ -20,6 +20,23 @@ export class UserDrizzleRepository extends UserRepository {
     super();
   }
 
+  async getPreferredLocale(userId: string): Promise<string | null> {
+    const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+      tx
+        .select({ preferredLocale: users.preferredLocale })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1),
+    );
+    return user?.preferredLocale ?? null;
+  }
+
+  async updatePreferredLocale(userId: string, locale: string | null): Promise<void> {
+    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+      tx.update(users).set({ preferredLocale: locale }).where(eq(users.id, userId)),
+    );
+  }
+
   async create(data: CreateUserData): Promise<UserRecord> {
     const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
       tx

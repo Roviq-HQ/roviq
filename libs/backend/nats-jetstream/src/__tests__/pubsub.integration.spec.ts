@@ -20,7 +20,7 @@ import { JetStreamServer } from '../server/jetstream.server';
 import { DEFAULT_DLQ_STREAM } from '../streams/stream.config';
 import { ensureStreams } from '../streams/stream.manager';
 
-const servers = [process.env.NATS_URL ?? 'nats://localhost:4222'];
+const servers = [process.env.NATS_TEST_URL ?? 'nats://localhost:4224'];
 const poll = { timeout: 5_000, interval: 20 };
 type Handler = (payload: unknown, context: JetStreamContext) => Promise<void>;
 
@@ -131,7 +131,9 @@ describe('JetStream transport with a real broker', () => {
     if (names.includes(DEFAULT_DLQ_STREAM.name)) {
       for await (const consumer of jsm.consumers.list(DEFAULT_DLQ_STREAM.name)) {
         if (!consumer.name.startsWith('ROV54_')) {
-          throw new Error('DLQ has application consumers; set NATS_URL to an isolated test broker');
+          throw new Error(
+            'DLQ has application consumers; set NATS_TEST_URL to an isolated test broker',
+          );
         }
       }
     }

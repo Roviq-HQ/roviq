@@ -26,6 +26,9 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
 - `pickers/AcademicYearSelector` + `useSelectedAcademicYear()` — persistent academic-year dropdown stored in the URL via nuqs (`?year=`); seeds the active year on load and exposes `loading`. Shared across academic-years, academics, and examinations pages. `ControlledAcademicYearSelector` + `useLocalAcademicYear()` is the same dropdown with caller-held state (no URL) — used only inside the timetable creation wizard; every other timetable read resolves the active year server-side.
 
+- `account/LanguagePreference` — shared account language setting for all three portals; saved preferences apply after authentication, with browser language then English as fallback. The topbar selector remains a per-visit override.
+- `AccountLocaleSync` — applies the authenticated account language once per account load, preserving the route, query and fragment.
+
 ## Shared Libraries
 
 ### @roviq/ui

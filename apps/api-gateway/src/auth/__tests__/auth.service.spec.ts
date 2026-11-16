@@ -140,6 +140,23 @@ describe('AuthService', () => {
     );
   });
 
+  describe('account language', () => {
+    it('should read the authenticated account preference', async () => {
+      mockUserRepo.getPreferredLocale.mockResolvedValue('hi');
+      expect(await authService.getPreferredLocale('user-1')).toBe('hi');
+      expect(mockUserRepo.getPreferredLocale).toHaveBeenCalledWith('user-1');
+    });
+
+    it.each([
+      'en',
+      'hi',
+      null,
+    ])('should save %s without changing identity fields', async (locale) => {
+      expect(await authService.updatePreferredLocale('user-1', locale)).toBe(locale);
+      expect(mockUserRepo.updatePreferredLocale).toHaveBeenCalledWith('user-1', locale);
+    });
+  });
+
   describe('instituteLogin', () => {
     const mockUser = {
       id: 'user-1',

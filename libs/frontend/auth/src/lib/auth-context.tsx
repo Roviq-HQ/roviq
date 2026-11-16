@@ -9,6 +9,11 @@ import { createScopedTokenStorage } from './token-storage';
 import type { AuthState, AuthUser, LoginInput, LoginResult, MembershipInfo } from './types';
 
 interface AuthContextValue extends AuthState {
+  preferredLocale: string | null;
+  isLocaleLoading: boolean;
+  localePreferenceError: boolean;
+  reloadPreferredLocale: () => void;
+  savePreferredLocale: (locale: string | null) => Promise<void>;
   scope: AuthScope;
   sessionExpired: boolean;
   needsInstituteSelection: boolean;
@@ -31,6 +36,11 @@ interface AuthContextValue extends AuthState {
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 interface AuthProviderProps {
+  getPreferredLocale: (accessToken: string) => Promise<string | null>;
+  savePreferredLocaleMutation: (
+    locale: string | null,
+    accessToken: string,
+  ) => Promise<string | null>;
   scope?: AuthScope;
   loginMutation: (input: LoginInput) => Promise<LoginResult>;
   passkeyLoginMutation?: () => Promise<LoginResult>;
@@ -68,6 +78,8 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({
+  getPreferredLocale,
+  savePreferredLocaleMutation,
   scope = 'institute',
   loginMutation,
   passkeyLoginMutation,
@@ -431,6 +443,66 @@ export function AuthProvider({
     return tokenStorage.getAccessToken();
   }, [tokenStorage]);
 
+  const [localePreference, setLocalePreference] = React.useState<{
+    userId: string;
+    locale: string | null;
+    loading: boolean;
+    error: boolean;
+  } | null>(null);
+  const [localeReload, reloadPreferredLocale] = React.useReducer((n: number) => n + 1, 0);
+  const localeRequest = React.useRef(0);
+  const localeUserId = state.user?.id;
+
+  React.useEffect(() => {
+    const request = ++localeRequest.current;
+    const accessToken = getAccessToken();
+    if (!localeUserId || !accessToken) {
+      setLocalePreference(null);
+      return;
+    }
+    setLocalePreference({ userId: localeUserId, locale: null, loading: true, error: false });
+    getPreferredLocale(accessToken).then(
+      (locale) => {
+        if (request === localeRequest.current) {
+          setLocalePreference({ userId: localeUserId, locale, loading: false, error: false });
+        }
+      },
+      () => {
+        if (request === localeRequest.current) {
+          setLocalePreference({ userId: localeUserId, locale: null, loading: false, error: true });
+        }
+      },
+    );
+    return () => {
+      ++localeRequest.current;
+    };
+  }, [localeUserId, getAccessToken, getPreferredLocale, localeReload]);
+
+  const savePreferredLocale = React.useCallback(
+    async (locale: string | null) => {
+      const accessToken = getAccessToken();
+      if (!localeUserId || !accessToken || isImpersonated)
+        throw new Error('Account preferences unavailable');
+      const request = ++localeRequest.current;
+      const savedLocale = await savePreferredLocaleMutation(locale, accessToken);
+      if (request !== localeRequest.current)
+        throw new Error('Account changed while saving language');
+      setLocalePreference({
+        userId: localeUserId,
+        locale: savedLocale,
+        loading: false,
+        error: false,
+      });
+    },
+    [getAccessToken, isImpersonated, localeUserId, savePreferredLocaleMutation],
+  );
+
+  const currentLocalePreference =
+    localePreference?.userId === localeUserId ? localePreference : null;
+  const preferredLocale = currentLocalePreference?.locale ?? null;
+  const isLocaleLoading = Boolean(localeUserId) && (currentLocalePreference?.loading ?? true);
+  const localePreferenceError = currentLocalePreference?.error ?? false;
+
   const getRefreshToken = React.useCallback(() => {
     if (typeof window !== 'undefined' && sessionStorage.getItem('roviq-impersonation-token')) {
       return null;
@@ -461,6 +533,11 @@ export function AuthProvider({
   const value = React.useMemo<AuthContextValue>(
     () => ({
       ...state,
+      preferredLocale,
+      isLocaleLoading,
+      localePreferenceError,
+      reloadPreferredLocale,
+      savePreferredLocale,
       scope,
       sessionExpired,
       needsInstituteSelection,
@@ -481,6 +558,10 @@ export function AuthProvider({
     }),
     [
       state,
+      preferredLocale,
+      isLocaleLoading,
+      localePreferenceError,
+      savePreferredLocale,
       scope,
       sessionExpired,
       needsInstituteSelection,

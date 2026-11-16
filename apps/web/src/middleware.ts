@@ -1,4 +1,6 @@
+import { routing } from '@roviq/i18n';
 import { type NextRequest, NextResponse } from 'next/server';
+import createMiddleware from 'next-intl/middleware';
 
 const SCOPE_MAP: Record<string, string> = {
   admin: 'admin',
@@ -10,8 +12,7 @@ function getScopeFromHostname(hostname: string): string {
   return SCOPE_MAP[subdomain] ?? 'institute';
 }
 
-const locales = ['en', 'hi'];
-const defaultLocale = 'en';
+const intlMiddleware = createMiddleware(routing);
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,26 +22,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const intlResponse = intlMiddleware(request);
+  if (!intlResponse.ok) return intlResponse;
+
   const hostname = request.headers.get('host') ?? '';
   const scope = getScopeFromHostname(hostname);
 
-  // Check if pathname already has a locale prefix
-  const pathnameHasLocale = locales.some(
-    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`,
-  );
-
-  // Extract locale and remaining path
-  let locale = defaultLocale;
-  let restPath = pathname;
-
-  if (pathnameHasLocale) {
-    locale = pathname.split('/')[1];
-    restPath = pathname.slice(locale.length + 1) || '/';
-  }
+  const [, locale, ...segments] = pathname.split('/');
+  const restPath = `/${segments.join('/')}`;
 
   // Check if path already starts with a scope prefix
   const scopePrefixes = ['admin', 'reseller', 'institute'];
-  const pathAfterLocale = pathnameHasLocale ? restPath : pathname;
+  const pathAfterLocale = restPath;
   const hasScope = scopePrefixes.some(
     (s) => pathAfterLocale.startsWith(`/${s}/`) || pathAfterLocale === `/${s}`,
   );
@@ -51,23 +44,14 @@ export function middleware(request: NextRequest) {
     const isRoot = restPath === '/' || restPath === '';
     const targetPath = isRoot ? '/login' : restPath;
 
-    const newPath = pathnameHasLocale
-      ? `/${locale}/${scope}${targetPath}`
-      : `/${defaultLocale}/${scope}${pathname === '/' ? '/login' : pathname}`;
+    const newPath = `/${locale}/${scope}${targetPath}`;
 
     const url = request.nextUrl.clone();
     url.pathname = newPath;
-    return NextResponse.rewrite(url);
+    return NextResponse.rewrite(url, { headers: intlResponse.headers });
   }
 
-  // If no locale prefix, add default locale
-  if (!pathnameHasLocale) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/${defaultLocale}${pathname}`;
-    return NextResponse.rewrite(url);
-  }
-
-  return NextResponse.next();
+  return intlResponse;
 }
 
 export const config = {

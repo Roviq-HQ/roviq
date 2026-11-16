@@ -127,6 +127,26 @@ export function createAuthMutations(graphqlUrl: string) {
       return data.refreshToken;
     },
 
+    async getPreferredLocale(accessToken: string): Promise<string | null> {
+      const data = await graphqlFetch<{ myPreferredLocale: string | null }>(
+        graphqlUrl,
+        'query MyPreferredLocale { myPreferredLocale }',
+        undefined,
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.myPreferredLocale;
+    },
+
+    async savePreferredLocale(locale: string | null, accessToken: string): Promise<string | null> {
+      const data = await graphqlFetch<{ updateMyPreferredLocale: string | null }>(
+        graphqlUrl,
+        'mutation UpdateMyPreferredLocale($input: UpdateLocaleInput!) { updateMyPreferredLocale(input: $input) }',
+        { input: { locale } },
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.updateMyPreferredLocale;
+    },
+
     async logout(accessToken: string): Promise<void> {
       try {
         await graphqlFetch(graphqlUrl, 'mutation Logout { logout }', undefined, {

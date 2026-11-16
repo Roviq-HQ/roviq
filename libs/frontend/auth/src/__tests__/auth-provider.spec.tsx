@@ -54,6 +54,10 @@ const MOCK_MEMBERSHIPS: MembershipInfo[] = [
 function makeDefaultProps() {
   return {
     scope: 'institute' as const,
+    getPreferredLocale: vi.fn().mockResolvedValue(null),
+    savePreferredLocaleMutation: vi
+      .fn()
+      .mockImplementation(async (locale: string | null) => locale),
     loginMutation: vi.fn().mockResolvedValue({}),
     selectInstituteMutation: vi.fn().mockResolvedValue({
       accessToken: makeJwt(FUTURE),
@@ -408,4 +412,107 @@ describe('ImpersonationBanner', () => {
   it.todo('hides banner when not impersonating');
   it.todo('shows exit impersonation button that calls notifyImpersonationEnded');
   it.todo('shows impersonator name in the banner');
+});
+
+describe('account language preference', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('should fetch the saved language when restoring a cached authenticated account', async () => {
+    const props = makeDefaultProps();
+    props.getPreferredLocale.mockResolvedValue('hi');
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    const { result } = renderUseAuth(props);
+
+    await waitFor(() => expect(result.current.preferredLocale).toBe('hi'));
+    expect(result.current.isLocaleLoading).toBe(false);
+    expect(props.getPreferredLocale).toHaveBeenCalledWith(makeJwt(FUTURE));
+  });
+
+  it('should keep authentication usable and allow retry after a preference load fails', async () => {
+    const props = makeDefaultProps();
+    props.getPreferredLocale.mockRejectedValueOnce(new Error('offline')).mockResolvedValue('hi');
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    const { result } = renderUseAuth(props);
+
+    await waitFor(() => expect(result.current.localePreferenceError).toBe(true));
+    expect(result.current.isAuthenticated).toBe(true);
+    act(() => result.current.reloadPreferredLocale());
+    await waitFor(() => expect(result.current.preferredLocale).toBe('hi'));
+    expect(result.current.localePreferenceError).toBe(false);
+  });
+
+  it('should retain the saved language after a failed save', async () => {
+    const props = makeDefaultProps();
+    props.getPreferredLocale.mockResolvedValue('hi');
+    props.savePreferredLocaleMutation.mockRejectedValue(new Error('offline'));
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.preferredLocale).toBe('hi'));
+
+    await act(async () => {
+      await expect(result.current.savePreferredLocale('en')).rejects.toThrow('offline');
+    });
+    expect(result.current.preferredLocale).toBe('hi');
+  });
+
+  it('should clear the preference when restoring browser language detection', async () => {
+    const props = makeDefaultProps();
+    props.getPreferredLocale.mockResolvedValue('hi');
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.preferredLocale).toBe('hi'));
+
+    await act(async () => result.current.savePreferredLocale(null));
+    expect(props.savePreferredLocaleMutation).toHaveBeenCalledWith(null, makeJwt(FUTURE));
+    expect(result.current.preferredLocale).toBeNull();
+  });
+
+  it('should ignore a pending response after logout', async () => {
+    let resolveLocale: (locale: string) => void = () => {};
+    const props = makeDefaultProps();
+    props.getPreferredLocale.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLocale = resolve;
+        }),
+    );
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(props.getPreferredLocale).toHaveBeenCalledTimes(1));
+
+    await act(async () => result.current.logout());
+    await act(async () => resolveLocale('hi'));
+    expect(result.current.preferredLocale).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it('should reject a stale save result after the account logs out', async () => {
+    let resolveSave: () => void = () => {};
+    const props = makeDefaultProps();
+    props.savePreferredLocaleMutation.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = () => resolve('en');
+        }),
+    );
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    const { result } = renderUseAuth(props);
+    await waitFor(() => expect(result.current.isLocaleLoading).toBe(false));
+
+    const saving = result.current.savePreferredLocale('en');
+    const rejected = expect(saving).rejects.toThrow('Account changed while saving language');
+    await act(async () => result.current.logout());
+    await act(async () => resolveSave());
+    await rejected;
+    expect(result.current.preferredLocale).toBeNull();
+  });
 });

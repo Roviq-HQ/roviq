@@ -3837,6 +3837,7 @@ type Mutation {
 
   """Edit a PENDING leave before it is decided."""
   updateLeave(id: ID!, input: UpdateLeaveInput!): LeaveModel!
+  updateMyPreferredLocale(input: UpdateLocaleInput!): String
 
   """Update own profile (phone, photo, nationality)"""
   updateMyProfile(input: UpdateMyProfileInput!): UserProfileData!
@@ -4330,6 +4331,9 @@ type Query {
   myInvoices(after: String, filter: BillingFilterInput, first: Int = 20): [InvoiceModel!]!
   myPasskeys: [PasskeyInfo!]!
   myPaymentHistory(after: String, first: Int = 20): [PaymentModel!]!
+
+  """Saved language for the authenticated account across all portals."""
+  myPreferredLocale: String
 
   """Get current user profile based on membership type"""
   myProfile: MyProfile!
@@ -6079,6 +6083,11 @@ input UpdateLeaveInput {
   reason: String
   startDate: String
   type: LeaveType
+}
+
+input UpdateLocaleInput {
+  """en or hi; null restores browser language detection."""
+  locale: String
 }
 
 """

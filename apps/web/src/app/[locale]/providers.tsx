@@ -6,6 +6,7 @@ import { GraphQLProvider } from '@roviq/graphql';
 import { ThemeProvider } from '@roviq/ui/components/theme-provider';
 import { Toaster } from '@roviq/ui/components/ui/sonner';
 import { TooltipProvider } from '@roviq/ui/components/ui/tooltip';
+import { AccountLocaleSync } from '@web/components/account-locale-sync';
 import { useTranslations } from 'next-intl';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import * as React from 'react';
@@ -115,6 +116,8 @@ export function Providers({ scope = 'institute', children }: ProvidersProps) {
 
   return (
     <AuthProvider
+      getPreferredLocale={authMutations.getPreferredLocale}
+      savePreferredLocaleMutation={authMutations.savePreferredLocale}
       scope={scope}
       loginMutation={loginMutation}
       passkeyLoginMutation={passkeyLogin}
@@ -126,6 +129,7 @@ export function Providers({ scope = 'institute', children }: ProvidersProps) {
       sessionExpiredLabels={sessionExpiredLabels}
     >
       <GraphQLBridge scopedStorage={scopedStorage}>
+        <AccountLocaleSync />
         <NuqsAdapter>
           <ThemeProvider>
             <TooltipProvider>{children}</TooltipProvider>
