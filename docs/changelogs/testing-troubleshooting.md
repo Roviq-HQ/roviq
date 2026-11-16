@@ -327,3 +327,23 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Verification:** The failing GitHub job confirms browser installation failed and UI tests never ran. Playwright's versioned 1.59.1 system requirements list Ubuntu 22.04/24.04. A new GitHub Actions run is required to verify browser installation and the UI suite on the pinned runner.
 
 ---
+
+## 2026-11-16 — `fixed` — CI spent ~8 minutes starting the e2e stack before the first test
+
+**Scope:** `docker/Dockerfile.backend` (new `e2e` target), `docker/compose.e2e.yaml`, `scripts/e2e-compose.sh`, `.github/workflows/ci.yml`, `scripts/ci-check.sh`, e2e scripts in `package.json`. Linear: ROV-277.
+
+**Evidence:** PR 234, run 43804873685, `E2E API (Vitest)`: `Start E2E stack` took 7m51s against 4m08s of tests. Run 43807704166: 6m39s on `ubuntu-latest` (Ubuntu 26.04) versus 3m59s for the identical build in the UI job on `ubuntu-24.04`.
+
+**Root cause:** Three ~2 GB images were built per job: the `dev` image twice (`api-gateway`, `migrate-and-seed`) and a production `notification-service` image (`nx build` + `COPY node_modules`). They re-installed and re-copied what the runner already had. On Ubuntu 26.04 runners Docker's containerd image store compresses and then unpacks every exported image (101s + 67s versus 16s + 10s on 24.04). Nothing was cached between runs, so the gateway also compiled from scratch (56-77s).
+
+**Fix:** One toolchain-only image (265 MB) for all backend services. The checkout and host `node_modules` are bind-mounted at the host path, containers run as the invoking UID, and build output goes to `.e2e/` (cached in CI with `actions/cache`). `api-gateway` builds both apps; `notification-service` starts from that output. CI and local use the same `pnpm e2e:up`.
+
+**Verification:** Local cold start (empty `.e2e/`, images present): all services healthy in 60s. `pnpm test:e2e:api` uncached: 237 passed, 19 skipped. Tilt's dev gateway on :3005 stayed up; host `dist/` untouched. CI timing is confirmed only after the branch is pushed.
+
+**Do NOT:**
+
+- Mount the checkout at `/app` or any path other than the host path. pnpm's `.bin` shims hard-code the host path in `NODE_PATH`; at `/app` the gateway failed with `Cannot find module 'axios'` (a dependency of `@roviq/ee-payments` that only resolves through that fallback).
+- Call `docker compose -f docker/compose.e2e.yaml` directly; use `scripts/e2e-compose.sh` or the `pnpm e2e:*` scripts.
+- Run nx in a git worktree with `NX_WORKSPACE_ROOT_PATH` exported from another checkout — nx then uses that checkout's cache and replays stale results.
+
+---

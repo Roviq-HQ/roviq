@@ -102,6 +102,7 @@
       "{workspaceRoot}/docker/compose.e2e.yaml",
       "{workspaceRoot}/docker/Dockerfile.backend",
       "{workspaceRoot}/docker/Dockerfile.backend.dockerignore",
+      "{workspaceRoot}/scripts/e2e-compose.sh",
       "{workspaceRoot}/scripts/seed-essential.ts",
       "{workspaceRoot}/scripts/seed-demo.ts",
       "{workspaceRoot}/scripts/seed-e2e.ts",

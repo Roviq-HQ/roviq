@@ -27,7 +27,8 @@ pnpm test:all                     # unit + int + e2e:api + e2e:ui
 pnpm test:coverage                # unit-node + unit-dom with v8 coverage
 
 # Teardown
-pnpm e2e:down                     # remove Docker E2E containers + volumes
+pnpm e2e:down                     # stop Docker E2E containers (keeps volumes and .e2e/ build cache)
+pnpm e2e:nuke                     # also wipe volumes and .e2e/
 
 # Watch mode (single project)
 nx run api-gateway:test --watch
@@ -40,6 +41,7 @@ nx run api-gateway:test --watch
 - CI runs **six blocking jobs**: `lint`, `typecheck`, `test` (unit — no DB), `build`, `e2e-api` (Docker stack + Vitest E2E), `e2e-ui` (Docker stack + Playwright). Integration tests (`pnpm test:int`) run as part of the `test` job against `roviq_test` via `DATABASE_URL_TEST`. E2E jobs spin up `compose.e2e.yaml` with `--wait` and tear it down via `if: always()`.
 
 - The `e2e-ui` job pins `ubuntu-24.04` because Playwright 1.59.1 supports Ubuntu 22.04/24.04, while `ubuntu-latest` can select unsupported Ubuntu 26.04. Recheck OS support when upgrading Playwright before changing this runner.
+- Both e2e jobs start the stack with `pnpm e2e:up` (the same command as local) and restore `.e2e/nx/cache` via `actions/cache`, so the api-gateway and notification-service builds are cache hits on most runs.
 
 ## Docker Compose Files
 
@@ -57,10 +59,13 @@ Convenience scripts:
 
 ```bash
 pnpm infra:up       # docker compose -f docker/compose.infra.yaml up -d
-pnpm e2e:up         # docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
+pnpm e2e:up         # scripts/e2e-compose.sh up -d --build --wait
 pnpm e2e:clean      # re-run migrate+seed on existing e2e stack
-pnpm e2e:down       # tear down e2e stack + volumes
+pnpm e2e:down       # stop e2e stack, keep volumes and .e2e/
+pnpm e2e:nuke       # stop e2e stack, wipe volumes and .e2e/
 ```
+
+Every e2e compose call goes through `scripts/e2e-compose.sh`. It sets `E2E_WORKSPACE`/`E2E_UID`/`E2E_GID` and pre-creates the bind-mount targets; calling `docker compose -f docker/compose.e2e.yaml` directly fails with "run via scripts/e2e-compose.sh".
 
 **Database per test type:**
 
@@ -78,13 +83,18 @@ docker/compose.e2e.yaml
 ├── postgres (clean roviq_test DB via init-db.sh)
 ├── nats
 ├── redis
-├── migrate-and-seed (runs drizzle-kit migrate + seed.ts, exits)
-├── api-gateway (waits for migrate-and-seed)
-├── notification-service (waits for migrate-and-seed)
+├── migrate-and-seed (db:reset --test + seed-e2e, exits)
+├── api-gateway (waits for migrate-and-seed; builds api-gateway + notification-service, then `nx serve`)
+├── notification-service (waits for api-gateway healthy; runs the output it built)
 └── [profile: vitest] vitest-e2e
 ```
 
-One command spins up infra, migrates, seeds, runs tests, and propagates the exit code. No shell scripts needed — Docker Compose profiles handle everything.
+Backend services share one toolchain-only image (`roviq-e2e-backend`, target `e2e` in `docker/Dockerfile.backend`: Node, curl, procps, pnpm). Nothing is installed or copied at image build time:
+
+- The host checkout, including the host's `node_modules`, is bind-mounted at its **host path** (pnpm's bin shims embed absolute paths, so mounting at `/app` breaks module resolution).
+- Containers run as the invoking user, so files they write stay owned by you (or the CI runner).
+- `.e2e/dist` and `.e2e/nx` (git-ignored) are mounted over `dist/` and `.nx/` inside the containers. The host's `dist/` and `.nx/` are never touched, so Tilt's dev gateway and the e2e stack run side by side.
+- Requires a Linux host on the Node major in `.nvmrc`; run `pnpm install` on the host after dependency changes — there is no image rebuild.
 
 ### Deterministic Seed Data
 
@@ -286,4 +296,4 @@ Both scripts are pure grep — fast enough to run in the `lint` job without extr
 | Query from Docker | `docker exec roviq-e2e-postgres-1 psql -U roviq -d roviq_test` |
 | Full reset | `pnpm e2e:down && pnpm e2e:up` |
 | Re-seed only | `pnpm e2e:clean` |
-| Code changes | `pnpm nx build api-gateway` locally — Docker mounts `dist/`, `libs/`, `apps/api-gateway/src/` so `nx serve` inside Docker picks up changes automatically |
+| Code changes | Edit files on the host — the checkout is bind-mounted, so `nx serve` inside the api-gateway container rebuilds and restarts. notification-service changes need `scripts/e2e-compose.sh restart api-gateway notification-service` |

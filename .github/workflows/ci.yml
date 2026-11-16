@@ -205,36 +205,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Provision .env for docker compose
         run: cp .env.example .env
-      - name: Make bind-mounted sources writable + pre-create vite-temp dirs
-        # The api-gateway/notification-service containers run as `node`
-        # (UID 1000) but checkout-action writes files as `runner` (UID 1001).
-        # @nx/vitest writes `.timestamp-*.mjs` files into
-        # `<lib>/node_modules/.vite-temp/` next to vitest configs during
-        # project-graph inference at container boot. Without pre-existing
-        # 777-mode `.vite-temp/` dirs the container hits EACCES and never
-        # reaches healthy state. Find every vitest config and pre-create its
-        # adjacent `.vite-temp/` so the container can write timestamp files.
-        run: |
-          find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
-            -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
-          # a+rwX: add rw for all, exec ONLY on dirs (or files already exec).
-          # Plain 777 would set 100755 on regular files, which git interprets
-          # as a mode change — codegen then re-writes those files keeping the
-          # 100755 bit, and the schema-drift gate diffs `old mode 100644 → new
-          # mode 100755` with zero content delta. Capital X preserves committed
-          # file modes while still making dirs traversable+writable for both
-          # the runner (UID 1001) and the container (UID 1000).
-          chmod -R a+rwX libs ee apps scripts e2e
+      - name: Restore e2e Nx cache (api-gateway + notification-service builds)
+        uses: actions/cache@v4
+        with:
+          path: .e2e/nx/cache
+          key: e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            e2e-nx-${{ runner.os }}-
       - name: Start E2E stack
-        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
+        # Containers run as the runner's UID on a bind-mounted checkout
+        # (scripts/e2e-compose.sh), so no chmod/chown of sources is needed.
+        run: pnpm e2e:up
         timeout-minutes: 12
-      - name: Reclaim file ownership for runner
-        # The api-gateway/notification-service containers run as `node` (UID 1000)
-        # and create files (e.g. `libs/**/node_modules/.vite-temp/*.mjs`) during
-        # nx project-graph inference. Host runner is UID 1001 — without this step,
-        # subsequent host-side `nx`/playwright calls hit EACCES trying to write
-        # new timestamp files in container-owned dirs.
-        run: sudo chown -R "$(id -u):$(id -g)" libs ee apps scripts e2e
       - name: Check resolver→schema drift (regenerate from live api-gateway)
         # CI deliberately unset (empty string) so codegen.ts introspects the
         # live api-gateway on port 3004 rather than reading the committed
@@ -284,10 +267,10 @@ jobs:
           WS_URL: ws://localhost:3004/api/graphql
       - name: Show docker logs on failure
         if: failure()
-        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml logs --tail=200
+        run: scripts/e2e-compose.sh logs --tail=200
       - name: Stop E2E stack
         if: always()
-        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml down -v
+        run: scripts/e2e-compose.sh down -v
 
   e2e-ui:
     name: E2E UI (Playwright)
@@ -308,26 +291,17 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Provision .env for docker compose
         run: cp .env.example .env
-      - name: Make bind-mounted sources writable + pre-create vite-temp dirs
-        # See e2e-api job for explanation.
-        run: |
-          find libs ee apps -name 'vitest.config.*' -not -path '*/node_modules/*' \
-            -exec sh -c 'd=$(dirname "$1")/node_modules/.vite-temp; mkdir -p "$d"' _ {} \;
-          # a+rwX: add rw for all, exec ONLY on dirs (or files already exec).
-          # Plain 777 would set 100755 on regular files, which git interprets
-          # as a mode change — codegen then re-writes those files keeping the
-          # 100755 bit, and the schema-drift gate diffs `old mode 100644 → new
-          # mode 100755` with zero content delta. Capital X preserves committed
-          # file modes while still making dirs traversable+writable for both
-          # the runner (UID 1001) and the container (UID 1000).
-          chmod -R a+rwX libs ee apps scripts e2e
+      - name: Restore e2e Nx cache (api-gateway + notification-service builds)
+        uses: actions/cache@v4
+        with:
+          path: .e2e/nx/cache
+          key: e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            e2e-nx-${{ runner.os }}-
       - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
-        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --build --wait
+        run: pnpm e2e:up
         timeout-minutes: 12
-      - name: Reclaim file ownership for runner
-        # See e2e-api job for explanation — container runs as UID 1000, runner is
-        # UID 1001; chown after compose-up so host-side nx/playwright can write.
-        run: sudo chown -R "$(id -u):$(id -g)" libs ee apps scripts e2e
       - name: Run codegen (Next.js dev:web needs fresh GraphQL types)
         run: pnpm codegen
       - name: Playwright E2E tests
@@ -347,7 +321,7 @@ jobs:
           retention-days: 7
       - name: Show docker logs on failure
         if: failure()
-        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml logs --tail=200
+        run: scripts/e2e-compose.sh logs --tail=200
       - name: Stop E2E stack
         if: always()
-        run: docker compose -p roviq-e2e -f docker/compose.e2e.yaml down -v
+        run: scripts/e2e-compose.sh down -v

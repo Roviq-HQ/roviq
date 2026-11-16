@@ -125,7 +125,7 @@ fi
 # Phase 2 (sequential): seed (needs postgres up AND migrate-and-seed image).
 # Phase 3 (sequential): start app containers (need built images + seeded DB).
 if (( run_e2e )); then
-  COMPOSE=(docker compose -p roviq-e2e -f docker/compose.e2e.yaml)
+  COMPOSE=(scripts/e2e-compose.sh)
   log "phase 1 (parallel): infra start + backend image build + web build"
 
   # Stream A: pull up infra services that don't depend on migrate-and-seed.
@@ -134,11 +134,9 @@ if (( run_e2e )); then
         postgres redis nats temporal mongodb novu-api novu-worker novu-bootstrap \
       > "$tmpdir/infra.log" 2>&1 ) & infra_pid=$!
 
-  # Stream B: build backend images (no runtime). COMPOSE_BAKE dedupes the
-  # shared `dev` stage across api-gateway, migrate-and-seed, vitest-e2e,
-  # rls-tests; notification-service builds its own production stage.
-  ( COMPOSE_BAKE=true "${COMPOSE[@]}" build \
-        api-gateway notification-service migrate-and-seed \
+  # Stream B: build the shared toolchain image (one image for every backend
+  # service; source and node_modules come from the bind mount).
+  ( "${COMPOSE[@]}" build api-gateway \
       > "$tmpdir/backend-build.log" 2>&1 ) & build_pid=$!
 
   # Stream C: frontend build on host. Independent of Docker.
@@ -166,8 +164,9 @@ if (( run_e2e )); then
     log "✗ seed failed"; cat "$tmpdir/seed.log"; exit 1
   fi
 
-  # Phase 3: start app containers. Images built in phase 1 (no --build needed),
-  # seed completed in phase 2 (depends_on satisfied).
+  # Phase 3: start app containers. Image built in phase 1 (no --build needed),
+  # seed completed in phase 2 (depends_on satisfied). api-gateway builds both
+  # apps; notification-service starts once it is healthy.
   log "phase 3: start backend apps"
   if ! "${COMPOSE[@]}" up -d --wait \
        api-gateway notification-service novu-bridge-sync > "$tmpdir/apps.log" 2>&1; then
