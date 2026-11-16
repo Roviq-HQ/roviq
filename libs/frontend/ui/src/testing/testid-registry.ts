@@ -322,6 +322,15 @@ export const testIds = {
     cancelBtn: 'cancel-create-reseller-btn',
   },
 
+  authLogin: {
+    error: 'login-error',
+    username: 'login-username-input',
+    usernameError: 'login-username-error',
+    password: 'login-password-input',
+    passwordError: 'login-password-error',
+    submit: 'login-submit-btn',
+  },
+
   // ── Auth: login pages (shared across scopes) ───────────────────────────
   auth: {
     loginCard: 'login-card',
