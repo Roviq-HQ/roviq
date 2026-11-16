@@ -256,6 +256,57 @@ describe('ROV-151: user_identifiers', () => {
       expect((err as Error).message).toMatch(/chk_identifier_value|violates check constraint/i);
     });
   });
+
+  // ROV-173 compliance #1: DPDP requires Aadhaar/PAN to be encrypted at rest.
+  it.each([
+    UserIdentifierType.AADHAAR,
+    UserIdentifierType.PAN,
+  ])('%s stored only in value_plain → rejected by chk_identifier_sensitive_encrypted', async (type) => {
+    await inTransaction(async (client) => {
+      const err = await client
+        .query(
+          `INSERT INTO user_identifiers (id, user_id, type, value_plain) VALUES ($1, $2, $3, '234123412346')`,
+          ['eeeeeeee-2005-0001-0001-000000000001', SEED.USER_ADMIN, type],
+        )
+        .catch((e: Error) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/chk_identifier_sensitive_encrypted/);
+    });
+  });
+
+  it.each([
+    UserIdentifierType.AADHAAR,
+    UserIdentifierType.PAN,
+  ])('%s with encrypted path AND a plaintext copy → rejected', async (type) => {
+    await inTransaction(async (client) => {
+      const err = await client
+        .query(
+          `INSERT INTO user_identifiers (id, user_id, type, value_encrypted, value_hash, value_masked, value_plain)
+           VALUES ($1, $2, $3, '\\x00', $4, 'XXXX-XXXX-2346', '234123412346')`,
+          [
+            'eeeeeeee-2006-0001-0001-000000000001',
+            SEED.USER_ADMIN,
+            type,
+            createHash('sha256').update('234123412346').digest('hex'),
+          ],
+        )
+        .catch((e: Error) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/chk_identifier_sensitive_encrypted/);
+    });
+  });
+
+  it('non-sensitive type (APAAR) may still use value_plain', async () => {
+    await inTransaction(async (client) => {
+      const res = await client.query(
+        `INSERT INTO user_identifiers (id, user_id, type, value_plain) VALUES ($1, $2, $3, 'APAAR123') RETURNING value_plain`,
+        ['eeeeeeee-2007-0001-0001-000000000001', SEED.USER_ADMIN, UserIdentifierType.APAAR],
+      );
+      expect(res.rows[0].value_plain).toBe('APAAR123');
+    });
+  });
 });
 
 // ── user_addresses ─────────────────────────────────────────────

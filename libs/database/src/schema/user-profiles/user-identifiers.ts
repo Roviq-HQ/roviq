@@ -109,6 +109,16 @@ export const userIdentifiers = pgTable(
         AND ${table.valueMasked} IS NOT NULL
       ) OR ${table.valuePlain} IS NOT NULL`,
     ),
+    // DPDP: Aadhaar/PAN must never land in value_plain, even if the encrypted path is also set.
+    check(
+      'chk_identifier_sensitive_encrypted',
+      sql`${table.type} NOT IN ('AADHAAR', 'PAN') OR (
+        ${table.valuePlain} IS NULL
+        AND ${table.valueEncrypted} IS NOT NULL
+        AND ${table.valueHash} IS NOT NULL
+        AND ${table.valueMasked} IS NOT NULL
+      )`,
+    ),
     /** Only one identifier per type per user */
     uniqueIndex('uq_identifier_user_type').on(table.userId, table.type),
     /** Aadhaar lookup by hash for duplicate detection during admission */
