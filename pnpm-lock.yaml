@@ -157,6 +157,9 @@ importers:
       '@ucast/sql':
         specifier: ^0.1.0
         version: 0.1.0
+      axios:
+        specifier: ^1.13.6
+        version: 1.13.6
       cashfree-pg:
         specifier: ^5.1.0
         version: 5.1.0
