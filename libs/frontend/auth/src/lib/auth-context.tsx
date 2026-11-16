@@ -20,6 +20,7 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   getAccessToken: () => string | null;
+  getRefreshToken: () => string | null;
   selectInstitute: (membershipId: string) => Promise<void>;
   switchInstitute: (membershipId: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -60,7 +61,7 @@ interface AuthProviderProps {
     newPassword: string,
     accessToken: string,
   ) => Promise<boolean>;
-  logoutMutation: () => Promise<void>;
+  logoutMutation: (accessToken: string) => Promise<void>;
   onAuthError?: () => void;
   sessionExpiredLabels?: SessionExpiredDialogProps['labels'];
   children: React.ReactNode;
@@ -363,7 +364,8 @@ export function AuthProvider({
 
   const logout = React.useCallback(async () => {
     try {
-      await logoutMutation();
+      const accessToken = tokenStorage.getAccessToken();
+      if (accessToken) await logoutMutation(accessToken);
     } catch {
       // Ignore errors during logout
     }
@@ -429,6 +431,13 @@ export function AuthProvider({
     return tokenStorage.getAccessToken();
   }, [tokenStorage]);
 
+  const getRefreshToken = React.useCallback(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('roviq-impersonation-token')) {
+      return null;
+    }
+    return tokenStorage.getRefreshToken();
+  }, [tokenStorage]);
+
   const notifyImpersonationEnded = React.useCallback(() => {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('roviq-impersonation-token');
@@ -463,6 +472,7 @@ export function AuthProvider({
       logout,
       refreshSession,
       getAccessToken,
+      getRefreshToken,
       selectInstitute,
       switchInstitute,
       changePassword,
@@ -482,6 +492,7 @@ export function AuthProvider({
       logout,
       refreshSession,
       getAccessToken,
+      getRefreshToken,
       selectInstitute,
       switchInstitute,
       changePassword,

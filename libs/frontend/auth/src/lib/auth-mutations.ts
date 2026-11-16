@@ -127,29 +127,32 @@ export function createAuthMutations(graphqlUrl: string) {
       return data.refreshToken;
     },
 
-    async logout(): Promise<void> {
+    async logout(accessToken: string): Promise<void> {
       try {
-        await graphqlFetch(graphqlUrl, 'mutation Logout { logout }');
+        await graphqlFetch(graphqlUrl, 'mutation Logout { logout }', undefined, {
+          Authorization: `Bearer ${accessToken}`,
+        });
       } catch {
         // Ignore — tokens are cleared client-side regardless
       }
     },
 
     // Session management
-    async mySessions(accessToken: string): Promise<SessionInfo[]> {
+    async mySessions(accessToken: string, currentRefreshToken: string): Promise<SessionInfo[]> {
       const data = await graphqlFetch<{ mySessions: SessionInfo[] }>(
         graphqlUrl,
-        `query MySessions {
-          mySessions {
+        `query MySessions($currentRefreshToken: String!) {
+          mySessions(currentRefreshToken: $currentRefreshToken) {
             id
             ipAddress
             userAgent
+            deviceInfo
             lastUsedAt
             createdAt
             isCurrent
           }
         }`,
-        undefined,
+        { currentRefreshToken },
         { Authorization: `Bearer ${accessToken}` },
       );
       return data.mySessions;
@@ -167,13 +170,16 @@ export function createAuthMutations(graphqlUrl: string) {
       return data.revokeSession;
     },
 
-    async revokeAllOtherSessions(accessToken: string): Promise<boolean> {
+    async revokeAllOtherSessions(
+      accessToken: string,
+      currentRefreshToken: string,
+    ): Promise<boolean> {
       const data = await graphqlFetch<{ revokeAllOtherSessions: boolean }>(
         graphqlUrl,
-        `mutation RevokeAllOtherSessions {
-          revokeAllOtherSessions
+        `mutation RevokeAllOtherSessions($currentRefreshToken: String!) {
+          revokeAllOtherSessions(currentRefreshToken: $currentRefreshToken)
         }`,
-        undefined,
+        { currentRefreshToken },
         { Authorization: `Bearer ${accessToken}` },
       );
       return data.revokeAllOtherSessions;

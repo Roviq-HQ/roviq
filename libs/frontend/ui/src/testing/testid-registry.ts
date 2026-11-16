@@ -11,6 +11,19 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  sessions: {
+    title: 'sessions-title',
+    item: 'session-item',
+    current: 'session-current',
+    revoke: (id: string) => `session-revoke-${id}`,
+    revokeAll: 'sessions-revoke-all',
+    loading: 'sessions-loading',
+    empty: 'sessions-empty',
+    error: 'sessions-error',
+    retry: 'sessions-retry',
+    userAgent: 'session-user-agent',
+    ipAddress: 'session-ip-address',
+  },
   // ── Cross-cutting layout (consumed by libs/frontend/ui components) ─────
   layout: {
     topbar: 'topbar',
@@ -320,6 +333,15 @@ export const testIds = {
     backBtn: 'back-to-resellers-btn',
     form: 'create-reseller-form',
     cancelBtn: 'cancel-create-reseller-btn',
+  },
+
+  authLogin: {
+    error: 'login-error',
+    username: 'login-username-input',
+    usernameError: 'login-username-error',
+    password: 'login-password-input',
+    passwordError: 'login-password-error',
+    submit: 'login-submit-btn',
   },
 
   // ── Auth: login pages (shared across scopes) ───────────────────────────

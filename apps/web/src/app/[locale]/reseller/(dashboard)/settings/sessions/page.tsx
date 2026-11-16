@@ -15,11 +15,12 @@ export default function ResellerSessionsPage() {
   const t = useTranslations('sessions');
   const { format } = useFormatDate();
 
-  const { sessions, isLoading, revokeSession, revokeAllOtherSessions } = useSessions({
-    fetchSessions: authMutations.mySessions,
-    revokeSessionMutation: authMutations.revokeSession,
-    revokeAllOtherSessionsMutation: authMutations.revokeAllOtherSessions,
-  });
+  const { sessions, isLoading, error, refetch, revokeSession, revokeAllOtherSessions } =
+    useSessions({
+      fetchSessions: authMutations.mySessions,
+      revokeSessionMutation: authMutations.revokeSession,
+      revokeAllOtherSessionsMutation: authMutations.revokeAllOtherSessions,
+    });
 
   const labels = React.useMemo<SessionsPageLabels>(
     () => ({
@@ -34,17 +35,27 @@ export default function ResellerSessionsPage() {
       unknownIp: t('unknownIp'),
       current: t('current'),
       created: t('created'),
+      device: t('device'),
+      ip: t('ip'),
+      lastUsed: t('lastUsed'),
+      unknownLastUsed: t('unknownLastUsed'),
+      loadError: t('loadError'),
+      revokeError: t('revokeError'),
+      revoked: t('revoked'),
+      revokedOthers: t('revokedOthers'),
+      retry: t('retry'),
     }),
     [t],
   );
 
   const formatDate = React.useCallback(
-    (dateString: string) => format(parseISO(dateString), 'PP'),
+    (dateString: string) => format(parseISO(dateString), 'Pp'),
     [format],
   );
 
   const mapped: SessionData[] = sessions.map((s) => ({
     id: s.id,
+    deviceInfo: s.deviceInfo,
     ipAddress: s.ipAddress,
     userAgent: s.userAgent,
     lastUsedAt: s.lastUsedAt,
@@ -56,6 +67,8 @@ export default function ResellerSessionsPage() {
     <SessionsPage
       sessions={mapped}
       loading={isLoading}
+      error={error !== null}
+      onRetry={refetch}
       onRevoke={revokeSession}
       onRevokeAllOther={revokeAllOtherSessions}
       labels={labels}

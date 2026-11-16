@@ -611,8 +611,16 @@ export class AuthService {
 
   // ── Session management ─────────────────────────────────
 
-  async getActiveSessions(userId: string) {
-    return this.refreshTokenRepo.findActiveByUserId(userId);
+  async getActiveSessions(userId: string, currentRefreshToken: string) {
+    const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
+    const sessions = await this.refreshTokenRepo.findActiveByUserId(userId);
+    if (!sessions.some((session) => session.tokenHash === tokenHash)) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return sessions.map((session) => ({
+      ...session,
+      isCurrent: session.tokenHash === tokenHash,
+    }));
   }
 
   async revokeSession(userId: string, sessionId: string): Promise<void> {
@@ -631,7 +639,7 @@ export class AuthService {
   ): Promise<void> {
     const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
     const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
-    if (!currentToken) {
+    if (!currentToken || currentToken.userId !== userId) {
       throw new UnauthorizedException('Invalid refresh token');
     }
     await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentToken.id, 'user_initiated');

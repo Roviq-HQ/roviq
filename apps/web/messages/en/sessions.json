@@ -9,5 +9,14 @@
   "unknownDevice": "Unknown Device",
   "unknownIp": "Unknown IP",
   "current": "Current",
-  "created": "Created"
+  "created": "Created",
+  "device": "Device",
+  "ip": "IP address",
+  "lastUsed": "Last active",
+  "unknownLastUsed": "Not yet recorded",
+  "loadError": "Unable to load sessions. Please try again.",
+  "revokeError": "Unable to revoke sessions. Please try again.",
+  "revoked": "Session revoked.",
+  "revokedOthers": "Other sessions revoked. Your current session remains active.",
+  "retry": "Retry"
 }

@@ -2,10 +2,13 @@
 
 import type { AuthScope } from '@roviq/common-types';
 import { Button, useAppForm } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
+
+const { authLogin } = testIds;
 
 type LoginFormValues = { username: string; password: string };
 
@@ -31,7 +34,7 @@ export interface LoginFormProps {
 }
 
 export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
-  const { login, loginWithPasskey } = useAuth();
+  const { login, loginWithPasskey, isLoading } = useAuth();
   const [isPasskeyLoading, setIsPasskeyLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -102,7 +105,7 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
       {error && (
         <div
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          data-testid="login-error"
+          data-testid={authLogin.error}
         >
           {error}
         </div>
@@ -124,9 +127,9 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
               type="text"
               autoComplete="username webauthn"
               placeholder={l.enterUsername}
-              disabled={isPasskeyLoading}
-              testId="login-username-input"
-              errorTestId="login-username-error"
+              disabled={isLoading || isPasskeyLoading}
+              testId={authLogin.username}
+              errorTestId={authLogin.usernameError}
             />
           )}
         </form.AppField>
@@ -138,17 +141,17 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
               type="password"
               autoComplete="current-password"
               placeholder={l.enterPassword}
-              disabled={isPasskeyLoading}
-              testId="login-password-input"
-              errorTestId="login-password-error"
+              disabled={isLoading || isPasskeyLoading}
+              testId={authLogin.password}
+              errorTestId={authLogin.passwordError}
             />
           )}
         </form.AppField>
 
         <form.AppForm>
           <form.SubmitButton
-            testId="login-submit-btn"
-            disabled={isPasskeyLoading}
+            testId={authLogin.submit}
+            disabled={isLoading || isPasskeyLoading}
             submittingLabel={l.signingIn}
             className="w-full"
           >
@@ -166,7 +169,7 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
       <Button
         type="button"
         variant="outline"
-        disabled={isPasskeyLoading}
+        disabled={isLoading || isPasskeyLoading}
         className="w-full gap-2.5"
         onClick={handlePasskeyLogin}
       >

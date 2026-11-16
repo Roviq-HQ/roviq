@@ -91,6 +91,18 @@ Applied at resolver class level. Combines `GqlAuthGuard` (JWT validation) + scop
 - `revokeAllOtherSessions` — revoke every refresh token for the user EXCEPT the caller's current one (reason `user_initiated`). The caller keeps working on the same token; crucially, the `user_initiated` reason means a stale client replaying one of the killed tokens will hit `Refresh token revoked` without triggering the rotation-reuse cascade (see [Token Refresh](#token-refresh)), so the caller's keep-alive session is not collaterally killed.
 - `changePassword` — in addition to clearing the password, revokes every refresh token for the user with reason `password_change`. Cascading is deliberately suppressed for the same reason: a late client retry after a password change should just fail, not replay-attack-cascade.
 
+## Active session management (ROV-100)
+
+All three portals expose `/en/{scope}/settings/sessions` (`admin`, `reseller`, `institute`; Hindi uses `/hi/`). The shared session hook reads tokens from the current scope's storage at request time, including after refresh-token rotation. Impersonated tabs cannot use the original account's refresh token for session management.
+
+`mySessions(currentRefreshToken: String!)` identifies the current session by comparing the refresh-token hash with the authenticated user's active sessions. It rejects a token outside that list and returns only session metadata; token hashes never appear in GraphQL. The UI marks the current session, hides its individual revoke button, and displays device, IP, last-active and creation timestamps.
+
+`revokeAllOtherSessions(currentRefreshToken: String!)` requires a token belonging to the authenticated user. The frontend sends the current token and refetches the list after success. The resolver uses `@NoAudit()` because the auth service emits `all_sessions_revoked` without including the refresh token; the generic mutation audit would serialize this sensitive argument. Load failures offer retry, mutation failures show translated feedback, and all session labels are available in English and Hindi.
+
+The shared login form submits through `form.handleSubmit()` and prevents native navigation for both the submit button and Enter. It uses POST as a fallback and keeps credential fields and buttons disabled while auth restores, so credentials cannot be submitted in the page URL before hydration.
+
+Logout sends the access token in the Authorization header so the guarded server mutation runs before local credentials are cleared.
+
 ## First-Login Password Change (ROV-96)
 
 Every newly-provisioned user is born with `users.must_change_password = true` and is forced through `changePassword` before any other resolver responds.

@@ -140,23 +140,6 @@ UUIDv7 for all PKs. Full details live in the `/drizzle-database` skill.
 
 ---
 
-## SESSION PERSISTENCE
-
-### [SESPR] Session Persistence
-
-At the start of every chat, check whether `.claude/sessions/<session-uuid>/` exists (where `<session-uuid>` is the Claude Code runtime session UUID, visible in background-task output file paths like `/tmp/claude-1000/-home-priyanshu-roviq/<uuid>/tasks/...`).
-
-If missing, create it with 5 files:
-- `summary.md` — human-readable rolling status, active agents, branch state, next actions
-- `metadata.yaml` — machine-readable index (session id + slug + folder + started_at + status + initiative scope + Linear issues filed + files created/modified + agents + verified flows)
-- `todos.md` — checklist mirror of `TodoWrite` state with `[HH:MM → HH:MM]` start/end timestamps per item, no `Deferred` section — everything is either Open Commitment or Blocked
-- `changelog.md` — chronological `[HH:MM] type:` per-action log with types `scope|edit|commit|lib|agent|linear|verify|decision|revert|docs|rule`
-- `deviations.md` — spec drifts, architectural trade-offs, user-rejected approaches, tool quirks, open questions for future sessions
-
-Update these files regularly as work progresses — at minimum after every commit, agent dispatch, Linear issue filed, or user feedback that changes direction. Sessions may crash and recover; these files are the context restoration surface for the next-session-you. Nothing is ever "deferred" — it either lands this session or becomes an explicit open commitment tracked in `todos.md`.
-
----
-
 ## COMMENT STYLE
 
 ### [SHCMT] Short, Useful, WHY-only Comments

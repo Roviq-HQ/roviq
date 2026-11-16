@@ -84,6 +84,7 @@ export interface PasskeyInfo {
 
 export interface SessionInfo {
   id: string;
+  deviceInfo?: string;
   ipAddress?: string;
   userAgent?: string;
   lastUsedAt?: string;

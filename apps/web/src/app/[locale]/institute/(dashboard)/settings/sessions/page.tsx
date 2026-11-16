@@ -16,7 +16,7 @@ const authMutations = createAuthMutations(GRAPHQL_HTTP);
 export default function InstituteSessionsPage() {
   const t = useTranslations('sessions');
   const { format } = useFormatDate();
-  const formatDate = React.useCallback((d: string) => format(parseISO(d), 'PP'), [format]);
+  const formatDate = React.useCallback((d: string) => format(parseISO(d), 'Pp'), [format]);
 
   const labels = React.useMemo<SessionsPageLabels>(
     () => ({
@@ -31,18 +31,29 @@ export default function InstituteSessionsPage() {
       unknownIp: t('unknownIp'),
       current: t('current'),
       created: t('created'),
+      device: t('device'),
+      ip: t('ip'),
+      lastUsed: t('lastUsed'),
+      unknownLastUsed: t('unknownLastUsed'),
+      loadError: t('loadError'),
+      revokeError: t('revokeError'),
+      revoked: t('revoked'),
+      revokedOthers: t('revokedOthers'),
+      retry: t('retry'),
     }),
     [t],
   );
 
-  const { sessions, isLoading, revokeSession, revokeAllOtherSessions } = useSessions({
-    fetchSessions: authMutations.mySessions,
-    revokeSessionMutation: authMutations.revokeSession,
-    revokeAllOtherSessionsMutation: authMutations.revokeAllOtherSessions,
-  });
+  const { sessions, isLoading, error, refetch, revokeSession, revokeAllOtherSessions } =
+    useSessions({
+      fetchSessions: authMutations.mySessions,
+      revokeSessionMutation: authMutations.revokeSession,
+      revokeAllOtherSessionsMutation: authMutations.revokeAllOtherSessions,
+    });
 
   const mapped: SessionData[] = sessions.map((s) => ({
     id: s.id,
+    deviceInfo: s.deviceInfo,
     ipAddress: s.ipAddress,
     userAgent: s.userAgent,
     lastUsedAt: s.lastUsedAt,
@@ -54,6 +65,8 @@ export default function InstituteSessionsPage() {
     <SessionsPage
       sessions={mapped}
       loading={isLoading}
+      error={error !== null}
+      onRetry={refetch}
       labels={labels}
       formatDate={formatDate}
       onRevoke={revokeSession}

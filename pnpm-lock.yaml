@@ -614,6 +614,8 @@ importers:
 
   libs/database: {}
 
+  libs/frontend/auth: {}
+
   libs/frontend/graphql: {}
 
   libs/frontend/ui: {}

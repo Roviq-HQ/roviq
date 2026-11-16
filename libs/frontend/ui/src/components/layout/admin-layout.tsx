@@ -2,7 +2,6 @@
 
 import { ThemeProvider } from 'next-themes';
 import type * as React from 'react';
-import { Toaster } from 'sonner';
 import { cn } from '../../lib/utils';
 import { BottomTabBar } from './bottom-tab-bar';
 import { CommandPalette } from './command-palette';
@@ -66,9 +65,6 @@ export function AdminLayout({
           </div>
         </div>
         <CommandPalette config={config} />
-        <div className="print:hidden">
-          <Toaster position="bottom-right" richColors />
-        </div>
       </SidebarProvider>
     </ThemeProvider>
   );

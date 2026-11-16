@@ -37,6 +37,8 @@ nx run api-gateway:test --watch
 
 ## CI and pre-push
 
+The local gate health-checks long-running infrastructure first, then waits for the Novu bootstrap and seed containers to exit successfully. It starts the API and notification service in that order without restarting their completed setup dependencies. Standalone setup containers use their exit status rather than `compose up --wait`, which expects a running or healthy service when no dependent is selected.
+
 - `pnpm test:e2e:api` routes through the cacheable Nx target `api-gateway-e2e:test-e2e`; `pnpm test:e2e:ui` through `web-e2e-suite:e2e` (single invocation, single cache hash) covering web-admin-e2e, web-institute-e2e, web-reseller-e2e plus cross-portal.
 - The UI target's cache inputs (`e2eFrontend`) include `e2eStack`: gateway, notification-service, `libs`, `ee`, migrations, seed scripts and the e2e Docker files. A backend-only change therefore re-runs the Playwright suite on pre-push instead of replaying a cached pass.
 - `pnpm ci:check` — unified gate. Runs lint/typecheck/unit/integration/e2e in parallel; locally uses `nx affected` against `origin/main`, on CI runs the full suite. Invoked by `.husky/pre-push`. Bypass: `SKIP_PREPUSH=1 git push` or `git push --no-verify`.

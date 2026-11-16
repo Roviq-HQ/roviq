@@ -457,3 +457,27 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Do NOT:** drop `--no-recreate`. Run from a git worktree, Compose sees a different bind-mount path for `init-db.sh` and recreates the Tilt-owned Postgres container.
 
 ---
+
+## 2026-11-16 — `fixed` — Local typecheck codegen raced the Tilt gateway restart
+
+**Context:** ROV-100 runtime verification restarted `api-gateway` while `pnpm typecheck` began its `web:codegen` dependency.
+
+**Root cause:** Codegen fetches the local GraphQL schema. During the restart it received `ECONNREFUSED 127.0.0.1:3005`, so the web build could not start.
+
+**Fix:** Order these dependent checks: wait for `tilt logs api-gateway` to report startup, confirm `{ __typename }` responds at `/api/graphql`, then run `pnpm typecheck`. Keep checks independent of the gateway parallel where appropriate.
+
+**Verification:** The restarted gateway reported successful startup and readiness; the schema probe returned `Query`. The subsequent typecheck completed successfully.
+
+---
+
+## 2026-11-16 — `fixed` — Pre-push rejected successful isolated setup containers
+
+**Scope:** phased startup in `scripts/ci-check.sh`, discovered while pushing ROV-100 after rebasing onto ROV-277.
+
+**Root cause:** Phase 1 selected `novu-bootstrap` without its backend dependents. In that selected Compose project, `up --wait` expected it to remain running or healthy and rejected its successful exit with `container roviq-e2e-novu-bootstrap-1 exited (0)`. The isolated migrate-and-seed phase had the same issue.
+
+**Fix:** Health-check long-running infrastructure, then start each setup container and check its actual exit status with `docker wait` using the container ID returned by `compose ps --all --quiet`. Preserve nonzero setup and Docker errors. Start and health-check the API before the notification service without restarting their completed setup dependencies. All health checks and test gates remain enabled.
+
+**Verification:** The original push failed during infra startup. The corrected full `pnpm ci:check` passed lint, typecheck, unit, integration, API e2e, Playwright UI and validation gates. Four isolated regression cases cover an already-completed successful container, failed setup with diagnostics, a Docker wait error and a missing container. The tests target hashes the CI script. Tilt's dev API restarted successfully after the project configuration change.
+
+---

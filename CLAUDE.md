@@ -41,7 +41,6 @@ If any of below rule applies to you then you `MUST` read full details: `sed -n '
 - [RDPKG] Read `package.json` scripts before running app commands. Run `pnpm lint:fix` frequently
 - [NPENV] `process.env['FOO']` banned (Biome); `process.env.FOO` banned until `FOO` is on `ProcessEnv` (TS)
 - [NFEEI] Frontend must not import from `/ee`
-- [SESPR] **Session persistence** — create `.claude/sessions/<session-uuid>/` with 5 files at session start. Update after every commit/agent/direction change
 - [SHCMT] **Comments: short and useful, WHY-only** (hidden constraint, non-obvious workaround). Skip if a reader can infer from code + name. No long block comments or docstrings restating what the code does
 - [NTLSA] **No test-loosening shortcuts.** When a strict assertion (`toHaveBeenCalledWith({...})`, `toEqual({...})`) fails because a mock fixture is missing a field, FIX THE FIXTURE. Never weaken to `expect.objectContaining`, `expect.any`, partial-match, or `// eslint-disable` to make a failing test pass. The strict shape is what the test exists to enforce
 - [NSDFR] **No skipping/deferring mandatory review items.** When fixing a code review (CTO review, PR review, Linear-issue verification), every H1/H2/H3/Mandatory item MUST be applied in this session. Never defer with "needs its own spec", "out of scope", or "follow-up issue" unless the user explicitly approved deferral. Recommended/M-items may be deferred only with the user's explicit go-ahead in this conversation
