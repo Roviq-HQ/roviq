@@ -7,6 +7,7 @@
  *   03-create-guardian    — createGuardian persists fields, returns a profile
  *   04-link-guardian      — linkGuardianToStudent creates a relationship
  *   05-unlink-primary     — unlink primary without replacement → error
+ *                           unlink a student's only guardian → LAST_GUARDIAN_CANNOT_BE_DELETED
  *   07-revoke-access      — revokeGuardianAccess preserves the link (TC
  *                           history) but sets canPickup=false
  *   06-sibling-discovery  — myChildren as a guardian returns all linked
@@ -19,6 +20,7 @@
  */
 import assert from 'node:assert';
 import { Gender, GuardianRelationship } from '@roviq/common-types';
+import type { SectionModel, StandardModel, StudentModel } from '@roviq/graphql/generated';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { SEED } from '../../shared/seed-fixtures';
@@ -136,6 +138,66 @@ describe('Guardian E2E', () => {
       assert(res.errors);
       expect(res.errors.length).toBeGreaterThan(0);
       expect(res.errors[0].message.toLowerCase()).toContain('primary');
+    });
+
+    // ROV-173 compliance #12
+    it('rejects unlinking a student’s only guardian with LAST_GUARDIAN_CANNOT_BE_DELETED', async () => {
+      const standardsRes = await gql<{ standards: Pick<StandardModel, 'id'>[] }>(
+        `query Standards($academicYearId: ID!) { standards(academicYearId: $academicYearId) { id } }`,
+        { academicYearId: SEED.ACADEMIC_YEAR_INST1.id },
+        adminToken,
+      );
+      expect(standardsRes.errors).toBeUndefined();
+      const standardId = standardsRes.data?.standards[0]?.id;
+      assert(standardId);
+
+      const sectionsRes = await gql<{ sections: Pick<SectionModel, 'id'>[] }>(
+        `query Sections($standardId: ID!) { sections(standardId: $standardId) { id } }`,
+        { standardId },
+        adminToken,
+      );
+      expect(sectionsRes.errors).toBeUndefined();
+      const sectionId = sectionsRes.data?.sections[0]?.id;
+      assert(sectionId);
+
+      const studentRes = await gql<{ createStudent: Pick<StudentModel, 'id'> }>(
+        `mutation CreateStudent($input: CreateStudentInput!) { createStudent(input: $input) { id } }`,
+        {
+          input: {
+            firstName: { en: 'Kavya' },
+            gender: Gender.FEMALE,
+            standardId,
+            sectionId,
+            academicYearId: SEED.ACADEMIC_YEAR_INST1.id,
+          },
+        },
+        adminToken,
+      );
+      expect(studentRes.errors).toBeUndefined();
+      const onlyChildId = studentRes.data?.createStudent.id;
+      assert(onlyChildId);
+
+      const linkRes = await gql<{ linkGuardianToStudent: Pick<GuardianLink, 'id'> }>(
+        `mutation LinkGuardian($input: LinkGuardianInput!) { linkGuardianToStudent(input: $input) { id } }`,
+        {
+          input: {
+            guardianProfileId: newGuardianId,
+            studentProfileId: onlyChildId,
+            relationship: GuardianRelationship.FATHER,
+            isPrimaryContact: false,
+            canPickup: true,
+          },
+        },
+        adminToken,
+      );
+      expect(linkRes.errors).toBeUndefined();
+
+      const res = await gql(
+        `mutation UnlinkGuardian($input: UnlinkGuardianInput!) { unlinkGuardianFromStudent(input: $input) }`,
+        { input: { guardianProfileId: newGuardianId, studentProfileId: onlyChildId } },
+        adminToken,
+      );
+      expect(res.errors?.[0]?.extensions?.code).toBe('LAST_GUARDIAN_CANNOT_BE_DELETED');
     });
   });
 
