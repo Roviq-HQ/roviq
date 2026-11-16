@@ -63,6 +63,15 @@ apps/web/src/app/[locale]/
 middleware.ts        — hostname → scope rewrite (admin.* → /admin/, default → /institute/)
 ```
 
+## HTTP request correlation (ROV-80)
+
+The gateway registers `CorrelationIdMiddleware` globally in `main.ts`, before request
+parsing and auth middleware. Global registration also covers paths outside `/api`,
+including 404 responses. Each request receives `req.correlationId` and a matching
+`x-correlation-id` response header. A non-empty client header is preserved; a missing
+or empty header generates a UUID. The `@CorrelationId()` GraphQL parameter decorator
+reads the same value. Tenant context and audit consumers use this request value.
+
 ## Tech Stack
 
 | Layer     | Technology                                                   |

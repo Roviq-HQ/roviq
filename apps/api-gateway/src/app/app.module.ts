@@ -130,6 +130,7 @@ const wsLogger = new Logger('WsTicketAuth');
   ],
   controllers: [AppController],
   providers: [
+    CorrelationIdMiddleware,
     AppService,
     AppResolver,
     DateOnlyScalar,
@@ -155,7 +156,6 @@ const wsLogger = new Logger('WsTicketAuth');
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(CorrelationIdMiddleware).forRoutes('*path');
     consumer.apply(TenantMiddleware).forRoutes('*path');
   }
 }
