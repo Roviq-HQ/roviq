@@ -5,10 +5,14 @@ import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app/app.module';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
+  // Cover body-parser failures and paths outside the global API prefix.
+  const correlationIdMiddleware = app.get(CorrelationIdMiddleware);
+  app.use(correlationIdMiddleware.use.bind(correlationIdMiddleware));
 
   const config = app.get(ConfigService);
   const globalPrefix = 'api';
