@@ -7,7 +7,8 @@
         "{workspaceRoot}/.claude/rules/**/*",
         "{workspaceRoot}/.claude/skills/**/SKILL.md",
         "{workspaceRoot}/docs/references/**/*",
-        "{workspaceRoot}/CLAUDE.md"
+        "{workspaceRoot}/CLAUDE.md",
+        "{workspaceRoot}/scripts/ci-check.sh"
       ]
     }
   }

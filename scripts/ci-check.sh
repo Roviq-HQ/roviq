@@ -134,11 +134,26 @@ if (( run_e2e )); then
   COMPOSE=(scripts/e2e-compose.sh)
   log "phase 1 (parallel): infra start + backend image build + web build"
 
-  # Stream A: pull up infra services that don't depend on migrate-and-seed.
-  # `--wait` blocks on healthy + completes one-shot novu-bootstrap.
+  wait_setup_service() {
+    local container_id exit_code
+    container_id=$("${COMPOSE[@]}" ps --all --quiet "$1")
+    if [[ -z "$container_id" ]]; then
+      log "ERROR: no container found for setup service $1"
+      return 1
+    fi
+    exit_code=$(docker wait "$container_id") || return $?
+    if [[ "$exit_code" != "0" ]]; then
+      "${COMPOSE[@]}" logs --no-color "$1"
+      return "$exit_code"
+    fi
+  }
+
+  # Isolated one-shots have no dependents in Compose's selected project, so
+  # --wait treats a successful exit as a failed running/healthy check.
   ( "${COMPOSE[@]}" up -d --wait \
-        postgres redis nats temporal mongodb novu-api novu-worker novu-bootstrap \
-      > "$tmpdir/infra.log" 2>&1 ) & infra_pid=$!
+        postgres redis nats temporal mongodb novu-api novu-worker \
+      && "${COMPOSE[@]}" up -d --no-deps novu-bootstrap \
+      && wait_setup_service novu-bootstrap ) > "$tmpdir/infra.log" 2>&1 & infra_pid=$!
 
   # Stream B: build the shared toolchain image (one image for every backend
   # service, defined on migrate-and-seed; source and node_modules come from
@@ -164,10 +179,10 @@ if (( run_e2e )); then
     exit 1
   fi
 
-  # Phase 2: seed. --force-recreate ensures fresh seed even when the named
-  # container completed in a prior run. --wait blocks until exit code is set.
+  # Phase 2: seed. Recreate the one-shot, then check its recorded exit code.
   log "phase 2: migrate + seed e2e DB"
-  if ! "${COMPOSE[@]}" up -d --wait --force-recreate migrate-and-seed > "$tmpdir/seed.log" 2>&1; then
+  if ! { "${COMPOSE[@]}" up -d --no-deps --force-recreate migrate-and-seed \
+         && wait_setup_service migrate-and-seed; } > "$tmpdir/seed.log" 2>&1; then
     log "✗ seed failed"; cat "$tmpdir/seed.log"; exit 1
   fi
 
@@ -175,7 +190,8 @@ if (( run_e2e )); then
   # seed completed in phase 2 (depends_on satisfied). api-gateway builds both
   # apps; notification-service starts once it is healthy.
   log "phase 3: start backend apps"
-  if ! { "${COMPOSE[@]}" up -d --wait api-gateway notification-service \
+  if ! { "${COMPOSE[@]}" up -d --wait --no-deps api-gateway \
+         && "${COMPOSE[@]}" up -d --wait --no-deps notification-service \
          && "${COMPOSE[@]}" run --rm novu-bridge-sync; } > "$tmpdir/apps.log" 2>&1; then
     log "✗ app startup failed"; cat "$tmpdir/apps.log"; exit 1
   fi
