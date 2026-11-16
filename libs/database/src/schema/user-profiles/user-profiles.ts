@@ -13,6 +13,7 @@ import {
 import { users } from '../auth/users';
 import { i18nText } from '../common/columns';
 import { gender } from '../common/enums';
+import { userScopedPolicies } from '../common/rls-policies';
 
 /**
  * Drizzle custom type for a PostgreSQL `tsvector` column.
@@ -28,7 +29,8 @@ const tsvector = customType<{ data: string }>({
 /**
  * Platform-level personal profile extending the Auth `users` table.
  *
- * NO RLS — globally scoped. Write access controlled by CASL (self or admin).
+ * No `tenant_id`: one row per user, shared by every institute they belong to.
+ * RLS: readable only where the user holds a membership; writes are admin-only.
  * A user's name, DOB, and gender don't change per institute.
  */
 export const userProfiles = pgTable(
@@ -111,5 +113,6 @@ export const userProfiles = pgTable(
     index('idx_user_profiles_user_id').on(table.userId),
     /** GIN index on the generated tsvector for fast full-text search */
     index('idx_user_profiles_search').using('gin', sql`search_vector`),
+    ...userScopedPolicies('user_profiles'),
   ],
-);
+).enableRLS();

@@ -28,17 +28,9 @@ const SKIP_BASENAMES = new Set([
   'rls-policies.ts',
 ]);
 
-/**
- * Platform-level user tables whose access is enforced by DB-role GRANTs
- * (only `roviq_admin` / `roviq_reseller` connect; `roviq_app` is denied at
- * the GRANT layer) plus CASL at the resolver layer. They intentionally do
- * not carry per-row RLS.
- */
+// Platform-level tables still without RLS. roviq_app holds full GRANTs on them, so only
+// application code isolates tenants here. ROV-279 removes these exemptions.
 export const RLS_EXEMPT_BASENAMES = new Set([
-  'user-profiles.ts',
-  'user-documents.ts',
-  'user-addresses.ts',
-  'user-identifiers.ts',
   'auth-providers.ts',
   'phone-numbers.ts',
   'group-memberships.ts',

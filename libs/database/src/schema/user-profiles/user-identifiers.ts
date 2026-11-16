@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { userIdentifierType } from '../common/enums';
+import { userScopedPolicies } from '../common/rls-policies';
 
 /**
  * Drizzle custom type for BYTEA columns storing AES-256-GCM encrypted data.
@@ -34,7 +35,8 @@ export const encryptedBytea = customType<{
 });
 
 /**
- * Government-issued identity documents — platform-level, NO RLS.
+ * Government-issued identity documents — platform-level, keyed by user.
+ * RLS: readable only where the user holds a membership; writes are admin-only.
  *
  * Sensitive identifiers (Aadhaar, PAN) use application-level AES-256-GCM
  * encryption via `IDENTITY_ENCRYPTION_KEY`. Non-sensitive identifiers
@@ -124,5 +126,6 @@ export const userIdentifiers = pgTable(
     /** Aadhaar lookup by hash for duplicate detection during admission */
     index('idx_identifiers_aadhaar_hash').on(table.valueHash).where(sql`type = 'AADHAAR'`),
     index('idx_user_identifiers_user_id').on(table.userId),
+    ...userScopedPolicies('user_identifiers'),
   ],
-);
+).enableRLS();

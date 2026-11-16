@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { index, jsonb, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { addressType } from '../common/enums';
+import { userScopedPolicies } from '../common/rls-policies';
 
 /** Geographic coordinates for OASIS geo-tagging */
 export type Coordinates = {
@@ -10,7 +11,8 @@ export type Coordinates = {
 };
 
 /**
- * User addresses — platform-level, NO RLS.
+ * User addresses — platform-level, keyed by user.
+ * RLS: readable only where the user holds a membership; writes are admin-only.
  *
  * Each user can have at most one address per type (permanent, current, emergency).
  * District field is essential for Indian government reporting (UDISE+, Shala Darpan).
@@ -52,5 +54,6 @@ export const userAddresses = pgTable(
     /** One address per type per user */
     uniqueIndex('uq_address_user_type').on(table.userId, table.type),
     index('idx_user_addresses_user_id').on(table.userId),
+    ...userScopedPolicies('user_addresses'),
   ],
-);
+).enableRLS();

@@ -49,10 +49,12 @@ describe('hasRls', () => {
 });
 
 describe('RLS_EXEMPT_BASENAMES', () => {
-  it('contains the documented platform-level user tables', () => {
-    expect(RLS_EXEMPT_BASENAMES.has('user-profiles.ts')).toBe(true);
-    expect(RLS_EXEMPT_BASENAMES.has('phone-numbers.ts')).toBe(true);
-    expect(RLS_EXEMPT_BASENAMES.has('group-memberships.ts')).toBe(true);
+  it('lists exactly the platform-level tables still awaiting RLS (ROV-279)', () => {
+    expect([...RLS_EXEMPT_BASENAMES].sort()).toEqual([
+      'auth-providers.ts',
+      'group-memberships.ts',
+      'phone-numbers.ts',
+    ]);
   });
 
   it('does not contain typical tenant business tables', () => {
@@ -90,8 +92,8 @@ describe('findMissingRls', () => {
 
   it('skips files on the exempt list', () => {
     writeFileSync(
-      join(dir, 'user-profiles.ts'),
-      `export const userProfiles = pgTable('user_profiles', {});`,
+      join(dir, 'phone-numbers.ts'),
+      `export const phoneNumbers = pgTable('phone_numbers', {});`,
     );
     expect(findMissingRls(dir)).toEqual([]);
   });
