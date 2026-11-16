@@ -120,6 +120,12 @@ if (( IS_CI )) || [[ -n "$affected" ]]; then
   run_typecheck=1; run_unit=1
 fi
 
+# The integration suite uses the dev infra, not the e2e stack. Check it now so
+# a stopped database fails (or is started) here, not minutes into the run.
+if (( run_int && ! IS_CI )); then
+  node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/int-infra.ts
+fi
+
 # ── Pre-warm: 4-way parallel infra/build, then sequential seed + app start ──
 # Phase 1 (parallel): infra containers + backend image build + frontend build.
 # Phase 2 (sequential): seed (needs postgres up AND migrate-and-seed image).

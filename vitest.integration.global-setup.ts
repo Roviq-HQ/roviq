@@ -6,12 +6,15 @@
 import 'dotenv/config';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { ensureIntegrationInfra } from './scripts/int-infra';
 
 export async function setup(): Promise<void> {
   const url = process.env.DATABASE_URL_TEST_MIGRATE;
   if (!url) {
     throw new Error('DATABASE_URL_TEST_MIGRATE is not set; cannot prepare integration test DB');
   }
+
+  await ensureIntegrationInfra(__dirname);
 
   const result = spawnSync('drizzle-kit', ['migrate', '--config=drizzle.config.ts'], {
     stdio: 'inherit',
@@ -21,6 +24,9 @@ export async function setup(): Promise<void> {
   });
 
   if (result.status !== 0) {
-    throw new Error(`drizzle-kit migrate failed (exit ${result.status})`);
+    const target = new URL(url);
+    throw new Error(
+      `drizzle-kit migrate failed (exit ${result.status}) against ${target.host}${target.pathname} — its output is above`,
+    );
   }
 }

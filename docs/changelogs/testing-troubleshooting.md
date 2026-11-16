@@ -443,3 +443,17 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Do NOT:** declare a runtime dependency only in a lib's `package.json`; it must also be a root dependency or the production image cannot resolve it.
 
 ---
+
+## 2026-11-16 — Pre-push integration suite failed with `drizzle-kit migrate failed (exit 1)` after a reboot — `fixed`
+
+**Symptom:** `pnpm ci:check` reported `✗ int (7s, exit=1)` with `No test files found` and `drizzle-kit migrate failed (exit 1)`, after the e2e stack phases had already run.
+
+**Root cause:** The integration suite uses the dev infra (`docker/compose.infra.yaml`: Postgres 5434, Redis 6379, NATS 4222), not the e2e stack. The machine had rebooted and Tilt was not running, so those containers were stopped. Nothing checked for them: `vitest.integration.global-setup.ts` went straight to `drizzle-kit migrate`, and the error named the tool, not the unreachable database.
+
+**Fix:** `scripts/int-infra.ts` probes the three ports from `DATABASE_URL_TEST_MIGRATE`, `REDIS_URL` and `NATS_URL`. If one on localhost is down it runs `docker compose -f docker/compose.infra.yaml up -d --no-recreate --wait <services>`; a remote host, or a failed start, throws an error naming the service, env var and host:port. The integration global setup calls it before migrating, and `ci-check.sh` runs it before phase 1 so the check takes effect at the start of the run. The migrate failure message now names the target database.
+
+**Verification:** Stopped `docker-postgres-1` and `docker-nats-1`; the check started both in 6s and the next run of a single integration spec passed. With everything up the check takes 0.05s.
+
+**Do NOT:** drop `--no-recreate`. Run from a git worktree, Compose sees a different bind-mount path for `init-db.sh` and recreates the Tilt-owned Postgres container.
+
+---

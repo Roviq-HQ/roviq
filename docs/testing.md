@@ -15,6 +15,7 @@ nx affected -t test               # only changed projects
 
 # Integration tests (real PostgreSQL, roviq_test DB on port 5434)
 pnpm test:int                     # vitest --project integration
+                                  # starts dev Postgres/Redis/NATS itself if they are stopped (scripts/int-infra.ts)
 
 # E2E tests (requires Docker stack: pnpm e2e:up)
 pnpm test:e2e:api                 # Vitest GraphQL tests against api-gateway:3004
