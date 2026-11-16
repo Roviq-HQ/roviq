@@ -501,3 +501,14 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Root cause:** The frontend test project defaults to happy-dom, whose browser Request implementation strips forbidden `cookie` and `host` headers. Server middleware tests consequently lost their input headers.
 
 **Fix:** Run this server middleware spec in Node via its Vitest environment directive. Assertions retain the full expected locale redirect and portal rewrite URLs.
+
+
+---
+
+## 2026-11-16 — `fixed` — full integration run shared a DLQ broker with transport tests
+
+**Scope:** CI Test job and local integration infrastructure, found while verifying ROV-52 after rebasing onto ROV-54.
+
+**Root cause:** The transport tests correctly refused a DLQ with application consumers. Application integration tests boot real NATS consumers on the same `NATS_URL`, so two DLQ cases failed in the full suite despite passing on a standalone broker.
+
+**Fix:** Transport and stream-configuration tests use `NATS_TEST_URL` (default port 4224). Application tests keep `NATS_URL` (port 4222). Compose and the integration infrastructure check provide a separate `nats-test` broker; CI starts and checks both. The DLQ safety check and every integration test remain enabled.

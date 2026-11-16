@@ -40,6 +40,18 @@ services:
       timeout: 3s
       retries: 5
 
+  nats-test:
+    image: nats:2.10-alpine
+    ports:
+      - "4224:4222"
+      - "8224:8222"
+    command: ["--jetstream", "-m", "8222"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # Scrapes NATS' built-in monitoring endpoint (`:8222`) and re-exposes
   # JetStream stream/consumer stats in Prometheus format. Required for the
   # admin observability "Streams" tab.

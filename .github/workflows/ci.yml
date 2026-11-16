@@ -71,6 +71,7 @@ jobs:
       DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
       REDIS_URL: redis://localhost:6379
       NATS_URL: nats://localhost:4222
+      NATS_TEST_URL: nats://localhost:4224
       JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
       JWT_REFRESH_SECRET: ${{ secrets.CI_JWT_REFRESH_SECRET }}
       JWT_EXPIRATION: 15m
@@ -139,6 +140,20 @@ jobs:
           done
           echo "JetStream failed to come up within 30s"
           docker logs ci-nats
+          exit 1
+      - name: Start isolated NATS for transport tests
+        run: |
+          docker run -d --name ci-nats-transport -p 4224:4222 -p 8224:8222 \
+            nats:2.10-alpine -js -m 8222
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8224/varz | grep -q '"jetstream"'; then
+              echo "Transport JetStream is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Transport JetStream failed to come up within 30s"
+          docker logs ci-nats-transport
           exit 1
       - uses: pnpm/action-setup@v4
       - uses: nrwl/nx-set-shas@v4

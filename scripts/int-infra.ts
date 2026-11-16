@@ -55,6 +55,12 @@ export async function ensureIntegrationInfra(workspaceRoot: string): Promise<voi
     target('postgres', 'DATABASE_URL_TEST_MIGRATE', process.env.DATABASE_URL_TEST_MIGRATE, 5432),
     target('redis', 'REDIS_URL', process.env.REDIS_URL, 6379),
     target('nats', 'NATS_URL', process.env.NATS_URL, 4222),
+    target(
+      'nats-test',
+      'NATS_TEST_URL',
+      process.env.NATS_TEST_URL ?? 'nats://localhost:4224',
+      4222,
+    ),
   ];
 
   const down = await findDown(targets);

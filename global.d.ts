@@ -10,6 +10,7 @@ declare global {
       JWT_SECRET?: string;
       JWT_REFRESH_SECRET?: string;
       NATS_URL?: string;
+      NATS_TEST_URL?: string;
       NATS_STREAM_DRIFT_RECREATE?: string;
       REDIS_URL?: string;
       LOG_LEVEL?: string;
