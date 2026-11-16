@@ -20,7 +20,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { StudentStatisticsModel } from './models/student-statistics.model';
-import { studentReadPredicate } from './student-read-predicate';
+import { activeAcademicYearIds, studentReadPredicate } from './student-read-predicate';
 
 @Injectable()
 export class StudentReadRepository {
@@ -30,26 +30,28 @@ export class StudentReadRepository {
       tx
         .select({ id: studentProfilesLive.id })
         .from(studentProfilesLive)
-        .where(and(eq(studentProfilesLive.id, id), studentReadPredicate(access.ability)))
+        .where(and(eq(studentProfilesLive.id, id), studentReadPredicate(access.ability, null)))
         .limit(1),
     );
     return rows.length > 0;
   }
   findById(id: string, access: InstituteReadAccess) {
-    return this.loadById(id, access.user, studentReadPredicate(access.ability));
+    return this.loadById(id, access.user, studentReadPredicate(access.ability, null));
   }
   findForMutation(id: string, ctx: InstituteContext) {
     return this.loadById(id, ctx, undefined);
   }
   list(filter: StudentFilterInput, access: InstituteReadAccess) {
-    return this.loadList(filter, access.user, studentReadPredicate(access.ability));
+    return this.loadList(
+      filter,
+      access.user,
+      studentReadPredicate(access.ability, filter.academicYearId ?? null),
+    );
   }
   listForAttendance(filter: StudentFilterInput, ctx: InstituteContext) {
     return this.loadList(filter, ctx, undefined);
   }
   private async loadById(id: string, ctx: InstituteContext, restriction: SQL | undefined) {
-    const tenantId = ctx.tenantId;
-
     const rows = await withTenant(this.db, ctx, async (tx) => {
       return tx
         .select({
@@ -106,10 +108,7 @@ export class StudentReadRepository {
           studentAcademicsLive,
           and(
             eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-            eq(
-              studentAcademicsLive.academicYearId,
-              sql`(SELECT id FROM academic_years_live WHERE tenant_id = ${tenantId} AND is_active = true LIMIT 1)`,
-            ),
+            inArray(studentAcademicsLive.academicYearId, activeAcademicYearIds()),
           ),
         )
         .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
@@ -303,7 +302,7 @@ export class StudentReadRepository {
   // ── UPDATE ────────────────────────────────────────────────
 
   async statistics(access: InstituteReadAccess): Promise<StudentStatisticsModel> {
-    const restriction = studentReadPredicate(access.ability);
+    const restriction = studentReadPredicate(access.ability, null);
 
     return withTenant(this.db, access.user, async (tx) => {
       const [{ total }] = await tx
@@ -382,7 +381,10 @@ export class StudentReadRepository {
         .select({ userId: studentProfilesLive.userId })
         .from(studentProfilesLive)
         .where(
-          and(eq(studentProfilesLive.id, studentProfileId), studentReadPredicate(access.ability)),
+          and(
+            eq(studentProfilesLive.id, studentProfileId),
+            studentReadPredicate(access.ability, null),
+          ),
         )
         .limit(1);
     });

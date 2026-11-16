@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@roviq/auth';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Avatar,
@@ -19,6 +19,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -35,13 +36,13 @@ import { parseAsInteger, parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { useAcademicYears } from '../academic-years/use-academic-years';
-import { useSections, useStandards } from '../academics/use-academics';
 import {
+  type AttendanceDateSummary,
   type AttendanceStatus,
   type SectionStudent,
   type StatusCount,
   useBulkMarkAttendance,
-  useDateCounts,
+  useDateSummary,
   useMarkAttendance,
   useOpenSession,
   useOverrideSession,
@@ -50,6 +51,11 @@ import {
   useSessionsForSection,
   useStudentsInSection,
 } from './use-attendance';
+import {
+  type AttendanceScopeSelection,
+  type ResolvedAttendanceScope,
+  useAttendanceScope,
+} from './use-attendance-scope';
 
 const { instituteAttendance } = testIds;
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
@@ -67,6 +73,16 @@ function todayIso(): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function attendanceError(
+  err: unknown,
+  t: ReturnType<typeof useTranslations<'attendance'>>,
+  fallback: string,
+): string {
+  return extractGraphQLErrorCode(err) === 'ATTENDANCE_OVERRIDE_FORBIDDEN'
+    ? t('errors.ATTENDANCE_OVERRIDE_FORBIDDEN')
+    : extractGraphQLError(err, fallback);
 }
 
 export default function AttendancePage() {
@@ -88,16 +104,39 @@ export default function AttendancePage() {
     if (!yearId && activeYearId) void setYearId(activeYearId);
   }, [yearId, activeYearId, setYearId]);
 
-  const { standards } = useStandards(activeYearId);
-  const { sections } = useSections(standardId);
-  const { students, loading: studentsLoading } = useStudentsInSection(sectionId);
+  const requested = React.useMemo(() => ({ standardId, sectionId }), [standardId, sectionId]);
+  const applyScope = React.useCallback(
+    (selection: AttendanceScopeSelection) => {
+      void setStandardId(selection.standardId);
+      void setSectionId(selection.sectionId);
+    },
+    [setStandardId, setSectionId],
+  );
+  const scope = useAttendanceScope({
+    academicYearId: activeYearId,
+    requested,
+    onResolved: applyScope,
+    selectsSection: true,
+  });
+  const sections = scope.sectionsForStandard;
+  // Only a server-permitted section ever reaches section-scoped queries.
+  const scopedSectionId = scope.sectionId;
+  const { students, loading: studentsLoading } = useStudentsInSection(
+    scopedSectionId,
+    activeYearId,
+  );
 
-  const { sessions, refetch: refetchSessions } = useSessionsForSection(sectionId, date, date);
+  const { sessions, refetch: refetchSessions } = useSessionsForSection(scopedSectionId, date, date);
   const currentSession = sessions.find((s) => (s.period ?? null) === (period ?? null)) ?? null;
 
   const { entries, refetch: refetchEntries } = useSessionEntries(currentSession?.id ?? null);
   const { counts: sessionCounts } = useSessionCounts(currentSession?.id ?? null);
-  const { counts: dayCounts } = useDateCounts(date ?? todayIso());
+  const { summary: daySummary } = useDateSummary({
+    date: date ?? todayIso(),
+    sectionId: scopedSectionId,
+    academicYearId: activeYearId,
+    skip: !scopedSectionId || !activeYearId,
+  });
 
   const { openSession, loading: opening } = useOpenSession();
   const { override, loading: overriding } = useOverrideSession();
@@ -110,14 +149,14 @@ export default function AttendancePage() {
   );
 
   async function handleOpenSession() {
-    if (!sectionId || !activeYearId) return;
+    if (!scopedSectionId || !activeYearId) return;
     // lecturerId resolution:
     //   1. Prefer the membership of the currently-authenticated user for this
     //      tenant — every subject/class teacher can open their own session.
     //   2. Fall back to the section's configured class-teacher when the caller
     //      has no matching membership (e.g., a platform admin driving the UI).
     //   3. Bail with an error if neither is available.
-    const section = sections.find((s) => s.id === sectionId);
+    const section = sections.find((s) => s.id === scopedSectionId);
     // The active institute-scope JWT pins us to one tenant, so `user.membershipId`
     // IS the lecturer membership for any teacher opening a session on their own.
     // Admins / platform users fall back to the section's configured class teacher.
@@ -128,7 +167,7 @@ export default function AttendancePage() {
     }
     try {
       await openSession({
-        sectionId,
+        sectionId: scopedSectionId,
         academicYearId: activeYearId,
         date: date ?? todayIso(),
         period,
@@ -137,7 +176,7 @@ export default function AttendancePage() {
       toast.success(t('sessionOpened'));
       await refetchSessions();
     } catch (err) {
-      const msg = extractGraphQLError(err, t('errors.SESSION_TAKEN'));
+      const msg = attendanceError(err, t, t('errors.SESSION_TAKEN'));
       toast.error(msg);
     }
   }
@@ -147,7 +186,7 @@ export default function AttendancePage() {
     try {
       await mark({ sessionId: currentSession.id, studentId: studentMembershipId, status });
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed'));
+      toast.error(attendanceError(err, t, t('errors.FAILED')));
     }
   }
 
@@ -162,7 +201,7 @@ export default function AttendancePage() {
       toast.success(t('markAllDone'));
       await refetchEntries();
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed'));
+      toast.error(attendanceError(err, t, t('errors.FAILED')));
     }
   }
 
@@ -182,7 +221,7 @@ export default function AttendancePage() {
                 </h1>
               </div>
               <div className="flex items-center gap-3">
-                <DaySummary counts={dayCounts} />
+                <DaySummary summary={daySummary} />
                 <Button
                   asChild
                   variant="outline"
@@ -202,10 +241,14 @@ export default function AttendancePage() {
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
-                    <span className="text-xs font-medium text-muted-foreground mb-1 block">
+                    <Label
+                      htmlFor={instituteAttendance.dateInput}
+                      className="text-xs font-medium text-muted-foreground mb-1 block"
+                    >
                       {t('pickDate')}
-                    </span>
+                    </Label>
                     <Input
+                      id={instituteAttendance.dateInput}
                       type="date"
                       value={date ?? ''}
                       onChange={(e) => setDate(e.target.value || null)}
@@ -213,16 +256,22 @@ export default function AttendancePage() {
                     />
                   </div>
                   <div>
-                    <span className="text-xs font-medium text-muted-foreground mb-1 block">
+                    <Label
+                      htmlFor={instituteAttendance.periodSelect}
+                      className="text-xs font-medium text-muted-foreground mb-1 block"
+                    >
                       {t('period')}
-                    </span>
+                    </Label>
                     <Select
                       value={period === null || period === undefined ? '__daily__' : String(period)}
                       onValueChange={(v) =>
                         setPeriod(v === '__daily__' ? null : Number.parseInt(v, 10))
                       }
                     >
-                      <SelectTrigger data-testid={instituteAttendance.periodSelect}>
+                      <SelectTrigger
+                        id={instituteAttendance.periodSelect}
+                        data-testid={instituteAttendance.periodSelect}
+                      >
                         <SelectValue placeholder={t('dailyMode')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -235,64 +284,20 @@ export default function AttendancePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                      {t('pickStandard')}
-                    </span>
-                    <Select
-                      value={standardId ?? '__none__'}
-                      onValueChange={(v) => {
-                        void setStandardId(v === '__none__' ? null : v);
-                        void setSectionId(null);
-                      }}
-                    >
-                      <SelectTrigger data-testid={instituteAttendance.standardSelect}>
-                        <SelectValue placeholder="—" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">—</SelectItem>
-                        {standards.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {resolveI18n(s.name)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                      {t('pickSection')}
-                    </span>
-                    <Select
-                      value={sectionId ?? '__none__'}
-                      onValueChange={(v) => setSectionId(v === '__none__' ? null : v)}
-                    >
-                      <SelectTrigger data-testid={instituteAttendance.sectionSelect}>
-                        <SelectValue placeholder="—" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">—</SelectItem>
-                        {sections.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {resolveI18n(s.name)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <ScopeSelects
+                    scope={scope}
+                    onStandardChange={(id) => {
+                      void setStandardId(id);
+                      void setSectionId(null);
+                    }}
+                    onSectionChange={(id) => void setSectionId(id)}
+                  />
                 </div>
               </CardContent>
             </Card>
 
-            {!sectionId ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Users />
-                  </EmptyMedia>
-                  <EmptyTitle>{t('selectSectionFirst')}</EmptyTitle>
-                </EmptyHeader>
-              </Empty>
+            {!scopedSectionId ? (
+              <NoSectionState noAssignments={scope.noAssignments} />
             ) : !currentSession ? (
               <Empty>
                 <EmptyHeader>
@@ -317,9 +322,9 @@ export default function AttendancePage() {
                 <div className="flex items-center justify-between">
                   <SessionSummary counts={sessionCounts} />
                   <div className="flex items-center gap-2">
-                    {sectionId &&
+                    {scopedSectionId &&
                       (() => {
-                        const section = sections.find((s) => s.id === sectionId);
+                        const section = sections.find((s) => s.id === scopedSectionId);
                         const myLecturerId = section?.classTeacherId;
                         const isOtherLecturer = Boolean(
                           myLecturerId && currentSession.lecturerId !== myLecturerId,
@@ -343,7 +348,7 @@ export default function AttendancePage() {
                                   await refetchSessions();
                                   toast.success(t('overrideDone'));
                                 } catch (err) {
-                                  toast.error(extractGraphQLError(err, 'Failed'));
+                                  toast.error(attendanceError(err, t, t('errors.FAILED')));
                                 }
                               }}
                             >
@@ -454,6 +459,119 @@ export default function AttendancePage() {
   );
 }
 
+function NoSectionState({ noAssignments }: { noAssignments: boolean }) {
+  const t = useTranslations('attendance');
+  return noAssignments ? (
+    <Empty data-testid={instituteAttendance.noAssignedSections}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Users />
+        </EmptyMedia>
+        <EmptyTitle>{t('noAssignedSections')}</EmptyTitle>
+        <EmptyDescription>{t('noAssignedSectionsHint')}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  ) : (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Users />
+        </EmptyMedia>
+        <EmptyTitle>{t('selectSectionFirst')}</EmptyTitle>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function ScopeSelects({
+  scope,
+  onStandardChange,
+  onSectionChange,
+}: {
+  scope: Pick<
+    ResolvedAttendanceScope,
+    | 'standards'
+    | 'sectionsForStandard'
+    | 'standardId'
+    | 'sectionId'
+    | 'allowAllStandards'
+    | 'allowAllSections'
+  >;
+  onStandardChange: (id: string | null) => void;
+  onSectionChange: (id: string | null) => void;
+}) {
+  const t = useTranslations('attendance');
+  const resolveI18n = useI18nField();
+  return (
+    <>
+      <div>
+        <Label
+          htmlFor={instituteAttendance.standardSelect}
+          className="text-xs font-medium text-muted-foreground mb-1 block"
+        >
+          {t('pickStandard')}
+        </Label>
+        <Select
+          value={scope.standardId ?? '__none__'}
+          onValueChange={(v) => onStandardChange(v === '__none__' ? null : v)}
+          disabled={scope.standards.length === 0}
+        >
+          <SelectTrigger
+            id={instituteAttendance.standardSelect}
+            data-testid={instituteAttendance.standardSelect}
+          >
+            <SelectValue placeholder="—" />
+          </SelectTrigger>
+          <SelectContent>
+            {scope.allowAllStandards ? <SelectItem value="__none__">—</SelectItem> : null}
+            {scope.standards.map((s) => (
+              <SelectItem
+                key={s.id}
+                value={s.id}
+                data-testid={instituteAttendance.standardOption(s.id)}
+              >
+                {resolveI18n(s.name)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label
+          htmlFor={instituteAttendance.sectionSelect}
+          className="text-xs font-medium text-muted-foreground mb-1 block"
+        >
+          {t('pickSection')}
+        </Label>
+        <Select
+          value={scope.sectionId ?? '__none__'}
+          onValueChange={(v) => onSectionChange(v === '__none__' ? null : v)}
+          disabled={scope.sectionsForStandard.length === 0}
+        >
+          <SelectTrigger
+            id={instituteAttendance.sectionSelect}
+            data-testid={instituteAttendance.sectionSelect}
+          >
+            <SelectValue placeholder="—" />
+          </SelectTrigger>
+          <SelectContent>
+            {scope.allowAllSections ? <SelectItem value="__none__">—</SelectItem> : null}
+            {scope.sectionsForStandard.map((s) => (
+              <SelectItem
+                key={s.id}
+                value={s.id}
+                data-testid={instituteAttendance.sectionOption(s.id)}
+              >
+                {s.displayLabel ?? resolveI18n(s.name)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  );
+}
+
 type StudentColumnArgs = {
   t: ReturnType<typeof useTranslations<'attendance'>>;
   resolveI18n: ReturnType<typeof useI18nField>;
@@ -530,21 +648,32 @@ function buildStudentColumns({
   ];
 }
 
-function DaySummary({ counts }: { counts: StatusCount[] }) {
+function DaySummary({ summary }: { summary: AttendanceDateSummary | null }) {
   const t = useTranslations('attendance');
-  if (counts.length === 0) return null;
+  if (!summary || summary.counts.length === 0) return null;
   return (
-    <div className="flex items-center gap-2">
-      {counts.map((c) => (
-        <Badge
-          key={c.status}
-          variant="outline"
-          className={`${STATUS_COLORS[c.status as AttendanceStatus] ?? ''} border-0`}
-          data-testid={`attendance-day-count-${c.status}`}
-        >
-          {t(`counts.${c.status}` as Parameters<typeof t>[0])}: {c.count}
-        </Badge>
-      ))}
+    <div className="flex flex-col items-end gap-1" data-testid={instituteAttendance.daySummary}>
+      <div className="flex items-center gap-2">
+        {summary.counts.map((c) => (
+          <Badge
+            key={c.status}
+            variant="outline"
+            className={`${STATUS_COLORS[c.status as AttendanceStatus] ?? ''} border-0`}
+            data-testid={instituteAttendance.dayCount(c.status)}
+          >
+            {t(`counts.${c.status}` as Parameters<typeof t>[0])}: {c.count}
+          </Badge>
+        ))}
+      </div>
+      <span
+        className="text-xs text-muted-foreground"
+        data-testid={instituteAttendance.daySummaryScope}
+      >
+        {t('daySummary.scope', {
+          sessions: summary.sessionCount,
+          students: summary.studentCount,
+        })}
+      </span>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { subject } from '@casl/ability';
 import {
   ConflictException,
   ForbiddenException,
@@ -5,7 +6,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AcademicStatus, AttendanceStatus } from '@roviq/common-types';
+import type { InstituteReadAccess } from '@roviq/casl';
+import { AcademicStatus, type AppAction, AttendanceStatus } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { HolidayService } from '../holiday/holiday.service';
@@ -16,8 +18,13 @@ import type { BulkMarkAttendanceInput, MarkAttendanceInput } from './dto/mark-at
 import { AttendanceRepository } from './repositories/attendance.repository';
 import type {
   AbsenteeReportRow,
+  AbsenteesReportQuery,
   AttendanceEntryRecord,
+  AttendanceSectionRow,
+  AttendanceSectionScope,
   AttendanceSessionRecord,
+  DateSummaryQuery,
+  SectionDailyBreakdownQuery,
   SectionDailyBreakdownRow,
   StudentHistoryRow,
 } from './repositories/types';
@@ -34,26 +41,137 @@ export class AttendanceService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  async findSession(id: string): Promise<AttendanceSessionRecord> {
-    const session = await this.repo.findSessionById(id);
-    if (!session) throw new NotFoundException(`Attendance session ${id} not found`);
+  async findSession(id: string, access: InstituteReadAccess): Promise<AttendanceSessionRecord> {
+    const session = await this.repo.findSessionById(id, access);
+    if (!session) {
+      throw new NotFoundException({
+        message: `Attendance session ${id} not found`,
+        code: 'ATTENDANCE_SESSION_NOT_FOUND',
+      });
+    }
     return session;
   }
 
-  async findEntries(sessionId: string): Promise<AttendanceEntryRecord[]> {
-    await this.findSession(sessionId);
-    return this.repo.findEntriesBySession(sessionId);
+  async findEntries(sessionId: string, access: InstituteReadAccess) {
+    await this.findSession(sessionId, access);
+    return this.repo.findEntriesBySession(sessionId, access);
   }
 
   async findSessionsForSection(
     sectionId: string,
     startDate: string,
     endDate: string,
+    access: InstituteReadAccess,
   ): Promise<AttendanceSessionRecord[]> {
-    return this.repo.findSessionsInRange({ sectionId, startDate, endDate });
+    return this.repo.findSessionsInRange({ sectionId, startDate, endDate }, access);
   }
 
-  async openSession(input: CreateAttendanceSessionInput): Promise<AttendanceSessionRecord> {
+  listSections(
+    academicYearId: string,
+    access: InstituteReadAccess,
+  ): Promise<AttendanceSectionRow[]> {
+    return this.repo.listSections(academicYearId, access);
+  }
+
+  private async sectionScope(sectionId: string): Promise<AttendanceSectionScope> {
+    const scope = await this.repo.findSectionScope(sectionId);
+    if (!scope) {
+      throw new NotFoundException({
+        message: `Section ${sectionId} not found`,
+        code: 'SECTION_NOT_FOUND',
+      });
+    }
+    return scope;
+  }
+
+  private authorize(
+    access: InstituteReadAccess,
+    action: AppAction,
+    fields: AttendanceSectionScope & { lecturerId: string; date: string; studentId?: string },
+  ): void {
+    const record = subject('Attendance', { tenantId: access.user.tenantId, ...fields });
+    if (!access.ability.can(action, record)) {
+      throw new ForbiddenException('Not authorized for attendance in this section');
+    }
+  }
+
+  /** Any write to a past-dated session (create, mark, reassign, delete) needs its own grant. */
+  private assertPastDayPermission(
+    access: InstituteReadAccess,
+    fields: AttendanceSectionScope & { lecturerId: string; date: string },
+  ): boolean {
+    if (!this.isPastDate(fields.date)) return false;
+    const record = subject('AttendanceOverride', { tenantId: access.user.tenantId, ...fields });
+    if (!access.ability.can('update', record)) {
+      throw new ForbiddenException({
+        message: 'Past-day attendance edits require the AttendanceOverride permission',
+        code: 'ATTENDANCE_OVERRIDE_FORBIDDEN',
+      });
+    }
+    return true;
+  }
+
+  /** Marking also requires the caller to opt in explicitly before touching a past day. */
+  private async assertEditWindow(
+    access: InstituteReadAccess,
+    session: AttendanceSessionRecord,
+    overridePastDay: boolean,
+  ): Promise<boolean> {
+    if (!this.isPastDate(session.date)) return false;
+    if (!overridePastDay) {
+      throw new ForbiddenException(
+        'ATTENDANCE_EDIT_WINDOW_CLOSED: attendance for past dates can only be edited with explicit admin override.',
+      );
+    }
+    const scope = await this.sectionScope(session.sectionId);
+    return this.assertPastDayPermission(access, {
+      ...scope,
+      lecturerId: session.lecturerId,
+      date: session.date,
+    });
+  }
+
+  private async authorizeSession(
+    access: InstituteReadAccess,
+    action: AppAction,
+    session: AttendanceSessionRecord,
+    studentId?: string,
+  ): Promise<AttendanceSectionScope> {
+    const scope = await this.sectionScope(session.sectionId);
+    this.authorize(access, action, {
+      ...scope,
+      lecturerId: session.lecturerId,
+      date: session.date,
+      ...(studentId !== undefined && { studentId }),
+    });
+    return scope;
+  }
+
+  private async assertStudentInSession(
+    session: AttendanceSessionRecord,
+    studentId: string,
+  ): Promise<void> {
+    if (!(await this.repo.isStudentInSession(session, studentId))) {
+      throw new ForbiddenException('Student is not enrolled in this attendance session section');
+    }
+  }
+
+  async openSession(
+    input: CreateAttendanceSessionInput,
+    access: InstituteReadAccess,
+  ): Promise<AttendanceSessionRecord> {
+    const scope = await this.sectionScope(input.sectionId);
+    if (scope.academicYearId !== input.academicYearId) {
+      throw new NotFoundException({
+        message: `Section ${input.sectionId} not found in academic year ${input.academicYearId}`,
+        code: 'SECTION_NOT_FOUND',
+      });
+    }
+    this.authorize(access, 'create', {
+      ...scope,
+      lecturerId: input.lecturerId,
+      date: input.date,
+    });
     const existing = await this.repo.findSession({
       sectionId: input.sectionId,
       date: input.date,
@@ -68,6 +186,12 @@ export class AttendanceService {
       }
       return existing;
     }
+
+    this.assertPastDayPermission(access, {
+      ...scope,
+      lecturerId: input.lecturerId,
+      date: input.date,
+    });
 
     // Refuse to open a session on a declared holiday. This runs *after* the
     // idempotence check so re-opening an already-existing session on what
@@ -93,7 +217,7 @@ export class AttendanceService {
     // Auto-seed: every active student of the section starts PRESENT (or
     // LEAVE if an approved leave covers this date). Teachers then only have
     // to flip absentees / latecomers. Mirrors the paper-register workflow.
-    await this.seedPresentEntries(session.id, input.sectionId, session.date);
+    await this.seedPresentEntries(session);
 
     this.eventBus.emit(EVENT_PATTERNS.ATTENDANCE_SESSION.opened, {
       sessionId: session.id,
@@ -106,11 +230,8 @@ export class AttendanceService {
     return session;
   }
 
-  private async seedPresentEntries(
-    sessionId: string,
-    sectionId: string,
-    date: string,
-  ): Promise<void> {
+  private async seedPresentEntries(session: AttendanceSessionRecord): Promise<void> {
+    const { id: sessionId, sectionId, academicYearId, date } = session;
     // Paginate defensively in case a section grows beyond 1000 students.
     const PAGE_SIZE = 1000;
     const membershipIds: string[] = [];
@@ -119,6 +240,7 @@ export class AttendanceService {
     for (let i = 0; i < 20; i++) {
       const page = await this.studentService.list({
         sectionId,
+        academicYearId,
         first: PAGE_SIZE,
         after,
         academicStatus: [AcademicStatus.ENROLLED],
@@ -150,12 +272,19 @@ export class AttendanceService {
     sessionId: string,
     lecturerId: string,
     subjectId: string | null,
+    access: InstituteReadAccess,
   ): Promise<AttendanceSessionRecord> {
-    const session = await this.findSession(sessionId);
+    const session = await this.findSession(sessionId, access);
+    const scope = await this.authorizeSession(access, 'update', session);
     const lecturerChanged = session.lecturerId !== lecturerId;
     const subjectChanged = (session.subjectId ?? null) !== (subjectId ?? null);
 
     if (!lecturerChanged && !subjectChanged) return session;
+    this.assertPastDayPermission(access, {
+      ...scope,
+      lecturerId: session.lecturerId,
+      date: session.date,
+    });
 
     const withLecturer = lecturerChanged
       ? await this.repo.assignLecturer(sessionId, lecturerId)
@@ -177,15 +306,13 @@ export class AttendanceService {
 
   async markAttendance(
     input: MarkAttendanceInput,
-    opts: { overridePastDay?: boolean; overrideReason?: string | null } = {},
+    opts: { overridePastDay: boolean; overrideReason: string | null },
+    access: InstituteReadAccess,
   ): Promise<AttendanceEntryRecord> {
-    const session = await this.findSession(input.sessionId);
-    const past = this.isPastDate(session.date);
-    if (past && !opts.overridePastDay) {
-      throw new ForbiddenException(
-        'ATTENDANCE_EDIT_WINDOW_CLOSED: attendance for past dates can only be edited with explicit admin override.',
-      );
-    }
+    const session = await this.findSession(input.sessionId, access);
+    await this.authorizeSession(access, 'update', session, input.studentId);
+    await this.assertStudentInSession(session, input.studentId);
+    const past = await this.assertEditWindow(access, session, opts.overridePastDay);
     const entry = await this.repo.upsertEntry({
       sessionId: input.sessionId,
       studentId: input.studentId,
@@ -247,15 +374,21 @@ export class AttendanceService {
 
   async bulkMark(
     input: BulkMarkAttendanceInput,
-    opts: { overridePastDay?: boolean; overrideReason?: string | null } = {},
+    opts: { overridePastDay: boolean; overrideReason: string | null },
+    access: InstituteReadAccess,
   ): Promise<AttendanceEntryRecord[]> {
-    const session = await this.findSession(input.sessionId);
-    const past = this.isPastDate(session.date);
-    if (past && !opts.overridePastDay) {
-      throw new ForbiddenException(
-        'ATTENDANCE_EDIT_WINDOW_CLOSED: attendance for past dates can only be edited with explicit admin override.',
-      );
+    const session = await this.findSession(input.sessionId, access);
+    const scope = await this.sectionScope(session.sectionId);
+    for (const item of input.entries) {
+      this.authorize(access, 'update', {
+        ...scope,
+        lecturerId: session.lecturerId,
+        date: session.date,
+        studentId: item.studentId,
+      });
+      await this.assertStudentInSession(session, item.studentId);
     }
+    const past = await this.assertEditWindow(access, session, opts.overridePastDay);
     const results: AttendanceEntryRecord[] = [];
     for (const item of input.entries) {
       const entry = await this.repo.upsertEntry({
@@ -284,39 +417,52 @@ export class AttendanceService {
     return results;
   }
 
-  async counts(sessionId: string) {
-    await this.findSession(sessionId);
-    const byStatus = await this.repo.countByStatus(sessionId);
+  async counts(sessionId: string, access: InstituteReadAccess) {
+    await this.findSession(sessionId, access);
+    const byStatus = await this.repo.countByStatus(sessionId, access);
     return Object.entries(byStatus).map(([status, count]) => ({ status, count }));
   }
 
-  async countsForDate(date: string) {
-    const byStatus = await this.repo.countForDate(date);
-    return Object.entries(byStatus).map(([status, count]) => ({ status, count }));
+  async dateSummary(query: DateSummaryQuery, access: InstituteReadAccess) {
+    const summary = await this.repo.dateSummary(query, access);
+    return {
+      sessionCount: summary.sessionCount,
+      studentCount: summary.studentCount,
+      counts: Object.entries(summary.counts).map(([status, count]) => ({ status, count })),
+    };
   }
 
   async absenteesReport(
-    sectionId: string | null,
-    startDate: string,
-    endDate: string,
+    query: AbsenteesReportQuery,
+    access: InstituteReadAccess,
   ): Promise<AbsenteeReportRow[]> {
-    return this.repo.absenteesReport({ sectionId, startDate, endDate });
+    return this.repo.absenteesReport(query, access);
   }
 
-  async sectionDailyBreakdown(date: string): Promise<SectionDailyBreakdownRow[]> {
-    return this.repo.sectionDailyBreakdown(date);
+  async sectionDailyBreakdown(
+    query: SectionDailyBreakdownQuery,
+    access: InstituteReadAccess,
+  ): Promise<SectionDailyBreakdownRow[]> {
+    return this.repo.sectionDailyBreakdown(query, access);
   }
 
   async studentHistory(
     studentId: string,
     startDate: string,
     endDate: string,
+    access: InstituteReadAccess,
   ): Promise<StudentHistoryRow[]> {
-    return this.repo.studentHistory({ studentId, startDate, endDate });
+    return this.repo.studentHistory({ studentId, startDate, endDate }, access);
   }
 
-  async deleteSession(id: string): Promise<boolean> {
-    const session = await this.findSession(id);
+  async deleteSession(id: string, access: InstituteReadAccess): Promise<boolean> {
+    const session = await this.findSession(id, access);
+    const scope = await this.authorizeSession(access, 'delete', session);
+    this.assertPastDayPermission(access, {
+      ...scope,
+      lecturerId: session.lecturerId,
+      date: session.date,
+    });
     await this.repo.softDeleteSession(id);
     this.eventBus.emit(EVENT_PATTERNS.ATTENDANCE_SESSION.deleted, {
       sessionId: id,

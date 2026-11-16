@@ -1,7 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { InstituteReadAccess } from '@roviq/casl';
 import {
-  academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
   guardianProfilesLive,
@@ -14,8 +13,8 @@ import {
   userProfiles,
   withTenant,
 } from '@roviq/database';
-import { and, eq, ilike, or, sql } from 'drizzle-orm';
-import { studentReadPredicate } from '../student/student-read-predicate';
+import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { activeAcademicYearIds, studentReadPredicate } from '../student/student-read-predicate';
 import type { ListGuardiansFilterInput } from './dto/list-guardians-filter.input';
 import { guardianLinkedReadPredicate, guardianReadPredicate } from './guardian-read-predicate';
 
@@ -46,10 +45,10 @@ export class GuardianReadRepository {
         SELECT COUNT(*)::int FROM ${studentGuardianLinks}
         INNER JOIN ${studentProfilesLive} ON ${studentProfilesLive.id} = ${studentGuardianLinks.studentProfileId}
         LEFT JOIN ${studentAcademicsLive} ON ${studentAcademicsLive.studentProfileId} = ${studentProfilesLive.id}
-          AND ${studentAcademicsLive.academicYearId} IN (SELECT id FROM ${academicYearsLive} WHERE is_active = true)
+          AND ${inArray(studentAcademicsLive.academicYearId, activeAcademicYearIds())}
         WHERE ${studentGuardianLinks.guardianProfileId} = ${guardianProfilesLive.id}
           AND ${guardianLinkedReadPredicate(access.ability) ?? sql`true`}
-          AND ${studentReadPredicate(access.ability) ?? sql`true`}
+          AND ${studentReadPredicate(access.ability, null) ?? sql`true`}
       )`.as('linked_student_count'),
     } as const;
   }
@@ -139,10 +138,7 @@ export class GuardianReadRepository {
           studentAcademicsLive,
           and(
             eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-            eq(
-              studentAcademicsLive.academicYearId,
-              sql`(SELECT id FROM ${academicYearsLive} WHERE tenant_id = ${access.user.tenantId} AND is_active = true LIMIT 1)`,
-            ),
+            inArray(studentAcademicsLive.academicYearId, activeAcademicYearIds()),
           ),
         )
         .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
@@ -151,7 +147,7 @@ export class GuardianReadRepository {
           and(
             eq(studentGuardianLinks.guardianProfileId, guardianProfileId),
             guardianLinkedReadPredicate(access.ability),
-            studentReadPredicate(access.ability),
+            studentReadPredicate(access.ability, null),
           ),
         )
         .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);
@@ -190,14 +186,14 @@ export class GuardianReadRepository {
           studentAcademicsLive,
           and(
             eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-            sql`${studentAcademicsLive.academicYearId} IN (SELECT id FROM ${academicYearsLive} WHERE is_active = true)`,
+            inArray(studentAcademicsLive.academicYearId, activeAcademicYearIds()),
           ),
         )
         .where(
           and(
             eq(studentGuardianLinks.studentProfileId, studentProfileId),
             guardianLinkedReadPredicate(access.ability),
-            studentReadPredicate(access.ability),
+            studentReadPredicate(access.ability, null),
           ),
         )
         .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);

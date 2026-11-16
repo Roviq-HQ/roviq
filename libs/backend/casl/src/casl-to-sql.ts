@@ -11,7 +11,7 @@
 import { rulesToAST } from '@casl/ability/extra';
 import type { AppAbility, AppAction, AppSubject } from '@roviq/common-types';
 import { allInterpreters, createSqlInterpreter, pg } from '@ucast/sql';
-import { type SQL, sql } from 'drizzle-orm';
+import { type AnyColumn, type SQL, sql } from 'drizzle-orm';
 
 const within: typeof allInterpreters.in = (condition, query, context) =>
   condition.value.length === 0
@@ -23,90 +23,58 @@ const nin: typeof allInterpreters.nin = (condition, query, context) =>
     : allInterpreters.nin(condition, query, context);
 const interpret = createSqlInterpreter({ ...allInterpreters, in: within, within, nin });
 
-/**
- * Field name → PostgreSQL column name mapping.
- *
- * Maps camelCase CASL condition field names to snake_case PostgreSQL column names.
- * When CASL conditions reference "sectionId", @ucast/sql needs to produce "section_id".
- */
-const FIELD_TO_COLUMN: Record<string, string> = {
-  userId: 'user_id',
-  tenantId: 'tenant_id',
-  sectionId: 'section_id',
-  standardId: 'standard_id',
-  departmentId: 'department_id',
-  studentId: 'student_id',
-  membershipId: 'membership_id',
-  academicYearId: 'academic_year_id',
-};
+/** CASL condition field → Drizzle column (or column expression) it constrains. */
+export type CaslColumnMap = Readonly<Record<string, AnyColumn | SQL>>;
+
+// ⟪n⟫ marks a field slot; @ucast/sql never emits these brackets itself.
+const FIELD_TOKEN = /\$(\d+)|⟪(\d+)⟫/g;
 
 /**
  * Convert CASL ability rules for a given action+subject into a Drizzle SQL WHERE clause.
  *
- * @param ability - The user's CASL ability (from AbilityFactory)
- * @param action - The action being checked (e.g., 'read', 'update')
- * @param subject - The subject being accessed (e.g., 'Student', 'Attendance')
- * @returns Drizzle SQL expression for .where(), or undefined if no restrictions (manage:all)
+ * Every condition field must map to a Drizzle column; a rule on an unmapped field
+ * cannot be evaluated, so the whole predicate fails closed (`false`).
  *
- * @example
- * // Teacher with section restriction:
- * caslToSqlWhere(teacherAbility, 'read', 'Student')
- * // → sql`"section_id" IN ($1, $2)` with teacher's section UUIDs
- *
- * // Admin with manage:all:
- * caslToSqlWhere(adminAbility, 'read', 'Student')
- * // → undefined (no restriction)
- *
- * // Student with own-data restriction:
- * caslToSqlWhere(studentAbility, 'read', 'Student')
- * // → sql`"user_id" = $1` with student's user ID
+ * @returns Drizzle SQL for `.where()`, or undefined when unrestricted (e.g. manage:all)
  */
 export function caslToSqlWhere(
   ability: AppAbility,
   action: AppAction,
   subject: AppSubject,
-  columns: Readonly<Record<string, string>> = {},
+  columns: CaslColumnMap,
 ): SQL | undefined {
-  // rulesToAST extracts the @ucast/core Condition from CASL's internal representation
   const ast = rulesToAST(ability, action, subject);
-
-  // null = no matching rules = no access. Return sql`false` to block all rows.
-  // undefined return = no restrictions (manage:all or unconditional rule)
   if (ast === null) return sql`false`;
-
-  // If the AST is a trivial "true" (unconditional allow), return undefined = no filter
   if ('operator' in ast && ast.operator === 'and' && 'value' in ast) {
     const val = ast.value;
     if (Array.isArray(val) && val.length === 0) return undefined;
   }
 
+  const fields: string[] = [];
+  let unmapped = false;
   const [sqlString, params] = interpret(ast, {
     ...pg,
     escapeField: (field: string) => {
-      const mapped = columns[field] ?? FIELD_TO_COLUMN[field] ?? field;
-      return mapped
-        .split('.')
-        .map((part) => `"${part.replaceAll('"', '""')}"`)
-        .join('.');
+      if (!Object.hasOwn(columns, field)) unmapped = true;
+      return `⟪${fields.push(field) - 1}⟫`;
     },
     joinRelation: () => false,
   });
-
+  if (unmapped) return sql`false`;
   if (!sqlString || sqlString === '()') return undefined;
 
-  // Build Drizzle SQL with proper parameter binding
-  // Split $N placeholders and bind params via sql template
-  const parts = sqlString.split(/\$(\d+)/);
   const chunks: SQL[] = [];
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      if (parts[i]) chunks.push(sql.raw(parts[i]));
-    } else {
-      const paramIndex = Number.parseInt(parts[i], 10) - 1;
-      chunks.push(sql`${params[paramIndex]}`);
-    }
+  let last = 0;
+  for (const match of sqlString.matchAll(FIELD_TOKEN)) {
+    const index = match.index ?? 0;
+    if (index > last) chunks.push(sql.raw(sqlString.slice(last, index)));
+    chunks.push(
+      match[1] !== undefined
+        ? sql`${params[Number(match[1]) - 1]}`
+        : sql`${columns[fields[Number(match[2])]]}`,
+    );
+    last = index + match[0].length;
   }
-
-  if (chunks.length === 0) return undefined;
-  return chunks.length === 1 ? chunks[0] : sql.join(chunks, sql``);
+  if (last < sqlString.length) chunks.push(sql.raw(sqlString.slice(last)));
+  return sql.join(chunks, sql``);
 }

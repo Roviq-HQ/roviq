@@ -18,13 +18,15 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { AttendanceStatus } from '@roviq/common-types';
+import { createMongoAbility } from '@casl/ability';
+import { type AppAbility, AttendanceStatus } from '@roviq/common-types';
 import {
   academicYears,
   attendanceSessions,
   type DrizzleDB,
   memberships,
   mkAdminCtx,
+  mkInstituteCtx,
   roles,
   SYSTEM_USER_ID,
   sections,
@@ -185,6 +187,13 @@ describe('Attendance repository (integration)', () => {
     await appResult?.close();
   });
 
+  function adminAccess() {
+    return {
+      user: mkInstituteCtx(tenant.tenantId, 'test:attendance'),
+      ability: createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]),
+    };
+  }
+
   /** Wrap a repo call in the same request context production middleware sets. */
   async function asTenant<T>(fn: () => Promise<T>): Promise<T> {
     return withTestContext(fn, {
@@ -249,7 +258,7 @@ describe('Attendance repository (integration)', () => {
       }),
     );
 
-    const counts = await asTenant(() => repo.countByStatus(session.id));
+    const counts = await asTenant(() => repo.countByStatus(session.id, adminAccess()));
     expect(counts[AttendanceStatus.PRESENT]).toBe(1);
     expect(counts[AttendanceStatus.ABSENT]).toBe(1);
     // No LEAVE / LATE entries were inserted — they must not appear in the map.
@@ -292,7 +301,7 @@ describe('Attendance repository (integration)', () => {
     expect(second.remarks).toBe('late slip not submitted');
 
     // Only a single row exists for this (session, student) pair.
-    const entries = await asTenant(() => repo.findEntriesBySession(session.id));
+    const entries = await asTenant(() => repo.findEntriesBySession(session.id, adminAccess()));
     const forStudentA = entries.filter((e) => e.studentId === fixture.studentAMembershipId);
     expect(forStudentA).toHaveLength(1);
 

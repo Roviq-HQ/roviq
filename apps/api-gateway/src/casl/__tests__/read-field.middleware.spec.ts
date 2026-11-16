@@ -16,6 +16,7 @@ function abilityFor(role: DefaultRole) {
         ? {
             conditions: substituteUserVars(rule.conditions, {
               userId: 'own-user',
+              membershipId: 'own-membership',
               assignedSections: ['own-section'],
               linkedStudentIds: ['own-student'],
             }),

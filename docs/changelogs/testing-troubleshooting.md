@@ -292,6 +292,30 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 
 ---
 
+## 2026-11-15 — `fixed` — Local integration tests raced the E2E database reset
+
+**Scope:** Local `.env` test database URLs; no application code changed.
+
+**Root cause:** `DATABASE_URL_TEST` and `DATABASE_URL_TEST_MIGRATE` pointed to port `5435`, sharing the E2E database. The pre-push gate runs integration tests alongside E2E. The UI E2E target's uncached `e2e-seed` dependency resets that database, so integration workers observed missing tables and missing seed data during the reset. PostgreSQL logs confirmed missing-table errors during this overlap.
+
+**Fix:** Restored both local integration URLs to port `5434`, matching `.env.example` and the database separation documented in `docs/testing.md`. E2E retains its separate database on port `5435`.
+
+**Verification:** `tilt trigger integration-tests` executed all 42 integration files: 392 passed, 5 existing todo, no failures. This includes all 18 ROV-204 authorization cases.
+
+**Do NOT:** Point integration URLs at the E2E database while the pre-push gate runs these suites in parallel. Both databases are named `roviq_test`; the host port distinguishes them locally.
+
+---
+
+## 2026-11-15 — `diagnosed` — Push retry exposed additional integration DB problems
+
+**Context:** Follow-up to the database URL correction above. The standalone Tilt run passed, but the full push retry still failed; that standalone result does not establish a clean pre-push gate.
+
+**Evidence:** The retry no longer reports missing tables or missing seed data. It instead reports concurrent `ensure_monthly_partition` calls colliding on `audit_logs_2026_12`, a deadlock in the seed idempotency suite, and a structural RLS assertion listing 18 tables without FORCE RLS. A direct catalog query confirms `timetables.relforcerowsecurity = false` in `roviq_test` on port `5434`, versus `true` in the E2E database on `5435`. Both migration ledgers now contain 35 entries; migration count alone does not establish equivalent database setup.
+
+**Status:** Push remains blocked. Partition creation concurrency, seed-suite write isolation, and integration database RLS setup require further fixes; no checks were bypassed.
+
+---
+
 ## 2026-11-16 — `fixed` — CI Chromium installation failed on Ubuntu 26.04
 
 **Scope:** `e2e-ui` runner in `.github/workflows/ci.yml`.

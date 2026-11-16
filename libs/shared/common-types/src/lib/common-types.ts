@@ -69,6 +69,11 @@ export const AppSubject = {
   Timetable: 'Timetable',
   /** Daily attendance records for students. Teachers create/update; students can only read their own */
   Attendance: 'Attendance',
+  /**
+   * Editing attendance after its same-day window closed (audited). Separate from Attendance so
+   * section-scoped `manage Attendance` grants never imply it.
+   */
+  AttendanceOverride: 'AttendanceOverride',
   /** Leave applications (student + staff) — apply, approve, reject, cancel. Feeds attendance auto-seed */
   Leave: 'Leave',
   /** Institute holiday calendar — admins publish, attendance consults to block session creation */
@@ -638,7 +643,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Subject' },
     { action: 'read', subject: 'Timetable' },
     { action: 'read', subject: 'ReportCard' },
-    { action: 'read', subject: 'Attendance', conditions: { studentId: '${user.id}' } },
+    // Attendance entries reference the student's membership, not their user id.
+    { action: 'read', subject: 'Attendance', conditions: { studentId: '$user.membershipId' } },
     // Students can file own leaves + read the holiday calendar.
     { action: 'create', subject: 'Leave', conditions: { userId: '$user.sub' } },
     { action: 'read', subject: 'Leave', conditions: { userId: '$user.sub' } },
@@ -649,7 +655,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   parent: [
     ...SELF_SERVICE_ABILITIES,
     { action: 'read', subject: 'Student', conditions: { id: { $in: '$user.linkedStudentIds' } } },
-    { action: 'read', subject: 'Attendance' },
+    {
+      action: 'read',
+      subject: 'Attendance',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
+    },
     { action: 'manage', subject: 'Consent' },
     { action: 'read', subject: 'Institute' },
     { action: 'read', subject: 'AcademicYear' },

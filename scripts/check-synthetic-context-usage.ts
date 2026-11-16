@@ -56,6 +56,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/admission/__tests__/enquiry.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/admission.service.ts',
   'apps/api-gateway/src/institute/admission/workflows/student-admission.activities.ts',
+  'apps/api-gateway/src/institute/attendance/__tests__/attendance-authorization.integration.spec.ts',
   'apps/api-gateway/src/institute/attendance/__tests__/attendance.integration.spec.ts',
   'apps/api-gateway/src/institute/attendance/repositories/attendance.drizzle-repository.ts',
   'apps/api-gateway/src/institute/bot/bot.service.ts',

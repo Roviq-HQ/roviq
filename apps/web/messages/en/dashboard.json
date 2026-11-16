@@ -56,13 +56,14 @@
   "profileDescription": "View and update your personal contact details.",
   "attendanceKpi": {
     "title": "Today's attendance",
-    "total": "total",
+    "total": "marks",
     "present": "Present",
     "absent": "Absent",
     "leave": "Leave",
     "late": "Late",
     "viewDetails": "View details",
-    "noData": "No attendance recorded today yet."
+    "noData": "No attendance recorded today yet.",
+    "scope": "{sessions, plural, one {# session} other {# sessions}} · {students, plural, one {# student} other {# students}} you can view"
   },
   "timetableTitle": "Timetable",
   "timetableDescription": "Build and manage weekly class schedules.",

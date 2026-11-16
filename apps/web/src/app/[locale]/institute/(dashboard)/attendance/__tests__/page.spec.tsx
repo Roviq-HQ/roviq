@@ -1,5 +1,7 @@
-import { screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
 import AttendancePage from '../page';
 
@@ -41,25 +43,43 @@ vi.mock('@roviq/auth', () => ({
   }),
 }));
 
-vi.mock('../../academics/use-academics', () => ({
-  useStandards: () => ({ standards: [], loading: false }),
-  useSections: () => ({ sections: [], loading: false }),
-}));
+function sectionOption(id: string) {
+  return {
+    id,
+    name: { en: id },
+    displayLabel: `Class 5-${id}`,
+    standardId: 'std-5',
+    standardName: { en: 'Class 5' },
+    classTeacherId: null,
+  };
+}
 
 const hookState = {
   students: [] as Array<Record<string, unknown>>,
   sessions: [] as Array<Record<string, unknown>>,
   entries: [] as Array<Record<string, unknown>>,
   sessionCounts: [] as Array<{ status: string; count: number }>,
-  dayCounts: [] as Array<{ status: string; count: number }>,
+  sections: [sectionOption('A'), sectionOption('B')],
 };
+const sessionsForSection = vi.fn((_sectionId: string | null) => ({
+  sessions: hookState.sessions,
+  loading: false,
+  refetch: vi.fn(),
+}));
+
+const { openSession, toastError } = vi.hoisted(() => ({
+  openSession: vi.fn(),
+  toastError: vi.fn(),
+}));
+vi.mock('sonner', () => ({ toast: { error: toastError, success: vi.fn() } }));
 
 vi.mock('../use-attendance', () => ({
-  useSessionsForSection: () => ({ sessions: hookState.sessions, loading: false, refetch: vi.fn() }),
+  useSessionsForSection: (sectionId: string | null) => sessionsForSection(sectionId),
   useSessionEntries: () => ({ entries: hookState.entries, loading: false, refetch: vi.fn() }),
   useSessionCounts: () => ({ counts: hookState.sessionCounts }),
-  useDateCounts: () => ({ counts: hookState.dayCounts, loading: false }),
-  useOpenSession: () => ({ openSession: vi.fn(), loading: false }),
+  useDateSummary: () => ({ summary: null, loading: false }),
+  useAttendanceSections: () => ({ sections: hookState.sections, loading: false }),
+  useOpenSession: () => ({ openSession, loading: false }),
   useOverrideSession: () => ({ override: vi.fn(), loading: false }),
   useMarkAttendance: () => ({ mark: vi.fn(), loading: false }),
   useBulkMarkAttendance: () => ({ bulkMark: vi.fn(), loading: false }),
@@ -67,6 +87,11 @@ vi.mock('../use-attendance', () => ({
 }));
 
 describe('AttendancePage', () => {
+  beforeEach(() => {
+    hookState.sections = [sectionOption('A'), sectionOption('B')];
+    sessionsForSection.mockClear();
+  });
+
   it('renders the title and reports link when the user has read permission', () => {
     renderWithProviders(<AttendancePage />);
     expect(screen.getByTestId('attendance-title')).toBeInTheDocument();
@@ -77,6 +102,38 @@ describe('AttendancePage', () => {
     renderWithProviders(<AttendancePage />);
     // The Users icon empty state copy keyed at attendance.selectSectionFirst.
     expect(screen.getByText('Choose a section to take attendance')).toBeInTheDocument();
+  });
+
+  it('preselects the only permitted section and loads it without a manual choice', () => {
+    hookState.sections = [sectionOption('A')];
+    renderWithProviders(<AttendancePage />);
+    expect(screen.queryByText('Choose a section to take attendance')).not.toBeInTheDocument();
+    expect(sessionsForSection).toHaveBeenLastCalledWith('A');
+  });
+
+  it('shows the no-assignment state and never requests a section without permitted sections', () => {
+    hookState.sections = [];
+    renderWithProviders(<AttendancePage />);
+    expect(screen.getByTestId('attendance-no-assigned-sections')).toBeInTheDocument();
+    expect(sessionsForSection).not.toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('explains that a past-day register needs an administrator', async () => {
+    hookState.sections = [sectionOption('A')];
+    openSession.mockRejectedValueOnce(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'denied', extensions: { code: 'ATTENDANCE_OVERRIDE_FORBIDDEN' } }],
+      }),
+    );
+    renderWithProviders(<AttendancePage />);
+
+    await userEvent.click(screen.getByTestId('attendance-open-session-btn'));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'Only an administrator can change attendance for a past date.',
+      ),
+    );
   });
 
   it('hides the feature when the current ability denies read on Attendance', () => {

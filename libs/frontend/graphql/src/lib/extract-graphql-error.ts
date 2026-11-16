@@ -27,3 +27,10 @@ export function extractGraphQLError(error: unknown, fallback: string): string {
 
   return fallback;
 }
+
+/** Returns the `extensions.code` of the first GraphQL error, for mapping to translated copy. */
+export function extractGraphQLErrorCode(error: unknown): string | null {
+  if (!CombinedGraphQLErrors.is(error)) return null;
+  const code = error.errors[0]?.extensions?.code;
+  return typeof code === 'string' ? code : null;
+}

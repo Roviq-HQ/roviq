@@ -7,9 +7,21 @@
  */
 import { createMongoAbility } from '@casl/ability';
 import { type AppAbility, DEFAULT_ROLE_ABILITIES } from '@roviq/common-types';
+import { pgTable, uuid } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { caslToSqlWhere } from '../casl-to-sql';
 import { substituteUserVars } from '../substitute-user-vars';
+
+const studentProfiles = pgTable('student_profiles_live', {
+  id: uuid().primaryKey(),
+  userId: uuid('user_id'),
+  sectionId: uuid('section_id'),
+});
+const STUDENT_COLUMNS = {
+  id: studentProfiles.id,
+  userId: studentProfiles.userId,
+  sectionId: studentProfiles.sectionId,
+};
 
 /** Typed shape for CASL $in operator conditions (pre- or post-substitution) */
 interface InCondition {
@@ -26,6 +38,7 @@ function abilityForRole(
 
   const ctx = {
     userId: context?.userId ?? 'test-user-id',
+    membershipId: 'test-membership-id',
     assignedSections: context?.assignedSections,
   };
 
@@ -45,7 +58,7 @@ function abilityForRole(
 describe('institute_admin', () => {
   it('#3: caslToSqlWhere → undefined (no restrictions, manage:all)', () => {
     const ability = abilityForRole('institute_admin');
-    expect(caslToSqlWhere(ability, 'read', 'Student')).toBeUndefined();
+    expect(caslToSqlWhere(ability, 'read', 'Student', STUDENT_COLUMNS)).toBeUndefined();
   });
 
   it('can manage any subject', () => {
@@ -61,7 +74,7 @@ describe('institute_admin', () => {
 describe('student', () => {
   it('#4: caslToSqlWhere → SQL with user_id restriction', () => {
     const ability = abilityForRole('student', { userId: 'student-uuid-123' });
-    const result = caslToSqlWhere(ability, 'read', 'Student');
+    const result = caslToSqlWhere(ability, 'read', 'Student', STUDENT_COLUMNS);
     expect(result).toBeDefined();
     // Should NOT be undefined — student has conditions
   });
@@ -84,7 +97,7 @@ describe('class_teacher', () => {
       userId: 'teacher-1',
       assignedSections: ['sec-aaa', 'sec-bbb'],
     });
-    const result = caslToSqlWhere(ability, 'read', 'Student');
+    const result = caslToSqlWhere(ability, 'read', 'Student', STUDENT_COLUMNS);
     expect(result).toBeDefined();
     // The SQL should restrict by section_id
   });
@@ -215,8 +228,8 @@ describe('cross-tenant', () => {
   it('#18: different tenant context produces different SQL', () => {
     const abilityA = abilityForRole('student', { userId: 'user-tenant-A' });
     const abilityB = abilityForRole('student', { userId: 'user-tenant-B' });
-    const sqlA = caslToSqlWhere(abilityA, 'read', 'Student');
-    const sqlB = caslToSqlWhere(abilityB, 'read', 'Student');
+    const sqlA = caslToSqlWhere(abilityA, 'read', 'Student', STUDENT_COLUMNS);
+    const sqlB = caslToSqlWhere(abilityB, 'read', 'Student', STUDENT_COLUMNS);
     // Both should produce SQL (not undefined), and they should differ
     expect(sqlA).toBeDefined();
     expect(sqlB).toBeDefined();
@@ -232,7 +245,7 @@ describe('substituteUserVars', () => {
         userId: '$user.sub',
         sectionId: { $in: '$user.assignedSections' },
       },
-      { userId: 'u-123', assignedSections: ['s-1', 's-2'] },
+      { userId: 'u-123', membershipId: 'm-123', assignedSections: ['s-1', 's-2'] },
     );
     expect(result.userId).toBe('u-123');
     expect(result.sectionId.$in).toEqual(['s-1', 's-2']);

@@ -24,26 +24,26 @@ import type { ApplicationModel } from './models/application.model';
 import type { EnquiryModel } from './models/enquiry.model';
 
 function admissionReadPredicate(ability: AppAbility, subject: 'Enquiry' | 'Application') {
-  const table = subject === 'Enquiry' ? 'enquiries_live' : 'admission_applications_live';
-  return caslToSqlWhere(
-    ability,
-    'read',
-    subject,
-    Object.fromEntries(
-      Object.entries({
-        id: 'id',
-        tenantId: 'tenant_id',
-        assignedTo: 'assigned_to',
-        createdBy: 'created_by',
-        academicYearId: 'academic_year_id',
-        standardId: 'standard_id',
-        sectionId: 'section_id',
-        status: 'status',
-        enquiryId: 'enquiry_id',
-        studentProfileId: 'student_profile_id',
-      }).map(([field, column]) => [field, `${table}.${column}`]),
-    ),
-  );
+  return subject === 'Enquiry'
+    ? caslToSqlWhere(ability, 'read', subject, {
+        id: enquiriesLive.id,
+        tenantId: enquiriesLive.tenantId,
+        assignedTo: enquiriesLive.assignedTo,
+        createdBy: enquiriesLive.createdBy,
+        academicYearId: enquiriesLive.academicYearId,
+        status: enquiriesLive.status,
+      })
+    : caslToSqlWhere(ability, 'read', subject, {
+        id: admissionApplicationsLive.id,
+        tenantId: admissionApplicationsLive.tenantId,
+        createdBy: admissionApplicationsLive.createdBy,
+        academicYearId: admissionApplicationsLive.academicYearId,
+        standardId: admissionApplicationsLive.standardId,
+        sectionId: admissionApplicationsLive.sectionId,
+        status: admissionApplicationsLive.status,
+        enquiryId: admissionApplicationsLive.enquiryId,
+        studentProfileId: admissionApplicationsLive.studentProfileId,
+      });
 }
 
 @Injectable()

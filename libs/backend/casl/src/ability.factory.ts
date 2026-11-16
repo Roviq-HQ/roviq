@@ -58,6 +58,7 @@ export class AbilityFactory {
     // Assignments come from current database state, not token or client claims.
     const context: UserContext = {
       userId: user.userId,
+      membershipId: user.membershipId,
       tenantId: user.tenantId,
       assignedSections: assignments.assignedSections,
       linkedStudentIds: assignments.linkedStudentIds,

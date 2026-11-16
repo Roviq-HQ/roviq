@@ -1,6 +1,15 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { AttendanceMode, AttendanceStatus } from '@roviq/common-types';
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 
 @InputType({
   description:
@@ -31,18 +40,6 @@ export class MarkAttendanceInput {
   remarks?: string | null;
 }
 
-@InputType({
-  description: 'Bulk mark multiple students in one session. Useful for end-of-class submission.',
-})
-export class BulkMarkAttendanceInput {
-  @IsUUID()
-  @Field(() => ID)
-  sessionId!: string;
-
-  @Field(() => [MarkAttendanceItem])
-  entries!: MarkAttendanceItem[];
-}
-
 @InputType()
 export class MarkAttendanceItem {
   @IsUUID()
@@ -63,4 +60,19 @@ export class MarkAttendanceItem {
   @MaxLength(500)
   @Field(() => String, { nullable: true })
   remarks?: string | null;
+}
+
+@InputType({
+  description: 'Bulk mark multiple students in one session. Useful for end-of-class submission.',
+})
+export class BulkMarkAttendanceInput {
+  @IsUUID()
+  @Field(() => ID)
+  sessionId!: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MarkAttendanceItem)
+  @Field(() => [MarkAttendanceItem])
+  entries!: MarkAttendanceItem[];
 }

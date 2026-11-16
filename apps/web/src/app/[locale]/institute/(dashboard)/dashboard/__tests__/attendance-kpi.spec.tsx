@@ -48,13 +48,22 @@ interface Count {
   status: 'PRESENT' | 'ABSENT' | 'LEAVE' | 'LATE';
   count: number;
 }
-const hookState: { counts: Count[] } = { counts: [] };
+const hookState: { counts: Count[]; sessionCount: number; studentCount: number } = {
+  counts: [],
+  sessionCount: 0,
+  studentCount: 0,
+};
 
 vi.mock('../../attendance/use-attendance', () => ({
-  useDateCounts: () => ({ counts: hookState.counts, loading: false, refetch: vi.fn() }),
-  // Re-export any other attendance hook names the page might pull in — the
-  // dashboard itself only imports useDateCounts today but this keeps the
-  // mock forward-compatible without breaking if the import set shifts.
+  useDateSummary: () => ({
+    summary: {
+      sessionCount: hookState.sessionCount,
+      studentCount: hookState.studentCount,
+      counts: hookState.counts,
+    },
+    loading: false,
+  }),
+  // Keeps the mock valid if the dashboard starts importing other attendance hooks.
   useSessionsForSection: () => ({ sessions: [], loading: false, refetch: vi.fn() }),
   useSessionEntries: () => ({ entries: [], loading: false, refetch: vi.fn() }),
   useSessionCounts: () => ({ counts: [] }),
@@ -85,7 +94,22 @@ describe('Dashboard AttendanceKpiCard', () => {
     expect(within(card).getByTestId('dashboard-attendance-kpi-LATE')).toHaveTextContent('2');
   });
 
-  it('shows the no-data copy on the KPI card when useDateCounts returns []', () => {
+  it('labels totals as marks across sessions and distinct students', () => {
+    hookState.counts = [
+      { status: 'PRESENT', count: 3 },
+      { status: 'ABSENT', count: 1 },
+    ];
+    hookState.sessionCount = 2;
+    hookState.studentCount = 2;
+    renderWithProviders(<DashboardPage />);
+    const card = screen.getByTestId('dashboard-attendance-kpi-card');
+    expect(within(card).getByText('/ 4 marks')).toBeInTheDocument();
+    expect(within(card).getByTestId('dashboard-attendance-kpi-scope')).toHaveTextContent(
+      '2 sessions · 2 students you can view',
+    );
+  });
+
+  it('shows the no-data copy on the KPI card when the summary has no marks', () => {
     hookState.counts = [];
     renderWithProviders(<DashboardPage />);
     const card = screen.getByTestId('dashboard-attendance-kpi-card');

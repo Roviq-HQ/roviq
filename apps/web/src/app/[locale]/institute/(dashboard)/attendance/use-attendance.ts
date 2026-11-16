@@ -3,7 +3,9 @@
 import { gql, useMutation, useQuery } from '@roviq/graphql';
 import type {
   AbsenteeReportItem,
+  AttendanceDateSummary,
   AttendanceEntryModel,
+  AttendanceSectionOption,
   AttendanceSessionModel,
   AttendanceStatus,
   AttendanceStatusCount,
@@ -55,10 +57,27 @@ const SESSION_COUNTS = gql`
 `;
 
 const DATE_COUNTS = gql`
-  query AttendanceCountsForDate($date: String!) {
-    attendanceCountsForDate(date: $date) {
-      status
-      count
+  query AttendanceCountsForDate($date: String!, $sectionId: ID, $academicYearId: ID) {
+    attendanceCountsForDate(date: $date, sectionId: $sectionId, academicYearId: $academicYearId) {
+      sessionCount
+      studentCount
+      counts {
+        status
+        count
+      }
+    }
+  }
+`;
+
+const ATTENDANCE_SECTIONS = gql`
+  query AttendanceSections($academicYearId: ID!) {
+    attendanceSections(academicYearId: $academicYearId) {
+      id
+      name
+      displayLabel
+      standardId
+      standardName
+      classTeacherId
     }
   }
 `;
@@ -102,8 +121,8 @@ const BULK_MARK = gql`
 `;
 
 const LIST_STUDENTS_IN_SECTION = gql`
-  query StudentsInSection($sectionId: ID!) {
-    listStudents(filter: { sectionId: $sectionId, first: 1000 }) {
+  query StudentsInSection($sectionId: ID!, $academicYearId: ID!) {
+    listStudents(filter: { sectionId: $sectionId, academicYearId: $academicYearId, first: 1000 }) {
       edges {
         node {
           id
@@ -120,7 +139,14 @@ const LIST_STUDENTS_IN_SECTION = gql`
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export type { AbsenteeReportItem, AttendanceStatus, SectionDailyBreakdown, StudentHistoryItem };
+export type {
+  AbsenteeReportItem,
+  AttendanceDateSummary,
+  AttendanceSectionOption,
+  AttendanceStatus,
+  SectionDailyBreakdown,
+  StudentHistoryItem,
+};
 export type AttendanceSession = AttendanceSessionModel;
 export type AttendanceEntry = AttendanceEntryModel;
 export type StatusCount = AttendanceStatusCount;
@@ -162,11 +188,30 @@ export function useSessionCounts(sessionId: string | null) {
   return { counts: data?.attendanceCounts ?? [] };
 }
 
-export function useDateCounts(date: string) {
-  const { data, loading } = useQuery<{ attendanceCountsForDate: StatusCount[] }>(DATE_COUNTS, {
-    variables: { date },
-  });
-  return { counts: data?.attendanceCountsForDate ?? [], loading };
+/**
+ * Totals for one date. The server limits them to the caller's authorized
+ * sections; pass a section/year to narrow further.
+ */
+export function useDateSummary(options: {
+  date: string;
+  sectionId: string | null;
+  academicYearId: string | null;
+  skip: boolean;
+}) {
+  const { date, sectionId, academicYearId, skip } = options;
+  const { data, loading } = useQuery<{ attendanceCountsForDate: AttendanceDateSummary }>(
+    DATE_COUNTS,
+    { variables: { date, sectionId, academicYearId }, skip },
+  );
+  return { summary: skip ? null : (data?.attendanceCountsForDate ?? null), loading };
+}
+
+export function useAttendanceSections(academicYearId: string | null) {
+  const { data, loading } = useQuery<{ attendanceSections: AttendanceSectionOption[] }>(
+    ATTENDANCE_SECTIONS,
+    { variables: { academicYearId }, skip: !academicYearId },
+  );
+  return { sections: data?.attendanceSections ?? [], loading };
 }
 
 export function useOpenSession() {
@@ -214,7 +259,8 @@ export function useBulkMarkAttendance() {
   };
 }
 
-export function useStudentsInSection(sectionId: string | null) {
+/** Roster of a section in a given academic year (the list API defaults to the active year). */
+export function useStudentsInSection(sectionId: string | null, academicYearId: string | null) {
   const { data, loading } = useQuery<{
     listStudents: {
       edges: Array<{
@@ -222,8 +268,8 @@ export function useStudentsInSection(sectionId: string | null) {
       }>;
     };
   }>(LIST_STUDENTS_IN_SECTION, {
-    variables: { sectionId },
-    skip: !sectionId,
+    variables: { sectionId, academicYearId },
+    skip: !sectionId || !academicYearId,
   });
   return {
     students: (data?.listStudents.edges.map((e) => e.node) ?? []).filter(
@@ -237,8 +283,18 @@ export function useStudentsInSection(sectionId: string | null) {
 // ── Reports ──────────────────────────────────────────────────────────
 
 const ABSENTEES_REPORT = gql`
-  query AttendanceAbsenteesReport($sectionId: ID, $startDate: String!, $endDate: String!) {
-    attendanceAbsenteesReport(sectionId: $sectionId, startDate: $startDate, endDate: $endDate) {
+  query AttendanceAbsenteesReport(
+    $sectionId: ID
+    $standardId: ID
+    $startDate: String!
+    $endDate: String!
+  ) {
+    attendanceAbsenteesReport(
+      sectionId: $sectionId
+      standardId: $standardId
+      startDate: $startDate
+      endDate: $endDate
+    ) {
       studentId
       totalSessions
       presentCount
@@ -251,8 +307,8 @@ const ABSENTEES_REPORT = gql`
 `;
 
 const SECTION_DAILY_BREAKDOWN = gql`
-  query AttendanceSectionDailyBreakdown($date: String!) {
-    attendanceSectionDailyBreakdown(date: $date) {
+  query AttendanceSectionDailyBreakdown($date: String!, $standardId: ID) {
+    attendanceSectionDailyBreakdown(date: $date, standardId: $standardId) {
       sectionId
       sectionName
       period
@@ -268,21 +324,25 @@ const SECTION_DAILY_BREAKDOWN = gql`
 `;
 
 /**
- * Absentee report aggregated per-student for the given date range. When
- * `sectionId` is null the backend aggregates across the entire tenant
- * (still bounded by the caller's CASL subject scope). The hook skips the
- * query until both dates are provided — otherwise Apollo would fire with
- * empty strings and the resolver would reject the input.
+ * Absentee report aggregated per-student for the given date range. Null
+ * section and standard cover all of the caller's authorized sections.
  */
-export function useAbsenteesReport(sectionId: string | null, startDate: string, endDate: string) {
+export function useAbsenteesReport(options: {
+  sectionId: string | null;
+  standardId: string | null;
+  startDate: string;
+  endDate: string;
+  skip: boolean;
+}) {
+  const { sectionId, standardId, startDate, endDate, skip } = options;
   const { data, loading, error, refetch } = useQuery<{
     attendanceAbsenteesReport: AbsenteeReportItem[];
   }>(ABSENTEES_REPORT, {
-    variables: { sectionId, startDate, endDate },
-    skip: !startDate || !endDate,
+    variables: { sectionId, standardId, startDate, endDate },
+    skip: skip || !startDate || !endDate,
   });
   return {
-    rows: data?.attendanceAbsenteesReport ?? [],
+    rows: skip ? [] : (data?.attendanceAbsenteesReport ?? []),
     loading,
     error,
     refetch,
@@ -295,15 +355,20 @@ export function useAbsenteesReport(sectionId: string | null, startDate: string, 
  * row per (section, period) pair so a class taking multiple periods on
  * the same day renders as several rows.
  */
-export function useSectionDailyBreakdown(date: string) {
+export function useSectionDailyBreakdown(options: {
+  date: string;
+  standardId: string | null;
+  skip: boolean;
+}) {
+  const { date, standardId, skip } = options;
   const { data, loading, error, refetch } = useQuery<{
     attendanceSectionDailyBreakdown: SectionDailyBreakdown[];
   }>(SECTION_DAILY_BREAKDOWN, {
-    variables: { date },
-    skip: !date,
+    variables: { date, standardId },
+    skip: skip || !date,
   });
   return {
-    rows: data?.attendanceSectionDailyBreakdown ?? [],
+    rows: skip ? [] : (data?.attendanceSectionDailyBreakdown ?? []),
     loading,
     error,
     refetch,

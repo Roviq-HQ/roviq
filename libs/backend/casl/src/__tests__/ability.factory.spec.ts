@@ -1,3 +1,4 @@
+import { DEFAULT_ROLE_ABILITIES } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import type Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -169,6 +170,22 @@ describe('AbilityFactory', () => {
       const rules = ability.rules;
       const attendanceRule = rules.find((r) => r.subject === 'Attendance');
       expect(attendanceRule?.conditions).toEqual({ studentId: 'user-42' });
+    });
+
+    it('should resolve the default student attendance rule to the caller membership', async () => {
+      mockRedis.get.mockResolvedValue(JSON.stringify(DEFAULT_ROLE_ABILITIES.student));
+      mockMembershipAbilityRepo.findAbilities.mockResolvedValue({ abilities: null });
+
+      const ability = await factory.createForUser({
+        userId: 'user-42',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        membershipId: 'membership-1',
+        roleId: 'role-1',
+      });
+
+      const rule = ability.rules.find((r) => r.subject === 'Attendance');
+      expect(rule?.conditions).toEqual({ studentId: 'membership-1' });
     });
 
     it('should resolve ${user.tenantId} placeholders in conditions', async () => {

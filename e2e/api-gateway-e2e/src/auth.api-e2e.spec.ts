@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import type { AuthPayload, InstituteLoginResult, UserType } from '@roviq/graphql/generated';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { E2E_USERS, SEED_NAMES } from '../../shared/seed-fixtures';
+import { E2E_USERS, SEED_IDS, SEED_NAMES } from '../../shared/seed-fixtures';
 import { E2eLogoutDocument, E2eMeDocument, E2ePingDocument } from './__generated__/graphql';
 import { gql } from './helpers/gql-client';
 
@@ -161,12 +161,13 @@ describe('Auth E2E', () => {
       assert(res.data);
       const { user } = res.data.instituteLogin;
       assert(user);
-      const userId = user.id;
       const rules = user.abilityRules ?? [];
       const attendanceRule = rules.find((r) => r.action === 'read' && r.subject === 'Attendance');
       expect(attendanceRule).toBeDefined();
-      // ${user.id} should be resolved to the actual student user ID
-      expect(attendanceRule?.conditions).toEqual({ studentId: userId });
+      // Attendance entries reference the student's membership, not the user id.
+      expect(attendanceRule?.conditions).toEqual({
+        studentId: SEED_IDS.MEMBERSHIP_STUDENT_INST1,
+      });
     });
 
     it('should reject instituteLogin with wrong password', async () => {

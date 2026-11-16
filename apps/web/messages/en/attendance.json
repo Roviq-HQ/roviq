@@ -33,7 +33,9 @@
   "accessDenied": "You do not have permission to view attendance.",
   "errors": {
     "SESSION_TAKEN": "This period was already opened by another lecturer. Use override to take over.",
-    "LECTURER_REQUIRED": "A lecturer membership is required to open the session."
+    "LECTURER_REQUIRED": "A lecturer membership is required to open the session.",
+    "ATTENDANCE_OVERRIDE_FORBIDDEN": "Only an administrator can change attendance for a past date.",
+    "FAILED": "Something went wrong. Please try again."
   },
   "override": "Take over",
   "overriding": "Taking over…",
@@ -93,5 +95,10 @@
     "viewHistory": "View history",
     "pickStudentHint": "Choose a student to view their attendance history.",
     "back": "Back to reports"
+  },
+  "noAssignedSections": "No sections assigned to you",
+  "noAssignedSectionsHint": "Attendance appears here once you are assigned as class or subject teacher for a section in this academic year.",
+  "daySummary": {
+    "scope": "{sessions, plural, one {# session} other {# sessions}} · {students, plural, one {# student} other {# students}} — counts are marks per session"
   }
 }

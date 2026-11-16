@@ -1,42 +1,64 @@
 import { caslToSqlWhere } from '@roviq/casl';
 import type { AppAbility } from '@roviq/common-types';
 import {
-  academicYearsLive,
   guardianProfilesLive,
   studentAcademicsLive,
   studentGuardianLinks,
   studentProfilesLive,
 } from '@roviq/database';
-import { sql } from 'drizzle-orm';
+import { and, eq, exists, inArray, sql } from 'drizzle-orm';
+import { alias, QueryBuilder } from 'drizzle-orm/pg-core';
+import { activeAcademicYearIds } from '../student/student-read-predicate';
+
+const qb = new QueryBuilder();
+const scopeProfile = alias(guardianProfilesLive, 'guardian_scope_profile');
+const scopeLink = alias(studentGuardianLinks, 'guardian_scope_link');
+const scopeStudent = alias(studentProfilesLive, 'guardian_scope_student');
+const scopeAcademic = alias(studentAcademicsLive, 'guardian_scope_academic');
 
 export function guardianLinkedReadPredicate(ability: AppAbility, correlated = false) {
-  const guardian = correlated ? 'guardian_scope_profile' : 'guardian_profiles_live';
-  const academic = correlated ? 'guardian_scope_academic' : 'student_academics_live';
-  return caslToSqlWhere(ability, 'read', 'Guardian', {
-    id: `${guardian}.id`,
-    userId: `${guardian}.user_id`,
-    membershipId: `${guardian}.membership_id`,
-    tenantId: `${guardian}.tenant_id`,
-    sectionId: `${academic}.section_id`,
-    standardId: `${academic}.standard_id`,
-    academicYearId: `${academic}.academic_year_id`,
-  });
+  return caslToSqlWhere(
+    ability,
+    'read',
+    'Guardian',
+    correlated
+      ? {
+          id: scopeProfile.id,
+          userId: scopeProfile.userId,
+          membershipId: scopeProfile.membershipId,
+          tenantId: scopeProfile.tenantId,
+          sectionId: scopeAcademic.sectionId,
+          standardId: scopeAcademic.standardId,
+          academicYearId: scopeAcademic.academicYearId,
+        }
+      : {
+          id: guardianProfilesLive.id,
+          userId: guardianProfilesLive.userId,
+          membershipId: guardianProfilesLive.membershipId,
+          tenantId: guardianProfilesLive.tenantId,
+          sectionId: studentAcademicsLive.sectionId,
+          standardId: studentAcademicsLive.standardId,
+          academicYearId: studentAcademicsLive.academicYearId,
+        },
+  );
 }
 
 export function guardianReadPredicate(ability: AppAbility) {
   const restriction = guardianLinkedReadPredicate(ability, true);
   if (!restriction) return undefined;
-  return sql`EXISTS (
-    SELECT 1 FROM ${guardianProfilesLive} AS guardian_scope_profile
-    LEFT JOIN ${studentGuardianLinks} AS guardian_scope_link
-      ON guardian_scope_link.guardian_profile_id = guardian_scope_profile.id
-    LEFT JOIN ${studentProfilesLive} AS guardian_scope_student
-      ON guardian_scope_student.id = guardian_scope_link.student_profile_id
-    LEFT JOIN ${studentAcademicsLive} AS guardian_scope_academic
-      ON guardian_scope_academic.student_profile_id = guardian_scope_student.id
-      AND guardian_scope_academic.academic_year_id IN (
-        SELECT id FROM ${academicYearsLive} WHERE is_active = true
+  return exists(
+    qb
+      .select({ one: sql`1` })
+      .from(scopeProfile)
+      .leftJoin(scopeLink, eq(scopeLink.guardianProfileId, scopeProfile.id))
+      .leftJoin(scopeStudent, eq(scopeStudent.id, scopeLink.studentProfileId))
+      .leftJoin(
+        scopeAcademic,
+        and(
+          eq(scopeAcademic.studentProfileId, scopeStudent.id),
+          inArray(scopeAcademic.academicYearId, activeAcademicYearIds()),
+        ),
       )
-    WHERE guardian_scope_profile.id = ${guardianProfilesLive.id} AND ${restriction}
-  )`;
+      .where(and(eq(scopeProfile.id, guardianProfilesLive.id), restriction)),
+  );
 }

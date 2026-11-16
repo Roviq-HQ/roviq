@@ -1,27 +1,50 @@
 import { caslToSqlWhere } from '@roviq/casl';
 import type { AppAbility } from '@roviq/common-types';
 import { academicYearsLive, studentAcademicsLive, studentProfilesLive } from '@roviq/database';
-import { sql } from 'drizzle-orm';
+import { and, eq, exists, inArray, sql } from 'drizzle-orm';
+import { alias, QueryBuilder } from 'drizzle-orm/pg-core';
 
-export function studentReadPredicate(ability: AppAbility) {
+const qb = new QueryBuilder();
+const readStudent = alias(studentProfilesLive, 'read_student');
+const readAcademic = alias(studentAcademicsLive, 'read_academic');
+
+/** Ids of the tenant's active academic year (tenant comes from RLS). */
+export function activeAcademicYearIds() {
+  return qb
+    .select({ id: academicYearsLive.id })
+    .from(academicYearsLive)
+    .where(eq(academicYearsLive.isActive, true));
+}
+
+/**
+ * Section conditions are checked against the student's enrolment in `academicYearId`,
+ * or in the active year when null.
+ */
+export function studentReadPredicate(ability: AppAbility, academicYearId: string | null) {
   const restriction = caslToSqlWhere(ability, 'read', 'Student', {
-    id: 'read_student.id',
-    userId: 'read_student.user_id',
-    tenantId: 'read_student.tenant_id',
-    membershipId: 'read_student.membership_id',
-    sectionId: 'read_academic.section_id',
-    standardId: 'read_academic.standard_id',
-    academicYearId: 'read_academic.academic_year_id',
+    id: readStudent.id,
+    userId: readStudent.userId,
+    tenantId: readStudent.tenantId,
+    membershipId: readStudent.membershipId,
+    sectionId: readAcademic.sectionId,
+    standardId: readAcademic.standardId,
+    academicYearId: readAcademic.academicYearId,
   });
   if (!restriction) return undefined;
   // Keep section conditions correlated without duplicating students in counts or pages.
-  return sql`EXISTS (
-    SELECT 1 FROM ${studentProfilesLive} AS read_student
-    LEFT JOIN ${studentAcademicsLive} AS read_academic
-      ON read_academic.student_profile_id = read_student.id
-      AND read_academic.academic_year_id IN (
-        SELECT id FROM ${academicYearsLive} WHERE is_active = true
+  return exists(
+    qb
+      .select({ one: sql`1` })
+      .from(readStudent)
+      .leftJoin(
+        readAcademic,
+        and(
+          eq(readAcademic.studentProfileId, readStudent.id),
+          academicYearId
+            ? eq(readAcademic.academicYearId, academicYearId)
+            : inArray(readAcademic.academicYearId, activeAcademicYearIds()),
+        ),
       )
-    WHERE read_student.id = ${studentProfilesLive.id} AND ${restriction}
-  )`;
+      .where(and(eq(readStudent.id, studentProfilesLive.id), restriction)),
+  );
 }
