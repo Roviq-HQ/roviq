@@ -7,7 +7,9 @@
  * 3. Revoke access → canPickup=false, isPrimaryContact=false, link preserved
  * 4. Delete blocks if only guardian for a student
  */
+import assert from 'node:assert';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Sequential result queue ──────────────────────────────
@@ -195,9 +197,13 @@ describe('Guardian — Unlink Validation', () => {
     queueResult([{ id: 'link-1', isPrimaryContact: false }]); // find link → not primary
     queueResult([{ id: 'link-1' }]); // allLinks → only 1 link
 
-    await expect(
-      service.unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' }),
-    ).rejects.toThrow(BadRequestException);
+    const err = await service
+      .unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(BusinessException);
+    assert(err instanceof BusinessException);
+    expect(err.code).toBe(ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED);
   });
 });
 

@@ -1,6 +1,11 @@
 import type { AdmissionNumberConfig } from '@roviq/database';
 import { describe, expect, it } from 'vitest';
-import { resolveAdmissionPrefix, resolveAdmissionYear } from '../admission-number';
+import {
+  admissionSeriesName,
+  formatSequenceValue,
+  resolveAdmissionPrefix,
+  resolveAdmissionYear,
+} from '../admission-number';
 
 const DEFAULT_CONFIG: AdmissionNumberConfig = {
   format: '{prefix}{year}/{value:04d}',
@@ -78,5 +83,34 @@ describe('resolveAdmissionYear', () => {
     const config: AdmissionNumberConfig = { ...DEFAULT_CONFIG, year_format: 'YY-YY' };
     const date = new Date('2099-12-01');
     expect(resolveAdmissionYear(config, date)).toBe('99-00');
+  });
+});
+
+describe('admissionSeriesName', () => {
+  it('gives each prefix its own series', () => {
+    expect(admissionSeriesName('K-')).toBe('adm_no:K-');
+    expect(admissionSeriesName('')).toBe('adm_no:');
+    expect(admissionSeriesName('K-')).not.toBe(admissionSeriesName(''));
+  });
+});
+
+describe('formatSequenceValue', () => {
+  it('fills prefix, year and zero-padded value', () => {
+    expect(
+      formatSequenceValue('{prefix}{year}/{value:04d}', { prefix: 'K-', year: '2026', value: 7n }),
+    ).toBe('K-2026/0007');
+  });
+
+  it('honours other pad widths and an unpadded {value}', () => {
+    expect(formatSequenceValue('TC/{value:03d}', { prefix: '', year: '', value: 5n })).toBe(
+      'TC/005',
+    );
+    expect(formatSequenceValue('{value}', { prefix: '', year: '', value: 42n })).toBe('42');
+  });
+
+  it('does not truncate values wider than the pad', () => {
+    expect(formatSequenceValue('{value:04d}', { prefix: '', year: '', value: 123456n })).toBe(
+      '123456',
+    );
   });
 });

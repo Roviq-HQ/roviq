@@ -37,6 +37,7 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { Client, Connection } from '@temporalio/client';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { nextTcSerialNumber } from './tc-serial';
 
 /**
  * Default Temporal task queue name for the TC-issuance workflow. Overridable
@@ -231,48 +232,29 @@ export class CertificateService {
     if (tc.length === 0) throw new NotFoundException('TC not found');
     TC_STATE_MACHINE.assertTransition(tc[0].status, TcStatus.ISSUED);
 
-    // Generate final serial number
+    const today = new Date().toISOString().split('T')[0];
+    const pdfUrl = `/api/storage/tc/${tenantId}/${tcId}.pdf`;
+
+    // Serial + status in one transaction so a failed issue doesn't burn a number
     const tcSerialNumber = await withTenant(
       this.db,
       mkInstituteCtx(tenantId, 'service:certificate'),
       async (tx) => {
-        const seqName = `tc_no:${tc[0].academicYearId}`;
+        const serial = await nextTcSerialNumber(tx, tenantId, tc[0].academicYearId);
         await tx
-          .insert(tenantSequences)
-          .values({
-            tenantId,
-            sequenceName: seqName,
-            currentValue: 0n,
-            formatTemplate: 'TC/{value:04d}',
+          .update(tcRegister)
+          .set({
+            status: TcStatus.ISSUED,
+            tcSerialNumber: serial,
+            issuedAt: new Date(),
+            pdfUrl,
+            qrVerificationUrl: `/tc/verify/${serial}`,
+            updatedBy: actorId,
           })
-          .onConflictDoNothing();
-
-        const result = await tx.execute(
-          sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, ${seqName})`,
-        );
-        const row = result.rows[0] as { next_val: string; formatted: string };
-        return row.formatted || `TC/${row.next_val}`;
+          .where(eq(tcRegister.id, tcId));
+        return serial;
       },
     );
-
-    const today = new Date().toISOString().split('T')[0];
-    const pdfUrl = `/api/storage/tc/${tenantId}/${tcId}.pdf`;
-    const qrVerificationUrl = `/tc/verify/${tcSerialNumber}`;
-
-    // Update tc_register
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:certificate'), async (tx) => {
-      await tx
-        .update(tcRegister)
-        .set({
-          status: TcStatus.ISSUED,
-          tcSerialNumber,
-          issuedAt: new Date(),
-          pdfUrl,
-          qrVerificationUrl,
-          updatedBy: actorId,
-        })
-        .where(eq(tcRegister.id, tcId));
-    });
 
     // Update student_profile (PRD §5.1 Step 5)
     await withTenant(this.db, mkInstituteCtx(tenantId, 'service:certificate'), async (tx) => {

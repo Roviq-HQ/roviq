@@ -10,8 +10,8 @@
  * unlink (no link, primary without replacement, last-guardian) and revoke
  * (link not found); this file complements it with the positive-link flow.
  */
-import { BadRequestException } from '@nestjs/common';
-import { GuardianRelationship } from '@roviq/common-types';
+import assert from 'node:assert';
+import { BusinessException, ErrorCode, GuardianRelationship } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Sequential result queue (mirrors guardian-linking.spec.ts) ─────────────
@@ -206,9 +206,13 @@ describe('GuardianService — unlinkFromStudent last-guardian guard (unit)', () 
     queueResult([{ id: 'link-1', isPrimaryContact: false }]); // find link
     queueResult([{ id: 'link-1' }]); // allLinks → exactly one
 
-    await expect(
-      service.unlinkFromStudent({ guardianProfileId: 'g-1', studentProfileId: 's-1' }),
-    ).rejects.toThrow(BadRequestException);
+    const err = await service
+      .unlinkFromStudent({ guardianProfileId: 'g-1', studentProfileId: 's-1' })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(BusinessException);
+    assert(err instanceof BusinessException);
+    expect(err.code).toBe(ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED);
   });
 });
 

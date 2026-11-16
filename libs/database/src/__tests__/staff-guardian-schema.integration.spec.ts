@@ -6,7 +6,7 @@
  *
  * Run: pnpm nx test database -- --project integration
  */
-import { GuardianRelationship } from '@roviq/common-types';
+import { GuardianRelationship, SOCIAL_CATEGORY_VALUES } from '@roviq/common-types';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMembership, createTestUser, findRole, TEST_SUPERUSER_URL } from './test-helpers';
@@ -143,6 +143,41 @@ describe('ROV-156: staff_qualifications', () => {
           ['eeeeeeee-8005-0001-0001-000000000001', staffId, SEED.INSTITUTE_1],
         )
         .catch((e: Error) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/invalid input value for enum/i);
+    });
+  });
+});
+
+// ── staff_profiles.social_category (UDISE+ teacher field) ──
+
+describe('ROV-173 compliance #19: staff_profiles.social_category', () => {
+  const insertStaff = async (client: pg.PoolClient, n: number, socialCategory: string) => {
+    const suffix = String(n).padStart(12, '0');
+    const userId = await createTestUser(client, `eeeeeeee-da19-0001-0001-${suffix}`);
+    const roleId = await findRole(client, SEED.INSTITUTE_1);
+    const memId = `eeeeeeee-8019-0001-0001-${suffix}`;
+    await createMembership(client, memId, userId, SEED.INSTITUTE_1, roleId);
+    return client.query<{ social_category: string }>(
+      `INSERT INTO staff_profiles (id, user_id, membership_id, tenant_id, social_category, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $2, $2) RETURNING social_category`,
+      [`eeeeeeee-8119-0001-0001-${suffix}`, userId, memId, SEED.INSTITUTE_1, socialCategory],
+    );
+  };
+
+  it('accepts every UDISE+ social category value', async () => {
+    await inTransaction(async (client) => {
+      for (const [i, category] of SOCIAL_CATEGORY_VALUES.entries()) {
+        const res = await insertStaff(client, i + 1, category);
+        expect(res.rows[0].social_category).toBe(category);
+      }
+    });
+  });
+
+  it('rejects a value outside the UDISE+ categories', async () => {
+    await inTransaction(async (client) => {
+      const err = await insertStaff(client, 99, 'UNKNOWN').catch((e: Error) => e);
 
       expect(err).toBeInstanceOf(Error);
       expect((err as Error).message).toMatch(/invalid input value for enum/i);

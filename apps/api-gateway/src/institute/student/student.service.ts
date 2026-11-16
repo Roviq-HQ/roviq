@@ -26,11 +26,9 @@ import {
   UserDocumentType,
 } from '@roviq/common-types';
 import {
-  type AdmissionNumberConfig,
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
-  instituteConfigsLive,
   memberships,
   membershipsLive,
   mkAdminCtx,
@@ -39,12 +37,10 @@ import {
   rolesLive,
   sections,
   softDelete,
-  standardsLive,
   studentAcademics,
   studentAcademicsLive,
   studentProfiles,
   studentProfilesLive,
-  tenantSequences,
   userDocuments,
   userProfiles,
   withAdmin,
@@ -54,7 +50,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
 import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
-import { resolveAdmissionPrefix, resolveAdmissionYear } from './admission-number';
+import { nextAdmissionNumber } from './admission-number.sequence';
 import type { CreateStudentInput } from './dto/create-student.input';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { UpdateStudentInput } from './dto/update-student.input';
@@ -198,16 +194,14 @@ export class StudentService {
       membershipId = existing[0].id;
     }
 
-    // 4. Generate admission number
-    const admissionNumber = await this.generateAdmissionNumber(tenantId, input.standardId);
-
-    // 5. Create student_profile
+    // 4–5. Admission number + student_profile in one transaction (no gaps on failure)
     const admissionDate = input.admissionDate ?? new Date().toISOString().split('T')[0];
-    const newProfiles = await withTenant(
+    const { newProfiles, admissionNumber } = await withTenant(
       this.db,
       mkInstituteCtx(tenantId, 'service:student'),
       async (tx) => {
-        return tx
+        const admissionNumber = await nextAdmissionNumber(tx, tenantId, input.standardId);
+        const newProfiles = await tx
           .insert(studentProfiles)
           .values({
             userId,
@@ -236,6 +230,7 @@ export class StudentService {
             updatedBy: actorId,
           })
           .returning({ id: studentProfiles.id });
+        return { newProfiles, admissionNumber };
       },
     );
 
@@ -778,85 +773,5 @@ export class StudentService {
     });
 
     return userId;
-  }
-
-  private async generateAdmissionNumber(tenantId: string, standardId: string): Promise<string> {
-    // Get institute config for admission number format
-    const config = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ admissionNumberConfig: instituteConfigsLive.admissionNumberConfig })
-          .from(instituteConfigsLive)
-          .limit(1);
-      },
-    );
-
-    const admConfig: AdmissionNumberConfig = config[0]?.admissionNumberConfig ?? {
-      format: '{prefix}{value:04d}',
-      year_format: 'YYYY',
-      prefixes: {},
-      no_prefix_from_class: 2,
-    };
-
-    // Get standard's numeric_order for prefix resolution
-    const std = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ numericOrder: standardsLive.numericOrder })
-          .from(standardsLive)
-          .where(eq(standardsLive.id, standardId))
-          .limit(1);
-      },
-    );
-
-    const numericOrder = std[0]?.numericOrder ?? 1;
-    const prefix = resolveAdmissionPrefix(admConfig, numericOrder);
-    const year = resolveAdmissionYear(admConfig);
-
-    // Ensure sequence exists with correct prefix/format
-    const formatTemplate = admConfig.format.replace('{year}', year);
-
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      await tx
-        .insert(tenantSequences)
-        .values({
-          tenantId,
-          sequenceName: 'adm_no',
-          currentValue: 0n,
-          prefix: prefix || null,
-          formatTemplate,
-        })
-        .onConflictDoNothing();
-
-      // Update prefix if it changed (e.g., different standard)
-      await tx
-        .update(tenantSequences)
-        .set({ prefix: prefix || null })
-        .where(
-          and(eq(tenantSequences.tenantId, tenantId), eq(tenantSequences.sequenceName, 'adm_no')),
-        );
-    });
-
-    // Atomic increment
-    const result = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        const rows = await tx.execute(
-          sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'adm_no')`,
-        );
-        return rows.rows[0] as { next_val: string; formatted: string } | undefined;
-      },
-    );
-
-    if (!result) {
-      throw new Error('Failed to generate admission number');
-    }
-
-    return result.formatted || `ADM-${result.next_val}`;
   }
 }

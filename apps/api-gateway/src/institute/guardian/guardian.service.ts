@@ -13,7 +13,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DefaultRoles, type GuardianEducationLevel } from '@roviq/common-types';
+import {
+  BusinessException,
+  DefaultRoles,
+  ErrorCode,
+  type GuardianEducationLevel,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -498,7 +503,10 @@ export class GuardianService {
     );
 
     if (allLinks.length <= 1) {
-      throw new BadRequestException('Cannot unlink the last guardian from a student');
+      throw new BusinessException(
+        ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
+        'Cannot unlink the last guardian from a student',
+      );
     }
 
     // Delete the link

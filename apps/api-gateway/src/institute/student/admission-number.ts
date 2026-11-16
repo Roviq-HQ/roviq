@@ -58,3 +58,29 @@ export function resolveAdmissionYear(config: AdmissionNumberConfig, date = new D
   // Default: YYYY
   return String(year);
 }
+
+/**
+ * Each prefix is its own admission register series (e.g. `K-` for Nursery–Class 1,
+ * unprefixed from Class 2), so counters never interleave between class bands.
+ */
+export function admissionSeriesName(prefix: string): string {
+  return `adm_no:${prefix}`;
+}
+
+/** Pre-series shared counter; new series start after its value so old numbers can't repeat. */
+export const LEGACY_ADMISSION_SEQUENCE = 'adm_no';
+
+const VALUE_PLACEHOLDER = /\{value(?::0(\d+)d)?\}/g;
+
+/** Fill `{prefix}`, `{year}` and `{value}` / `{value:0Nd}` in a sequence format template. */
+export function formatSequenceValue(
+  template: string,
+  parts: { prefix: string; year: string; value: bigint },
+): string {
+  return template
+    .replaceAll('{prefix}', parts.prefix)
+    .replaceAll('{year}', parts.year)
+    .replace(VALUE_PLACEHOLDER, (_match, width: string | undefined) =>
+      parts.value.toString().padStart(width ? Number(width) : 0, '0'),
+    );
+}
