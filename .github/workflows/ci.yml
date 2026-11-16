@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual runs include the Playwright job (see e2e-ui).
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -142,11 +144,25 @@ jobs:
       - uses: nrwl/nx-set-shas@v4
       - uses: actions/cache@v4
         with:
-          path: .nx/cache
+          # Nx ignores .nx/cache without its index, a SQLite file in
+          # workspace-data named after /etc/machine-id.
+          path: |
+            .nx/cache
+            .nx/workspace-data/*.db*
           key: nx-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-test-${{ github.sha }}
           restore-keys: |
             nx-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-test-
             nx-cache-${{ runner.os }}-
+      - name: Report Nx cache index
+        # The restored index is only usable if this runner has the machine id
+        # of the runner that saved it; otherwise every task re-runs.
+        run: |
+          if [ -f ".nx/workspace-data/$(cat /etc/machine-id).db" ]; then
+            echo "Nx cache index for this runner restored"
+          else
+            echo "::notice::No Nx cache index for this runner's machine id; tasks will re-run"
+            ls .nx/workspace-data 2>/dev/null || true
+          fi
       - run: pnpm install --frozen-lockfile
       - name: Set up database roles
         env:
@@ -179,11 +195,25 @@ jobs:
       - uses: nrwl/nx-set-shas@v4
       - uses: actions/cache@v4
         with:
-          path: .nx/cache
+          # Nx ignores .nx/cache without its index, a SQLite file in
+          # workspace-data named after /etc/machine-id.
+          path: |
+            .nx/cache
+            .nx/workspace-data/*.db*
           key: nx-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-build-${{ github.sha }}
           restore-keys: |
             nx-cache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-build-
             nx-cache-${{ runner.os }}-
+      - name: Report Nx cache index
+        # The restored index is only usable if this runner has the machine id
+        # of the runner that saved it; otherwise every task re-runs.
+        run: |
+          if [ -f ".nx/workspace-data/$(cat /etc/machine-id).db" ]; then
+            echo "Nx cache index for this runner restored"
+          else
+            echo "::notice::No Nx cache index for this runner's machine id; tasks will re-run"
+            ls .nx/workspace-data 2>/dev/null || true
+          fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm codegen
       - name: Build affected projects
@@ -276,10 +306,15 @@ jobs:
         run: scripts/e2e-compose.sh logs --tail=200
       - name: Stop E2E stack
         if: always()
-        run: scripts/e2e-compose.sh down -v
+        run: scripts/e2e-compose.sh --profile setup down -v
 
   e2e-ui:
     name: E2E UI (Playwright)
+    # Paused on push/PR since 2026-11-16 (ROV-277): single-developer repo, the
+    # suite runs on every push via .husky/pre-push (pnpm ci:check). Still
+    # runnable on demand: `gh workflow run CI --ref <branch>`. Remove this
+    # `if` to re-enable.
+    if: github.event_name == 'workflow_dispatch'
     # Playwright 1.59.1 supports Ubuntu 24.04; ubuntu-latest can select 26.04.
     runs-on: ubuntu-24.04
     needs: [lint]
@@ -293,8 +328,6 @@ jobs:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
       - name: Provision .env for docker compose
         run: cp .env.example .env
       - name: Restore e2e Nx cache (api-gateway + notification-service builds)
@@ -309,11 +342,23 @@ jobs:
           restore-keys: |
             e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
             e2e-nx-${{ runner.os }}-
-      - name: Start E2E stack (api-gateway on :3004 only — Playwright spawns its own dev:web)
-        run: pnpm e2e:up
-        timeout-minutes: 12
+      - name: Start E2E stack in the background (api-gateway on :3004 only — Playwright spawns its own dev:web)
+        # Runs alongside the browser install and codegen below; the wait step
+        # collects its log and exit code.
+        run: |
+          ( pnpm e2e:up > "$RUNNER_TEMP/e2e-up.log" 2>&1; echo $? > "$RUNNER_TEMP/e2e-up.rc" ) &
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
       - name: Run codegen (Next.js dev:web needs fresh GraphQL types)
+        # CI=true makes codegen read the committed schema.graphql, so it does
+        # not need the gateway; the e2e-api job gates schema drift.
         run: pnpm codegen
+      - name: Wait for E2E stack
+        timeout-minutes: 12
+        run: |
+          while [ ! -f "$RUNNER_TEMP/e2e-up.rc" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/e2e-up.log"
+          exit "$(cat "$RUNNER_TEMP/e2e-up.rc")"
       - name: Playwright E2E tests
         # Stack is already up; the target's e2e-seed dependency still re-seeds.
         run: pnpm nx run web-e2e-suite:e2e
@@ -336,4 +381,4 @@ jobs:
         run: scripts/e2e-compose.sh logs --tail=200
       - name: Stop E2E stack
         if: always()
-        run: scripts/e2e-compose.sh down -v
+        run: scripts/e2e-compose.sh --profile setup down -v

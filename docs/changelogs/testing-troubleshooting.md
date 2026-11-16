@@ -367,3 +367,79 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Do NOT:** cache an Nx cache folder without its `workspace-data`. The Build job's `.nx/cache` restore shows the same symptom (39 MB restored, zero cache hits in attempt 2); not yet fixed.
 
 ---
+
+## 2026-11-16 — `fixed` — Repeated `e2e:up` recreated backend containers, then failed on `novu-bridge-sync exited (0)`
+
+**Scope:** `docker/compose.e2e.yaml`, `e2e:up` in `package.json`, `e2e/shared/preflight.ts`, UI job in `.github/workflows/ci.yml`. Linear: ROV-277.
+
+**Evidence:** PR 242, run 43819221625, `E2E UI (Playwright)` took 11m27s. Inside the Playwright step the preflight reported `API not reachable`, ran `pnpm e2e:up`, and that recreated migrate-and-seed, api-gateway and notification-service: 62s before the first test. The same happened in attempt 2 of run 43814888787 but not in attempt 1.
+
+**Root cause:**
+
+- Three services each declared a `build` for the shared `roviq-e2e-backend` tag. Compose stamps a per-service label into each image, so every `up --build` produced three different image IDs under one tag and the containers were recreated. Locally: IDs `1729a624…`, `67d8bdda…`, `834519c2…` from one command.
+- With that fixed, 2 of 5 repeated `up --wait` calls failed with `container roviq-e2e-novu-bridge-sync-1 exited (0)`. Compose's `--wait` treats a service as one-shot only when another service depends on it with `service_completed_successfully` (`getDependencyCondition` in compose `pkg/compose/start.go`); nothing depends on the bridge sync, so it was judged as running|healthy. The recreation had been masking this race.
+- The preflight probed the gateway once with a 1s timeout. Why the gateway missed that probe in CI is not established; the container logs were lost in the recreation.
+
+**Fix:** One `build` definition (on `migrate-and-seed`). `novu-bridge-sync` moved to the `setup` profile and run by `pnpm e2e:up` after the stack is healthy. Preflight polls for up to 20s, prints the failure reason and the api-gateway log tail before restarting the stack. The UI job starts the stack in the background while browsers install and codegen runs.
+
+**Verification:** Six consecutive `pnpm e2e:up` calls: all exit 0, no containers recreated after the first, ~27s each.
+
+**Do NOT:**
+
+- Add a `build:` to a second service that uses the shared image tag.
+- Start a one-shot service from `up --wait` unless another service depends on it with `service_completed_successfully`.
+
+---
+
+## 2026-11-16 — `fixed` — Playwright CI job paused; UI suite runs on pre-push only
+
+**Scope:** `e2e-ui` job in `.github/workflows/ci.yml`. Linear: ROV-277.
+
+**Context:** After the start-up fixes the UI job still took ~11.5 minutes, about 6 of them the Next.js build plus the tests on a 4-vCPU runner. Owner decision (single developer): pause it for a few months and rely on the local pre-push gate.
+
+**Change:** The job has `if: github.event_name == 'workflow_dispatch'`, and the workflow gained a `workflow_dispatch` trigger. On push/PR the job reports as skipped; `gh workflow run CI --ref <branch>` runs it. The job definition is kept current, not commented out.
+
+**Known gaps while paused:**
+
+- `git push --no-verify` or `SKIP_PREPUSH=1` skips the UI suite with no CI backstop.
+- `web-e2e-suite:e2e` is Nx-cached on the `e2eFrontend` inputs, which contain no backend sources, so a backend-only change replays the cached UI result on pre-push.
+
+**Re-enable:** remove the `if:` line.
+
+---
+
+## 2026-11-16 — `fixed` — Gateway parked dead after booting during a DB reset; UI cache ignored backend changes
+
+**Scope:** `e2e/shared/preflight.ts`, `e2eFrontend` / new `e2eStack` inputs in `nx.json`. Linear: ROV-277. Resolves the "not established" cause in the entry two above.
+
+**Root cause (gateway):** `e2e-seed` / `e2e:clean` drops and recreates the schema under a live gateway. If the gateway reloads in that window, `AuditPartitionMaintainer.onModuleInit` fails on `SELECT ensure_monthly_partition(...)` (function dropped), the process exits, and `nx serve` parks at "waiting for changes to restart". The container stays running, so `pnpm e2e:up` does nothing. The old stack only recovered because `up --build` recreated the containers by accident. Captured locally by the new preflight log tail after a source edit landed during a re-seed.
+
+**Root cause (cache):** `web-e2e-suite:e2e` hashed frontend files only, so a backend-only change replayed the cached UI pass. With the Playwright CI job paused nothing else would run the suite for such a change.
+
+**Fix:** Preflight restarts the api-gateway container when the API is still down after `e2e:up`, then waits up to 120s. `e2eFrontend` now includes `e2eStack` (backend sources, migrations, seeds, e2e Docker files).
+
+**Verification:** Killed the gateway process inside the container (nx parked, probe refused); the UI run logged the restart and finished with 249 passed. Cache: run, re-run (cache hit), edit `apps/api-gateway/src/main.ts`, run again (executed, no cache).
+
+**Still open:** the re-seed itself still runs under a live gateway; a reload during it can crash the gateway until preflight restarts it.
+
+---
+
+## 2026-11-16 — `fixed` — Production gateway image could not load `@roviq/ee-payments` (`axios` missing); Build/Test Nx cache never hit
+
+**Scope:** root `package.json` + `pnpm-lock.yaml`; `build` and `test` jobs in `.github/workflows/ci.yml`. Linear: ROV-277.
+
+**Root cause (axios):** `axios` was declared only in `ee/libs/backend/payments/package.json`. Compiled libs run from `dist/`, where Node resolves third-party modules from the root `node_modules`, and `axios` was not there. Dev and the old e2e images worked only because pnpm's `.bin` shims add the hoisted store to `NODE_PATH`. The production images start with plain `node dist/src/main.js`, and `app.module.ts` imports the EE module statically, so the gateway would fail at start-up. Found when the e2e stack was first mounted at `/app` (see the first ROV-277 entry).
+
+**Evidence:** In a production-layout image built before the fix: `require('@roviq/ee-payments')` → `Cannot find module 'axios'`. A scan of every lib `package.json` found no other dependency missing from the root.
+
+**Fix:** `axios` added to the root `package.json` at `^1.13.6`, the version the payments lib already resolves. The lockfile change is the root importer entry only.
+
+**Verification:** Built `docker/Dockerfile.backend --target api-gateway` from the fixed tree; `axios`, `@roviq/ee-payments` and `@roviq/ee-gateway` all load.
+
+**Root cause (Build/Test cache):** Both jobs cached `.nx/cache` without the Nx index in `.nx/workspace-data`. Attempt 2 of run 43814888787: Build restored 39 MB on an exact key and rebuilt all 25 projects with zero cache hits.
+
+**Fix:** Cache `.nx/workspace-data/*.db*` with `.nx/cache`; a `Report Nx cache index` step says whether the restored index matches the runner. On the host the index is named after `/etc/machine-id`, so this only helps if GitHub runners share one. Not yet confirmed in CI. Nx's supported cross-machine option is a remote cache (Nx Cloud or `@nx/shared-fs-cache`).
+
+**Do NOT:** declare a runtime dependency only in a lib's `package.json`; it must also be a root dependency or the production image cannot resolve it.
+
+---

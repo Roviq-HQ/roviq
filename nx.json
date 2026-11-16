@@ -112,8 +112,27 @@
       { "env": "API_URL" },
       { "env": "WS_URL" }
     ],
+    "e2eStack": [
+      "{workspaceRoot}/apps/api-gateway/**/*.ts",
+      "{workspaceRoot}/apps/notification-service/**/*.ts",
+      "{workspaceRoot}/libs/**/*.ts",
+      "{workspaceRoot}/ee/**/*.ts",
+      "!{workspaceRoot}/apps/api-gateway/**/*.spec.ts",
+      "!{workspaceRoot}/apps/notification-service/**/*.spec.ts",
+      "!{workspaceRoot}/ee/**/*.spec.ts",
+      "{workspaceRoot}/libs/database/migrations/**/*",
+      "{workspaceRoot}/docker/compose.e2e.yaml",
+      "{workspaceRoot}/docker/Dockerfile.backend",
+      "{workspaceRoot}/scripts/e2e-compose.sh",
+      "{workspaceRoot}/scripts/seed-essential.ts",
+      "{workspaceRoot}/scripts/seed-demo.ts",
+      "{workspaceRoot}/scripts/seed-e2e.ts",
+      "{workspaceRoot}/scripts/db-reset.ts",
+      "{workspaceRoot}/scripts/db-baseline.ts"
+    ],
     "e2eFrontend": [
       "sharedGlobals",
+      "e2eStack",
       "{workspaceRoot}/apps/web/**/*",
       "!{workspaceRoot}/apps/web/.next/**/*",
       "{workspaceRoot}/libs/frontend/**/*",

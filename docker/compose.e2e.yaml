@@ -20,10 +20,6 @@
 # absolute paths (NODE_PATH), so any other mount point changes resolution.
 x-backend: &backend
   image: roviq-e2e-backend
-  build:
-    context: ..
-    dockerfile: docker/Dockerfile.backend
-    target: e2e
   user: "${E2E_UID:?run via scripts/e2e-compose.sh}:${E2E_GID:?run via scripts/e2e-compose.sh}"
   working_dir: ${E2E_WORKSPACE:?run via scripts/e2e-compose.sh}
   env_file: ../.env
@@ -186,7 +182,11 @@ services:
 
   # Phase 2: bridge sync — runs AFTER notification-service is up.
   # Idempotent: re-running steps 1-5 is a no-op because the admin already exists.
+  # Profiled so `up --wait` does not start it: nothing depends on it, and
+  # --wait judges such a one-shot as running|healthy, failing with
+  # "exited (0)" whenever it finishes first. `pnpm e2e:up` runs it afterwards.
   novu-bridge-sync:
+    profiles: [setup]
     image: alpine:3.21
     volumes:
       - ../scripts/novu-setup.sh:/usr/local/bin/novu-setup.sh:ro
@@ -208,6 +208,14 @@ services:
 
   migrate-and-seed:
     <<: *backend
+    # The only build definition for the shared image. Compose stamps a
+    # per-service label into every image it builds, so one tag built by
+    # several services changes ID on each `up --build` and the containers
+    # get recreated.
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      target: e2e
     command: sh -c "pnpm run db:reset --test && DATABASE_URL_MIGRATE=$$DATABASE_URL_TEST_MIGRATE pnpm run db:seed:e2e"
     volumes: *backend-volumes
     environment:

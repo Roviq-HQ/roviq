@@ -135,8 +135,9 @@ if (( run_e2e )); then
       > "$tmpdir/infra.log" 2>&1 ) & infra_pid=$!
 
   # Stream B: build the shared toolchain image (one image for every backend
-  # service; source and node_modules come from the bind mount).
-  ( "${COMPOSE[@]}" build api-gateway \
+  # service, defined on migrate-and-seed; source and node_modules come from
+  # the bind mount).
+  ( "${COMPOSE[@]}" build migrate-and-seed \
       > "$tmpdir/backend-build.log" 2>&1 ) & build_pid=$!
 
   # Stream C: frontend build on host. Independent of Docker.
@@ -168,8 +169,8 @@ if (( run_e2e )); then
   # seed completed in phase 2 (depends_on satisfied). api-gateway builds both
   # apps; notification-service starts once it is healthy.
   log "phase 3: start backend apps"
-  if ! "${COMPOSE[@]}" up -d --wait \
-       api-gateway notification-service novu-bridge-sync > "$tmpdir/apps.log" 2>&1; then
+  if ! { "${COMPOSE[@]}" up -d --wait api-gateway notification-service \
+         && "${COMPOSE[@]}" run --rm novu-bridge-sync; } > "$tmpdir/apps.log" 2>&1; then
     log "✗ app startup failed"; cat "$tmpdir/apps.log"; exit 1
   fi
 
