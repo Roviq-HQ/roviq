@@ -1,9 +1,16 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
-import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import {
+  AbilityGuard,
+  type AbilityRequestContext,
+  CheckAbility,
+  CurrentReadAccess,
+  type InstituteReadAccess,
+} from '@roviq/casl';
 import { pubSub } from '../../common/pubsub';
 import { AdmissionService } from './admission.service';
+import { AdmissionQueryService } from './admission-query.service';
 import { AdmissionStatisticsFilterInput } from './dto/admission-statistics-filter.input';
 import { CreateApplicationInput, UpdateApplicationInput } from './dto/create-application.input';
 import { ApplicationFilterInput } from './dto/enquiry-filter.input';
@@ -17,28 +24,36 @@ import {
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => ApplicationModel)
 export class ApplicationResolver {
-  constructor(private readonly admissionService: AdmissionService) {}
+  constructor(
+    private readonly admissionService: AdmissionService,
+    private readonly queries: AdmissionQueryService,
+  ) {}
 
   @Query(() => ApplicationConnection, { description: 'List applications with filters' })
   @CheckAbility('read', 'Application')
   async listApplications(
+    @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: ApplicationFilterInput,
   ): Promise<InstanceType<typeof ApplicationConnection>> {
-    return this.admissionService.listApplications(filter ?? {});
+    return this.queries.listApplications(filter ?? {}, access);
   }
 
   @Query(() => ApplicationModel, { description: 'Get application by ID' })
   @CheckAbility('read', 'Application')
-  async getApplication(@Args('id', { type: () => ID }) id: string): Promise<ApplicationModel> {
-    return this.admissionService.getApplication(id);
+  async getApplication(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
+  ): Promise<ApplicationModel> {
+    return this.queries.getApplication(id, access);
   }
 
   @Query(() => AdmissionStatisticsModel, { description: 'Admission funnel statistics' })
   @CheckAbility('read', 'Application')
   async admissionStatistics(
+    @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: AdmissionStatisticsFilterInput,
   ): Promise<AdmissionStatisticsModel> {
-    return this.admissionService.statistics(filter);
+    return this.queries.statistics(access, filter);
   }
 
   @Mutation(() => ApplicationModel, { description: 'Create a direct admission application' })
@@ -77,12 +92,24 @@ export class ApplicationResolver {
 
   @Subscription(() => ApplicationStatusUpdate, {
     description: 'Real-time application status changes',
-    filter: (
-      payload: { applicationStatusChanged: { tenantId: string } },
+    filter: async function (
+      this: ApplicationResolver,
+      payload: { applicationStatusChanged: { applicationId: string; tenantId: string } },
       _args: unknown,
-      context: { req: { user: import('@roviq/common-types').InstituteContext } },
-    ) => payload.applicationStatusChanged.tenantId === context.req.user.tenantId,
+      context: AbilityRequestContext,
+    ) {
+      return (
+        context.req.user.scope === 'institute' &&
+        payload.applicationStatusChanged.tenantId === context.req.user.tenantId &&
+        this.queries.filterEvent(
+          payload.applicationStatusChanged.applicationId,
+          'Application',
+          context,
+        )
+      );
+    },
   })
+  @CheckAbility('read', 'Application')
   applicationStatusChanged() {
     return pubSub.asyncIterableIterator('APPLICATION.status_changed');
   }

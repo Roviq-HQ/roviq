@@ -8,9 +8,16 @@
  * speaks fluent Drizzle without hitting a real database.
  */
 
+import { createMongoAbility } from '@casl/ability';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import type { AppAbility } from '@roviq/common-types';
 import { AcademicStatus, SocialCategory } from '@roviq/common-types';
+import type { DrizzleDB } from '@roviq/database';
+import type { EventBusService } from '@roviq/event-bus';
+import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { IdentityService } from '../../../auth/identity.service';
+import type { StudentReadRepository } from '../student-read.repository';
 
 // ── Sequential result queue ───────────────────────────────────
 
@@ -178,13 +185,18 @@ interface MockEventBus {
   emit: ReturnType<typeof vi.fn>;
 }
 
+let readRepository: StudentReadRepository;
 async function createService(eventBus: MockEventBus) {
   const mod = await import('../student.service');
-  const svc = Object.create(mod.StudentService.prototype);
-  svc.db = {};
-  svc.eventBus = eventBus;
-  svc.logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  return svc as InstanceType<typeof mod.StudentService>;
+  const { StudentReadRepository } = await import('../student-read.repository');
+  const db = createMock<DrizzleDB>();
+  readRepository = new StudentReadRepository(db);
+  return new mod.StudentService(
+    db,
+    createMock<EventBusService>({ emit: eventBus.emit }),
+    createMock<IdentityService>(),
+    readRepository,
+  );
 }
 
 describe('StudentService (unit)', () => {
@@ -293,7 +305,11 @@ describe('StudentService (unit)', () => {
       ]);
       queueResult([{ category: 'general', count: 40 }]);
 
-      const result = await service.statistics();
+      const { mkInstituteCtx } = await import('@roviq/database');
+      const result = await readRepository.statistics({
+        user: mkInstituteCtx('tenant-1', 'test:student-statistics'),
+        ability: createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]),
+      });
 
       expect(result.total).toBe(42);
       expect(result.byStatus).toEqual([

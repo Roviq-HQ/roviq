@@ -21,8 +21,9 @@ roviq/
 │   │       │   └── setup/        # Temporal InstituteSetupWorkflow
 │   │       ├── academic-year/    # Academic year lifecycle
 │   │       ├── institute-group/  # Institute group CRUD
-│   │       ├── auth/             # JWT, login, impersonation
+│   │       ├── auth/             # JWT, login, impersonation, auth events, repositories, ws-ticket
 │   │       ├── audit/            # Audit logging + Temporal partition workflow
+│   │       ├── casl/             # CASL ability guard + module
 │   │       └── common/           # Pagination, pubsub, event bus
 │   └── web/                  # Next.js 16 — unified web app (admin/reseller/institute)
 ├── libs/
@@ -50,6 +51,16 @@ roviq/
 │   ├── seed-ids.ts           # Deterministic UUIDs for seeding
 │   └── db-reset.ts           # Drop + push + FORCE RLS + GRANTs + seed
 └── docs/
+```
+
+### Web App Structure
+
+```text
+apps/web/src/app/[locale]/
+  admin/             — platform admin pages (audit-logs, billing, observability)
+  reseller/          — reseller pages (placeholder)
+  institute/         — institute pages (dashboard, select-institute, settings)
+middleware.ts        — hostname → scope rewrite (admin.* → /admin/, default → /institute/)
 ```
 
 ## Tech Stack

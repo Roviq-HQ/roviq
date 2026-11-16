@@ -24,6 +24,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/billing.integration.spec.ts',
   'apps/api-gateway/src/__tests__/integration-app.integration.spec.ts',
   'apps/api-gateway/src/__tests__/rls-cross-scope-isolation.integration.spec.ts',
+  // ROV-204: isolated authorization fixtures and in-memory read-policy tests only.
+  'apps/api-gateway/src/__tests__/student-read-authorization.integration.spec.ts',
   'apps/api-gateway/src/academic-year/academic-year.service.ts',
   'apps/api-gateway/src/academic-year/repositories/academic-year.drizzle-repository.ts',
   'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
@@ -45,9 +47,11 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts',
   'apps/api-gateway/src/auth/role/__tests__/role.integration.spec.ts',
   'apps/api-gateway/src/auth/role/repositories/role.drizzle-repository.ts',
+  'apps/api-gateway/src/casl/__tests__/read-field.middleware.spec.ts',
   // ROV-19: platform-admin DLQ reader — no repository layer; admin tool mirrors admin-reseller.service.
   'apps/api-gateway/src/dlq/dlq.service.ts',
   'apps/api-gateway/src/institute-group/repositories/institute-group.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/admission/__tests__/admission-statistics.spec.ts',
   'apps/api-gateway/src/institute/admission/__tests__/application.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/__tests__/enquiry.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/admission.service.ts',

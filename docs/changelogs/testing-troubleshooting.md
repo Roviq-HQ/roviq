@@ -279,6 +279,19 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 
 ---
 
+
+## 2026-11-14 — `fixed` — Integration test edits reused stale Nx results
+
+**Scope:** `integrationSources` inputs in `nx.json`.
+
+**Root cause:** The broad `!**/*.spec.ts` exclusion also matched `*.integration.spec.ts`. Nx applied that exclusion even with a later positive integration glob, so adding authorization cases could replay an older successful result.
+
+**Fix:** Removed that broad exclusion from integration inputs. Backend unit test edits now conservatively invalidate integration results as well; integration specs are always hashed. Unit/component exclusions for other target inputs remain unchanged.
+
+**Verification:** A cached authorization run reported 12 cases after three cases had been added. The corrected inputs executed all 15 expanded cases successfully. The ROV-204 integration tests use only `roviq_test` and clean their own fixtures.
+
+---
+
 ## 2026-11-16 — `fixed` — CI Chromium installation failed on Ubuntu 26.04
 
 **Scope:** `e2e-ui` runner in `.github/workflows/ci.yml`.

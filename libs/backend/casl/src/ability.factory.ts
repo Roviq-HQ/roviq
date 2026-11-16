@@ -38,16 +38,29 @@ export class AbilityFactory {
 
     // Fetch membership-specific abilities (only for institute scope where tenantId exists)
     const membership = user.tenantId
-      ? await this.membershipAbilityRepo.findAbilities(user.userId, user.tenantId)
+      ? await this.membershipAbilityRepo.findAbilities(user.membershipId, user.tenantId)
       : null;
 
     const memberAbilities = membership?.abilities ?? [];
 
-    // Build substitution context from user data
+    const needsAssignments = [...roleAbilities, ...memberAbilities].some((rule) => {
+      const conditions = JSON.stringify(rule.conditions ?? {});
+      return (
+        conditions.includes('$user.assignedSections') ||
+        conditions.includes('$user.linkedStudentIds')
+      );
+    });
+    const assignments =
+      user.scope === 'institute' && user.tenantId && needsAssignments
+        ? await this.membershipAbilityRepo.findReadAssignments(user.membershipId, user.tenantId)
+        : { assignedSections: [], linkedStudentIds: [] };
+
+    // Assignments come from current database state, not token or client claims.
     const context: UserContext = {
       userId: user.userId,
       tenantId: user.tenantId,
-      assignedSections: user.assignedSections,
+      assignedSections: assignments.assignedSections,
+      linkedStudentIds: assignments.linkedStudentIds,
       assignedSubjects: user.assignedSubjects,
       assignedDepartments: user.assignedDepartments,
     };

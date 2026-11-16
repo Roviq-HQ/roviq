@@ -2500,7 +2500,7 @@ Student linked to a guardian, with resolved name/class/section and link metadata
 """
 type GuardianLinkedStudentModel {
   """Institute-issued admission number. Plain string — never translated."""
-  admissionNumber: String!
+  admissionNumber: String
 
   """True if the linked guardian is authorised to pick the student up."""
   canPickup: Boolean!
@@ -5238,14 +5238,14 @@ type StudentHistoryItem {
 
 """Student profile with resolved user profile and current academic record"""
 type StudentModel {
-  academicStatus: AcademicStatus!
+  academicStatus: AcademicStatus
   admissionClass: String
   admissionDate: DateOnly!
-  admissionNumber: String!
-  admissionType: AdmissionType!
+  admissionNumber: String
+  admissionType: AdmissionType
   bloodGroup: String
   caste: String
-  createdAt: DateTime!
+  createdAt: DateTime
   currentAcademicYearId: String
   currentSectionId: String
   currentSectionName: I18nText
@@ -5258,15 +5258,15 @@ type StudentModel {
   firstName: I18nText!
   gender: Gender
   id: ID!
-  isBpl: Boolean!
-  isCwsn: Boolean!
-  isMinority: Boolean!
-  isRteAdmitted: Boolean!
+  isBpl: Boolean
+  isCwsn: Boolean
+  isMinority: Boolean
+  isRteAdmitted: Boolean
   lastName: I18nText
 
   """Student medical information"""
   medicalInfo: MedicalInfoObject
-  membershipId: String!
+  membershipId: String
   minorityType: MinorityType
   motherTongue: String
   previousSchoolBoard: String
@@ -5277,15 +5277,15 @@ type StudentModel {
   religion: String
   rollNumber: String
   rteCertificate: String
-  socialCategory: SocialCategory!
-  tcIssued: Boolean!
+  socialCategory: SocialCategory
+  tcIssued: Boolean
   tcIssuedDate: DateOnly
   tcNumber: String
   tcReason: String
-  tenantId: String!
-  updatedAt: DateTime!
-  userId: String!
-  version: Int!
+  tenantId: String
+  updatedAt: DateTime
+  userId: String
+  version: Int
 }
 
 """Aggregate student statistics for the current institute (ROV-154)"""

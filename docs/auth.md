@@ -229,6 +229,16 @@ This gives us one place to enforce password policy, audit the creation event, an
 - Role abilities cached in Redis with key `casl:role:{roleId}`, 5-minute TTL
 - Platform scope: `manage:all` (no DB lookup)
 
+### Student and admission reads
+
+Student lists, direct lookup, counts, statistics, documents, academic history, and student subscriptions enforce the current CASL read policy. Enquiry/application lists, application lookup, admission statistics, and their subscriptions apply the same row restrictions before pagination or aggregation. Guardian lists and direct lookup enforce guardian row policies; linked-child counts, linked-student lists, and student-contact lookups apply the policy to the exact linked student. Linked-student fields retain the student field policy. Teacher section assignments and guardian links are loaded from the database for each ability build; client claims cannot widen access.
+
+GraphQL field middleware masks fields on student, enquiry, and application responses, including mutation and subscription results. Restricted student fields are nullable. Sensitive values in application `formData` are removed recursively. Filters and sorting on restricted student fields are rejected to prevent inference from counts or ordering.
+
+Default policies retain `institute_admin` and `admin_clerk` access. Principals retain Aadhaar/PAN access; income and medical information are masked. Nurses and counselors retain their medical grants; counselor notes require the `CounselorNotes` permission. Custom role and membership grants remain explicit policy overrides.
+
+The `20261114164236_rov-204-read-permissions` migration updates existing default institute roles, narrows parent reads to linked students, and leaves custom roles and `admin_clerk` unchanged. After approval for the target database, apply it with `tilt trigger db-migrate` before admitting pilot traffic. The resource is manual and does not run automatically. Invalidate affected `casl:role:{roleId}` Redis entries or allow their five-minute TTL to expire before traffic resumes. No schema or RLS policy changes are required; the existing tenant policies and live views remain in force.
+
 ### Frontend
 - `AbilityProvider` hydrates CASL ability from login response
 - `<Can I="create" a="Student">` for conditional rendering

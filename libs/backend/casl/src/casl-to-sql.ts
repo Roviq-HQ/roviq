@@ -13,7 +13,15 @@ import type { AppAbility, AppAction, AppSubject } from '@roviq/common-types';
 import { allInterpreters, createSqlInterpreter, pg } from '@ucast/sql';
 import { type SQL, sql } from 'drizzle-orm';
 
-const interpret = createSqlInterpreter(allInterpreters);
+const within: typeof allInterpreters.in = (condition, query, context) =>
+  condition.value.length === 0
+    ? query.whereRaw('false')
+    : allInterpreters.in(condition, query, context);
+const nin: typeof allInterpreters.nin = (condition, query, context) =>
+  condition.value.length === 0
+    ? query.whereRaw('true')
+    : allInterpreters.nin(condition, query, context);
+const interpret = createSqlInterpreter({ ...allInterpreters, in: within, within, nin });
 
 /**
  * Field name → PostgreSQL column name mapping.
@@ -57,6 +65,7 @@ export function caslToSqlWhere(
   ability: AppAbility,
   action: AppAction,
   subject: AppSubject,
+  columns: Readonly<Record<string, string>> = {},
 ): SQL | undefined {
   // rulesToAST extracts the @ucast/core Condition from CASL's internal representation
   const ast = rulesToAST(ability, action, subject);
@@ -74,8 +83,11 @@ export function caslToSqlWhere(
   const [sqlString, params] = interpret(ast, {
     ...pg,
     escapeField: (field: string) => {
-      const mapped = FIELD_TO_COLUMN[field] ?? field;
-      return `"${mapped}"`;
+      const mapped = columns[field] ?? FIELD_TO_COLUMN[field] ?? field;
+      return mapped
+        .split('.')
+        .map((part) => `"${part.replaceAll('"', '""')}"`)
+        .join('.');
     },
     joinRelation: () => false,
   });

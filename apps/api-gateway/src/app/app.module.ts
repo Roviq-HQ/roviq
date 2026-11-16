@@ -20,6 +20,7 @@ import { ImpersonationSessionGuard } from '../auth/middleware/impersonation-sess
 import { MustChangePasswordGuard } from '../auth/middleware/must-change-password.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
+import { readFieldMiddleware } from '../casl/read-field.middleware';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { validate } from '../config/env.validation';
 import { DlqModule } from '../dlq/dlq.module';
@@ -54,6 +55,7 @@ const wsLogger = new Logger('WsTicketAuth');
       inject: [ConfigService, REDIS_CLIENT],
       useFactory: (config: ConfigService, redis: Redis) => ({
         autoSchemaFile: true,
+        buildSchemaOptions: { fieldMiddleware: [readFieldMiddleware] },
         path: 'api/graphql',
         // Promote domain error `code` from HttpException.getResponse() to
         // extensions.code so GraphQL clients can reliably branch on it.

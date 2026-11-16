@@ -376,7 +376,9 @@ export default function StudentDetailPage() {
                   <TabsContent value="attendance">
                     <ErrorBoundary FallbackComponent={TabErrorFallback}>
                       <Can I="read" a="Attendance">
-                        <StudentAttendanceTab membershipId={student.membershipId} />
+                        {student.membershipId && (
+                          <StudentAttendanceTab membershipId={student.membershipId} />
+                        )}
                       </Can>
                     </ErrorBoundary>
                   </TabsContent>
@@ -461,9 +463,9 @@ function StudentSidebar({ student }: { student: StudentDetailNode }) {
             <p className="text-xs font-mono text-muted-foreground">{student.admissionNumber}</p>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {t(`academicStatuses.${student.academicStatus}`, {
-              default: student.academicStatus,
-            })}
+            {student.academicStatus
+              ? t(`academicStatuses.${student.academicStatus}`, { default: student.academicStatus })
+              : '—'}
           </Badge>
           <Can I="update" a="Student">
             <StatusTransitionControl student={student} />
@@ -583,7 +585,9 @@ function StatusTransitionControl({ student }: { student: StudentDetailNode }) {
     },
   });
 
-  const validTransitions = STUDENT_STATUS_TRANSITIONS[student.academicStatus] ?? [];
+  const validTransitions = student.academicStatus
+    ? (STUDENT_STATUS_TRANSITIONS[student.academicStatus] ?? [])
+    : [];
 
   const runTransition = async (newStatus: string, reason?: string) => {
     try {
@@ -723,9 +727,11 @@ function StudentHeader({ student, onBack }: { student: StudentDetailNode; onBack
             <span className="font-mono">{student.admissionNumber}</span>
             <span>·</span>
             <span>
-              {t(`academicStatuses.${student.academicStatus}`, {
-                default: student.academicStatus,
-              })}
+              {student.academicStatus
+                ? t(`academicStatuses.${student.academicStatus}`, {
+                    default: student.academicStatus,
+                  })
+                : '—'}
             </span>
             {student.isRteAdmitted && (
               <Badge variant="outline" className="border-emerald-300 text-emerald-700">
@@ -810,6 +816,7 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
     defaultValues,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
     onSubmit: async ({ value }) => {
+      if (student.version == null) return;
       const parsed = schema.parse(value);
       try {
         const input: UpdateStudentInput = {
@@ -1176,7 +1183,7 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
               <form.AppForm>
                 <form.SubmitButton
                   testId="students-detail-save-btn"
-                  disabled={!isDirty || loading}
+                  disabled={!isDirty || loading || student.version == null}
                   submittingLabel={t('detail.profile.saving')}
                 >
                   {loading ? t('detail.profile.saving') : t('detail.profile.save')}

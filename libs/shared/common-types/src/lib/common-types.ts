@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noTemplateCurlyInString: '${user.id}' strings are CASL condition placeholders, not JS templates
-import type { MongoAbility, RawRuleOf } from '@casl/ability';
+import type { ForcedSubject, MongoAbility, RawRuleOf } from '@casl/ability';
 
 // CASL Actions
 export const AppAction = {
@@ -142,7 +142,7 @@ export const AppSubject = {
 export type AppSubject = (typeof AppSubject)[keyof typeof AppSubject];
 
 // The ability type used across backend and frontend
-export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
+export type AppAbility = MongoAbility<[AppAction, AppSubject | ForcedSubject<AppSubject>]>;
 
 // Raw rule shape stored in DB and sent to frontend
 export type AbilityRule = RawRuleOf<AppAbility>;
@@ -648,7 +648,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 22. parent (guardian) — reads linked children + manages consent ──
   parent: [
     ...SELF_SERVICE_ABILITIES,
-    { action: 'read', subject: 'Student' },
+    { action: 'read', subject: 'Student', conditions: { id: { $in: '$user.linkedStudentIds' } } },
     { action: 'read', subject: 'Attendance' },
     { action: 'manage', subject: 'Consent' },
     { action: 'read', subject: 'Institute' },
@@ -663,3 +663,13 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Holiday' },
   ],
 };
+
+// Broad read/manage rules must not implicitly disclose sensitive fields.
+for (const role of new Set(Object.values(DefaultRoles))) {
+  if (role === DefaultRoles.InstituteAdmin || role === DefaultRoles.AdminClerk) continue;
+  const fields = ['aadhaar', 'pan', 'annual_income', 'annualIncome', 'counselorNotes'];
+  if (role === DefaultRoles.Principal) fields.splice(0, 2);
+  if (role === DefaultRoles.Counselor) fields.splice(fields.indexOf('counselorNotes'), 1);
+  if (role !== DefaultRoles.Nurse && role !== DefaultRoles.Counselor) fields.push('medicalInfo');
+  DEFAULT_ROLE_ABILITIES[role].push({ action: 'read', subject: 'Student', fields, inverted: true });
+}

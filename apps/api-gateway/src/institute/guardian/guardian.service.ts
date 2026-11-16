@@ -24,9 +24,6 @@ import {
   mkInstituteCtx,
   phoneNumbers,
   rolesLive,
-  sectionsLive,
-  standardsLive,
-  studentAcademicsLive,
   studentGuardianLinks,
   studentProfilesLive,
   userProfiles,
@@ -36,7 +33,7 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { and, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
@@ -44,7 +41,6 @@ import type {
   RevokeGuardianAccessInput,
   UnlinkGuardianInput,
 } from './dto/link-guardian.input';
-import type { ListGuardiansFilterInput } from './dto/list-guardians-filter.input';
 
 @Injectable()
 export class GuardianService {
@@ -104,7 +100,7 @@ export class GuardianService {
     } as const;
   }
 
-  async findById(id: string) {
+  private async findById(id: string) {
     const tenantId = this.tenantId;
     const rows = await withTenant(
       this.db,
@@ -127,122 +123,6 @@ export class GuardianService {
     );
     if (rows.length === 0) throw new NotFoundException(`Guardian profile ${id} not found`);
     return rows[0];
-  }
-
-  async list(filter?: ListGuardiansFilterInput) {
-    const tenantId = this.tenantId;
-    const search = filter?.search?.trim();
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      const baseQuery = tx
-        .select(this.guardianSelect())
-        .from(guardianProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, guardianProfilesLive.userId))
-        .leftJoin(
-          phoneNumbers,
-          and(
-            eq(phoneNumbers.userId, guardianProfilesLive.userId),
-            eq(phoneNumbers.isPrimary, true),
-          ),
-        );
-
-      // Search matches either user_profiles.search_vector (name tokens in
-      // en + hi) OR the primary phone number (ilike substring match). The
-      // OR lets clerks search by partial phone digits without switching
-      // between name/phone filter modes.
-      const searchClause = search
-        ? or(
-            sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${search})`,
-            ilike(phoneNumbers.number, `%${search}%`),
-          )
-        : undefined;
-
-      return searchClause ? baseQuery.where(searchClause).limit(200) : baseQuery.limit(200);
-    });
-  }
-
-  /**
-   * Returns all students linked to a single guardian, joined with each
-   * student's display name + admission number + current standard/section.
-   * Used by the "Linked Children" tab on the guardian detail page (ROV-169).
-   * Primary contact links appear first. Only resolves current-year
-   * enrollment (studentAcademics row joined to the active academic year).
-   */
-  async listLinkedStudents(guardianProfileId: string) {
-    const tenantId = this.tenantId;
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      return tx
-        .select({
-          linkId: studentGuardianLinks.id,
-          studentProfileId: studentGuardianLinks.studentProfileId,
-          admissionNumber: studentProfilesLive.admissionNumber,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          profileImageUrl: userProfiles.profileImageUrl,
-          currentStandardName: standardsLive.name,
-          currentSectionName: sectionsLive.name,
-          relationship: studentGuardianLinks.relationship,
-          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-          isEmergencyContact: studentGuardianLinks.isEmergencyContact,
-          canPickup: studentGuardianLinks.canPickup,
-          livesWith: studentGuardianLinks.livesWith,
-        })
-        .from(studentGuardianLinks)
-        .innerJoin(
-          studentProfilesLive,
-          eq(studentProfilesLive.id, studentGuardianLinks.studentProfileId),
-        )
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
-        .leftJoin(
-          studentAcademicsLive,
-          and(
-            eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-            eq(
-              studentAcademicsLive.academicYearId,
-              sql`(SELECT id FROM academic_years WHERE tenant_id = ${tenantId} AND is_active = true LIMIT 1)`,
-            ),
-          ),
-        )
-        .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
-        .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
-        .where(eq(studentGuardianLinks.guardianProfileId, guardianProfileId))
-        .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);
-    });
-  }
-
-  /**
-   * Returns all guardians linked to a single student, joined with each
-   * guardian's display name + photo + occupation. Used by the Guardians tab
-   * on the student detail page (ROV-167). Primary contact appears first.
-   */
-  async listForStudent(studentProfileId: string) {
-    const tenantId = this.tenantId;
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      return tx
-        .select({
-          linkId: studentGuardianLinks.id,
-          guardianProfileId: studentGuardianLinks.guardianProfileId,
-          userId: guardianProfilesLive.userId,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          profileImageUrl: userProfiles.profileImageUrl,
-          occupation: guardianProfilesLive.occupation,
-          organization: guardianProfilesLive.organization,
-          relationship: studentGuardianLinks.relationship,
-          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-          isEmergencyContact: studentGuardianLinks.isEmergencyContact,
-          canPickup: studentGuardianLinks.canPickup,
-          livesWith: studentGuardianLinks.livesWith,
-        })
-        .from(studentGuardianLinks)
-        .innerJoin(
-          guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
-        )
-        .innerJoin(userProfiles, eq(userProfiles.userId, guardianProfilesLive.userId))
-        .where(eq(studentGuardianLinks.studentProfileId, studentProfileId))
-        .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);
-    });
   }
 
   async create(input: CreateGuardianInput) {

@@ -541,10 +541,11 @@ function DailyBreakdownTab() {
   const nameByMembership = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const s of students) {
+      if (!s.membershipId) continue;
       const first = resolveI18n(s.firstName) ?? '';
       const last = s.lastName ? (resolveI18n(s.lastName) ?? '') : '';
       const fullName = [first, last].filter(Boolean).join(' ');
-      map.set(s.membershipId, fullName || s.admissionNumber);
+      map.set(s.membershipId, fullName || s.admissionNumber || s.id);
     }
     return map;
   }, [students, resolveI18n]);

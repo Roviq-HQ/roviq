@@ -74,6 +74,40 @@ describe('AbilityFactory', () => {
   });
 
   describe('createForUser', () => {
+    it('uses the selected membership and database assignments instead of token section claims', async () => {
+      mockRedis.get.mockResolvedValue(
+        JSON.stringify([
+          {
+            action: 'read',
+            subject: 'Student',
+            conditions: { sectionId: { $in: '$user.assignedSections' } },
+          },
+        ]),
+      );
+      mockMembershipAbilityRepo.findAbilities.mockResolvedValue({ abilities: [] });
+      mockMembershipAbilityRepo.findReadAssignments.mockResolvedValue({
+        assignedSections: ['assigned-section'],
+        linkedStudentIds: [],
+      });
+      const ability = await factory.createForUser({
+        userId: 'user-1',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        membershipId: 'selected-membership',
+        roleId: 'role-1',
+        assignedSections: ['forged-section'],
+      });
+      expect(mockMembershipAbilityRepo.findAbilities).toHaveBeenCalledWith(
+        'selected-membership',
+        'tenant-1',
+      );
+      expect(mockMembershipAbilityRepo.findReadAssignments).toHaveBeenCalledWith(
+        'selected-membership',
+        'tenant-1',
+      );
+      expect(ability.rules[0].conditions).toEqual({ sectionId: { $in: ['assigned-section'] } });
+    });
+
     it('should combine role abilities and user abilities', async () => {
       const roleAbilities = [{ action: 'read', subject: 'Student' }];
       const userAbilities = [{ action: 'create', subject: 'Timetable' }];

@@ -30,7 +30,6 @@ import {
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
-  guardianProfilesLive,
   instituteConfigsLive,
   memberships,
   membershipsLive,
@@ -39,12 +38,10 @@ import {
   phoneNumbers,
   rolesLive,
   sections,
-  sectionsLive,
   softDelete,
   standardsLive,
   studentAcademics,
   studentAcademicsLive,
-  studentGuardianLinks,
   studentProfiles,
   studentProfilesLive,
   tenantSequences,
@@ -55,30 +52,15 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  notInArray,
-  or,
-  type SQL,
-  sql,
-} from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
-import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { resolveAdmissionPrefix, resolveAdmissionYear } from './admission-number';
 import type { CreateStudentInput } from './dto/create-student.input';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
-import type { StudentStatisticsModel } from './models/student-statistics.model';
+import { StudentReadRepository } from './student-read.repository';
 
 @Injectable()
 export class StudentService {
@@ -88,6 +70,7 @@ export class StudentService {
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
+    private readonly readRepository: StudentReadRepository,
   ) {}
 
   private getTenantId(): string {
@@ -302,61 +285,6 @@ export class StudentService {
    * Used by the Documents tab on the student detail page (ROV-167).
    * Returns the most-recently uploaded documents first.
    */
-  async listDocumentsForStudent(studentProfileId: string) {
-    const tenantId = this.getTenantId();
-
-    // 1. Verify the student belongs to this tenant and resolve their userId.
-    const studentRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ userId: studentProfilesLive.userId })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, studentProfileId))
-          .limit(1);
-      },
-    );
-
-    if (studentRows.length === 0) {
-      throw new NotFoundException({
-        message: 'Student not found',
-        code: 'STUDENT_NOT_FOUND',
-      });
-    }
-
-    const userId = studentRows[0].userId;
-
-    // 2. Read documents from the platform-level user_documents table.
-    return withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
-      const rows = await tx
-        .select({
-          id: userDocuments.id,
-          userId: userDocuments.userId,
-          type: userDocuments.type,
-          description: userDocuments.description,
-          fileUrls: userDocuments.fileUrls,
-          referenceNumber: userDocuments.referenceNumber,
-          isVerified: userDocuments.isVerified,
-          verifiedAt: userDocuments.verifiedAt,
-          verifiedBy: userDocuments.verifiedBy,
-          rejectionReason: userDocuments.rejectionReason,
-          expiryDate: userDocuments.expiryDate,
-          createdAt: userDocuments.createdAt,
-          updatedAt: userDocuments.updatedAt,
-        })
-        .from(userDocuments)
-        .where(eq(userDocuments.userId, userId))
-        .orderBy(sql`${userDocuments.createdAt} DESC`);
-
-      return rows.map((row) => ({
-        ...row,
-        verifiedAt: row.verifiedAt ? row.verifiedAt.toISOString() : null,
-        expiryDate: row.expiryDate ?? null,
-      }));
-    });
-  }
-
   /**
    * Records an uploaded document against a student's `user_documents` row.
    *
@@ -478,263 +406,18 @@ export class StudentService {
   }
 
   async findById(id: string) {
-    const tenantId = this.getTenantId();
-
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({
-            id: studentProfilesLive.id,
-            tenantId: studentProfilesLive.tenantId,
-            userId: studentProfilesLive.userId,
-            membershipId: studentProfilesLive.membershipId,
-            admissionNumber: studentProfilesLive.admissionNumber,
-            admissionDate: studentProfilesLive.admissionDate,
-            admissionClass: studentProfilesLive.admissionClass,
-            admissionType: studentProfilesLive.admissionType,
-            academicStatus: studentProfilesLive.academicStatus,
-            socialCategory: studentProfilesLive.socialCategory,
-            caste: studentProfilesLive.caste,
-            isMinority: studentProfilesLive.isMinority,
-            minorityType: studentProfilesLive.minorityType,
-            isBpl: studentProfilesLive.isBpl,
-            isCwsn: studentProfilesLive.isCwsn,
-            cwsnType: studentProfilesLive.cwsnType,
-            isRteAdmitted: studentProfilesLive.isRteAdmitted,
-            rteCertificate: studentProfilesLive.rteCertificate,
-            tcIssued: studentProfilesLive.tcIssued,
-            tcNumber: studentProfilesLive.tcNumber,
-            tcIssuedDate: studentProfilesLive.tcIssuedDate,
-            tcReason: studentProfilesLive.tcReason,
-            dateOfLeaving: studentProfilesLive.dateOfLeaving,
-            previousSchoolName: studentProfilesLive.previousSchoolName,
-            previousSchoolBoard: studentProfilesLive.previousSchoolBoard,
-            medicalInfo: studentProfilesLive.medicalInfo,
-            version: studentProfilesLive.version,
-            createdAt: studentProfilesLive.createdAt,
-            updatedAt: studentProfilesLive.updatedAt,
-            // user_profile join
-            firstName: userProfiles.firstName,
-            lastName: userProfiles.lastName,
-            gender: userProfiles.gender,
-            dateOfBirth: userProfiles.dateOfBirth,
-            bloodGroup: userProfiles.bloodGroup,
-            religion: userProfiles.religion,
-            motherTongue: userProfiles.motherTongue,
-            profileImageUrl: userProfiles.profileImageUrl,
-            // current academic
-            currentStudentAcademicId: studentAcademicsLive.id,
-            currentStandardId: studentAcademicsLive.standardId,
-            currentSectionId: studentAcademicsLive.sectionId,
-            currentAcademicYearId: studentAcademicsLive.academicYearId,
-            rollNumber: studentAcademicsLive.rollNumber,
-            currentStandardName: standardsLive.name,
-            currentSectionName: sectionsLive.name,
-          })
-          .from(studentProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
-          .leftJoin(
-            studentAcademicsLive,
-            and(
-              eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-              eq(
-                studentAcademicsLive.academicYearId,
-                sql`(SELECT id FROM academic_years_live WHERE tenant_id = ${tenantId} AND is_active = true LIMIT 1)`,
-              ),
-            ),
-          )
-          .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
-          .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
-          .where(eq(studentProfilesLive.id, id))
-          .limit(1);
-      },
+    return this.readRepository.findForMutation(
+      id,
+      mkInstituteCtx(this.getTenantId(), 'service:student'),
     );
-
-    if (rows.length === 0) {
-      throw new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' });
-    }
-
-    return rows[0];
   }
 
   async list(filter: StudentFilterInput) {
-    const tenantId = this.getTenantId();
-    const limit = filter.first ?? 25;
-
-    // Resolve academic year (default to active)
-    let academicYearId = filter.academicYearId;
-    if (!academicYearId) {
-      const activeYear = await withTenant(
-        this.db,
-        mkInstituteCtx(tenantId, 'service:student'),
-        async (tx) => {
-          return tx
-            .select({ id: academicYearsLive.id })
-            .from(academicYearsLive)
-            .where(eq(academicYearsLive.isActive, true))
-            .limit(1);
-        },
-      );
-      if (activeYear.length > 0) {
-        academicYearId = activeYear[0].id;
-      }
-    }
-
-    const conditions = this.buildListConditions(filter, academicYearId);
-
-    // Cursor decode
-    let cursorCondition: ReturnType<typeof sql> | undefined;
-    if (filter.after) {
-      const decoded = decodeCursor(filter.after);
-      cursorCondition = sql`${studentProfilesLive.id} > ${decoded.id}`;
-    }
-
-    const where = and(
-      ...(conditions.length > 0 ? conditions : []),
-      ...(cursorCondition ? [cursorCondition] : []),
+    return this.readRepository.listForAttendance(
+      filter,
+      mkInstituteCtx(this.getTenantId(), 'service:student'),
     );
-
-    // Whitelisted sort columns — prevents injection via orderBy string.
-    const ORDER_COLUMNS = {
-      createdAt: studentProfilesLive.createdAt,
-      admissionNumber: studentProfilesLive.admissionNumber,
-      admissionDate: studentProfilesLive.admissionDate,
-      academicStatus: studentProfilesLive.academicStatus,
-    } as const;
-    type OrderKey = keyof typeof ORDER_COLUMNS;
-    let orderColumn: (typeof ORDER_COLUMNS)[OrderKey] = studentProfilesLive.createdAt;
-    let orderDir: 'asc' | 'desc' = 'desc';
-    if (filter.orderBy) {
-      const [field, dir] = filter.orderBy.split(':');
-      if (field && field in ORDER_COLUMNS) {
-        orderColumn = ORDER_COLUMNS[field as OrderKey];
-      }
-      if (dir === 'asc' || dir === 'desc') {
-        orderDir = dir;
-      }
-    }
-    const orderExpr = orderDir === 'asc' ? asc(orderColumn) : desc(orderColumn);
-
-    // Aliased tables for the primary-guardian join — we reach from
-    // student_guardian_links -> guardian_profiles -> user_profiles via
-    // the guardian's user_id. Aliased so we don't collide with the main
-    // user_profiles join (which holds the student's own name).
-    const guardianUserProfiles = alias(userProfiles, 'guardian_user_profiles');
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      // Count total (without cursor)
-      const countWhere = conditions.length > 0 ? and(...conditions) : undefined;
-      const [{ total }] = await tx
-        .select({ total: count() })
-        .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
-        .leftJoin(
-          studentAcademicsLive,
-          eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-        )
-        .where(countWhere);
-
-      // Fetch rows
-      const rows = await tx
-        .select({
-          id: studentProfilesLive.id,
-          tenantId: studentProfilesLive.tenantId,
-          userId: studentProfilesLive.userId,
-          membershipId: studentProfilesLive.membershipId,
-          admissionNumber: studentProfilesLive.admissionNumber,
-          admissionDate: studentProfilesLive.admissionDate,
-          admissionClass: studentProfilesLive.admissionClass,
-          admissionType: studentProfilesLive.admissionType,
-          academicStatus: studentProfilesLive.academicStatus,
-          socialCategory: studentProfilesLive.socialCategory,
-          caste: studentProfilesLive.caste,
-          isMinority: studentProfilesLive.isMinority,
-          minorityType: studentProfilesLive.minorityType,
-          isBpl: studentProfilesLive.isBpl,
-          isCwsn: studentProfilesLive.isCwsn,
-          cwsnType: studentProfilesLive.cwsnType,
-          isRteAdmitted: studentProfilesLive.isRteAdmitted,
-          rteCertificate: studentProfilesLive.rteCertificate,
-          tcIssued: studentProfilesLive.tcIssued,
-          tcNumber: studentProfilesLive.tcNumber,
-          tcIssuedDate: studentProfilesLive.tcIssuedDate,
-          tcReason: studentProfilesLive.tcReason,
-          dateOfLeaving: studentProfilesLive.dateOfLeaving,
-          previousSchoolName: studentProfilesLive.previousSchoolName,
-          previousSchoolBoard: studentProfilesLive.previousSchoolBoard,
-          medicalInfo: studentProfilesLive.medicalInfo,
-          version: studentProfilesLive.version,
-          createdAt: studentProfilesLive.createdAt,
-          updatedAt: studentProfilesLive.updatedAt,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          gender: userProfiles.gender,
-          dateOfBirth: userProfiles.dateOfBirth,
-          bloodGroup: userProfiles.bloodGroup,
-          religion: userProfiles.religion,
-          motherTongue: userProfiles.motherTongue,
-          profileImageUrl: userProfiles.profileImageUrl,
-          currentStudentAcademicId: studentAcademicsLive.id,
-          currentStandardId: studentAcademicsLive.standardId,
-          currentSectionId: studentAcademicsLive.sectionId,
-          currentAcademicYearId: studentAcademicsLive.academicYearId,
-          rollNumber: studentAcademicsLive.rollNumber,
-          currentStandardName: standardsLive.name,
-          currentSectionName: sectionsLive.name,
-          primaryGuardianFirstName: guardianUserProfiles.firstName,
-          primaryGuardianLastName: guardianUserProfiles.lastName,
-        })
-        .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
-        .leftJoin(
-          studentAcademicsLive,
-          eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-        )
-        .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
-        .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
-        .leftJoin(
-          studentGuardianLinks,
-          and(
-            eq(studentGuardianLinks.studentProfileId, studentProfilesLive.id),
-            eq(studentGuardianLinks.isPrimaryContact, true),
-          ),
-        )
-        .leftJoin(
-          guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
-        )
-        .leftJoin(
-          guardianUserProfiles,
-          eq(guardianUserProfiles.userId, guardianProfilesLive.userId),
-        )
-        .where(where)
-        .orderBy(orderExpr, asc(studentProfilesLive.id))
-        .limit(limit + 1); // +1 for hasNextPage
-
-      const hasNextPage = rows.length > limit;
-      if (hasNextPage) rows.pop();
-
-      const edges = rows.map((row) => ({
-        node: row,
-        cursor: encodeCursor({ id: row.id }),
-      }));
-
-      return {
-        edges,
-        totalCount: total,
-        pageInfo: {
-          hasNextPage,
-          hasPreviousPage: !!filter.after,
-          startCursor: edges[0]?.cursor ?? null,
-          endCursor: edges[edges.length - 1]?.cursor ?? null,
-        },
-      };
-    });
   }
-
-  // ── UPDATE ────────────────────────────────────────────────
 
   async update(id: string, input: UpdateStudentInput): Promise<StudentModel> {
     const tenantId = this.getTenantId();
@@ -933,99 +616,7 @@ export class StudentService {
 
   // ── STATISTICS ────────────────────────────────────────────
 
-  async statistics(): Promise<StudentStatisticsModel> {
-    const tenantId = this.getTenantId();
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      const [{ total }] = await tx.select({ total: count() }).from(studentProfilesLive);
-
-      const byStatus = await tx
-        .select({ status: studentProfilesLive.academicStatus, count: count() })
-        .from(studentProfilesLive)
-        .groupBy(studentProfilesLive.academicStatus);
-
-      const bySection = await tx
-        .select({ sectionId: studentAcademicsLive.sectionId, count: count() })
-        .from(studentAcademicsLive)
-        .innerJoin(academicYearsLive, eq(academicYearsLive.id, studentAcademicsLive.academicYearId))
-        .innerJoin(
-          studentProfilesLive,
-          eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
-        )
-        .where(eq(academicYearsLive.isActive, true))
-        .groupBy(studentAcademicsLive.sectionId);
-
-      const byStandard = await tx
-        .select({ standardId: studentAcademicsLive.standardId, count: count() })
-        .from(studentAcademicsLive)
-        .innerJoin(academicYearsLive, eq(academicYearsLive.id, studentAcademicsLive.academicYearId))
-        .innerJoin(
-          studentProfilesLive,
-          eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
-        )
-        .where(eq(academicYearsLive.isActive, true))
-        .groupBy(studentAcademicsLive.standardId);
-
-      const byGender = await tx
-        .select({ gender: userProfiles.gender, count: count() })
-        .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
-        .groupBy(userProfiles.gender);
-
-      const byCategory = await tx
-        .select({ category: studentProfilesLive.socialCategory, count: count() })
-        .from(studentProfilesLive)
-        .groupBy(studentProfilesLive.socialCategory);
-
-      return {
-        total,
-        byStatus: byStatus.map((r) => ({ status: r.status, count: r.count })),
-        bySection: bySection.map((r) => ({ sectionId: r.sectionId, count: r.count })),
-        byStandard: byStandard.map((r) => ({ standardId: r.standardId, count: r.count })),
-        byGender: byGender.map((r) => ({ gender: r.gender ?? 'unknown', count: r.count })),
-        byCategory: byCategory.map((r) => ({ category: r.category, count: r.count })),
-      };
-    });
-  }
-
   // ── PRIVATE HELPERS ───────────────────────────────────────
-
-  private buildListConditions(
-    filter: StudentFilterInput,
-    academicYearId: string | undefined,
-  ): SQL[] {
-    const conditions: SQL[] = [];
-    if (academicYearId) {
-      conditions.push(eq(studentAcademicsLive.academicYearId, academicYearId));
-    }
-    if (filter.standardId) {
-      conditions.push(eq(studentAcademicsLive.standardId, filter.standardId));
-    }
-    if (filter.sectionId) {
-      conditions.push(eq(studentAcademicsLive.sectionId, filter.sectionId));
-    }
-    if (filter.academicStatus && filter.academicStatus.length > 0) {
-      conditions.push(inArray(studentProfilesLive.academicStatus, filter.academicStatus));
-    }
-    if (filter.socialCategory) {
-      conditions.push(eq(studentProfilesLive.socialCategory, filter.socialCategory));
-    }
-    if (filter.isRteAdmitted !== undefined) {
-      conditions.push(eq(studentProfilesLive.isRteAdmitted, filter.isRteAdmitted));
-    }
-    if (filter.gender) {
-      conditions.push(eq(userProfiles.gender, filter.gender));
-    }
-    if (filter.search) {
-      const searchTerm = filter.search;
-      const searchCondition = or(
-        sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
-        ilike(studentProfilesLive.admissionNumber, `%${searchTerm}%`),
-      );
-      if (searchCondition) conditions.push(searchCondition);
-    }
-    return conditions;
-  }
 
   private async validateStatusChange(
     tenantId: string,

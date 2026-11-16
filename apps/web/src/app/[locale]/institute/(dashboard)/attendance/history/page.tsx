@@ -234,6 +234,8 @@ function StudentPicker({
             <CommandEmpty>{t('reports.unknownStudent')}</CommandEmpty>
             <CommandGroup>
               {students.map((stu) => {
+                const membershipId = stu.membershipId;
+                if (!membershipId) return null;
                 const first = resolveI18n(stu.firstName) ?? '';
                 const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
                 const label = `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`;
@@ -241,10 +243,10 @@ function StudentPicker({
                 // CommandItem value so onSelect ships the right id upstream.
                 return (
                   <CommandItem
-                    key={stu.membershipId}
-                    value={stu.membershipId}
+                    key={membershipId}
+                    value={membershipId}
                     onSelect={() => {
-                      onChange(stu.membershipId);
+                      onChange(membershipId);
                       setOpen(false);
                     }}
                     data-testid={`history-student-option-${stu.membershipId}`}

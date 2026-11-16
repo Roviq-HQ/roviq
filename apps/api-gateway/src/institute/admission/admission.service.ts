@@ -11,7 +11,6 @@ import {
   AdmissionApplicationStatus,
   EnquirySource,
   EnquiryStatus,
-  FUNNEL_STAGES,
   GuardianRelationship,
 } from '@roviq/common-types';
 import {
@@ -31,18 +30,15 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { Client as TemporalClient, Connection as TemporalConnection } from '@temporalio/client';
-import type { InferSelectModel } from 'drizzle-orm';
-import { and, count, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
-import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
-import type { AdmissionStatisticsFilterInput } from './dto/admission-statistics-filter.input';
+import { and, eq, sql } from 'drizzle-orm';
+import { AdmissionReadRepository } from './admission-read.repository';
+import { toApplicationModel, toEnquiryModel } from './admission-records';
 import type {
   CreateApplicationInput,
   UpdateApplicationInput,
 } from './dto/create-application.input';
 import type { CreateEnquiryInput } from './dto/create-enquiry.input';
-import type { ApplicationFilterInput, EnquiryFilterInput } from './dto/enquiry-filter.input';
 import type { UpdateEnquiryInput } from './dto/update-enquiry.input';
-import type { AdmissionStatisticsModel } from './models/admission-statistics.model';
 import type { ApplicationModel } from './models/application.model';
 import type { EnquiryModel } from './models/enquiry.model';
 
@@ -52,66 +48,6 @@ import type { EnquiryModel } from './models/enquiry.model';
  * fields the GraphQL `EnquiryModel`/`ApplicationModel` exposes, eliminating
  * the `as unknown as Model` casts banned by the [NTESC] hard rule.
  */
-type EnquiryRow = InferSelectModel<typeof enquiries>;
-type ApplicationRow = InferSelectModel<typeof admissionApplications>;
-
-function toEnquiryModel(row: EnquiryRow): EnquiryModel {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    enquiryNumber: row.enquiryNumber,
-    studentName: row.studentName,
-    dateOfBirth: row.dateOfBirth,
-    gender: row.gender,
-    classRequested: row.classRequested,
-    academicYearId: row.academicYearId,
-    parentName: row.parentName,
-    parentPhone: row.parentPhone,
-    parentEmail: row.parentEmail,
-    parentRelation: row.parentRelation,
-    source: row.source,
-    referredBy: row.referredBy,
-    assignedTo: row.assignedTo,
-    previousSchool: row.previousSchool,
-    previousBoard: row.previousBoard,
-    siblingInSchool: row.siblingInSchool ?? false,
-    siblingAdmissionNo: row.siblingAdmissionNo,
-    specialNeeds: row.specialNeeds,
-    notes: row.notes,
-    status: row.status,
-    followUpDate: row.followUpDate,
-    lastContactedAt: row.lastContactedAt,
-    convertedToApplicationId: row.convertedToApplicationId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-function toApplicationModel(row: ApplicationRow): ApplicationModel {
-  return {
-    id: row.id,
-    tenantId: row.tenantId,
-    enquiryId: row.enquiryId,
-    academicYearId: row.academicYearId,
-    standardId: row.standardId,
-    sectionId: row.sectionId,
-    formData: row.formData,
-    status: row.status,
-    isRteApplication: row.isRteApplication,
-    testScore: row.testScore,
-    interviewScore: row.interviewScore,
-    meritRank: row.meritRank,
-    rteLotteryRank: row.rteLotteryRank,
-    offeredAt: row.offeredAt,
-    offerExpiresAt: row.offerExpiresAt,
-    offerAcceptedAt: row.offerAcceptedAt,
-    studentProfileId: row.studentProfileId,
-    version: row.version,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
 @Injectable()
 export class AdmissionService {
   private readonly logger = new Logger(AdmissionService.name);
@@ -119,6 +55,7 @@ export class AdmissionService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
+    private readonly readRepository: AdmissionReadRepository,
     private readonly config: ConfigService,
   ) {}
 
@@ -240,86 +177,6 @@ export class AdmissionService {
     this.logger.log(`Enquiry created: ${enquiry.id} (duplicate: ${isDuplicate})`);
 
     return { ...enquiry, isDuplicate };
-  }
-
-  async listEnquiries(filter: EnquiryFilterInput): Promise<{
-    edges: { node: EnquiryModel; cursor: string }[];
-    totalCount: number;
-    pageInfo: {
-      hasNextPage: boolean;
-      hasPreviousPage: boolean;
-      startCursor: string | null;
-      endCursor: string | null;
-    };
-  }> {
-    const tenantId = this.getTenantId();
-    const limit = filter.first ?? 25;
-
-    const conditions: SQL[] = [];
-    if (filter.status) conditions.push(eq(enquiriesLive.status, filter.status));
-    if (filter.source) conditions.push(eq(enquiriesLive.source, filter.source));
-    if (filter.classRequested)
-      conditions.push(eq(enquiriesLive.classRequested, filter.classRequested));
-    if (filter.assignedTo) conditions.push(eq(enquiriesLive.assignedTo, filter.assignedTo));
-    if (filter.followUpFrom) conditions.push(gte(enquiriesLive.followUpDate, filter.followUpFrom));
-    if (filter.followUpTo) conditions.push(lte(enquiriesLive.followUpDate, filter.followUpTo));
-    if (filter.overdueOnly) {
-      conditions.push(
-        sql`${enquiriesLive.followUpDate} < CURRENT_DATE AND ${enquiriesLive.status} NOT IN (${EnquiryStatus.ENROLLED}, ${EnquiryStatus.LOST}, ${EnquiryStatus.DROPPED})`,
-      );
-    }
-    if (filter.search) {
-      conditions.push(
-        sql`to_tsvector('simple', coalesce(${enquiriesLive.studentName}, '') || ' ' || coalesce(${enquiriesLive.parentName}, '')) @@ plainto_tsquery('simple', ${filter.search})`,
-      );
-    }
-
-    let cursorCondition: ReturnType<typeof sql> | undefined;
-    if (filter.after) {
-      const decoded = decodeCursor(filter.after);
-      cursorCondition = sql`${enquiriesLive.id} > ${decoded.id}`;
-    }
-
-    const where = and(
-      ...(conditions.length > 0 ? conditions : []),
-      ...(cursorCondition ? [cursorCondition] : []),
-    );
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:admission'), async (tx) => {
-      const countWhere = conditions.length > 0 ? and(...conditions) : undefined;
-      const [{ total }] = await tx.select({ total: count() }).from(enquiriesLive).where(countWhere);
-
-      // Sort: overdue follow-ups first, then by follow_up_date ascending
-      const rows = await tx
-        .select()
-        .from(enquiriesLive)
-        .where(where)
-        .orderBy(
-          sql`CASE WHEN ${enquiriesLive.followUpDate} < CURRENT_DATE THEN 0 ELSE 1 END`,
-          sql`${enquiriesLive.followUpDate} ASC NULLS LAST`,
-          enquiriesLive.id,
-        )
-        .limit(limit + 1);
-
-      const hasNextPage = rows.length > limit;
-      if (hasNextPage) rows.pop();
-
-      const edges = rows.map((row) => ({
-        node: toEnquiryModel(row),
-        cursor: encodeCursor({ id: row.id }),
-      }));
-
-      return {
-        edges,
-        totalCount: total,
-        pageInfo: {
-          hasNextPage,
-          hasPreviousPage: !!filter.after,
-          startCursor: edges[0]?.cursor ?? null,
-          endCursor: edges[edges.length - 1]?.cursor ?? null,
-        },
-      };
-    });
   }
 
   async updateEnquiry(id: string, input: UpdateEnquiryInput): Promise<EnquiryModel> {
@@ -522,23 +379,10 @@ export class AdmissionService {
   }
 
   async getApplication(id: string): Promise<ApplicationModel> {
-    const tenantId = this.getTenantId();
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .select()
-          .from(admissionApplicationsLive)
-          .where(eq(admissionApplicationsLive.id, id))
-          .limit(1);
-      },
+    return this.readRepository.getForMutation(
+      id,
+      mkInstituteCtx(this.getTenantId(), 'service:admission'),
     );
-
-    if (rows.length === 0) {
-      throw new NotFoundException('Application not found');
-    }
-    return toApplicationModel(rows[0]);
   }
 
   async updateApplication(id: string, input: UpdateApplicationInput): Promise<ApplicationModel> {
@@ -674,187 +518,7 @@ export class AdmissionService {
     return this.updateApplication(id, input);
   }
 
-  async listApplications(filter: ApplicationFilterInput): Promise<{
-    edges: { node: ApplicationModel; cursor: string }[];
-    totalCount: number;
-    pageInfo: {
-      hasNextPage: boolean;
-      hasPreviousPage: boolean;
-      startCursor: string | null;
-      endCursor: string | null;
-    };
-  }> {
-    const tenantId = this.getTenantId();
-    const limit = filter.first ?? 25;
-
-    const conditions: SQL[] = [];
-    if (filter.status) conditions.push(eq(admissionApplicationsLive.status, filter.status));
-    if (filter.academicYearId) {
-      conditions.push(eq(admissionApplicationsLive.academicYearId, filter.academicYearId));
-    }
-    if (filter.standardId) {
-      conditions.push(eq(admissionApplicationsLive.standardId, filter.standardId));
-    }
-    if (filter.isRteApplication !== undefined) {
-      conditions.push(eq(admissionApplicationsLive.isRteApplication, filter.isRteApplication));
-    }
-
-    let cursorCondition: ReturnType<typeof sql> | undefined;
-    if (filter.after) {
-      const decoded = decodeCursor(filter.after);
-      cursorCondition = sql`${admissionApplicationsLive.id} > ${decoded.id}`;
-    }
-
-    const where = and(
-      ...(conditions.length > 0 ? conditions : []),
-      ...(cursorCondition ? [cursorCondition] : []),
-    );
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:admission'), async (tx) => {
-      const countWhere = conditions.length > 0 ? and(...conditions) : undefined;
-      const [{ total }] = await tx
-        .select({ total: count() })
-        .from(admissionApplicationsLive)
-        .where(countWhere);
-
-      const rows = await tx
-        .select()
-        .from(admissionApplicationsLive)
-        .where(where)
-        .orderBy(admissionApplicationsLive.createdAt)
-        .limit(limit + 1);
-
-      const hasNextPage = rows.length > limit;
-      if (hasNextPage) rows.pop();
-
-      const edges = rows.map((row) => ({
-        node: toApplicationModel(row),
-        cursor: encodeCursor({ id: row.id }),
-      }));
-
-      return {
-        edges,
-        totalCount: total,
-        pageInfo: {
-          hasNextPage,
-          hasPreviousPage: !!filter.after,
-          startCursor: edges[0]?.cursor ?? null,
-          endCursor: edges[edges.length - 1]?.cursor ?? null,
-        },
-      };
-    });
-  }
-
   // ══════════════════════════════════════════════════════════
   // ADMISSION STATISTICS
   // ══════════════════════════════════════════════════════════
-
-  async statistics(filter?: AdmissionStatisticsFilterInput): Promise<AdmissionStatisticsModel> {
-    const tenantId = this.getTenantId();
-
-    // Build inclusive date-range predicates against `created_at`, anchored
-    // to **Asia/Kolkata** (the canonical timezone for every Indian institute).
-    // We push the conversion into Postgres via `AT TIME ZONE` rather than
-    // synthesising a `Date` here so the comparison happens against the row's
-    // own timestamp in IST. Without this, `to: '2026-04-15'` would match in
-    // UTC and silently drop events created between 23:30–24:00 IST.
-    //
-    //   from → IST midnight at the start of the day  (>=)
-    //   to   → IST 23:59:59.999999 at the end of the day  (<=)
-    //
-    // `from`/`to` are validated by class-validator as `IsDateString()` so
-    // they are safe to interpolate into SQL via `sql`.
-    const enquiryWindow = (() => {
-      const conds: SQL[] = [];
-      if (filter?.from) {
-        conds.push(
-          sql`${enquiriesLive.createdAt} >= (${filter.from}::date AT TIME ZONE 'Asia/Kolkata')`,
-        );
-      }
-      if (filter?.to) {
-        conds.push(
-          sql`${enquiriesLive.createdAt} < ((${filter.to}::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')`,
-        );
-      }
-      return conds.length > 0 ? and(...conds) : undefined;
-    })();
-
-    const appWindow = (() => {
-      const conds: SQL[] = [];
-      if (filter?.from) {
-        conds.push(
-          sql`${admissionApplicationsLive.createdAt} >= (${filter.from}::date AT TIME ZONE 'Asia/Kolkata')`,
-        );
-      }
-      if (filter?.to) {
-        conds.push(
-          sql`${admissionApplicationsLive.createdAt} < ((${filter.to}::date + INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata')`,
-        );
-      }
-      return conds.length > 0 ? and(...conds) : undefined;
-    })();
-
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:admission'), async (tx) => {
-      const [{ totalEnq }] = await tx
-        .select({ totalEnq: count() })
-        .from(enquiriesLive)
-        .where(enquiryWindow);
-      const [{ totalApp }] = await tx
-        .select({ totalApp: count() })
-        .from(admissionApplicationsLive)
-        .where(appWindow);
-
-      // Funnel: count applications at or past each stage
-      const statusCounts = await tx
-        .select({ status: admissionApplicationsLive.status, cnt: count() })
-        .from(admissionApplicationsLive)
-        .where(appWindow)
-        .groupBy(admissionApplicationsLive.status);
-
-      const statusMap = new Map(statusCounts.map((r) => [r.status, r.cnt]));
-
-      const funnel = FUNNEL_STAGES.map((stage) => ({
-        stage,
-        count: statusMap.get(stage) ?? 0,
-      }));
-
-      // Source breakdown — enquiryCount per source plus the number of those
-      // enquiries that converted to an application. The applicationCount is
-      // computed via a LEFT JOIN to admission_applications keyed on the
-      // enquiry FK so counts correctly reflect cross-over between tables.
-      const bySourceRows = await tx
-        .select({
-          source: enquiriesLive.source,
-          enquiryCount: sql<number>`COUNT(${enquiriesLive.id})::int`,
-          applicationCount: sql<number>`COUNT(${admissionApplicationsLive.id})::int`,
-        })
-        .from(enquiriesLive)
-        .leftJoin(
-          admissionApplicationsLive,
-          eq(admissionApplicationsLive.enquiryId, enquiriesLive.id),
-        )
-        .where(enquiryWindow)
-        .groupBy(enquiriesLive.source);
-
-      const bySource = bySourceRows.map((r) => ({
-        source: r.source,
-        enquiryCount: r.enquiryCount,
-        applicationCount: r.applicationCount,
-      }));
-
-      // Conversion rates
-      const enrolledCount = statusMap.get(AdmissionApplicationStatus.ENROLLED) ?? 0;
-      const enquiryToApplicationRate = totalEnq > 0 ? totalApp / totalEnq : 0;
-      const applicationToEnrolledRate = totalApp > 0 ? enrolledCount / totalApp : 0;
-
-      return {
-        totalEnquiries: totalEnq,
-        totalApplications: totalApp,
-        funnel,
-        bySource,
-        enquiryToApplicationRate,
-        applicationToEnrolledRate,
-      };
-    });
-  }
 }

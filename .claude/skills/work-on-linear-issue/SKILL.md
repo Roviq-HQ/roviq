@@ -32,6 +32,11 @@ description: Use when starting work on a Linear issue — provides the full work
 - Re-read "Does NOT Change" — revert any accidental modifications
 - `git diff --stat` — only files related to this issue
 
-## 6. Report (DO NOT commit)
+## 6. Prepare Manual Acceptance
+- Follow **Manual acceptance handoff** in root `CLAUDE.md`: ready-made local-dev fixtures inserted in seconds, verified logins, and a Linear checklist with credentials, record links, actions and exact expected results.
+- Prepare the fixture insert during implementation. Reuse the running environment; the user should do no setup.
+- Keep one-time review tooling out of the feature commit and remove it after completed review. Preserve regression tests; do not delete DB fixtures without a request.
+
+## 7. Report (DO NOT commit)
 - Summarize changes, list files, show test results, note concerns
 - Wait for explicit commit approval

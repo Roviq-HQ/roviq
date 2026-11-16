@@ -10,12 +10,10 @@
 - `tilt trigger e2e-gateway` — run API e2e tests
 - `tilt trigger e2e-ui` — run Playwright UI tests across all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e)
 - `pnpm e2e:up` — start Docker e2e infra (run once, stays running), MUST run it before e2e testing. if already running, just re-seed and continue.
-- `pnpm test:e2e:api` — Vitest E2E API tests against running api-gateway. Routes through cacheable Nx target `api-gateway-e2e:test-e2e`. **All new E2E API tests go here.**
-- `pnpm test:e2e:ui` — Playwright UI tests across the 3 canonical e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e) plus cross-portal. Routes through cacheable Nx target `web-e2e-suite:e2e` (single invocation, single cache hash).
+- `pnpm test:e2e:api` — Vitest E2E API tests against running api-gateway. **All new E2E API tests go here.**
+- `pnpm test:e2e:ui` — Playwright UI tests across the 3 portal e2e projects plus cross-portal.
 - `pnpm test:all` — full test pipeline: unit + integration + e2e:api + e2e:ui
-- `pnpm ci:check` — unified gate. Runs lint/typecheck/unit/integration/e2e in parallel; locally uses `nx affected` against `origin/main`, on CI runs the full suite. Invoked by `.husky/pre-push`. Bypass: `SKIP_PREPUSH=1 git push` or `git push --no-verify`.
-
-CI runs **six blocking jobs**: `lint`, `typecheck`, `test` (unit — no DB), `build`, `e2e-api` (Docker stack + Vitest E2E), `e2e-ui` (Docker stack + Playwright). Integration tests (`pnpm test:int`) run as part of the `test` job against `roviq_test` via `DATABASE_URL_TEST`. E2E jobs spin up `compose.e2e.yaml` with `--wait` and tear it down via `if: always()`.
+- `pnpm ci:check` — unified lint/typecheck/test/e2e gate, run by `.husky/pre-push`. CI jobs, Nx cache targets, bypass flags: `docs/testing.md` → "CI and pre-push".
 
 Tilt auto-detects file changes for app resources (api-gateway, web) — no `tilt trigger` needed after editing code, just check logs. Use `tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `tilt logs`.
 
@@ -80,40 +78,11 @@ All tokens are `type: 'access'` with `scope` field. No more `isPlatformAdmin` or
 - **DB roles**: `roviq_pooler` (NOINHERIT LOGIN) → assumes `roviq_app`/`roviq_reseller`/`roviq_admin` via `SET LOCAL ROLE`
 - **DATABASE_URL** uses `roviq_pooler`, **DATABASE_URL_MIGRATE** uses `roviq` (superuser)
 
-## API Gateway Structure
+## Code Layout
 
-```
-apps/api-gateway/src/
-  auth/              — JWT strategy, auth service, auth events, impersonation, repositories, ws-ticket
-  admin/             — platform-scope module group (@PlatformScope resolvers)
-  reseller/          — reseller-scope module group (@ResellerScope resolvers)
-  institute/         — institute-scope module group (@InstituteScope resolvers)
-    management/      — institute CRUD (create, update, activate, suspend, delete)
-    section/         — class sections
-    standard/        — grade levels
-    subject/         — subjects & curriculum
-  casl/              — CASL ability guard + module
-  audit/             — audit logging
-  common/            — pagination, middleware, decorators
-```
+Folder trees for `apps/api-gateway` and `apps/web`: `docs/architecture.md` → "Monorepo Structure" / "Web App Structure". Web routes live under `apps/web/src/app/[locale]/{admin,reseller,institute}/`; `middleware.ts` rewrites hostname → scope.
 
-## Web App Structure
-
-```
-apps/web/src/app/[locale]/
-  admin/             — platform admin pages (audit-logs, billing, observability)
-  reseller/          — reseller pages (placeholder)
-  institute/         — institute pages (dashboard, select-institute, settings)
-middleware.ts        — hostname → scope rewrite (admin.* → /admin/, default → /institute/)
-```
-
-### Common UI components
-
-App-wide reusable components live in `apps/web/src/components/` (import via the `@web/components/*` alias) — prefer these over re-building per feature. Data-coupled ones fetch via `@roviq/graphql` (inline `gql`/`useQuery`) or reuse existing feature hooks through the `@web/*` alias; they must NOT live in `@roviq/ui` (a lib cannot import app code). **Add one concise line here per new common component.**
-
-- `pickers/SectionPicker` — multi-select of class sections grouped by department → standard, with per-class / per-department / global "select all" and a live count.
-- `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
-- `pickers/AcademicYearSelector` + `useSelectedAcademicYear()` — persistent academic-year dropdown stored in the URL via nuqs (`?year=`); seeds the active year on load and exposes `loading`. Shared across academic-years, academics, and examinations pages. `ControlledAcademicYearSelector` + `useLocalAcademicYear()` is the same dropdown with caller-held state (no URL) — used only inside the timetable creation wizard; every other timetable read resolves the active year server-side.
+**Common UI components** live in `apps/web/src/components/` (`@web/components/*`). Check `docs/frontend.md` → "Common components" before building one, and add one line there per new common component.
 
 ## Workflow
 
@@ -134,6 +103,16 @@ After completing each phase/issue, before declaring done:
 7. **RLS audit**: When changing models, verify and report RLS status for every affected table
 8. **Fix iteratively**: If anything fails, fix and re-run until clean. Do NOT move to the next phase with known failures
 
+### Manual acceptance handoff
+
+- Prepare minimal, clearly named synthetic fixtures during implementation; insert into approved local dev via Tilt in seconds, using additive/idempotent writes.
+- Reuse running apps/infra. No rebuild, full seed/reset, or separate review environment just for handoff.
+- Verify fixtures and logins. In the Linear issue's **Manual acceptance**, list URL, credentials/roles, records with IDs/direct links, and numbered steps with exact expected results. The user performs checks, not setup.
+- Define observable acceptance criteria before coding. For UI changes, verify the normal browser flow, a boundary/forbidden case, and refresh/account switching. Add regression tests for discovered bugs.
+- Report what was verified, what remains unverified, and supporting evidence; distinguish automated results from pending manual acceptance.
+- Keep one-time scripts, hooks and generated review files out of the feature commit. Remove them after the user finishes review; retain regression tests. Delete database fixtures only when requested.
+- Preserve database approval scope; production writes require explicit approval.
+
 ### Deviations & Deferred Work
 
 - **Deviations** — spec drifts, trade-offs, user-rejected approaches: add as a comment on the current Linear issue
@@ -147,39 +126,22 @@ After completing each phase/issue, before declaring done:
 
 ## Quick Mistake Reference
 
-Entries covered by skills (`/drizzle-database`, `/backend-service`) are not repeated here.
+Full rationale + enforcing CI gate for each line: `docs/references/mistake-reference.md`. Read it before touching the area a line names.
 
-| Don't                                                      | Do                                                                                                                                                            |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `selectInstitute(tenantId)`                                | `selectInstitute(membershipId)`                                                                                                                               |
-| `User.abilities`                                           | `Membership.abilities` (abilities live on Membership)                                                                                                         |
-| `$transaction` / `withTenant(db, tenantId, fn)`            | `withTenant(db, ctx, fn)` — pass the branded `InstituteContext` (after `assertTenantContext(user)`) or `mkInstituteCtx(tenantId)` for synthetic callers. Same shape for `withReseller(db, ctx, fn)` and `withAdmin(db, ctx, fn)`. `tenantTransaction()` does not exist. |
-| `if (role === 'teacher')`                                  | `ability.can()`                                                                                                                                               |
-| `GqlAuthGuard` from `@roviq/casl`                          | `GqlAuthGuard` from `@roviq/auth-backend`                                                                                                                     |
-| `APP_GUARD` for scope isolation                            | `@PlatformScope()` / `@ResellerScope()` / `@InstituteScope()` at class level                                                                                  |
-| Raw `<button>`                                             | `<Button>` from `@roviq/ui`                                                                                                                                   |
-| Inline `<Popover>` + lucide `HelpCircle` next to a label   | `<FieldInfoPopover>` from `@roviq/ui`; on shared field components pass `info={<FieldInfoPopover …/>}`. Copy lives under `fieldHelp.*` in the locale JSON      |
-| Hardcoded UI strings                                       | `useTranslations()` from `next-intl`                                                                                                                          |
-| `new Date().toLocaleDateString()`                          | `useFormatDate()` from `@roviq/i18n`                                                                                                                          |
-| Nav href `/dashboard`                                      | Include scope prefix: `/admin/dashboard`, `/institute/dashboard`                                                                                              |
-| Writing docs/assertions from memory                        | Verify against actual source code before writing                                                                                                              |
-| New `@roviq/*` lib without vitest alias                    | Add to `apps/api-gateway/vitest.config.ts` `resolve.alias` too                                                                                                |
-| Hardcoded Redis key prefixes                               | Use `REDIS_KEYS` constants from `auth/redis-keys.ts`                                                                                                          |
-| Impersonation token refresh                                | Impersonation tokens are non-renewable. No refresh token created                                                                                              |
-| `defaultRandom()` or `gen_random_uuid()`                   | `.default(sql`uuidv7()`)` (PG 18 native)                                                                                                                      |
-| E2E locators: `getByRole`, `getByText`, `getByPlaceholder` | `page.getByTestId('…')` — Playwright's default `data-testid` attribute (NOT `data-test-id`). Add `data-testid="foo"` on the target element in production code |
-| Re-running tests/builds to see different output            | Save to temp file first: `pnpm test > /tmp/out.txt 2>&1`, then `grep`/`tail` from file                                                                        |
-| Querying e2e DB as `roviq` default                         | E2E uses `roviq_test` DB: `psql -U roviq -d roviq_test`                                                                                                       |
-| `tx.select().from(subjects)` for reads (and other soft-deletable tables) | `tx.select().from(subjectsLive)` — every soft-deletable table has a `<table>Live` security_invoker view that hides trashed rows. Writes still target the base table (`tx.insert(subjects)…`). CI guard: `pnpm check:live-views`. `withTrash()` removed |
-| `@Inject('JETSTREAM_CLIENT') natsClient` + `natsClient.emit('STUDENT.updated', …).subscribe(...)` in services | Inject `EventBusService` and call `eventBus.emit(EVENT_PATTERNS.STUDENT.updated, payload)` — wraps NATS JetStream + GraphQL pubsub. `pattern` is typed as `EventPattern` (typo = compile error). Direct `natsClient.emit('…')` outside the typed-wrapper allowlist fails `pnpm check:direct-nats-emit`. Every prefix MUST have a stream in `libs/backend/nats-jetstream/src/streams/stream.config.ts` (registry-coverage tests run as part of `nats-jetstream:test`) |
-| `if (!user.resellerId) throw new ForbiddenException(...)` inline in resolvers | `assertPlatformContext(user)` / `assertResellerContext(user)` / `assertTenantContext(user)` / `assertInstituteWithReseller(user)` from `@roviq/auth-backend` — narrows the branded `AuthUser` union and centralises the 403 error shape. The last replaces the old `assertReseller + assertTenant` double-assert that narrowed to `never` |
-| `mkAdminCtx()` / `mkResellerCtx()` / `mkInstituteCtx()` imported by a resolver or business service | These factories bypass JWT scope and only belong in workflow activities, seeders, repositories invoked from event consumers, and integration-test fixtures. New importers fail `pnpm check:synthetic-context-usage` until the file is added to `SYNTHETIC_CONTEXT_ALLOWLIST` with security review |
-| Local `diffDays` / `assertValidRange` per service | `calendarDaysBetween` / `isValidDateRange` / `rangesOverlap` from `@roviq/common-types/date-range` |
-| Inline `STATUS_TRANSITIONS: Record<string, string[]>` map + private `validateTransition()` per service | `defineStateMachine<S>(name, transitions)` from `@roviq/common-types`. Domain machines: `INSTITUTE_STATE_MACHINE`, `LEAVE_STATE_MACHINE`, `STUDENT_ACADEMIC_STATE_MACHINE`, `ADMISSION_APPLICATION_STATE_MACHINE`. Adding an enum value without listing transitions = compile error. Throws `BusinessException(ErrorCode.INVALID_STATE_TRANSITION)` (HTTP 422) |
-| Adding a new soft-deletable table without a `<table>Live` view; adding a `pgTable` without RLS policies | Three CI gates: `pnpm check:live-views` (bans base-table reads), `pnpm check:live-views-coverage` (every soft-deletable table has a `*Live` export), `pnpm check:rls-coverage` (every `pgTable` opts into RLS or is on `RLS_EXEMPT_BASENAMES`) |
-| Adding a `@CheckAbility(action, subject)` for a pair no role can reach (silent 403) or granting an ability no resolver checks (permission noise) | `apps/api-gateway/src/__tests__/ability-coverage.spec.ts` enforces both directions — every used pair must be reachable by ≥1 role (with manage/all expansion); every grant must be referenced by ≥1 resolver. Future-feature placeholders go on the explicit `allowGrantedButUnused` set |
-| `data-testid="institute-row-{id}"` literal in new `apps/web/src` tsx, `libs/frontend/ui` components, or e2e specs | `data-testid={layout.row(id)}` (after `import { testIds } from '@roviq/ui/testing/testid-registry'; const { layout } = testIds;`). Registry lives in `@roviq/ui` so `libs/frontend/ui` components, `apps/web` pages, and `e2e/*` specs all import the SAME constant — drift between code and test is structurally impossible. Destructure the group at module top when a file uses 2+ testids; otherwise inline `testIds.<group>.<key>` is fine. CI gate `pnpm check:testids` is **deny-by-default** for `apps/web/src`: any literal `data-testid="…"` fails unless (a) the file is in the `LEGACY_FILES` grandfather list (migrate file-by-file then drop the entry), (b) the file lives under `__tests__/`, or (c) the line carries `// allow-testid-literal: <reason>`. New files must use the registry from day one |
-| Hardcoded seed credentials / institute names in `e2e/shared/seed.ts`, `e2e/shared/e2e-users.ts`, or `scripts/seed.ts` | Single source `e2e/shared/seed-fixtures.ts` exports `SEED_CREDENTIALS`, `SEED_NAMES`, `SEED`, `E2E_USERS`. The other two files are re-export shims |
+- `selectInstitute(membershipId)`, not `tenantId` · abilities live on `Membership`, not `User`
+- `withTenant/withReseller/withAdmin(db, ctx, fn)` with the branded ctx — no `$transaction`, no `tenantTransaction()`
+- `assertTenantContext()` / `assertResellerContext()` / `assertPlatformContext()` / `assertInstituteWithReseller()` instead of inline `ForbiddenException`
+- `mk*Ctx()` only in workflow activities, seeders, event-consumer repos, integration fixtures (`pnpm check:synthetic-context-usage`)
+- `ability.can()`, never role checks · scope decorators at class level, not `APP_GUARD` · `GqlAuthGuard` from `@roviq/auth-backend`
+- Every `@CheckAbility` pair must be reachable by a role, every grant used (`ability-coverage.spec.ts`)
+- Reads from `<table>Live` views, writes to the base table · new soft-deletable table needs a `*Live` view, every `pgTable` needs RLS · ``.default(sql`uuidv7()`)``
+- `eventBus.emit(EVENT_PATTERNS.…)` via `EventBusService`, never `natsClient.emit` · every event prefix needs a stream
+- `defineStateMachine` for status transitions · `calendarDaysBetween` / `isValidDateRange` / `rangesOverlap` from `@roviq/common-types/date-range`
+- UI: `<Button>` and `<FieldInfoPopover>` from `@roviq/ui`, `useTranslations()`, `useFormatDate()`, scope-prefixed nav hrefs
+- Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`
+- Seed credentials/names only from `e2e/shared/seed-fixtures.ts`
+- `REDIS_KEYS` constants · new `@roviq/*` lib → add vitest alias in `apps/api-gateway/vitest.config.ts` · impersonation tokens never refresh
+- Save test/build output to a temp file and grep it — don't re-run · e2e DB is `roviq_test` · verify docs/assertions against source, not memory
 
 ## Skills (when needed, not always loaded)
 
@@ -200,45 +162,17 @@ Domain-specific rules live in `.claude/skills/` and load only when relevant:
 - `docs/frontend.md` — frontend patterns
 - `docs/infrastructure.md` — infra setup
 - `docs/getting-started.md` — onboarding
-- `docs/testing.md` — test strategy
+- `docs/testing.md` — test strategy, CI jobs, compose files
+- `docs/references/mistake-reference.md` — full Quick Mistake Reference with CI gates
 - `docs/dependency-updates.md` — supply-chain-safe dependency updates with 24h/7d release-age gates; minors auto-batch via `pnpm deps:update`, majors migrate one-at-a-time through Claude Code via `pnpm deps:upgrade`
 - `docs/plans/` — design docs and implementation plans
 - `docs/changelogs/testing-troubleshooting.md` — **append-only** log of testing-infra issues (slow pre-push, Docker rebuilds, flaky suites, Nx cache misses) and their fixes. After fixing ANY testing-related issue, append a new entry — never edit or delete existing entries. If a fix resolves a prior `diagnosed` entry, append a new `fixed` entry that references the diagnosis date.
 
 ## Docker Compose Files
 
-Select the right compose file explicitly — this repo does not use `--profile` flags.
+Pick the compose file explicitly — no `--profile` flags. All five files: `docs/testing.md` → "Docker Compose Files". E2E stack is `docker/compose.e2e.yaml` (`roviq_test`, PG host port 5435, API port 3004).
 
-| File                        | Purpose                                                               | Common entry point                                       |
-| --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
-| `docker/compose.infra.yaml` | Postgres, Redis, NATS (infra only)                                    | `pnpm infra:up` (Tilt runs apps)                         |
-| `docker/compose.dev.yaml`   | Full dev stack inside Docker                                          | `pnpm dev:docker`                                        |
-| `docker/compose.e2e.yaml`   | Migrated+seeded `roviq_test` stack (PG host port 5435, API port 3004) | `pnpm e2e:up` → `pnpm test:e2e:api` / `pnpm test:e2e:ui` |
-| `docker/compose.app.yaml`   | App-only bundle (no infra)                                            | Reused by other composes                                 |
-| `docker/compose.novu.yaml`  | Novu notification stack                                               | `pnpm novu:setup`                                        |
+## Nx
 
-See `docs/testing.md` for the full workflow.
-
-<!-- nx configuration start-->
-<!-- Leave the start & end comments to automatically receive updates. -->
-
-## General Guidelines for working with Nx
-
-- For navigating/exploring the workspace, invoke the `nx-workspace` skill first - it has patterns for querying projects, targets, and dependencies
-- When running tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
-- Prefix nx commands with the workspace's package manager (e.g., `pnpm nx build`, `npm exec nx test`) - avoids using globally installed CLI
-- You have access to the Nx MCP server and its tools, use them to help the user
-- For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
-- NEVER guess CLI flags - always check nx_docs or `--help` first when unsure
-
-## Scaffolding & Generators
-
-- For scaffolding tasks (creating apps, libs, project structure, setup), ALWAYS invoke the `nx-generate` skill FIRST before exploring or calling MCP tools
-
-## When to use nx_docs
-
-- USE for: advanced config options, unfamiliar flags, migration guides, plugin configuration, edge cases
-- DON'T USE for: basic generator syntax (`nx g @nx/react:app`), standard commands, things you already know
-- The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
-
-<!-- nx configuration end-->
+- Run tasks via `pnpm nx` (`run`, `run-many`, `affected`), not the underlying tool. Use the Nx MCP tools. Invoke the `nx-workspace` skill to explore and the `nx-generate` skill before any scaffolding.
+- Never guess CLI flags — check `--help` or nx_docs (advanced config, migrations, plugin options; not basic generator syntax). Plugin best practices: `node_modules/@nx/<plugin>/PLUGIN.md` when present.

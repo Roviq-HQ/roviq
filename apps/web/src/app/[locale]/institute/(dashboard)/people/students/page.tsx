@@ -743,7 +743,7 @@ export default function StudentsPage() {
         accessorKey: 'academicStatus',
         header: () => <SortableHeader column="academicStatus" label={t('columns.status')} />,
         cell: ({ row }) => {
-          const statusKey = row.original.academicStatus.toUpperCase();
+          const statusKey = row.original.academicStatus?.toUpperCase() ?? '';
           const Icon = STATUS_ICON[statusKey] ?? CheckCircle2;
           return (
             <Badge
@@ -751,9 +751,9 @@ export default function StudentsPage() {
               className={`inline-flex items-center gap-1 ${STATUS_CLASS[statusKey] ?? ''}`}
             >
               <Icon className="size-3.5" />
-              {t(`academicStatuses.${statusKey}`, {
-                default: row.original.academicStatus,
-              })}
+              {row.original.academicStatus
+                ? t(`academicStatuses.${statusKey}`, { default: row.original.academicStatus })
+                : '—'}
             </Badge>
           );
         },
@@ -772,9 +772,11 @@ export default function StudentsPage() {
         header: t('columns.category'),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {t(`socialCategories.${row.original.socialCategory}`, {
-              default: row.original.socialCategory,
-            })}
+            {row.original.socialCategory
+              ? t(`socialCategories.${row.original.socialCategory}`, {
+                  default: row.original.socialCategory,
+                })
+              : '—'}
           </span>
         ),
       },
@@ -847,7 +849,7 @@ export default function StudentsPage() {
         return value;
       };
       const lines = [
-        header.map(csvEscape).join(','),
+        header.map((value) => csvEscape(value ?? '')).join(','),
         ...rows.map((s) =>
           [
             s.admissionNumber,
@@ -862,7 +864,7 @@ export default function StudentsPage() {
             s.isRteAdmitted ? 'Yes' : 'No',
             s.admissionDate,
           ]
-            .map(csvEscape)
+            .map((value) => csvEscape(value ?? ''))
             .join(','),
         ),
       ];
@@ -975,7 +977,7 @@ export default function StudentsPage() {
                   !std && !sec
                     ? t('columns.notAssigned')
                     : `${std ?? ''}${std && sec ? ' · ' : ''}${sec ?? ''}`;
-                const statusKey = student.academicStatus.toUpperCase();
+                const statusKey = student.academicStatus?.toUpperCase() ?? '';
                 return (
                   <Link
                     href={`/institute/people/students/${student.id}`}
@@ -991,7 +993,9 @@ export default function StudentsPage() {
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {t('columns.status')}:{' '}
-                      {t(`academicStatuses.${statusKey}`, { default: student.academicStatus })}
+                      {student.academicStatus
+                        ? t(`academicStatuses.${statusKey}`, { default: student.academicStatus })
+                        : '—'}
                     </div>
                   </Link>
                 );

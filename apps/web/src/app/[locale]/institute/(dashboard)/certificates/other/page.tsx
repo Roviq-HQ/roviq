@@ -362,7 +362,7 @@ function IssueCertificateDialog({
         case 'lastName':
           return ln;
         case 'admissionNumber':
-          return selectedStudent.admissionNumber;
+          return selectedStudent.admissionNumber ?? '';
         case 'class':
           return resolveI18n(selectedStudent.currentStandardName) ?? '';
         case 'section':

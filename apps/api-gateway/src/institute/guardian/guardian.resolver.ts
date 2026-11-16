@@ -1,7 +1,12 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
-import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import {
+  AbilityGuard,
+  CheckAbility,
+  CurrentReadAccess,
+  type InstituteReadAccess,
+} from '@roviq/casl';
 import { CreateGuardianInput } from './dto/create-guardian.input';
 import {
   LinkGuardianInput,
@@ -11,6 +16,7 @@ import {
 import { ListGuardiansFilterInput } from './dto/list-guardians-filter.input';
 import { UpdateGuardianInput } from './dto/update-guardian.input';
 import { GuardianService } from './guardian.service';
+import { GuardianQueryService } from './guardian-query.service';
 import {
   GuardianLinkedStudentModel,
   GuardianLinkModel,
@@ -21,16 +27,20 @@ import {
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => GuardianModel)
 export class GuardianResolver {
-  constructor(private readonly guardianService: GuardianService) {}
+  constructor(
+    private readonly guardianService: GuardianService,
+    private readonly queries: GuardianQueryService,
+  ) {}
 
   @Query(() => [GuardianModel], {
     description: 'List all guardians in this institute, with optional free-text search',
   })
   @CheckAbility('read', 'Guardian')
   async listGuardians(
+    @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: ListGuardiansFilterInput,
   ): Promise<GuardianModel[]> {
-    return this.guardianService.list(filter) as Promise<GuardianModel[]>;
+    return this.queries.list(filter ?? {}, access);
   }
 
   @Query(() => [GuardianLinkedStudentModel], {
@@ -40,10 +50,9 @@ export class GuardianResolver {
   @CheckAbility('read', 'Guardian')
   async listLinkedStudents(
     @Args('guardianProfileId', { type: () => ID }) guardianProfileId: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<GuardianLinkedStudentModel[]> {
-    return this.guardianService.listLinkedStudents(guardianProfileId) as Promise<
-      GuardianLinkedStudentModel[]
-    >;
+    return this.queries.listLinkedStudents(guardianProfileId, access);
   }
 
   @Query(() => [StudentGuardianModel], {
@@ -53,14 +62,18 @@ export class GuardianResolver {
   @CheckAbility('read', 'Guardian')
   async listStudentGuardians(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentGuardianModel[]> {
-    return this.guardianService.listForStudent(studentProfileId) as Promise<StudentGuardianModel[]>;
+    return this.queries.listForStudent(studentProfileId, access);
   }
 
   @Query(() => GuardianModel, { description: 'Get a guardian by ID' })
   @CheckAbility('read', 'Guardian')
-  async getGuardian(@Args('id', { type: () => ID }) id: string): Promise<GuardianModel> {
-    return this.guardianService.findById(id) as Promise<GuardianModel>;
+  async getGuardian(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
+  ): Promise<GuardianModel> {
+    return this.queries.findById(id, access);
   }
 
   @Mutation(() => GuardianModel, { description: 'Create guardian, optionally link to a student' })
