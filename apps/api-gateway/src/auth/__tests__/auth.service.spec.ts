@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -14,6 +15,7 @@ import { MembershipRepository } from '../repositories/membership.repository';
 import { PlatformMembershipRepository } from '../repositories/platform-membership.repository';
 import { RefreshTokenRepository } from '../repositories/refresh-token.repository';
 import { ResellerMembershipRepository } from '../repositories/reseller-membership.repository';
+import type { RefreshTokenWithRelations } from '../repositories/types';
 import { UserRepository } from '../repositories/user.repository';
 
 function createMockUserRepo() {
@@ -1344,6 +1346,79 @@ describe('AuthService', () => {
       expect(err).toBeInstanceOf(UnauthorizedException);
       const response = (err as UnauthorizedException).getResponse() as { code?: string };
       expect(response.code).toBe('ACCOUNT_LOCKED');
+    });
+  });
+  describe('session management', () => {
+    function session(id: string, token: string): RefreshTokenWithRelations {
+      return {
+        id,
+        tokenHash: createHash('sha256').update(token).digest('hex'),
+        userId: 'user-1',
+        membershipScope: 'institute',
+        revokedAt: null,
+        revokedReason: null,
+        expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+        createdAt: new Date('2026-11-16T00:00:00.000Z'),
+        deviceInfo: null,
+        ipAddress: null,
+        userAgent: null,
+        lastUsedAt: null,
+        user: {
+          id: 'user-1',
+          username: 'session-user',
+          email: 'session@example.com',
+          status: 'ACTIVE',
+          passwordChangedAt: null,
+          mustChangePassword: false,
+        },
+        membership: null,
+      };
+    }
+
+    it('should mark only the matching active session as current', async () => {
+      const current = session('current', 'refresh');
+      const other = session('other', 'other-refresh');
+      mockRefreshTokenRepo.findActiveByUserId.mockResolvedValue([current, other]);
+
+      expect(await authService.getActiveSessions('user-1', 'refresh')).toEqual([
+        { ...current, isCurrent: true },
+        { ...other, isCurrent: false },
+      ]);
+      expect(mockRefreshTokenRepo.findActiveByUserId).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should reject a refresh token outside the active sessions', async () => {
+      mockRefreshTokenRepo.findActiveByUserId.mockResolvedValue([session('current', 'refresh')]);
+
+      await expect(authService.getActiveSessions('user-1', 'foreign-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should preserve the matching session when revoking other sessions', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'current', userId: 'user-1' });
+
+      await authService.revokeAllOtherSessions('user-1', 'refresh');
+
+      expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(
+        createHash('sha256').update('refresh').digest('hex'),
+      );
+      expect(mockRefreshTokenRepo.revokeAllOtherForUser).toHaveBeenCalledWith(
+        'user-1',
+        'current',
+        'user_initiated',
+      );
+    });
+
+    it('should reject another user refresh token before revoking anything', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'foreign', userId: 'other-user' });
+
+      await expect(authService.revokeAllOtherSessions('user-1', 'foreign-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      expect(mockRefreshTokenRepo.revokeAllOtherForUser).not.toHaveBeenCalled();
+      expect(mockAuthEventService.emit).not.toHaveBeenCalled();
     });
   });
 });

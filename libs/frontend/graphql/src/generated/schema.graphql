@@ -4336,7 +4336,10 @@ type Query {
 
   """Published report cards for the signed-in student."""
   myReportCards: [ReportCardInstanceModel!]!
-  mySessions: [SessionInfo!]!
+  mySessions(
+    """Identifies the current session without returning token hashes."""
+    currentRefreshToken: String!
+  ): [SessionInfo!]!
   mySubscription: SubscriptionModel
   notificationConfigs: [NotificationConfigModel!]!
 

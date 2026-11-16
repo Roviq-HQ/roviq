@@ -11,6 +11,19 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  sessions: {
+    title: 'sessions-title',
+    item: 'session-item',
+    current: 'session-current',
+    revoke: (id: string) => `session-revoke-${id}`,
+    revokeAll: 'sessions-revoke-all',
+    loading: 'sessions-loading',
+    empty: 'sessions-empty',
+    error: 'sessions-error',
+    retry: 'sessions-retry',
+    userAgent: 'session-user-agent',
+    ipAddress: 'session-ip-address',
+  },
   // ── Cross-cutting layout (consumed by libs/frontend/ui components) ─────
   layout: {
     topbar: 'topbar',

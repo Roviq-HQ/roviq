@@ -6,11 +6,14 @@ import type { SessionInfo } from './types';
 
 interface UseSessionsOptions {
   /** Function that fetches sessions from the API */
-  fetchSessions: (accessToken: string) => Promise<SessionInfo[]>;
+  fetchSessions: (accessToken: string, currentRefreshToken: string) => Promise<SessionInfo[]>;
   /** Function that revokes a single session */
   revokeSessionMutation: (sessionId: string, accessToken: string) => Promise<boolean>;
   /** Function that revokes all other sessions */
-  revokeAllOtherSessionsMutation: (accessToken: string) => Promise<boolean>;
+  revokeAllOtherSessionsMutation: (
+    accessToken: string,
+    currentRefreshToken: string,
+  ) => Promise<boolean>;
 }
 
 interface UseSessionsReturn {
@@ -27,29 +30,31 @@ export function useSessions({
   revokeSessionMutation,
   revokeAllOtherSessionsMutation,
 }: UseSessionsOptions): UseSessionsReturn {
-  const { getAccessToken } = useAuth();
+  const { getAccessToken, getRefreshToken } = useAuth();
   const [sessions, setSessions] = React.useState<SessionInfo[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const refetch = React.useCallback(async () => {
     const token = getAccessToken();
-    if (!token) {
-      setError('No access token');
+    const refreshToken = getRefreshToken();
+    if (!token || !refreshToken) {
+      setSessions([]);
+      setError('No active session');
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      const result = await fetchSessions(token);
+      const result = await fetchSessions(token, refreshToken);
       setSessions(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
     } finally {
       setIsLoading(false);
     }
-  }, [fetchSessions, getAccessToken]);
+  }, [fetchSessions, getAccessToken, getRefreshToken]);
 
   React.useEffect(() => {
     refetch();
@@ -67,10 +72,11 @@ export function useSessions({
 
   const revokeAllOtherSessions = React.useCallback(async () => {
     const token = getAccessToken();
-    if (!token) throw new Error('No access token');
-    await revokeAllOtherSessionsMutation(token);
+    const refreshToken = getRefreshToken();
+    if (!token || !refreshToken) throw new Error('No active session');
+    await revokeAllOtherSessionsMutation(token, refreshToken);
     await refetch();
-  }, [revokeAllOtherSessionsMutation, getAccessToken, refetch]);
+  }, [revokeAllOtherSessionsMutation, getAccessToken, getRefreshToken, refetch]);
 
   return {
     sessions,

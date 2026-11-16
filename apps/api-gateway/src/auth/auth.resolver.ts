@@ -110,8 +110,14 @@ export class AuthResolver {
 
   @Query(() => [SessionInfo])
   @UseGuards(GqlAuthGuard)
-  async mySessions(@CurrentUser() user: AuthUser): Promise<SessionInfo[]> {
-    const sessions = await this.authService.getActiveSessions(user.userId);
+  async mySessions(
+    @Args('currentRefreshToken', {
+      description: 'Identifies the current session without returning token hashes.',
+    })
+    currentRefreshToken: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<SessionInfo[]> {
+    const sessions = await this.authService.getActiveSessions(user.userId, currentRefreshToken);
     return sessions.map((s) => ({
       id: s.id,
       deviceInfo: s.deviceInfo ?? undefined,
@@ -120,7 +126,7 @@ export class AuthResolver {
       lastUsedAt: s.lastUsedAt ?? undefined,
       createdAt: s.createdAt,
       expiresAt: s.expiresAt,
-      isCurrent: false,
+      isCurrent: s.isCurrent,
     }));
   }
 
@@ -134,6 +140,7 @@ export class AuthResolver {
     return true;
   }
 
+  @NoAudit()
   @Mutation(() => Boolean)
   @UseGuards(GqlAuthGuard)
   async revokeAllOtherSessions(

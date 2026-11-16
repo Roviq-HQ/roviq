@@ -457,3 +457,15 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Do NOT:** drop `--no-recreate`. Run from a git worktree, Compose sees a different bind-mount path for `init-db.sh` and recreates the Tilt-owned Postgres container.
 
 ---
+
+## 2026-11-16 — `fixed` — Local typecheck codegen raced the Tilt gateway restart
+
+**Context:** ROV-100 runtime verification restarted `api-gateway` while `pnpm typecheck` began its `web:codegen` dependency.
+
+**Root cause:** Codegen fetches the local GraphQL schema. During the restart it received `ECONNREFUSED 127.0.0.1:3005`, so the web build could not start.
+
+**Fix:** Order these dependent checks: wait for `tilt logs api-gateway` to report startup, confirm `{ __typename }` responds at `/api/graphql`, then run `pnpm typecheck`. Keep checks independent of the gateway parallel where appropriate.
+
+**Verification:** The restarted gateway reported successful startup and readiness; the schema probe returned `Query`. The subsequent typecheck completed successfully.
+
+---
