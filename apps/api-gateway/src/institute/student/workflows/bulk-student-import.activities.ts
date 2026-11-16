@@ -25,6 +25,7 @@ import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { and, eq, sql } from 'drizzle-orm';
 import Papa from 'papaparse';
 import type { IdentityService } from '../../../auth/identity.service';
+import { nextAdmissionNumber } from '../admission-number.sequence';
 import type {
   BulkStudentImportActivities,
   RowError,
@@ -449,31 +450,6 @@ async function findStudentRoleId(db: DrizzleDB, tenantId: string): Promise<strin
   return studentRole.length > 0 ? studentRole[0].id : null;
 }
 
-/** Generate next admission number via tenant_sequences. */
-async function generateAdmissionNumber(db: DrizzleDB, tenantId: string): Promise<string> {
-  const seqResult = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'workflow:bulk-student-import.activities'),
-    async (tx) => {
-      await tx
-        .insert(tenantSequences)
-        .values({
-          tenantId,
-          sequenceName: 'adm_no',
-          currentValue: 0n,
-          formatTemplate: '{prefix}{value:04d}',
-        })
-        .onConflictDoNothing();
-
-      const result = await tx.execute(
-        sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'adm_no')`,
-      );
-      return result.rows[0] as { next_val: string; formatted: string };
-    },
-  );
-  return seqResult.formatted || `ADM-${seqResult.next_val}`;
-}
-
 /** Generate next roll number for a section+year via tenant_sequences. */
 async function generateRollNumber(
   db: DrizzleDB,
@@ -583,17 +559,16 @@ async function createStudentRecords(
   userId: string,
   membershipId: string,
 ): Promise<void> {
-  const admissionNumber =
-    row.admissionNumber ?? (await generateAdmissionNumber(ctx.db, ctx.tenantId));
-
   const targetStandardId = row.standardId ?? ctx.defaultStandardId;
   const targetSectionId = row.sectionId ?? ctx.defaultSectionId;
 
-  const newProfiles = await withTenant(
+  const { newProfiles, admissionNumber } = await withTenant(
     ctx.db,
     mkInstituteCtx(ctx.tenantId, 'workflow:bulk-student-import'),
     async (tx) => {
-      return tx
+      const admissionNumber =
+        row.admissionNumber ?? (await nextAdmissionNumber(tx, ctx.tenantId, targetStandardId));
+      const newProfiles = await tx
         .insert(studentProfiles)
         .values({
           userId,
@@ -609,6 +584,7 @@ async function createStudentRecords(
           updatedBy: ctx.createdBy,
         })
         .returning({ id: studentProfiles.id });
+      return { newProfiles, admissionNumber };
     },
   );
 

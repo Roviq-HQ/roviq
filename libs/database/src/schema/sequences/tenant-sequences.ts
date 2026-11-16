@@ -10,9 +10,10 @@ import { institutes } from '../tenant/institutes';
  * counter scoped to a tenant.
  *
  * Sequence name patterns:
- * - `adm_no` — admission numbers
+ * - `adm_no:{prefix}` — admission numbers, one series per prefix (`adm_no:` = unprefixed);
+ *   legacy shared `adm_no` is read-only, new series start after its value
  * - `roll_no:{section_id}:{academic_year_id}` — roll numbers per section per year
- * - `tc_no:{academic_year_id}` — TC serial numbers per year
+ * - `tc_no:{academic_year_id}` — TC serials per year, formatted `TC/{year label}/0001`
  * - `cert_no:{type}:{academic_year_id}` — certificate serial numbers
  * - `enquiry_no` — enquiry sequential numbers
  * - `employee_id` — staff employee IDs

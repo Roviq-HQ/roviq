@@ -34,7 +34,6 @@ import {
   studentGuardianLinks,
   studentProfiles,
   studentProfilesLive,
-  tenantSequences,
   userProfiles,
   users,
   withAdmin,
@@ -43,6 +42,7 @@ import {
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { and, eq, sql } from 'drizzle-orm';
 import type { IdentityService } from '../../../auth/identity.service';
+import { nextAdmissionNumber } from '../../student/admission-number.sequence';
 import type {
   ApplicationPayload,
   EnquiryPayload,
@@ -327,7 +327,7 @@ export function createStudentAdmissionActivities(
       tenantId,
       userId,
       membershipId,
-      _standardId,
+      standardId,
       formData,
       isRte,
       createdBy,
@@ -352,41 +352,12 @@ export function createStudentAdmissionActivities(
         return { studentProfileId: existing[0].id, admissionNumber: existing[0].admissionNumber };
       }
 
-      // Generate admission number
-      await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          await tx
-            .insert(tenantSequences)
-            .values({
-              tenantId,
-              sequenceName: 'adm_no',
-              currentValue: 0n,
-              formatTemplate: '{prefix}{value:04d}',
-            })
-            .onConflictDoNothing();
-        },
-      );
-
-      const seqResult = await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          const result = await tx.execute(
-            sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'adm_no')`,
-          );
-          return result.rows[0] as { next_val: string; formatted: string };
-        },
-      );
-
-      const admissionNumber = seqResult.formatted || `ADM-${seqResult.next_val}`;
-
       const rows = await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
         async (tx) => {
-          return tx
+          const admissionNumber = await nextAdmissionNumber(tx, tenantId, standardId);
+          const inserted = await tx
             .insert(studentProfiles)
             .values({
               userId,
@@ -404,10 +375,11 @@ export function createStudentAdmissionActivities(
               updatedBy: createdBy,
             })
             .returning({ id: studentProfiles.id });
+          return { inserted, admissionNumber };
         },
       );
 
-      return { studentProfileId: rows[0].id, admissionNumber };
+      return { studentProfileId: rows.inserted[0].id, admissionNumber: rows.admissionNumber };
     },
 
     async createStudentAcademics(

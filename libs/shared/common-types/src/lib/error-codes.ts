@@ -78,6 +78,10 @@ export const ErrorCode = {
   /** Cannot mark a student TRANSFERRED_OUT before issuing a Transfer Certificate */
   TC_REQUIRED_FOR_TRANSFER: 'TC_REQUIRED_FOR_TRANSFER',
 
+  // ── Guardian ───────────────────────────────────────────
+  /** Cannot unlink a student's only guardian — link another guardian first */
+  LAST_GUARDIAN_CANNOT_BE_DELETED: 'LAST_GUARDIAN_CANNOT_BE_DELETED',
+
   // ── Timetable ──────────────────────────────────────────
   /** Timetable not found or soft-deleted */
   TIMETABLE_NOT_FOUND: 'TIMETABLE_NOT_FOUND',
@@ -164,6 +168,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   HAS_ACTIVE_ENROLLMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
   HAS_RECORDED_ASSESSMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
   TC_REQUIRED_FOR_TRANSFER: HttpStatus.UNPROCESSABLE_ENTITY,
+  LAST_GUARDIAN_CANNOT_BE_DELETED: HttpStatus.UNPROCESSABLE_ENTITY,
   STREAM_REQUIRED: HttpStatus.BAD_REQUEST,
   SECTION_CAPACITY_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   SUBJECT_CODE_DUPLICATE: HttpStatus.CONFLICT,
