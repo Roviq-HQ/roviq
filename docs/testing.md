@@ -39,6 +39,8 @@ nx run api-gateway:test --watch
 - `pnpm ci:check` — unified gate. Runs lint/typecheck/unit/integration/e2e in parallel; locally uses `nx affected` against `origin/main`, on CI runs the full suite. Invoked by `.husky/pre-push`. Bypass: `SKIP_PREPUSH=1 git push` or `git push --no-verify`.
 - CI runs **six blocking jobs**: `lint`, `typecheck`, `test` (unit — no DB), `build`, `e2e-api` (Docker stack + Vitest E2E), `e2e-ui` (Docker stack + Playwright). Integration tests (`pnpm test:int`) run as part of the `test` job against `roviq_test` via `DATABASE_URL_TEST`. E2E jobs spin up `compose.e2e.yaml` with `--wait` and tear it down via `if: always()`.
 
+- The `e2e-ui` job pins `ubuntu-24.04` because Playwright 1.59.1 supports Ubuntu 22.04/24.04, while `ubuntu-latest` can select unsupported Ubuntu 26.04. Recheck OS support when upgrading Playwright before changing this runner.
+
 ## Docker Compose Files
 
 Compose files live under `docker/` and are selected explicitly per use case — this project does not use named `--profile` flags.
