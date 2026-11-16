@@ -27,5 +27,18 @@
     "scopePlatformBody": "Platform admin — can manage institutes, resellers, plans, and platform-wide audit logs. Signs in at admin.roviq.com. Sessions expire every 5 minutes for security.",
     "scopeResellerBody": "Reseller — can request new institutes, manage billing for their portfolio, and view reseller-level audit logs. Signs in at reseller.roviq.com. Sessions expire every 10 minutes.",
     "scopeInstituteBody": "Institute — standard user of one or more institutes (teacher, clerk, parent, student). Signs in at app.roviq.com. Sessions expire every 15 minutes with refresh token continuity."
+  },
+  "language": {
+    "title": "Language",
+    "description": "Save a language for this account across all Roviq portals. The topbar language selector changes only your current visit.",
+    "label": "Preferred language",
+    "browser": "Use browser language",
+    "saved": "Language preference saved",
+    "saveFailed": "Could not save your language. Please try again.",
+    "saving": "Saving…",
+    "loading": "Loading language preference…",
+    "loadFailed": "Could not load your saved language.",
+    "retry": "Try again",
+    "impersonating": "Language preferences cannot be changed while impersonating another account."
   }
 }

@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ForbiddenException, UseGuards } from '@nestjs/common';
 import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
 import { assertTenantContext, CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
 import { RegisterInput } from './dto/register.input';
+import { UpdateLocaleInput } from './dto/update-locale.input';
 import { extractMeta, type GqlContext } from './gql-context';
 
 @Resolver()
@@ -178,6 +179,26 @@ export class AuthResolver {
       extractMeta(ctx),
     );
     return true;
+  }
+
+  @Query(() => String, {
+    nullable: true,
+    description: 'Saved language for the authenticated account across all portals.',
+  })
+  @UseGuards(GqlAuthGuard)
+  async myPreferredLocale(@CurrentUser() user: AuthUser): Promise<string | null> {
+    return this.authService.getPreferredLocale(user.userId);
+  }
+
+  @Mutation(() => String, { nullable: true })
+  @UseGuards(GqlAuthGuard)
+  async updateMyPreferredLocale(
+    @Args('input') input: UpdateLocaleInput,
+    @CurrentUser() user: AuthUser,
+  ): Promise<string | null> {
+    if (user.isImpersonated)
+      throw new ForbiddenException('Cannot change account preferences while impersonating');
+    return this.authService.updatePreferredLocale(user.userId, input.locale ?? null);
   }
 
   // ── Me query ───────────────────────────────────────────

@@ -80,6 +80,15 @@ export class AuthService {
     private readonly eventBus: EventBusService,
   ) {}
 
+  getPreferredLocale(userId: string): Promise<string | null> {
+    return this.userRepo.getPreferredLocale(userId);
+  }
+
+  async updatePreferredLocale(userId: string, locale: string | null): Promise<string | null> {
+    await this.userRepo.updatePreferredLocale(userId, locale);
+    return locale;
+  }
+
   // ── Registration ───────────────────────────────────────
 
   async register(input: RegisterInput): Promise<AuthPayload> {

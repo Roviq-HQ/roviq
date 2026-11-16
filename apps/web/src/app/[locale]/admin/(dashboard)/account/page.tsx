@@ -20,6 +20,7 @@ import {
   FieldSet,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { LanguagePreference } from '@web/components/account/language-preference';
 import { parseISO } from 'date-fns';
 import { Check, Copy, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -250,6 +251,7 @@ export default function AccountPage() {
         </Card>
 
         {/* Passkey security (ZJRNK — encourage passkey adoption in account settings). */}
+        <LanguagePreference />
         <PasskeyManager
           mutations={passkeyMutations}
           labels={passkeyLabels}

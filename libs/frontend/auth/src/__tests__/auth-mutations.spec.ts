@@ -70,3 +70,35 @@ describe('session GraphQL requests', () => {
     });
   });
 });
+
+describe('account language GraphQL requests', () => {
+  it('should fetch the saved language using the current access token', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ data: { myPreferredLocale: 'hi' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await createAuthMutations(url).getPreferredLocale('access')).toBe('hi');
+    expect(fetchMock).toHaveBeenCalledWith(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer access' },
+      body: JSON.stringify({ query: 'query MyPreferredLocale { myPreferredLocale }' }),
+    });
+  });
+
+  it.each(['en', 'hi', null])('should save %s without accepting a user id', async (locale) => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ data: { updateMyPreferredLocale: locale } }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await createAuthMutations(url).savePreferredLocale(locale, 'access')).toBe(locale);
+    expect(fetchMock).toHaveBeenCalledWith(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer access' },
+      body: JSON.stringify({
+        query:
+          'mutation UpdateMyPreferredLocale($input: UpdateLocaleInput!) { updateMyPreferredLocale(input: $input) }',
+        variables: { input: { locale } },
+      }),
+    });
+  });
+});

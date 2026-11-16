@@ -28,7 +28,9 @@ export function LocaleSwitcher() {
   const t = useTranslations('locale');
 
   function handleLocaleChange(newLocale: string) {
-    router.replace(pathname, { locale: newLocale });
+    router.replace(`${pathname}${window.location.search}${window.location.hash}`, {
+      locale: newLocale,
+    });
   }
 
   const current = locales.find((l) => l.value === locale);
@@ -37,6 +39,7 @@ export function LocaleSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
+          title={t('switchLocale')}
           variant="ghost"
           size="icon"
           className="relative"

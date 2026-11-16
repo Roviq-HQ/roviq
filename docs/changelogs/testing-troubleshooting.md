@@ -493,3 +493,11 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Verification:** All 48 real-broker cases passed against NATS 2.10.29 on a temporary broker started through Tilt. The suite checks ACK removal, NAK retries, terminal advisories, DLQ metadata, malformed JSON recovery, headers/context, durable reconnects, bounded pull concurrency, shared workers, ordering, concurrent publishers, payload limits, and all stream settings. The library's test TypeScript check passed. Temporary test streams and DLQ resources were removed after the run.
 
 ---
+
+## 2026-11-16 — `fixed` — middleware header tests require the Node environment
+
+**Scope:** ROV-52 locale/portal middleware regressions in `apps/web/src/__tests__/middleware.spec.ts`.
+
+**Root cause:** The frontend test project defaults to happy-dom, whose browser Request implementation strips forbidden `cookie` and `host` headers. Server middleware tests consequently lost their input headers.
+
+**Fix:** Run this server middleware spec in Node via its Vitest environment directive. Assertions retain the full expected locale redirect and portal rewrite URLs.

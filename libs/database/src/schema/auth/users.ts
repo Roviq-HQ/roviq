@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   pgPolicy,
   pgTable,
   text,
@@ -20,6 +21,7 @@ export const users = pgTable(
     username: text().notNull(),
     passwordHash: text('password_hash').notNull(),
     avatarUrl: text('avatar_url'),
+    preferredLocale: text('preferred_locale'),
     status: userStatus().default('ACTIVE').notNull(),
     passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
     /** True when the user was created with a system-generated temp password and must change it before any other action. */
@@ -27,6 +29,7 @@ export const users = pgTable(
     ...timestamps,
   },
   (table) => [
+    check('users_preferred_locale_check', sql`${table.preferredLocale} IN ('en', 'hi')`),
     uniqueIndex('users_email_key').using('btree', table.email.asc().nullsLast()),
     uniqueIndex('users_username_key').using('btree', table.username.asc().nullsLast()),
     // All roles can SELECT users

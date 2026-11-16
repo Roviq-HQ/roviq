@@ -11,6 +11,12 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  accountLocale: {
+    card: 'account-language-card',
+    select: 'account-language-select',
+    option: (locale: string) => `account-language-option-${locale}`,
+    retry: 'account-language-retry',
+  },
   sessions: {
     title: 'sessions-title',
     item: 'session-item',

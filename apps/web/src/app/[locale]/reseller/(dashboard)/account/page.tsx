@@ -3,6 +3,7 @@
 import type { PasskeyManagerLabels, PasswordChangeFormLabels } from '@roviq/auth';
 import { createAuthMutations, PasskeyManager, PasswordChangeForm } from '@roviq/auth';
 import { useFormatDate } from '@roviq/i18n';
+import { LanguagePreference } from '@web/components/account/language-preference';
 import { parseISO } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -88,6 +89,7 @@ export default function AccountPage() {
       </div>
 
       <div className="grid max-w-2xl gap-6">
+        <LanguagePreference />
         <PasskeyManager
           mutations={passkeyMutations}
           labels={passkeyLabels}

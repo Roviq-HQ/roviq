@@ -288,3 +288,10 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 | institute | teacher | read students/sections/standards/subjects/timetables, CRU attendance |
 | institute | student | read timetable/subjects, read own attendance |
 | institute | parent | read timetable/attendance/students |
+
+
+## Account language
+
+`users.preferred_locale` is nullable and constrained to `en` or `hi`. `myPreferredLocale` and `updateMyPreferredLocale(input)` use the authenticated user ID in all three scopes; clients cannot target another account. Impersonated sessions may read but cannot save account preferences. Existing `users` RLS remains enabled: runtime roles can read; writes use the auth repository's existing admin wrapper.
+
+The auth context fetches the preference on account restoration/login. Saved language takes precedence after authentication (ROV-52 product decision); without a saved language, browser languages are matched in order, then English is used. Each account applies this once per document load and preserves the path, query and fragment. Locale navigation can remount providers without reapplying the saved language; a full refresh applies it again. Account settings save across visits; the topbar selector overrides only the current visit. Selecting "Use browser language" clears the account preference. Failed loads leave authentication usable and expose retry in account settings; failed saves retain the previous value.
