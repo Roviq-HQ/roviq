@@ -35,6 +35,16 @@ pnpm e2e:nuke                     # also wipe volumes and .e2e/
 nx run api-gateway:test --watch
 ```
 
+## JetStream transport integration tests
+
+Run `NATS_URL=nats://localhost:<test-port> pnpm nx run nats-jetstream:test:nats` against an isolated NATS server with JetStream enabled. The target always executes against the broker (no Nx result caching), needs no database, and runs the transport and stream-configuration suites. The same files are included in `pnpm test:int` in CI.
+
+The transport suite exercises the actual NestJS JetStream publisher and pull workers: payload/header/context propagation, ACK removal, NAK redelivery, terminal DLQ routing, malformed JSON recovery, durable reconnects, bounded pulls/concurrency, shared workers, ordered/concurrent publishing, and broker payload limits. The stream suite checks every current `STREAMS` entry, including NOTIFICATION's interest retention and DLQ's limits retention, plus idempotency without losing stored messages.
+
+Tests create UUID-prefixed streams/consumers and remove them after use. DLQ entries are purged only for each test's unique subject; an initially absent DLQ stream is removed once empty. The suite rejects an existing application DLQ consumer before publishing failures, so do not point it at an active app's broker. Start test infrastructure through Tilt and set `NATS_URL` to that broker. The default URL is `nats://localhost:4222`, matching the isolated CI broker.
+
+Current header behavior differs from the original ROV-18 wrappers: missing tenant headers yield `undefined` on `JetStreamContext` and `null` in request context; missing correlation headers stay empty on `JetStreamContext`, while request context gets a generated UUID. Explicit headers override ambient context. Oversized messages are rejected according to the broker's advertised `max_payload`; a large message within that limit must round-trip.
+
 ## CI and pre-push
 
 The local gate health-checks long-running infrastructure first, then waits for the Novu bootstrap and seed containers to exit successfully. It starts the API and notification service in that order without restarting their completed setup dependencies. Standalone setup containers use their exit status rather than `compose up --wait`, which expects a running or healthy service when no dependent is selected.

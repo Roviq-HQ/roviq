@@ -481,3 +481,15 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Verification:** The original push failed during infra startup. The corrected full `pnpm ci:check` passed lint, typecheck, unit, integration, API e2e, Playwright UI and validation gates. Four isolated regression cases cover an already-completed successful container, failed setup with diagnostics, a Docker wait error and a missing container. The tests target hashes the CI script. Tilt's dev API restarted successfully after the project configuration change.
 
 ---
+
+## 2026-11-16 — `fixed` — JetStream integration tests touched shared application streams
+
+**Scope:** NATS stream integration tests and the new ROV-54 transport suite.
+
+**Root cause:** The existing stream suite deleted every configured application stream before testing, disrupting durable consumers and pending messages on a reused broker. Transport dead letters on a shared broker also reach the application's DLQ reader. NATS tests previously required the integration runner's unrelated database migration setup.
+
+**Fix:** Give test streams and subjects unique UUID prefixes, verify every registry entry and idempotency without deleting application streams, and clean up only owned resources. Reject existing application DLQ consumers before failure tests publish messages. Add an uncached `nats-jetstream:test:nats` target for an isolated JetStream broker without database setup. Align the library's test TypeScript configuration with Vitest's ES module/bundler resolution and workspace-wide source imports, allowing its test files to be typechecked directly.
+
+**Verification:** All 48 real-broker cases passed against NATS 2.10.29 on a temporary broker started through Tilt. The suite checks ACK removal, NAK retries, terminal advisories, DLQ metadata, malformed JSON recovery, headers/context, durable reconnects, bounded pull concurrency, shared workers, ordering, concurrent publishers, payload limits, and all stream settings. The library's test TypeScript check passed. Temporary test streams and DLQ resources were removed after the run.
+
+---

@@ -4,6 +4,13 @@
   "sourceRoot": "libs/backend/nats-jetstream/src",
   "projectType": "library",
   "targets": {
+    "test:nats": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "vitest run --config libs/backend/nats-jetstream/vitest.nats.config.ts"
+      }
+    },
     "build": {
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
