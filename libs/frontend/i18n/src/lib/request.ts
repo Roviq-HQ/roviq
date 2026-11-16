@@ -1,6 +1,7 @@
 import { hasLocale } from 'next-intl';
 import { getRequestConfig } from 'next-intl/server';
 import { defaultLocale } from './config';
+import { mergeMessages } from './merge-messages';
 import { routing } from './routing';
 
 export function createRequestConfig(
@@ -20,7 +21,7 @@ export function createRequestConfig(
 
     return {
       locale,
-      messages: { ...fallbackMessages, ...messages },
+      messages: mergeMessages(fallbackMessages, messages),
       formats: {
         dateTime: {
           short: { day: 'numeric', month: 'short', year: 'numeric' },
