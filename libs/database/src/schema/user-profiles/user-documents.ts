@@ -2,9 +2,11 @@ import { sql } from 'drizzle-orm';
 import { boolean, date, index, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { userDocumentType } from '../common/enums';
+import { userScopedPolicies } from '../common/rls-policies';
 
 /**
- * Uploaded scans/photos of identity and academic documents — platform-level, NO RLS.
+ * Uploaded scans/photos of identity and academic documents — platform-level, keyed by user.
+ * RLS: readable only where the user holds a membership; writes are admin-only.
  *
  * Stores references to S3/MinIO file URLs. Document verification workflow
  * tracks approval/rejection status.
@@ -60,5 +62,8 @@ export const userDocuments = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (table) => [index('idx_user_documents_user_type').on(table.userId, table.type)],
-);
+  (table) => [
+    index('idx_user_documents_user_type').on(table.userId, table.type),
+    ...userScopedPolicies('user_documents'),
+  ],
+).enableRLS();

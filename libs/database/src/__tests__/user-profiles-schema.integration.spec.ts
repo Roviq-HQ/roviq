@@ -2,7 +2,7 @@
  * M1 User Profile Schema Integration Tests (ROV-151).
  *
  * Verifies platform-level tables: user_profiles, user_identifiers,
- * user_documents, user_addresses — NO RLS, GRANT-based access.
+ * user_documents, user_addresses — keyed by user, RLS via userScopedPolicies().
  *
  * Run: pnpm nx test database --testPathPattern=user-profiles-schema
  */
@@ -57,22 +57,32 @@ describe('ROV-151: user_profiles', () => {
   const clearExistingProfile = (client: pg.PoolClient, userId: string) =>
     client.query(`DELETE FROM user_profiles WHERE user_id = $1`, [userId]);
 
-  it('INSERT as roviq_app succeeds (no RLS blocking)', async () => {
+  it('INSERT as roviq_app is rejected by RLS (writes are admin-only)', async () => {
     await inTransaction(async (client) => {
       await clearExistingProfile(client, SEED.USER_ADMIN);
-      // Switch to roviq_app role to verify GRANTs work
       await client.query(`SET LOCAL ROLE roviq_app`);
 
-      const profileId = 'eeeeeeee-1001-0001-0001-000000000001';
-      await client.query(
-        `INSERT INTO user_profiles (id, user_id, first_name, last_name, created_by, updated_by)
-         VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $5)`,
-        [profileId, SEED.USER_ADMIN, enName('Test'), enName('User'), SEED.USER_ADMIN],
-      );
+      await expect(
+        client.query(
+          `INSERT INTO user_profiles (user_id, first_name, last_name, created_by, updated_by)
+           VALUES ($1, $2::jsonb, $3::jsonb, $1, $1)`,
+          [SEED.USER_ADMIN, enName('Test'), enName('User')],
+        ),
+      ).rejects.toThrow('new row violates row-level security policy for table "user_profiles"');
+    });
+  });
 
-      const res = await client.query(`SELECT first_name FROM user_profiles WHERE id = $1`, [
-        profileId,
-      ]);
+  it('INSERT as roviq_admin succeeds', async () => {
+    await inTransaction(async (client) => {
+      await clearExistingProfile(client, SEED.USER_ADMIN);
+      await client.query(`SET LOCAL ROLE roviq_admin`);
+
+      const res = await client.query(
+        `INSERT INTO user_profiles (user_id, first_name, last_name, created_by, updated_by)
+         VALUES ($1, $2::jsonb, $3::jsonb, $1, $1)
+         RETURNING first_name`,
+        [SEED.USER_ADMIN, enName('Test'), enName('User')],
+      );
       expect(res.rows[0].first_name).toEqual({ en: 'Test' });
     });
   });
