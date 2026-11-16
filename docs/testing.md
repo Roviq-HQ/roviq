@@ -41,7 +41,9 @@ nx run api-gateway:test --watch
 - CI runs **six blocking jobs**: `lint`, `typecheck`, `test` (unit — no DB), `build`, `e2e-api` (Docker stack + Vitest E2E), `e2e-ui` (Docker stack + Playwright). Integration tests (`pnpm test:int`) run as part of the `test` job against `roviq_test` via `DATABASE_URL_TEST`. E2E jobs spin up `compose.e2e.yaml` with `--wait` and tear it down via `if: always()`.
 
 - The `e2e-ui` job pins `ubuntu-24.04` because Playwright 1.59.1 supports Ubuntu 22.04/24.04, while `ubuntu-latest` can select unsupported Ubuntu 26.04. Recheck OS support when upgrading Playwright before changing this runner.
-- Both e2e jobs start the stack with `pnpm e2e:up` (the same command as local) and restore `.e2e/nx/cache` via `actions/cache`, so the api-gateway and notification-service builds are cache hits on most runs.
+- Both e2e jobs start the stack with `pnpm e2e:up` (the same command as local) and restore `.e2e/nx/cache` and `.e2e/nx/workspace-data` via `actions/cache` (Nx ignores the cache folder without its index in `workspace-data`), so the api-gateway and notification-service builds are cache hits on most runs.
+- After `pnpm e2e:up`, CI runs the Nx targets directly (`api-gateway-e2e:test-e2e`, `web-e2e-suite:e2e`). `pnpm test:e2e:api` / `pnpm test:e2e:ui` are for local use: they start and re-seed the stack first, which CI has already done.
+- Playwright uses its default worker count everywhere (half the logical cores: 2 on a 4-vCPU GitHub runner). Tests must stay safe under `fullyParallel`.
 
 ## Docker Compose Files
 

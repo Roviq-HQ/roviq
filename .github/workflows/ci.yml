@@ -206,9 +206,13 @@ jobs:
       - name: Provision .env for docker compose
         run: cp .env.example .env
       - name: Restore e2e Nx cache (api-gateway + notification-service builds)
+        # workspace-data holds Nx's cache index (machine.db); the cache folder
+        # alone is ignored and every task rebuilds.
         uses: actions/cache@v4
         with:
-          path: .e2e/nx/cache
+          path: |
+            .e2e/nx/cache
+            .e2e/nx/workspace-data
           key: e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
@@ -261,7 +265,9 @@ jobs:
           NATS_URL: nats://localhost:4223
         run: pnpm check:jetstream-drift
       - name: Vitest E2E API tests
-        run: pnpm test:e2e:api
+        # The stack is already up, seeded and healthy; `pnpm test:e2e:api`
+        # would start and re-seed it a second time.
+        run: pnpm nx run api-gateway-e2e:test-e2e
         env:
           API_URL: http://localhost:3004/api/graphql
           WS_URL: ws://localhost:3004/api/graphql
@@ -292,9 +298,13 @@ jobs:
       - name: Provision .env for docker compose
         run: cp .env.example .env
       - name: Restore e2e Nx cache (api-gateway + notification-service builds)
+        # workspace-data holds Nx's cache index (machine.db); the cache folder
+        # alone is ignored and every task rebuilds.
         uses: actions/cache@v4
         with:
-          path: .e2e/nx/cache
+          path: |
+            .e2e/nx/cache
+            .e2e/nx/workspace-data
           key: e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             e2e-nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
@@ -305,13 +315,15 @@ jobs:
       - name: Run codegen (Next.js dev:web needs fresh GraphQL types)
         run: pnpm codegen
       - name: Playwright E2E tests
-        run: pnpm test:e2e:ui
+        # Stack is already up; the target's e2e-seed dependency still re-seeds.
+        run: pnpm nx run web-e2e-suite:e2e
         env:
           # Playwright webServer reuses these — points API at the Docker stack
           API_URL: http://localhost:3004/api/graphql
           WS_URL: ws://localhost:3004/api/graphql
           NEXT_PUBLIC_API_URL: http://localhost:3004
           NEXT_PUBLIC_WS_URL: ws://localhost:3004
+          NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: ''
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

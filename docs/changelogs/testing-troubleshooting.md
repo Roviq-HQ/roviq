@@ -347,3 +347,23 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 - Run nx in a git worktree with `NX_WORKSPACE_ROOT_PATH` exported from another checkout — nx then uses that checkout's cache and replays stale results.
 
 ---
+
+## 2026-11-16 — `fixed` — E2E CI: Nx cache restored but unused, stack started twice, Playwright on one worker
+
+**Scope:** `.github/workflows/ci.yml` (both e2e jobs), `e2e/playwright.config.ts`. Linear: ROV-277. Follow-up to the entry above.
+
+**Evidence:** PR 242, run 43814888787, attempts 1 (cache empty) and 2 (cache restored). `Start E2E stack` was 2m38s then 3m06s for the API job: no gain from the cache. In attempt 2 the API test step took 1m50s for 33s of tests; the UI test step took 8m34s, 7.5m of it running 268 tests on one worker.
+
+**Root cause:**
+
+- Only `.e2e/nx/cache` was cached. Nx keeps the cache index in `workspace-data/machine.db`; without it every entry is treated as missing. Reproduced locally: cache folder alone, full rebuild and gateway healthy in 41s; with `workspace-data`, build step 0.3s and healthy in 22s.
+- The test steps ran `pnpm test:e2e:api` / `pnpm test:e2e:ui`, which call `pnpm e2e:up` (recreating migrate-and-seed, api-gateway and notification-service) and re-seed, on a stack the previous step had just started and seeded: ~77s (API) and ~49s (UI) per run.
+- `playwright.config.ts` forced `workers: 1` when `CI` is set.
+
+**Fix:** Cache `.e2e/nx/cache` and `.e2e/nx/workspace-data` together. Run the Nx targets directly in CI. Remove the CI worker override so Playwright uses its default (2 workers on a 4-vCPU runner); CI retries stay at 2.
+
+**Verification:** Local only so far: the cache reproduction above; the UI suite passes at 16 workers (244 passed, 19 skipped). CI timings need the next two runs (the first saves a usable cache).
+
+**Do NOT:** cache an Nx cache folder without its `workspace-data`. The Build job's `.nx/cache` restore shows the same symptom (39 MB restored, zero cache hits in attempt 2); not yet fixed.
+
+---
