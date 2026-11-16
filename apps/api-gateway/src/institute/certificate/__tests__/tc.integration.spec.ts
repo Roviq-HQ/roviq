@@ -45,7 +45,11 @@ interface StudentFixture {
   academicYearId: string;
 }
 
-async function createEnrolledStudent(db: DrizzleDB, tenantId: string): Promise<StudentFixture> {
+async function createEnrolledStudent(
+  db: DrizzleDB,
+  tenantId: string,
+  yearLabel = '2025-26',
+): Promise<StudentFixture> {
   const suffix = randomUUID().slice(0, 8);
 
   return withAdmin(db, mkAdminCtx('test:tc'), async (tx) => {
@@ -53,9 +57,9 @@ async function createEnrolledStudent(db: DrizzleDB, tenantId: string): Promise<S
       .insert(academicYears)
       .values({
         tenantId,
-        label: '2025-26',
-        startDate: '2025-04-01',
-        endDate: '2026-03-31',
+        label: yearLabel,
+        startDate: `${yearLabel.slice(0, 4)}-04-01`,
+        endDate: `${Number(yearLabel.slice(0, 4)) + 1}-03-31`,
         isActive: false,
         createdBy: SYSTEM_USER_ID,
         updatedBy: SYSTEM_USER_ID,
@@ -188,6 +192,14 @@ const REJECT_TC = /* GraphQL */ `
   }
 `;
 
+const ISSUE_TC = /* GraphQL */ `
+  mutation IssueTC($id: ID!) {
+    issueTC(id: $id) {
+      tcSerialNumber
+    }
+  }
+`;
+
 const LIST_TCS = /* GraphQL */ `
   query ListTCs($filter: ListTCFilterInput) {
     listTCs(filter: $filter) {
@@ -205,6 +217,9 @@ interface ApproveTCResponse {
 }
 interface RejectTCResponse {
   rejectTC: { id: string; status: string };
+}
+interface IssueTCResponse {
+  issueTC: { tcSerialNumber: string };
 }
 interface ListTCsResponse {
   listTCs: ReadonlyArray<{ id: string; status: string }>;
@@ -352,5 +367,45 @@ describe('TCResolver (integration)', () => {
     });
     expect(response.errors).toBeDefined();
     expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+  });
+  // ROV-173 compliance #8: the counter resets per academic year, so the year label keeps serials unique.
+  it('issueTC numbers TCs per academic year as TC/<year>/NNNN, unique across years', async () => {
+    const nextYear = await createEnrolledStudent(result.db, tenantId, '2026-27');
+    const approvedTc = async (target: StudentFixture) => {
+      const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .insert(tcRegister)
+          .values({
+            tenantId,
+            studentProfileId: target.studentProfileId,
+            academicYearId: target.academicYearId,
+            tcSerialNumber: `TC-TMP-${randomUUID()}`,
+            status: TcStatus.APPROVED,
+            reason: 'Serial numbering test',
+            requestedBy: SYSTEM_USER_ID,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: tcRegister.id }),
+      );
+      return tc.id;
+    };
+    const issue = async (id: string) => {
+      const response = await gqlRequest<IssueTCResponse>(result.httpServer, {
+        query: ISSUE_TC,
+        token: instituteToken,
+        variables: { id },
+      });
+      expect(response.errors).toBeUndefined();
+      return response.data?.issueTC.tcSerialNumber;
+    };
+
+    const first = await approvedTc(fixture);
+    const second = await approvedTc(fixture);
+    const nextYearFirst = await approvedTc(nextYear);
+
+    expect(await issue(first)).toBe('TC/2025-26/0001');
+    expect(await issue(second)).toBe('TC/2025-26/0002');
+    expect(await issue(nextYearFirst)).toBe('TC/2026-27/0001');
   });
 });

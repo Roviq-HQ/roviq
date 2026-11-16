@@ -23,13 +23,13 @@ import {
   studentProfilesLive,
   tcRegister,
   tcRegisterLive,
-  tenantSequences,
   userProfiles,
   withAdmin,
   withTenant,
 } from '@roviq/database';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { eq, sql } from 'drizzle-orm';
+import { nextTcSerialNumber } from '../tc-serial';
 import type { CbseTcData, TCIssuanceActivities } from './tc-issuance.types';
 
 const logger = new Logger('TCIssuanceActivities');
@@ -469,55 +469,33 @@ export function createTCIssuanceActivities(
     async issueTC(tenantId, tcRegisterId, studentProfileId, academicYearId) {
       logger.log(`Issuing TC ${tcRegisterId}`);
 
-      // Generate TC serial number
-      const tcSerialNumber = await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
-        async (tx) => {
-          const seqName = `tc_no:${academicYearId}`;
-          await tx
-            .insert(tenantSequences)
-            .values({
-              tenantId,
-              sequenceName: seqName,
-              currentValue: 0n,
-              formatTemplate: 'TC/{value:04d}',
-            })
-            .onConflictDoNothing();
-
-          const result = await tx.execute(
-            sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, ${seqName})`,
-          );
-          const row = result.rows[0] as { next_val: string; formatted: string };
-          return row.formatted || `TC/${row.next_val}`;
-        },
-      );
-
       const today = new Date().toISOString().split('T')[0];
 
       // TODO: Generate PDF with Handlebars template + QR code
       // Stub: use placeholder PDF URL
       const pdfUrl = `/api/storage/tc/${tenantId}/${tcRegisterId}.pdf`;
-      const qrVerificationUrl = `/tc/verify/${tcSerialNumber}`;
 
-      // Update tc_register: status, serial, PDF URL, and set dateOfIssue inside tc_data (single UPDATE)
-      await withTenant(
+      // Serial + status in one transaction so a failed attempt doesn't burn a number
+      const tcSerialNumber = await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
+          const serial = await nextTcSerialNumber(tx, tenantId, academicYearId);
           await tx
             .update(tcRegister)
             .set({
               status: TcStatus.ISSUED,
-              tcSerialNumber,
+              tcSerialNumber: serial,
               issuedAt: new Date(),
               pdfUrl,
-              qrVerificationUrl,
+              qrVerificationUrl: `/tc/verify/${serial}`,
               tcData: sql`jsonb_set(COALESCE(tc_data, '{}'), '{dateOfIssue}', to_jsonb(${today}::text))`,
             })
             .where(eq(tcRegister.id, tcRegisterId));
+          return serial;
         },
       );
+      const qrVerificationUrl = `/tc/verify/${tcSerialNumber}`;
 
       // Update student_profile: mark transferred_out (PRD §5.1 Step 5)
       await withTenant(

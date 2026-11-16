@@ -35,7 +35,7 @@ Resolvers live under [apps/api-gateway/src/institute/certificate/](apps/api-gate
 
 ## Database schema
 
-- [`tc_register`](libs/database/src/schema/admission/tc-register.ts) — TC serial number, student FK, reason, status enum, issue date, duplicate flag.
+- [`tc_register`](libs/database/src/schema/admission/tc-register.ts) — TC serial number, student FK, reason, status enum, issue date, duplicate flag. Serials are `TC/{academic year label}/NNNN` (for example `TC/2025-26/0001`). The counter restarts each academic year, and the year label keeps serials unique per tenant ([tc-serial.ts](apps/api-gateway/src/institute/certificate/tc-serial.ts)).
 - [`issued_certificates`](libs/database/src/schema/admission/issued-certificates.ts) — certificate instances with template FK, rendered PDF URL, serial number.
 - [`certificate_templates`](libs/database/src/schema/admission/certificate-templates.ts) — tenant-configurable templates (bonafide, character, migration).
 - [`groups`](libs/database/src/schema/groups/groups.ts) — dynamic student cohort definitions (backend only — see Known gaps).
