@@ -31,20 +31,23 @@ export async function persistSessionStorage(page: Page): Promise<void> {
  * contexts (browser.newContext) that don't get the console-guardian page-fixture init script.
  */
 export async function addSessionRestoreInitScript(context: BrowserContext): Promise<void> {
-  await context.addInitScript((prefix) => {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith(prefix)) {
-          const realKey = key.slice(prefix.length);
-          const val = localStorage.getItem(key);
-          if (val !== null) sessionStorage.setItem(realKey, val);
-        }
+  await context.addInitScript(restoreCapturedSession, E2E_SESSION_PREFIX);
+}
+
+export function restoreCapturedSession(prefix: string): void {
+  try {
+    const capturedKeys = Object.keys(localStorage).filter((key) => key.startsWith(prefix));
+    for (const key of capturedKeys) {
+      const realKey = key.slice(prefix.length);
+      const value = localStorage.getItem(key);
+      if (value !== null && sessionStorage.getItem(realKey) === null) {
+        sessionStorage.setItem(realKey, value);
       }
-    } catch {
-      // Cross-origin contexts deny localStorage access — safe to ignore
+      localStorage.removeItem(key);
     }
-  }, E2E_SESSION_PREFIX);
+  } catch {
+    // Cross-origin frames can deny storage access.
+  }
 }
 
 /**

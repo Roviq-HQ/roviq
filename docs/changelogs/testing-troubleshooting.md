@@ -517,3 +517,8 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 ## 2026-11-17 — fixed: classic JSX runtime in the i18n library tests
 
 ROV-86 introduced the library's first React context provider. The per-library Nx Vitest configuration uses the classic JSX runtime, while the root DOM project uses the automatic runtime. The provider now uses React's `createElement`, and its regression test does the same, so both supported runners execute the same provider without a missing `React` global. Verified with `pnpm test` and the root unit suite.
+
+
+## 2026-11-17 — fixed: captured E2E sessions overwrote institute switches
+
+The session restore init script replayed the storage-state access token on every navigation. An institute switch rotated the token and user metadata, then a reload restored the old token, leaving authentication scoped to one institute and the stored user scoped to another. ROV-86's current-institute data check correctly refused that mismatch. Both shared init-script entry points now consume captured session values once and preserve any existing current session. Unit regression coverage also proves logout cannot resurrect the captured token. The Playwright institute-language journey verifies switching to another institute and back after a locale change.

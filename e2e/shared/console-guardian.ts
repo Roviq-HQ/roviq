@@ -27,7 +27,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { test as base, type ConsoleMessage, expect } from '@playwright/test';
 import { formatGraphQLError } from '@roviq/common-types';
 import type { GraphQLFormattedError } from 'graphql';
-import { E2E_SESSION_PREFIX } from './auth-helpers';
+import { E2E_SESSION_PREFIX, restoreCapturedSession } from './auth-helpers';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -131,20 +131,7 @@ export const test = base.extend<ConsoleGuardianFixture>({
   page: async ({ page, failOnConsoleErrors, checkAccessibility }, use, testInfo) => {
     // Restore sessionStorage tokens from localStorage (persisted by auth setup).
     // addInitScript runs before any page script on every navigation.
-    await page.addInitScript((prefix) => {
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key?.startsWith(prefix)) {
-            const realKey = key.slice(prefix.length);
-            const val = localStorage.getItem(key);
-            if (val !== null) sessionStorage.setItem(realKey, val);
-          }
-        }
-      } catch {
-        // Cross-origin contexts deny localStorage access — safe to ignore
-      }
-    }, E2E_SESSION_PREFIX);
+    await page.addInitScript(restoreCapturedSession, E2E_SESSION_PREFIX);
 
     const errors: ConsoleEntry[] = [];
     const warnings: ConsoleEntry[] = [];
