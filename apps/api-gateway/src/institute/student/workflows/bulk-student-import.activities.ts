@@ -11,7 +11,7 @@ import {
   memberships,
   mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   studentAcademics,
   studentProfiles,
@@ -386,9 +386,9 @@ async function findUserByPhone(db: DrizzleDB, phone: string): Promise<string | n
     mkAdminCtx('workflow:bulk-student-import.activities'),
     async (tx) => {
       return tx
-        .select({ userId: phoneNumbers.userId })
-        .from(phoneNumbers)
-        .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, phone)))
+        .select({ userId: phoneNumbersLive.userId })
+        .from(phoneNumbersLive)
+        .where(and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)))
         .limit(1);
     },
   );
@@ -420,12 +420,13 @@ async function createUser(
   identityService: IdentityService,
   row: ValidatedRow,
   tenantId: string,
+  actorId: string,
 ): Promise<string> {
   const email = row.email ?? `student-${Date.now()}-${row.rowNumber}@roviq.placeholder`;
   const username = `student-${tenantId.slice(0, 8)}-${Date.now()}-${row.rowNumber}`;
   const phone = row.phone ? { countryCode: '+91', number: row.phone } : undefined;
 
-  const { userId } = await identityService.createUser({ email, username, phone });
+  const { userId } = await identityService.createUser({ email, username, phone, actorId });
   return userId;
 }
 
@@ -648,7 +649,7 @@ async function insertSingleRow(
   if (userId) {
     logger.log(`Row ${row.rowNumber}: Found existing user by phone ${row.phone}`);
   } else {
-    userId = await createUser(ctx.identityService, row, ctx.tenantId);
+    userId = await createUser(ctx.identityService, row, ctx.tenantId, ctx.createdBy);
   }
 
   // Create user_profile (idempotent)

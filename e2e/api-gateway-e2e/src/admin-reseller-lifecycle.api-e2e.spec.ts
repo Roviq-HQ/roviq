@@ -48,8 +48,8 @@ async function insertTestReseller(
       : null;
 
   await pool.query(
-    `INSERT INTO resellers (id, name, slug, tier, is_system, is_active, status, suspended_at)
-     VALUES ($1, $2, $3, 'FULL_MANAGEMENT', false, $4, $5, $6)
+    `INSERT INTO resellers (id, name, slug, tier, is_system, is_active, status, suspended_at, created_by, updated_by)
+     VALUES ($1, $2, $3, 'FULL_MANAGEMENT', false, $4, $5, $6, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')
      ON CONFLICT (id) DO UPDATE
        SET status = EXCLUDED.status,
            is_active = EXCLUDED.is_active,

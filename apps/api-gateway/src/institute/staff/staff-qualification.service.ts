@@ -10,10 +10,10 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
-  mkAdminCtx,
   mkInstituteCtx,
+  softDelete,
   staffQualifications,
-  withAdmin,
+  staffQualificationsLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -40,9 +40,9 @@ export class StaffQualificationService {
       async (tx) => {
         const rows = await tx
           .select()
-          .from(staffQualifications)
-          .where(eq(staffQualifications.staffProfileId, staffProfileId))
-          .orderBy(asc(staffQualifications.type), asc(staffQualifications.degreeName));
+          .from(staffQualificationsLive)
+          .where(eq(staffQualificationsLive.staffProfileId, staffProfileId))
+          .orderBy(asc(staffQualificationsLive.type), asc(staffQualificationsLive.degreeName));
         return rows;
       },
     );
@@ -50,6 +50,7 @@ export class StaffQualificationService {
 
   async create(input: CreateStaffQualificationInput) {
     const tenantId = this.tenantId;
+    const actorId = getRequestContext().userId;
     return withTenant(
       this.db,
       mkInstituteCtx(tenantId, 'service:staff-qualification'),
@@ -57,6 +58,8 @@ export class StaffQualificationService {
         const rows = await tx
           .insert(staffQualifications)
           .values({
+            createdBy: actorId,
+            updatedBy: actorId,
             staffProfileId: input.staffProfileId,
             tenantId,
             type: input.type,
@@ -88,6 +91,8 @@ export class StaffQualificationService {
         if (input.gradePercentage !== undefined) patch.gradePercentage = input.gradePercentage;
         if (input.certificateUrl !== undefined) patch.certificateUrl = input.certificateUrl;
 
+        patch.updatedBy = getRequestContext().userId;
+
         const rows = await tx
           .update(staffQualifications)
           .set(patch)
@@ -103,21 +108,13 @@ export class StaffQualificationService {
   }
 
   async delete(id: string): Promise<boolean> {
-    const tenantId = this.tenantId;
-    // The `staff_qualifications` table blocks DELETE for `roviq_app` via
-    // `tenantPoliciesSimple` (USING (false)) and has no soft-delete columns,
-    // so the hard-delete must run through the admin policy. Tenant isolation
-    // is re-enforced here by the explicit `tenant_id = :tenantId` predicate
-    // in the WHERE clause, making the operation cross-tenant-safe.
-    return withAdmin(this.db, mkAdminCtx('service:staff-qualification'), async (tx) => {
-      const rows = await tx
-        .delete(staffQualifications)
-        .where(and(eq(staffQualifications.id, id), eq(staffQualifications.tenantId, tenantId)))
-        .returning({ id: staffQualifications.id });
-      if (rows.length === 0) {
-        throw new NotFoundException(`Staff qualification ${id} not found`);
-      }
-      return true;
-    });
+    await withTenant(
+      this.db,
+      mkInstituteCtx(this.tenantId, 'service:staff-qualification'),
+      async (tx) => {
+        await softDelete(tx, staffQualifications, id);
+      },
+    );
+    return true;
   }
 }

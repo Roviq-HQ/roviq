@@ -30,6 +30,8 @@ export interface CreateUserInput {
   /** Display name for the welcome message. */
   firstName?: string;
   lastName?: string;
+  /** Recorded as created_by — `SYSTEM_USER_ID` for unattended flows. */
+  actorId: string;
 }
 
 export interface CreateUserResult {
@@ -61,7 +63,6 @@ export interface CreateUserWithMembershipInput extends CreateUserInput {
   resellerId?: string;
   roleId: string;
   abilities?: AbilityRule[];
-  actorId: string;
   /** Skip emitting NOTIFICATION.user.created for cases where the caller emits its own welcome (e.g. bulk import sends a single batch notification). */
   skipWelcomeNotification?: boolean;
 }
@@ -103,6 +104,8 @@ export class IdentityService {
       return tx
         .insert(users)
         .values({
+          createdBy: input.actorId,
+          updatedBy: input.actorId,
           email: input.email,
           username: input.username,
           passwordHash,
@@ -117,6 +120,8 @@ export class IdentityService {
         await tx
           .insert(phoneNumbers)
           .values({
+            createdBy: input.actorId,
+            updatedBy: input.actorId,
             userId: row.id,
             countryCode: phone.countryCode,
             number: phone.number,
@@ -166,6 +171,8 @@ export class IdentityService {
           return tx
             .insert(resellerMemberships)
             .values({
+              createdBy: input.actorId,
+              updatedBy: input.actorId,
               userId: input.userId,
               resellerId,
               roleId: input.roleId,
@@ -183,6 +190,8 @@ export class IdentityService {
       return tx
         .insert(platformMemberships)
         .values({
+          createdBy: input.actorId,
+          updatedBy: input.actorId,
           userId: input.userId,
           roleId: input.roleId,
           isActive: true,
@@ -202,6 +211,7 @@ export class IdentityService {
       phone: input.phone,
       firstName: input.firstName,
       lastName: input.lastName,
+      actorId: input.actorId,
     });
 
     const membership = await this.createMembership({

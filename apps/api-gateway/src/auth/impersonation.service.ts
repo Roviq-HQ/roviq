@@ -18,11 +18,11 @@ import {
   institutesLive,
   membershipsLive,
   mkAdminCtx,
-  phoneNumbers,
-  platformMemberships,
-  resellerMemberships,
+  phoneNumbersLive,
+  platformMembershipsLive,
+  resellerMembershipsLive,
   rolesLive,
-  users,
+  usersLive,
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -142,9 +142,9 @@ export class ImpersonationService {
     // Verify target user exists and is active
     const targetUser = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
-        .select({ id: users.id, status: users.status })
-        .from(users)
-        .where(eq(users.id, targetUserId))
+        .select({ id: usersLive.id, status: usersLive.status })
+        .from(usersLive)
+        .where(eq(usersLive.id, targetUserId))
         .limit(1),
     );
 
@@ -203,12 +203,12 @@ export class ImpersonationService {
         mkAdminCtx('service:impersonation'),
         (tx) =>
           tx
-            .select({ resellerId: resellerMemberships.resellerId })
-            .from(resellerMemberships)
+            .select({ resellerId: resellerMembershipsLive.resellerId })
+            .from(resellerMembershipsLive)
             .where(
               and(
-                eq(resellerMemberships.userId, impersonatorUserId),
-                eq(resellerMemberships.isActive, true),
+                eq(resellerMembershipsLive.userId, impersonatorUserId),
+                eq(resellerMembershipsLive.isActive, true),
               ),
             )
             .limit(1),
@@ -376,9 +376,9 @@ export class ImpersonationService {
       (tx) =>
         Promise.all([
           tx
-            .select({ id: users.id, username: users.username })
-            .from(users)
-            .where(and(eq(users.id, targetUserId), eq(users.status, 'ACTIVE')))
+            .select({ id: usersLive.id, username: usersLive.username })
+            .from(usersLive)
+            .where(and(eq(usersLive.id, targetUserId), eq(usersLive.status, 'ACTIVE')))
             .limit(1),
           tx
             .select({
@@ -551,9 +551,9 @@ export class ImpersonationService {
 
       if (opts.resellerId) {
         const staff = await tx
-          .select({ userId: resellerMemberships.userId })
-          .from(resellerMemberships)
-          .where(eq(resellerMemberships.resellerId, opts.resellerId));
+          .select({ userId: resellerMembershipsLive.userId })
+          .from(resellerMembershipsLive)
+          .where(eq(resellerMembershipsLive.resellerId, opts.resellerId));
         const staffIds = staff.map((s) => s.userId);
         if (staffIds.length === 0) return [];
         conditions.push(inArray(impersonationSessions.impersonatorId, staffIds));
@@ -561,9 +561,9 @@ export class ImpersonationService {
       if (opts.sessionId) conditions.push(eq(impersonationSessions.id, opts.sessionId));
       if (opts.activeOnly) conditions.push(isNull(impersonationSessions.endedAt));
 
-      const impersonator = alias(users, 'impersonator');
-      const target = alias(users, 'target_user');
-      const verifier = alias(users, 'otp_verifier');
+      const impersonator = alias(usersLive, 'impersonator');
+      const target = alias(usersLive, 'target_user');
+      const verifier = alias(usersLive, 'otp_verifier');
 
       const rows = await tx
         .select({
@@ -638,22 +638,22 @@ export class ImpersonationService {
 
     if (platformIds.length) {
       const found = await tx
-        .select({ userId: platformMemberships.userId, roleName: rolesLive.name })
-        .from(platformMemberships)
-        .innerJoin(rolesLive, eq(rolesLive.id, platformMemberships.roleId))
-        .where(inArray(platformMemberships.userId, platformIds));
+        .select({ userId: platformMembershipsLive.userId, roleName: rolesLive.name })
+        .from(platformMembershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, platformMembershipsLive.roleId))
+        .where(inArray(platformMembershipsLive.userId, platformIds));
       for (const r of found) platformRoles.set(r.userId, r.roleName);
     }
 
     if (resellerIds.length) {
       const found = await tx
-        .select({ userId: resellerMemberships.userId, roleName: rolesLive.name })
-        .from(resellerMemberships)
-        .innerJoin(rolesLive, eq(rolesLive.id, resellerMemberships.roleId))
+        .select({ userId: resellerMembershipsLive.userId, roleName: rolesLive.name })
+        .from(resellerMembershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, resellerMembershipsLive.roleId))
         .where(
           and(
-            inArray(resellerMemberships.userId, resellerIds),
-            eq(resellerMemberships.isActive, true),
+            inArray(resellerMembershipsLive.userId, resellerIds),
+            eq(resellerMembershipsLive.isActive, true),
           ),
         );
       // First active reseller membership wins — display only.
@@ -795,11 +795,13 @@ export class ImpersonationService {
     const [phoneRow] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
-          countryCode: phoneNumbers.countryCode,
-          number: phoneNumbers.number,
+          countryCode: phoneNumbersLive.countryCode,
+          number: phoneNumbersLive.number,
         })
-        .from(phoneNumbers)
-        .where(and(eq(phoneNumbers.userId, adminRow.userId), eq(phoneNumbers.isPrimary, true)))
+        .from(phoneNumbersLive)
+        .where(
+          and(eq(phoneNumbersLive.userId, adminRow.userId), eq(phoneNumbersLive.isPrimary, true)),
+        )
         .limit(1),
     );
 

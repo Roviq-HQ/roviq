@@ -312,21 +312,21 @@ describe('M7: bot_profiles CHECK constraints', () => {
   });
 });
 
-// ── privacy_notices: UNIQUE(tenant_id, version, language) ───
+// ── privacy_notices: UNIQUE(tenant_id, notice_version, language) ───
 
-describe('M7: privacy_notices UNIQUE(tenant_id, version, language)', () => {
+describe('M7: privacy_notices UNIQUE(tenant_id, notice_version, language)', () => {
   it('duplicate version+language for same tenant fails', async () => {
     await inTransaction(async (client) => {
       await client.query(
-        `INSERT INTO privacy_notices (id, tenant_id, version, language, content, is_active)
-         VALUES ($1, $2, 1, 'en', 'Privacy notice v1 English', true)`,
+        `INSERT INTO privacy_notices (id, tenant_id, notice_version, language, content, is_active, created_by, updated_by)
+         VALUES ($1, $2, 1, 'en', 'Privacy notice v1 English', true, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         ['ffffffff-b001-0001-0001-000000000001', SEED.INSTITUTE_1],
       );
 
       const err = await client
         .query(
-          `INSERT INTO privacy_notices (id, tenant_id, version, language, content, is_active)
-           VALUES ($1, $2, 1, 'en', 'Duplicate notice', false)`,
+          `INSERT INTO privacy_notices (id, tenant_id, notice_version, language, content, is_active, created_by, updated_by)
+           VALUES ($1, $2, 1, 'en', 'Duplicate notice', false, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['ffffffff-b001-0001-0001-000000000002', SEED.INSTITUTE_1],
         )
         .catch((e: Error) => e);

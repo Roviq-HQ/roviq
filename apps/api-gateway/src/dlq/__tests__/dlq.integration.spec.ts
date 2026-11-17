@@ -109,8 +109,8 @@ async function createReplayUser(): Promise<string> {
   const id = randomUUID();
   createdUserIds.push(id);
   await superPool.query(
-    `INSERT INTO users (id, username, email, password_hash)
-     VALUES ($1, $2, $3, 'not-a-real-hash')`,
+    `INSERT INTO users (id, username, email, password_hash, created_by, updated_by)
+     VALUES ($1, $2, $3, 'not-a-real-hash', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
     [id, `dlq-replayer-${id.slice(-8)}`, `dlq-${id.slice(-8)}@test.local`],
   );
   return id;

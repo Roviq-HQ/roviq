@@ -1,7 +1,7 @@
 import type { AbilityRule } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import { boolean, jsonb, pgPolicy, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { timestamps } from '../common/columns';
+import { entityColumns } from '../common/columns';
 import { roviqAdmin } from '../common/rls-policies';
 import { roles } from '../tenant/roles';
 import { users } from './users';
@@ -18,10 +18,12 @@ export const platformMemberships = pgTable(
       .references(() => roles.id),
     abilities: jsonb().$type<AbilityRule[]>().default([]),
     isActive: boolean('is_active').default(true).notNull(),
-    ...timestamps,
+    ...entityColumns,
   },
   (table) => [
-    uniqueIndex('uq_platform_membership_user').on(table.userId),
+    uniqueIndex('uq_platform_membership_user')
+      .on(table.userId)
+      .where(sql`${table.deletedAt} IS NULL`),
     // Only admin can access platform memberships — default deny for roviq_app and roviq_reseller
     pgPolicy('platform_membership_admin', {
       for: 'all',

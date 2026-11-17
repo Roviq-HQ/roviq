@@ -29,9 +29,12 @@ import {
   mkInstituteCtx,
   phoneNumbers,
   rolesLive,
+  softDelete,
   studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
   userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -89,18 +92,18 @@ export class GuardianService {
       createdAt: guardianProfilesLive.createdAt,
       updatedAt: guardianProfilesLive.updatedAt,
       // user_profile join
-      firstName: userProfiles.firstName,
-      lastName: userProfiles.lastName,
-      profileImageUrl: userProfiles.profileImageUrl,
-      gender: userProfiles.gender,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+      profileImageUrl: userProfilesLive.profileImageUrl,
+      gender: userProfilesLive.gender,
       // phone_numbers join (primary phone only)
       primaryPhone: phoneNumbers.number,
       // Scalar subquery: count of linked students (excludes soft-deleted links).
       // Cast to int so Drizzle returns `number`, not `string` (PG COUNT returns bigint).
       linkedStudentCount: sql<number>`(
         SELECT COUNT(*)::int
-        FROM ${studentGuardianLinks}
-        WHERE ${studentGuardianLinks.guardianProfileId} = ${guardianProfilesLive.id}
+        FROM ${studentGuardianLinksLive}
+        WHERE ${studentGuardianLinksLive.guardianProfileId} = ${guardianProfilesLive.id}
       )`.as('linked_student_count'),
     } as const;
   }
@@ -114,7 +117,7 @@ export class GuardianService {
         return tx
           .select(this.guardianSelect())
           .from(guardianProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, guardianProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
           .leftJoin(
             phoneNumbers,
             and(
@@ -143,6 +146,7 @@ export class GuardianService {
       email,
       username,
       phone,
+      actorId: this.userId,
     });
     const newUser = { id: newUserId };
 
@@ -152,6 +156,8 @@ export class GuardianService {
         await tx
           .insert(phoneNumbers)
           .values({
+            createdBy: this.userId,
+            updatedBy: this.userId,
             userId: newUser.id,
             countryCode: '+91',
             number: phone,
@@ -328,9 +334,9 @@ export class GuardianService {
       mkInstituteCtx(tenantId, 'service:guardian'),
       async (tx) => {
         return tx
-          .select({ studentProfileId: studentGuardianLinks.studentProfileId })
-          .from(studentGuardianLinks)
-          .where(eq(studentGuardianLinks.guardianProfileId, id));
+          .select({ studentProfileId: studentGuardianLinksLive.studentProfileId })
+          .from(studentGuardianLinksLive)
+          .where(eq(studentGuardianLinksLive.guardianProfileId, id));
       },
     );
 
@@ -340,12 +346,12 @@ export class GuardianService {
         mkInstituteCtx(tenantId, 'service:guardian'),
         async (tx) => {
           return tx
-            .select({ id: studentGuardianLinks.id })
-            .from(studentGuardianLinks)
+            .select({ id: studentGuardianLinksLive.id })
+            .from(studentGuardianLinksLive)
             .where(
               and(
-                eq(studentGuardianLinks.studentProfileId, link.studentProfileId),
-                sql`${studentGuardianLinks.guardianProfileId} != ${id}`,
+                eq(studentGuardianLinksLive.studentProfileId, link.studentProfileId),
+                sql`${studentGuardianLinksLive.guardianProfileId} != ${id}`,
               ),
             )
             .limit(1);
@@ -411,7 +417,7 @@ export class GuardianService {
       await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
         await tx
           .update(studentGuardianLinks)
-          .set({ isPrimaryContact: false })
+          .set({ isPrimaryContact: false, updatedBy: this.userId })
           .where(
             and(
               eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
@@ -430,6 +436,8 @@ export class GuardianService {
           const rows = await tx
             .insert(studentGuardianLinks)
             .values({
+              createdBy: this.userId,
+              updatedBy: this.userId,
               tenantId,
               studentProfileId: input.studentProfileId,
               guardianProfileId: input.guardianProfileId,
@@ -471,11 +479,11 @@ export class GuardianService {
       async (tx) => {
         return tx
           .select()
-          .from(studentGuardianLinks)
+          .from(studentGuardianLinksLive)
           .where(
             and(
-              eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
-              eq(studentGuardianLinks.guardianProfileId, input.guardianProfileId),
+              eq(studentGuardianLinksLive.studentProfileId, input.studentProfileId),
+              eq(studentGuardianLinksLive.guardianProfileId, input.guardianProfileId),
             ),
           )
           .limit(1);
@@ -496,9 +504,9 @@ export class GuardianService {
       mkInstituteCtx(tenantId, 'service:guardian'),
       async (tx) => {
         return tx
-          .select({ id: studentGuardianLinks.id })
-          .from(studentGuardianLinks)
-          .where(eq(studentGuardianLinks.studentProfileId, input.studentProfileId));
+          .select({ id: studentGuardianLinksLive.id })
+          .from(studentGuardianLinksLive)
+          .where(eq(studentGuardianLinksLive.studentProfileId, input.studentProfileId));
       },
     );
 
@@ -509,9 +517,8 @@ export class GuardianService {
       );
     }
 
-    // Delete the link
     await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      await tx.delete(studentGuardianLinks).where(eq(studentGuardianLinks.id, link[0].id));
+      await softDelete(tx, studentGuardianLinks, link[0].id);
     });
 
     // If new primary provided, set it
@@ -520,7 +527,7 @@ export class GuardianService {
       await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
         await tx
           .update(studentGuardianLinks)
-          .set({ isPrimaryContact: true })
+          .set({ isPrimaryContact: true, updatedBy: this.userId })
           .where(
             and(
               eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
@@ -550,6 +557,7 @@ export class GuardianService {
           .set({
             canPickup: false,
             isPrimaryContact: false,
+            updatedBy: this.userId,
           })
           .where(
             and(
@@ -577,14 +585,14 @@ export class GuardianService {
     return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
       return tx
         .select({
-          linkId: studentGuardianLinks.id,
-          studentProfileId: studentGuardianLinks.studentProfileId,
-          relationship: studentGuardianLinks.relationship,
-          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-          canPickup: studentGuardianLinks.canPickup,
+          linkId: studentGuardianLinksLive.id,
+          studentProfileId: studentGuardianLinksLive.studentProfileId,
+          relationship: studentGuardianLinksLive.relationship,
+          isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
+          canPickup: studentGuardianLinksLive.canPickup,
         })
-        .from(studentGuardianLinks)
-        .where(eq(studentGuardianLinks.guardianProfileId, guardianProfileId));
+        .from(studentGuardianLinksLive)
+        .where(eq(studentGuardianLinksLive.guardianProfileId, guardianProfileId));
     });
   }
 }

@@ -79,6 +79,8 @@ async function createTenantWithStudent(db: DrizzleDB, resellerId: string): Promi
     const [user] = await tx
       .insert(users)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         email: `rls_stu_${suffix}@test.local`,
         username: `rls_stu_${suffix}`,
         passwordHash: 'not-a-real-hash',
@@ -143,7 +145,12 @@ async function createIsolatedReseller(db: DrizzleDB): Promise<string> {
   return withAdmin(db, mkAdminCtx('test:rls-cross-scope'), async (tx) => {
     const [r] = await tx
       .insert(resellers)
-      .values({ name: `RLS Reseller ${suffix}`, slug: `rls-reseller-${suffix}` })
+      .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        name: `RLS Reseller ${suffix}`,
+        slug: `rls-reseller-${suffix}`,
+      })
       .returning({ id: resellers.id });
     return r.id;
   });
@@ -314,6 +321,8 @@ describe.skipIf(!hasTestDb)('RLS cross-scope isolation', () => {
       tx
         .insert(users)
         .values({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           email: `rls_cross_${suffix}@test.local`,
           username: `rls_cross_${suffix}`,
           passwordHash: 'not-a-real-hash',

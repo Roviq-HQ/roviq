@@ -137,9 +137,12 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
       [foreignGuardian, [studentIds[2]]],
     ] as const) {
       const tenantId = person === foreignGuardian ? foreignTenant.tenantId : tenant.tenantId;
-      await tx
-        .insert(userProfiles)
-        .values({ userId: person.userId, firstName: { en: 'Test guardian' } });
+      await tx.insert(userProfiles).values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        userId: person.userId,
+        firstName: { en: 'Test guardian' },
+      });
       const [guardian] = await tx
         .insert(guardianProfiles)
         .values({
@@ -153,6 +156,8 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
       guardianIds.push(guardian.id);
       await tx.insert(studentGuardianLinks).values(
         children.map((studentProfileId) => ({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           tenantId,
           guardianProfileId: guardian.id,
           studentProfileId,
@@ -232,6 +237,8 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
             })
             .returning();
           await tx.insert(userProfiles).values({
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
             userId: person.userId,
             firstName: { en: `Student ${index}` },
             gender: Gender.MALE,

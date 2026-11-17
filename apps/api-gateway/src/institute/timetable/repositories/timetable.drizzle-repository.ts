@@ -20,7 +20,7 @@ import {
   timetableSectionsLive,
   timetables,
   timetablesLive,
-  userProfiles,
+  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -870,11 +870,11 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         const rows = await tx
           .select({
             membershipId: staffProfilesLive.membershipId,
-            firstName: userProfiles.firstName,
-            lastName: userProfiles.lastName,
+            firstName: userProfilesLive.firstName,
+            lastName: userProfilesLive.lastName,
           })
           .from(staffProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
           .where(inArray(staffProfilesLive.membershipId, teacherIds));
         for (const r of rows) {
           teachers[r.membershipId] =
@@ -893,11 +893,11 @@ export class TimetableDrizzleRepository extends TimetableRepository {
       const rows = await tx
         .select({
           membershipId: staffProfilesLive.membershipId,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
         })
         .from(staffProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
         .limit(100);
       return rows;
     });

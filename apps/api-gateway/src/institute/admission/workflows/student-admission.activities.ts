@@ -25,16 +25,17 @@ import {
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   sections,
   sectionsLive,
   studentAcademics,
   studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfiles,
   studentProfilesLive,
   userProfiles,
-  users,
+  usersLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -164,9 +165,11 @@ export function createStudentAdmissionActivities(
             mkAdminCtx('workflow:student-admission.activities'),
             async (tx) => {
               return tx
-                .select({ userId: phoneNumbers.userId })
-                .from(phoneNumbers)
-                .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, phone)))
+                .select({ userId: phoneNumbersLive.userId })
+                .from(phoneNumbersLive)
+                .where(
+                  and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)),
+                )
                 .limit(1);
             },
           );
@@ -188,7 +191,11 @@ export function createStudentAdmissionActivities(
           db,
           mkAdminCtx('workflow:student-admission.activities'),
           async (tx) => {
-            return tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+            return tx
+              .select({ id: usersLive.id })
+              .from(usersLive)
+              .where(eq(usersLive.email, email))
+              .limit(1);
           },
         );
         if (existingByEmail.length > 0) {
@@ -200,6 +207,7 @@ export function createStudentAdmissionActivities(
           email,
           username,
           phone: phone ? { countryCode: '+91', number: phone } : undefined,
+          actorId: createdBy,
         });
         eventBus.emit(EVENT_PATTERNS.USER.admission_created, {
           tenantId,
@@ -426,9 +434,14 @@ export function createStudentAdmissionActivities(
           mkAdminCtx('workflow:student-admission.activities'),
           async (tx) => {
             return tx
-              .select({ userId: phoneNumbers.userId })
-              .from(phoneNumbers)
-              .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, parentPhone)))
+              .select({ userId: phoneNumbersLive.userId })
+              .from(phoneNumbersLive)
+              .where(
+                and(
+                  eq(phoneNumbersLive.countryCode, '+91'),
+                  eq(phoneNumbersLive.number, parentPhone),
+                ),
+              )
               .limit(1);
           },
         );
@@ -444,7 +457,11 @@ export function createStudentAdmissionActivities(
           db,
           mkAdminCtx('workflow:student-admission.activities'),
           async (tx) => {
-            return tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+            return tx
+              .select({ id: usersLive.id })
+              .from(usersLive)
+              .where(eq(usersLive.email, email))
+              .limit(1);
           },
         );
         if (existingByEmail.length > 0) {
@@ -456,6 +473,7 @@ export function createStudentAdmissionActivities(
           email,
           username,
           phone: { countryCode: '+91', number: parentPhone },
+          actorId: createdBy,
         });
         return newId;
       })();
@@ -589,12 +607,12 @@ export function createStudentAdmissionActivities(
         mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
         async (tx) => {
           return tx
-            .select({ id: studentGuardianLinks.id })
-            .from(studentGuardianLinks)
+            .select({ id: studentGuardianLinksLive.id })
+            .from(studentGuardianLinksLive)
             .where(
               and(
-                eq(studentGuardianLinks.studentProfileId, studentProfileId),
-                eq(studentGuardianLinks.isPrimaryContact, true),
+                eq(studentGuardianLinksLive.studentProfileId, studentProfileId),
+                eq(studentGuardianLinksLive.isPrimaryContact, true),
               ),
             )
             .limit(1);
@@ -609,6 +627,8 @@ export function createStudentAdmissionActivities(
           await tx
             .insert(studentGuardianLinks)
             .values({
+              createdBy,
+              updatedBy: createdBy,
               tenantId,
               studentProfileId,
               guardianProfileId,

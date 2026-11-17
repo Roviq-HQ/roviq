@@ -3,7 +3,7 @@ import { integer, jsonb, timestamp, uuid } from 'drizzle-orm/pg-core';
 /** Multi-language text stored as `{ "en": "Science", "hi": "विज्ञान" }` */
 export type I18nContent = Record<string, string>;
 
-/** Auth/platform tables — no soft delete, no tenant */
+/** Building block for the spreads below — tables spread `entityColumns` / `tenantColumns` */
 export const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true })

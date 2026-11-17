@@ -18,12 +18,12 @@ import {
   mkAdminCtx,
   mkInstituteCtx,
   studentAcademicsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfiles,
   studentProfilesLive,
   tcRegister,
   tcRegisterLive,
-  userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -357,8 +357,8 @@ export function createTCIssuanceActivities(
       const up = await withAdmin(db, mkAdminCtx('workflow:tc-issuance.activities'), async (tx) => {
         return tx
           .select()
-          .from(userProfiles)
-          .where(eq(userProfiles.userId, student.userId))
+          .from(userProfilesLive)
+          .where(eq(userProfilesLive.userId, student.userId))
           .limit(1);
       });
 
@@ -369,17 +369,17 @@ export function createTCIssuanceActivities(
         async (tx) => {
           return tx
             .select({
-              relationship: studentGuardianLinks.relationship,
-              firstName: userProfiles.firstName,
-              lastName: userProfiles.lastName,
+              relationship: studentGuardianLinksLive.relationship,
+              firstName: userProfilesLive.firstName,
+              lastName: userProfilesLive.lastName,
             })
-            .from(studentGuardianLinks)
+            .from(studentGuardianLinksLive)
             .innerJoin(
               guardianProfiles,
-              eq(studentGuardianLinks.guardianProfileId, guardianProfiles.id),
+              eq(studentGuardianLinksLive.guardianProfileId, guardianProfiles.id),
             )
-            .innerJoin(userProfiles, eq(guardianProfiles.userId, userProfiles.userId))
-            .where(eq(studentGuardianLinks.studentProfileId, studentProfileId));
+            .innerJoin(userProfilesLive, eq(guardianProfiles.userId, userProfilesLive.userId))
+            .where(eq(studentGuardianLinksLive.studentProfileId, studentProfileId));
         },
       );
 

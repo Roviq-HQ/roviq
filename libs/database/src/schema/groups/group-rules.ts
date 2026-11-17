@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { foreignKey, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { tenantColumns } from '../common/columns';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { groups } from './groups';
 
@@ -11,7 +12,7 @@ import { groups } from './groups';
  * rule_dimensions tracks which data dimensions the rule depends on,
  * enabling targeted invalidation (only recalculate when a relevant dimension changes).
  *
- * No soft delete (tenantPoliciesSimple). Three-tier RLS enforced.
+ * Three-tier RLS enforced.
  */
 export const groupRules = pgTable(
   'group_rules',
@@ -20,7 +21,6 @@ export const groupRules = pgTable(
     groupId: uuid('group_id')
       .notNull()
       .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    tenantId: uuid('tenant_id').notNull(),
     /** JsonLogic rule definition — evaluated against student/staff profile data */
     rule: jsonb('rule').notNull(),
     /**
@@ -32,11 +32,7 @@ export const groupRules = pgTable(
     /** Human-readable description — e.g., "All female students in Class 10 Science" */
     description: text('description'),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -49,6 +45,6 @@ export const groupRules = pgTable(
     index('idx_group_rules_group').on(table.groupId),
     index('idx_group_rules_tenant').on(table.tenantId),
 
-    ...tenantPoliciesSimple('group_rules'),
+    ...tenantPolicies('group_rules'),
   ],
 ).enableRLS();

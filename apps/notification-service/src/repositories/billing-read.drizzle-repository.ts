@@ -5,7 +5,7 @@ import {
   i18nDisplay,
   institutes,
   mkAdminCtx,
-  users,
+  usersLive,
   withAdmin,
 } from '@roviq/database';
 import { plans, subscriptions } from '@roviq/ee-database';
@@ -33,8 +33,8 @@ export class BillingReadDrizzleRepository extends BillingReadRepository {
           planCurrency: plans.currency,
         })
         .from(subscriptions)
-        .innerJoin(plans, eq(subscriptions.planId, plans.id))
-        .innerJoin(institutes, eq(subscriptions.tenantId, institutes.id))
+        .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
+        .innerJoin(institutes, eq(subscriptions.tenantId, institutes.id)) // allow-base-read: history rows keep the institute name after it is deleted
         .where(eq(subscriptions.id, subscriptionId))
         .limit(1);
 
@@ -58,9 +58,9 @@ export class BillingReadDrizzleRepository extends BillingReadRepository {
   async findPlatformAdminUser(): Promise<UserIdRecord | null> {
     return withAdmin(this.db, mkAdminCtx('repository:billing-read'), async (tx) => {
       const result = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.username, 'admin'))
+        .select({ id: usersLive.id })
+        .from(usersLive)
+        .where(eq(usersLive.username, 'admin'))
         .limit(1);
 
       return result[0] ?? null;

@@ -17,12 +17,14 @@ import {
   mkAdminCtx,
   mkInstituteCtx,
   phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   staffProfilesLive,
   studentAcademicsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
   userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -82,8 +84,8 @@ export class ProfileService {
     const profile = await withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
       const rows = await tx
         .select()
-        .from(userProfiles)
-        .where(eq(userProfiles.userId, userId))
+        .from(userProfilesLive)
+        .where(eq(userProfilesLive.userId, userId))
         .limit(1);
       return rows[0] ?? null;
     });
@@ -188,19 +190,19 @@ export class ProfileService {
         children = await withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
           return tx
             .select({
-              studentProfileId: studentGuardianLinks.studentProfileId,
-              relationship: studentGuardianLinks.relationship,
-              isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-              firstName: userProfiles.firstName,
-              lastName: userProfiles.lastName,
+              studentProfileId: studentGuardianLinksLive.studentProfileId,
+              relationship: studentGuardianLinksLive.relationship,
+              isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
+              firstName: userProfilesLive.firstName,
+              lastName: userProfilesLive.lastName,
             })
-            .from(studentGuardianLinks)
+            .from(studentGuardianLinksLive)
             .innerJoin(
               studentProfilesLive,
-              eq(studentGuardianLinks.studentProfileId, studentProfilesLive.id),
+              eq(studentGuardianLinksLive.studentProfileId, studentProfilesLive.id),
             )
-            .innerJoin(userProfiles, eq(studentProfilesLive.userId, userProfiles.userId))
-            .where(eq(studentGuardianLinks.guardianProfileId, guardianProfile[0].id));
+            .innerJoin(userProfilesLive, eq(studentProfilesLive.userId, userProfilesLive.userId))
+            .where(eq(studentGuardianLinksLive.guardianProfileId, guardianProfile[0].id));
         });
       }
 
@@ -246,18 +248,20 @@ export class ProfileService {
       const phone = input.phone;
       await withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
         const existing = await tx
-          .select({ id: phoneNumbers.id })
-          .from(phoneNumbers)
-          .where(and(eq(phoneNumbers.userId, userId), eq(phoneNumbers.isPrimary, true)))
+          .select({ id: phoneNumbersLive.id })
+          .from(phoneNumbersLive)
+          .where(and(eq(phoneNumbersLive.userId, userId), eq(phoneNumbersLive.isPrimary, true)))
           .limit(1);
 
         if (existing.length > 0) {
           await tx
             .update(phoneNumbers)
-            .set({ number: phone })
+            .set({ number: phone, updatedBy: userId })
             .where(eq(phoneNumbers.id, existing[0].id));
         } else {
           await tx.insert(phoneNumbers).values({
+            createdBy: userId,
+            updatedBy: userId,
             userId,
             countryCode: '+91',
             number: phone,

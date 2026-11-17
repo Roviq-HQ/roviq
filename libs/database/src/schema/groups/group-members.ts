@@ -8,8 +8,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { tenantColumns } from '../common/columns';
 import { groupMemberSource } from '../common/enums';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { memberships } from '../tenant/memberships';
 import { groups } from './groups';
@@ -20,7 +21,7 @@ import { groups } from './groups';
  * Hybrid groups support manual exclusions via `is_excluded` flag (member matches rules
  * but is explicitly excluded by admin). UNIQUE(group_id, membership_id) prevents duplicates.
  *
- * No soft delete (tenantPoliciesSimple). Three-tier RLS enforced.
+ * Three-tier RLS enforced.
  */
 export const groupMembers = pgTable(
   'group_members',
@@ -29,7 +30,6 @@ export const groupMembers = pgTable(
     groupId: uuid('group_id')
       .notNull()
       .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    tenantId: uuid('tenant_id').notNull(),
     membershipId: uuid('membership_id')
       .notNull()
       .references(() => memberships.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -48,6 +48,7 @@ export const groupMembers = pgTable(
     isExcluded: boolean('is_excluded').notNull().default(false),
     /** When this membership was last resolved/confirmed by the group engine */
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -58,12 +59,14 @@ export const groupMembers = pgTable(
       .onUpdate('cascade'),
 
     /** Each membership can appear at most once per group */
-    uniqueIndex('uq_group_member').on(table.groupId, table.membershipId),
+    uniqueIndex('uq_group_member')
+      .on(table.groupId, table.membershipId)
+      .where(sql`${table.deletedAt} IS NULL`),
     /** Active (non-excluded) members per group — used for member list queries */
     index('idx_group_members_group').on(table.groupId).where(sql`${table.isExcluded} = false`),
     /** All groups a membership belongs to — used for "my groups" queries */
     index('idx_group_members_membership').on(table.membershipId),
 
-    ...tenantPoliciesSimple('group_members'),
+    ...tenantPolicies('group_members'),
   ],
 ).enableRLS();

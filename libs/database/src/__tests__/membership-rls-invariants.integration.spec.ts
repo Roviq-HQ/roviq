@@ -113,8 +113,8 @@ describe('ROV-88 Invariant 2: reseller_memberships cross-reseller isolation', ()
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
       await expect(
         client.query(
-          `INSERT INTO reseller_memberships (user_id, role_id, reseller_id)
-           VALUES ($1, $2, $3)`,
+          `INSERT INTO reseller_memberships (user_id, role_id, reseller_id, created_by, updated_by)
+           VALUES ($1, $2, $3, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [SEED.USER_ADMIN, SEED.ROLE_RESELLER_FULL_ADMIN, SEED.RESELLER_DIRECT],
         ),
       ).rejects.toThrow(/permission denied|row-level security/);

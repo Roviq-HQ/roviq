@@ -31,7 +31,7 @@ export class DashboardService {
             interval: plans.interval,
           })
           .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
           .where(eq(subscriptions.status, 'ACTIVE'));
 
         let mrr = 0n;

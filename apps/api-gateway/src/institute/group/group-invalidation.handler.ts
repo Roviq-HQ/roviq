@@ -10,7 +10,7 @@ import { GroupMembershipType } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
-  groupRules,
+  groupRulesLive,
   groups,
   mkInstituteCtx,
   withTenant,
@@ -99,10 +99,10 @@ export class GroupInvalidationHandler {
       async (tx) => {
         // Find group_ids whose rules reference any of the given dimensions
         const affectedRules = await tx
-          .select({ groupId: groupRules.groupId })
-          .from(groupRules)
+          .select({ groupId: groupRulesLive.groupId })
+          .from(groupRulesLive)
           .where(
-            sql`${groupRules.ruleDimensions} && ARRAY[${sql.join(
+            sql`${groupRulesLive.ruleDimensions} && ARRAY[${sql.join(
               dimensions.map((d) => sql`${d}`),
               sql`, `,
             )}]::text[]`,

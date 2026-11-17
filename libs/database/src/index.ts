@@ -12,7 +12,6 @@ export {
   roviqApp,
   roviqReseller,
   tenantPolicies,
-  tenantPoliciesSimple,
 } from './schema/common/rls-policies';
 export { relations } from './schema/relations';
 export { notDeleted, restoreDeleted, softDelete } from './soft-delete';

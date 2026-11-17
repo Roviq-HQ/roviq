@@ -24,6 +24,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/billing.integration.spec.ts',
   'apps/api-gateway/src/__tests__/integration-app.integration.spec.ts',
   'apps/api-gateway/src/__tests__/rls-cross-scope-isolation.integration.spec.ts',
+  'apps/api-gateway/src/__tests__/soft-delete-audit.integration.spec.ts',
   // ROV-204: isolated authorization fixtures and in-memory read-policy tests only.
   'apps/api-gateway/src/__tests__/student-read-authorization.integration.spec.ts',
   // ROV-205: isolated security-invariant fixtures and RLS-scoped predicate execution only.

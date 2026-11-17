@@ -25,6 +25,7 @@ import {
   staffProfilesLive,
   tenantSequences,
   userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -69,11 +70,11 @@ export class StaffService {
       id: staffProfilesLive.id,
       userId: staffProfilesLive.userId,
       membershipId: staffProfilesLive.membershipId,
-      firstName: userProfiles.firstName,
-      lastName: userProfiles.lastName,
-      gender: userProfiles.gender,
-      dateOfBirth: userProfiles.dateOfBirth,
-      profileImageUrl: userProfiles.profileImageUrl,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+      gender: userProfilesLive.gender,
+      dateOfBirth: userProfilesLive.dateOfBirth,
+      profileImageUrl: userProfilesLive.profileImageUrl,
       employeeId: staffProfilesLive.employeeId,
       designation: staffProfilesLive.designation,
       department: staffProfilesLive.department,
@@ -98,7 +99,7 @@ export class StaffService {
         return tx
           .select(this.staffSelectLive())
           .from(staffProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
           .where(eq(staffProfilesLive.id, id))
           .limit(1);
       },
@@ -123,7 +124,7 @@ export class StaffService {
       // every value of the i18nText jsonb on insert.
       if (filter.search) {
         conditions.push(
-          sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${filter.search})`,
+          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${filter.search})`,
         );
       }
 
@@ -132,7 +133,7 @@ export class StaffService {
       const rows = await tx
         .select(this.staffSelectLive())
         .from(staffProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .limit(limit);
       return rows;
@@ -160,6 +161,7 @@ export class StaffService {
       email,
       username,
       phone,
+      actorId,
     });
     const newUser = { id: newUserId };
 
@@ -170,6 +172,8 @@ export class StaffService {
         await tx
           .insert(phoneNumbers)
           .values({
+            createdBy: actorId,
+            updatedBy: actorId,
             userId: newUser.id,
             countryCode: '+91',
             number: phone,

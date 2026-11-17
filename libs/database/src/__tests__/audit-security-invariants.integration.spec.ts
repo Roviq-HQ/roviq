@@ -161,7 +161,7 @@ describe('Invariant 3: roviq_reseller cross-reseller isolation', () => {
     const superClient = await superPool.connect();
     try {
       await superClient.query(
-        `INSERT INTO resellers (id, name, slug, status) VALUES ($1, 'Test Reseller B', $2, '${ResellerStatus.ACTIVE}') ON CONFLICT DO NOTHING`,
+        `INSERT INTO resellers (id, name, slug, status, created_by, updated_by) VALUES ($1, 'Test Reseller B', $2, '${ResellerStatus.ACTIVE}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000') ON CONFLICT DO NOTHING`,
         [resellerB, `test-reseller-${Date.now()}`],
       );
       await superClient.query(
@@ -452,7 +452,7 @@ describe('ROV-64: scoped visibility per role', () => {
 
   beforeAll(async () => {
     await superPool.query(
-      `INSERT INTO resellers (id, name, slug, status) VALUES ($1, 'ROV-64 Other Reseller', $2, '${ResellerStatus.ACTIVE}')`,
+      `INSERT INTO resellers (id, name, slug, status, created_by, updated_by) VALUES ($1, 'ROV-64 Other Reseller', $2, '${ResellerStatus.ACTIVE}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
       [otherReseller, `rov-64-other-${otherReseller.slice(0, 8)}`],
     );
     const rows: Array<[string, string | null, string | null]> = [

@@ -13,7 +13,7 @@ import {
   type DrizzleDB,
   guardianProfilesLive,
   mkInstituteCtx,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   withTenant,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -79,11 +79,11 @@ export class ConsentService {
       mkInstituteCtx(tenantId, 'service:consent'),
       async (tx) => {
         return tx
-          .select({ id: studentGuardianLinks.id })
-          .from(studentGuardianLinks)
+          .select({ id: studentGuardianLinksLive.id })
+          .from(studentGuardianLinksLive)
           .where(
-            sql`${studentGuardianLinks.guardianProfileId} = ${guardianProfileId}
-            AND ${studentGuardianLinks.studentProfileId} = ${studentProfileId}`,
+            sql`${studentGuardianLinksLive.guardianProfileId} = ${guardianProfileId}
+            AND ${studentGuardianLinksLive.studentProfileId} = ${studentProfileId}`,
           )
           .limit(1);
       },

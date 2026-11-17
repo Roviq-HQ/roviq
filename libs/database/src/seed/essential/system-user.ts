@@ -7,6 +7,8 @@ export async function seedSystemUser(tx: DrizzleDB): Promise<void> {
   await tx
     .insert(users)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       id: SYSTEM_USER_ID,
       username: 'system',
       email: 'system@roviq.internal',

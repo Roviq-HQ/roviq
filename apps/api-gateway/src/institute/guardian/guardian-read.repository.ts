@@ -8,9 +8,9 @@ import {
   sectionsLive,
   standardsLive,
   studentAcademicsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
-  userProfiles,
+  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
@@ -34,19 +34,19 @@ export class GuardianReadRepository {
       createdAt: guardianProfilesLive.createdAt,
       updatedAt: guardianProfilesLive.updatedAt,
 
-      firstName: userProfiles.firstName,
-      lastName: userProfiles.lastName,
-      profileImageUrl: userProfiles.profileImageUrl,
-      gender: userProfiles.gender,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+      profileImageUrl: userProfilesLive.profileImageUrl,
+      gender: userProfilesLive.gender,
 
       primaryPhone: phoneNumbers.number,
 
       linkedStudentCount: sql<number>`(
-        SELECT COUNT(*)::int FROM ${studentGuardianLinks}
-        INNER JOIN ${studentProfilesLive} ON ${studentProfilesLive.id} = ${studentGuardianLinks.studentProfileId}
+        SELECT COUNT(*)::int FROM ${studentGuardianLinksLive}
+        INNER JOIN ${studentProfilesLive} ON ${studentProfilesLive.id} = ${studentGuardianLinksLive.studentProfileId}
         LEFT JOIN ${studentAcademicsLive} ON ${studentAcademicsLive.studentProfileId} = ${studentProfilesLive.id}
           AND ${inArray(studentAcademicsLive.academicYearId, activeAcademicYearIds())}
-        WHERE ${studentGuardianLinks.guardianProfileId} = ${guardianProfilesLive.id}
+        WHERE ${studentGuardianLinksLive.guardianProfileId} = ${guardianProfilesLive.id}
           AND ${guardianLinkedReadPredicate(access.ability) ?? sql`true`}
           AND ${studentReadPredicate(access.ability, null) ?? sql`true`}
       )`.as('linked_student_count'),
@@ -58,7 +58,7 @@ export class GuardianReadRepository {
       return tx
         .select(this.guardianSelect(access))
         .from(guardianProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, guardianProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
         .leftJoin(
           phoneNumbers,
           and(
@@ -80,7 +80,7 @@ export class GuardianReadRepository {
       const baseQuery = tx
         .select(this.guardianSelect(access))
         .from(guardianProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, guardianProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
         .leftJoin(
           phoneNumbers,
           and(
@@ -91,7 +91,7 @@ export class GuardianReadRepository {
 
       const searchClause = search
         ? or(
-            sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${search})`,
+            sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${search})`,
             ilike(phoneNumbers.number, `%${search}%`),
           )
         : undefined;
@@ -104,8 +104,8 @@ export class GuardianReadRepository {
     return withTenant(this.db, access.user, async (tx) => {
       return tx
         .select({
-          linkId: studentGuardianLinks.id,
-          studentProfileId: studentGuardianLinks.studentProfileId,
+          linkId: studentGuardianLinksLive.id,
+          studentProfileId: studentGuardianLinksLive.studentProfileId,
           userId: studentProfilesLive.userId,
           tenantId: studentProfilesLive.tenantId,
           currentAcademicYearId: studentAcademicsLive.academicYearId,
@@ -113,27 +113,27 @@ export class GuardianReadRepository {
           currentSectionId: studentAcademicsLive.sectionId,
           currentStandardId: studentAcademicsLive.standardId,
           admissionNumber: studentProfilesLive.admissionNumber,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          profileImageUrl: userProfiles.profileImageUrl,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          profileImageUrl: userProfilesLive.profileImageUrl,
           currentStandardName: standardsLive.name,
           currentSectionName: sectionsLive.name,
-          relationship: studentGuardianLinks.relationship,
-          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-          isEmergencyContact: studentGuardianLinks.isEmergencyContact,
-          canPickup: studentGuardianLinks.canPickup,
-          livesWith: studentGuardianLinks.livesWith,
+          relationship: studentGuardianLinksLive.relationship,
+          isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
+          isEmergencyContact: studentGuardianLinksLive.isEmergencyContact,
+          canPickup: studentGuardianLinksLive.canPickup,
+          livesWith: studentGuardianLinksLive.livesWith,
         })
-        .from(studentGuardianLinks)
+        .from(studentGuardianLinksLive)
         .innerJoin(
           studentProfilesLive,
-          eq(studentProfilesLive.id, studentGuardianLinks.studentProfileId),
+          eq(studentProfilesLive.id, studentGuardianLinksLive.studentProfileId),
         )
         .innerJoin(
           guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
+          eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
         )
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
         .leftJoin(
           studentAcademicsLive,
           and(
@@ -145,12 +145,12 @@ export class GuardianReadRepository {
         .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
         .where(
           and(
-            eq(studentGuardianLinks.guardianProfileId, guardianProfileId),
+            eq(studentGuardianLinksLive.guardianProfileId, guardianProfileId),
             guardianLinkedReadPredicate(access.ability),
             studentReadPredicate(access.ability, null),
           ),
         )
-        .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);
+        .orderBy(sql`${studentGuardianLinksLive.isPrimaryContact} DESC`);
     });
   }
 
@@ -158,29 +158,29 @@ export class GuardianReadRepository {
     return withTenant(this.db, access.user, async (tx) => {
       return tx
         .select({
-          linkId: studentGuardianLinks.id,
-          guardianProfileId: studentGuardianLinks.guardianProfileId,
+          linkId: studentGuardianLinksLive.id,
+          guardianProfileId: studentGuardianLinksLive.guardianProfileId,
           userId: guardianProfilesLive.userId,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          profileImageUrl: userProfiles.profileImageUrl,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          profileImageUrl: userProfilesLive.profileImageUrl,
           occupation: guardianProfilesLive.occupation,
           organization: guardianProfilesLive.organization,
-          relationship: studentGuardianLinks.relationship,
-          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-          isEmergencyContact: studentGuardianLinks.isEmergencyContact,
-          canPickup: studentGuardianLinks.canPickup,
-          livesWith: studentGuardianLinks.livesWith,
+          relationship: studentGuardianLinksLive.relationship,
+          isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
+          isEmergencyContact: studentGuardianLinksLive.isEmergencyContact,
+          canPickup: studentGuardianLinksLive.canPickup,
+          livesWith: studentGuardianLinksLive.livesWith,
         })
-        .from(studentGuardianLinks)
+        .from(studentGuardianLinksLive)
         .innerJoin(
           guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
+          eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
         )
-        .innerJoin(userProfiles, eq(userProfiles.userId, guardianProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
         .innerJoin(
           studentProfilesLive,
-          eq(studentProfilesLive.id, studentGuardianLinks.studentProfileId),
+          eq(studentProfilesLive.id, studentGuardianLinksLive.studentProfileId),
         )
         .leftJoin(
           studentAcademicsLive,
@@ -191,12 +191,12 @@ export class GuardianReadRepository {
         )
         .where(
           and(
-            eq(studentGuardianLinks.studentProfileId, studentProfileId),
+            eq(studentGuardianLinksLive.studentProfileId, studentProfileId),
             guardianLinkedReadPredicate(access.ability),
             studentReadPredicate(access.ability, null),
           ),
         )
-        .orderBy(sql`${studentGuardianLinks.isPrimaryContact} DESC`);
+        .orderBy(sql`${studentGuardianLinksLive.isPrimaryContact} DESC`);
     });
   }
 }

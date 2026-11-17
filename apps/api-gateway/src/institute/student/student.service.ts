@@ -33,7 +33,7 @@ import {
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   sections,
   softDelete,
@@ -93,9 +93,9 @@ export class StudentService {
     if (phone) {
       const existing = await withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
         return tx
-          .select({ userId: phoneNumbers.userId })
-          .from(phoneNumbers)
-          .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, phone)))
+          .select({ userId: phoneNumbersLive.userId })
+          .from(phoneNumbersLive)
+          .where(and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)))
           .limit(1);
       });
       if (existing.length > 0) {
@@ -345,6 +345,8 @@ export class StudentService {
       const rows = await tx
         .insert(userDocuments)
         .values({
+          createdBy: actorId,
+          updatedBy: actorId,
           userId,
           type: input.type,
           description: input.description ?? null,
@@ -760,7 +762,7 @@ export class StudentService {
     }
   }
 
-  private async createUser(input: CreateStudentInput, _actorId: string): Promise<string> {
+  private async createUser(input: CreateStudentInput, actorId: string): Promise<string> {
     const suffix = crypto.randomUUID().slice(0, 12);
     const email = `student-${suffix}@roviq.placeholder`;
     const username = `student-${suffix}`;
@@ -770,6 +772,7 @@ export class StudentService {
       email,
       username,
       phone,
+      actorId,
     });
 
     return userId;

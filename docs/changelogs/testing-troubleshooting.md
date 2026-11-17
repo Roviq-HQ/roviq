@@ -573,3 +573,30 @@ This supersedes the note in the 2026-04-17 entry that pre-commit was "intentiona
 
 Still CI-only: the codegen-drift step (needs a running gateway). Still pre-push-only: `check:no-double-cast` and `check:db-drift`.
 
+
+
+## 2026-11-17 — fixed: membership uniqueness tests depended on heap order (ROV-84)
+
+`m0-schema-constraints.integration.spec.ts` picked roles with `SELECT id FROM roles WHERE tenant_id = $1 LIMIT 2` and no `ORDER BY`. When the first row was a role the seeded teacher already holds, the first insert failed with `duplicate key … memberships_user_id_tenant_id_role_id_key`. The two tests passed or failed depending on which other suites had updated `roles` earlier in the run.
+
+The lookup now excludes roles the teacher already holds and orders by `id`.
+
+**Verification:** the spec passed 6/6 in isolation and in the full `pnpm test:int` run.
+
+
+## 2026-11-17 — fixed: `check:live-views` missed joins and newer tables (ROV-84)
+
+`scripts/check-live-views.ts` kept a hand-written table list that had fallen behind `live-views.ts` (timetable and examination tables were missing), and it matched only `.from(<table>)`, so a join on a base table passed. The list is now derived from the `*Live` exports and the pattern also covers `.<kind>Join(<table>, …)`.
+
+Joins that must keep seeing a deleted row carry `// allow-base-read: <reason>`: billing records joined to `plans` / `institutes`, and audit logs joined to `institutes`.
+
+
+## 2026-11-17 — diagnosed: a two-month-old local dev stack blocks Tilt and integration tests
+
+Seen on a slot 0 checkout whose containers and volumes were last used two months earlier:
+
+* `postgres` failed to start with `error mounting … docker-desktop-bind-mounts … init-db.sh: no such file or directory`. The stopped container held a stale Docker Desktop bind-mount path. Removing the stopped container (`docker rm docker-postgres-1`, data volume untouched) and re-triggering `postgres` fixed it.
+* `api-gateway` exited on `Stream "NOTIFICATION" drift detected: retention workqueue → interest`. The dev NATS volume still had the old stream. Deleting that one dev stream let the gateway recreate it.
+* `pnpm test:int` failed in global setup with `drizzle-kit migrate failed (exit 1)` and no reason. `roviq_test` had no tables, and the migration chain cannot be replayed onto an empty database (`type "ResellerTier" already exists`). `pnpm db:reset --test --seed` rebuilt it. The real error is only visible in the Postgres container log.
+* `minio` cannot start: `quay.io/minio/minio:latest` returns `unauthorized` on pull. Not fixed.
+* Running `nx build` by hand while Tilt serves `api-gateway` removes `dist/apps/api-gateway/src/main.js` and the serve process exits. Re-trigger `api-gateway` afterwards.

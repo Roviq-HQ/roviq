@@ -29,7 +29,7 @@ export class SubscriptionRepository {
         const [sub] = await tx
           .select({ subscription: subscriptions, plan: plans })
           .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
           .where(
             and(
               eq(subscriptions.tenantId, tenantId),
@@ -52,7 +52,7 @@ export class SubscriptionRepository {
         const [sub] = await tx
           .select({ subscription: subscriptions, plan: plans })
           .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
           .where(eq(subscriptions.id, id))
           .limit(1);
         if (!sub) return null;
@@ -102,8 +102,8 @@ export class SubscriptionRepository {
               institute: { id: institutes.id, name: institutes.name },
             })
             .from(subscriptions)
-            .innerJoin(plans, eq(subscriptions.planId, plans.id))
-            .innerJoin(institutes, eq(subscriptions.tenantId, institutes.id))
+            .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
+            .innerJoin(institutes, eq(subscriptions.tenantId, institutes.id)) // allow-base-read: history rows keep the institute name after it is deleted
             .where(where)
             .orderBy(desc(subscriptions.createdAt), desc(subscriptions.id))
             .limit(params.first),

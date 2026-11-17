@@ -1,17 +1,7 @@
 import { sql } from 'drizzle-orm';
-import {
-  check,
-  customType,
-  date,
-  index,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { check, customType, date, index, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { i18nText } from '../common/columns';
+import { entityColumns, i18nText } from '../common/columns';
 import { gender } from '../common/enums';
 import { userScopedPolicies } from '../common/rls-policies';
 
@@ -97,13 +87,7 @@ export const userProfiles = pgTable(
     ),
 
     // ── Metadata ────────────────────────────────────────
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
-    createdBy: uuid('created_by').references(() => users.id),
-    updatedBy: uuid('updated_by').references(() => users.id),
+    ...entityColumns,
   },
   (table) => [
     check(

@@ -15,7 +15,7 @@ import {
   TcStatus,
 } from '@roviq/common-types';
 import {
-  certificateTemplates,
+  certificateTemplatesLive,
   DRIZZLE_DB,
   type DrizzleDB,
   issuedCertificates,
@@ -28,7 +28,7 @@ import {
   tcRegister,
   tcRegisterLive,
   tenantSequences,
-  userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -303,8 +303,8 @@ export class CertificateService {
       isCounterSigned: tcRegisterLive.isCounterSigned,
       createdAt: tcRegisterLive.createdAt,
       // Joined from user_profiles via student_profiles.user_id
-      studentFirstName: userProfiles.firstName,
-      studentLastName: userProfiles.lastName,
+      studentFirstName: userProfilesLive.firstName,
+      studentLastName: userProfilesLive.lastName,
       // Snapshot captured at TC generation time (CBSE 20-field spec)
       currentStandardName: sql<string | null>`${tcRegisterLive.tcData}->>'class_studied'`,
     };
@@ -337,7 +337,7 @@ export class CertificateService {
             studentProfilesLive,
             eq(studentProfilesLive.id, tcRegisterLive.studentProfileId),
           )
-          .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
           .where(eq(tcRegisterLive.id, tcId))
           .limit(1);
       },
@@ -364,7 +364,7 @@ export class CertificateService {
             studentProfilesLive,
             eq(studentProfilesLive.id, tcRegisterLive.studentProfileId),
           )
-          .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
           .where(where)
           .limit(50);
       },
@@ -446,8 +446,8 @@ export class CertificateService {
       async (tx) => {
         return tx
           .select()
-          .from(certificateTemplates)
-          .where(eq(certificateTemplates.id, input.templateId))
+          .from(certificateTemplatesLive)
+          .where(eq(certificateTemplatesLive.id, input.templateId))
           .limit(1);
       },
     );
@@ -472,8 +472,8 @@ export class CertificateService {
         const up = await withAdmin(this.db, mkAdminCtx('service:certificate'), async (tx) => {
           return tx
             .select()
-            .from(userProfiles)
-            .where(eq(userProfiles.userId, sp[0].userId))
+            .from(userProfilesLive)
+            .where(eq(userProfilesLive.userId, sp[0].userId))
             .limit(1);
         });
         const fnObj = up[0]?.firstName as Record<string, string> | null | undefined;
@@ -580,9 +580,9 @@ export class CertificateService {
       mkInstituteCtx(tenantId, 'service:certificate'),
       async (tx) => {
         return tx
-          .select({ type: certificateTemplates.type })
-          .from(certificateTemplates)
-          .where(eq(certificateTemplates.id, issued.templateId))
+          .select({ type: certificateTemplatesLive.type })
+          .from(certificateTemplatesLive)
+          .where(eq(certificateTemplatesLive.id, issued.templateId))
           .limit(1);
       },
     );
@@ -631,12 +631,12 @@ export class CertificateService {
       async (tx) => {
         return tx
           .select({
-            id: certificateTemplates.id,
-            type: certificateTemplates.type,
-            templateContent: certificateTemplates.templateContent,
+            id: certificateTemplatesLive.id,
+            type: certificateTemplatesLive.type,
+            templateContent: certificateTemplatesLive.templateContent,
           })
-          .from(certificateTemplates)
-          .where(eq(certificateTemplates.id, templateId))
+          .from(certificateTemplatesLive)
+          .where(eq(certificateTemplatesLive.id, templateId))
           .limit(1);
       },
     );
@@ -704,8 +704,8 @@ export class CertificateService {
       async (tx) => {
         return tx
           .select()
-          .from(certificateTemplates)
-          .where(eq(certificateTemplates.id, input.templateId))
+          .from(certificateTemplatesLive)
+          .where(eq(certificateTemplatesLive.id, input.templateId))
           .limit(1);
       },
     );
@@ -728,8 +728,8 @@ export class CertificateService {
     const up = await withAdmin(this.db, mkAdminCtx('service:certificate'), async (tx) => {
       return tx
         .select()
-        .from(userProfiles)
-        .where(eq(userProfiles.userId, studentRow.userId))
+        .from(userProfilesLive)
+        .where(eq(userProfilesLive.userId, studentRow.userId))
         .limit(1);
     });
     const fnObj = up[0]?.firstName as Record<string, string> | null | undefined;
@@ -801,9 +801,9 @@ h1{font-size:20px;margin:0 0 16px}p{margin:8px 0}</style></head><body>${rendered
       // constraint for views.
       if (filter?.type) {
         const templateIds = await tx
-          .select({ id: certificateTemplates.id })
-          .from(certificateTemplates)
-          .where(eq(certificateTemplates.type, filter.type));
+          .select({ id: certificateTemplatesLive.id })
+          .from(certificateTemplatesLive)
+          .where(eq(certificateTemplatesLive.type, filter.type));
         if (templateIds.length === 0) return [];
         conditions.push(
           inArray(

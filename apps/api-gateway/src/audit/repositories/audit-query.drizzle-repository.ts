@@ -146,7 +146,7 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
         .from(auditLogs)
         .leftJoin(actor, eq(actor.id, auditLogs.actorId))
         .leftJoin(userAlias, eq(userAlias.id, auditLogs.userId))
-        .leftJoin(institutes, eq(institutes.id, auditLogs.tenantId))
+        .leftJoin(institutes, eq(institutes.id, auditLogs.tenantId)) // allow-base-read: history rows keep the institute name after it is deleted
         .leftJoin(resellersLive, eq(resellersLive.id, auditLogs.resellerId))
         .$dynamic();
 

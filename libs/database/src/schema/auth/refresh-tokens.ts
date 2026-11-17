@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, inet, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
-import { timestamps } from '../common/columns';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { entityColumns } from '../common/columns';
+import { tenantPolicies } from '../common/rls-policies';
 import { users } from './users';
 
 export const refreshTokens = pgTable(
@@ -45,11 +45,11 @@ export const refreshTokens = pgTable(
      */
     revokedReason: varchar('revoked_reason', { length: 32 }),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
-    ...timestamps,
+    ...entityColumns,
   },
   (table) => [
     index('refresh_tokens_tenant_id_idx').using('btree', table.tenantId.asc().nullsLast()),
     index('refresh_tokens_token_hash_idx').using('btree', table.tokenHash.asc().nullsLast()),
-    ...tenantPoliciesSimple('refresh_tokens'),
+    ...tenantPolicies('refresh_tokens'),
   ],
 );

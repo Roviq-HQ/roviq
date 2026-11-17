@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { check, foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { tenantColumns } from '../common/columns';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { groups } from './groups';
 
@@ -11,22 +12,24 @@ import { groups } from './groups';
  * child groups are inherited into the parent group during resolution.
  * CHECK constraint prevents self-referencing (parent != child).
  *
- * Composite PK: (parent_group_id, child_group_id).
- * No soft delete (tenantPoliciesSimple). Three-tier RLS enforced.
+ * Three-tier RLS enforced.
  */
 export const groupChildren = pgTable(
   'group_children',
   {
+    id: uuid().default(sql`uuidv7()`).primaryKey(),
     parentGroupId: uuid('parent_group_id')
       .notNull()
       .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     childGroupId: uuid('child_group_id')
       .notNull()
       .references(() => groups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    tenantId: uuid('tenant_id').notNull(),
+    ...tenantColumns,
   },
   (table) => [
-    primaryKey({ columns: [table.parentGroupId, table.childGroupId] }),
+    uniqueIndex('uq_group_child')
+      .on(table.parentGroupId, table.childGroupId)
+      .where(sql`${table.deletedAt} IS NULL`),
 
     foreignKey({
       columns: [table.tenantId],
@@ -40,6 +43,6 @@ export const groupChildren = pgTable(
 
     index('idx_group_children_tenant').on(table.tenantId),
 
-    ...tenantPoliciesSimple('group_children'),
+    ...tenantPolicies('group_children'),
   ],
 ).enableRLS();

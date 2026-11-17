@@ -16,11 +16,11 @@ import {
   mkAdminCtx,
   mkInstituteCtx,
   staffProfilesLive,
-  staffQualifications,
+  staffQualificationsLive,
   studentAcademicsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
-  userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -63,7 +63,7 @@ export async function generateUdiseDcfExport(
   const allProfiles = await withAdmin(
     db,
     mkAdminCtx('service:certificate-udise-dcf-export'),
-    async (tx) => tx.select().from(userProfiles),
+    async (tx) => tx.select().from(userProfilesLive),
   );
   const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
 
@@ -74,17 +74,17 @@ export async function generateUdiseDcfExport(
     async (tx) => {
       return tx
         .select({
-          studentProfileId: studentGuardianLinks.studentProfileId,
-          relationship: studentGuardianLinks.relationship,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
+          studentProfileId: studentGuardianLinksLive.studentProfileId,
+          relationship: studentGuardianLinksLive.relationship,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
         })
-        .from(studentGuardianLinks)
+        .from(studentGuardianLinksLive)
         .innerJoin(
           guardianProfiles,
-          eq(studentGuardianLinks.guardianProfileId, guardianProfiles.id),
+          eq(studentGuardianLinksLive.guardianProfileId, guardianProfiles.id),
         )
-        .innerJoin(userProfiles, eq(guardianProfiles.userId, userProfiles.userId));
+        .innerJoin(userProfilesLive, eq(guardianProfiles.userId, userProfilesLive.userId));
     },
   );
 
@@ -154,7 +154,7 @@ export async function generateUdiseDcfExport(
     db,
     mkInstituteCtx(tenantId, 'service:certificate-udise-dcf-export'),
     async (tx) => {
-      return tx.select().from(staffQualifications);
+      return tx.select().from(staffQualificationsLive);
     },
   );
 

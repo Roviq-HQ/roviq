@@ -134,6 +134,8 @@ async function createAttendanceFixture(
       const [user] = await tx
         .insert(users)
         .values({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           email: `${local}@test.local`,
           username: local,
           passwordHash: 'not-a-real-hash',

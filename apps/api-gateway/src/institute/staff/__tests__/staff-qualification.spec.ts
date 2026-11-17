@@ -10,6 +10,7 @@
 
 import { NotFoundException } from '@nestjs/common';
 import { QualificationType } from '@roviq/common-types';
+import { staffQualifications } from '@roviq/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Sequential result queue (shared between `withTenant` and `withAdmin`) ──
@@ -54,8 +55,11 @@ async function mockWithContext(_db: unknown, ...args: unknown[]) {
   return fn(createMockTx());
 }
 
+const softDeleteMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@roviq/database', () => ({
   DRIZZLE_DB: Symbol('DRIZZLE_DB'),
+  softDelete: softDeleteMock,
   withAdmin: vi.fn(mockWithContext),
   withTenant: vi.fn(mockWithContext),
   staffQualifications: {
@@ -119,6 +123,31 @@ vi.mock('@roviq/database', () => ({
     roleId: 'r',
     type: 'access',
   }),
+  usersLive: { __tableName: 'usersLive' },
+  refreshTokensLive: { __tableName: 'refreshTokensLive' },
+  phoneNumbersLive: { __tableName: 'phoneNumbersLive' },
+  authProvidersLive: { __tableName: 'authProvidersLive' },
+  platformMembershipsLive: { __tableName: 'platformMembershipsLive' },
+  resellerMembershipsLive: { __tableName: 'resellerMembershipsLive' },
+  groupMembershipsLive: { __tableName: 'groupMembershipsLive' },
+  userProfilesLive: { __tableName: 'userProfilesLive' },
+  userAddressesLive: { __tableName: 'userAddressesLive' },
+  userDocumentsLive: { __tableName: 'userDocumentsLive' },
+  userIdentifiersLive: { __tableName: 'userIdentifiersLive' },
+  studentGuardianLinksLive: { __tableName: 'studentGuardianLinksLive' },
+  staffQualificationsLive: {
+    id: 'id',
+    staffProfileId: 'staff_profile_id',
+    tenantId: 'tenant_id',
+    type: 'type',
+    degreeName: 'degree_name',
+  },
+  privacyNoticesLive: { __tableName: 'privacyNoticesLive' },
+  certificateTemplatesLive: { __tableName: 'certificateTemplatesLive' },
+  applicationDocumentsLive: { __tableName: 'applicationDocumentsLive' },
+  groupRulesLive: { __tableName: 'groupRulesLive' },
+  groupMembersLive: { __tableName: 'groupMembersLive' },
+  groupChildrenLive: { __tableName: 'groupChildrenLive' },
 }));
 
 vi.mock('@roviq/request-context', () => ({
@@ -203,16 +232,17 @@ describe('StaffQualificationService (unit)', () => {
     await expect(service.update('missing', { degreeName: 'X' })).rejects.toThrow(NotFoundException);
   });
 
-  it('delete returns true on success', async () => {
-    queueResult([{ id: 'q5' }]);
+  it('delete soft-deletes the row and returns true', async () => {
+    softDeleteMock.mockResolvedValueOnce(undefined);
 
     const result = await service.delete('q5');
 
     expect(result).toBe(true);
+    expect(softDeleteMock).toHaveBeenCalledWith(expect.anything(), staffQualifications, 'q5');
   });
 
   it('delete throws NotFoundException when no row matches', async () => {
-    queueResult([]);
+    softDeleteMock.mockRejectedValueOnce(new NotFoundException('Record not found'));
 
     await expect(service.delete('missing')).rejects.toThrow(NotFoundException);
   });

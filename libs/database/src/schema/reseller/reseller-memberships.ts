@@ -2,7 +2,7 @@ import type { AbilityRule } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import { boolean, index, jsonb, pgPolicy, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { timestamps } from '../common/columns';
+import { entityColumns } from '../common/columns';
 import { roviqAdmin, roviqReseller } from '../common/rls-policies';
 import { roles } from '../tenant/roles';
 import { resellers } from './resellers';
@@ -22,10 +22,12 @@ export const resellerMemberships = pgTable(
       .references(() => resellers.id),
     abilities: jsonb().$type<AbilityRule[]>().default([]),
     isActive: boolean('is_active').default(true).notNull(),
-    ...timestamps,
+    ...entityColumns,
   },
   (table) => [
-    uniqueIndex('uq_reseller_membership').on(table.userId, table.resellerId),
+    uniqueIndex('uq_reseller_membership')
+      .on(table.userId, table.resellerId)
+      .where(sql`${table.deletedAt} IS NULL`),
     index('reseller_memberships_reseller_id_idx').on(table.resellerId),
     // Reseller can manage their own memberships
     pgPolicy('reseller_membership_own', {
