@@ -8,7 +8,11 @@ import type {
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { E2ePingDocument } from './__generated__/graphql';
-import { loginAsInstituteAdmin, loginAsTeacher } from './helpers/auth';
+import {
+  loginAsInstituteAdmin,
+  loginAsInstituteAdminSecondInstitute,
+  loginAsTeacher,
+} from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
 /**
@@ -103,6 +107,19 @@ describe('Institute scope E2E', () => {
     });
 
     it('runs the full create → update → activate → archive guard → restore flow', async () => {
+      // Activation is forward-only and pushes the previous year to COMPLETING for
+      // good, so this runs in the second institute: the first institute's active
+      // year is what admission and the UI suites build on.
+      const { accessToken: flowToken } = await loginAsInstituteAdminSecondInstitute();
+      const originalRes = await gql<{ activeAcademicYear: AcademicYearModel }>(
+        `{ activeAcademicYear { id } }`,
+        undefined,
+        flowToken,
+      );
+      expect(originalRes.errors).toBeUndefined();
+      assert(originalRes.data);
+      const originalYearId = originalRes.data.activeAcademicYear.id;
+
       // 1. Create a future, non-overlapping year
       const createRes = await gql<{ createAcademicYear: AcademicYearModel }>(
         `mutation Create($input: CreateAcademicYearInput!) {
@@ -117,7 +134,7 @@ describe('Institute scope E2E', () => {
             endDate: '2031-03-31',
           },
         },
-        instToken,
+        flowToken,
       );
       expect(createRes.errors).toBeUndefined();
       assert(createRes.data);
@@ -138,7 +155,7 @@ describe('Institute scope E2E', () => {
             endDate: '2030-06-30',
           },
         },
-        instToken,
+        flowToken,
       );
       expect(overlapRes.errors).toBeDefined();
       expect(overlapRes.errors?.[0].message).toMatch(/overlaps/);
@@ -155,7 +172,7 @@ describe('Institute scope E2E', () => {
             endDate: '2031-03-31',
           },
         },
-        instToken,
+        flowToken,
       );
       expect(badDatesRes.errors).toBeDefined();
       expect(badDatesRes.errors?.[0].message).toMatch(/before/);
@@ -166,7 +183,7 @@ describe('Institute scope E2E', () => {
           activateAcademicYear(id: $id) { id isActive status }
         }`,
         { id: newYearId },
-        instToken,
+        flowToken,
       );
       expect(actRes.errors).toBeUndefined();
       assert(actRes.data);
@@ -180,7 +197,7 @@ describe('Institute scope E2E', () => {
           activateAcademicYear(id: $id) { id }
         }`,
         { id: newYearId },
-        instToken,
+        flowToken,
       );
       expect(reActRes.errors).toBeDefined();
       expect(reActRes.errors?.[0].message).toMatch(/already active/);
@@ -192,7 +209,7 @@ describe('Institute scope E2E', () => {
           archiveAcademicYear(id: $id) { id }
         }`,
         { id: newYearId },
-        instToken,
+        flowToken,
       );
       expect(archRes.errors).toBeDefined();
       expect(archRes.errors?.[0].message).toMatch(/COMPLETING/);
@@ -211,7 +228,7 @@ describe('Institute scope E2E', () => {
             endDate: '2032-03-31',
           },
         },
-        instToken,
+        flowToken,
       );
       expect(updateRes.errors).toBeUndefined();
       assert(updateRes.data);
@@ -226,8 +243,8 @@ describe('Institute scope E2E', () => {
         `mutation Activate($id: ID!) {
           activateAcademicYear(id: $id) { id isActive status }
         }`,
-        { id: activeYearId },
-        instToken,
+        { id: originalYearId },
+        flowToken,
       );
       expect(reactivateRes.errors).toBeDefined();
       expect(reactivateRes.errors?.[0].message).toMatch(
@@ -239,7 +256,7 @@ describe('Institute scope E2E', () => {
       const delRes = await gql<{ deleteAcademicYear: boolean }>(
         `mutation Delete($id: ID!) { deleteAcademicYear(id: $id) }`,
         { id: newYearId },
-        instToken,
+        flowToken,
       );
       // newYearId is currently ACTIVE. There's a known production wart where
       // softDelete on an active row fails the RLS UPDATE WITH CHECK on this
