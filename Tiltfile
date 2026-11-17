@@ -15,6 +15,21 @@ dotenv('./.env')
 # Re-evaluate Tiltfile when .env changes
 watch_file('.env')
 
+# Parallel dev instances (docs/infrastructure.md): ports and the compose project come
+# from .env, written by `pnpm instance:new`. Defaults are instance 0.
+def port(name, default):
+  return os.getenv(name, default)
+
+def local_url(port_name, default, path=''):
+  return 'http://localhost:%s%s' % (port(port_name, default), path)
+
+def compose(path):
+  project = os.getenv('ROVIQ_COMPOSE_PROJECT', '')
+  if project:
+    docker_compose(path, project_name=project)
+  else:
+    docker_compose(path)
+
 # ─── Dev (startup pipeline + apps) ───────────────────────────────────────────
 
 # Package manager — auto-runs on dependency changes
@@ -25,12 +40,13 @@ local_resource(
   labels=['dev'],
 )
 
-# Schema push — auto-runs, retries until postgres is ready
+# Schema push — auto-runs, retries until postgres is ready.
+# A database with no tables is bootstrapped first (prereq functions, grants, custom migrations).
 local_resource(
   'db-push',
   cmd='''
     for i in $(seq 1 30); do
-      if pnpm run db:push 2>/dev/null; then
+      if pnpm run db:reset --if-empty 2>/dev/null && pnpm run db:push 2>/dev/null; then
         echo "Schema push completed successfully"
         exit 0
       fi
@@ -73,10 +89,10 @@ local_resource(
   deps=[],
   resource_deps=['db-push', 'redis', 'nats'],
   readiness_probe=probe(
-    http_get=http_get_action(port=3005, path='/api/health'),
+    http_get=http_get_action(port=int(port('API_GATEWAY_PORT', '3005')), path='/api/health'),
     period_secs=10,
   ),
-  links=['http://localhost:3005/api/graphql'],
+  links=[local_url('API_GATEWAY_PORT', '3005', '/api/graphql')],
 )
 
 # GraphQL Codegen — watches schema introspection + document files, regenerates types
@@ -98,7 +114,7 @@ local_resource(
   serve_dir='.',
   deps=['.env'],
   resource_deps=['pnpm-install'],
-  links=['http://localhost:4200'],
+  links=[local_url('WEB_PORT', '4200')],
 )
 
 # Notification Service (NestJS) — async event processing via NATS
@@ -115,36 +131,35 @@ local_resource(
 
 # ─── Infra ────────────────────────────────────────────────────────────────────
 
-docker_compose('./docker/compose.infra.yaml')
+compose('./docker/compose.infra.yaml')
 
 # Core infra — required for all dev work
 dc_resource('postgres', labels=['infra'])
 dc_resource('redis', labels=['infra'])
 dc_resource('nats', labels=['infra'],
-            links=['http://localhost:8222'])
+            links=[local_url('DEV_NATS_MONITOR_PORT', '8222')])
 dc_resource('mongodb', labels=['infra'])
 dc_resource('minio', labels=['infra'],
-            links=['http://localhost:9003'])
+            links=[local_url('DEV_MINIO_CONSOLE_PORT', '9003')])
 
 # Temporal — workflow engine, only needed when working on async workflows
 dc_resource('temporal', labels=['infra'], resource_deps=['postgres'])
 dc_resource('temporal-ui', labels=['infra'], auto_init=False,
-            links=['http://localhost:8233'])
+            links=[local_url('DEV_TEMPORAL_UI_PORT', '8233')])
 
 # ─── Novu Self-Hosted (manual) ───────────────────────────────────────────────
 # Start manually when working with local notifications
-# Dashboard: http://localhost:4000 | API: http://localhost:3340
 
-docker_compose('./docker/compose.novu.yaml')
+compose('./docker/compose.novu.yaml')
 
 dc_resource('novu-api', labels=['novu'], resource_deps=['redis', 'mongodb'],
-            auto_init=False, links=['http://localhost:3340'])
+            auto_init=False, links=[local_url('DEV_NOVU_API_PORT', '3340')])
 dc_resource('novu-worker', labels=['novu'], resource_deps=['novu-api'],
             auto_init=False)
 dc_resource('novu-ws', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False, links=['http://localhost:3342'])
+            auto_init=False, links=[local_url('DEV_NOVU_WS_PORT', '3342')])
 dc_resource('novu-dashboard', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False, links=['http://localhost:4000'])
+            auto_init=False, links=[local_url('DEV_NOVU_DASHBOARD_PORT', '4000')])
 
 # One-click setup: register, get API key, update .env, remove branding, sync bridge
 # allow_parallel: runs in its own build lane so a stuck/long-running setup does not
@@ -282,15 +297,15 @@ dc_resource('loki', labels=['observability'], auto_init=False)
 dc_resource('otel-collector', labels=['observability'], resource_deps=['tempo', 'loki'],
             auto_init=False)
 dc_resource('grafana', labels=['observability'], resource_deps=['prometheus', 'tempo', 'loki'],
-            auto_init=False, links=['http://localhost:3001'])
+            auto_init=False, links=[local_url('DEV_GRAFANA_PORT', '3001')])
 
 # Aggregator: triggering this pulls up every observability dc_resource above.
 local_resource(
   'observability',
-  cmd='echo "Observability stack up: Grafana http://localhost:3001"',
+  cmd='echo "Observability stack up: Grafana %s"' % local_url('DEV_GRAFANA_PORT', '3001'),
   resource_deps=['prometheus', 'tempo', 'loki', 'otel-collector', 'grafana'],
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,
   labels=['observability'],
-  links=['http://localhost:3001'],
+  links=[local_url('DEV_GRAFANA_PORT', '3001')],
 )

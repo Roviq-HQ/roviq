@@ -8,6 +8,7 @@
  *   pnpm db:reset          — drop + push (dev database)
  *   pnpm db:reset --seed   — drop + push + seed
  *   pnpm db:reset --test   — target roviq_test database (for e2e); always seeds
+ *   pnpm db:reset --if-empty — set up a database that was never bootstrapped and holds no users; otherwise do nothing
  *
  * Safety: refuses to run when NODE_ENV=production.
  */
@@ -37,11 +38,18 @@ const connectionString = useTestDb
 // etc.) and a schema-only test DB silently breaks 16+ test files with cryptic
 // FK errors. No valid scenario for an unseeded test DB.
 const shouldSeed = process.argv.includes('--seed') || useTestDb;
+// A fresh database needs the prereq functions and custom migrations that a bare
+// `drizzle-kit push` does not create, so Tilt's db-push bootstraps it through here.
+const onlyIfEmpty = process.argv.includes('--if-empty');
 
 async function main(): Promise<void> {
   const pool = new Pool({ connectionString });
   const db = drizzle({ client: pool });
   try {
+    if (onlyIfEmpty && !(await needsBootstrap(db))) {
+      console.log('Database is already set up; nothing to bootstrap.');
+      return;
+    }
     await dropEverything(db);
     await applyPrereq(pool);
     console.log('Database cleared.');
@@ -117,6 +125,20 @@ async function flushTestRedis(): Promise<void> {
   } finally {
     redis.disconnect();
   }
+}
+
+// True for a new database and for one left half-created by a failed push: no migration
+// baseline (db-reset always writes one) and no users, so there is no data to lose.
+async function needsBootstrap(db: ReturnType<typeof drizzle>): Promise<boolean> {
+  const state = await db.execute<{ baselined: boolean; has_users_table: boolean }>(sql`
+    SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS baselined,
+           to_regclass('public.users') IS NOT NULL AS has_users_table
+  `);
+  const row = state.rows[0];
+  if (!row || row.baselined) return false;
+  if (!row.has_users_table) return true;
+  const users = await db.execute(sql`SELECT 1 FROM users LIMIT 1`);
+  return users.rows.length === 0;
 }
 
 async function dropEverything(db: ReturnType<typeof drizzle>): Promise<void> {

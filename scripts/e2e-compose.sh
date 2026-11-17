@@ -15,4 +15,6 @@ export E2E_WORKSPACE="$PWD"
 export E2E_UID="${E2E_UID:-$(id -u)}"
 export E2E_GID="${E2E_GID:-$(id -g)}"
 
-exec docker compose -p roviq-e2e -f docker/compose.e2e.yaml "$@"
+. scripts/instance-env.sh
+
+exec docker compose -p "${ROVIQ_E2E_COMPOSE_PROJECT:-roviq-e2e}" -f docker/compose.e2e.yaml "$@"

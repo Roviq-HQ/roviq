@@ -2,6 +2,8 @@ import path from 'node:path';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
+const e2ePostgresPort = process.env.E2E_POSTGRES_PORT ?? '5435';
+
 export default defineConfig({
   plugins: [tsconfigPaths({ root: '../..' })],
   test: {
@@ -14,8 +16,8 @@ export default defineConfig({
     globalSetup: './global-setup.ts',
     fileParallelism: false,
     env: {
-      DATABASE_URL_E2E: 'postgresql://roviq_pooler:roviq_pooler_dev@localhost:5435/roviq_test',
-      DATABASE_URL_E2E_MIGRATE: 'postgresql://roviq:roviq_dev@localhost:5435/roviq_test',
+      DATABASE_URL_E2E: `postgresql://roviq_pooler:roviq_pooler_dev@localhost:${e2ePostgresPort}/roviq_test`,
+      DATABASE_URL_E2E_MIGRATE: `postgresql://roviq:roviq_dev@localhost:${e2ePostgresPort}/roviq_test`,
     },
   },
 });

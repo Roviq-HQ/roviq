@@ -3,16 +3,19 @@
 //
 // Schema source (configured in `codegen.ts`):
 //   - CI=1 → reads committed `schema.graphql` (offline)
-//   - dev  → fetches from http://localhost:3005/api/graphql (live api-gateway)
+//   - dev  → fetches from NEXT_PUBLIC_API_URL (live api-gateway, default localhost:3005)
 // Without either, codegen fails with a network error. We detect that case
-// up-front so the message is actionable instead of "ECONNREFUSED 3005".
+// up-front so the message is actionable instead of a bare "ECONNREFUSED".
 
+import 'dotenv/config';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
+// Same source as codegen.ts, so the probe hits the gateway codegen will read.
+const GRAPHQL_URL = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005'}/api/graphql`;
 
 const isCi = process.env.CI === 'true' || process.env.CI === '1';
 
@@ -34,7 +37,7 @@ if (!isCi) {
         'content-type: application/json',
         '-d',
         '{"query":"{__typename}"}',
-        'http://localhost:3005/api/graphql',
+        GRAPHQL_URL,
       ],
       { stdio: 'pipe' },
     );
@@ -44,7 +47,7 @@ if (!isCi) {
   }
   if (!liveSchemaReachable) {
     process.stderr.write(
-      'check:codegen-drift — api-gateway is not reachable at http://localhost:3005/api/graphql.\n' +
+      `check:codegen-drift — api-gateway is not reachable at ${GRAPHQL_URL}.\n` +
         '\n' +
         'Codegen needs a schema source. Pick one:\n' +
         '  • Local dev — `tilt trigger api-gateway` and wait for it to be ready, then re-run\n' +

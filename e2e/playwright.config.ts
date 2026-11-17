@@ -2,10 +2,13 @@ import path from 'node:path';
 import { workspaceRoot } from '@nx/devkit';
 import { defineConfig, devices } from '@playwright/test';
 
-// ── Portal URLs (E2E uses port 4201, separate from dev port 4200) ──
-const ADMIN_URL = process.env.WEB_URL_ADMIN || 'http://admin.localhost:4201';
-const INSTITUTE_URL = process.env.WEB_URL_INSTITUTE || 'http://localhost:4201';
-const RESELLER_URL = process.env.WEB_URL_RESELLER || 'http://reseller.localhost:4201';
+// ── Portal URLs (E2E web port is separate from the dev web port) ──
+const ADMIN_URL =
+  process.env.WEB_URL_ADMIN || `http://admin.localhost:${process.env.E2E_WEB_PORT ?? '4201'}`;
+const INSTITUTE_URL =
+  process.env.WEB_URL_INSTITUTE || `http://localhost:${process.env.E2E_WEB_PORT ?? '4201'}`;
+const RESELLER_URL =
+  process.env.WEB_URL_RESELLER || `http://reseller.localhost:${process.env.E2E_WEB_PORT ?? '4201'}`;
 
 // ── Auth state files ──
 const adminAuth = path.join(__dirname, 'playwright/.auth/admin.json');
@@ -162,7 +165,8 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       E2E_PROBE: '1',
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004',
+      NEXT_PUBLIC_API_URL:
+        process.env.NEXT_PUBLIC_API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3004'}`,
       NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: '',
     },
   },

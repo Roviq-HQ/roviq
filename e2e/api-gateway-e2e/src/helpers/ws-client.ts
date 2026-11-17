@@ -1,8 +1,10 @@
 import { createClient } from 'graphql-ws';
 import WebSocket from 'ws';
 
-const WS_URL = process.env.WS_URL ?? 'ws://localhost:3004/api/graphql';
-const API_URL = process.env.API_URL ?? 'http://localhost:3004/api/graphql';
+const WS_URL =
+  process.env.WS_URL ?? `ws://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
+const API_URL =
+  process.env.API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 // Strip `/graphql` (with or without trailing slash) to get the API base.
 const API_BASE = API_URL.replace(/\/graphql\/?$/, '');
 

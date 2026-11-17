@@ -23,8 +23,8 @@ export interface NovuCreds {
   appId: string;
 }
 
-const DOCKER_VOLUME = 'roviq-e2e_novu_creds';
-const HOST_API_URL = 'http://localhost:3443';
+const DOCKER_VOLUME = `${process.env.ROVIQ_E2E_COMPOSE_PROJECT ?? 'roviq-e2e'}_novu_creds`;
+const HOST_API_URL = `http://localhost:${process.env.E2E_NOVU_API_PORT ?? '3443'}`;
 
 function rewriteInternalHost(url: string | undefined): string | undefined {
   if (!url) return url;

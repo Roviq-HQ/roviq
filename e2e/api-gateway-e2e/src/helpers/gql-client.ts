@@ -1,7 +1,8 @@
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core';
 import { type FormattedExecutionResult, print } from 'graphql';
 
-const API_URL = process.env.API_URL || 'http://localhost:3004/api/graphql';
+const API_URL =
+  process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 
 /**
  * Default response shape — opaque object map. Callers that want strong

@@ -12,7 +12,8 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const API_URL = process.env.API_URL || 'http://localhost:3004/api/graphql';
+const API_URL =
+  process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
 const PROBE_TIMEOUT_MS = 2_000;
 const PROBE_INTERVAL_MS = 500;
@@ -55,7 +56,16 @@ export async function requireBackend(): Promise<void> {
   }
 
   console.log(`API not reachable at ${API_URL} (${reason}) — api-gateway container log tail:`);
-  spawnSync('docker', ['logs', '--tail', '40', 'roviq-e2e-api-gateway-1'], { stdio: 'inherit' });
+  spawnSync(
+    'docker',
+    [
+      'logs',
+      '--tail',
+      '40',
+      `${process.env.ROVIQ_E2E_COMPOSE_PROJECT ?? 'roviq-e2e'}-api-gateway-1`,
+    ],
+    { stdio: 'inherit' },
+  );
 
   console.log('Starting Docker E2E stack (pnpm e2e:up)...');
   const result = spawnSync('pnpm', ['e2e:up'], {

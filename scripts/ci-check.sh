@@ -23,6 +23,10 @@ fi
 IS_CI=0
 [[ "${CI:-}" == "true" ]] && IS_CI=1
 
+# Target this checkout's e2e stack (docs/infrastructure.md → "Parallel dev instances").
+. scripts/instance-env.sh
+export E2E_API_PORT="${E2E_API_PORT:-3004}" E2E_NATS_PORT="${E2E_NATS_PORT:-4223}"
+
 if (( ! IS_CI )); then
   if [[ "${SKIP_PREPUSH:-0}" == "1" || "${HUSKY:-}" == "0" ]]; then
     log "skipped via env var"; exit 0
@@ -163,7 +167,7 @@ if (( run_e2e )); then
 
   # Stream C: frontend build on host. Independent of Docker.
   ( cd apps/web && \
-      NEXT_PUBLIC_API_URL=http://localhost:3004 \
+      NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
       NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='' \
       pnpm exec next build > "$tmpdir/web-build.log" 2>&1 ) & web_pid=$!
 
@@ -205,7 +209,7 @@ if (( run_e2e )); then
   warmup_start=$SECONDS
   warmup_ok=0
   while (( SECONDS - warmup_start < 90 )); do
-    if response=$(curl -sf -X POST http://localhost:3004/api/graphql \
+    if response=$(curl -sf -X POST "http://localhost:$E2E_API_PORT/api/graphql" \
          -H 'Content-Type: application/json' \
          -d '{"query":"{ __typename }"}' \
          --max-time 5 2>/dev/null) \
@@ -217,7 +221,7 @@ if (( run_e2e )); then
   done
   if (( ! warmup_ok )); then
     log "✗ api-gateway warmup probe timed out after 90s"
-    docker logs roviq-e2e-api-gateway-1 --tail 40 2>&1 | sed 's/^/  /'
+    docker logs "${ROVIQ_E2E_COMPOSE_PROJECT:-roviq-e2e}-api-gateway-1" --tail 40 2>&1 | sed 's/^/  /'
     exit 1
   fi
   log "✓ api-gateway ready ($((SECONDS - warmup_start))s warmup)"
@@ -256,16 +260,16 @@ launch lint pnpm -s lint
 (( run_unit )) && launch unit pnpm -s test:unit
 (( run_int ))       && launch int       pnpm -s nx run integration-tests:test:int
 
-# e2e-api → e2e-ui run sequentially: they share roviq_test on port 5435.
+# e2e-api → e2e-ui run sequentially: they share the e2e stack's roviq_test.
 # Wrapped in one launched job so the whole e2e suite executes alongside the
 # other parallel jobs without racing them on the DB.
 # JetStream drift gate runs first — needs the e2e NATS up but no DB seed,
 # fails fast so a stream-config PR doesn't waste a full e2e run before the
 # drift becomes the obvious fix.
 (( run_e2e )) && launch e2e bash -c 'set -e
-  NATS_URL=nats://localhost:4223 pnpm -s check:jetstream-drift
+  NATS_URL="nats://localhost:$E2E_NATS_PORT" pnpm -s check:jetstream-drift
   pnpm -s nx run api-gateway-e2e:test-e2e
-  NEXT_PUBLIC_API_URL=http://localhost:3004 \
+  NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
   NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='\'''\'' \
   pnpm -s nx run web-e2e-suite:e2e'
 

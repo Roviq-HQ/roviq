@@ -23,17 +23,19 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loginAsPlatformAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
-// The e2e NATS publishes on host port 4223 — offset off the dev infra's 4222
-// so the two can run side by side. We pin to 4223 (overridable via
+// The e2e NATS publishes on its own host port (4223 for instance 0), offset off
+// the dev infra's so the two can run side by side. We pin to it (overridable via
 // E2E_NATS_URL) and deliberately ignore the ambient `NATS_URL`, which `.env`
-// points at the dev-infra NATS (4222): publishing there would land on a
+// points at the dev-infra NATS: publishing there would land on a
 // different JetStream and the e2e api-gateway's dlq-reader would never see it.
-const NATS_URL = process.env.E2E_NATS_URL ?? 'nats://localhost:4223';
+const NATS_URL =
+  process.env.E2E_NATS_URL ?? `nats://localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
 
 // Superuser connection used ONLY to delete the platform rows this suite seeds
 // (no GraphQL delete exists for dlq_messages). Mirrors the e2e vitest env.
 const DB_URL =
-  process.env.DATABASE_URL_E2E_MIGRATE ?? 'postgresql://roviq:roviq_dev@localhost:5435/roviq_test';
+  process.env.DATABASE_URL_E2E_MIGRATE ??
+  `postgresql://roviq:roviq_dev@localhost:${process.env.E2E_POSTGRES_PORT ?? '5435'}/roviq_test`;
 
 interface DlqMessageNode {
   id: string;
