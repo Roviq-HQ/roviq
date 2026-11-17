@@ -50,11 +50,7 @@ describe('hasRls', () => {
 
 describe('RLS_EXEMPT_BASENAMES', () => {
   it('lists exactly the platform-level tables still awaiting RLS (ROV-279)', () => {
-    expect([...RLS_EXEMPT_BASENAMES].sort()).toEqual([
-      'auth-providers.ts',
-      'group-memberships.ts',
-      'phone-numbers.ts',
-    ]);
+    expect([...RLS_EXEMPT_BASENAMES].sort()).toEqual(['auth-providers.ts', 'phone-numbers.ts']);
   });
 
   it('does not contain typical tenant business tables', () => {
