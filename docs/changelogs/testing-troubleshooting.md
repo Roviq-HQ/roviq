@@ -625,3 +625,12 @@ In a full `pnpm test:e2e:ui` run, both `people-restore.e2e.spec.ts` tests timed 
 The spec now runs in its own `institute-locales` Playwright project that depends on `admin`, `institute`, `reseller` and `cross-portal`, the same way the account-language journeys do.
 
 **Verification:** `pnpm ci:check` passed end to end after the change; the same run failed the two tests before it.
+
+
+## 2026-11-17 — fixed: RLS sweep failed on another suite's scratch table (ROV-84)
+
+The CI `Test` job failed once on `security-invariants.integration.spec.ts` › "21. every RLS-enabled table has policies for expected scope roles" with `rov64_scratch_13d00bd1_2099_01: FORCE RLS enabled but 0 policies`. That table belongs to `audit-security-invariants.integration.spec.ts`, which detaches a sealed scratch partition while the sweep runs in a parallel worker. Once detached it is an ordinary table with FORCE RLS and no policies, which is exactly what the sweep reports.
+
+The sweep now skips tables named `rov64_scratch_*`.
+
+**Verification:** `pnpm test:int` passed 575 tests after the change.

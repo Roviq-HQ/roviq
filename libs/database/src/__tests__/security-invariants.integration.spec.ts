@@ -558,6 +558,8 @@ describe('Structural invariants — RLS sweep', () => {
       WHERE c.relkind IN ('r','p')
         AND NOT c.relispartition
         AND c.relforcerowsecurity = true
+        -- audit-security-invariants detaches a sealed scratch partition while this runs in parallel
+        AND c.relname !~ '^rov64_scratch_'
         AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
       ORDER BY c.relname
     `);
