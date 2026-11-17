@@ -72,7 +72,7 @@ interface AuthProviderProps {
     newPassword: string,
     accessToken: string,
   ) => Promise<boolean>;
-  logoutMutation: (accessToken: string) => Promise<void>;
+  logoutMutation: (accessToken: string, currentRefreshToken: string) => Promise<void>;
   onAuthError?: () => void;
   sessionExpiredLabels?: SessionExpiredDialogProps['labels'];
   children: React.ReactNode;
@@ -384,7 +384,8 @@ export function AuthProvider({
   const logout = React.useCallback(async () => {
     try {
       const accessToken = tokenStorage.getAccessToken();
-      if (accessToken) await logoutMutation(accessToken);
+      const refreshToken = tokenStorage.getRefreshToken();
+      if (accessToken && refreshToken) await logoutMutation(accessToken, refreshToken);
     } catch {
       // Ignore errors during logout
     }

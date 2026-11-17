@@ -6,9 +6,10 @@
  * and CASL-gated via `manage:Reseller` (platform_admin) or `read:Reseller`
  * (platform_support, read-only).
  */
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { CurrentUser, PlatformScope } from '@roviq/auth-backend';
-import { CheckAbility } from '@roviq/casl';
+import { CurrentUser, GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { ResellerTier } from '@roviq/common-types';
 import { AdminResellerService } from './admin-reseller.service';
@@ -17,7 +18,7 @@ import { AdminListResellersFilterInput } from './dto/admin-list-resellers-filter
 import { AdminUpdateResellerInput } from './dto/admin-update-reseller.input';
 import { AdminResellerConnection, AdminResellerModel } from './models/admin-reseller.model';
 
-@PlatformScope()
+@UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => AdminResellerModel)
 export class AdminResellerResolver {
   constructor(private readonly resellerService: AdminResellerService) {}

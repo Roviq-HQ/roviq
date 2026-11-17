@@ -6,11 +6,12 @@ import type {
   ImpersonationSessionsQueryVariables,
 } from './use-impersonation-sessions.generated';
 
-export type ImpersonationSessionNode = ImpersonationSessionsQuery['impersonationSessions'][number];
+export type ImpersonationSessionNode =
+  ImpersonationSessionsQuery['adminImpersonationSessions'][number];
 
 const IMPERSONATION_SESSIONS_QUERY = gql`
   query ImpersonationSessions($activeOnly: Boolean, $sessionId: String, $first: Int) {
-    impersonationSessions(activeOnly: $activeOnly, sessionId: $sessionId, first: $first) {
+    adminImpersonationSessions(activeOnly: $activeOnly, sessionId: $sessionId, first: $first) {
       id
       impersonatorId
       impersonatorScope
@@ -42,7 +43,7 @@ export function useImpersonationSessions(variables: ImpersonationSessionsQueryVa
   >(IMPERSONATION_SESSIONS_QUERY, { variables, notifyOnNetworkStatusChange: true });
 
   return {
-    sessions: data?.impersonationSessions ?? [],
+    sessions: data?.adminImpersonationSessions ?? [],
     loading,
     error,
     refetch,

@@ -28,18 +28,22 @@ describe('session GraphQL requests', () => {
     });
   });
 
-  it('should authenticate logout so the server can revoke sessions', async () => {
+  it('should send the current refresh token so logout ends only this session', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValue(Response.json({ data: { logout: true } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await createAuthMutations(url).logout('access');
+    await createAuthMutations(url).logout('access', 'refresh');
 
     expect(fetchMock).toHaveBeenCalledWith(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer access' },
-      body: JSON.stringify({ query: 'mutation Logout { logout }' }),
+      body: JSON.stringify({
+        query:
+          'mutation Logout($currentRefreshToken: String!) { logout(currentRefreshToken: $currentRefreshToken) }',
+        variables: { currentRefreshToken: 'refresh' },
+      }),
     });
   });
 

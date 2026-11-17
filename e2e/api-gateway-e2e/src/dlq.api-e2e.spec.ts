@@ -4,7 +4,7 @@
  * Exercises the platform-admin dead-letter API end-to-end: a real envelope is
  * published to the JetStream `DLQ` stream, the live `dlq-reader` consumer
  * persists it to `dlq_messages`, and the GraphQL surface
- * (`adminListDlqMessages` / `replayDlqMessage` / `discardDlqMessage`) reads and
+ * (`adminListDlqMessages` / `adminReplayDlqMessage` / `adminDiscardDlqMessage`) reads and
  * mutates it. Nothing is mocked — NATS, the consumer, Postgres, and the
  * api-gateway are all the live e2e containers.
  *
@@ -69,11 +69,11 @@ const LIST_QUERY = `query ListDlq($filter: DlqMessageFilterInput) {
 }`;
 
 const REPLAY_MUTATION = `mutation Replay($id: ID!) {
-  replayDlqMessage(id: $id) { id status replayCount replayedAt }
+  adminReplayDlqMessage(id: $id) { id status replayCount replayedAt }
 }`;
 
 const DISCARD_MUTATION = `mutation Discard($id: ID!) {
-  discardDlqMessage(id: $id) { id status }
+  adminDiscardDlqMessage(id: $id) { id status }
 }`;
 
 /** Publish a dead-letter envelope to DLQ.<STREAM>, matching publishToDlq's shape. */
@@ -174,7 +174,7 @@ describe('DLQ reader E2E (ROV-19)', () => {
     expect(row.replayCount).toBe(0);
   });
 
-  it('replayDlqMessage sets status=replayed and replayCount=1', async () => {
+  it('adminReplayDlqMessage sets status=replayed and replayCount=1', async () => {
     const marker = `dlq-replay-${randomUUID()}`;
     const correlationId = randomUUID();
     seededCorrelationIds.push(correlationId);
@@ -182,13 +182,13 @@ describe('DLQ reader E2E (ROV-19)', () => {
     await publishDeadLetter(js, marker, correlationId);
     const pending = await waitForDlqRow(adminToken, correlationId, { status: 'PENDING' });
 
-    const res = await gql<{ replayDlqMessage: DlqMessageNode }>(
+    const res = await gql<{ adminReplayDlqMessage: DlqMessageNode }>(
       REPLAY_MUTATION,
       { id: pending.id },
       adminToken,
     );
     expect(res.errors).toBeUndefined();
-    const replayed = res.data?.replayDlqMessage;
+    const replayed = res.data?.adminReplayDlqMessage;
     assert(replayed);
     expect(replayed.id).toBe(pending.id);
     expect(replayed.status).toBe('REPLAYED');
@@ -196,7 +196,7 @@ describe('DLQ reader E2E (ROV-19)', () => {
     expect(replayed.replayedAt).not.toBeNull();
   });
 
-  it('discardDlqMessage sets status=discarded', async () => {
+  it('adminDiscardDlqMessage sets status=discarded', async () => {
     const marker = `dlq-discard-${randomUUID()}`;
     const correlationId = randomUUID();
     seededCorrelationIds.push(correlationId);
@@ -204,13 +204,13 @@ describe('DLQ reader E2E (ROV-19)', () => {
     await publishDeadLetter(js, marker, correlationId);
     const pending = await waitForDlqRow(adminToken, correlationId, { status: 'PENDING' });
 
-    const res = await gql<{ discardDlqMessage: DlqMessageNode }>(
+    const res = await gql<{ adminDiscardDlqMessage: DlqMessageNode }>(
       DISCARD_MUTATION,
       { id: pending.id },
       adminToken,
     );
     expect(res.errors).toBeUndefined();
-    const discarded = res.data?.discardDlqMessage;
+    const discarded = res.data?.adminDiscardDlqMessage;
     assert(discarded);
     expect(discarded.id).toBe(pending.id);
     expect(discarded.status).toBe('DISCARDED');

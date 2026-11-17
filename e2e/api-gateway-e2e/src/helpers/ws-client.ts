@@ -18,7 +18,7 @@ const API_BASE = API_URL.replace(/\/graphql\/?$/, '');
  *
  * Endpoint: `GET /api/auth/ws-ticket`, auth via `Authorization: Bearer <token>`.
  */
-async function exchangeWsTicket(token: string): Promise<string> {
+export async function exchangeWsTicket(token: string): Promise<string> {
   const res = await fetch(`${API_BASE}/auth/ws-ticket`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -86,5 +86,51 @@ export async function subscribeOnce<T>(
         complete: () => {},
       },
     );
+  });
+}
+
+export type WsConnectOutcome = { acknowledged: true } | { acknowledged: false; closeCode: number };
+
+function closeCodeOf(event: unknown): number {
+  if (typeof event === 'object' && event !== null && 'code' in event) {
+    const { code } = event;
+    if (typeof code === 'number') return code;
+  }
+  throw new Error(`WebSocket closed without a close code: ${JSON.stringify(event)}`);
+}
+
+/** Opens one connection with the given `connection_init` payload and reports whether the server acknowledged it. */
+export function connectWithParams(
+  connectionParams: Record<string, unknown>,
+  timeoutMs = 5000,
+): Promise<WsConnectOutcome> {
+  return new Promise<WsConnectOutcome>((resolve, reject) => {
+    const client = createClient({
+      url: WS_URL,
+      webSocketImpl: WebSocket,
+      connectionParams,
+      lazy: false,
+      retryAttempts: 0,
+      onNonLazyError: () => {},
+      on: {
+        connected: () => {
+          clearTimeout(timer);
+          resolve({ acknowledged: true });
+          client.dispose();
+        },
+        closed: (event) => {
+          clearTimeout(timer);
+          try {
+            resolve({ acknowledged: false, closeCode: closeCodeOf(event) });
+          } catch (err) {
+            reject(err);
+          }
+        },
+      },
+    });
+    const timer = setTimeout(() => {
+      client.dispose();
+      reject(new Error('WebSocket connection attempt timed out'));
+    }, timeoutMs);
   });
 }

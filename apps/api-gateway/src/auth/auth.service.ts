@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
-import type { AbilityRule, AuthScope } from '@roviq/common-types';
+import type { AbilityRule, AuthScope, AuthUser, InstituteContext } from '@roviq/common-types';
 import {
   BusinessException,
   ErrorCode,
@@ -60,6 +60,16 @@ const ACCESS_TTL_SECONDS: Record<AuthScope, number> = {
 };
 const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+interface RefreshMembership {
+  scope: AuthScope;
+  tenantId?: string;
+  resellerId?: string;
+  membershipId: string;
+  roleId: string;
+  roleAbilities: Record<string, unknown>[];
+  membershipAbilities: Record<string, unknown>[] | null;
+}
+
 interface RequestMeta {
   ip?: string;
   userAgent?: string;
@@ -111,12 +121,8 @@ export class AuthService {
     const user = await this.verifyCredentials(username, password, meta);
 
     const membership = await this.platformMembershipRepo.findByUserId(user.id);
-    if (!membership) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
-    }
-
-    if (!membership.isActive) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
+    if (!membership?.isActive) {
+      this.rejectWrongPortal(user.id, 'platform', meta);
     }
 
     const result = await this.issueTokens({
@@ -164,14 +170,9 @@ export class AuthService {
     const user = await this.verifyCredentials(username, password, meta);
 
     const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
-    if (memberships.length === 0) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
-    }
-
-    // Check reseller is active
     const m = memberships[0];
-    if (!m.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
+    if (!m?.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
+      this.rejectWrongPortal(user.id, 'reseller', meta);
     }
 
     const result = await this.issueTokens({
@@ -222,7 +223,7 @@ export class AuthService {
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
+      this.rejectWrongPortal(user.id, 'institute', meta);
     }
 
     if (memberships.length === 1) {
@@ -431,19 +432,25 @@ export class AuthService {
   // ── Institute switching (already authenticated) ────────
 
   async switchInstitute(
-    userId: string,
+    current: InstituteContext,
     targetMembershipId: string,
     currentRefreshToken: string,
     meta?: RequestMeta,
   ): Promise<AuthPayload> {
-    // ROV-92: "revoke old refresh token" — hash the raw token, find the row,
-    // revoke that ONE row. This is a scope switch, not a token rotation from
-    // the refresh flow, so tag it `user_initiated` — reuse-detection must
-    // not cascade if the caller legitimately presents the old token again.
-    const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
-    const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
-    if (currentToken) {
-      await this.refreshTokenRepo.revoke(currentToken.id, 'user_initiated');
+    // An impersonation token must never be traded for a renewable session.
+    if (current.isImpersonated) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Cannot switch institute while impersonating',
+      );
+    }
+    const userId = current.userId;
+
+    const currentToken = await this.refreshTokenRepo.findByHash(
+      this.hashToken(currentRefreshToken),
+    );
+    if (!currentToken || currentToken.userId !== userId) {
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
 
     const membership = await this.membershipRepo.findByIdAndUser(targetMembershipId, userId);
@@ -459,6 +466,10 @@ export class AuthService {
       throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'User not found or inactive');
     }
 
+    // Revoked only once the switch is certain, so a rejected switch keeps the
+    // session. `user_initiated`: replaying the old token must not cascade.
+    await this.refreshTokenRepo.revoke(currentToken.id, 'user_initiated');
+
     const result = await this.issueTokens({
       user,
       scope: 'institute',
@@ -471,6 +482,17 @@ export class AuthService {
       meta,
     });
 
+    if (result.user) {
+      result.user.abilityRules = await this.getAbilityRules(
+        user.id,
+        'institute',
+        membership.tenantId,
+        membership.id,
+        membership.roleId,
+      );
+      result.user.primaryNavSlugs = await this.getPrimaryNavSlugs(membership.roleId);
+    }
+
     this.authEventService
       .emit({
         userId,
@@ -481,7 +503,7 @@ export class AuthService {
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
         metadata: {
-          from_tenant_id: currentToken?.id,
+          from_tenant_id: current.tenantId,
           to_tenant_id: membership.tenantId,
         },
       })
@@ -496,98 +518,25 @@ export class AuthService {
     const payload = this.verifyRefreshTokenPayload(token);
     const storedToken = await this.loadAndValidateStoredRefreshToken(token, payload);
 
-    // Refresh from a fresh DB read so the new access token reflects current
-    // mustChangePassword + status. The relation user object is good enough
-    // for the password-changed-at invariant inside `loadAndValidate…`, but
-    // we want the canonical record for token issuance.
-    const user = (await this.userRepo.findById(storedToken.user.id)) ?? null;
+    // Fresh DB read so the new access token reflects the current status and
+    // mustChangePassword, not the values joined onto the token row.
+    const user = await this.userRepo.findById(storedToken.user.id);
     if (!user) {
       throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
-
-    // Revoke old token — this IS a rotation (replaced by the new token
-    // issued below), so the next attempt to use it correctly triggers
-    // the reuse-cascade above.
-    await this.refreshTokenRepo.revoke(storedToken.id, 'rotation');
+    if (user.status !== 'ACTIVE') {
+      throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'User not found or inactive');
+    }
 
     const scope = storedToken.membershipScope as AuthScope;
+    const membership = await this.resolveRefreshMembership(scope, user.id, payload.membershipId);
 
-    // Re-issue based on scope
-    let result: AuthPayload;
+    // Rotated only after the membership check: a rejected refresh must not
+    // leave a `rotation` row behind, or the client's retry would trip reuse
+    // detection and revoke the user's sessions in other institutes.
+    await this.refreshTokenRepo.revoke(storedToken.id, 'rotation');
 
-    if (scope === 'platform') {
-      const membership = await this.platformMembershipRepo.findByUserId(user.id);
-      if (!membership) {
-        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active platform membership');
-      }
-      result = await this.issueTokens({
-        user,
-        scope: 'platform',
-        membershipId: membership.id,
-        roleId: membership.roleId,
-        roleAbilities: membership.role.abilities as Record<string, unknown>[],
-        membershipAbilities: membership.abilities as Record<string, unknown>[] | null,
-        meta,
-      });
-    } else if (scope === 'reseller') {
-      const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
-      if (memberships.length === 0) {
-        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active reseller membership');
-      }
-      const m = memberships[0];
-      if (!m.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
-        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Reseller account suspended');
-      }
-      result = await this.issueTokens({
-        user,
-        scope: 'reseller',
-        resellerId: m.resellerId,
-        membershipId: m.id,
-        roleId: m.roleId,
-        roleAbilities: m.role.abilities as Record<string, unknown>[],
-        membershipAbilities: m.abilities as Record<string, unknown>[] | null,
-        meta,
-      });
-    } else if (storedToken.membership) {
-      // Institute scope. `storedToken.membership` carries the joined
-      // institute (see refresh-token.drizzle-repository.ts), so
-      // `institute.resellerId` is available without an extra DB hop —
-      // required to mint a JWT containing the claim (ROV-261).
-      const m = storedToken.membership;
-      result = await this.issueTokens({
-        user,
-        scope: 'institute',
-        tenantId: m.tenantId,
-        resellerId: m.institute.resellerId,
-        membershipId: m.id,
-        roleId: m.roleId,
-        roleAbilities: m.role.abilities as Record<string, unknown>[],
-        membershipAbilities: m.abilities as Record<string, unknown>[] | null,
-        meta,
-      });
-    } else {
-      // Fallback: find first active institute membership.
-      // findActiveByUserId returns memberships ordered by createdAt asc, so [0]
-      // is deterministic AND carries `institute.resellerId` for the JWT.
-      // Replaces the previous `findFirstActive` (no orderBy → DB-order
-      // non-determinism; no institute JOIN).
-      const memberships = await this.membershipRepo.findActiveByUserId(user.id);
-      const firstMembership = memberships[0];
-      if (!firstMembership) {
-        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active memberships');
-      }
-      result = await this.issueTokens({
-        user,
-        scope: 'institute',
-        tenantId: firstMembership.tenantId,
-        resellerId: firstMembership.institute.resellerId,
-        membershipId: firstMembership.id,
-        roleId: firstMembership.roleId,
-        roleAbilities: firstMembership.role.abilities as Record<string, unknown>[],
-        membershipAbilities: firstMembership.abilities as Record<string, unknown>[] | null,
-        meta,
-      });
-    }
+    const result = await this.issueTokens({ user, ...membership, meta });
 
     this.authEventService
       .emit({
@@ -605,17 +554,27 @@ export class AuthService {
 
   // ── Logout ─────────────────────────────────────────────
 
-  async logout(userId: string, refreshTokenId?: string, meta?: RequestMeta): Promise<void> {
-    if (refreshTokenId) {
-      await this.refreshTokenRepo.revoke(refreshTokenId, 'user_initiated');
-    } else {
-      await this.refreshTokenRepo.revokeAllForUser(userId, 'user_initiated');
+  /** Ends the caller's current session only; other devices stay signed in. */
+  async logout(current: AuthUser, currentRefreshToken: string, meta?: RequestMeta): Promise<void> {
+    // The impersonator holds no session of the target; nothing here is theirs to end.
+    if (current.isImpersonated) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Cannot log out while impersonating');
+    }
+
+    // A token that is already revoked is not found: logging out twice succeeds.
+    const session = await this.refreshTokenRepo.findByHash(this.hashToken(currentRefreshToken));
+    if (session) {
+      if (session.userId !== current.userId) {
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
+      }
+      await this.refreshTokenRepo.revoke(session.id, 'user_initiated');
     }
 
     this.authEventService
       .emit({
-        userId,
+        userId: current.userId,
         type: 'logout',
+        scope: current.scope,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -837,6 +796,82 @@ export class AuthService {
     }
 
     return storedToken;
+  }
+
+  /**
+   * The membership a refresh token was issued for, re-read so a deactivated
+   * membership, suspended reseller or deleted institute stops refreshing.
+   */
+  private async resolveRefreshMembership(
+    scope: AuthScope,
+    userId: string,
+    membershipId: string,
+  ): Promise<RefreshMembership> {
+    if (scope === 'platform') {
+      const membership = await this.platformMembershipRepo.findByUserId(userId);
+      if (!membership || membership.id !== membershipId) {
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active platform membership');
+      }
+      return {
+        scope: 'platform',
+        membershipId: membership.id,
+        roleId: membership.roleId,
+        roleAbilities: membership.role.abilities as Record<string, unknown>[],
+        membershipAbilities: membership.abilities as Record<string, unknown>[] | null,
+      };
+    }
+
+    if (scope === 'reseller') {
+      const memberships = await this.resellerMembershipRepo.findByUserId(userId);
+      const m = memberships.find((candidate) => candidate.id === membershipId);
+      if (!m) {
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active reseller membership');
+      }
+      if (!m.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Reseller account suspended');
+      }
+      return {
+        scope: 'reseller',
+        resellerId: m.resellerId,
+        membershipId: m.id,
+        roleId: m.roleId,
+        roleAbilities: m.role.abilities as Record<string, unknown>[],
+        membershipAbilities: m.abilities as Record<string, unknown>[] | null,
+      };
+    }
+
+    const m = await this.membershipRepo.findByIdAndUser(membershipId, userId);
+    if (!m) {
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active institute membership');
+    }
+    return {
+      scope: 'institute',
+      tenantId: m.tenantId,
+      resellerId: m.institute.resellerId,
+      membershipId: m.id,
+      roleId: m.roleId,
+      roleAbilities: m.role.abilities as Record<string, unknown>[],
+      membershipAbilities: m.abilities as Record<string, unknown>[] | null,
+    };
+  }
+
+  /**
+   * Correct password, no usable account in this portal. Same error as a wrong
+   * password so the response does not confirm the credentials.
+   */
+  private rejectWrongPortal(userId: string, scope: AuthScope, meta?: RequestMeta): never {
+    this.authEventService
+      .emit({
+        userId,
+        type: 'login_failed',
+        scope,
+        failureReason: 'wrong_portal',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+      })
+      .catch(() => {});
+    throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
   }
 
   // ── Private: credential verification ───────────────────

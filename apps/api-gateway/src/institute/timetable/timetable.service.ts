@@ -9,7 +9,7 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { AcademicYearRepository } from '../../academic-year/repositories/academic-year.repository';
+import { AcademicYearRepository } from '../academic-year/repositories/academic-year.repository';
 import { TimetableRepository } from './repositories/timetable.repository';
 import type {
   ListTimetablesQuery,

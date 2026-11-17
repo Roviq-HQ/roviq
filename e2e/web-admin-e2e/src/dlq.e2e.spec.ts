@@ -45,7 +45,7 @@ const LIST_QUERY = `query ListDlq($filter: DlqMessageFilterInput) {
 }`;
 
 const DISCARD_MUTATION = `mutation Discard($id: ID!) {
-  discardDlqMessage(id: $id) { id status }
+  adminDiscardDlqMessage(id: $id) { id status }
 }`;
 
 async function apiGql<T>(

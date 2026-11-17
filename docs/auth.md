@@ -26,9 +26,9 @@ Auth failures carry a machine-readable `extensions.code` (see `docs/architecture
 | Code | HTTP | Raised when |
 |------|------|-------------|
 | `UNAUTHENTICATED` | 401 | Access token missing, malformed or expired — the client refreshes and retries |
-| `INVALID_CREDENTIALS` | 401 | Wrong Roviq ID or password, unknown or inactive user |
+| `INVALID_CREDENTIALS` | 401 | Wrong Roviq ID or password, unknown or inactive user, or a correct password with no usable membership in this portal (same response, so it does not confirm the credentials) |
 | `ACCOUNT_LOCKED` | 401 | Too many failed logins for the Roviq ID |
-| `ACCOUNT_NOT_FOUND` | 401 | Credentials are valid but there is no usable membership in this portal |
+| `ACCOUNT_NOT_FOUND` | 401 | Passkey login succeeded but the user has no active institute membership |
 | `ACCOUNT_INACTIVE` | 401 | The user behind a selection/switch token is deleted or not ACTIVE |
 | `SESSION_EXPIRED` | 401 | Refresh or institute-selection token invalid, expired, revoked or reused |
 | `PASSWORD_CHANGED` | 401 | Refresh token predates a password change — full re-login, no re-auth dialog |
@@ -51,24 +51,24 @@ Three separate login mutations, one per portal:
 ### Admin Portal: `adminLogin(username, password)`
 1. Verifies credentials
 2. Looks up `platform_memberships` for user
-3. No membership → `ACCOUNT_NOT_FOUND` ("No account found")
+3. No active membership → `INVALID_CREDENTIALS`, identical to a wrong password. A `login_failed` auth event with `failureReason: wrong_portal` records the real cause
 4. Issues scope=platform access token (5min TTL) + refresh token
 
 ### Reseller Portal: `resellerLogin(username, password)`
 1. Verifies credentials
 2. Looks up `reseller_memberships` for user
-3. Checks reseller is active (`is_active = true`, `status = 'active'`)
+3. Checks reseller is active (`is_active = true`, `status = 'active'`). No membership or an inactive reseller → `INVALID_CREDENTIALS`, as above
 4. Issues scope=reseller access token (10min TTL) + refresh token
 
 ### Institute Portal: `instituteLogin(username, password)`
 1. Verifies credentials
-2. Looks up active `memberships` (institute-scoped) for user
+2. Looks up active `memberships` (institute-scoped) for user. None → `INVALID_CREDENTIALS`, as above
 3. **Single membership:** issues scope=institute access token (15min TTL) + refresh token
 4. **Multiple memberships:** returns `requiresInstituteSelection: true` + membership list for picker
 5. User calls `selectInstitute(membershipId)` → issues scoped tokens
 
 ### Institute Switching
-- `switchInstitute(membershipId)` — revokes old refresh token, issues new tokens. No re-auth.
+- `switchInstitute(membershipId, currentRefreshToken)` — institute scope only, refused during impersonation. `currentRefreshToken` must be a live refresh token of the caller; that one row is revoked (reason `user_initiated`) and new tokens are issued. No re-auth. Every check runs before the revoke, so a rejected switch leaves the session usable.
 
 ## JWT Structure
 
@@ -83,6 +83,7 @@ All tokens are `type: 'access'` — no more separate 'platform' type.
 
 ### Token Refresh
 - Refresh token rotation: each use invalidates the old token and issues a new pair (reason `rotation`)
+- Each refresh re-reads the user and the membership named in the token (`membershipId` claim). An inactive user gets `ACCOUNT_INACTIVE`; a missing, inactive or soft-deleted membership, a deleted institute or a suspended reseller gets `SESSION_EXPIRED`. A refresh never moves a session to a different membership. The old token is rotated only after these checks pass, so a rejected refresh does not arm reuse detection.
 - Reason-aware revocation: `refresh_tokens.revoked_reason` records why a row was revoked. Every revocation path tags itself so the reuse-detection cascade can tell a rotation-replay attack from a late client retry. Values:
   - `rotation` — normal rotate-then-reuse signal. Replay triggers the cascade.
   - `user_initiated` — `logout`, `revokeSession`, `revokeAllOtherSessions`, scope switch (`switchInstitute`).
@@ -109,8 +110,19 @@ Applied at resolver class level. Combines `GqlAuthGuard` (JWT validation) + scop
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes
 - Frontend: `<ProtectedRoute>` component redirects to `/login` with return URL
 
+## WebSocket Authentication (ws-ticket, ROV-95)
+
+graphql-ws connections never carry the JWT. The client exchanges its access token for a short-lived ticket and sends only the ticket in `connectionParams`.
+
+1. `GET /api/auth/ws-ticket` with `Authorization: Bearer <access token>` returns `{ ticket }` (a UUID). `issueWsTicket` stores the full `AuthUser` in Redis under `ws-ticket:<uuid>` for 30 seconds.
+2. The client opens the socket with `connectionParams: { ticket }`. `onConnect` in `app.module.ts` calls `consumeWsTicket`, which reads and deletes the key in one `GETDEL`, so a ticket works once even when two sockets race on it.
+3. The user is put on `ctx.extra.user` and copied to `req.user` by the GraphQL `context()` wrapper, so `@CurrentUser()`, scope guards and CASL work as on HTTP.
+
+A missing, malformed, unknown, expired or reused ticket closes the socket with code 4403. The stored user is validated on the way in and out (`ws-ticket.store.ts`) and keeps `isImpersonated`, `impersonationSessionId` and `mustChangePassword`, which `ImpersonationSessionGuard` and `MustChangePasswordGuard` read on the subscription path. On reconnect the frontend (`libs/frontend/graphql/src/lib/client.ts`) fetches a new ticket.
+
 ## Session Management
 
+- `logout(currentRefreshToken)` — ends only the session of that refresh token (reason `user_initiated`); other devices stay signed in. Succeeds if the session is already gone, rejects a token of another user with `SESSION_EXPIRED`, and is refused during impersonation. The access token stays valid until it expires.
 - `mySessions` query — returns active refresh tokens with device_info, ip, last_used_at
 - `revokeSession(sessionId)` — revoke a specific session (reason `user_initiated`)
 - `revokeAllOtherSessions` — revoke every refresh token for the user EXCEPT the caller's current one (reason `user_initiated`). The caller keeps working on the same token; crucially, the `user_initiated` reason means a stale client replaying one of the killed tokens will hit `Refresh token revoked` without triggering the rotation-reuse cascade (see [Token Refresh](#token-refresh)), so the caller's keep-alive session is not collaterally killed.
@@ -228,7 +240,7 @@ Read models over `impersonation_sessions` surface sessions for review and termin
 
 | Query | Scope | Returns |
 |---|---|---|
-| `impersonationSessions(activeOnly, sessionId, first)` | platform | All sessions across scopes (newest first) |
+| `adminImpersonationSessions(activeOnly, sessionId, first)` | platform | All sessions across scopes (newest first) |
 | `resellerImpersonationSessions(activeOnly, sessionId, first)` | reseller | Sessions started by the reseller's own team |
 
 Both return `ImpersonationSessionModel` — the row plus resolved display names (impersonator, target user, OTP verifier) and the target institute name, with a derived `status` of `ACTIVE` / `ENDED` / `EXPIRED` (from `endedAt` then `expiresAt`). RLS on `impersonation_sessions` grants resellers full read, so `listSessions` enforces the team scope explicitly by filtering impersonators to the reseller's `reseller_memberships`.
@@ -264,7 +276,9 @@ This gives us one place to enforce password policy, audit the creation event, an
 - `@CheckAbility({ action, subject })` decorator + `AbilityGuard` for resolver-level checks
 - `@CurrentAbility()` param decorator for imperative checks in resolver body
 - Role abilities cached in Redis with key `casl:role:{roleId}`, 5-minute TTL
-- Platform scope: `manage:all` (no DB lookup)
+- Platform scope uses the role's abilities like the other scopes: `platform_admin` is `manage all`, `platform_support` is read-only plus impersonation
+- `AbilityGuard` must come after `GqlAuthGuard` in the class-level chain: `@UseGuards(GqlAuthGuard, <Scope>ScopeGuard, AbilityGuard)`. A separate `@UseGuards(AbilityGuard)` under a scope decorator runs before authentication. `ability-guard-wiring.spec.ts` fails on a `@CheckAbility` without the guard and on a mis-ordered chain
+- Starting impersonation and verifying its OTP need `impersonate User` in every scope; listing sessions needs `read AuditLog`. Changing tenant notification channels needs `update_config Institute`
 
 ### Student and admission reads
 

@@ -111,6 +111,7 @@ export class GroupResolver {
       return tenantMatch && groupMatch;
     },
   })
+  @CheckAbility({ action: 'read', subject: 'Group' })
   groupMembershipResolved(@Args('groupId', { type: () => ID }) _groupId: string) {
     return pubSub.asyncIterableIterator('GROUP.membership_resolved');
   }

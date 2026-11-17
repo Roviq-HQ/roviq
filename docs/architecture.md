@@ -9,20 +9,27 @@ roviq/
 │   │   └── src/
 │   │       ├── admin/            # Platform-scope resolvers (@PlatformScope)
 │   │       │   ├── institute/    # Admin institute CRUD, lifecycle, statistics
-│   │       │   └── reseller/     # Admin reseller management
+│   │       │   ├── reseller/     # Admin reseller management
+│   │       │   ├── audit/        # adminAuditLogs, adminAuthEvents
+│   │       │   └── dlq/          # Dead-letter queue list, replay, discard
 │   │       ├── reseller/         # Reseller-scope resolvers (@ResellerScope)
 │   │       │   ├── institute/    # Reseller institute requests, suspend/reactivate
-│   │       │   └── institute-group/  # Reseller group management
+│   │       │   ├── institute-group/  # Reseller group management
+│   │       │   └── audit/        # resellerAuditLogs
 │   │       ├── institute/        # Institute-scope resolvers (@InstituteScope)
 │   │       │   ├── management/   # Institute CRUD, branding, config
 │   │       │   ├── standard/     # Grade levels
 │   │       │   ├── section/      # Class sections
 │   │       │   ├── subject/      # Subjects & curriculum
+│   │       │   ├── academic-year/    # Academic year lifecycle
+│   │       │   ├── institute-group/  # Institute group service, models (shared with admin/reseller)
+│   │       │   ├── role/             # Institute roles and primary nav
+│   │       │   ├── notification-config/  # Tenant notification channels, device tokens
+│   │       │   ├── audit/        # auditLogs, entityAuditTimeline
 │   │       │   └── setup/        # Temporal InstituteSetupWorkflow
-│   │       ├── academic-year/    # Academic year lifecycle
-│   │       ├── institute-group/  # Institute group CRUD
 │   │       ├── auth/             # JWT, login, impersonation, auth events, repositories, ws-ticket
-│   │       ├── audit/            # Audit logging + Temporal partition workflow
+│   │       ├── audit/            # Audit interceptor, consumer, service, partition workflow (no resolvers)
+│   │       ├── dlq/              # DLQ consumer and service (resolver lives in admin/dlq)
 │   │       ├── casl/             # CASL ability guard + module
 │   │       └── common/           # Pagination, pubsub, event bus
 │   └── web/                  # Next.js 16 — unified web app (admin/reseller/institute)

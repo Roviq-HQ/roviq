@@ -3,7 +3,7 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { AcademicYearRepository } from '../../academic-year/repositories/academic-year.repository';
+import { AcademicYearRepository } from '../academic-year/repositories/academic-year.repository';
 import type { CreateSubjectInput } from './dto/create-subject.input';
 import type { UpdateSubjectInput } from './dto/update-subject.input';
 import { SubjectRepository } from './repositories/subject.repository';

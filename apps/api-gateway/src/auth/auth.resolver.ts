@@ -78,8 +78,9 @@ export class AuthResolver {
     @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
+    assertTenantContext(user);
     return this.authService.switchInstitute(
-      user.userId,
+      user,
       membershipId,
       currentRefreshToken,
       extractMeta(ctx),
@@ -103,8 +104,15 @@ export class AuthResolver {
   @Mutation(() => Boolean)
   @UseGuards(GqlAuthGuard)
   @AllowWhenPasswordChangeRequired()
-  async logout(@CurrentUser() user: AuthUser): Promise<boolean> {
-    await this.authService.logout(user.userId);
+  async logout(
+    @Args('currentRefreshToken', {
+      description: 'Refresh token of the session to end. Other sessions stay signed in.',
+    })
+    currentRefreshToken: string,
+    @CurrentUser() user: AuthUser,
+    @Context() ctx: GqlContext,
+  ): Promise<boolean> {
+    await this.authService.logout(user, currentRefreshToken, extractMeta(ctx));
     return true;
   }
 

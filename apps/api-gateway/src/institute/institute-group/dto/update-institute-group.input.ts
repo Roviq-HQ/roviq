@@ -5,7 +5,7 @@ import { IsEnum, IsInt, IsObject, IsOptional, IsString } from 'class-validator';
 import {
   InstituteAddressInput,
   InstituteContactInput,
-} from '../../institute/management/dto/create-institute.input';
+} from '../../management/dto/create-institute.input';
 
 @InputType({
   description:

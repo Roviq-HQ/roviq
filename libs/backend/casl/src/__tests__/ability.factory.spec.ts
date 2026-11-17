@@ -75,6 +75,44 @@ describe('AbilityFactory', () => {
   });
 
   describe('createForUser', () => {
+    it('should give a platform user the abilities of its role, not blanket access', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRoleRepo.findAbilities.mockResolvedValue({
+        abilities: [
+          { action: 'read', subject: 'all' },
+          { action: 'impersonate', subject: 'User' },
+        ],
+      });
+
+      const ability = await factory.createForUser({
+        userId: 'support-1',
+        scope: 'platform',
+        membershipId: 'platform-membership-1',
+        roleId: 'platform-support-role',
+      });
+
+      expect(mockRoleRepo.findAbilities).toHaveBeenCalledWith('platform-support-role');
+      expect(mockMembershipAbilityRepo.findAbilities).not.toHaveBeenCalled();
+      expect(ability.can('read', 'Reseller')).toBe(true);
+      expect(ability.can('impersonate', 'User')).toBe(true);
+      expect(ability.can('create', 'Reseller')).toBe(false);
+      expect(ability.can('replay', 'DlqMessage')).toBe(false);
+    });
+
+    it('should give a platform user with an unknown role no abilities', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRoleRepo.findAbilities.mockResolvedValue(null);
+
+      const ability = await factory.createForUser({
+        userId: 'ghost-1',
+        scope: 'platform',
+        membershipId: 'platform-membership-2',
+        roleId: 'missing-role',
+      });
+
+      expect(ability.can('read', 'Reseller')).toBe(false);
+    });
+
     it('uses the selected membership and database assignments instead of token section claims', async () => {
       mockRedis.get.mockResolvedValue(
         JSON.stringify([

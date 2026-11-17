@@ -10,7 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
-import { TermConfigInput } from '../../institute/management/dto/update-institute-config.input';
+import { TermConfigInput } from '../../management/dto/update-institute-config.input';
 
 @InputType({
   description: 'Fields that can be updated on an existing academic year. All fields are optional.',

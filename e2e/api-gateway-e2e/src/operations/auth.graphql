@@ -5,8 +5,8 @@ query E2eMe {
   }
 }
 
-mutation E2eLogout {
-  logout
+mutation E2eLogout($currentRefreshToken: String!) {
+  logout(currentRefreshToken: $currentRefreshToken)
 }
 
 mutation E2eRegister($input: RegisterInput!) {

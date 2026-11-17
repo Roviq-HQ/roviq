@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { AcademicYearRepository } from '../../academic-year/repositories/academic-year.repository';
+import { AcademicYearRepository } from '../academic-year/repositories/academic-year.repository';
 import type { CreateStandardInput } from './dto/create-standard.input';
 import type { UpdateStandardInput } from './dto/update-standard.input';
 import { StandardRepository } from './repositories/standard.repository';

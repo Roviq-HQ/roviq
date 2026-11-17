@@ -12,12 +12,15 @@
  */
 
 import {
+  cleanupTestInstitute,
   createInstituteToken,
   createIntegrationApp,
   createPlatformToken,
   createResellerToken,
+  createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  type TestInstitute,
 } from '@roviq/testing/integration';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../e2e/shared/seed-fixtures';
@@ -74,15 +77,15 @@ const PLATFORM_OPS: readonly Op[] = [
     name: 'adminListUsers',
     query: 'query { adminListUsers { totalCount } }',
   },
-  // AuditResolver — platform-scoped @Query adminAuditLogs
+  // AdminAuditResolver — platform-scoped @Query adminAuditLogs
   {
     name: 'adminAuditLogs',
     query: 'query { adminAuditLogs { totalCount } }',
   },
-  // AuditResolver — platform-scoped @Query authEvents (separate method, same class)
+  // AdminAuditResolver — platform-scoped @Query adminAuthEvents (separate method, same class)
   {
-    name: 'authEvents',
-    query: 'query { authEvents { __typename } }',
+    name: 'adminAuthEvents',
+    query: 'query { adminAuthEvents { __typename } }',
   },
 ];
 
@@ -115,7 +118,7 @@ const RESELLER_OPS: readonly Op[] = [
     name: 'resellerListUsers',
     query: 'query { resellerListUsers { totalCount } }',
   },
-  // AuditResolver — reseller-scoped @Query
+  // ResellerAuditResolver — reseller-scoped @Query
   {
     name: 'resellerAuditLogs',
     query: 'query { resellerAuditLogs { totalCount } }',
@@ -250,7 +253,7 @@ const INSTITUTE_OPS: readonly Op[] = [
     name: 'instituteGroups',
     query: 'query { instituteGroups { totalCount } }',
   },
-  // AuditResolver — institute-scoped @Query
+  // InstituteAuditResolver — institute-scoped @Query
   {
     name: 'auditLogs',
     query: 'query { auditLogs { totalCount } }',
@@ -281,6 +284,12 @@ describe('Cross-scope guard rejection', () => {
     membershipId: FAKE.MEMBERSHIP,
     roleId: FAKE.ROLE,
   });
+  // Platform token backed by the real seeded role, for the positive-proof test.
+  const seededPlatformToken = createPlatformToken({
+    sub: SEED_IDS.USER_ADMIN,
+    membershipId: FAKE.MEMBERSHIP,
+    roleId: SEED_IDS.ROLE_PLATFORM_ADMIN,
+  });
   // Reseller token backed by the real seeded role so AbilityFactory can
   // resolve abilities — used only for the positive-proof test.
   const seededResellerToken = createResellerToken({
@@ -296,11 +305,17 @@ describe('Cross-scope guard rejection', () => {
     roleId: FAKE.ROLE,
   });
 
+  // Real institute admin, for the positive-proof test: institute roles are
+  // per tenant, so there is no seeded role id to reuse.
+  let tenant: TestInstitute;
+
   beforeAll(async () => {
     result = await createIntegrationApp({ modules: [AppModule] });
+    tenant = await createTestInstitute(result.db);
   });
 
   afterAll(async () => {
+    if (tenant) await cleanupTestInstitute(result.db, tenant);
     await result?.close();
   });
 
@@ -317,7 +332,7 @@ describe('Cross-scope guard rejection', () => {
     it('platform token reaches a @PlatformScope resolver without FORBIDDEN', async () => {
       const response = await gqlRequest(result.httpServer, {
         query: PLATFORM_OPS[0].query,
-        token: platformToken,
+        token: seededPlatformToken,
       });
       const code = response.errors?.[0]?.extensions?.code;
       expect(code).not.toBe('FORBIDDEN');
@@ -335,7 +350,12 @@ describe('Cross-scope guard rejection', () => {
     it('institute token reaches an @InstituteScope resolver without FORBIDDEN', async () => {
       const response = await gqlRequest(result.httpServer, {
         query: INSTITUTE_OPS[0].query,
-        token: instituteToken,
+        token: createInstituteToken({
+          sub: tenant.userId,
+          tenantId: tenant.tenantId,
+          membershipId: tenant.membershipId,
+          roleId: tenant.roleId,
+        }),
       });
       const code = response.errors?.[0]?.extensions?.code;
       expect(code).not.toBe('FORBIDDEN');

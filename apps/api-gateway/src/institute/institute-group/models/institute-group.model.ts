@@ -4,7 +4,7 @@ import { DateTimeScalar } from '@roviq/nestjs-graphql';
 import {
   InstituteAddressObject,
   InstituteContactObject,
-} from '../../institute/management/models/institute.model';
+} from '../../management/models/institute.model';
 
 registerEnumType(GroupType, {
   name: 'GroupType',

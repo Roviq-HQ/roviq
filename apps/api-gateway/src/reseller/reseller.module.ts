@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { InstituteGroupModule } from '../institute/institute-group/institute-group.module';
 import { InstituteModule } from '../institute/management/institute.module';
-import { InstituteGroupModule } from '../institute-group/institute-group.module';
+import { ResellerAuditResolver } from './audit/reseller-audit.resolver';
 import { ResellerImpersonationResolver } from './impersonation/reseller-impersonation.resolver';
 import { ResellerInstituteResolver } from './institute/reseller-institute.resolver';
 import { ResellerInstituteService } from './institute/reseller-institute.service';
@@ -14,6 +16,7 @@ import { ResellerUserModule } from './user/reseller-user.module';
 @Module({
   imports: [
     AuthModule,
+    AuditModule,
     InstituteModule,
     InstituteGroupModule,
     ResellerUserModule,
@@ -26,6 +29,7 @@ import { ResellerUserModule } from './user/reseller-user.module';
     ResellerInstituteGroupResolver,
     ResellerInstituteGroupService,
     ResellerImpersonationResolver,
+    ResellerAuditResolver,
   ],
 })
 export class ResellerModule {}

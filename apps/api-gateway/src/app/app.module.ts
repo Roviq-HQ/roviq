@@ -19,6 +19,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ImpersonationSessionGuard } from '../auth/middleware/impersonation-session.guard';
 import { MustChangePasswordGuard } from '../auth/middleware/must-change-password.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
+import { consumeWsTicket } from '../auth/ws-ticket.store';
 import { CaslModule } from '../casl/casl.module';
 import { readFieldMiddleware } from '../casl/read-field.middleware';
 import { createGraphqlErrorFormatter } from '../common/filters/graphql-error.mapper';
@@ -73,22 +74,16 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
           'graphql-ws': {
             path: '/api/graphql',
             onConnect: async (ctx) => {
-              const ticket = ctx.connectionParams?.ticket as string | undefined;
-              if (!ticket) {
-                wsLogger.warn('WebSocket connection rejected: no ticket provided');
+              const user = await consumeWsTicket(redis, ctx.connectionParams?.ticket);
+              if (!user) {
+                wsLogger.warn(
+                  'WebSocket connection rejected: missing, invalid, expired or reused ticket',
+                );
                 return false;
               }
 
-              const key = `ws-ticket:${ticket}`;
-              const data = await redis.get(key);
-              if (!data) {
-                wsLogger.warn('WebSocket connection rejected: invalid or expired ticket');
-                return false;
-              }
-
-              await redis.del(key); // single-use: delete immediately
               const extra = ctx.extra as Record<string, unknown>;
-              extra.user = JSON.parse(data) as AuthUser;
+              extra.user = user;
               return true;
             },
           },

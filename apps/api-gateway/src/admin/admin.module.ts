@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { DlqModule } from '../dlq/dlq.module';
+import { InstituteGroupModule } from '../institute/institute-group/institute-group.module';
 import { InstituteModule } from '../institute/management/institute.module';
-import { InstituteGroupModule } from '../institute-group/institute-group.module';
 import { AdminAttendanceModule } from './attendance/admin-attendance.module';
+import { AdminAuditResolver } from './audit/admin-audit.resolver';
+import { AdminDlqResolver } from './dlq/admin-dlq.resolver';
 import { AdminImpersonationResolver } from './impersonation/admin-impersonation.resolver';
 import { AdminInstituteLoaders } from './institute/admin-institute.loaders';
 import { AdminInstituteResolver } from './institute/admin-institute.resolver';
@@ -18,6 +22,8 @@ import { AdminUserModule } from './user/admin-user.module';
 @Module({
   imports: [
     AuthModule, // provides AuthEventService
+    AuditModule, // provides AuditService
+    DlqModule, // provides DlqService
     InstituteGroupModule, // provides InstituteGroupService for admin group operations
     InstituteModule, // provides InstituteService for admin institute operations
     AdminUserModule,
@@ -34,6 +40,8 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminInstituteLoaders, // request-scoped DataLoaders for the field resolver
     AdminInstituteSubscriptionResolver,
     AdminImpersonationResolver,
+    AdminAuditResolver,
+    AdminDlqResolver,
   ],
 })
 export class AdminModule {}

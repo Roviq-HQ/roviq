@@ -29,11 +29,6 @@ export class AbilityFactory {
     assignedSubjects?: string[];
     assignedDepartments?: string[];
   }): Promise<AppAbility> {
-    // Platform admins get manage:all — no DB lookup needed
-    if (user.scope === 'platform') {
-      return createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]);
-    }
-
     const roleAbilities = await this.getRoleAbilities(user.roleId);
 
     // Fetch membership-specific abilities (only for institute scope where tenantId exists)

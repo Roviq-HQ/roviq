@@ -15,7 +15,7 @@ import {
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, count, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
-import { decodeCursor } from '../../common/pagination/relay-pagination.model';
+import { decodeCursor } from '../../../common/pagination/relay-pagination.model';
 import { InstituteGroupRepository } from './institute-group.repository';
 import type {
   CreateInstituteGroupData,

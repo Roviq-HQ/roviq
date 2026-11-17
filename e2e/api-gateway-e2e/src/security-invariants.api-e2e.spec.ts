@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
 import type {
   AuthPayload,
   ImpersonationAuthPayload,
@@ -8,8 +9,9 @@ import type {
 import { describe, expect, it } from 'vitest';
 import { E2E_USERS, SEED_IDS } from '../../shared/seed-fixtures';
 import { E2eMeDocument } from './__generated__/graphql';
-import { loginAsPlatformAdmin, loginAsTeacher } from './helpers/auth';
+import { loginAsInstituteAdmin, loginAsPlatformAdmin, loginAsTeacher } from './helpers/auth';
 import { gql } from './helpers/gql-client';
+import { connectWithParams, exchangeWsTicket } from './helpers/ws-client';
 
 // Strip only the trailing `/graphql` so the NestJS global prefix (`/api`)
 // stays intact — `POST /api/graphql` (GraphQL) vs `GET /api/auth/ws-ticket`
@@ -18,6 +20,17 @@ import { gql } from './helpers/gql-client';
 const API_BASE_URL = (
   process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`
 ).replace(/\/graphql$/, '');
+
+const REFRESH_MUTATION = `mutation Refresh($token: String!) {
+  refreshToken(token: $token) { accessToken refreshToken }
+}`;
+
+const SWITCH_MUTATION = `mutation SwitchInstitute($membershipId: String!, $currentRefreshToken: String!) {
+  switchInstitute(membershipId: $membershipId, currentRefreshToken: $currentRefreshToken) {
+    accessToken
+    refreshToken
+  }
+}`;
 
 describe('Security Invariant E2E Tests', () => {
   // ── 7. Impersonation token cannot be refreshed ──────────────────────
@@ -117,8 +130,30 @@ describe('Security Invariant E2E Tests', () => {
     });
   });
 
-  // ── 12. Wrong portal returns "No account found" ─────────────────────
-  describe('12 — Wrong portal returns "No account found"', () => {
+  // ── 12. Wrong portal is indistinguishable from a wrong password ─────
+  describe('12 — Wrong portal is indistinguishable from a wrong password', () => {
+    const LOGIN_MUTATIONS = {
+      adminLogin: `mutation AdminLogin($username: String!, $password: String!) {
+        adminLogin(username: $username, password: $password) { accessToken }
+      }`,
+      resellerLogin: `mutation ResellerLogin($username: String!, $password: String!) {
+        resellerLogin(username: $username, password: $password) { accessToken }
+      }`,
+      instituteLogin: `mutation InstituteLogin($username: String!, $password: String!) {
+        instituteLogin(username: $username, password: $password) { accessToken }
+      }`,
+    };
+
+    async function loginFailure(
+      mutation: keyof typeof LOGIN_MUTATIONS,
+      username: string,
+      password: string,
+    ) {
+      const res = await gql(LOGIN_MUTATIONS[mutation], { username, password });
+      assert(res.errors);
+      return { message: res.errors[0].message, code: res.errors[0].extensions?.code };
+    }
+
     it('instituteLogin with admin credentials should work (admin has institute memberships)', async () => {
       const res = await gql<{ instituteLogin: InstituteLoginResult }>(
         `mutation InstituteLogin($username: String!, $password: String!) {
@@ -142,38 +177,18 @@ describe('Security Invariant E2E Tests', () => {
       ).toBe(true);
     });
 
-    it('resellerLogin with teacher credentials should fail with "No account found"', async () => {
-      const res = await gql<{ resellerLogin: AuthPayload }>(
-        `mutation ResellerLogin($username: String!, $password: String!) {
-          resellerLogin(username: $username, password: $password) {
-            accessToken
-          }
-        }`,
-        { username: E2E_USERS.TEACHER.username, password: E2E_USERS.TEACHER.password },
-      );
+    it.each([
+      ['resellerLogin', E2E_USERS.TEACHER],
+      ['adminLogin', E2E_USERS.TEACHER],
+      ['instituteLogin', E2E_USERS.RESELLER],
+    ] as const)('%s with valid credentials of another portal fails exactly like a wrong password', async (mutation, user) => {
+      // Wrong password first: the correct password that follows resets the
+      // lockout counter of this shared seed user.
+      const wrongPassword = await loginFailure(mutation, user.username, randomUUID());
+      const wrongPortal = await loginFailure(mutation, user.username, user.password);
 
-      expect(res.errors).toBeDefined();
-      assert(res.errors);
-      expect(res.errors[0].message).toMatch(
-        /No account found|Invalid credentials|No reseller membership/i,
-      );
-    });
-
-    it('adminLogin with teacher credentials should fail with "No account found"', async () => {
-      const res = await gql<{ adminLogin: AuthPayload }>(
-        `mutation AdminLogin($username: String!, $password: String!) {
-          adminLogin(username: $username, password: $password) {
-            accessToken
-          }
-        }`,
-        { username: E2E_USERS.TEACHER.username, password: E2E_USERS.TEACHER.password },
-      );
-
-      expect(res.errors).toBeDefined();
-      assert(res.errors);
-      expect(res.errors[0].message).toMatch(
-        /No account found|Invalid credentials|No platform membership/i,
-      );
+      expect(wrongPortal).toEqual({ message: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+      expect(wrongPortal).toEqual(wrongPassword);
     });
   });
 
@@ -220,6 +235,65 @@ describe('Security Invariant E2E Tests', () => {
     });
   });
 
+  // ── 14b. An impersonation token cannot touch the target's sessions ──
+  describe("14b — Impersonation token cannot end or replace the target's sessions", () => {
+    it('logout and switchInstitute are forbidden, the target stays signed in, subscriptions connect', async () => {
+      const teacher = await loginAsTeacher();
+      const { accessToken: adminToken } = await loginAsPlatformAdmin();
+
+      const startRes = await gql<{ adminStartImpersonation: StartImpersonationResult }>(
+        `mutation AdminStartImpersonation($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
+          adminStartImpersonation(
+            targetUserId: $targetUserId,
+            targetTenantId: $targetTenantId,
+            reason: $reason
+          ) { code }
+        }`,
+        {
+          targetUserId: SEED_IDS.USER_TEACHER,
+          targetTenantId: SEED_IDS.INSTITUTE_1,
+          reason: 'security invariant test — impersonation cannot manage target sessions',
+        },
+        adminToken,
+      );
+      expect(startRes.errors).toBeUndefined();
+      const code = startRes.data?.adminStartImpersonation.code;
+      assert(code);
+
+      const exchange = await gql<{ exchangeImpersonationCode: ImpersonationAuthPayload }>(
+        `mutation($code: String!) { exchangeImpersonationCode(code: $code) { accessToken } }`,
+        { code },
+      );
+      expect(exchange.errors).toBeUndefined();
+      const impersonationToken = exchange.data?.exchangeImpersonationCode.accessToken;
+      assert(impersonationToken);
+
+      const logoutRes = await gql(
+        `mutation Logout($currentRefreshToken: String!) { logout(currentRefreshToken: $currentRefreshToken) }`,
+        { currentRefreshToken: teacher.refreshToken },
+        impersonationToken,
+      );
+      expect(logoutRes.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+
+      const switchRes = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: teacher.refreshToken },
+        impersonationToken,
+      );
+      expect(switchRes.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(switchRes.data).toBeNull();
+
+      const refreshRes = await gql<{ refreshToken: AuthPayload }>(REFRESH_MUTATION, {
+        token: teacher.refreshToken,
+      });
+      expect(refreshRes.errors).toBeUndefined();
+      expect(refreshRes.data?.refreshToken.accessToken).toBeTruthy();
+
+      const ticket = await exchangeWsTicket(impersonationToken);
+      expect(await connectWithParams({ ticket })).toEqual({ acknowledged: true });
+    });
+  });
+
   // ── 15. Intra-institute impersonation respects role hierarchy ───────
   describe('15 — Intra-institute impersonation respects role hierarchy', () => {
     it('teacher cannot impersonate admin (higher role)', async () => {
@@ -239,10 +313,10 @@ describe('Security Invariant E2E Tests', () => {
         accessToken,
       );
 
-      // Should be rejected — teacher cannot impersonate admin
-      expect(res.errors).toBeDefined();
-      assert(res.errors);
-      expect(res.errors[0].message).toMatch(/permission|forbidden|cannot impersonate|higher role/i);
+      // A teacher has no `impersonate User` ability, so the guard rejects
+      // the call before the service compares roles.
+      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(res.data).toBeNull();
     });
   });
 
@@ -320,9 +394,68 @@ describe('Security Invariant E2E Tests', () => {
       assert(switchedUser);
       expect(switchedUser.tenantId).toBe(secondMembership.tenantId);
 
-      // Note: switchInstitute currently does NOT revoke the old refresh token
-      // (currentRefreshTokenId is passed as undefined from the resolver).
-      // When that is wired up, add a test here to verify the old refresh token is rejected.
+      // The session that was switched away from is revoked.
+      const staleRefresh = await gql(REFRESH_MUTATION, { token: firstRefreshToken });
+      expect(staleRefresh.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+
+      // Revoked as a deliberate switch, not a rotation: replaying the old
+      // token must not cascade onto the new session.
+      const freshRefresh = await gql<{ refreshToken: AuthPayload }>(REFRESH_MUTATION, {
+        token: newRefreshToken,
+      });
+      expect(freshRefresh.errors).toBeUndefined();
+      expect(freshRefresh.data?.refreshToken.accessToken).toBeTruthy();
+    });
+
+    it('a rejected switch keeps the current session usable', async () => {
+      const { accessToken, refreshToken } = await loginAsInstituteAdmin();
+
+      const switchRes = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: refreshToken },
+        accessToken,
+      );
+      expect(switchRes.errors?.[0]?.extensions?.code).toBe('NO_ACTIVE_MEMBERSHIP');
+
+      const refreshRes = await gql<{ refreshToken: AuthPayload }>(REFRESH_MUTATION, {
+        token: refreshToken,
+      });
+      expect(refreshRes.errors).toBeUndefined();
+      expect(refreshRes.data?.refreshToken.accessToken).toBeTruthy();
+    });
+
+    it('rejects a switch that does not present a live refresh token of the caller', async () => {
+      const { accessToken } = await loginAsInstituteAdmin();
+      const { refreshToken: teacherRefreshToken } = await loginAsTeacher();
+
+      const unknown = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: 'not-a-refresh-token' },
+        accessToken,
+      );
+      expect(unknown.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+      expect(unknown.data).toBeNull();
+
+      const foreign = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: teacherRefreshToken },
+        accessToken,
+      );
+      expect(foreign.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+      expect(foreign.data).toBeNull();
+    });
+
+    it('rejects switchInstitute from a platform-scope token', async () => {
+      const { accessToken, refreshToken } = await loginAsPlatformAdmin();
+
+      const res = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: refreshToken },
+        accessToken,
+      );
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(res.data).toBeNull();
     });
   });
 
@@ -401,6 +534,56 @@ describe('Security Invariant E2E Tests', () => {
 
       // Each request must mint a distinct single-use ticket
       expect(body2.ticket).not.toBe(body1.ticket);
+    });
+
+    // graphql-ws closes with 4403 when onConnect refuses the connection.
+    const REJECTED = { acknowledged: false, closeCode: 4403 };
+
+    it('acknowledges a connection that presents a fresh ticket', async () => {
+      const { accessToken } = await loginAsTeacher();
+      const ticket = await exchangeWsTicket(accessToken);
+
+      expect(await connectWithParams({ ticket })).toEqual({ acknowledged: true });
+    });
+
+    it('rejects a ticket that was already used', async () => {
+      const { accessToken } = await loginAsTeacher();
+      const ticket = await exchangeWsTicket(accessToken);
+      expect(await connectWithParams({ ticket })).toEqual({ acknowledged: true });
+
+      expect(await connectWithParams({ ticket })).toEqual(REJECTED);
+    });
+
+    it('lets only one of two connections racing on the same ticket through', async () => {
+      const { accessToken } = await loginAsTeacher();
+      const ticket = await exchangeWsTicket(accessToken);
+
+      const outcomes = await Promise.all([
+        connectWithParams({ ticket }),
+        connectWithParams({ ticket }),
+      ]);
+
+      expect(outcomes.filter((outcome) => outcome.acknowledged)).toHaveLength(1);
+      expect(outcomes).toContainEqual(REJECTED);
+    });
+
+    it('rejects a connection without a ticket', async () => {
+      expect(await connectWithParams({})).toEqual(REJECTED);
+    });
+
+    it('rejects a ticket that was never issued', async () => {
+      expect(await connectWithParams({ ticket: randomUUID() })).toEqual(REJECTED);
+    });
+
+    it('rejects a malformed ticket', async () => {
+      expect(await connectWithParams({ ticket: 'not-a-ticket' })).toEqual(REJECTED);
+    });
+
+    it('rejects a raw access token sent in place of a ticket', async () => {
+      const { accessToken } = await loginAsTeacher();
+
+      expect(await connectWithParams({ ticket: accessToken })).toEqual(REJECTED);
+      expect(await connectWithParams({ Authorization: `Bearer ${accessToken}` })).toEqual(REJECTED);
     });
   });
 

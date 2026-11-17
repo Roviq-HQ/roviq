@@ -158,11 +158,14 @@ export function createAuthMutations(graphqlUrl: string) {
       return data.updateMyPreferredLocale;
     },
 
-    async logout(accessToken: string): Promise<void> {
+    async logout(accessToken: string, currentRefreshToken: string): Promise<void> {
       try {
-        await graphqlFetch(graphqlUrl, 'mutation Logout { logout }', undefined, {
-          Authorization: `Bearer ${accessToken}`,
-        });
+        await graphqlFetch(
+          graphqlUrl,
+          'mutation Logout($currentRefreshToken: String!) { logout(currentRefreshToken: $currentRefreshToken) }',
+          { currentRefreshToken },
+          { Authorization: `Bearer ${accessToken}` },
+        );
       } catch {
         // Ignore — tokens are cleared client-side regardless
       }

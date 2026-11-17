@@ -9,7 +9,7 @@ import {
   TEST_POOLER_URL,
   TEST_SUPERUSER_URL,
 } from '../../../../../../libs/database/src/__tests__/test-helpers';
-import { InstituteRoleDrizzleRepository } from '../../../auth/role/repositories/role.drizzle-repository';
+import { InstituteRoleDrizzleRepository } from '../../role/repositories/role.drizzle-repository';
 import { SectionDrizzleRepository } from '../../section/repositories/section.drizzle-repository';
 import { InstituteDrizzleRepository } from '../repositories/institute.drizzle-repository';
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { CreateInstituteGroupInput } from '../../institute-group/dto/create-institute-group.input';
-import { InstituteGroupService } from '../../institute-group/institute-group.service';
+import type { CreateInstituteGroupInput } from '../../institute/institute-group/dto/create-institute-group.input';
+import { InstituteGroupService } from '../../institute/institute-group/institute-group.service';
 
 @Injectable()
 export class ResellerInstituteGroupService {
