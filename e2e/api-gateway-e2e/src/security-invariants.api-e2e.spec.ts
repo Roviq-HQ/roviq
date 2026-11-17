@@ -313,10 +313,10 @@ describe('Security Invariant E2E Tests', () => {
         accessToken,
       );
 
-      // Should be rejected — teacher cannot impersonate admin
-      expect(res.errors).toBeDefined();
-      assert(res.errors);
-      expect(res.errors[0].message).toMatch(/permission|forbidden|cannot impersonate|higher role/i);
+      // A teacher has no `impersonate User` ability, so the guard rejects
+      // the call before the service compares roles.
+      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(res.data).toBeNull();
     });
   });
 

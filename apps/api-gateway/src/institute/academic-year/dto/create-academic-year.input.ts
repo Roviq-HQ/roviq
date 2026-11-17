@@ -8,7 +8,7 @@ import {
   Matches,
   ValidateNested,
 } from 'class-validator';
-import { TermConfigInput } from '../../institute/management/dto/update-institute-config.input';
+import { TermConfigInput } from '../../management/dto/update-institute-config.input';
 
 @InputType({ description: 'Fields required to create a new academic year for the institute.' })
 export class CreateAcademicYearInput {

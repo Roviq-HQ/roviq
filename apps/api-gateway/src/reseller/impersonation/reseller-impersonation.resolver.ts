@@ -1,19 +1,27 @@
+import { UseGuards } from '@nestjs/common';
 import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
-import { assertResellerContext, CurrentUser, ResellerScope } from '@roviq/auth-backend';
+import {
+  assertResellerContext,
+  CurrentUser,
+  GqlAuthGuard,
+  ResellerScopeGuard,
+} from '@roviq/auth-backend';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { StartImpersonationResult } from '../../auth/dto/impersonation.dto';
 import { ImpersonationSessionModel } from '../../auth/dto/impersonation-session.model';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ImpersonationService } from '../../auth/impersonation.service';
 
-@ResellerScope()
+@UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver()
 export class ResellerImpersonationResolver {
   constructor(private readonly impersonationService: ImpersonationService) {}
 
   /** Resellers: list impersonation sessions started by their own team (newest first). */
   @Query(() => [ImpersonationSessionModel])
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
   async resellerImpersonationSessions(
     @CurrentUser() user: AuthUser,
     @Args('activeOnly', { type: () => Boolean, nullable: true }) activeOnly?: boolean,
@@ -31,6 +39,7 @@ export class ResellerImpersonationResolver {
 
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
+  @CheckAbility({ action: 'impersonate', subject: 'User' })
   async resellerStartImpersonation(
     @Args('targetUserId') targetUserId: string,
     @Args('targetTenantId') targetTenantId: string,
@@ -50,6 +59,7 @@ export class ResellerImpersonationResolver {
 
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
+  @CheckAbility({ action: 'impersonate', subject: 'User' })
   async resellerVerifyImpersonationOtp(
     @Args('sessionId') sessionId: string,
     @Args('otp') otp: string,

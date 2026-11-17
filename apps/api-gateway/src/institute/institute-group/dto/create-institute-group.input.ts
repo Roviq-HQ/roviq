@@ -5,7 +5,7 @@ import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, Matches } from 'cla
 import {
   InstituteAddressInput,
   InstituteContactInput,
-} from '../../institute/management/dto/create-institute.input';
+} from '../../management/dto/create-institute.input';
 
 @InputType({
   description: 'Fields required to create an institute group (chain, trust, or society).',

@@ -1,13 +1,12 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Int, Query, Resolver } from '@nestjs/graphql';
-import { PlatformScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { AdminUserService } from './admin-user.service';
 import { AdminListUsersFilterInput } from './dto/admin-list-users-filter.input';
 import { AdminUserConnection, AdminUserModel } from './models/admin-user.model';
 
-@PlatformScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => AdminUserModel)
 export class AdminUserResolver {
   constructor(private readonly service: AdminUserService) {}

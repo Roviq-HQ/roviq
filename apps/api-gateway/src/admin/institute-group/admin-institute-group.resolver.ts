@@ -2,12 +2,12 @@ import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
-import { CreateInstituteGroupInput } from '../../institute-group/dto/create-institute-group.input';
-import { InstituteGroupFilterInput } from '../../institute-group/dto/institute-group-filter.input';
-import { UpdateInstituteGroupInput } from '../../institute-group/dto/update-institute-group.input';
-import { InstituteGroupService } from '../../institute-group/institute-group.service';
-import { InstituteGroupModel } from '../../institute-group/models/institute-group.model';
-import { InstituteGroupConnection } from '../../institute-group/models/institute-group-connection.model';
+import { CreateInstituteGroupInput } from '../../institute/institute-group/dto/create-institute-group.input';
+import { InstituteGroupFilterInput } from '../../institute/institute-group/dto/institute-group-filter.input';
+import { UpdateInstituteGroupInput } from '../../institute/institute-group/dto/update-institute-group.input';
+import { InstituteGroupService } from '../../institute/institute-group/institute-group.service';
+import { InstituteGroupModel } from '../../institute/institute-group/models/institute-group.model';
+import { InstituteGroupConnection } from '../../institute/institute-group/models/institute-group-connection.model';
 
 @UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => InstituteGroupModel)

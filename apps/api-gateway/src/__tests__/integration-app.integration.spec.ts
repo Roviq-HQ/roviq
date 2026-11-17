@@ -45,6 +45,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SEED_IDS } from '../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../app/app.module';
 
 const ADMIN_LIST_INSTITUTES_QUERY = /* GraphQL */ `
@@ -126,10 +127,11 @@ describe('@roviq/testing/integration — proof-of-concept', () => {
     // and so the round-trip exercises withAdmin → Drizzle → RLS → response.
     const tenant = await createTestInstitute(result.db);
     try {
+      // Platform abilities come from the role, so this needs the seeded admin role.
       const token = createPlatformToken({
         sub: FAKE_USER_ID,
         membershipId: FAKE_MEMBERSHIP_ID,
-        roleId: FAKE_ROLE_ID,
+        roleId: SEED_IDS.ROLE_PLATFORM_ADMIN,
       });
 
       // Search matches name/code, not slug — use the slug suffix which is

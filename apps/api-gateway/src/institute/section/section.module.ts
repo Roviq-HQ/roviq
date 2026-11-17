@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AcademicYearRepositoryModule } from '../../academic-year/repositories/academic-year-repository.module';
+import { AcademicYearRepositoryModule } from '../academic-year/repositories/academic-year-repository.module';
 import { StandardRepositoryModule } from '../standard/repositories/standard-repository.module';
 import { SectionRepositoryModule } from './repositories/section-repository.module';
 import { SectionResolver } from './section.resolver';

@@ -1,20 +1,23 @@
+import { UseGuards } from '@nestjs/common';
 import { Args, Context, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
-import { CurrentUser, PlatformScope } from '@roviq/auth-backend';
+import { CurrentUser, GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { StartImpersonationResult } from '../../auth/dto/impersonation.dto';
 import { ImpersonationSessionModel } from '../../auth/dto/impersonation-session.model';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ImpersonationService } from '../../auth/impersonation.service';
 
-@PlatformScope()
+@UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver()
 export class AdminImpersonationResolver {
   constructor(private readonly impersonationService: ImpersonationService) {}
 
   /** Platform admins: list impersonation sessions across all scopes (newest first). */
   @Query(() => [ImpersonationSessionModel])
-  async impersonationSessions(
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
+  async adminImpersonationSessions(
     @Args('activeOnly', { type: () => Boolean, nullable: true }) activeOnly?: boolean,
     @Args('sessionId', { nullable: true }) sessionId?: string,
     @Args('first', { type: () => Int, nullable: true, defaultValue: 50 }) first?: number,
@@ -28,6 +31,7 @@ export class AdminImpersonationResolver {
 
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
+  @CheckAbility({ action: 'impersonate', subject: 'User' })
   async adminStartImpersonation(
     @Args('targetUserId') targetUserId: string,
     @Args('targetTenantId') targetTenantId: string,
@@ -47,6 +51,7 @@ export class AdminImpersonationResolver {
 
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
+  @CheckAbility({ action: 'impersonate', subject: 'User' })
   async adminVerifyImpersonationOtp(
     @Args('sessionId') sessionId: string,
     @Args('otp') otp: string,

@@ -2,7 +2,7 @@ import { Field, ID, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { AcademicYearStatus } from '@roviq/common-types';
 import { DateOnlyScalar, DateTimeScalar } from '@roviq/nestjs-graphql';
 import GraphQLJSON from 'graphql-type-json';
-import { TermConfigModel } from '../../institute/management/models/institute-config.model';
+import { TermConfigModel } from '../../management/models/institute-config.model';
 
 registerEnumType(AcademicYearStatus, { name: 'AcademicYearStatus' });
 

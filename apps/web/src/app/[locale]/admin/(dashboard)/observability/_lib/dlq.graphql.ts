@@ -53,7 +53,7 @@ const ADMIN_LIST_DLQ_MESSAGES = gql`
 
 const REPLAY_DLQ_MESSAGE = gql`
   mutation ReplayDlqMessage($id: ID!) {
-    replayDlqMessage(id: $id) {
+    adminReplayDlqMessage(id: $id) {
       ...DlqMessageFields
     }
   }
@@ -62,7 +62,7 @@ const REPLAY_DLQ_MESSAGE = gql`
 
 const DISCARD_DLQ_MESSAGE = gql`
   mutation DiscardDlqMessage($id: ID!) {
-    discardDlqMessage(id: $id) {
+    adminDiscardDlqMessage(id: $id) {
       ...DlqMessageFields
     }
   }

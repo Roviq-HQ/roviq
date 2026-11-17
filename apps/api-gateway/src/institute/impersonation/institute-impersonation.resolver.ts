@@ -1,19 +1,27 @@
+import { UseGuards } from '@nestjs/common';
 import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
-import { assertTenantContext, CurrentUser, InstituteScope } from '@roviq/auth-backend';
+import {
+  assertTenantContext,
+  CurrentUser,
+  GqlAuthGuard,
+  InstituteScopeGuard,
+} from '@roviq/auth-backend';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { StartImpersonationResult } from '../../auth/dto/impersonation.dto';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ImpersonationService } from '../../auth/impersonation.service';
 
-@InstituteScope()
+@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver()
 export class InstituteImpersonationResolver {
   constructor(private readonly impersonationService: ImpersonationService) {}
 
   @NoAudit()
   @Mutation(() => StartImpersonationResult)
+  @CheckAbility({ action: 'impersonate', subject: 'User' })
   async impersonateUser(
     @Args('targetUserId') targetUserId: string,
     @Args('reason') reason: string,

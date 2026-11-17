@@ -5,7 +5,7 @@ import type { AuthEventModel } from '@roviq/graphql/generated';
 
 const AUTH_EVENTS_QUERY = gql`
   query AuthEvents($first: Int) {
-    authEvents(first: $first) {
+    adminAuthEvents(first: $first) {
       id
       userId
       eventType
@@ -24,13 +24,13 @@ const AUTH_EVENTS_QUERY = gql`
 export type AuthEvent = AuthEventModel;
 
 export function useAuthEvents(first = 50) {
-  const { data, loading, refetch } = useQuery<{ authEvents: AuthEvent[] }>(AUTH_EVENTS_QUERY, {
+  const { data, loading, refetch } = useQuery<{ adminAuthEvents: AuthEvent[] }>(AUTH_EVENTS_QUERY, {
     variables: { first },
     pollInterval: 10000,
   });
 
   return {
-    events: data?.authEvents ?? [],
+    events: data?.adminAuthEvents ?? [],
     loading,
     refetch,
   };

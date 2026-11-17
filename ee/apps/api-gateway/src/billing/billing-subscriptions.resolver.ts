@@ -1,5 +1,7 @@
+import { UseGuards } from '@nestjs/common';
 import { Resolver, Subscription } from '@nestjs/graphql';
-import { InstituteScope, ResellerScope } from '@roviq/auth-backend';
+import { GqlAuthGuard, InstituteScopeGuard, ResellerScopeGuard } from '@roviq/auth-backend';
+import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { pubSub } from '@roviq/pubsub';
 import { InvoiceModel } from './models/invoice.model';
 import { PaymentModel } from './models/payment.model';
@@ -10,7 +12,7 @@ import { SubscriptionModel } from './models/subscription.model';
 // ---------------------------------------------------------------------------
 
 @Resolver()
-@InstituteScope()
+@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 export class InstituteBillingSubscriptions {
   @Subscription(() => SubscriptionModel, {
     name: 'mySubscriptionStatusChanged',
@@ -20,6 +22,7 @@ export class InstituteBillingSubscriptions {
       context: { user: import('@roviq/common-types').InstituteContext },
     ) => payload.tenantId === context.user.tenantId,
   })
+  @CheckAbility({ action: 'read', subject: 'Subscription' })
   mySubscriptionStatusChanged() {
     return pubSub.asyncIterableIterator('BILLING.subscription.status_changed');
   }
@@ -32,6 +35,7 @@ export class InstituteBillingSubscriptions {
       context: { user: import('@roviq/common-types').InstituteContext },
     ) => payload.tenantId === context.user.tenantId,
   })
+  @CheckAbility({ action: 'read', subject: 'Invoice' })
   myInvoiceGenerated() {
     return pubSub.asyncIterableIterator('BILLING.invoice.generated');
   }
@@ -44,6 +48,7 @@ export class InstituteBillingSubscriptions {
       context: { user: import('@roviq/common-types').InstituteContext },
     ) => payload.tenantId === context.user.tenantId,
   })
+  @CheckAbility({ action: 'read', subject: 'Payment' })
   myPaymentStatusChanged() {
     return pubSub.asyncIterableIterator('BILLING.payment.status_changed');
   }
@@ -54,7 +59,7 @@ export class InstituteBillingSubscriptions {
 // ---------------------------------------------------------------------------
 
 @Resolver()
-@ResellerScope()
+@UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 export class ResellerBillingSubscriptions {
   @Subscription(() => InvoiceModel, {
     name: 'resellerInvoiceGenerated',
@@ -64,6 +69,7 @@ export class ResellerBillingSubscriptions {
       context: { user: import('@roviq/common-types').ResellerContext },
     ) => payload.resellerId === context.user.resellerId,
   })
+  @CheckAbility({ action: 'read', subject: 'Invoice' })
   resellerInvoiceGenerated() {
     return pubSub.asyncIterableIterator('BILLING.invoice.generated');
   }
@@ -76,6 +82,7 @@ export class ResellerBillingSubscriptions {
       context: { user: import('@roviq/common-types').ResellerContext },
     ) => payload.resellerId === context.user.resellerId,
   })
+  @CheckAbility({ action: 'read', subject: 'Payment' })
   resellerPaymentReceived() {
     return pubSub.asyncIterableIterator('BILLING.payment.succeeded');
   }
@@ -88,6 +95,7 @@ export class ResellerBillingSubscriptions {
       context: { user: import('@roviq/common-types').ResellerContext },
     ) => payload.resellerId === context.user.resellerId,
   })
+  @CheckAbility({ action: 'read', subject: 'Subscription' })
   resellerSubscriptionChanged() {
     return pubSub.asyncIterableIterator('BILLING.subscription.status_changed');
   }

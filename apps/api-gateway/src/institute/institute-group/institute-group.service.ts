@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { encodeCursor } from '../common/pagination/relay-pagination.model';
+import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { CreateInstituteGroupInput } from './dto/create-institute-group.input';
 import type { InstituteGroupFilterInput } from './dto/institute-group-filter.input';
 import type { UpdateInstituteGroupInput } from './dto/update-institute-group.input';

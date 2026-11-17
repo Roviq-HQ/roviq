@@ -3471,6 +3471,9 @@ type Mutation {
 
   """Delete a suspended reseller after 30-day grace period"""
   adminDeleteReseller(resellerId: String!): Boolean!
+
+  """Discard a dead-lettered message without replaying it"""
+  adminDiscardDlqMessage(id: ID!): DlqMessageModel!
   adminEndImpersonation(sessionId: String!): Boolean!
   adminLogin(password: String!, username: String!): AuthPayload!
 
@@ -3480,6 +3483,9 @@ type Mutation {
 
   """Remove an institute from its group (clears the group assignment)"""
   adminRemoveInstituteGroup(id: ID!): InstituteModel!
+
+  """Re-publish a dead-lettered message to its original subject"""
+  adminReplayDlqMessage(id: ID!): DlqMessageModel!
   adminRestoreInstitute(id: ID!): InstituteModel!
 
   """
@@ -3676,9 +3682,6 @@ type Mutation {
 
   """Soft-delete timetables. Returns the count removed."""
   deleteTimetable(ids: [ID!]!): Int!
-
-  """Discard a dead-lettered message without replaying it"""
-  discardDlqMessage(id: ID!): DlqMessageModel!
   endImpersonation(sessionId: String!): Boolean!
 
   """Enroll a student in a section with capacity check"""
@@ -3772,9 +3775,6 @@ type Mutation {
   removeTimetablePeriod(periodId: ID!, timetableId: ID!): Boolean!
   removeTimetableSection(sectionId: ID!, timetableId: ID!): Boolean!
   replaceGradeBands(input: ReplaceGradeBandsInput!): [GradeBandModel!]!
-
-  """Re-publish a dead-lettered message to its original subject"""
-  replayDlqMessage(id: ID!): DlqMessageModel!
 
   """Request a certificate from template — auto-populates fields"""
   requestCertificate(input: RequestCertificateInput!): CertificateModel!
@@ -4153,6 +4153,7 @@ type Query {
     date: String!
   ): [AdminAttendanceSummaryModel!]!
   adminAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
+  adminAuthEvents(first: Int = 50): [AuthEventModel!]!
   adminGetInstitute(id: ID!): InstituteModel!
 
   """
@@ -4162,6 +4163,7 @@ type Query {
 
   """Fetch a single reseller by id with computed counts"""
   adminGetReseller(id: ID!): AdminResellerModel!
+  adminImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   adminInstituteStatistics: InstituteStatisticsModel!
 
   """Platform admin: list dead-lettered NATS messages (ROV-19)"""
@@ -4214,7 +4216,6 @@ type Query {
   """
   attendanceStudentHistory(endDate: String!, startDate: String!, studentId: ID!): [StudentHistoryItem!]!
   auditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
-  authEvents(first: Int = 50): [AuthEventModel!]!
 
   """Get bulk import progress by workflow ID"""
   bulkImportProgress(workflowId: String!): BulkImportProgressModel!
@@ -4301,7 +4302,6 @@ type Query {
     """ISO YYYY-MM-DD date to look up."""
     date: String!
   ): [HolidayModel!]!
-  impersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   institute(id: ID!): InstituteModel!
   instituteGroup(id: ID!): InstituteGroupModel!
   instituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!

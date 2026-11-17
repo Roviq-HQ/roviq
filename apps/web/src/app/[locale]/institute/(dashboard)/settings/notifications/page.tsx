@@ -14,6 +14,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  useAbility,
 } from '@roviq/ui';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -97,6 +98,7 @@ function getDefaultConfig(notificationType: string): NotificationConfig {
 
 export default function NotificationPreferencesPage() {
   const t = useTranslations('notifications');
+  const canEdit = useAbility().can('update_config', 'Institute');
 
   const { data, loading } = useQuery<NotificationConfigsQuery>(NOTIFICATION_CONFIGS_QUERY);
 
@@ -141,6 +143,7 @@ export default function NotificationPreferencesPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
+        {!canEdit && <p className="mt-1 text-sm text-muted-foreground">{t('readOnly')}</p>}
       </div>
 
       <Card>
@@ -172,7 +175,7 @@ export default function NotificationPreferencesPage() {
                         <Switch
                           checked={config[ch.field]}
                           onCheckedChange={(val) => handleToggle(type, ch.field, val)}
-                          disabled={loading}
+                          disabled={loading || !canEdit}
                           aria-label={`${t(labelKey)} ${t(ch.labelKey)}`}
                         />
                       </TableCell>

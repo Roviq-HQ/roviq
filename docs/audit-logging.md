@@ -24,7 +24,7 @@ Service side-effects → AuditEmitter → NATS JetStream (AUDIT.log)
 | `AuditInterceptor` | `apps/api-gateway/src/audit/audit.interceptor.ts` | Gateway mutation capture (Layer 1) |
 | `AuditEmitter` | `libs/backend/audit/src/audit-emitter.ts` | Service-level event emission (Layer 2) |
 | `AuditConsumer` | `apps/api-gateway/src/audit/audit.consumer.ts` | Batched raw SQL writes from NATS |
-| Resolvers | `apps/api-gateway/src/audit/audit.resolver.ts` | `adminAuditLogs`, `resellerAuditLogs`, `auditLogs`, `entityAuditTimeline` |
+| Resolvers | `apps/api-gateway/src/{admin,reseller,institute}/audit/*-audit.resolver.ts` | `adminAuditLogs`, `adminAuthEvents` (platform), `resellerAuditLogs` (reseller), `auditLogs`, `entityAuditTimeline` (institute) |
 | Decorators | `libs/backend/audit/src/decorators/` | `@AuditMask()`, `@NoAudit()` |
 | Partition workflow | `apps/api-gateway/src/audit/workflows/` | Temporal cron for monthly partition management |
 

@@ -1,6 +1,11 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Field, ID, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
-import { assertResellerContext, CurrentUser, ResellerScope } from '@roviq/auth-backend';
+import {
+  assertResellerContext,
+  CurrentUser,
+  GqlAuthGuard,
+  ResellerScopeGuard,
+} from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { ResellerInviteTeamMemberInput } from './dto/reseller-invite-team-member.input';
@@ -17,8 +22,7 @@ class ResellerInviteTeamMemberResult {
   membershipId!: string;
 }
 
-@ResellerScope()
-@UseGuards(AbilityGuard)
+@UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver(() => ResellerTeamMemberModel)
 export class ResellerTeamResolver {
   constructor(private readonly service: ResellerTeamService) {}

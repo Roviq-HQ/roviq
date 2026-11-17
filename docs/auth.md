@@ -240,7 +240,7 @@ Read models over `impersonation_sessions` surface sessions for review and termin
 
 | Query | Scope | Returns |
 |---|---|---|
-| `impersonationSessions(activeOnly, sessionId, first)` | platform | All sessions across scopes (newest first) |
+| `adminImpersonationSessions(activeOnly, sessionId, first)` | platform | All sessions across scopes (newest first) |
 | `resellerImpersonationSessions(activeOnly, sessionId, first)` | reseller | Sessions started by the reseller's own team |
 
 Both return `ImpersonationSessionModel` — the row plus resolved display names (impersonator, target user, OTP verifier) and the target institute name, with a derived `status` of `ACTIVE` / `ENDED` / `EXPIRED` (from `endedAt` then `expiresAt`). RLS on `impersonation_sessions` grants resellers full read, so `listSessions` enforces the team scope explicitly by filtering impersonators to the reseller's `reseller_memberships`.
@@ -276,7 +276,9 @@ This gives us one place to enforce password policy, audit the creation event, an
 - `@CheckAbility({ action, subject })` decorator + `AbilityGuard` for resolver-level checks
 - `@CurrentAbility()` param decorator for imperative checks in resolver body
 - Role abilities cached in Redis with key `casl:role:{roleId}`, 5-minute TTL
-- Platform scope: `manage:all` (no DB lookup)
+- Platform scope uses the role's abilities like the other scopes: `platform_admin` is `manage all`, `platform_support` is read-only plus impersonation
+- `AbilityGuard` must come after `GqlAuthGuard` in the class-level chain: `@UseGuards(GqlAuthGuard, <Scope>ScopeGuard, AbilityGuard)`. A separate `@UseGuards(AbilityGuard)` under a scope decorator runs before authentication. `ability-guard-wiring.spec.ts` fails on a `@CheckAbility` without the guard and on a mis-ordered chain
+- Starting impersonation and verifying its OTP need `impersonate User` in every scope; listing sessions needs `read AuditLog`. Changing tenant notification channels needs `update_config Institute`
 
 ### Student and admission reads
 

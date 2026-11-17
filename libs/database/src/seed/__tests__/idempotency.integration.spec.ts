@@ -8,7 +8,7 @@ import {
   studentProfiles,
   users,
 } from '../../schema';
-import { seedDemo, seedE2e, seedEssential } from '../';
+import { seedDemo, seedE2e, seedEssential } from '..';
 import { SEED_IDS } from '../ids';
 import { makeSeedTestDb } from './seed-test-helpers';
 
