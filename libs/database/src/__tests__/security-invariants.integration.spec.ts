@@ -39,7 +39,9 @@ function scopeExpectation(opts: {
   hasResellerId: boolean;
 }): { roles: string[]; scope: string } {
   if (opts.isPlatformFacet) return { roles: ['roviq_admin'], scope: 'platform-facet' };
-  if (opts.hasTenantId) return { roles: ['roviq_app', 'roviq_admin'], scope: 'tenant' };
+  if (opts.hasTenantId) {
+    return { roles: ['roviq_app', 'roviq_reseller', 'roviq_admin'], scope: 'tenant' };
+  }
   if (opts.hasResellerId) return { roles: ['roviq_reseller', 'roviq_admin'], scope: 'reseller' };
   return { roles: ['roviq_admin'], scope: 'platform' };
 }
@@ -95,15 +97,17 @@ describe('Role isolation', () => {
 
   it('2. roviq_app cannot read platform_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM platform_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
   it('3. roviq_app cannot read reseller_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM reseller_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM reseller_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
@@ -286,9 +290,9 @@ describe('Data isolation', () => {
     // Platform admin user has no institute membership accessible via roviq_app
     // if the tenant context doesn't match
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      // Platform memberships are invisible to roviq_app (default deny)
-      const res = await client.query('SELECT * FROM platform_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
@@ -567,7 +571,7 @@ describe('Structural invariants — RLS sweep', () => {
     expect(result.rows.length).toBeGreaterThan(0);
 
     // Expected roles per scope tier:
-    //   tenant (has tenant_id)  → roviq_app + roviq_admin
+    //   tenant (has tenant_id)  → roviq_app + roviq_reseller + roviq_admin
     //   reseller (has reseller_id, no tenant_id) → roviq_reseller + roviq_admin
     //   platform (neither)      → roviq_admin
     //
@@ -576,15 +580,9 @@ describe('Structural invariants — RLS sweep', () => {
     // or managed exclusively via GRANT/REVOKE + superuser access.
     // Known tables in this state are tracked here and must shrink over time.
     const KNOWN_NO_POLICY_TABLES = new Set([
-      // Identity tables — accessed via identity service (superuser / NATS), not RLS
+      // Identity tables without RLS yet — ROV-279
       'auth_providers',
       'phone_numbers',
-      'user_addresses',
-      'user_documents',
-      'user_identifiers',
-      'user_profiles',
-      // Junction table — accessed via JOINs in tenant context
-      'group_memberships',
     ]);
 
     const violations: string[] = [];
@@ -618,6 +616,90 @@ describe('Structural invariants — RLS sweep', () => {
     }
 
     expect(violations, `RLS role coverage gaps:\n${violations.join('\n')}`).toEqual([]);
+  });
+});
+
+// ── Admin-only and read-only tables (ROV-90) ──────────────────
+
+describe('ROV-90: group_memberships is admin-only', () => {
+  it('has RLS enabled and forced', async () => {
+    const res = await superPool.query(
+      `SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'group_memberships'`,
+    );
+    expect(res.rows).toEqual([{ relrowsecurity: true, relforcerowsecurity: true }]);
+  });
+
+  it('roviq_app cannot read group_memberships', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(client.query('SELECT * FROM group_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it('roviq_app cannot read group_memberships_live', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(client.query('SELECT * FROM group_memberships_live')).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it('roviq_reseller cannot read group_memberships', async () => {
+    await asRole(
+      'roviq_reseller',
+      { 'app.current_reseller_id': SEED.RESELLER_DIRECT },
+      async (client) => {
+        await expect(client.query('SELECT * FROM group_memberships')).rejects.toThrow(
+          /permission denied/,
+        );
+      },
+    );
+  });
+
+  it('roviq_admin can read group_memberships', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      const res = await client.query('SELECT count(*) FROM group_memberships');
+      expect(Number(res.rows[0].count)).toBeGreaterThanOrEqual(0);
+    });
+  });
+});
+
+describe('ROV-90: users is read-only outside roviq_admin', () => {
+  it('roviq_app and roviq_reseller hold SELECT and nothing else', async () => {
+    const res = await superPool.query(
+      `SELECT r AS role, p AS privilege, has_table_privilege(r, 'users', p) AS granted
+       FROM unnest(ARRAY['roviq_app', 'roviq_reseller']) r,
+            unnest(ARRAY['DELETE', 'INSERT', 'SELECT', 'UPDATE']) p
+       ORDER BY r, p`,
+    );
+    expect(res.rows).toEqual([
+      { role: 'roviq_app', privilege: 'DELETE', granted: false },
+      { role: 'roviq_app', privilege: 'INSERT', granted: false },
+      { role: 'roviq_app', privilege: 'SELECT', granted: true },
+      { role: 'roviq_app', privilege: 'UPDATE', granted: false },
+      { role: 'roviq_reseller', privilege: 'DELETE', granted: false },
+      { role: 'roviq_reseller', privilege: 'INSERT', granted: false },
+      { role: 'roviq_reseller', privilege: 'SELECT', granted: true },
+      { role: 'roviq_reseller', privilege: 'UPDATE', granted: false },
+    ]);
+  });
+
+  it('roviq_app cannot UPDATE users', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(
+        client.query(`UPDATE users SET username = 'tampered' WHERE id = $1`, [SEED.USER_ADMIN]),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it('roviq_admin can UPDATE users', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      const res = await client.query(`UPDATE users SET updated_at = now() WHERE id = $1`, [
+        SEED.USER_ADMIN,
+      ]);
+      expect(res.rowCount).toBe(1);
+    });
   });
 });
 
