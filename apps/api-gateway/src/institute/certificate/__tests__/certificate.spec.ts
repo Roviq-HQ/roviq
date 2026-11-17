@@ -210,7 +210,7 @@ describe('CertificateService (unit)', () => {
       expect(result).toEqual(certRow);
     });
 
-    it('throws NotFoundException when no row is returned', async () => {
+    it('rejects when no row is returned', async () => {
       queueResult([]);
       await expect(service.findCertificateById('missing')).rejects.toThrow(/not found/i);
     });

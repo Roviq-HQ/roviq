@@ -1,4 +1,5 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   auditLogs,
   authEvents,
@@ -26,12 +27,12 @@ function decodeCursor(cursor: string): { timestamp: string; id: string } {
   const decoded = Buffer.from(cursor, 'base64url').toString();
   const separatorIndex = decoded.lastIndexOf(':');
   if (separatorIndex === -1) {
-    throw new BadRequestException('Invalid cursor format');
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor format');
   }
   const timestamp = decoded.slice(0, separatorIndex);
   const id = decoded.slice(separatorIndex + 1);
   if (Number.isNaN(Date.parse(timestamp)) || !UUID_RE.test(id)) {
-    throw new BadRequestException('Invalid cursor format');
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor format');
   }
   return { timestamp, id };
 }

@@ -1,5 +1,6 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { InstituteReadAccess } from '@roviq/casl';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   attendanceEntries,
   attendanceEntriesLive,
@@ -289,10 +290,10 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
         .where(and(eq(attendanceSessions.id, sessionId), isNull(attendanceSessions.deletedAt)))
         .returning(sessionWriteReturning);
       if (rows.length === 0)
-        throw new NotFoundException({
-          message: `Attendance session ${sessionId} not found`,
-          code: 'ATTENDANCE_SESSION_NOT_FOUND',
-        });
+        throw new BusinessException(
+          ErrorCode.ATTENDANCE_SESSION_NOT_FOUND,
+          `Attendance session ${sessionId} not found`,
+        );
       return rows[0] as AttendanceSessionRecord;
     });
   }
@@ -307,10 +308,10 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
         .where(and(eq(attendanceSessions.id, sessionId), isNull(attendanceSessions.deletedAt)))
         .returning(sessionWriteReturning);
       if (rows.length === 0)
-        throw new NotFoundException({
-          message: `Attendance session ${sessionId} not found`,
-          code: 'ATTENDANCE_SESSION_NOT_FOUND',
-        });
+        throw new BusinessException(
+          ErrorCode.ATTENDANCE_SESSION_NOT_FOUND,
+          `Attendance session ${sessionId} not found`,
+        );
       return rows[0] as AttendanceSessionRecord;
     });
   }

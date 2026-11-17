@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   BusinessException,
   ErrorCode,
@@ -66,7 +66,7 @@ export class InstituteService {
   async findById(id: string): Promise<InstituteRecord> {
     const record = await this.instituteRepo.findById(id);
     if (!record) {
-      throw new NotFoundException(`Institute ${id} not found`);
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
     }
     return record;
   }
@@ -109,7 +109,7 @@ export class InstituteService {
     if (input.contact) {
       const result = instituteContactSchema.safeParse(input.contact);
       if (!result.success) {
-        throw new BadRequestException(result.error.message);
+        throw new BusinessException(ErrorCode.VALIDATION_FAILED, result.error.message);
       }
     }
 
@@ -270,7 +270,7 @@ export class InstituteService {
   private async requireInstitute(id: string): Promise<InstituteRecord> {
     const record = await this.instituteRepo.findById(id);
     if (!record) {
-      throw new NotFoundException(`Institute ${id} not found`);
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
     }
     return record;
   }

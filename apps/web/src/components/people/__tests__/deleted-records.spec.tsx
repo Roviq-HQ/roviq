@@ -171,4 +171,46 @@ describe('DeletePersonButton', () => {
     );
     expect(onDeleted).not.toHaveBeenCalled();
   });
+
+  it('should explain that the only guardian of a student cannot be deleted', async () => {
+    const onDeleted = vi.fn();
+    state.deletePerson.mockRejectedValue(graphQLError('LAST_GUARDIAN_CANNOT_BE_DELETED'));
+    renderWithProviders(
+      <DeletePersonButton
+        kind="guardian"
+        id="guardian-1"
+        name="Suresh Kumar"
+        onDeleted={onDeleted}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete guardian' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await waitFor(() =>
+      expect(state.toastError).toHaveBeenCalledWith('Could not delete Suresh Kumar', {
+        description:
+          'This is the only guardian of a student. Link another guardian to that student first.',
+        duration: Number.POSITIVE_INFINITY,
+      }),
+    );
+    expect(onDeleted).not.toHaveBeenCalled();
+  });
+
+  it('should show generic copy, never the server text, for an unmapped error code', async () => {
+    state.deletePerson.mockRejectedValue(graphQLError('INTERNAL_ERROR'));
+    renderWithProviders(
+      <DeletePersonButton kind="staff" id="staff-1" name="Asha Rao" onDeleted={vi.fn()} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete staff member' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await waitFor(() =>
+      expect(state.toastError).toHaveBeenCalledWith('Could not delete Asha Rao', {
+        description: 'An unexpected error occurred. Please try again.',
+        duration: Number.POSITIVE_INFINITY,
+      }),
+    );
+  });
 });

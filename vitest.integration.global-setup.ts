@@ -1,8 +1,8 @@
-// Runs ONCE before any integration test worker starts. Applies pending
-// Drizzle migrations to DATABASE_URL_TEST_MIGRATE (host's `roviq_test`),
-// idempotently. Without this, a teammate who pulls a branch with a new
-// migration sees cryptic FK / column errors until they remember to run
-// `pnpm db:reset --test --seed`.
+// Runs ONCE before any integration test worker starts. Bootstraps a bare
+// `roviq_test`, then applies pending Drizzle migrations to
+// DATABASE_URL_TEST_MIGRATE, idempotently. Without this, a teammate who pulls
+// a branch with a new migration sees cryptic FK / column errors until they
+// remember to run `pnpm db:reset --test --seed`.
 import 'dotenv/config';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -15,6 +15,19 @@ export async function setup(): Promise<void> {
   }
 
   await ensureIntegrationInfra(__dirname);
+
+  // A never-bootstrapped roviq_test (new dev instance, wiped volume) has no
+  // prereq functions; `drizzle-kit migrate` fails on it without a message.
+  const bootstrap = spawnSync('pnpm', ['run', 'db:reset', '--test', '--if-empty'], {
+    stdio: 'inherit',
+    cwd: __dirname,
+    shell: false,
+  });
+  if (bootstrap.status !== 0) {
+    throw new Error(
+      `db:reset --test --if-empty failed (exit ${bootstrap.status}) — its output is above`,
+    );
+  }
 
   const result = spawnSync('drizzle-kit', ['migrate', '--config=drizzle.config.ts'], {
     stdio: 'inherit',

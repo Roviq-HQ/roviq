@@ -1,11 +1,66 @@
 import { HttpStatus } from '@nestjs/common';
 
 /**
- * Structured error codes for institute-service mutations.
- * Each code maps to an HTTP status and a machine-readable identifier.
- * Messages are i18n-translated via the `errors` namespace.
+ * Machine-readable error codes surfaced to clients as GraphQL `extensions.code`.
+ * Each code maps to one HTTP status; the frontend translates codes to copy.
  */
 export const ErrorCode = {
+  // ── Generic (status-derived fallbacks) ─────────────────
+  /** Request is malformed or violates a precondition with no more specific code */
+  BAD_REQUEST: 'BAD_REQUEST',
+  /** Input failed DTO validation (class-validator / ValidationPipe) */
+  VALIDATION_FAILED: 'VALIDATION_FAILED',
+  /** Access token missing, malformed or expired — clients refresh and retry */
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  /** Requested resource does not exist and has no more specific *_NOT_FOUND code */
+  NOT_FOUND: 'NOT_FOUND',
+  /** Request conflicts with current state and has no more specific code */
+  CONFLICT: 'CONFLICT',
+  /** Business rule rejected the request and has no more specific code */
+  UNPROCESSABLE_ENTITY: 'UNPROCESSABLE_ENTITY',
+  /** Rate limit hit (ThrottlerGuard) */
+  TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+  /** Unexpected server failure — details are logged, never sent to the client */
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // ── Auth ───────────────────────────────────────────────
+  /** Wrong Roviq ID or password (also unknown / inactive user, to avoid enumeration) */
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  /** Too many failed logins — the Roviq ID is locked for a cooldown window */
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
+  /** Credentials are valid but the user has no usable membership in this portal */
+  ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND',
+  /** User behind an otherwise valid token is deleted or no longer ACTIVE */
+  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
+  /** Refresh or institute-selection token is invalid, expired, revoked or reused */
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
+  /** Refresh token predates a password change — a full re-login is required */
+  PASSWORD_CHANGED: 'PASSWORD_CHANGED',
+  /** Access token carries mustChangePassword — only the password change is allowed */
+  PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED',
+  /** Current password supplied to changePassword does not match */
+  CURRENT_PASSWORD_INCORRECT: 'CURRENT_PASSWORD_INCORRECT',
+  /** New password is identical to the current password */
+  PASSWORD_UNCHANGED: 'PASSWORD_UNCHANGED',
+  /** Target membership is missing or not ACTIVE for this user */
+  NO_ACTIVE_MEMBERSHIP: 'NO_ACTIVE_MEMBERSHIP',
+  /** Session to revoke does not exist or belongs to another user */
+  SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+  /** Impersonation session ended, expired or was revoked */
+  IMPERSONATION_ENDED: 'IMPERSONATION_ENDED',
+
+  // ── Passkey ────────────────────────────────────────────
+  /** WebAuthn challenge expired or was already consumed */
+  PASSKEY_CHALLENGE_EXPIRED: 'PASSKEY_CHALLENGE_EXPIRED',
+  /** Passkey registration response could not be verified */
+  PASSKEY_VERIFICATION_FAILED: 'PASSKEY_VERIFICATION_FAILED',
+  /** Passkey sign-in failed (unknown credential, bad signature or inactive user) */
+  PASSKEY_AUTHENTICATION_FAILED: 'PASSKEY_AUTHENTICATION_FAILED',
+  /** Passkey does not exist or belongs to another user */
+  PASSKEY_NOT_FOUND: 'PASSKEY_NOT_FOUND',
+  /** Removing this passkey would leave the user with no way to sign in */
+  PASSKEY_LAST_AUTH_METHOD: 'PASSKEY_LAST_AUTH_METHOD',
+
   // ── Institute ──────────────────────────────────────────
   /** Institute not found or soft-deleted */
   INSTITUTE_NOT_FOUND: 'INSTITUTE_NOT_FOUND',
@@ -47,7 +102,7 @@ export const ErrorCode = {
   FORBIDDEN: 'FORBIDDEN',
 
   // ── Academic Year ──────────────────────────────────────
-  /** Date ranges overlap with another academic year (schools only) */
+  /** Date ranges overlap with another academic year */
   ACADEMIC_YEAR_OVERLAP: 'ACADEMIC_YEAR_OVERLAP',
   /** Start date must be before end date */
   INVALID_DATE_RANGE: 'INVALID_DATE_RANGE',
@@ -67,6 +122,8 @@ export const ErrorCode = {
   SECTION_NAME_DUPLICATE: 'SECTION_NAME_DUPLICATE',
   /** Cannot delete — students are actively enrolled */
   HAS_ACTIVE_ENROLLMENTS: 'HAS_ACTIVE_ENROLLMENTS',
+  /** Cannot restore student — the admission number was reissued to a live student */
+  ADMISSION_NUMBER_TAKEN: 'ADMISSION_NUMBER_TAKEN',
   /** Cannot delete subject — assessments have been recorded against it */
   HAS_RECORDED_ASSESSMENTS: 'HAS_RECORDED_ASSESSMENTS',
   /** Section under a stream-applicable standard must specify a stream */
@@ -127,6 +184,137 @@ export const ErrorCode = {
   REPORT_CARD_NOT_PUBLISHED: 'REPORT_CARD_NOT_PUBLISHED',
   /** Report card generation failed (missing marks / no covered exams) */
   REPORT_CARD_GENERATION_FAILED: 'REPORT_CARD_GENERATION_FAILED',
+  // ── Not found ──────────────────────────────────────────
+  /** Academic year not found in this institute */
+  ACADEMIC_YEAR_NOT_FOUND: 'ACADEMIC_YEAR_NOT_FOUND',
+  /** Admission application not found */
+  APPLICATION_NOT_FOUND: 'APPLICATION_NOT_FOUND',
+  /** Attendance session not found */
+  ATTENDANCE_SESSION_NOT_FOUND: 'ATTENDANCE_SESSION_NOT_FOUND',
+  /** Bot profile not found */
+  BOT_NOT_FOUND: 'BOT_NOT_FOUND',
+  /** Issued certificate not found */
+  CERTIFICATE_NOT_FOUND: 'CERTIFICATE_NOT_FOUND',
+  /** Certificate template not found */
+  CERTIFICATE_TEMPLATE_NOT_FOUND: 'CERTIFICATE_TEMPLATE_NOT_FOUND',
+  /** Dead-letter message not found */
+  DLQ_MESSAGE_NOT_FOUND: 'DLQ_MESSAGE_NOT_FOUND',
+  /** Admission enquiry not found */
+  ENQUIRY_NOT_FOUND: 'ENQUIRY_NOT_FOUND',
+  /** Exam schedule row not found */
+  EXAM_SCHEDULE_NOT_FOUND: 'EXAM_SCHEDULE_NOT_FOUND',
+  /** Exam term not found */
+  EXAM_TERM_NOT_FOUND: 'EXAM_TERM_NOT_FOUND',
+  /** Member is not part of the group */
+  GROUP_MEMBER_NOT_FOUND: 'GROUP_MEMBER_NOT_FOUND',
+  /** User group not found */
+  GROUP_NOT_FOUND: 'GROUP_NOT_FOUND',
+  /** Guardian is not linked to the student */
+  GUARDIAN_LINK_NOT_FOUND: 'GUARDIAN_LINK_NOT_FOUND',
+  /** Guardian profile not found */
+  GUARDIAN_NOT_FOUND: 'GUARDIAN_NOT_FOUND',
+  /** Holiday not found */
+  HOLIDAY_NOT_FOUND: 'HOLIDAY_NOT_FOUND',
+  /** Institute group not found */
+  INSTITUTE_GROUP_NOT_FOUND: 'INSTITUTE_GROUP_NOT_FOUND',
+  /** Leave request not found */
+  LEAVE_NOT_FOUND: 'LEAVE_NOT_FOUND',
+  /** Membership row not found */
+  MEMBERSHIP_NOT_FOUND: 'MEMBERSHIP_NOT_FOUND',
+  /** No active payment gateway is configured for the reseller or institute */
+  PAYMENT_GATEWAY_NOT_CONFIGURED: 'PAYMENT_GATEWAY_NOT_CONFIGURED',
+  /** Role not found (including a missing default role for the institute) */
+  ROLE_NOT_FOUND: 'ROLE_NOT_FOUND',
+  /** Section not found */
+  SECTION_NOT_FOUND: 'SECTION_NOT_FOUND',
+  /** Staff profile not found */
+  STAFF_NOT_FOUND: 'STAFF_NOT_FOUND',
+  /** Staff qualification not found */
+  STAFF_QUALIFICATION_NOT_FOUND: 'STAFF_QUALIFICATION_NOT_FOUND',
+  /** Standard not found */
+  STANDARD_NOT_FOUND: 'STANDARD_NOT_FOUND',
+  /** Student has no academic record for the year */
+  STUDENT_ACADEMIC_NOT_FOUND: 'STUDENT_ACADEMIC_NOT_FOUND',
+  /** Student profile not found */
+  STUDENT_NOT_FOUND: 'STUDENT_NOT_FOUND',
+  /** Subject not found */
+  SUBJECT_NOT_FOUND: 'SUBJECT_NOT_FOUND',
+  /** Subscription not found */
+  SUBSCRIPTION_NOT_FOUND: 'SUBSCRIPTION_NOT_FOUND',
+  /** Subscription plan not found */
+  SUBSCRIPTION_PLAN_NOT_FOUND: 'SUBSCRIPTION_PLAN_NOT_FOUND',
+  /** Transfer Certificate not found or not in the state the action needs */
+  TC_NOT_FOUND: 'TC_NOT_FOUND',
+  /** Reseller team member not found */
+  TEAM_MEMBER_NOT_FOUND: 'TEAM_MEMBER_NOT_FOUND',
+  /** Timetable override not found */
+  TIMETABLE_OVERRIDE_NOT_FOUND: 'TIMETABLE_OVERRIDE_NOT_FOUND',
+  /** Period does not exist in the timetable */
+  TIMETABLE_PERIOD_NOT_FOUND: 'TIMETABLE_PERIOD_NOT_FOUND',
+  /** User profile not found */
+  USER_PROFILE_NOT_FOUND: 'USER_PROFILE_NOT_FOUND',
+
+  // ── Admission / academics ──────────────────────────────
+  /** Archived academic years are read-only */
+  ACADEMIC_YEAR_ARCHIVED: 'ACADEMIC_YEAR_ARCHIVED',
+  /** Applications are only accepted for the active academic year */
+  ACADEMIC_YEAR_NOT_ACTIVE: 'ACADEMIC_YEAR_NOT_ACTIVE',
+  /** Enquiry was already converted to an application */
+  ENQUIRY_ALREADY_CONVERTED: 'ENQUIRY_ALREADY_CONVERTED',
+  /** A section must be chosen before the applicant can be enrolled */
+  SECTION_REQUIRED: 'SECTION_REQUIRED',
+  /** Chosen section belongs to a different standard than the application */
+  SECTION_STANDARD_MISMATCH: 'SECTION_STANDARD_MISMATCH',
+  /** Action needs an ENROLLED student (e.g. requesting a TC) */
+  STUDENT_NOT_ENROLLED: 'STUDENT_NOT_ENROLLED',
+  /** Student document type is not one of the supported types */
+  INVALID_DOCUMENT_TYPE: 'INVALID_DOCUMENT_TYPE',
+  /** A student document needs at least one file URL */
+  FILE_URLS_REQUIRED: 'FILE_URLS_REQUIRED',
+  /** Guardian is already linked to this student */
+  GUARDIAN_ALREADY_LINKED: 'GUARDIAN_ALREADY_LINKED',
+  /** Unlinking the primary contact needs a replacement primary guardian */
+  PRIMARY_GUARDIAN_REQUIRED: 'PRIMARY_GUARDIAN_REQUIRED',
+
+  // ── Attendance / leave ─────────────────────────────────
+  /** Past-day attendance edits need the AttendanceOverride permission */
+  ATTENDANCE_OVERRIDE_FORBIDDEN: 'ATTENDANCE_OVERRIDE_FORBIDDEN',
+  /** Past-day attendance edit attempted without an explicit admin override */
+  ATTENDANCE_EDIT_WINDOW_CLOSED: 'ATTENDANCE_EDIT_WINDOW_CLOSED',
+  /** Another lecturer already took attendance for this slot */
+  ATTENDANCE_SLOT_TAKEN: 'ATTENDANCE_SLOT_TAKEN',
+  /** Attendance cannot be taken on a holiday */
+  ATTENDANCE_ON_HOLIDAY: 'ATTENDANCE_ON_HOLIDAY',
+  /** Leaves of 3+ calendar days need a supporting document */
+  LEAVE_DOCUMENT_REQUIRED: 'LEAVE_DOCUMENT_REQUIRED',
+  /** Only PENDING leaves can be edited */
+  LEAVE_NOT_EDITABLE: 'LEAVE_NOT_EDITABLE',
+
+  // ── Impersonation ──────────────────────────────────────
+  /** Target user cannot be impersonated (self, inactive, or no membership in the institute) */
+  IMPERSONATION_TARGET_INVALID: 'IMPERSONATION_TARGET_INVALID',
+  /** Impersonation session is missing, already ended, or has no target tenant */
+  IMPERSONATION_SESSION_INVALID: 'IMPERSONATION_SESSION_INVALID',
+  /** Consent OTP cannot be sent (no active institute admin or no contact phone) */
+  IMPERSONATION_CONSENT_UNAVAILABLE: 'IMPERSONATION_CONSENT_UNAVAILABLE',
+  /** Consent OTP is wrong or not valid for this session */
+  IMPERSONATION_OTP_INVALID: 'IMPERSONATION_OTP_INVALID',
+  /** Consent OTP expired or was never issued */
+  IMPERSONATION_OTP_EXPIRED: 'IMPERSONATION_OTP_EXPIRED',
+  /** Too many wrong consent OTP attempts — the OTP is discarded */
+  IMPERSONATION_OTP_ATTEMPTS_EXCEEDED: 'IMPERSONATION_OTP_ATTEMPTS_EXCEEDED',
+  /** One-time impersonation exchange code expired or was already used */
+  IMPERSONATION_CODE_EXPIRED: 'IMPERSONATION_CODE_EXPIRED',
+
+  // ── Billing ────────────────────────────────────────────
+  /** Plan cannot be archived while subscriptions still use it */
+  PLAN_HAS_ACTIVE_SUBSCRIPTIONS: 'PLAN_HAS_ACTIVE_SUBSCRIPTIONS',
+  /** Only inactive plans can be restored */
+  PLAN_NOT_INACTIVE: 'PLAN_NOT_INACTIVE',
+  /** Only active plans can be assigned */
+  PLAN_NOT_ACTIVE: 'PLAN_NOT_ACTIVE',
+  /** Institute already has an active subscription */
+  SUBSCRIPTION_ALREADY_ACTIVE: 'SUBSCRIPTION_ALREADY_ACTIVE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -134,6 +322,7 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 /**
  * Maps each error code to its HTTP status.
  * Status categories per PRD §14:
+ *   401 = not authenticated / credentials rejected
  *   403 = CASL permission denied
  *   404 = not found
  *   400 = validation failure
@@ -141,6 +330,31 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
  *   422 = business rule violation
  */
 export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
+  BAD_REQUEST: HttpStatus.BAD_REQUEST,
+  VALIDATION_FAILED: HttpStatus.BAD_REQUEST,
+  UNAUTHENTICATED: HttpStatus.UNAUTHORIZED,
+  NOT_FOUND: HttpStatus.NOT_FOUND,
+  CONFLICT: HttpStatus.CONFLICT,
+  UNPROCESSABLE_ENTITY: HttpStatus.UNPROCESSABLE_ENTITY,
+  TOO_MANY_REQUESTS: HttpStatus.TOO_MANY_REQUESTS,
+  INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
+  INVALID_CREDENTIALS: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_LOCKED: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_NOT_FOUND: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_INACTIVE: HttpStatus.UNAUTHORIZED,
+  SESSION_EXPIRED: HttpStatus.UNAUTHORIZED,
+  PASSWORD_CHANGED: HttpStatus.UNAUTHORIZED,
+  PASSWORD_CHANGE_REQUIRED: HttpStatus.FORBIDDEN,
+  CURRENT_PASSWORD_INCORRECT: HttpStatus.UNAUTHORIZED,
+  PASSWORD_UNCHANGED: HttpStatus.BAD_REQUEST,
+  NO_ACTIVE_MEMBERSHIP: HttpStatus.FORBIDDEN,
+  SESSION_NOT_FOUND: HttpStatus.FORBIDDEN,
+  IMPERSONATION_ENDED: HttpStatus.UNAUTHORIZED,
+  PASSKEY_CHALLENGE_EXPIRED: HttpStatus.BAD_REQUEST,
+  PASSKEY_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,
+  PASSKEY_AUTHENTICATION_FAILED: HttpStatus.UNAUTHORIZED,
+  PASSKEY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PASSKEY_LAST_AUTH_METHOD: HttpStatus.BAD_REQUEST,
   INSTITUTE_NOT_FOUND: HttpStatus.NOT_FOUND,
   INSTITUTE_CODE_DUPLICATE: HttpStatus.CONFLICT,
   INSTITUTE_EMAIL_DUPLICATE: HttpStatus.CONFLICT,
@@ -169,6 +383,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   STANDARD_NAME_DUPLICATE: HttpStatus.CONFLICT,
   SECTION_NAME_DUPLICATE: HttpStatus.CONFLICT,
   HAS_ACTIVE_ENROLLMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
+  ADMISSION_NUMBER_TAKEN: HttpStatus.UNPROCESSABLE_ENTITY,
   HAS_RECORDED_ASSESSMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
   TC_REQUIRED_FOR_TRANSFER: HttpStatus.UNPROCESSABLE_ENTITY,
   LAST_GUARDIAN_CANNOT_BE_DELETED: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -195,4 +410,65 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   REPORT_CARD_NOT_FOUND: HttpStatus.NOT_FOUND,
   REPORT_CARD_NOT_PUBLISHED: HttpStatus.UNPROCESSABLE_ENTITY,
   REPORT_CARD_GENERATION_FAILED: HttpStatus.UNPROCESSABLE_ENTITY,
+  ACADEMIC_YEAR_NOT_FOUND: HttpStatus.NOT_FOUND,
+  APPLICATION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ATTENDANCE_SESSION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  BOT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  CERTIFICATE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  CERTIFICATE_TEMPLATE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  DLQ_MESSAGE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ENQUIRY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  EXAM_SCHEDULE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  EXAM_TERM_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GROUP_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GROUP_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GUARDIAN_LINK_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GUARDIAN_NOT_FOUND: HttpStatus.NOT_FOUND,
+  HOLIDAY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  INSTITUTE_GROUP_NOT_FOUND: HttpStatus.NOT_FOUND,
+  LEAVE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  MEMBERSHIP_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PAYMENT_GATEWAY_NOT_CONFIGURED: HttpStatus.NOT_FOUND,
+  ROLE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  SECTION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  STAFF_NOT_FOUND: HttpStatus.NOT_FOUND,
+  STAFF_QUALIFICATION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  STANDARD_NOT_FOUND: HttpStatus.NOT_FOUND,
+  STUDENT_ACADEMIC_NOT_FOUND: HttpStatus.NOT_FOUND,
+  STUDENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  SUBJECT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  SUBSCRIPTION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  SUBSCRIPTION_PLAN_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TC_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TEAM_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TIMETABLE_OVERRIDE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TIMETABLE_PERIOD_NOT_FOUND: HttpStatus.NOT_FOUND,
+  USER_PROFILE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ACADEMIC_YEAR_ARCHIVED: HttpStatus.BAD_REQUEST,
+  ACADEMIC_YEAR_NOT_ACTIVE: HttpStatus.CONFLICT,
+  ENQUIRY_ALREADY_CONVERTED: HttpStatus.CONFLICT,
+  SECTION_REQUIRED: HttpStatus.BAD_REQUEST,
+  SECTION_STANDARD_MISMATCH: HttpStatus.BAD_REQUEST,
+  STUDENT_NOT_ENROLLED: HttpStatus.BAD_REQUEST,
+  INVALID_DOCUMENT_TYPE: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_URLS_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
+  GUARDIAN_ALREADY_LINKED: HttpStatus.CONFLICT,
+  PRIMARY_GUARDIAN_REQUIRED: HttpStatus.BAD_REQUEST,
+  ATTENDANCE_OVERRIDE_FORBIDDEN: HttpStatus.FORBIDDEN,
+  ATTENDANCE_EDIT_WINDOW_CLOSED: HttpStatus.FORBIDDEN,
+  ATTENDANCE_SLOT_TAKEN: HttpStatus.CONFLICT,
+  ATTENDANCE_ON_HOLIDAY: HttpStatus.CONFLICT,
+  LEAVE_DOCUMENT_REQUIRED: HttpStatus.BAD_REQUEST,
+  LEAVE_NOT_EDITABLE: HttpStatus.BAD_REQUEST,
+  IMPERSONATION_TARGET_INVALID: HttpStatus.BAD_REQUEST,
+  IMPERSONATION_SESSION_INVALID: HttpStatus.BAD_REQUEST,
+  IMPERSONATION_CONSENT_UNAVAILABLE: HttpStatus.BAD_REQUEST,
+  IMPERSONATION_OTP_INVALID: HttpStatus.UNAUTHORIZED,
+  IMPERSONATION_OTP_EXPIRED: HttpStatus.UNAUTHORIZED,
+  IMPERSONATION_OTP_ATTEMPTS_EXCEEDED: HttpStatus.UNAUTHORIZED,
+  IMPERSONATION_CODE_EXPIRED: HttpStatus.UNAUTHORIZED,
+  PLAN_HAS_ACTIVE_SUBSCRIPTIONS: HttpStatus.BAD_REQUEST,
+  PLAN_NOT_INACTIVE: HttpStatus.BAD_REQUEST,
+  PLAN_NOT_ACTIVE: HttpStatus.BAD_REQUEST,
+  SUBSCRIPTION_ALREADY_ACTIVE: HttpStatus.BAD_REQUEST,
 };

@@ -64,7 +64,7 @@ describe.each(accounts)('Account language ($scope)', ({ login }) => {
     const before = await gql(GetAccountLocaleDocument, {}, token);
     expect(before.errors).toBeUndefined();
     const result = await gql(SaveAccountLocaleDocument, { input: { locale: 'fr' } }, token);
-    expect(result.errors?.map((error) => error.extensions?.code)).toEqual(['BAD_REQUEST']);
+    expect(result.errors?.map((error) => error.extensions?.code)).toEqual(['VALIDATION_FAILED']);
     const after = await gql(GetAccountLocaleDocument, {}, token);
     expect(after.errors).toBeUndefined();
     expect(after.data).toEqual(before.data);

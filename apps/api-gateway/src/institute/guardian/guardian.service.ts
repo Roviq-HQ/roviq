@@ -5,14 +5,7 @@
  * sibling discovery, and divorce/access revocation.
  */
 
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   BusinessException,
   DefaultRoles,
@@ -129,7 +122,8 @@ export class GuardianService {
           .limit(1);
       },
     );
-    if (rows.length === 0) throw new NotFoundException(`Guardian profile ${id} not found`);
+    if (rows.length === 0)
+      throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian profile ${id} not found`);
     return rows[0];
   }
 
@@ -203,7 +197,10 @@ export class GuardianService {
     );
 
     if (guardianRole.length === 0)
-      throw new NotFoundException('Parent role not found for this institute');
+      throw new BusinessException(
+        ErrorCode.ROLE_NOT_FOUND,
+        'Parent role not found for this institute',
+      );
 
     // Create membership
     const newMembership = await withTenant(
@@ -298,7 +295,10 @@ export class GuardianService {
     );
 
     if (updatedRows.length === 0) {
-      throw new ConflictException('Guardian profile version mismatch');
+      throw new BusinessException(
+        ErrorCode.CONCURRENT_MODIFICATION,
+        'Guardian profile version mismatch',
+      );
     }
 
     // Name fields live on the platform-level `user_profiles` table, which
@@ -359,11 +359,10 @@ export class GuardianService {
       );
 
       if (otherGuardians.length === 0) {
-        throw new BadRequestException({
-          message:
-            'Cannot delete guardian who is the only guardian for a student. Unlink or assign another guardian first.',
-          code: 'GUARDIAN_IS_ONLY_GUARDIAN',
-        });
+        throw new BusinessException(
+          ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
+          'Cannot delete guardian who is the only guardian for a student. Unlink or assign another guardian first.',
+        );
       }
     }
 
@@ -373,7 +372,8 @@ export class GuardianService {
         .set({ deletedAt: new Date(), deletedBy: actorId })
         .where(and(eq(guardianProfiles.id, id), sql`${guardianProfiles.deletedAt} IS NULL`))
         .returning();
-      if (rows.length === 0) throw new NotFoundException(`Guardian ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
     });
 
     return true;
@@ -407,10 +407,7 @@ export class GuardianService {
         .where(and(eq(guardianProfiles.id, id), isNotNull(guardianProfiles.deletedAt)))
         .returning({ id: guardianProfiles.id });
       if (rows.length === 0) {
-        throw new NotFoundException({
-          message: 'Deleted guardian not found',
-          code: 'GUARDIAN_NOT_FOUND',
-        });
+        throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, 'Deleted guardian not found');
       }
     });
 
@@ -435,7 +432,10 @@ export class GuardianService {
       },
     );
     if (student.length === 0)
-      throw new NotFoundException('Student profile not found in this institute');
+      throw new BusinessException(
+        ErrorCode.STUDENT_NOT_FOUND,
+        'Student profile not found in this institute',
+      );
 
     // Validate guardian exists in this tenant
     const guardian = await withTenant(
@@ -450,7 +450,10 @@ export class GuardianService {
       },
     );
     if (guardian.length === 0)
-      throw new NotFoundException('Guardian profile not found in this institute');
+      throw new BusinessException(
+        ErrorCode.GUARDIAN_NOT_FOUND,
+        'Guardian profile not found in this institute',
+      );
 
     // If setting as primary contact, clear any existing primary for this student
     if (input.isPrimaryContact) {
@@ -492,7 +495,10 @@ export class GuardianService {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (message.includes('uq_student_guardian')) {
-            throw new ConflictException('This guardian is already linked to this student');
+            throw new BusinessException(
+              ErrorCode.GUARDIAN_ALREADY_LINKED,
+              'This guardian is already linked to this student',
+            );
           }
           throw error;
         }
@@ -529,11 +535,16 @@ export class GuardianService {
           .limit(1);
       },
     );
-    if (link.length === 0) throw new NotFoundException('Guardian-student link not found');
+    if (link.length === 0)
+      throw new BusinessException(
+        ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+        'Guardian-student link not found',
+      );
 
     // If removing primary contact, require replacement
     if (link[0].isPrimaryContact && !input.newPrimaryGuardianId) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
         'Cannot unlink primary contact without providing newPrimaryGuardianId',
       );
     }
@@ -607,7 +618,11 @@ export class GuardianService {
           )
           .returning();
 
-        if (rows.length === 0) throw new NotFoundException('Guardian-student link not found');
+        if (rows.length === 0)
+          throw new BusinessException(
+            ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+            'Guardian-student link not found',
+          );
         return rows[0];
       },
     );

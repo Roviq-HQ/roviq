@@ -32,7 +32,7 @@ description: Use when working on any backend service, resolver, repository, or m
 - Services return repository `Record` types — GraphQL handles mapping via `@ObjectType` decorators
 - Use `EventBusService` for event publishing — never inject `JETSTREAM_CLIENT` directly in services
 - Use `BusinessException(ErrorCode.X, message)` for business errors — never `BadRequestException` with hardcoded strings
-- Use `ForbiddenException` for scope/auth checks — never `throw new Error()`
+- Use `BusinessException(ErrorCode.FORBIDDEN, message)` for scope/auth checks — never `throw new Error()` or a bare Nest exception
 
 ## Status Changes = Named Domain Mutations (state machines, ROV-249)
 

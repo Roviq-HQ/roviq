@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -210,7 +211,8 @@ export class SubjectDrizzleRepository extends SubjectRepository {
         .where(and(eq(subjects.id, id), isNull(subjects.deletedAt)))
         .returning(writeReturning);
 
-      if (rows.length === 0) throw new NotFoundException(`Subject ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.SUBJECT_NOT_FOUND, `Subject ${id} not found`);
       return rows[0] as SubjectRecord;
     });
   }

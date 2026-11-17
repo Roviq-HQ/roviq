@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -127,7 +128,8 @@ export class LeaveDrizzleRepository extends LeaveRepository {
         })
         .where(and(eq(leaves.id, id), isNull(leaves.deletedAt)))
         .returning(writeReturning);
-      if (rows.length === 0) throw new NotFoundException(`Leave ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
       return rows[0] as LeaveRecord;
     });
   }
@@ -145,7 +147,8 @@ export class LeaveDrizzleRepository extends LeaveRepository {
         .set({ status, decidedBy, updatedBy: userId })
         .where(and(eq(leaves.id, id), isNull(leaves.deletedAt)))
         .returning(writeReturning);
-      if (rows.length === 0) throw new NotFoundException(`Leave ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
       return rows[0] as LeaveRecord;
     });
   }

@@ -5,6 +5,8 @@ import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
+import { presentAuthError } from './auth-error-feedback';
+import { type AuthErrorLabels, isPasskeySupported } from './error-utils';
 
 export interface ReAuthFormLabels {
   password?: string;
@@ -15,17 +17,12 @@ export interface ReAuthFormLabels {
   or?: string;
   passwordRequired?: string;
   loginFailed?: string;
-  passkeyNotAvailable?: string;
   switchAccount?: string;
+  /** Translated copy per error code / client failure; `loginFailed` covers unknown codes. */
+  errors?: AuthErrorLabels;
 }
 
-function getPasskeyErrorMessage(err: unknown, fallback: string, notAvailable: string): string {
-  const errName = err instanceof Error ? err.name : '';
-  if (errName === 'NotAllowedError' || errName === 'AbortError') return notAvailable;
-  return err instanceof Error ? err.message : fallback;
-}
-
-const DEFAULT_LABELS: Required<ReAuthFormLabels> = {
+const DEFAULT_LABELS: Required<Omit<ReAuthFormLabels, 'errors'>> = {
   password: 'Password',
   enterPassword: 'Enter your password',
   signIn: 'Sign in',
@@ -34,7 +31,6 @@ const DEFAULT_LABELS: Required<ReAuthFormLabels> = {
   or: 'or',
   passwordRequired: 'Password is required',
   loginFailed: 'Login failed. Please try again.',
-  passkeyNotAvailable: 'No passkey found. Try signing in with your password.',
   switchAccount: 'Switch account',
 };
 
@@ -51,6 +47,7 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
   const [error, setError] = React.useState<string | null>(null);
 
   const l = { ...DEFAULT_LABELS, ...labels };
+  const errorLabels: AuthErrorLabels = { ...labels?.errors, generic: l.loginFailed };
 
   const schema = React.useMemo(
     () => z.object({ password: z.string().min(1, l.passwordRequired) }),
@@ -66,19 +63,34 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
         await login({ username, password: value.password });
         onSuccess?.();
       } catch (err) {
-        setError(err instanceof Error ? err.message : l.loginFailed);
+        presentAuthError(err, {
+          labels: errorLabels,
+          onInline: setError,
+          onRetry: () => void form.handleSubmit(),
+        });
       }
     },
   });
 
   const handlePasskeyLogin = async () => {
-    setIsPasskeyLoading(true);
     setError(null);
+    if (!isPasskeySupported()) {
+      presentAuthError(new DOMException('WebAuthn unavailable', 'NotSupportedError'), {
+        labels: errorLabels,
+        onInline: setError,
+      });
+      return;
+    }
+    setIsPasskeyLoading(true);
     try {
       await loginWithPasskey();
       onSuccess?.();
     } catch (err) {
-      setError(getPasskeyErrorMessage(err, l.loginFailed, l.passkeyNotAvailable));
+      presentAuthError(err, {
+        labels: errorLabels,
+        onInline: setError,
+        onRetry: () => void handlePasskeyLogin(),
+      });
     } finally {
       setIsPasskeyLoading(false);
     }
@@ -105,7 +117,10 @@ export function ReAuthForm({ username, onSuccess, onSwitchAccount, labels }: ReA
       </div>
 
       {error && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
           {error}
         </div>
       )}

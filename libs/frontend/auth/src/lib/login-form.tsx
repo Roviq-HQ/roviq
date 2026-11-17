@@ -7,6 +7,8 @@ import { Fingerprint, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
+import { presentAuthError } from './auth-error-feedback';
+import { type AuthErrorLabels, isPasskeySupported } from './error-utils';
 
 const { authLogin } = testIds;
 
@@ -29,7 +31,8 @@ export interface LoginFormProps {
     usernameRequired?: string;
     passwordRequired?: string;
     loginFailed?: string;
-    passkeyNotAvailable?: string;
+    /** Translated copy per error code / client failure; `loginFailed` covers unknown codes. */
+    errors?: AuthErrorLabels;
   };
 }
 
@@ -50,9 +53,8 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
     usernameRequired: labels?.usernameRequired ?? 'Username is required',
     passwordRequired: labels?.passwordRequired ?? 'Password is required',
     loginFailed: labels?.loginFailed ?? 'Login failed. Please try again.',
-    passkeyNotAvailable:
-      labels?.passkeyNotAvailable ?? 'No passkey found. Try signing in with your password.',
   };
+  const errorLabels: AuthErrorLabels = { ...labels?.errors, generic: l.loginFailed };
 
   const loginSchema = React.useMemo(
     () =>
@@ -72,29 +74,36 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
         await login(value);
         onSuccess?.();
       } catch (err) {
-        const message = err instanceof Error ? err.message : l.loginFailed;
-        setError(message);
-        onError?.(err instanceof Error ? err : new Error(message));
+        presentAuthError(err, {
+          labels: errorLabels,
+          onInline: setError,
+          onRetry: () => void form.handleSubmit(),
+        });
+        onError?.(err instanceof Error ? err : new Error(l.loginFailed));
       }
     },
   });
 
   const handlePasskeyLogin = async () => {
-    setIsPasskeyLoading(true);
     setError(null);
+    if (!isPasskeySupported()) {
+      presentAuthError(new DOMException('WebAuthn unavailable', 'NotSupportedError'), {
+        labels: errorLabels,
+        onInline: setError,
+      });
+      return;
+    }
+    setIsPasskeyLoading(true);
     try {
       await loginWithPasskey();
       onSuccess?.();
     } catch (err) {
-      const errName = err instanceof Error ? err.name : '';
-      const message =
-        errName === 'NotAllowedError' || errName === 'AbortError'
-          ? l.passkeyNotAvailable
-          : err instanceof Error
-            ? err.message
-            : l.loginFailed;
-      setError(message);
-      onError?.(err instanceof Error ? err : new Error(message));
+      presentAuthError(err, {
+        labels: errorLabels,
+        onInline: setError,
+        onRetry: () => void handlePasskeyLogin(),
+      });
+      onError?.(err instanceof Error ? err : new Error(l.loginFailed));
     } finally {
       setIsPasskeyLoading(false);
     }
@@ -104,6 +113,7 @@ export function LoginForm({ onSuccess, onError, labels }: LoginFormProps) {
     <div className="space-y-5">
       {error && (
         <div
+          role="alert"
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           data-testid={authLogin.error}
         >

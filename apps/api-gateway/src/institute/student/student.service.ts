@@ -7,14 +7,7 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
  * TODO: Replace user creation with NATS calls when Identity Service is ready.
  */
 
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AcademicStatus,
   AdmissionType,
@@ -147,7 +140,10 @@ export class StudentService {
     );
 
     if (studentRole.length === 0) {
-      throw new NotFoundException('Student role not found for this institute');
+      throw new BusinessException(
+        ErrorCode.ROLE_NOT_FOUND,
+        'Student role not found for this institute',
+      );
     }
 
     const newMemberships = await withTenant(
@@ -309,16 +305,16 @@ export class StudentService {
 
     const allowedTypes = new Set<string>(USER_DOCUMENT_TYPE_VALUES);
     if (!allowedTypes.has(input.type)) {
-      throw new UnprocessableEntityException({
-        message: `Invalid document type '${input.type}'`,
-        code: 'INVALID_DOCUMENT_TYPE',
-      });
+      throw new BusinessException(
+        ErrorCode.INVALID_DOCUMENT_TYPE,
+        `Invalid document type '${input.type}'`,
+      );
     }
     if (input.fileUrls.length === 0) {
-      throw new UnprocessableEntityException({
-        message: 'At least one file URL is required',
-        code: 'FILE_URLS_REQUIRED',
-      });
+      throw new BusinessException(
+        ErrorCode.FILE_URLS_REQUIRED,
+        'At least one file URL is required',
+      );
     }
 
     // 1. Verify the student belongs to this tenant and resolve their userId.
@@ -334,10 +330,7 @@ export class StudentService {
       },
     );
     if (studentRows.length === 0) {
-      throw new NotFoundException({
-        message: 'Student not found',
-        code: 'STUDENT_NOT_FOUND',
-      });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
     const userId = studentRows[0].userId;
 
@@ -507,7 +500,7 @@ export class StudentService {
     );
 
     if (current.length === 0) {
-      throw new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     STUDENT_ACADEMIC_STATE_MACHINE.assertTransition(current[0].academicStatus, newStatus);
@@ -539,7 +532,7 @@ export class StudentService {
     );
 
     if (updated.length === 0) {
-      throw new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.statusChanged, {
@@ -599,10 +592,10 @@ export class StudentService {
     );
 
     if (activeEnrollments.length > 0) {
-      throw new UnprocessableEntityException({
-        message: 'Cannot delete student with active enrollments in the current academic year',
-        code: 'HAS_ACTIVE_ENROLLMENTS',
-      });
+      throw new BusinessException(
+        ErrorCode.HAS_ACTIVE_ENROLLMENTS,
+        'Cannot delete student with active enrollments in the current academic year',
+      );
     }
 
     await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
@@ -640,10 +633,7 @@ export class StudentService {
         .from(studentProfiles) // allow-base-read: restore looks up a trashed row
         .where(and(eq(studentProfiles.id, id), isNotNull(studentProfiles.deletedAt)));
       if (!deleted) {
-        throw new NotFoundException({
-          message: 'Deleted student not found',
-          code: 'STUDENT_NOT_FOUND',
-        });
+        throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Deleted student not found');
       }
 
       // The admission number is unique among live students only, so it may
@@ -654,10 +644,10 @@ export class StudentService {
         .where(eq(studentProfilesLive.admissionNumber, deleted.admissionNumber))
         .limit(1);
       if (taken) {
-        throw new UnprocessableEntityException({
-          message: `Admission number ${deleted.admissionNumber} is now used by another student`,
-          code: 'ADMISSION_NUMBER_TAKEN',
-        });
+        throw new BusinessException(
+          ErrorCode.ADMISSION_NUMBER_TAKEN,
+          `Admission number ${deleted.admissionNumber} is now used by another student`,
+        );
       }
 
       await tx
@@ -694,7 +684,7 @@ export class StudentService {
     );
 
     if (current.length === 0) {
-      throw new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     STUDENT_ACADEMIC_STATE_MACHINE.assertTransition(
@@ -752,12 +742,12 @@ export class StudentService {
     );
 
     if (exists.length === 0) {
-      throw new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
-    throw new ConflictException({
-      message: 'Concurrent modification detected — please reload and try again',
-      code: 'CONCURRENT_MODIFICATION',
-    });
+    throw new BusinessException(
+      ErrorCode.CONCURRENT_MODIFICATION,
+      'Concurrent modification detected — please reload and try again',
+    );
   }
 
   private async applyUserProfileUpdates(

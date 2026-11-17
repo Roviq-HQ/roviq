@@ -422,7 +422,7 @@ describe('Admission E2E', () => {
       );
 
       const res = await gql(APPROVE, { id: appId }, accessToken);
-      expect(res.errors?.[0]?.extensions?.code).toBe('BAD_REQUEST');
+      expect(res.errors?.[0]?.extensions?.code).toBe('SECTION_REQUIRED');
     });
 
     it('updateApplication refuses ENROLLED so enrolment cannot bypass the workflow', async () => {

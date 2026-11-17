@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { hash } from '@node-rs/argon2';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -116,7 +117,8 @@ export class BotService {
 
   async rotateBotApiKey(botProfileId: string): Promise<CreateBotResponse> {
     const existing = await this.repo.findById(botProfileId);
-    if (!existing) throw new NotFoundException(`Bot profile ${botProfileId} not found`);
+    if (!existing)
+      throw new BusinessException(ErrorCode.BOT_NOT_FOUND, `Bot profile ${botProfileId} not found`);
 
     // Generate new key
     const keyRandom = randomBytes(16).toString('hex');
@@ -164,7 +166,8 @@ export class BotService {
   async deleteBot(id: string, tenantId: string): Promise<boolean> {
     // Look up the bot profile's membership before soft-deleting
     const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundException(`Bot profile ${id} not found`);
+    if (!existing)
+      throw new BusinessException(ErrorCode.BOT_NOT_FOUND, `Bot profile ${id} not found`);
 
     const membershipId = existing.membershipId;
 

@@ -8,8 +8,7 @@
  * that speaks fluent Drizzle without hitting a real database.
  */
 
-import { NotFoundException } from '@nestjs/common';
-import { QualificationType } from '@roviq/common-types';
+import { ErrorCode, QualificationType } from '@roviq/common-types';
 import { staffQualifications } from '@roviq/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -226,13 +225,16 @@ describe('StaffQualificationService (unit)', () => {
     expect(result).toEqual(updated);
   });
 
-  it('update throws NotFoundException when no row matches', async () => {
+  it('update rejects when no row matches', async () => {
     queueResult([]);
 
-    await expect(service.update('missing', { degreeName: 'X' })).rejects.toThrow(NotFoundException);
+    await expect(service.update('missing', { degreeName: 'X' })).rejects.toMatchObject({
+      code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+    });
   });
 
   it('delete soft-deletes the row and returns true', async () => {
+    queueResult([{ id: 'q5' }]);
     softDeleteMock.mockResolvedValueOnce(undefined);
 
     const result = await service.delete('q5');
@@ -241,9 +243,12 @@ describe('StaffQualificationService (unit)', () => {
     expect(softDeleteMock).toHaveBeenCalledWith(expect.anything(), staffQualifications, 'q5');
   });
 
-  it('delete throws NotFoundException when no row matches', async () => {
-    softDeleteMock.mockRejectedValueOnce(new NotFoundException('Record not found'));
+  it('delete rejects when no row matches', async () => {
+    queueResult([]);
 
-    await expect(service.delete('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.delete('missing')).rejects.toMatchObject({
+      code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+    });
+    expect(softDeleteMock).not.toHaveBeenCalled();
   });
 });

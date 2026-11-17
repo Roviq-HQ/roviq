@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
+  BusinessException,
   calendarDaysBetween,
+  ErrorCode,
   isValidDateRange,
   LEAVE_STATE_MACHINE,
   LeaveStatus,
@@ -31,7 +33,7 @@ export class LeaveService {
 
   async findById(id: string): Promise<LeaveRecord> {
     const record = await this.repo.findById(id);
-    if (!record) throw new NotFoundException(`Leave ${id} not found`);
+    if (!record) throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
     return record;
   }
 
@@ -52,7 +54,8 @@ export class LeaveService {
       calendarDaysBetween(input.startDate, input.endDate) >= MIN_DOCUMENTED_DAYS &&
       files.length === 0
     ) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.LEAVE_DOCUMENT_REQUIRED,
         'Leaves spanning 3 or more calendar days require at least one supporting document.',
       );
     }
@@ -83,7 +86,10 @@ export class LeaveService {
     if (existing.status !== LeaveStatus.PENDING) {
       // Deliberately strict: approvals are audited decisions. To amend an
       // already-decided leave the applicant must cancel and re-apply.
-      throw new BadRequestException('Only PENDING leaves can be edited.');
+      throw new BusinessException(
+        ErrorCode.LEAVE_NOT_EDITABLE,
+        'Only PENDING leaves can be edited.',
+      );
     }
     const start = input.startDate ?? existing.startDate;
     const end = input.endDate ?? existing.endDate;
@@ -167,7 +173,10 @@ export class LeaveService {
 
   private assertValidRange(start: string, end: string) {
     if (!isValidDateRange(start, end)) {
-      throw new BadRequestException('Leave end date must not be before the start date.');
+      throw new BusinessException(
+        ErrorCode.INVALID_DATE_RANGE,
+        'Leave end date must not be before the start date.',
+      );
     }
   }
 }

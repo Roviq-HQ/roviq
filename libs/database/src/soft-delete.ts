@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { getRequestContext } from '@roviq/request-context';
 import { eq, isNull, type SQL, sql } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -53,7 +53,7 @@ export async function softDelete(tx: DrizzleDB, table: PgTable, id: string): Pro
 
   const [existing] = await tx.select({ id: t.id }).from(table).where(eq(t.id, id));
   if (!existing) {
-    throw new NotFoundException('Record not found');
+    throw new BusinessException(ErrorCode.NOT_FOUND, 'Record not found');
   }
 
   await tx
@@ -76,7 +76,7 @@ export async function restoreDeleted(tx: DrizzleDB, table: PgTable, id: string):
 
   const [existing] = await tx.select({ id: t.id }).from(table).where(eq(t.id, id));
   if (!existing) {
-    throw new NotFoundException('Record not found');
+    throw new BusinessException(ErrorCode.NOT_FOUND, 'Record not found');
   }
 
   await tx

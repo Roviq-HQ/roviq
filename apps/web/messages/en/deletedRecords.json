@@ -50,6 +50,6 @@
   "errors": {
     "HAS_ACTIVE_ENROLLMENTS": "This student is enrolled in the current academic year. Mark them as left or transferred first.",
     "ADMISSION_NUMBER_TAKEN": "The admission number is now used by another student. Change that student's admission number, then restore.",
-    "GUARDIAN_IS_ONLY_GUARDIAN": "This is the only guardian of a student. Link another guardian to that student first."
+    "LAST_GUARDIAN_CANNOT_BE_DELETED": "This is the only guardian of a student. Link another guardian to that student first."
   }
 }

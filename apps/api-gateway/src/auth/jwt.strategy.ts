@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import type { AuthScope, AuthUser } from '@roviq/common-types';
+import { type AuthScope, type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 interface JwtPayload {
@@ -46,10 +46,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       case 'platform':
         return { ...base, _scope: 'platform', scope: 'platform' };
       case 'reseller':
-        if (!payload.resellerId) throw new UnauthorizedException('Reseller JWT missing resellerId');
+        if (!payload.resellerId) {
+          throw new BusinessException(ErrorCode.UNAUTHENTICATED, 'Reseller JWT missing resellerId');
+        }
         return { ...base, _scope: 'reseller', scope: 'reseller', resellerId: payload.resellerId };
       case 'institute':
-        if (!payload.tenantId) throw new UnauthorizedException('Institute JWT missing tenantId');
+        if (!payload.tenantId) {
+          throw new BusinessException(ErrorCode.UNAUTHENTICATED, 'Institute JWT missing tenantId');
+        }
         return {
           ...base,
           _scope: 'institute',

@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   Button,
@@ -43,7 +43,7 @@ const SUBJECT = { student: 'Student', staff: 'Staff', guardian: 'Guardian' } as 
 const KNOWN_ERROR_CODES = [
   'HAS_ACTIVE_ENROLLMENTS',
   'ADMISSION_NUMBER_TAKEN',
-  'GUARDIAN_IS_ONLY_GUARDIAN',
+  'LAST_GUARDIAN_CANNOT_BE_DELETED',
 ] as const;
 type KnownErrorCode = (typeof KNOWN_ERROR_CODES)[number];
 
@@ -53,12 +53,13 @@ function isKnownErrorCode(code: string | null): code is KnownErrorCode {
 
 function useErrorDescription() {
   const t = useTranslations('deletedRecords');
+  const tError = useTranslations('error');
   return React.useCallback(
     (error: unknown): string => {
       const code = extractGraphQLErrorCode(error);
-      return isKnownErrorCode(code) ? t(`errors.${code}`) : extractGraphQLError(error, '');
+      return isKnownErrorCode(code) ? t(`errors.${code}`) : tError('errorDescription');
     },
-    [t],
+    [t, tError],
   );
 }
 

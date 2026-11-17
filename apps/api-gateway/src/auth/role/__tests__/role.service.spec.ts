@@ -82,7 +82,7 @@ describe('InstituteRoleService (unit)', () => {
       expect(repo.findById).toHaveBeenCalledWith(ROLE_ID);
     });
 
-    it('returns null when the repo returns null (no NotFoundException)', async () => {
+    it('returns null when the repo returns null (no error)', async () => {
       repo.findById.mockResolvedValue(null);
 
       const result = await service.findById(ROLE_ID);

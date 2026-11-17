@@ -5,14 +5,8 @@
  * Uses withTenant/withAdmin for RLS enforcement.
  */
 
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { DefaultRoles, EmploymentType } from '@roviq/common-types';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, DefaultRoles, EmploymentType, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -104,7 +98,8 @@ export class StaffService {
           .limit(1);
       },
     );
-    if (rows.length === 0) throw new NotFoundException(`Staff profile ${id} not found`);
+    if (rows.length === 0)
+      throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, `Staff profile ${id} not found`);
     return rows[0];
   }
 
@@ -148,7 +143,10 @@ export class StaffService {
     if (input.dateOfJoining) {
       const today = new Date().toISOString().split('T')[0];
       if (input.dateOfJoining > today) {
-        throw new BadRequestException('date_of_joining must not be in the future');
+        throw new BusinessException(
+          ErrorCode.VALIDATION_FAILED,
+          'date_of_joining must not be in the future',
+        );
       }
     }
 
@@ -221,7 +219,10 @@ export class StaffService {
     );
 
     if (staffRole.length === 0)
-      throw new NotFoundException('Teacher role not found for this institute');
+      throw new BusinessException(
+        ErrorCode.ROLE_NOT_FOUND,
+        'Teacher role not found for this institute',
+      );
 
     // Create membership
     const newMembership = await withTenant(
@@ -320,7 +321,8 @@ export class StaffService {
           .from(staffProfilesLive)
           .where(eq(staffProfilesLive.id, id))
           .limit(1);
-        if (existing.length === 0) throw new NotFoundException(`Staff profile ${id} not found`);
+        if (existing.length === 0)
+          throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, `Staff profile ${id} not found`);
 
         const rows = await tx
           .update(staffProfiles)
@@ -344,7 +346,8 @@ export class StaffService {
           .returning();
 
         if (rows.length === 0) {
-          throw new ConflictException(
+          throw new BusinessException(
+            ErrorCode.CONCURRENT_MODIFICATION,
             'Staff profile was modified by another request (version mismatch)',
           );
         }
@@ -376,7 +379,8 @@ export class StaffService {
           .where(and(eq(staffProfiles.id, id), isNull(staffProfiles.deletedAt)))
           .returning();
 
-        if (rows.length === 0) throw new NotFoundException(`Staff profile ${id} not found`);
+        if (rows.length === 0)
+          throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, `Staff profile ${id} not found`);
         return rows[0];
       },
     );
@@ -420,10 +424,7 @@ export class StaffService {
         .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
         .returning({ id: staffProfiles.id });
       if (rows.length === 0) {
-        throw new NotFoundException({
-          message: 'Deleted staff member not found',
-          code: 'STAFF_NOT_FOUND',
-        });
+        throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, 'Deleted staff member not found');
       }
     });
 

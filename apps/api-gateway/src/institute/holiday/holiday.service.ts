@@ -1,5 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { type HolidayType, isValidDateRange } from '@roviq/common-types';
+import { Injectable } from '@nestjs/common';
+import {
+  BusinessException,
+  ErrorCode,
+  type HolidayType,
+  isValidDateRange,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
@@ -23,7 +28,8 @@ export class HolidayService {
 
   async findById(id: string): Promise<HolidayRecord> {
     const record = await this.repo.findById(id);
-    if (!record) throw new NotFoundException(`Holiday ${id} not found`);
+    if (!record)
+      throw new BusinessException(ErrorCode.HOLIDAY_NOT_FOUND, `Holiday ${id} not found`);
     return record;
   }
 
@@ -103,7 +109,10 @@ export class HolidayService {
   // holiday + future calendar code agree on the YYYY-MM-DD UTC-midnight rule.
   private assertValidRange(start: string, end: string) {
     if (!isValidDateRange(start, end)) {
-      throw new BadRequestException('Holiday end date must not be before the start date.');
+      throw new BusinessException(
+        ErrorCode.INVALID_DATE_RANGE,
+        'Holiday end date must not be before the start date.',
+      );
     }
   }
 }

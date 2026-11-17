@@ -1,25 +1,3 @@
-/**
- * AdminInstituteService unit tests.
- *
- * Covers the new admin-scope mutations introduced in ROV-174/175:
- *   - reassignReseller: target-reseller validation, ownership update, event emission
- *   - assignGroup: group existence check, ownership update, event emission
- *   - removeGroup: ownership nullification, event emission
- *   - retrySetup: COMPLETED guard, workflow fire-and-forget, event emission
- *   - approve: status guard, repo call, event emission
- *   - reject: status guard, repo call, event emission
- *   - getAcademicTree: year selection, tree mapping (no academic year → empty tree)
- *
- * `withAdmin` is mocked via `globalThis.__rovInstTx` — the same pattern used by
- * admin-reseller.service.spec.ts — keeping mock complexity at a minimum while
- * covering every branching path. `InstituteService` and `InstituteRepository`
- * are replaced with `createMock` doubles.
- *
- * Temporal workflow triggering is fire-and-forget (`void async () => {}`).
- * `Connection.connect` from `@temporalio/client` is mocked to throw immediately —
- * the service catches it internally so the mutation still resolves correctly.
- */
-import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ErrorCode, ResellerStatus } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
@@ -302,11 +280,13 @@ describe('AdminInstituteService', () => {
   // ── assignGroup ─────────────────────────────────────────────────────────────
 
   describe('assignGroup', () => {
-    it('throws NotFoundException when group does not exist', async () => {
+    it('rejects when group does not exist', async () => {
       const { tx } = createTxMock({ tableRows: { institute_groups: [] } });
       setTx(tx);
 
-      await expect(service.assignGroup(INSTITUTE_ID, GROUP_ID)).rejects.toThrow(NotFoundException);
+      await expect(service.assignGroup(INSTITUTE_ID, GROUP_ID)).rejects.toMatchObject({
+        code: ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+      });
       expect(instituteRepo.updateOwnership).not.toHaveBeenCalled();
     });
 

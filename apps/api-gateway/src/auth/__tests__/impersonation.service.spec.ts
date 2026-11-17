@@ -18,12 +18,14 @@
  *
  * `node:crypto` is mocked so `randomInt`/`randomUUID` are deterministic.
  */
+
 import { randomInt, randomUUID } from 'node:crypto';
-import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
 import type { AppAbility } from '@roviq/common-types';
+import { ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { createMock } from '@roviq/testing';
@@ -222,25 +224,25 @@ beforeEach(() => {
 
 describe('ImpersonationService', () => {
   describe('startImpersonation — basic guards', () => {
-    it('rejects reason shorter than 10 chars with BadRequestException', async () => {
+    it('rejects reason shorter than 10 chars', async () => {
       const { service } = createSubject();
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', 'short'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_FAILED });
     });
 
-    it('rejects an unknown impersonator scope with ForbiddenException', async () => {
+    it('rejects an unknown impersonator scope', async () => {
       const { service } = createSubject();
       await expect(
         service.startImpersonation('imp-1', 'martian', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
     });
 
-    it('rejects self-impersonation with BadRequestException', async () => {
+    it('rejects self-impersonation', async () => {
       const { service } = createSubject();
       await expect(
         service.startImpersonation('same', 'platform', 'same', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
     it('rejects when target user is not found', async () => {
@@ -249,7 +251,7 @@ describe('ImpersonationService', () => {
       setTx(tx);
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
     it('rejects when target user is not ACTIVE', async () => {
@@ -260,7 +262,7 @@ describe('ImpersonationService', () => {
       setTx(tx);
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
     it('rejects when target has no active membership in the target tenant', async () => {
@@ -274,7 +276,7 @@ describe('ImpersonationService', () => {
       setTx(tx);
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
     it('rejects when target institute is not found', async () => {
@@ -292,7 +294,7 @@ describe('ImpersonationService', () => {
       setTx(tx);
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.INSTITUTE_NOT_FOUND });
     });
   });
 
@@ -372,7 +374,7 @@ describe('ImpersonationService', () => {
 
       await expect(
         service.startImpersonation('imp-1', 'reseller', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(redis.set).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
@@ -514,7 +516,7 @@ describe('ImpersonationService', () => {
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
-    it('OTP path: when no institute_admin is found, throws BadRequestException without writing the Redis OTP key', async () => {
+    it('OTP path: when no institute_admin is found, rejects without writing the Redis OTP key', async () => {
       const { service, redis, eventBus } = createSubject();
       const otpSetCallsBefore = vi.mocked(redis.set).mock.calls.length;
       const { tx } = createTx({
@@ -537,7 +539,7 @@ describe('ImpersonationService', () => {
 
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE });
 
       // After Track A's fix the admin lookup happens BEFORE the Redis write,
       // so the OTP key is never persisted on the no-admin path.
@@ -549,7 +551,7 @@ describe('ImpersonationService', () => {
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
-    it('OTP path: institute_admin without a primary phone throws BadRequestException without writing the Redis OTP key', async () => {
+    it('OTP path: institute_admin without a primary phone rejects without writing the Redis OTP key', async () => {
       const { service, redis, eventBus } = createSubject();
       const { tx } = createTx({
         selects: [
@@ -573,7 +575,7 @@ describe('ImpersonationService', () => {
 
       await expect(
         service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE });
 
       const otpSetCalls = vi
         .mocked(redis.set)
@@ -596,7 +598,7 @@ describe('ImpersonationService', () => {
       endedAt: null,
     };
 
-    it('throws UnauthorizedException when the impersonation session no longer exists', async () => {
+    it('rejects when the impersonation session no longer exists', async () => {
       const { service } = createSubject();
       const { tx } = createTx({ selects: [{ table: 'impersonation_sessions', rows: [] }] });
       setTx(tx);
@@ -606,7 +608,7 @@ describe('ImpersonationService', () => {
       );
     });
 
-    it('throws UnauthorizedException when caller userId does not match session.impersonatorId', async () => {
+    it('rejects when caller userId does not match session.impersonatorId', async () => {
       const { service } = createSubject();
       const { tx } = createTx({
         selects: [{ table: 'impersonation_sessions', rows: [liveSession] }],
@@ -618,7 +620,7 @@ describe('ImpersonationService', () => {
       );
     });
 
-    it('throws UnauthorizedException when the impersonation session has already ended', async () => {
+    it('rejects when the impersonation session has already ended', async () => {
       const { service } = createSubject();
       const { tx } = createTx({
         selects: [
@@ -635,7 +637,7 @@ describe('ImpersonationService', () => {
       );
     });
 
-    it('throws UnauthorizedException when OTP key is missing from Redis', async () => {
+    it('rejects when OTP key is missing from Redis', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.get).mockResolvedValue(null);
       const { tx } = createTx({
@@ -657,9 +659,9 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      await expect(service.verifyOtp('session-1', '999999', 'imp-1')).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.verifyOtp('session-1', '999999', 'imp-1')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_INVALID,
+      });
 
       expect(redis.set).toHaveBeenCalledWith(
         `${REDIS_KEYS.IMPERSONATION_OTP}session-1`,
@@ -680,7 +682,7 @@ describe('ImpersonationService', () => {
       setTx(tx);
 
       const err = await service.verifyOtp('session-1', '999999', 'imp-1').catch((e: unknown) => e);
-      expect(err).toBeInstanceOf(UnauthorizedException);
+      expect(err).toMatchObject({ code: ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED });
       expect((err as UnauthorizedException).message).toContain('maximum attempts exceeded');
       expect(redis.del).toHaveBeenCalledWith(`${REDIS_KEYS.IMPERSONATION_OTP}session-1`);
       // The mismatch branch must not also persist a fresh attempt counter
@@ -711,15 +713,15 @@ describe('ImpersonationService', () => {
   });
 
   describe('exchangeCode', () => {
-    it('throws UnauthorizedException when the code is not in Redis', async () => {
+    it('rejects when the code is not in Redis', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(null);
-      await expect(service.exchangeCode('missing-code')).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(service.exchangeCode('missing-code')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_CODE_EXPIRED,
+      });
     });
 
-    it('throws UnauthorizedException when the target user is no longer ACTIVE', async () => {
+    it('rejects when the target user is no longer ACTIVE', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(
         JSON.stringify({ sessionId: 'session-1', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
@@ -737,7 +739,7 @@ describe('ImpersonationService', () => {
       await expect(service.exchangeCode('code-1')).rejects.toThrow(/no longer active/);
     });
 
-    it('throws UnauthorizedException when the target lost their active membership', async () => {
+    it('rejects when the target lost their active membership', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(
         JSON.stringify({ sessionId: 'session-1', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
@@ -803,16 +805,16 @@ describe('ImpersonationService', () => {
   });
 
   describe('endImpersonation', () => {
-    it('throws BadRequestException when the session is not found', async () => {
+    it('rejects when the session is not found', async () => {
       const { service } = createSubject();
       const { tx } = createTx({ selects: [{ table: 'impersonation_sessions', rows: [] }] });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', 'imp-1')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.endImpersonation('session-1', 'imp-1')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_SESSION_INVALID,
+      });
     });
 
-    it('throws BadRequestException when the session is already ended', async () => {
+    it('rejects when the session is already ended', async () => {
       const { service } = createSubject();
       const { tx } = createTx({
         selects: [
@@ -830,12 +832,12 @@ describe('ImpersonationService', () => {
         ],
       });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', 'imp-1')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.endImpersonation('session-1', 'imp-1')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_SESSION_INVALID,
+      });
     });
 
-    it('throws ForbiddenException when caller is neither impersonator nor target', async () => {
+    it('rejects when caller is neither impersonator nor target', async () => {
       const { service } = createSubject();
       const { tx } = createTx({
         selects: [
@@ -853,9 +855,9 @@ describe('ImpersonationService', () => {
         ],
       });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', 'someone-else')).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(service.endImpersonation('session-1', 'someone-else')).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
     });
 
     it('happy path: updates row, deletes session cache, emits impersonation_end', async () => {

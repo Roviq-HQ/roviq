@@ -74,10 +74,13 @@ export async function ensureIntegrationInfra(workspaceRoot: string): Promise<voi
   console.log(`Integration test infra is down: ${describe(down)}`);
   console.log('Starting it from docker/compose.infra.yaml...');
   const services = down.map((t) => t.service);
+  // Without -p, Compose uses the default project, which belongs to instance 0.
+  const project = process.env.ROVIQ_COMPOSE_PROJECT;
   const result = spawnSync(
     'docker',
     [
       'compose',
+      ...(project ? ['-p', project] : []),
       '-f',
       'docker/compose.infra.yaml',
       'up',

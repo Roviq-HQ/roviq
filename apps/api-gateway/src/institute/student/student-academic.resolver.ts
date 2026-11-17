@@ -1,4 +1,4 @@
-import { ForbiddenException, UseGuards } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import {
@@ -7,6 +7,7 @@ import {
   CurrentReadAccess,
   type InstituteReadAccess,
 } from '@roviq/casl';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EnrollStudentInput, UpdateStudentSectionInput } from './dto/enroll-student.input';
 import { StudentAcademicHistoryModel } from './models/student-academic-history.model';
 import { StudentAcademicService } from './student-academic.service';
@@ -31,7 +32,7 @@ export class StudentAcademicResolver {
   ): Promise<StudentAcademicHistoryModel[]> {
     await this.students.findById(studentProfileId, access);
     if (!access.ability.can('read', 'Student', 'currentSectionId'))
-      throw new ForbiddenException('Cannot read academic history');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Cannot read academic history');
     return this.academicService.listForStudent(studentProfileId);
   }
 

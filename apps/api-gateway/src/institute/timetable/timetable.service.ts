@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   BusinessException,
   ErrorCode,
@@ -141,7 +141,8 @@ export class TimetableService {
 
   async findById(id: string): Promise<TimetableRecord> {
     const record = await this.repo.findTimetableById(id);
-    if (!record) throw new NotFoundException(`Timetable ${id} not found`);
+    if (!record)
+      throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
     return record;
   }
 

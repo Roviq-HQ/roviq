@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { ErrorCode } from '@roviq/common-types';
 import type { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
@@ -204,6 +203,6 @@ describe('TimetableScheduleService.assignEntry', () => {
         days: ['MONDAY'],
         splits: [{ splitIndex: 0 }],
       }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toMatchObject({ code: ErrorCode.TIMETABLE_NOT_FOUND });
   });
 });

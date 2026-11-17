@@ -1,4 +1,5 @@
-import { ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -161,7 +162,10 @@ export class ResellerTeamService {
     );
 
     if (membershipCount > 0 && !roleRow) {
-      throw new ForbiddenException('Supplied roleId does not belong to this reseller');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Supplied roleId does not belong to this reseller',
+      );
     }
 
     const result = await this.identityService.createUserWithMembership({
@@ -203,7 +207,10 @@ export class ResellerTeamService {
     );
 
     if (!existing) {
-      throw new ConflictException('Team member not found in this reseller');
+      throw new BusinessException(
+        ErrorCode.TEAM_MEMBER_NOT_FOUND,
+        'Team member not found in this reseller',
+      );
     }
 
     await withReseller(this.db, mkResellerCtx(resellerId, 'service:reseller-team'), (tx) =>

@@ -1,3 +1,4 @@
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 /**
  * Student enrollment + section change service (ROV-154).
@@ -6,13 +7,7 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
  * section strength updates, and NATS event emission.
  */
 
-import {
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   academicYearsLive,
   DRIZZLE_DB,
@@ -180,7 +175,10 @@ export class StudentAcademicService {
     );
 
     if (current.length === 0) {
-      throw new NotFoundException('Student academic record not found');
+      throw new BusinessException(
+        ErrorCode.STUDENT_ACADEMIC_NOT_FOUND,
+        'Student academic record not found',
+      );
     }
 
     const oldSectionId = current[0].sectionId;
@@ -251,7 +249,7 @@ export class StudentAcademicService {
     );
 
     if (sectionRows.length === 0) {
-      throw new NotFoundException('Section not found');
+      throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
     }
 
     const configRows = await withTenant(
@@ -281,10 +279,10 @@ export class StudentAcademicService {
   ): void {
     if (currentStrength >= norms.hardMax) {
       if (!overrideReason) {
-        throw new UnprocessableEntityException({
-          message: `Section at hard maximum capacity (${currentStrength}/${norms.hardMax}). Provide override_reason to proceed.`,
-          code: 'SECTION_CAPACITY_EXCEEDED',
-        });
+        throw new BusinessException(
+          ErrorCode.SECTION_CAPACITY_EXCEEDED,
+          `Section at hard maximum capacity (${currentStrength}/${norms.hardMax}). Provide override_reason to proceed.`,
+        );
       }
       this.logger.warn(
         `Capacity override: ${currentStrength}/${norms.hardMax}. Reason: ${overrideReason}`,

@@ -6,7 +6,8 @@
  * The latest row per (guardian, student, purpose) determines current consent state.
  */
 
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   consentRecords,
   DRIZZLE_DB,
@@ -59,7 +60,7 @@ export class ConsentService {
     );
 
     if (rows.length === 0) {
-      throw new ForbiddenException('Only guardians can manage consent records');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Only guardians can manage consent records');
     }
 
     return rows[0].id;
@@ -90,7 +91,10 @@ export class ConsentService {
     );
 
     if (links.length === 0) {
-      throw new ForbiddenException('Guardian is not linked to the specified student');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Guardian is not linked to the specified student',
+      );
     }
   }
 

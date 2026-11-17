@@ -1,15 +1,9 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
-import { DefaultRoles } from '@roviq/common-types';
+import { BusinessException, DefaultRoles, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -126,17 +120,23 @@ export class ImpersonationService {
   ): Promise<StartImpersonationResult> {
     // Validate reason length
     if (!reason || reason.trim().length < MIN_REASON_LENGTH) {
-      throw new BadRequestException(`Reason must be at least ${MIN_REASON_LENGTH} characters`);
+      throw new BusinessException(
+        ErrorCode.VALIDATION_FAILED,
+        `Reason must be at least ${MIN_REASON_LENGTH} characters`,
+      );
     }
 
     // Validate impersonator scope
     if (!ALLOWED_IMPERSONATOR_SCOPES.has(impersonatorScope)) {
-      throw new ForbiddenException('Invalid impersonator scope');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Invalid impersonator scope');
     }
 
     // Cannot impersonate yourself
     if (impersonatorUserId === targetUserId) {
-      throw new BadRequestException('Cannot impersonate yourself');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_TARGET_INVALID,
+        'Cannot impersonate yourself',
+      );
     }
 
     // Verify target user exists and is active
@@ -149,7 +149,10 @@ export class ImpersonationService {
     );
 
     if (targetUser.length === 0 || targetUser[0].status !== 'ACTIVE') {
-      throw new BadRequestException('Target user not found or inactive');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_TARGET_INVALID,
+        'Target user not found or inactive',
+      );
     }
 
     // Verify target user has an active membership in the target tenant
@@ -172,7 +175,8 @@ export class ImpersonationService {
     );
 
     if (targetMembership.length === 0) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_TARGET_INVALID,
         'Target user has no active membership in the specified institute',
       );
     }
@@ -190,7 +194,7 @@ export class ImpersonationService {
     );
 
     if (targetInstitute.length === 0) {
-      throw new BadRequestException('Target institute not found');
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Target institute not found');
     }
 
     const requireConsent = targetInstitute[0].requireImpersonationConsent;
@@ -215,7 +219,7 @@ export class ImpersonationService {
       );
 
       if (!resellerMembership) {
-        throw new ForbiddenException('No active reseller membership');
+        throw new BusinessException(ErrorCode.FORBIDDEN, 'No active reseller membership');
       }
 
       // Check the institute belongs to this reseller
@@ -228,7 +232,10 @@ export class ImpersonationService {
       );
 
       if (!inst || inst.resellerId !== resellerMembership.resellerId) {
-        throw new ForbiddenException('Institute does not belong to your reseller');
+        throw new BusinessException(
+          ErrorCode.FORBIDDEN,
+          'Institute does not belong to your reseller',
+        );
       }
     }
 
@@ -313,23 +320,35 @@ export class ImpersonationService {
     );
 
     if (!session) {
-      throw new UnauthorizedException('Impersonation session not found');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session not found',
+      );
     }
     if (session.impersonatorId !== impersonatorUserId) {
-      throw new UnauthorizedException('OTP verification not authorized for this session');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_OTP_INVALID,
+        'OTP verification not authorized for this session',
+      );
     }
     if (session.endedAt) {
-      throw new UnauthorizedException('Impersonation session already ended');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session already ended',
+      );
     }
     if (!session.targetTenantId) {
       // OTP-gated impersonation is only meaningful for tenant-scoped sessions.
-      throw new UnauthorizedException('Impersonation session has no target tenant');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session has no target tenant',
+      );
     }
 
     const key = `${REDIS_KEYS.IMPERSONATION_OTP}${sessionId}`;
     const stored = await this.redis.get(key);
     if (!stored) {
-      throw new UnauthorizedException('OTP expired or not found');
+      throw new BusinessException(ErrorCode.IMPERSONATION_OTP_EXPIRED, 'OTP expired or not found');
     }
 
     const payload = JSON.parse(stored) as OtpPayload;
@@ -338,12 +357,15 @@ export class ImpersonationService {
       const attempts = payload.attempts + 1;
       if (attempts >= MAX_OTP_ATTEMPTS) {
         await this.redis.del(key);
-        throw new UnauthorizedException('OTP invalid — maximum attempts exceeded');
+        throw new BusinessException(
+          ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
+          'OTP invalid — maximum attempts exceeded',
+        );
       }
       const ttl = await this.redis.ttl(key);
       const nextPayload: OtpPayload = { otp: payload.otp, attempts };
       await this.redis.set(key, JSON.stringify(nextPayload), 'EX', ttl > 0 ? ttl : OTP_TTL_SECONDS);
-      throw new UnauthorizedException('OTP invalid');
+      throw new BusinessException(ErrorCode.IMPERSONATION_OTP_INVALID, 'OTP invalid');
     }
 
     // Consume OTP
@@ -364,7 +386,10 @@ export class ImpersonationService {
     // Atomic read-and-delete (GETDEL, Redis 6.2+) — prevents TOCTOU race on concurrent exchanges
     const stored = await this.redis.getdel(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
     if (!stored) {
-      throw new UnauthorizedException('Impersonation code expired or already used');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_CODE_EXPIRED,
+        'Impersonation code expired or already used',
+      );
     }
 
     const { sessionId, targetUserId, tenantId } = JSON.parse(stored) as CodePayload;
@@ -415,17 +440,26 @@ export class ImpersonationService {
     );
 
     const targetUser = targetUsers[0];
-    if (!targetUser) throw new UnauthorizedException('Target user no longer active');
+    if (!targetUser)
+      throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'Target user no longer active');
 
     const membership = membershipRows[0];
     if (!membership)
-      throw new UnauthorizedException('Target user no longer has an active membership');
+      throw new BusinessException(
+        ErrorCode.NO_ACTIVE_MEMBERSHIP,
+        'Target user no longer has an active membership',
+      );
 
     const session = sessions[0];
-    if (!session) throw new UnauthorizedException('Impersonation session not found');
+    if (!session)
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session not found',
+      );
 
     const institute = instituteRows[0];
-    if (!institute) throw new UnauthorizedException('Institute not found');
+    if (!institute)
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
 
     // Generate impersonation access token (non-renewable, no refresh token)
     const accessToken = this.generateImpersonationToken({
@@ -483,16 +517,25 @@ export class ImpersonationService {
     );
 
     if (!session) {
-      throw new BadRequestException('Impersonation session not found');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session not found',
+      );
     }
 
     if (session.endedAt) {
-      throw new BadRequestException('Impersonation session already ended');
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session already ended',
+      );
     }
 
     // Only the impersonator or the target can end the session
     if (session.impersonatorId !== userId && session.targetUserId !== userId) {
-      throw new ForbiddenException('Not authorized to end this impersonation session');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Not authorized to end this impersonation session',
+      );
     }
 
     await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
@@ -716,7 +759,7 @@ export class ImpersonationService {
     );
 
     if (!impersonatorMembership) {
-      throw new ForbiddenException('No active membership in this institute');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this institute');
     }
 
     // Check CASL 'impersonate' ability on 'User'. AbilityFactory resolves the
@@ -733,7 +776,10 @@ export class ImpersonationService {
     });
 
     if (!ability.can('impersonate', 'User')) {
-      throw new ForbiddenException('You do not have permission to impersonate users');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'You do not have permission to impersonate users',
+      );
     }
   }
 
@@ -785,7 +831,8 @@ export class ImpersonationService {
 
     if (!adminRow) {
       // No institute_admin to consent — surface a clear error so the caller can retry/escalate.
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE,
         'Cannot request impersonation consent — institute has no active institute_admin',
       );
     }
@@ -806,7 +853,8 @@ export class ImpersonationService {
     );
 
     if (!phoneRow) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE,
         'Cannot request impersonation consent — institute admin has no contact phone on file',
       );
     }

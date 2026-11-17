@@ -21,6 +21,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { LanguagePreference } from '@web/components/account/language-preference';
+import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { parseISO } from 'date-fns';
 import { Check, Copy, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -54,6 +55,7 @@ function maskEmail(email: string): string {
 export default function AccountPage() {
   const t = useTranslations('account');
   const tAuth = useTranslations('auth');
+  const errorLabels = useAuthErrorLabels();
   const tCommon = useTranslations('common');
   const { format } = useFormatDate();
   const { user } = useAuth();
@@ -109,8 +111,12 @@ export default function AccountPage() {
       removePasskeyConfirm: tAuth('removePasskeyConfirm'),
       nameTooLong: tAuth('nameTooLong'),
       passkeyPasswordRequired: tAuth('passkeyPasswordRequired'),
+      loadFailed: tAuth('passkeysLoadFailed'),
+      removeFailed: tAuth('passkeyRemoveFailed'),
+      addFailed: tAuth('passkeyAddFailed'),
+      errors: errorLabels,
     }),
-    [tAuth],
+    [tAuth, errorLabels],
   );
 
   const passwordChangeLabels = React.useMemo<PasswordChangeFormLabels>(
@@ -140,8 +146,9 @@ export default function AccountPage() {
       requiredError: tAuth('passwordChange.requiredError'),
       successMessage: tAuth('passwordChange.successMessage'),
       genericError: tAuth('passwordChange.genericError'),
+      errors: errorLabels,
     }),
-    [tAuth],
+    [tAuth, errorLabels],
   );
 
   return (

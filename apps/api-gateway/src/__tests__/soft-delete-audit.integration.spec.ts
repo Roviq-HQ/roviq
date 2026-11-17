@@ -408,13 +408,13 @@ describe('Soft delete + audit columns (integration)', () => {
         query: REFRESH,
         variables: { token: refreshToken },
       });
-      expect(refreshed.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
+      expect(refreshed.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
 
       const relogin = await gqlRequest(result.httpServer, {
         query: LOGIN,
         variables: { username: institute.username, password: PASSWORD },
       });
-      expect(relogin.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
+      expect(relogin.errors?.[0]?.extensions?.code).toBe('INVALID_CREDENTIALS');
     });
   });
 });
