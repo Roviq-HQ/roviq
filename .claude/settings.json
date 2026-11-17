@@ -65,20 +65,24 @@
       "mcp__plugin_playwright_playwright__browser_type",
       "mcp__plugin_playwright_playwright__browser_wait_for"
     ],
-    "deny": [
+    "ask": [
       "Bash(git stash*)",
       "Bash(git checkout *)",
       "Bash(git checkout -- *)",
+      "Bash(git branch -D *)",
+      "Bash(git restore .)",
+      "Bash(git restore *)",
+      "Bash(rm *)",
+      "Bash(docker stop $(*))",
+      "Bash(docker kill $(*))"
+    ],
+    "deny": [
       "Bash(git reset --hard*)",
       "Bash(git clean -f*)",
       "Bash(git push --force*)",
       "Bash(git push -f *)",
       "Bash(git stash drop*)",
       "Bash(git stash clear*)",
-      "Bash(git branch -D *)",
-      "Bash(git restore .)",
-      "Bash(git restore *)",
-      "Bash(rm *)",
       "Bash(rm -rf *)",
       "Bash(rmdir *)",
       "Bash(docker system prune*)",
@@ -89,8 +93,6 @@
       "Bash(docker container prune*)",
       "Bash(docker network prune*)",
       "Bash(docker rmi*)",
-      "Bash(docker stop $(*))",
-      "Bash(docker kill $(*))",
       "Bash(systemctl *)",
       "Bash(service *)",
       "Bash(shutdown *)",

@@ -30,7 +30,7 @@ export class ApplicationResolver {
   ) {}
 
   @Query(() => ApplicationConnection, { description: 'List applications with filters' })
-  @CheckAbility('read', 'Application')
+  @CheckAbility({ action: 'read', subject: 'Application' })
   async listApplications(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: ApplicationFilterInput,
@@ -39,7 +39,7 @@ export class ApplicationResolver {
   }
 
   @Query(() => ApplicationModel, { description: 'Get application by ID' })
-  @CheckAbility('read', 'Application')
+  @CheckAbility({ action: 'read', subject: 'Application' })
   async getApplication(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -48,7 +48,7 @@ export class ApplicationResolver {
   }
 
   @Query(() => AdmissionStatisticsModel, { description: 'Admission funnel statistics' })
-  @CheckAbility('read', 'Application')
+  @CheckAbility({ action: 'read', subject: 'Application' })
   async admissionStatistics(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: AdmissionStatisticsFilterInput,
@@ -57,7 +57,7 @@ export class ApplicationResolver {
   }
 
   @Mutation(() => ApplicationModel, { description: 'Create a direct admission application' })
-  @CheckAbility('create', 'Application')
+  @CheckAbility({ action: 'create', subject: 'Application' })
   async createApplication(@Args('input') input: CreateApplicationInput): Promise<ApplicationModel> {
     return this.admissionService.createApplication(input);
   }
@@ -65,7 +65,7 @@ export class ApplicationResolver {
   @Mutation(() => ApplicationModel, {
     description: 'Update application status (state machine validated)',
   })
-  @CheckAbility('update', 'Application')
+  @CheckAbility({ action: 'update', subject: 'Application' })
   async updateApplication(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateApplicationInput,
@@ -76,7 +76,7 @@ export class ApplicationResolver {
   @Mutation(() => ApplicationModel, {
     description: 'Start the enrolment workflow; status stays FEE_PAID until done',
   })
-  @CheckAbility('update', 'Application')
+  @CheckAbility({ action: 'update', subject: 'Application' })
   async approveApplication(
     @Args('id', { type: () => ID }) id: string,
     @Args(
@@ -94,7 +94,7 @@ export class ApplicationResolver {
   }
 
   @Mutation(() => ApplicationModel, { description: 'Reject an application' })
-  @CheckAbility('update', 'Application')
+  @CheckAbility({ action: 'update', subject: 'Application' })
   async rejectApplication(
     @Args('id', { type: () => ID }) id: string,
     @Args('reason', { nullable: true }) reason?: string,
@@ -121,7 +121,7 @@ export class ApplicationResolver {
       );
     },
   })
-  @CheckAbility('read', 'Application')
+  @CheckAbility({ action: 'read', subject: 'Application' })
   applicationStatusChanged() {
     return pubSub.asyncIterableIterator('APPLICATION.status_changed');
   }

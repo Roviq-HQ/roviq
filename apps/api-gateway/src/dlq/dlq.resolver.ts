@@ -17,7 +17,7 @@ export class DlqResolver {
   @Query(() => DlqMessageConnection, {
     description: 'Platform admin: list dead-lettered NATS messages (ROV-19)',
   })
-  @CheckAbility('read', 'DlqMessage')
+  @CheckAbility({ action: 'read', subject: 'DlqMessage' })
   async adminListDlqMessages(@Args('filter', { nullable: true }) filter?: DlqMessageFilterInput) {
     return this.dlq.list(filter ?? {});
   }
@@ -25,7 +25,7 @@ export class DlqResolver {
   @Mutation(() => DlqMessageModel, {
     description: 'Re-publish a dead-lettered message to its original subject',
   })
-  @CheckAbility('replay', 'DlqMessage')
+  @CheckAbility({ action: 'replay', subject: 'DlqMessage' })
   async replayDlqMessage(
     @Args('id', { type: () => ID }) id: string,
     @CurrentUser() user: AuthUser,
@@ -36,7 +36,7 @@ export class DlqResolver {
   @Mutation(() => DlqMessageModel, {
     description: 'Discard a dead-lettered message without replaying it',
   })
-  @CheckAbility('replay', 'DlqMessage')
+  @CheckAbility({ action: 'replay', subject: 'DlqMessage' })
   async discardDlqMessage(@Args('id', { type: () => ID }) id: string) {
     return this.dlq.discard(id);
   }

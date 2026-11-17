@@ -19,7 +19,7 @@ export class GroupResolver {
   constructor(private readonly groupService: GroupService) {}
 
   @Query(() => [GroupModel], { description: 'List groups with optional filters' })
-  @CheckAbility('read', 'Group')
+  @CheckAbility({ action: 'read', subject: 'Group' })
   async listGroups(
     @Args('filter', { nullable: true }) filter?: GroupFilterInput,
   ): Promise<GroupModel[]> {
@@ -27,7 +27,7 @@ export class GroupResolver {
   }
 
   @Query(() => GroupModel, { description: 'Get a group by ID' })
-  @CheckAbility('read', 'Group')
+  @CheckAbility({ action: 'read', subject: 'Group' })
   async getGroup(@Args('id', { type: () => ID }) id: string): Promise<GroupModel> {
     return this.groupService.findById(id);
   }
@@ -35,7 +35,7 @@ export class GroupResolver {
   @Query(() => [GroupMemberModel], {
     description: 'List all members (including excluded) of a group',
   })
-  @CheckAbility('read', 'Group')
+  @CheckAbility({ action: 'read', subject: 'Group' })
   async listGroupMembers(
     @Args('groupId', { type: () => ID }) groupId: string,
   ): Promise<GroupMemberModel[]> {
@@ -45,13 +45,13 @@ export class GroupResolver {
   @Mutation(() => GroupModel, {
     description: 'Create a new group (static, dynamic, hybrid, or composite)',
   })
-  @CheckAbility('create', 'Group')
+  @CheckAbility({ action: 'create', subject: 'Group' })
   async createGroup(@Args('input') input: CreateGroupInput): Promise<GroupModel> {
     return this.groupService.create(input);
   }
 
   @Mutation(() => GroupModel, { description: 'Update a group' })
-  @CheckAbility('update', 'Group')
+  @CheckAbility({ action: 'update', subject: 'Group' })
   async updateGroup(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateGroupInput,
@@ -60,7 +60,7 @@ export class GroupResolver {
   }
 
   @Mutation(() => Boolean, { description: 'Soft delete a group' })
-  @CheckAbility('delete', 'Group')
+  @CheckAbility({ action: 'delete', subject: 'Group' })
   async deleteGroup(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.groupService.delete(id);
   }
@@ -68,7 +68,7 @@ export class GroupResolver {
   @Mutation(() => GroupResolutionUpdate, {
     description: 'Resolve group members (triggers rule evaluation + cache refresh)',
   })
-  @CheckAbility('update', 'Group')
+  @CheckAbility({ action: 'update', subject: 'Group' })
   async resolveGroupMembers(
     @Args('groupId', { type: () => ID }) groupId: string,
   ): Promise<GroupResolutionUpdate> {
@@ -79,7 +79,7 @@ export class GroupResolver {
     description:
       'Toggle the exclusion flag on a hybrid-group member (admin override for rule-resolved rows)',
   })
-  @CheckAbility('update', 'Group')
+  @CheckAbility({ action: 'update', subject: 'Group' })
   async setGroupMemberExcluded(
     @Args('groupId', { type: () => ID }) groupId: string,
     @Args('memberId', { type: () => ID }) memberId: string,
@@ -91,7 +91,7 @@ export class GroupResolver {
   @Query(() => RulePreviewResult, {
     description: 'Dry-run rule evaluation without saving — returns count + sample',
   })
-  @CheckAbility('read', 'Group')
+  @CheckAbility({ action: 'read', subject: 'Group' })
   async previewGroupRule(
     @Args('rule', { type: () => GraphQLJSON }) rule: Record<string, unknown>,
   ): Promise<RulePreviewResult> {

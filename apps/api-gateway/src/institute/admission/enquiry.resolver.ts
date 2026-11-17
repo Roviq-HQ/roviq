@@ -26,7 +26,7 @@ export class EnquiryResolver {
   ) {}
 
   @Query(() => EnquiryConnection, { description: 'List enquiries with filters and pagination' })
-  @CheckAbility('read', 'Enquiry')
+  @CheckAbility({ action: 'read', subject: 'Enquiry' })
   async listEnquiries(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: EnquiryFilterInput,
@@ -35,13 +35,13 @@ export class EnquiryResolver {
   }
 
   @Mutation(() => EnquiryModel, { description: 'Create a pre-admission enquiry' })
-  @CheckAbility('create', 'Enquiry')
+  @CheckAbility({ action: 'create', subject: 'Enquiry' })
   async createEnquiry(@Args('input') input: CreateEnquiryInput): Promise<EnquiryModel> {
     return this.admissionService.createEnquiry(input);
   }
 
   @Mutation(() => EnquiryModel, { description: 'Update an enquiry' })
-  @CheckAbility('update', 'Enquiry')
+  @CheckAbility({ action: 'update', subject: 'Enquiry' })
   async updateEnquiry(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateEnquiryInput,
@@ -50,7 +50,7 @@ export class EnquiryResolver {
   }
 
   @Mutation(() => ApplicationModel, { description: 'Convert enquiry to a formal application' })
-  @CheckAbility('create', 'Application')
+  @CheckAbility({ action: 'create', subject: 'Application' })
   async convertEnquiryToApplication(
     @Args('enquiryId', { type: () => ID }) enquiryId: string,
     @Args('standardId', { type: () => ID }) standardId: string,
@@ -74,7 +74,7 @@ export class EnquiryResolver {
       );
     },
   })
-  @CheckAbility('read', 'Enquiry')
+  @CheckAbility({ action: 'read', subject: 'Enquiry' })
   enquiryCreated() {
     return pubSub.asyncIterableIterator('ENQUIRY.created');
   }

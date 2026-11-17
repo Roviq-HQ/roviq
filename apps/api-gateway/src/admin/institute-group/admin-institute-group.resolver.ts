@@ -15,7 +15,7 @@ export class AdminInstituteGroupResolver {
   constructor(private readonly groupService: InstituteGroupService) {}
 
   @Query(() => InstituteGroupConnection)
-  @CheckAbility('read', 'InstituteGroup')
+  @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
   async adminListInstituteGroups(
     @Args('filter', { nullable: true }) filter?: InstituteGroupFilterInput,
   ) {
@@ -23,13 +23,13 @@ export class AdminInstituteGroupResolver {
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('create', 'InstituteGroup')
+  @CheckAbility({ action: 'create', subject: 'InstituteGroup' })
   async adminCreateInstituteGroup(@Args('input') input: CreateInstituteGroupInput) {
     return this.groupService.create(input);
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('update', 'InstituteGroup')
+  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
   async adminUpdateInstituteGroup(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateInstituteGroupInput,
@@ -38,7 +38,7 @@ export class AdminInstituteGroupResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'InstituteGroup')
+  @CheckAbility({ action: 'delete', subject: 'InstituteGroup' })
   async adminDeleteInstituteGroup(@Args('id', { type: () => ID }) id: string) {
     return this.groupService.delete(id);
   }

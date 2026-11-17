@@ -41,7 +41,7 @@ export class ReportCardResolver {
   // ── NEP subject topics ──────────────────────────────────────────────────────
 
   @Query(() => [SubjectTopicModel], { description: 'NEP topics for a subject.' })
-  @CheckAbility('read', 'Exam')
+  @CheckAbility({ action: 'read', subject: 'Exam' })
   subjectTopics(
     @Args('subjectId', { type: () => ID }) subjectId: string,
     @Args('standardId', { type: () => ID, nullable: true }) standardId: string | null,
@@ -52,20 +52,20 @@ export class ReportCardResolver {
   }
 
   @Mutation(() => SubjectTopicModel)
-  @CheckAbility('manage', 'Exam')
+  @CheckAbility({ action: 'manage', subject: 'Exam' })
   createSubjectTopic(@Args('input') input: CreateSubjectTopicInput): Promise<SubjectTopicModel> {
     return this.config.createSubjectTopic(input) as Promise<SubjectTopicModel>;
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('manage', 'Exam')
+  @CheckAbility({ action: 'manage', subject: 'Exam' })
   async deleteSubjectTopic(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     await this.config.deleteSubjectTopic(id);
     return true;
   }
 
   @Mutation(() => Int, { description: 'Bulk-enter NEP topic competency assessments.' })
-  @CheckAbility('update', 'Exam')
+  @CheckAbility({ action: 'update', subject: 'Exam' })
   async enterTopicAssessments(@Args('input') input: EnterTopicAssessmentsInput): Promise<number> {
     const saved = await this.marks.upsertTopicAssessments(input.assessments);
     return saved.length;
@@ -74,13 +74,13 @@ export class ReportCardResolver {
   // ── Co-scholastic ────────────────────────────────────────────────────────────
 
   @Query(() => [CoScholasticAreaModel])
-  @CheckAbility('read', 'Exam')
+  @CheckAbility({ action: 'read', subject: 'Exam' })
   coScholasticAreas(): Promise<CoScholasticAreaModel[]> {
     return this.config.listCoScholasticAreas() as Promise<CoScholasticAreaModel[]>;
   }
 
   @Mutation(() => CoScholasticAreaModel)
-  @CheckAbility('manage', 'Exam')
+  @CheckAbility({ action: 'manage', subject: 'Exam' })
   createCoScholasticArea(
     @Args('input') input: CreateCoScholasticAreaInput,
   ): Promise<CoScholasticAreaModel> {
@@ -88,14 +88,14 @@ export class ReportCardResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('manage', 'Exam')
+  @CheckAbility({ action: 'manage', subject: 'Exam' })
   async deleteCoScholasticArea(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     await this.config.deleteCoScholasticArea(id);
     return true;
   }
 
   @Mutation(() => Int)
-  @CheckAbility('update', 'Exam')
+  @CheckAbility({ action: 'update', subject: 'Exam' })
   async enterCoScholasticAssessments(
     @Args('input') input: EnterCoScholasticInput,
   ): Promise<number> {
@@ -106,7 +106,7 @@ export class ReportCardResolver {
   // ── Report cards ─────────────────────────────────────────────────────────────
 
   @Query(() => [ReportCardModel])
-  @CheckAbility('read', 'ReportCard')
+  @CheckAbility({ action: 'read', subject: 'ReportCard' })
   reportCards(
     @Args('academicYearId', { type: () => ID }) academicYearId: string,
   ): Promise<ReportCardModel[]> {
@@ -114,19 +114,19 @@ export class ReportCardResolver {
   }
 
   @Query(() => ReportCardModel)
-  @CheckAbility('read', 'ReportCard')
+  @CheckAbility({ action: 'read', subject: 'ReportCard' })
   reportCard(@Args('id', { type: () => ID }) id: string): Promise<ReportCardModel> {
     return this.cards.getReportCard(id) as Promise<ReportCardModel>;
   }
 
   @Mutation(() => ReportCardModel)
-  @CheckAbility('manage', 'ReportCard')
+  @CheckAbility({ action: 'manage', subject: 'ReportCard' })
   createReportCard(@Args('input') input: CreateReportCardInput): Promise<ReportCardModel> {
     return this.cards.createReportCard(input) as Promise<ReportCardModel>;
   }
 
   @Mutation(() => ReportCardModel)
-  @CheckAbility('manage', 'ReportCard')
+  @CheckAbility({ action: 'manage', subject: 'ReportCard' })
   updateReportCard(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateReportCardInput,
@@ -135,14 +135,14 @@ export class ReportCardResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('manage', 'ReportCard')
+  @CheckAbility({ action: 'manage', subject: 'ReportCard' })
   async deleteReportCard(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     await this.cards.deleteReportCard(id);
     return true;
   }
 
   @Mutation(() => Int, { description: 'Generate per-student instances for a section.' })
-  @CheckAbility('manage', 'ReportCard')
+  @CheckAbility({ action: 'manage', subject: 'ReportCard' })
   async generateReportCards(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
     @Args('sectionId', { type: () => ID }) sectionId: string,
@@ -152,7 +152,7 @@ export class ReportCardResolver {
   }
 
   @Mutation(() => Int, { description: 'Publish all generated instances; returns the count.' })
-  @CheckAbility('manage', 'ReportCard')
+  @CheckAbility({ action: 'manage', subject: 'ReportCard' })
   publishReportCards(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
   ): Promise<number> {
@@ -163,7 +163,7 @@ export class ReportCardResolver {
   // `payload` already matches ReportCardPayloadModel field-for-field, so it is
   // returned as the record type (a record→model cast can't bridge the jsonb).
   @Query(() => [ReportCardInstanceModel], { description: 'Instances of a report card.' })
-  @CheckAbility('read', 'ReportCard')
+  @CheckAbility({ action: 'read', subject: 'ReportCard' })
   reportCardInstances(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
   ): Promise<ReportCardInstanceRecord[]> {
@@ -171,7 +171,7 @@ export class ReportCardResolver {
   }
 
   @Query(() => ReportCardInstanceModel)
-  @CheckAbility('read', 'ReportCard')
+  @CheckAbility({ action: 'read', subject: 'ReportCard' })
   reportCardInstance(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
@@ -182,14 +182,14 @@ export class ReportCardResolver {
   @Query(() => [ReportCardInstanceModel], {
     description: 'Published report cards for the signed-in student.',
   })
-  @CheckAbility('read', 'ReportCard')
+  @CheckAbility({ action: 'read', subject: 'ReportCard' })
   myReportCards(@CurrentUser() user: AuthUser): Promise<ReportCardInstanceRecord[]> {
     assertTenantContext(user);
     return this.cards.listForMembership(user.membershipId);
   }
 
   @Query(() => String, { description: 'Base64-encoded report-card PDF.' })
-  @CheckAbility('read', 'ReportCard')
+  @CheckAbility({ action: 'read', subject: 'ReportCard' })
   async reportCardPdf(@Args('instanceId', { type: () => ID }) instanceId: string): Promise<string> {
     const buffer = await this.pdf.render(instanceId);
     return buffer.toString('base64');

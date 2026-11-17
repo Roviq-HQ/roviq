@@ -61,7 +61,7 @@ export class ResellerBillingResolver {
 
   @Query(() => [SubscriptionPlanModel], { name: 'subscriptionPlans' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'SubscriptionPlan')
+  @CheckAbility({ action: 'read', subject: 'SubscriptionPlan' })
   async resellerListPlans(
     @CurrentUser() user: AuthUser,
     @Args('status', { nullable: true }) status?: string,
@@ -78,21 +78,21 @@ export class ResellerBillingResolver {
 
   @Query(() => SubscriptionPlanModel, { name: 'subscriptionPlan' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'SubscriptionPlan')
+  @CheckAbility({ action: 'read', subject: 'SubscriptionPlan' })
   async resellerGetPlan(@CurrentUser() user: AuthUser, @Args('id', { type: () => ID }) id: string) {
     return this.planService.getPlan(rid(user), id);
   }
 
   @Mutation(() => SubscriptionPlanModel, { name: 'createSubscriptionPlan' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'SubscriptionPlan')
+  @CheckAbility({ action: 'create', subject: 'SubscriptionPlan' })
   async resellerCreatePlan(@CurrentUser() user: AuthUser, @Args('input') input: CreatePlanInput) {
     return this.planService.createPlan(rid(user), input);
   }
 
   @Mutation(() => SubscriptionPlanModel, { name: 'updateSubscriptionPlan' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'SubscriptionPlan')
+  @CheckAbility({ action: 'update', subject: 'SubscriptionPlan' })
   async resellerUpdatePlan(
     @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
@@ -103,7 +103,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => Boolean, { name: 'deletePlan' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('delete', 'SubscriptionPlan')
+  @CheckAbility({ action: 'delete', subject: 'SubscriptionPlan' })
   async resellerDeletePlan(
     @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
@@ -119,7 +119,7 @@ export class ResellerBillingResolver {
       'Archive (deactivate) a subscription plan. Blocks new subscriptions but does not affect existing ones.',
   })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'SubscriptionPlan')
+  @CheckAbility({ action: 'update', subject: 'SubscriptionPlan' })
   async resellerArchivePlan(
     @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
@@ -134,7 +134,7 @@ export class ResellerBillingResolver {
       'Restore an archived plan back to active. New subscriptions can be created against it again.',
   })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'SubscriptionPlan')
+  @CheckAbility({ action: 'update', subject: 'SubscriptionPlan' })
   async resellerRestorePlan(
     @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
@@ -148,7 +148,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => AssignPlanResult, { name: 'assignPlanToInstitute' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'Subscription')
+  @CheckAbility({ action: 'create', subject: 'Subscription' })
   async resellerAssignPlan(@CurrentUser() user: AuthUser, @Args('input') input: AssignPlanInput) {
     const subscription = await this.subscriptionService.assignPlan(rid(user), {
       tenantId: input.tenantId,
@@ -159,14 +159,14 @@ export class ResellerBillingResolver {
 
   @Mutation(() => SubscriptionModel, { name: 'changePlan' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Subscription')
+  @CheckAbility({ action: 'update', subject: 'Subscription' })
   async resellerChangePlan(@CurrentUser() user: AuthUser, @Args('input') input: ChangePlanInput) {
     return this.subscriptionService.changePlan(rid(user), input.subscriptionId, input.newPlanId);
   }
 
   @Mutation(() => SubscriptionModel, { name: 'pauseSubscription' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Subscription')
+  @CheckAbility({ action: 'update', subject: 'Subscription' })
   async resellerPauseSubscription(
     @CurrentUser() user: AuthUser,
     @Args('input') input: PauseSubscriptionInput,
@@ -180,7 +180,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => SubscriptionModel, { name: 'resumeSubscription' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Subscription')
+  @CheckAbility({ action: 'update', subject: 'Subscription' })
   async resellerResumeSubscription(
     @CurrentUser() user: AuthUser,
     @Args('subscriptionId', { type: () => ID }) subscriptionId: string,
@@ -190,7 +190,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => SubscriptionModel, { name: 'cancelSubscription' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Subscription')
+  @CheckAbility({ action: 'update', subject: 'Subscription' })
   async resellerCancelSubscription(
     @CurrentUser() user: AuthUser,
     @Args('input') input: CancelSubscriptionInput,
@@ -204,7 +204,7 @@ export class ResellerBillingResolver {
 
   @Query(() => [SubscriptionModel], { name: 'subscriptions' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Subscription')
+  @CheckAbility({ action: 'read', subject: 'Subscription' })
   async resellerListSubscriptions(
     @CurrentUser() user: AuthUser,
     @Args('status', { nullable: true }) status?: string,
@@ -225,7 +225,7 @@ export class ResellerBillingResolver {
 
   @Query(() => [InvoiceModel], { name: 'invoices' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Invoice')
+  @CheckAbility({ action: 'read', subject: 'Invoice' })
   async resellerListInvoices(
     @CurrentUser() user: AuthUser,
     @Args('instituteId', { type: () => ID, nullable: true }) instituteId?: string,
@@ -246,7 +246,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => InvoiceModel, { name: 'generateInvoice' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'Invoice')
+  @CheckAbility({ action: 'create', subject: 'Invoice' })
   async resellerGenerateInvoice(
     @CurrentUser() user: AuthUser,
     @Args('input') input: GenerateInvoiceInput,
@@ -265,7 +265,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => InvoiceModel, { name: 'recordManualPayment' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Invoice')
+  @CheckAbility({ action: 'update', subject: 'Invoice' })
   async resellerRecordManualPayment(
     @CurrentUser() user: AuthUser,
     @Args('invoiceId', { type: () => ID }) invoiceId: string,
@@ -276,7 +276,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => InvoiceModel, { name: 'issueRefund' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Payment')
+  @CheckAbility({ action: 'update', subject: 'Payment' })
   async resellerIssueRefund(
     @CurrentUser() user: AuthUser,
     @Args('paymentId', { type: () => ID }) paymentId: string,
@@ -291,14 +291,14 @@ export class ResellerBillingResolver {
 
   @Query(() => [PaymentGatewayConfigModel], { name: 'gatewayConfigs' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'PaymentGatewayConfig')
+  @CheckAbility({ action: 'read', subject: 'PaymentGatewayConfig' })
   async resellerListGatewayConfigs(@CurrentUser() user: AuthUser) {
     return this.gatewayConfigService.listConfigs(rid(user));
   }
 
   @Mutation(() => PaymentGatewayConfigModel, { name: 'createGatewayConfig' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'PaymentGatewayConfig')
+  @CheckAbility({ action: 'create', subject: 'PaymentGatewayConfig' })
   async resellerCreateGatewayConfig(
     @CurrentUser() user: AuthUser,
     @Args('input') input: CreateGatewayConfigInput,
@@ -308,7 +308,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => PaymentGatewayConfigModel, { name: 'updateGatewayConfig' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'PaymentGatewayConfig')
+  @CheckAbility({ action: 'update', subject: 'PaymentGatewayConfig' })
   async resellerUpdateGatewayConfig(
     @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
@@ -319,7 +319,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => Boolean, { name: 'deleteGatewayConfig' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('delete', 'PaymentGatewayConfig')
+  @CheckAbility({ action: 'delete', subject: 'PaymentGatewayConfig' })
   async resellerDeleteGatewayConfig(
     @CurrentUser() user: AuthUser,
     @Args('id', { type: () => ID }) id: string,
@@ -334,7 +334,7 @@ export class ResellerBillingResolver {
 
   @Query(() => BillingDashboardModel, { name: 'resellerBillingDashboard' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'BillingDashboard')
+  @CheckAbility({ action: 'read', subject: 'BillingDashboard' })
   async resellerBillingDashboard(@CurrentUser() user: AuthUser) {
     return this.dashboardService.getDashboard(rid(user));
   }
@@ -345,7 +345,7 @@ export class ResellerBillingResolver {
 
   @Query(() => [PaymentModel], { name: 'unverifiedPayments' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Payment')
+  @CheckAbility({ action: 'read', subject: 'Payment' })
   async resellerUnverifiedPayments(
     @CurrentUser() user: AuthUser,
     @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first?: number,
@@ -361,7 +361,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => PaymentModel, { name: 'verifyUpiPayment' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Payment')
+  @CheckAbility({ action: 'update', subject: 'Payment' })
   async resellerVerifyUpiPayment(
     @CurrentUser() user: AuthUser,
     @Args('paymentId', { type: () => ID }) paymentId: string,
@@ -371,7 +371,7 @@ export class ResellerBillingResolver {
 
   @Mutation(() => PaymentModel, { name: 'rejectUpiPayment' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('update', 'Payment')
+  @CheckAbility({ action: 'update', subject: 'Payment' })
   async resellerRejectUpiPayment(
     @CurrentUser() user: AuthUser,
     @Args('input') input: RejectUpiInput,

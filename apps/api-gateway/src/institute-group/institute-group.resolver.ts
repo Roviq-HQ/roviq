@@ -17,7 +17,7 @@ export class InstituteGroupResolver {
   constructor(private readonly instituteGroupService: InstituteGroupService) {}
 
   @Query(() => InstituteGroupConnection)
-  @CheckAbility('read', 'InstituteGroup')
+  @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
   async instituteGroups(
     @Args('filter', { nullable: true }) filter?: InstituteGroupFilterInput,
   ): Promise<InstanceType<typeof InstituteGroupConnection>> {
@@ -25,19 +25,19 @@ export class InstituteGroupResolver {
   }
 
   @Query(() => InstituteGroupModel)
-  @CheckAbility('read', 'InstituteGroup')
+  @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
   async instituteGroup(@Args('id', { type: () => ID }) id: string): Promise<InstituteGroupModel> {
     return this.instituteGroupService.findById(id);
   }
 
   @Query(() => [GroupMembershipModel])
-  @CheckAbility('read', 'InstituteGroup')
+  @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
   async myGroups(@CurrentUser() user: AuthUser): Promise<GroupMembershipModel[]> {
     return this.instituteGroupService.findMyGroups(user.userId);
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('create', 'InstituteGroup')
+  @CheckAbility({ action: 'create', subject: 'InstituteGroup' })
   async createInstituteGroup(
     @Args('input') input: CreateInstituteGroupInput,
   ): Promise<InstituteGroupModel> {
@@ -45,7 +45,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('update', 'InstituteGroup')
+  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
   async updateInstituteGroup(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateInstituteGroupInput,
@@ -54,7 +54,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('update', 'InstituteGroup')
+  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
   async activateInstituteGroup(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<InstituteGroupModel> {
@@ -62,7 +62,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('update', 'InstituteGroup')
+  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
   async deactivateInstituteGroup(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<InstituteGroupModel> {
@@ -70,7 +70,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => InstituteGroupModel)
-  @CheckAbility('update', 'InstituteGroup')
+  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
   async suspendInstituteGroup(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<InstituteGroupModel> {
@@ -78,13 +78,13 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'InstituteGroup')
+  @CheckAbility({ action: 'delete', subject: 'InstituteGroup' })
   async deleteInstituteGroup(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.instituteGroupService.delete(id);
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('manage', 'InstituteGroup')
+  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
   async addInstituteToGroup(
     @Args('instituteId', { type: () => ID }) instituteId: string,
     @Args('groupId', { type: () => ID }) groupId: string,
@@ -93,7 +93,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('manage', 'InstituteGroup')
+  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
   async removeInstituteFromGroup(
     @Args('instituteId', { type: () => ID }) instituteId: string,
   ): Promise<boolean> {
@@ -101,7 +101,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => GroupMembershipModel)
-  @CheckAbility('manage', 'InstituteGroup')
+  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
   async addGroupMember(
     @Args('groupId', { type: () => ID }) groupId: string,
     @Args('userId', { type: () => ID }) userId: string,
@@ -111,7 +111,7 @@ export class InstituteGroupResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('manage', 'InstituteGroup')
+  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
   async removeGroupMember(
     @Args('groupId', { type: () => ID }) groupId: string,
     @Args('userId', { type: () => ID }) userId: string,

@@ -18,7 +18,7 @@ export class HolidayResolver {
     description:
       'List holidays, ordered by `startDate` ASC (calendar order — clients render upcoming first). Optional filters narrow by type, overlapping date range, or visibility.',
   })
-  @CheckAbility('read', 'Holiday')
+  @CheckAbility({ action: 'read', subject: 'Holiday' })
   async holidays(
     @Args('type', { type: () => HolidayType, nullable: true }) type: HolidayType | null,
     @Args('startDate', { type: () => String, nullable: true }) startDate: string | null,
@@ -34,7 +34,7 @@ export class HolidayResolver {
   }
 
   @Query(() => HolidayModel)
-  @CheckAbility('read', 'Holiday')
+  @CheckAbility({ action: 'read', subject: 'Holiday' })
   async holiday(@Args('id', { type: () => ID }) id: string): Promise<HolidayRecord> {
     return this.service.findById(id);
   }
@@ -42,7 +42,7 @@ export class HolidayResolver {
   @Query(() => [HolidayModel], {
     description: 'Return every holiday whose inclusive range contains the given date.',
   })
-  @CheckAbility('read', 'Holiday')
+  @CheckAbility({ action: 'read', subject: 'Holiday' })
   async holidaysOnDate(
     @Args('date', { type: () => String, description: 'ISO YYYY-MM-DD date to look up.' })
     date: string,
@@ -51,13 +51,13 @@ export class HolidayResolver {
   }
 
   @Mutation(() => HolidayModel, { description: 'Publish a new holiday or break.' })
-  @CheckAbility('create', 'Holiday')
+  @CheckAbility({ action: 'create', subject: 'Holiday' })
   async createHoliday(@Args('input') input: CreateHolidayInput): Promise<HolidayRecord> {
     return this.service.create(input);
   }
 
   @Mutation(() => HolidayModel, { description: 'Edit an existing holiday.' })
-  @CheckAbility('update', 'Holiday')
+  @CheckAbility({ action: 'update', subject: 'Holiday' })
   async updateHoliday(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateHolidayInput,
@@ -66,7 +66,7 @@ export class HolidayResolver {
   }
 
   @Mutation(() => Boolean, { description: 'Soft-delete a holiday.' })
-  @CheckAbility('delete', 'Holiday')
+  @CheckAbility({ action: 'delete', subject: 'Holiday' })
   async deleteHoliday(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.service.delete(id);
   }

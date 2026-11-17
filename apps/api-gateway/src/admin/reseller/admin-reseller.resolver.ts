@@ -27,7 +27,7 @@ export class AdminResellerResolver {
   @Query(() => AdminResellerConnection, {
     description: 'Platform admin: list resellers with cursor pagination, search, and filters',
   })
-  @CheckAbility('read', 'Reseller')
+  @CheckAbility({ action: 'read', subject: 'Reseller' })
   async adminListResellers(
     @Args('filter', { nullable: true }) filter?: AdminListResellersFilterInput,
   ) {
@@ -37,7 +37,7 @@ export class AdminResellerResolver {
   @Query(() => AdminResellerModel, {
     description: 'Fetch a single reseller by id with computed counts',
   })
-  @CheckAbility('read', 'Reseller')
+  @CheckAbility({ action: 'read', subject: 'Reseller' })
   async adminGetReseller(@Args('id', { type: () => ID }) id: string) {
     return this.resellerService.getById(id);
   }
@@ -47,7 +47,7 @@ export class AdminResellerResolver {
   @Mutation(() => AdminResellerModel, {
     description: 'Create a new reseller + initial admin user attached to the tier role',
   })
-  @CheckAbility('create', 'Reseller')
+  @CheckAbility({ action: 'create', subject: 'Reseller' })
   async adminCreateReseller(
     @Args('input') input: AdminCreateResellerInput,
     @CurrentUser() user: AuthUser,
@@ -58,7 +58,7 @@ export class AdminResellerResolver {
   @Mutation(() => AdminResellerModel, {
     description: 'Update mutable reseller fields (name, branding, customDomain)',
   })
-  @CheckAbility('update', 'Reseller')
+  @CheckAbility({ action: 'update', subject: 'Reseller' })
   async adminUpdateReseller(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: AdminUpdateResellerInput,
@@ -71,7 +71,7 @@ export class AdminResellerResolver {
     description:
       'Change reseller tier. Cascades to all reseller_memberships: their role_id is updated so staff abilities change on next token refresh.',
   })
-  @CheckAbility('update', 'Reseller')
+  @CheckAbility({ action: 'update', subject: 'Reseller' })
   async adminChangeResellerTier(
     @Args('id', { type: () => ID }) id: string,
     @Args('newTier', { type: () => ResellerTier }) newTier: ResellerTier,
@@ -85,7 +85,7 @@ export class AdminResellerResolver {
   @Mutation(() => Boolean, {
     description: 'Suspend a reseller and revoke all staff sessions',
   })
-  @CheckAbility('suspend', 'Reseller')
+  @CheckAbility({ action: 'suspend', subject: 'Reseller' })
   async adminSuspendReseller(
     @Args('resellerId') resellerId: string,
     @Args('reason', { nullable: true }) reason?: string,
@@ -97,7 +97,7 @@ export class AdminResellerResolver {
   @Mutation(() => Boolean, {
     description: 'Unsuspend a previously suspended reseller (reactivates staff login)',
   })
-  @CheckAbility('update', 'Reseller')
+  @CheckAbility({ action: 'update', subject: 'Reseller' })
   async adminUnsuspendReseller(@Args('resellerId') resellerId: string): Promise<boolean> {
     await this.resellerService.unsuspendReseller(resellerId);
     return true;
@@ -106,7 +106,7 @@ export class AdminResellerResolver {
   @Mutation(() => Boolean, {
     description: 'Delete a suspended reseller after 30-day grace period',
   })
-  @CheckAbility('delete', 'Reseller')
+  @CheckAbility({ action: 'delete', subject: 'Reseller' })
   async adminDeleteReseller(@Args('resellerId') resellerId: string): Promise<boolean> {
     await this.resellerService.deleteReseller(resellerId);
     return true;

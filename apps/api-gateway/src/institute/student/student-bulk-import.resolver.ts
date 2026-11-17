@@ -32,7 +32,7 @@ export class StudentBulkImportResolver {
    * Returns the Temporal workflow ID for progress tracking via bulkImportProgress.
    */
   @Mutation(() => BulkImportStartResult, { description: 'Start bulk student import from CSV' })
-  @CheckAbility('create', 'Student')
+  @CheckAbility({ action: 'create', subject: 'Student' })
   async bulkCreateStudents(
     @Args('input') input: BulkCreateStudentsInput,
     @CurrentUser() user: AuthUser,
@@ -61,7 +61,7 @@ export class StudentBulkImportResolver {
    * Poll this query to track import status.
    */
   @Query(() => BulkImportProgressModel, { description: 'Get bulk import progress by workflow ID' })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   async bulkImportProgress(
     @Args('workflowId') workflowId: string,
   ): Promise<BulkImportProgressModel> {

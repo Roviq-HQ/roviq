@@ -31,7 +31,7 @@ export class TimetableViewResolver {
     description:
       'Weekly grid for a section. Defaults to the active timetable covering the section.',
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   sectionTimetable(
     @Args('sectionId', { type: () => ID }) sectionId: string,
     @Args('timetableId', { type: () => ID, nullable: true }) timetableId: string | null,
@@ -47,7 +47,7 @@ export class TimetableViewResolver {
     description:
       "Weekly grid for a teacher (membership id). Defaults to the institute's active timetable.",
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   staffTimetable(
     @Args('teacherId', { type: () => ID }) teacherId: string,
     @Args('timetableId', { type: () => ID, nullable: true }) timetableId: string | null,
@@ -62,7 +62,7 @@ export class TimetableViewResolver {
     description:
       'Staff id + display name for timetable grids and assignment dropdowns. Readable with Timetable read so teachers can label cells without Staff-directory access.',
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   teacherOptions(): Promise<TeacherOptionModel[]> {
     return this.view.teacherOptions();
   }
@@ -71,7 +71,7 @@ export class TimetableViewResolver {
     name: 'sectionTimetablePdf',
     description: "Base64-encoded PDF of a section's weekly timetable.",
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   async sectionTimetablePdf(
     @Args('sectionId', { type: () => ID }) sectionId: string,
     @Args('timetableId', { type: () => ID, nullable: true }) timetableId: string | null,
@@ -84,7 +84,7 @@ export class TimetableViewResolver {
     name: 'staffTimetablePdf',
     description: "Base64-encoded PDF of a teacher's weekly timetable.",
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   async staffTimetablePdf(
     @Args('teacherId', { type: () => ID }) teacherId: string,
     @Args('timetableId', { type: () => ID, nullable: true }) timetableId: string | null,
@@ -97,7 +97,7 @@ export class TimetableViewResolver {
     description:
       'Resolved schedule for a section on a date (master entries with overrides applied).',
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   timetableDaySchedule(
     @Args('date', { type: () => String }) date: string,
     @Args('sectionId', { type: () => ID }) sectionId: string,
@@ -108,7 +108,7 @@ export class TimetableViewResolver {
   @Query(() => [DayScheduleSlotModel], {
     description: 'Resolved schedule for a teacher on a date.',
   })
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   staffDaySchedule(
     @Args('date', { type: () => String }) date: string,
     @Args('teacherId', { type: () => ID }) teacherId: string,
@@ -117,7 +117,7 @@ export class TimetableViewResolver {
   }
 
   @Query(() => [TimetableDayOverrideModel])
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   timetableDayOverrides(
     @Args('timetableId', { type: () => ID }) timetableId: string,
     @Args('date', { type: () => String }) date: string,
@@ -129,7 +129,7 @@ export class TimetableViewResolver {
     description:
       'Add a per-date override (substitution, cancellation, room/subject change, extra).',
   })
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   createTimetableDayOverride(
     @Args('input') input: CreateTimetableDayOverrideInput,
   ): Promise<TimetableDayOverrideRecord> {
@@ -148,7 +148,7 @@ export class TimetableViewResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   clearTimetableDayOverride(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.view.clearOverride(id);
   }

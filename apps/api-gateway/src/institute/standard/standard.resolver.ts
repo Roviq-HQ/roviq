@@ -14,7 +14,7 @@ export class StandardResolver {
   constructor(private readonly standardService: StandardService) {}
 
   @Query(() => [StandardModel])
-  @CheckAbility('read', 'Standard')
+  @CheckAbility({ action: 'read', subject: 'Standard' })
   async standards(
     @Args('academicYearId', {
       type: () => ID,
@@ -27,19 +27,19 @@ export class StandardResolver {
   }
 
   @Query(() => StandardModel)
-  @CheckAbility('read', 'Standard')
+  @CheckAbility({ action: 'read', subject: 'Standard' })
   async standard(@Args('id', { type: () => ID }) id: string): Promise<StandardRecord> {
     return this.standardService.findById(id);
   }
 
   @Mutation(() => StandardModel)
-  @CheckAbility('create', 'Standard')
+  @CheckAbility({ action: 'create', subject: 'Standard' })
   async createStandard(@Args('input') input: CreateStandardInput): Promise<StandardRecord> {
     return this.standardService.create(input);
   }
 
   @Mutation(() => StandardModel)
-  @CheckAbility('update', 'Standard')
+  @CheckAbility({ action: 'update', subject: 'Standard' })
   async updateStandard(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateStandardInput,
@@ -48,7 +48,7 @@ export class StandardResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'Standard')
+  @CheckAbility({ action: 'delete', subject: 'Standard' })
   async deleteStandard(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.standardService.delete(id);
   }

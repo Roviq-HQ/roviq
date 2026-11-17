@@ -14,25 +14,25 @@ export class AcademicYearResolver {
   constructor(private readonly academicYearService: AcademicYearService) {}
 
   @Query(() => [AcademicYearModel])
-  @CheckAbility('read', 'AcademicYear')
+  @CheckAbility({ action: 'read', subject: 'AcademicYear' })
   async academicYears(): Promise<AcademicYearRecord[]> {
     return this.academicYearService.findAll();
   }
 
   @Query(() => AcademicYearModel)
-  @CheckAbility('read', 'AcademicYear')
+  @CheckAbility({ action: 'read', subject: 'AcademicYear' })
   async academicYear(@Args('id', { type: () => ID }) id: string): Promise<AcademicYearRecord> {
     return this.academicYearService.findById(id);
   }
 
   @Query(() => AcademicYearModel, { nullable: true })
-  @CheckAbility('read', 'AcademicYear')
+  @CheckAbility({ action: 'read', subject: 'AcademicYear' })
   async activeAcademicYear(): Promise<AcademicYearRecord | null> {
     return this.academicYearService.findActive();
   }
 
   @Mutation(() => AcademicYearModel)
-  @CheckAbility('create', 'AcademicYear')
+  @CheckAbility({ action: 'create', subject: 'AcademicYear' })
   async createAcademicYear(
     @Args('input') input: CreateAcademicYearInput,
   ): Promise<AcademicYearRecord> {
@@ -40,7 +40,7 @@ export class AcademicYearResolver {
   }
 
   @Mutation(() => AcademicYearModel)
-  @CheckAbility('update', 'AcademicYear')
+  @CheckAbility({ action: 'update', subject: 'AcademicYear' })
   async updateAcademicYear(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateAcademicYearInput,
@@ -49,7 +49,7 @@ export class AcademicYearResolver {
   }
 
   @Mutation(() => AcademicYearModel)
-  @CheckAbility('update', 'AcademicYear')
+  @CheckAbility({ action: 'update', subject: 'AcademicYear' })
   async activateAcademicYear(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<AcademicYearRecord> {
@@ -57,7 +57,7 @@ export class AcademicYearResolver {
   }
 
   @Mutation(() => AcademicYearModel)
-  @CheckAbility('update', 'AcademicYear')
+  @CheckAbility({ action: 'update', subject: 'AcademicYear' })
   async archiveAcademicYear(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<AcademicYearRecord> {
@@ -65,7 +65,7 @@ export class AcademicYearResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'AcademicYear')
+  @CheckAbility({ action: 'delete', subject: 'AcademicYear' })
   async deleteAcademicYear(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.academicYearService.delete(id);
   }

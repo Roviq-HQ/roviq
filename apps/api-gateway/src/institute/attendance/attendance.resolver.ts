@@ -35,7 +35,7 @@ export class AttendanceResolver {
   constructor(private readonly service: AttendanceService) {}
 
   @Query(() => AttendanceSessionModel)
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceSession(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -44,7 +44,7 @@ export class AttendanceResolver {
   }
 
   @Query(() => [AttendanceSessionModel])
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceSessionsForSection(
     @Args('sectionId', { type: () => ID }) sectionId: string,
     @Args('startDate', { type: () => String }) startDate: string,
@@ -58,7 +58,7 @@ export class AttendanceResolver {
     description:
       'Sections in the academic year whose attendance the caller may read, resolved from current server-side assignments.',
   })
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceSections(
     @Args('academicYearId', { type: () => ID }) academicYearId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -67,7 +67,7 @@ export class AttendanceResolver {
   }
 
   @Query(() => [AttendanceEntryModel])
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceEntries(
     @Args('sessionId', { type: () => ID }) sessionId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -76,7 +76,7 @@ export class AttendanceResolver {
   }
 
   @Query(() => [AttendanceStatusCount])
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceCounts(
     @Args('sessionId', { type: () => ID }) sessionId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -88,7 +88,7 @@ export class AttendanceResolver {
     description:
       "Attendance totals for a date across the caller's authorized sections. Pass sectionId/academicYearId to narrow; omitting them never widens beyond authorized sections.",
   })
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceCountsForDate(
     @Args('date', { type: () => String }) date: string,
     @Args('sectionId', { type: () => ID, nullable: true }) sectionId: string | null,
@@ -102,7 +102,7 @@ export class AttendanceResolver {
     description:
       "Per-student absentee report aggregated across sessions. Pass sectionId for one section, standardId for one standard, or neither for all of the caller's authorized sections.",
   })
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceAbsenteesReport(
     @Args('sectionId', { type: () => ID, nullable: true }) sectionId: string | null,
     @Args('startDate', { type: () => String }) startDate: string,
@@ -117,7 +117,7 @@ export class AttendanceResolver {
     description:
       'One row per authorized attendance session on the given date — aggregate counts plus the list of ABSENT membership ids. Pass standardId to narrow to one standard.',
   })
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceSectionDailyBreakdown(
     @Args('date', { type: () => String }) date: string,
     @Args('standardId', { type: () => ID, nullable: true }) standardId: string | null,
@@ -130,7 +130,7 @@ export class AttendanceResolver {
     description:
       'Per-student attendance history — every mark for this student across the requested date range, newest first.',
   })
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async attendanceStudentHistory(
     @Args('studentId', { type: () => ID }) studentId: string,
     @Args('startDate', { type: () => String }) startDate: string,
@@ -144,7 +144,7 @@ export class AttendanceResolver {
     description:
       'Open a session and seed its roster. A date before today requires the AttendanceOverride permission (ATTENDANCE_OVERRIDE_FORBIDDEN otherwise).',
   })
-  @CheckAbility('create', 'Attendance')
+  @CheckAbility({ action: 'create', subject: 'Attendance' })
   async openAttendanceSession(
     @Args('input') input: CreateAttendanceSessionInput,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -156,7 +156,7 @@ export class AttendanceResolver {
     description:
       'Override an existing attendance session — replaces lecturer and/or subject. Past-dated sessions require the AttendanceOverride permission.',
   })
-  @CheckAbility('update', 'Attendance')
+  @CheckAbility({ action: 'update', subject: 'Attendance' })
   async overrideAttendanceSession(
     @Args('sessionId', { type: () => ID }) sessionId: string,
     @Args('lecturerId', { type: () => ID }) lecturerId: string,
@@ -170,7 +170,7 @@ export class AttendanceResolver {
     description:
       'Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true`, and ATTENDANCE_OVERRIDE_FORBIDDEN unless the caller may `update` AttendanceOverride for the section. Overrides are audited.',
   })
-  @CheckAbility('update', 'Attendance')
+  @CheckAbility({ action: 'update', subject: 'Attendance' })
   async markAttendance(
     @Args('input') input: MarkAttendanceInput,
     @Args('overridePastDay', { type: () => Boolean, nullable: true })
@@ -190,7 +190,7 @@ export class AttendanceResolver {
     description:
       'Bulk-mark a roster. Same past-day guard as markAttendance: `overridePastDay: true` plus the AttendanceOverride permission.',
   })
-  @CheckAbility('update', 'Attendance')
+  @CheckAbility({ action: 'update', subject: 'Attendance' })
   async bulkMarkAttendance(
     @Args('input') input: BulkMarkAttendanceInput,
     @Args('overridePastDay', { type: () => Boolean, nullable: true })
@@ -210,7 +210,7 @@ export class AttendanceResolver {
     description:
       'Soft-delete a session. Past-dated sessions require the AttendanceOverride permission, so a past register cannot be deleted and re-seeded.',
   })
-  @CheckAbility('delete', 'Attendance')
+  @CheckAbility({ action: 'delete', subject: 'Attendance' })
   async deleteAttendanceSession(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,

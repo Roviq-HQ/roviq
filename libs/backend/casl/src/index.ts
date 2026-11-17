@@ -1,7 +1,7 @@
 export { AbilityFactory } from './ability.factory';
 export { AbilityGuard } from './ability.guard';
 export { type CaslColumnMap, caslToSqlWhere } from './casl-to-sql';
-export { type AbilityCheck, CHECK_ABILITY_KEY, CheckAbility } from './check-ability.decorator';
+export { type AbilityCheck, CheckAbility } from './check-ability.decorator';
 export { CurrentAbility } from './current-ability.decorator';
 export {
   type AbilityRequestContext,

@@ -24,7 +24,7 @@ export class StudentAcademicResolver {
     description:
       'Year-by-year academic history for a single student (Academics tab on detail page).',
   })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   async listStudentAcademics(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -36,14 +36,14 @@ export class StudentAcademicResolver {
   }
 
   @Mutation(() => ID, { description: 'Enroll a student in a section with capacity check' })
-  @CheckAbility('create', 'Student')
+  @CheckAbility({ action: 'create', subject: 'Student' })
   async enrollStudent(@Args('input') input: EnrollStudentInput): Promise<string> {
     const result = await this.academicService.enroll(input);
     return result.id;
   }
 
   @Mutation(() => ID, { description: 'Change student section with capacity check' })
-  @CheckAbility('update', 'Student')
+  @CheckAbility({ action: 'update', subject: 'Student' })
   async updateStudentSection(@Args('input') input: UpdateStudentSectionInput): Promise<string> {
     const result = await this.academicService.changeSection(input);
     return result.id;

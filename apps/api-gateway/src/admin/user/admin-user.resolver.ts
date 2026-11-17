@@ -15,7 +15,7 @@ export class AdminUserResolver {
   @Query(() => AdminUserConnection, {
     description: 'List all users with pagination, search, and filters (platform admin)',
   })
-  @CheckAbility('read', 'User')
+  @CheckAbility({ action: 'read', subject: 'User' })
   async adminListUsers(@Args('filter', { nullable: true }) filter?: AdminListUsersFilterInput) {
     return this.service.list(filter ?? {});
   }
@@ -23,7 +23,7 @@ export class AdminUserResolver {
   @Query(() => [AdminUserModel], {
     description: 'Typeahead search for users by name, username, or phone (platform admin)',
   })
-  @CheckAbility('read', 'User')
+  @CheckAbility({ action: 'read', subject: 'User' })
   async adminSearchUsers(
     @Args('query') query: string,
     @Args('limit', { type: () => Int, defaultValue: 10 }) limit: number,

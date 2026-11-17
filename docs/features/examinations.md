@@ -56,7 +56,7 @@ Forbidden transitions throw `BusinessException(ErrorCode.INVALID_STATE_TRANSITIO
 
 ## GraphQL surface (institute scope)
 
-Both resolvers guard with `@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)`. Each operation carries a granular `@CheckAbility(action, subject)` — `read`/`create`/`update`/`delete`/`manage` against `GradingScheme` | `Exam` | `ReportCard` (not blanket `manage`).
+Both resolvers guard with `@UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)`. Each operation carries a granular `@CheckAbility({ action, subject })` — `read`/`create`/`update`/`delete`/`manage` against `GradingScheme` | `Exam` | `ReportCard` (not blanket `manage`).
 
 **Grading & config** — Queries: `gradingSchemes`, `gradingScheme`, `examTerms`, `subjectTopics`, `coScholasticAreas`. Mutations: `createGradingScheme`, `updateGradingScheme`, `replaceGradeBands`, `deleteGradingScheme`, `createExamTerm`, `updateExamTerm`, `deleteExamTerm`, `createSubjectTopic`, `deleteSubjectTopic`, `createCoScholasticArea`, `deleteCoScholasticArea` (config mutations require `manage`).
 

@@ -14,7 +14,7 @@ export class StaffResolver {
   constructor(private readonly staffService: StaffService) {}
 
   @Query(() => [StaffModel], { description: 'List staff with optional filters' })
-  @CheckAbility('read', 'Staff')
+  @CheckAbility({ action: 'read', subject: 'Staff' })
   async listStaff(
     @Args('filter', { nullable: true }) filter?: ListStaffFilterInput,
   ): Promise<StaffModel[]> {
@@ -22,25 +22,25 @@ export class StaffResolver {
   }
 
   @Query(() => StaffModel, { description: 'Get a single staff member by ID' })
-  @CheckAbility('read', 'Staff')
+  @CheckAbility({ action: 'read', subject: 'Staff' })
   async getStaffMember(@Args('id', { type: () => ID }) id: string): Promise<StaffModel> {
     return this.staffService.findById(id) as Promise<StaffModel>;
   }
 
   @Query(() => StaffStatistics, { description: 'Staff statistics aggregated by department' })
-  @CheckAbility('read', 'Staff')
+  @CheckAbility({ action: 'read', subject: 'Staff' })
   async staffStatistics(): Promise<StaffStatistics> {
     return this.staffService.statistics() as Promise<StaffStatistics>;
   }
 
   @Mutation(() => StaffModel, { description: 'Create a new staff member' })
-  @CheckAbility('create', 'Staff')
+  @CheckAbility({ action: 'create', subject: 'Staff' })
   async createStaffMember(@Args('input') input: CreateStaffInput): Promise<StaffModel> {
     return this.staffService.create(input) as Promise<StaffModel>;
   }
 
   @Mutation(() => StaffModel, { description: 'Update staff member with optimistic concurrency' })
-  @CheckAbility('update', 'Staff')
+  @CheckAbility({ action: 'update', subject: 'Staff' })
   async updateStaffMember(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateStaffInput,
@@ -49,7 +49,7 @@ export class StaffResolver {
   }
 
   @Mutation(() => Boolean, { description: 'Soft-delete staff member, sets date_of_leaving' })
-  @CheckAbility('delete', 'Staff')
+  @CheckAbility({ action: 'delete', subject: 'Staff' })
   async deleteStaffMember(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.staffService.delete(id);
   }

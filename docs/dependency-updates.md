@@ -273,7 +273,7 @@ needs tightening.
 ### 63 minors applied in one commit, one of them breaks prod a week later
 
 You broke the rule. Semver said it was safe; the publisher lied. This
-is why we have the test suite running pre-commit — if the test suite
+is why we have the test suite running pre-push — if the test suite
 didn't catch it, add a test that does. `git revert` the bump commit,
 then pin the culprit in `package.json` and re-run `deps:update`.
 

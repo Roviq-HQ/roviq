@@ -7,7 +7,7 @@
  *      next `me` query reflects the new value (proves cache invalidation
  *      flushed the role-abilities Redis entry that backs `getPrimaryNavSlugs`).
  *   2. Authorization: a non-admin role (class_teacher / TEACHER seed user) is
- *      blocked by the @CheckAbility('update', 'Role') decorator → FORBIDDEN.
+ *      blocked by the @CheckAbility({ action: 'update', subject: 'Role' }) decorator → FORBIDDEN.
  *   3. Cross-tenant: an admin in tenant A passing a role ID belonging to
  *      tenant B is rejected — RLS hides the row from the UPDATE so the repo
  *      throws NotFoundException → propagates to GraphQL.

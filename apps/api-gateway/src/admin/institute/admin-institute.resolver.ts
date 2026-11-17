@@ -20,7 +20,7 @@ export class AdminInstituteResolver {
   ) {}
 
   @Query(() => InstituteConnection)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async adminListInstitutes(
     @Args('filter', { nullable: true }) filter?: AdminListInstitutesFilterInput,
   ) {
@@ -28,19 +28,19 @@ export class AdminInstituteResolver {
   }
 
   @Query(() => InstituteModel)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async adminGetInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.findById(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('create', 'Institute')
+  @CheckAbility({ action: 'create', subject: 'Institute' })
   async adminCreateInstitute(@Args('input') input: AdminCreateInstituteInput) {
     return this.instituteService.create(input);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('approve', 'Institute')
+  @CheckAbility({ action: 'approve', subject: 'Institute' })
   async adminApproveInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.adminService.approve(id);
   }
@@ -49,13 +49,13 @@ export class AdminInstituteResolver {
     description:
       'Activate institute (PENDING/INACTIVE/SUSPENDED → ACTIVE). Requires setup_status COMPLETED.',
   })
-  @CheckAbility('activate', 'Institute')
+  @CheckAbility({ action: 'activate', subject: 'Institute' })
   async adminActivateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.activate(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('reject', 'Institute')
+  @CheckAbility({ action: 'reject', subject: 'Institute' })
   async adminRejectInstitute(
     @Args('id', { type: () => ID }) id: string,
     @Args('reason') reason: string,
@@ -64,13 +64,13 @@ export class AdminInstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('deactivate', 'Institute')
+  @CheckAbility({ action: 'deactivate', subject: 'Institute' })
   async adminDeactivateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.deactivate(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('suspend', 'Institute')
+  @CheckAbility({ action: 'suspend', subject: 'Institute' })
   async adminSuspendInstitute(
     @Args('id', { type: () => ID }) id: string,
     @Args('reason', { nullable: true }) reason?: string,
@@ -79,13 +79,13 @@ export class AdminInstituteResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'Institute')
+  @CheckAbility({ action: 'delete', subject: 'Institute' })
   async adminDeleteInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.delete(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('restore', 'Institute')
+  @CheckAbility({ action: 'restore', subject: 'Institute' })
   async adminRestoreInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.restore(id);
   }
@@ -93,7 +93,7 @@ export class AdminInstituteResolver {
   @Mutation(() => InstituteModel, {
     description: 'Reassign an institute to a different active reseller',
   })
-  @CheckAbility('update', 'Institute')
+  @CheckAbility({ action: 'update', subject: 'Institute' })
   async adminReassignInstituteReseller(
     @Args('id', { type: () => ID }) id: string,
     @Args('newResellerId', { type: () => ID }) newResellerId: string,
@@ -104,7 +104,7 @@ export class AdminInstituteResolver {
   @Mutation(() => InstituteModel, {
     description: 'Assign an institute to a group (franchise/trust)',
   })
-  @CheckAbility('update', 'Institute')
+  @CheckAbility({ action: 'update', subject: 'Institute' })
   async adminAssignInstituteGroup(
     @Args('id', { type: () => ID }) id: string,
     @Args('groupId', { type: () => ID }) groupId: string,
@@ -115,7 +115,7 @@ export class AdminInstituteResolver {
   @Mutation(() => InstituteModel, {
     description: 'Remove an institute from its group (clears the group assignment)',
   })
-  @CheckAbility('update', 'Institute')
+  @CheckAbility({ action: 'update', subject: 'Institute' })
   async adminRemoveInstituteGroup(@Args('id', { type: () => ID }) id: string) {
     return this.adminService.removeGroup(id);
   }
@@ -124,13 +124,13 @@ export class AdminInstituteResolver {
     description:
       'Retry the institute setup workflow for an institute whose setup failed or is stuck. Idempotent.',
   })
-  @CheckAbility('update', 'Institute')
+  @CheckAbility({ action: 'update', subject: 'Institute' })
   async adminRetryInstituteSetup(@Args('id', { type: () => ID }) id: string) {
     return this.adminService.retrySetup(id);
   }
 
   @Query(() => InstituteStatisticsModel)
-  @CheckAbility('view_statistics', 'Institute')
+  @CheckAbility({ action: 'view_statistics', subject: 'Institute' })
   async adminInstituteStatistics() {
     return this.adminService.getStatistics();
   }
@@ -139,7 +139,7 @@ export class AdminInstituteResolver {
     description:
       'Read-only academic structure (standards → sections + subjects) for an institute — admin-view only, institute portal owns CRUD',
   })
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async adminGetInstituteAcademicTree(
     @Args('instituteId', { type: () => ID }) instituteId: string,
   ) {

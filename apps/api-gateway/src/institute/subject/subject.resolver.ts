@@ -15,13 +15,13 @@ export class SubjectResolver {
   constructor(private readonly subjectService: SubjectService) {}
 
   @Query(() => [SubjectModel], { description: 'List every subject in the current institute.' })
-  @CheckAbility('read', 'Subject')
+  @CheckAbility({ action: 'read', subject: 'Subject' })
   async subjects(): Promise<SubjectRecord[]> {
     return this.subjectService.findAll();
   }
 
   @Query(() => SubjectModel, { description: 'Fetch a subject by id.' })
-  @CheckAbility('read', 'Subject')
+  @CheckAbility({ action: 'read', subject: 'Subject' })
   async subject(@Args('id', { type: () => ID }) id: string): Promise<SubjectRecord> {
     return this.subjectService.findById(id);
   }
@@ -29,7 +29,7 @@ export class SubjectResolver {
   @Query(() => [SubjectModel], {
     description: 'Subjects linked to the given standard via `standard_subjects`.',
   })
-  @CheckAbility('read', 'Subject')
+  @CheckAbility({ action: 'read', subject: 'Subject' })
   async subjectsByStandard(
     @Args('standardId', { type: () => ID }) standardId: string,
   ): Promise<SubjectRecord[]> {
@@ -40,7 +40,7 @@ export class SubjectResolver {
     description:
       'Every subject linked to the year’s standards, each tagged with its standard. One batched read replacing per-standard fan-out for label maps.',
   })
-  @CheckAbility('read', 'Subject')
+  @CheckAbility({ action: 'read', subject: 'Subject' })
   async subjectsByAcademicYear(
     @Args('academicYearId', {
       type: () => ID,
@@ -53,13 +53,13 @@ export class SubjectResolver {
   }
 
   @Mutation(() => SubjectModel, { description: 'Create a subject in the current institute.' })
-  @CheckAbility('create', 'Subject')
+  @CheckAbility({ action: 'create', subject: 'Subject' })
   async createSubject(@Args('input') input: CreateSubjectInput): Promise<SubjectRecord> {
     return this.subjectService.create(input);
   }
 
   @Mutation(() => SubjectModel, { description: 'Update an existing subject by id.' })
-  @CheckAbility('update', 'Subject')
+  @CheckAbility({ action: 'update', subject: 'Subject' })
   async updateSubject(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateSubjectInput,
@@ -70,7 +70,7 @@ export class SubjectResolver {
   @Mutation(() => Boolean, {
     description: 'Soft-delete a subject. Returns true on success.',
   })
-  @CheckAbility('delete', 'Subject')
+  @CheckAbility({ action: 'delete', subject: 'Subject' })
   async deleteSubject(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.subjectService.delete(id);
   }
@@ -83,7 +83,7 @@ export class SubjectResolver {
     description:
       'Link the subject to a standard (idempotent). Returns the subject for cache-update parity.',
   })
-  @CheckAbility('update', 'Subject')
+  @CheckAbility({ action: 'update', subject: 'Subject' })
   async assignSubjectToStandard(
     @Args('subjectId', { type: () => ID }) subjectId: string,
     @Args('standardId', { type: () => ID }) standardId: string,
@@ -95,7 +95,7 @@ export class SubjectResolver {
   @Mutation(() => SubjectModel, {
     description: 'Remove the subject from a standard (idempotent). Returns the subject.',
   })
-  @CheckAbility('update', 'Subject')
+  @CheckAbility({ action: 'update', subject: 'Subject' })
   async removeSubjectFromStandard(
     @Args('subjectId', { type: () => ID }) subjectId: string,
     @Args('standardId', { type: () => ID }) standardId: string,
@@ -108,7 +108,7 @@ export class SubjectResolver {
     description:
       'Link the subject to a section (idempotent). Returns the subject for cache-update parity.',
   })
-  @CheckAbility('update', 'Subject')
+  @CheckAbility({ action: 'update', subject: 'Subject' })
   async assignSubjectToSection(
     @Args('subjectId', { type: () => ID }) subjectId: string,
     @Args('sectionId', { type: () => ID }) sectionId: string,
@@ -120,7 +120,7 @@ export class SubjectResolver {
   @Mutation(() => SubjectModel, {
     description: 'Remove the subject from a section (idempotent). Returns the subject.',
   })
-  @CheckAbility('update', 'Subject')
+  @CheckAbility({ action: 'update', subject: 'Subject' })
   async removeSubjectFromSection(
     @Args('subjectId', { type: () => ID }) subjectId: string,
     @Args('sectionId', { type: () => ID }) sectionId: string,

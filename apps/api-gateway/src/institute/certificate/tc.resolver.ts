@@ -15,19 +15,19 @@ export class TCResolver {
   @Mutation(() => TCModel, {
     description: 'Request a Transfer Certificate — starts TCIssuanceWorkflow',
   })
-  @CheckAbility('create', 'TC')
+  @CheckAbility({ action: 'create', subject: 'TC' })
   async requestTC(@Args('input') input: RequestTCInput): Promise<TCModel> {
     return this.certService.requestTC(input) as Promise<TCModel>;
   }
 
   @Mutation(() => TCModel, { description: 'Approve a TC (principal only)' })
-  @CheckAbility('manage', 'TC')
+  @CheckAbility({ action: 'manage', subject: 'TC' })
   async approveTC(@Args('id', { type: () => ID }) id: string): Promise<TCModel> {
     return this.certService.approveTC(id) as Promise<TCModel>;
   }
 
   @Mutation(() => TCModel, { description: 'Reject a transfer certificate request' })
-  @CheckAbility('manage', 'TC')
+  @CheckAbility({ action: 'manage', subject: 'TC' })
   async rejectTC(
     @Args('id', { type: () => ID }) id: string,
     @Args('reason') reason: string,
@@ -39,19 +39,19 @@ export class TCResolver {
   @Mutation(() => TCModel, {
     description: 'Issue TC — generates serial, PDF, marks student transferred_out',
   })
-  @CheckAbility('manage', 'TC')
+  @CheckAbility({ action: 'manage', subject: 'TC' })
   async issueTC(@Args('id', { type: () => ID }) id: string): Promise<TCModel> {
     return this.certService.issueTC(id) as Promise<TCModel>;
   }
 
   @Query(() => TCModel, { description: 'Get TC details including 20-field CBSE data snapshot' })
-  @CheckAbility('read', 'TC')
+  @CheckAbility({ action: 'read', subject: 'TC' })
   async getTCDetails(@Args('id', { type: () => ID }) id: string): Promise<TCModel> {
     return this.certService.getTCDetails(id) as Promise<TCModel>;
   }
 
   @Query(() => [TCModel], { description: 'List TCs with optional filters' })
-  @CheckAbility('read', 'TC')
+  @CheckAbility({ action: 'read', subject: 'TC' })
   async listTCs(
     @Args('filter', { nullable: true }) filter?: ListTCFilterInput,
   ): Promise<TCModel[]> {
@@ -61,7 +61,7 @@ export class TCResolver {
   @Mutation(() => TCModel, {
     description: 'Request duplicate TC (PRD §5.3) — is_duplicate=true, references original',
   })
-  @CheckAbility('create', 'TC')
+  @CheckAbility({ action: 'create', subject: 'TC' })
   async requestDuplicateTC(@Args('input') input: RequestDuplicateTCInput): Promise<TCModel> {
     return this.certService.requestDuplicateTC({
       originalTcId: input.originalTcId,

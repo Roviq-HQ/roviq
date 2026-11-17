@@ -554,3 +554,22 @@ Each worktree is now an instance with a slot number: ports are `default + slot �
 Also fixed: `tilt up` against a brand-new database failed 30 times with `function i18n_text_to_string(jsonb) does not exist`, because `drizzle-kit push` alone does not create the prereq functions. Tilt's `db-push` now runs `pnpm db:reset --if-empty` first, which bootstraps a database that has no migration baseline and no users and does nothing otherwise.
 
 **Verification:** slot 0 and slot 1 ran side by side (API 3005 / 3025, web 4200 / 4220, separate `docker` and `roviq-1` projects); a table created in slot 1's database was absent from slot 0's; an admin login in the browser on `admin.localhost:4220` sent its GraphQL requests to `localhost:3025`.
+
+
+## 2026-11-17 — fixed: pre-commit built three apps and ran the full unit suite on every commit
+
+`.husky/pre-commit` ran `nx run-many -t build -p api-gateway,web,notification-service` and the full Vitest unit suite (`unit-node` + `unit-dom`, ~17s, not Nx-cached) on every commit. A branch with three small commits paid for the unit suite three times, and the build step could collide with a running Tilt gateway (`web:codegen` needs the live gateway on its port).
+
+Both steps are removed from pre-commit. Pre-push already runs them through `pnpm ci:check` (`typecheck` for affected projects and `pnpm test:unit`), so nothing reaches the remote unchecked. Pre-commit now runs only Biome (`biome check --write`) and `lint-staged`.
+
+This supersedes the note in the 2026-04-17 entry that pre-commit was "intentionally NOT modified": that note assumed every overlapping target was Nx-cached, which is not true of the direct `vitest run` call.
+
+**Trade-off:** a commit can now contain a type error or failing unit test; it is caught at push time. `git push --no-verify` or `SKIP_PREPUSH=1` skips the check locally, and CI's `typecheck` and `test` jobs still block the PR.
+
+
+## 2026-11-17 — fixed: four fast CI lint-job checks ran in neither git hook
+
+`check:synthetic-context-usage`, `check:direct-nats-emit`, `test:check-integration` and `test:check-dates` ran only in CI's `lint` job, so a violation was found after the push. They take about 3s together and are now part of the `gates` group in `scripts/ci-check.sh`, which runs on every pre-push regardless of the affected set.
+
+Still CI-only: the codegen-drift step (needs a running gateway). Still pre-push-only: `check:no-double-cast` and `check:db-drift`.
+

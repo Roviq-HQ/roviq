@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { AbilityFactory } from './ability.factory';
-import { type AbilityCheck, CHECK_ABILITY_KEY } from './check-ability.decorator';
+import { CheckAbility } from './check-ability.decorator';
 
 @Injectable()
 export class AbilityGuard implements CanActivate {
@@ -17,10 +17,7 @@ export class AbilityGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const check = this.reflector.get<AbilityCheck | undefined>(
-      CHECK_ABILITY_KEY,
-      context.getHandler(),
-    );
+    const check = this.reflector.get(CheckAbility, context.getHandler());
 
     if (!check) {
       return true; // No ability check required

@@ -20,7 +20,7 @@ export class BotResolver {
   constructor(private readonly botService: BotService) {}
 
   @Mutation(() => CreateBotResponse)
-  @CheckAbility('create', 'Bot')
+  @CheckAbility({ action: 'create', subject: 'Bot' })
   async createBot(
     @Args('input') input: CreateBotInput,
     @CurrentUser() user: AuthUser,
@@ -30,7 +30,7 @@ export class BotResolver {
   }
 
   @Mutation(() => CreateBotResponse)
-  @CheckAbility('update', 'Bot')
+  @CheckAbility({ action: 'update', subject: 'Bot' })
   async rotateBotApiKey(
     @Args('botId', { type: () => ID }) botId: string,
   ): Promise<CreateBotResponse> {
@@ -38,13 +38,13 @@ export class BotResolver {
   }
 
   @Query(() => [BotModel])
-  @CheckAbility('read', 'Bot')
+  @CheckAbility({ action: 'read', subject: 'Bot' })
   async listBots(): Promise<BotModel[]> {
     return this.botService.listBots();
   }
 
   @Mutation(() => BotModel)
-  @CheckAbility('update', 'Bot')
+  @CheckAbility({ action: 'update', subject: 'Bot' })
   async updateBot(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateBotInput,
@@ -53,7 +53,7 @@ export class BotResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'Bot')
+  @CheckAbility({ action: 'delete', subject: 'Bot' })
   async deleteBot(
     @Args('id', { type: () => ID }) id: string,
     @CurrentUser() user: AuthUser,

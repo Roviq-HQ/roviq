@@ -21,7 +21,7 @@ export class StaffQualificationResolver {
   @Query(() => [StaffQualificationModel], {
     description: 'List qualifications for a given staff profile',
   })
-  @CheckAbility('read', 'Staff')
+  @CheckAbility({ action: 'read', subject: 'Staff' })
   async listStaffQualifications(
     @Args('staffProfileId', { type: () => ID }) staffProfileId: string,
   ): Promise<StaffQualificationModel[]> {
@@ -31,7 +31,7 @@ export class StaffQualificationResolver {
   @Mutation(() => StaffQualificationModel, {
     description: 'Add a qualification record to a staff profile',
   })
-  @CheckAbility('update', 'Staff')
+  @CheckAbility({ action: 'update', subject: 'Staff' })
   async createStaffQualification(
     @Args('input') input: CreateStaffQualificationInput,
   ): Promise<StaffQualificationModel> {
@@ -41,7 +41,7 @@ export class StaffQualificationResolver {
   @Mutation(() => StaffQualificationModel, {
     description: 'Update an existing staff qualification',
   })
-  @CheckAbility('update', 'Staff')
+  @CheckAbility({ action: 'update', subject: 'Staff' })
   async updateStaffQualification(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateStaffQualificationInput,
@@ -50,7 +50,7 @@ export class StaffQualificationResolver {
   }
 
   @Mutation(() => Boolean, { description: 'Delete a staff qualification record' })
-  @CheckAbility('update', 'Staff')
+  @CheckAbility({ action: 'update', subject: 'Staff' })
   async deleteStaffQualification(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.service.delete(id);
   }
