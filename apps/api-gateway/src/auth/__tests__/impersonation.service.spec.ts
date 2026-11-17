@@ -867,11 +867,43 @@ describe('ImpersonationService', () => {
       expect(inserted).toEqual([]);
     });
 
+    it.each([
+      ['the caller uses a token of another scope', platformActor, []],
+      [
+        'the reseller membership was deactivated meanwhile',
+        resellerActor,
+        [{ table: 'reseller_memberships', rows: [] }],
+      ],
+      [
+        'the institute moved to another reseller meanwhile',
+        resellerActor,
+        [ACTIVE_RESELLER_MEMBERSHIP, { table: 'institutes', rows: [{ resellerId: 'reseller-B' }] }],
+      ],
+    ])('opens no session with the right OTP when %s', async (_label, actor, selects) => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.getdel).mockResolvedValue(JSON.stringify(pending));
+      const { tx, inserted } = createTx({ selects });
+      setTx(tx);
+
+      await expect(service.verifyOtp(actor, 'request-1', '111111')).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
+      expect(inserted).toEqual([]);
+      expect(redis.set).not.toHaveBeenCalled();
+    });
+
     it('on match consumes the request, writes the verified session and returns an exchange code', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
       vi.mocked(redis.getdel).mockResolvedValue(JSON.stringify(pending));
-      const { tx, inserted } = createTx({ insertReturning: [{ id: 'session-31' }] });
+      const { tx, inserted } = createTx({
+        selects: [
+          ACTIVE_RESELLER_MEMBERSHIP,
+          { table: 'institutes', rows: [{ resellerId: 'reseller-1' }] },
+        ],
+        insertReturning: [{ id: 'session-31' }],
+      });
       setTx(tx);
 
       const result = await service.verifyOtp(resellerActor, 'request-1', '111111');

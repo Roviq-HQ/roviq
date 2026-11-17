@@ -323,6 +323,9 @@ export class ImpersonationService {
     }
     await this.redis.del(attemptsKey);
 
+    // Minutes may have passed since the request was started.
+    await this.assertStillAuthorized(actor, pending);
+
     const sessionId = await this.createSession(pending, pending.verifierUserId);
     const code = await this.issueImpersonationCode({
       sessionId,
@@ -714,6 +717,32 @@ export class ImpersonationService {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
         'Cannot start impersonation from an impersonation session',
+      );
+    }
+  }
+
+  /** Re-runs the scope checks of the start step for the caller completing an OTP request. */
+  private async assertStillAuthorized(actor: AuthUser, pending: PendingOtp): Promise<void> {
+    if (actor.scope !== pending.impersonatorScope) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'OTP verification not authorized for this request',
+      );
+    }
+    if (actor.scope !== 'reseller') return;
+
+    await this.assertActiveResellerMembership(actor);
+    const [institute] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ resellerId: institutesLive.resellerId })
+        .from(institutesLive)
+        .where(eq(institutesLive.id, pending.tenantId))
+        .limit(1),
+    );
+    if (institute?.resellerId !== actor.resellerId) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Institute does not belong to your reseller',
       );
     }
   }
