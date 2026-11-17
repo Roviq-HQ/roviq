@@ -5,17 +5,17 @@
  *   01-create-enquiry         — create + basic fields + isDuplicate=false
  *   02-list-enquiries         — list + status filter + search
  *   03-convert-to-application — enquiry → application, status=submitted
- *   04-application-lifecycle  — SUBMITTED → DOCUMENTS_PENDING → … → FEE_PAID
- *                               (ENROLLED requires StudentAdmissionWorkflow
- *                               worker — ROV-232; approveApplication is
- *                               asserted up to workflow start only)
+ *   04-application-lifecycle  — SUBMITTED → DOCUMENTS_PENDING → … → FEE_PAID,
+ *                               approveApplication → ENROLLED via
+ *                               StudentAdmissionWorkflow, rejectApplication
  *   05-admission-statistics   — funnel + ratios
  *   06-rte-application        — isRteApplication preserved through status change
  *   07-dedup-enquiry          — same (phone + class) → isDuplicate=true
  *
  * Plus subscription coverage Hurl could not express:
  *   - enquiryCreated fires after createEnquiry
- *   - applicationStatusUpdated fires after updateApplication
+ *   - applicationStatusChanged fires after updateApplication and after the
+ *     workflow enrols the student
  *
  * Tests share login state via `beforeAll`. Later tests reuse ids captured by
  * earlier tests within the same describe block.
@@ -35,15 +35,11 @@ import { loginAsInstituteAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 import { subscribeOnce } from './helpers/ws-client';
 
-// NOTE: Admission module is not yet feature-complete — several mutations
-// (createApplication formData validator, approveApplication workflow wiring)
-// still have pre-existing gaps. The spec is drafted as a migration target,
-// but the whole suite is skipped until the module is finished. Do not delete
-// e2e/api-gateway-e2e/hurl/admission/ until this spec is unskipped and passes.
-describe.skip('Admission E2E (blocked: module incomplete — formData validator, admission worker per ROV-232)', () => {
+describe('Admission E2E', () => {
   let accessToken: string;
   let academicYearId: string;
   let standardId: string;
+  let sectionId: string;
 
   beforeAll(async () => {
     const admin = await loginAsInstituteAdmin();
@@ -59,6 +55,16 @@ describe.skip('Admission E2E (blocked: module incomplete — formData validator,
     const standards = standardsRes.data?.standards ?? [];
     expect(standards.length).toBeGreaterThanOrEqual(1);
     standardId = standards[0].id;
+
+    const sectionsRes = await gql<{ sections: Array<{ id: string }> }>(
+      `query Sections($standardId: ID!) { sections(standardId: $standardId) { id } }`,
+      { standardId },
+      accessToken,
+    );
+    expect(sectionsRes.errors).toBeUndefined();
+    const firstSection = sectionsRes.data?.sections[0];
+    assert(firstSection);
+    sectionId = firstSection.id;
   });
 
   // ─────────────────────────────────────────────────────
@@ -307,31 +313,18 @@ describe.skip('Admission E2E (blocked: module incomplete — formData validator,
       }
     });
 
-    it('approveApplication triggers StudentAdmissionWorkflow (enrolled transition requires worker — ROV-232)', async () => {
-      // We can assert the mutation itself returns successfully and sets the
-      // status to ENROLLED at the service layer (post-workflow-start). The
-      // full end-to-end (worker picks up, activities run, student record
-      // created) is blocked on the worker addition tracked in ROV-232.
-      // Until then, this test confirms the trigger endpoint works; the
-      // background workflow will accumulate in Temporal's queue.
+    async function createFeePaidApplication(studentName: string, parentPhone: string) {
       const createRes = await gql<{ createApplication: { id: string } }>(
         `mutation CreateApp($input: CreateApplicationInput!) {
           createApplication(input: $input) { id }
         }`,
-        {
-          input: {
-            academicYearId,
-            standardId,
-            formData: { studentName: 'Approve Test', parentPhone: '9111000022' },
-          },
-        },
+        { input: { academicYearId, standardId, formData: { studentName, parentPhone } } },
         accessToken,
       );
       expect(createRes.errors).toBeUndefined();
       const appId = createRes.data?.createApplication.id;
       assert(appId);
 
-      // Fast-forward through states to FEE_PAID.
       for (const status of [
         AdmissionApplicationStatus.DOCUMENTS_PENDING,
         AdmissionApplicationStatus.DOCUMENTS_VERIFIED,
@@ -343,23 +336,162 @@ describe.skip('Admission E2E (blocked: module incomplete — formData validator,
         const r = await gql(UPDATE, { id: appId, input: { status } }, accessToken);
         expect(r.errors, `transition to ${status} failed`).toBeUndefined();
       }
+      return appId;
+    }
+
+    const APPROVE = `
+      mutation Approve($id: ID!, $sectionId: ID) {
+        approveApplication(id: $id, sectionId: $sectionId) { id status sectionId }
+      }
+    `;
+
+    it('approveApplication enrols the applicant through StudentAdmissionWorkflow', async () => {
+      const appId = await createFeePaidApplication(
+        'Approve Test',
+        `91110${String(Date.now()).slice(-5)}`,
+      );
+
+      type Envelope = {
+        applicationStatusChanged: {
+          applicationId: string;
+          oldStatus: AdmissionApplicationStatus;
+          newStatus: AdmissionApplicationStatus;
+        };
+      };
+      const eventPromise = subscribeOnce<Envelope>(
+        `subscription { applicationStatusChanged { applicationId oldStatus newStatus } }`,
+        {},
+        accessToken,
+        30_000,
+      );
+      await new Promise((r) => setTimeout(r, 200));
 
       const approveRes = await gql<{
-        approveApplication: { id: string; status: AdmissionApplicationStatus };
+        approveApplication: {
+          id: string;
+          status: AdmissionApplicationStatus;
+          sectionId: string | null;
+        };
+      }>(APPROVE, { id: appId, sectionId }, accessToken);
+      expect(approveRes.errors).toBeUndefined();
+      // The mutation only starts the workflow — ENROLLED is the workflow's write.
+      expect(approveRes.data?.approveApplication).toEqual({
+        id: appId,
+        status: AdmissionApplicationStatus.FEE_PAID,
+        sectionId,
+      });
+
+      const event = await eventPromise;
+      expect(event.applicationStatusChanged).toEqual({
+        applicationId: appId,
+        oldStatus: AdmissionApplicationStatus.FEE_PAID,
+        newStatus: AdmissionApplicationStatus.ENROLLED,
+      });
+
+      const appRes = await gql<{
+        getApplication: { status: AdmissionApplicationStatus; studentProfileId: string | null };
       }>(
-        `mutation Approve($id: ID!) { approveApplication(id: $id) { id status } }`,
+        `query App($id: ID!) { getApplication(id: $id) { status studentProfileId } }`,
         { id: appId },
         accessToken,
       );
-      expect(approveRes.errors).toBeUndefined();
-      expect(approveRes.data?.approveApplication.status).toBe(AdmissionApplicationStatus.ENROLLED);
+      expect(appRes.errors).toBeUndefined();
+      expect(appRes.data?.getApplication.status).toBe(AdmissionApplicationStatus.ENROLLED);
+      const studentProfileId = appRes.data?.getApplication.studentProfileId;
+      assert(studentProfileId);
+
+      const studentRes = await gql<{
+        getStudent: { id: string; academicStatus: string; currentSectionId: string | null };
+      }>(
+        `query Student($id: ID!) { getStudent(id: $id) { id academicStatus currentSectionId } }`,
+        { id: studentProfileId },
+        accessToken,
+      );
+      expect(studentRes.errors).toBeUndefined();
+      expect(studentRes.data?.getStudent).toEqual({
+        id: studentProfileId,
+        academicStatus: 'ENROLLED',
+        currentSectionId: sectionId,
+      });
+    });
+
+    it('approveApplication refuses an application with no section', async () => {
+      const appId = await createFeePaidApplication(
+        'No Section Test',
+        `91120${String(Date.now()).slice(-5)}`,
+      );
+
+      const res = await gql(APPROVE, { id: appId }, accessToken);
+      expect(res.errors?.[0]?.extensions?.code).toBe('BAD_REQUEST');
+    });
+
+    it('updateApplication refuses ENROLLED so enrolment cannot bypass the workflow', async () => {
+      const appId = await createFeePaidApplication(
+        'Bypass Test',
+        `91130${String(Date.now()).slice(-5)}`,
+      );
+
+      const res = await gql(
+        UPDATE,
+        { id: appId, input: { status: AdmissionApplicationStatus.ENROLLED } },
+        accessToken,
+      );
+      expect(res.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
+    });
+
+    it('rejectApplication stores the reason and makes the application terminal', async () => {
+      const createRes = await gql<{ createApplication: { id: string } }>(
+        `mutation CreateApp($input: CreateApplicationInput!) {
+          createApplication(input: $input) { id }
+        }`,
+        {
+          input: {
+            academicYearId,
+            standardId,
+            formData: { studentName: 'Reject Test', parentPhone: '9111000033' },
+          },
+        },
+        accessToken,
+      );
+      expect(createRes.errors).toBeUndefined();
+      const appId = createRes.data?.createApplication.id;
+      assert(appId);
+
+      const rejectRes = await gql<{
+        rejectApplication: {
+          status: AdmissionApplicationStatus;
+          rejectionReason: string | null;
+          rejectedAt: string | null;
+          formData: Record<string, unknown>;
+        };
+      }>(
+        `mutation Reject($id: ID!, $reason: String) {
+          rejectApplication(id: $id, reason: $reason) { status rejectionReason rejectedAt formData }
+        }`,
+        { id: appId, reason: 'Seats full for this class' },
+        accessToken,
+      );
+      expect(rejectRes.errors).toBeUndefined();
+      const rejected = rejectRes.data?.rejectApplication;
+      assert(rejected);
+      expect(rejected.status).toBe(AdmissionApplicationStatus.REJECTED);
+      expect(rejected.rejectionReason).toBe('Seats full for this class');
+      expect(rejected.rejectedAt).toBeTruthy();
+      expect(rejected.formData).toEqual({ studentName: 'Reject Test', parentPhone: '9111000033' });
+
+      const again = await gql(
+        UPDATE,
+        { id: appId, input: { status: AdmissionApplicationStatus.DOCUMENTS_PENDING } },
+        accessToken,
+      );
+      expect(again.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
     });
   });
 
   // ─────────────────────────────────────────────────────
-  // applicationStatusUpdated subscription
+  // applicationStatusChanged subscription
   // ─────────────────────────────────────────────────────
-  describe('applicationStatusUpdated subscription', () => {
+  describe('applicationStatusChanged subscription', () => {
     it('fires after updateApplication with the new status', async () => {
       // Seed an application to mutate.
       const createRes = await gql<{ createApplication: { id: string } }>(
@@ -380,14 +512,14 @@ describe.skip('Admission E2E (blocked: module incomplete — formData validator,
       assert(appId);
 
       type Envelope = {
-        applicationStatusUpdated: {
+        applicationStatusChanged: {
           applicationId: string;
           newStatus: AdmissionApplicationStatus;
         };
       };
       const eventPromise = subscribeOnce<Envelope>(
         `subscription {
-          applicationStatusUpdated { applicationId newStatus }
+          applicationStatusChanged { applicationId newStatus }
         }`,
         {},
         accessToken,
@@ -404,8 +536,8 @@ describe.skip('Admission E2E (blocked: module incomplete — formData validator,
       expect(updateRes.errors).toBeUndefined();
 
       const event = await eventPromise;
-      expect(event.applicationStatusUpdated.applicationId).toBe(appId);
-      expect(event.applicationStatusUpdated.newStatus).toBe(
+      expect(event.applicationStatusChanged.applicationId).toBe(appId);
+      expect(event.applicationStatusChanged.newStatus).toBe(
         AdmissionApplicationStatus.DOCUMENTS_PENDING,
       );
     });

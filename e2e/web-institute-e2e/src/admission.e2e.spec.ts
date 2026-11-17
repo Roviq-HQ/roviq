@@ -3,12 +3,13 @@
  *
  * Exercises the page shells of the three admission routes
  * (`/admission/enquiries`, `/admission/applications`, `/admission/statistics`)
- * behind an authenticated institute admin session. Resilient to an empty seed
- * — no per-row assertions. End-to-end data flow (create → convert → approve)
- * is covered by the API-level e2e spec in `e2e/api-gateway-e2e/` which is
- * faster + deterministic.
+ * behind an authenticated institute admin session, plus the two terminal
+ * decisions an admin makes from the applications list (ROV-206): reject with
+ * a reason, and approve & enrol into a section.
  */
+
 import { expect, test } from '../../shared/console-guardian';
+import { AdmissionApplicationsPage } from './pages/AdmissionApplicationsPage';
 
 test.describe('Admission enquiries page', () => {
   test.beforeEach(async ({ page }) => {
@@ -51,6 +52,42 @@ test.describe('Admission applications page', () => {
     await expect(page.getByTestId('applications-title')).toBeVisible();
     await expect(page.getByTestId('applications-status-filter')).toBeVisible();
     await expect(page.getByTestId('applications-rte-filter')).toBeVisible();
+  });
+});
+
+test.describe('Admission application decisions', () => {
+  test('rejecting stores the reason and shows it on the row after a reload', async ({ page }) => {
+    const applications = new AdmissionApplicationsPage(page);
+    await applications.goto();
+    const id = await applications.createApplication(`UI Reject ${Date.now()}`);
+    await page.reload();
+
+    await applications.reject(id, 'Seats full for this class');
+
+    await expect(applications.rejectionReason(id)).toContainText('Seats full for this class');
+    await expect(applications.statusBadge(id)).toHaveText(/rejected/i);
+    await page.reload();
+    await expect(applications.rejectionReason(id)).toContainText('Seats full for this class');
+    await expect(applications.rejectButton(id)).toHaveCount(0);
+  });
+
+  test('approving needs a section and ends with the applicant enrolled', async ({ page }) => {
+    const applications = new AdmissionApplicationsPage(page);
+    await applications.goto();
+    const id = await applications.createApplication(`UI Enrol ${Date.now()}`);
+    await applications.advanceToFeePaid(id);
+    await page.reload();
+
+    await expect(applications.changeStatusButton(id)).toBeDisabled();
+    await applications.openApproveDialog(id);
+    await expect(applications.approveConfirmButton()).toBeDisabled();
+    await applications.chooseFirstSection();
+    await applications.approveConfirmButton().click();
+
+    // No reload: the workflow's applicationStatusChanged push updates the row.
+    await expect(applications.statusBadge(id)).toHaveText(/enrolled/i, {
+      timeout: 30_000,
+    });
   });
 });
 

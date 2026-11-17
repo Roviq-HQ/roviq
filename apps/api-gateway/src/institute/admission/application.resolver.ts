@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import {
@@ -74,11 +74,23 @@ export class ApplicationResolver {
   }
 
   @Mutation(() => ApplicationModel, {
-    description: 'Approve application → triggers StudentAdmissionWorkflow',
+    description: 'Start the enrolment workflow; status stays FEE_PAID until done',
   })
   @CheckAbility('update', 'Application')
-  async approveApplication(@Args('id', { type: () => ID }) id: string): Promise<ApplicationModel> {
-    return this.admissionService.approveAndEnroll(id);
+  async approveApplication(
+    @Args('id', { type: () => ID }) id: string,
+    @Args(
+      'sectionId',
+      {
+        type: () => ID,
+        nullable: true,
+        description: 'Section to place the student in; required unless the application has one',
+      },
+      new ParseUUIDPipe({ optional: true }),
+    )
+    sectionId?: string,
+  ): Promise<ApplicationModel> {
+    return this.admissionService.approveAndEnroll(id, sectionId);
   }
 
   @Mutation(() => ApplicationModel, { description: 'Reject an application' })

@@ -4,11 +4,15 @@
  * Verifies the 18-status pipeline rendering, RTE badge, status-change action
  * visibility, and the FEE_PAID → ENROLLED approve flow.
  */
+
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../../messages/en/admission.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
+
+const { instituteAdmissionApplications } = testIds;
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -56,6 +60,8 @@ const baseApp = {
   offeredAt: null,
   offerExpiresAt: null,
   offerAcceptedAt: null,
+  rejectionReason: null,
+  rejectedAt: null,
   studentProfileId: null,
   version: 1,
   createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
@@ -64,21 +70,47 @@ const baseApp = {
 
 const feePaidApp = { ...baseApp, id: 'app-2', status: 'FEE_PAID', isRteApplication: false };
 const submittedApp = { ...baseApp, status: 'SUBMITTED' };
+const rejectedApp = {
+  ...baseApp,
+  id: 'app-3',
+  status: 'REJECTED',
+  rejectionReason: 'Seats full for Class 1',
+  rejectedAt: new Date('2026-04-16T10:00:00Z').toISOString(),
+};
 
 const refetch = vi.fn();
+const listState = { failed: false };
+const approve = vi.fn(() => Promise.resolve({}));
 vi.mock('../../use-admission', () => ({
-  useApplications: () => ({
-    applications: [submittedApp, feePaidApp],
-    totalCount: 2,
-    hasNextPage: false,
-    endCursor: null,
-    loading: false,
-    refetch,
-    fetchMore: vi.fn(),
-  }),
+  useApplications: () =>
+    listState.failed
+      ? {
+          applications: [],
+          totalCount: 0,
+          hasNextPage: false,
+          endCursor: null,
+          loading: false,
+          error: new Error('boom'),
+          refetch,
+          fetchMore: vi.fn(),
+        }
+      : {
+          applications: [submittedApp, feePaidApp, rejectedApp],
+          totalCount: 3,
+          hasNextPage: false,
+          endCursor: null,
+          loading: false,
+          error: undefined,
+          refetch,
+          fetchMore: vi.fn(),
+        },
   useApplicationStatusChanged: vi.fn(),
   useUpdateApplication: () => [vi.fn(), { loading: false }],
-  useApproveApplication: () => [vi.fn(), { loading: false }],
+  useApproveApplication: () => [approve, { loading: false }],
+  useSectionsForAdmission: () => ({
+    data: { sections: [{ id: 'sec-1', name: { en: 'A' }, capacity: 40, currentStrength: 12 }] },
+    loading: false,
+  }),
   useRejectApplication: () => [vi.fn(), { loading: false }],
 }));
 
@@ -136,5 +168,55 @@ describe('ApplicationsPage (component)', () => {
     renderPage();
     await userEvent.click(screen.getByTestId('application-status-btn-app-1'));
     expect(await screen.findByTestId('status-change-dialog')).toBeInTheDocument();
+  });
+
+  it('shows the rejection reason only on applications that have one', () => {
+    renderPage();
+    expect(
+      screen.getByTestId(instituteAdmissionApplications.rejectionReason('app-3')),
+    ).toHaveTextContent('Reason: Seats full for Class 1');
+    expect(
+      screen.queryByTestId(instituteAdmissionApplications.rejectionReason('app-1')),
+    ).not.toBeInTheDocument();
+  });
+
+  it('disables manual status change on FEE_PAID, where enrolment is the only next step', () => {
+    renderPage();
+    expect(screen.getByTestId('application-status-btn-app-2')).toBeDisabled();
+    expect(screen.getByTestId('application-status-btn-app-1')).toBeEnabled();
+  });
+
+  it('requires a section before the approve dialog can be confirmed', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId('application-approve-btn-app-2'));
+    const confirm = await screen.findByTestId(instituteAdmissionApplications.approveConfirmBtn);
+    expect(confirm).toBeDisabled();
+
+    await userEvent.click(screen.getByTestId(instituteAdmissionApplications.approveSectionSelect));
+    await userEvent.click(
+      await screen.findByTestId(instituteAdmissionApplications.approveSectionOption('sec-1')),
+    );
+    await userEvent.click(confirm);
+
+    expect(approve).toHaveBeenCalledWith({ variables: { id: 'app-2', sectionId: 'sec-1' } });
+  });
+
+  it('shows an error with retry, not the empty state, when the list fails to load', async () => {
+    listState.failed = true;
+    try {
+      renderPage();
+      expect(screen.getByTestId(instituteAdmissionApplications.loadError)).toHaveTextContent(
+        messagesEn.applications.loadError.title,
+      );
+      expect(
+        screen.queryByTestId(instituteAdmissionApplications.emptyNoData),
+      ).not.toBeInTheDocument();
+
+      refetch.mockClear();
+      await userEvent.click(screen.getByTestId(instituteAdmissionApplications.loadErrorRetryBtn));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    } finally {
+      listState.failed = false;
+    }
   });
 });

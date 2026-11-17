@@ -19,8 +19,7 @@ const activities = proxyActivities<StudentAdmissionActivities>({
 export async function StudentAdmissionWorkflow(
   input: StudentAdmissionInput,
 ): Promise<StudentAdmissionResult> {
-  const { applicationId, tenantId } = input;
-  const SYSTEM_ACTOR = 'SYSTEM';
+  const { applicationId, tenantId, actorId } = input;
 
   // 1. Load application + enquiry data
   const { application } = await activities.loadApplicationData(applicationId, tenantId);
@@ -42,12 +41,12 @@ export async function StudentAdmissionWorkflow(
   const { userId, membershipId } = await activities.createUserAndMembership(
     tenantId,
     formData,
-    SYSTEM_ACTOR,
+    actorId,
     applicationId,
   );
 
   // 4. Create user_profile from form_data
-  await activities.createUserProfile(userId, formData, SYSTEM_ACTOR);
+  await activities.createUserProfile(userId, formData, actorId);
 
   // 5. Create student_profile with admission_number
   const { studentProfileId, admissionNumber } = await activities.createStudentProfile(
@@ -57,7 +56,7 @@ export async function StudentAdmissionWorkflow(
     standardId,
     formData,
     isRte,
-    SYSTEM_ACTOR,
+    actorId,
   );
 
   // 6. Create student_academics (section placement)
@@ -68,21 +67,16 @@ export async function StudentAdmissionWorkflow(
       academicYearId,
       standardId,
       sectionId,
-      SYSTEM_ACTOR,
+      actorId,
     );
   }
 
   // 7. Link guardians from parent info — applicationId seed keeps placeholder
   // guardian creation idempotent across retries.
-  await activities.linkGuardians(tenantId, studentProfileId, formData, SYSTEM_ACTOR, applicationId);
+  await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, applicationId);
 
   // 8. Update application: status='enrolled', student_profile_id
-  await activities.updateApplicationEnrolled(
-    applicationId,
-    tenantId,
-    studentProfileId,
-    SYSTEM_ACTOR,
-  );
+  await activities.updateApplicationEnrolled(applicationId, tenantId, studentProfileId, actorId);
 
   // 9. Emit student.admitted
   if (sectionId) {
@@ -96,7 +90,7 @@ export async function StudentAdmissionWorkflow(
   }
 
   // 10. Apply previous school TC data if present
-  await activities.applyPreviousSchoolData(tenantId, studentProfileId, formData, SYSTEM_ACTOR);
+  await activities.applyPreviousSchoolData(tenantId, studentProfileId, formData, actorId);
 
   return { studentProfileId, admissionNumber, membershipId };
 }

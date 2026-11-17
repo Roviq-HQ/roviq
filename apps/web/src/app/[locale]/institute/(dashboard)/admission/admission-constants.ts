@@ -225,7 +225,12 @@ export function isTerminalApplicationStatus(status: string): boolean {
   return APPLICATION_TERMINAL_STATUSES.has(status as ApplicationStatusKey);
 }
 
-export function getNextApplicationStatuses(status: string): readonly ApplicationStatusKey[] {
+function getNextApplicationStatuses(status: string): readonly ApplicationStatusKey[] {
   const key = status as ApplicationStatusKey;
   return APPLICATION_TRANSITIONS[key] ?? [];
+}
+
+// ENROLLED is written only by the enrolment workflow (Approve & enrol), never picked by hand.
+export function getSelectableApplicationStatuses(status: string): readonly ApplicationStatusKey[] {
+  return getNextApplicationStatuses(status).filter((s) => s !== 'ENROLLED');
 }

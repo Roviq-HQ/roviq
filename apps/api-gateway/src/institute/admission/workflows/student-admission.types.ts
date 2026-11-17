@@ -9,6 +9,8 @@
 export interface StudentAdmissionInput {
   applicationId: string;
   tenantId: string;
+  /** User who approved the application — recorded as created_by/updated_by on every row the workflow writes. */
+  actorId: string;
 }
 
 export interface StudentAdmissionResult {

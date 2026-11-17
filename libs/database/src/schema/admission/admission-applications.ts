@@ -1,4 +1,4 @@
-import { AdmissionApplicationStatus } from '@roviq/common-types';
+import { AdmissionApplicationStatus, REJECTION_REASON_MAX_LENGTH } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -10,6 +10,7 @@ import {
   pgTable,
   timestamp,
   uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { tenantColumns } from '../common/columns';
 import { admissionApplicationStatus } from '../common/enums';
@@ -57,6 +58,7 @@ export const admissionApplications = pgTable(
      * Application lifecycle state:
      * - `draft`: application started but not yet submitted
      * - `submitted`: formally submitted by parent/guardian
+     * - `under_review`: institute staff are reviewing the submitted application
      * - `documents_pending`: awaiting required document uploads
      * - `documents_verified`: all documents verified by admin
      * - `test_scheduled`: entrance test date assigned
@@ -99,6 +101,12 @@ export const admissionApplications = pgTable(
     offerExpiresAt: timestamp('offer_expires_at', { withTimezone: true }),
     /** Timestamp when the parent accepted the offer */
     offerAcceptedAt: timestamp('offer_accepted_at', { withTimezone: true }),
+
+    // ── Rejection ───────────────────────────────────────
+    /** Reason recorded when the institute rejects the application (NULL if none given) */
+    rejectionReason: varchar('rejection_reason', { length: REJECTION_REASON_MAX_LENGTH }),
+    /** Timestamp when the application moved to `rejected` */
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
 
     // ── Conversion to student ───────────────────────────
     /** FK to student_profiles — set after successful enrollment */

@@ -160,6 +160,11 @@
       "noMatch": "No matching applications",
       "noMatchDescription": "Try clearing filters or broadening the search."
     },
+    "loadError": {
+      "title": "Could not load applications",
+      "description": "Something went wrong while fetching the list. Your data is safe.",
+      "retry": "Try again"
+    },
     "actions": {
       "view": "View",
       "approve": "Approve & enrol",
@@ -169,7 +174,11 @@
     },
     "approveDialog": {
       "title": "Approve & enrol applicant",
-      "description": "This will trigger the enrolment workflow. You cannot undo this action.",
+      "description": "This places the student in the chosen section and starts enrolment. You cannot undo this action.",
+      "sectionLabel": "Section",
+      "sectionPlaceholder": "Choose a section",
+      "sectionOption": "{name} ({filled}/{capacity} seats filled)",
+      "noSections": "This class has no sections yet. Add one under Academics before enrolling.",
       "confirm": "Approve & enrol",
       "cancel": "Cancel",
       "success": "Enrolment workflow started.",
@@ -196,6 +205,7 @@
       "cancel": "Cancel"
     },
     "rteBadge": "RTE",
+    "rejectionReason": "Reason: {reason}",
     "workflowPending": "Enrolment in progress...",
     "terminalNote": "Terminal status — no further transitions."
   },

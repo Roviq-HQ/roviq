@@ -58,6 +58,8 @@ export function toApplicationModel(row: ApplicationRow): ApplicationModel & { cr
     offeredAt: row.offeredAt,
     offerExpiresAt: row.offerExpiresAt,
     offerAcceptedAt: row.offerAcceptedAt,
+    rejectionReason: row.rejectionReason,
+    rejectedAt: row.rejectedAt,
     studentProfileId: row.studentProfileId,
     version: row.version,
     createdAt: row.createdAt,

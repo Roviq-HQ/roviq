@@ -23,7 +23,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import {
   type ApplicationStatusKey,
-  getNextApplicationStatuses,
+  getSelectableApplicationStatuses,
   isTerminalApplicationStatus,
 } from '../admission-constants';
 import { type ApplicationNode, useUpdateApplication } from '../use-admission';
@@ -53,7 +53,7 @@ export function StatusChangeDialog({ open, onOpenChange, application }: StatusCh
 
   const currentStatus = application.status;
   const isTerminal = isTerminalApplicationStatus(currentStatus);
-  const transitions = getNextApplicationStatuses(currentStatus);
+  const transitions = getSelectableApplicationStatuses(currentStatus);
 
   const handleSubmit = async () => {
     if (!target) return;

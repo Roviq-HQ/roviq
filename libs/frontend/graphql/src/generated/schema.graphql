@@ -478,6 +478,10 @@ type ApplicationModel {
   offerAcceptedAt: DateTime
   offerExpiresAt: DateTime
   offeredAt: DateTime
+  rejectedAt: DateTime
+
+  """Reason given when the institute rejected the application"""
+  rejectionReason: String
   rteLotteryRank: Int
   sectionId: String
   standardId: String!
@@ -3481,8 +3485,15 @@ type Mutation {
   """Submit a new leave application (PENDING)."""
   applyLeave(input: CreateLeaveInput!): LeaveModel!
 
-  """Approve application → triggers StudentAdmissionWorkflow"""
-  approveApplication(id: ID!): ApplicationModel!
+  """Start the enrolment workflow; status stays FEE_PAID until done"""
+  approveApplication(
+    id: ID!
+
+    """
+    Section to place the student in; required unless the application has one
+    """
+    sectionId: ID
+  ): ApplicationModel!
 
   """Approve a PENDING leave."""
   approveLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
@@ -5801,7 +5812,7 @@ input UpdateApplicationInput {
   """Updated form data (partial merge)"""
   formData: JSON
   interviewScore: String
-  meritRank: Float
+  meritRank: Int
   sectionId: ID
 
   """New status (validated by state machine)"""

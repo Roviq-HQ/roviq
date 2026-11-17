@@ -87,6 +87,9 @@ export const AdmissionApplicationStatus = Object.fromEntries(
   ADMISSION_APPLICATION_STATUS_VALUES.map((v) => [v, v]),
 ) as { readonly [K in AdmissionApplicationStatus]: K };
 
+/** Width of `admission_applications.rejection_reason`; the reject dialog and API enforce the same limit. */
+export const REJECTION_REASON_MAX_LENGTH = 255;
+
 // ---------------------------------------------------------------------------
 
 /**

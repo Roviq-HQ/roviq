@@ -2,10 +2,9 @@
  * Activities for StudentAdmissionWorkflow (ROV-159).
  *
  * Each activity is idempotent — checks "does this already exist?" before creating.
- * DrizzleDB + NATS client injected via closure at worker startup.
+ * DrizzleDB + EventBusService injected via closure at worker startup.
  */
 import { Logger } from '@nestjs/common';
-import type { ClientProxy } from '@nestjs/microservices';
 import {
   AcademicStatus,
   AdmissionApplicationStatus,
@@ -39,7 +38,9 @@ import {
   withAdmin,
   withTenant,
 } from '@roviq/database';
-import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
+import type { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { ApplicationFailure } from '@temporalio/common';
 import { and, eq, sql } from 'drizzle-orm';
 import type { IdentityService } from '../../../auth/identity.service';
 import { nextAdmissionNumber } from '../../student/admission-number.sequence';
@@ -51,30 +52,11 @@ import type {
 
 const logger = new Logger('StudentAdmissionActivities');
 
-/**
- * Narrow interface over ClientProxy so the factory accepts either the
- * NestJS microservice client or `null` (for tests / callers that haven't
- * wired NATS yet — mirrors the bulk-student-import pattern).
- */
-interface NatsEmitter {
-  emit(
-    pattern: string,
-    data: unknown,
-  ): { subscribe: (opts: { error?: (err: unknown) => void }) => void };
-}
-
 export function createStudentAdmissionActivities(
   db: DrizzleDB,
-  natsClient: ClientProxy | NatsEmitter | null,
+  eventBus: EventBusService,
   identityService: IdentityService,
 ): StudentAdmissionActivities {
-  function emitEvent(pattern: EventPattern, data: unknown): void {
-    if (!natsClient) return;
-    natsClient.emit(pattern, data).subscribe({
-      error: (err: unknown) => logger.warn(`Failed to emit ${pattern}: ${String(err)}`),
-    });
-  }
-
   return {
     async loadApplicationData(applicationId, tenantId) {
       logger.log(`Loading application ${applicationId}`);
@@ -219,7 +201,7 @@ export function createStudentAdmissionActivities(
           username,
           phone: phone ? { countryCode: '+91', number: phone } : undefined,
         });
-        emitEvent(EVENT_PATTERNS.USER.admission_created, {
+        eventBus.emit(EVENT_PATTERNS.USER.admission_created, {
           tenantId,
           userId: newUserId,
           email,
@@ -640,7 +622,7 @@ export function createStudentAdmissionActivities(
         },
       );
 
-      emitEvent(EVENT_PATTERNS.GUARDIAN.linked, {
+      eventBus.emit(EVENT_PATTERNS.GUARDIAN.linked, {
         tenantId,
         guardianProfileId,
         studentProfileId,
@@ -653,20 +635,44 @@ export function createStudentAdmissionActivities(
     },
 
     async updateApplicationEnrolled(applicationId, tenantId, studentProfileId, updatedBy) {
-      await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          await tx
-            .update(admissionApplications)
-            .set({
-              status: AdmissionApplicationStatus.ENROLLED,
-              studentProfileId,
-              updatedBy,
-            })
-            .where(eq(admissionApplications.id, applicationId));
-        },
-      );
+      const ctx = mkInstituteCtx(tenantId, 'workflow:student-admission.activities');
+      const oldStatus = AdmissionApplicationStatus.FEE_PAID;
+      const newStatus = AdmissionApplicationStatus.ENROLLED;
+
+      const updated = await withTenant(db, ctx, async (tx) => {
+        return tx
+          .update(admissionApplications)
+          .set({ status: newStatus, studentProfileId, updatedBy })
+          .where(
+            and(
+              eq(admissionApplications.id, applicationId),
+              eq(admissionApplications.status, oldStatus),
+            ),
+          )
+          .returning({ id: admissionApplications.id });
+      });
+
+      if (updated.length === 0) {
+        const rows = await withTenant(db, ctx, async (tx) => {
+          return tx
+            .select({ status: admissionApplicationsLive.status })
+            .from(admissionApplicationsLive)
+            .where(eq(admissionApplicationsLive.id, applicationId))
+            .limit(1);
+        });
+        // Activity retry after a successful write — already enrolled, nothing to announce.
+        if (rows[0]?.status === newStatus) return;
+        throw ApplicationFailure.nonRetryable(
+          `Application ${applicationId} is ${rows[0]?.status ?? 'missing'}, expected ${oldStatus}`,
+        );
+      }
+
+      eventBus.emit(EVENT_PATTERNS.APPLICATION.status_changed, {
+        applicationId,
+        oldStatus,
+        newStatus,
+        tenantId,
+      });
     },
 
     async emitStudentAdmittedEvent(
@@ -676,7 +682,7 @@ export function createStudentAdmissionActivities(
       standardId,
       sectionId,
     ) {
-      emitEvent(EVENT_PATTERNS.STUDENT.admitted, {
+      eventBus.emit(EVENT_PATTERNS.STUDENT.admitted, {
         tenantId,
         studentProfileId,
         membershipId,

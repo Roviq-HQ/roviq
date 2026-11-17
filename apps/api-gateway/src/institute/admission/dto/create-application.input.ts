@@ -1,6 +1,6 @@
-import { Field, ID, InputType } from '@nestjs/graphql';
+import { Field, ID, InputType, Int } from '@nestjs/graphql';
 import { AdmissionApplicationStatus } from '@roviq/common-types';
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
 
 @InputType({ description: 'Input for creating an admission application (ROV-159)' })
@@ -27,6 +27,7 @@ export class CreateApplicationInput {
   sectionId?: string;
 
   @Field(() => GraphQLJSON, { description: 'Institute-specific admission form data' })
+  @IsObject()
   formData!: Record<string, unknown>;
 
   @Field({
@@ -54,6 +55,7 @@ export class UpdateApplicationInput {
 
   @Field(() => GraphQLJSON, { nullable: true, description: 'Updated form data (partial merge)' })
   @IsOptional()
+  @IsObject()
   formData?: Record<string, unknown>;
 
   @Field({ nullable: true })
@@ -66,7 +68,8 @@ export class UpdateApplicationInput {
   @IsString()
   interviewScore?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Int, { nullable: true })
   @IsOptional()
+  @IsInt()
   meritRank?: number;
 }

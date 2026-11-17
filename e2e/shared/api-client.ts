@@ -3,7 +3,7 @@
  * persistent data they created through the UI.
  *
  * Auth: reads the scope-appropriate access token from the browser's
- * `localStorage` (set by `auth.setup.ts`) and sends it as
+ * `sessionStorage` (restored from the `auth.setup.ts` capture) and sends it as
  * `Authorization: Bearer …`. Cookies are NOT used for API auth in this
  * stack, so `page.request` without an explicit header is anonymous.
  *
@@ -16,10 +16,17 @@
 import type { Page } from '@playwright/test';
 
 const API_URL = process.env.API_URL || 'http://localhost:3004/api/graphql';
-const INSTITUTE_TOKEN_KEY = '__e2e_session__roviq-institute-access-token';
+const INSTITUTE_SESSION_KEY = 'roviq-institute-access-token';
+const INSTITUTE_TOKEN_KEY = `__e2e_session__${INSTITUTE_SESSION_KEY}`;
 
+// The page fixture moves captured tokens back into sessionStorage on load, so the
+// prefixed localStorage copy only exists before the first navigation.
 async function instituteAccessToken(page: Page): Promise<string | null> {
-  return page.evaluate((key) => window.localStorage.getItem(key), INSTITUTE_TOKEN_KEY);
+  return page.evaluate(
+    ([sessionKey, capturedKey]) =>
+      window.sessionStorage.getItem(sessionKey) ?? window.localStorage.getItem(capturedKey),
+    [INSTITUTE_SESSION_KEY, INSTITUTE_TOKEN_KEY],
+  );
 }
 
 /**
@@ -61,4 +68,26 @@ export async function deleteStudentViaApi(page: Page, studentId: string): Promis
 export function extractStudentIdFromUrl(url: string): string | null {
   const match = url.match(/\/students\/([0-9a-f-]{36})(?:[/?#]|$)/);
   return match?.[1] ?? null;
+}
+
+/**
+ * Runs a GraphQL operation as the signed-in institute user. Throws on GraphQL
+ * errors so a broken setup step fails the test where it happens.
+ */
+export async function instituteGraphql<TData>(
+  page: Page,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<TData> {
+  const token = await instituteAccessToken(page);
+  if (!token) throw new Error('No institute access token in localStorage');
+  const res = await page.request.post(API_URL, {
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    data: { query, variables },
+  });
+  const body: { data?: TData; errors?: Array<{ message: string }> } = await res.json();
+  if (body.errors?.length || !body.data) {
+    throw new Error(`GraphQL setup call failed: ${JSON.stringify(body.errors ?? body)}`);
+  }
+  return body.data;
 }

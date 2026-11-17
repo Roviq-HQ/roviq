@@ -21,7 +21,16 @@ import {
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { parseISO } from 'date-fns';
-import { CheckCircle2, GitBranch, Inbox, Loader2, SearchX, ThumbsDown, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  GitBranch,
+  Inbox,
+  Loader2,
+  SearchX,
+  ThumbsDown,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsBoolean, parseAsString, useQueryStates } from 'nuqs';
 import * as React from 'react';
@@ -31,6 +40,7 @@ import {
   APPLICATION_STATUS_ICON,
   APPLICATION_STATUS_VALUES,
   type ApplicationStatusKey,
+  getSelectableApplicationStatuses,
   isTerminalApplicationStatus,
 } from '../admission-constants';
 import {
@@ -71,7 +81,7 @@ export default function ApplicationsPage() {
     return f;
   }, [filters]);
 
-  const { applications, totalCount, loading, refetch } = useApplications(queryFilter);
+  const { applications, totalCount, loading, error, refetch } = useApplications(queryFilter);
 
   // ROV-168: real-time status updates clear the pending indicator and
   // refetch so the row reflects the new status without manual reload.
@@ -159,6 +169,14 @@ export default function ApplicationsPage() {
                 <Icon className="size-3.5" />
                 {t(`applicationStatuses.${key}`, { default: row.original.status })}
               </Badge>
+              {row.original.rejectionReason && (
+                <span
+                  className="max-w-56 text-xs text-muted-foreground"
+                  data-testid={instituteAdmissionApplications.rejectionReason(row.original.id)}
+                >
+                  {t('applications.rejectionReason', { reason: row.original.rejectionReason })}
+                </span>
+              )}
               {isPending && (
                 <span
                   className="inline-flex items-center gap-1 text-xs text-amber-700"
@@ -213,13 +231,14 @@ export default function ApplicationsPage() {
           const status = row.original.status as ApplicationStatusKey;
           const terminal = isTerminalApplicationStatus(status);
           const canApprove = status === 'FEE_PAID';
+          const canChangeStatus = getSelectableApplicationStatuses(status).length > 0;
           return (
             <div className="flex items-center gap-1">
               <Can I="update" a="Application">
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={terminal}
+                  disabled={!canChangeStatus}
                   title={t('applications.actions.changeStatus')}
                   data-testid={`application-status-btn-${row.original.id}`}
                   onClick={() => setStatusChange(row.original)}
@@ -345,7 +364,28 @@ export default function ApplicationsPage() {
               data={applications}
               isLoading={loading && applications.length === 0}
               emptyState={
-                hasFilters ? (
+                error ? (
+                  <Empty className="py-12">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <TriangleAlert aria-hidden="true" />
+                      </EmptyMedia>
+                      <EmptyTitle data-testid={instituteAdmissionApplications.loadError}>
+                        {t('applications.loadError.title')}
+                      </EmptyTitle>
+                      <EmptyDescription>{t('applications.loadError.description')}</EmptyDescription>
+                    </EmptyHeader>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title={t('applications.loadError.retry')}
+                      data-testid={instituteAdmissionApplications.loadErrorRetryBtn}
+                      onClick={() => refetch()}
+                    >
+                      {t('applications.loadError.retry')}
+                    </Button>
+                  </Empty>
+                ) : hasFilters ? (
                   <Empty className="py-12">
                     <EmptyHeader>
                       <EmptyMedia variant="icon">

@@ -274,11 +274,11 @@ The Applications page is the formal pipeline. Each application moves through a s
 
 #### Changing status
 
-Click the **Move to** button on a row to open the status-change dialog. Only **valid next statuses** are listed; the dropdown enforces the same state machine as the backend so an invalid move is impossible.
+Click the **Move to** button on a row to open the status-change dialog. Only **valid next statuses** are listed; the dropdown enforces the same state machine as the backend so an invalid move is impossible. `ENROLLED` is never offered here -- it is set only by **Approve & enrol**, so on a `FEE_PAID` application the button is disabled.
 
 #### Approving and enrolling
 
-When an application reaches `FEE_PAID`, an **Approve & enrol** button appears. Clicking it shows a confirmation dialog -- this is a one-way action that:
+When an application reaches `FEE_PAID`, an **Approve & enrol** button appears. Clicking it shows a confirmation dialog that asks for the **section** to place the student in (the sections of the applied class, with seats filled); it cannot be confirmed without one. This is a one-way action that:
 
 1. Triggers the StudentAdmissionWorkflow on the backend
 2. Creates the student's user account, profile, and academic placement
@@ -286,11 +286,11 @@ When an application reaches `FEE_PAID`, an **Approve & enrol** button appears. C
 4. Links the parent guardian to the student
 5. Notifies downstream systems (notifications, billing, etc.) via a `student.admitted` event
 
-The application row shows an **Enrolment in progress...** indicator with a spinner while the workflow runs (typically a few seconds). When the workflow completes, the status flips to `ENROLLED` automatically and the student appears in the **Students** page under People.
+The application row shows an **Enrolment in progress...** indicator with a spinner while the workflow runs (typically a few seconds). The application stays `FEE_PAID` until the workflow has created the student; it then sets `ENROLLED` and the student link in one write and pushes the change to the page, and the student appears in the **Students** page under People. Approving the same application again while the workflow is running does nothing.
 
 #### Rejecting
 
-Click the **Reject** button (red) on any non-terminal application. A dialog asks for an optional internal reason; the reason is stored with the application for audit purposes.
+Click the **Reject** button (red) on any non-terminal application. A dialog asks for an optional reason (up to 255 characters). The reason and the rejection time are stored on the application and the reason is shown under the **Rejected** badge in the list.
 
 #### RTE applications
 

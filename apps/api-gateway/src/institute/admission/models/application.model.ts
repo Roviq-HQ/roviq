@@ -53,6 +53,15 @@ export class ApplicationModel {
   @Field(() => DateTimeScalar, { nullable: true })
   offerAcceptedAt?: Date | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description: 'Reason given when the institute rejected the application',
+  })
+  rejectionReason?: string | null;
+
+  @Field(() => DateTimeScalar, { nullable: true })
+  rejectedAt?: Date | null;
+
   @Field(() => String, { nullable: true })
   studentProfileId?: string | null;
 

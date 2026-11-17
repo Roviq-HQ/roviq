@@ -4,14 +4,24 @@
  * Direct service → Drizzle (no abstract repository).
  */
 
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ADMISSION_APPLICATION_STATE_MACHINE,
   AdmissionApplicationStatus,
+  BusinessException,
   EnquirySource,
   EnquiryStatus,
+  ErrorCode,
   GuardianRelationship,
+  REJECTION_REASON_MAX_LENGTH,
 } from '@roviq/common-types';
 import {
   academicYearsLive,
@@ -22,6 +32,7 @@ import {
   enquiries,
   enquiriesLive,
   mkInstituteCtx,
+  sectionsLive,
   standardsLive,
   tenantSequences,
   withTenant,
@@ -29,7 +40,11 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { Client as TemporalClient, Connection as TemporalConnection } from '@temporalio/client';
+import {
+  Client as TemporalClient,
+  Connection as TemporalConnection,
+  WorkflowExecutionAlreadyStartedError,
+} from '@temporalio/client';
 import { and, eq, sql } from 'drizzle-orm';
 import { AdmissionReadRepository } from './admission-read.repository';
 import { toApplicationModel, toEnquiryModel } from './admission-records';
@@ -386,33 +401,41 @@ export class AdmissionService {
   }
 
   async updateApplication(id: string, input: UpdateApplicationInput): Promise<ApplicationModel> {
+    // ENROLLED is written only by StudentAdmissionWorkflow, together with student_profile_id.
+    if (input.status === AdmissionApplicationStatus.ENROLLED) {
+      throw new BusinessException(
+        ErrorCode.INVALID_STATE_TRANSITION,
+        'Enrolment runs through approveApplication, not a direct status update',
+      );
+    }
+    return this.transitionApplication(id, input, {});
+  }
+
+  private async transitionApplication(
+    id: string,
+    input: UpdateApplicationInput,
+    extra: { rejectionReason?: string | null },
+  ): Promise<ApplicationModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
+    const ctx = mkInstituteCtx(tenantId, 'service:admission');
 
-    // Load current status for transition validation
-    const current = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .select({ status: admissionApplicationsLive.status })
-          .from(admissionApplicationsLive)
-          .where(eq(admissionApplicationsLive.id, id))
-          .limit(1);
-      },
-    );
+    const current = await withTenant(this.db, ctx, async (tx) => {
+      return tx
+        .select({ status: admissionApplicationsLive.status })
+        .from(admissionApplicationsLive)
+        .where(eq(admissionApplicationsLive.id, id))
+        .limit(1);
+    });
 
     if (current.length === 0) {
       throw new NotFoundException('Application not found');
     }
 
     const oldStatus = current[0].status;
-    ADMISSION_APPLICATION_STATE_MACHINE.assertTransition(
-      oldStatus as AdmissionApplicationStatus,
-      input.status as AdmissionApplicationStatus,
-    );
+    ADMISSION_APPLICATION_STATE_MACHINE.assertTransition(oldStatus, input.status);
 
-    const updates: Record<string, unknown> = {
+    const updates: Partial<typeof admissionApplications.$inferInsert> = {
       status: input.status,
       updatedBy: actorId,
     };
@@ -423,24 +446,31 @@ export class AdmissionService {
     if (input.interviewScore !== undefined) updates.interviewScore = input.interviewScore;
     if (input.meritRank !== undefined) updates.meritRank = input.meritRank;
 
-    // Auto-set timestamps based on status
-    if (input.status === AdmissionApplicationStatus.OFFER_MADE) updates.offeredAt = new Date();
-    if (input.status === AdmissionApplicationStatus.OFFER_ACCEPTED)
-      updates.offerAcceptedAt = new Date();
+    const now = new Date();
+    if (input.status === AdmissionApplicationStatus.OFFER_MADE) updates.offeredAt = now;
+    if (input.status === AdmissionApplicationStatus.OFFER_ACCEPTED) updates.offerAcceptedAt = now;
+    if (input.status === AdmissionApplicationStatus.REJECTED) {
+      updates.rejectedAt = now;
+      updates.rejectionReason = extra.rejectionReason ?? null;
+    }
 
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .update(admissionApplications)
-          .set(updates)
-          .where(eq(admissionApplications.id, id))
-          .returning();
-      },
-    );
+    // Status predicate makes the transition atomic: a concurrent writer that
+    // already moved the row leaves this UPDATE matching nothing.
+    const rows = await withTenant(this.db, ctx, async (tx) => {
+      return tx
+        .update(admissionApplications)
+        .set(updates)
+        .where(and(eq(admissionApplications.id, id), eq(admissionApplications.status, oldStatus)))
+        .returning();
+    });
 
-    // Emit status change for subscription
+    if (rows.length === 0) {
+      throw new BusinessException(
+        ErrorCode.CONCURRENT_MODIFICATION,
+        'Application status changed while this update was in progress — reload and retry',
+      );
+    }
+
     this.eventBus.emit(EVENT_PATTERNS.APPLICATION.status_changed, {
       applicationId: id,
       oldStatus,
@@ -453,50 +483,83 @@ export class AdmissionService {
   }
 
   /**
-   * Trigger the StudentAdmissionWorkflow via Temporal.
-   *
-   * This does NOT flip the application status itself — that responsibility
-   * belongs to the workflow's `updateApplicationEnrolled` activity, which
-   * sets `status='enrolled'` AND `student_profile_id` in a single write
-   * once every upstream step (user creation, student profile, academics,
-   * guardian linking) has succeeded. Writing ENROLLED here would:
-   *   - publish `applicationStatusChanged` before the student exists
-   *     (subscriptions get a phantom transition)
-   *   - leave `student_profile_id` NULL on the application row, breaking
-   *     downstream lookups
-   *   - race the workflow's own write
-   *
-   * The resolver therefore returns the *current* application row (still
-   * FEE_PAID); the UI tracks the in-flight workflow via the pending
-   * indicator and reconciles on the `applicationStatusChanged` push.
+   * Starts StudentAdmissionWorkflow and returns the application still FEE_PAID.
+   * The workflow's `updateApplicationEnrolled` activity is the only writer of
+   * ENROLLED — it sets status and `student_profile_id` together and publishes
+   * `applicationStatusChanged` once the student exists.
    */
-  async approveAndEnroll(id: string): Promise<ApplicationModel> {
+  async approveAndEnroll(id: string, sectionId?: string): Promise<ApplicationModel> {
     const tenantId = this.getTenantId();
+    const actorId = this.getUserId();
+    const ctx = mkInstituteCtx(tenantId, 'service:admission');
 
-    // Validate that the current state can legally enrol — surfaces a clear
-    // domain error before we spend a workflow execution slot.
-    const current = await this.getApplication(id);
+    let current = await this.getApplication(id);
     ADMISSION_APPLICATION_STATE_MACHINE.assertTransition(
       current.status as AdmissionApplicationStatus,
       AdmissionApplicationStatus.ENROLLED,
     );
 
+    // student_academics.section_id is NOT NULL: without a section the workflow
+    // would create a student with no class placement.
+    const targetSectionId = sectionId ?? current.sectionId;
+    if (!targetSectionId) {
+      throw new BadRequestException('Choose a section before enrolling this applicant');
+    }
+    const section = await withTenant(this.db, ctx, async (tx) => {
+      return tx
+        .select({ id: sectionsLive.id })
+        .from(sectionsLive)
+        .where(
+          and(
+            eq(sectionsLive.id, targetSectionId),
+            eq(sectionsLive.standardId, current.standardId),
+          ),
+        )
+        .limit(1);
+    });
+    if (section.length === 0) {
+      throw new BadRequestException('Section does not belong to the class this application is for');
+    }
+
+    if (targetSectionId !== current.sectionId) {
+      const rows = await withTenant(this.db, ctx, async (tx) => {
+        return tx
+          .update(admissionApplications)
+          .set({ sectionId: targetSectionId, updatedBy: actorId })
+          .where(
+            and(
+              eq(admissionApplications.id, id),
+              eq(admissionApplications.status, AdmissionApplicationStatus.FEE_PAID),
+            ),
+          )
+          .returning();
+      });
+      if (rows.length === 0) {
+        throw new BusinessException(
+          ErrorCode.CONCURRENT_MODIFICATION,
+          'Application status changed while this update was in progress — reload and retry',
+        );
+      }
+      current = toApplicationModel(rows[0]);
+    }
+
     const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
     const connection = await TemporalConnection.connect({ address });
+    const workflowId = `student-admission-${id}`;
     try {
       const client = new TemporalClient({ connection });
-      // Stable workflow ID per application keeps Temporal's de-dup honest:
-      // a duplicate approveApplication call returns the same workflow rather
-      // than starting a parallel one. `WorkflowIdReusePolicy` defaults to
-      // ALLOW_DUPLICATE_FAILED_ONLY, which is exactly what we want here.
-      const workflowId = `student-admission-${id}`;
       await client.workflow.start('StudentAdmissionWorkflow', {
         taskQueue: 'student-admission',
         workflowId,
         workflowExecutionTimeout: '5 minutes',
-        args: [{ applicationId: id, tenantId }],
+        args: [{ applicationId: id, tenantId, actorId }],
       });
       this.logger.log(`Started StudentAdmissionWorkflow: ${workflowId} for application ${id}`);
+    } catch (err) {
+      // Stable workflow ID per application: a repeat approval while the first
+      // run is in flight joins it instead of starting a parallel enrolment.
+      if (!(err instanceof WorkflowExecutionAlreadyStartedError)) throw err;
+      this.logger.log(`StudentAdmissionWorkflow ${workflowId} already running — not restarted`);
     } finally {
       await connection.close();
     }
@@ -505,17 +568,17 @@ export class AdmissionService {
   }
 
   async rejectApplication(id: string, reason?: string): Promise<ApplicationModel> {
-    // Store rejection reason in formData since there's no dedicated column
-    const input: UpdateApplicationInput = { status: AdmissionApplicationStatus.REJECTED };
-    if (reason) {
-      const current = await this.getApplication(id);
-      input.formData = {
-        ...current.formData,
-        _rejectionReason: reason,
-        _rejectedAt: new Date().toISOString(),
-      };
+    const rejectionReason = reason?.trim() || null;
+    if (rejectionReason && rejectionReason.length > REJECTION_REASON_MAX_LENGTH) {
+      throw new BadRequestException(
+        `Rejection reason must be at most ${REJECTION_REASON_MAX_LENGTH} characters`,
+      );
     }
-    return this.updateApplication(id, input);
+    return this.transitionApplication(
+      id,
+      { status: AdmissionApplicationStatus.REJECTED },
+      { rejectionReason },
+    );
   }
 
   // ══════════════════════════════════════════════════════════

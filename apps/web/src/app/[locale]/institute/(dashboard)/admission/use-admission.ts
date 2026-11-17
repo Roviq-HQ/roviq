@@ -15,6 +15,7 @@ import type {
   EnquirySource,
   EnquiryStatus,
   FunnelStage,
+  SectionModel,
   SourceBreakdown,
   StandardModel,
   UpdateEnquiryInput,
@@ -210,6 +211,8 @@ const APPLICATION_FIELDS = `
   offeredAt
   offerExpiresAt
   offerAcceptedAt
+  rejectionReason
+  rejectedAt
   studentProfileId
   version
   createdAt
@@ -235,7 +238,7 @@ const LIST_APPLICATIONS_QUERY = gql`
 `;
 
 export function useApplications(filter?: ApplicationFilterInput) {
-  const { data, loading, refetch, fetchMore } = useQuery<{
+  const { data, loading, error, refetch, fetchMore } = useQuery<{
     listApplications: {
       edges: Array<{ cursor: string; node: ApplicationNode }>;
       totalCount: number;
@@ -252,6 +255,7 @@ export function useApplications(filter?: ApplicationFilterInput) {
     hasNextPage: data?.listApplications.pageInfo.hasNextPage ?? false,
     endCursor: data?.listApplications.pageInfo.endCursor ?? null,
     loading,
+    error,
     refetch,
     fetchMore,
   };
@@ -321,17 +325,18 @@ export function useUpdateApplication() {
 }
 
 const APPROVE_APPLICATION = gql`
-  mutation InstituteApproveApplication($id: ID!) {
-    approveApplication(id: $id) {
+  mutation InstituteApproveApplication($id: ID!, $sectionId: ID) {
+    approveApplication(id: $id, sectionId: $sectionId) {
       ${APPLICATION_FIELDS}
     }
   }
 `;
 
 export function useApproveApplication() {
-  return useMutation<{ approveApplication: ApplicationNode }, { id: string }>(APPROVE_APPLICATION, {
-    refetchQueries: ['InstituteListApplications'],
-  });
+  return useMutation<{ approveApplication: ApplicationNode }, { id: string; sectionId: string }>(
+    APPROVE_APPLICATION,
+    { refetchQueries: ['InstituteListApplications'] },
+  );
 }
 
 const REJECT_APPLICATION = gql`
@@ -444,6 +449,24 @@ export function useStandardsForAdmission(academicYearId: string | null | undefin
   });
 }
 
+const SECTIONS_QUERY = gql`
+  query SectionsForAdmission($standardId: ID!) {
+    sections(standardId: $standardId) {
+      id
+      name
+      capacity
+      currentStrength
+    }
+  }
+`;
+
+export function useSectionsForAdmission(standardId: string | null | undefined) {
+  return useQuery<{ sections: SectionPickerNode[] }>(SECTIONS_QUERY, {
+    variables: { standardId: standardId ?? '' },
+    skip: !standardId,
+  });
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type EnquiryNode = EnquiryModel;
@@ -455,6 +478,8 @@ export type AcademicYearPickerNode = Pick<
 >;
 
 export type StandardPickerNode = Pick<StandardModel, 'id' | 'name' | 'numericOrder'>;
+
+export type SectionPickerNode = Pick<SectionModel, 'id' | 'name' | 'capacity' | 'currentStrength'>;
 
 export type FunnelStageNode = FunnelStage;
 export type SourceBreakdownNode = SourceBreakdown;

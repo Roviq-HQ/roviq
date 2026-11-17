@@ -9,10 +9,9 @@
  * STUDENT_ADMISSION_WORKER_ENABLED=true so that only one API instance runs
  * the worker when the service is scaled horizontally.
  */
-import path from 'node:path';
-import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ClientProxy } from '@nestjs/microservices';
+import { EventBusService } from '@roviq/event-bus';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { IdentityService } from '../../../auth/identity.service';
 import { createDrizzleForWorker } from '../../student/workflows/worker-db';
@@ -25,7 +24,7 @@ export class StudentAdmissionWorkerService implements OnModuleInit {
 
   constructor(
     private readonly config: ConfigService,
-    @Inject('JETSTREAM_CLIENT') private readonly natsClient: ClientProxy,
+    private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
   ) {}
 
@@ -47,12 +46,12 @@ export class StudentAdmissionWorkerService implements OnModuleInit {
     const db = await createDrizzleForWorker(dbUrl);
 
     const { createStudentAdmissionActivities } = await import('./student-admission.activities.js');
-    const activities = createStudentAdmissionActivities(db, this.natsClient, this.identityService);
+    const activities = createStudentAdmissionActivities(db, this.eventBus, this.identityService);
 
     const worker = await Worker.create({
       connection,
       taskQueue: TASK_QUEUE,
-      workflowsPath: path.resolve(__dirname, './'),
+      workflowsPath: require.resolve('./student-admission.workflow'),
       activities,
     });
 

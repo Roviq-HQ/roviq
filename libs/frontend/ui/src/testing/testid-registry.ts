@@ -544,15 +544,21 @@ export const testIds = {
     clearFiltersBtn: 'applications-clear-filters-btn',
     emptyNoData: 'applications-empty-no-data',
     emptyNoMatch: 'applications-empty-no-match',
+    loadError: 'applications-load-error',
+    loadErrorRetryBtn: 'applications-load-error-retry-btn',
     // Approve dialog
     approveDialog: 'approve-application-dialog',
     approveCancelBtn: 'approve-cancel-btn',
     approveConfirmBtn: 'approve-confirm-btn',
+    approveSectionSelect: 'approve-section-select',
+    approveSectionOption: (id: string) => `approve-section-option-${id}`,
+    approveNoSections: 'approve-no-sections',
     // Reject dialog
     rejectDialog: 'reject-application-dialog',
     rejectCancelBtn: 'reject-cancel-btn',
     rejectConfirmBtn: 'reject-confirm-btn',
     rejectReasonInput: 'reject-reason-input',
+    rejectionReason: (id: string) => `application-rejection-reason-${id}`,
     // Status change dialog
     statusChangeDialog: 'status-change-dialog',
     statusChangeSelect: 'status-change-select',

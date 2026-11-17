@@ -1,5 +1,6 @@
 'use client';
 
+import { REJECTION_REASON_MAX_LENGTH } from '@roviq/common-types';
 import { extractGraphQLError } from '@roviq/graphql';
 import {
   Button,
@@ -45,7 +46,7 @@ export function RejectApplicationDialog({
     if (!application) return;
     try {
       await reject({
-        variables: { id: application.id, reason: reason || undefined },
+        variables: { id: application.id, reason: reason.trim() || undefined },
       });
       onRejected?.(application.id);
       onOpenChange(false);
@@ -70,6 +71,7 @@ export function RejectApplicationDialog({
           <Textarea
             id="reject-reason"
             rows={3}
+            maxLength={REJECTION_REASON_MAX_LENGTH}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder={t('applications.rejectDialog.reasonPlaceholder')}

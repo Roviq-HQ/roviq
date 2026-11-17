@@ -527,3 +527,8 @@ The session restore init script replayed the storage-state access token on every
 ## 2026-11-17 — fixed: parallel portal language tests shared one user
 
 The platform and institute account-language journeys both authenticated as the seeded admin, whose preferred locale belongs to the user across all scopes. Running both journeys together let one reset the preference while the other checked refresh persistence. The institute setup now captures a separate teacher session for its account-language journey; platform, reseller and institute preference tests use distinct users. The existing institute administrator session remains available for configuration tests. Assertions and parallel execution remain enabled.
+
+
+## 2026-11-17 — fixed: admission E2E suite was skipped because no admission flow could complete
+
+`admission.api-e2e.spec.ts` was `describe.skip` behind ROV-232. Three defects kept it there: Temporal workers passed a directory as `workflowsPath`, so the bundler failed and the worker never polled; `StudentAdmissionWorkflow` wrote the literal `'SYSTEM'` into UUID `created_by` columns; and `CreateApplicationInput.formData` had no class-validator decorator, so the global `forbidNonWhitelisted` pipe rejected every `createApplication` call. All three are fixed (ROV-206), `STUDENT_ADMISSION_WORKER_ENABLED` is set for the api-gateway in `docker/compose.e2e.yaml`, and the suite now runs and asserts the real `ENROLLED` outcome. The TC issuance, compliance export and bulk import workers are still not enabled in the E2E stack.

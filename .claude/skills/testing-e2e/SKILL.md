@@ -154,7 +154,7 @@ it('instituteConfigUpdated fires after updateInstituteConfig', async () => {
 
 ## Temporal-backed workflows
 
-Admission (`StudentAdmissionWorkflow`), TC issuance (`TCIssuanceWorkflow`), institute setup, compliance export, and bulk student import run inside Temporal workers. The workers are not yet registered in the e2e stack (tracked in **ROV-232**). Until that lands:
+`StudentAdmissionWorkflow` runs in the e2e stack (the api-gateway sets `STUDENT_ADMISSION_WORKER_ENABLED`), so admission specs assert the real `ENROLLED` outcome — subscribe to `applicationStatusChanged` before `approveApplication` and await the event. TC issuance (`TCIssuanceWorkflow`), institute setup, compliance export, and bulk student import workers are not yet registered in the e2e stack (tracked in **ROV-232**). For those:
 
 - Mutations that enqueue a workflow still return successfully — assert the response envelope.
 - Assertions that depend on a post-workflow state (e.g. `ENROLLED`, `GENERATED`, `ISSUED`) go in a `describe.skip(...)` that names **ROV-232** in the title so the suite can be unskipped in one pass when the worker lands.
