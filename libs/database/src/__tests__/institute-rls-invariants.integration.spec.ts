@@ -113,19 +113,21 @@ describe('Invariant 3: roviq_app cross-tenant isolation', () => {
 });
 
 describe('Invariant 4: roviq_app cannot read platform_memberships', () => {
-  it('returns 0 rows (no GRANT, no policy)', async () => {
+  it('is denied (no GRANT, no policy)', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM platform_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 });
 
 describe('Invariant 5: roviq_app cannot read reseller_memberships', () => {
-  it('returns 0 rows', async () => {
+  it('is denied (no GRANT, no policy)', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM reseller_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM reseller_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 });

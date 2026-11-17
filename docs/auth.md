@@ -11,9 +11,9 @@
 
 - **User** — platform-level (no RLS), globally unique username/email. No tenantId/roleId.
 - **Membership** — three types, each linking User to a scope:
-  - `platform_memberships` — User↔Platform role (1:1 per user)
-  - `reseller_memberships` — User↔Reseller with role
-  - `memberships` — User↔Institute with role. Tenant-scoped (RLS). Holds per-member `abilities` overrides.
+  - `platform_memberships` — User↔Platform role (1:1 per user). `roviq_admin` only: `roviq_app` and `roviq_reseller` hold no table privilege and no policy.
+  - `reseller_memberships` — User↔Reseller with role. `roviq_reseller` reads and writes its own reseller's rows, `roviq_admin` all; `roviq_app` holds no table privilege.
+  - `memberships` — User↔Institute with role. Tenant-scoped (RLS). Holds per-member `abilities` overrides. `roviq_reseller` reads the rows of its own institutes and cannot write. A platform role never lives here: migration `rov-88-platform-membership-backfill` moves any such row into `platform_memberships`.
 - **AuthProvider** — platform-level, tracks auth methods per user (password, passkey, OAuth — future).
 - **RefreshToken** — stores `membership_scope` ('platform'|'reseller'|'institute') + `membership_id` (polymorphic, references the scope's membership table).
 

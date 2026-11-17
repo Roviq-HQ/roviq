@@ -1,9 +1,10 @@
 /**
  * ROV-88 + ROV-91 RLS Security Invariant Tests (Auth PRD §4, §5).
  *
- * 5 tests covering:
- *   1. platform_memberships: only roviq_admin can read (default deny for app/reseller)
+ * Covers:
+ *   1. platform_memberships: only roviq_admin can read (no grant, no policy for app/reseller)
  *   2. reseller_memberships: roviq_reseller sees own, cross-reseller isolation
+ *   10-11. membership table privileges, reseller read access to institute memberships
  *   3. roles scope CHECK: platform role with tenant_id → constraint violation
  *   4. impersonation_sessions: CHECK expires_at > started_at + 1 hour → rejected
  *   5. auth_events: roviq_app can INSERT but not SELECT/UPDATE/DELETE
@@ -14,9 +15,10 @@
  * Run: pnpm nx test database --testPathPattern=membership-rls-invariants
  * Requires: seeded DB (pnpm db:reset --seed)
  */
+import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TEST_POOLER_URL, TEST_SUPERUSER_URL } from './test-helpers';
+import { createMembership, TEST_POOLER_URL, TEST_SUPERUSER_URL } from './test-helpers';
 
 const SEED = {
   RESELLER_DIRECT: '00000000-0000-7000-a000-000000000011',
@@ -64,30 +66,31 @@ afterAll(async () => {
 // ROV-88 Invariant 1: platform_memberships — admin-only access
 // ═══════════════════════════════════════════════════════
 
-describe('ROV-88 Invariant 1: platform_memberships default deny for roviq_app', () => {
-  it('roviq_app cannot SELECT from platform_memberships (0 rows, no policy)', async () => {
+describe('ROV-88 Invariant 1: platform_memberships is admin-only', () => {
+  it('roviq_app cannot SELECT from platform_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM platform_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
-  it('roviq_reseller cannot SELECT from platform_memberships (0 rows, no policy)', async () => {
+  it('roviq_reseller cannot SELECT from platform_memberships', async () => {
     await asRole(
       'roviq_reseller',
       { 'app.current_reseller_id': SEED.RESELLER_DIRECT },
       async (client) => {
-        const res = await client.query('SELECT * FROM platform_memberships');
-        expect(res.rows).toHaveLength(0);
+        await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+          /permission denied/,
+        );
       },
     );
   });
 
   it('roviq_admin can SELECT from platform_memberships', async () => {
     await asRole('roviq_admin', {}, async (client) => {
-      // Just verify SELECT doesn't error — row count depends on seed
       const res = await client.query('SELECT count(*) FROM platform_memberships');
-      expect(Number(res.rows[0].count)).toBeGreaterThanOrEqual(0);
+      expect(Number(res.rows[0].count)).toBeGreaterThanOrEqual(1);
     });
   });
 });
@@ -109,6 +112,25 @@ describe('ROV-88 Invariant 2: reseller_memberships cross-reseller isolation', ()
     );
   });
 
+  it('roviq_reseller sees only its own reseller_memberships', async () => {
+    await asRole(
+      'roviq_reseller',
+      { 'app.current_reseller_id': SEED.RESELLER_DIRECT },
+      async (client) => {
+        const res = await client.query('SELECT DISTINCT reseller_id FROM reseller_memberships');
+        expect(res.rows).toEqual([{ reseller_id: SEED.RESELLER_DIRECT }]);
+      },
+    );
+  });
+
+  it('roviq_app cannot SELECT from reseller_memberships', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(client.query('SELECT * FROM reseller_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
   it('roviq_app cannot INSERT into reseller_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
       await expect(
@@ -117,8 +139,122 @@ describe('ROV-88 Invariant 2: reseller_memberships cross-reseller isolation', ()
            VALUES ($1, $2, $3)`,
           [SEED.USER_ADMIN, SEED.ROLE_RESELLER_FULL_ADMIN, SEED.RESELLER_DIRECT],
         ),
-      ).rejects.toThrow(/permission denied|row-level security/);
+      ).rejects.toThrow(/permission denied/);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-88 Invariant 10: membership table privileges
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-88 Invariant 10: membership table privileges', () => {
+  it('roviq_app and roviq_reseller hold only the privileges their policies need', async () => {
+    const res = await superPool.query(
+      `SELECT t AS "table", r AS role, p AS privilege, has_table_privilege(r, t, p) AS granted
+       FROM unnest(ARRAY['platform_memberships', 'reseller_memberships']) t,
+            unnest(ARRAY['roviq_app', 'roviq_reseller']) r,
+            unnest(ARRAY['DELETE', 'INSERT', 'SELECT', 'UPDATE']) p
+       ORDER BY t, r, p`,
+    );
+    const row = (table: string, role: string, granted: boolean) =>
+      ['DELETE', 'INSERT', 'SELECT', 'UPDATE'].map((privilege) => ({
+        table,
+        role,
+        privilege,
+        granted,
+      }));
+    expect(res.rows).toEqual([
+      ...row('platform_memberships', 'roviq_app', false),
+      ...row('platform_memberships', 'roviq_reseller', false),
+      ...row('reseller_memberships', 'roviq_app', false),
+      ...row('reseller_memberships', 'roviq_reseller', true),
+    ]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-88 Invariant 11: reseller read access to institute memberships
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-88 Invariant 11: memberships reseller read', () => {
+  // Superuser builds a second reseller + institute + membership, then drops to
+  // roviq_reseller inside the same transaction so nothing is committed.
+  async function withOtherResellerMembership(
+    fn: (client: pg.PoolClient, other: { resellerId: string; tenantId: string }) => Promise<void>,
+  ): Promise<void> {
+    const client = await superPool.connect();
+    try {
+      await client.query('BEGIN');
+      const suffix = randomUUID().slice(0, 8);
+      const reseller = await client.query(
+        `INSERT INTO resellers (name, slug) VALUES ($1, $2) RETURNING id`,
+        [`ROV-88 Reseller ${suffix}`, `rov-88-reseller-${suffix}`],
+      );
+      const resellerId: string = reseller.rows[0].id;
+      const institute = await client.query(
+        `INSERT INTO institutes (name, slug, reseller_id, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $4) RETURNING id`,
+        [
+          { en: `ROV-88 Institute ${suffix}` },
+          `rov-88-institute-${suffix}`,
+          resellerId,
+          SEED.USER_ADMIN,
+        ],
+      );
+      const tenantId: string = institute.rows[0].id;
+      const role = await client.query(
+        `INSERT INTO roles (scope, tenant_id, name, abilities, created_by, updated_by)
+         VALUES ('institute', $1, $2, '[]', $3, $3) RETURNING id`,
+        [tenantId, { en: 'ROV-88 Role' }, SEED.USER_ADMIN],
+      );
+      await createMembership(client, randomUUID(), SEED.USER_ADMIN, tenantId, role.rows[0].id);
+      await fn(client, { resellerId, tenantId });
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  }
+
+  async function becomeReseller(client: pg.PoolClient, resellerId: string): Promise<void> {
+    await client.query('SET LOCAL ROLE roviq_reseller');
+    await client.query(`SELECT set_config('app.current_reseller_id', $1, true)`, [resellerId]);
+  }
+
+  it('a reseller reads memberships of its own institutes only', async () => {
+    await withOtherResellerMembership(async (client, other) => {
+      await becomeReseller(client, other.resellerId);
+      const res = await client.query('SELECT DISTINCT tenant_id FROM memberships');
+      expect(res.rows).toEqual([{ tenant_id: other.tenantId }]);
+    });
+  });
+
+  it("a reseller cannot read memberships of another reseller's institute", async () => {
+    await withOtherResellerMembership(async (client, other) => {
+      await becomeReseller(client, SEED.RESELLER_DIRECT);
+      const own = await client.query('SELECT count(*) FROM memberships WHERE tenant_id = $1', [
+        SEED.INSTITUTE_1,
+      ]);
+      expect(Number(own.rows[0].count)).toBeGreaterThanOrEqual(1);
+      const foreign = await client.query('SELECT count(*) FROM memberships WHERE tenant_id = $1', [
+        other.tenantId,
+      ]);
+      expect(Number(foreign.rows[0].count)).toBe(0);
+    });
+  });
+
+  it('a reseller cannot write memberships', async () => {
+    await asRole(
+      'roviq_reseller',
+      { 'app.current_reseller_id': SEED.RESELLER_DIRECT },
+      async (client) => {
+        await expect(
+          client.query(`UPDATE memberships SET status = 'SUSPENDED' WHERE tenant_id = $1`, [
+            SEED.INSTITUTE_1,
+          ]),
+        ).rejects.toThrow(/permission denied/);
+      },
+    );
   });
 });
 

@@ -95,15 +95,17 @@ describe('Role isolation', () => {
 
   it('2. roviq_app cannot read platform_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM platform_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
   it('3. roviq_app cannot read reseller_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      const res = await client.query('SELECT * FROM reseller_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM reseller_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
@@ -286,9 +288,9 @@ describe('Data isolation', () => {
     // Platform admin user has no institute membership accessible via roviq_app
     // if the tenant context doesn't match
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      // Platform memberships are invisible to roviq_app (default deny)
-      const res = await client.query('SELECT * FROM platform_memberships');
-      expect(res.rows).toHaveLength(0);
+      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
