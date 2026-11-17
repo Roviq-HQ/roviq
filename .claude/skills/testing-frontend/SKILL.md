@@ -123,6 +123,8 @@ Never use `container.querySelector()`, XPath, or CSS selectors.
 
 All three boot `dev:web:e2e` (the unified `apps/web` Next.js app on port 4201, separate from dev port 4200). Subdomain routing in middleware determines which portal renders.
 
+> Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
+
 ### File Naming
 - Test specs: `src/{feature}.e2e.spec.ts`
 - Auth setup: `src/auth.setup.ts` (Playwright setup project, produces `storageState`)

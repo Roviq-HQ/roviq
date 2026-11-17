@@ -213,7 +213,7 @@ Uses `docker/compose.e2e.yaml` to spin up isolated infrastructure + services + t
 
 ### Local (for rapid iteration)
 
-Requires `tilt up` for infrastructure. Tilt handles migrations and seeding automatically.
+Requires `pnpm tilt up` for infrastructure. Tilt handles migrations and seeding automatically.
 
 ### API Gateway — Vitest
 

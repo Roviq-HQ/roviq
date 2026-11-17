@@ -149,4 +149,4 @@ File: `docker/grafana/provisioning/alerting/audit-rules.yaml`
 
 - **Unit tests**: `pnpm test` (interceptor: 38, consumer: 12, emitter: 9, helpers: 17)
 - **Integration tests**: `pnpm test:int` (15 audit + 22 security invariants)
-- **E2E tests**: `tilt trigger e2e-gateway` (RLS, CHECK, idempotency, impersonation)
+- **E2E tests**: `pnpm tilt trigger e2e-gateway` (RLS, CHECK, idempotency, impersonation)

@@ -61,7 +61,7 @@ Certificate templates and student name snapshots are stored as `i18nText` jsonb 
 
 ## Self-verification (manual smoke test)
 
-1. `tilt trigger db-clean`, watch `tilt logs db-clean` until seed completes.
+1. `pnpm tilt trigger db-clean`, watch `pnpm tilt logs db-clean` until seed completes.
 2. Login as institute admin, navigate to `/institute/certificates/tc`.
 3. Click "Request TC" → pick a seeded student → submit; row appears in `requested` state.
 4. Open the TC detail page → click "Approve" → status flips to `approved`, audit entry appears.

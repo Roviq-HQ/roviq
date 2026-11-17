@@ -24,9 +24,12 @@ pnpm e2e:up            # brings up postgres/redis/nats first, then the rest with
 pnpm test:e2e:api      # runs the Vitest E2E project against the up stack
 ```
 
-`pnpm e2e:up` is the only sanctioned way to bring up the Docker stack — it runs `docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --wait` after a staged startup of the infra layer, which is what the `--wait` health-gate expects. Do not invoke `docker compose … up` directly.
+`pnpm e2e:up` is the only sanctioned way to bring up the Docker stack — it runs `docker compose -p <this instance's e2e project> -f docker/compose.e2e.yaml up -d --wait` after a staged startup of the infra layer, which is what the `--wait` health-gate expects. Do not invoke `docker compose … up` directly.
 
 The compose project seeds `roviq_test` (port 5435) and provisions Temporal, Novu, and notification-service. If Novu credentials can't be resolved (`helpers/novu.ts` reads from env, then from the `roviq-e2e_novu_creds` docker volume), notification-dependent suites flip to `describe.skip` with a reason — they do not fail the run.
+
+> Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
+> The Compose project is `roviq-e2e` in instance 0 and `roviq-e2e-<slot>` otherwise, so container and volume names change with it. Never hardcode a port, project or container name in a spec or helper: derive it from `E2E_API_PORT`, `E2E_POSTGRES_PORT`, `E2E_NATS_PORT`, `E2E_NOVU_API_PORT`, `E2E_WEB_PORT` or `ROVIQ_E2E_COMPOSE_PROJECT` with the instance 0 value as the default.
 
 ## Making GraphQL requests
 

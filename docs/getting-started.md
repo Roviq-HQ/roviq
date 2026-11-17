@@ -11,7 +11,7 @@
 
 ```bash
 git clone https://github.com/Roviq-HQ/roviq.git && cd roviq
-tilt up
+pnpm tilt up
 ```
 
 Tilt handles everything automatically:
@@ -34,6 +34,8 @@ Open the Tilt UI at http://localhost:10350 to monitor all resources.
 Login requires only username + password — no Institute ID.
 
 ## Quick Verification
+
+> Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
 
 ```bash
 # GraphQL playground
@@ -84,8 +86,8 @@ nx affected -t test               # only changed projects
 
 ```bash
 # Dev environment
-tilt up                  # Start everything (infra + apps)
-tilt down                # Stop everything
+pnpm tilt up                  # Start everything (infra + apps)
+pnpm tilt down                # Stop everything
 
 # Individual apps (if not using Tilt)
 pnpm run dev:gateway      # API gateway               (port 3005)

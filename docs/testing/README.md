@@ -12,6 +12,8 @@
 
 ## Checklist Files
 
+> Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
+
 | File | Scope | Coverage |
 | ------ | ------- | ---------- |
 | [reseller-portal.md](reseller-portal.md) | `reseller.localhost:4200` | 53% (74/140) |
