@@ -1,8 +1,8 @@
 import { createMongoAbility } from '@casl/ability';
 import type { PartialFuncReturn } from '@golevelup/ts-vitest';
-import { BadGatewayException, BadRequestException, Logger } from '@nestjs/common';
+import { BadGatewayException, Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { type AppAbility, BusinessException } from '@roviq/common-types';
+import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
 import type { DrizzleDB } from '@roviq/database';
 import { BillingInterval, PaymentProvider, SubscriptionStatus } from '@roviq/ee-billing-types';
 import {
@@ -262,11 +262,13 @@ describe('BillingService', () => {
         );
         repo.findPlanWithSubscriptionCount.mockResolvedValue({ activeSubscriptionCount: 3 });
 
-        await expect(service.archivePlan('plan-1')).rejects.toThrow(BadRequestException);
+        await expect(service.archivePlan('plan-1')).rejects.toMatchObject({
+          code: ErrorCode.PLAN_HAS_ACTIVE_SUBSCRIPTIONS,
+        });
         expect(repo.archivePlan).not.toHaveBeenCalled();
       }));
 
-    it('should throw NotFoundException for non-existent plan', () =>
+    it('should reject for non-existent plan', () =>
       requestContext.run(TEST_CTX, async () => {
         repo.findPlanById.mockResolvedValue(null);
 
@@ -303,7 +305,9 @@ describe('BillingService', () => {
           mockReturn<'findPlanById'>({ id: 'plan-1', status: 'ACTIVE' }),
         );
 
-        await expect(service.restorePlan('plan-1')).rejects.toThrow(BadRequestException);
+        await expect(service.restorePlan('plan-1')).rejects.toMatchObject({
+          code: ErrorCode.PLAN_NOT_INACTIVE,
+        });
         expect(repo.restorePlan).not.toHaveBeenCalled();
       }));
   });
@@ -358,7 +362,7 @@ describe('BillingService', () => {
             customerEmail: 'billing@demo.com',
             customerPhone: '9876543210',
           }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toMatchObject({ code: ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE });
       }));
 
     it('should reject institute with existing active subscription', () =>
@@ -379,7 +383,7 @@ describe('BillingService', () => {
             customerEmail: 'billing@demo.com',
             customerPhone: '9876543210',
           }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toMatchObject({ code: ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE });
       }));
 
     it('should create provider plan, subscription, gateway config, and emit event', () =>

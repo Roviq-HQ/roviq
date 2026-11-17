@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode, type GradingSchemeKind } from '@roviq/common-types';
 import { ExaminationGradingService, type GradeBandInput } from './examination-grading.service';
 import { ExaminationRepository } from './repositories/examination.repository';
@@ -96,7 +96,8 @@ export class ExaminationConfigService {
 
   async getExamTerm(id: string): Promise<ExamTermRecord> {
     const term = await this.repo.findExamTermById(id);
-    if (!term) throw new NotFoundException(`Exam term ${id} not found`);
+    if (!term)
+      throw new BusinessException(ErrorCode.EXAM_TERM_NOT_FOUND, `Exam term ${id} not found`);
     return term;
   }
 

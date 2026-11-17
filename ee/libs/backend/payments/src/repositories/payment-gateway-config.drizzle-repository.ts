@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { DRIZZLE_DB, type DrizzleDB, institutes, mkAdminCtx, withAdmin } from '@roviq/database';
 import { gatewayConfigs } from '@roviq/ee-database';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -27,7 +28,10 @@ export class PaymentGatewayConfigDrizzleRepository extends PaymentGatewayConfigR
         .limit(1);
 
       if (!result[0]) {
-        throw new NotFoundException(`PaymentGatewayConfig not found for institute ${instituteId}`);
+        throw new BusinessException(
+          ErrorCode.PAYMENT_GATEWAY_NOT_CONFIGURED,
+          `PaymentGatewayConfig not found for institute ${instituteId}`,
+        );
       }
 
       return result[0];

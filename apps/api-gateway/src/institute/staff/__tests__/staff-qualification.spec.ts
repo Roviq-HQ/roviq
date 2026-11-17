@@ -8,8 +8,7 @@
  * that speaks fluent Drizzle without hitting a real database.
  */
 
-import { NotFoundException } from '@nestjs/common';
-import { QualificationType } from '@roviq/common-types';
+import { ErrorCode, QualificationType } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Sequential result queue (shared between `withTenant` and `withAdmin`) ──
@@ -197,10 +196,12 @@ describe('StaffQualificationService (unit)', () => {
     expect(result).toEqual(updated);
   });
 
-  it('update throws NotFoundException when no row matches', async () => {
+  it('update rejects when no row matches', async () => {
     queueResult([]);
 
-    await expect(service.update('missing', { degreeName: 'X' })).rejects.toThrow(NotFoundException);
+    await expect(service.update('missing', { degreeName: 'X' })).rejects.toMatchObject({
+      code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+    });
   });
 
   it('delete returns true on success', async () => {
@@ -211,9 +212,11 @@ describe('StaffQualificationService (unit)', () => {
     expect(result).toBe(true);
   });
 
-  it('delete throws NotFoundException when no row matches', async () => {
+  it('delete rejects when no row matches', async () => {
     queueResult([]);
 
-    await expect(service.delete('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.delete('missing')).rejects.toMatchObject({
+      code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+    });
   });
 });

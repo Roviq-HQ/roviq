@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { i18nDisplay } from '@roviq/database';
 import PDFDocument from 'pdfkit';
 import { ExaminationRepository } from './repositories/examination.repository';
@@ -44,7 +45,7 @@ export class ExaminationDatesheetPdfService {
 
   async render(examId: string, sectionId?: string, staffId?: string): Promise<Buffer> {
     const exam = await this.repo.findExamById(examId);
-    if (!exam) throw new NotFoundException(`Exam ${examId} not found`);
+    if (!exam) throw new BusinessException(ErrorCode.EXAM_NOT_FOUND, `Exam ${examId} not found`);
 
     let schedules = await this.repo.findSchedulesByExam(examId);
     if (sectionId) schedules = schedules.filter((s) => s.sectionId === sectionId);

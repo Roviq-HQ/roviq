@@ -1,7 +1,12 @@
 import { jetstream } from '@nats-io/jetstream';
 import { type NatsConnection, headers as natsHeaders } from '@nats-io/nats-core';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DLQ_STATE_MACHINE, type DlqStatus } from '@roviq/common-types';
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  BusinessException,
+  DLQ_STATE_MACHINE,
+  type DlqStatus,
+  ErrorCode,
+} from '@roviq/common-types';
 import { DRIZZLE_DB, type DrizzleDB, dlqMessages, mkAdminCtx, withAdmin } from '@roviq/database';
 import { and, desc, eq, type SQL, sql } from 'drizzle-orm';
 import { decodeCursor, encodeCursor } from '../common/pagination/relay-pagination.model';
@@ -91,7 +96,8 @@ export class DlqService {
   async replay(id: string, replayedBy: string) {
     return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {
       const [row] = await tx.select().from(dlqMessages).where(eq(dlqMessages.id, id));
-      if (!row) throw new NotFoundException(`DLQ message ${id} not found`);
+      if (!row)
+        throw new BusinessException(ErrorCode.DLQ_MESSAGE_NOT_FOUND, `DLQ message ${id} not found`);
 
       const status: DlqStatus = row.status as DlqStatus;
       DLQ_STATE_MACHINE.assertTransition(status, 'replayed');
@@ -121,7 +127,8 @@ export class DlqService {
   async discard(id: string) {
     return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {
       const [row] = await tx.select().from(dlqMessages).where(eq(dlqMessages.id, id));
-      if (!row) throw new NotFoundException(`DLQ message ${id} not found`);
+      if (!row)
+        throw new BusinessException(ErrorCode.DLQ_MESSAGE_NOT_FOUND, `DLQ message ${id} not found`);
 
       const status: DlqStatus = row.status as DlqStatus;
       DLQ_STATE_MACHINE.assertTransition(status, 'discarded');

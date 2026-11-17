@@ -5,12 +5,14 @@
  * and Temporal workflow orchestration.
  */
 
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   AcademicStatus,
+  BusinessException,
   CertificateStatus,
   CertificateTemplateType,
+  ErrorCode,
   TC_STATE_MACHINE,
   TcStatus,
 } from '@roviq/common-types';
@@ -93,9 +95,11 @@ export class CertificateService {
       },
     );
 
-    if (student.length === 0) throw new NotFoundException('Student profile not found');
+    if (student.length === 0)
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student profile not found');
     if (student[0].academicStatus !== AcademicStatus.ENROLLED) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.STUDENT_NOT_ENROLLED,
         `Student must be enrolled to request TC (current: ${student[0].academicStatus})`,
       );
     }
@@ -169,7 +173,11 @@ export class CertificateService {
         .set({ status: TcStatus.APPROVED, approvedBy: actorId, approvedAt: new Date() })
         .where(and(eq(tcRegister.id, tcId), eq(tcRegister.status, TcStatus.GENERATED)))
         .returning({ id: tcRegister.id });
-      if (rows.length === 0) throw new NotFoundException('TC not found or not in generated status');
+      if (rows.length === 0)
+        throw new BusinessException(
+          ErrorCode.TC_NOT_FOUND,
+          'TC not found or not in generated status',
+        );
     });
 
     return this.getTCDetails(tcId);
@@ -199,7 +207,8 @@ export class CertificateService {
         .where(eq(tcRegisterLive.id, id))
         .limit(1);
 
-      if (existing.length === 0) throw new NotFoundException('TC not found');
+      if (existing.length === 0)
+        throw new BusinessException(ErrorCode.TC_NOT_FOUND, 'TC not found');
 
       TC_STATE_MACHINE.assertTransition(existing[0].status, TcStatus.CANCELLED);
 
@@ -229,7 +238,7 @@ export class CertificateService {
       },
     );
 
-    if (tc.length === 0) throw new NotFoundException('TC not found');
+    if (tc.length === 0) throw new BusinessException(ErrorCode.TC_NOT_FOUND, 'TC not found');
     TC_STATE_MACHINE.assertTransition(tc[0].status, TcStatus.ISSUED);
 
     const today = new Date().toISOString().split('T')[0];
@@ -342,7 +351,7 @@ export class CertificateService {
           .limit(1);
       },
     );
-    if (rows.length === 0) throw new NotFoundException('TC not found');
+    if (rows.length === 0) throw new BusinessException(ErrorCode.TC_NOT_FOUND, 'TC not found');
     return this.mapTC(rows[0]);
   }
 
@@ -393,7 +402,8 @@ export class CertificateService {
       },
     );
 
-    if (original.length === 0) throw new NotFoundException('Original TC not found');
+    if (original.length === 0)
+      throw new BusinessException(ErrorCode.TC_NOT_FOUND, 'Original TC not found');
     TC_STATE_MACHINE.assertTransition(original[0].status, TcStatus.DUPLICATE_REQUESTED);
 
     const tempSerial = `TC-DUP-${Date.now()}`;
@@ -451,7 +461,11 @@ export class CertificateService {
           .limit(1);
       },
     );
-    if (template.length === 0) throw new NotFoundException('Certificate template not found');
+    if (template.length === 0)
+      throw new BusinessException(
+        ErrorCode.CERTIFICATE_TEMPLATE_NOT_FOUND,
+        'Certificate template not found',
+      );
 
     // Auto-populate certificate data from student/staff profile
     let certificateData: Record<string, unknown> = {};
@@ -569,7 +583,8 @@ export class CertificateService {
           })
           .where(eq(issuedCertificates.id, certId))
           .returning();
-        if (rows.length === 0) throw new NotFoundException('Certificate not found');
+        if (rows.length === 0)
+          throw new BusinessException(ErrorCode.CERTIFICATE_NOT_FOUND, 'Certificate not found');
         return rows[0];
       },
     );
@@ -609,7 +624,8 @@ export class CertificateService {
           .limit(1);
       },
     );
-    if (rows.length === 0) throw new NotFoundException('Certificate not found');
+    if (rows.length === 0)
+      throw new BusinessException(ErrorCode.CERTIFICATE_NOT_FOUND, 'Certificate not found');
     return rows[0];
   }
 
@@ -640,7 +656,11 @@ export class CertificateService {
           .limit(1);
       },
     );
-    if (template.length === 0) throw new NotFoundException('Certificate template not found');
+    if (template.length === 0)
+      throw new BusinessException(
+        ErrorCode.CERTIFICATE_TEMPLATE_NOT_FOUND,
+        'Certificate template not found',
+      );
 
     const content = template[0].templateContent;
     if (content && content.length > 0) {
@@ -709,7 +729,11 @@ export class CertificateService {
           .limit(1);
       },
     );
-    if (template.length === 0) throw new NotFoundException('Certificate template not found');
+    if (template.length === 0)
+      throw new BusinessException(
+        ErrorCode.CERTIFICATE_TEMPLATE_NOT_FOUND,
+        'Certificate template not found',
+      );
 
     const studentRows = await withTenant(
       this.db,
@@ -722,7 +746,8 @@ export class CertificateService {
           .limit(1);
       },
     );
-    if (studentRows.length === 0) throw new NotFoundException('Student not found');
+    if (studentRows.length === 0)
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
 
     const studentRow = studentRows[0];
     const up = await withAdmin(this.db, mkAdminCtx('service:certificate'), async (tx) => {

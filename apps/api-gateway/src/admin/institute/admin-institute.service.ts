@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BusinessException, ErrorCode, ResellerStatus } from '@roviq/common-types';
 import {
@@ -198,7 +198,10 @@ export class AdminInstituteService {
         .limit(1),
     );
     if (rows.length === 0) {
-      throw new NotFoundException(`Institute group ${groupId} not found`);
+      throw new BusinessException(
+        ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+        `Institute group ${groupId} not found`,
+      );
     }
 
     const previousGroupId = (institute as InstituteRecord).groupId;

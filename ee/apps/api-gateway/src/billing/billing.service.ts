@@ -1,14 +1,11 @@
-import {
-  BadGatewayException,
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { type AppAbility, SUBSCRIPTION_STATE_MACHINE } from '@roviq/common-types';
+import {
+  type AppAbility,
+  BusinessException,
+  ErrorCode,
+  SUBSCRIPTION_STATE_MACHINE,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -128,11 +125,16 @@ export class BillingService {
 
   async archivePlan(id: string) {
     const plan = await this.repo.findPlanById(id);
-    if (!plan) throw new NotFoundException('Subscription plan not found');
+    if (!plan)
+      throw new BusinessException(
+        ErrorCode.SUBSCRIPTION_PLAN_NOT_FOUND,
+        'Subscription plan not found',
+      );
 
     const { activeSubscriptionCount } = await this.repo.findPlanWithSubscriptionCount(id);
     if (activeSubscriptionCount > 0) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.PLAN_HAS_ACTIVE_SUBSCRIPTIONS,
         'Cannot archive a plan with active subscriptions. Cancel or migrate them first.',
       );
     }
@@ -144,10 +146,17 @@ export class BillingService {
 
   async restorePlan(id: string) {
     const plan = await this.repo.findPlanById(id);
-    if (!plan) throw new NotFoundException('Subscription plan not found');
+    if (!plan)
+      throw new BusinessException(
+        ErrorCode.SUBSCRIPTION_PLAN_NOT_FOUND,
+        'Subscription plan not found',
+      );
 
     if (plan.status !== 'INACTIVE') {
-      throw new BadRequestException('Only inactive plans can be restored');
+      throw new BusinessException(
+        ErrorCode.PLAN_NOT_INACTIVE,
+        'Only inactive plans can be restored',
+      );
     }
 
     const restored = await this.repo.restorePlan(id);
@@ -166,7 +175,11 @@ export class BillingService {
 
   async findPlan(id: string, ability?: AppAbility) {
     const plan = await this.repo.findPlanById(id, ability);
-    if (!plan) throw new NotFoundException('Subscription plan not found');
+    if (!plan)
+      throw new BusinessException(
+        ErrorCode.SUBSCRIPTION_PLAN_NOT_FOUND,
+        'Subscription plan not found',
+      );
     return plan;
   }
 
@@ -182,23 +195,33 @@ export class BillingService {
     ability?: AppAbility,
   ) {
     if (ability && !ability.can('create', 'Subscription')) {
-      throw new ForbiddenException('Not allowed to create subscriptions for this institute');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Not allowed to create subscriptions for this institute',
+      );
     }
 
     const existing = await this.repo.findSubscriptionByInstitute(input.tenantId);
     if (existing && !['CANCELLED', 'EXPIRED'].includes(existing.status)) {
-      throw new BadRequestException('Institute already has an active subscription');
+      throw new BusinessException(
+        ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE,
+        'Institute already has an active subscription',
+      );
     }
 
     const plan = await this.repo.findPlanById(input.planId);
-    if (!plan) throw new NotFoundException('Subscription plan not found');
+    if (!plan)
+      throw new BusinessException(
+        ErrorCode.SUBSCRIPTION_PLAN_NOT_FOUND,
+        'Subscription plan not found',
+      );
 
     if (plan.status !== 'ACTIVE') {
-      throw new BadRequestException('Cannot assign a non-active plan');
+      throw new BusinessException(ErrorCode.PLAN_NOT_ACTIVE, 'Cannot assign a non-active plan');
     }
 
     if (plan.resellerId !== input.resellerId) {
-      throw new ForbiddenException('Plan does not belong to this reseller');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Plan does not belong to this reseller');
     }
 
     const { userId } = getRequestContext();
@@ -280,10 +303,11 @@ export class BillingService {
 
   async cancelSubscription(subscriptionId: string, atCycleEnd = true, ability?: AppAbility) {
     const sub = await this.repo.findSubscriptionById(subscriptionId);
-    if (!sub) throw new NotFoundException('Subscription not found');
+    if (!sub)
+      throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND, 'Subscription not found');
 
     if (ability && !ability.can('update', 'Subscription')) {
-      throw new ForbiddenException('Not allowed to modify this subscription');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Not allowed to modify this subscription');
     }
 
     SUBSCRIPTION_STATE_MACHINE.assertTransition(sub.status as SubscriptionStatus, 'CANCELLED');
@@ -314,10 +338,11 @@ export class BillingService {
 
   async pauseSubscription(subscriptionId: string, ability?: AppAbility) {
     const sub = await this.repo.findSubscriptionById(subscriptionId);
-    if (!sub) throw new NotFoundException('Subscription not found');
+    if (!sub)
+      throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND, 'Subscription not found');
 
     if (ability && !ability.can('update', 'Subscription')) {
-      throw new ForbiddenException('Not allowed to modify this subscription');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Not allowed to modify this subscription');
     }
 
     SUBSCRIPTION_STATE_MACHINE.assertTransition(sub.status as SubscriptionStatus, 'PAUSED');
@@ -342,10 +367,11 @@ export class BillingService {
 
   async resumeSubscription(subscriptionId: string, ability?: AppAbility) {
     const sub = await this.repo.findSubscriptionById(subscriptionId);
-    if (!sub) throw new NotFoundException('Subscription not found');
+    if (!sub)
+      throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND, 'Subscription not found');
 
     if (ability && !ability.can('update', 'Subscription')) {
-      throw new ForbiddenException('Not allowed to modify this subscription');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Not allowed to modify this subscription');
     }
 
     SUBSCRIPTION_STATE_MACHINE.assertTransition(sub.status as SubscriptionStatus, 'ACTIVE');

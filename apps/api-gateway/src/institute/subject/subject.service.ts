@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
@@ -25,7 +25,8 @@ export class SubjectService {
 
   async findById(id: string): Promise<SubjectRecord> {
     const record = await this.repo.findById(id);
-    if (!record) throw new NotFoundException(`Subject ${id} not found`);
+    if (!record)
+      throw new BusinessException(ErrorCode.SUBJECT_NOT_FOUND, `Subject ${id} not found`);
     return record;
   }
 

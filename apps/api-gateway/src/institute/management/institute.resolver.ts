@@ -1,4 +1,4 @@
-import { ForbiddenException, UseGuards } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   assertTenantContext,
@@ -8,6 +8,7 @@ import {
 } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { CreateInstituteInput } from './dto/create-institute.input';
 import { InstituteFilterInput } from './dto/institute-filter.input';
 import { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
@@ -40,7 +41,10 @@ export class InstituteResolver {
   async myInstitute(@CurrentUser() user: AuthUser) {
     assertTenantContext(user);
     if (!user.tenantId) {
-      throw new ForbiddenException('Institute scope required to access myInstitute');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Institute scope required to access myInstitute',
+      );
     }
     return this.instituteService.findById(user.tenantId);
   }

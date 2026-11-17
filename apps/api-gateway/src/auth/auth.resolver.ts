@@ -1,8 +1,9 @@
-import { ForbiddenException, UseGuards } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
 import { assertTenantContext, CurrentUser, GqlAuthGuard } from '@roviq/auth-backend';
 import type { AuthUser } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
@@ -197,7 +198,10 @@ export class AuthResolver {
     @CurrentUser() user: AuthUser,
   ): Promise<string | null> {
     if (user.isImpersonated)
-      throw new ForbiddenException('Cannot change account preferences while impersonating');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Cannot change account preferences while impersonating',
+      );
     return this.authService.updatePreferredLocale(user.userId, input.locale ?? null);
   }
 

@@ -31,18 +31,6 @@ describe('toStructuredError', () => {
     });
   });
 
-  it('should honour an explicit code on a plain HttpException response', () => {
-    const result = toStructuredError(
-      new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' }),
-    );
-
-    expect(result).toEqual({
-      message: 'Student not found',
-      code: 'STUDENT_NOT_FOUND',
-      statusCode: 404,
-    });
-  });
-
   it.each([
     [new BadRequestException('bad'), 'BAD_REQUEST', 400],
     [new UnauthorizedException(), 'UNAUTHENTICATED', 401],
@@ -59,12 +47,6 @@ describe('toStructuredError', () => {
       code,
       statusCode,
     });
-  });
-
-  it('should ignore a response code that is not UPPER_SNAKE', () => {
-    const result = toStructuredError(new BadRequestException({ message: 'bad', code: 'oops' }));
-
-    expect(result.code).toBe('BAD_REQUEST');
   });
 
   it('should join class-validator message arrays', () => {

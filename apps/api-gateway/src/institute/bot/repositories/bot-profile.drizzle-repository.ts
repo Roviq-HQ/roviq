@@ -1,5 +1,11 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { BotRateLimitTier, BotStatus, BotType } from '@roviq/common-types';
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  BotRateLimitTier,
+  BotStatus,
+  BotType,
+  BusinessException,
+  ErrorCode,
+} from '@roviq/common-types';
 import {
   botProfiles,
   botProfilesLive,
@@ -131,7 +137,8 @@ export class BotProfileDrizzleRepository extends BotProfileRepository {
         .where(and(eq(botProfiles.id, id), isNull(botProfiles.deletedAt)))
         .returning(returningColumns);
 
-      if (rows.length === 0) throw new NotFoundException(`Bot profile ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.BOT_NOT_FOUND, `Bot profile ${id} not found`);
       return rows[0] as BotProfileRecord;
     });
   }
@@ -145,7 +152,8 @@ export class BotProfileDrizzleRepository extends BotProfileRepository {
         .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
         .where(and(eq(botProfiles.id, id), isNull(botProfiles.deletedAt)))
         .returning({ id: botProfiles.id });
-      if (rows.length === 0) throw new NotFoundException(`Bot profile ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.BOT_NOT_FOUND, `Bot profile ${id} not found`);
     });
   }
 }

@@ -8,7 +8,6 @@
  * 4. Delete blocks if only guardian for a student
  */
 import assert from 'node:assert';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -182,7 +181,7 @@ describe('Guardian — Unlink Validation', () => {
 
     await expect(
       service.unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' }),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toMatchObject({ code: ErrorCode.GUARDIAN_LINK_NOT_FOUND });
   });
 
   it('unlinkFromStudent rejects unlink of primary without replacement', async () => {
@@ -190,7 +189,7 @@ describe('Guardian — Unlink Validation', () => {
 
     await expect(
       service.unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toMatchObject({ code: ErrorCode.PRIMARY_GUARDIAN_REQUIRED });
   });
 
   it('unlinkFromStudent rejects unlinking the last guardian', async () => {
@@ -234,7 +233,7 @@ describe('Guardian — Revoke Access (Divorce)', () => {
 
     await expect(
       service.revokeAccess({ guardianProfileId: 'g1', studentProfileId: 's1' }),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toMatchObject({ code: ErrorCode.GUARDIAN_LINK_NOT_FOUND });
   });
 });
 
@@ -251,6 +250,8 @@ describe('Guardian — Delete Validation', () => {
     queueResult([{ studentProfileId: 's1' }]); // guardian's links
     queueResult([]); // no other guardians for s1
 
-    await expect(service.delete('g1')).rejects.toThrow(BadRequestException);
+    await expect(service.delete('g1')).rejects.toMatchObject({
+      code: ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
+    });
   });
 });

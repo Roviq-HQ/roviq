@@ -1,5 +1,6 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { InstituteReadAccess } from '@roviq/casl';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -69,7 +70,8 @@ export class GuardianReadRepository {
         .where(and(eq(guardianProfilesLive.id, id), guardianReadPredicate(access.ability)))
         .limit(1);
     });
-    if (rows.length === 0) throw new NotFoundException(`Guardian profile ${id} not found`);
+    if (rows.length === 0)
+      throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian profile ${id} not found`);
     return rows[0];
   }
 

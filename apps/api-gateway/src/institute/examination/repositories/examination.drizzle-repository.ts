@@ -1,5 +1,6 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { ExamStatus, GradingSchemeKind, ReportCardStatus } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   attendanceEntriesLive,
   attendanceSessionsLive,
@@ -312,7 +313,11 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           createdAt: gradingSchemes.createdAt,
           updatedAt: gradingSchemes.updatedAt,
         });
-      if (rows.length === 0) throw new NotFoundException(`Grading scheme ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(
+          ErrorCode.GRADING_SCHEME_NOT_FOUND,
+          `Grading scheme ${id} not found`,
+        );
       return rows[0] as GradingSchemeRecord;
     });
   }
@@ -485,7 +490,8 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           createdAt: examTerms.createdAt,
           updatedAt: examTerms.updatedAt,
         });
-      if (rows.length === 0) throw new NotFoundException(`Exam term ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.EXAM_TERM_NOT_FOUND, `Exam term ${id} not found`);
       return rows[0] as ExamTermRecord;
     });
   }
@@ -601,7 +607,8 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .where(and(eq(exams.id, id), isNull(exams.deletedAt)))
         .returning(examWrite);
-      if (rows.length === 0) throw new NotFoundException(`Exam ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.EXAM_NOT_FOUND, `Exam ${id} not found`);
       return rows[0] as ExamRecord;
     });
   }
@@ -614,7 +621,8 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         .set({ status, updatedBy: userId })
         .where(and(eq(exams.id, id), isNull(exams.deletedAt)))
         .returning(examWrite);
-      if (rows.length === 0) throw new NotFoundException(`Exam ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.EXAM_NOT_FOUND, `Exam ${id} not found`);
       return rows[0] as ExamRecord;
     });
   }
@@ -633,7 +641,8 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         .set({ deletedAt: null, deletedBy: null, updatedBy: userId })
         .where(eq(exams.id, id))
         .returning(examWrite);
-      if (rows.length === 0) throw new NotFoundException(`Exam ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.EXAM_NOT_FOUND, `Exam ${id} not found`);
       return rows[0] as ExamRecord;
     });
   }
@@ -685,7 +694,11 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .where(and(eq(examSchedules.id, id), isNull(examSchedules.deletedAt)))
         .returning(scheduleWrite);
-      if (rows.length === 0) throw new NotFoundException(`Exam schedule ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(
+          ErrorCode.EXAM_SCHEDULE_NOT_FOUND,
+          `Exam schedule ${id} not found`,
+        );
       return rows[0] as ExamScheduleRecord;
     });
   }
@@ -1215,7 +1228,8 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         })
         .where(and(eq(reportCards.id, id), isNull(reportCards.deletedAt)))
         .returning();
-      if (rows.length === 0) throw new NotFoundException(`Report card ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.REPORT_CARD_NOT_FOUND, `Report card ${id} not found`);
       return rows[0] as ReportCardRecord;
     });
   }
@@ -1245,7 +1259,8 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         .set({ status, updatedBy: userId })
         .where(and(eq(reportCards.id, id), isNull(reportCards.deletedAt)))
         .returning();
-      if (rows.length === 0) throw new NotFoundException(`Report card ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.REPORT_CARD_NOT_FOUND, `Report card ${id} not found`);
       return rows[0] as ReportCardRecord;
     });
   }

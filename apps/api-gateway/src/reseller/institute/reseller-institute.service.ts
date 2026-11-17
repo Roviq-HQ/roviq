@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
@@ -16,7 +16,7 @@ export class ResellerInstituteService {
 
   private getResellerId(): string {
     const { resellerId } = getRequestContext();
-    if (!resellerId) throw new ForbiddenException('Reseller scope required');
+    if (!resellerId) throw new BusinessException(ErrorCode.FORBIDDEN, 'Reseller scope required');
     return resellerId;
   }
 

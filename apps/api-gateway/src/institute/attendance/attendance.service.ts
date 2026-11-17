@@ -1,13 +1,13 @@
 import { subject } from '@casl/ability';
-import {
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { InstituteReadAccess } from '@roviq/casl';
-import { AcademicStatus, type AppAction, AttendanceStatus } from '@roviq/common-types';
+import {
+  AcademicStatus,
+  type AppAction,
+  AttendanceStatus,
+  BusinessException,
+  ErrorCode,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { HolidayService } from '../holiday/holiday.service';
@@ -44,10 +44,10 @@ export class AttendanceService {
   async findSession(id: string, access: InstituteReadAccess): Promise<AttendanceSessionRecord> {
     const session = await this.repo.findSessionById(id, access);
     if (!session) {
-      throw new NotFoundException({
-        message: `Attendance session ${id} not found`,
-        code: 'ATTENDANCE_SESSION_NOT_FOUND',
-      });
+      throw new BusinessException(
+        ErrorCode.ATTENDANCE_SESSION_NOT_FOUND,
+        `Attendance session ${id} not found`,
+      );
     }
     return session;
   }
@@ -76,10 +76,7 @@ export class AttendanceService {
   private async sectionScope(sectionId: string): Promise<AttendanceSectionScope> {
     const scope = await this.repo.findSectionScope(sectionId);
     if (!scope) {
-      throw new NotFoundException({
-        message: `Section ${sectionId} not found`,
-        code: 'SECTION_NOT_FOUND',
-      });
+      throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, `Section ${sectionId} not found`);
     }
     return scope;
   }
@@ -91,7 +88,10 @@ export class AttendanceService {
   ): void {
     const record = subject('Attendance', { tenantId: access.user.tenantId, ...fields });
     if (!access.ability.can(action, record)) {
-      throw new ForbiddenException('Not authorized for attendance in this section');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Not authorized for attendance in this section',
+      );
     }
   }
 
@@ -103,10 +103,10 @@ export class AttendanceService {
     if (!this.isPastDate(fields.date)) return false;
     const record = subject('AttendanceOverride', { tenantId: access.user.tenantId, ...fields });
     if (!access.ability.can('update', record)) {
-      throw new ForbiddenException({
-        message: 'Past-day attendance edits require the AttendanceOverride permission',
-        code: 'ATTENDANCE_OVERRIDE_FORBIDDEN',
-      });
+      throw new BusinessException(
+        ErrorCode.ATTENDANCE_OVERRIDE_FORBIDDEN,
+        'Past-day attendance edits require the AttendanceOverride permission',
+      );
     }
     return true;
   }
@@ -119,8 +119,9 @@ export class AttendanceService {
   ): Promise<boolean> {
     if (!this.isPastDate(session.date)) return false;
     if (!overridePastDay) {
-      throw new ForbiddenException(
-        'ATTENDANCE_EDIT_WINDOW_CLOSED: attendance for past dates can only be edited with explicit admin override.',
+      throw new BusinessException(
+        ErrorCode.ATTENDANCE_EDIT_WINDOW_CLOSED,
+        'Attendance for past dates can only be edited with explicit admin override.',
       );
     }
     const scope = await this.sectionScope(session.sectionId);
@@ -152,7 +153,10 @@ export class AttendanceService {
     studentId: string,
   ): Promise<void> {
     if (!(await this.repo.isStudentInSession(session, studentId))) {
-      throw new ForbiddenException('Student is not enrolled in this attendance session section');
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Student is not enrolled in this attendance session section',
+      );
     }
   }
 
@@ -162,10 +166,10 @@ export class AttendanceService {
   ): Promise<AttendanceSessionRecord> {
     const scope = await this.sectionScope(input.sectionId);
     if (scope.academicYearId !== input.academicYearId) {
-      throw new NotFoundException({
-        message: `Section ${input.sectionId} not found in academic year ${input.academicYearId}`,
-        code: 'SECTION_NOT_FOUND',
-      });
+      throw new BusinessException(
+        ErrorCode.SECTION_NOT_FOUND,
+        `Section ${input.sectionId} not found in academic year ${input.academicYearId}`,
+      );
     }
     this.authorize(access, 'create', {
       ...scope,
@@ -180,7 +184,8 @@ export class AttendanceService {
 
     if (existing) {
       if (existing.lecturerId !== input.lecturerId) {
-        throw new ConflictException(
+        throw new BusinessException(
+          ErrorCode.ATTENDANCE_SLOT_TAKEN,
           `Attendance for this slot already taken by another lecturer. Override required.`,
         );
       }
@@ -202,7 +207,10 @@ export class AttendanceService {
       const holidayNames = holidaysOnDate
         .map((h) => h.name.en ?? Object.values(h.name)[0] ?? 'unnamed')
         .join(', ');
-      throw new ConflictException(`ATTENDANCE_ON_HOLIDAY: ${holidayNames}`);
+      throw new BusinessException(
+        ErrorCode.ATTENDANCE_ON_HOLIDAY,
+        `Attendance cannot be taken on a holiday: ${holidayNames}`,
+      );
     }
 
     const session = await this.repo.createSession({

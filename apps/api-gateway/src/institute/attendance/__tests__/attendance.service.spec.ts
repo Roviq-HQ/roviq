@@ -15,7 +15,6 @@
  */
 
 import { createMongoAbility } from '@casl/ability';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { InstituteReadAccess } from '@roviq/casl';
 import {
   type AbilityRule,
@@ -23,6 +22,7 @@ import {
   type AppAbility,
   AttendanceMode,
   AttendanceStatus,
+  ErrorCode,
   type InstituteContext,
 } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -303,11 +303,13 @@ describe('AttendanceService (unit)', () => {
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
-    it('throws ConflictException when the slot is owned by another lecturer', async () => {
+    it('rejects when the slot is owned by another lecturer', async () => {
       const existing = buildSession({ lecturerId: LECTURER_B });
       repo.findSession.mockResolvedValue(existing);
 
-      await expect(service.openSession(input, ADMIN)).rejects.toBeInstanceOf(ConflictException);
+      await expect(service.openSession(input, ADMIN)).rejects.toMatchObject({
+        code: ErrorCode.ATTENDANCE_SLOT_TAKEN,
+      });
       expect(repo.createSession).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
@@ -323,7 +325,7 @@ describe('AttendanceService (unit)', () => {
 
       await expect(
         service.openSession({ ...input, sectionId: OTHER_SECTION_ID }, TEACHER),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(repo.findSession).not.toHaveBeenCalled();
       expect(repo.createSession).not.toHaveBeenCalled();
     });
@@ -331,20 +333,22 @@ describe('AttendanceService (unit)', () => {
     it('rejects an academic year that does not own the section', async () => {
       await expect(
         service.openSession({ ...input, academicYearId: OTHER_YEAR_ID }, ADMIN),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toMatchObject({ code: ErrorCode.SECTION_NOT_FOUND });
       expect(repo.createSession).not.toHaveBeenCalled();
     });
 
     it('rejects an unknown section', async () => {
       repo.findSectionScope.mockResolvedValue(null);
 
-      await expect(service.openSession(input, ADMIN)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.openSession(input, ADMIN)).rejects.toMatchObject({
+        code: ErrorCode.SECTION_NOT_FOUND,
+      });
     });
 
     it('rejects callers who may only read attendance', async () => {
-      await expect(service.openSession(input, READ_ONLY)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(service.openSession(input, READ_ONLY)).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
     });
   });
 
@@ -429,9 +433,9 @@ describe('AttendanceService (unit)', () => {
     it('rejects past-day edits without explicit admin override', async () => {
       repo.findSessionById.mockResolvedValue(buildSession({ date: '2020-01-01' }));
 
-      await expect(service.markAttendance(baseInput, PRESENT_ONLY, ADMIN)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(service.markAttendance(baseInput, PRESENT_ONLY, ADMIN)).rejects.toMatchObject({
+        code: ErrorCode.ATTENDANCE_EDIT_WINDOW_CLOSED,
+      });
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
 
@@ -494,9 +498,9 @@ describe('AttendanceService (unit)', () => {
     it('looks the session up through the caller read scope', async () => {
       repo.findSessionById.mockResolvedValue(null);
 
-      await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toMatchObject({
+        code: ErrorCode.ATTENDANCE_SESSION_NOT_FOUND,
+      });
       expect(repo.findSessionById).toHaveBeenCalledWith(SESSION_ID, TEACHER);
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
@@ -505,9 +509,9 @@ describe('AttendanceService (unit)', () => {
       repo.findSessionById.mockResolvedValue(buildSession({ sectionId: OTHER_SECTION_ID }));
       repo.findSectionScope.mockResolvedValue({ ...SECTION_SCOPE, sectionId: OTHER_SECTION_ID });
 
-      await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
 
@@ -515,9 +519,9 @@ describe('AttendanceService (unit)', () => {
       repo.findSessionById.mockResolvedValue(buildSession());
       repo.isStudentInSession.mockResolvedValue(false);
 
-      await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(service.markAttendance(baseInput, PRESENT_ONLY, TEACHER)).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
   });
@@ -539,7 +543,7 @@ describe('AttendanceService (unit)', () => {
           PRESENT_ONLY,
           TEACHER,
         ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(repo.upsertEntry).not.toHaveBeenCalled();
     });
   });
@@ -623,16 +627,16 @@ describe('AttendanceService (unit)', () => {
 
       await expect(
         service.overrideSession(SESSION_ID, LECTURER_B, null, READ_ONLY),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(repo.assignLecturer).not.toHaveBeenCalled();
     });
 
     it('rejects deleting a session the caller may only read', async () => {
       repo.findSessionById.mockResolvedValue(buildSession());
 
-      await expect(service.deleteSession(SESSION_ID, READ_ONLY)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(service.deleteSession(SESSION_ID, READ_ONLY)).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
       expect(repo.softDeleteSession).not.toHaveBeenCalled();
     });
   });

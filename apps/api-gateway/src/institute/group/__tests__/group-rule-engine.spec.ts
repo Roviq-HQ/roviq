@@ -215,7 +215,7 @@ describe('GroupService (unit)', () => {
     expect(extractDimensions).not.toHaveBeenCalled();
   });
 
-  it('findById throws NotFoundException when no row is returned', async () => {
+  it('findById rejects when no row is returned', async () => {
     queueResult([]);
     await expect(service.findById('missing')).rejects.toThrow(/not found/i);
   });

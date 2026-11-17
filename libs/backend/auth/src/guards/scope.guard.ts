@@ -1,12 +1,7 @@
-import {
-  type CanActivate,
-  type ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  mixin,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable, mixin } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import type { AuthScope, AuthUser } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 
 export function createScopeGuard(scope: AuthScope) {
   @Injectable()
@@ -15,7 +10,7 @@ export function createScopeGuard(scope: AuthScope) {
       const ctx = GqlExecutionContext.create(context);
       const user = ctx.getContext().req.user as AuthUser | undefined;
       if (!user || user.scope !== scope) {
-        throw new ForbiddenException(`${scope} scope required`);
+        throw new BusinessException(ErrorCode.FORBIDDEN, `${scope} scope required`);
       }
       return true;
     }

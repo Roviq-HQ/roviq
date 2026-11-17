@@ -3,7 +3,6 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { GraphQLError, type GraphQLFormattedError } from 'graphql';
 
 const INTERNAL_MESSAGE = 'Internal server error';
-const CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 const STATUS_FALLBACK_CODE: Partial<Record<number, ErrorCode>> = {
   [HttpStatus.BAD_REQUEST]: ErrorCode.BAD_REQUEST,
@@ -19,13 +18,6 @@ export interface StructuredError {
   message: string;
   code: string;
   statusCode: number;
-}
-
-/** Explicit `{ code }` on an HttpException response, e.g. `new NotFoundException({ code, message })`. */
-function readResponseCode(response: string | object): string | undefined {
-  if (typeof response !== 'object' || !('code' in response)) return undefined;
-  const { code } = response;
-  return typeof code === 'string' && CODE_PATTERN.test(code) ? code : undefined;
 }
 
 function readMessage(exception: HttpException): string {
@@ -49,8 +41,7 @@ export function toStructuredError(exception: unknown): StructuredError {
   const code =
     exception instanceof BusinessException
       ? exception.code
-      : (readResponseCode(exception.getResponse()) ??
-        STATUS_FALLBACK_CODE[statusCode] ??
+      : (STATUS_FALLBACK_CODE[statusCode] ??
         (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR
           ? ErrorCode.INTERNAL_ERROR
           : ErrorCode.BAD_REQUEST));

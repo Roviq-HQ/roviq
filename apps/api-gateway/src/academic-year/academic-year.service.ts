@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   ACADEMIC_YEAR_STATE_MACHINE,
   BusinessException,
@@ -43,7 +43,11 @@ export class AcademicYearService {
 
   async findById(id: string): Promise<AcademicYearRecord> {
     const record = await this.repo.findById(id);
-    if (!record) throw new NotFoundException(`Academic year ${id} not found`);
+    if (!record)
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+        `Academic year ${id} not found`,
+      );
     return record;
   }
 
@@ -79,9 +83,16 @@ export class AcademicYearService {
 
   async update(id: string, input: UpdateAcademicYearInput): Promise<AcademicYearRecord> {
     const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundException(`Academic year ${id} not found`);
+    if (!existing)
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+        `Academic year ${id} not found`,
+      );
     if (existing.status === 'ARCHIVED') {
-      throw new BadRequestException('Cannot modify an archived academic year');
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_ARCHIVED,
+        'Cannot modify an archived academic year',
+      );
     }
 
     // If dates are changing, re-validate overlap
@@ -134,7 +145,11 @@ export class AcademicYearService {
 
   async activate(id: string): Promise<AcademicYearRecord> {
     const target = await this.repo.findById(id);
-    if (!target) throw new NotFoundException(`Academic year ${id} not found`);
+    if (!target)
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+        `Academic year ${id} not found`,
+      );
 
     if (target.isActive) {
       throw new BusinessException(
@@ -160,7 +175,11 @@ export class AcademicYearService {
 
   async archive(id: string): Promise<AcademicYearRecord> {
     const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundException(`Academic year ${id} not found`);
+    if (!existing)
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+        `Academic year ${id} not found`,
+      );
 
     ACADEMIC_YEAR_STATE_MACHINE.assertTransition(existing.status, 'ARCHIVED');
 
@@ -221,7 +240,10 @@ export class AcademicYearService {
         .limit(1);
     });
     if (rows.length === 0) {
-      throw new NotFoundException('Institute not found for current tenant context');
+      throw new BusinessException(
+        ErrorCode.INSTITUTE_NOT_FOUND,
+        'Institute not found for current tenant context',
+      );
     }
     return rows[0].type as InstituteType;
   }

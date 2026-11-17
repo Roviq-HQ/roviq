@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import PDFDocument from 'pdfkit';
 import type { ReportCardPayload } from './report-card-generation.service';
 import { ExaminationRepository } from './repositories/examination.repository';
@@ -14,7 +15,11 @@ export class ReportCardPdfService {
 
   async render(instanceId: string): Promise<Buffer> {
     const instance = await this.repo.findReportCardInstanceById(instanceId);
-    if (!instance) throw new NotFoundException(`Report card instance ${instanceId} not found`);
+    if (!instance)
+      throw new BusinessException(
+        ErrorCode.REPORT_CARD_NOT_FOUND,
+        `Report card instance ${instanceId} not found`,
+      );
     const payload = instance.payload as ReportCardPayload;
     return this.draw(instance, payload);
   }

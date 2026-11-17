@@ -1,5 +1,6 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AbilityFactory, type AbilityRequestContext, type InstituteReadAccess } from '@roviq/casl';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import { StudentReadRepository } from './student-read.repository';
 
@@ -27,13 +28,19 @@ export class StudentQueryService {
     ] as const;
     for (const [value, field] of filters) {
       if (value !== undefined && !access.ability.can('read', 'Student', field)) {
-        throw new ForbiddenException('Cannot filter students by a restricted field');
+        throw new BusinessException(
+          ErrorCode.FORBIDDEN,
+          'Cannot filter students by a restricted field',
+        );
       }
     }
     if (filter.orderBy) {
       const field = filter.orderBy.split(':')[0];
       if (field && !access.ability.can('read', 'Student', field)) {
-        throw new ForbiddenException('Cannot sort students by a restricted field');
+        throw new BusinessException(
+          ErrorCode.FORBIDDEN,
+          'Cannot sort students by a restricted field',
+        );
       }
     }
     return this.repository.list(filter, access);
@@ -45,7 +52,7 @@ export class StudentQueryService {
 
   listDocumentsForStudent(id: string, access: InstituteReadAccess) {
     if (!access.ability.can('read', 'Student', 'documents')) {
-      throw new ForbiddenException('Cannot read student documents');
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Cannot read student documents');
     }
     return this.repository.listDocumentsForStudent(id, access);
   }
