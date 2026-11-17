@@ -1,4 +1,6 @@
-# Important rules - It will be a very shameful act by you if you don't follow each and every rule declared here
+# Important rules
+
+### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table.
 
 **Always use `tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Examples:
 
@@ -32,7 +34,6 @@ If any of below rule applies to you then you `MUST` read full details: `sed -n '
 
 - [NWKRD] **No workarounds — proper fixes only.** Root-cause bugs, don't patch symptoms. +5 proper, -5 hack
 - [NACPR] **No auto commits/push.** Output `git add` + `git commit` for copy-paste. Conventional commits, header ≤100 chars
-- [NDBMD] **No DB modifications** (INSERT/UPDATE/DELETE) without approval
 - [LNFST] **Linear first** — read the full issue (especially "Does NOT Change" + "Verification") before coding. Keep in sync
 - [RSBFC] Instead of try-catch on errors: (1) web search latest docs + (2) Context7 MCP. Do BOTH every time
 - [NTESC] **No type escape hatches** — never `any`, `as unknown`, `as never`. Search codebase → context7 → web → discuss with user
@@ -104,9 +105,9 @@ After completing each phase/issue, before declaring done:
 
 ### Manual acceptance handoff
 
-- Prepare minimal, clearly named synthetic fixtures during implementation; insert into approved local dev via Tilt in seconds, using additive/idempotent writes.
+- Prepare minimal, clearly named synthetic fixtures during implementation; insert into approved local dev via Tilt in seconds, using additive/idempotent writes. Only if needed to review from ui.
 - Reuse running apps/infra. No rebuild, full seed/reset, or separate review environment just for handoff.
-- Verify fixtures and logins. In the Linear issue's **Manual acceptance**, list URL, credentials/roles, records with IDs/direct links, and numbered steps with exact expected results. The user performs checks, not setup.
+- Verify fixtures and logins. In a temporary file's **Manual acceptance**, list URL, credentials/roles, records with IDs/direct links, and numbered steps with exact expected results. The user performs checks, not setup.
 - Define observable acceptance criteria before coding. For UI changes, verify the normal browser flow, a boundary/forbidden case, and refresh/account switching. Add regression tests for discovered bugs.
 - Report what was verified, what remains unverified, and supporting evidence; distinguish automated results from pending manual acceptance.
 - Keep one-time scripts, hooks and generated review files out of the feature commit. Remove them after the user finishes review; retain regression tests. Delete database fixtures only when requested.

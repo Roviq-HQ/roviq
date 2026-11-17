@@ -33,12 +33,6 @@ Commit message format:
 
 ---
 
-### [NDBMD] No DB Modifications Without Approval
-
-Never execute INSERT, UPDATE, or DELETE statements without explicit user approval.
-
----
-
 ## LINEAR & PLANNING
 
 ### [LNFST] Linear First
