@@ -4,7 +4,6 @@
  * Registers billing automation workflows on the 'billing-automation' task queue.
  * Uses ConfigService for all env access.
  */
-import path from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NativeConnection, Worker } from '@temporalio/worker';
@@ -42,7 +41,7 @@ export class BillingWorkerService implements OnModuleInit {
     const worker = await Worker.create({
       connection,
       taskQueue: TASK_QUEUE,
-      workflowsPath: path.resolve(__dirname, './'),
+      workflowsPath: require.resolve('./workflows'),
       activities,
     });
 

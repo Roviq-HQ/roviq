@@ -7,7 +7,6 @@
  * Follows the same pattern as BillingWorkerService (ee/billing/workflows/billing.worker.ts).
  * Uses ConfigService for all env access.
  */
-import path from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NativeConnection, Worker } from '@temporalio/worker';
@@ -53,7 +52,7 @@ export class BulkStudentImportWorkerService implements OnModuleInit {
     const worker = await Worker.create({
       connection,
       taskQueue: TASK_QUEUE,
-      workflowsPath: path.resolve(__dirname, './'),
+      workflowsPath: require.resolve('./bulk-student-import.workflow'),
       activities,
     });
 
