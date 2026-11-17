@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
-import { ErrorCode, NEW_PASSWORD_MIN_LENGTH } from '@roviq/common-types';
+import type { AuthScope, InstituteContext } from '@roviq/common-types';
+import { ErrorCode, NEW_PASSWORD_MIN_LENGTH, ResellerStatus } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +16,12 @@ import { MembershipRepository } from '../repositories/membership.repository';
 import { PlatformMembershipRepository } from '../repositories/platform-membership.repository';
 import { RefreshTokenRepository } from '../repositories/refresh-token.repository';
 import { ResellerMembershipRepository } from '../repositories/reseller-membership.repository';
-import type { RefreshTokenWithRelations } from '../repositories/types';
+import type {
+  MembershipWithInstituteAndRole,
+  RefreshTokenWithRelations,
+  ResellerMembershipWithResellerAndRole,
+  UserRecord,
+} from '../repositories/types';
 import { UserRepository } from '../repositories/user.repository';
 
 function createMockUserRepo() {
@@ -96,6 +102,95 @@ function createMockConfigService() {
     }),
   });
 }
+
+const REFRESH_TOKEN = 'mock-token';
+const RESELLER_ID = '00000000-0000-7000-a000-000000000011';
+
+function activeUser(): UserRecord {
+  return {
+    id: 'user-1',
+    username: 'admin',
+    email: 'admin@test.com',
+    passwordHash: 'mock-hash',
+    status: 'ACTIVE',
+    passwordChangedAt: null,
+    mustChangePassword: false,
+  };
+}
+
+function activeMembership(
+  overrides: Partial<MembershipWithInstituteAndRole> = {},
+): MembershipWithInstituteAndRole {
+  return {
+    id: 'membership-1',
+    tenantId: 'tenant-1',
+    roleId: 'role-1',
+    status: 'ACTIVE',
+    abilities: null,
+    role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
+    institute: {
+      id: 'tenant-1',
+      name: { en: 'Test Institute' },
+      slug: 'test-institute',
+      logoUrl: null,
+      resellerId: RESELLER_ID,
+    },
+    ...overrides,
+  };
+}
+
+function storedRefreshToken(membershipScope: AuthScope): RefreshTokenWithRelations {
+  return {
+    id: 'token-id-1',
+    tokenHash: createHash('sha256').update(REFRESH_TOKEN).digest('hex'),
+    userId: 'user-1',
+    membershipScope,
+    revokedAt: null,
+    revokedReason: null,
+    expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+    createdAt: new Date('2026-11-16T00:00:00.000Z'),
+    deviceInfo: null,
+    ipAddress: null,
+    userAgent: null,
+    lastUsedAt: null,
+    user: {
+      id: 'user-1',
+      username: 'admin',
+      email: 'admin@test.com',
+      status: 'ACTIVE',
+      passwordChangedAt: null,
+      mustChangePassword: false,
+    },
+    membership: null,
+  };
+}
+
+function resellerMembership(
+  id: string,
+  resellerId: string,
+  status: ResellerStatus = ResellerStatus.ACTIVE,
+): ResellerMembershipWithResellerAndRole {
+  return {
+    id,
+    userId: 'user-1',
+    resellerId,
+    roleId: 'role-1',
+    isActive: true,
+    abilities: null,
+    reseller: { id: resellerId, name: 'Reseller', slug: 'reseller', isActive: true, status },
+    role: { id: 'role-1', abilities: [] },
+  };
+}
+
+const instituteCaller: InstituteContext = {
+  _scope: 'institute',
+  scope: 'institute',
+  userId: 'user-1',
+  membershipId: 'membership-1',
+  roleId: 'role-1',
+  type: 'access',
+  tenantId: 'tenant-1',
+};
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -714,6 +809,7 @@ describe('AuthService', () => {
         },
       });
 
+      mockMembershipRepo.findByIdAndUser.mockResolvedValue(activeMembership());
       mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
       mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('new-jwt');
@@ -1088,79 +1184,243 @@ describe('AuthService', () => {
       expect(failure.message).toBe('Refresh token expired');
     });
 
-    it('should re-issue management tokens via fallback when no membership on stored token', async () => {
-      const tokenId = 'fallback-token';
-      mockJwt.verify.mockReturnValue({
-        sub: 'user-1',
-        tokenId,
-        membershipId: 'membership-1',
-        type: 'refresh',
+    describe('membership re-validation', () => {
+      beforeEach(() => {
+        mockJwt.verify.mockReturnValue({
+          sub: 'user-1',
+          tokenId: 'token-id-1',
+          membershipId: 'membership-1',
+          type: 'refresh',
+        });
+        mockJwt.sign.mockReturnValue('new-jwt');
+        mockUserRepo.findById.mockResolvedValue(activeUser());
       });
 
-      const { createHash } = await import('node:crypto');
-      const fakeToken = 'mock-token';
-      const expectedHash = createHash('sha256').update(fakeToken).digest('hex');
+      it('should issue institute tokens from the re-read membership, not the token row', async () => {
+        const roleAbilities = [{ action: 'manage', subject: 'all' }];
+        const memberAbilities = [{ action: 'read', subject: 'Profile' }];
+        mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(
+          storedRefreshToken('institute'),
+        );
+        mockMembershipRepo.findByIdAndUser.mockResolvedValue(
+          activeMembership({
+            abilities: memberAbilities,
+            role: { id: 'role-1', name: { en: 'Admin' }, abilities: roleAbilities },
+          }),
+        );
 
-      mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue({
-        id: tokenId,
-        tokenHash: expectedHash,
-        userId: 'user-1',
-        membershipScope: 'institute',
-        revokedAt: null,
-        revokedReason: null,
-        expiresAt: new Date(Date.now() + 86400000),
-        createdAt: new Date(),
-        deviceInfo: null,
-        ipAddress: null,
-        userAgent: null,
-        lastUsedAt: null,
-        user: {
-          id: 'user-1',
-          username: 'admin',
-          email: 'admin@test.com',
-          status: 'ACTIVE',
-          passwordChangedAt: null,
-          mustChangePassword: false,
-        },
-        membership: null,
+        const result = await authService.refreshToken(REFRESH_TOKEN);
+
+        expect(mockMembershipRepo.findByIdAndUser).toHaveBeenCalledWith('membership-1', 'user-1');
+        expect(result.user?.tenantId).toBe('tenant-1');
+        expect(result.user?.abilityRules).toEqual([...roleAbilities, ...memberAbilities]);
       });
 
-      const roleAbilities = [{ action: 'manage', subject: 'all' }];
-      const memberAbilities = [{ action: 'read', subject: 'Profile' }];
-      mockMembershipRepo.findActiveByUserId.mockResolvedValue([
-        {
-          id: 'membership-1',
-          tenantId: 'tenant-1',
-          roleId: 'role-1',
-          status: 'ACTIVE',
-          abilities: memberAbilities,
-          role: { id: 'role-1', name: { en: 'Admin' }, abilities: roleAbilities },
-          institute: {
-            id: 'tenant-1',
-            name: { en: 'Test Institute' },
-            slug: 'test-institute',
-            logoUrl: null,
-            resellerId: '00000000-0000-7000-a000-000000000011',
-          },
-        },
-      ]);
+      it('should reject when the institute membership is no longer active and keep the token unrotated', async () => {
+        mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(
+          storedRefreshToken('institute'),
+        );
+        mockMembershipRepo.findByIdAndUser.mockResolvedValue(null);
 
-      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
-      mockRefreshTokenRepo.create.mockResolvedValue(undefined);
+        await expectBusinessError(
+          authService.refreshToken(REFRESH_TOKEN),
+          ErrorCode.SESSION_EXPIRED,
+        );
+
+        expect(mockMembershipRepo.findActiveByUserId).not.toHaveBeenCalled();
+        expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+        expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should reject an inactive user with ACCOUNT_INACTIVE', async () => {
+        mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(
+          storedRefreshToken('institute'),
+        );
+        mockUserRepo.findById.mockResolvedValue({ ...activeUser(), status: 'SUSPENDED' });
+
+        await expectBusinessError(
+          authService.refreshToken(REFRESH_TOKEN),
+          ErrorCode.ACCOUNT_INACTIVE,
+        );
+
+        expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+        expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should refresh into the reseller membership the token was issued for', async () => {
+        mockJwt.verify.mockReturnValue({
+          sub: 'user-1',
+          tokenId: 'token-id-1',
+          membershipId: 'reseller-membership-2',
+          type: 'refresh',
+        });
+        mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(
+          storedRefreshToken('reseller'),
+        );
+        mockResellerMembershipRepo.findByUserId.mockResolvedValue([
+          resellerMembership('reseller-membership-1', 'reseller-1'),
+          resellerMembership('reseller-membership-2', 'reseller-2'),
+        ]);
+
+        const result = await authService.refreshToken(REFRESH_TOKEN);
+
+        expect(result.user?.resellerId).toBe('reseller-2');
+        expect(result.user?.membershipId).toBe('reseller-membership-2');
+      });
+
+      it('should reject when the reseller of the token membership is suspended', async () => {
+        mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(
+          storedRefreshToken('reseller'),
+        );
+        mockResellerMembershipRepo.findByUserId.mockResolvedValue([
+          resellerMembership('membership-1', 'reseller-1', ResellerStatus.SUSPENDED),
+        ]);
+
+        await expectBusinessError(
+          authService.refreshToken(REFRESH_TOKEN),
+          ErrorCode.SESSION_EXPIRED,
+        );
+
+        expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      });
+
+      it('should reject a platform token whose membership is gone', async () => {
+        mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(
+          storedRefreshToken('platform'),
+        );
+        mockPlatformMembershipRepo.findByUserId.mockResolvedValue(null);
+
+        await expectBusinessError(
+          authService.refreshToken(REFRESH_TOKEN),
+          ErrorCode.SESSION_EXPIRED,
+        );
+
+        expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('switchInstitute', () => {
+    const tokenHash = createHash('sha256').update(REFRESH_TOKEN).digest('hex');
+    const target = activeMembership({
+      id: 'membership-2',
+      tenantId: 'tenant-2',
+      institute: {
+        id: 'tenant-2',
+        name: { en: 'Second Institute' },
+        slug: 'second-institute',
+        logoUrl: null,
+        resellerId: RESELLER_ID,
+      },
+    });
+
+    beforeEach(() => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'token-id-1', userId: 'user-1' });
+      mockMembershipRepo.findByIdAndUser.mockResolvedValue(target);
+      mockUserRepo.findById.mockResolvedValue(activeUser());
       mockJwt.sign.mockReturnValue('new-jwt');
-      mockUserRepo.findById.mockResolvedValue({
-        id: 'user-1',
-        username: 'admin',
-        email: 'admin@test.com',
-        passwordHash: 'mock-hash',
-        status: 'ACTIVE',
-        passwordChangedAt: null,
-        mustChangePassword: false,
+    });
+
+    it('should revoke only the presented refresh token and issue tokens for the target institute', async () => {
+      const result = await authService.switchInstitute(
+        instituteCaller,
+        'membership-2',
+        REFRESH_TOKEN,
+      );
+
+      expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(tokenHash);
+      expect(mockMembershipRepo.findByIdAndUser).toHaveBeenCalledWith('membership-2', 'user-1');
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(1);
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'user_initiated');
+      expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
+      expect(result.accessToken).toBe('new-jwt');
+      expect(result.user?.tenantId).toBe('tenant-2');
+      expect(result.user?.membershipId).toBe('membership-2');
+    });
+
+    it('should record the institute the caller switched from and to', async () => {
+      await authService.switchInstitute(instituteCaller, 'membership-2', REFRESH_TOKEN, {
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: 'laptop',
       });
 
-      const result = await authService.refreshToken(fakeToken);
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'institute_switch',
+        scope: 'institute',
+        tenantId: 'tenant-2',
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: 'laptop',
+        metadata: { from_tenant_id: 'tenant-1', to_tenant_id: 'tenant-2' },
+      });
+    });
 
-      expect(result.user?.abilityRules).toEqual([...roleAbilities, ...memberAbilities]);
+    it('should keep the session when the target membership is not active', async () => {
+      mockMembershipRepo.findByIdAndUser.mockResolvedValue(null);
+
+      await expectBusinessError(
+        authService.switchInstitute(instituteCaller, 'membership-2', REFRESH_TOKEN),
+        ErrorCode.NO_ACTIVE_MEMBERSHIP,
+      );
+
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject an unknown refresh token without issuing tokens', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue(null);
+
+      await expectBusinessError(
+        authService.switchInstitute(instituteCaller, 'membership-2', 'unknown-token'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a refresh token that belongs to another user', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'foreign', userId: 'other-user' });
+
+      await expectBusinessError(
+        authService.switchInstitute(instituteCaller, 'membership-2', REFRESH_TOKEN),
+        ErrorCode.SESSION_EXPIRED,
+      );
+
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should refuse to switch during impersonation', async () => {
+      await expectBusinessError(
+        authService.switchInstitute(
+          {
+            ...instituteCaller,
+            isImpersonated: true,
+            impersonatorId: 'admin-1',
+            impersonationSessionId: 'session-1',
+          },
+          'membership-2',
+          REFRESH_TOKEN,
+        ),
+        ErrorCode.FORBIDDEN,
+      );
+
+      expect(mockRefreshTokenRepo.findByHash).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject an inactive user and keep the session', async () => {
+      mockUserRepo.findById.mockResolvedValue({ ...activeUser(), status: 'SUSPENDED' });
+
+      await expectBusinessError(
+        authService.switchInstitute(instituteCaller, 'membership-2', REFRESH_TOKEN),
+        ErrorCode.ACCOUNT_INACTIVE,
+      );
+
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
     });
   });
 

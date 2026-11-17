@@ -78,8 +78,9 @@ export class AuthResolver {
     @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<AuthPayload> {
+    assertTenantContext(user);
     return this.authService.switchInstitute(
-      user.userId,
+      user,
       membershipId,
       currentRefreshToken,
       extractMeta(ctx),
