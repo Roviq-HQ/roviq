@@ -37,6 +37,10 @@ export const impersonationSessions = pgTable(
     otpVerifiedBy: uuid('otp_verified_by').references(() => users.id),
   },
   (table) => [
+    check(
+      'chk_impersonator_scope',
+      sql`${table.impersonatorScope} IN ('platform', 'reseller', 'institute')`,
+    ),
     // Reason must be at least 10 characters
     check('chk_reason_length', sql`length(${table.reason}) >= 10`),
     // Session max 1 hour

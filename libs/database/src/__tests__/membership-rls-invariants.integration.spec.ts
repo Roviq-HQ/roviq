@@ -273,3 +273,155 @@ describe('ROV-91 Invariant 6: system roles seeded correctly', () => {
     expect(resellerFull?.name_en).toBe('reseller_full_admin');
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// ROV-91 Invariant 7: scope columns reject unknown values
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-91 Invariant 7: scope columns reject unknown values', () => {
+  it('role with an unknown scope violates chk_role_scope', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(
+        client.query(
+          `INSERT INTO roles (scope, tenant_id, reseller_id, name, abilities, created_by, updated_by)
+           VALUES ('galaxy', NULL, NULL, '{"en":"unknown_scope_role"}', '[]', $1, $1)`,
+          [SEED.USER_ADMIN],
+        ),
+      ).rejects.toThrow(/chk_role_scope/);
+    });
+  });
+
+  it('refresh token with an unknown membership_scope violates its CHECK', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(
+        client.query(
+          `INSERT INTO refresh_tokens (user_id, membership_id, membership_scope, token_hash, expires_at)
+           VALUES ($1, uuidv7(), 'galaxy', 'rov-91-hash', now() + interval '1 day')`,
+          [SEED.USER_ADMIN],
+        ),
+      ).rejects.toThrow(/chk_refresh_token_membership_scope/);
+    });
+  });
+
+  it('impersonation session with an unknown impersonator_scope violates its CHECK', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(
+        client.query(
+          `INSERT INTO impersonation_sessions
+           (impersonator_id, impersonator_scope, target_user_id, target_tenant_id,
+            reason, started_at, expires_at)
+           VALUES ($1, 'galaxy', $1, $2,
+                   'Valid reason longer than ten chars', now(), now() + interval '30 minutes')`,
+          [SEED.USER_ADMIN, SEED.INSTITUTE_1],
+        ),
+      ).rejects.toThrow(/chk_impersonator_scope/);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-91 Invariant 8: platform / reseller role names are unique
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-91 Invariant 8: platform and reseller role name uniqueness', () => {
+  const insertRole = (
+    client: pg.PoolClient,
+    scope: string,
+    resellerId: string | null,
+    name: string,
+  ) =>
+    client.query(
+      `INSERT INTO roles (scope, tenant_id, reseller_id, name, abilities, created_by, updated_by)
+       VALUES ($1, NULL, $2, $3, '[]', $4, $4)`,
+      [scope, resellerId, JSON.stringify({ en: name }), SEED.USER_ADMIN],
+    );
+
+  it('rejects a second platform role with an existing name', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(insertRole(client, 'platform', null, 'platform_admin')).rejects.toThrow(
+        /roles_platform_name_key/,
+      );
+    });
+  });
+
+  it('rejects a second role with the same name under the same reseller', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(
+        insertRole(client, 'reseller', SEED.RESELLER_DIRECT, 'reseller_full_admin'),
+      ).rejects.toThrow(/roles_reseller_id_name_key/);
+    });
+  });
+
+  it('allows the same role name under a different reseller', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      const reseller = await client.query(
+        `INSERT INTO resellers (name, slug) VALUES ('ROV-91 Reseller', 'rov-91-uniq-reseller') RETURNING id`,
+      );
+      const res = await insertRole(client, 'reseller', reseller.rows[0].id, 'reseller_full_admin');
+      expect(res.rowCount).toBe(1);
+    });
+  });
+
+  it('allows a name to be reused once the earlier role is soft-deleted', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await insertRole(client, 'platform', null, 'rov_91_reusable');
+      await client.query(
+        `UPDATE roles SET deleted_at = now() WHERE scope = 'platform' AND name->>'en' = 'rov_91_reusable'`,
+      );
+      const res = await insertRole(client, 'platform', null, 'rov_91_reusable');
+      expect(res.rowCount).toBe(1);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-91 Invariant 9: auth_events table privileges are INSERT-only
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-91 Invariant 9: auth_events table privileges', () => {
+  it('roviq_app and roviq_reseller hold INSERT and nothing else', async () => {
+    const res = await superPool.query(
+      `SELECT r AS role, p AS privilege, has_table_privilege(r, 'auth_events', p) AS granted
+       FROM unnest(ARRAY['roviq_app', 'roviq_reseller']) r,
+            unnest(ARRAY['INSERT', 'SELECT', 'UPDATE', 'DELETE']) p
+       ORDER BY r, p`,
+    );
+    expect(res.rows).toEqual([
+      { role: 'roviq_app', privilege: 'DELETE', granted: false },
+      { role: 'roviq_app', privilege: 'INSERT', granted: true },
+      { role: 'roviq_app', privilege: 'SELECT', granted: false },
+      { role: 'roviq_app', privilege: 'UPDATE', granted: false },
+      { role: 'roviq_reseller', privilege: 'DELETE', granted: false },
+      { role: 'roviq_reseller', privilege: 'INSERT', granted: true },
+      { role: 'roviq_reseller', privilege: 'SELECT', granted: false },
+      { role: 'roviq_reseller', privilege: 'UPDATE', granted: false },
+    ]);
+  });
+
+  it('roviq_app cannot UPDATE auth_events', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(client.query(`UPDATE auth_events SET event_type = 'tampered'`)).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it('roviq_reseller can INSERT but cannot SELECT auth_events', async () => {
+    await asRole(
+      'roviq_reseller',
+      { 'app.current_reseller_id': SEED.RESELLER_DIRECT },
+      async (client) => {
+        const res = await client.query(
+          `INSERT INTO auth_events (user_id, event_type, scope, reseller_id)
+           VALUES ($1, 'login_success', 'reseller', $2)`,
+          [SEED.USER_ADMIN, SEED.RESELLER_DIRECT],
+        );
+        expect(res.rowCount).toBe(1);
+        await client.query('SAVEPOINT before_select');
+        await expect(client.query('SELECT * FROM auth_events LIMIT 1')).rejects.toThrow(
+          /permission denied/,
+        );
+      },
+    );
+  });
+});
