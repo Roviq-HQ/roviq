@@ -8,7 +8,8 @@
  * the view; writes (`.insert`, `.update`, `.delete`, `softDelete`) target the
  * base table.
  *
- * This script scans `apps/` and `ee/apps/` for `.from(<baseTable>)` where
+ * This script scans `apps/` and `ee/apps/` for `.from(<baseTable>)` and
+ * `.<kind>Join(<baseTable>, …)` where
  * `<baseTable>` is a known soft-deletable name. Allowed exceptions:
  *   1. The line is part of an INSERT/UPDATE/DELETE chain (write-side).
  *   2. The file lives under `**\/__tests__\/**` (mocks aren't enforced).
@@ -20,47 +21,19 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import {
+  EE_LIVE_VIEWS_FILE,
+  LIVE_VIEWS_FILE,
+  loadLiveViewExports,
+} from './check-live-views-coverage';
 
 const ROOT = process.cwd();
 
-// Tables that have a corresponding `<table>Live` view. Keep in sync with
-// `libs/database/src/schema/live-views.ts` and
-// `ee/libs/database/src/schema/billing/live-views.ts`.
+// Derived from the `*Live` exports so a new view is enforced without editing this file.
 const SOFT_DELETABLE_TABLES = [
-  'academicYears',
-  'admissionApplications',
-  'attendanceEntries',
-  'attendanceSessions',
-  'botProfiles',
-  'enquiries',
-  'gatewayConfigs',
-  'groups',
-  'guardianProfiles',
-  'holidays',
-  'instituteAffiliations',
-  'instituteBranding',
-  'instituteConfigs',
-  'instituteGroupBranding',
-  'instituteGroups',
-  'instituteIdentifiers',
-  'instituteNotificationConfigs',
-  'institutes',
-  'issuedCertificates',
-  'leaves',
-  'memberships',
-  'plans',
-  'resellers',
-  'roles',
-  'sectionSubjects',
-  'sections',
-  'staffProfiles',
-  'standardSubjects',
-  'standards',
-  'studentAcademics',
-  'studentProfiles',
-  'subjects',
-  'tcRegister',
-] as const;
+  ...loadLiveViewExports(LIVE_VIEWS_FILE),
+  ...loadLiveViewExports(EE_LIVE_VIEWS_FILE),
+].map((name) => name.slice(0, -'Live'.length));
 
 const SCAN_ROOTS = [
   'apps/api-gateway/src',
@@ -107,10 +80,9 @@ function scan(file: string): Hit[] {
     const line = lines[i];
     if (line.includes('// allow-base-read')) continue;
     for (const table of SOFT_DELETABLE_TABLES) {
-      // Match `.from(<table>)` — boundary check via the trailing `)` or `,`
-      // avoids matching `<table>Live`. Write-side `.insert/.update/.delete`
-      // calls are unaffected.
-      const re = new RegExp(`\\.from\\(\\s*${table}\\s*[),]`);
+      // Trailing `)` or `,` avoids matching `<table>Live`; joins leak trashed
+      // rows the same way `.from` does. Writes are unaffected.
+      const re = new RegExp(`\\.(from|\\w+Join)\\(\\s*${table}\\s*[),]`);
       if (!re.test(line)) continue;
       hits.push({ file, line: i + 1, text: line.trim(), table });
     }
@@ -132,7 +104,7 @@ function main(): number {
     `check:live-views — ${hits.length} base-table read(s) found. Use the *_live view or annotate with \`// allow-base-read: <reason>\`:\n\n`,
   );
   for (const hit of hits) {
-    process.stderr.write(`  ${relative(ROOT, hit.file)}:${hit.line}  .from(${hit.table})\n`);
+    process.stderr.write(`  ${relative(ROOT, hit.file)}:${hit.line}  ${hit.table}\n`);
     process.stderr.write(`    ${hit.text}\n`);
   }
   return 1;

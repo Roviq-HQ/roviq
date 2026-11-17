@@ -23,10 +23,6 @@ describe('hasRls', () => {
     expect(hasRls("...tenantPolicies('foo'),")).toBe(true);
   });
 
-  it('detects tenantPoliciesSimple', () => {
-    expect(hasRls("...tenantPoliciesSimple('foo'),")).toBe(true);
-  });
-
   it('detects entityPolicies', () => {
     expect(hasRls("...entityPolicies('foo'),")).toBe(true);
   });

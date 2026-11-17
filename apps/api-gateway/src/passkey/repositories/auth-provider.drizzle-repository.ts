@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   authProviders,
+  authProvidersLive,
   DRIZZLE_DB,
   type DrizzleDB,
   mkAdminCtx,
-  users,
+  usersLive,
   withAdmin,
 } from '@roviq/database';
-import { and, count, desc, eq, ne } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, ne } from 'drizzle-orm';
 import { AuthProviderRepository } from './auth-provider.repository';
 import type { AuthProviderRecord, CreatePasskeyData } from './types';
 
@@ -21,16 +22,16 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
       return tx
         .select({
-          id: authProviders.id,
-          userId: authProviders.userId,
-          provider: authProviders.provider,
-          providerUserId: authProviders.providerUserId,
-          providerData: authProviders.providerData,
-          createdAt: authProviders.createdAt,
+          id: authProvidersLive.id,
+          userId: authProvidersLive.userId,
+          provider: authProvidersLive.provider,
+          providerUserId: authProvidersLive.providerUserId,
+          providerData: authProvidersLive.providerData,
+          createdAt: authProvidersLive.createdAt,
         })
-        .from(authProviders)
-        .where(and(eq(authProviders.userId, userId), eq(authProviders.provider, 'passkey')))
-        .orderBy(desc(authProviders.createdAt));
+        .from(authProvidersLive)
+        .where(and(eq(authProvidersLive.userId, userId), eq(authProvidersLive.provider, 'passkey')))
+        .orderBy(desc(authProvidersLive.createdAt));
     });
   }
 
@@ -38,20 +39,20 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
       return tx
         .select({
-          id: authProviders.id,
-          userId: authProviders.userId,
-          provider: authProviders.provider,
-          providerUserId: authProviders.providerUserId,
-          providerData: authProviders.providerData,
-          createdAt: authProviders.createdAt,
+          id: authProvidersLive.id,
+          userId: authProvidersLive.userId,
+          provider: authProvidersLive.provider,
+          providerUserId: authProvidersLive.providerUserId,
+          providerData: authProvidersLive.providerData,
+          createdAt: authProvidersLive.createdAt,
         })
-        .from(authProviders)
-        .innerJoin(users, eq(authProviders.userId, users.id))
+        .from(authProvidersLive)
+        .innerJoin(usersLive, eq(authProvidersLive.userId, usersLive.id))
         .where(
           and(
-            eq(authProviders.provider, 'passkey'),
-            eq(users.username, username),
-            eq(users.status, 'ACTIVE'),
+            eq(authProvidersLive.provider, 'passkey'),
+            eq(usersLive.username, username),
+            eq(usersLive.status, 'ACTIVE'),
           ),
         );
     });
@@ -61,18 +62,18 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
       const result = await tx
         .select({
-          id: authProviders.id,
-          userId: authProviders.userId,
-          provider: authProviders.provider,
-          providerUserId: authProviders.providerUserId,
-          providerData: authProviders.providerData,
-          createdAt: authProviders.createdAt,
+          id: authProvidersLive.id,
+          userId: authProvidersLive.userId,
+          provider: authProvidersLive.provider,
+          providerUserId: authProvidersLive.providerUserId,
+          providerData: authProvidersLive.providerData,
+          createdAt: authProvidersLive.createdAt,
         })
-        .from(authProviders)
+        .from(authProvidersLive)
         .where(
           and(
-            eq(authProviders.provider, 'passkey'),
-            eq(authProviders.providerUserId, credentialId),
+            eq(authProvidersLive.provider, 'passkey'),
+            eq(authProvidersLive.providerUserId, credentialId),
           ),
         )
         .limit(1);
@@ -86,6 +87,8 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
       const result = await tx
         .insert(authProviders)
         .values({
+          createdBy: data.userId,
+          updatedBy: data.userId,
           userId: data.userId,
           provider: data.provider,
           providerUserId: data.providerUserId,
@@ -114,12 +117,12 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
     return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
       const result = await tx
         .select({ count: count() })
-        .from(authProviders)
+        .from(authProvidersLive)
         .where(
           and(
-            eq(authProviders.userId, userId),
-            eq(authProviders.provider, 'passkey'),
-            ne(authProviders.id, excludeId),
+            eq(authProvidersLive.userId, userId),
+            eq(authProvidersLive.provider, 'passkey'),
+            ne(authProvidersLive.id, excludeId),
           ),
         );
 
@@ -130,8 +133,15 @@ export class AuthProviderDrizzleRepository extends AuthProviderRepository {
   async deletePasskey(id: string, userId: string): Promise<number> {
     return withAdmin(this.db, mkAdminCtx('repository:auth-provider'), async (tx) => {
       const result = await tx
-        .delete(authProviders)
-        .where(and(eq(authProviders.id, id), eq(authProviders.userId, userId)));
+        .update(authProviders)
+        .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
+        .where(
+          and(
+            eq(authProviders.id, id),
+            eq(authProviders.userId, userId),
+            isNull(authProviders.deletedAt),
+          ),
+        );
 
       return result.rowCount ?? 0;
     });

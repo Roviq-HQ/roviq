@@ -40,6 +40,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { ColumnDef } from '@tanstack/react-table';
+import { DeletedRecordsButton } from '@web/components/people/deleted-records';
 import {
   AlertCircle,
   ArrowRightCircle,
@@ -929,6 +930,7 @@ export default function StudentsPage() {
                         ? t('export.buttonSelected', { count: selectedIds.size })
                         : t('export.buttonAll')}
                   </Button>
+                  <DeletedRecordsButton kind="student" />
                   <Can I="create" a="Student">
                     <Button
                       onClick={() => router.push('/institute/people/students/new')}

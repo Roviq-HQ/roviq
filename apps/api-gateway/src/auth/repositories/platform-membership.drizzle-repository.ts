@@ -3,8 +3,8 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   mkAdminCtx,
-  platformMemberships,
-  roles,
+  platformMembershipsLive,
+  rolesLive,
   withAdmin,
 } from '@roviq/database';
 import { and, eq } from 'drizzle-orm';
@@ -21,17 +21,22 @@ export class PlatformMembershipDrizzleRepository extends PlatformMembershipRepos
     const [row] = await withAdmin(this.db, mkAdminCtx('repository:platform-membership'), (tx) =>
       tx
         .select({
-          id: platformMemberships.id,
-          userId: platformMemberships.userId,
-          roleId: platformMemberships.roleId,
-          isActive: platformMemberships.isActive,
-          abilities: platformMemberships.abilities,
-          roleIdFk: roles.id,
-          roleAbilities: roles.abilities,
+          id: platformMembershipsLive.id,
+          userId: platformMembershipsLive.userId,
+          roleId: platformMembershipsLive.roleId,
+          isActive: platformMembershipsLive.isActive,
+          abilities: platformMembershipsLive.abilities,
+          roleIdFk: rolesLive.id,
+          roleAbilities: rolesLive.abilities,
         })
-        .from(platformMemberships)
-        .innerJoin(roles, eq(platformMemberships.roleId, roles.id))
-        .where(and(eq(platformMemberships.userId, userId), eq(platformMemberships.isActive, true)))
+        .from(platformMembershipsLive)
+        .innerJoin(rolesLive, eq(platformMembershipsLive.roleId, rolesLive.id))
+        .where(
+          and(
+            eq(platformMembershipsLive.userId, userId),
+            eq(platformMembershipsLive.isActive, true),
+          ),
+        )
         .limit(1),
     );
 

@@ -18,6 +18,7 @@ const resellerAuth = path.join(__dirname, 'playwright/.auth/reseller.json');
 const chrome = devices['Desktop Chrome'];
 
 const ACCOUNT_LANGUAGE_SPEC = /language-preference\.e2e\.spec\.ts/;
+const INSTITUTE_LOCALES_SPEC = /institute-locales\.e2e\.spec\.ts/;
 const SHARED_USER_PROJECTS = ['admin', 'institute', 'reseller', 'cross-portal'];
 
 export default defineConfig({
@@ -113,7 +114,7 @@ export default defineConfig({
     {
       name: 'institute',
       testDir: './web-institute-e2e/src',
-      testIgnore: [/login\.e2e\.spec\.ts/, /.*\.setup\.ts/],
+      testIgnore: [/login\.e2e\.spec\.ts/, /.*\.setup\.ts/, INSTITUTE_LOCALES_SPEC],
       use: { ...chrome, baseURL: INSTITUTE_URL, storageState: instituteAuth },
       dependencies: ['institute-setup'],
     },
@@ -149,6 +150,18 @@ export default defineConfig({
       testDir: './web-reseller-e2e/src',
       testMatch: ACCOUNT_LANGUAGE_SPEC,
       use: { ...chrome, baseURL: RESELLER_URL, storageState: resellerAuth },
+      dependencies: SHARED_USER_PROJECTS,
+    },
+
+    // ── Institute content languages ──
+    // Makes Tamil the seeded institute's default language for a while, which
+    // makes the Tamil name required on every translated form. Runs only after
+    // the specs that fill those forms have finished.
+    {
+      name: 'institute-locales',
+      testDir: './web-institute-e2e/src',
+      testMatch: INSTITUTE_LOCALES_SPEC,
+      use: { ...chrome, baseURL: INSTITUTE_URL, storageState: instituteAuth },
       dependencies: SHARED_USER_PROJECTS,
     },
   ],

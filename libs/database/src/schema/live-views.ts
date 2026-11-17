@@ -5,11 +5,22 @@ import { isNull } from 'drizzle-orm';
 import { pgView } from 'drizzle-orm/pg-core';
 
 import { admissionApplications } from './admission/admission-applications';
+import { applicationDocuments } from './admission/application-documents';
+import { certificateTemplates } from './admission/certificate-templates';
 import { enquiries } from './admission/enquiries';
 import { issuedCertificates } from './admission/issued-certificates';
 import { tcRegister } from './admission/tc-register';
+import { authProviders } from './auth/auth-providers';
+import { phoneNumbers } from './auth/phone-numbers';
+import { platformMemberships } from './auth/platform-memberships';
+import { refreshTokens } from './auth/refresh-tokens';
+import { users } from './auth/users';
+import { groupChildren } from './groups/group-children';
+import { groupMembers } from './groups/group-members';
+import { groupRules } from './groups/group-rules';
 import { groups } from './groups/groups';
 import { instituteNotificationConfigs } from './notification/notification-configs';
+import { resellerMemberships } from './reseller/reseller-memberships';
 import { resellers } from './reseller/resellers';
 import { academicYears } from './tenant/academic-years';
 import { attendanceEntries } from './tenant/attendance/attendance-entries';
@@ -26,6 +37,7 @@ import { gradingSchemes } from './tenant/examination/grading-schemes';
 import { reportCardInstances } from './tenant/examination/report-card-instances';
 import { reportCards } from './tenant/examination/report-cards';
 import { subjectTopics } from './tenant/examination/subject-topics';
+import { groupMemberships } from './tenant/group-memberships';
 import { holidays } from './tenant/holidays';
 import { instituteAffiliations } from './tenant/institute-affiliations';
 import { instituteBranding } from './tenant/institute-branding';
@@ -49,9 +61,16 @@ import { timetableSections } from './tenant/timetable/timetable-sections';
 import { timetables } from './tenant/timetable/timetables';
 import { botProfiles } from './user-profiles/bot-profiles';
 import { guardianProfiles } from './user-profiles/guardian-profiles';
+import { privacyNotices } from './user-profiles/privacy-notices';
 import { staffProfiles } from './user-profiles/staff-profiles';
+import { staffQualifications } from './user-profiles/staff-qualifications';
 import { studentAcademics } from './user-profiles/student-academics';
+import { studentGuardianLinks } from './user-profiles/student-guardian-links';
 import { studentProfiles } from './user-profiles/student-profiles';
+import { userAddresses } from './user-profiles/user-addresses';
+import { userDocuments } from './user-profiles/user-documents';
+import { userIdentifiers } from './user-profiles/user-identifiers';
+import { userProfiles } from './user-profiles/user-profiles';
 
 export const liveView = <T extends string>(name: T) => pgView(name).with({ securityInvoker: true });
 
@@ -219,4 +238,63 @@ export const studentAcademicsLive = liveView('student_academics_live').as((qb) =
 );
 export const studentProfilesLive = liveView('student_profiles_live').as((qb) =>
   qb.select().from(studentProfiles).where(isNull(studentProfiles.deletedAt)),
+);
+
+// Identity, memberships, personal data and group internals.
+export const usersLive = liveView('users_live').as((qb) =>
+  qb.select().from(users).where(isNull(users.deletedAt)),
+);
+export const refreshTokensLive = liveView('refresh_tokens_live').as((qb) =>
+  qb.select().from(refreshTokens).where(isNull(refreshTokens.deletedAt)),
+);
+export const phoneNumbersLive = liveView('phone_numbers_live').as((qb) =>
+  qb.select().from(phoneNumbers).where(isNull(phoneNumbers.deletedAt)),
+);
+export const authProvidersLive = liveView('auth_providers_live').as((qb) =>
+  qb.select().from(authProviders).where(isNull(authProviders.deletedAt)),
+);
+export const platformMembershipsLive = liveView('platform_memberships_live').as((qb) =>
+  qb.select().from(platformMemberships).where(isNull(platformMemberships.deletedAt)),
+);
+export const resellerMembershipsLive = liveView('reseller_memberships_live').as((qb) =>
+  qb.select().from(resellerMemberships).where(isNull(resellerMemberships.deletedAt)),
+);
+export const groupMembershipsLive = liveView('group_memberships_live').as((qb) =>
+  qb.select().from(groupMemberships).where(isNull(groupMemberships.deletedAt)),
+);
+export const userProfilesLive = liveView('user_profiles_live').as((qb) =>
+  qb.select().from(userProfiles).where(isNull(userProfiles.deletedAt)),
+);
+export const userAddressesLive = liveView('user_addresses_live').as((qb) =>
+  qb.select().from(userAddresses).where(isNull(userAddresses.deletedAt)),
+);
+export const userDocumentsLive = liveView('user_documents_live').as((qb) =>
+  qb.select().from(userDocuments).where(isNull(userDocuments.deletedAt)),
+);
+export const userIdentifiersLive = liveView('user_identifiers_live').as((qb) =>
+  qb.select().from(userIdentifiers).where(isNull(userIdentifiers.deletedAt)),
+);
+export const studentGuardianLinksLive = liveView('student_guardian_links_live').as((qb) =>
+  qb.select().from(studentGuardianLinks).where(isNull(studentGuardianLinks.deletedAt)),
+);
+export const staffQualificationsLive = liveView('staff_qualifications_live').as((qb) =>
+  qb.select().from(staffQualifications).where(isNull(staffQualifications.deletedAt)),
+);
+export const privacyNoticesLive = liveView('privacy_notices_live').as((qb) =>
+  qb.select().from(privacyNotices).where(isNull(privacyNotices.deletedAt)),
+);
+export const certificateTemplatesLive = liveView('certificate_templates_live').as((qb) =>
+  qb.select().from(certificateTemplates).where(isNull(certificateTemplates.deletedAt)),
+);
+export const applicationDocumentsLive = liveView('application_documents_live').as((qb) =>
+  qb.select().from(applicationDocuments).where(isNull(applicationDocuments.deletedAt)),
+);
+export const groupRulesLive = liveView('group_rules_live').as((qb) =>
+  qb.select().from(groupRules).where(isNull(groupRules.deletedAt)),
+);
+export const groupMembersLive = liveView('group_members_live').as((qb) =>
+  qb.select().from(groupMembers).where(isNull(groupMembers.deletedAt)),
+);
+export const groupChildrenLive = liveView('group_children_live').as((qb) =>
+  qb.select().from(groupChildren).where(isNull(groupChildren.deletedAt)),
 );

@@ -114,7 +114,8 @@
     "GRADUATED": "स्नातक",
     "WITHDRAWN": "वापस लिया",
     "SUSPENDED": "निलंबित",
-    "EXPELLED": "निष्कासित"
+    "EXPELLED": "निष्कासित",
+    "RE_ENROLLED": "पुनः नामांकित"
   },
   "genders": {
     "MALE": "पुरुष",

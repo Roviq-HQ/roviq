@@ -59,7 +59,6 @@ function createTxMock(stages: TxStages) {
     updateRefreshTokens: vi.fn(),
     updateInstitutes: vi.fn(),
     updateMemberships: vi.fn(),
-    deleteMemberships: vi.fn(),
     updateImpersonation: vi.fn(),
     insertReseller: vi.fn(),
     insertRoles: vi.fn(),
@@ -160,16 +159,6 @@ function createTxMock(stages: TxStages) {
         typeof table === 'object' && table !== null ? String(getTableName(table as never)) : '';
       return makeUpdateChain(tableName);
     }),
-    delete: vi.fn((table: unknown) => {
-      const tableName: string =
-        typeof table === 'object' && table !== null ? String(getTableName(table as never)) : '';
-      return {
-        where: (cond: unknown) => {
-          if (tableName === 'reseller_memberships') calls.deleteMemberships({ cond });
-          return Promise.resolve();
-        },
-      };
-    }),
   };
 
   return { tx, calls };
@@ -242,7 +231,7 @@ describe('AdminResellerService', () => {
       const { tx } = createTxMock({ resellerRows: [] });
       setTx(tx);
 
-      await expect(service.suspendReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.suspendReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_NOT_FOUND,
       });
     });
@@ -253,7 +242,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.suspendReseller(SYSTEM_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.suspendReseller(SYSTEM_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.SYSTEM_RESELLER_PROTECTED,
       });
       expect(calls.updateReseller).not.toHaveBeenCalled();
@@ -267,7 +256,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.suspendReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.suspendReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_ALREADY_SUSPENDED,
       });
       expect(calls.updateReseller).not.toHaveBeenCalled();
@@ -279,7 +268,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.suspendReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.suspendReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_INVALID,
       });
     });
@@ -292,13 +281,14 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await service.suspendReseller(NORMAL_RESELLER_ID, 'policy violation');
+      await service.suspendReseller(NORMAL_RESELLER_ID, ACTOR_ID, 'policy violation');
 
       expect(calls.updateReseller).toHaveBeenCalledTimes(1);
       const resellerUpdate = calls.updateReseller.mock.calls[0][0];
       expect(resellerUpdate.values.status).toBe(ResellerStatus.SUSPENDED);
       expect(resellerUpdate.values.suspendedAt).toBeInstanceOf(Date);
       expect(resellerUpdate.values.isActive).toBe(false);
+      expect(resellerUpdate.values.updatedBy).toBe(ACTOR_ID);
 
       expect(calls.updateRefreshTokens).toHaveBeenCalledTimes(1);
       expect(calls.updateImpersonation).toHaveBeenCalledTimes(1);
@@ -332,7 +322,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await service.suspendReseller(NORMAL_RESELLER_ID);
+      await service.suspendReseller(NORMAL_RESELLER_ID, ACTOR_ID);
 
       expect(calls.updateReseller).toHaveBeenCalledTimes(1);
       expect(calls.updateRefreshTokens).not.toHaveBeenCalled();
@@ -352,7 +342,7 @@ describe('AdminResellerService', () => {
       const { tx } = createTxMock({ resellerRows: [] });
       setTx(tx);
 
-      await expect(service.unsuspendReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.unsuspendReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_NOT_FOUND,
       });
     });
@@ -363,7 +353,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.unsuspendReseller(SYSTEM_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.unsuspendReseller(SYSTEM_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.SYSTEM_RESELLER_PROTECTED,
       });
     });
@@ -374,7 +364,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.unsuspendReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.unsuspendReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_INVALID,
       });
     });
@@ -385,7 +375,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.unsuspendReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.unsuspendReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_NOT_SUSPENDED,
       });
     });
@@ -398,7 +388,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await service.unsuspendReseller(NORMAL_RESELLER_ID);
+      await service.unsuspendReseller(NORMAL_RESELLER_ID, ACTOR_ID);
 
       expect(calls.updateReseller).toHaveBeenCalledTimes(1);
       const update = calls.updateReseller.mock.calls[0][0].values;
@@ -423,7 +413,7 @@ describe('AdminResellerService', () => {
       const { tx } = createTxMock({ resellerRows: [] });
       setTx(tx);
 
-      await expect(service.deleteReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.deleteReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_NOT_FOUND,
       });
     });
@@ -436,7 +426,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.deleteReseller(SYSTEM_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.deleteReseller(SYSTEM_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.SYSTEM_RESELLER_PROTECTED,
       });
     });
@@ -447,7 +437,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.deleteReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.deleteReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_NOT_SUSPENDED,
       });
     });
@@ -466,12 +456,12 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await expect(service.deleteReseller(NORMAL_RESELLER_ID)).rejects.toMatchObject({
+      await expect(service.deleteReseller(NORMAL_RESELLER_ID, ACTOR_ID)).rejects.toMatchObject({
         code: ErrorCode.GRACE_PERIOD_NOT_ELAPSED,
       });
     });
 
-    it('reassigns institutes, deletes memberships, soft-deletes reseller after grace period', async () => {
+    it('reassigns institutes, soft-deletes memberships and reseller after grace period', async () => {
       const suspendedAt = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000); // 40 days ago
       const { tx, calls } = createTxMock({
         resellerRows: [
@@ -486,12 +476,15 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      await service.deleteReseller(NORMAL_RESELLER_ID);
+      await service.deleteReseller(NORMAL_RESELLER_ID, ACTOR_ID);
 
       expect(calls.updateInstitutes).toHaveBeenCalledTimes(1);
       expect(calls.updateInstitutes.mock.calls[0][0].values.resellerId).toBe(SYSTEM_RESELLER_ID);
 
-      expect(calls.deleteMemberships).toHaveBeenCalledTimes(1);
+      expect(calls.updateMemberships).toHaveBeenCalledTimes(1);
+      const membershipUpdate = calls.updateMemberships.mock.calls[0][0].values;
+      expect(membershipUpdate.deletedAt).toBeInstanceOf(Date);
+      expect(membershipUpdate.deletedBy).toBe(ACTOR_ID);
 
       expect(calls.updateRoles).toHaveBeenCalledTimes(1);
       expect(calls.updateRoles.mock.calls[0][0].values.deletedAt).toBeInstanceOf(Date);
@@ -500,6 +493,8 @@ describe('AdminResellerService', () => {
       const update = calls.updateReseller.mock.calls[0][0].values;
       expect(update.status).toBe(ResellerStatus.DELETED);
       expect(update.deletedAt).toBeInstanceOf(Date);
+      expect(update.deletedBy).toBe(ACTOR_ID);
+      expect(update.updatedBy).toBe(ACTOR_ID);
 
       expect(eventBus.emit).toHaveBeenCalledWith(
         'RESELLER.status_changed',

@@ -19,13 +19,15 @@ import {
   type DrizzleDB,
   groupChildren,
   groupMembers,
+  groupMembersLive,
   groupRules,
+  groupRulesLive,
   groups,
   groupsLive,
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  users,
+  usersLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -105,6 +107,8 @@ export class GroupService {
         if (input.rule && Object.keys(input.rule).length > 0) {
           const dimensions = extractDimensions(input.rule);
           await tx.insert(groupRules).values({
+            createdBy: actorId,
+            updatedBy: actorId,
             groupId,
             tenantId,
             rule: input.rule,
@@ -117,6 +121,8 @@ export class GroupService {
         if (input.childGroupIds && input.childGroupIds.length > 0) {
           for (const childId of input.childGroupIds) {
             await tx.insert(groupChildren).values({
+              createdBy: actorId,
+              updatedBy: actorId,
               parentGroupId: groupId,
               childGroupId: childId,
               tenantId,
@@ -191,8 +197,13 @@ export class GroupService {
           const dimensions = extractDimensions(input.rule);
           // Replace any existing rule rows before the groups UPDATE so the
           // invalidation is atomic with the rule change.
-          await tx.delete(groupRules).where(eq(groupRules.groupId, id));
+          await tx
+            .update(groupRules)
+            .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId })
+            .where(and(eq(groupRules.groupId, id), isNull(groupRules.deletedAt)));
           await tx.insert(groupRules).values({
+            createdBy: actorId,
+            updatedBy: actorId,
             groupId: id,
             tenantId,
             rule: input.rule,
@@ -258,8 +269,10 @@ export class GroupService {
         async (tx) => {
           return tx
             .select({ total: count() })
-            .from(groupMembers)
-            .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.isExcluded, false)));
+            .from(groupMembersLive)
+            .where(
+              and(eq(groupMembersLive.groupId, groupId), eq(groupMembersLive.isExcluded, false)),
+            );
         },
       );
 
@@ -296,9 +309,11 @@ export class GroupService {
         mkInstituteCtx(tenantId, 'service:group'),
         async (tx) => {
           return tx
-            .select({ membershipId: groupMembers.membershipId })
-            .from(groupMembers)
-            .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.isExcluded, true)));
+            .select({ membershipId: groupMembersLive.membershipId })
+            .from(groupMembersLive)
+            .where(
+              and(eq(groupMembersLive.groupId, groupId), eq(groupMembersLive.isExcluded, true)),
+            );
         },
       );
       const excludedSet = new Set(excluded.map((r) => r.membershipId));
@@ -310,13 +325,13 @@ export class GroupService {
         mkInstituteCtx(tenantId, 'service:group'),
         async (tx) => {
           return tx
-            .select({ membershipId: groupMembers.membershipId })
-            .from(groupMembers)
+            .select({ membershipId: groupMembersLive.membershipId })
+            .from(groupMembersLive)
             .where(
               and(
-                eq(groupMembers.groupId, groupId),
-                eq(groupMembers.source, GroupMemberSource.MANUAL),
-                eq(groupMembers.isExcluded, false),
+                eq(groupMembersLive.groupId, groupId),
+                eq(groupMembersLive.source, GroupMemberSource.MANUAL),
+                eq(groupMembersLive.isExcluded, false),
               ),
             );
         },
@@ -326,30 +341,45 @@ export class GroupService {
       matchingMembershipIds = [...allIds];
     }
 
-    // Delete old rule-resolved members
     await withTenant(this.db, mkInstituteCtx(tenantId, 'service:group'), async (tx) => {
-      await tx
-        .delete(groupMembers)
-        .where(
-          and(eq(groupMembers.groupId, groupId), eq(groupMembers.source, GroupMemberSource.RULE)),
-        );
+      const now = new Date();
+      const current = await tx
+        .select({
+          id: groupMembersLive.id,
+          membershipId: groupMembersLive.membershipId,
+          source: groupMembersLive.source,
+        })
+        .from(groupMembersLive)
+        .where(eq(groupMembersLive.groupId, groupId));
 
-      // Insert new rule-resolved members
-      if (matchingMembershipIds.length > 0) {
-        const now = new Date();
+      // Diff instead of delete-and-reinsert: unchanged members keep their row,
+      // so a re-resolve only leaves a tombstone for a member that really left.
+      const matching = new Set(matchingMembershipIds);
+      const staleIds = current
+        .filter((m) => m.source === GroupMemberSource.RULE && !matching.has(m.membershipId))
+        .map((m) => m.id);
+      if (staleIds.length > 0) {
         await tx
-          .insert(groupMembers)
-          .values(
-            matchingMembershipIds.map((membershipId) => ({
-              groupId,
-              tenantId,
-              membershipId,
-              source: GroupMemberSource.RULE,
-              isExcluded: false,
-              resolvedAt: now,
-            })),
-          )
-          .onConflictDoNothing();
+          .update(groupMembers)
+          .set({ deletedAt: now, deletedBy: actorId, updatedBy: actorId })
+          .where(inArray(groupMembers.id, staleIds));
+      }
+
+      const present = new Set(current.map((m) => m.membershipId));
+      const added = matchingMembershipIds.filter((id) => !present.has(id));
+      if (added.length > 0) {
+        await tx.insert(groupMembers).values(
+          added.map((membershipId) => ({
+            createdBy: actorId,
+            updatedBy: actorId,
+            groupId,
+            tenantId,
+            membershipId,
+            source: GroupMemberSource.RULE,
+            isExcluded: false,
+            resolvedAt: now,
+          })),
+        );
       }
 
       // Update group metadata
@@ -433,16 +463,16 @@ export class GroupService {
       async (tx) => {
         return tx
           .select({
-            id: groupMembers.id,
-            groupId: groupMembers.groupId,
-            membershipId: groupMembers.membershipId,
-            source: groupMembers.source,
-            isExcluded: groupMembers.isExcluded,
-            resolvedAt: groupMembers.resolvedAt,
+            id: groupMembersLive.id,
+            groupId: groupMembersLive.groupId,
+            membershipId: groupMembersLive.membershipId,
+            source: groupMembersLive.source,
+            isExcluded: groupMembersLive.isExcluded,
+            resolvedAt: groupMembersLive.resolvedAt,
           })
-          .from(groupMembers)
-          .where(eq(groupMembers.groupId, groupId))
-          .orderBy(groupMembers.isExcluded, groupMembers.id);
+          .from(groupMembersLive)
+          .where(eq(groupMembersLive.groupId, groupId))
+          .orderBy(groupMembersLive.isExcluded, groupMembersLive.id);
       },
     );
 
@@ -468,9 +498,9 @@ export class GroupService {
       userIds.length > 0
         ? await withAdmin(this.db, mkAdminCtx('service:group'), async (tx) => {
             return tx
-              .select({ id: users.id, username: users.username, email: users.email })
-              .from(users)
-              .where(inArray(users.id, userIds));
+              .select({ id: usersLive.id, username: usersLive.username, email: usersLive.email })
+              .from(usersLive)
+              .where(inArray(usersLive.id, userIds));
           })
         : [];
 
@@ -513,7 +543,7 @@ export class GroupService {
       async (tx) => {
         const rows = await tx
           .update(groupMembers)
-          .set({ isExcluded: excluded })
+          .set({ isExcluded: excluded, updatedBy: actorId })
           .where(and(eq(groupMembers.id, memberId), eq(groupMembers.groupId, groupId)))
           .returning();
         return rows;
@@ -531,8 +561,10 @@ export class GroupService {
       async (tx) => {
         const [{ total }] = await tx
           .select({ total: count() })
-          .from(groupMembers)
-          .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.isExcluded, false)));
+          .from(groupMembersLive)
+          .where(
+            and(eq(groupMembersLive.groupId, groupId), eq(groupMembersLive.isExcluded, false)),
+          );
 
         await tx
           .update(groups)
@@ -570,7 +602,7 @@ export class GroupService {
       this.db,
       mkInstituteCtx(tenantId, 'service:group'),
       async (tx) => {
-        return tx.select().from(groupRules).where(eq(groupRules.groupId, groupId));
+        return tx.select().from(groupRulesLive).where(eq(groupRulesLive.groupId, groupId));
       },
     );
 

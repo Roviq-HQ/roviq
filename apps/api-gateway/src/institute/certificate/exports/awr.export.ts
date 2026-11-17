@@ -10,7 +10,7 @@ import {
   mkInstituteCtx,
   studentAcademicsLive,
   studentProfilesLive,
-  userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -69,7 +69,7 @@ export async function generateAwrExport(
   const allProfiles = await withAdmin(
     db,
     mkAdminCtx('service:certificate-awr-export'),
-    async (tx) => tx.select().from(userProfiles),
+    async (tx) => tx.select().from(userProfilesLive),
   );
   const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
   const academicMap = new Map(academics.map((a) => [a.studentProfileId, a]));

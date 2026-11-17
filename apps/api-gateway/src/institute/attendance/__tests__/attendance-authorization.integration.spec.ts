@@ -173,6 +173,8 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
       .returning();
     for (const person of enrolled) {
       await tx.insert(userProfiles).values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         userId: person.userId,
         firstName: { en: `Student ${name}` },
         gender: Gender.FEMALE,
@@ -320,15 +322,20 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
         .from(studentProfiles)
         .where(eq(studentProfiles.membershipId, studentA.membershipId));
       for (const person of [parent, unlinkedParent]) {
-        await tx
-          .insert(userProfiles)
-          .values({ userId: person.userId, firstName: { en: 'Parent' } });
+        await tx.insert(userProfiles).values({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+          userId: person.userId,
+          firstName: { en: 'Parent' },
+        });
         const [guardian] = await tx
           .insert(guardianProfiles)
           .values({ tenantId: t, userId: person.userId, membershipId: person.membershipId, ...by })
           .returning();
         if (person === parent) {
           await tx.insert(studentGuardianLinks).values({
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
             tenantId: t,
             guardianProfileId: guardian.id,
             studentProfileId: childProfile.id,

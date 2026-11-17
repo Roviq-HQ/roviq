@@ -135,8 +135,8 @@ describe('ROV-88 Invariant 2: reseller_memberships cross-reseller isolation', ()
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
       await expect(
         client.query(
-          `INSERT INTO reseller_memberships (user_id, role_id, reseller_id)
-           VALUES ($1, $2, $3)`,
+          `INSERT INTO reseller_memberships (user_id, role_id, reseller_id, created_by, updated_by)
+           VALUES ($1, $2, $3, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [SEED.USER_ADMIN, SEED.ROLE_RESELLER_FULL_ADMIN, SEED.RESELLER_DIRECT],
         ),
       ).rejects.toThrow(/permission denied/);
@@ -152,7 +152,10 @@ describe('ROV-88 Invariant 10: membership table privileges', () => {
   it('roviq_app and roviq_reseller hold only the privileges their policies need', async () => {
     const res = await superPool.query(
       `SELECT t AS "table", r AS role, p AS privilege, has_table_privilege(r, t, p) AS granted
-       FROM unnest(ARRAY['platform_memberships', 'reseller_memberships']) t,
+       FROM unnest(ARRAY[
+              'platform_memberships', 'platform_memberships_live',
+              'reseller_memberships', 'reseller_memberships_live'
+            ]) t,
             unnest(ARRAY['roviq_app', 'roviq_reseller']) r,
             unnest(ARRAY['DELETE', 'INSERT', 'SELECT', 'UPDATE']) p
        ORDER BY t, r, p`,
@@ -164,11 +167,23 @@ describe('ROV-88 Invariant 10: membership table privileges', () => {
         privilege,
         granted,
       }));
+    // A reseller holds SELECT only on the live view
+    const liveRow = (table: string, role: string) =>
+      ['DELETE', 'INSERT', 'SELECT', 'UPDATE'].map((privilege) => ({
+        table,
+        role,
+        privilege,
+        granted: privilege === 'SELECT',
+      }));
     expect(res.rows).toEqual([
       ...row('platform_memberships', 'roviq_app', false),
       ...row('platform_memberships', 'roviq_reseller', false),
+      ...row('platform_memberships_live', 'roviq_app', false),
+      ...row('platform_memberships_live', 'roviq_reseller', false),
       ...row('reseller_memberships', 'roviq_app', false),
       ...row('reseller_memberships', 'roviq_reseller', true),
+      ...row('reseller_memberships_live', 'roviq_app', false),
+      ...liveRow('reseller_memberships_live', 'roviq_reseller'),
     ]);
   });
 });
@@ -188,8 +203,9 @@ describe('ROV-88 Invariant 11: memberships reseller read', () => {
       await client.query('BEGIN');
       const suffix = randomUUID().slice(0, 8);
       const reseller = await client.query(
-        `INSERT INTO resellers (name, slug) VALUES ($1, $2) RETURNING id`,
-        [`ROV-88 Reseller ${suffix}`, `rov-88-reseller-${suffix}`],
+        `INSERT INTO resellers (name, slug, created_by, updated_by)
+         VALUES ($1, $2, $3, $3) RETURNING id`,
+        [`ROV-88 Reseller ${suffix}`, `rov-88-reseller-${suffix}`, SEED.USER_ADMIN],
       );
       const resellerId: string = reseller.rows[0].id;
       const institute = await client.query(
@@ -431,8 +447,8 @@ describe('ROV-91 Invariant 7: scope columns reject unknown values', () => {
     await asRole('roviq_admin', {}, async (client) => {
       await expect(
         client.query(
-          `INSERT INTO refresh_tokens (user_id, membership_id, membership_scope, token_hash, expires_at)
-           VALUES ($1, uuidv7(), 'galaxy', 'rov-91-hash', now() + interval '1 day')`,
+          `INSERT INTO refresh_tokens (user_id, membership_id, membership_scope, token_hash, expires_at, created_by, updated_by)
+           VALUES ($1, uuidv7(), 'galaxy', 'rov-91-hash', now() + interval '1 day', $1, $1)`,
           [SEED.USER_ADMIN],
         ),
       ).rejects.toThrow(/chk_refresh_token_membership_scope/);
@@ -491,7 +507,9 @@ describe('ROV-91 Invariant 8: platform and reseller role name uniqueness', () =>
   it('allows the same role name under a different reseller', async () => {
     await asRole('roviq_admin', {}, async (client) => {
       const reseller = await client.query(
-        `INSERT INTO resellers (name, slug) VALUES ('ROV-91 Reseller', 'rov-91-uniq-reseller') RETURNING id`,
+        `INSERT INTO resellers (name, slug, created_by, updated_by)
+         VALUES ('ROV-91 Reseller', 'rov-91-uniq-reseller', $1, $1) RETURNING id`,
+        [SEED.USER_ADMIN],
       );
       const res = await insertRole(client, 'reseller', reseller.rows[0].id, 'reseller_full_admin');
       expect(res.rowCount).toBe(1);

@@ -5,8 +5,8 @@ import {
   institutesLive,
   membershipsLive,
   mkAdminCtx,
-  userProfiles,
-  users,
+  userProfilesLive,
+  usersLive,
   withAdmin,
 } from '@roviq/database';
 import { and, asc, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
@@ -29,11 +29,11 @@ export class AdminUserService {
           .map((w) => `${w}:*`)
           .join(' & ');
         const searchCondition = or(
-          sql`${userProfiles.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
-          sql`${users.username} ILIKE ${`%${searchTerm}%`}`,
+          sql`${userProfilesLive.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
+          sql`${usersLive.username} ILIKE ${`%${searchTerm}%`}`,
           sql`EXISTS (
             SELECT 1 FROM phone_numbers pn
-            WHERE pn.user_id = ${users.id}
+            WHERE pn.user_id = ${usersLive.id}
             AND pn.number ILIKE ${`%${searchTerm}%`}
           )`,
         );
@@ -41,22 +41,22 @@ export class AdminUserService {
       } else {
         const pattern = `%${searchTerm}%`;
         const searchCondition = or(
-          sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
-          sql`${users.username} ILIKE ${pattern}`,
+          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
+          sql`${usersLive.username} ILIKE ${pattern}`,
         );
         if (searchCondition) conditions.push(searchCondition);
       }
     }
 
     if (filter.status && filter.status.length > 0) {
-      conditions.push(inArray(users.status, filter.status));
+      conditions.push(inArray(usersLive.status, filter.status));
     }
 
     if (filter.tenantId) {
       conditions.push(
         sql`EXISTS (
           SELECT 1 FROM memberships m
-          WHERE m.user_id = ${users.id}
+          WHERE m.user_id = ${usersLive.id}
           AND m.tenant_id = ${filter.tenantId}
           AND m.deleted_at IS NULL
         )`,
@@ -65,7 +65,7 @@ export class AdminUserService {
       conditions.push(
         sql`EXISTS (
           SELECT 1 FROM memberships m
-          WHERE m.user_id = ${users.id}
+          WHERE m.user_id = ${usersLive.id}
           AND m.deleted_at IS NULL
         )`,
       );
@@ -73,7 +73,7 @@ export class AdminUserService {
       conditions.push(
         sql`NOT EXISTS (
           SELECT 1 FROM memberships m
-          WHERE m.user_id = ${users.id}
+          WHERE m.user_id = ${usersLive.id}
           AND m.deleted_at IS NULL
         )`,
       );
@@ -82,7 +82,7 @@ export class AdminUserService {
     if (filter.after) {
       const cursor = decodeCursor(filter.after);
       if (cursor.id) {
-        conditions.push(sql`${users.id} > ${cursor.id as string}`);
+        conditions.push(sql`${usersLive.id} > ${cursor.id as string}`);
       }
     }
 
@@ -103,24 +103,24 @@ export class AdminUserService {
       const [totalResult, userRows] = await Promise.all([
         tx
           .select({ value: count() })
-          .from(users)
-          .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+          .from(usersLive)
+          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
           .where(where),
         tx
           .select({
-            id: users.id,
-            email: users.email,
-            username: users.username,
-            status: users.status,
-            createdAt: users.createdAt,
-            firstName: userProfiles.firstName,
-            lastName: userProfiles.lastName,
-            profileImageUrl: userProfiles.profileImageUrl,
+            id: usersLive.id,
+            email: usersLive.email,
+            username: usersLive.username,
+            status: usersLive.status,
+            createdAt: usersLive.createdAt,
+            firstName: userProfilesLive.firstName,
+            lastName: userProfilesLive.lastName,
+            profileImageUrl: userProfilesLive.profileImageUrl,
           })
-          .from(users)
-          .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+          .from(usersLive)
+          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
           .where(where)
-          .orderBy(asc(users.createdAt))
+          .orderBy(asc(usersLive.createdAt))
           .limit(limit + 1),
       ]);
 
@@ -210,29 +210,29 @@ export class AdminUserService {
 
       const rows = await tx
         .select({
-          id: users.id,
-          email: users.email,
-          username: users.username,
-          status: users.status,
-          createdAt: users.createdAt,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          profileImageUrl: userProfiles.profileImageUrl,
+          id: usersLive.id,
+          email: usersLive.email,
+          username: usersLive.username,
+          status: usersLive.status,
+          createdAt: usersLive.createdAt,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          profileImageUrl: userProfilesLive.profileImageUrl,
         })
-        .from(users)
-        .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+        .from(usersLive)
+        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
         .where(
           or(
-            sql`${userProfiles.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
-            sql`${users.username} ILIKE ${`%${searchTerm}%`}`,
+            sql`${userProfilesLive.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
+            sql`${usersLive.username} ILIKE ${`%${searchTerm}%`}`,
             sql`EXISTS (
               SELECT 1 FROM phone_numbers pn
-              WHERE pn.user_id = ${users.id}
+              WHERE pn.user_id = ${usersLive.id}
               AND pn.number ILIKE ${`%${searchTerm}%`}
             )`,
           ),
         )
-        .orderBy(asc(users.createdAt))
+        .orderBy(asc(usersLive.createdAt))
         .limit(limit);
 
       return rows.map((row) => ({

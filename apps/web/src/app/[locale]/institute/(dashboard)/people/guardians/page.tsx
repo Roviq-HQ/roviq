@@ -18,6 +18,7 @@ import {
   useDebounce,
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
+import { DeletedRecordsButton } from '@web/components/people/deleted-records';
 import { Plus, Search, SearchX, Users, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryStates } from 'nuqs';
@@ -185,6 +186,7 @@ export default function GuardiansPage() {
                 <p className="text-muted-foreground">{t('description')}</p>
               </div>
               <div className="flex items-center gap-2">
+                <DeletedRecordsButton kind="guardian" />
                 <Can I="create" a="Guardian">
                   <Button onClick={() => router.push('/people/guardians/new')}>
                     <Plus className="size-4" />

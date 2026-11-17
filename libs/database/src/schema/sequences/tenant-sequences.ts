@@ -1,5 +1,5 @@
 import { bigint, foreignKey, pgTable, primaryKey, uuid, varchar } from 'drizzle-orm/pg-core';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 
 /**
@@ -43,6 +43,6 @@ export const tenantSequences = pgTable(
     })
       .onDelete('cascade')
       .onUpdate('cascade'),
-    ...tenantPoliciesSimple('tenant_sequences'),
+    ...tenantPolicies('tenant_sequences'),
   ],
 ).enableRLS();

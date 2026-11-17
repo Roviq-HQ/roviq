@@ -115,7 +115,7 @@ describe('Role isolation', () => {
     // Create a second reseller via superuser for this test
     const fakeResellerId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
     await superPool.query(
-      `INSERT INTO resellers (id, name, slug, tier) VALUES ($1, 'Test Reseller', 'test-reseller', '${ResellerTier.FULL_MANAGEMENT}') ON CONFLICT (slug) DO NOTHING`,
+      `INSERT INTO resellers (id, name, slug, tier, created_by, updated_by) VALUES ($1, 'Test Reseller', 'test-reseller', '${ResellerTier.FULL_MANAGEMENT}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000') ON CONFLICT (slug) DO NOTHING`,
       [fakeResellerId],
     );
 
@@ -216,8 +216,8 @@ describe('Session management', () => {
       // Insert a test refresh token for a reseller staff member
       const tokenId = 'ffffffff-0000-0000-0000-000000000010';
       await client.query(
-        `INSERT INTO refresh_tokens (id, user_id, token_hash, membership_id, membership_scope, expires_at)
-         VALUES ($1, $2, 'test-hash-9', $3, 'reseller', now() + interval '7 days')`,
+        `INSERT INTO refresh_tokens (id, user_id, token_hash, membership_id, membership_scope, expires_at, created_by, updated_by)
+         VALUES ($1, $2, 'test-hash-9', $3, 'reseller', now() + interval '7 days', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [tokenId, SEED.USER_ADMIN, SEED.ROLE_RESELLER_FULL_ADMIN],
       );
 
@@ -269,8 +269,8 @@ describe('Session management', () => {
       const passwordChangedAt = new Date(); // now
 
       await client.query(
-        `INSERT INTO refresh_tokens (id, user_id, token_hash, membership_id, membership_scope, expires_at, created_at)
-         VALUES ($1, $2, 'test-hash-11', $3, 'institute', now() + interval '7 days', $4)`,
+        `INSERT INTO refresh_tokens (id, user_id, token_hash, membership_id, membership_scope, expires_at, created_at, created_by, updated_by)
+         VALUES ($1, $2, 'test-hash-11', $3, 'institute', now() + interval '7 days', $4, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [tokenId, SEED.USER_TEACHER, SEED.ROLE_PLATFORM_ADMIN, tokenCreatedAt],
       );
 
@@ -562,6 +562,8 @@ describe('Structural invariants — RLS sweep', () => {
       WHERE c.relkind IN ('r','p')
         AND NOT c.relispartition
         AND c.relforcerowsecurity = true
+        -- audit-security-invariants detaches a sealed scratch partition while this runs in parallel
+        AND c.relname !~ '^rov64_scratch_'
         AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
       ORDER BY c.relname
     `);
@@ -630,6 +632,14 @@ describe('ROV-90: group_memberships is admin-only', () => {
   it('roviq_app cannot read group_memberships', async () => {
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
       await expect(client.query('SELECT * FROM group_memberships')).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it('roviq_app cannot read group_memberships_live', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(client.query('SELECT * FROM group_memberships_live')).rejects.toThrow(
         /permission denied/,
       );
     });

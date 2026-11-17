@@ -98,6 +98,8 @@ async function createStudentFixture(db: DrizzleDB, tenantId: string): Promise<St
     const [user] = await tx
       .insert(users)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         email: `student_${suffix}@test.local`,
         username: `stu_${suffix}`,
         passwordHash: 'not-a-real-hash',

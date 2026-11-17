@@ -10,7 +10,8 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantColumns } from '../common/columns';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 
 /**
@@ -21,15 +22,14 @@ import { institutes } from '../tenant/institutes';
  * - Available in at least English and Hindi
  * - Versioned (new version doesn't invalidate old consents)
  *
- * No soft delete (tenantPoliciesSimple). Three-tier RLS enforced.
+ * Three-tier RLS enforced.
  */
 export const privacyNotices = pgTable(
   'privacy_notices',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    tenantId: uuid('tenant_id').notNull(),
     /** Version number — monotonically increasing per tenant */
-    version: integer('version').notNull(),
+    noticeVersion: integer('notice_version').notNull(),
     /** Language code — 'en', 'hi', 'ur', etc. At least English and Hindi required */
     language: varchar('language', { length: 10 }).notNull().default('en'),
     /** Full text of the privacy notice */
@@ -39,7 +39,7 @@ export const privacyNotices = pgTable(
     /** When this notice version was published */
     publishedAt: timestamp('published_at', { withTimezone: true }),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -50,8 +50,10 @@ export const privacyNotices = pgTable(
       .onUpdate('cascade'),
 
     /** One version per language per tenant */
-    uniqueIndex('uq_notice_version').on(table.tenantId, table.version, table.language),
+    uniqueIndex('uq_notice_version')
+      .on(table.tenantId, table.noticeVersion, table.language)
+      .where(sql`${table.deletedAt} IS NULL`),
 
-    ...tenantPoliciesSimple('privacy_notices'),
+    ...tenantPolicies('privacy_notices'),
   ],
 ).enableRLS();

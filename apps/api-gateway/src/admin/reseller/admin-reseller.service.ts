@@ -11,6 +11,7 @@ import {
   type ResellerSystemRoleName,
   refreshTokens,
   resellerMemberships,
+  resellerMembershipsLive,
   resellers,
   roles,
   withAdmin,
@@ -193,6 +194,8 @@ export class AdminResellerService {
         const [created] = await tx
           .insert(resellers)
           .values({
+            createdBy: actorId,
+            updatedBy: actorId,
             name: input.name,
             slug,
             tier: input.tier,
@@ -261,7 +264,7 @@ export class AdminResellerService {
       if (input.name !== undefined) patch.name = input.name;
       if (input.branding !== undefined) patch.branding = input.branding;
       if (input.customDomain !== undefined) patch.customDomain = input.customDomain;
-      patch.updatedAt = new Date();
+      patch.updatedBy = actorId;
 
       const [updated] = await tx
         .update(resellers)
@@ -315,13 +318,13 @@ export class AdminResellerService {
 
         const [updated] = await tx
           .update(resellers)
-          .set({ tier: newTier, updatedAt: new Date() })
+          .set({ tier: newTier, updatedBy: actorId })
           .where(eq(resellers.id, resellerId))
           .returning();
 
         await tx
           .update(resellerMemberships)
-          .set({ roleId: roleIds[TIER_TO_ROLE_NAME[newTier]], updatedAt: new Date() })
+          .set({ roleId: roleIds[TIER_TO_ROLE_NAME[newTier]], updatedBy: actorId })
           .where(eq(resellerMemberships.resellerId, resellerId));
 
         return { record: updated, oldTier: existing.tier };
@@ -344,7 +347,7 @@ export class AdminResellerService {
 
   // ── Existing lifecycle mutations (preserved from ROV-97) ────
 
-  async suspendReseller(resellerId: string, reason?: string): Promise<void> {
+  async suspendReseller(resellerId: string, actorId: string, reason?: string): Promise<void> {
     const { record, previousStatus } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
@@ -378,15 +381,16 @@ export class AdminResellerService {
             status: ResellerStatus.SUSPENDED,
             suspendedAt: new Date(),
             isActive: false,
+            updatedBy: actorId,
           })
           .where(eq(resellers.id, resellerId))
           .returning();
 
         // 3. Get all reseller staff user IDs
         const staffRows = await tx
-          .select({ userId: resellerMemberships.userId })
-          .from(resellerMemberships)
-          .where(eq(resellerMemberships.resellerId, resellerId));
+          .select({ userId: resellerMembershipsLive.userId })
+          .from(resellerMembershipsLive)
+          .where(eq(resellerMembershipsLive.resellerId, resellerId));
         const staffUserIds = staffRows.map((s) => s.userId);
 
         if (staffUserIds.length > 0) {
@@ -455,7 +459,7 @@ export class AdminResellerService {
     });
   }
 
-  async unsuspendReseller(resellerId: string): Promise<void> {
+  async unsuspendReseller(resellerId: string, actorId: string): Promise<void> {
     const record = await withAdmin(this.db, mkAdminCtx('service:admin-reseller'), async (tx) => {
       const [reseller] = await tx.select().from(resellers).where(eq(resellers.id, resellerId)); // allow-base-read: admin unsuspend may target trashed (TODO: validate)
       if (!reseller)
@@ -482,6 +486,7 @@ export class AdminResellerService {
           status: ResellerStatus.ACTIVE,
           suspendedAt: null,
           isActive: true,
+          updatedBy: actorId,
         })
         .where(eq(resellers.id, resellerId))
         .returning();
@@ -496,7 +501,7 @@ export class AdminResellerService {
     });
   }
 
-  async deleteReseller(resellerId: string): Promise<void> {
+  async deleteReseller(resellerId: string, actorId: string): Promise<void> {
     const { record, affectedInstituteIds } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
@@ -543,18 +548,39 @@ export class AdminResellerService {
           .set({ resellerId: DEFAULT_RESELLER_ID })
           .where(eq(institutes.resellerId, resellerId));
 
-        // 5. Delete reseller memberships
-        await tx.delete(resellerMemberships).where(eq(resellerMemberships.resellerId, resellerId));
+        const deletedAt = new Date();
+
+        // 5. Soft-delete reseller memberships
+        await tx
+          .update(resellerMemberships)
+          .set({ deletedAt, deletedBy: actorId, updatedBy: actorId })
+          .where(
+            and(
+              eq(resellerMemberships.resellerId, resellerId),
+              isNull(resellerMemberships.deletedAt),
+            ),
+          );
 
         await tx
           .update(roles)
-          .set({ deletedAt: new Date() })
-          .where(and(eq(roles.resellerId, resellerId), eq(roles.scope, 'reseller')));
+          .set({ deletedAt, deletedBy: actorId, updatedBy: actorId })
+          .where(
+            and(
+              eq(roles.resellerId, resellerId),
+              eq(roles.scope, 'reseller'),
+              isNull(roles.deletedAt),
+            ),
+          );
 
         // 6. Soft-delete reseller
         const [updated] = await tx
           .update(resellers)
-          .set({ status: ResellerStatus.DELETED, deletedAt: new Date() })
+          .set({
+            status: ResellerStatus.DELETED,
+            deletedAt,
+            deletedBy: actorId,
+            updatedBy: actorId,
+          })
           .where(eq(resellers.id, resellerId))
           .returning();
 
@@ -594,17 +620,17 @@ export class AdminResellerService {
           .groupBy(institutesLive.resellerId),
         tx
           .select({
-            resellerId: resellerMemberships.resellerId,
-            count: count(resellerMemberships.id),
+            resellerId: resellerMembershipsLive.resellerId,
+            count: count(resellerMembershipsLive.id),
           })
-          .from(resellerMemberships)
+          .from(resellerMembershipsLive)
           .where(
             and(
-              inArray(resellerMemberships.resellerId, resellerIds),
-              eq(resellerMemberships.isActive, true),
+              inArray(resellerMembershipsLive.resellerId, resellerIds),
+              eq(resellerMembershipsLive.isActive, true),
             ),
           )
-          .groupBy(resellerMemberships.resellerId),
+          .groupBy(resellerMembershipsLive.resellerId),
       ]);
       for (const row of instRows) instituteCount.set(row.resellerId, Number(row.count));
       for (const row of teamRows) teamSize.set(row.resellerId, Number(row.count));

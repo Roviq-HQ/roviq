@@ -1,15 +1,8 @@
 import { sql } from 'drizzle-orm';
-import {
-  boolean,
-  foreignKey,
-  index,
-  pgTable,
-  timestamp,
-  uniqueIndex,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { boolean, foreignKey, index, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { tenantColumns } from '../common/columns';
 import { guardianRelationship } from '../common/enums';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { guardianProfiles } from './guardian-profiles';
 import { studentProfiles } from './student-profiles';
@@ -25,7 +18,6 @@ export const studentGuardianLinks = pgTable(
   'student_guardian_links',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    tenantId: uuid('tenant_id').notNull(),
     studentProfileId: uuid('student_profile_id')
       .notNull()
       .references(() => studentProfiles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -44,11 +36,7 @@ export const studentGuardianLinks = pgTable(
     /** Whether the student resides with this guardian — affects address on records */
     livesWith: boolean('lives_with').notNull().default(true),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -59,14 +47,16 @@ export const studentGuardianLinks = pgTable(
       .onUpdate('cascade'),
 
     /** One link per student-guardian pair per institute */
-    uniqueIndex('uq_student_guardian').on(table.studentProfileId, table.guardianProfileId),
+    uniqueIndex('uq_student_guardian')
+      .on(table.studentProfileId, table.guardianProfileId)
+      .where(sql`${table.deletedAt} IS NULL`),
     /** Exactly one primary contact per student — enforced at DB level */
     uniqueIndex('idx_primary_contact')
       .on(table.studentProfileId)
-      .where(sql`${table.isPrimaryContact} = true`),
+      .where(sql`${table.isPrimaryContact} = true AND ${table.deletedAt} IS NULL`),
     /** Find all students of a guardian (sibling discovery, parent dashboard) */
     index('idx_guardian_students').on(table.guardianProfileId),
 
-    ...tenantPoliciesSimple('student_guardian_links'),
+    ...tenantPolicies('student_guardian_links'),
   ],
 ).enableRLS();

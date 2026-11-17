@@ -10,14 +10,14 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantColumns } from '../common/columns';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { admissionApplications } from './admission-applications';
 
 /**
  * Documents submitted with an admission application — per-document verification tracking.
  *
- * Immutable append-only (no soft delete). Uses `tenantPoliciesSimple` (no deleted_at).
  * Three-tier RLS enforced.
  */
 export const applicationDocuments = pgTable(
@@ -27,7 +27,6 @@ export const applicationDocuments = pgTable(
     applicationId: uuid('application_id')
       .notNull()
       .references(() => admissionApplications.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    tenantId: uuid('tenant_id').notNull(),
     /** Document type — same enum as user_documents.type (birth_certificate, aadhaar_card, etc.) */
     type: varchar('type', { length: 50 }).notNull(),
     /** Array of S3/MinIO file URLs — supports multi-page document scans */
@@ -40,7 +39,7 @@ export const applicationDocuments = pgTable(
     /** Reason for rejection — populated when admin rejects a document */
     rejectionReason: varchar('rejection_reason', { length: 255 }),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -52,6 +51,6 @@ export const applicationDocuments = pgTable(
 
     index('idx_application_documents_app').on(table.applicationId),
 
-    ...tenantPoliciesSimple('application_documents'),
+    ...tenantPolicies('application_documents'),
   ],
 ).enableRLS();

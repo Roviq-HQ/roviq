@@ -47,12 +47,20 @@ async function inTransaction(fn: (client: pg.PoolClient) => Promise<void>): Prom
 
 // ── ROV-148: Membership dual-role constraint ──────────────────
 
+// Roles the seeded teacher does not hold yet — otherwise the first insert
+// collides with the seed membership depending on heap order.
+const FREE_ROLES_SQL = `SELECT id FROM roles
+  WHERE tenant_id = $1
+    AND id NOT IN (SELECT role_id FROM memberships WHERE user_id = $2 AND tenant_id = $1)
+  ORDER BY id`;
+
 describe('ROV-148: memberships UNIQUE(user_id, tenant_id, role_id)', () => {
   it('allows two memberships for same user+tenant with different roles', async () => {
     await inTransaction(async (client) => {
       // First, find two different roles for INSTITUTE_1
-      const rolesRes = await client.query(`SELECT id FROM roles WHERE tenant_id = $1 LIMIT 2`, [
+      const rolesRes = await client.query(`${FREE_ROLES_SQL} LIMIT 2`, [
         SEED.INSTITUTE_1,
+        SEED.USER_TEACHER,
       ]);
       expect(rolesRes.rows.length).toBeGreaterThanOrEqual(2);
       const [role1, role2] = rolesRes.rows;
@@ -85,8 +93,9 @@ describe('ROV-148: memberships UNIQUE(user_id, tenant_id, role_id)', () => {
 
   it('rejects two memberships for same user+tenant with SAME role', async () => {
     await inTransaction(async (client) => {
-      const rolesRes = await client.query(`SELECT id FROM roles WHERE tenant_id = $1 LIMIT 1`, [
+      const rolesRes = await client.query(`${FREE_ROLES_SQL} LIMIT 1`, [
         SEED.INSTITUTE_1,
+        SEED.USER_TEACHER,
       ]);
       const roleId = rolesRes.rows[0].id;
 
@@ -125,16 +134,16 @@ describe('ROV-150: phone_numbers partial unique (one primary per user)', () => {
 
       // Insert first primary phone
       await client.query(
-        `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label)
-         VALUES ($1, $2, '+91', '9000000001', true, 'personal')`,
+        `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label, created_by, updated_by)
+         VALUES ($1, $2, '+91', '9000000001', true, 'personal', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [phoneId1, SEED.USER_TEACHER],
       );
 
       // Insert second primary phone — should fail (partial unique index)
       const err = await client
         .query(
-          `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label)
-           VALUES ($1, $2, '+91', '9000000002', true, 'work')`,
+          `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label, created_by, updated_by)
+           VALUES ($1, $2, '+91', '9000000002', true, 'work', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [phoneId2, SEED.USER_TEACHER],
         )
         .catch((e: Error) => e);
@@ -151,15 +160,15 @@ describe('ROV-150: phone_numbers partial unique (one primary per user)', () => {
 
       // Insert primary phone
       await client.query(
-        `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label)
-         VALUES ($1, $2, '+91', '9100000001', true, 'personal')`,
+        `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label, created_by, updated_by)
+         VALUES ($1, $2, '+91', '9100000001', true, 'personal', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [phoneId1, SEED.USER_TEACHER],
       );
 
       // Insert non-primary phone — should succeed
       await client.query(
-        `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label)
-         VALUES ($1, $2, '+91', '9100000002', false, 'work')`,
+        `INSERT INTO phone_numbers (id, user_id, country_code, number, is_primary, label, created_by, updated_by)
+         VALUES ($1, $2, '+91', '9100000002', false, 'work', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [phoneId2, SEED.USER_TEACHER],
       );
 

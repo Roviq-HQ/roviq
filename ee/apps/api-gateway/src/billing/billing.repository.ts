@@ -145,7 +145,7 @@ export class BillingRepository {
       const rows = await tx
         .select({ subscription: subscriptions, plan: plans })
         .from(subscriptions)
-        .innerJoin(plans, eq(subscriptions.planId, plans.id))
+        .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
         .where(eq(subscriptions.tenantId, instituteId))
         .orderBy(desc(subscriptions.createdAt))
         .limit(1);
@@ -201,7 +201,7 @@ export class BillingRepository {
             institute: { id: institutesLive.id, name: institutesLive.name },
           })
           .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
           .innerJoin(institutesLive, eq(subscriptions.tenantId, institutesLive.id))
           .where(where)
           .orderBy(desc(subscriptions.createdAt), desc(subscriptions.id))

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { index, jsonb, pgTable, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
+import { entityColumns } from '../common/columns';
 import { addressType } from '../common/enums';
 import { userScopedPolicies } from '../common/rls-policies';
 
@@ -44,15 +45,13 @@ export const userAddresses = pgTable(
     /** Geographic coordinates { lat, lng } — used for OASIS geo-tagging */
     coordinates: jsonb().$type<Coordinates>(),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
+    ...entityColumns,
   },
   (table) => [
     /** One address per type per user */
-    uniqueIndex('uq_address_user_type').on(table.userId, table.type),
+    uniqueIndex('uq_address_user_type')
+      .on(table.userId, table.type)
+      .where(sql`${table.deletedAt} IS NULL`),
     index('idx_user_addresses_user_id').on(table.userId),
     ...userScopedPolicies('user_addresses'),
   ],

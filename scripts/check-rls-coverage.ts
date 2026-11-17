@@ -3,7 +3,7 @@
  * exempt list of platform-level user tables whose access is governed by
  * DB-role GRANTs + CASL rather than per-row RLS).
  *
- * Detects RLS via any of: `tenantPolicies(`, `tenantPoliciesSimple(`,
+ * Detects RLS via any of: `tenantPolicies(`,
  * `entityPolicies(`, `immutableEntityPolicies(`, `pgPolicy(`, `.enableRLS()`.
  *
  * Companion to `scripts/check-live-views-coverage.ts`.
@@ -34,7 +34,6 @@ export const RLS_EXEMPT_BASENAMES = new Set(['auth-providers.ts', 'phone-numbers
 
 const RLS_INDICATORS = [
   'tenantPolicies(',
-  'tenantPoliciesSimple(',
   'entityPolicies(',
   'immutableEntityPolicies(',
   'pgPolicy(',

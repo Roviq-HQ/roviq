@@ -39,7 +39,7 @@ async function inRolledBackTx(fn: (tx: DrizzleDB) => Promise<void>): Promise<voi
 async function createReseller(tx: DrizzleDB, slug: string): Promise<string> {
   const [reseller] = await tx
     .insert(resellers)
-    .values({ name: `ROV-91 ${slug}`, slug })
+    .values({ name: `ROV-91 ${slug}`, slug, createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID })
     .returning({ id: resellers.id });
   assert(reseller);
   return reseller.id;
@@ -120,6 +120,8 @@ describe('ROV-91 reseller role backfill migration', () => {
           email: 'rov-91-backfill@test.local',
           username: 'rov-91-backfill',
           passwordHash: 'not-a-real-hash',
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
         })
         .returning({ id: users.id });
       assert(user);
@@ -127,6 +129,8 @@ describe('ROV-91 reseller role backfill migration', () => {
         userId: user.id,
         resellerId,
         roleId: SEED_IDS.ROLE_RESELLER_VIEWER,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
       });
 
       for (const statement of statements) await tx.execute(sql.raw(statement));

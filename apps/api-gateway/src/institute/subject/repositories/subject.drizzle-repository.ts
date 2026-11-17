@@ -237,13 +237,16 @@ export class SubjectDrizzleRepository extends SubjectRepository {
 
   async removeFromStandard(subjectId: string, standardId: string): Promise<void> {
     const tenantId = this.getTenantId();
+    const { userId } = getRequestContext();
     await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
       await tx
-        .delete(standardSubjects)
+        .update(standardSubjects)
+        .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
         .where(
           and(
             eq(standardSubjects.subjectId, subjectId),
             eq(standardSubjects.standardId, standardId),
+            isNull(standardSubjects.deletedAt),
           ),
         );
     });
@@ -262,11 +265,17 @@ export class SubjectDrizzleRepository extends SubjectRepository {
 
   async removeFromSection(subjectId: string, sectionId: string): Promise<void> {
     const tenantId = this.getTenantId();
+    const { userId } = getRequestContext();
     await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
       await tx
-        .delete(sectionSubjects)
+        .update(sectionSubjects)
+        .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
         .where(
-          and(eq(sectionSubjects.subjectId, subjectId), eq(sectionSubjects.sectionId, sectionId)),
+          and(
+            eq(sectionSubjects.subjectId, subjectId),
+            eq(sectionSubjects.sectionId, sectionId),
+            isNull(sectionSubjects.deletedAt),
+          ),
         );
     });
   }

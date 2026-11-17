@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { index, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { timestamps } from '../common/columns';
+import { entityColumns } from '../common/columns';
 import { users } from './users';
 
 export const authProviders = pgTable(
@@ -13,14 +13,12 @@ export const authProviders = pgTable(
     provider: text().notNull(),
     providerUserId: text('provider_user_id'),
     providerData: jsonb('provider_data'),
-    ...timestamps,
+    ...entityColumns,
   },
   (table) => [
-    uniqueIndex('auth_providers_provider_provider_user_id_key').using(
-      'btree',
-      table.provider.asc().nullsLast(),
-      table.providerUserId.asc().nullsLast(),
-    ),
+    uniqueIndex('auth_providers_provider_provider_user_id_key')
+      .using('btree', table.provider.asc().nullsLast(), table.providerUserId.asc().nullsLast())
+      .where(sql`${table.deletedAt} IS NULL`),
     index('auth_providers_user_id_idx').using('btree', table.userId.asc().nullsLast()),
   ],
 );

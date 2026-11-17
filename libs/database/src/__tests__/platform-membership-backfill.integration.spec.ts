@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { AbilityRule } from '@roviq/common-types';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
+import { SYSTEM_USER_ID } from '../constants';
 import type { DrizzleDB } from '../providers';
 import { memberships, platformMemberships, users } from '../schema';
 import { makeSeedTestDb } from '../seed/__tests__/seed-test-helpers';
@@ -34,7 +35,13 @@ async function inRolledBackTx(fn: (tx: DrizzleDB) => Promise<void>): Promise<voi
 async function createUser(tx: DrizzleDB, username: string): Promise<string> {
   const [user] = await tx
     .insert(users)
-    .values({ email: `${username}@test.local`, username, passwordHash: 'not-a-real-hash' })
+    .values({
+      email: `${username}@test.local`,
+      username,
+      passwordHash: 'not-a-real-hash',
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+    })
     .returning({ id: users.id });
   assert(user);
   return user.id;
@@ -46,6 +53,7 @@ async function platformRows(tx: DrizzleDB, userId: string) {
       roleId: platformMemberships.roleId,
       abilities: platformMemberships.abilities,
       isActive: platformMemberships.isActive,
+      createdBy: platformMemberships.createdBy,
     })
     .from(platformMemberships)
     .where(eq(platformMemberships.userId, userId));
@@ -87,7 +95,7 @@ describe('ROV-88 platform membership backfill migration', () => {
       await runBackfill(tx);
 
       expect(await platformRows(tx, userId)).toEqual([
-        { roleId: SEED_IDS.ROLE_PLATFORM_ADMIN, abilities, isActive: true },
+        { roleId: SEED_IDS.ROLE_PLATFORM_ADMIN, abilities, isActive: true, createdBy: userId },
       ]);
       expect(await instituteRows(tx, userId)).toEqual([]);
     });
@@ -108,7 +116,12 @@ describe('ROV-88 platform membership backfill migration', () => {
       await runBackfill(tx);
 
       expect(await platformRows(tx, userId)).toEqual([
-        { roleId: SEED_IDS.ROLE_PLATFORM_SUPPORT, abilities: [], isActive: false },
+        {
+          roleId: SEED_IDS.ROLE_PLATFORM_SUPPORT,
+          abilities: [],
+          isActive: false,
+          createdBy: userId,
+        },
       ]);
       expect(await instituteRows(tx, userId)).toEqual([]);
     });
@@ -117,7 +130,12 @@ describe('ROV-88 platform membership backfill migration', () => {
   it('should keep an existing platform membership and still remove the stale row', async () => {
     await inRolledBackTx(async (tx) => {
       const userId = await createUser(tx, 'rov-88-backfill-existing');
-      await tx.insert(platformMemberships).values({ userId, roleId: SEED_IDS.ROLE_PLATFORM_ADMIN });
+      await tx.insert(platformMemberships).values({
+        userId,
+        roleId: SEED_IDS.ROLE_PLATFORM_ADMIN,
+        createdBy: userId,
+        updatedBy: userId,
+      });
       await tx.insert(memberships).values({
         userId,
         tenantId: SEED_IDS.INSTITUTE_1,
@@ -129,7 +147,7 @@ describe('ROV-88 platform membership backfill migration', () => {
       await runBackfill(tx);
 
       expect(await platformRows(tx, userId)).toEqual([
-        { roleId: SEED_IDS.ROLE_PLATFORM_ADMIN, abilities: [], isActive: true },
+        { roleId: SEED_IDS.ROLE_PLATFORM_ADMIN, abilities: [], isActive: true, createdBy: userId },
       ]);
       expect(await instituteRows(tx, userId)).toEqual([]);
     });

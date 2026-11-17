@@ -213,7 +213,7 @@ const detailMessages = {
   },
 };
 
-const commonMessages = { loading: 'Loading', error: 'Error' };
+const commonMessages = { loading: 'Loading', error: 'Error', cancel: 'Cancel' };
 
 function renderPage() {
   return renderWithProviders(<GuardianDetailPage />, {

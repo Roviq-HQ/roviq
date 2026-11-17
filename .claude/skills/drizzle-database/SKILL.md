@@ -99,9 +99,14 @@ After ANY schema change:
 
 ### Column conventions
 
-- Tenant-scoped business tables: spread `...tenantColumns` (tenantId + timestamps + tracking + soft delete + version)
-- Auth/platform tables (users, refresh_tokens, auth_providers): spread `...timestamps` only
-- audit_logs: NO common columns — immutable append-only with its own `created_at`
+- Tenant-scoped tables: spread `...tenantColumns` (tenantId + timestamps + tracking + soft delete + version)
+- Every other mutable table, including identity tables (`users`, `refresh_tokens`, `phone_numbers`, `auth_providers`, `user_profiles`, the three membership tables, `resellers`): spread `...entityColumns`. `refresh_tokens` uses `entityColumns` plus its own nullable `tenant_id`
+- Exempt, and the only tables that may skip audit + soft-delete columns:
+  - append-only records: `audit_logs`, `auth_events`, `dlq_messages`, `consent_records`, `impersonation_sessions`
+  - counters: `tenant_sequences`, `reseller_invoice_sequences`
+  - EE financial records (`invoices`, `payments`, `subscriptions`): `trackingColumns`, status only, never deleted
+- A row inserted before its actor exists (self-registration) or by an unattended flow uses `SYSTEM_USER_ID`. Otherwise pass the acting user's id explicitly — `created_by` / `updated_by` are NOT NULL with no default on purpose
+- Unique indexes on a soft-deletable table are partial (`WHERE deleted_at IS NULL`) so a deleted row releases its key. Exceptions that stay global: `users.email`, `users.username`, `resellers.slug` (a deleted identity must not be claimable by someone else). An `onConflict` on a partial index needs `targetWhere: sql`deleted_at IS NULL``
 - Billing EE tables: spread `...entityColumns` (like tenantColumns but without tenantId)
 - Immutable event tables (payment_events): only `createdAt`, no update/delete columns
 - `createdBy`/`updatedBy` — read from `getRequestContext().userId`. `SYSTEM_USER_ID` for automated ops
@@ -123,11 +128,11 @@ After ANY schema change:
 - **Visibility lives in `<table>_live` security_invoker views** — NOT in RLS, NOT in service-level `isNull(deletedAt)` predicates. Every soft-deletable table has a corresponding `<table>Live` export from `@roviq/database` (e.g. `subjects`/`subjectsLive`, `studentProfiles`/`studentProfilesLive`). Reads MUST use the `*Live` view; writes target the base table.
 - The view is created `WITH (security_invoker = true)` so SELECT runs RLS as the calling DB role — without that, the view runs as its owner and would leak rows across tenants. PG 15+ feature; PG 18 inlines the view with the partial index for free.
 - INSERT/UPDATE/DELETE … RETURNING must hit the **base table** — Drizzle pgViews are read-only. Repository pattern: a `liveColumns` projection (read) + a `writeReturning` projection (insert/update return).
-- NEVER use `db.delete()` — always `softDelete(db, table, id)` which throws `NotFoundException` directly. Helper sits in `@roviq/database` and is now a plain UPDATE (the old `withTrashFlag` dance is gone).
+- NEVER use `db.delete()` — always `softDelete(db, table, id)` which throws `NotFoundException` directly. A `DELETE` issued as `roviq_app` matches the `USING (false)` policy and silently removes nothing. For a bulk soft delete, `UPDATE … SET deleted_at, deleted_by, updated_by … WHERE deleted_at IS NULL`. Helper sits in `@roviq/database` and is now a plain UPDATE (the old `withTrashFlag` dance is gone).
 - Restore: `restoreDeleted(db, table, id)` — caller looks up the row through the **base table** (no view filter) and the helper clears `deletedAt`/`deletedBy`.
 - Trash listings (admin recycle bin, audit cross-tenant break-glass): query the base table directly with an explicit `isNull(table.deletedAt)` opposite (`isNotNull(...)`). Don't reach for the view.
 - Three CI gates lock soft-delete + RLS end-to-end (Item 6 / ROV-250):
-  - `pnpm check:live-views` — bans application code reading a soft-deletable base table outside `__tests__/`. Annotate intentional cases with `// allow-base-read: <reason>`.
+  - `pnpm check:live-views` — bans application code reading a soft-deletable base table (`.from()` or any join) outside `__tests__/`. The table list is derived from the `*Live` exports, so a new view is enforced automatically. Annotate intentional cases with `// allow-base-read: <reason>`.
   - `pnpm check:live-views-coverage` — every `pgTable` that spreads `tenantColumns`/`entityColumns` or declares `deletedAt:` MUST have a matching `<table>Live` export from `live-views.ts`. Adding a soft-deletable table without the view fails CI.
   - `pnpm check:rls-coverage` — every `pgTable` MUST opt into RLS (`tenantPolicies()` / `entityPolicies()` / inline `pgPolicy()` / `.enableRLS()`) or be on `RLS_EXEMPT_BASENAMES` with a justification (platform-level user tables governed by DB-role GRANTs).
 - `notDeleted(table)` helper (also in `@roviq/database`) returns `isNull(table.deletedAt)` for the rare case a query needs to combine "live" with another table without its own view.

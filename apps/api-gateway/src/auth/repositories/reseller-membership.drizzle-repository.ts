@@ -3,9 +3,9 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   mkAdminCtx,
-  resellerMemberships,
-  resellers,
-  roles,
+  resellerMembershipsLive,
+  resellersLive,
+  rolesLive,
   withAdmin,
 } from '@roviq/database';
 import { and, eq } from 'drizzle-orm';
@@ -22,24 +22,29 @@ export class ResellerMembershipDrizzleRepository extends ResellerMembershipRepos
     const rows = await withAdmin(this.db, mkAdminCtx('repository:reseller-membership'), (tx) =>
       tx
         .select({
-          id: resellerMemberships.id,
-          userId: resellerMemberships.userId,
-          resellerId: resellerMemberships.resellerId,
-          roleId: resellerMemberships.roleId,
-          isActive: resellerMemberships.isActive,
-          abilities: resellerMemberships.abilities,
-          resellerIdFk: resellers.id,
-          resellerName: resellers.name,
-          resellerSlug: resellers.slug,
-          resellerIsActive: resellers.isActive,
-          resellerStatus: resellers.status,
-          roleIdFk: roles.id,
-          roleAbilities: roles.abilities,
+          id: resellerMembershipsLive.id,
+          userId: resellerMembershipsLive.userId,
+          resellerId: resellerMembershipsLive.resellerId,
+          roleId: resellerMembershipsLive.roleId,
+          isActive: resellerMembershipsLive.isActive,
+          abilities: resellerMembershipsLive.abilities,
+          resellerIdFk: resellersLive.id,
+          resellerName: resellersLive.name,
+          resellerSlug: resellersLive.slug,
+          resellerIsActive: resellersLive.isActive,
+          resellerStatus: resellersLive.status,
+          roleIdFk: rolesLive.id,
+          roleAbilities: rolesLive.abilities,
         })
-        .from(resellerMemberships)
-        .innerJoin(resellers, eq(resellerMemberships.resellerId, resellers.id))
-        .innerJoin(roles, eq(resellerMemberships.roleId, roles.id))
-        .where(and(eq(resellerMemberships.userId, userId), eq(resellerMemberships.isActive, true))),
+        .from(resellerMembershipsLive)
+        .innerJoin(resellersLive, eq(resellerMembershipsLive.resellerId, resellersLive.id))
+        .innerJoin(rolesLive, eq(resellerMembershipsLive.roleId, rolesLive.id))
+        .where(
+          and(
+            eq(resellerMembershipsLive.userId, userId),
+            eq(resellerMembershipsLive.isActive, true),
+          ),
+        ),
     );
 
     return rows.map((row) => ({

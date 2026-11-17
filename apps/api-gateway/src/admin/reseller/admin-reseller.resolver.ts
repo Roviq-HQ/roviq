@@ -88,9 +88,10 @@ export class AdminResellerResolver {
   @CheckAbility({ action: 'suspend', subject: 'Reseller' })
   async adminSuspendReseller(
     @Args('resellerId') resellerId: string,
+    @CurrentUser() user: AuthUser,
     @Args('reason', { nullable: true }) reason?: string,
   ): Promise<boolean> {
-    await this.resellerService.suspendReseller(resellerId, reason);
+    await this.resellerService.suspendReseller(resellerId, user.userId, reason);
     return true;
   }
 
@@ -98,8 +99,11 @@ export class AdminResellerResolver {
     description: 'Unsuspend a previously suspended reseller (reactivates staff login)',
   })
   @CheckAbility({ action: 'update', subject: 'Reseller' })
-  async adminUnsuspendReseller(@Args('resellerId') resellerId: string): Promise<boolean> {
-    await this.resellerService.unsuspendReseller(resellerId);
+  async adminUnsuspendReseller(
+    @Args('resellerId') resellerId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<boolean> {
+    await this.resellerService.unsuspendReseller(resellerId, user.userId);
     return true;
   }
 
@@ -107,8 +111,11 @@ export class AdminResellerResolver {
     description: 'Delete a suspended reseller after 30-day grace period',
   })
   @CheckAbility({ action: 'delete', subject: 'Reseller' })
-  async adminDeleteReseller(@Args('resellerId') resellerId: string): Promise<boolean> {
-    await this.resellerService.deleteReseller(resellerId);
+  async adminDeleteReseller(
+    @Args('resellerId') resellerId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<boolean> {
+    await this.resellerService.deleteReseller(resellerId, user.userId);
     return true;
   }
 }

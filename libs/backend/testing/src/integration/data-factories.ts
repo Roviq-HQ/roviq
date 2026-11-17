@@ -134,6 +134,8 @@ export async function createTestInstitute(
     const [user] = await tx
       .insert(users)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         email: `${username}@test.local`,
         username,
         passwordHash,
@@ -209,6 +211,8 @@ export async function createTestTeacher(db: DrizzleDB, tenantId: string): Promis
     const [user] = await tx
       .insert(users)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         email: `${username}@test.local`,
         username,
         passwordHash: DUMMY_PASSWORD_HASH,
@@ -282,12 +286,19 @@ export async function createTestReseller(db: DrizzleDB): Promise<TestReseller> {
   return withAdmin(db, mkAdminCtx('test:data-factories'), async (tx) => {
     const [reseller] = await tx
       .insert(resellers)
-      .values({ name: `Test Reseller ${slugSuffix}`, slug })
+      .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        name: `Test Reseller ${slugSuffix}`,
+        slug,
+      })
       .returning({ id: resellers.id });
 
     const [user] = await tx
       .insert(users)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         email: `${username}@test.local`,
         username,
         passwordHash: DUMMY_PASSWORD_HASH,
@@ -311,6 +322,8 @@ export async function createTestReseller(db: DrizzleDB): Promise<TestReseller> {
     const [membership] = await tx
       .insert(resellerMemberships)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         userId: user.id,
         roleId: role.id,
         resellerId: reseller.id,

@@ -57,38 +57,6 @@ export const tenantPolicies = (tableName: string) => [
   }),
 ];
 
-/** RLS policies for tenant-scoped tables WITHOUT deletedAt (e.g., refresh_tokens) */
-export const tenantPoliciesSimple = (tableName: string) => [
-  pgPolicy(`${tableName}_app_select`, {
-    for: 'select',
-    to: roviqApp,
-    using: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-  }),
-  pgPolicy(`${tableName}_app_insert`, {
-    for: 'insert',
-    to: roviqApp,
-    withCheck: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-  }),
-  pgPolicy(`${tableName}_app_update`, {
-    for: 'update',
-    to: roviqApp,
-    using: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-    withCheck: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-  }),
-  pgPolicy(`${tableName}_app_delete`, {
-    for: 'delete',
-    to: roviqApp,
-    using: sql`false`,
-  }),
-  resellerTenantRead(tableName),
-  pgPolicy(`${tableName}_admin_all`, {
-    for: 'all',
-    to: roviqAdmin,
-    using: sql`true`,
-    withCheck: sql`true`,
-  }),
-];
-
 /** RLS policies for immutable/append-only entity tables (no deletedAt, no update) */
 export const immutableEntityPolicies = (tableName: string) => [
   pgPolicy(`${tableName}_app_select`, {

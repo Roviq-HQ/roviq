@@ -1,16 +1,8 @@
 import { sql } from 'drizzle-orm';
-import {
-  foreignKey,
-  index,
-  integer,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { foreignKey, index, integer, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import { tenantColumns } from '../common/columns';
 import { qualificationType } from '../common/enums';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 import { staffProfiles } from './staff-profiles';
 
@@ -27,7 +19,6 @@ export const staffQualifications = pgTable(
     staffProfileId: uuid('staff_profile_id')
       .notNull()
       .references(() => staffProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    tenantId: uuid('tenant_id').notNull(),
 
     /**
      * Qualification category:
@@ -47,7 +38,7 @@ export const staffQualifications = pgTable(
     /** S3/MinIO URL of the uploaded certificate scan */
     certificateUrl: text('certificate_url'),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -59,6 +50,6 @@ export const staffQualifications = pgTable(
 
     index('idx_staff_qualifications_profile').on(table.staffProfileId),
 
-    ...tenantPoliciesSimple('staff_qualifications'),
+    ...tenantPolicies('staff_qualifications'),
   ],
 ).enableRLS();

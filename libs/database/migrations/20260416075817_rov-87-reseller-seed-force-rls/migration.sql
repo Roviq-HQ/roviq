@@ -19,16 +19,31 @@
 --    seed ID defined in scripts/seed-ids.ts (synthetic-v7 — deterministic
 --    suffix, zero-timestamp prefix). It is also the column default for
 --    institutes.reseller_id.
-INSERT INTO resellers (id, name, slug, is_system, tier, status)
-VALUES (
-  '00000000-0000-7000-a000-000000000011',
-  'Roviq Direct',
-  'roviq-direct',
-  true,
-  'FULL_MANAGEMENT',
-  'ACTIVE'
-)
-ON CONFLICT (id) DO NOTHING;
+--    This file runs on two schemas: `drizzle-kit migrate` applies it before
+--    the audit columns exist, `db:reset` applies it after `push` created them
+--    as NOT NULL. plpgsql plans each branch only when it runs.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'resellers' AND column_name = 'created_by'
+  ) THEN
+    INSERT INTO resellers (id, name, slug, is_system, tier, status, created_by, updated_by)
+    VALUES (
+      '00000000-0000-7000-a000-000000000011', 'Roviq Direct', 'roviq-direct', true,
+      'FULL_MANAGEMENT', 'ACTIVE',
+      '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000'
+    )
+    ON CONFLICT (id) DO NOTHING;
+  ELSE
+    INSERT INTO resellers (id, name, slug, is_system, tier, status)
+    VALUES (
+      '00000000-0000-7000-a000-000000000011', 'Roviq Direct', 'roviq-direct', true,
+      'FULL_MANAGEMENT', 'ACTIVE'
+    )
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $$;
 --> statement-breakpoint
 
 -- 2. FORCE RLS on reseller tables.

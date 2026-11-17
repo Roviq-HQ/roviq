@@ -64,6 +64,8 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
     .insert(users)
     .values(
       newGuardians.map((g) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         id: g.userId,
         username: g.username,
         email: g.email,
@@ -102,6 +104,8 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
     .insert(authProviders)
     .values(
       newGuardians.map((g) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         userId: g.userId,
         provider: 'password',
         providerUserId: g.userId,
@@ -128,6 +132,8 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
     .insert(studentGuardianLinks)
     .values([
       {
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         id: SEED_IDS.LINK_G1_S2,
         tenantId: instituteId,
         studentProfileId: SEED_IDS.STUDENT_PROFILE_2,
@@ -139,6 +145,8 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
         livesWith: true,
       },
       {
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         id: SEED_IDS.LINK_G2_S2,
         tenantId: instituteId,
         studentProfileId: SEED_IDS.STUDENT_PROFILE_2,
@@ -150,6 +158,8 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
         livesWith: true,
       },
       {
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         id: SEED_IDS.LINK_G2_S3,
         tenantId: instituteId,
         studentProfileId: SEED_IDS.STUDENT_PROFILE_3,
@@ -161,6 +171,8 @@ export async function seedE2eGuardians(tx: DrizzleDB, instituteId: string): Prom
         livesWith: true,
       },
       {
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         id: SEED_IDS.LINK_G3_S4,
         tenantId: instituteId,
         studentProfileId: SEED_IDS.STUDENT_PROFILE_4,

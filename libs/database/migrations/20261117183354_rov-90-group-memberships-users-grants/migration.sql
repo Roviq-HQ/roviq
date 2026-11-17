@@ -4,10 +4,10 @@ ALTER TABLE group_memberships FORCE ROW LEVEL SECURITY;
 
 -- group_memberships is roviq_admin-only. The blanket `GRANT ... ON ALL TABLES`
 -- in db-reset.ts / init-db.sh gave roviq_app full DML and roviq_reseller SELECT.
-REVOKE ALL ON group_memberships FROM roviq_app;
+REVOKE ALL ON group_memberships, group_memberships_live FROM roviq_app;
 --> statement-breakpoint
 
-REVOKE ALL ON group_memberships FROM roviq_reseller;
+REVOKE ALL ON group_memberships, group_memberships_live FROM roviq_reseller;
 --> statement-breakpoint
 
 -- users: every role reads, only roviq_admin writes. RLS already denied
