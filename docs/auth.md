@@ -314,6 +314,14 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 | institute | student | read timetable/subjects, read own attendance |
 | institute | parent | read timetable/attendance/students |
 
+### Platform and reseller system roles
+
+- Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
+- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed only maintains the Roviq Direct copies (fixed seed ids). Migration `rov-91-reseller-role-backfill` gives resellers that predate this their own copies and moves any `reseller_memberships` row that still points at another reseller's role onto them.
+- `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
+- Database guards: `chk_role_scope` rejects unknown scopes and wrong tenant/reseller combinations; role names are unique per platform (`roles_platform_name_key`) and per reseller (`roles_reseller_id_name_key`) among live rows. `refresh_tokens.membership_scope` and `impersonation_sessions.impersonator_scope` accept only `platform`, `reseller`, `institute`.
+- `auth_events`: `roviq_app` and `roviq_reseller` hold the INSERT table privilege only; `roviq_admin` reads.
+
 
 ## Account language
 

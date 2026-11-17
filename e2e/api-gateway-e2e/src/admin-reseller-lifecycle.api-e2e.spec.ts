@@ -62,7 +62,21 @@ async function insertTestReseller(
 async function deleteTestReseller(pool: pg.Pool, id: string): Promise<void> {
   // Remove any dependent rows first — test reseller should have none, but defensive.
   await pool.query('DELETE FROM reseller_memberships WHERE reseller_id = $1', [id]);
+  await pool.query('DELETE FROM roles WHERE reseller_id = $1', [id]);
   await pool.query('DELETE FROM resellers WHERE id = $1', [id]);
+}
+
+async function getResellerRoles(
+  pool: pg.Pool,
+  resellerId: string,
+): Promise<{ id: string; name: string }[]> {
+  const res = await pool.query<{ id: string; name: string }>(
+    `SELECT id, name->>'en' AS name FROM roles
+     WHERE reseller_id = $1 AND scope = 'reseller' AND deleted_at IS NULL
+     ORDER BY name->>'en'`,
+    [resellerId],
+  );
+  return res.rows;
 }
 
 async function getResellerStatus(
@@ -322,10 +336,7 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
     let createdId: string | null = null;
 
     afterAll(async () => {
-      if (createdId) {
-        await pool.query('DELETE FROM reseller_memberships WHERE reseller_id = $1', [createdId]);
-        await pool.query('DELETE FROM resellers WHERE id = $1', [createdId]);
-      }
+      if (createdId) await deleteTestReseller(pool, createdId);
     });
 
     it('creates a reseller + initial admin, returns the new row with tier=FULL_MANAGEMENT', async () => {
@@ -350,6 +361,24 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
       expect(res.data.adminCreateReseller.status).toBe('ACTIVE');
       expect(res.data.adminCreateReseller.isSystem).toBe(false);
       createdId = res.data.adminCreateReseller.id;
+    });
+
+    it('gives the new reseller its own system roles and puts the initial admin on its full-admin copy', async () => {
+      assert(createdId);
+      const ownRoles = await getResellerRoles(pool, createdId);
+      expect(ownRoles.map((r) => r.name)).toEqual([
+        'reseller_full_admin',
+        'reseller_support_admin',
+        'reseller_viewer',
+      ]);
+
+      const memberships = await pool.query<{ role_id: string }>(
+        'SELECT role_id FROM reseller_memberships WHERE reseller_id = $1',
+        [createdId],
+      );
+      const fullAdmin = ownRoles.find((r) => r.name === 'reseller_full_admin');
+      assert(fullAdmin);
+      expect(memberships.rows).toEqual([{ role_id: fullAdmin.id }]);
     });
 
     it('rejects a duplicate slug with SLUG_DUPLICATE', async () => {
@@ -425,10 +454,7 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
 
     afterAll(async () => {
       for (const id of [resellerId1, resellerId2]) {
-        if (id) {
-          await pool.query('DELETE FROM reseller_memberships WHERE reseller_id = $1', [id]);
-          await pool.query('DELETE FROM resellers WHERE id = $1', [id]);
-        }
+        if (id) await deleteTestReseller(pool, id);
       }
       // Also remove the user created by the first mutation (unique email, no FK deps).
       await pool.query('DELETE FROM users WHERE email = $1', [sharedEmail]);
@@ -524,6 +550,53 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
         TEST_RESELLER_ID,
       ]);
       expect(after.rows[0].tier).toBe('READ_ONLY');
+    });
+
+    it('moves the reseller staff onto its own copy of the new tier role', async () => {
+      const suffix = Date.now().toString(36);
+      const created = await gql(
+        E2eAdminCreateResellerDocument,
+        {
+          input: {
+            name: `E2E Tier ${suffix}`,
+            slug: `e2e-tier-${suffix}`,
+            tier: 'FULL_MANAGEMENT',
+            initialAdminEmail: `e2e-tier-${suffix}@roviq.test`,
+          },
+        },
+        adminToken,
+      );
+      expect(created.errors).toBeUndefined();
+      assert(created.data);
+      const resellerId = created.data.adminCreateReseller.id;
+
+      try {
+        const res = await gql(
+          E2eAdminChangeResellerTierDocument,
+          { id: resellerId, tier: 'READ_ONLY' },
+          adminToken,
+        );
+        expect(res.errors).toBeUndefined();
+
+        const viewer = (await getResellerRoles(pool, resellerId)).find(
+          (r) => r.name === 'reseller_viewer',
+        );
+        assert(viewer);
+        const memberships = await pool.query<{ role_id: string }>(
+          'SELECT role_id FROM reseller_memberships WHERE reseller_id = $1',
+          [resellerId],
+        );
+        expect(memberships.rows).toEqual([{ role_id: viewer.id }]);
+      } finally {
+        const staff = await pool.query<{ user_id: string }>(
+          'SELECT user_id FROM reseller_memberships WHERE reseller_id = $1',
+          [resellerId],
+        );
+        await deleteTestReseller(pool, resellerId);
+        for (const { user_id } of staff.rows) {
+          await pool.query('DELETE FROM users WHERE id = $1', [user_id]);
+        }
+      }
     });
 
     it('rejects tier change when reseller is suspended', async () => {

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, inet, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, index, inet, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
 import { users } from './users';
@@ -48,6 +48,10 @@ export const refreshTokens = pgTable(
     ...entityColumns,
   },
   (table) => [
+    check(
+      'chk_refresh_token_membership_scope',
+      sql`${table.membershipScope} IN ('platform', 'reseller', 'institute')`,
+    ),
     index('refresh_tokens_tenant_id_idx').using('btree', table.tenantId.asc().nullsLast()),
     index('refresh_tokens_token_hash_idx').using('btree', table.tokenHash.asc().nullsLast()),
     ...tenantPolicies('refresh_tokens'),

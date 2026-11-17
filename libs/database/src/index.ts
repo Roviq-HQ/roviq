@@ -4,6 +4,12 @@ export { DatabaseModule } from './database.module';
 export { escapeLikePattern, i18nDisplay, i18nLocaleEquals, i18nNameSearch } from './i18n';
 export { RoviqDrizzleLogger } from './logger';
 export { createDrizzleDb, DRIZZLE_DB, type DrizzleDB } from './providers';
+export {
+  provisionResellerSystemRoles,
+  RESELLER_SYSTEM_ROLE_ABILITIES,
+  RESELLER_SYSTEM_ROLE_NAMES,
+  type ResellerSystemRoleName,
+} from './reseller-system-roles';
 export * from './schema';
 export {
   entityPolicies,

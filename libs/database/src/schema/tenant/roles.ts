@@ -52,13 +52,14 @@ export const roles = pgTable(
     })
       .onDelete('restrict')
       .onUpdate('cascade'),
-    // Scope constraint: platform = no tenant/reseller, reseller = reseller only, institute = tenant only
+    // ELSE FALSE: a CASE with no match yields NULL, which a CHECK accepts
     check(
       'chk_role_scope',
       sql`CASE ${table.scope}
         WHEN 'platform'  THEN ${table.tenantId} IS NULL AND ${table.resellerId} IS NULL
         WHEN 'reseller'  THEN ${table.tenantId} IS NULL AND ${table.resellerId} IS NOT NULL
         WHEN 'institute' THEN ${table.tenantId} IS NOT NULL AND ${table.resellerId} IS NULL
+        ELSE FALSE
       END`,
     ),
     uniqueIndex('roles_tenant_id_name_key').using(
@@ -66,6 +67,13 @@ export const roles = pgTable(
       table.tenantId.asc().nullsLast(),
       table.name.asc().nullsLast(),
     ),
+    // roles_tenant_id_name_key cannot cover these: tenant_id is NULL and NULLs are distinct
+    uniqueIndex('roles_platform_name_key')
+      .on(table.name)
+      .where(sql`${table.scope} = 'platform' AND ${table.deletedAt} IS NULL`),
+    uniqueIndex('roles_reseller_id_name_key')
+      .on(table.resellerId, table.name)
+      .where(sql`${table.scope} = 'reseller' AND ${table.deletedAt} IS NULL`),
     index('roles_tenant_id_idx').using('btree', table.tenantId.asc().nullsLast()),
     index('roles_scope_idx').on(table.scope),
     index('roles_reseller_id_idx').on(table.resellerId),

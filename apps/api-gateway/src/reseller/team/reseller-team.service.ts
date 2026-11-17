@@ -7,6 +7,7 @@ import {
   mkResellerCtx,
   resellerMemberships,
   resellerMembershipsLive,
+  rolesLive,
   userProfilesLive,
   usersLive,
   withAdmin,
@@ -133,35 +134,20 @@ export class ResellerTeamService {
     actorId: string,
     input: ResellerInviteTeamMemberInput,
   ): Promise<{ membershipId: string }> {
-    // Guard: the supplied roleId must belong to this reseller (not another tenant's role)
-    const [roleRow] = await withAdmin(this.db, mkAdminCtx('service:reseller-team'), (tx) =>
+    const [role] = await withAdmin(this.db, mkAdminCtx('service:reseller-team'), (tx) =>
       tx
-        .select({ id: resellerMembershipsLive.roleId })
-        .from(resellerMembershipsLive)
+        .select({ id: rolesLive.id })
+        .from(rolesLive)
         .where(
           and(
-            eq(resellerMembershipsLive.resellerId, resellerId),
-            eq(resellerMembershipsLive.roleId, input.roleId),
+            eq(rolesLive.id, input.roleId),
+            eq(rolesLive.scope, 'reseller'),
+            eq(rolesLive.resellerId, resellerId),
           ),
         )
         .limit(1),
     );
-
-    // If there are no existing memberships for this reseller yet, we allow the
-    // first invite without the role-belongs-to-reseller check. For subsequent
-    // invites the role must already be in use by this reseller.
-    const membershipCount = await withReseller(
-      this.db,
-      mkResellerCtx(resellerId, 'service:reseller-team'),
-      (tx) =>
-        tx
-          .select({ value: count() })
-          .from(resellerMembershipsLive)
-          .where(eq(resellerMembershipsLive.resellerId, resellerId))
-          .then((r) => r[0]?.value ?? 0),
-    );
-
-    if (membershipCount > 0 && !roleRow) {
+    if (!role) {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
         'Supplied roleId does not belong to this reseller',
