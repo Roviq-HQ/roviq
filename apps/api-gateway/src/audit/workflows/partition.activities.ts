@@ -2,7 +2,6 @@ import { Logger } from '@nestjs/common';
 import { type DrizzleDB, mkAdminCtx, withAdmin } from '@roviq/database';
 import { sql } from 'drizzle-orm';
 import {
-  getMonthAfterNextStart,
   getNextMonthStart,
   getPartitionName,
   getRetentionCutoff,
@@ -32,24 +31,17 @@ export function createPartitionActivities(db: DrizzleDB): PartitionActivities {
   return {
     /**
      * Activity 1: Create next month's partition.
-     * Idempotent — IF NOT EXISTS prevents failures on re-run.
-     * Runs via withAdmin since partition DDL requires roviq_admin.
+     * Idempotent, and goes through ensure_monthly_partition so the partition
+     * is sealed against direct access — roviq_admin cannot run the DDL itself.
      */
     async createNextMonthPartition(): Promise<string> {
-      const now = new Date();
-      const nextMonth = getNextMonthStart(now);
-      const monthAfter = getMonthAfterNextStart(now);
+      const nextMonth = getNextMonthStart(new Date());
       const partitionName = getPartitionName(nextMonth);
 
       return withAdmin(db, mkAdminCtx('workflow:partition.activities'), async (tx) => {
         await tx.execute(
-          sql.raw(`
-            CREATE TABLE IF NOT EXISTS ${partitionName}
-            PARTITION OF audit_logs
-            FOR VALUES FROM ('${nextMonth.toISOString()}') TO ('${monthAfter.toISOString()}')
-          `),
+          sql`SELECT ensure_monthly_partition('audit_logs'::regclass, ${nextMonth.toISOString()}::timestamptz)`,
         );
-
         logger.log(`Partition ${partitionName} created (or already exists)`);
         return partitionName;
       });
@@ -82,7 +74,7 @@ export function createPartitionActivities(db: DrizzleDB): PartitionActivities {
 
           if (partitionEnd <= cutoff) {
             await tx.execute(
-              sql.raw(`ALTER TABLE audit_logs DETACH PARTITION ${row.partition_name}`),
+              sql`SELECT detach_monthly_partition('audit_logs'::regclass, ${row.partition_name})`,
             );
             detached.push(row.partition_name);
             logger.log(

@@ -194,8 +194,8 @@ async function applyRoleGrants(pool: Pool): Promise<void> {
   `);
 }
 
-// db:push only ENABLEs RLS — never FORCEs it. Skip partition children:
-// FORCE on parent propagates automatically.
+// db:push only ENABLEs RLS — never FORCEs it. Partition children are sealed
+// separately by lock_down_partitions() (via ensure_monthly_partition).
 async function forceRlsOnAllTables(pool: Pool): Promise<void> {
   const { rows } = await pool.query<{ tablename: string }>(`
     SELECT c.relname AS tablename

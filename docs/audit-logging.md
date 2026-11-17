@@ -47,6 +47,12 @@ Service side-effects → AuditEmitter → NATS JetStream (AUDIT.log)
 | `roviq_admin` | All | All | All | All |
 | `roviq_pooler` | **Denied** (NOINHERIT) | — | — | — |
 
+### Partition children are sealed
+
+Policies and GRANTs on `audit_logs` only cover access through the parent. Each `audit_logs_YYYY_MM` child is its own relation, so every child carries **no** privileges for `roviq_app` / `roviq_reseller` / `roviq_admin` and has FORCE RLS with no policies — direct `SELECT/INSERT/UPDATE/DELETE` on a child is `permission denied` for all runtime roles. This also holds after a partition is detached.
+
+`lock_down_partitions(parent)` applies the seal. It runs inside `ensure_monthly_partition()` on every call (boot, daily timer, `db-reset`, Temporal), so new partitions are born sealed and any sibling reopened by a later blanket `GRANT ... ON ALL TABLES` is re-sealed within a day. Always query the parent; never name a partition in application SQL.
+
 ## Partition Management (Temporal)
 
 Monthly partitions created via Temporal cron workflow:
@@ -55,6 +61,7 @@ Monthly partitions created via Temporal cron workflow:
 - **Task queue**: `audit-maintenance`
 - **Workflow**: `auditPartitionManagement`
 - **Activities**: `createNextMonthPartition` (idempotent), `enforceRetention` (detach, not drop), `verifyPartitionHealth`
+- **DDL path**: activities run as `roviq_admin`, which owns no tables, so they call the `SECURITY DEFINER` functions `ensure_monthly_partition()` and `detach_monthly_partition()` rather than issuing partition DDL themselves
 - **Retention**: 1 year default (per-tenant tiers deferred to billing)
 
 ### Running the worker
