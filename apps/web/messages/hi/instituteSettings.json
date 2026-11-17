@@ -187,8 +187,8 @@
     "attendanceType": "उपस्थिति प्रकार",
     "attendanceTypeDescription": "उपस्थिति कैसे दर्ज की जाती है — प्रतिदिन एक बार या प्रति लेक्चर/पीरियड।",
     "attendanceOptions": {
-      "daily": "दैनिक",
-      "lecture_wise": "लेक्चर-वार"
+      "DAILY": "दैनिक",
+      "LECTURE_WISE": "लेक्चर-वार"
     },
     "operatingHours": "कार्य समय",
     "operatingHoursDescription": "संस्थान के खुलने और बंद होने का समय।",

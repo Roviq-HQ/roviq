@@ -187,8 +187,8 @@
     "attendanceType": "Attendance Type",
     "attendanceTypeDescription": "How attendance is recorded — once per day or per lecture/period.",
     "attendanceOptions": {
-      "daily": "Daily",
-      "lecture_wise": "Lecture-wise"
+      "DAILY": "Daily",
+      "LECTURE_WISE": "Lecture-wise"
     },
     "operatingHours": "Operating Hours",
     "operatingHoursDescription": "Institute opening and closing times.",
