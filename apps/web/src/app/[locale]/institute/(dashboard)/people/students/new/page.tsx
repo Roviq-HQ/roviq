@@ -8,6 +8,7 @@ import {
   emptyStringToUndefined,
   phoneSchema,
   useI18nField,
+  useInstituteLocales,
   useRouter,
   zodValidator,
 } from '@roviq/i18n';
@@ -41,10 +42,10 @@ import {
 } from '../use-students';
 
 const { instituteStudents } = testIds;
-function buildSchema(t: ReturnType<typeof useTranslations>) {
+function buildSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
   return z.object({
-    firstName: buildI18nTextSchema(t('new.errors.firstNameRequired')),
-    lastName: buildI18nTextSchema(t('new.errors.lastNameRequired')).optional(),
+    firstName: buildI18nTextSchema(t('new.errors.firstNameRequired'), defaultLocale),
+    lastName: buildI18nTextSchema(t('new.errors.lastNameRequired'), defaultLocale).optional(),
     gender: emptyStringToUndefined(z.enum(GENDER_VALUES).optional()),
     dateOfBirth: emptyStringToUndefined(dateSchema(t('new.errors.dateInvalid')).optional()),
     phone: emptyStringToUndefined(phoneSchema(t('new.errors.phoneInvalid')).optional()),
@@ -104,7 +105,8 @@ function StudentForm({ years }: { years: readonly AcademicYearNode[] }) {
   const router = useRouter();
   const [createStudent] = useCreateStudent();
 
-  const schema = React.useMemo(() => buildSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildSchema(t, defaultLocale), [t, defaultLocale]);
   const activeYear = years.find((y) => y.isActive);
   const defaultValues = React.useMemo<StudentFormValues>(
     () => ({

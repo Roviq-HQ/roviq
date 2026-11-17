@@ -1,7 +1,7 @@
 'use client';
 
 import { extractGraphQLError } from '@roviq/graphql';
-import { zodValidator } from '@roviq/i18n';
+import { useInstituteLocales, zodValidator } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -35,7 +35,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { AddressForm } from './components/address-form';
 import { ContactBuilder } from './components/contact-builder';
-import { type InstituteInfoFormValues, instituteInfoSchema } from './schemas';
+import { buildInstituteInfoSchema, type InstituteInfoFormValues } from './schemas';
 import type { MyInstituteData } from './types';
 import { useUpdateInstituteInfo } from './use-institute-settings';
 
@@ -89,6 +89,11 @@ const DEFAULT_VALUES: InstituteInfoFormValues = {
 };
 
 export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoTabProps) {
+  const { defaultLocale } = useInstituteLocales();
+  const instituteInfoSchema = React.useMemo(
+    () => buildInstituteInfoSchema(defaultLocale),
+    [defaultLocale],
+  );
   const t = useTranslations('instituteSettings');
   const ti = useTranslations('instituteSettings.info');
   const [concurrentError, setConcurrentError] = React.useState(false);

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   jsonb,
   pgPolicy,
@@ -76,7 +77,9 @@ export const institutes = pgTable(
     logoUrl: text('logo_url'),
     timezone: text().default('Asia/Kolkata').notNull(),
     currency: text().default('INR').notNull(),
-    settings: jsonb().default({}).notNull(),
+    supportedLocales: jsonb('supported_locales').$type<string[]>().default(['en']).notNull(),
+    defaultLocale: text('default_locale').default('en').notNull(),
+    settings: jsonb().$type<Record<string, unknown>>().default({}).notNull(),
     /** Whether this is a demo institute — sample data seeded, notifications disabled */
     isDemo: boolean('is_demo').default(false).notNull(),
     /** When true, cross-scope impersonation (platform/reseller -> this institute) requires OTP from the institute admin. */
@@ -92,6 +95,17 @@ export const institutes = pgTable(
     ...entityColumns,
   },
   (table) => [
+    check(
+      'institutes_locales_valid',
+      sql`jsonb_typeof(${table.supportedLocales}) = 'array'
+      AND ${table.supportedLocales} @> '["en"]'::jsonb
+      AND ${table.supportedLocales} ? ${table.defaultLocale}`,
+    ),
+    index('idx_institutes_name_gin').using('gin', table.name),
+    index('idx_institutes_name_trgm').using(
+      'gin',
+      sql`i18n_text_to_string(${table.name}) gin_trgm_ops`,
+    ),
     uniqueIndex('institutes_slug_key').using('btree', table.slug.asc().nullsLast()),
     index('institutes_group_id_idx').on(table.groupId),
     uniqueIndex('institutes_code_key')

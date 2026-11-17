@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  i18nNameSearch,
   mkInstituteCtx,
   roles,
   rolesLive,
@@ -42,6 +43,18 @@ export class InstituteRoleDrizzleRepository extends InstituteRoleRepository {
         .where(eq(rolesLive.scope, 'institute'))
         .orderBy(asc(rolesLive.name)) as Promise<RoleRecord[]>;
     });
+  }
+
+  async searchByName(query: string): Promise<RoleRecord[]> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:role'), async (tx) =>
+      tx
+        .select(liveColumns)
+        .from(rolesLive)
+        .where(and(eq(rolesLive.scope, 'institute'), i18nNameSearch(rolesLive.name, query)))
+        .orderBy(asc(rolesLive.id))
+        .limit(20),
+    );
   }
 
   async findById(id: string): Promise<RoleRecord | null> {

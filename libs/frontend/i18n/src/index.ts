@@ -10,10 +10,12 @@ export {
 export { useDateLocale, useFormatDate, useFormatNumber } from './lib/formatting';
 export type { I18nText } from './lib/i18n-text-schema';
 export {
+  buildI18nTextOptionalSchema,
   buildI18nTextSchema,
   i18nTextOptionalSchema,
   i18nTextSchema,
 } from './lib/i18n-text-schema';
+export { InstituteLocalesProvider, useInstituteLocales } from './lib/institute-locales';
 // NOTE: `intlMiddleware` / `intlMatcherConfig` intentionally NOT re-exported from
 // this barrel. They pull in `next-intl/middleware` → `next/server`, which is a
 // server-only runtime and breaks both happy-dom unit tests and client bundles.

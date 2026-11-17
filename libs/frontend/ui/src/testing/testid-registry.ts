@@ -11,6 +11,16 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  instituteLocales: {
+    loading: 'institute-locales-loading',
+    error: 'institute-locales-error',
+    retry: 'institute-locales-retry',
+    language: (locale: string) => `institute-language-${locale}`,
+    defaultLanguage: 'institute-default-language',
+    defaultOption: (locale: string) => `institute-default-option-${locale}`,
+    save: 'institute-locales-save',
+  },
+
   accountLocale: {
     card: 'account-language-card',
     select: 'account-language-select',
@@ -49,6 +59,7 @@ export const testIds = {
     themeOption: (mode: 'system' | 'light' | 'dark') => `theme-${mode}`,
     instituteSwitcher: 'institute-switcher',
     instituteSwitcherMenu: 'institute-switcher-menu',
+    instituteOption: (id: string) => `institute-switch-option-${id}`,
     // User menu (topbar avatar dropdown)
     userMenuTrigger: 'user-menu-trigger',
     userMenuProfile: 'user-menu-profile',
@@ -697,6 +708,7 @@ export const testIds = {
 
   // ── Institute: holiday ────────────────────────────────────────────────
   instituteHoliday: {
+    newName: (locale: string) => `holiday-new-name-${locale}`,
     title: 'holiday-title',
     addBtn: 'holiday-add-btn',
     viewToggleCalendar: 'holiday-view-toggle-calendar',

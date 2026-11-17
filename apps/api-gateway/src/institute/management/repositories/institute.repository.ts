@@ -1,3 +1,4 @@
+import type { InstituteLocaleSettings } from '@roviq/common-types';
 import type { InstituteStatus } from '@roviq/database';
 import type {
   CreateInstituteData,
@@ -11,6 +12,12 @@ import type {
 } from './types';
 
 export abstract class InstituteRepository {
+  abstract updateLocales(
+    id: string,
+    settings: InstituteLocaleSettings,
+    version: number,
+  ): Promise<InstituteRecord>;
+  abstract searchByName(query: string): Promise<InstituteRecord[]>;
   abstract findById(id: string): Promise<InstituteRecord | null>;
   abstract findByIdIncludeDeleted(id: string): Promise<InstituteRecord | null>;
   abstract search(

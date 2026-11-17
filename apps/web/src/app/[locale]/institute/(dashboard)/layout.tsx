@@ -34,9 +34,10 @@ import {
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
+import { CurrentInstituteLocalesProvider } from './institute-locales-provider';
 import { TenantThemeProvider } from './tenant-theme-provider';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tGroups = useTranslations('groups');
   const tCommon = useTranslations('common');
@@ -436,6 +437,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <AdminLayout config={config}>{children}</AdminLayout>
         </TenantThemeProvider>
       </AbilityProvider>
+    </ProtectedRoute>
+  );
+}
+
+export default function InstituteDashboard({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <CurrentInstituteLocalesProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </CurrentInstituteLocalesProvider>
     </ProtectedRoute>
   );
 }

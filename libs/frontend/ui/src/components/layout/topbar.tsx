@@ -44,7 +44,11 @@ function InstituteSwitcherInline({ config }: { config: InstituteSwitcherConfig }
         data-testid={layout.instituteSwitcherMenu}
       >
         {config.memberships.map((m) => (
-          <DropdownMenuItem key={m.tenantId} onClick={() => config.onSwitch(m.tenantId)}>
+          <DropdownMenuItem
+            key={m.tenantId}
+            data-testid={layout.instituteOption(m.tenantId)}
+            onClick={() => config.onSwitch(m.tenantId)}
+          >
             <div className="flex w-full items-center gap-2">
               {m.instituteLogoUrl ? (
                 <Image

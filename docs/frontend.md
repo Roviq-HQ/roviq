@@ -64,6 +64,7 @@ Internationalization powered by next-intl and date-fns:
 - `useFormatDate()` — date formatting via date-fns with locale-aware output
 - `useFormatNumber()` — number/currency/percent formatting via `Intl.NumberFormat`
 - `LocaleSwitcher` — language dropdown component (in `@roviq/ui`)
+- `InstituteLocalesProvider` / `useInstituteLocales()` — institute content languages, separate from interface locales; `I18nField` renders enabled languages and `useI18nField()` falls back through the institute default. Required text needs English plus that default. See [content language configuration](plans/per-tenant-locale-config.md).
 - RTL-ready: `rtlLocales` config array, `dir` attribute on `<html>`
 
 **Translation file structure** (per app):

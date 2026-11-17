@@ -172,6 +172,8 @@ function makeInstituteRecord(overrides: Partial<InstituteRecord> = {}): Institut
     timezone: 'Asia/Kolkata',
     currency: 'INR',
     settings: {},
+    supportedLocales: ['en'],
+    defaultLocale: 'en',
     status: 'ACTIVE',
     resellerId: RESELLER_ID,
     groupId: null,

@@ -17,6 +17,8 @@ export const ErrorCode = {
   SETUP_NOT_COMPLETE: 'SETUP_NOT_COMPLETE',
   /** Status transition not permitted by the domain state machine */
   INVALID_STATE_TRANSITION: 'INVALID_STATE_TRANSITION',
+  /** Invalid institute language configuration */
+  INVALID_LOCALE_SETTINGS: 'INVALID_LOCALE_SETTINGS',
   /** Reseller row does not exist (404 — wrong id or already hard-deleted) */
   RESELLER_NOT_FOUND: 'RESELLER_NOT_FOUND',
   /** Referenced reseller exists but is in an invalid state (inactive, deleted, suspended) */
@@ -144,6 +146,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INSTITUTE_EMAIL_DUPLICATE: HttpStatus.CONFLICT,
   SETUP_NOT_COMPLETE: HttpStatus.UNPROCESSABLE_ENTITY,
   INVALID_STATE_TRANSITION: HttpStatus.UNPROCESSABLE_ENTITY,
+  INVALID_LOCALE_SETTINGS: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_FOUND: HttpStatus.NOT_FOUND,
   RESELLER_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   SYSTEM_RESELLER_PROTECTED: HttpStatus.UNPROCESSABLE_ENTITY,

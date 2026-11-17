@@ -59,6 +59,11 @@ export const sections = pgTable(
     ...tenantColumns,
   },
   (table) => [
+    index('idx_sections_name_gin').using('gin', table.name),
+    index('idx_sections_name_trgm').using(
+      'gin',
+      sql`i18n_text_to_string(${table.name}) gin_trgm_ops`,
+    ),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

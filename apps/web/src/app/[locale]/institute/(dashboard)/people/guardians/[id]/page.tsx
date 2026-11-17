@@ -11,6 +11,7 @@ import {
   emptyStringToUndefined,
   useFormatDate,
   useI18nField,
+  useInstituteLocales,
   useRouter,
   zodValidator,
 } from '@roviq/i18n';
@@ -119,9 +120,9 @@ const DPDP_CONSENT_PURPOSES = [
   'cctv_monitoring',
 ] as const;
 
-function buildGuardianProfileSchema(t: ReturnType<typeof useTranslations>) {
-  const firstNameSchema = buildI18nTextSchema(t('new.errors.firstNameRequired'));
-  const lastNameSchema = buildI18nTextSchema(t('new.errors.lastNameRequired'));
+function buildGuardianProfileSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
+  const firstNameSchema = buildI18nTextSchema(t('new.errors.firstNameRequired'), defaultLocale);
+  const lastNameSchema = buildI18nTextSchema(t('new.errors.lastNameRequired'), defaultLocale);
   return z.object({
     firstName: firstNameSchema,
     lastName: lastNameSchema.optional(),
@@ -345,7 +346,11 @@ function GuardianProfileTab({
 }) {
   const t = useTranslations('guardians');
   const [updateGuardian, { loading: saving }] = useUpdateGuardian();
-  const schema = React.useMemo(() => buildGuardianProfileSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(
+    () => buildGuardianProfileSchema(t, defaultLocale),
+    [t, defaultLocale],
+  );
 
   // Normalise server-returned i18n text into the shape TanStack's
   // `form.Field name="firstName.hi"` expects — every locale key must be a

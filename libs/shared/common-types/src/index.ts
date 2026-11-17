@@ -5,6 +5,7 @@ export * from './lib/date-range';
 export * from './lib/enums';
 export * from './lib/error-codes';
 export * from './lib/format-graphql-error';
+export * from './lib/institute-locales';
 export * from './lib/nav-slugs';
 export * from './lib/policy/password-policy';
 export * from './lib/schemas/address';

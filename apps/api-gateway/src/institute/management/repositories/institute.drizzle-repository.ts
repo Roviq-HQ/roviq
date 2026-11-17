@@ -1,9 +1,11 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode, type InstituteLocaleSettings } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  escapeLikePattern,
   type InstituteStatus,
+  i18nNameSearch,
   instituteAffiliationsLive,
   instituteBranding,
   instituteBrandingLive,
@@ -66,37 +68,14 @@ function buildStatusCondition(
   return null;
 }
 
-function buildFullTextSearchCondition(searchTerm: string): SQL | undefined {
-  const tsQuery = searchTerm
-    .split(/\s+/)
-    .map((w) => `${w}:*`)
-    .join(' & ');
-  return or(
-    sql`to_tsvector('english', COALESCE(${institutesLive.name}->>'en', '')) @@ to_tsquery('english', ${tsQuery})`,
-    sql`COALESCE(${institutesLive.name}->>'en', '') % ${searchTerm}`,
-    sql`COALESCE(${institutesLive.code}, '') % ${searchTerm}`,
-  );
-}
-
-function buildIlikeSearchCondition(searchTerm: string): SQL | undefined {
-  const pattern = `%${searchTerm}%`;
-  return or(
-    sql`${institutesLive.name}->>'en' ILIKE ${pattern}`,
-    ilike(institutesLive.code, pattern),
-  );
-}
-
 function buildSearchCondition(search: string | undefined): SQL | null {
-  if (!search) return null;
-  const searchTerm = search.trim();
-  if (searchTerm.length === 0) return null;
-
-  const condition =
-    searchTerm.length >= 3
-      ? buildFullTextSearchCondition(searchTerm)
-      : buildIlikeSearchCondition(searchTerm);
-
-  return condition ?? null;
+  if (!search?.trim()) return null;
+  return (
+    or(
+      i18nNameSearch(institutesLive.name, search),
+      ilike(institutesLive.code, `%${escapeLikePattern(search.trim())}%`),
+    ) ?? null
+  );
 }
 
 function buildCursorCondition(after: string | undefined): SQL | null {
@@ -121,6 +100,8 @@ const instituteLiveColumns = {
   timezone: institutesLive.timezone,
   currency: institutesLive.currency,
   settings: institutesLive.settings,
+  supportedLocales: institutesLive.supportedLocales,
+  defaultLocale: institutesLive.defaultLocale,
   status: institutesLive.status,
   resellerId: institutesLive.resellerId,
   groupId: institutesLive.groupId,
@@ -146,6 +127,8 @@ const instituteColumns = {
   timezone: institutes.timezone,
   currency: institutes.currency,
   settings: institutes.settings,
+  supportedLocales: institutes.supportedLocales,
+  defaultLocale: institutes.defaultLocale,
   status: institutes.status,
   resellerId: institutes.resellerId,
   groupId: institutes.groupId,
@@ -234,6 +217,36 @@ export class InstituteDrizzleRepository extends InstituteRepository {
         total: totalResult[0]?.value ?? 0,
       };
     });
+  }
+
+  async updateLocales(
+    id: string,
+    settings: InstituteLocaleSettings,
+    version: number,
+  ): Promise<InstituteRecord> {
+    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
+      const [record] = await tx
+        .update(institutes)
+        .set({
+          ...settings,
+          version: sql`${institutes.version} + 1`,
+          updatedBy: getRequestContext().userId,
+        })
+        .where(
+          and(eq(institutes.id, id), eq(institutes.version, version), isNull(institutes.deletedAt)),
+        )
+        .returning(instituteColumns);
+      if (!record)
+        throw new BusinessException(
+          ErrorCode.CONCURRENT_MODIFICATION,
+          'Refresh the institute and try again.',
+        );
+      return record;
+    });
+  }
+
+  async searchByName(query: string): Promise<InstituteRecord[]> {
+    return (await this.search({ search: query })).records;
   }
 
   async findById(id: string): Promise<InstituteRecord | null> {

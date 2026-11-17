@@ -7,6 +7,7 @@ import {
   dateSchema,
   emptyStringToUndefined,
   phoneSchema,
+  useInstituteLocales,
   useRouter,
   zodValidator,
 } from '@roviq/i18n';
@@ -33,10 +34,10 @@ import { useCreateStaffMember } from '../use-staff';
 const { instituteStaff } = testIds;
 // ─── Schema ───────────────────────────────────────────────────────────────
 
-function buildSchema(t: ReturnType<typeof useTranslations>) {
+function buildSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
   return z.object({
-    firstName: buildI18nTextSchema(t('new.errors.firstNameRequired')),
-    lastName: buildI18nTextSchema(t('new.errors.lastNameRequired')).optional(),
+    firstName: buildI18nTextSchema(t('new.errors.firstNameRequired'), defaultLocale),
+    lastName: buildI18nTextSchema(t('new.errors.lastNameRequired'), defaultLocale).optional(),
     email: emptyStringToUndefined(z.string().email(t('new.errors.emailInvalid')).optional()),
     phone: emptyStringToUndefined(phoneSchema(t('new.errors.phoneInvalid')).optional()),
     gender: emptyStringToUndefined(z.enum(GENDER_VALUES).optional()),
@@ -79,7 +80,8 @@ export default function CreateStaffPage() {
 
   useBreadcrumbOverride({ new: t('new.title') });
 
-  const schema = React.useMemo(() => buildSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildSchema(t, defaultLocale), [t, defaultLocale]);
 
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,

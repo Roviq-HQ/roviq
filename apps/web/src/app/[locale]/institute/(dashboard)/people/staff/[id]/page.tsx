@@ -2,11 +2,12 @@
 
 import type { EmploymentType, SocialCategory as GqlSocialCategory } from '@roviq/graphql/generated';
 import {
-  i18nTextOptionalSchema,
-  i18nTextSchema,
+  buildI18nTextOptionalSchema,
+  buildI18nTextSchema,
   Link as LocaleLink,
   useFormatDate,
   useI18nField,
+  useInstituteLocales,
   zodValidator,
 } from '@roviq/i18n';
 import {
@@ -384,21 +385,22 @@ function StaffHeader({ staff, onBack }: { staff: StaffDetailNode; onBack: () => 
  * / deactivate) must go through named domain mutations — not implemented on
  * this tab by design (see `.claude/rules/entity-lifecycle.md`).
  */
-const profileSchema = z.object({
-  firstName: i18nTextSchema,
-  // Optional schema accepts an all-empty `{ en: '', hi: '' }` object — required
-  // because the I18nField always renders both locale rows and would emit
-  // empty strings rather than `undefined` when the user clears them.
-  lastName: i18nTextOptionalSchema,
-  designation: z.string().optional(),
-  department: z.string().optional(),
-  employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
-  isClassTeacher: z.boolean(),
-  socialCategory: z.enum(SOCIAL_CATEGORIES).optional(),
-  specialization: z.string().optional(),
-});
+const buildProfileSchema = (defaultLocale: string) =>
+  z.object({
+    firstName: buildI18nTextSchema('Required', defaultLocale),
+    // Optional schema accepts an all-empty `{ en: '', hi: '' }` object — required
+    // because the I18nField always renders both locale rows and would emit
+    // empty strings rather than `undefined` when the user clears them.
+    lastName: buildI18nTextOptionalSchema(defaultLocale),
+    designation: z.string().optional(),
+    department: z.string().optional(),
+    employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
+    isClassTeacher: z.boolean(),
+    socialCategory: z.enum(SOCIAL_CATEGORIES).optional(),
+    specialization: z.string().optional(),
+  });
 
-type ProfileFormSchema = typeof profileSchema;
+type ProfileFormSchema = ReturnType<typeof buildProfileSchema>;
 type ProfileFormValues = z.input<ProfileFormSchema>;
 
 function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; loading: boolean }) {
@@ -410,6 +412,8 @@ function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; l
   // the I18nField renders is bound to a defined string. Without this the
   // first keystroke in `hi` would dirty an undefined → string transition
   // and invalidate equality-based dirty checks.
+  const { defaultLocale } = useInstituteLocales();
+  const profileSchema = React.useMemo(() => buildProfileSchema(defaultLocale), [defaultLocale]);
   const defaultValues: ProfileFormValues = React.useMemo(
     () => ({
       firstName: { en: staff.firstName.en ?? '', hi: staff.firstName.hi ?? '' },

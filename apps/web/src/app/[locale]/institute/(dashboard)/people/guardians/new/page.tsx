@@ -6,6 +6,7 @@ import {
   buildI18nTextSchema,
   emptyStringToUndefined,
   phoneSchema,
+  useInstituteLocales,
   useRouter,
   zodValidator,
 } from '@roviq/i18n';
@@ -30,10 +31,10 @@ import { useFormDraft } from '../../../../../../../hooks/use-form-draft';
 import { useCreateGuardian } from '../use-guardians';
 
 const { instituteGuardians } = testIds;
-function buildSchema(t: ReturnType<typeof useTranslations>) {
+function buildSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
   return z.object({
-    firstName: buildI18nTextSchema(t('new.errors.firstNameRequired')),
-    lastName: buildI18nTextSchema(t('new.errors.lastNameRequired')).optional(),
+    firstName: buildI18nTextSchema(t('new.errors.firstNameRequired'), defaultLocale),
+    lastName: buildI18nTextSchema(t('new.errors.lastNameRequired'), defaultLocale).optional(),
     gender: emptyStringToUndefined(z.enum(GENDER_VALUES).optional()),
     email: emptyStringToUndefined(z.string().email(t('new.errors.emailInvalid')).optional()),
     phone: emptyStringToUndefined(phoneSchema(t('new.errors.phoneInvalid')).optional()),
@@ -64,7 +65,8 @@ export default function CreateGuardianPage() {
 
   useBreadcrumbOverride({ new: t('new.title') });
 
-  const schema = React.useMemo(() => buildSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildSchema(t, defaultLocale), [t, defaultLocale]);
 
   const form = useAppForm({
     defaultValues: EMPTY_DEFAULTS,

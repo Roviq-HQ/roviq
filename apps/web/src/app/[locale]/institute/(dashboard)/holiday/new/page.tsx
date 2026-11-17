@@ -1,7 +1,7 @@
 'use client';
 
 import { extractGraphQLError } from '@roviq/graphql';
-import { i18nTextSchema, useRouter, zodValidator } from '@roviq/i18n';
+import { buildI18nTextSchema, useInstituteLocales, useRouter, zodValidator } from '@roviq/i18n';
 import { Button, Can, FieldGroup, I18nField, useAppForm } from '@roviq/ui';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -41,10 +41,10 @@ function parseTags(text: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-function buildSchema(t: ReturnType<typeof useTranslations>) {
+function buildSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
   return z
     .object({
-      name: i18nTextSchema,
+      name: buildI18nTextSchema('Required', defaultLocale),
       description: z.string().max(DESCRIPTION_MAX),
       type: z.enum(HOLIDAY_TYPE_VALUES),
       startDate: z.string().regex(ISO_DATE_REGEX, t('fields.startDate')),
@@ -63,7 +63,8 @@ export default function NewHolidayPage() {
   const router = useRouter();
   const { mutate: createHoliday } = useCreateHoliday();
 
-  const schema = React.useMemo(() => buildSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildSchema(t, defaultLocale), [t, defaultLocale]);
 
   const form = useAppForm({
     defaultValues: EMPTY_FORM,

@@ -1,6 +1,12 @@
 'use client';
 
-import { buildI18nTextSchema, useFormatDate, useI18nField, zodValidator } from '@roviq/i18n';
+import {
+  buildI18nTextSchema,
+  useFormatDate,
+  useI18nField,
+  useInstituteLocales,
+  zodValidator,
+} from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -452,9 +458,12 @@ const EMPTY_WIZARD: WizardForm = {
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-function buildWizardSchema(t: ReturnType<typeof useTranslations<'timetable'>>) {
+function buildWizardSchema(
+  t: ReturnType<typeof useTranslations<'timetable'>>,
+  defaultLocale: string,
+) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.TIMETABLE_NAME_DUPLICATE')),
+    name: buildI18nTextSchema(t('errors.TIMETABLE_NAME_DUPLICATE'), defaultLocale),
     description: z.string(),
     sectionIds: z.array(z.string()).min(1),
     effectiveFrom: z.string().regex(DATE_REGEX),
@@ -493,7 +502,8 @@ function CreateTimetableWizard({
   // session runs). Local state — the list page itself stays year-free.
   const { yearId, setYearId } = useLocalAcademicYear();
   const { standards } = useStandards(yearId);
-  const schema = React.useMemo(() => buildWizardSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildWizardSchema(t, defaultLocale), [t, defaultLocale]);
 
   const form = useAppForm({
     defaultValues: EMPTY_WIZARD,

@@ -1,6 +1,7 @@
 'use client';
 
-import { type Locale, localeLabels, locales } from '@roviq/i18n';
+import { instituteLocaleLabels } from '@roviq/common-types';
+import { useInstituteLocales } from '@roviq/i18n';
 import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@roviq/ui/components/ui/field';
 import { Input } from '@roviq/ui/components/ui/input';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
@@ -24,10 +25,10 @@ type AnyForm = any;
  * - `string` — the placeholder for the CURRENT app locale's row only. Other
  *   locale rows render with no placeholder (avoids showing a Hindi hint
  *   under the `EN` input and vice-versa).
- * - `Partial<Record<Locale, string>>` — explicit per-locale hints; use when
+ * - `Partial<Record<string, string>>` — explicit per-locale hints; use when
  *   you want a visible example in every row regardless of app locale.
  */
-export type I18nFieldPlaceholder = string | Partial<Record<Locale, string>>;
+export type I18nFieldPlaceholder = string | Partial<Record<string, string>>;
 
 export interface I18nFieldProps {
   /** The form instance returned from `useAppForm()`. */
@@ -48,8 +49,8 @@ export interface I18nFieldProps {
 
 function resolvePlaceholder(
   placeholder: I18nFieldPlaceholder | undefined,
-  rowLocale: Locale,
-  activeLocale: Locale,
+  rowLocale: string,
+  activeLocale: string,
 ): string | undefined {
   if (!placeholder) return undefined;
   if (typeof placeholder === 'string') {
@@ -86,7 +87,8 @@ export function I18nField({
   testId,
   className,
 }: I18nFieldProps) {
-  const activeLocale = useLocale() as Locale;
+  const activeLocale = useLocale();
+  const { supportedLocales } = useInstituteLocales();
   return (
     <FieldSet className={cn('space-y-1', className)}>
       <FieldLegend variant="label" className="flex items-center gap-2">
@@ -94,7 +96,7 @@ export function I18nField({
         {info}
       </FieldLegend>
       <div className="mt-1 space-y-2">
-        {locales.map((locale) => (
+        {supportedLocales.map((locale) => (
           <I18nFieldLocaleRow
             key={locale}
             form={form}
@@ -115,7 +117,7 @@ interface I18nFieldLocaleRowProps {
   form: AnyForm;
   parentName: string;
   parentLabel: string;
-  locale: Locale;
+  locale: string;
   /** Already-resolved placeholder for THIS row's locale, or undefined to omit. */
   placeholder?: string;
   testId?: string;
@@ -137,8 +139,8 @@ function I18nFieldLocaleRow({
         const invalid = errors.length > 0;
         const value = typeof field.state.value === 'string' ? field.state.value : '';
         const ariaLabel = parentLabel
-          ? `${parentLabel} (${localeLabels[locale]})`
-          : localeLabels[locale];
+          ? `${parentLabel} (${instituteLocaleLabels[locale] ?? locale})`
+          : (instituteLocaleLabels[locale] ?? locale);
         return (
           <div>
             <div className="flex items-center gap-2">

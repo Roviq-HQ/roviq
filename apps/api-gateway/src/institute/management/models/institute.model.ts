@@ -101,6 +101,14 @@ registerEnumType(InstituteStatus, { name: 'InstituteStatus' });
 
 @ObjectType()
 export class InstituteModel {
+  @Field(() => [String], {
+    description: 'Languages enabled for institute-authored text. English is always included.',
+  })
+  supportedLocales!: string[];
+
+  @Field({ description: 'Fallback language for institute-authored text; must be enabled.' })
+  defaultLocale!: string;
+
   @Field(() => ID)
   id!: string;
 

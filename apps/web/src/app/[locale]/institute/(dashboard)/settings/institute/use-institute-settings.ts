@@ -27,6 +27,8 @@ const INSTITUTE_FIELDS = gql`
     timezone
     currency
     settings
+    supportedLocales
+    defaultLocale
     status
     createdAt
     updatedAt

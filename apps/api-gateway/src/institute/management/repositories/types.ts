@@ -21,6 +21,8 @@ export interface InstituteRecord {
   timezone: string;
   currency: string;
   settings: Record<string, unknown>;
+  supportedLocales: string[];
+  defaultLocale: string;
   status: InstituteStatus;
   resellerId: string;
   groupId: string | null;
