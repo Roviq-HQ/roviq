@@ -565,3 +565,11 @@ Both steps are removed from pre-commit. Pre-push already runs them through `pnpm
 This supersedes the note in the 2026-04-17 entry that pre-commit was "intentionally NOT modified": that note assumed every overlapping target was Nx-cached, which is not true of the direct `vitest run` call.
 
 **Trade-off:** a commit can now contain a type error or failing unit test; it is caught at push time. `git push --no-verify` or `SKIP_PREPUSH=1` skips the check locally, and CI's `typecheck` and `test` jobs still block the PR.
+
+
+## 2026-11-17 — fixed: four fast CI lint-job checks ran in neither git hook
+
+`check:synthetic-context-usage`, `check:direct-nats-emit`, `test:check-integration` and `test:check-dates` ran only in CI's `lint` job, so a violation was found after the push. They take about 3s together and are now part of the `gates` group in `scripts/ci-check.sh`, which runs on every pre-push regardless of the affected set.
+
+Still CI-only: the codegen-drift step (needs a running gateway). Still pre-push-only: `check:no-double-cast` and `check:db-drift`.
+

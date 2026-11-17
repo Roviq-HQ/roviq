@@ -273,16 +273,20 @@ launch lint pnpm -s lint
   NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='\'''\'' \
   pnpm -s nx run web-e2e-suite:e2e'
 
-# Schema-coverage gates — fast (<1s total), always run regardless of affected
-# set since they catch global drift (live views / RLS / testid registry /
-# drizzle migration↔snapshot consistency).
+# Static gates — fast, always run regardless of affected set since they catch
+# global drift (live views / RLS / testid registry / drizzle migration↔snapshot
+# consistency / context and NATS allowlists / test conventions).
 launch gates bash -c 'set -e
   pnpm -s check:live-views
   pnpm -s check:live-views-coverage
   pnpm -s check:rls-coverage
   pnpm -s check:testids
   pnpm -s check:no-double-cast
-  pnpm -s check:db-drift'
+  pnpm -s check:db-drift
+  pnpm -s check:synthetic-context-usage
+  pnpm -s check:direct-nats-emit
+  pnpm -s test:check-integration
+  pnpm -s test:check-dates'
 
 # ── Collect results ────────────────────────────────────────────────────────
 overall=0
