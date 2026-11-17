@@ -62,6 +62,8 @@ function createTxMock(stages: TxStages) {
     deleteMemberships: vi.fn(),
     updateImpersonation: vi.fn(),
     insertReseller: vi.fn(),
+    insertRoles: vi.fn(),
+    updateRoles: vi.fn(),
   };
 
   // Selects are routed by the `from(table)` argument — more robust than
@@ -109,6 +111,7 @@ function createTxMock(stages: TxStages) {
         else if (tableName === 'impersonation_sessions')
           calls.updateImpersonation({ values, cond });
         else if (tableName === 'reseller_memberships') calls.updateMemberships({ values, cond });
+        else if (tableName === 'roles') calls.updateRoles({ values, cond });
       };
       return {
         where: (cond: unknown) => {
@@ -124,14 +127,34 @@ function createTxMock(stages: TxStages) {
 
   const tx = {
     select: vi.fn(() => makeSelectChain()),
-    insert: vi.fn((_table: unknown) => ({
-      values: (values: Record<string, unknown>) => ({
-        returning: () => {
-          calls.insertReseller({ values });
-          return Promise.resolve([stages.insertedReseller ?? { ...values, id: 'new-reseller-id' }]);
-        },
-      }),
-    })),
+    insert: vi.fn((table: unknown) => {
+      const tableName: string =
+        typeof table === 'object' && table !== null ? String(getTableName(table as never)) : '';
+      if (tableName === 'roles') {
+        return {
+          values: (values: { name: { en: string }; resellerId: string }[]) => ({
+            onConflictDoUpdate: () => ({
+              returning: () => {
+                calls.insertRoles({ values });
+                return Promise.resolve(
+                  values.map((v) => ({ id: `role-${v.name.en}`, name: v.name })),
+                );
+              },
+            }),
+          }),
+        };
+      }
+      return {
+        values: (values: Record<string, unknown>) => ({
+          returning: () => {
+            calls.insertReseller({ values });
+            return Promise.resolve([
+              stages.insertedReseller ?? { ...values, id: 'new-reseller-id' },
+            ]);
+          },
+        }),
+      };
+    }),
     update: vi.fn((table: unknown) => {
       const tableName: string =
         typeof table === 'object' && table !== null ? String(getTableName(table as never)) : '';
@@ -470,6 +493,9 @@ describe('AdminResellerService', () => {
 
       expect(calls.deleteMemberships).toHaveBeenCalledTimes(1);
 
+      expect(calls.updateRoles).toHaveBeenCalledTimes(1);
+      expect(calls.updateRoles.mock.calls[0][0].values.deletedAt).toBeInstanceOf(Date);
+
       expect(calls.updateReseller).toHaveBeenCalledTimes(1);
       const update = calls.updateReseller.mock.calls[0][0].values;
       expect(update.status).toBe(ResellerStatus.DELETED);
@@ -504,7 +530,6 @@ describe('AdminResellerService', () => {
       };
       const { tx, calls } = createTxMock({
         resellerRows: [], // no slug conflict
-        extraSelectRows: [[{ id: 'role-full-admin-id' }]], // role lookup succeeds
         insertedReseller,
       });
       setTx(tx);
@@ -525,6 +550,22 @@ describe('AdminResellerService', () => {
         }),
       );
 
+      // The reseller gets its own copy of all three system roles
+      expect(calls.insertRoles).toHaveBeenCalledTimes(1);
+      const roleValues: { name: { en: string }; resellerId: string; scope: string }[] =
+        calls.insertRoles.mock.calls[0][0].values;
+      expect(roleValues.map((r) => r.name.en)).toEqual([
+        'reseller_full_admin',
+        'reseller_support_admin',
+        'reseller_viewer',
+      ]);
+      expect(roleValues.map((r) => r.resellerId)).toEqual([
+        'new-reseller-id',
+        'new-reseller-id',
+        'new-reseller-id',
+      ]);
+      expect(roleValues.map((r) => r.scope)).toEqual(['reseller', 'reseller', 'reseller']);
+
       // IdentityService provisioned with correct args
       expect(identityService.createUserWithMembership).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -532,7 +573,7 @@ describe('AdminResellerService', () => {
           username: 'admin@acme.test',
           scope: 'reseller',
           resellerId: 'new-reseller-id',
-          roleId: 'role-full-admin-id',
+          roleId: 'role-reseller_full_admin',
           actorId: ACTOR_ID,
         }),
       );
@@ -573,22 +614,22 @@ describe('AdminResellerService', () => {
       await expect(promise).rejects.toMatchObject({ code: ErrorCode.SLUG_DUPLICATE });
     });
 
-    it('throws INVALID_TIER when the tier role is missing from the seed', async () => {
-      const { tx } = createTxMock({
-        resellerRows: [], // no slug conflict
-        extraSelectRows: [[]], // role lookup returns empty
-      });
+    it.each([
+      [ResellerTier.FULL_MANAGEMENT, 'role-reseller_full_admin'],
+      [ResellerTier.SUPPORT_MANAGEMENT, 'role-reseller_support_admin'],
+      [ResellerTier.READ_ONLY, 'role-reseller_viewer'],
+    ])('should give the initial admin the %s copy of the reseller role', async (tier, roleId) => {
+      const { tx } = createTxMock({ resellerRows: [] });
       setTx(tx);
 
-      const promise = service.create(
-        {
-          name: 'Acme Partners',
-          tier: ResellerTier.FULL_MANAGEMENT,
-          initialAdminEmail: 'admin@acme.test',
-        },
+      await service.create(
+        { name: 'Acme Partners', tier, initialAdminEmail: 'admin@acme.test' },
         ACTOR_ID,
       );
-      await expect(promise).rejects.toMatchObject({ code: ErrorCode.INVALID_TIER });
+
+      expect(identityService.createUserWithMembership).toHaveBeenCalledWith(
+        expect.objectContaining({ resellerId: 'new-reseller-id', roleId }),
+      );
     });
   });
 
@@ -699,8 +740,6 @@ describe('AdminResellerService', () => {
             tier: ResellerTier.FULL_MANAGEMENT,
           },
         ],
-        // Role lookup for new tier
-        extraSelectRows: [[{ id: 'role-new-tier-id' }]],
       });
       setTx(tx);
 
@@ -709,7 +748,8 @@ describe('AdminResellerService', () => {
       expect(calls.updateReseller).toHaveBeenCalled();
       expect(calls.updateReseller.mock.calls[0][0].values.tier).toBe(ResellerTier.READ_ONLY);
       expect(calls.updateMemberships).toHaveBeenCalledTimes(1);
-      expect(calls.updateMemberships.mock.calls[0][0].values.roleId).toBe('role-new-tier-id');
+      expect(calls.insertRoles.mock.calls[0][0].values[0].resellerId).toBe(NORMAL_RESELLER_ID);
+      expect(calls.updateMemberships.mock.calls[0][0].values.roleId).toBe('role-reseller_viewer');
       expect(eventBus.emit).toHaveBeenCalledWith(
         'RESELLER.tier_changed',
         expect.objectContaining({

@@ -7,10 +7,12 @@ import {
   institutes,
   institutesLive,
   mkAdminCtx,
+  provisionResellerSystemRoles,
+  type ResellerSystemRoleName,
   refreshTokens,
   resellerMemberships,
   resellers,
-  rolesLive,
+  roles,
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -33,12 +35,11 @@ const DEFAULT_RESELLER_ID = '00000000-0000-7000-a000-000000000011';
 const GRACE_PERIOD_DAYS = 30;
 
 /**
- * Role name per tier — created by the platform seed (see scripts/seed.ts).
- * The initial admin attached during `adminCreateReseller` receives the role
- * matching the chosen tier; `changeTier` cascades updates to this role on
- * every existing reseller_membership.
+ * Role name per tier. Each reseller owns its own copy of these roles, created
+ * in `create`. The initial admin receives the copy matching the chosen tier;
+ * `changeTier` moves every reseller_membership to the new tier's copy.
  */
-const TIER_TO_ROLE_NAME: Record<ResellerTier, string> = {
+const TIER_TO_ROLE_NAME: Record<ResellerTier, ResellerSystemRoleName> = {
   FULL_MANAGEMENT: 'reseller_full_admin',
   SUPPORT_MANAGEMENT: 'reseller_support_admin',
   READ_ONLY: 'reseller_viewer',
@@ -189,22 +190,6 @@ export class AdminResellerService {
           );
         }
 
-        const [role] = await tx
-          .select({ id: rolesLive.id })
-          .from(rolesLive)
-          .where(
-            and(
-              sql`${rolesLive.name}->>'en' = ${TIER_TO_ROLE_NAME[input.tier]}`,
-              eq(rolesLive.scope, 'reseller'),
-            ),
-          );
-        if (!role) {
-          throw new BusinessException(
-            ErrorCode.INVALID_TIER,
-            `No system role found for tier ${input.tier}. Re-run seed.`,
-          );
-        }
-
         const [created] = await tx
           .insert(resellers)
           .values({
@@ -219,7 +204,8 @@ export class AdminResellerService {
           })
           .returning();
 
-        return { reseller: created, roleId: role.id };
+        const roleIds = await provisionResellerSystemRoles(tx, created.id, actorId);
+        return { reseller: created, roleId: roleIds[TIER_TO_ROLE_NAME[input.tier]] };
       },
     );
 
@@ -324,21 +310,8 @@ export class AdminResellerService {
         }
         if (existing.tier === newTier) return { record: existing, oldTier: existing.tier };
 
-        const [newRole] = await tx
-          .select({ id: rolesLive.id })
-          .from(rolesLive)
-          .where(
-            and(
-              sql`${rolesLive.name}->>'en' = ${TIER_TO_ROLE_NAME[newTier]}`,
-              eq(rolesLive.scope, 'reseller'),
-            ),
-          );
-        if (!newRole) {
-          throw new BusinessException(
-            ErrorCode.INVALID_TIER,
-            `No system role found for tier ${newTier}. Re-run seed.`,
-          );
-        }
+        // Also covers resellers created before each reseller owned its roles
+        const roleIds = await provisionResellerSystemRoles(tx, resellerId, actorId);
 
         const [updated] = await tx
           .update(resellers)
@@ -348,7 +321,7 @@ export class AdminResellerService {
 
         await tx
           .update(resellerMemberships)
-          .set({ roleId: newRole.id, updatedAt: new Date() })
+          .set({ roleId: roleIds[TIER_TO_ROLE_NAME[newTier]], updatedAt: new Date() })
           .where(eq(resellerMemberships.resellerId, resellerId));
 
         return { record: updated, oldTier: existing.tier };
@@ -572,6 +545,11 @@ export class AdminResellerService {
 
         // 5. Delete reseller memberships
         await tx.delete(resellerMemberships).where(eq(resellerMemberships.resellerId, resellerId));
+
+        await tx
+          .update(roles)
+          .set({ deletedAt: new Date() })
+          .where(and(eq(roles.resellerId, resellerId), eq(roles.scope, 'reseller')));
 
         // 6. Soft-delete reseller
         const [updated] = await tx
