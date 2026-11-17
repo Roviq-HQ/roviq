@@ -58,12 +58,14 @@ if [ "$MODE" = "docker" ]; then
   NOVU_PASSWORD="${NOVU_PASSWORD:-RoviqE2E123!@#}"
   NOVU_ORG="${NOVU_ORG:-Roviq E2E}"
 else
-  NOVU_API="${NOVU_API:-http://localhost:3340}"
-  NOTIF_SVC="${NOTIF_SVC:-http://localhost:3002}"
+  REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+  ROVIQ_ENV_FILE="$REPO_ROOT/.env"
+  . "$REPO_ROOT/scripts/instance-env.sh"
+  NOVU_API="${NOVU_API:-http://localhost:${DEV_NOVU_API_PORT:-3340}}"
+  NOTIF_SVC="${NOTIF_SVC:-http://localhost:${NOTIFICATION_SERVICE_PORT:-3002}}"
   NOVU_EMAIL="${NOVU_EMAIL:-admin@roviq.local}"
   NOVU_PASSWORD="${NOVU_PASSWORD:-RoviqLocal123!@#}"
   NOVU_ORG="${NOVU_ORG:-Roviq}"
-  REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fi
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -166,8 +168,8 @@ if [ "$MODE" = "host" ]; then
   update_env "NOVU_SECRET_KEY" "$API_KEY"
   update_env "NOVU_APPLICATION_IDENTIFIER" "$APP_ID"
   update_env "NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER" "$APP_ID"
-  update_env "NEXT_PUBLIC_NOVU_BACKEND_URL" "http://localhost:3340"
-  update_env "NEXT_PUBLIC_NOVU_SOCKET_URL" "http://localhost:3342"
+  update_env "NEXT_PUBLIC_NOVU_BACKEND_URL" "http://localhost:${DEV_NOVU_API_PORT:-3340}"
+  update_env "NEXT_PUBLIC_NOVU_SOCKET_URL" "http://localhost:${DEV_NOVU_WS_PORT:-3342}"
 
   ok ".env updated"
 else
@@ -212,11 +214,11 @@ else
 
   # Resolve bridge URL per-mode
   if [ "$MODE" = "host" ]; then
-    BRIDGE_HEALTH="http://localhost:3002/health"
+    BRIDGE_HEALTH="$NOTIF_SVC/health"
     # Host IP reachable from Docker containers — interface-agnostic
     HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')
     if [ -z "$HOST_IP" ]; then HOST_IP="host.docker.internal"; fi
-    BRIDGE_URL="http://${HOST_IP}:3002/api/novu"
+    BRIDGE_URL="http://${HOST_IP}:${NOTIFICATION_SERVICE_PORT:-3002}/api/novu"
   else
     BRIDGE_HEALTH="$NOTIF_SVC/health"
     BRIDGE_URL="$NOTIF_SVC/api/novu"
@@ -261,7 +263,7 @@ fi
 echo "" >&2
 if [ "$MODE" = "host" ]; then
   echo "Novu local setup complete!" >&2
-  echo "  Dashboard:  http://localhost:4000" >&2
+  echo "  Dashboard:  http://localhost:${DEV_NOVU_DASHBOARD_PORT:-4000}" >&2
   echo "  API:        $NOVU_API" >&2
   echo "  App ID:     $APP_ID" >&2
   echo "" >&2

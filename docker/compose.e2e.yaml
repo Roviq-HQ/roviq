@@ -45,7 +45,7 @@ services:
     volumes:
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
     ports:
-      - "5435:5432"
+      - "${E2E_POSTGRES_PORT:-5435}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U roviq"]
       interval: 5s
@@ -69,8 +69,8 @@ services:
     # host-side `check:jetstream-drift` script connects via localhost:4223;
     # in-network clients still use `nats:4222` (the container-internal port).
     ports:
-      - "4223:4222"
-      - "8223:8222"
+      - "${E2E_NATS_PORT:-4223}:4222"
+      - "${E2E_NATS_MONITOR_PORT:-8223}:8222"
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
       interval: 5s
@@ -133,7 +133,7 @@ services:
     # reach Novu at http://localhost:3443. Container-to-container traffic
     # continues to use the internal `novu-api:3000` hostname.
     ports:
-      - "127.0.0.1:3443:3000"
+      - "127.0.0.1:${E2E_NOVU_API_PORT:-3443}:3000"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -275,7 +275,7 @@ services:
       STUDENT_ADMISSION_WORKER_ENABLED: "true"
       # E2E-specific overrides
       API_GATEWAY_PORT: "3004"
-      ALLOWED_ORIGINS: "http://localhost:3004,http://localhost:4201,http://admin.localhost:4201,http://reseller.localhost:4201"
+      ALLOWED_ORIGINS: "http://localhost:${E2E_API_PORT:-3004},http://localhost:${E2E_WEB_PORT:-4201},http://admin.localhost:${E2E_WEB_PORT:-4201},http://reseller.localhost:${E2E_WEB_PORT:-4201}"
       NODE_ENV: test
       # Enable EE modules — the frontend references EE billing operations and the
       # schema-drift gate compares them against the running api-gateway's schema.
@@ -292,7 +292,7 @@ services:
       novu-bootstrap:
         condition: service_completed_successfully
     ports:
-      - "3004:3004"
+      - "${E2E_API_PORT:-3004}:3004"
     # Real GraphQL probe — nx serve binds the HTTP port before its module
     # graph is compiled, so /api/health returns 200 while early queries still
     # hit UND_ERR_SOCKET. Probing the actual GraphQL endpoint defers "healthy"
@@ -326,6 +326,8 @@ services:
     environment:
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
       NATS_URL: nats://nats:4222
+      # env_file carries the host instance's port; in-network callers use 3002.
+      NOTIFICATION_SERVICE_PORT: "3002"
       NODE_ENV: test
     depends_on:
       api-gateway:

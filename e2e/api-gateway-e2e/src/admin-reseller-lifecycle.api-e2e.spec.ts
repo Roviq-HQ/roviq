@@ -29,7 +29,7 @@ import { gql } from './helpers/gql-client';
 const SUPERUSER_URL =
   process.env.DATABASE_URL_E2E_MIGRATE ??
   process.env.DATABASE_URL_TEST_MIGRATE ??
-  'postgresql://roviq:roviq_dev@localhost:5435/roviq_test';
+  `postgresql://roviq:roviq_dev@localhost:${process.env.E2E_POSTGRES_PORT ?? '5435'}/roviq_test`;
 
 // Fixed test UUIDs so re-runs are idempotent (we DELETE by ID in afterAll).
 const TEST_RESELLER_ID = 'ffffffff-f000-4000-a000-000000000101';

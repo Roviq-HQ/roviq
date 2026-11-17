@@ -20,10 +20,12 @@ import { E2E_USERS } from '../../shared/seed-fixtures';
 
 const { dlq } = testIds;
 
-// e2e NATS publishes on host port 4223 (offset off dev infra 4222). Pin to it
+// e2e NATS publishes on its own host port (4223 for instance 0). Pin to it
 // and ignore the ambient NATS_URL, which points at the dev-infra JetStream.
-const NATS_URL = process.env.E2E_NATS_URL ?? 'nats://localhost:4223';
-const API_URL = process.env.API_URL ?? 'http://localhost:3004/api/graphql';
+const NATS_URL =
+  process.env.E2E_NATS_URL ?? `nats://localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
+const API_URL =
+  process.env.API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 
 interface SeededRow {
   id: string;

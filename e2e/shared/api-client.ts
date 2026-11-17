@@ -15,7 +15,8 @@
 
 import type { Page } from '@playwright/test';
 
-const API_URL = process.env.API_URL || 'http://localhost:3004/api/graphql';
+const API_URL =
+  process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 const INSTITUTE_SESSION_KEY = 'roviq-institute-access-token';
 const INSTITUTE_TOKEN_KEY = `__e2e_session__${INSTITUTE_SESSION_KEY}`;
 

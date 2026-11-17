@@ -23,6 +23,8 @@ Tilt `codegen` resource runs `pnpm codegen --watch` automatically — regenerate
 
 Use `tilt logs <resource>` to check output when things fail (e.g., `tilt logs db-clean`, `tilt logs api-gateway`, `tilt logs e2e-gateway`).
 
+**Parallel dev instances** — each agent works in its own worktree with its own ports, containers and databases (`pnpm instance:new <slot> <branch>`). If `.env` has `ROVIQ_INSTANCE` set, you are in one: every port in this file is shifted by `slot × 20` (`pnpm instance:ports` lists them) and Tilt must be reached with `pnpm tilt <args>` unless `TILT_PORT` is set. Details: `docs/infrastructure.md` → "Parallel dev instances".
+
 ## Identity
 
 **Roviq** — multi-tenant institute management SaaS. Users = "Roviqians", usernames = "Roviq ID".

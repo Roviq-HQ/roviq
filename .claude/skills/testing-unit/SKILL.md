@@ -94,8 +94,8 @@ Root `vitest.workspace.ts` defines three projects: `unit`, `integration`, `e2e-a
 | Profile | API Port | PG Port | Starts | Use for |
 |---|---|---|---|---|
 | `dev` | 3000 | 5432 | Infra only (PG, Redis, NATS) | Local dev, Tilt manages apps |
-| `e2e` | 3004 | 5433 | Full stack + Novu | Local E2E, `pnpm test:e2e:api` |
-| `ci` | 3004 | 5433 | Same as `e2e` | GitHub Actions |
+| `e2e` | 3004 | 5435 | Full stack + Novu | Local E2E, `pnpm test:e2e:api` |
+| `ci` | 3004 | 5435 | Same as `e2e` | GitHub Actions |
 
 ## What NOT to Test
 

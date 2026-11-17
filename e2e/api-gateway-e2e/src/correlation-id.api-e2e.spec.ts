@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-const apiUrl = process.env.API_URL || 'http://localhost:3004/api/graphql';
+const apiUrl =
+  process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 // Raw fetch exposes response headers, which the shared GraphQL helper omits.

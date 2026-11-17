@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
-    ports: ["5434:5432"]
+    ports: ["${DEV_POSTGRES_PORT:-5434}:5432"]
     environment:
       POSTGRES_USER: roviq
       POSTGRES_PASSWORD: roviq_dev
@@ -17,7 +17,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["${DEV_REDIS_PORT:-6379}:6379"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -29,8 +29,8 @@ services:
   nats:
     image: nats:2.10-alpine
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "${DEV_NATS_PORT:-4222}:4222"
+      - "${DEV_NATS_MONITOR_PORT:-8222}:8222"
     command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
     volumes:
       - nats_data:/data
@@ -43,8 +43,8 @@ services:
   nats-test:
     image: nats:2.10-alpine
     ports:
-      - "4224:4222"
-      - "8224:8222"
+      - "${DEV_NATS_TEST_PORT:-4224}:4222"
+      - "${DEV_NATS_TEST_MONITOR_PORT:-8224}:8222"
     command: ["--jetstream", "-m", "8222"]
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
@@ -59,7 +59,7 @@ services:
     image: natsio/prometheus-nats-exporter:latest
     command: ["-varz", "-jsz=all", "-connz", "http://nats:8222"]
     ports:
-      - "7777:7777"
+      - "${DEV_NATS_EXPORTER_PORT:-7777}:7777"
     depends_on:
       nats:
         condition: service_healthy
@@ -69,7 +69,7 @@ services:
     # Host port is 27018 (not the default 27017) to avoid clashing with other
     # local mongo instances. Novu connects via internal DNS (mongodb:27017),
     # so only external tools (mongosh/compass) use localhost:27018.
-    ports: ["27018:27017"]
+    ports: ["${DEV_MONGODB_PORT:-27018}:27017"]
     volumes:
       - mongodb_data:/data/db
     healthcheck:
@@ -81,8 +81,8 @@ services:
   minio:
     image: quay.io/minio/minio:latest
     ports:
-      - "9002:9000"
-      - "9003:9001"
+      - "${DEV_MINIO_PORT:-9002}:9000"
+      - "${DEV_MINIO_CONSOLE_PORT:-9003}:9001"
     environment:
       MINIO_ROOT_USER: roviq_minio
       MINIO_ROOT_PASSWORD: roviq_minio_dev
@@ -98,7 +98,7 @@ services:
   temporal:
     image: temporalio/auto-setup:latest
     ports:
-      - "7233:7233"
+      - "${DEV_TEMPORAL_PORT:-7233}:7233"
     environment:
       DB: postgres12
       DB_PORT: 5432
@@ -112,7 +112,7 @@ services:
   temporal-ui:
     image: temporalio/ui:latest
     ports:
-      - "8233:8080"
+      - "${DEV_TEMPORAL_UI_PORT:-8233}:8080"
     environment:
       TEMPORAL_ADDRESS: temporal:7233
 
@@ -122,9 +122,9 @@ services:
     volumes:
       - ./otel/collector-config.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      - '4317:4317'
-      - '4318:4318'
-      - '13133:13133'
+      - '${DEV_OTEL_GRPC_PORT:-4317}:4317'
+      - '${DEV_OTEL_HTTP_PORT:-4318}:4318'
+      - '${DEV_OTEL_HEALTH_PORT:-13133}:13133'
     depends_on:
       tempo:
         condition: service_started
@@ -138,7 +138,7 @@ services:
       - ./tempo/tempo-config.yaml:/etc/tempo/config.yaml:ro
       - tempo_data:/var/tempo
     ports:
-      - '3200:3200'
+      - '${DEV_TEMPO_PORT:-3200}:3200'
 
   loki:
     image: grafana/loki:latest
@@ -147,7 +147,7 @@ services:
       - ./loki/loki-config.yaml:/etc/loki/config.yaml:ro
       - loki_data:/loki
     ports:
-      - '3100:3100'
+      - '${DEV_LOKI_PORT:-3100}:3100'
 
   prometheus:
     image: prom/prometheus:latest
@@ -156,7 +156,7 @@ services:
       - ../docs/observability/alerts:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
-      - '9090:9090'
+      - '${DEV_PROMETHEUS_PORT:-9090}:9090'
     healthcheck:
       test: ['CMD', 'wget', '--spider', 'http://localhost:9090/-/ready']
       interval: 5s
@@ -181,7 +181,7 @@ services:
       - ../docs/observability/dashboards:/var/lib/grafana/dashboards_docs:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - '3001:3000'
+      - '${DEV_GRAFANA_PORT:-3001}:3000'
     depends_on:
       prometheus:
         condition: service_started

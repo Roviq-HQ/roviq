@@ -15,10 +15,9 @@ import { gql } from './helpers/gql-client';
 // stays intact — `POST /api/graphql` (GraphQL) vs `GET /api/auth/ws-ticket`
 // (REST controller) both live under `/api`. Dropping `/api/graphql` wholesale
 // would route ws-ticket requests to `/auth/ws-ticket` → 404.
-const API_BASE_URL = (process.env.API_URL || 'http://localhost:3004/api/graphql').replace(
-  /\/graphql$/,
-  '',
-);
+const API_BASE_URL = (
+  process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`
+).replace(/\/graphql$/, '');
 
 describe('Security Invariant E2E Tests', () => {
   // ── 7. Impersonation token cannot be refreshed ──────────────────────

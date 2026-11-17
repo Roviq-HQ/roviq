@@ -341,6 +341,8 @@ Both scripts are pure grep — fast enough to run in the `lint` job without extr
 | E2E API gateway port | `3004` |
 | Query from host | `psql -h localhost -p 5435 -U roviq -d roviq_test` |
 | Query from Docker | `docker exec roviq-e2e-postgres-1 psql -U roviq -d roviq_test` |
+
+These are the instance 0 values. In a parallel dev instance every port is shifted by `slot × 20` and the compose project is `roviq-e2e-<slot>`: see `docs/infrastructure.md` → "Parallel dev instances".
 | Full reset | `pnpm e2e:down && pnpm e2e:up` |
 | Re-seed only | `pnpm e2e:clean` |
 | Code changes | Edit files on the host — the checkout is bind-mounted, so `nx serve` inside the api-gateway container rebuilds and restarts. notification-service changes need `scripts/e2e-compose.sh restart api-gateway notification-service` |

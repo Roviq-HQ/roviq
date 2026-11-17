@@ -33,6 +33,12 @@ declare global {
       LOKI_URL?: string;
       TEMPO_URL?: string;
       NEXT_PUBLIC_GRAFANA_URL?: string;
+      E2E_API_PORT?: string;
+      E2E_WEB_PORT?: string;
+      E2E_POSTGRES_PORT?: string;
+      E2E_NATS_PORT?: string;
+      E2E_NOVU_API_PORT?: string;
+      ROVIQ_E2E_COMPOSE_PROJECT?: string;
     }
   }
 }

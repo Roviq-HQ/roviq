@@ -15,8 +15,10 @@ import { SEED } from '../../shared/seed-fixtures';
 const adminAuth = path.join(__dirname, '../../playwright/.auth/admin.json');
 const resellerAuth = path.join(__dirname, '../../playwright/.auth/reseller.json');
 
-const ADMIN_URL = 'http://admin.localhost:4201';
-const RESELLER_URL = 'http://reseller.localhost:4201';
+const ADMIN_URL =
+  process.env.WEB_URL_ADMIN || `http://admin.localhost:${process.env.E2E_WEB_PORT ?? '4201'}`;
+const RESELLER_URL =
+  process.env.WEB_URL_RESELLER || `http://reseller.localhost:${process.env.E2E_WEB_PORT ?? '4201'}`;
 
 test.describe('Cross-portal: institute visibility', () => {
   test('seeded institute visible to admin is also listed for reseller', async ({ browser }) => {

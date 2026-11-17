@@ -14,8 +14,8 @@ x-novu-env: &novu-env
   JWT_SECRET: ${NOVU_JWT_SECRET:-novu-local-jwt-secret-change-me}
   STORE_ENCRYPTION_KEY: ${NOVU_STORE_ENCRYPTION_KEY:-novulocalstoreencrkey12345678abc}
   NOVU_SECRET_KEY: ${NOVU_SECRET_KEY:-placeholder}
-  API_ROOT_URL: http://localhost:3340
-  FRONT_BASE_URL: http://localhost:4000
+  API_ROOT_URL: http://localhost:${DEV_NOVU_API_PORT:-3340}
+  FRONT_BASE_URL: http://localhost:${DEV_NOVU_DASHBOARD_PORT:-4000}
 
 x-novu-logging: &novu-logging
   driver: json-file
@@ -26,7 +26,7 @@ x-novu-logging: &novu-logging
 services:
   novu-api:
     image: ghcr.io/novuhq/novu/api:3.14.0
-    ports: ["3340:3000"]
+    ports: ["${DEV_NOVU_API_PORT:-3340}:3000"]
     environment:
       <<: *novu-env
     extra_hosts:
@@ -57,7 +57,7 @@ services:
 
   novu-ws:
     image: ghcr.io/novuhq/novu/ws:3.14.0
-    ports: ["3342:3002"]
+    ports: ["${DEV_NOVU_WS_PORT:-3342}:3002"]
     environment:
       <<: *novu-env
     depends_on:
@@ -68,10 +68,10 @@ services:
 
   novu-dashboard:
     image: ghcr.io/novuhq/novu/dashboard:3.14.0
-    ports: ["4000:4000"]
+    ports: ["${DEV_NOVU_DASHBOARD_PORT:-4000}:4000"]
     environment:
-      VITE_API_HOSTNAME: http://localhost:3340
-      VITE_WEBSOCKET_HOSTNAME: http://localhost:3342
+      VITE_API_HOSTNAME: http://localhost:${DEV_NOVU_API_PORT:-3340}
+      VITE_WEBSOCKET_HOSTNAME: http://localhost:${DEV_NOVU_WS_PORT:-3342}
     depends_on:
       novu-api:
         condition: service_started

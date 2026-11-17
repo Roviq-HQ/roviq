@@ -26,7 +26,7 @@ pnpm test:e2e:api      # runs the Vitest E2E project against the up stack
 
 `pnpm e2e:up` is the only sanctioned way to bring up the Docker stack — it runs `docker compose -p roviq-e2e -f docker/compose.e2e.yaml up -d --wait` after a staged startup of the infra layer, which is what the `--wait` health-gate expects. Do not invoke `docker compose … up` directly.
 
-The compose project seeds `roviq_test` (port 5433) and provisions Temporal, Novu, and notification-service. If Novu credentials can't be resolved (`helpers/novu.ts` reads from env, then from the `roviq-e2e_novu_creds` docker volume), notification-dependent suites flip to `describe.skip` with a reason — they do not fail the run.
+The compose project seeds `roviq_test` (port 5435) and provisions Temporal, Novu, and notification-service. If Novu credentials can't be resolved (`helpers/novu.ts` reads from env, then from the `roviq-e2e_novu_creds` docker volume), notification-dependent suites flip to `describe.skip` with a reason — they do not fail the run.
 
 ## Making GraphQL requests
 
@@ -224,7 +224,7 @@ Cross-scope rejection and cross-tenant isolation that are already covered by the
 - **No new `.hurl` files.** Migration is one-way; new domain tests go directly in Vitest.
 - **No `sleep()` / fixed delays.** The single exception is the ~200ms subscription warm-up above. For async state transitions (audit consumer, webhook → invoice status), poll with a bounded `waitFor(...)` pattern.
 - **No mocks.** Everything hits the real running stack. If your spec needs to stub something, you're writing an integration test — move it to `apps/api-gateway/**/*.integration.spec.ts`.
-- **No direct DB writes.** Integration tests own DB-level setup. E2E composes state via GraphQL mutations + seed fixtures. Reading via `psql -U roviq -d roviq_test` (port 5433) is fine for diagnosis, not for setup.
+- **No direct DB writes.** Integration tests own DB-level setup. E2E composes state via GraphQL mutations + seed fixtures. Reading via `psql -U roviq -d roviq_test` (port 5435) is fine for diagnosis, not for setup.
 - **No hardcoded credentials or UUIDs.** Use `E2E_USERS` and `SEED` / `SEED_IDS`.
 - **No string interpolation for credentials in GraphQL queries.** Always use the `variables` object (query-injection risk and makes the query cacheable).
 - **No `describe.skip` without a reason + issue link.** The skip title must name the blocker (e.g. `ROV-232 — TCIssuanceWorkflow worker not registered`).

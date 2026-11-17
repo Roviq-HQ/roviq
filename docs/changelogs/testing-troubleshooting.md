@@ -543,3 +543,14 @@ Found while pushing ROV-206; none involved admission code.
 - **Admin reseller list rendered in Hindi.** The admin and reseller account-language journeys save Hindi on the seeded `admin` / `reseller1` users while other specs for the same users run in parallel. They moved to their own Playwright projects (`admin-account-language`, `reseller-account-language`) that depend on every shared-user project, so they run last.
 
 Also: `e2e/shared/api-client.ts` read the access token from a `localStorage` key the page fixture deletes on load, so `deleteStudentViaApi` cleanup silently did nothing. It now reads `sessionStorage` first.
+
+
+## 2026-11-17 — fixed: worktrees shared one dev stack and one e2e stack (ROV-281)
+
+Every git worktree used the same host ports and the same Compose projects (`docker`, `roviq-e2e`). Two checkouts therefore shared the dev database, where Tilt's `db-push --force` dropped another branch's columns (see the shared-database loss earlier today), and `pnpm e2e:up` from a second checkout re-pointed the single `roviq-e2e` project at that checkout's files (`docker compose ls` listed `compose.e2e.yaml` from two directories under one project).
+
+Each worktree is now an instance with a slot number: ports are `default + slot × 20` and the Compose projects are `roviq-<slot>` / `roviq-e2e-<slot>`. `pnpm instance:new <slot> <branch>` creates and configures one. Compose files, the Tiltfile, `scripts/e2e-compose.sh`, `scripts/ci-check.sh`, and the Playwright / Vitest e2e configs read the instance variables from `.env` with the old values as defaults, so slot 0 and CI are unchanged. See `docs/infrastructure.md` → "Parallel dev instances".
+
+Also fixed: `tilt up` against a brand-new database failed 30 times with `function i18n_text_to_string(jsonb) does not exist`, because `drizzle-kit push` alone does not create the prereq functions. Tilt's `db-push` now runs `pnpm db:reset --if-empty` first, which bootstraps a database that has no migration baseline and no users and does nothing otherwise.
+
+**Verification:** slot 0 and slot 1 ran side by side (API 3005 / 3025, web 4200 / 4220, separate `docker` and `roviq-1` projects); a table created in slot 1's database was absent from slot 0's; an admin login in the browser on `admin.localhost:4220` sent its GraphQL requests to `localhost:3025`.
