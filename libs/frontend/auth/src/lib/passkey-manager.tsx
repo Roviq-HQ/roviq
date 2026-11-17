@@ -18,6 +18,7 @@ import {
   Separator,
   useAppForm,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   RegistrationResponseJSON,
@@ -26,7 +27,11 @@ import { Fingerprint, KeyRound, Loader2, Plus, ShieldCheck, Trash2 } from 'lucid
 import * as React from 'react';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
+import { presentAuthError } from './auth-error-feedback';
+import { type AuthErrorLabels, isPasskeySupported, resolveAuthErrorMessage } from './error-utils';
 import type { PasskeyInfo } from './types';
+
+const { passkeyManager } = testIds;
 
 export interface PasskeyManagerLabels {
   title?: string;
@@ -48,6 +53,11 @@ export interface PasskeyManagerLabels {
   removing?: string;
   nameTooLong?: string;
   passkeyPasswordRequired?: string;
+  loadFailed?: string;
+  removeFailed?: string;
+  addFailed?: string;
+  /** Translated copy per error code / client failure; unknown codes use the `*Failed` label. */
+  errors?: AuthErrorLabels;
 }
 
 export interface PasskeyManagerMutations {
@@ -95,6 +105,9 @@ function resolveLabels(labels?: PasskeyManagerLabels) {
     nameTooLong: labels?.nameTooLong ?? 'Passkey name must be 100 characters or less',
     passkeyPasswordRequired:
       labels?.passkeyPasswordRequired ?? 'Password is required to add a passkey',
+    loadFailed: labels?.loadFailed ?? 'Failed to load passkeys',
+    removeFailed: labels?.removeFailed ?? 'Failed to remove passkey',
+    addFailed: labels?.addFailed ?? 'Failed to add passkey',
   };
 }
 
@@ -105,10 +118,16 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
   const [error, setError] = React.useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = React.useState(false);
   const [removeTarget, setRemoveTarget] = React.useState<PasskeyInfo | null>(null);
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
   const [isRemoving, setIsRemoving] = React.useState(false);
 
   const l = resolveLabels(labels);
+  const errorLabels = labels?.errors;
   const fmt = formatDate;
+  const loadFailedMessage = React.useCallback(
+    (err: unknown) => resolveAuthErrorMessage(err, { ...errorLabels, generic: l.loadFailed }),
+    [l.loadFailed, errorLabels],
+  );
 
   const loadPasskeys = React.useCallback(async () => {
     const token = getAccessToken();
@@ -116,12 +135,13 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
     try {
       const result = await mutations.myPasskeys(token);
       setPasskeys(result);
-    } catch {
-      setError('Failed to load passkeys');
+      setError(null);
+    } catch (err) {
+      setError(loadFailedMessage(err));
     } finally {
       setIsLoading(false);
     }
-  }, [getAccessToken, mutations]);
+  }, [getAccessToken, mutations, loadFailedMessage]);
 
   React.useEffect(() => {
     loadPasskeys();
@@ -132,15 +152,25 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
     const token = getAccessToken();
     if (!token) return;
     setIsRemoving(true);
+    setRemoveError(null);
     try {
       await mutations.removePasskey(removeTarget.id, token);
       setPasskeys((prev) => prev.filter((p) => p.id !== removeTarget.id));
       setRemoveTarget(null);
-    } catch {
-      setError('Failed to remove passkey');
+    } catch (err) {
+      presentAuthError(err, {
+        labels: { ...errorLabels, generic: l.removeFailed },
+        onInline: setRemoveError,
+        onRetry: () => void handleRemove(),
+      });
     } finally {
       setIsRemoving(false);
     }
+  };
+
+  const closeRemoveDialog = () => {
+    setRemoveTarget(null);
+    setRemoveError(null);
   };
 
   return (
@@ -171,7 +201,11 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
 
         <CardContent className="pt-0">
           {error && (
-            <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <div
+              role="alert"
+              className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              data-testid={passkeyManager.error}
+            >
               {error}
             </div>
           )}
@@ -264,6 +298,7 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         labels={l}
+        errorLabels={{ ...errorLabels, generic: l.addFailed }}
         mutations={mutations}
         getAccessToken={getAccessToken}
         onSuccess={(passkey) => {
@@ -272,7 +307,7 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
         }}
       />
 
-      <Dialog open={removeTarget !== null} onOpenChange={() => setRemoveTarget(null)}>
+      <Dialog open={removeTarget !== null} onOpenChange={closeRemoveDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -291,8 +326,17 @@ export function PasskeyManager({ mutations, labels, formatDate }: PasskeyManager
               </p>
             </div>
           )}
+          {removeError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              data-testid={passkeyManager.removeError}
+            >
+              {removeError}
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setRemoveTarget(null)} disabled={isRemoving}>
+            <Button variant="outline" onClick={closeRemoveDialog} disabled={isRemoving}>
               {l.cancel}
             </Button>
             <Button variant="destructive" onClick={handleRemove} disabled={isRemoving}>
@@ -312,6 +356,7 @@ function AddPasskeyDialog({
   open,
   onOpenChange,
   labels,
+  errorLabels,
   mutations,
   getAccessToken,
   onSuccess,
@@ -319,6 +364,7 @@ function AddPasskeyDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   labels: Record<string, string>;
+  errorLabels: AuthErrorLabels;
   mutations: PasskeyManagerMutations;
   getAccessToken: () => string | null;
   onSuccess: (passkey: PasskeyInfo) => void;
@@ -345,8 +391,15 @@ function AddPasskeyDialog({
       const token = getAccessToken();
       if (!token) return;
 
-      setIsAdding(true);
       setError(null);
+      if (!isPasskeySupported()) {
+        presentAuthError(new DOMException('WebAuthn unavailable', 'NotSupportedError'), {
+          labels: errorLabels,
+          onInline: setError,
+        });
+        return;
+      }
+      setIsAdding(true);
       try {
         const optionsJSON = await mutations.generateRegistrationOptions(value.password, token);
         const { startRegistration } = await import('@simplewebauthn/browser');
@@ -361,7 +414,11 @@ function AddPasskeyDialog({
         onSuccess(passkey);
         formApi.reset();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add passkey');
+        presentAuthError(err, {
+          labels: errorLabels,
+          onInline: setError,
+          onRetry: () => void formApi.handleSubmit(),
+        });
       } finally {
         setIsAdding(false);
       }
@@ -398,7 +455,11 @@ function AddPasskeyDialog({
 
           <div className="space-y-4 py-5">
             {error && (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+                data-testid={passkeyManager.addError}
+              >
                 {error}
               </div>
             )}

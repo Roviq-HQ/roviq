@@ -1,16 +1,19 @@
 'use client';
 
 import type { MembershipInfo } from '@roviq/auth';
-import { sanitizeReturnUrl, useAuth } from '@roviq/auth';
+import { isAppError, resolveAuthErrorMessage, sanitizeReturnUrl, useAuth } from '@roviq/auth';
 import { useI18nField } from '@roviq/i18n';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
+import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
+import { toast } from 'sonner';
 
 export default function SelectInstitutePage() {
   const t = useTranslations('selectInstitute');
+  const errorLabels = useAuthErrorLabels();
   const ti = useI18nField();
   const { memberships, needsInstituteSelection, isAuthenticated, isLoading, selectInstitute } =
     useAuth();
@@ -41,9 +44,14 @@ export default function SelectInstitutePage() {
         new URLSearchParams(window.location.search).get('returnUrl'),
       );
       router.replace(returnUrl ?? '/dashboard');
-    } catch {
-      setError(t('selectFailed'));
+    } catch (err) {
       setSelecting(null);
+      if (isAppError(err, 'SESSION_EXPIRED')) {
+        toast.error(errorLabels.SESSION_EXPIRED);
+        router.replace('/login');
+        return;
+      }
+      setError(resolveAuthErrorMessage(err, { ...errorLabels, generic: t('selectFailed') }));
     }
   };
 
@@ -66,7 +74,10 @@ export default function SelectInstitutePage() {
         </CardHeader>
         <CardContent>
           {error && (
-            <div className="bg-destructive/10 text-destructive mb-4 rounded-md p-3 text-sm">
+            <div
+              role="alert"
+              className="bg-destructive/10 text-destructive mb-4 rounded-md p-3 text-sm"
+            >
               {error}
             </div>
           )}

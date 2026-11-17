@@ -1,12 +1,7 @@
-import {
-  type CanActivate,
-  type ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import type { AuthUser } from '@roviq/common-types';
+import { type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
 import { ALLOW_WHEN_PASSWORD_CHANGE_REQUIRED } from '../decorators/allow-when-password-change-required.decorator';
 
 /**
@@ -53,9 +48,9 @@ export class MustChangePasswordGuard implements CanActivate {
       return true;
     }
 
-    throw new ForbiddenException({
-      code: 'PASSWORD_CHANGE_REQUIRED',
-      message: 'You must change your password before continuing.',
-    });
+    throw new BusinessException(
+      ErrorCode.PASSWORD_CHANGE_REQUIRED,
+      'You must change your password before continuing.',
+    );
   }
 }

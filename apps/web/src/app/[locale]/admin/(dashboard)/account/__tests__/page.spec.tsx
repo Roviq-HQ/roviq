@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // stub useAuth and replace PasskeyManager with a marker so the tests don't
 // have to wire mutations.
 const useAuthMock = vi.fn();
-vi.mock('@roviq/auth', () => ({
+vi.mock('@roviq/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@roviq/auth')>()),
   useAuth: () => useAuthMock(),
   createAuthMutations: () => ({
     myPasskeys: {},

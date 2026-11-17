@@ -13,14 +13,15 @@
  * against a per-test transaction stub. We don't assert SQL shape — only
  * Redis reads/writes and exception payloads.
  */
-import { type ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
-import type { AuthUser } from '@roviq/common-types';
+import { type AuthUser, ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import type Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectBusinessError } from '../../../__tests__/expect-business-error';
 import { ImpersonationSessionGuard } from '../impersonation-session.guard';
 
 // ── Module-level mocks ─────────────────────────────────────────
@@ -141,13 +142,7 @@ function createGuard(
 }
 
 async function expectImpersonationEnded(fn: () => Promise<unknown>): Promise<void> {
-  await expect(fn()).rejects.toBeInstanceOf(UnauthorizedException);
-  try {
-    await fn();
-  } catch (err: unknown) {
-    const response = (err as UnauthorizedException).getResponse() as { code?: string };
-    expect(response.code).toBe('IMPERSONATION_ENDED');
-  }
+  await expectBusinessError(fn, ErrorCode.IMPERSONATION_ENDED);
 }
 
 // ── Tests ──────────────────────────────────────────────────────

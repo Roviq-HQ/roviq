@@ -1,7 +1,7 @@
 import { createMongoAbility } from '@casl/ability';
-import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { AppAbility } from '@roviq/common-types';
+import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { describe, expect, it, vi } from 'vitest';
 import type { AbilityFactory } from '../ability.factory';
@@ -64,14 +64,16 @@ describe('AbilityGuard', () => {
 
     await expect(
       guard.canActivate(buildContext(resolver.guarded, { user: { userId: 'user-1' } })),
-    ).rejects.toThrow(new ForbiddenException('You are not allowed to create Attendance'));
+    ).rejects.toThrow(
+      new BusinessException(ErrorCode.FORBIDDEN, 'You are not allowed to create Attendance'),
+    );
   });
 
   it('should reject a guarded handler when the request has no user', async () => {
     const { guard } = buildGuard(createMongoAbility<AppAbility>([]));
 
     await expect(guard.canActivate(buildContext(resolver.guarded, {}))).rejects.toThrow(
-      new ForbiddenException('Authentication required'),
+      new BusinessException(ErrorCode.FORBIDDEN, 'Authentication required'),
     );
   });
 });

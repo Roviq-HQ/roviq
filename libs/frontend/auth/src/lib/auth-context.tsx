@@ -2,6 +2,7 @@
 
 import type { AuthScope } from '@roviq/common-types';
 import * as React from 'react';
+import { AuthRequestError, isAppError } from './error-utils';
 import { checkIsImpersonated, isTokenExpired } from './jwt-decode';
 import type { SessionExpiredDialogProps } from './session-expired-dialog';
 import { SessionExpiredDialog } from './session-expired-dialog';
@@ -168,8 +169,7 @@ export function AuthProvider({
             scheduleRefresh(result.accessToken);
           } catch (err) {
             // If password was changed, clear all state and force re-login
-            const message = err instanceof Error ? err.message : '';
-            if (message.includes('Password changed') || message.includes('PASSWORD_CHANGED')) {
+            if (isAppError(err, 'PASSWORD_CHANGED')) {
               tokenStorage.clear();
               if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
               setState({
@@ -317,10 +317,17 @@ export function AuthProvider({
     async (membershipId: string) => {
       if (!pendingSelectionToken) {
         clearAllState();
-        throw new Error('Session expired');
+        throw new AuthRequestError('Session expired', 'SESSION_EXPIRED');
       }
 
-      const result = await selectInstituteMutation(pendingSelectionToken, membershipId);
+      const result = await selectInstituteMutation(pendingSelectionToken, membershipId).catch(
+        (err: unknown) => {
+          // The selection token is single-purpose and short-lived; once the
+          // server rejects it the only way forward is a fresh login.
+          if (isAppError(err, 'SESSION_EXPIRED')) clearAllState();
+          throw err;
+        },
+      );
       tokenStorage.setTokens({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,

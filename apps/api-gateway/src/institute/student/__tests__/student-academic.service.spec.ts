@@ -7,7 +7,7 @@
  * directly — mirroring the pattern in `staff-qualification.spec.ts`.
  */
 
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ErrorCode } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Sequential result queue ───────────────────────────────────
@@ -181,12 +181,10 @@ describe('StudentAcademicService (unit)', () => {
           standardId: 'std-1',
           sectionId: 'sec-1',
         }),
-      ).rejects.toMatchObject({
-        response: { code: 'SECTION_CAPACITY_EXCEEDED' },
-      });
+      ).rejects.toMatchObject({ code: ErrorCode.SECTION_CAPACITY_EXCEEDED });
     });
 
-    it('throws UnprocessableEntityException for capacity overflow', async () => {
+    it('rejects for capacity overflow', async () => {
       queueResult([{ currentStrength: 50, capacity: 45 }]);
       queueResult([{ sectionStrengthNorms: { optimal: 40, hardMax: 45, exemptionAllowed: true } }]);
 
@@ -197,7 +195,7 @@ describe('StudentAcademicService (unit)', () => {
           standardId: 'std-1',
           sectionId: 'sec-1',
         }),
-      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      ).rejects.toMatchObject({ code: ErrorCode.SECTION_CAPACITY_EXCEEDED });
     });
 
     it('succeeds past capacity when overrideReason is provided', async () => {
@@ -242,12 +240,10 @@ describe('StudentAcademicService (unit)', () => {
           studentAcademicId: 'sa-1',
           newSectionId: 'sec-new',
         }),
-      ).rejects.toMatchObject({
-        response: { code: 'SECTION_CAPACITY_EXCEEDED' },
-      });
+      ).rejects.toMatchObject({ code: ErrorCode.SECTION_CAPACITY_EXCEEDED });
     });
 
-    it('throws NotFoundException when the enrollment does not exist', async () => {
+    it('rejects when the enrollment does not exist', async () => {
       queueResult([]); // current enrollment SELECT → empty.
 
       await expect(
@@ -255,7 +251,7 @@ describe('StudentAcademicService (unit)', () => {
           studentAcademicId: 'missing',
           newSectionId: 'sec-new',
         }),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toMatchObject({ code: ErrorCode.STUDENT_ACADEMIC_NOT_FOUND });
     });
   });
 });

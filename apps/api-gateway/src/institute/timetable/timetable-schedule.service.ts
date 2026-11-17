@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode, type Weekday } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
@@ -47,7 +47,11 @@ export class TimetableScheduleService {
    */
   async assignEntry(input: AssignEntryServiceInput): Promise<TimetableEntryRecord[]> {
     const timetable = await this.repo.findTimetableById(input.timetableId);
-    if (!timetable) throw new NotFoundException(`Timetable ${input.timetableId} not found`);
+    if (!timetable)
+      throw new BusinessException(
+        ErrorCode.TIMETABLE_NOT_FOUND,
+        `Timetable ${input.timetableId} not found`,
+      );
 
     const period = await this.assertAssignableTarget(input);
 
@@ -84,7 +88,10 @@ export class TimetableScheduleService {
   private async assertAssignableTarget(input: AssignEntryServiceInput) {
     const period = await this.repo.findPeriodById(input.periodId);
     if (!period || period.timetableId !== input.timetableId) {
-      throw new NotFoundException(`Period ${input.periodId} not found in this timetable`);
+      throw new BusinessException(
+        ErrorCode.TIMETABLE_PERIOD_NOT_FOUND,
+        `Period ${input.periodId} not found in this timetable`,
+      );
     }
     if (period.kind === 'BREAK') {
       throw new BusinessException(
@@ -143,7 +150,11 @@ export class TimetableScheduleService {
 
   async clearEntry(input: ClearEntryServiceInput): Promise<boolean> {
     const timetable = await this.repo.findTimetableById(input.timetableId);
-    if (!timetable) throw new NotFoundException(`Timetable ${input.timetableId} not found`);
+    if (!timetable)
+      throw new BusinessException(
+        ErrorCode.TIMETABLE_NOT_FOUND,
+        `Timetable ${input.timetableId} not found`,
+      );
     await this.repo.clearEntry({
       timetableId: input.timetableId,
       sectionId: input.sectionId,

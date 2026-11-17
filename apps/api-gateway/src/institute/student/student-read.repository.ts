@@ -1,6 +1,7 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { InstituteReadAccess } from '@roviq/casl';
 import type { InstituteContext } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   academicYearsLive,
   DRIZZLE_DB,
@@ -118,7 +119,7 @@ export class StudentReadRepository {
     });
 
     if (rows.length === 0) {
-      throw new NotFoundException({ message: 'Student not found', code: 'STUDENT_NOT_FOUND' });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     return rows[0];
@@ -390,10 +391,7 @@ export class StudentReadRepository {
     });
 
     if (studentRows.length === 0) {
-      throw new NotFoundException({
-        message: 'Student not found',
-        code: 'STUDENT_NOT_FOUND',
-      });
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     const userId = studentRows[0].userId;

@@ -1,9 +1,11 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { caslToSqlWhere, type InstituteReadAccess } from '@roviq/casl';
 import {
   AdmissionApplicationStatus,
   type AppAbility,
+  BusinessException,
   EnquiryStatus,
+  ErrorCode,
   FUNNEL_STAGES,
   type InstituteContext,
 } from '@roviq/common-types';
@@ -241,7 +243,7 @@ export class AdmissionReadRepository {
     });
 
     if (rows.length === 0) {
-      throw new NotFoundException('Application not found');
+      throw new BusinessException(ErrorCode.APPLICATION_NOT_FOUND, 'Application not found');
     }
     return toApplicationModel(rows[0]);
   }

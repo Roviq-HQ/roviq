@@ -1,7 +1,7 @@
-import { type ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { type ExecutionContext, Injectable } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { AuthGuard } from '@nestjs/passport';
-import type { AuthUser } from '@roviq/common-types';
+import { type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
 
 @Injectable()
 export class GqlPlatformAuthGuard extends AuthGuard('jwt') {
@@ -13,10 +13,10 @@ export class GqlPlatformAuthGuard extends AuthGuard('jwt') {
   // biome-ignore lint/suspicious/noExplicitAny: must match IAuthGuard.handleRequest signature
   override handleRequest<TUser = any>(err: any, user: any, _info: any): TUser {
     if (err || !user) {
-      throw err || new UnauthorizedException();
+      throw err || new BusinessException(ErrorCode.UNAUTHENTICATED, 'Unauthorized');
     }
     if ((user as AuthUser).scope !== 'platform') {
-      throw new UnauthorizedException('Platform scope required');
+      throw new BusinessException(ErrorCode.UNAUTHENTICATED, 'Platform scope required');
     }
     return user as TUser;
   }

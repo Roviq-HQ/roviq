@@ -151,6 +151,7 @@ Full rationale + enforcing CI gate for each line: `docs/references/mistake-refer
 - UI: `<Button>` and `<FieldInfoPopover>` from `@roviq/ui`, `useTranslations()`, `useFormatDate()`, scope-prefixed nav hrefs
 - Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`
 - Seed credentials/names only from `e2e/shared/seed-fixtures.ts`
+- Errors: `BusinessException(ErrorCode.X, …)` on the backend; frontend branches on `extensions.code` (`isAppError`, `extractGraphQLErrorCode`) and shows translated copy — never `err.message`
 - `REDIS_KEYS` constants · new `@roviq/*` lib → add vitest alias in `apps/api-gateway/vitest.config.ts` · impersonation tokens never refresh
 - Save test/build output to a temp file and grep it — don't re-run · e2e DB is `roviq_test` · verify docs/assertions against source, not memory
 - `pnpm tilt …`, never bare `tilt` · no hardcoded dev/e2e ports in code or tests — instance variables with slot 0 defaults

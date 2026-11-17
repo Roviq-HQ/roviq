@@ -1,14 +1,8 @@
-import {
-  type CanActivate,
-  type ExecutionContext,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
-import type { AuthUser } from '@roviq/common-types';
+import { type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -87,10 +81,7 @@ export class ImpersonationSessionGuard implements CanActivate {
     // Tombstone check — wins any race with a concurrent cache write.
     const tombstone = await this.redis.get(tombstoneKey);
     if (tombstone) {
-      throw new UnauthorizedException({
-        code: 'IMPERSONATION_ENDED',
-        message: 'Impersonation session ended',
-      });
+      throw new BusinessException(ErrorCode.IMPERSONATION_ENDED, 'Impersonation session ended');
     }
 
     // Check Redis cache
@@ -115,10 +106,10 @@ export class ImpersonationSessionGuard implements CanActivate {
       );
 
       if (!session) {
-        throw new UnauthorizedException({
-          code: 'IMPERSONATION_ENDED',
-          message: 'Impersonation session not found',
-        });
+        throw new BusinessException(
+          ErrorCode.IMPERSONATION_ENDED,
+          'Impersonation session not found',
+        );
       }
 
       sessionData = JSON.stringify({
@@ -134,17 +125,11 @@ export class ImpersonationSessionGuard implements CanActivate {
     const parsed = JSON.parse(sessionData);
 
     if (parsed.endedAt || parsed.endedReason === 'revoked') {
-      throw new UnauthorizedException({
-        code: 'IMPERSONATION_ENDED',
-        message: 'Impersonation session ended',
-      });
+      throw new BusinessException(ErrorCode.IMPERSONATION_ENDED, 'Impersonation session ended');
     }
 
     if (new Date(parsed.expiresAt) < new Date()) {
-      throw new UnauthorizedException({
-        code: 'IMPERSONATION_ENDED',
-        message: 'Impersonation session expired',
-      });
+      throw new BusinessException(ErrorCode.IMPERSONATION_ENDED, 'Impersonation session expired');
     }
 
     return true;

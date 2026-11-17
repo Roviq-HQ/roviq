@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -183,7 +184,8 @@ export class SectionDrizzleRepository extends SectionRepository {
         .where(and(eq(sections.id, id), isNull(sections.deletedAt)))
         .returning(writeReturning);
 
-      if (rows.length === 0) throw new NotFoundException(`Section ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, `Section ${id} not found`);
       return rows[0] as SectionRecord;
     });
   }

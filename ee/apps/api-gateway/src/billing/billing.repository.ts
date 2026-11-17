@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { type AppAbility } from '@roviq/common-types';
+import { Inject, Injectable } from '@nestjs/common';
+import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
 import { DRIZZLE_DB, type DrizzleDB, institutesLive, mkAdminCtx, withAdmin } from '@roviq/database';
 import {
   gatewayConfigs,
@@ -348,7 +348,8 @@ export class BillingRepository {
         .from(institutesLive)
         .where(eq(institutesLive.id, id))
         .limit(1);
-      if (!institute) throw new NotFoundException(`Institute ${id} not found`);
+      if (!institute)
+        throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
       return institute;
     });
   }

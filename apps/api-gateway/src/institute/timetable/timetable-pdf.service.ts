@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { Weekday } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { i18nDisplay } from '@roviq/database';
 import PDFDocument from 'pdfkit';
 import { TimetableRepository } from './repositories/timetable.repository';
@@ -47,7 +48,11 @@ export class TimetablePdfService {
   /** Section weekly timetable as a downloadable PDF (Buffer). */
   async sectionTimetablePdf(sectionId: string, timetableId?: string): Promise<Buffer> {
     const grid = await this.view.sectionTimetable(sectionId, timetableId);
-    if (!grid) throw new NotFoundException('No timetable found for this section');
+    if (!grid)
+      throw new BusinessException(
+        ErrorCode.TIMETABLE_NOT_FOUND,
+        'No timetable found for this section',
+      );
     const timetable = await this.repo.findTimetableById(grid.timetableId);
     const labels = await this.collectLabels(grid.entries, [sectionId]);
     return this.render({
@@ -62,7 +67,8 @@ export class TimetablePdfService {
   /** Staff weekly timetable as a downloadable PDF (Buffer). */
   async staffTimetablePdf(teacherId: string, timetableId?: string): Promise<Buffer> {
     const grid = await this.view.staffTimetable(teacherId, timetableId);
-    if (!grid) throw new NotFoundException('No active timetable found');
+    if (!grid)
+      throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, 'No active timetable found');
     const timetable = await this.repo.findTimetableById(grid.timetableId);
     const sectionIds = grid.entries.map((e) => e.sectionId);
     const labels = await this.collectLabels(grid.entries, sectionIds);

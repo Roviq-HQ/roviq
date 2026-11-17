@@ -7,8 +7,8 @@
  * - Guardian membership → guardian_profile + user_profile + linked children
  */
 
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DefaultRoles } from '@roviq/common-types';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, DefaultRoles, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -61,7 +61,8 @@ export class ProfileService {
       },
     );
 
-    if (!membership) throw new NotFoundException('Membership not found');
+    if (!membership)
+      throw new BusinessException(ErrorCode.MEMBERSHIP_NOT_FOUND, 'Membership not found');
 
     const role = await withTenant(
       this.db,
@@ -88,7 +89,8 @@ export class ProfileService {
       return rows[0] ?? null;
     });
 
-    if (!profile) throw new NotFoundException('User profile not found');
+    if (!profile)
+      throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
 
     const userProfileData = {
       id: profile.id,
@@ -237,7 +239,8 @@ export class ProfileService {
         .where(eq(userProfiles.userId, userId))
         .returning();
 
-      if (rows.length === 0) throw new NotFoundException('User profile not found');
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
       return rows[0];
     });
 

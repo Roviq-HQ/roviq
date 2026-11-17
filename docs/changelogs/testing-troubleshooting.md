@@ -573,3 +573,21 @@ This supersedes the note in the 2026-04-17 entry that pre-commit was "intentiona
 
 Still CI-only: the codegen-drift step (needs a running gateway). Still pre-push-only: `check:no-double-cast` and `check:db-drift`.
 
+
+## 2026-11-17 — fixed: `pnpm test:int` failed before any test on a never-bootstrapped `roviq_test`
+
+In a new dev instance (slot 2) `pnpm test:int` stopped in the global setup with `drizzle-kit migrate failed (exit 1) against localhost:5474/roviq_test — its output is above`, and nothing was above: drizzle-kit printed only its spinner. The instance's `roviq_test` had never been set up (0 tables), so the first migration hit missing prereq functions. Each failed attempt also left an empty `drizzle.__drizzle_migrations` table behind, which made `pnpm db:reset --if-empty` report "already set up" because it treated the table's existence as a baseline.
+
+`vitest.integration.global-setup.ts` now runs `pnpm db:reset --test --if-empty` before `drizzle-kit migrate`, the same bootstrap Tilt's `db-push` does for the dev database. `needsBootstrap()` in `scripts/db-reset.ts` now requires at least one row in `drizzle.__drizzle_migrations` before it calls a database baselined. A database that is set up is untouched: the bootstrap is a no-op and migrate runs as before.
+
+**Verification:** in slot 2 the first run bootstrapped and seeded `roviq_test`, then ran the suite; the next run printed `Database is already set up; nothing to bootstrap.` and passed 543 tests.
+
+
+## 2026-11-17 — fixed: `pnpm test:int` in a parallel instance started instance 0's infra
+
+After a reboot, `pnpm test:int` in slot 2 found its Postgres/Redis/NATS down and ran `docker compose -f docker/compose.infra.yaml up` with no project name. Compose fell back to the default project `docker`, which is instance 0's, so it started `docker-postgres-1`, `docker-redis-1`, `docker-nats-1` and `docker-nats-test-1` and then failed with `Started the dev infra but still cannot connect: postgres (… localhost:5474) …` because slot 2's own containers were still down.
+
+`scripts/int-infra.ts` now passes `-p $ROVIQ_COMPOSE_PROJECT` when it is set, so the instance's own project is started. Instance 0 and CI do not set the variable and behave as before. `pnpm infra:up` / `infra:down` in `package.json` have the same gap and are unchanged.
+
+**Verification:** with slot 2's infra stopped, `pnpm test:int` started `roviq-2-postgres-1`, `roviq-2-redis-1` and `roviq-2-nats-1` and ran the suite.
+

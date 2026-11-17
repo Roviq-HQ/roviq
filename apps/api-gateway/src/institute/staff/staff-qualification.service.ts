@@ -6,7 +6,8 @@
  * tenant-scoped via a `tenant_id` FK to `institutes`.
  */
 
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -95,7 +96,10 @@ export class StaffQualificationService {
           .returning();
 
         if (rows.length === 0) {
-          throw new NotFoundException(`Staff qualification ${id} not found`);
+          throw new BusinessException(
+            ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+            `Staff qualification ${id} not found`,
+          );
         }
         return rows[0];
       },
@@ -115,7 +119,10 @@ export class StaffQualificationService {
         .where(and(eq(staffQualifications.id, id), eq(staffQualifications.tenantId, tenantId)))
         .returning({ id: staffQualifications.id });
       if (rows.length === 0) {
-        throw new NotFoundException(`Staff qualification ${id} not found`);
+        throw new BusinessException(
+          ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+          `Staff qualification ${id} not found`,
+        );
       }
       return true;
     });

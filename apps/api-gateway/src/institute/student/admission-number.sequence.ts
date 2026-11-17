@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   type AdmissionNumberConfig,
   type DrizzleDB,
@@ -47,7 +47,8 @@ export async function nextAdmissionNumber(
     .from(standardsLive)
     .where(eq(standardsLive.id, standardId))
     .limit(1);
-  if (!standard) throw new NotFoundException(`Standard ${standardId} not found`);
+  if (!standard)
+    throw new BusinessException(ErrorCode.STANDARD_NOT_FOUND, `Standard ${standardId} not found`);
 
   const prefix = resolveAdmissionPrefix(config, standard.numericOrder);
   const sequenceName = admissionSeriesName(prefix);
@@ -73,7 +74,11 @@ export async function nextAdmissionNumber(
     sql`SELECT next_val FROM next_sequence_value(${tenantId}::uuid, ${sequenceName})`,
   );
   const row = result.rows[0];
-  if (!row) throw new NotFoundException(`Admission sequence ${sequenceName} not found`);
+  if (!row)
+    throw new BusinessException(
+      ErrorCode.NOT_FOUND,
+      `Admission sequence ${sequenceName} not found`,
+    );
 
   return formatSequenceValue(config.format, {
     prefix,

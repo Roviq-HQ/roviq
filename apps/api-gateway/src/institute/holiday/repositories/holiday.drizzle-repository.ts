@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -127,7 +128,8 @@ export class HolidayDrizzleRepository extends HolidayRepository {
         })
         .where(and(eq(holidays.id, id), isNull(holidays.deletedAt)))
         .returning(writeReturning);
-      if (rows.length === 0) throw new NotFoundException(`Holiday ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.HOLIDAY_NOT_FOUND, `Holiday ${id} not found`);
       return rows[0] as HolidayRecord;
     });
   }

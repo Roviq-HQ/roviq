@@ -1,10 +1,10 @@
-import { ForbiddenException } from '@nestjs/common';
 import type {
   AuthUser,
   InstituteContext,
   PlatformContext,
   ResellerContext,
 } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 
 /**
  * Assert the authenticated user has a platform context. Narrows the branded
@@ -12,7 +12,7 @@ import type {
  */
 export function assertPlatformContext(user: AuthUser): asserts user is PlatformContext {
   if (user.scope !== 'platform') {
-    throw new ForbiddenException('Platform scope required');
+    throw new BusinessException(ErrorCode.FORBIDDEN, 'Platform scope required');
   }
 }
 
@@ -24,7 +24,7 @@ export function assertPlatformContext(user: AuthUser): asserts user is PlatformC
  */
 export function assertResellerContext(user: AuthUser): asserts user is ResellerContext {
   if (user.scope !== 'reseller' || !user.resellerId) {
-    throw new ForbiddenException('Reseller scope required');
+    throw new BusinessException(ErrorCode.FORBIDDEN, 'Reseller scope required');
   }
 }
 
@@ -34,7 +34,7 @@ export function assertResellerContext(user: AuthUser): asserts user is ResellerC
  */
 export function assertTenantContext(user: AuthUser): asserts user is InstituteContext {
   if (user.scope !== 'institute' || !user.tenantId) {
-    throw new ForbiddenException('Institute scope required');
+    throw new BusinessException(ErrorCode.FORBIDDEN, 'Institute scope required');
   }
 }
 
@@ -47,6 +47,6 @@ export function assertInstituteWithReseller(
   user: AuthUser,
 ): asserts user is InstituteContext & { resellerId: string } {
   if (user.scope !== 'institute' || !user.tenantId || !user.resellerId) {
-    throw new ForbiddenException('Institute scope with reseller required');
+    throw new BusinessException(ErrorCode.FORBIDDEN, 'Institute scope with reseller required');
   }
 }

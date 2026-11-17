@@ -13,8 +13,7 @@
  * does not reliably wire private fields under esbuild/Vitest).
  */
 
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { BusinessException, LeaveStatus, LeaveType } from '@roviq/common-types';
+import { BusinessException, ErrorCode, LeaveStatus, LeaveType } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { LeaveService } from '../leave.service';
 import type { LeaveRepository } from '../repositories/leave.repository';
@@ -113,10 +112,12 @@ describe('LeaveService (unit)', () => {
       expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID);
     });
 
-    it('throws NotFoundException when the repo returns null', async () => {
+    it('rejects when the repo returns null', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.findById(LEAVE_ID)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.findById(LEAVE_ID)).rejects.toMatchObject({
+        code: ErrorCode.LEAVE_NOT_FOUND,
+      });
     });
   });
 
@@ -140,7 +141,7 @@ describe('LeaveService (unit)', () => {
   });
 
   describe('apply', () => {
-    it('rejects with BadRequestException when endDate precedes startDate', async () => {
+    it('rejects when endDate precedes startDate', async () => {
       const input = {
         userId: USER_ID,
         startDate: '2026-05-10',
@@ -153,12 +154,14 @@ describe('LeaveService (unit)', () => {
       await expect(service.apply(input)).rejects.toThrow(
         'Leave end date must not be before the start date.',
       );
-      await expect(service.apply(input)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.apply(input)).rejects.toMatchObject({
+        code: ErrorCode.INVALID_DATE_RANGE,
+      });
       expect(repo.create).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
 
-    it('rejects with BadRequestException when the range spans 3+ calendar days and no files are attached', async () => {
+    it('rejects when the range spans 3+ calendar days and no files are attached', async () => {
       const input = {
         userId: USER_ID,
         startDate: '2026-05-01',
@@ -169,7 +172,9 @@ describe('LeaveService (unit)', () => {
         fileUrls: [],
       };
 
-      await expect(service.apply(input)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.apply(input)).rejects.toMatchObject({
+        code: ErrorCode.LEAVE_DOCUMENT_REQUIRED,
+      });
       expect(repo.create).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
@@ -246,13 +251,13 @@ describe('LeaveService (unit)', () => {
   });
 
   describe('update', () => {
-    it('rejects with BadRequestException when the existing leave is already APPROVED', async () => {
+    it('rejects when the existing leave is already APPROVED', async () => {
       const existing = buildLeave({ status: LeaveStatus.APPROVED });
       repo.findById.mockResolvedValue(existing);
 
-      await expect(service.update(LEAVE_ID, { reason: 'changed my mind' })).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.update(LEAVE_ID, { reason: 'changed my mind' })).rejects.toMatchObject({
+        code: ErrorCode.LEAVE_NOT_EDITABLE,
+      });
       expect(repo.update).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });

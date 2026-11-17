@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { i18nDisplay } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -21,7 +21,8 @@ export class SectionService {
 
   async findById(id: string): Promise<SectionRecord> {
     const record = await this.repo.findById(id);
-    if (!record) throw new NotFoundException(`Section ${id} not found`);
+    if (!record)
+      throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, `Section ${id} not found`);
     return record;
   }
 
@@ -54,7 +55,10 @@ export class SectionService {
     // the error code reaches GraphQL extensions cleanly.
     const parent = await this.standardRepo.findById(input.standardId);
     if (!parent) {
-      throw new NotFoundException(`Standard ${input.standardId} not found`);
+      throw new BusinessException(
+        ErrorCode.STANDARD_NOT_FOUND,
+        `Standard ${input.standardId} not found`,
+      );
     }
     if (parent.streamApplicable && !input.stream) {
       throw new BusinessException(

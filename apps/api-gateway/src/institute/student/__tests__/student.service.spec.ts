@@ -9,9 +9,8 @@
  */
 
 import { createMongoAbility } from '@casl/ability';
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { AppAbility } from '@roviq/common-types';
-import { AcademicStatus, SocialCategory } from '@roviq/common-types';
+import { AcademicStatus, ErrorCode, SocialCategory } from '@roviq/common-types';
 import type { DrizzleDB } from '@roviq/database';
 import type { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
@@ -220,7 +219,7 @@ describe('StudentService (unit)', () => {
   });
 
   describe('update', () => {
-    it('throws ConflictException CONCURRENT_MODIFICATION on version mismatch', async () => {
+    it('rejects with CONCURRENT_MODIFICATION on version mismatch', async () => {
       // Update (.returning()) resolves to [] → version mismatch path.
       queueResult([]);
       // throwVersionConflict selects the row → still exists, so conflict.
@@ -230,17 +229,17 @@ describe('StudentService (unit)', () => {
         version: 1,
         socialCategory: SocialCategory.GENERAL,
       });
-      await expect(promise).rejects.toBeInstanceOf(ConflictException);
+      await expect(promise).rejects.toMatchObject({ code: ErrorCode.CONCURRENT_MODIFICATION });
       await expect(
         // Re-run with same queue state (already consumed) would fail — so assert
         // via a single caught error below.
         promise.catch((e: unknown) => {
           throw e;
         }),
-      ).rejects.toMatchObject({ response: { code: 'CONCURRENT_MODIFICATION' } });
+      ).rejects.toMatchObject({ code: ErrorCode.CONCURRENT_MODIFICATION });
     });
 
-    it('throws NotFoundException when the student does not exist', async () => {
+    it('rejects when the student does not exist', async () => {
       // Update returns [] → fall through to throwVersionConflict.
       queueResult([]);
       // throwVersionConflict select → not found.
@@ -248,7 +247,7 @@ describe('StudentService (unit)', () => {
 
       await expect(
         service.update('missing', { version: 1, socialCategory: SocialCategory.GENERAL }),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toMatchObject({ code: ErrorCode.STUDENT_NOT_FOUND });
     });
 
     it('emits STUDENT.left when academicStatus transitions to a departure status', async () => {

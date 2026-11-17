@@ -1,5 +1,6 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Weekday } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -359,7 +360,8 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         })
         .where(and(eq(timetables.id, id), isNull(timetables.deletedAt)))
         .returning(timetableWriteReturning);
-      if (rows.length === 0) throw new NotFoundException(`Timetable ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
       return rows[0] as TimetableRecord;
     });
   }
@@ -372,7 +374,8 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         .set({ status, updatedBy: userId })
         .where(and(eq(timetables.id, id), isNull(timetables.deletedAt)))
         .returning(timetableWriteReturning);
-      if (rows.length === 0) throw new NotFoundException(`Timetable ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
       return rows[0] as TimetableRecord;
     });
   }
@@ -403,7 +406,8 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         .set({ status: 'ACTIVE', updatedBy: userId })
         .where(and(eq(timetables.id, id), isNull(timetables.deletedAt)))
         .returning(timetableWriteReturning);
-      if (rows.length === 0) throw new NotFoundException(`Timetable ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
 
       return {
         timetable: rows[0] as TimetableRecord,
@@ -458,7 +462,8 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         .set({ deletedAt: null, deletedBy: null, updatedBy: userId })
         .where(eq(timetables.id, id))
         .returning(timetableWriteReturning);
-      if (rows.length === 0) throw new NotFoundException(`Timetable ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
       return rows[0] as TimetableRecord;
     });
   }
@@ -564,7 +569,11 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         })
         .where(and(eq(timetablePeriods.id, id), isNull(timetablePeriods.deletedAt)))
         .returning(periodWriteReturning);
-      if (rows.length === 0) throw new NotFoundException(`Timetable period ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(
+          ErrorCode.TIMETABLE_PERIOD_NOT_FOUND,
+          `Timetable period ${id} not found`,
+        );
       return rows[0] as TimetablePeriodRecord;
     });
   }

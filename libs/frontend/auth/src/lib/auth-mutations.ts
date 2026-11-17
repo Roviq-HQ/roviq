@@ -3,6 +3,7 @@ import type {
   PublicKeyCredentialCreationOptionsJSON,
   RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
+import { AuthRequestError } from './error-utils';
 import type { AuthUser, LoginInput, LoginResult, PasskeyAuthOptions, SessionInfo } from './types';
 
 interface AuthResponse {
@@ -32,6 +33,11 @@ const INSTITUTE_LOGIN_FIELDS = `
   memberships { membershipId tenantId roleId instituteName instituteSlug instituteLogoUrl roleName }
 `;
 
+interface GraphQLResponse<T> {
+  data: T;
+  errors?: { message?: string; extensions?: { code?: unknown } }[];
+}
+
 async function graphqlFetch<T>(
   url: string,
   query: string,
@@ -44,10 +50,15 @@ async function graphqlFetch<T>(
     body: JSON.stringify({ query, variables }),
   });
 
-  const json = await res.json();
+  const json: GraphQLResponse<T> = await res.json();
 
-  if (json.errors?.length) {
-    throw new Error(json.errors[0].message ?? 'GraphQL error');
+  const [firstError] = json.errors ?? [];
+  if (firstError) {
+    const code = firstError.extensions?.code;
+    throw new AuthRequestError(
+      firstError.message ?? 'GraphQL error',
+      typeof code === 'string' ? code : null,
+    );
   }
 
   return json.data;

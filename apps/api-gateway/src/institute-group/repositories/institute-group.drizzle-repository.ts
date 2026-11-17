@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode, type GroupType } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
@@ -191,7 +191,10 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .returning(groupColumns);
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute group ${id} not found`);
+        throw new BusinessException(
+          ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+          `Institute group ${id} not found`,
+        );
       }
       return rows[0] as InstituteGroupRecord;
     });
@@ -238,7 +241,10 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .returning({ id: institutes.id });
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute ${instituteId} not found`);
+        throw new BusinessException(
+          ErrorCode.INSTITUTE_NOT_FOUND,
+          `Institute ${instituteId} not found`,
+        );
       }
     });
   }
@@ -252,7 +258,10 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .returning({ id: institutes.id });
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute ${instituteId} not found`);
+        throw new BusinessException(
+          ErrorCode.INSTITUTE_NOT_FOUND,
+          `Institute ${instituteId} not found`,
+        );
       }
     });
   }
@@ -281,7 +290,10 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .returning({ id: groupMemberships.id });
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Membership not found for user ${userId} in group ${groupId}`);
+        throw new BusinessException(
+          ErrorCode.MEMBERSHIP_NOT_FOUND,
+          `Membership not found for user ${userId} in group ${groupId}`,
+        );
       }
     });
   }

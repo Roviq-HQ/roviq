@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { encodeCursor } from '../common/pagination/relay-pagination.model';
@@ -84,7 +85,10 @@ export class InstituteGroupService {
   async findById(id: string): Promise<InstituteGroupRecord> {
     const record = await this.groupRepo.findById(id);
     if (!record) {
-      throw new NotFoundException(`Institute group ${id} not found`);
+      throw new BusinessException(
+        ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+        `Institute group ${id} not found`,
+      );
     }
     return record;
   }
@@ -188,7 +192,10 @@ export class InstituteGroupService {
   private async requireGroup(id: string) {
     const record = await this.groupRepo.findById(id);
     if (!record) {
-      throw new NotFoundException(`Institute group ${id} not found`);
+      throw new BusinessException(
+        ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+        `Institute group ${id} not found`,
+      );
     }
     return record;
   }

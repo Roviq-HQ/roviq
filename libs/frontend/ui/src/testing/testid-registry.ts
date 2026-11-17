@@ -361,6 +361,13 @@ export const testIds = {
     submit: 'login-submit-btn',
   },
 
+  // ── Auth: passkey manager (libs/frontend/auth) ─────────────────────────
+  passkeyManager: {
+    error: 'passkey-manager-error',
+    addError: 'passkey-add-error',
+    removeError: 'passkey-remove-error',
+  },
+
   // ── Auth: login pages (shared across scopes) ───────────────────────────
   auth: {
     loginCard: 'login-card',

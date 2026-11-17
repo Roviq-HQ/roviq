@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode, type InstituteLocaleSettings } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
@@ -341,7 +341,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
         .returning(instituteColumns);
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute ${id} not found`);
+        throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
       }
       return rows[0] as InstituteRecord;
     });
@@ -351,7 +351,8 @@ export class InstituteDrizzleRepository extends InstituteRepository {
     const { userId } = getRequestContext();
 
     if (data.resellerId === undefined && data.groupId === undefined) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.BAD_REQUEST,
         'updateOwnership requires at least one of resellerId or groupId',
       );
     }
@@ -368,7 +369,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
         .returning(instituteColumns);
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute ${id} not found`);
+        throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
       }
       return rows[0] as InstituteRecord;
     });
@@ -412,7 +413,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
 
     const record = await this.findById(id);
     if (!record) {
-      throw new NotFoundException(`Institute ${id} not found`);
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
     }
     return record;
   }
@@ -472,7 +473,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
 
     const record = await this.findById(id);
     if (!record) {
-      throw new NotFoundException(`Institute ${id} not found`);
+      throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, `Institute ${id} not found`);
     }
     return record;
   }
@@ -504,7 +505,10 @@ export class InstituteDrizzleRepository extends InstituteRepository {
         .returning(instituteColumns);
 
       if (rows.length === 0) {
-        throw new NotFoundException(`Institute ${id} not found or not deleted`);
+        throw new BusinessException(
+          ErrorCode.INSTITUTE_NOT_FOUND,
+          `Institute ${id} not found or not deleted`,
+        );
       }
       return rows[0] as InstituteRecord;
     });

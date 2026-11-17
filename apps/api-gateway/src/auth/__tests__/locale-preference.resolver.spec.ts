@@ -1,5 +1,5 @@
-import { ForbiddenException } from '@nestjs/common';
 import type { AuthScope, AuthUser } from '@roviq/common-types';
+import { ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthResolver } from '../auth.resolver';
@@ -35,9 +35,9 @@ describe('account language ownership', () => {
       isImpersonated: true,
     });
 
-    await expect(resolver.updateMyPreferredLocale({ locale: 'hi' }, actor)).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(resolver.updateMyPreferredLocale({ locale: 'hi' }, actor)).rejects.toMatchObject({
+      code: ErrorCode.FORBIDDEN,
+    });
     expect(service.updatePreferredLocale).not.toHaveBeenCalled();
   });
 });

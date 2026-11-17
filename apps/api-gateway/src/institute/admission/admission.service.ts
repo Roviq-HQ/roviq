@@ -4,14 +4,7 @@
  * Direct service → Drizzle (no abstract repository).
  */
 
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ADMISSION_APPLICATION_STATE_MACHINE,
@@ -232,7 +225,7 @@ export class AdmissionService {
     );
 
     if (rows.length === 0) {
-      throw new NotFoundException('Enquiry not found');
+      throw new BusinessException(ErrorCode.ENQUIRY_NOT_FOUND, 'Enquiry not found');
     }
 
     return toEnquiryModel(rows[0]);
@@ -256,13 +249,16 @@ export class AdmissionService {
     );
 
     if (enqRows.length === 0) {
-      throw new NotFoundException('Enquiry not found');
+      throw new BusinessException(ErrorCode.ENQUIRY_NOT_FOUND, 'Enquiry not found');
     }
 
     const enq = enqRows[0];
 
     if (enq.convertedToApplicationId) {
-      throw new ConflictException('Enquiry already converted to an application');
+      throw new BusinessException(
+        ErrorCode.ENQUIRY_ALREADY_CONVERTED,
+        'Enquiry already converted to an application',
+      );
     }
 
     // Create application from enquiry data
@@ -339,7 +335,10 @@ export class AdmissionService {
       },
     );
     if (standardRows.length === 0) {
-      throw new NotFoundException(`Standard ${input.standardId} not found in this institute`);
+      throw new BusinessException(
+        ErrorCode.STANDARD_NOT_FOUND,
+        `Standard ${input.standardId} not found in this institute`,
+      );
     }
 
     // Applications must target an ACTIVE academic year — admissions for
@@ -357,12 +356,14 @@ export class AdmissionService {
       },
     );
     if (yearRows.length === 0) {
-      throw new NotFoundException(
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
         `Academic year ${input.academicYearId} not found in this institute`,
       );
     }
     if (!yearRows[0].isActive) {
-      throw new ConflictException(
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_ACTIVE,
         `Academic year ${input.academicYearId} is not active — applications cannot be accepted`,
       );
     }
@@ -429,7 +430,7 @@ export class AdmissionService {
     });
 
     if (current.length === 0) {
-      throw new NotFoundException('Application not found');
+      throw new BusinessException(ErrorCode.APPLICATION_NOT_FOUND, 'Application not found');
     }
 
     const oldStatus = current[0].status;
@@ -503,7 +504,10 @@ export class AdmissionService {
     // would create a student with no class placement.
     const targetSectionId = sectionId ?? current.sectionId;
     if (!targetSectionId) {
-      throw new BadRequestException('Choose a section before enrolling this applicant');
+      throw new BusinessException(
+        ErrorCode.SECTION_REQUIRED,
+        'Choose a section before enrolling this applicant',
+      );
     }
     const section = await withTenant(this.db, ctx, async (tx) => {
       return tx
@@ -518,7 +522,10 @@ export class AdmissionService {
         .limit(1);
     });
     if (section.length === 0) {
-      throw new BadRequestException('Section does not belong to the class this application is for');
+      throw new BusinessException(
+        ErrorCode.SECTION_STANDARD_MISMATCH,
+        'Section does not belong to the class this application is for',
+      );
     }
 
     if (targetSectionId !== current.sectionId) {
@@ -570,7 +577,8 @@ export class AdmissionService {
   async rejectApplication(id: string, reason?: string): Promise<ApplicationModel> {
     const rejectionReason = reason?.trim() || null;
     if (rejectionReason && rejectionReason.length > REJECTION_REASON_MAX_LENGTH) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.VALIDATION_FAILED,
         `Rejection reason must be at most ${REJECTION_REASON_MAX_LENGTH} characters`,
       );
     }

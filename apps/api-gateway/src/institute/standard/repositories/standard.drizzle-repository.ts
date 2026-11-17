@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -139,7 +140,8 @@ export class StandardDrizzleRepository extends StandardRepository {
         .where(and(eq(standards.id, id), isNull(standards.deletedAt)))
         .returning(writeReturning);
 
-      if (rows.length === 0) throw new NotFoundException(`Standard ${id} not found`);
+      if (rows.length === 0)
+        throw new BusinessException(ErrorCode.STANDARD_NOT_FOUND, `Standard ${id} not found`);
       return rows[0] as StandardRecord;
     });
   }

@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -84,7 +85,7 @@ export class InstituteRoleDrizzleRepository extends InstituteRoleRepository {
           isSystem: roles.isSystem,
           primaryNavSlugs: roles.primaryNavSlugs,
         });
-      if (!row) throw new NotFoundException(`Role ${id} not found`);
+      if (!row) throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, `Role ${id} not found`);
       return row as RoleRecord;
     });
   }

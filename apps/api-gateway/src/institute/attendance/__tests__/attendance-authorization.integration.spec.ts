@@ -705,7 +705,9 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
 
     it('rejects a client override flag without the AttendanceOverride permission', async () => {
       const variables = { s: ids.sessionPast, st: studentA.membershipId };
-      expect(await errorCodes(teacher, mark, { ...variables, o: false })).toEqual(['FORBIDDEN']);
+      expect(await errorCodes(teacher, mark, { ...variables, o: false })).toEqual([
+        'ATTENDANCE_EDIT_WINDOW_CLOSED',
+      ]);
       expect(await errorCodes(teacher, mark, { ...variables, o: true })).toEqual([
         'ATTENDANCE_OVERRIDE_FORBIDDEN',
       ]);

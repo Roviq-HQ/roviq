@@ -407,7 +407,7 @@ describe('Admission applications (integration)', () => {
       variables: { id: fixture.feePaidApplicationId },
     });
 
-    expect(response.errors?.[0]?.extensions?.code).toBe('BAD_REQUEST');
+    expect(response.errors?.[0]?.extensions?.code).toBe('SECTION_REQUIRED');
     expect(temporal.start).not.toHaveBeenCalled();
   });
 
@@ -418,7 +418,7 @@ describe('Admission applications (integration)', () => {
       variables: { id: fixture.feePaidApplicationId, sectionId: fixture.otherStandardSectionId },
     });
 
-    expect(response.errors?.[0]?.extensions?.code).toBe('BAD_REQUEST');
+    expect(response.errors?.[0]?.extensions?.code).toBe('SECTION_STANDARD_MISMATCH');
     expect(temporal.start).not.toHaveBeenCalled();
     const row = await loadApplication(fixture.feePaidApplicationId);
     expect(row.sectionId).toBeNull();
@@ -574,7 +574,7 @@ describe('Admission applications (integration)', () => {
       },
     });
 
-    expect(response.errors?.[0]?.extensions?.code).toBe('BAD_REQUEST');
+    expect(response.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
     const row = await loadApplication(fixture.submittedApplicationId);
     expect(row.status).not.toBe(AdmissionApplicationStatus.REJECTED);
   });

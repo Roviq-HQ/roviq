@@ -19,6 +19,31 @@
 
 Design doc: `docs/plans/2026-03-06-user-identity-auth-redesign.md`
 
+## Error Codes
+
+Auth failures carry a machine-readable `extensions.code` (see `docs/architecture.md` → "Error Handling"). The frontend never shows the server message; it maps the code to `auth.errors.<CODE>` in `apps/web/messages/{en,hi}/auth.json`.
+
+| Code | HTTP | Raised when |
+|------|------|-------------|
+| `UNAUTHENTICATED` | 401 | Access token missing, malformed or expired — the client refreshes and retries |
+| `INVALID_CREDENTIALS` | 401 | Wrong Roviq ID or password, unknown or inactive user |
+| `ACCOUNT_LOCKED` | 401 | Too many failed logins for the Roviq ID |
+| `ACCOUNT_NOT_FOUND` | 401 | Credentials are valid but there is no usable membership in this portal |
+| `ACCOUNT_INACTIVE` | 401 | The user behind a selection/switch token is deleted or not ACTIVE |
+| `SESSION_EXPIRED` | 401 | Refresh or institute-selection token invalid, expired, revoked or reused |
+| `PASSWORD_CHANGED` | 401 | Refresh token predates a password change — full re-login, no re-auth dialog |
+| `PASSWORD_CHANGE_REQUIRED` | 403 | Token carries `mustChangePassword` |
+| `CURRENT_PASSWORD_INCORRECT` | 401 | Wrong password on `changePassword` or when confirming a passkey registration |
+| `PASSWORD_UNCHANGED` | 400 | New password equals the current one |
+| `NO_ACTIVE_MEMBERSHIP` | 403 | Selected/target membership is missing or not ACTIVE |
+| `SESSION_NOT_FOUND` | 403 | Session to revoke does not belong to the user |
+| `IMPERSONATION_ENDED` | 401 | Impersonation session ended, expired or revoked |
+| `PASSKEY_CHALLENGE_EXPIRED` | 400 | WebAuthn challenge expired or already used |
+| `PASSKEY_VERIFICATION_FAILED` | 400 | Passkey registration response rejected |
+| `PASSKEY_AUTHENTICATION_FAILED` | 401 | Passkey sign-in rejected (unknown credential or bad signature — deliberately one code) |
+| `PASSKEY_NOT_FOUND` | 404 | Passkey missing or owned by another user |
+| `PASSKEY_LAST_AUTH_METHOD` | 400 | Removing the passkey would leave no sign-in method |
+
 ## Auth Flow (Three-Scope Model)
 
 Three separate login mutations, one per portal:
@@ -26,7 +51,7 @@ Three separate login mutations, one per portal:
 ### Admin Portal: `adminLogin(username, password)`
 1. Verifies credentials
 2. Looks up `platform_memberships` for user
-3. No membership → "No account found" (same error as wrong password)
+3. No membership → `ACCOUNT_NOT_FOUND` ("No account found")
 4. Issues scope=platform access token (5min TTL) + refresh token
 
 ### Reseller Portal: `resellerLogin(username, password)`

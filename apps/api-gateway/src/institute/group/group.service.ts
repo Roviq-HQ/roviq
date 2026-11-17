@@ -5,10 +5,12 @@
  * resolution with recursive CTE, and hybrid (rule + manual) logic.
  */
 
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  BusinessException,
   DomainGroupType,
   DynamicGroupStatus,
+  ErrorCode,
   GroupMemberSource,
   GroupMembershipType,
 } from '@roviq/common-types';
@@ -139,7 +141,8 @@ export class GroupService {
         return tx.select().from(groupsLive).where(eq(groupsLive.id, id)).limit(1);
       },
     );
-    if (rows.length === 0) throw new NotFoundException('Group not found');
+    if (rows.length === 0)
+      throw new BusinessException(ErrorCode.GROUP_NOT_FOUND, 'Group not found');
     return rows[0] as GroupRecord;
   }
 
@@ -208,7 +211,8 @@ export class GroupService {
       },
     );
 
-    if (rows.length === 0) throw new NotFoundException('Group not found');
+    if (rows.length === 0)
+      throw new BusinessException(ErrorCode.GROUP_NOT_FOUND, 'Group not found');
     return rows[0] as GroupRecord;
   }
 
@@ -226,7 +230,8 @@ export class GroupService {
           .returning({ id: groups.id });
       },
     );
-    if (deleted.length === 0) throw new NotFoundException('Group not found');
+    if (deleted.length === 0)
+      throw new BusinessException(ErrorCode.GROUP_NOT_FOUND, 'Group not found');
     return true;
   }
 
@@ -515,7 +520,8 @@ export class GroupService {
       },
     );
 
-    if (updated.length === 0) throw new NotFoundException('Group member not found');
+    if (updated.length === 0)
+      throw new BusinessException(ErrorCode.GROUP_MEMBER_NOT_FOUND, 'Group member not found');
 
     // Recompute active count and update groups.memberCount + resolvedAt.
     const resolvedAt = new Date();

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
@@ -18,7 +18,8 @@ export class StandardService {
 
   async findById(id: string): Promise<StandardRecord> {
     const record = await this.repo.findById(id);
-    if (!record) throw new NotFoundException(`Standard ${id} not found`);
+    if (!record)
+      throw new BusinessException(ErrorCode.STANDARD_NOT_FOUND, `Standard ${id} not found`);
     return record;
   }
 

@@ -1,7 +1,7 @@
 import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { Logger, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -21,6 +21,8 @@ import { MustChangePasswordGuard } from '../auth/middleware/must-change-password
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
 import { CaslModule } from '../casl/casl.module';
 import { readFieldMiddleware } from '../casl/read-field.middleware';
+import { createGraphqlErrorFormatter } from '../common/filters/graphql-error.mapper';
+import { GraphqlExceptionFilter } from '../common/filters/graphql-exception.filter';
 import { CorrelationIdMiddleware } from '../common/middleware/correlation-id.middleware';
 import { validate } from '../config/env.validation';
 import { DlqModule } from '../dlq/dlq.module';
@@ -35,6 +37,7 @@ import { AppResolver } from './app.resolver';
 import { AppService } from './app.service';
 
 const wsLogger = new Logger('WsTicketAuth');
+const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
 
 @Module({
   imports: [
@@ -57,29 +60,13 @@ const wsLogger = new Logger('WsTicketAuth');
         autoSchemaFile: true,
         buildSchemaOptions: { fieldMiddleware: [readFieldMiddleware] },
         path: 'api/graphql',
-        // Promote domain error `code` from HttpException.getResponse() to
-        // extensions.code so GraphQL clients can reliably branch on it.
-        // We only look at response.code (our BusinessException shape:
-        // { statusCode, code, message }) — never response.error, which
-        // NestJS auto-populates with the HTTP status name (e.g. "Forbidden")
-        // and would clobber Apollo's canonical codes.
-        formatError: (formatted, error) => {
-          const err = error as {
-            originalError?: {
-              response?: { code?: unknown };
-              code?: unknown;
-            };
-          };
-          const orig = err.originalError;
-          const code =
-            (typeof orig?.response === 'object' && orig.response
-              ? orig.response.code
-              : undefined) ?? orig?.code;
-          if (typeof code === 'string' && /^[A-Z][A-Z0-9_]*$/.test(code)) {
-            return { ...formatted, extensions: { ...formatted.extensions, code } };
-          }
-          return formatted;
-        },
+        // Our mapper owns the error shape; Nest's built-in transform would
+        // re-add `extensions.originalError`.
+        autoTransformHttpErrors: false,
+        includeStacktraceInErrorResponses: config.get('NODE_ENV') === 'development',
+        formatError: createGraphqlErrorFormatter({
+          onUnhandled: (thrown) => gqlErrorLogger.error({ err: thrown }, 'Unhandled GraphQL error'),
+        }),
         playground: config.get('NODE_ENV') !== 'production',
         introspection: config.get('NODE_ENV') !== 'production',
         subscriptions: {
@@ -131,6 +118,10 @@ const wsLogger = new Logger('WsTicketAuth');
   controllers: [AppController],
   providers: [
     CorrelationIdMiddleware,
+    {
+      provide: APP_FILTER,
+      useClass: GraphqlExceptionFilter,
+    },
     AppService,
     AppResolver,
     DateOnlyScalar,

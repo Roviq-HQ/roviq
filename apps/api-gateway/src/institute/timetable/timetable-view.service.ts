@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { type TimetableOverrideType, WEEKDAY_BY_JS_DAY, type Weekday } from '@roviq/common-types';
+import { Injectable } from '@nestjs/common';
+import {
+  BusinessException,
+  ErrorCode,
+  type TimetableOverrideType,
+  WEEKDAY_BY_JS_DAY,
+  type Weekday,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { TimetableRepository } from './repositories/timetable.repository';
@@ -63,7 +69,8 @@ export interface CreateOverrideServiceInput {
 function weekdayOf(dateIso: string): Weekday {
   const jsDay = new Date(`${dateIso}T00:00:00Z`).getUTCDay();
   const weekday = WEEKDAY_BY_JS_DAY[jsDay];
-  if (!weekday) throw new NotFoundException(`Invalid date "${dateIso}"`);
+  if (!weekday)
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, `Invalid date "${dateIso}"`);
   return weekday;
 }
 
@@ -172,7 +179,11 @@ export class TimetableViewService {
 
   async createOverride(input: CreateOverrideServiceInput): Promise<TimetableDayOverrideRecord> {
     const timetable = await this.repo.findTimetableById(input.timetableId);
-    if (!timetable) throw new NotFoundException(`Timetable ${input.timetableId} not found`);
+    if (!timetable)
+      throw new BusinessException(
+        ErrorCode.TIMETABLE_NOT_FOUND,
+        `Timetable ${input.timetableId} not found`,
+      );
 
     // Snapshot the master cell so history survives later master edits.
     const dayOfWeek = weekdayOf(input.date);
@@ -214,7 +225,11 @@ export class TimetableViewService {
 
   async clearOverride(id: string): Promise<boolean> {
     const override = await this.repo.findOverrideById(id);
-    if (!override) throw new NotFoundException(`Override ${id} not found`);
+    if (!override)
+      throw new BusinessException(
+        ErrorCode.TIMETABLE_OVERRIDE_NOT_FOUND,
+        `Override ${id} not found`,
+      );
     await this.repo.softDeleteOverride(id);
     this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.override_cleared, {
       overrideId: id,

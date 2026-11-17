@@ -225,7 +225,7 @@ Defined in `@roviq/common-types` `ErrorCode`:
 | `INSTITUTE_CODE_DUPLICATE` | 409 | |
 | `SETUP_NOT_COMPLETE` | 422 | Cannot activate before setup |
 | `CONCURRENT_MODIFICATION` | 409 | Version mismatch |
-| `ACADEMIC_YEAR_OVERLAP` | 400 | Schools only |
+| `ACADEMIC_YEAR_OVERLAP` | 400 | |
 | `INVALID_DATE_RANGE` | 400 | start >= end |
 | `YEAR_ALREADY_ACTIVE` | 409 | |
 | `STANDARD_NAME_DUPLICATE` | 409 | |

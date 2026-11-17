@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { academicYearsLive, type DrizzleDB, tenantSequences } from '@roviq/database';
 import { eq, sql } from 'drizzle-orm';
 import { formatSequenceValue } from '../student/admission-number';
@@ -23,7 +23,11 @@ export async function nextTcSerialNumber(
     .from(academicYearsLive)
     .where(eq(academicYearsLive.id, academicYearId))
     .limit(1);
-  if (!year) throw new NotFoundException(`Academic year ${academicYearId} not found`);
+  if (!year)
+    throw new BusinessException(
+      ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+      `Academic year ${academicYearId} not found`,
+    );
 
   const sequenceName = `tc_no:${academicYearId}`;
   await tx
@@ -40,7 +44,8 @@ export async function nextTcSerialNumber(
     sql`SELECT next_val FROM next_sequence_value(${tenantId}::uuid, ${sequenceName})`,
   );
   const row = result.rows[0];
-  if (!row) throw new NotFoundException(`TC sequence ${sequenceName} not found`);
+  if (!row)
+    throw new BusinessException(ErrorCode.NOT_FOUND, `TC sequence ${sequenceName} not found`);
 
   return formatTcSerial(year.label, BigInt(row.next_val));
 }

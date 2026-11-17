@@ -11,8 +11,7 @@
  * does not reliably wire private fields under esbuild/Vitest).
  */
 
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { HolidayType } from '@roviq/common-types';
+import { ErrorCode, HolidayType } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 const TENANT_ID = '00000000-0000-7000-a000-000000000001';
@@ -107,10 +106,12 @@ describe('HolidayService (unit)', () => {
       expect(repo.findById).toHaveBeenCalledWith(HOLIDAY_ID);
     });
 
-    it('throws NotFoundException when the repo returns null', async () => {
+    it('rejects when the repo returns null', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.findById(HOLIDAY_ID)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.findById(HOLIDAY_ID)).rejects.toMatchObject({
+        code: ErrorCode.HOLIDAY_NOT_FOUND,
+      });
     });
   });
 
@@ -133,7 +134,7 @@ describe('HolidayService (unit)', () => {
   });
 
   describe('create', () => {
-    it('rejects with BadRequestException when endDate precedes startDate', async () => {
+    it('rejects when endDate precedes startDate', async () => {
       const input = {
         name: { en: 'Broken' },
         type: HolidayType.OTHER,
@@ -142,7 +143,9 @@ describe('HolidayService (unit)', () => {
         isPublic: true,
       };
 
-      await expect(service.create(input)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.create(input)).rejects.toMatchObject({
+        code: ErrorCode.INVALID_DATE_RANGE,
+      });
       expect(repo.create).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
@@ -197,9 +200,9 @@ describe('HolidayService (unit)', () => {
       const existing = buildHoliday({ startDate: '2026-11-07', endDate: '2026-11-07' });
       repo.findById.mockResolvedValue(existing);
 
-      await expect(service.update(HOLIDAY_ID, { endDate: '2026-11-06' })).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.update(HOLIDAY_ID, { endDate: '2026-11-06' })).rejects.toMatchObject({
+        code: ErrorCode.INVALID_DATE_RANGE,
+      });
       expect(repo.update).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });

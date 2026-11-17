@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { CashfreeAdapter } from '../adapters/cashfree.adapter';
 import { RazorpayAdapter } from '../adapters/razorpay.adapter';
 import { CryptoService } from '../crypto/crypto.service';
@@ -32,7 +33,8 @@ export class PaymentGatewayFactory {
   async create(resellerId: string, provider?: string): Promise<PaymentGateway> {
     const gwConfig = await this.configRepo.findActiveByResellerId(resellerId, provider);
     if (!gwConfig) {
-      throw new NotFoundException(
+      throw new BusinessException(
+        ErrorCode.PAYMENT_GATEWAY_NOT_CONFIGURED,
         `No active payment gateway configured for reseller ${resellerId}${provider ? ` (${provider})` : ''}`,
       );
     }

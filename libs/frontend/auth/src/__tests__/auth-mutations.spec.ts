@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAuthMutations } from '../lib/auth-mutations';
+import { AuthRequestError } from '../lib/error-utils';
 
 const url = 'http://api.test/api/graphql';
 
@@ -100,5 +101,45 @@ describe('account language GraphQL requests', () => {
         variables: { input: { locale } },
       }),
     });
+  });
+});
+
+describe('GraphQL error responses', () => {
+  it('should reject with the server error code so callers can branch on it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({
+          errors: [
+            {
+              message: 'Invalid credentials',
+              extensions: { code: 'INVALID_CREDENTIALS', statusCode: 401 },
+            },
+          ],
+          data: null,
+        }),
+      ),
+    );
+
+    const failure = await createAuthMutations(url)
+      .instituteLogin({ username: 'admin', password: 'wrong' })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(AuthRequestError);
+    expect(failure).toMatchObject({ message: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+  });
+
+  it('should carry a null code when the server sends none', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(Response.json({ errors: [{ message: 'boom' }] })),
+    );
+
+    const failure = await createAuthMutations(url)
+      .refresh('refresh-token')
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(AuthRequestError);
+    expect(failure).toMatchObject({ message: 'boom', code: null });
   });
 });
