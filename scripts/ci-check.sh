@@ -254,7 +254,7 @@ launch() {
 # Biome (full repo, matches CI's `pnpm lint`) — catches diagnostics the nx eslint target misses.
 launch lint pnpm -s lint
 (( run_typecheck )) && launch typecheck "${nx_prefix[@]}" -t typecheck --parallel=3
-# Full unit suite (vitest unit-node + unit-dom) — matches the pre-commit gate.
+# Full unit suite (vitest unit-node + unit-dom); pre-commit no longer runs it.
 # `nx affected -t test` misses apps/web tests (no `test` target; the root vitest
 # `tests:test` cache doesn't track apps/web files), so it false-passes. (ROV-265)
 (( run_unit )) && launch unit pnpm -s test:unit
