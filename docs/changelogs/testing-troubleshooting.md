@@ -522,3 +522,8 @@ ROV-86 introduced the library's first React context provider. The per-library Nx
 ## 2026-11-17 — fixed: captured E2E sessions overwrote institute switches
 
 The session restore init script replayed the storage-state access token on every navigation. An institute switch rotated the token and user metadata, then a reload restored the old token, leaving authentication scoped to one institute and the stored user scoped to another. ROV-86's current-institute data check correctly refused that mismatch. Both shared init-script entry points now consume captured session values once and preserve any existing current session. Unit regression coverage also proves logout cannot resurrect the captured token. The Playwright institute-language journey verifies switching to another institute and back after a locale change.
+
+
+## 2026-11-17 — fixed: parallel portal language tests shared one user
+
+The platform and institute account-language journeys both authenticated as the seeded admin, whose preferred locale belongs to the user across all scopes. Running both journeys together let one reset the preference while the other checked refresh persistence. The institute setup now captures a separate teacher session for its account-language journey; platform, reseller and institute preference tests use distinct users. The existing institute administrator session remains available for configuration tests. Assertions and parallel execution remain enabled.

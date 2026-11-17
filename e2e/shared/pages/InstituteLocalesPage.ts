@@ -86,11 +86,15 @@ export class InstituteLocalesPage {
     await this.page.keyboard.press('Escape');
   }
   async switchTo(id: string) {
-    await this.page.goto('/en/settings/institute?tab=configuration');
+    await this.goto();
+    if ((await this.currentSettings()).id === id) return;
     await this.page.getByTestId(layout.instituteSwitcher).click();
-    await this.page.getByTestId(layout.instituteOption(id)).click();
-    await expect.poll(async () => (await this.currentSettings()).id).toBe(id);
+    await Promise.all([
+      this.page.waitForEvent('domcontentloaded'),
+      this.page.getByTestId(layout.instituteOption(id)).click(),
+    ]);
     await expect(this.page.getByTestId(instituteLocales.defaultLanguage)).toBeVisible();
+    expect((await this.currentSettings()).id).toBe(id);
   }
   async expectDefaultLanguage(locale: string) {
     await expect(this.page.getByTestId(instituteLocales.defaultLanguage)).toHaveText(locale);

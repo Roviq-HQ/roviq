@@ -17,3 +17,14 @@ setup('authenticate as institute admin', async ({ page }) => {
   await persistSessionStorage(page);
   await page.context().storageState({ path: instituteAuthFile });
 });
+
+setup('authenticate as teacher for account preferences', async ({ page }) => {
+  const loginPage = new LoginPage(page);
+  await loginPage.goto('/en/login');
+  await loginPage.login(E2E_USERS.TEACHER.username, E2E_USERS.TEACHER.password);
+  await loginPage.expectRedirectToDashboard();
+  await persistSessionStorage(page);
+  await page
+    .context()
+    .storageState({ path: path.join(__dirname, '../../playwright/.auth/institute-teacher.json') });
+});
