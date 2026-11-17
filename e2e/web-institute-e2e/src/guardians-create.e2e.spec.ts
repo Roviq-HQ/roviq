@@ -117,26 +117,31 @@ test.describe('Guardians — create page', () => {
     await create.expectRedirectedToDetail();
   });
 
-  test('Hindi locale renders translated title, dropdown trigger, and all 6 options', async ({
-    page,
-  }) => {
-    const create = new GuardianCreatePage(page);
-    await create.goto('hi');
+  test.describe('Hindi interface', () => {
+    // With no saved account language the app follows the browser language, not the URL prefix.
+    test.use({ locale: 'hi-IN' });
 
-    await expect(page.getByTestId('guardian-new-title')).toBeVisible();
-    await expect(page.getByTestId('guardian-new-education-level-select')).toBeVisible();
+    test('Hindi locale renders translated title, dropdown trigger, and all 6 options', async ({
+      page,
+    }) => {
+      const create = new GuardianCreatePage(page);
+      await create.goto('hi');
 
-    await create.openEducationLevel();
-    for (const level of EDUCATION_LEVELS) {
-      const label = EDUCATION_LEVEL_LABELS_HI[level];
-      await expect(create.educationLevelOption(label)).toBeVisible();
-    }
-    // Close the popover before submitting.
-    await page.keyboard.press('Escape');
+      await expect(page.getByTestId('guardian-new-title')).toBeVisible();
+      await expect(page.getByTestId('guardian-new-education-level-select')).toBeVisible();
 
-    await create.firstNameEnglish().fill(`HiGuardian ${Date.now()}`);
-    await create.submit();
-    await create.expectRedirectedToDetail();
+      await create.openEducationLevel();
+      for (const level of EDUCATION_LEVELS) {
+        const label = EDUCATION_LEVEL_LABELS_HI[level];
+        await expect(create.educationLevelOption(label)).toBeVisible();
+      }
+      // Close the popover before submitting.
+      await page.keyboard.press('Escape');
+
+      await create.firstNameEnglish().fill(`HiGuardian ${Date.now()}`);
+      await create.submit();
+      await create.expectRedirectedToDetail();
+    });
   });
 
   test('phone validation rejects non-10-digit number on blur', async ({ page }) => {

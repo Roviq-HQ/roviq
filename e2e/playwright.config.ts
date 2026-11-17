@@ -14,6 +14,9 @@ const resellerAuth = path.join(__dirname, 'playwright/.auth/reseller.json');
 
 const chrome = devices['Desktop Chrome'];
 
+const ACCOUNT_LANGUAGE_SPEC = /language-preference\.e2e\.spec\.ts/;
+const SHARED_USER_PROJECTS = ['admin', 'institute', 'reseller', 'cross-portal'];
+
 export default defineConfig({
   globalSetup: './shared/preflight.ts',
   outputDir: path.join(workspaceRoot, 'dist/.playwright/e2e/test-output'),
@@ -100,7 +103,7 @@ export default defineConfig({
     {
       name: 'admin',
       testDir: './web-admin-e2e/src',
-      testIgnore: [/login\.e2e\.spec\.ts/, /.*\.setup\.ts/],
+      testIgnore: [/login\.e2e\.spec\.ts/, /.*\.setup\.ts/, ACCOUNT_LANGUAGE_SPEC],
       use: { ...chrome, baseURL: ADMIN_URL, storageState: adminAuth },
       dependencies: ['admin-setup'],
     },
@@ -114,7 +117,7 @@ export default defineConfig({
     {
       name: 'reseller',
       testDir: './web-reseller-e2e/src',
-      testIgnore: /.*\.setup\.ts/,
+      testIgnore: [/.*\.setup\.ts/, ACCOUNT_LANGUAGE_SPEC],
       use: { ...chrome, baseURL: RESELLER_URL, storageState: resellerAuth },
       dependencies: ['reseller-setup'],
     },
@@ -125,6 +128,25 @@ export default defineConfig({
       testDir: './cross-portal/src',
       use: { ...chrome },
       dependencies: ['admin-setup', 'institute-setup', 'reseller-setup'],
+    },
+
+    // ── Account language journeys ──
+    // They switch the signed-in user's saved language to Hindi for a while. The
+    // seeded admin and reseller users are shared by every other spec, so these
+    // run only after all of them have finished.
+    {
+      name: 'admin-account-language',
+      testDir: './web-admin-e2e/src',
+      testMatch: ACCOUNT_LANGUAGE_SPEC,
+      use: { ...chrome, baseURL: ADMIN_URL, storageState: adminAuth },
+      dependencies: SHARED_USER_PROJECTS,
+    },
+    {
+      name: 'reseller-account-language',
+      testDir: './web-reseller-e2e/src',
+      testMatch: ACCOUNT_LANGUAGE_SPEC,
+      use: { ...chrome, baseURL: RESELLER_URL, storageState: resellerAuth },
+      dependencies: SHARED_USER_PROJECTS,
     },
   ],
 

@@ -532,3 +532,14 @@ The platform and institute account-language journeys both authenticated as the s
 ## 2026-11-17 — fixed: admission E2E suite was skipped because no admission flow could complete
 
 `admission.api-e2e.spec.ts` was `describe.skip` behind ROV-232. Three defects kept it there: Temporal workers passed a directory as `workflowsPath`, so the bundler failed and the worker never polled; `StudentAdmissionWorkflow` wrote the literal `'SYSTEM'` into UUID `created_by` columns; and `CreateApplicationInput.formData` had no class-validator decorator, so the global `forbidNonWhitelisted` pipe rejected every `createApplication` call. All three are fixed (ROV-206), `STUDENT_ADMISSION_WORKER_ENABLED` is set for the api-gateway in `docker/compose.e2e.yaml`, and the suite now runs and asserts the real `ENROLLED` outcome. The TC issuance, compliance export and bulk import workers are still not enabled in the E2E stack.
+
+
+## 2026-11-17 — fixed: three order-dependent failures in the full Playwright run
+
+Found while pushing ROV-206; none involved admission code.
+
+- **Sessions page: "Invalid refresh token".** `switchInstitute` revokes the caller's refresh token. `tenant-isolation` and `institute-locales` switched institute on the shared `storageState` session, so `settings.e2e.spec.ts` (which sends that token to `mySessions`) failed whenever it ran after them. Both specs now start signed out and log in to their own session (`e2e/shared/own-institute-session.ts`).
+- **Hindi guardian form rendered in English.** Since ROV-52 a user with no saved language follows the browser language, not the URL prefix, so `/hi/...` redirected to `/en/...` in an English browser. The Hindi tests in `guardians-create` and `mobile` now run with `locale: 'hi-IN'`; the mobile test also asserts the URL stays on `/hi/`.
+- **Admin reseller list rendered in Hindi.** The admin and reseller account-language journeys save Hindi on the seeded `admin` / `reseller1` users while other specs for the same users run in parallel. They moved to their own Playwright projects (`admin-account-language`, `reseller-account-language`) that depend on every shared-user project, so they run last.
+
+Also: `e2e/shared/api-client.ts` read the access token from a `localStorage` key the page fixture deletes on load, so `deleteStudentViaApi` cleanup silently did nothing. It now reads `sessionStorage` first.

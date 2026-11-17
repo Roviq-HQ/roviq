@@ -17,9 +17,19 @@
  * than asserting on row count.
  */
 import { expect, test } from '../../shared/console-guardian';
+import {
+  loginWithOwnInstituteSession,
+  SIGNED_OUT_STORAGE_STATE,
+} from '../../shared/own-institute-session';
 import { SEED } from '../../shared/seed-fixtures';
 
 test.describe('Tenant isolation — institute switching', () => {
+  test.use({ storageState: SIGNED_OUT_STORAGE_STATE });
+
+  test.beforeEach(async ({ page }) => {
+    await loginWithOwnInstituteSession(page);
+  });
+
   test('switching to Institute 2 updates the switcher label', async ({ page }) => {
     await page.goto('/en/dashboard');
     await expect(page.getByTestId('dashboard-welcome-card')).toBeVisible({ timeout: 10_000 });

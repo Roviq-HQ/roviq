@@ -91,10 +91,16 @@ test.describe('Mobile — authenticated pages (360px)', () => {
     await expect(page.getByTestId('locale-switcher')).toBeInViewport();
   });
 
-  test('Hindi locale renders dashboard without horizontal overflow', async ({ page }) => {
-    await page.goto('/hi/dashboard');
-    await expect(page.getByTestId('dashboard-welcome-card')).toBeVisible({ timeout: 10_000 });
+  test.describe('Hindi interface', () => {
+    // With no saved account language the app follows the browser language, not the URL prefix.
+    test.use({ locale: 'hi-IN' });
 
-    expect(await hasNoHorizontalScroll(page)).toBe(true);
+    test('Hindi locale renders dashboard without horizontal overflow', async ({ page }) => {
+      await page.goto('/hi/dashboard');
+      await expect(page.getByTestId('dashboard-welcome-card')).toBeVisible({ timeout: 10_000 });
+      await expect(page).toHaveURL(/\/hi\//);
+
+      expect(await hasNoHorizontalScroll(page)).toBe(true);
+    });
   });
 });

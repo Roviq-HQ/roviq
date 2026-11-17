@@ -1,11 +1,18 @@
 import { instituteLocaleLabels } from '@roviq/common-types';
 import { test } from '../../shared/console-guardian';
+import {
+  loginWithOwnInstituteSession,
+  SIGNED_OUT_STORAGE_STATE,
+} from '../../shared/own-institute-session';
 import { InstituteLocalesPage } from '../../shared/pages/InstituteLocalesPage';
 import { SEED } from '../../shared/seed-fixtures';
+
+test.use({ storageState: SIGNED_OUT_STORAGE_STATE });
 
 test('institute languages persist and drive translated inputs without changing interface languages', async ({
   page,
 }) => {
+  await loginWithOwnInstituteSession(page);
   const settings = new InstituteLocalesPage(page);
   await settings.goto();
   const original = await settings.currentSettings();
