@@ -618,3 +618,10 @@ Seen on a slot 0 checkout whose containers and volumes were last used two months
 * `minio` cannot start: `quay.io/minio/minio:latest` returns `unauthorized` on pull. Not fixed.
 * Running `nx build` by hand while Tilt serves `api-gateway` removes `dist/apps/api-gateway/src/main.js` and the serve process exits. Re-trigger `api-gateway` afterwards.
 
+## 2026-11-17 — fixed: `institute-locales` spec broke translated forms in parallel specs (ROV-84)
+
+In a full `pnpm test:e2e:ui` run, both `people-restore.e2e.spec.ts` tests timed out clicking a disabled **Create Guardian** button. Run alone they passed. The error context showed the name inputs as `EN` + `TA`: `institute-locales.e2e.spec.ts` makes Tamil the seeded institute's default language for a few seconds, and while it does, every translated form in that institute requires a Tamil value. Under `fullyParallel` any spec that fills such a form in that window fails.
+
+The spec now runs in its own `institute-locales` Playwright project that depends on `admin`, `institute`, `reseller` and `cross-portal`, the same way the account-language journeys do.
+
+**Verification:** `pnpm ci:check` passed end to end after the change; the same run failed the two tests before it.
