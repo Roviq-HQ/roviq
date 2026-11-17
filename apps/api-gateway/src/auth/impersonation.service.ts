@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
-import type { AuthScope, AuthUser, InstituteContext } from '@roviq/common-types';
+import type { AuthScope, AuthUser, InstituteContext, ResellerContext } from '@roviq/common-types';
 import { BusinessException, DefaultRoles, ErrorCode, instituteRoleRank } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
@@ -59,6 +59,8 @@ interface ImpersonationMeta {
 interface CodePayload {
   sessionId: string;
   targetUserId: string;
+  /** The membership the start checks authorized; the token is issued for exactly this one. */
+  targetMembershipId: string;
   tenantId: string;
 }
 
@@ -68,6 +70,7 @@ interface PendingOtp {
   impersonatorId: string;
   impersonatorScope: AuthScope;
   targetUserId: string;
+  targetMembershipId: string;
   tenantId: string;
   reason: string;
   ip: string | null;
@@ -162,7 +165,9 @@ export class ImpersonationService {
       );
     }
 
-    const [targetMembership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+    // Every active membership the target holds here: the rank check must see
+    // the most senior one, and the session is pinned to the oldest.
+    const targetMemberships = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
           id: membershipsLive.id,
@@ -178,8 +183,9 @@ export class ImpersonationService {
             eq(membershipsLive.status, 'ACTIVE'),
           ),
         )
-        .limit(1),
+        .orderBy(asc(membershipsLive.createdAt), asc(membershipsLive.id)),
     );
+    const targetMembership = targetMemberships[0];
 
     if (!targetMembership) {
       throw new BusinessException(
@@ -204,18 +210,25 @@ export class ImpersonationService {
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Target institute not found');
     }
 
-    if (actor.scope === 'reseller' && targetInstitute.resellerId !== actor.resellerId) {
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Institute does not belong to your reseller',
-      );
+    if (actor.scope === 'reseller') {
+      if (targetInstitute.resellerId !== actor.resellerId) {
+        throw new BusinessException(
+          ErrorCode.FORBIDDEN,
+          'Institute does not belong to your reseller',
+        );
+      }
+      await this.assertActiveResellerMembership(actor);
     }
 
     if (actor.scope === 'institute') {
-      await this.validateIntraInstituteImpersonation(actor, targetTenantId, {
-        name: targetMembership.roleName,
-        abilities: targetMembership.roleAbilities,
-      });
+      await this.validateIntraInstituteImpersonation(
+        actor,
+        targetTenantId,
+        targetMemberships.map((membership) => ({
+          name: membership.roleName,
+          abilities: membership.roleAbilities,
+        })),
+      );
     }
 
     // Reseller: always needs the institute admin's OTP. Platform: only when the
@@ -228,6 +241,7 @@ export class ImpersonationService {
       impersonatorId: actor.userId,
       impersonatorScope: actor.scope,
       targetUserId,
+      targetMembershipId: targetMembership.id,
       tenantId: targetTenantId,
       reason: reason.trim(),
       ip: meta?.ip ?? null,
@@ -245,6 +259,7 @@ export class ImpersonationService {
     const code = await this.issueImpersonationCode({
       sessionId,
       targetUserId,
+      targetMembershipId: targetMembership.id,
       tenantId: targetTenantId,
     });
 
@@ -278,9 +293,19 @@ export class ImpersonationService {
       );
     }
 
+    // Reserve the attempt BEFORE comparing (INCR is atomic), so parallel
+    // guesses cannot all be checked against one remaining attempt.
+    const attempts = await this.redis.incr(attemptsKey);
+    await this.redis.expire(attemptsKey, OTP_TTL_SECONDS);
+    if (attempts > MAX_OTP_ATTEMPTS) {
+      await this.redis.del(key, attemptsKey);
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
+        'OTP invalid — maximum attempts exceeded',
+      );
+    }
+
     if (!otpMatches(pending.otp, otp)) {
-      // INCR is atomic: parallel guesses cannot share one attempt.
-      const attempts = await this.redis.incr(attemptsKey);
       if (attempts >= MAX_OTP_ATTEMPTS) {
         await this.redis.del(key, attemptsKey);
         throw new BusinessException(
@@ -288,7 +313,6 @@ export class ImpersonationService {
           'OTP invalid — maximum attempts exceeded',
         );
       }
-      await this.redis.expire(attemptsKey, OTP_TTL_SECONDS);
       throw new BusinessException(ErrorCode.IMPERSONATION_OTP_INVALID, 'OTP invalid');
     }
 
@@ -303,6 +327,7 @@ export class ImpersonationService {
     const code = await this.issueImpersonationCode({
       sessionId,
       targetUserId: pending.targetUserId,
+      targetMembershipId: pending.targetMembershipId,
       tenantId: pending.tenantId,
     });
 
@@ -321,7 +346,9 @@ export class ImpersonationService {
       );
     }
 
-    const { sessionId, targetUserId, tenantId } = JSON.parse(stored) as CodePayload;
+    const { sessionId, targetUserId, targetMembershipId, tenantId } = JSON.parse(
+      stored,
+    ) as CodePayload;
 
     // Fetch all required data in parallel within a single transaction
     const [targetUsers, membershipRows, sessions, instituteRows] = await withAdmin(
@@ -343,6 +370,8 @@ export class ImpersonationService {
             .from(membershipsLive)
             .where(
               and(
+                // Exactly the membership that was authorized at start.
+                eq(membershipsLive.id, targetMembershipId),
                 eq(membershipsLive.userId, targetUserId),
                 eq(membershipsLive.tenantId, tenantId),
                 eq(membershipsLive.status, 'ACTIVE'),
@@ -689,10 +718,31 @@ export class ImpersonationService {
     }
   }
 
+  /** The token can be minutes old; the reseller membership must still be active now. */
+  private async assertActiveResellerMembership(actor: ResellerContext): Promise<void> {
+    const [membership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ id: resellerMembershipsLive.id })
+        .from(resellerMembershipsLive)
+        .where(
+          and(
+            eq(resellerMembershipsLive.id, actor.membershipId),
+            eq(resellerMembershipsLive.userId, actor.userId),
+            eq(resellerMembershipsLive.resellerId, actor.resellerId),
+            eq(resellerMembershipsLive.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+    if (!membership) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active reseller membership');
+    }
+  }
+
   private async validateIntraInstituteImpersonation(
     actor: InstituteContext,
     tenantId: string,
-    targetRole: RoleInfo,
+    targetRoles: RoleInfo[],
   ): Promise<void> {
     if (actor.tenantId !== tenantId) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this institute');
@@ -739,7 +789,10 @@ export class ImpersonationService {
     }
 
     const actorRank = instituteRoleRank(actorMembership.roleName, actorMembership.roleAbilities);
-    if (instituteRoleRank(targetRole.name, targetRole.abilities) >= actorRank) {
+    const targetRank = Math.max(
+      ...targetRoles.map((role) => instituteRoleRank(role.name, role.abilities)),
+    );
+    if (targetRank >= actorRank) {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
         'You can only impersonate users whose role is below your own',
@@ -792,6 +845,7 @@ export class ImpersonationService {
           and(
             eq(resellerMembershipsLive.userId, session.impersonatorId),
             eq(resellerMembershipsLive.resellerId, actor.resellerId),
+            eq(resellerMembershipsLive.isActive, true),
           ),
         )
         .limit(1),

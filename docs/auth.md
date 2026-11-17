@@ -223,18 +223,20 @@ Flow when the OTP gate fires:
 4. Institute admin reads the OTP and shares it with the impersonator out-of-band.
 5. Caller submits `<scope>VerifyImpersonationOtp(sessionId, otp)`.
    - Only the user who started the request may verify it; anyone else is refused without spending an attempt.
-   - Wrong OTP increments an atomic counter (`INCR` on `impersonation-otp:{requestId}:attempts`); after **3 wrong attempts** the request is deleted.
+   - Every attempt is reserved with an atomic `INCR` on `impersonation-otp:{requestId}:attempts` before the OTP is compared, so parallel guesses cannot share an attempt; after **3 wrong attempts** the request is deleted.
    - Correct OTP consumes the request with `GETDEL`, writes the session row with `otp_verified` and `otp_verified_by` (the admin the OTP went to), and returns the same `{ code }` payload the no-OTP path returns.
 6. When OTP is not required (institute has consent disabled and impersonator is platform), `startImpersonation` returns `{ code, requiresOtp: false }` directly.
 
 ### Who may impersonate whom (ROV-94)
 
 - Starting impersonation and verifying its OTP need `impersonate User` in every scope. By default: `platform_admin`, `platform_support`, `reseller_full_admin`, `reseller_support_admin`, `institute_admin` and `principal`.
-- **Reseller**: the institute's `reseller_id` must equal the `resellerId` in the caller's token.
-- **Intra-institute**: the target's role must rank strictly below the caller's (`INSTITUTE_ROLE_RANK` / `instituteRoleRank()` in `@roviq/common-types`). An institute admin cannot impersonate another institute admin; a principal reaches teachers, students and parents but not the admin. Any role granting `manage all` ranks with the institute admin whatever it is called; other custom roles rank as staff.
+- **Reseller**: the institute's `reseller_id` must equal the `resellerId` in the caller's token, and that reseller membership must still be active.
+- **Intra-institute**: the target's role must rank strictly below the caller's (`INSTITUTE_ROLE_RANK` / `instituteRoleRank()` in `@roviq/common-types`). A target with several memberships in the institute is ranked by the most senior one. An institute admin cannot impersonate another institute admin; a principal reaches teachers, students and parents but not the admin. Any role granting `manage all` ranks with the institute admin whatever it is called; other custom roles rank as staff.
 - **No nesting**: an impersonation token can neither start nor OTP-verify another impersonation.
 - The impersonation token carries the same `resellerId` claim as a normal institute token, lasts 15 minutes and has no refresh token.
+- The membership checked at start is pinned in the OTP request and the one-time code; `exchangeImpersonationCode` issues the token for exactly that membership.
 - `exchangeImpersonationCode` issues no token if the session was ended or has expired since the code was created.
+- Frontend: a tab holding `roviq-impersonation-token` loads the impersonated user through `me` (`AuthProvider` `currentUserQuery`) and acts as that user, whether or not the impersonator has a session of their own in the browser. A rejected token is dropped and the tab is signed out.
 
 ### Ending and revoking a session (ROV-94)
 

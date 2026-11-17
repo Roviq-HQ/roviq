@@ -221,6 +221,10 @@ function impersonated(actor: InstituteContext): InstituteContext {
 
 const TARGET_USER: SelectStep = { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] };
 const ADMIN_RECIPIENT: SelectStep = { table: 'memberships', rows: [{ userId: 'admin-1' }] };
+const ACTIVE_RESELLER_MEMBERSHIP: SelectStep = {
+  table: 'reseller_memberships',
+  rows: [{ id: 'imp-mem' }],
+};
 const ADMIN_PHONE: SelectStep = {
   table: 'phone_numbers',
   rows: [{ countryCode: '+91', number: '9999999999' }],
@@ -366,6 +370,7 @@ describe('ImpersonationService', () => {
           TARGET_USER,
           targetMembership('student'),
           institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+          ACTIVE_RESELLER_MEMBERSHIP,
           ADMIN_RECIPIENT,
           ADMIN_PHONE,
         ],
@@ -391,6 +396,7 @@ describe('ImpersonationService', () => {
         impersonatorId: 'imp-1',
         impersonatorScope: 'reseller',
         targetUserId: 'tgt-1',
+        targetMembershipId: 'tgt-mem',
         tenantId: 'tenant-1',
         reason: REASON_VALID,
         ip: '10.0.0.1',
@@ -422,6 +428,26 @@ describe('ImpersonationService', () => {
           TARGET_USER,
           targetMembership('student'),
           institute({ resellerId: 'reseller-B', requireImpersonationConsent: false }),
+        ],
+      });
+      setTx(tx);
+
+      await expect(
+        service.startImpersonation(resellerActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(redis.set).not.toHaveBeenCalled();
+      expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(inserted).toEqual([]);
+    });
+
+    it('reseller scope rejects a caller whose reseller membership is no longer active', async () => {
+      const { service, redis, eventBus } = createSubject();
+      const { tx, inserted } = createTx({
+        selects: [
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+          { table: 'reseller_memberships', rows: [] },
         ],
       });
       setTx(tx);
@@ -503,7 +529,12 @@ describe('ImpersonationService', () => {
       expect(redis.set).toHaveBeenCalledTimes(1);
       expect(redis.set).toHaveBeenCalledWith(
         `${REDIS_KEYS.IMPERSONATION_CODE}${FIXED_UUID}`,
-        JSON.stringify({ sessionId: 'session-11', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
+        JSON.stringify({
+          sessionId: 'session-11',
+          targetUserId: 'tgt-1',
+          targetMembershipId: 'tgt-mem',
+          tenantId: 'tenant-1',
+        }),
         'EX',
         30,
       );
@@ -598,6 +629,33 @@ describe('ImpersonationService', () => {
       setTx(stub.tx);
       return { ...subject, ...stub };
     }
+
+    it('ranks a target by the most senior of its memberships in the institute', async () => {
+      const { service, inserted } = (() => {
+        const subject = createSubject();
+        const stub = createTx({
+          selects: [
+            TARGET_USER,
+            {
+              table: 'memberships',
+              rows: [
+                { id: 'tgt-mem', roleName: 'student', roleAbilities: [] },
+                { id: 'tgt-mem-2', roleName: 'institute_admin', roleAbilities: MANAGE_ALL },
+              ],
+            },
+            institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+            actorMembership('principal', IMPERSONATE),
+          ],
+        });
+        setTx(stub.tx);
+        return { ...subject, ...stub };
+      })();
+
+      await expect(
+        service.startImpersonation(instituteActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(inserted).toEqual([]);
+    });
 
     it('rejects a token for a different institute than the target', async () => {
       const { service, inserted } = arrange(
@@ -700,6 +758,7 @@ describe('ImpersonationService', () => {
       impersonatorId: 'imp-1',
       impersonatorScope: 'reseller',
       targetUserId: 'tgt-1',
+      targetMembershipId: 'tgt-mem',
       tenantId: 'tenant-1',
       reason: REASON_VALID,
       ip: '10.0.0.1',
@@ -776,7 +835,22 @@ describe('ImpersonationService', () => {
         code: ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
       });
       expect(redis.del).toHaveBeenCalledWith(KEY, ATTEMPTS_KEY);
-      expect(redis.expire).not.toHaveBeenCalled();
+      expect(inserted).toEqual([]);
+    });
+
+    it('refuses even the correct OTP once the attempts are used up', async () => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      // A parallel guess already took the last attempt.
+      vi.mocked(redis.incr).mockResolvedValue(4);
+      const { tx, inserted } = createTx();
+      setTx(tx);
+
+      await expect(service.verifyOtp(resellerActor, 'request-1', '111111')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
+      });
+      expect(redis.del).toHaveBeenCalledWith(KEY, ATTEMPTS_KEY);
+      expect(redis.getdel).not.toHaveBeenCalled();
       expect(inserted).toEqual([]);
     });
 
@@ -805,7 +879,9 @@ describe('ImpersonationService', () => {
       expect(result).toEqual({ code: FIXED_UUID });
       expect(redis.getdel).toHaveBeenCalledWith(KEY);
       expect(redis.del).toHaveBeenCalledWith(ATTEMPTS_KEY);
-      expect(redis.incr).not.toHaveBeenCalled();
+      // The attempt is reserved before the comparison.
+      expect(redis.incr).toHaveBeenCalledTimes(1);
+      expect(redis.incr).toHaveBeenCalledWith(ATTEMPTS_KEY);
       expect(inserted).toHaveLength(1);
       const row = inserted[0].values as { startedAt: Date; expiresAt: Date; otpVerified: Date };
       expect(inserted[0].values).toEqual({
@@ -824,7 +900,12 @@ describe('ImpersonationService', () => {
       expect(row.otpVerified).toBeInstanceOf(Date);
       expect(redis.set).toHaveBeenCalledWith(
         `${REDIS_KEYS.IMPERSONATION_CODE}${FIXED_UUID}`,
-        JSON.stringify({ sessionId: 'session-31', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
+        JSON.stringify({
+          sessionId: 'session-31',
+          targetUserId: 'tgt-1',
+          targetMembershipId: 'tgt-mem',
+          tenantId: 'tenant-1',
+        }),
         'EX',
         30,
       );
@@ -835,6 +916,7 @@ describe('ImpersonationService', () => {
     const CODE_PAYLOAD = JSON.stringify({
       sessionId: 'session-1',
       targetUserId: 'tgt-1',
+      targetMembershipId: 'mem-1',
       tenantId: 'tenant-1',
     });
     const EXCHANGE_USER = { table: 'users', rows: [{ id: 'tgt-1', username: 'student-jane' }] };
