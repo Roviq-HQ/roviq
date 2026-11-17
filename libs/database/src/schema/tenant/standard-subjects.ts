@@ -25,7 +25,9 @@ export const standardSubjects = pgTable(
     })
       .onDelete('cascade')
       .onUpdate('cascade'),
-    uniqueIndex('standard_subjects_subject_standard_key').on(table.subjectId, table.standardId),
+    uniqueIndex('standard_subjects_subject_standard_key')
+      .on(table.subjectId, table.standardId)
+      .where(sql`${table.deletedAt} IS NULL`),
     index('standard_subjects_tenant_id_idx').on(table.tenantId),
     index('standard_subjects_standard_id_idx').on(table.standardId),
     ...tenantPolicies('standard_subjects'),
