@@ -1,4 +1,4 @@
-import { SetMetadata } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { AppAction, AppSubject } from '@roviq/common-types';
 
 export interface AbilityCheck {
@@ -6,7 +6,4 @@ export interface AbilityCheck {
   subject: AppSubject;
 }
 
-export const CHECK_ABILITY_KEY = 'check_ability';
-
-export const CheckAbility = (action: AppAction, subject: AppSubject) =>
-  SetMetadata(CHECK_ABILITY_KEY, { action, subject } satisfies AbilityCheck);
+export const CheckAbility = Reflector.createDecorator<AbilityCheck>();

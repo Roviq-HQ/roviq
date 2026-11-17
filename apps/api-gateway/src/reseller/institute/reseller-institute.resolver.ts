@@ -15,25 +15,25 @@ export class ResellerInstituteResolver {
   constructor(private readonly resellerInstituteService: ResellerInstituteService) {}
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('create', 'Institute')
+  @CheckAbility({ action: 'create', subject: 'Institute' })
   async resellerCreateInstituteRequest(@Args('input') input: ResellerCreateInstituteRequestInput) {
     return this.resellerInstituteService.createRequest(input);
   }
 
   @Query(() => InstituteConnection)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async resellerListInstitutes(@Args('filter', { nullable: true }) filter?: InstituteFilterInput) {
     return this.resellerInstituteService.list(filter ?? {});
   }
 
   @Query(() => InstituteModel)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async resellerGetInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.resellerInstituteService.findById(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('suspend', 'Institute')
+  @CheckAbility({ action: 'suspend', subject: 'Institute' })
   async resellerSuspendInstitute(
     @Args('id', { type: () => ID }) id: string,
     @Args('reason', { nullable: true }) reason?: string,
@@ -42,13 +42,13 @@ export class ResellerInstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('activate', 'Institute')
+  @CheckAbility({ action: 'activate', subject: 'Institute' })
   async resellerReactivateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.resellerInstituteService.reactivate(id);
   }
 
   @Query(() => InstituteStatisticsModel)
-  @CheckAbility('view_statistics', 'Institute')
+  @CheckAbility({ action: 'view_statistics', subject: 'Institute' })
   async resellerInstituteStatistics() {
     return this.resellerInstituteService.getStatistics();
   }

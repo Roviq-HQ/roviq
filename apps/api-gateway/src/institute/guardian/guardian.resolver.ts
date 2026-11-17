@@ -35,7 +35,7 @@ export class GuardianResolver {
   @Query(() => [GuardianModel], {
     description: 'List all guardians in this institute, with optional free-text search',
   })
-  @CheckAbility('read', 'Guardian')
+  @CheckAbility({ action: 'read', subject: 'Guardian' })
   async listGuardians(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: ListGuardiansFilterInput,
@@ -47,7 +47,7 @@ export class GuardianResolver {
     description:
       'List students linked to a single guardian, with resolved class/section + link metadata. Used by the Linked Children tab on the guardian detail page.',
   })
-  @CheckAbility('read', 'Guardian')
+  @CheckAbility({ action: 'read', subject: 'Guardian' })
   async listLinkedStudents(
     @Args('guardianProfileId', { type: () => ID }) guardianProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -59,7 +59,7 @@ export class GuardianResolver {
     description:
       'List guardians linked to a single student, with relationship and contact metadata. Used by the Guardians tab on the student detail page.',
   })
-  @CheckAbility('read', 'Guardian')
+  @CheckAbility({ action: 'read', subject: 'Guardian' })
   async listStudentGuardians(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -68,7 +68,7 @@ export class GuardianResolver {
   }
 
   @Query(() => GuardianModel, { description: 'Get a guardian by ID' })
-  @CheckAbility('read', 'Guardian')
+  @CheckAbility({ action: 'read', subject: 'Guardian' })
   async getGuardian(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -77,13 +77,13 @@ export class GuardianResolver {
   }
 
   @Mutation(() => GuardianModel, { description: 'Create guardian, optionally link to a student' })
-  @CheckAbility('create', 'Guardian')
+  @CheckAbility({ action: 'create', subject: 'Guardian' })
   async createGuardian(@Args('input') input: CreateGuardianInput): Promise<GuardianModel> {
     return this.guardianService.create(input) as Promise<GuardianModel>;
   }
 
   @Mutation(() => GuardianModel, { description: 'Update guardian with optimistic concurrency' })
-  @CheckAbility('update', 'Guardian')
+  @CheckAbility({ action: 'update', subject: 'Guardian' })
   async updateGuardian(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateGuardianInput,
@@ -92,13 +92,13 @@ export class GuardianResolver {
   }
 
   @Mutation(() => Boolean, { description: 'Soft-delete a guardian' })
-  @CheckAbility('delete', 'Guardian')
+  @CheckAbility({ action: 'delete', subject: 'Guardian' })
   async deleteGuardian(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.guardianService.delete(id);
   }
 
   @Mutation(() => GuardianLinkModel, { description: 'Link a guardian to a student' })
-  @CheckAbility('create', 'Guardian')
+  @CheckAbility({ action: 'create', subject: 'Guardian' })
   async linkGuardianToStudent(@Args('input') input: LinkGuardianInput): Promise<GuardianLinkModel> {
     return this.guardianService.linkToStudent(input) as Promise<GuardianLinkModel>;
   }
@@ -106,7 +106,7 @@ export class GuardianResolver {
   @Mutation(() => Boolean, {
     description: 'Unlink a guardian from a student. If primary, must provide newPrimaryGuardianId',
   })
-  @CheckAbility('delete', 'Guardian')
+  @CheckAbility({ action: 'delete', subject: 'Guardian' })
   async unlinkGuardianFromStudent(@Args('input') input: UnlinkGuardianInput): Promise<boolean> {
     return this.guardianService.unlinkFromStudent(input);
   }
@@ -115,7 +115,7 @@ export class GuardianResolver {
     description:
       'Revoke guardian access (divorce/separation). Sets can_pickup=false, preserves link for TC history.',
   })
-  @CheckAbility('manage', 'Guardian')
+  @CheckAbility({ action: 'manage', subject: 'Guardian' })
   async revokeGuardianAccess(
     @Args('input') input: RevokeGuardianAccessInput,
   ): Promise<GuardianLinkModel> {

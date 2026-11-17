@@ -26,7 +26,7 @@ export class ResellerTeamResolver {
   @Query(() => ResellerTeamMemberConnection, {
     description: 'List team members with a reseller-scope membership in this reseller organisation',
   })
-  @CheckAbility('read', 'User')
+  @CheckAbility({ action: 'read', subject: 'User' })
   async resellerListTeamMembers(
     @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: ResellerTeamFilterInput,
@@ -39,7 +39,7 @@ export class ResellerTeamResolver {
     description:
       'Create a new user and assign them a reseller-scope membership. A welcome notification with a temporary password is dispatched automatically.',
   })
-  @CheckAbility('create', 'User')
+  @CheckAbility({ action: 'create', subject: 'User' })
   async resellerInviteTeamMember(
     @Args('input') input: ResellerInviteTeamMemberInput,
     @CurrentUser() user: AuthUser,
@@ -52,7 +52,7 @@ export class ResellerTeamResolver {
     description:
       "Deactivate a team member's reseller-scope membership. The user account is preserved.",
   })
-  @CheckAbility('delete', 'User')
+  @CheckAbility({ action: 'delete', subject: 'User' })
   async resellerRemoveTeamMember(
     @Args('membershipId', { type: () => ID }) membershipId: string,
     @CurrentUser() user: AuthUser,

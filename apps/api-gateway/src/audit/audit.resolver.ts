@@ -25,7 +25,7 @@ export class AuditResolver {
   /** Platform admins: see ALL audit logs across every scope and tenant */
   @Query(() => AuditLogConnection)
   @UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
-  @CheckAbility('read', 'AuditLog')
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
   async adminAuditLogs(
     @Args('filter', { nullable: true }) filter?: AuditLogFilterInput,
     @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first?: number,
@@ -45,7 +45,7 @@ export class AuditResolver {
   /** Resellers: see audit logs for their managed institutes + own reseller-scoped entries */
   @Query(() => AuditLogConnection)
   @UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
-  @CheckAbility('read', 'AuditLog')
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
   async resellerAuditLogs(
     @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: AuditLogFilterInput,
@@ -66,7 +66,7 @@ export class AuditResolver {
   /** Institute admins: see audit logs scoped to their tenant only */
   @Query(() => AuditLogConnection)
   @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
-  @CheckAbility('read', 'AuditLog')
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
   async auditLogs(
     @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: AuditLogFilterInput,
@@ -85,7 +85,7 @@ export class AuditResolver {
   /** Entity audit timeline: view audit trail for a specific entity within the tenant */
   @Query(() => AuditLogConnection)
   @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
-  @CheckAbility('read', 'AuditLog')
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
   async entityAuditTimeline(
     @CurrentUser() user: AuthUser,
     @Args('entityType') entityType: string,
@@ -107,7 +107,7 @@ export class AuditResolver {
   /** Auth events: platform admins only — shows login/logout/refresh events across all scopes */
   @Query(() => [AuthEventModel])
   @UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
-  @CheckAbility('read', 'AuditLog')
+  @CheckAbility({ action: 'read', subject: 'AuditLog' })
   async authEvents(
     @Args('first', { type: () => Int, nullable: true, defaultValue: 50 }) first?: number,
   ): Promise<AuthEventModel[]> {

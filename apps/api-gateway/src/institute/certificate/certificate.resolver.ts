@@ -15,7 +15,7 @@ export class CertificateResolver {
   @Mutation(() => CertificateModel, {
     description: 'Request a certificate from template — auto-populates fields',
   })
-  @CheckAbility('create', 'Certificate')
+  @CheckAbility({ action: 'create', subject: 'Certificate' })
   async requestCertificate(
     @Args('input') input: RequestCertificateInput,
   ): Promise<CertificateModel> {
@@ -25,13 +25,13 @@ export class CertificateResolver {
   @Mutation(() => CertificateModel, {
     description: 'Issue certificate — generates serial, renders PDF',
   })
-  @CheckAbility('manage', 'Certificate')
+  @CheckAbility({ action: 'manage', subject: 'Certificate' })
   async issueCertificate(@Args('id', { type: () => ID }) id: string): Promise<CertificateModel> {
     return this.certService.issueCertificate(id);
   }
 
   @Query(() => [CertificateModel], { description: 'List certificates with optional filters' })
-  @CheckAbility('read', 'Certificate')
+  @CheckAbility({ action: 'read', subject: 'Certificate' })
   async listCertificates(
     @Args('filter', { nullable: true }) filter?: ListCertificateFilterInput,
   ): Promise<CertificateModel[]> {
@@ -39,7 +39,7 @@ export class CertificateResolver {
   }
 
   @Query(() => CertificateModel, { description: 'Get a certificate by id' })
-  @CheckAbility('read', 'Certificate')
+  @CheckAbility({ action: 'read', subject: 'Certificate' })
   async getCertificate(@Args('id', { type: () => ID }) id: string): Promise<CertificateModel> {
     return this.certService.findCertificateById(id);
   }
@@ -48,7 +48,7 @@ export class CertificateResolver {
     description:
       'Placeholder field names for a certificate template (auto-populate driver for the Issue Certificate dialog).',
   })
-  @CheckAbility('read', 'Certificate')
+  @CheckAbility({ action: 'read', subject: 'Certificate' })
   async getCertificateTemplateFields(
     @Args('templateId', { type: () => ID }) templateId: string,
   ): Promise<string[]> {
@@ -59,7 +59,7 @@ export class CertificateResolver {
     description:
       'Renders a preview HTML for a certificate by substituting student data into the template. No row is persisted.',
   })
-  @CheckAbility('read', 'Certificate')
+  @CheckAbility({ action: 'read', subject: 'Certificate' })
   async previewCertificate(@Args('input') input: PreviewCertificateInput): Promise<string> {
     return this.certService.previewCertificate(input);
   }

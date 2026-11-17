@@ -1,4 +1,4 @@
-// Static-source coverage check: every `@CheckAbility(action, subject)` used
+// Static-source coverage check: every `@CheckAbility({ action, subject })` used
 // by a resolver is reachable by at least one default role's abilities.
 //
 // Catches the silent class of bug where a resolver guards a mutation with
@@ -63,7 +63,8 @@ interface UsedPair {
   file: string;
 }
 
-const CHECK_ABILITY_RE = /@CheckAbility\s*\(\s*['"]([a-z_]+)['"]\s*,\s*['"]([A-Z][A-Za-z]*)['"]/g;
+const CHECK_ABILITY_RE =
+  /@CheckAbility\s*\(\s*\{\s*action:\s*['"]([a-z_]+)['"]\s*,\s*subject:\s*['"]([A-Z][A-Za-z]*)['"]/g;
 
 function collectUsedPairs(): UsedPair[] {
   const out: UsedPair[] = [];
@@ -128,9 +129,9 @@ function collectUngrantedPairs(
 }
 
 describe('CASL ability coverage', () => {
-  it('every @CheckAbility(action, subject) is reachable by ≥ 1 default role', () => {
+  it('every @CheckAbility({ action, subject }) is reachable by ≥ 1 default role', () => {
     const used = collectUsedPairs();
-    expect(used.length).toBeGreaterThan(20); // sanity: ~280 across api-gateway + ee
+    expect(used.length).toBeGreaterThan(300); // a regex that stops matching must fail, not pass vacuously
 
     // Deduplicate by (action, subject); keep one example file per pair.
     const unique = new Map<string, UsedPair>();

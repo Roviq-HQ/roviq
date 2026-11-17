@@ -24,19 +24,19 @@ export class InstituteResolver {
   constructor(private readonly instituteService: InstituteService) {}
 
   @Query(() => InstituteConnection)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async institutes(@Args('filter', { nullable: true }) filter?: InstituteFilterInput) {
     return this.instituteService.search(filter ?? {});
   }
 
   @Query(() => InstituteModel)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async institute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.findById(id);
   }
 
   @Query(() => InstituteModel)
-  @CheckAbility('read', 'Institute')
+  @CheckAbility({ action: 'read', subject: 'Institute' })
   async myInstitute(@CurrentUser() user: AuthUser) {
     assertTenantContext(user);
     if (!user.tenantId) {
@@ -46,13 +46,13 @@ export class InstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('create', 'Institute')
+  @CheckAbility({ action: 'create', subject: 'Institute' })
   async createInstitute(@Args('input') input: CreateInstituteInput) {
     return this.instituteService.create(input);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update_info', 'Institute')
+  @CheckAbility({ action: 'update_info', subject: 'Institute' })
   async updateInstituteInfo(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateInstituteInfoInput,
@@ -61,7 +61,7 @@ export class InstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update_branding', 'Institute')
+  @CheckAbility({ action: 'update_branding', subject: 'Institute' })
   async updateInstituteBranding(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateInstituteBrandingInput,
@@ -71,7 +71,7 @@ export class InstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update_config', 'Institute')
+  @CheckAbility({ action: 'update_config', subject: 'Institute' })
   async updateInstituteLocales(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateInstituteLocalesInput,
@@ -81,7 +81,7 @@ export class InstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('update_config', 'Institute')
+  @CheckAbility({ action: 'update_config', subject: 'Institute' })
   async updateInstituteConfig(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateInstituteConfigInput,
@@ -91,37 +91,37 @@ export class InstituteResolver {
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('activate', 'Institute')
+  @CheckAbility({ action: 'activate', subject: 'Institute' })
   async activateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.activate(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('deactivate', 'Institute')
+  @CheckAbility({ action: 'deactivate', subject: 'Institute' })
   async deactivateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.deactivate(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('suspend', 'Institute')
+  @CheckAbility({ action: 'suspend', subject: 'Institute' })
   async suspendInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.suspend(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('reject', 'Institute')
+  @CheckAbility({ action: 'reject', subject: 'Institute' })
   async rejectInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.reject(id);
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('delete', 'Institute')
+  @CheckAbility({ action: 'delete', subject: 'Institute' })
   async deleteInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.delete(id);
   }
 
   @Mutation(() => InstituteModel)
-  @CheckAbility('restore', 'Institute')
+  @CheckAbility({ action: 'restore', subject: 'Institute' })
   async restoreInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.restore(id);
   }

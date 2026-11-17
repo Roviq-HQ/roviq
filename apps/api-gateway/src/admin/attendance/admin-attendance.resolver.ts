@@ -21,7 +21,7 @@ export class AdminAttendanceResolver {
     description:
       'Platform admin: cross-tenant attendance roll-up for a single date. One row per institute with totals for each status + session count.',
   })
-  @CheckAbility('read', 'Attendance')
+  @CheckAbility({ action: 'read', subject: 'Attendance' })
   async adminAttendanceSummary(
     @Args('date', { type: () => String, description: 'ISO YYYY-MM-DD date to roll up.' })
     date: string,

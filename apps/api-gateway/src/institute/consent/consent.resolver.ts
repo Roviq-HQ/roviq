@@ -18,7 +18,7 @@ export class ConsentResolver {
   @Mutation(() => ConsentRecordModel, {
     description: 'Grant parental consent for a data processing purpose (DPDP Act 2023)',
   })
-  @CheckAbility('create', 'Consent')
+  @CheckAbility({ action: 'create', subject: 'Consent' })
   async grantConsent(
     @Args('input') input: GrantConsentInput,
     @CurrentUser() user: AuthUser,
@@ -35,7 +35,7 @@ export class ConsentResolver {
     description:
       'Withdraw parental consent for a data processing purpose (creates a new append-only record)',
   })
-  @CheckAbility('create', 'Consent')
+  @CheckAbility({ action: 'create', subject: 'Consent' })
   async withdrawConsent(
     @Args('input') input: WithdrawConsentInput,
     @CurrentUser() user: AuthUser,
@@ -51,7 +51,7 @@ export class ConsentResolver {
   @Query(() => [ConsentStatus], {
     description: 'Get current consent status for all linked children and purposes',
   })
-  @CheckAbility('read', 'Consent')
+  @CheckAbility({ action: 'read', subject: 'Consent' })
   async myConsentStatus(@CurrentUser() user: AuthUser): Promise<ConsentStatus[]> {
     return this.consentService.myConsentStatus(user.membershipId);
   }
@@ -60,7 +60,7 @@ export class ConsentResolver {
     description:
       'Get current consent status for every DPDP purpose for a single student. Used by the guardian detail page to show per-child consent badges.',
   })
-  @CheckAbility('read', 'Consent')
+  @CheckAbility({ action: 'read', subject: 'Consent' })
   async consentStatusForStudent(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
   ): Promise<ConsentStatus[]> {

@@ -18,7 +18,7 @@ export class LeaveResolver {
     description:
       'List leave applications, ordered by `startDate` DESC (most recent first — leave UIs are decision-driven, not calendar-driven). Optional filters narrow by user, status, type, and overlapping date range.',
   })
-  @CheckAbility('read', 'Leave')
+  @CheckAbility({ action: 'read', subject: 'Leave' })
   async leaves(
     @Args('userId', { type: () => ID, nullable: true }) userId: string | null,
     @Args('status', { type: () => LeaveStatus, nullable: true }) status: LeaveStatus | null,
@@ -36,19 +36,19 @@ export class LeaveResolver {
   }
 
   @Query(() => LeaveModel)
-  @CheckAbility('read', 'Leave')
+  @CheckAbility({ action: 'read', subject: 'Leave' })
   async leave(@Args('id', { type: () => ID }) id: string): Promise<LeaveRecord> {
     return this.service.findById(id);
   }
 
   @Mutation(() => LeaveModel, { description: 'Submit a new leave application (PENDING).' })
-  @CheckAbility('create', 'Leave')
+  @CheckAbility({ action: 'create', subject: 'Leave' })
   async applyLeave(@Args('input') input: CreateLeaveInput): Promise<LeaveRecord> {
     return this.service.apply(input);
   }
 
   @Mutation(() => LeaveModel, { description: 'Edit a PENDING leave before it is decided.' })
-  @CheckAbility('update', 'Leave')
+  @CheckAbility({ action: 'update', subject: 'Leave' })
   async updateLeave(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateLeaveInput,
@@ -57,7 +57,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Approve a PENDING leave.' })
-  @CheckAbility('update', 'Leave')
+  @CheckAbility({ action: 'update', subject: 'Leave' })
   async approveLeave(
     @Args('id', { type: () => ID }) id: string,
     @Args('approverMembershipId', { type: () => ID }) approverMembershipId: string,
@@ -66,7 +66,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Reject a PENDING leave.' })
-  @CheckAbility('update', 'Leave')
+  @CheckAbility({ action: 'update', subject: 'Leave' })
   async rejectLeave(
     @Args('id', { type: () => ID }) id: string,
     @Args('approverMembershipId', { type: () => ID }) approverMembershipId: string,
@@ -75,7 +75,7 @@ export class LeaveResolver {
   }
 
   @Mutation(() => LeaveModel, { description: 'Cancel an own / pending leave.' })
-  @CheckAbility('update', 'Leave')
+  @CheckAbility({ action: 'update', subject: 'Leave' })
   async cancelLeave(
     @Args('id', { type: () => ID }) id: string,
     @Args('cancellerMembershipId', { type: () => ID }) cancellerMembershipId: string,
@@ -87,7 +87,7 @@ export class LeaveResolver {
     description:
       'Soft-delete a leave application. Returns true on success. Mirrors `deleteHoliday`.',
   })
-  @CheckAbility('delete', 'Leave')
+  @CheckAbility({ action: 'delete', subject: 'Leave' })
   async deleteLeave(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.service.delete(id);
   }

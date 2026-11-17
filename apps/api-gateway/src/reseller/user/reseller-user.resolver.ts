@@ -16,7 +16,7 @@ export class ResellerUserResolver {
   @Query(() => ResellerUserConnection, {
     description: 'List users with memberships in institutes belonging to this reseller',
   })
-  @CheckAbility('read', 'User')
+  @CheckAbility({ action: 'read', subject: 'User' })
   async resellerListUsers(
     @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: ResellerListUsersFilterInput,

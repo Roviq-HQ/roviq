@@ -236,7 +236,7 @@ This gives us one place to enforce password policy, audit the creation event, an
 
 ### Backend
 - `AbilityFactory` creates abilities per request from `Membership.abilities` + `Role.abilities`
-- `@CheckAbility(action, subject)` decorator + `AbilityGuard` for resolver-level checks
+- `@CheckAbility({ action, subject })` decorator + `AbilityGuard` for resolver-level checks
 - `@CurrentAbility()` param decorator for imperative checks in resolver body
 - Role abilities cached in Redis with key `casl:role:{roleId}`, 5-minute TTL
 - Platform scope: `manage:all` (no DB lookup)

@@ -87,7 +87,7 @@ describe('DEFAULT_ROLE_ABILITIES with CASL', () => {
     expect(ability.can('manage', 'Bot')).toBe(true);
   });
 
-  // CR-001: every CASL subject used by `@CheckAbility(action, 'Foo')` in the
+  // CR-001: every CASL subject used by `@CheckAbility({ action, subject: 'Foo' })` in the
   // gateway must have at least one role in DEFAULT_ROLE_ABILITIES with read
   // (or higher) access — otherwise shipping a feature locks every institute
   // role out of it ("forbidden for everyone except platform admin"). The

@@ -23,7 +23,7 @@ export class ComplianceExportResolver {
   @Mutation(() => ExportStartResult, {
     description: 'Start a compliance export workflow — returns workflowId for progress tracking',
   })
-  @CheckAbility('manage', 'Export')
+  @CheckAbility({ action: 'manage', subject: 'Export' })
   async exportComplianceReport(
     @Args('input') input: ExportComplianceReportInput,
     @CurrentUser() user: AuthUser,
@@ -58,7 +58,7 @@ export class ComplianceExportResolver {
     description:
       'List past compliance export reports (stub — returns empty until export history table is added)',
   })
-  @CheckAbility('read', 'Export')
+  @CheckAbility({ action: 'read', subject: 'Export' })
   async listExportReports(): Promise<ExportReportModel[]> {
     // TODO: Query an export_reports table when it's created.
     // For now, returns empty array. Exports are tracked via Temporal workflow history.

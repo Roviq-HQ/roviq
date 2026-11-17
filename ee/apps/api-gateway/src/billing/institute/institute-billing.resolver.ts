@@ -37,7 +37,7 @@ export class InstituteBillingResolver {
   /** Returns current subscription with plan details. Returns null when no subscription (not error). */
   @Query(() => SubscriptionModel, { nullable: true, name: 'mySubscription' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Subscription')
+  @CheckAbility({ action: 'read', subject: 'Subscription' })
   async mySubscription(@CurrentUser() user: AuthUser) {
     // BI-003: institute users must always have both tenant + reseller context
     // by the time they reach billing. Throw a typed error instead of silently
@@ -50,7 +50,7 @@ export class InstituteBillingResolver {
 
   @Query(() => [InvoiceModel], { name: 'myInvoices' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Invoice')
+  @CheckAbility({ action: 'read', subject: 'Invoice' })
   async myInvoices(
     @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: BillingFilterInput,
@@ -71,7 +71,7 @@ export class InstituteBillingResolver {
 
   @Query(() => InvoiceModel, { nullable: true, name: 'myInvoice' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Invoice')
+  @CheckAbility({ action: 'read', subject: 'Invoice' })
   async myInvoice(@CurrentUser() user: AuthUser, @Args('id', { type: () => ID }) id: string) {
     assertInstituteWithReseller(user);
     const invoice = await this.invoiceService.getInvoice(user.resellerId, id);
@@ -85,7 +85,7 @@ export class InstituteBillingResolver {
 
   @Mutation(() => InitiatePaymentResult, { name: 'initiatePayment' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'Payment')
+  @CheckAbility({ action: 'create', subject: 'Payment' })
   async initiatePayment(
     @CurrentUser() user: AuthUser,
     @Args('invoiceId', { type: () => ID }) invoiceId: string,
@@ -106,7 +106,7 @@ export class InstituteBillingResolver {
 
   @Mutation(() => PaymentModel, { name: 'verifyPayment' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'Payment')
+  @CheckAbility({ action: 'create', subject: 'Payment' })
   async verifyPayment(@CurrentUser() user: AuthUser, @Args('input') input: VerifyPaymentGqlInput) {
     assertResellerContext(user);
     return this.paymentService.verifyPayment(user.resellerId, input);
@@ -114,7 +114,7 @@ export class InstituteBillingResolver {
 
   @Query(() => [PaymentModel], { name: 'myPaymentHistory' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Payment')
+  @CheckAbility({ action: 'read', subject: 'Payment' })
   async myPaymentHistory(
     @CurrentUser() user: AuthUser,
     @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first?: number,
@@ -134,7 +134,7 @@ export class InstituteBillingResolver {
 
   @Mutation(() => PaymentModel, { name: 'submitUpiProof' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('create', 'Payment')
+  @CheckAbility({ action: 'create', subject: 'Payment' })
   async instituteSubmitUpiProof(
     @CurrentUser() user: AuthUser,
     @Args('input') input: SubmitUpiProofInput,
@@ -159,7 +159,7 @@ export class InstituteBillingResolver {
 
   @Query(() => String, { name: 'generateInvoicePdf', description: 'Returns base64-encoded PDF' })
   @UseGuards(AbilityGuard)
-  @CheckAbility('read', 'Invoice')
+  @CheckAbility({ action: 'read', subject: 'Invoice' })
   async instituteGenerateInvoicePdf(
     @CurrentUser() user: AuthUser,
     @Args('invoiceId', { type: () => ID }) invoiceId: string,

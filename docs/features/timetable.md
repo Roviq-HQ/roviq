@@ -26,7 +26,7 @@ Migration: `libs/database/migrations/20260526224039_thankful_ravenous` (tables, 
 - `timetable-view.service.ts` — section/staff weekly grids; per-date `daySchedule` (master entries for the weekday overlaid with that date's overrides — substitution replaces, cancellation hides); override create/clear.
 - `timetable-pdf.service.ts` — renders a section or staff weekly grid to a **real downloadable PDF** (pdfkit, A4 landscape, manual table layout with page-break-aware row heights). Display labels (subject / "Standard - Section" / teacher name) are resolved server-side by `TimetableRepository.resolveLabels()`, which reads `subjectsLive`, `sectionsLive`+`standardsLive`, and `staffProfilesLive`+`userProfiles` (teacher = membership id) under tenant RLS. Returns a `Buffer`; the resolver base64-encodes it. Follows the EE invoice-PDF pattern. 4 unit tests.
 
-## GraphQL surface (institute scope, `@CheckAbility(..., 'Timetable')`)
+## GraphQL surface (institute scope, `@CheckAbility({ action, subject: 'Timetable' })`)
 
 Queries: `timetables` (paginated), `timetable`, `timetableStatistics`, `sectionTimetable`, `staffTimetable`, `timetableDaySchedule`, `staffDaySchedule`, `timetableDayOverrides`, **`sectionTimetablePdf` / `staffTimetablePdf`** (return a base64-encoded PDF `String`, mirror the EE `generateInvoicePdf` shape).
 Mutations: `createTimetable`, `updateTimetable`, **`activateTimetable` / `deactivateTimetable` / `archiveTimetable`** (named transitions), `deleteTimetable`, `restoreTimetable`, `addTimetableSection`, `removeTimetableSection`, `addTimetablePeriod`, `updateTimetablePeriod`, `removeTimetablePeriod`, `assignTimetableEntry`, `clearTimetableEntry`, `createTimetableDayOverride`, `clearTimetableDayOverride`.

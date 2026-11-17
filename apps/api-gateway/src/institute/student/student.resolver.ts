@@ -29,7 +29,7 @@ export class StudentResolver {
   ) {}
 
   @Query(() => StudentConnection, { description: 'List students with filters and pagination' })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   async listStudents(
     @CurrentReadAccess() access: InstituteReadAccess,
     @Args('filter', { nullable: true }) filter?: StudentFilterInput,
@@ -38,7 +38,7 @@ export class StudentResolver {
   }
 
   @Query(() => StudentModel, { description: 'Get a student by ID' })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   async getStudent(
     @Args('id', { type: () => ID }) id: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -47,7 +47,7 @@ export class StudentResolver {
   }
 
   @Query(() => StudentStatisticsModel, { description: 'Aggregate student statistics' })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   async studentStatistics(
     @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentStatisticsModel> {
@@ -57,7 +57,7 @@ export class StudentResolver {
   @Query(() => [StudentDocumentModel], {
     description: 'List uploaded documents for a single student (Documents tab on detail page).',
   })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   async listStudentDocuments(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
     @CurrentReadAccess() access: InstituteReadAccess,
@@ -66,13 +66,13 @@ export class StudentResolver {
   }
 
   @Mutation(() => StudentModel, { description: 'Create a new student with admission' })
-  @CheckAbility('create', 'Student')
+  @CheckAbility({ action: 'create', subject: 'Student' })
   async createStudent(@Args('input') input: CreateStudentInput): Promise<StudentModel> {
     return this.studentService.create(input);
   }
 
   @Mutation(() => StudentModel, { description: 'Update student profile (optimistic concurrency)' })
-  @CheckAbility('update', 'Student')
+  @CheckAbility({ action: 'update', subject: 'Student' })
   async updateStudent(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateStudentInput,
@@ -84,7 +84,7 @@ export class StudentResolver {
     description:
       'Explicit academic status transition (named domain mutation). Validates against the status state machine and emits STUDENT.statusChanged.',
   })
-  @CheckAbility('update', 'Student')
+  @CheckAbility({ action: 'update', subject: 'Student' })
   async transitionStudentStatus(
     @Args('id', { type: () => ID }) id: string,
     @Args('newStatus', { type: () => AcademicStatus }) newStatus: AcademicStatus,
@@ -97,7 +97,7 @@ export class StudentResolver {
     description:
       'Records an uploaded document (client uploads file bytes to object storage first, then calls this mutation with the resulting URLs).',
   })
-  @CheckAbility('update', 'Student')
+  @CheckAbility({ action: 'update', subject: 'Student' })
   async uploadStudentDocument(
     @Args('input') input: UploadStudentDocumentInput,
   ): Promise<StudentDocumentModel> {
@@ -105,7 +105,7 @@ export class StudentResolver {
   }
 
   @Mutation(() => Boolean, { description: 'Soft delete a student profile' })
-  @CheckAbility('delete', 'Student')
+  @CheckAbility({ action: 'delete', subject: 'Student' })
   async deleteStudent(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.studentService.delete(id);
   }
@@ -125,7 +125,7 @@ export class StudentResolver {
       );
     },
   })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   studentUpdated(@Args('studentId', { type: () => ID }) _studentId: string) {
     return pubSub.asyncIterableIterator('STUDENT.updated');
   }
@@ -146,7 +146,7 @@ export class StudentResolver {
       );
     },
   })
-  @CheckAbility('read', 'Student')
+  @CheckAbility({ action: 'read', subject: 'Student' })
   studentsInTenantUpdated() {
     return pubSub.asyncIterableIterator('STUDENT.updated');
   }

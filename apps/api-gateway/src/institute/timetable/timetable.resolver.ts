@@ -37,7 +37,7 @@ export class TimetableResolver {
   ) {}
 
   @Query(() => PaginatedTimetablesModel)
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   timetables(
     @Args('academicYearId', {
       type: () => ID,
@@ -62,13 +62,13 @@ export class TimetableResolver {
   }
 
   @Query(() => TimetableModel)
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   timetable(@Args('id', { type: () => ID }) id: string): Promise<TimetableRecord> {
     return this.service.findById(id);
   }
 
   @Query(() => TimetableStatisticsModel)
-  @CheckAbility('read', 'Timetable')
+  @CheckAbility({ action: 'read', subject: 'Timetable' })
   timetableStatistics(
     @Args('academicYearId', { type: () => ID, nullable: true }) academicYearId: string | null,
   ) {
@@ -86,7 +86,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => TimetableModel)
-  @CheckAbility('create', 'Timetable')
+  @CheckAbility({ action: 'create', subject: 'Timetable' })
   createTimetable(@Args('input') input: CreateTimetableInput): Promise<TimetableRecord> {
     return this.service.create({
       academicYearId: input.academicYearId,
@@ -114,7 +114,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => TimetableModel)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   updateTimetable(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateTimetableInput,
@@ -123,7 +123,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => TimetableModel, { description: 'Publish a timetable (DRAFT/INACTIVE → ACTIVE).' })
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   activateTimetable(@Args('id', { type: () => ID }) id: string): Promise<TimetableRecord> {
     return this.service.activate(id);
   }
@@ -131,19 +131,19 @@ export class TimetableResolver {
   @Mutation(() => TimetableModel, {
     description: 'Retire the active timetable (ACTIVE → INACTIVE).',
   })
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   deactivateTimetable(@Args('id', { type: () => ID }) id: string): Promise<TimetableRecord> {
     return this.service.deactivate(id);
   }
 
   @Mutation(() => TimetableModel, { description: 'Permanently retire a timetable (→ ARCHIVED).' })
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   archiveTimetable(@Args('id', { type: () => ID }) id: string): Promise<TimetableRecord> {
     return this.service.archive(id);
   }
 
   @Mutation(() => Int, { description: 'Soft-delete timetables. Returns the count removed.' })
-  @CheckAbility('delete', 'Timetable')
+  @CheckAbility({ action: 'delete', subject: 'Timetable' })
   deleteTimetable(@Args('ids', { type: () => [ID] }) ids: string[]): Promise<number> {
     return this.service.delete(ids);
   }
@@ -151,13 +151,13 @@ export class TimetableResolver {
   @Mutation(() => Int, {
     description: 'Restore soft-deleted timetables. Returns the count restored.',
   })
-  @CheckAbility('delete', 'Timetable')
+  @CheckAbility({ action: 'delete', subject: 'Timetable' })
   restoreTimetable(@Args('ids', { type: () => [ID] }) ids: string[]): Promise<number> {
     return this.service.restore(ids);
   }
 
   @Mutation(() => TimetableSectionModel)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   addTimetableSection(
     @Args('timetableId', { type: () => ID }) timetableId: string,
     @Args('sectionId', { type: () => ID }) sectionId: string,
@@ -166,7 +166,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   removeTimetableSection(
     @Args('timetableId', { type: () => ID }) timetableId: string,
     @Args('sectionId', { type: () => ID }) sectionId: string,
@@ -175,7 +175,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => TimetablePeriodModel)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   addTimetablePeriod(
     @Args('input') input: AddTimetablePeriodInput,
   ): Promise<TimetablePeriodRecord> {
@@ -190,7 +190,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => TimetablePeriodModel)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   updateTimetablePeriod(
     @Args('timetableId', { type: () => ID }) timetableId: string,
     @Args('periodId', { type: () => ID }) periodId: string,
@@ -200,7 +200,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   removeTimetablePeriod(
     @Args('timetableId', { type: () => ID }) timetableId: string,
     @Args('periodId', { type: () => ID }) periodId: string,
@@ -212,7 +212,7 @@ export class TimetableResolver {
     description:
       'Assign subject/teacher/room to a cell for one or more weekdays (supports class-split).',
   })
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   assignTimetableEntry(
     @Args('input') input: AssignTimetableEntryInput,
   ): Promise<TimetableEntryRecord[]> {
@@ -232,7 +232,7 @@ export class TimetableResolver {
   }
 
   @Mutation(() => Boolean)
-  @CheckAbility('update', 'Timetable')
+  @CheckAbility({ action: 'update', subject: 'Timetable' })
   clearTimetableEntry(@Args('input') input: ClearTimetableEntryInput): Promise<boolean> {
     return this.schedule.clearEntry({
       timetableId: input.timetableId,

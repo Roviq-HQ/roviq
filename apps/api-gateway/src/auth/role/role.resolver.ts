@@ -15,7 +15,7 @@ export class InstituteRoleResolver {
   @Query(() => [RoleModel], {
     description: 'List institute roles available for primary-nav customization.',
   })
-  @CheckAbility('read', 'Role')
+  @CheckAbility({ action: 'read', subject: 'Role' })
   async instituteRoles(): Promise<RoleRecord[]> {
     return this.service.list();
   }
@@ -23,7 +23,7 @@ export class InstituteRoleResolver {
   @Mutation(() => RoleModel, {
     description: "Set a role's phone bottom tab bar destinations.",
   })
-  @CheckAbility('update', 'Role')
+  @CheckAbility({ action: 'update', subject: 'Role' })
   async updateRolePrimaryNav(@Args('input') input: UpdateRolePrimaryNavInput): Promise<RoleRecord> {
     return this.service.updatePrimaryNavSlugs(input.roleId, input.slugs);
   }
