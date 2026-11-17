@@ -1,5 +1,15 @@
 export { AuthContext, AuthProvider, useAuth } from './lib/auth-context';
 export { createAuthMutations } from './lib/auth-mutations';
+export type { AuthErrorKey, AuthErrorLabels, ClientErrorKind } from './lib/error-utils';
+export {
+  AUTH_CLIENT_ERROR_KINDS,
+  AUTH_ERROR_CODES,
+  AuthRequestError,
+  classifyClientError,
+  extractErrorCode,
+  isAppError,
+  resolveAuthErrorMessage,
+} from './lib/error-utils';
 export { checkIsImpersonated, decodeJwt, isTokenExpired } from './lib/jwt-decode';
 export type { LoginFormProps } from './lib/login-form';
 export { LoginForm } from './lib/login-form';

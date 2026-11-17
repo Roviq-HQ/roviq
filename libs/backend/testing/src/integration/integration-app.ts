@@ -1,13 +1,9 @@
 import 'json-bigint-patch';
 import type { Server } from 'node:http';
 import { createMock } from '@golevelup/ts-vitest';
-import {
-  BadRequestException,
-  type INestApplication,
-  type Type,
-  ValidationPipe,
-} from '@nestjs/common';
+import { type INestApplication, type Type, ValidationPipe } from '@nestjs/common';
 import { Test, type TestingModule, type TestingModuleBuilder } from '@nestjs/testing';
+import { validationExceptionFactory } from '@roviq/common-types';
 import { createDrizzleDb, DRIZZLE_DB, type DrizzleDB } from '@roviq/database';
 import type { JetStreamClient } from '@roviq/nats-jetstream';
 import { REDIS_CLIENT } from '@roviq/redis';
@@ -165,11 +161,7 @@ export async function createIntegrationApp(
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      // Mirrors main.ts — joined validator messages reach GraphQL via .message.
-      exceptionFactory: (errors) => {
-        const messages = errors.flatMap((e) => Object.values(e.constraints ?? {}));
-        return new BadRequestException(messages.join('; '));
-      },
+      exceptionFactory: validationExceptionFactory,
     }),
   );
 

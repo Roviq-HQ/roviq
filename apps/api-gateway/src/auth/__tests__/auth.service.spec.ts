@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
-import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
-import { NEW_PASSWORD_MIN_LENGTH } from '@roviq/common-types';
+import { ErrorCode, NEW_PASSWORD_MIN_LENGTH } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectBusinessError } from '../../__tests__/expect-business-error';
 import { AuthService } from '../auth.service';
 import { AuthEventService } from '../auth-event.service';
 import { LoginLockoutService } from '../login-lockout.service';
@@ -262,24 +262,27 @@ describe('AuthService', () => {
     it('should reject invalid password', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
 
-      await expect(authService.instituteLogin('admin', 'wrong-password')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.instituteLogin('admin', 'wrong-password'),
+        ErrorCode.INVALID_CREDENTIALS,
       );
     });
 
     it('should reject inactive user', async () => {
       mockUserRepo.findByUsername.mockResolvedValue({ ...mockUser, status: 'SUSPENDED' as const });
 
-      await expect(authService.instituteLogin('admin', 'correct-password')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.instituteLogin('admin', 'correct-password'),
+        ErrorCode.INVALID_CREDENTIALS,
       );
     });
 
-    it('should throw UnauthorizedException for non-existent user', async () => {
+    it('should reject a non-existent user with INVALID_CREDENTIALS', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(null);
 
-      await expect(authService.instituteLogin('nonexistent', 'password')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.instituteLogin('nonexistent', 'password'),
+        ErrorCode.INVALID_CREDENTIALS,
       );
     });
 
@@ -287,9 +290,11 @@ describe('AuthService', () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
 
-      await expect(authService.instituteLogin('admin', 'correct-password')).rejects.toThrow(
-        'No account found',
+      const failure = await expectBusinessError(
+        authService.instituteLogin('admin', 'correct-password'),
+        ErrorCode.ACCOUNT_NOT_FOUND,
       );
+      expect(failure.message).toBe('No account found');
     });
 
     it('should use the same error message for user-not-found and wrong-password', async () => {
@@ -299,7 +304,7 @@ describe('AuthService', () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       const err2 = await authService.instituteLogin('admin', 'wrong').catch((e: Error) => e);
 
-      expect((err1 as UnauthorizedException).message).toBe((err2 as UnauthorizedException).message);
+      expect((err1 as Error).message).toBe((err2 as Error).message);
     });
 
     it('should find user by username', async () => {
@@ -372,16 +377,19 @@ describe('AuthService', () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockPlatformMembershipRepo.findByUserId.mockResolvedValue(null);
 
-      await expect(authService.adminLogin('platformadmin', 'correct-password')).rejects.toThrow(
-        'No account found',
+      const failure = await expectBusinessError(
+        authService.adminLogin('platformadmin', 'correct-password'),
+        ErrorCode.ACCOUNT_NOT_FOUND,
       );
+      expect(failure.message).toBe('No account found');
     });
 
     it('should reject invalid password', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
 
-      await expect(authService.adminLogin('platformadmin', 'wrong-password')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.adminLogin('platformadmin', 'wrong-password'),
+        ErrorCode.INVALID_CREDENTIALS,
       );
     });
   });
@@ -455,11 +463,12 @@ describe('AuthService', () => {
       expect(result.memberships).toHaveLength(2);
     });
 
-    it('should throw UnauthorizedException when user not found', async () => {
+    it('should reject with INVALID_CREDENTIALS when user not found', async () => {
       mockUserRepo.findById.mockResolvedValue(null);
 
-      await expect(authService.instituteLoginByUserId('nonexistent')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.instituteLoginByUserId('nonexistent'),
+        ErrorCode.INVALID_CREDENTIALS,
       );
     });
 
@@ -467,9 +476,11 @@ describe('AuthService', () => {
       mockUserRepo.findById.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
 
-      await expect(authService.instituteLoginByUserId('user-1')).rejects.toThrow(
-        'No account found',
+      const failure = await expectBusinessError(
+        authService.instituteLoginByUserId('user-1'),
+        ErrorCode.ACCOUNT_NOT_FOUND,
       );
+      expect(failure.message).toBe('No account found');
     });
   });
 
@@ -561,9 +572,10 @@ describe('AuthService', () => {
     it('should reject if no active membership found', async () => {
       mockMembershipRepo.findByIdAndUser.mockResolvedValue(null);
 
-      await expect(
+      await expectBusinessError(
         authService.selectInstitute('mock-selection-token', 'membership-999'),
-      ).rejects.toThrow(ForbiddenException);
+        ErrorCode.NO_ACTIVE_MEMBERSHIP,
+      );
     });
 
     it('should reject inactive membership', async () => {
@@ -583,9 +595,10 @@ describe('AuthService', () => {
         role: { id: 'role-1', name: { en: 'Admin' }, abilities: [] },
       });
 
-      await expect(
+      await expectBusinessError(
         authService.selectInstitute('mock-selection-token', 'membership-1'),
-      ).rejects.toThrow(ForbiddenException);
+        ErrorCode.NO_ACTIVE_MEMBERSHIP,
+      );
     });
 
     it('should reject invalid selection token', async () => {
@@ -593,17 +606,21 @@ describe('AuthService', () => {
         throw new Error('invalid');
       });
 
-      await expect(authService.selectInstitute('bad-token', 'membership-1')).rejects.toThrow(
-        'Invalid or expired selection token',
+      const failure = await expectBusinessError(
+        authService.selectInstitute('bad-token', 'membership-1'),
+        ErrorCode.SESSION_EXPIRED,
       );
+      expect(failure.message).toBe('Invalid or expired selection token');
     });
 
     it('should reject token with wrong purpose', async () => {
       mockJwt.verify.mockReturnValue({ sub: 'user-1', purpose: 'other' });
 
-      await expect(
+      const failure = await expectBusinessError(
         authService.selectInstitute('wrong-purpose-token', 'membership-1'),
-      ).rejects.toThrow('Invalid or expired selection token');
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toBe('Invalid or expired selection token');
     });
   });
 
@@ -724,13 +741,17 @@ describe('AuthService', () => {
         throw new Error('invalid');
       });
 
-      await expect(authService.refreshToken('bad-token')).rejects.toThrow(UnauthorizedException);
+      await expectBusinessError(authService.refreshToken('bad-token'), ErrorCode.SESSION_EXPIRED);
     });
 
     it('should throw when token type is not refresh', async () => {
       mockJwt.verify.mockReturnValue({ sub: 'user-1', type: 'access' });
 
-      await expect(authService.refreshToken('access-token')).rejects.toThrow('Invalid token type');
+      const failure = await expectBusinessError(
+        authService.refreshToken('access-token'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toBe('Invalid token type');
     });
 
     it('should revoke all tokens on reuse detection', async () => {
@@ -771,9 +792,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('mock-token')).rejects.toThrow(
-        'Refresh token reuse detected',
+      const failure = await expectBusinessError(
+        authService.refreshToken('mock-token'),
+        ErrorCode.SESSION_EXPIRED,
       );
+      expect(failure.message).toBe('Refresh token reuse detected');
 
       expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'rotation');
     });
@@ -817,9 +840,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('stale-but-legit')).rejects.toThrow(
-        'Refresh token revoked',
+      const failure = await expectBusinessError(
+        authService.refreshToken('stale-but-legit'),
+        ErrorCode.SESSION_EXPIRED,
       );
+      expect(failure.message).toBe('Refresh token revoked');
       // Critical assertion: NO family kill.
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
@@ -863,7 +888,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('stale-but-legit')).rejects.toThrow(/revoked/i);
+      const failure = await expectBusinessError(
+        authService.refreshToken('stale-but-legit'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toMatch(/revoked/i);
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
@@ -905,7 +934,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('stale-but-legit')).rejects.toThrow(/revoked/i);
+      const failure = await expectBusinessError(
+        authService.refreshToken('stale-but-legit'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toMatch(/revoked/i);
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
@@ -949,7 +982,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('stale-but-legit')).rejects.toThrow(/reuse detected/i);
+      const failure = await expectBusinessError(
+        authService.refreshToken('stale-but-legit'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toMatch(/reuse detected/i);
       expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'rotation');
     });
 
@@ -962,7 +999,11 @@ describe('AuthService', () => {
       });
       mockRefreshTokenRepo.findByIdWithRelations.mockResolvedValue(null);
 
-      await expect(authService.refreshToken('mock-token')).rejects.toThrow('Invalid refresh token');
+      const failure = await expectBusinessError(
+        authService.refreshToken('mock-token'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toBe('Invalid refresh token');
     });
 
     it('should throw when token hash does not match', async () => {
@@ -997,7 +1038,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('mock-token')).rejects.toThrow('Invalid refresh token');
+      const failure = await expectBusinessError(
+        authService.refreshToken('mock-token'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toBe('Invalid refresh token');
     });
 
     it('should throw on expired refresh token', async () => {
@@ -1036,7 +1081,11 @@ describe('AuthService', () => {
         membership: null,
       });
 
-      await expect(authService.refreshToken('mock-token')).rejects.toThrow('Refresh token expired');
+      const failure = await expectBusinessError(
+        authService.refreshToken('mock-token'),
+        ErrorCode.SESSION_EXPIRED,
+      );
+      expect(failure.message).toBe('Refresh token expired');
     });
 
     it('should re-issue management tokens via fallback when no membership on stored token', async () => {
@@ -1245,31 +1294,33 @@ describe('AuthService', () => {
       );
     });
 
-    it('rejects wrong current password with UnauthorizedException carrying expected message', async () => {
-      const err = await authService
-        .changePassword(userId, 'not-the-current-password', NEW)
-        .catch((e: unknown) => e);
+    it('rejects wrong current password with CURRENT_PASSWORD_INCORRECT', async () => {
+      const failure = await expectBusinessError(
+        authService.changePassword(userId, 'not-the-current-password', NEW),
+        ErrorCode.CURRENT_PASSWORD_INCORRECT,
+      );
 
-      expect(err).toBeInstanceOf(UnauthorizedException);
-      expect((err as UnauthorizedException).message).toContain('Current password is incorrect');
+      expect(failure.message).toBe('Current password is incorrect');
 
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
-    it('rejects new password shorter than NEW_PASSWORD_MIN_LENGTH with BadRequestException', async () => {
+    it('rejects new password shorter than NEW_PASSWORD_MIN_LENGTH with VALIDATION_FAILED', async () => {
       // One character shy of the floor, padded from 'a' so the content is
       // deterministic regardless of what NEW_PASSWORD_MIN_LENGTH is.
       const tooShort = 'a'.repeat(NEW_PASSWORD_MIN_LENGTH - 1);
-      await expect(authService.changePassword(userId, CURRENT, tooShort)).rejects.toThrow(
-        BadRequestException,
+      await expectBusinessError(
+        authService.changePassword(userId, CURRENT, tooShort),
+        ErrorCode.VALIDATION_FAILED,
       );
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
     });
 
-    it('rejects when new password equals current with BadRequestException', async () => {
-      await expect(authService.changePassword(userId, CURRENT, CURRENT)).rejects.toThrow(
-        BadRequestException,
+    it('rejects when new password equals current with PASSWORD_UNCHANGED', async () => {
+      await expectBusinessError(
+        authService.changePassword(userId, CURRENT, CURRENT),
+        ErrorCode.PASSWORD_UNCHANGED,
       );
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();
     });
@@ -1300,17 +1351,13 @@ describe('AuthService', () => {
       };
     });
 
-    it('throws ACCOUNT_LOCKED UnauthorizedException when lockout is active', async () => {
+    it('throws ACCOUNT_LOCKED when lockout is active', async () => {
       mockLockout.isLocked.mockResolvedValue(true);
 
-      const err = await authService
-        .instituteLogin('admin', correctPassword)
-        .catch((e: unknown) => e);
-
-      expect(err).toBeInstanceOf(UnauthorizedException);
-      // UnauthorizedException with object payload exposes the code via getResponse()
-      const response = (err as UnauthorizedException).getResponse() as { code?: string };
-      expect(response.code).toBe('ACCOUNT_LOCKED');
+      await expectBusinessError(
+        authService.instituteLogin('admin', correctPassword),
+        ErrorCode.ACCOUNT_LOCKED,
+      );
       expect(mockUserRepo.findByUsername).not.toHaveBeenCalled();
     });
 
@@ -1341,11 +1388,12 @@ describe('AuthService', () => {
       expect(mockLockout.recordFailure).not.toHaveBeenCalled();
     });
 
-    it('calls recordFailure on a failed login and surfaces UnauthorizedException', async () => {
+    it('calls recordFailure on a failed login and surfaces INVALID_CREDENTIALS', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
 
-      await expect(authService.instituteLogin('admin', 'wrong-password')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.instituteLogin('admin', 'wrong-password'),
+        ErrorCode.INVALID_CREDENTIALS,
       );
 
       expect(mockLockout.recordFailure).toHaveBeenCalledWith('admin', undefined);
@@ -1356,13 +1404,10 @@ describe('AuthService', () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockLockout.recordFailure.mockResolvedValue({ locked: true, remainingAttempts: 0 });
 
-      const err = await authService
-        .instituteLogin('admin', 'wrong-password')
-        .catch((e: unknown) => e);
-
-      expect(err).toBeInstanceOf(UnauthorizedException);
-      const response = (err as UnauthorizedException).getResponse() as { code?: string };
-      expect(response.code).toBe('ACCOUNT_LOCKED');
+      await expectBusinessError(
+        authService.instituteLogin('admin', 'wrong-password'),
+        ErrorCode.ACCOUNT_LOCKED,
+      );
     });
   });
   describe('session management', () => {
@@ -1407,8 +1452,9 @@ describe('AuthService', () => {
     it('should reject a refresh token outside the active sessions', async () => {
       mockRefreshTokenRepo.findActiveByUserId.mockResolvedValue([session('current', 'refresh')]);
 
-      await expect(authService.getActiveSessions('user-1', 'foreign-token')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.getActiveSessions('user-1', 'foreign-token'),
+        ErrorCode.SESSION_EXPIRED,
       );
     });
 
@@ -1430,8 +1476,9 @@ describe('AuthService', () => {
     it('should reject another user refresh token before revoking anything', async () => {
       mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'foreign', userId: 'other-user' });
 
-      await expect(authService.revokeAllOtherSessions('user-1', 'foreign-token')).rejects.toThrow(
-        UnauthorizedException,
+      await expectBusinessError(
+        authService.revokeAllOtherSessions('user-1', 'foreign-token'),
+        ErrorCode.SESSION_EXPIRED,
       );
 
       expect(mockRefreshTokenRepo.revokeAllOtherForUser).not.toHaveBeenCalled();

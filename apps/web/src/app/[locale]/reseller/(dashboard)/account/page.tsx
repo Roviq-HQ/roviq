@@ -4,6 +4,7 @@ import type { PasskeyManagerLabels, PasswordChangeFormLabels } from '@roviq/auth
 import { createAuthMutations, PasskeyManager, PasswordChangeForm } from '@roviq/auth';
 import { useFormatDate } from '@roviq/i18n';
 import { LanguagePreference } from '@web/components/account/language-preference';
+import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { parseISO } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -24,6 +25,7 @@ const passkeyMutations = {
 export default function AccountPage() {
   const t = useTranslations('account');
   const tAuth = useTranslations('auth');
+  const errorLabels = useAuthErrorLabels();
   const { format } = useFormatDate();
   const formatDate = React.useCallback((d: string) => format(parseISO(d), 'PP'), [format]);
 
@@ -46,8 +48,12 @@ export default function AccountPage() {
       removePasskeyConfirm: tAuth('removePasskeyConfirm'),
       nameTooLong: tAuth('nameTooLong'),
       passkeyPasswordRequired: tAuth('passkeyPasswordRequired'),
+      loadFailed: tAuth('passkeysLoadFailed'),
+      removeFailed: tAuth('passkeyRemoveFailed'),
+      addFailed: tAuth('passkeyAddFailed'),
+      errors: errorLabels,
     }),
-    [tAuth],
+    [tAuth, errorLabels],
   );
 
   const passwordChangeLabels = React.useMemo<PasswordChangeFormLabels>(
@@ -77,8 +83,9 @@ export default function AccountPage() {
       requiredError: tAuth('passwordChange.requiredError'),
       successMessage: tAuth('passwordChange.successMessage'),
       genericError: tAuth('passwordChange.genericError'),
+      errors: errorLabels,
     }),
-    [tAuth],
+    [tAuth, errorLabels],
   );
 
   return (

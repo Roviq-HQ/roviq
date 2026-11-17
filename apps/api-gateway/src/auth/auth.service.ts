@@ -1,16 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
 import type { AbilityRule, AuthScope } from '@roviq/common-types';
-import { NEW_PASSWORD_MIN_LENGTH, ResellerStatus } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  NEW_PASSWORD_MIN_LENGTH,
+  ResellerStatus,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
@@ -24,6 +24,8 @@ import { RefreshTokenRepository } from './repositories/refresh-token.repository'
 import { ResellerMembershipRepository } from './repositories/reseller-membership.repository';
 import type { RefreshTokenWithRelations, UserRecord } from './repositories/types';
 import { UserRepository } from './repositories/user.repository';
+
+const ACCOUNT_LOCKED_MESSAGE = 'Too many attempts. Try again in 30 minutes.';
 
 // ── Token payload types ──────────────────────────────────
 
@@ -110,11 +112,11 @@ export class AuthService {
 
     const membership = await this.platformMembershipRepo.findByUserId(user.id);
     if (!membership) {
-      throw new UnauthorizedException('No account found');
+      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
     if (!membership.isActive) {
-      throw new UnauthorizedException('No account found');
+      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
     const result = await this.issueTokens({
@@ -163,13 +165,13 @@ export class AuthService {
 
     const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
     if (memberships.length === 0) {
-      throw new UnauthorizedException('No account found');
+      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
     // Check reseller is active
     const m = memberships[0];
     if (!m.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
-      throw new UnauthorizedException('No account found');
+      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
     const result = await this.issueTokens({
@@ -220,7 +222,7 @@ export class AuthService {
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
-      throw new UnauthorizedException('No account found');
+      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
     if (memberships.length === 1) {
@@ -292,12 +294,12 @@ export class AuthService {
   async instituteLoginByUserId(userId: string, meta?: RequestMeta): Promise<InstituteLoginResult> {
     const user = await this.userRepo.findById(userId);
     if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
     }
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
-      throw new UnauthorizedException('No account found');
+      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
     if (memberships.length === 1) {
@@ -368,17 +370,17 @@ export class AuthService {
       }
       userId = payload.sub;
     } catch {
-      throw new UnauthorizedException('Invalid or expired selection token');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid or expired selection token');
     }
 
     const membership = await this.membershipRepo.findByIdAndUser(membershipId, userId);
     if (!membership || membership.status !== 'ACTIVE') {
-      throw new ForbiddenException('No active membership found');
+      throw new BusinessException(ErrorCode.NO_ACTIVE_MEMBERSHIP, 'No active membership found');
     }
 
     const user = await this.userRepo.findById(userId);
     if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('User not found or inactive');
+      throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'User not found or inactive');
     }
 
     const result = await this.issueTokens({
@@ -446,12 +448,15 @@ export class AuthService {
 
     const membership = await this.membershipRepo.findByIdAndUser(targetMembershipId, userId);
     if (!membership || membership.status !== 'ACTIVE') {
-      throw new ForbiddenException('No active membership for target institute');
+      throw new BusinessException(
+        ErrorCode.NO_ACTIVE_MEMBERSHIP,
+        'No active membership for target institute',
+      );
     }
 
     const user = await this.userRepo.findById(userId);
     if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('User not found or inactive');
+      throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'User not found or inactive');
     }
 
     const result = await this.issueTokens({
@@ -497,7 +502,7 @@ export class AuthService {
     // we want the canonical record for token issuance.
     const user = (await this.userRepo.findById(storedToken.user.id)) ?? null;
     if (!user) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
 
     // Revoke old token — this IS a rotation (replaced by the new token
@@ -513,7 +518,7 @@ export class AuthService {
     if (scope === 'platform') {
       const membership = await this.platformMembershipRepo.findByUserId(user.id);
       if (!membership) {
-        throw new UnauthorizedException('No active platform membership');
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active platform membership');
       }
       result = await this.issueTokens({
         user,
@@ -527,11 +532,11 @@ export class AuthService {
     } else if (scope === 'reseller') {
       const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
       if (memberships.length === 0) {
-        throw new UnauthorizedException('No active reseller membership');
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active reseller membership');
       }
       const m = memberships[0];
       if (!m.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
-        throw new UnauthorizedException('Reseller account suspended');
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Reseller account suspended');
       }
       result = await this.issueTokens({
         user,
@@ -569,7 +574,7 @@ export class AuthService {
       const memberships = await this.membershipRepo.findActiveByUserId(user.id);
       const firstMembership = memberships[0];
       if (!firstMembership) {
-        throw new UnauthorizedException('No active memberships');
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'No active memberships');
       }
       result = await this.issueTokens({
         user,
@@ -624,7 +629,7 @@ export class AuthService {
     const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
     const sessions = await this.refreshTokenRepo.findActiveByUserId(userId);
     if (!sessions.some((session) => session.tokenHash === tokenHash)) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
     return sessions.map((session) => ({
       ...session,
@@ -636,7 +641,7 @@ export class AuthService {
     // Verify the session belongs to this user
     const session = await this.refreshTokenRepo.findByIdWithRelations(sessionId);
     if (!session || session.userId !== userId) {
-      throw new ForbiddenException('Session not found');
+      throw new BusinessException(ErrorCode.SESSION_NOT_FOUND, 'Session not found');
     }
     await this.refreshTokenRepo.revoke(sessionId, 'user_initiated');
   }
@@ -649,7 +654,7 @@ export class AuthService {
     const tokenHash = createHash('sha256').update(currentRefreshToken).digest('hex');
     const currentToken = await this.refreshTokenRepo.findByHash(tokenHash);
     if (!currentToken || currentToken.userId !== userId) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
     await this.refreshTokenRepo.revokeAllOtherForUser(userId, currentToken.id, 'user_initiated');
 
@@ -698,10 +703,14 @@ export class AuthService {
     meta?: RequestMeta,
   ): Promise<void> {
     if (currentPassword === newPassword) {
-      throw new BadRequestException('New password must differ from current password');
+      throw new BusinessException(
+        ErrorCode.PASSWORD_UNCHANGED,
+        'New password must differ from current password',
+      );
     }
     if (newPassword.length < NEW_PASSWORD_MIN_LENGTH) {
-      throw new BadRequestException(
+      throw new BusinessException(
+        ErrorCode.VALIDATION_FAILED,
         `New password must be at least ${NEW_PASSWORD_MIN_LENGTH} characters`,
       );
     }
@@ -711,12 +720,18 @@ export class AuthService {
     // deleted mid-session; it is not an enumeration surface.
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new BusinessException(
+        ErrorCode.CURRENT_PASSWORD_INCORRECT,
+        'Current password is incorrect',
+      );
     }
 
     const valid = await verify(user.passwordHash, currentPassword);
     if (!valid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new BusinessException(
+        ErrorCode.CURRENT_PASSWORD_INCORRECT,
+        'Current password is incorrect',
+      );
     }
 
     const newHash = await hash(newPassword);
@@ -749,7 +764,7 @@ export class AuthService {
 
   /**
    * Verify the JWT signature + `type: 'refresh'` claim. Throws
-   * `UnauthorizedException` on a malformed/tampered/wrong-secret token or a
+   * `SESSION_EXPIRED` on a malformed/tampered/wrong-secret token or a
    * non-refresh token type. Pulling this out of `refreshToken()` keeps that
    * method's cyclomatic complexity within the Biome budget.
    */
@@ -760,11 +775,11 @@ export class AuthService {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
 
     if (payload.type !== 'refresh') {
-      throw new UnauthorizedException('Invalid token type');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid token type');
     }
 
     return payload;
@@ -795,7 +810,7 @@ export class AuthService {
     const storedToken = await this.refreshTokenRepo.findByIdWithRelations(payload.tokenId);
 
     if (!storedToken || storedToken.tokenHash !== tokenHash) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
     }
 
     if (storedToken.revokedAt) {
@@ -803,19 +818,22 @@ export class AuthService {
         storedToken.revokedReason === null || storedToken.revokedReason === 'rotation';
       if (isRotationReuse) {
         await this.refreshTokenRepo.revokeAllForUser(storedToken.userId, 'rotation');
-        throw new UnauthorizedException('Refresh token reuse detected');
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Refresh token reuse detected');
       }
-      throw new UnauthorizedException('Refresh token revoked');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Refresh token revoked');
     }
 
     if (storedToken.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token expired');
+      throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Refresh token expired');
     }
 
     const storedUser = storedToken.user;
     if (storedUser.passwordChangedAt && storedToken.createdAt < storedUser.passwordChangedAt) {
       await this.refreshTokenRepo.revoke(storedToken.id, 'password_change');
-      throw new UnauthorizedException('Password changed — please re-authenticate');
+      throw new BusinessException(
+        ErrorCode.PASSWORD_CHANGED,
+        'Password changed — please re-authenticate',
+      );
     }
 
     return storedToken;
@@ -831,10 +849,7 @@ export class AuthService {
     const usernameLower = username.toLowerCase();
 
     if (await this.lockout.isLocked(usernameLower)) {
-      throw new UnauthorizedException({
-        code: 'ACCOUNT_LOCKED',
-        message: 'Too many attempts. Try again in 30 minutes.',
-      });
+      throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
     }
 
     const user = await this.userRepo.findByUsername(username);
@@ -851,12 +866,9 @@ export class AuthService {
         })
         .catch(() => {});
       if (result.locked) {
-        throw new UnauthorizedException({
-          code: 'ACCOUNT_LOCKED',
-          message: 'Too many attempts. Try again in 30 minutes.',
-        });
+        throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
       }
-      throw new UnauthorizedException('Invalid credentials');
+      throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
     }
 
     const valid = await verify(user.passwordHash, password);
@@ -873,12 +885,9 @@ export class AuthService {
         .catch(() => {});
       const result = await this.lockout.recordFailure(usernameLower, meta);
       if (result.locked) {
-        throw new UnauthorizedException({
-          code: 'ACCOUNT_LOCKED',
-          message: 'Too many attempts. Try again in 30 minutes.',
-        });
+        throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
       }
-      throw new UnauthorizedException('Invalid credentials');
+      throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
     }
 
     await this.lockout.clearOnSuccess(usernameLower);

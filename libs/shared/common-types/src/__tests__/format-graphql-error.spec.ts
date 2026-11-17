@@ -7,9 +7,8 @@
  * fixtures can be refreshed when Apollo Server / NestJS error formats change.
  *
  * The formatter is the rendering layer of the Console Guardian. When these
- * tests pass, test failures will show the actual root cause string
- * ("Phone must be a valid 10-digit Indian mobile number") instead of the
- * useless wrapper ("Bad Request Exception").
+ * tests pass, test failures show the server's message with its error code
+ * ("challengeId should not be empty [VALIDATION_FAILED]").
  *
  * References:
  *  - GraphQL spec §7.1.2 https://spec.graphql.org/draft/#sec-Errors
@@ -24,24 +23,15 @@ import { formatGraphQLError } from '../lib/format-graphql-error';
 describe('formatGraphQLError', () => {
   // ── 1. instituteLogin with wrong password ──────────────────────────────
   // curl -X POST $API -d '{"query":"mutation { instituteLogin(username:\"admin\", password:\"wrong\") { accessToken } }"}'
-  describe('UNAUTHENTICATED — Passport JWT / login failure', () => {
-    it('formats wrong-password login (NestJS UnauthorizedException via JWT)', () => {
+  describe('Auth failures — coded by GraphqlExceptionFilter', () => {
+    it('formats wrong-password login', () => {
       const err: GraphQLFormattedError = {
         message: 'Invalid credentials',
         locations: [{ line: 1, column: 12 }],
         path: ['instituteLogin'],
-        extensions: {
-          code: 'UNAUTHENTICATED',
-          originalError: {
-            message: 'Invalid credentials',
-            error: 'Unauthorized',
-            statusCode: 401,
-          },
-        },
+        extensions: { code: 'INVALID_CREDENTIALS', statusCode: 401 },
       };
-      expect(formatGraphQLError(err)).toBe(
-        'Invalid credentials [UNAUTHENTICATED]: Invalid credentials',
-      );
+      expect(formatGraphQLError(err)).toBe('Invalid credentials [INVALID_CREDENTIALS]');
     });
 
     // Captured by hitting any authenticated query without a Bearer token
@@ -49,13 +39,10 @@ describe('formatGraphQLError', () => {
       const err: GraphQLFormattedError = {
         message: 'Unauthorized',
         locations: [{ line: 1, column: 3 }],
-        path: ['myProfile'],
-        extensions: {
-          code: 'UNAUTHENTICATED',
-          originalError: { message: 'Unauthorized', statusCode: 401 },
-        },
+        path: ['myPasskeys'],
+        extensions: { code: 'UNAUTHENTICATED', statusCode: 401 },
       };
-      expect(formatGraphQLError(err)).toBe('Unauthorized [UNAUTHENTICATED]: Unauthorized');
+      expect(formatGraphQLError(err)).toBe('Unauthorized [UNAUTHENTICATED]');
     });
   });
 
@@ -141,53 +128,23 @@ describe('formatGraphQLError', () => {
   // ── 5. NestJS ValidationPipe (class-validator) — array of messages ─────
   // curl -X POST $API -d '{"query":"mutation($input: UpdateMyProfileInput!) ...",
   //   "variables":{"input":{"phone":"abc","profileImageUrl":"not-a-url"}}}'
-  describe('BAD_REQUEST — NestJS ValidationPipe with array messages', () => {
-    it('joins multiple class-validator messages with commas', () => {
+  describe('VALIDATION_FAILED — NestJS ValidationPipe', () => {
+    // curl -X POST $API -d '{"query":"mutation { verifyPasskeyAuth(input:{challengeId:\"\", credential:{}}) { accessToken } }"}'
+    it('formats the validator message carried on the error itself', () => {
       const err: GraphQLFormattedError = {
-        message: 'Bad Request Exception',
-        locations: [{ line: 1, column: 43 }],
-        path: ['updateMyProfile'],
-        extensions: {
-          code: 'BAD_REQUEST',
-          originalError: {
-            message: [
-              'Phone must be a valid 10-digit Indian mobile number',
-              'profileImageUrl must be a valid URL',
-            ],
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-        },
+        message: 'challengeId should not be empty',
+        locations: [{ line: 1, column: 12 }],
+        path: ['verifyPasskeyAuth'],
+        extensions: { code: 'VALIDATION_FAILED', statusCode: 400 },
       };
-      expect(formatGraphQLError(err)).toBe(
-        'Bad Request Exception [BAD_REQUEST]: Phone must be a valid 10-digit Indian mobile number, profileImageUrl must be a valid URL',
-      );
-    });
-
-    it('handles single-message validation array (one bad field)', () => {
-      const err: GraphQLFormattedError = {
-        message: 'Bad Request Exception',
-        locations: [{ line: 2, column: 3 }],
-        path: ['grantConsent'],
-        extensions: {
-          code: 'BAD_REQUEST',
-          originalError: {
-            message: ['studentProfileId must be a valid UUIDv7'],
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-        },
-      };
-      expect(formatGraphQLError(err)).toBe(
-        'Bad Request Exception [BAD_REQUEST]: studentProfileId must be a valid UUIDv7',
-      );
+      expect(formatGraphQLError(err)).toBe('challengeId should not be empty [VALIDATION_FAILED]');
     });
   });
 
-  // ── 6. BusinessException (custom code, no originalError wrapper) ───────
+  // ── 6. BusinessException (custom domain code) ──────────────────────────
   // curl -X POST $API -d '{"query":"{ getStudent(id:\"<unknown-uuid>\") { id } }"}'
   describe('Custom domain codes (BusinessException pattern)', () => {
-    it('formats BusinessException with no originalError', () => {
+    it('formats a domain error by its custom code', () => {
       const err: GraphQLFormattedError = {
         message: 'Student not found',
         locations: [{ line: 1, column: 3 }],
@@ -223,28 +180,27 @@ describe('formatGraphQLError', () => {
   });
 
   // ── 8. Apollo Server v4 stacktrace extension (dev mode) ────────────────
-  describe('extensions.stacktrace (Apollo Server v4 dev mode)', () => {
+  describe('extensions.stacktrace (development only)', () => {
     it('ignores the stacktrace array in formatted output', () => {
       const err: GraphQLFormattedError = {
-        message: 'Bad Request Exception',
+        message: 'Challenge expired or not found',
         extensions: {
-          code: 'BAD_REQUEST',
-          originalError: { message: ['name should not be empty'] },
+          code: 'PASSKEY_CHALLENGE_EXPIRED',
+          statusCode: 400,
           stacktrace: [
-            'BadRequestException: Bad Request Exception',
-            '    at ValidationPipe.exceptionFactory (/app/node_modules/@nestjs/common/pipes/validation.pipe.js:112:20)',
+            'BusinessException: Challenge expired or not found',
+            '    at PasskeyService.verifyAuth (/app/apps/api-gateway/src/passkey/passkey.service.ts:231:13)',
             '    at processTicksAndRejections (node:internal/process/task_queues:104:5)',
           ],
         },
       };
       const out = formatGraphQLError(err);
-      expect(out).toBe('Bad Request Exception [BAD_REQUEST]: name should not be empty');
-      expect(out).not.toContain('stacktrace');
+      expect(out).toBe('Challenge expired or not found [PASSKEY_CHALLENGE_EXPIRED]');
       expect(out).not.toContain('processTicksAndRejections');
     });
   });
 
-  // ── 9. Plain spec-compliant error (no extensions) ──────────────────────
+  // ── 9. Errors without extensions ───────────────────────────────────────
   describe('plain GraphQL execution errors (spec §7.1.2)', () => {
     it('formats minimal error with only message', () => {
       const err: GraphQLFormattedError = { message: 'Field "foo" not found' };
@@ -263,28 +219,6 @@ describe('formatGraphQLError', () => {
 
   // ── 10. Edge cases (defensive) ─────────────────────────────────────────
   describe('defensive edge cases', () => {
-    it('handles empty originalError.message string', () => {
-      const err: GraphQLFormattedError = {
-        message: 'Internal Error',
-        extensions: {
-          code: 'INTERNAL_SERVER_ERROR',
-          originalError: { message: '' },
-        },
-      };
-      expect(formatGraphQLError(err)).toBe('Internal Error [INTERNAL_SERVER_ERROR]');
-    });
-
-    it('handles empty originalError.message array', () => {
-      const err: GraphQLFormattedError = {
-        message: 'Bad Request Exception',
-        extensions: {
-          code: 'BAD_REQUEST',
-          originalError: { message: [] },
-        },
-      };
-      expect(formatGraphQLError(err)).toBe('Bad Request Exception [BAD_REQUEST]');
-    });
-
     it('falls back to NO_CODE when extensions.code is missing', () => {
       const err: GraphQLFormattedError = {
         message: 'Weird',

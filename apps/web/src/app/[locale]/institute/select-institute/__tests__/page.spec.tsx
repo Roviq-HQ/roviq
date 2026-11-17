@@ -5,8 +5,10 @@
  * to /select-institute without the returnUrl, and selection hardcoded /dashboard,
  * so they never returned to the page they originally requested.
  */
+import { AuthRequestError } from '@roviq/auth';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../../../__test-utils__/render-with-providers';
 
@@ -23,14 +25,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 const selectInstitute = vi.fn().mockResolvedValue(undefined);
-vi.mock('@roviq/auth', () => ({
-  // Faithful to the real helper: same-origin relative paths only.
-  sanitizeReturnUrl: (raw: string | null | undefined) => {
-    if (!raw?.startsWith('/')) return null;
-    const second = raw[1];
-    if (second === '/' || second === '\\') return null;
-    return raw;
-  },
+vi.mock('@roviq/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@roviq/auth')>()),
   useAuth: () => ({
     memberships: [
       {
@@ -46,6 +42,7 @@ vi.mock('@roviq/auth', () => ({
     selectInstitute,
   }),
 }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 import SelectInstitutePage from '../page';
 
@@ -76,5 +73,41 @@ describe('SelectInstitutePage — returnUrl redirect', () => {
     await userEvent.click(screen.getByTestId('select-institute-option-m1'));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
+  });
+});
+
+describe('SelectInstitutePage — selection failures', () => {
+  beforeEach(() => {
+    replace.mockClear();
+    selectInstitute.mockReset();
+    vi.mocked(toast.error).mockClear();
+    setUrl('');
+  });
+
+  it('sends the user back to login with a toast when the selection token has expired', async () => {
+    selectInstitute.mockRejectedValueOnce(
+      new AuthRequestError('Invalid or expired selection token', 'SESSION_EXPIRED'),
+    );
+    renderWithProviders(<SelectInstitutePage />);
+
+    await userEvent.click(screen.getByTestId('select-institute-option-m1'));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    expect(toast.error).toHaveBeenCalledWith('Your session has expired. Please sign in again.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('explains a revoked membership inline and keeps the user on the page', async () => {
+    selectInstitute.mockRejectedValueOnce(
+      new AuthRequestError('No active membership found', 'NO_ACTIVE_MEMBERSHIP'),
+    );
+    renderWithProviders(<SelectInstitutePage />);
+
+    await userEvent.click(screen.getByTestId('select-institute-option-m1'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'You no longer have access to this institute.',
+    );
+    expect(replace).not.toHaveBeenCalledWith('/login');
   });
 });

@@ -1,9 +1,10 @@
-import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import type { AuthUser } from '@roviq/common-types';
+import { type AuthUser, ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectBusinessError } from '../../__tests__/expect-business-error';
 import { ALLOW_WHEN_PASSWORD_CHANGE_REQUIRED } from '../decorators/allow-when-password-change-required.decorator';
 import { MustChangePasswordGuard } from '../middleware/must-change-password.guard';
 
@@ -64,23 +65,13 @@ describe('MustChangePasswordGuard', () => {
   });
 
   describe('HTTP requests (req.user populated)', () => {
-    it('blocks with PASSWORD_CHANGE_REQUIRED when user.mustChangePassword=true and handler is not allow-decorated', () => {
+    it('blocks with PASSWORD_CHANGE_REQUIRED when user.mustChangePassword=true and handler is not allow-decorated', async () => {
       guard = new MustChangePasswordGuard(makeReflector(undefined));
       stubGqlContext({ req: { user: makeUser({ mustChangePassword: true }) } });
 
       const ctx = makeExecutionContext();
-      const err = (() => {
-        try {
-          guard.canActivate(ctx);
-          return null;
-        } catch (e: unknown) {
-          return e;
-        }
-      })();
 
-      expect(err).toBeInstanceOf(ForbiddenException);
-      const response = (err as ForbiddenException).getResponse() as { code?: string };
-      expect(response.code).toBe('PASSWORD_CHANGE_REQUIRED');
+      await expectBusinessError(() => guard.canActivate(ctx), ErrorCode.PASSWORD_CHANGE_REQUIRED);
     });
 
     it('returns true when user has no mustChangePassword flag', () => {
@@ -124,11 +115,14 @@ describe('MustChangePasswordGuard', () => {
     //      auth/scope guards reject), which is the safe behaviour for a
     //      first-login check that runs after authentication.
 
-    it('blocks WS with mustChangePassword=true when context has been wrapped (req.user populated)', () => {
+    it('blocks WS with mustChangePassword=true when context has been wrapped (req.user populated)', async () => {
       guard = new MustChangePasswordGuard(makeReflector(undefined));
       stubGqlContext({ req: { user: makeUser({ mustChangePassword: true }) } });
 
-      expect(() => guard.canActivate(makeExecutionContext())).toThrow(ForbiddenException);
+      await expectBusinessError(
+        () => guard.canActivate(makeExecutionContext()),
+        ErrorCode.PASSWORD_CHANGE_REQUIRED,
+      );
     });
 
     it('does NOT fail-open when WS context has not been wrapped — reads only from req?.user, never extra.user', () => {

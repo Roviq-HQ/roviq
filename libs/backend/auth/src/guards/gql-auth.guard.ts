@@ -1,6 +1,7 @@
-import { type ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { type ExecutionContext, Injectable } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { AuthGuard } from '@nestjs/passport';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 
 @Injectable()
 export class GqlAuthGuard extends AuthGuard('jwt') {
@@ -30,7 +31,7 @@ export class GqlAuthGuard extends AuthGuard('jwt') {
   // biome-ignore lint/suspicious/noExplicitAny: must match IAuthGuard.handleRequest signature
   override handleRequest<TUser = any>(err: any, user: any, _info: any): TUser {
     if (err || !user) {
-      throw err || new UnauthorizedException();
+      throw err || new BusinessException(ErrorCode.UNAUTHENTICATED, 'Unauthorized');
     }
     return user as TUser;
   }

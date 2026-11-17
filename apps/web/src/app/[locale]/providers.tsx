@@ -7,6 +7,7 @@ import { ThemeProvider } from '@roviq/ui/components/theme-provider';
 import { Toaster } from '@roviq/ui/components/ui/sonner';
 import { TooltipProvider } from '@roviq/ui/components/ui/tooltip';
 import { AccountLocaleSync } from '@web/components/account-locale-sync';
+import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { useTranslations } from 'next-intl';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import * as React from 'react';
@@ -91,6 +92,7 @@ interface ProvidersProps {
 
 export function Providers({ scope = 'institute', children }: ProvidersProps) {
   const t = useTranslations('auth');
+  const errorLabels = useAuthErrorLabels();
   const scopedStorage = React.useMemo(() => createScopedTokenStorage(scope), [scope]);
 
   const sessionExpiredLabels = React.useMemo(
@@ -105,11 +107,11 @@ export function Providers({ scope = 'institute', children }: ProvidersProps) {
         signInWithPasskey: t('signInWithPasskey'),
         or: t('or'),
         loginFailed: t('loginFailed'),
-        passkeyNotAvailable: t('passkeyNotAvailable'),
+        errors: errorLabels,
         switchAccount: t('switchAccount'),
       },
     }),
-    [t],
+    [t, errorLabels],
   );
 
   const loginMutation = React.useMemo(() => getScopedLoginMutation(scope), [scope]);

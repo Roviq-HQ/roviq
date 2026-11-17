@@ -20,6 +20,7 @@ import { Eye, EyeOff, KeyRound, ShieldAlert } from 'lucide-react';
 import * as React from 'react';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
+import { type AuthErrorLabels, resolveAuthErrorMessage } from './error-utils';
 
 export interface PasswordChangeFormLabels {
   title?: string;
@@ -47,6 +48,8 @@ export interface PasswordChangeFormLabels {
   requiredError?: string;
   successMessage?: string;
   genericError?: string;
+  /** Translated copy per error code; unknown codes use `genericError`. */
+  errors?: AuthErrorLabels;
 }
 
 export interface PasswordChangeFormProps {
@@ -169,7 +172,9 @@ export function PasswordChangeForm({ labels, onSuccess }: PasswordChangeFormProp
         formApi.reset();
         onSuccess?.();
       } catch (err) {
-        setServerError(err instanceof Error ? err.message : l.genericError);
+        setServerError(
+          resolveAuthErrorMessage(err, { ...labels?.errors, generic: l.genericError }),
+        );
       }
     },
   });

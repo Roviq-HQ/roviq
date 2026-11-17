@@ -72,7 +72,8 @@ function processGraphQLError(
     handleImpersonationEnded(config);
     return false;
   }
-  if (err.extensions?.code === 'UNAUTHENTICATED' || err.message === 'Unauthorized') {
+  // SESSION_EXPIRED: the refresh token sent with a session operation was rejected.
+  if (err.extensions?.code === 'UNAUTHENTICATED' || err.extensions?.code === 'SESSION_EXPIRED') {
     return handleAuthError(config, operation, forward);
   }
   return false;

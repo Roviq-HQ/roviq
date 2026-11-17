@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type {
   AuthenticationResponseJSON,
@@ -31,6 +32,7 @@ function toProviderData(json: unknown): PasskeyProviderData {
 
 @Injectable()
 export class PasskeyService {
+  private readonly logger = new Logger(PasskeyService.name);
   private readonly rpId: string;
   private readonly rpName: string;
   private readonly origins: string[];
@@ -57,14 +59,14 @@ export class PasskeyService {
   ): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const valid = await this.authService.verifyPassword(userId, password);
     if (!valid) {
-      throw new UnauthorizedException('Invalid password');
+      throw new BusinessException(ErrorCode.CURRENT_PASSWORD_INCORRECT, 'Invalid password');
     }
 
     const existingPasskeys = await this.authProviderRepo.findPasskeysByUserId(userId);
 
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'User not found');
     }
 
     const options = await generateRegistrationOptions({
@@ -100,19 +102,27 @@ export class PasskeyService {
   ): Promise<PasskeyInfo> {
     const challenge = await this.redis.get(`webauthn:reg:${userId}`);
     if (!challenge) {
-      throw new BadRequestException('Challenge expired or not found');
+      throw new BusinessException(
+        ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
+        'Challenge expired or not found',
+      );
     }
     await this.redis.del(`webauthn:reg:${userId}`);
 
+    // simplewebauthn rejects (rather than returning verified=false) on a
+    // challenge/origin/RP mismatch — a client fault, not a server error.
     const verification = await verifyRegistrationResponse({
       response: credential,
       expectedChallenge: challenge,
       expectedOrigin: this.origins,
       expectedRPID: this.rpId,
+    }).catch((error: unknown) => {
+      this.logger.warn({ err: error, userId }, 'Passkey registration verification rejected');
+      return null;
     });
 
-    if (!verification.verified || !verification.registrationInfo) {
-      throw new BadRequestException('Verification failed');
+    if (!verification?.verified || !verification.registrationInfo) {
+      throw new BusinessException(ErrorCode.PASSKEY_VERIFICATION_FAILED, 'Verification failed');
     }
 
     const {
@@ -173,7 +183,7 @@ export class PasskeyService {
       const passkeys = await this.authProviderRepo.findByActiveUsername(username);
 
       if (passkeys.length === 0) {
-        throw new UnauthorizedException('Invalid credentials');
+        throw new BusinessException(ErrorCode.PASSKEY_AUTHENTICATION_FAILED, 'Invalid credentials');
       }
 
       allowCredentials = passkeys
@@ -213,7 +223,10 @@ export class PasskeyService {
   ): Promise<InstituteLoginResult> {
     const stored = await this.redis.get(`webauthn:auth:${challengeId}`);
     if (!stored) {
-      throw new BadRequestException('Challenge expired or not found');
+      throw new BusinessException(
+        ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
+        'Challenge expired or not found',
+      );
     }
     await this.redis.del(`webauthn:auth:${challengeId}`);
 
@@ -222,7 +235,7 @@ export class PasskeyService {
     const passkey = await this.authProviderRepo.findByCredentialId(credential.id);
 
     if (!passkey) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new BusinessException(ErrorCode.PASSKEY_AUTHENTICATION_FAILED, 'Invalid credentials');
     }
 
     const data = toProviderData(passkey.providerData);
@@ -239,10 +252,16 @@ export class PasskeyService {
         counter: data.counter,
         transports: data.transports as AuthenticatorTransportFuture[],
       },
+    }).catch((error: unknown) => {
+      this.logger.warn(
+        { err: error, passkeyId: passkey.id },
+        'Passkey sign-in verification rejected',
+      );
+      return null;
     });
 
-    if (!verification.verified) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!verification?.verified) {
+      throw new BusinessException(ErrorCode.PASSKEY_AUTHENTICATION_FAILED, 'Invalid credentials');
     }
 
     // Update counter and lastUsedAt
@@ -278,13 +297,16 @@ export class PasskeyService {
     const otherPasskeys = await this.authProviderRepo.countOtherPasskeys(userId, passkeyId);
 
     if (!hasPassword && otherPasskeys === 0) {
-      throw new BadRequestException('Cannot remove your only authentication method');
+      throw new BusinessException(
+        ErrorCode.PASSKEY_LAST_AUTH_METHOD,
+        'Cannot remove your only authentication method',
+      );
     }
 
     const deletedCount = await this.authProviderRepo.deletePasskey(passkeyId, userId);
 
     if (deletedCount === 0) {
-      throw new BadRequestException('Passkey not found');
+      throw new BusinessException(ErrorCode.PASSKEY_NOT_FOUND, 'Passkey not found');
     }
 
     return true;

@@ -151,6 +151,18 @@ reads the same value. Tenant context and audit consumers use this request value.
 - Each status transition is a named domain mutation (`suspend()`, not `updateStatus('SUSPENDED')`)
 - `BusinessException` with `ErrorCode` enum for all business errors (not generic `BadRequestException`)
 
+### Error Handling (ROV-83)
+
+Every GraphQL error reaches the client as `{ message, extensions: { code, statusCode } }` — nothing else. No `originalError`; a `stacktrace` only when `NODE_ENV=development`.
+
+- **Codes** live in `ErrorCode` (`libs/shared/common-types/src/lib/error-codes.ts`); `ERROR_STATUS` maps each to one HTTP status. Throw `new BusinessException(ErrorCode.X, message)`. The message is English and for logs/developers — the frontend translates the code.
+- **`GraphqlExceptionFilter`** (`apps/api-gateway/src/common/filters/`, registered as `APP_FILTER`) converts whatever a guard, pipe, interceptor or resolver throws into that shape, on HTTP and graphql-ws alike. Non-GraphQL routes keep Nest's default HTTP error body.
+- **`createGraphqlErrorFormatter`** (Apollo `formatError`) is the last stop for errors that never pass a Nest filter — field resolvers and field middleware. Request-level errors from graphql-js / Apollo (`GRAPHQL_VALIDATION_FAILED`, `GRAPHQL_PARSE_FAILED`, `BAD_USER_INPUT`) keep their own code and carry no `statusCode`.
+- **Code resolution**, in order: `BusinessException.code` → an explicit `{ code }` on a plain `HttpException` response (legacy, e.g. `STUDENT_NOT_FOUND`) → the HTTP status (`400 BAD_REQUEST`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 CONFLICT`, `422 UNPROCESSABLE_ENTITY`, `429 TOO_MANY_REQUESTS`).
+- **Anything that is not an `HttpException`** is a server fault: the client gets `INTERNAL_ERROR` / "Internal server error", and the real error is logged at `error` level with the request's correlation ID. A third-party library that rejects on bad client input (e.g. `@simplewebauthn/server` on a challenge mismatch) must be translated to a coded 4xx at the call site.
+- **DTO validation** fails as `VALIDATION_FAILED` with the validator messages joined by `; ` (`validationExceptionFactory`, shared by `main.ts` and the integration harness).
+- **`UNAUTHENTICATED` and `SESSION_EXPIRED` are the only codes that make the Apollo client refresh the session** (`libs/frontend/graphql/src/lib/client.ts`). Do not reuse them for anything else.
+
 ### Field Resolver Pattern: scope-specific joins without duplicating ObjectTypes
 
 When a query in one scope (e.g., admin) needs extra joined fields on a shared `@ObjectType` (e.g., `InstituteModel`), use a scope-specific `@ResolveField` resolver class instead of creating a parallel `AdminInstituteModel`. This avoids duplicating the full ObjectType while keeping cross-scope contamination impossible.

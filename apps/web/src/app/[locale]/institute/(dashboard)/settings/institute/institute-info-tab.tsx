@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
 import { useInstituteLocales, zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -40,20 +40,6 @@ import type { MyInstituteData } from './types';
 import { useUpdateInstituteInfo } from './use-institute-settings';
 
 const { instituteSettings } = testIds;
-/** Check if a GraphQL error is a CONCURRENT_MODIFICATION error code. */
-function isConcurrentModificationError(err: unknown): boolean {
-  if (err && typeof err === 'object' && 'graphQLErrors' in err) {
-    const gqlErrors = (err as { graphQLErrors: Array<{ extensions?: Record<string, unknown> }> })
-      .graphQLErrors;
-    return gqlErrors.some(
-      (e) =>
-        (e.extensions?.originalError as { error?: string } | undefined)?.error ===
-        'CONCURRENT_MODIFICATION',
-    );
-  }
-  return false;
-}
-
 interface InstituteInfoTabProps {
   institute: MyInstituteData['myInstitute'] | undefined;
   loading: boolean;
@@ -124,7 +110,7 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
         });
         toast.success(t('saved'));
       } catch (err) {
-        if (isConcurrentModificationError(err)) {
+        if (extractGraphQLErrorCode(err) === 'CONCURRENT_MODIFICATION') {
           setConcurrentError(true);
         } else {
           const message = extractGraphQLError(err, t('saveFailed'));

@@ -1,11 +1,66 @@
 import { HttpStatus } from '@nestjs/common';
 
 /**
- * Structured error codes for institute-service mutations.
- * Each code maps to an HTTP status and a machine-readable identifier.
- * Messages are i18n-translated via the `errors` namespace.
+ * Machine-readable error codes surfaced to clients as GraphQL `extensions.code`.
+ * Each code maps to one HTTP status; the frontend translates codes to copy.
  */
 export const ErrorCode = {
+  // ── Generic (status-derived fallbacks) ─────────────────
+  /** Request is malformed or violates a precondition with no more specific code */
+  BAD_REQUEST: 'BAD_REQUEST',
+  /** Input failed DTO validation (class-validator / ValidationPipe) */
+  VALIDATION_FAILED: 'VALIDATION_FAILED',
+  /** Access token missing, malformed or expired — clients refresh and retry */
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  /** Requested resource does not exist and has no more specific *_NOT_FOUND code */
+  NOT_FOUND: 'NOT_FOUND',
+  /** Request conflicts with current state and has no more specific code */
+  CONFLICT: 'CONFLICT',
+  /** Business rule rejected the request and has no more specific code */
+  UNPROCESSABLE_ENTITY: 'UNPROCESSABLE_ENTITY',
+  /** Rate limit hit (ThrottlerGuard) */
+  TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+  /** Unexpected server failure — details are logged, never sent to the client */
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // ── Auth ───────────────────────────────────────────────
+  /** Wrong Roviq ID or password (also unknown / inactive user, to avoid enumeration) */
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  /** Too many failed logins — the Roviq ID is locked for a cooldown window */
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
+  /** Credentials are valid but the user has no usable membership in this portal */
+  ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND',
+  /** User behind an otherwise valid token is deleted or no longer ACTIVE */
+  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
+  /** Refresh or institute-selection token is invalid, expired, revoked or reused */
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
+  /** Refresh token predates a password change — a full re-login is required */
+  PASSWORD_CHANGED: 'PASSWORD_CHANGED',
+  /** Access token carries mustChangePassword — only the password change is allowed */
+  PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED',
+  /** Current password supplied to changePassword does not match */
+  CURRENT_PASSWORD_INCORRECT: 'CURRENT_PASSWORD_INCORRECT',
+  /** New password is identical to the current password */
+  PASSWORD_UNCHANGED: 'PASSWORD_UNCHANGED',
+  /** Target membership is missing or not ACTIVE for this user */
+  NO_ACTIVE_MEMBERSHIP: 'NO_ACTIVE_MEMBERSHIP',
+  /** Session to revoke does not exist or belongs to another user */
+  SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+  /** Impersonation session ended, expired or was revoked */
+  IMPERSONATION_ENDED: 'IMPERSONATION_ENDED',
+
+  // ── Passkey ────────────────────────────────────────────
+  /** WebAuthn challenge expired or was already consumed */
+  PASSKEY_CHALLENGE_EXPIRED: 'PASSKEY_CHALLENGE_EXPIRED',
+  /** Passkey registration response could not be verified */
+  PASSKEY_VERIFICATION_FAILED: 'PASSKEY_VERIFICATION_FAILED',
+  /** Passkey sign-in failed (unknown credential, bad signature or inactive user) */
+  PASSKEY_AUTHENTICATION_FAILED: 'PASSKEY_AUTHENTICATION_FAILED',
+  /** Passkey does not exist or belongs to another user */
+  PASSKEY_NOT_FOUND: 'PASSKEY_NOT_FOUND',
+  /** Removing this passkey would leave the user with no way to sign in */
+  PASSKEY_LAST_AUTH_METHOD: 'PASSKEY_LAST_AUTH_METHOD',
+
   // ── Institute ──────────────────────────────────────────
   /** Institute not found or soft-deleted */
   INSTITUTE_NOT_FOUND: 'INSTITUTE_NOT_FOUND',
@@ -47,7 +102,7 @@ export const ErrorCode = {
   FORBIDDEN: 'FORBIDDEN',
 
   // ── Academic Year ──────────────────────────────────────
-  /** Date ranges overlap with another academic year (schools only) */
+  /** Date ranges overlap with another academic year */
   ACADEMIC_YEAR_OVERLAP: 'ACADEMIC_YEAR_OVERLAP',
   /** Start date must be before end date */
   INVALID_DATE_RANGE: 'INVALID_DATE_RANGE',
@@ -134,6 +189,7 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 /**
  * Maps each error code to its HTTP status.
  * Status categories per PRD §14:
+ *   401 = not authenticated / credentials rejected
  *   403 = CASL permission denied
  *   404 = not found
  *   400 = validation failure
@@ -141,6 +197,31 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
  *   422 = business rule violation
  */
 export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
+  BAD_REQUEST: HttpStatus.BAD_REQUEST,
+  VALIDATION_FAILED: HttpStatus.BAD_REQUEST,
+  UNAUTHENTICATED: HttpStatus.UNAUTHORIZED,
+  NOT_FOUND: HttpStatus.NOT_FOUND,
+  CONFLICT: HttpStatus.CONFLICT,
+  UNPROCESSABLE_ENTITY: HttpStatus.UNPROCESSABLE_ENTITY,
+  TOO_MANY_REQUESTS: HttpStatus.TOO_MANY_REQUESTS,
+  INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
+  INVALID_CREDENTIALS: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_LOCKED: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_NOT_FOUND: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_INACTIVE: HttpStatus.UNAUTHORIZED,
+  SESSION_EXPIRED: HttpStatus.UNAUTHORIZED,
+  PASSWORD_CHANGED: HttpStatus.UNAUTHORIZED,
+  PASSWORD_CHANGE_REQUIRED: HttpStatus.FORBIDDEN,
+  CURRENT_PASSWORD_INCORRECT: HttpStatus.UNAUTHORIZED,
+  PASSWORD_UNCHANGED: HttpStatus.BAD_REQUEST,
+  NO_ACTIVE_MEMBERSHIP: HttpStatus.FORBIDDEN,
+  SESSION_NOT_FOUND: HttpStatus.FORBIDDEN,
+  IMPERSONATION_ENDED: HttpStatus.UNAUTHORIZED,
+  PASSKEY_CHALLENGE_EXPIRED: HttpStatus.BAD_REQUEST,
+  PASSKEY_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,
+  PASSKEY_AUTHENTICATION_FAILED: HttpStatus.UNAUTHORIZED,
+  PASSKEY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PASSKEY_LAST_AUTH_METHOD: HttpStatus.BAD_REQUEST,
   INSTITUTE_NOT_FOUND: HttpStatus.NOT_FOUND,
   INSTITUTE_CODE_DUPLICATE: HttpStatus.CONFLICT,
   INSTITUTE_EMAIL_DUPLICATE: HttpStatus.CONFLICT,

@@ -1,8 +1,9 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectBusinessError } from '../../__tests__/expect-business-error';
 import { AuthService } from '../../auth/auth.service';
 import { AuthEventService } from '../../auth/auth-event.service';
 import { UserRepository } from '../../auth/repositories/user.repository';
@@ -120,9 +121,11 @@ describe('PasskeyService', () => {
     it('should reject if password is wrong', async () => {
       mockAuth.verifyPassword.mockResolvedValue(false);
 
-      await expect(service.generateRegistrationOptions('user-1', 'wrong-password')).rejects.toThrow(
-        UnauthorizedException,
+      const failure = await expectBusinessError(
+        service.generateRegistrationOptions('user-1', 'wrong-password'),
+        ErrorCode.CURRENT_PASSWORD_INCORRECT,
       );
+      expect(failure.message).toBe('Invalid password');
     });
 
     it('should generate options and store challenge in Redis', async () => {
@@ -194,9 +197,11 @@ describe('PasskeyService', () => {
     it('should throw if challenge not found in Redis', async () => {
       mockRedis.get.mockResolvedValue(null);
 
-      await expect(
+      const failure = await expectBusinessError(
         service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
-      ).rejects.toThrow('Challenge expired');
+        ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
+      );
+      expect(failure.message).toBe('Challenge expired or not found');
     });
 
     it('should throw if verification fails', async () => {
@@ -205,9 +210,25 @@ describe('PasskeyService', () => {
         verified: false,
       });
 
-      await expect(
+      const failure = await expectBusinessError(
         service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
-      ).rejects.toThrow('Verification failed');
+        ErrorCode.PASSKEY_VERIFICATION_FAILED,
+      );
+      expect(failure.message).toBe('Verification failed');
+    });
+
+    it('should reject with PASSKEY_VERIFICATION_FAILED when the library rejects the response', async () => {
+      mockRedis.get.mockResolvedValue('stored-challenge');
+      vi.mocked(verifyRegistrationResponse).mockRejectedValue(
+        new Error('Unexpected registration response challenge'),
+      );
+
+      const failure = await expectBusinessError(
+        service.verifyRegistration('user-1', {} as RegistrationResponseJSON, 'My Key'),
+        ErrorCode.PASSKEY_VERIFICATION_FAILED,
+      );
+
+      expect(failure.message).toBe('Verification failed');
     });
 
     it('should create AuthProvider row on success', async () => {
@@ -271,9 +292,11 @@ describe('PasskeyService', () => {
     it('should throw generic error when user has no passkeys', async () => {
       mockAuthProviderRepo.findByActiveUsername.mockResolvedValue([]);
 
-      await expect(service.generateAuthOptions('nonexistent')).rejects.toThrow(
-        'Invalid credentials',
+      const failure = await expectBusinessError(
+        service.generateAuthOptions('nonexistent'),
+        ErrorCode.PASSKEY_AUTHENTICATION_FAILED,
       );
+      expect(failure.message).toBe('Invalid credentials');
     });
 
     it('should store challenge with random challengeId and return it', async () => {
@@ -305,44 +328,50 @@ describe('PasskeyService', () => {
   });
 
   describe('verifyAuth', () => {
+    const storedPasskey = {
+      id: 'ap-1',
+      userId: 'user-1',
+      provider: 'passkey',
+      providerUserId: 'cred-1',
+      providerData: {
+        publicKey: 'AQID', // base64url of [1,2,3]
+        counter: 0,
+        transports: ['internal'],
+        name: 'My Key',
+        deviceType: 'multiDevice',
+        backedUp: true,
+        webauthnUserID: 'wuid',
+        registeredAt: '2026-03-10T00:00:00.000Z',
+        lastUsedAt: null,
+        aaguid: '00000000-0000-0000-0000-000000000000',
+      },
+      createdAt: new Date('2026-01-01'),
+    };
+
     it('should throw if challenge not found', async () => {
       mockRedis.get.mockResolvedValue(null);
 
-      await expect(
+      const failure = await expectBusinessError(
         service.verifyAuth('challenge-id', {} as AuthenticationResponseJSON),
-      ).rejects.toThrow('Challenge expired');
+        ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
+      );
+      expect(failure.message).toBe('Challenge expired or not found');
     });
 
     it('should throw if passkey not found for credential', async () => {
       mockRedis.get.mockResolvedValue(JSON.stringify({ challenge: 'c' }));
       mockAuthProviderRepo.findByCredentialId.mockResolvedValue(null);
 
-      await expect(
+      const failure = await expectBusinessError(
         service.verifyAuth('challenge-id', { id: 'unknown-cred' } as AuthenticationResponseJSON),
-      ).rejects.toThrow('Invalid credentials');
+        ErrorCode.PASSKEY_AUTHENTICATION_FAILED,
+      );
+      expect(failure.message).toBe('Invalid credentials');
     });
 
     it('should update counter and lastUsedAt, then call instituteLoginByUserId', async () => {
       mockRedis.get.mockResolvedValue(JSON.stringify({ challenge: 'stored-challenge' }));
-      mockAuthProviderRepo.findByCredentialId.mockResolvedValue({
-        id: 'ap-1',
-        userId: 'user-1',
-        provider: 'passkey',
-        providerUserId: 'cred-1',
-        providerData: {
-          publicKey: 'AQID', // base64url of [1,2,3]
-          counter: 0,
-          transports: ['internal'],
-          name: 'My Key',
-          deviceType: 'multiDevice',
-          backedUp: true,
-          webauthnUserID: 'wuid',
-          registeredAt: '2026-03-10T00:00:00.000Z',
-          lastUsedAt: null,
-          aaguid: '00000000-0000-0000-0000-000000000000',
-        },
-        createdAt: new Date('2026-01-01'),
-      });
+      mockAuthProviderRepo.findByCredentialId.mockResolvedValue(storedPasskey);
       vi.mocked(verifyAuthenticationResponse).mockResolvedValue({
         verified: true,
         authenticationInfo: { newCounter: 1 },
@@ -368,6 +397,22 @@ describe('PasskeyService', () => {
         }),
       );
       expect(mockAuth.instituteLoginByUserId).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should reject with PASSKEY_AUTHENTICATION_FAILED when the library rejects the response', async () => {
+      mockRedis.get.mockResolvedValue(JSON.stringify({ challenge: 'stored-challenge' }));
+      mockAuthProviderRepo.findByCredentialId.mockResolvedValue(storedPasskey);
+      vi.mocked(verifyAuthenticationResponse).mockRejectedValue(
+        new Error('Unexpected authentication response origin'),
+      );
+
+      const failure = await expectBusinessError(
+        service.verifyAuth('challenge-id', { id: 'cred-1' } as AuthenticationResponseJSON),
+        ErrorCode.PASSKEY_AUTHENTICATION_FAILED,
+      );
+
+      expect(failure.message).toBe('Invalid credentials');
+      expect(mockAuth.instituteLoginByUserId).not.toHaveBeenCalled();
     });
   });
 
@@ -411,9 +456,11 @@ describe('PasskeyService', () => {
       });
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
 
-      await expect(service.removePasskey('user-1', 'ap-1')).rejects.toThrow(
-        'Cannot remove your only authentication method',
+      const failure = await expectBusinessError(
+        service.removePasskey('user-1', 'ap-1'),
+        ErrorCode.PASSKEY_LAST_AUTH_METHOD,
       );
+      expect(failure.message).toBe('Cannot remove your only authentication method');
     });
 
     it('should allow removal if user still has a password', async () => {
@@ -465,9 +512,11 @@ describe('PasskeyService', () => {
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(0);
 
-      await expect(service.removePasskey('user-1', 'other-users-ap')).rejects.toThrow(
-        'Passkey not found',
+      const failure = await expectBusinessError(
+        service.removePasskey('user-1', 'other-users-ap'),
+        ErrorCode.PASSKEY_NOT_FOUND,
       );
+      expect(failure.message).toBe('Passkey not found');
     });
   });
 });

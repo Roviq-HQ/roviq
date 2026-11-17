@@ -1,7 +1,8 @@
 'use client';
 
-import { LoginForm, sanitizeReturnUrl, useAuth } from '@roviq/auth';
+import { LoginForm, resolveAuthErrorMessage, sanitizeReturnUrl, useAuth } from '@roviq/auth';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
+import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { LogIn } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 const { auth } = testIds;
 export default function LoginPage() {
   const t = useTranslations('auth');
+  const errorLabels = useAuthErrorLabels();
   const { isAuthenticated, needsInstituteSelection, login } = useAuth();
   const router = useRouter();
   const [quickLoading, setQuickLoading] = React.useState<string | null>(null);
@@ -35,9 +37,9 @@ export default function LoginPage() {
     setQuickLoading(user.username);
     try {
       await login({ username: user.username, password: user.password });
-    } catch {
+    } catch (err) {
       setQuickLoading(null);
-      toast.error(t('loginFailed'));
+      toast.error(resolveAuthErrorMessage(err, { ...errorLabels, generic: t('loginFailed') }));
     }
   };
 
@@ -72,7 +74,7 @@ export default function LoginPage() {
     usernameRequired: t('usernameRequired'),
     passwordRequired: t('passwordRequired'),
     loginFailed: t('loginFailed'),
-    passkeyNotAvailable: t('passkeyNotAvailable'),
+    errors: errorLabels,
   };
 
   return (
