@@ -23,6 +23,7 @@ const SCAN_ROOTS = [join(ROOT, 'apps'), join(ROOT, 'ee'), join(ROOT, 'libs')];
 export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/billing.integration.spec.ts',
   'apps/api-gateway/src/__tests__/integration-app.integration.spec.ts',
+  'apps/api-gateway/src/__tests__/people-restore.integration.spec.ts',
   'apps/api-gateway/src/__tests__/rls-cross-scope-isolation.integration.spec.ts',
   'apps/api-gateway/src/__tests__/soft-delete-audit.integration.spec.ts',
   // ROV-204: isolated authorization fixtures and in-memory read-policy tests only.
@@ -103,6 +104,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/student-event.handler.ts',
   'apps/api-gateway/src/institute/student/student.service.ts',
   'apps/api-gateway/src/institute/student/workflows/bulk-student-import.activities.ts',
+  'apps/api-gateway/src/institute/subject/__tests__/subject-links.integration.spec.ts',
   'apps/api-gateway/src/institute/subject/repositories/subject.drizzle-repository.ts',
   'apps/api-gateway/src/institute/timetable/__tests__/teacher-options.integration.spec.ts',
   'apps/api-gateway/src/institute/timetable/repositories/timetable.drizzle-repository.ts',

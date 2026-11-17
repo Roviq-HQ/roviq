@@ -1,0 +1,55 @@
+{
+  "student": {
+    "button": "Deleted students",
+    "title": "Deleted students",
+    "description": "Students removed from this institute. Restore one to bring back the full record.",
+    "empty": "No deleted students",
+    "emptyDescription": "A student you delete is listed here and can be restored.",
+    "identifier": "Admission no.",
+    "deleteButton": "Delete student",
+    "deleteTitle": "Delete {name}?",
+    "deleteConsequence": "{name} will no longer appear in student lists, attendance or reports. Nothing is erased: you can restore the record from Deleted students."
+  },
+  "staff": {
+    "button": "Deleted staff",
+    "title": "Deleted staff",
+    "description": "Staff members removed from this institute. Restore one to bring back the full record.",
+    "empty": "No deleted staff",
+    "emptyDescription": "A staff member you delete is listed here and can be restored.",
+    "identifier": "Employee ID",
+    "deleteButton": "Delete staff member",
+    "deleteTitle": "Delete {name}?",
+    "deleteConsequence": "{name} will no longer appear in staff lists or timetables, and today is recorded as the leaving date. Nothing is erased: you can restore the record from Deleted staff."
+  },
+  "guardian": {
+    "button": "Deleted guardians",
+    "title": "Deleted guardians",
+    "description": "Guardians removed from this institute. Restore one to bring back the full record.",
+    "empty": "No deleted guardians",
+    "emptyDescription": "A guardian you delete is listed here and can be restored.",
+    "identifier": "",
+    "deleteButton": "Delete guardian",
+    "deleteTitle": "Delete {name}?",
+    "deleteConsequence": "{name} will no longer appear in the guardian directory or on linked students. Nothing is erased: you can restore the record from Deleted guardians."
+  },
+  "columns": {
+    "name": "Name",
+    "deletedOn": "Deleted on"
+  },
+  "restore": "Restore",
+  "restoreTitle": "Restore {name}",
+  "restored": "{name} restored",
+  "deleted": "{name} deleted",
+  "undo": "Undo",
+  "confirmDelete": "Delete",
+  "deleting": "Deleting…",
+  "loadFailed": "Could not load deleted records",
+  "retry": "Retry",
+  "restoreFailed": "Could not restore {name}",
+  "deleteFailed": "Could not delete {name}",
+  "errors": {
+    "HAS_ACTIVE_ENROLLMENTS": "This student is enrolled in the current academic year. Mark them as left or transferred first.",
+    "ADMISSION_NUMBER_TAKEN": "The admission number is now used by another student. Change that student's admission number, then restore.",
+    "GUARDIAN_IS_ONLY_GUARDIAN": "This is the only guardian of a student. Link another guardian to that student first."
+  }
+}

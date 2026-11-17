@@ -7,6 +7,7 @@ import {
   CurrentReadAccess,
   type InstituteReadAccess,
 } from '@roviq/casl';
+import { DeletedPersonModel } from '../../common/deleted-person.model';
 import { CreateGuardianInput } from './dto/create-guardian.input';
 import {
   LinkGuardianInput,
@@ -95,6 +96,20 @@ export class GuardianResolver {
   @CheckAbility({ action: 'delete', subject: 'Guardian' })
   async deleteGuardian(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
     return this.guardianService.delete(id);
+  }
+
+  @Query(() => [DeletedPersonModel], {
+    description: 'Soft-deleted guardians of this institute, most recently deleted first.',
+  })
+  @CheckAbility({ action: 'restore', subject: 'Guardian' })
+  async listDeletedGuardians(): Promise<DeletedPersonModel[]> {
+    return this.guardianService.listDeleted();
+  }
+
+  @Mutation(() => Boolean, { description: 'Restore a soft-deleted guardian.' })
+  @CheckAbility({ action: 'restore', subject: 'Guardian' })
+  async restoreGuardian(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
+    return this.guardianService.restore(id);
   }
 
   @Mutation(() => GuardianLinkModel, { description: 'Link a guardian to a student' })

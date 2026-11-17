@@ -41,7 +41,7 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
@@ -359,9 +359,11 @@ export class GuardianService {
       );
 
       if (otherGuardians.length === 0) {
-        throw new BadRequestException(
-          'Cannot delete guardian who is the only guardian for a student. Unlink or assign another guardian first.',
-        );
+        throw new BadRequestException({
+          message:
+            'Cannot delete guardian who is the only guardian for a student. Unlink or assign another guardian first.',
+          code: 'GUARDIAN_IS_ONLY_GUARDIAN',
+        });
       }
     }
 
@@ -372,6 +374,44 @@ export class GuardianService {
         .where(and(eq(guardianProfiles.id, id), sql`${guardianProfiles.deletedAt} IS NULL`))
         .returning();
       if (rows.length === 0) throw new NotFoundException(`Guardian ${id} not found`);
+    });
+
+    return true;
+  }
+
+  async listDeleted() {
+    const tenantId = this.tenantId;
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
+      return tx
+        .select({
+          id: guardianProfiles.id,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          deletedAt: sql<Date>`${guardianProfiles.deletedAt}`.mapWith(guardianProfiles.deletedAt),
+        })
+        .from(guardianProfiles) // allow-base-read: the Deleted list shows trashed rows
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfiles.userId))
+        .where(isNotNull(guardianProfiles.deletedAt))
+        .orderBy(desc(guardianProfiles.deletedAt));
+    });
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const tenantId = this.tenantId;
+    const actorId = this.userId;
+
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
+      const rows = await tx
+        .update(guardianProfiles)
+        .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
+        .where(and(eq(guardianProfiles.id, id), isNotNull(guardianProfiles.deletedAt)))
+        .returning({ id: guardianProfiles.id });
+      if (rows.length === 0) {
+        throw new NotFoundException({
+          message: 'Deleted guardian not found',
+          code: 'GUARDIAN_NOT_FOUND',
+        });
+      }
     });
 
     return true;

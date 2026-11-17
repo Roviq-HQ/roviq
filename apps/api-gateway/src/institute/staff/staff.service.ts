@@ -32,7 +32,7 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import type { CreateStaffInput } from './dto/create-staff.input';
 import type { ListStaffFilterInput } from './dto/list-staff-filter.input';
@@ -387,6 +387,47 @@ export class StaffService {
       tenantId,
     });
 
+    return true;
+  }
+
+  async listDeleted() {
+    const tenantId = this.tenantId;
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:staff'), async (tx) => {
+      return tx
+        .select({
+          id: staffProfiles.id,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          identifier: staffProfiles.employeeId,
+          deletedAt: sql<Date>`${staffProfiles.deletedAt}`.mapWith(staffProfiles.deletedAt),
+        })
+        .from(staffProfiles) // allow-base-read: the Deleted list shows trashed rows
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfiles.userId))
+        .where(isNotNull(staffProfiles.deletedAt))
+        .orderBy(desc(staffProfiles.deletedAt));
+    });
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const tenantId = this.tenantId;
+    const actorId = this.userId;
+
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:staff'), async (tx) => {
+      const rows = await tx
+        .update(staffProfiles)
+        // delete() stamps the leaving date, so restore has to clear it again.
+        .set({ deletedAt: null, deletedBy: null, dateOfLeaving: null, updatedBy: actorId })
+        .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
+        .returning({ id: staffProfiles.id });
+      if (rows.length === 0) {
+        throw new NotFoundException({
+          message: 'Deleted staff member not found',
+          code: 'STAFF_NOT_FOUND',
+        });
+      }
+    });
+
+    this.eventBus.emit(EVENT_PATTERNS.STAFF.joined, { staffProfileId: id, tenantId });
     return true;
   }
 

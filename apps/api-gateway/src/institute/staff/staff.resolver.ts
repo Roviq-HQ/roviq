@@ -2,6 +2,7 @@ import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import { DeletedPersonModel } from '../../common/deleted-person.model';
 import { CreateStaffInput } from './dto/create-staff.input';
 import { ListStaffFilterInput } from './dto/list-staff-filter.input';
 import { UpdateStaffInput } from './dto/update-staff.input';
@@ -46,6 +47,22 @@ export class StaffResolver {
     @Args('input') input: UpdateStaffInput,
   ): Promise<StaffModel> {
     return this.staffService.update(id, input) as Promise<StaffModel>;
+  }
+
+  @Query(() => [DeletedPersonModel], {
+    description: 'Soft-deleted staff members of this institute, most recently deleted first.',
+  })
+  @CheckAbility({ action: 'restore', subject: 'Staff' })
+  async listDeletedStaff(): Promise<DeletedPersonModel[]> {
+    return this.staffService.listDeleted();
+  }
+
+  @Mutation(() => Boolean, {
+    description: 'Restore a soft-deleted staff member and clear the leaving date that delete set.',
+  })
+  @CheckAbility({ action: 'restore', subject: 'Staff' })
+  async restoreStaffMember(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
+    return this.staffService.restore(id);
   }
 
   @Mutation(() => Boolean, { description: 'Soft-delete staff member, sets date_of_leaving' })

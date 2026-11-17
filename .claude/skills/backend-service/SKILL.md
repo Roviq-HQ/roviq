@@ -57,7 +57,7 @@ Delete = one line: `await this.service.delete(id); return true;`. `softDelete()`
 
 ### Trash/Restore
 
-Trash/restore needs CASL: `@CheckAbility({ action: 'manage', subject })`. Resolver calls a service method that reads from the **base table** (not the `*_live` view) so soft-deleted rows are visible. `withTrash()` no longer exists — soft-delete visibility is enforced at the application layer via `<table>_live` views (see `/drizzle-database` skill). Restore = `restoreDeleted(tx, table, id)` from `@roviq/database`.
+Trash/restore needs CASL: `@CheckAbility({ action: 'restore', subject })` (covered by `manage`). People modules (students, staff, guardians) expose `listDeleted<X>` returning the shared `DeletedPersonModel` plus `restore<X>(id)`; follow that shape for a new restorable entity. Resolver calls a service method that reads from the **base table** (not the `*_live` view) so soft-deleted rows are visible. `withTrash()` no longer exists — soft-delete visibility is enforced at the application layer via `<table>_live` views (see `/drizzle-database` skill). Restore = `restoreDeleted(tx, table, id)` from `@roviq/database`.
 
 ## Enum Conventions
 

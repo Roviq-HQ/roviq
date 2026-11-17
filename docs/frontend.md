@@ -30,6 +30,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 
 - `account/LanguagePreference` — shared account language setting for all three portals; saved preferences apply after authentication, with browser language then English as fallback. The topbar selector remains a per-visit override.
 - `AccountLocaleSync` — applies the authenticated account language once per account load, preserving the route, query and fragment.
+- `people/DeletedRecordsButton` + `people/DeletePersonButton` — delete, Deleted list and Restore for students, staff and guardians (`kind` prop). Delete states the consequence and offers Undo on the toast; both are gated by `<Can>` (`delete` / `restore`).
 
 ## Shared Libraries
 

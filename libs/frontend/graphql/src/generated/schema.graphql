@@ -1912,6 +1912,24 @@ enum DaySession {
   MORNING
 }
 
+"""
+A soft-deleted student, staff member or guardian, as shown in the Deleted list. Restore it with the matching restore mutation.
+"""
+type DeletedPersonModel {
+  """When the record was deleted."""
+  deletedAt: DateTime!
+  firstName: I18nText!
+
+  """Profile id — pass it to the restore mutation."""
+  id: ID!
+
+  """
+  Admission number for a student, employee id for staff, null for a guardian.
+  """
+  identifier: String
+  lastName: I18nText
+}
+
 type DepartmentCount {
   count: Int!
   department: String!
@@ -3787,12 +3805,25 @@ type Mutation {
   """Resolve group members (triggers rule evaluation + cache refresh)"""
   resolveGroupMembers(groupId: ID!): GroupResolutionUpdate!
   restoreExam(id: ID!): ExamModel!
+
+  """Restore a soft-deleted guardian."""
+  restoreGuardian(id: ID!): Boolean!
   restoreInstitute(id: ID!): InstituteModel!
 
   """
   Restore an archived plan back to active. New subscriptions can be created against it again.
   """
   restorePlan(id: ID!): SubscriptionPlanModel!
+
+  """
+  Restore a soft-deleted staff member and clear the leaving date that delete set.
+  """
+  restoreStaffMember(id: ID!): Boolean!
+
+  """
+  Restore a soft-deleted student. Fails with ADMISSION_NUMBER_TAKEN when the admission number has been reissued.
+  """
+  restoreStudent(id: ID!): Boolean!
 
   """Restore soft-deleted timetables. Returns the count restored."""
   restoreTimetable(ids: [ID!]!): Int!
@@ -4289,6 +4320,17 @@ type Query {
 
   """List certificates with optional filters"""
   listCertificates(filter: ListCertificateFilterInput): [CertificateModel!]!
+
+  """Soft-deleted guardians of this institute, most recently deleted first."""
+  listDeletedGuardians: [DeletedPersonModel!]!
+
+  """
+  Soft-deleted staff members of this institute, most recently deleted first.
+  """
+  listDeletedStaff: [DeletedPersonModel!]!
+
+  """Soft-deleted students of this institute, most recently deleted first."""
+  listDeletedStudents: [DeletedPersonModel!]!
 
   """List enquiries with filters and pagination"""
   listEnquiries(filter: EnquiryFilterInput): EnquiryConnection!
