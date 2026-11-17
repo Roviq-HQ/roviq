@@ -820,6 +820,21 @@ export const testIds = {
     newDraftBanner: 'guardian-new-draft-banner',
   },
 
+  // ── Institute: people → deleted records (students, staff, guardians) ───
+  deletedRecords: {
+    openBtn: (kind: string) => `deleted-${kind}-open-btn`,
+    panel: (kind: string) => `deleted-${kind}-panel`,
+    empty: (kind: string) => `deleted-${kind}-empty`,
+    error: (kind: string) => `deleted-${kind}-error`,
+    retryBtn: (kind: string) => `deleted-${kind}-retry-btn`,
+    row: (id: string) => `deleted-row-${id}`,
+    restoreBtn: (id: string) => `deleted-restore-btn-${id}`,
+    deleteBtn: (kind: string) => `delete-${kind}-btn`,
+    deleteDialog: (kind: string) => `delete-${kind}-dialog`,
+    deleteConfirmBtn: (kind: string) => `delete-${kind}-confirm-btn`,
+    deleteCancelBtn: (kind: string) => `delete-${kind}-cancel-btn`,
+  },
+
   // ── Institute: people → staff ──────────────────────────────────────────
   instituteStaff: {
     title: 'staff-title',

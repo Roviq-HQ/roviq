@@ -69,6 +69,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
+import { DeletePersonButton } from '@web/components/people/deleted-records';
 import { useDebouncedValue } from '@web/hooks/use-debounced-value';
 import { useFormDraft } from '@web/hooks/use-form-draft';
 import {
@@ -226,8 +227,16 @@ export default function GuardianDetailPage() {
                 <ArrowLeft className="size-4" />
                 {t('detail.back')}
               </Button>
-              <div className="text-xs text-muted-foreground">
-                {formatDate(new Date(guardian.updatedAt), 'date-medium')}
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-muted-foreground">
+                  {formatDate(new Date(guardian.updatedAt), 'date-medium')}
+                </div>
+                <DeletePersonButton
+                  kind="guardian"
+                  id={guardian.id}
+                  name={fullName}
+                  onDeleted={() => router.push('/institute/people/guardians')}
+                />
               </div>
             </div>
 

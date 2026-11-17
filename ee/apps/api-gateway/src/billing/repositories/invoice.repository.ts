@@ -121,7 +121,7 @@ export class InvoiceRepository {
           })
           .from(invoices)
           .innerJoin(subscriptions, eq(invoices.subscriptionId, subscriptions.id))
-          .innerJoin(institutes, eq(invoices.tenantId, institutes.id))
+          .innerJoin(institutes, eq(invoices.tenantId, institutes.id)) // allow-base-read: history rows keep the institute name after it is deleted
           .where(where)
           .orderBy(desc(invoices.createdAt), desc(invoices.id))
           .limit(params.first),

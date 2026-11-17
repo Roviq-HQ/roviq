@@ -49,7 +49,7 @@ export function createBillingActivities(db: DrizzleDB): BillingActivities {
             plan: plans,
           })
           .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
           .where(
             and(eq(subscriptions.status, 'ACTIVE'), lte(subscriptions.currentPeriodEnd, leadDate)),
           );

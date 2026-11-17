@@ -114,7 +114,8 @@
     "GRADUATED": "Graduated",
     "WITHDRAWN": "Withdrawn",
     "SUSPENDED": "Suspended",
-    "EXPELLED": "Expelled"
+    "EXPELLED": "Expelled",
+    "RE_ENROLLED": "Re-enrolled"
   },
   "genders": {
     "MALE": "Male",

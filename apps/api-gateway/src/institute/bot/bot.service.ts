@@ -54,6 +54,8 @@ export class BotService {
       const [created] = await tx
         .insert(users)
         .values({
+          createdBy: createdBy,
+          updatedBy: createdBy,
           username: botUsername,
           email: botEmail,
           passwordHash,

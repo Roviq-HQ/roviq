@@ -12,8 +12,8 @@ import {
   studentAcademicsLive,
   studentGuardianLinks,
   studentProfilesLive,
-  userDocuments,
-  userProfiles,
+  userDocumentsLive,
+  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
@@ -86,14 +86,14 @@ export class StudentReadRepository {
           createdAt: studentProfilesLive.createdAt,
           updatedAt: studentProfilesLive.updatedAt,
           // user_profile join
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          gender: userProfiles.gender,
-          dateOfBirth: userProfiles.dateOfBirth,
-          bloodGroup: userProfiles.bloodGroup,
-          religion: userProfiles.religion,
-          motherTongue: userProfiles.motherTongue,
-          profileImageUrl: userProfiles.profileImageUrl,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          gender: userProfilesLive.gender,
+          dateOfBirth: userProfilesLive.dateOfBirth,
+          bloodGroup: userProfilesLive.bloodGroup,
+          religion: userProfilesLive.religion,
+          motherTongue: userProfilesLive.motherTongue,
+          profileImageUrl: userProfilesLive.profileImageUrl,
           // current academic
           currentStudentAcademicId: studentAcademicsLive.id,
           currentStandardId: studentAcademicsLive.standardId,
@@ -104,7 +104,7 @@ export class StudentReadRepository {
           currentSectionName: sectionsLive.name,
         })
         .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
         .leftJoin(
           studentAcademicsLive,
           and(
@@ -187,7 +187,7 @@ export class StudentReadRepository {
     // student_guardian_links -> guardian_profiles -> user_profiles via
     // the guardian's user_id. Aliased so we don't collide with the main
     // user_profiles join (which holds the student's own name).
-    const guardianUserProfiles = alias(userProfiles, 'guardian_user_profiles');
+    const guardianUserProfiles = alias(userProfilesLive, 'guardian_user_profiles');
 
     return withTenant(this.db, ctx, async (tx) => {
       // Count total (without cursor)
@@ -195,7 +195,7 @@ export class StudentReadRepository {
       const [{ total }] = await tx
         .select({ total: count() })
         .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
         .leftJoin(
           studentAcademicsLive,
           eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
@@ -234,14 +234,14 @@ export class StudentReadRepository {
           version: studentProfilesLive.version,
           createdAt: studentProfilesLive.createdAt,
           updatedAt: studentProfilesLive.updatedAt,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
-          gender: userProfiles.gender,
-          dateOfBirth: userProfiles.dateOfBirth,
-          bloodGroup: userProfiles.bloodGroup,
-          religion: userProfiles.religion,
-          motherTongue: userProfiles.motherTongue,
-          profileImageUrl: userProfiles.profileImageUrl,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          gender: userProfilesLive.gender,
+          dateOfBirth: userProfilesLive.dateOfBirth,
+          bloodGroup: userProfilesLive.bloodGroup,
+          religion: userProfilesLive.religion,
+          motherTongue: userProfilesLive.motherTongue,
+          profileImageUrl: userProfilesLive.profileImageUrl,
           currentStudentAcademicId: studentAcademicsLive.id,
           currentStandardId: studentAcademicsLive.standardId,
           currentSectionId: studentAcademicsLive.sectionId,
@@ -253,7 +253,7 @@ export class StudentReadRepository {
           primaryGuardianLastName: guardianUserProfiles.lastName,
         })
         .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
         .leftJoin(
           studentAcademicsLive,
           eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
@@ -340,11 +340,11 @@ export class StudentReadRepository {
         .groupBy(studentAcademicsLive.standardId);
 
       const byGender = await tx
-        .select({ gender: userProfiles.gender, count: count() })
+        .select({ gender: userProfilesLive.gender, count: count() })
         .from(studentProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
         .where(restriction)
-        .groupBy(userProfiles.gender);
+        .groupBy(userProfilesLive.gender);
 
       const byCategory = await tx
         .select({ category: studentProfilesLive.socialCategory, count: count() })
@@ -400,23 +400,23 @@ export class StudentReadRepository {
     return withTenant(this.db, access.user, async (tx) => {
       const rows = await tx
         .select({
-          id: userDocuments.id,
-          userId: userDocuments.userId,
-          type: userDocuments.type,
-          description: userDocuments.description,
-          fileUrls: userDocuments.fileUrls,
-          referenceNumber: userDocuments.referenceNumber,
-          isVerified: userDocuments.isVerified,
-          verifiedAt: userDocuments.verifiedAt,
-          verifiedBy: userDocuments.verifiedBy,
-          rejectionReason: userDocuments.rejectionReason,
-          expiryDate: userDocuments.expiryDate,
-          createdAt: userDocuments.createdAt,
-          updatedAt: userDocuments.updatedAt,
+          id: userDocumentsLive.id,
+          userId: userDocumentsLive.userId,
+          type: userDocumentsLive.type,
+          description: userDocumentsLive.description,
+          fileUrls: userDocumentsLive.fileUrls,
+          referenceNumber: userDocumentsLive.referenceNumber,
+          isVerified: userDocumentsLive.isVerified,
+          verifiedAt: userDocumentsLive.verifiedAt,
+          verifiedBy: userDocumentsLive.verifiedBy,
+          rejectionReason: userDocumentsLive.rejectionReason,
+          expiryDate: userDocumentsLive.expiryDate,
+          createdAt: userDocumentsLive.createdAt,
+          updatedAt: userDocumentsLive.updatedAt,
         })
-        .from(userDocuments)
-        .where(eq(userDocuments.userId, userId))
-        .orderBy(sql`${userDocuments.createdAt} DESC`);
+        .from(userDocumentsLive)
+        .where(eq(userDocumentsLive.userId, userId))
+        .orderBy(sql`${userDocumentsLive.createdAt} DESC`);
 
       return rows
         .filter(
@@ -456,12 +456,12 @@ export class StudentReadRepository {
       conditions.push(eq(studentProfilesLive.isRteAdmitted, filter.isRteAdmitted));
     }
     if (filter.gender) {
-      conditions.push(eq(userProfiles.gender, filter.gender));
+      conditions.push(eq(userProfilesLive.gender, filter.gender));
     }
     if (filter.search) {
       const searchTerm = filter.search;
       const searchCondition = or(
-        sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
+        sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
         ilike(studentProfilesLive.admissionNumber, `%${searchTerm}%`),
       );
       if (searchCondition) conditions.push(searchCondition);

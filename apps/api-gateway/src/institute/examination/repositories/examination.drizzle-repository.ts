@@ -39,7 +39,7 @@ import {
   subjectsLive,
   subjectTopics,
   subjectTopicsLive,
-  userProfiles,
+  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -829,15 +829,15 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           studentProfileId: studentProfilesLive.id,
           membershipId: studentProfilesLive.membershipId,
           rollNumber: studentAcademicsLive.rollNumber,
-          firstName: userProfiles.firstName,
-          lastName: userProfiles.lastName,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
         })
         .from(studentAcademicsLive)
         .innerJoin(
           studentProfilesLive,
           eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
         )
-        .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
         .where(
           and(
             eq(studentAcademicsLive.sectionId, sectionId),
@@ -891,11 +891,11 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         const rows = await tx
           .select({
             membershipId: studentProfilesLive.membershipId,
-            firstName: userProfiles.firstName,
-            lastName: userProfiles.lastName,
+            firstName: userProfilesLive.firstName,
+            lastName: userProfilesLive.lastName,
           })
           .from(studentProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, studentProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
           .where(inArray(studentProfilesLive.membershipId, studentIds));
         for (const r of rows) {
           students[r.membershipId] =
@@ -906,11 +906,11 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         const rows = await tx
           .select({
             membershipId: staffProfilesLive.membershipId,
-            firstName: userProfiles.firstName,
-            lastName: userProfiles.lastName,
+            firstName: userProfilesLive.firstName,
+            lastName: userProfilesLive.lastName,
           })
           .from(staffProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
           .where(inArray(staffProfilesLive.membershipId, staffIds));
         for (const r of rows) {
           staff[r.membershipId] = `${i18nDisplay(r.firstName)} ${i18nDisplay(r.lastName)}`.trim();

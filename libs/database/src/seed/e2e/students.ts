@@ -138,6 +138,8 @@ export async function seedE2eStudents(
     .insert(users)
     .values(
       fixtures.map((s) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         id: s.userId,
         username: s.username,
         email: s.email,
@@ -176,6 +178,8 @@ export async function seedE2eStudents(
     .insert(authProviders)
     .values(
       fixtures.map((s) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         userId: s.userId,
         provider: 'password',
         providerUserId: s.userId,

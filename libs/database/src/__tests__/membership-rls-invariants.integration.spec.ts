@@ -113,8 +113,8 @@ describe('ROV-88 Invariant 2: reseller_memberships cross-reseller isolation', ()
     await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
       await expect(
         client.query(
-          `INSERT INTO reseller_memberships (user_id, role_id, reseller_id)
-           VALUES ($1, $2, $3)`,
+          `INSERT INTO reseller_memberships (user_id, role_id, reseller_id, created_by, updated_by)
+           VALUES ($1, $2, $3, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [SEED.USER_ADMIN, SEED.ROLE_RESELLER_FULL_ADMIN, SEED.RESELLER_DIRECT],
         ),
       ).rejects.toThrow(/permission denied|row-level security/);
@@ -295,8 +295,8 @@ describe('ROV-91 Invariant 7: scope columns reject unknown values', () => {
     await asRole('roviq_admin', {}, async (client) => {
       await expect(
         client.query(
-          `INSERT INTO refresh_tokens (user_id, membership_id, membership_scope, token_hash, expires_at)
-           VALUES ($1, uuidv7(), 'galaxy', 'rov-91-hash', now() + interval '1 day')`,
+          `INSERT INTO refresh_tokens (user_id, membership_id, membership_scope, token_hash, expires_at, created_by, updated_by)
+           VALUES ($1, uuidv7(), 'galaxy', 'rov-91-hash', now() + interval '1 day', $1, $1)`,
           [SEED.USER_ADMIN],
         ),
       ).rejects.toThrow(/chk_refresh_token_membership_scope/);
@@ -355,7 +355,9 @@ describe('ROV-91 Invariant 8: platform and reseller role name uniqueness', () =>
   it('allows the same role name under a different reseller', async () => {
     await asRole('roviq_admin', {}, async (client) => {
       const reseller = await client.query(
-        `INSERT INTO resellers (name, slug) VALUES ('ROV-91 Reseller', 'rov-91-uniq-reseller') RETURNING id`,
+        `INSERT INTO resellers (name, slug, created_by, updated_by)
+         VALUES ('ROV-91 Reseller', 'rov-91-uniq-reseller', $1, $1) RETURNING id`,
+        [SEED.USER_ADMIN],
       );
       const res = await insertRole(client, 'reseller', reseller.rows[0].id, 'reseller_full_admin');
       expect(res.rowCount).toBe(1);

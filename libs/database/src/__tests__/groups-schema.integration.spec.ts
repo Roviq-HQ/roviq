@@ -130,8 +130,8 @@ describe('M6: group_children CHECK (parent != child)', () => {
 
       const err = await client
         .query(
-          `INSERT INTO group_children (parent_group_id, child_group_id, tenant_id)
-           VALUES ($1, $1, $2)`,
+          `INSERT INTO group_children (parent_group_id, child_group_id, tenant_id, created_by, updated_by)
+           VALUES ($1, $1, $2, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [groupId, SEED.INSTITUTE_1],
         )
         .catch((e: Error) => e);
@@ -159,16 +159,16 @@ describe('M6: group_members UNIQUE(group_id, membership_id)', () => {
 
       // First member insert
       await client.query(
-        `INSERT INTO group_members (id, group_id, tenant_id, membership_id, source)
-         VALUES ($1, $2, $3, $4, '${GroupMemberSource.MANUAL}')`,
+        `INSERT INTO group_members (id, group_id, tenant_id, membership_id, source, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, '${GroupMemberSource.MANUAL}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         ['ffffffff-a004-0001-0001-000000000020', groupId, SEED.INSTITUTE_1, memId],
       );
 
       // Duplicate → should fail
       const err = await client
         .query(
-          `INSERT INTO group_members (id, group_id, tenant_id, membership_id, source)
-           VALUES ($1, $2, $3, $4, '${GroupMemberSource.RULE}')`,
+          `INSERT INTO group_members (id, group_id, tenant_id, membership_id, source, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, '${GroupMemberSource.RULE}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['ffffffff-a004-0001-0001-000000000021', groupId, SEED.INSTITUTE_1, memId],
         )
         .catch((e: Error) => e);

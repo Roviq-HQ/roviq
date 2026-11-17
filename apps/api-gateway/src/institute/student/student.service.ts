@@ -26,7 +26,7 @@ import {
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   sections,
   softDelete,
@@ -36,12 +36,13 @@ import {
   studentProfilesLive,
   userDocuments,
   userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
-import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import { nextAdmissionNumber } from './admission-number.sequence';
 import type { CreateStudentInput } from './dto/create-student.input';
@@ -86,9 +87,9 @@ export class StudentService {
     if (phone) {
       const existing = await withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
         return tx
-          .select({ userId: phoneNumbers.userId })
-          .from(phoneNumbers)
-          .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, phone)))
+          .select({ userId: phoneNumbersLive.userId })
+          .from(phoneNumbersLive)
+          .where(and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)))
           .limit(1);
       });
       if (existing.length > 0) {
@@ -338,6 +339,8 @@ export class StudentService {
       const rows = await tx
         .insert(userDocuments)
         .values({
+          createdBy: actorId,
+          updatedBy: actorId,
           userId,
           type: input.type,
           description: input.description ?? null,
@@ -602,6 +605,60 @@ export class StudentService {
     return true;
   }
 
+  async listDeleted() {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
+      return tx
+        .select({
+          id: studentProfiles.id,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          identifier: studentProfiles.admissionNumber,
+          deletedAt: sql<Date>`${studentProfiles.deletedAt}`.mapWith(studentProfiles.deletedAt),
+        })
+        .from(studentProfiles) // allow-base-read: the Deleted list shows trashed rows
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfiles.userId))
+        .where(isNotNull(studentProfiles.deletedAt))
+        .orderBy(desc(studentProfiles.deletedAt));
+    });
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const tenantId = this.getTenantId();
+    const actorId = this.getUserId();
+
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
+      const [deleted] = await tx
+        .select({ admissionNumber: studentProfiles.admissionNumber })
+        .from(studentProfiles) // allow-base-read: restore looks up a trashed row
+        .where(and(eq(studentProfiles.id, id), isNotNull(studentProfiles.deletedAt)));
+      if (!deleted) {
+        throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Deleted student not found');
+      }
+
+      // The admission number is unique among live students only, so it may
+      // have been reissued while this record sat in the Deleted list.
+      const [taken] = await tx
+        .select({ id: studentProfilesLive.id })
+        .from(studentProfilesLive)
+        .where(eq(studentProfilesLive.admissionNumber, deleted.admissionNumber))
+        .limit(1);
+      if (taken) {
+        throw new BusinessException(
+          ErrorCode.ADMISSION_NUMBER_TAKEN,
+          `Admission number ${deleted.admissionNumber} is now used by another student`,
+        );
+      }
+
+      await tx
+        .update(studentProfiles)
+        .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
+        .where(eq(studentProfiles.id, id));
+    });
+
+    return true;
+  }
+
   // ── STATISTICS ────────────────────────────────────────────
 
   // ── PRIVATE HELPERS ───────────────────────────────────────
@@ -753,7 +810,7 @@ export class StudentService {
     }
   }
 
-  private async createUser(input: CreateStudentInput, _actorId: string): Promise<string> {
+  private async createUser(input: CreateStudentInput, actorId: string): Promise<string> {
     const suffix = crypto.randomUUID().slice(0, 12);
     const email = `student-${suffix}@roviq.placeholder`;
     const username = `student-${suffix}`;
@@ -763,6 +820,7 @@ export class StudentService {
       email,
       username,
       phone,
+      actorId,
     });
 
     return userId;

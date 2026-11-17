@@ -19,13 +19,14 @@ import {
   staffProfilesLive,
   tenantSequences,
   userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import type { CreateStaffInput } from './dto/create-staff.input';
 import type { ListStaffFilterInput } from './dto/list-staff-filter.input';
@@ -63,11 +64,11 @@ export class StaffService {
       id: staffProfilesLive.id,
       userId: staffProfilesLive.userId,
       membershipId: staffProfilesLive.membershipId,
-      firstName: userProfiles.firstName,
-      lastName: userProfiles.lastName,
-      gender: userProfiles.gender,
-      dateOfBirth: userProfiles.dateOfBirth,
-      profileImageUrl: userProfiles.profileImageUrl,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+      gender: userProfilesLive.gender,
+      dateOfBirth: userProfilesLive.dateOfBirth,
+      profileImageUrl: userProfilesLive.profileImageUrl,
       employeeId: staffProfilesLive.employeeId,
       designation: staffProfilesLive.designation,
       department: staffProfilesLive.department,
@@ -92,7 +93,7 @@ export class StaffService {
         return tx
           .select(this.staffSelectLive())
           .from(staffProfilesLive)
-          .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
           .where(eq(staffProfilesLive.id, id))
           .limit(1);
       },
@@ -118,7 +119,7 @@ export class StaffService {
       // every value of the i18nText jsonb on insert.
       if (filter.search) {
         conditions.push(
-          sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${filter.search})`,
+          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${filter.search})`,
         );
       }
 
@@ -127,7 +128,7 @@ export class StaffService {
       const rows = await tx
         .select(this.staffSelectLive())
         .from(staffProfilesLive)
-        .innerJoin(userProfiles, eq(userProfiles.userId, staffProfilesLive.userId))
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .limit(limit);
       return rows;
@@ -158,6 +159,7 @@ export class StaffService {
       email,
       username,
       phone,
+      actorId,
     });
     const newUser = { id: newUserId };
 
@@ -168,6 +170,8 @@ export class StaffService {
         await tx
           .insert(phoneNumbers)
           .values({
+            createdBy: actorId,
+            updatedBy: actorId,
             userId: newUser.id,
             countryCode: '+91',
             number: phone,
@@ -387,6 +391,44 @@ export class StaffService {
       tenantId,
     });
 
+    return true;
+  }
+
+  async listDeleted() {
+    const tenantId = this.tenantId;
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:staff'), async (tx) => {
+      return tx
+        .select({
+          id: staffProfiles.id,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          identifier: staffProfiles.employeeId,
+          deletedAt: sql<Date>`${staffProfiles.deletedAt}`.mapWith(staffProfiles.deletedAt),
+        })
+        .from(staffProfiles) // allow-base-read: the Deleted list shows trashed rows
+        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfiles.userId))
+        .where(isNotNull(staffProfiles.deletedAt))
+        .orderBy(desc(staffProfiles.deletedAt));
+    });
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const tenantId = this.tenantId;
+    const actorId = this.userId;
+
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:staff'), async (tx) => {
+      const rows = await tx
+        .update(staffProfiles)
+        // delete() stamps the leaving date, so restore has to clear it again.
+        .set({ deletedAt: null, deletedBy: null, dateOfLeaving: null, updatedBy: actorId })
+        .where(and(eq(staffProfiles.id, id), isNotNull(staffProfiles.deletedAt)))
+        .returning({ id: staffProfiles.id });
+      if (rows.length === 0) {
+        throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, 'Deleted staff member not found');
+      }
+    });
+
+    this.eventBus.emit(EVENT_PATTERNS.STAFF.joined, { staffProfileId: id, tenantId });
     return true;
   }
 

@@ -190,8 +190,8 @@ describe('ROV-151: user_identifiers', () => {
 
       const identId = 'eeeeeeee-2001-0001-0001-000000000001';
       await client.query(
-        `INSERT INTO user_identifiers (id, user_id, type, value_encrypted, value_hash, value_masked)
-         VALUES ($1, $2, '${UserIdentifierType.AADHAAR}', $3, $4, $5)`,
+        `INSERT INTO user_identifiers (id, user_id, type, value_encrypted, value_hash, value_masked, created_by, updated_by)
+         VALUES ($1, $2, '${UserIdentifierType.AADHAAR}', $3, $4, $5, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [identId, SEED.USER_ADMIN, packed, hash, masked],
       );
 
@@ -219,8 +219,8 @@ describe('ROV-151: user_identifiers', () => {
     await inTransaction(async (client) => {
       const err = await client
         .query(
-          `INSERT INTO user_identifiers (id, user_id, type, value_plain)
-           VALUES ($1, $2, 'invalid_type', 'SOME123')`,
+          `INSERT INTO user_identifiers (id, user_id, type, value_plain, created_by, updated_by)
+           VALUES ($1, $2, 'invalid_type', 'SOME123', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-2002-0001-0001-000000000001', SEED.USER_ADMIN],
         )
         .catch((e: Error) => e);
@@ -236,13 +236,13 @@ describe('ROV-151: user_identifiers', () => {
       const id2 = 'eeeeeeee-2003-0001-0001-000000000002';
 
       await client.query(
-        `INSERT INTO user_identifiers (id, user_id, type, value_plain) VALUES ($1, $2, '${UserIdentifierType.APAAR}', 'APAAR001')`,
+        `INSERT INTO user_identifiers (id, user_id, type, value_plain, created_by, updated_by) VALUES ($1, $2, '${UserIdentifierType.APAAR}', 'APAAR001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [id1, SEED.USER_ADMIN],
       );
 
       const err = await client
         .query(
-          `INSERT INTO user_identifiers (id, user_id, type, value_plain) VALUES ($1, $2, '${UserIdentifierType.APAAR}', 'APAAR002')`,
+          `INSERT INTO user_identifiers (id, user_id, type, value_plain, created_by, updated_by) VALUES ($1, $2, '${UserIdentifierType.APAAR}', 'APAAR002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [id2, SEED.USER_ADMIN],
         )
         .catch((e: Error) => e);
@@ -256,8 +256,8 @@ describe('ROV-151: user_identifiers', () => {
     await inTransaction(async (client) => {
       const err = await client
         .query(
-          `INSERT INTO user_identifiers (id, user_id, type)
-           VALUES ($1, $2, '${UserIdentifierType.PAN}')`,
+          `INSERT INTO user_identifiers (id, user_id, type, created_by, updated_by)
+           VALUES ($1, $2, '${UserIdentifierType.PAN}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-2004-0001-0001-000000000001', SEED.USER_ADMIN],
         )
         .catch((e: Error) => e);
@@ -275,7 +275,7 @@ describe('ROV-151: user_identifiers', () => {
     await inTransaction(async (client) => {
       const err = await client
         .query(
-          `INSERT INTO user_identifiers (id, user_id, type, value_plain) VALUES ($1, $2, $3, '234123412346')`,
+          `INSERT INTO user_identifiers (id, user_id, type, value_plain, created_by, updated_by) VALUES ($1, $2, $3, '234123412346', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-2005-0001-0001-000000000001', SEED.USER_ADMIN, type],
         )
         .catch((e: Error) => e);
@@ -292,8 +292,8 @@ describe('ROV-151: user_identifiers', () => {
     await inTransaction(async (client) => {
       const err = await client
         .query(
-          `INSERT INTO user_identifiers (id, user_id, type, value_encrypted, value_hash, value_masked, value_plain)
-           VALUES ($1, $2, $3, '\\x00', $4, 'XXXX-XXXX-2346', '234123412346')`,
+          `INSERT INTO user_identifiers (id, user_id, type, value_encrypted, value_hash, value_masked, value_plain, created_by, updated_by)
+           VALUES ($1, $2, $3, '\\x00', $4, 'XXXX-XXXX-2346', '234123412346', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [
             'eeeeeeee-2006-0001-0001-000000000001',
             SEED.USER_ADMIN,
@@ -311,7 +311,7 @@ describe('ROV-151: user_identifiers', () => {
   it('non-sensitive type (APAAR) may still use value_plain', async () => {
     await inTransaction(async (client) => {
       const res = await client.query(
-        `INSERT INTO user_identifiers (id, user_id, type, value_plain) VALUES ($1, $2, $3, 'APAAR123') RETURNING value_plain`,
+        `INSERT INTO user_identifiers (id, user_id, type, value_plain, created_by, updated_by) VALUES ($1, $2, $3, 'APAAR123', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000') RETURNING value_plain`,
         ['eeeeeeee-2007-0001-0001-000000000001', SEED.USER_ADMIN, UserIdentifierType.APAAR],
       );
       expect(res.rows[0].value_plain).toBe('APAAR123');
@@ -328,15 +328,15 @@ describe('ROV-151: user_addresses', () => {
       const addr2 = 'eeeeeeee-3001-0001-0001-000000000002';
 
       await client.query(
-        `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code)
-         VALUES ($1, $2, '${AddressType.PERMANENT}', '123 Main St', 'Jaipur', 'Rajasthan', '302001')`,
+        `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code, created_by, updated_by)
+         VALUES ($1, $2, '${AddressType.PERMANENT}', '123 Main St', 'Jaipur', 'Rajasthan', '302001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [addr1, SEED.USER_ADMIN],
       );
 
       const err = await client
         .query(
-          `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code)
-           VALUES ($1, $2, 'PERMANENT', '456 Other St', 'Jodhpur', 'Rajasthan', '342001')`,
+          `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code, created_by, updated_by)
+           VALUES ($1, $2, 'PERMANENT', '456 Other St', 'Jodhpur', 'Rajasthan', '342001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           [addr2, SEED.USER_ADMIN],
         )
         .catch((e: Error) => e);
@@ -352,14 +352,14 @@ describe('ROV-151: user_addresses', () => {
       const addr2 = 'eeeeeeee-3002-0001-0001-000000000002';
 
       await client.query(
-        `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code)
-         VALUES ($1, $2, '${AddressType.PERMANENT}', '123 Main St', 'Jaipur', 'Rajasthan', '302001')`,
+        `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code, created_by, updated_by)
+         VALUES ($1, $2, '${AddressType.PERMANENT}', '123 Main St', 'Jaipur', 'Rajasthan', '302001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [addr1, SEED.USER_ADMIN],
       );
 
       await client.query(
-        `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code)
-         VALUES ($1, $2, '${AddressType.CURRENT}', '456 Other St', 'Jodhpur', 'Rajasthan', '342001')`,
+        `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code, created_by, updated_by)
+         VALUES ($1, $2, '${AddressType.CURRENT}', '456 Other St', 'Jodhpur', 'Rajasthan', '342001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         [addr2, SEED.USER_ADMIN],
       );
 
@@ -375,8 +375,8 @@ describe('ROV-151: user_addresses', () => {
     await inTransaction(async (client) => {
       const err = await client
         .query(
-          `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code)
-           VALUES ($1, $2, 'billing', '123 Main', 'Jaipur', 'Rajasthan', '302001')`,
+          `INSERT INTO user_addresses (id, user_id, type, line1, city, state, postal_code, created_by, updated_by)
+           VALUES ($1, $2, 'billing', '123 Main', 'Jaipur', 'Rajasthan', '302001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-3003-0001-0001-000000000001', SEED.USER_ADMIN],
         )
         .catch((e: Error) => e);

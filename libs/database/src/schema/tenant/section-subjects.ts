@@ -25,7 +25,9 @@ export const sectionSubjects = pgTable(
     })
       .onDelete('cascade')
       .onUpdate('cascade'),
-    uniqueIndex('section_subjects_subject_section_key').on(table.subjectId, table.sectionId),
+    uniqueIndex('section_subjects_subject_section_key')
+      .on(table.subjectId, table.sectionId)
+      .where(sql`${table.deletedAt} IS NULL`),
     index('section_subjects_tenant_id_idx').on(table.tenantId),
     index('section_subjects_section_id_idx').on(table.sectionId),
     ...tenantPolicies('section_subjects'),

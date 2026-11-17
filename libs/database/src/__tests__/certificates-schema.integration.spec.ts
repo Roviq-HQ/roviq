@@ -105,8 +105,8 @@ async function insertTemplate(
   const type = opts?.type ?? 'BONAFIDE_CERTIFICATE';
   const name = opts?.name ?? 'Test Template';
   await client.query(
-    `INSERT INTO certificate_templates (id, tenant_id, type, name, fields_schema)
-     VALUES ($1, $2, $3, $4, '{}')`,
+    `INSERT INTO certificate_templates (id, tenant_id, type, name, fields_schema, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, '{}', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
     [id, tenantId, type, name],
   );
   return id;

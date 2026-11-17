@@ -122,6 +122,8 @@ export const ErrorCode = {
   SECTION_NAME_DUPLICATE: 'SECTION_NAME_DUPLICATE',
   /** Cannot delete — students are actively enrolled */
   HAS_ACTIVE_ENROLLMENTS: 'HAS_ACTIVE_ENROLLMENTS',
+  /** Cannot restore student — the admission number was reissued to a live student */
+  ADMISSION_NUMBER_TAKEN: 'ADMISSION_NUMBER_TAKEN',
   /** Cannot delete subject — assessments have been recorded against it */
   HAS_RECORDED_ASSESSMENTS: 'HAS_RECORDED_ASSESSMENTS',
   /** Section under a stream-applicable standard must specify a stream */
@@ -381,6 +383,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   STANDARD_NAME_DUPLICATE: HttpStatus.CONFLICT,
   SECTION_NAME_DUPLICATE: HttpStatus.CONFLICT,
   HAS_ACTIVE_ENROLLMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
+  ADMISSION_NUMBER_TAKEN: HttpStatus.UNPROCESSABLE_ENTITY,
   HAS_RECORDED_ASSESSMENTS: HttpStatus.UNPROCESSABLE_ENTITY,
   TC_REQUIRED_FOR_TRANSFER: HttpStatus.UNPROCESSABLE_ENTITY,
   LAST_GUARDIAN_CANNOT_BE_DELETED: HttpStatus.UNPROCESSABLE_ENTITY,

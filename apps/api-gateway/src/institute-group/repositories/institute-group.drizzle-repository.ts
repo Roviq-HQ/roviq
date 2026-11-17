@@ -4,6 +4,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   groupMemberships,
+  groupMembershipsLive,
   instituteGroups,
   instituteGroupsLive,
   institutes,
@@ -41,6 +42,16 @@ const groupColumns = {
 } as const;
 
 const membershipColumns = {
+  id: groupMembershipsLive.id,
+  userId: groupMembershipsLive.userId,
+  groupId: groupMembershipsLive.groupId,
+  roleId: groupMembershipsLive.roleId,
+  isActive: groupMembershipsLive.isActive,
+  createdAt: groupMembershipsLive.createdAt,
+  updatedAt: groupMembershipsLive.updatedAt,
+} as const;
+
+const membershipWriteReturning = {
   id: groupMemberships.id,
   userId: groupMemberships.userId,
   groupId: groupMemberships.groupId,
@@ -267,26 +278,30 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
   }
 
   async addMember(groupId: string, userId: string, roleId: string): Promise<GroupMembershipRecord> {
+    const actorId = getRequestContext().userId;
     return withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
       const rows = await tx
         .insert(groupMemberships)
-        .values({
-          groupId,
-          userId,
-          roleId,
-          isActive: true,
-        })
-        .returning(membershipColumns);
+        .values({ createdBy: actorId, updatedBy: actorId, groupId, userId, roleId, isActive: true })
+        .returning(membershipWriteReturning);
 
       return rows[0] as GroupMembershipRecord;
     });
   }
 
   async removeMember(groupId: string, userId: string): Promise<void> {
+    const actorId = getRequestContext().userId;
     await withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
       const rows = await tx
-        .delete(groupMemberships)
-        .where(and(eq(groupMemberships.groupId, groupId), eq(groupMemberships.userId, userId)))
+        .update(groupMemberships)
+        .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId })
+        .where(
+          and(
+            eq(groupMemberships.groupId, groupId),
+            eq(groupMemberships.userId, userId),
+            isNull(groupMemberships.deletedAt),
+          ),
+        )
         .returning({ id: groupMemberships.id });
 
       if (rows.length === 0) {
@@ -302,8 +317,8 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
     return withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
       const rows = await tx
         .select(membershipColumns)
-        .from(groupMemberships)
-        .where(eq(groupMemberships.groupId, groupId));
+        .from(groupMembershipsLive)
+        .where(eq(groupMembershipsLive.groupId, groupId));
 
       return rows as GroupMembershipRecord[];
     });
@@ -313,8 +328,8 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
     return withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
       const rows = await tx
         .select(membershipColumns)
-        .from(groupMemberships)
-        .where(eq(groupMemberships.userId, userId));
+        .from(groupMembershipsLive)
+        .where(eq(groupMembershipsLive.userId, userId));
 
       return rows as GroupMembershipRecord[];
     });

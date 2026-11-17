@@ -83,16 +83,16 @@ describe('ROV-156: student_guardian_links', () => {
 
       // First primary contact — succeeds
       await client.query(
-        `INSERT INTO student_guardian_links (id, tenant_id, student_profile_id, guardian_profile_id, relationship, is_primary_contact)
-         VALUES ($1, $2, $3, $4, '${GuardianRelationship.FATHER}', true)`,
+        `INSERT INTO student_guardian_links (id, tenant_id, student_profile_id, guardian_profile_id, relationship, is_primary_contact, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, '${GuardianRelationship.FATHER}', true, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
         ['eeeeeeee-7005-0001-0001-000000000001', SEED.INSTITUTE_1, studentProfileId, gProfile1],
       );
 
       // Second primary contact — should fail
       const err = await client
         .query(
-          `INSERT INTO student_guardian_links (id, tenant_id, student_profile_id, guardian_profile_id, relationship, is_primary_contact)
-           VALUES ($1, $2, $3, $4, '${GuardianRelationship.MOTHER}', true)`,
+          `INSERT INTO student_guardian_links (id, tenant_id, student_profile_id, guardian_profile_id, relationship, is_primary_contact, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, '${GuardianRelationship.MOTHER}', true, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-7005-0001-0001-000000000002', SEED.INSTITUTE_1, studentProfileId, gProfile2],
         )
         .catch((e: Error) => e);
@@ -111,8 +111,8 @@ describe('ROV-156: staff_qualifications', () => {
       const fakeProfileId = 'eeeeeeee-8001-0001-0001-000000000099';
       const err = await client
         .query(
-          `INSERT INTO staff_qualifications (id, staff_profile_id, tenant_id, type, degree_name)
-           VALUES ($1, $2, $3, 'ACADEMIC', 'B.Ed')`,
+          `INSERT INTO staff_qualifications (id, staff_profile_id, tenant_id, type, degree_name, created_by, updated_by)
+           VALUES ($1, $2, $3, 'ACADEMIC', 'B.Ed', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-8002-0001-0001-000000000001', fakeProfileId, SEED.INSTITUTE_1],
         )
         .catch((e: Error) => e);
@@ -138,8 +138,8 @@ describe('ROV-156: staff_qualifications', () => {
 
       const err = await client
         .query(
-          `INSERT INTO staff_qualifications (id, staff_profile_id, tenant_id, type, degree_name)
-           VALUES ($1, $2, $3, 'invalid_type', 'B.Ed')`,
+          `INSERT INTO staff_qualifications (id, staff_profile_id, tenant_id, type, degree_name, created_by, updated_by)
+           VALUES ($1, $2, $3, 'invalid_type', 'B.Ed', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
           ['eeeeeeee-8005-0001-0001-000000000001', staffId, SEED.INSTITUTE_1],
         )
         .catch((e: Error) => e);

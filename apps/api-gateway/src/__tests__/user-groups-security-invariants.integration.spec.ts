@@ -176,7 +176,12 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
     section: typeof sections.$inferSelect,
     admissionNumber: string,
   ): Promise<string> {
-    await tx.insert(userProfiles).values({ userId: person.userId, firstName: { en: 'Student' } });
+    await tx.insert(userProfiles).values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+      userId: person.userId,
+      firstName: { en: 'Student' },
+    });
     const [profile] = await tx
       .insert(studentProfiles)
       .values({
@@ -208,6 +213,8 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       .insert(users)
       .values(
         indexes.map((index) => ({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           email: `perf_${suffix}_${index}@test.local`,
           username: `perf_${suffix}_${index}`,
           passwordHash: 'not-a-real-hash',
@@ -237,6 +244,8 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
     }));
     await tx.insert(userProfiles).values(
       userRows.map((row, index) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         userId: row.id,
         firstName: { en: `Perf ${index}` },
         gender: attributes[index].gender,
@@ -337,6 +346,8 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       const personal = [student.userId, foreignStudent.userId];
       await tx.insert(userIdentifiers).values(
         personal.map((userId) => ({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           userId,
           type: UserIdentifierType.APAAR,
           valuePlain: '123456789012',
@@ -344,6 +355,8 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       );
       await tx.insert(userDocuments).values(
         personal.map((userId) => ({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           userId,
           type: UserDocumentType.BIRTH_CERTIFICATE,
           fileUrls: ['https://files.test.local/birth-certificate.pdf'],
@@ -351,6 +364,8 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       );
       await tx.insert(userAddresses).values(
         personal.map((userId) => ({
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
           userId,
           type: AddressType.PERMANENT,
           line1: '12 Test Lane',

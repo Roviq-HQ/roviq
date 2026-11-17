@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, pgTable, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { timestamps } from '../common/columns';
+import { entityColumns } from '../common/columns';
 import { instituteGroups } from './institute-groups';
 import { roles } from './roles';
 
@@ -19,7 +19,11 @@ export const groupMemberships = pgTable(
       .notNull()
       .references(() => roles.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
     isActive: boolean('is_active').default(true).notNull(),
-    ...timestamps,
+    ...entityColumns,
   },
-  (table) => [uniqueIndex('group_memberships_user_group_key').on(table.userId, table.groupId)],
+  (table) => [
+    uniqueIndex('group_memberships_user_group_key')
+      .on(table.userId, table.groupId)
+      .where(sql`${table.deletedAt} IS NULL`),
+  ],
 );

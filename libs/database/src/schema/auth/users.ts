@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { timestamps } from '../common/columns';
+import { entityColumns } from '../common/columns';
 import { userStatus } from '../common/enums';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 
@@ -26,7 +26,7 @@ export const users = pgTable(
     passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
     /** True when the user was created with a system-generated temp password and must change it before any other action. */
     mustChangePassword: boolean('must_change_password').default(false).notNull(),
-    ...timestamps,
+    ...entityColumns,
   },
   (table) => [
     check('users_preferred_locale_check', sql`${table.preferredLocale} IN ('en', 'hi')`),

@@ -9,6 +9,7 @@ import {
   type InstituteReadAccess,
 } from '@roviq/casl';
 import { AcademicStatus } from '@roviq/common-types';
+import { DeletedPersonModel } from '../../common/deleted-person.model';
 import { pubSub } from '../../common/pubsub';
 import { CreateStudentInput } from './dto/create-student.input';
 import { StudentFilterInput } from './dto/student-filter.input';
@@ -63,6 +64,23 @@ export class StudentResolver {
     @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentDocumentModel[]> {
     return this.queries.listDocumentsForStudent(studentProfileId, access);
+  }
+
+  @Query(() => [DeletedPersonModel], {
+    description: 'Soft-deleted students of this institute, most recently deleted first.',
+  })
+  @CheckAbility({ action: 'restore', subject: 'Student' })
+  async listDeletedStudents(): Promise<DeletedPersonModel[]> {
+    return this.studentService.listDeleted();
+  }
+
+  @Mutation(() => Boolean, {
+    description:
+      'Restore a soft-deleted student. Fails with ADMISSION_NUMBER_TAKEN when the admission number has been reissued.',
+  })
+  @CheckAbility({ action: 'restore', subject: 'Student' })
+  async restoreStudent(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
+    return this.studentService.restore(id);
   }
 
   @Mutation(() => StudentModel, { description: 'Create a new student with admission' })

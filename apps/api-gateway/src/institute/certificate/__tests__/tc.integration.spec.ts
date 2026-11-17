@@ -96,6 +96,8 @@ async function createEnrolledStudent(
     const [user] = await tx
       .insert(users)
       .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
         email: `tc_stu_${suffix}@test.local`,
         username: `tc_stu_${suffix}`,
         passwordHash: 'not-a-real-hash',

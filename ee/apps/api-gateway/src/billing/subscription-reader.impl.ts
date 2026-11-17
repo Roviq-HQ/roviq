@@ -21,7 +21,7 @@ export class SubscriptionReaderImpl implements SubscriptionReader {
           planEntitlements: plans.entitlements,
         })
         .from(subscriptions)
-        .innerJoin(plans, eq(subscriptions.planId, plans.id))
+        .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
         .where(
           and(
             eq(subscriptions.tenantId, tenantId),

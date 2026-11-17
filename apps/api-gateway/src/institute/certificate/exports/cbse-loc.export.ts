@@ -10,7 +10,7 @@ import {
   mkInstituteCtx,
   studentAcademicsLive,
   studentProfilesLive,
-  userProfiles,
+  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -66,7 +66,7 @@ export async function generateCbseLocExport(
   const allProfiles = await withAdmin(
     db,
     mkAdminCtx('service:certificate-cbse-loc-export'),
-    async (tx) => tx.select().from(userProfiles),
+    async (tx) => tx.select().from(userProfilesLive),
   );
   const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
 

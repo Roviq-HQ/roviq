@@ -1,16 +1,8 @@
 import { sql } from 'drizzle-orm';
-import {
-  boolean,
-  foreignKey,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { boolean, foreignKey, jsonb, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import { tenantColumns } from '../common/columns';
 import { certificateTemplateType } from '../common/enums';
-import { tenantPoliciesSimple } from '../common/rls-policies';
+import { tenantPolicies } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 
 /**
@@ -19,13 +11,12 @@ import { institutes } from '../tenant/institutes';
  * HTML/Handlebars templates rendered with student/staff data at issuance time.
  * approval_chain JSONB defines the sign-off workflow (e.g., class teacher → principal).
  *
- * No soft delete (tenantPoliciesSimple). Three-tier RLS enforced.
+ * Three-tier RLS enforced.
  */
 export const certificateTemplates = pgTable(
   'certificate_templates',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    tenantId: uuid('tenant_id').notNull(),
 
     /**
      * Certificate type:
@@ -60,11 +51,7 @@ export const certificateTemplates = pgTable(
     /** Board affiliation — 'cbse', 'bseh', 'rbse', or NULL for custom templates */
     boardType: varchar('board_type', { length: 20 }),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
+    ...tenantColumns,
   },
   (table) => [
     foreignKey({
@@ -74,6 +61,6 @@ export const certificateTemplates = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
 
-    ...tenantPoliciesSimple('certificate_templates'),
+    ...tenantPolicies('certificate_templates'),
   ],
 ).enableRLS();

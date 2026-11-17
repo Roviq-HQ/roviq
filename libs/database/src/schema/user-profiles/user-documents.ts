@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, date, index, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
+import { entityColumns } from '../common/columns';
 import { userDocumentType } from '../common/enums';
 import { userScopedPolicies } from '../common/rls-policies';
 
@@ -56,11 +57,7 @@ export const userDocuments = pgTable(
     /** Document expiry date — relevant for certificates with validity periods */
     expiryDate: date('expiry_date'),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
+    ...entityColumns,
   },
   (table) => [
     index('idx_user_documents_user_type').on(table.userId, table.type),

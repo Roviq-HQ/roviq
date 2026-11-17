@@ -6,12 +6,14 @@ import {
   mkAdminCtx,
   mkResellerCtx,
   resellerMemberships,
+  resellerMembershipsLive,
   rolesLive,
-  userProfiles,
-  users,
+  userProfilesLive,
+  usersLive,
   withAdmin,
   withReseller,
 } from '@roviq/database';
+import { getRequestContext } from '@roviq/request-context';
 import { and, asc, count, eq, ilike, or, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
@@ -34,8 +36,8 @@ export class ResellerTeamService {
       const searchCondition =
         filter.search && filter.search.trim().length >= 2
           ? or(
-              ilike(users.username, `%${filter.search.trim()}%`),
-              sql`${userProfiles.searchVector} @@ plainto_tsquery('simple', ${filter.search.trim()})`,
+              ilike(usersLive.username, `%${filter.search.trim()}%`),
+              sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${filter.search.trim()})`,
             )
           : undefined;
 
@@ -43,13 +45,13 @@ export class ResellerTeamService {
       if (filter.after) {
         const cursor = decodeCursor(filter.after);
         if (cursor.id) {
-          cursorCondition = sql`${resellerMemberships.id} > ${cursor.id as string}`;
+          cursorCondition = sql`${resellerMembershipsLive.id} > ${cursor.id as string}`;
         }
       }
 
       const where = and(
-        eq(resellerMemberships.resellerId, resellerId),
-        eq(resellerMemberships.isActive, true),
+        eq(resellerMembershipsLive.resellerId, resellerId),
+        eq(resellerMembershipsLive.isActive, true),
         searchCondition,
         cursorCondition,
       );
@@ -59,29 +61,29 @@ export class ResellerTeamService {
       const [totalResult, rows] = await Promise.all([
         tx
           .select({ value: count() })
-          .from(resellerMemberships)
-          .leftJoin(users, eq(users.id, resellerMemberships.userId))
-          .leftJoin(userProfiles, eq(userProfiles.userId, resellerMemberships.userId))
+          .from(resellerMembershipsLive)
+          .leftJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
+          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, resellerMembershipsLive.userId))
           .where(where),
         tx
           .select({
-            membershipId: resellerMemberships.id,
-            roleId: resellerMemberships.roleId,
-            isActive: resellerMemberships.isActive,
-            membershipCreatedAt: resellerMemberships.createdAt,
-            userId: users.id,
-            email: users.email,
-            username: users.username,
-            userCreatedAt: users.createdAt,
-            firstName: userProfiles.firstName,
-            lastName: userProfiles.lastName,
-            profileImageUrl: userProfiles.profileImageUrl,
+            membershipId: resellerMembershipsLive.id,
+            roleId: resellerMembershipsLive.roleId,
+            isActive: resellerMembershipsLive.isActive,
+            membershipCreatedAt: resellerMembershipsLive.createdAt,
+            userId: usersLive.id,
+            email: usersLive.email,
+            username: usersLive.username,
+            userCreatedAt: usersLive.createdAt,
+            firstName: userProfilesLive.firstName,
+            lastName: userProfilesLive.lastName,
+            profileImageUrl: userProfilesLive.profileImageUrl,
           })
-          .from(resellerMemberships)
-          .innerJoin(users, eq(users.id, resellerMemberships.userId))
-          .leftJoin(userProfiles, eq(userProfiles.userId, resellerMemberships.userId))
+          .from(resellerMembershipsLive)
+          .innerJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
+          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, resellerMembershipsLive.userId))
           .where(where)
-          .orderBy(asc(resellerMemberships.createdAt))
+          .orderBy(asc(resellerMembershipsLive.createdAt))
           .limit(limit + 1),
       ]);
 
@@ -176,12 +178,15 @@ export class ResellerTeamService {
       mkResellerCtx(resellerId, 'service:reseller-team'),
       (tx) =>
         tx
-          .select({ id: resellerMemberships.id, resellerId: resellerMemberships.resellerId })
-          .from(resellerMemberships)
+          .select({
+            id: resellerMembershipsLive.id,
+            resellerId: resellerMembershipsLive.resellerId,
+          })
+          .from(resellerMembershipsLive)
           .where(
             and(
-              eq(resellerMemberships.id, membershipId),
-              eq(resellerMemberships.resellerId, resellerId),
+              eq(resellerMembershipsLive.id, membershipId),
+              eq(resellerMembershipsLive.resellerId, resellerId),
             ),
           )
           .limit(1),
@@ -197,7 +202,7 @@ export class ResellerTeamService {
     await withReseller(this.db, mkResellerCtx(resellerId, 'service:reseller-team'), (tx) =>
       tx
         .update(resellerMemberships)
-        .set({ isActive: false })
+        .set({ isActive: false, updatedBy: getRequestContext().userId })
         .where(eq(resellerMemberships.id, membershipId)),
     );
   }

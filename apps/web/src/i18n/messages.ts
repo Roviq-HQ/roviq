@@ -14,6 +14,7 @@ import enCertificates from '../../messages/en/certificates.json';
 import enCommon from '../../messages/en/common.json';
 import enConsent from '../../messages/en/consent.json';
 import enDashboard from '../../messages/en/dashboard.json';
+import enDeletedRecords from '../../messages/en/deletedRecords.json';
 import enDlq from '../../messages/en/dlq.json';
 import enError from '../../messages/en/error.json';
 import enExaminations from '../../messages/en/examinations.json';
@@ -53,6 +54,7 @@ import hiCertificates from '../../messages/hi/certificates.json';
 import hiCommon from '../../messages/hi/common.json';
 import hiConsent from '../../messages/hi/consent.json';
 import hiDashboard from '../../messages/hi/dashboard.json';
+import hiDeletedRecords from '../../messages/hi/deletedRecords.json';
 import hiDlq from '../../messages/hi/dlq.json';
 import hiError from '../../messages/hi/error.json';
 import hiExaminations from '../../messages/hi/examinations.json';
@@ -94,6 +96,7 @@ const en = {
   common: enCommon,
   consent: enConsent,
   dashboard: enDashboard,
+  deletedRecords: enDeletedRecords,
   dlq: enDlq,
   error: enError,
   examinations: enExaminations,
@@ -136,6 +139,7 @@ const hi = {
   common: hiCommon,
   consent: hiConsent,
   dashboard: hiDashboard,
+  deletedRecords: hiDeletedRecords,
   dlq: hiDlq,
   error: hiError,
   examinations: hiExaminations,

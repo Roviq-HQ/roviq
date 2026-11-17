@@ -9,7 +9,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { timestamps } from '../common/columns';
+import { entityColumns } from '../common/columns';
 import { resellerStatus, resellerTier } from '../common/enums';
 import { roviqAdmin, roviqReseller } from '../common/rls-policies';
 
@@ -24,10 +24,9 @@ export const resellers = pgTable(
     isActive: boolean('is_active').default(true).notNull(),
     status: resellerStatus().default('ACTIVE').notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
-    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     branding: jsonb().default({}),
     customDomain: varchar('custom_domain', { length: 255 }),
-    ...timestamps,
+    ...entityColumns,
   },
   (table) => [
     uniqueIndex('resellers_slug_key').on(table.slug),

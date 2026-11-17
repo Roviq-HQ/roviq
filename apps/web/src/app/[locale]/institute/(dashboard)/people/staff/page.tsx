@@ -23,6 +23,7 @@ import {
   useDebounce,
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
+import { DeletedRecordsButton } from '@web/components/people/deleted-records';
 import {
   Briefcase,
   CheckCircle2,
@@ -351,6 +352,7 @@ export default function StaffPage() {
                     ? t('export.buttonSelected', { count: selectedIds.size })
                     : t('export.buttonAll')}
                 </Button>
+                <DeletedRecordsButton kind="staff" />
                 <Can I="create" a="Staff">
                   <Button
                     className="min-h-11"

@@ -27,8 +27,8 @@ export const TEST_SUPERUSER_URL =
 /** Create a test user in the `users` table. Returns the user ID. */
 export async function createTestUser(client: pg.PoolClient, id: string): Promise<string> {
   await client.query(
-    `INSERT INTO users (id, username, email, password_hash)
-     VALUES ($1, $2, $3, 'not-a-real-hash')`,
+    `INSERT INTO users (id, username, email, password_hash, created_by, updated_by)
+     VALUES ($1, $2, $3, 'not-a-real-hash', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
     [id, `testuser-${id.slice(-8)}`, `test-${id.slice(-8)}@test.local`],
   );
   return id;

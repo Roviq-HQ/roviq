@@ -2,12 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
-  institutes,
-  memberships,
+  institutesLive,
+  membershipsLive,
   mkAdminCtx,
   refreshTokens,
-  roles,
-  users,
+  refreshTokensLive,
+  rolesLive,
+  usersLive,
   withAdmin,
 } from '@roviq/database';
 import { and, eq, gt, isNull, ne } from 'drizzle-orm';
@@ -55,6 +56,8 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
   async create(data: CreateRefreshTokenData): Promise<void> {
     await withAdmin(this.db, mkAdminCtx('repository:refresh-token'), (tx) =>
       tx.insert(refreshTokens).values({
+        createdBy: data.userId,
+        updatedBy: data.userId,
         id: data.id,
         tokenHash: data.tokenHash,
         userId: data.userId,
@@ -74,47 +77,47 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
       // Single query: token + user + optional membership + role
       const rows = await tx
         .select({
-          id: refreshTokens.id,
-          tokenHash: refreshTokens.tokenHash,
-          userId: refreshTokens.userId,
-          membershipScope: refreshTokens.membershipScope,
-          revokedAt: refreshTokens.revokedAt,
-          revokedReason: refreshTokens.revokedReason,
-          expiresAt: refreshTokens.expiresAt,
-          createdAt: refreshTokens.createdAt,
-          deviceInfo: refreshTokens.deviceInfo,
-          ipAddress: refreshTokens.ipAddress,
-          userAgent: refreshTokens.userAgent,
-          lastUsedAt: refreshTokens.lastUsedAt,
+          id: refreshTokensLive.id,
+          tokenHash: refreshTokensLive.tokenHash,
+          userId: refreshTokensLive.userId,
+          membershipScope: refreshTokensLive.membershipScope,
+          revokedAt: refreshTokensLive.revokedAt,
+          revokedReason: refreshTokensLive.revokedReason,
+          expiresAt: refreshTokensLive.expiresAt,
+          createdAt: refreshTokensLive.createdAt,
+          deviceInfo: refreshTokensLive.deviceInfo,
+          ipAddress: refreshTokensLive.ipAddress,
+          userAgent: refreshTokensLive.userAgent,
+          lastUsedAt: refreshTokensLive.lastUsedAt,
           user: {
-            id: users.id,
-            username: users.username,
-            email: users.email,
-            status: users.status,
-            passwordChangedAt: users.passwordChangedAt,
-            mustChangePassword: users.mustChangePassword,
+            id: usersLive.id,
+            username: usersLive.username,
+            email: usersLive.email,
+            status: usersLive.status,
+            passwordChangedAt: usersLive.passwordChangedAt,
+            mustChangePassword: usersLive.mustChangePassword,
           },
-          membershipId: memberships.id,
-          membershipTenantId: memberships.tenantId,
-          membershipRoleId: memberships.roleId,
-          membershipAbilities: memberships.abilities,
-          roleId: roles.id,
-          roleAbilities: roles.abilities,
+          membershipId: membershipsLive.id,
+          membershipTenantId: membershipsLive.tenantId,
+          membershipRoleId: membershipsLive.roleId,
+          membershipAbilities: membershipsLive.abilities,
+          roleId: rolesLive.id,
+          roleAbilities: rolesLive.abilities,
           // Institute fields — required so the refresh flow can mint an
           // institute-scope JWT containing `resellerId` (ROV-261) without
           // an extra round-trip to membershipRepo.findByIdAndUser.
-          instituteId: institutes.id,
-          instituteName: institutes.name,
-          instituteSlug: institutes.slug,
-          instituteLogoUrl: institutes.logoUrl,
-          instituteResellerId: institutes.resellerId,
+          instituteId: institutesLive.id,
+          instituteName: institutesLive.name,
+          instituteSlug: institutesLive.slug,
+          instituteLogoUrl: institutesLive.logoUrl,
+          instituteResellerId: institutesLive.resellerId,
         })
-        .from(refreshTokens)
-        .innerJoin(users, eq(refreshTokens.userId, users.id))
-        .leftJoin(memberships, eq(refreshTokens.membershipId, memberships.id))
-        .leftJoin(roles, eq(memberships.roleId, roles.id))
-        .leftJoin(institutes, eq(memberships.tenantId, institutes.id))
-        .where(eq(refreshTokens.id, id))
+        .from(refreshTokensLive)
+        .innerJoin(usersLive, eq(refreshTokensLive.userId, usersLive.id))
+        .leftJoin(membershipsLive, eq(refreshTokensLive.membershipId, membershipsLive.id))
+        .leftJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
+        .leftJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
+        .where(eq(refreshTokensLive.id, id))
         .limit(1);
 
       const row = rows[0];
@@ -173,9 +176,9 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
   async findByHash(tokenHash: string): Promise<{ id: string; userId: string } | null> {
     return withAdmin(this.db, mkAdminCtx('repository:refresh-token'), async (tx) => {
       const rows = await tx
-        .select({ id: refreshTokens.id, userId: refreshTokens.userId })
-        .from(refreshTokens)
-        .where(and(eq(refreshTokens.tokenHash, tokenHash), isNull(refreshTokens.revokedAt)))
+        .select({ id: refreshTokensLive.id, userId: refreshTokensLive.userId })
+        .from(refreshTokensLive)
+        .where(and(eq(refreshTokensLive.tokenHash, tokenHash), isNull(refreshTokensLive.revokedAt)))
         .limit(1);
       return rows[0] ?? null;
     });
@@ -185,48 +188,48 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
     return withAdmin(this.db, mkAdminCtx('repository:refresh-token'), async (tx) => {
       const rows = await tx
         .select({
-          id: refreshTokens.id,
-          tokenHash: refreshTokens.tokenHash,
-          userId: refreshTokens.userId,
-          membershipScope: refreshTokens.membershipScope,
-          revokedAt: refreshTokens.revokedAt,
-          revokedReason: refreshTokens.revokedReason,
-          expiresAt: refreshTokens.expiresAt,
-          createdAt: refreshTokens.createdAt,
-          deviceInfo: refreshTokens.deviceInfo,
-          ipAddress: refreshTokens.ipAddress,
-          userAgent: refreshTokens.userAgent,
-          lastUsedAt: refreshTokens.lastUsedAt,
+          id: refreshTokensLive.id,
+          tokenHash: refreshTokensLive.tokenHash,
+          userId: refreshTokensLive.userId,
+          membershipScope: refreshTokensLive.membershipScope,
+          revokedAt: refreshTokensLive.revokedAt,
+          revokedReason: refreshTokensLive.revokedReason,
+          expiresAt: refreshTokensLive.expiresAt,
+          createdAt: refreshTokensLive.createdAt,
+          deviceInfo: refreshTokensLive.deviceInfo,
+          ipAddress: refreshTokensLive.ipAddress,
+          userAgent: refreshTokensLive.userAgent,
+          lastUsedAt: refreshTokensLive.lastUsedAt,
           user: {
-            id: users.id,
-            username: users.username,
-            email: users.email,
-            status: users.status,
-            passwordChangedAt: users.passwordChangedAt,
-            mustChangePassword: users.mustChangePassword,
+            id: usersLive.id,
+            username: usersLive.username,
+            email: usersLive.email,
+            status: usersLive.status,
+            passwordChangedAt: usersLive.passwordChangedAt,
+            mustChangePassword: usersLive.mustChangePassword,
           },
-          membershipId: memberships.id,
-          membershipTenantId: memberships.tenantId,
-          membershipRoleId: memberships.roleId,
-          membershipAbilities: memberships.abilities,
-          roleId: roles.id,
-          roleAbilities: roles.abilities,
-          instituteId: institutes.id,
-          instituteName: institutes.name,
-          instituteSlug: institutes.slug,
-          instituteLogoUrl: institutes.logoUrl,
-          instituteResellerId: institutes.resellerId,
+          membershipId: membershipsLive.id,
+          membershipTenantId: membershipsLive.tenantId,
+          membershipRoleId: membershipsLive.roleId,
+          membershipAbilities: membershipsLive.abilities,
+          roleId: rolesLive.id,
+          roleAbilities: rolesLive.abilities,
+          instituteId: institutesLive.id,
+          instituteName: institutesLive.name,
+          instituteSlug: institutesLive.slug,
+          instituteLogoUrl: institutesLive.logoUrl,
+          instituteResellerId: institutesLive.resellerId,
         })
-        .from(refreshTokens)
-        .innerJoin(users, eq(refreshTokens.userId, users.id))
-        .leftJoin(memberships, eq(refreshTokens.membershipId, memberships.id))
-        .leftJoin(roles, eq(memberships.roleId, roles.id))
-        .leftJoin(institutes, eq(memberships.tenantId, institutes.id))
+        .from(refreshTokensLive)
+        .innerJoin(usersLive, eq(refreshTokensLive.userId, usersLive.id))
+        .leftJoin(membershipsLive, eq(refreshTokensLive.membershipId, membershipsLive.id))
+        .leftJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
+        .leftJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
         .where(
           and(
-            eq(refreshTokens.userId, userId),
-            isNull(refreshTokens.revokedAt),
-            gt(refreshTokens.expiresAt, new Date()),
+            eq(refreshTokensLive.userId, userId),
+            isNull(refreshTokensLive.revokedAt),
+            gt(refreshTokensLive.expiresAt, new Date()),
           ),
         );
 

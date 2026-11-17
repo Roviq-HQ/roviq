@@ -1,4 +1,5 @@
 // libs/database/src/seed/demo/users.ts
+
 import { hash } from '@node-rs/argon2';
 import {
   DEFAULT_PRIMARY_NAV_SLUGS,
@@ -6,6 +7,7 @@ import {
   type DefaultRole,
   DefaultRoles,
 } from '@roviq/common-types';
+import { sql } from 'drizzle-orm';
 import {
   authProviders,
   guardianProfiles,
@@ -96,6 +98,8 @@ export async function seedUsersAndMemberships(
   const [admin] = await tx
     .insert(users)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       id: SEED_IDS.USER_ADMIN,
       username: SEED_CREDENTIALS.ADMIN.username,
       email: 'admin@svm-ggn.edu.in',
@@ -106,6 +110,8 @@ export async function seedUsersAndMemberships(
   const [teacher] = await tx
     .insert(users)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       id: SEED_IDS.USER_TEACHER,
       username: SEED_CREDENTIALS.TEACHER.username,
       email: 'teacher1@svm-ggn.edu.in',
@@ -116,6 +122,8 @@ export async function seedUsersAndMemberships(
   const [student] = await tx
     .insert(users)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       id: SEED_IDS.USER_STUDENT,
       username: SEED_CREDENTIALS.STUDENT.username,
       email: 'student1@svm-ggn.edu.in',
@@ -126,6 +134,8 @@ export async function seedUsersAndMemberships(
   const [resellerUser] = await tx
     .insert(users)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       id: SEED_IDS.USER_RESELLER,
       username: SEED_CREDENTIALS.RESELLER.username,
       email: 'reseller1@roviq.com',
@@ -137,6 +147,8 @@ export async function seedUsersAndMemberships(
   const [guardianUser] = await tx
     .insert(users)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       id: SEED_IDS.USER_GUARDIAN,
       username: SEED_CREDENTIALS.GUARDIAN.username,
       email: 'guardian1@svm-ggn.edu.in',
@@ -198,19 +210,31 @@ export async function seedUsersAndMemberships(
     });
   await tx
     .insert(platformMemberships)
-    .values({ userId: admin.id, roleId: SEED_IDS.ROLE_PLATFORM_ADMIN })
-    .onConflictDoUpdate({ target: platformMemberships.userId, set: { updatedAt: new Date() } });
+    .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+      userId: admin.id,
+      roleId: SEED_IDS.ROLE_PLATFORM_ADMIN,
+    })
+    .onConflictDoUpdate({
+      target: platformMemberships.userId,
+      targetWhere: sql`deleted_at IS NULL`,
+      set: { updatedAt: new Date() },
+    });
 
   // reseller
   await tx
     .insert(resellerMemberships)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       userId: resellerUser.id,
       resellerId: SEED_IDS.RESELLER_DIRECT,
       roleId: SEED_IDS.ROLE_RESELLER_FULL_ADMIN,
     })
     .onConflictDoUpdate({
       target: [resellerMemberships.userId, resellerMemberships.resellerId],
+      targetWhere: sql`deleted_at IS NULL`,
       set: { updatedAt: new Date() },
     });
 
@@ -292,6 +316,8 @@ export async function seedUsersAndMemberships(
   await tx
     .insert(studentGuardianLinks)
     .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
       tenantId: inst1Id,
       studentProfileId: SEED_IDS.STUDENT_PROFILE_1,
       guardianProfileId: SEED_IDS.GUARDIAN_PROFILE_1,
@@ -305,9 +331,16 @@ export async function seedUsersAndMemberships(
   for (const user of [admin, teacher, student, resellerUser, guardianUser]) {
     await tx
       .insert(authProviders)
-      .values({ userId: user.id, provider: 'password', providerUserId: user.id })
+      .values({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        userId: user.id,
+        provider: 'password',
+        providerUserId: user.id,
+      })
       .onConflictDoUpdate({
         target: [authProviders.provider, authProviders.providerUserId],
+        targetWhere: sql`deleted_at IS NULL`,
         set: { updatedAt: new Date() },
       });
   }

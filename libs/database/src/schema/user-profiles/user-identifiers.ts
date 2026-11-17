@@ -12,6 +12,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
+import { entityColumns } from '../common/columns';
 import { userIdentifierType } from '../common/enums';
 import { userScopedPolicies } from '../common/rls-policies';
 
@@ -92,11 +93,7 @@ export const userIdentifiers = pgTable(
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     verifiedBy: uuid('verified_by').references(() => users.id),
 
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
+    ...entityColumns,
   },
   (table) => [
     /**
@@ -122,7 +119,9 @@ export const userIdentifiers = pgTable(
       )`,
     ),
     /** Only one identifier per type per user */
-    uniqueIndex('uq_identifier_user_type').on(table.userId, table.type),
+    uniqueIndex('uq_identifier_user_type')
+      .on(table.userId, table.type)
+      .where(sql`${table.deletedAt} IS NULL`),
     /** Aadhaar lookup by hash for duplicate detection during admission */
     index('idx_identifiers_aadhaar_hash').on(table.valueHash).where(sql`type = 'AADHAAR'`),
     index('idx_user_identifiers_user_id').on(table.userId),
