@@ -5,9 +5,9 @@
 [Tilt](https://docs.tilt.dev/) orchestrates the dev environment. Infra runs in Docker (via `docker/compose.infra.yaml`), apps run locally.
 
 ```bash
-tilt up              # Start everything
-tilt down            # Stop everything
-tilt get uiresources # Check resource status
+pnpm tilt up              # Start everything
+pnpm tilt down            # Stop everything
+pnpm tilt get uiresources # Check resource status
 ```
 
 Tilt UI: http://localhost:10350
@@ -35,7 +35,7 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 Both Compose stacks use `quay.io/minio/minio:latest`, the upstream Quay image. The
 Docker Hub reference `minio/minio:latest` no longer permits pulls. See the
 [upstream container documentation](https://github.com/minio/minio/blob/master/docs/docker/README.md).
-Retry a failed deployment with `tilt trigger minio`, then check `tilt logs minio`.
+Retry a failed deployment with `pnpm tilt trigger minio`, then check `pnpm tilt logs minio`.
 The local API is at `http://localhost:9002`; the console is at `http://localhost:9003`.
 
 ## Parallel dev instances
@@ -117,7 +117,7 @@ Platform tables (`users`, `institutes`, `phone_numbers`, `auth_providers`) have 
 
 ### Migrations
 
-Tilt runs schema push and seeding automatically on `tilt up`. A database that was never set up (no migration baseline, no users) is bootstrapped first with `pnpm db:reset --if-empty`, because a bare schema push does not create the prereq functions, grants and custom migrations. For manual use:
+Tilt runs schema push and seeding automatically on `pnpm tilt up`. A database that was never set up (no migration baseline, no users) is bootstrapped first with `pnpm db:reset --if-empty`, because a bare schema push does not create the prereq functions, grants and custom migrations. For manual use:
 
 ```bash
 pnpm run db:push          # Push Drizzle schema to DB

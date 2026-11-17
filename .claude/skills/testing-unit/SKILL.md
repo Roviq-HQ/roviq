@@ -97,6 +97,8 @@ Root `vitest.workspace.ts` defines three projects: `unit`, `integration`, `e2e-a
 | `e2e` | 3004 | 5435 | Full stack + Novu | Local E2E, `pnpm test:e2e:api` |
 | `ci` | 3004 | 5435 | Same as `e2e` | GitHub Actions |
 
+> Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
+
 ## What NOT to Test
 
 Auto-generated code, NestJS decorator wiring, third-party library internals, getter/setter with no logic, config/env loading.

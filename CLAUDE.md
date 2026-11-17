@@ -2,28 +2,37 @@
 
 ### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table.
 
-**Always use `tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Examples:
+**Always use `pnpm tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Always call it as `pnpm tilt …`, never bare `tilt`: the wrapper targets this checkout's own Tilt, while bare `tilt` can hit another instance's. Examples:
 
-- `tilt trigger db-push` — push schema
-- `tilt trigger db-seed` — seed data
-- `tilt trigger db-clean` — reset DB + re-seed
-- `tilt trigger api-gateway` — restart API
-- `tilt trigger web` — restart web app
-- `tilt trigger e2e-gateway` — run API e2e tests
-- `tilt trigger e2e-ui` — run Playwright UI tests across all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e)
+- `pnpm tilt trigger db-push` — push schema
+- `pnpm tilt trigger db-seed` — seed data
+- `pnpm tilt trigger db-clean` — reset DB + re-seed
+- `pnpm tilt trigger api-gateway` — restart API
+- `pnpm tilt trigger web` — restart web app
+- `pnpm tilt trigger e2e-gateway` — run API e2e tests
+- `pnpm tilt trigger e2e-ui` — run Playwright UI tests across all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e)
 - `pnpm e2e:up` — start Docker e2e infra (run once, stays running), MUST run it before e2e testing. if already running, just re-seed and continue.
 - `pnpm test:e2e:api` — Vitest E2E API tests against running api-gateway. **All new E2E API tests go here.**
 - `pnpm test:e2e:ui` — Playwright UI tests across the 3 portal e2e projects plus cross-portal.
 - `pnpm test:all` — full test pipeline: unit + integration + e2e:api + e2e:ui
 - `pnpm ci:check` — unified lint/typecheck/test/e2e gate, run by `.husky/pre-push`. CI jobs, Nx cache targets, bypass flags: `docs/testing.md` → "CI and pre-push".
 
-Tilt auto-detects file changes for app resources (api-gateway, web) — no `tilt trigger` needed after editing code, just check logs. Use `tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `tilt logs`.
+Tilt auto-detects file changes for app resources (api-gateway, web) — no `pnpm tilt trigger` needed after editing code, just check logs. Use `pnpm tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `pnpm tilt logs`.
 
-Tilt `codegen` resource runs `pnpm codegen --watch` automatically — regenerates GraphQL types when schema or document files change. After adding/modifying GraphQL resolvers or frontend queries, check `tilt logs codegen` to confirm types regenerated.
+Tilt `codegen` resource runs `pnpm codegen --watch` automatically — regenerates GraphQL types when schema or document files change. After adding/modifying GraphQL resolvers or frontend queries, check `pnpm tilt logs codegen` to confirm types regenerated.
 
-Use `tilt logs <resource>` to check output when things fail (e.g., `tilt logs db-clean`, `tilt logs api-gateway`, `tilt logs e2e-gateway`).
+Use `pnpm tilt logs <resource>` to check output when things fail (e.g., `pnpm tilt logs db-clean`, `pnpm tilt logs api-gateway`, `pnpm tilt logs e2e-gateway`).
 
-**Parallel dev instances** — each agent works in its own worktree with its own ports, containers and databases (`pnpm instance:new <slot> <branch>`). If `.env` has `ROVIQ_INSTANCE` set, you are in one: every port in this file is shifted by `slot × 20` (`pnpm instance:ports` lists them) and Tilt must be reached with `pnpm tilt <args>` unless `TILT_PORT` is set. Details: `docs/infrastructure.md` → "Parallel dev instances".
+## Parallel dev instances
+
+Several agents work at the same time, each in its own git worktree with its own ports, containers and databases. Full details: `docs/infrastructure.md` → "Parallel dev instances".
+
+- **Know which instance you are in before running or testing anything.** `pnpm instance:ports` prints the slot and every port. Slot 0 is the main checkout; `ROVIQ_INSTANCE=<n>` in `.env` means slot n.
+- **Every port and URL written in this file, in `docs/` and in the skills is the slot 0 value.** In slot n add `n × 20`: slot 1 has web on `localhost:4220` (`admin.localhost:4220`, `reseller.localhost:4220`), API on 3025, e2e API on 3024, e2e web on 4221. Never type a slot 0 port from memory.
+- **Never touch another instance.** Do not call another slot's ports, do not run `docker` commands against its Compose projects (`docker` / `roviq-e2e` belong to slot 0, `roviq-<n>` / `roviq-e2e-<n>` to slot n), and do not point a database client at its Postgres. Container names carry the project prefix, e.g. `roviq-1-postgres-1`.
+- **Starting parallel work**: when the user asks for work to run beside another agent's, or the current checkout is busy with another branch, create an instance with `pnpm instance:new <slot> <branch>` from the main checkout and work there. Do not start a second Tilt in a checkout that has no instance of its own.
+- **Browser testing**: cookies on `localhost` are shared across ports. Use a separate browser profile or context per instance, or a login in one instance signs the other out.
+- New code must not hardcode a dev or e2e port. Read the instance variable with the slot 0 value as the default (`process.env.E2E_API_PORT ?? '3004'`, `${DEV_POSTGRES_PORT:-5434}`); the table is in `scripts/lib/instance.ts`.
 
 ## Identity
 
@@ -53,8 +62,8 @@ If any of below rule applies to you then you `MUST` read full details: `sed -n '
 
 ## Architecture
 
-- **api-gateway** — NestJS GraphQL API (Apollo, code-first). Three-scope auth (platform/reseller/institute). Port 3005.
-- **web** — Next.js 16 (App Router) unified web app. Three scope directories: `admin/`, `reseller/`, `institute/`. Hostname middleware routes subdomains. Port 4200.
+- **api-gateway** — NestJS GraphQL API (Apollo, code-first). Three-scope auth (platform/reseller/institute). Port 3005 (slot 0).
+- **web** — Next.js 16 (App Router) unified web app. Three scope directories: `admin/`, `reseller/`, `institute/`. Hostname middleware routes subdomains. Port 4200 (slot 0).
 - **Shared libs** (`@roviq/*`): `database`, `common-types`, `nats-jetstream`, `resilience`, `graphql`, `auth`, `auth-backend`, `casl`, `i18n`, `ui`
 - **Infra**: PostgreSQL 18 + RLS (four-role: `roviq_pooler`→`roviq_app`/`roviq_reseller`/`roviq_admin`), Redis 7, NATS 2.10 + JetStream, MinIO, Temporal — all in Docker via Tilt
 
@@ -90,7 +99,7 @@ Folder trees for `apps/api-gateway` and `apps/web`: `docs/architecture.md` → "
 
 ### Runtime Verification
 
-Compilation passing does NOT mean it works. After any change to NX project.json, tsconfig, path aliases, Docker compose, infra configs, env vars, or new library scaffolding — **you MUST run the actual app** (`tilt trigger api-gateway` and check `tilt logs api-gateway`) and verify it starts without runtime errors. Fix iteratively until clean.
+Compilation passing does NOT mean it works. After any change to NX project.json, tsconfig, path aliases, Docker compose, infra configs, env vars, or new library scaffolding — **you MUST run the actual app** (`pnpm tilt trigger api-gateway` and check `pnpm tilt logs api-gateway`) and verify it starts without runtime errors. Fix iteratively until clean.
 
 ### Phase Completion — Bug-Free Gate
 
@@ -144,6 +153,7 @@ Full rationale + enforcing CI gate for each line: `docs/references/mistake-refer
 - Seed credentials/names only from `e2e/shared/seed-fixtures.ts`
 - `REDIS_KEYS` constants · new `@roviq/*` lib → add vitest alias in `apps/api-gateway/vitest.config.ts` · impersonation tokens never refresh
 - Save test/build output to a temp file and grep it — don't re-run · e2e DB is `roviq_test` · verify docs/assertions against source, not memory
+- `pnpm tilt …`, never bare `tilt` · no hardcoded dev/e2e ports in code or tests — instance variables with slot 0 defaults
 
 ## Skills (when needed, not always loaded)
 
@@ -172,7 +182,7 @@ Domain-specific rules live in `.claude/skills/` and load only when relevant:
 
 ## Docker Compose Files
 
-Pick the compose file explicitly — no `--profile` flags. All five files: `docs/testing.md` → "Docker Compose Files". E2E stack is `docker/compose.e2e.yaml` (`roviq_test`, PG host port 5435, API port 3004).
+Pick the compose file explicitly — no `--profile` flags. All five files: `docs/testing.md` → "Docker Compose Files". E2E stack is `docker/compose.e2e.yaml` (`roviq_test`, PG host port 5435, API port 3004 in slot 0; always start it through `pnpm e2e:up`, which picks this instance's project and ports).
 
 ## Nx
 

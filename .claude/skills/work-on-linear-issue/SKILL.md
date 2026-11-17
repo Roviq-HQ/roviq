@@ -13,7 +13,7 @@ description: Use when starting work on a Linear issue — provides the full work
 - Working tree must be clean — commit or resolve pending changes first
 - `git fetch origin` then branch from `origin/main`
 - Check blocking issues are completed (files/modules exist)
-- `tilt get uiresources` — all resources healthy
+- `pnpm tilt get uiresources` — all resources healthy
 - `pnpm install` — deps current
 - If prerequisites missing → STOP, report what's missing
 

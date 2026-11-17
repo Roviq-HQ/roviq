@@ -4,7 +4,7 @@ Known footguns in the dev + infra setup. One entry per symptom. Keep entries tig
 
 ---
 
-## `pnpm run dev:gateway` / `tilt trigger api-gateway` crashes with `Could not find …/main.js`
+## `pnpm run dev:gateway` / `pnpm tilt trigger api-gateway` crashes with `Could not find …/main.js`
 
 **Symptom.** Log sequence looks like:
 
@@ -53,7 +53,7 @@ pnpm e2e:down                          # tear down the whole e2e stack
 pnpm e2e:up                            # restarts against the current checkout + node_modules
 ```
 
-Then restart your local dev: `tilt trigger api-gateway` (or let Tilt auto-recover).
+Then restart your local dev: `pnpm tilt trigger api-gateway` (or let Tilt auto-recover).
 
 **Prevention in place.** [docker/compose.e2e.yaml](../docker/compose.e2e.yaml) follows the industry-standard pattern for Docker dev stacks: **source is bind-mounted, build output and nx state are isolated from the host's**.
 

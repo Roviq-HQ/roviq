@@ -11,6 +11,8 @@
 
 ## Apps
 
+> Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
+
 | App | URL | Purpose |
 |-----|-----|---------|
 | admin-portal | http://localhost:4200 | Platform admin — manage institutes, users, system health |

@@ -4,7 +4,7 @@ Roviq supports both **Novu Cloud** and a **local self-hosted Novu instance**. Th
 
 ## Quick Start
 
-1. Start core infrastructure: `tilt up`
+1. Start core infrastructure: `pnpm tilt up`
 2. In Tilt UI (`http://localhost:10350`), start all resources in the **novu** group
 3. Wait for `novu-api` to become healthy
 4. Open the Novu Dashboard at `http://localhost:4000` and create an account (first time only)

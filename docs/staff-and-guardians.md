@@ -105,7 +105,7 @@ Both dialogs share the same UX contract:
 
 ## Self-verification (manual smoke test)
 
-1. `tilt trigger db-clean`, wait for `tilt logs db-clean` to show seed complete.
+1. `pnpm tilt trigger db-clean`, wait for `pnpm tilt logs db-clean` to show seed complete.
 2. Login as institute admin, navigate to `/institute/people/staff`.
 3. Verify list loads with seeded staff; filter by department and confirm URL updates via nuqs.
 4. Click into a staff detail page → Qualifications tab → add a new qualification → verify row appears without full reload.

@@ -77,7 +77,7 @@ Every tenant-scoped table MUST have ALL of these:
 
 After ANY schema change:
 
-- Run `tilt trigger db-push` to sync schema to DB
+- Run `pnpm tilt trigger db-push` to sync schema to DB
 - Update `scripts/seed.ts` to match the new schema
 - Grep for old field names / unique constraints across `scripts/`, `e2e/`, and test files
 
