@@ -324,53 +324,84 @@ describe('Auth E2E', () => {
   });
 
   describe('logout', () => {
-    it('should logout successfully with valid token', async () => {
-      // Get a fresh token first
-      const loginRes = await gql<{ instituteLogin: InstituteLoginResult }>(
-        `mutation InstituteLogin($username: String!, $password: String!) {
-          instituteLogin(username: $username, password: $password) {
-            accessToken
-          }
-        }`,
-        { username: E2E_USERS.TEACHER.username, password: E2E_USERS.TEACHER.password },
-      );
-      assert(loginRes.data);
-      const token = loginRes.data.instituteLogin.accessToken ?? undefined;
+    const LOGIN = `mutation InstituteLogin($username: String!, $password: String!) {
+      instituteLogin(username: $username, password: $password) { accessToken refreshToken }
+    }`;
+    const REFRESH = `mutation RefreshToken($token: String!) {
+      refreshToken(token: $token) { accessToken refreshToken }
+    }`;
 
-      const res = await gql(E2eLogoutDocument, undefined, token);
-
+    async function login(user: { username: string; password: string }) {
+      const res = await gql<{ instituteLogin: InstituteLoginResult }>(LOGIN, user);
       expect(res.errors).toBeUndefined();
-      assert(res.data);
-      expect(res.data.logout).toBe(true);
+      const { accessToken, refreshToken } = res.data?.instituteLogin ?? {};
+      assert(accessToken);
+      assert(refreshToken);
+      return { accessToken, refreshToken };
+    }
+
+    it('should end the session of the presented refresh token', async () => {
+      const { accessToken, refreshToken } = await login(E2E_USERS.STUDENT);
+
+      const res = await gql(E2eLogoutDocument, { currentRefreshToken: refreshToken }, accessToken);
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.logout).toBe(true);
+
+      const refreshRes = await gql(REFRESH, { token: refreshToken });
+      expect(refreshRes.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
     });
 
-    it('should invalidate refresh tokens after logout', async () => {
-      const loginRes = await gql<{ instituteLogin: InstituteLoginResult }>(
-        `mutation InstituteLogin($username: String!, $password: String!) {
-          instituteLogin(username: $username, password: $password) {
-            accessToken
-            refreshToken
-          }
-        }`,
-        { username: E2E_USERS.STUDENT.username, password: E2E_USERS.STUDENT.password },
+    it('should leave the other sessions of the same user signed in', async () => {
+      const first = await login(E2E_USERS.STUDENT);
+      const second = await login(E2E_USERS.STUDENT);
+
+      const res = await gql(
+        E2eLogoutDocument,
+        { currentRefreshToken: first.refreshToken },
+        first.accessToken,
       );
-      assert(loginRes.data);
-      const { accessToken, refreshToken } = loginRes.data.instituteLogin;
+      expect(res.errors).toBeUndefined();
 
-      // Logout
-      await gql(E2eLogoutDocument, undefined, accessToken ?? undefined);
+      const refreshRes = await gql<{ refreshToken: AuthPayload }>(REFRESH, {
+        token: second.refreshToken,
+      });
+      expect(refreshRes.errors).toBeUndefined();
+      expect(refreshRes.data?.refreshToken.accessToken).toBeTruthy();
+    });
 
-      // Attempting to use the refresh token should fail
-      const refreshRes = await gql<{ refreshToken: AuthPayload }>(
-        `mutation RefreshToken($token: String!) {
-          refreshToken(token: $token) {
-            accessToken
-          }
-        }`,
-        { token: refreshToken },
+    it('should succeed when the session was already logged out', async () => {
+      const { accessToken, refreshToken } = await login(E2E_USERS.STUDENT);
+      await gql(E2eLogoutDocument, { currentRefreshToken: refreshToken }, accessToken);
+
+      const res = await gql(E2eLogoutDocument, { currentRefreshToken: refreshToken }, accessToken);
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.logout).toBe(true);
+    });
+
+    it("should refuse to end another user's session", async () => {
+      const student = await login(E2E_USERS.STUDENT);
+      const teacher = await login(E2E_USERS.TEACHER);
+
+      const res = await gql(
+        E2eLogoutDocument,
+        { currentRefreshToken: teacher.refreshToken },
+        student.accessToken,
       );
+      expect(res.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
 
-      expect(refreshRes.errors).toBeDefined();
+      const refreshRes = await gql<{ refreshToken: AuthPayload }>(REFRESH, {
+        token: teacher.refreshToken,
+      });
+      expect(refreshRes.errors).toBeUndefined();
+    });
+
+    it('should reject logout without an access token', async () => {
+      const { refreshToken } = await login(E2E_USERS.STUDENT);
+
+      const res = await gql(E2eLogoutDocument, { currentRefreshToken: refreshToken });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
     });
   });
 });

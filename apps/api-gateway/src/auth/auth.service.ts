@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
-import type { AbilityRule, AuthScope, InstituteContext } from '@roviq/common-types';
+import type { AbilityRule, AuthScope, AuthUser, InstituteContext } from '@roviq/common-types';
 import {
   BusinessException,
   ErrorCode,
@@ -121,12 +121,8 @@ export class AuthService {
     const user = await this.verifyCredentials(username, password, meta);
 
     const membership = await this.platformMembershipRepo.findByUserId(user.id);
-    if (!membership) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
-    }
-
-    if (!membership.isActive) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
+    if (!membership?.isActive) {
+      this.rejectWrongPortal(user.id, 'platform', meta);
     }
 
     const result = await this.issueTokens({
@@ -174,14 +170,9 @@ export class AuthService {
     const user = await this.verifyCredentials(username, password, meta);
 
     const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
-    if (memberships.length === 0) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
-    }
-
-    // Check reseller is active
     const m = memberships[0];
-    if (!m.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
+    if (!m?.reseller.isActive || m.reseller.status !== ResellerStatus.ACTIVE) {
+      this.rejectWrongPortal(user.id, 'reseller', meta);
     }
 
     const result = await this.issueTokens({
@@ -232,7 +223,7 @@ export class AuthService {
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
-      throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
+      this.rejectWrongPortal(user.id, 'institute', meta);
     }
 
     if (memberships.length === 1) {
@@ -563,17 +554,27 @@ export class AuthService {
 
   // ── Logout ─────────────────────────────────────────────
 
-  async logout(userId: string, refreshTokenId?: string, meta?: RequestMeta): Promise<void> {
-    if (refreshTokenId) {
-      await this.refreshTokenRepo.revoke(refreshTokenId, 'user_initiated');
-    } else {
-      await this.refreshTokenRepo.revokeAllForUser(userId, 'user_initiated');
+  /** Ends the caller's current session only; other devices stay signed in. */
+  async logout(current: AuthUser, currentRefreshToken: string, meta?: RequestMeta): Promise<void> {
+    // The impersonator holds no session of the target; nothing here is theirs to end.
+    if (current.isImpersonated) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Cannot log out while impersonating');
+    }
+
+    // A token that is already revoked is not found: logging out twice succeeds.
+    const session = await this.refreshTokenRepo.findByHash(this.hashToken(currentRefreshToken));
+    if (session) {
+      if (session.userId !== current.userId) {
+        throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid refresh token');
+      }
+      await this.refreshTokenRepo.revoke(session.id, 'user_initiated');
     }
 
     this.authEventService
       .emit({
-        userId,
+        userId: current.userId,
         type: 'logout',
+        scope: current.scope,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -852,6 +853,25 @@ export class AuthService {
       roleAbilities: m.role.abilities as Record<string, unknown>[],
       membershipAbilities: m.abilities as Record<string, unknown>[] | null,
     };
+  }
+
+  /**
+   * Correct password, no usable account in this portal. Same error as a wrong
+   * password so the response does not confirm the credentials.
+   */
+  private rejectWrongPortal(userId: string, scope: AuthScope, meta?: RequestMeta): never {
+    this.authEventService
+      .emit({
+        userId,
+        type: 'login_failed',
+        scope,
+        failureReason: 'wrong_portal',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+        deviceInfo: meta?.deviceInfo,
+      })
+      .catch(() => {});
+    throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
   }
 
   // ── Private: credential verification ───────────────────

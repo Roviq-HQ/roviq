@@ -26,9 +26,9 @@ Auth failures carry a machine-readable `extensions.code` (see `docs/architecture
 | Code | HTTP | Raised when |
 |------|------|-------------|
 | `UNAUTHENTICATED` | 401 | Access token missing, malformed or expired — the client refreshes and retries |
-| `INVALID_CREDENTIALS` | 401 | Wrong Roviq ID or password, unknown or inactive user |
+| `INVALID_CREDENTIALS` | 401 | Wrong Roviq ID or password, unknown or inactive user, or a correct password with no usable membership in this portal (same response, so it does not confirm the credentials) |
 | `ACCOUNT_LOCKED` | 401 | Too many failed logins for the Roviq ID |
-| `ACCOUNT_NOT_FOUND` | 401 | Credentials are valid but there is no usable membership in this portal |
+| `ACCOUNT_NOT_FOUND` | 401 | Passkey login succeeded but the user has no active institute membership |
 | `ACCOUNT_INACTIVE` | 401 | The user behind a selection/switch token is deleted or not ACTIVE |
 | `SESSION_EXPIRED` | 401 | Refresh or institute-selection token invalid, expired, revoked or reused |
 | `PASSWORD_CHANGED` | 401 | Refresh token predates a password change — full re-login, no re-auth dialog |
@@ -51,18 +51,18 @@ Three separate login mutations, one per portal:
 ### Admin Portal: `adminLogin(username, password)`
 1. Verifies credentials
 2. Looks up `platform_memberships` for user
-3. No membership → `ACCOUNT_NOT_FOUND` ("No account found")
+3. No active membership → `INVALID_CREDENTIALS`, identical to a wrong password. A `login_failed` auth event with `failureReason: wrong_portal` records the real cause
 4. Issues scope=platform access token (5min TTL) + refresh token
 
 ### Reseller Portal: `resellerLogin(username, password)`
 1. Verifies credentials
 2. Looks up `reseller_memberships` for user
-3. Checks reseller is active (`is_active = true`, `status = 'active'`)
+3. Checks reseller is active (`is_active = true`, `status = 'active'`). No membership or an inactive reseller → `INVALID_CREDENTIALS`, as above
 4. Issues scope=reseller access token (10min TTL) + refresh token
 
 ### Institute Portal: `instituteLogin(username, password)`
 1. Verifies credentials
-2. Looks up active `memberships` (institute-scoped) for user
+2. Looks up active `memberships` (institute-scoped) for user. None → `INVALID_CREDENTIALS`, as above
 3. **Single membership:** issues scope=institute access token (15min TTL) + refresh token
 4. **Multiple memberships:** returns `requiresInstituteSelection: true` + membership list for picker
 5. User calls `selectInstitute(membershipId)` → issues scoped tokens
@@ -122,6 +122,7 @@ A missing, malformed, unknown, expired or reused ticket closes the socket with c
 
 ## Session Management
 
+- `logout(currentRefreshToken)` — ends only the session of that refresh token (reason `user_initiated`); other devices stay signed in. Succeeds if the session is already gone, rejects a token of another user with `SESSION_EXPIRED`, and is refused during impersonation. The access token stays valid until it expires.
 - `mySessions` query — returns active refresh tokens with device_info, ip, last_used_at
 - `revokeSession(sessionId)` — revoke a specific session (reason `user_initiated`)
 - `revokeAllOtherSessions` — revoke every refresh token for the user EXCEPT the caller's current one (reason `user_initiated`). The caller keeps working on the same token; crucially, the `user_initiated` reason means a stale client replaying one of the killed tokens will hit `Refresh token revoked` without triggering the rotation-reuse cascade (see [Token Refresh](#token-refresh)), so the caller's keep-alive session is not collaterally killed.

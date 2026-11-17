@@ -130,8 +130,30 @@ describe('Security Invariant E2E Tests', () => {
     });
   });
 
-  // ── 12. Wrong portal returns "No account found" ─────────────────────
-  describe('12 — Wrong portal returns "No account found"', () => {
+  // ── 12. Wrong portal is indistinguishable from a wrong password ─────
+  describe('12 — Wrong portal is indistinguishable from a wrong password', () => {
+    const LOGIN_MUTATIONS = {
+      adminLogin: `mutation AdminLogin($username: String!, $password: String!) {
+        adminLogin(username: $username, password: $password) { accessToken }
+      }`,
+      resellerLogin: `mutation ResellerLogin($username: String!, $password: String!) {
+        resellerLogin(username: $username, password: $password) { accessToken }
+      }`,
+      instituteLogin: `mutation InstituteLogin($username: String!, $password: String!) {
+        instituteLogin(username: $username, password: $password) { accessToken }
+      }`,
+    };
+
+    async function loginFailure(
+      mutation: keyof typeof LOGIN_MUTATIONS,
+      username: string,
+      password: string,
+    ) {
+      const res = await gql(LOGIN_MUTATIONS[mutation], { username, password });
+      assert(res.errors);
+      return { message: res.errors[0].message, code: res.errors[0].extensions?.code };
+    }
+
     it('instituteLogin with admin credentials should work (admin has institute memberships)', async () => {
       const res = await gql<{ instituteLogin: InstituteLoginResult }>(
         `mutation InstituteLogin($username: String!, $password: String!) {
@@ -155,38 +177,18 @@ describe('Security Invariant E2E Tests', () => {
       ).toBe(true);
     });
 
-    it('resellerLogin with teacher credentials should fail with "No account found"', async () => {
-      const res = await gql<{ resellerLogin: AuthPayload }>(
-        `mutation ResellerLogin($username: String!, $password: String!) {
-          resellerLogin(username: $username, password: $password) {
-            accessToken
-          }
-        }`,
-        { username: E2E_USERS.TEACHER.username, password: E2E_USERS.TEACHER.password },
-      );
+    it.each([
+      ['resellerLogin', E2E_USERS.TEACHER],
+      ['adminLogin', E2E_USERS.TEACHER],
+      ['instituteLogin', E2E_USERS.RESELLER],
+    ] as const)('%s with valid credentials of another portal fails exactly like a wrong password', async (mutation, user) => {
+      // Wrong password first: the correct password that follows resets the
+      // lockout counter of this shared seed user.
+      const wrongPassword = await loginFailure(mutation, user.username, randomUUID());
+      const wrongPortal = await loginFailure(mutation, user.username, user.password);
 
-      expect(res.errors).toBeDefined();
-      assert(res.errors);
-      expect(res.errors[0].message).toMatch(
-        /No account found|Invalid credentials|No reseller membership/i,
-      );
-    });
-
-    it('adminLogin with teacher credentials should fail with "No account found"', async () => {
-      const res = await gql<{ adminLogin: AuthPayload }>(
-        `mutation AdminLogin($username: String!, $password: String!) {
-          adminLogin(username: $username, password: $password) {
-            accessToken
-          }
-        }`,
-        { username: E2E_USERS.TEACHER.username, password: E2E_USERS.TEACHER.password },
-      );
-
-      expect(res.errors).toBeDefined();
-      assert(res.errors);
-      expect(res.errors[0].message).toMatch(
-        /No account found|Invalid credentials|No platform membership/i,
-      );
+      expect(wrongPortal).toEqual({ message: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+      expect(wrongPortal).toEqual(wrongPassword);
     });
   });
 
@@ -230,6 +232,65 @@ describe('Security Invariant E2E Tests', () => {
       expect(second.errors).toBeDefined();
       assert(second.errors);
       expect(second.errors[0].message).toMatch(/expired or already used|invalid|unauthor/i);
+    });
+  });
+
+  // ── 14b. An impersonation token cannot touch the target's sessions ──
+  describe("14b — Impersonation token cannot end or replace the target's sessions", () => {
+    it('logout and switchInstitute are forbidden, the target stays signed in, subscriptions connect', async () => {
+      const teacher = await loginAsTeacher();
+      const { accessToken: adminToken } = await loginAsPlatformAdmin();
+
+      const startRes = await gql<{ adminStartImpersonation: StartImpersonationResult }>(
+        `mutation AdminStartImpersonation($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
+          adminStartImpersonation(
+            targetUserId: $targetUserId,
+            targetTenantId: $targetTenantId,
+            reason: $reason
+          ) { code }
+        }`,
+        {
+          targetUserId: SEED_IDS.USER_TEACHER,
+          targetTenantId: SEED_IDS.INSTITUTE_1,
+          reason: 'security invariant test — impersonation cannot manage target sessions',
+        },
+        adminToken,
+      );
+      expect(startRes.errors).toBeUndefined();
+      const code = startRes.data?.adminStartImpersonation.code;
+      assert(code);
+
+      const exchange = await gql<{ exchangeImpersonationCode: ImpersonationAuthPayload }>(
+        `mutation($code: String!) { exchangeImpersonationCode(code: $code) { accessToken } }`,
+        { code },
+      );
+      expect(exchange.errors).toBeUndefined();
+      const impersonationToken = exchange.data?.exchangeImpersonationCode.accessToken;
+      assert(impersonationToken);
+
+      const logoutRes = await gql(
+        `mutation Logout($currentRefreshToken: String!) { logout(currentRefreshToken: $currentRefreshToken) }`,
+        { currentRefreshToken: teacher.refreshToken },
+        impersonationToken,
+      );
+      expect(logoutRes.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+
+      const switchRes = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: teacher.refreshToken },
+        impersonationToken,
+      );
+      expect(switchRes.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(switchRes.data).toBeNull();
+
+      const refreshRes = await gql<{ refreshToken: AuthPayload }>(REFRESH_MUTATION, {
+        token: teacher.refreshToken,
+      });
+      expect(refreshRes.errors).toBeUndefined();
+      expect(refreshRes.data?.refreshToken.accessToken).toBeTruthy();
+
+      const ticket = await exchangeWsTicket(impersonationToken);
+      expect(await connectWithParams({ ticket })).toEqual({ acknowledged: true });
     });
   });
 

@@ -282,13 +282,16 @@ describe('AuthProvider — logout', () => {
     localStorage.setItem('roviq-institute-refresh-token', 'rt');
     localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
 
-    const { result } = renderUseAuth();
+    const props = makeDefaultProps();
+    const { result } = renderUseAuth(props);
     await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
 
     await act(async () => {
       await result.current.logout();
     });
 
+    expect(props.logoutMutation).toHaveBeenCalledTimes(1);
+    expect(props.logoutMutation).toHaveBeenCalledWith(accessToken, 'rt');
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBeNull();
     expect(result.current.memberships).toBeNull();
@@ -297,6 +300,7 @@ describe('AuthProvider — logout', () => {
   it('completes logout even when logoutMutation throws', async () => {
     const accessToken = makeJwt(FUTURE);
     sessionStorage.setItem('roviq-institute-access-token', accessToken);
+    localStorage.setItem('roviq-institute-refresh-token', 'rt');
     localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
 
     const props = makeDefaultProps();
@@ -310,6 +314,7 @@ describe('AuthProvider — logout', () => {
     });
 
     // State is still cleared even if the server call fails
+    expect(props.logoutMutation).toHaveBeenCalledWith(accessToken, 'rt');
     expect(result.current.isAuthenticated).toBe(false);
   });
 });

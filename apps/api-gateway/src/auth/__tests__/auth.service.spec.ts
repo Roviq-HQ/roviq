@@ -381,15 +381,25 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw when user has no active memberships', async () => {
+    it('should answer a correct password with no institute membership like a wrong password', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
 
       const failure = await expectBusinessError(
-        authService.instituteLogin('admin', 'correct-password'),
-        ErrorCode.ACCOUNT_NOT_FOUND,
+        authService.instituteLogin('admin', 'correct-password', { ip: '10.0.0.1' }),
+        ErrorCode.INVALID_CREDENTIALS,
       );
-      expect(failure.message).toBe('No account found');
+      expect(failure.message).toBe('Invalid credentials');
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'login_failed',
+        scope: 'institute',
+        failureReason: 'wrong_portal',
+        ip: '10.0.0.1',
+        userAgent: undefined,
+        deviceInfo: undefined,
+      });
     });
 
     it('should use the same error message for user-not-found and wrong-password', async () => {
@@ -468,15 +478,57 @@ describe('AuthService', () => {
       expect(result.user?.scope).toBe('platform');
     });
 
-    it('should throw when user has no platform membership', async () => {
+    it('should answer a correct password with no platform membership like a wrong password', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockPlatformMembershipRepo.findByUserId.mockResolvedValue(null);
 
       const failure = await expectBusinessError(
         authService.adminLogin('platformadmin', 'correct-password'),
-        ErrorCode.ACCOUNT_NOT_FOUND,
+        ErrorCode.INVALID_CREDENTIALS,
       );
-      expect(failure.message).toBe('No account found');
+      expect(failure.message).toBe('Invalid credentials');
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should answer an inactive platform membership like a wrong password', async () => {
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockPlatformMembershipRepo.findByUserId.mockResolvedValue({
+        ...mockPlatformMembership,
+        isActive: false,
+      });
+
+      const failure = await expectBusinessError(
+        authService.adminLogin('platformadmin', 'correct-password'),
+        ErrorCode.INVALID_CREDENTIALS,
+      );
+      expect(failure.message).toBe('Invalid credentials');
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should answer a reseller login with no reseller membership like a wrong password', async () => {
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockResellerMembershipRepo.findByUserId.mockResolvedValue([]);
+
+      const failure = await expectBusinessError(
+        authService.resellerLogin('platformadmin', 'correct-password'),
+        ErrorCode.INVALID_CREDENTIALS,
+      );
+      expect(failure.message).toBe('Invalid credentials');
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should answer a reseller login for a suspended reseller like a wrong password', async () => {
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockResellerMembershipRepo.findByUserId.mockResolvedValue([
+        resellerMembership('reseller-membership-1', 'reseller-1', ResellerStatus.SUSPENDED),
+      ]);
+
+      const failure = await expectBusinessError(
+        authService.resellerLogin('platformadmin', 'correct-password'),
+        ErrorCode.INVALID_CREDENTIALS,
+      );
+      expect(failure.message).toBe('Invalid credentials');
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
     });
 
     it('should reject invalid password', async () => {
@@ -1425,35 +1477,77 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should revoke specific refresh token when ID provided', async () => {
-      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
+    const tokenHash = createHash('sha256').update(REFRESH_TOKEN).digest('hex');
 
-      await authService.logout('user-1', 'token-id-1');
+    it('should revoke only the session of the presented refresh token', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'token-id-1', userId: 'user-1' });
 
-      // Logout is a user action, not a rotation — reason must NOT be
-      // `'rotation'` or a later refresh with the old token would trigger
-      // the reuse-cascade and kill every other session.
+      await authService.logout(instituteCaller, REFRESH_TOKEN);
+
+      expect(mockRefreshTokenRepo.findByHash).toHaveBeenCalledWith(tokenHash);
+      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(1);
+      // Not `rotation`: replaying the token later must not trigger the reuse cascade.
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith('token-id-1', 'user_initiated');
+      expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
-    it('should revoke all user tokens when no token ID provided', async () => {
-      mockRefreshTokenRepo.revokeAllForUser.mockResolvedValue(undefined);
+    it('should record the logout with the caller scope and request metadata', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'token-id-1', userId: 'user-1' });
 
-      await authService.logout('user-1');
+      await authService.logout(instituteCaller, REFRESH_TOKEN, {
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: 'laptop',
+      });
 
-      expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith(
-        'user-1',
-        'user_initiated',
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'logout',
+        scope: 'institute',
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: 'laptop',
+      });
+    });
+
+    it('should succeed without revoking when the session is already gone', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue(null);
+
+      await authService.logout(instituteCaller, REFRESH_TOKEN);
+
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('should reject a refresh token that belongs to another user', async () => {
+      mockRefreshTokenRepo.findByHash.mockResolvedValue({ id: 'foreign', userId: 'other-user' });
+
+      await expectBusinessError(
+        authService.logout(instituteCaller, REFRESH_TOKEN),
+        ErrorCode.SESSION_EXPIRED,
       );
+
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      expect(mockAuthEventService.emit).not.toHaveBeenCalled();
     });
 
-    it('should not throw when called twice with same token ID', async () => {
-      mockRefreshTokenRepo.revoke.mockResolvedValue(undefined);
+    it('should refuse to log out the impersonated account', async () => {
+      await expectBusinessError(
+        authService.logout(
+          {
+            ...instituteCaller,
+            isImpersonated: true,
+            impersonatorId: 'admin-1',
+            impersonationSessionId: 'session-1',
+          },
+          REFRESH_TOKEN,
+        ),
+        ErrorCode.FORBIDDEN,
+      );
 
-      await authService.logout('user-1', 'token-id-1');
-      await authService.logout('user-1', 'token-id-1');
-
-      expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledTimes(2);
+      expect(mockRefreshTokenRepo.findByHash).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.revoke).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
   });
 

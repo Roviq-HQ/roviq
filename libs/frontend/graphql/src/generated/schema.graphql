@@ -3719,7 +3719,10 @@ type Mutation {
   """Link a guardian to a student"""
   linkGuardianToStudent(input: LinkGuardianInput!): GuardianLinkModel!
   lockExam(id: ID!): ExamModel!
-  logout: Boolean!
+  logout(
+    """Refresh token of the session to end. Other sessions stay signed in."""
+    currentRefreshToken: String!
+  ): Boolean!
 
   """
   Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true`, and ATTENDANCE_OVERRIDE_FORBIDDEN unless the caller may `update` AttendanceOverride for the section. Overrides are audited.
