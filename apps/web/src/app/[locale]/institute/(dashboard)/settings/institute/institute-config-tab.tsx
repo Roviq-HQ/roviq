@@ -24,6 +24,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { ShiftsBuilder } from './components/shifts-builder';
 import { TermStructureBuilder } from './components/term-structure-builder';
+import { InstituteLanguages } from './institute-languages';
 import { type InstituteConfigFormValues, instituteConfigSchema } from './schemas';
 import type { MyInstituteData } from './types';
 import { useUpdateInstituteConfig } from './use-institute-settings';
@@ -129,6 +130,7 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
     <Can I="update_config" a="Institute" passThrough>
       {(allowed: boolean) => (
         <div className="space-y-6">
+          {institute && <InstituteLanguages institute={institute} />}
           <Card>
             <CardHeader>
               <CardTitle>{tc('title')}</CardTitle>

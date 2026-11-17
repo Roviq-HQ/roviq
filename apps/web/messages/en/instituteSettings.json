@@ -187,8 +187,8 @@
     "attendanceType": "Attendance Type",
     "attendanceTypeDescription": "How attendance is recorded — once per day or per lecture/period.",
     "attendanceOptions": {
-      "daily": "Daily",
-      "lecture_wise": "Lecture-wise"
+      "DAILY": "Daily",
+      "LECTURE_WISE": "Lecture-wise"
     },
     "operatingHours": "Operating Hours",
     "operatingHoursDescription": "Institute opening and closing times.",
@@ -238,5 +238,16 @@
       "shiftsTitle": "Shifts",
       "shiftsBody": "If your institute runs morning and afternoon shifts (common in urban government and aided schools), define each shift separately so timetables, fees, and attendance are scoped to the correct shift. Each student is assigned to exactly one shift per academic year."
     }
+  },
+  "languages": {
+    "title": "Content languages",
+    "description": "English is always required. Names also require a translation in the default language. Changing languages preserves existing translations. Interface language is set in your account.",
+    "defaultLanguage": "Default content language",
+    "save": "Save Changes",
+    "saving": "Saving…",
+    "saved": "Content languages saved",
+    "saveFailed": "Could not save content languages",
+    "loadFailed": "Could not load institute languages",
+    "retry": "Retry"
   }
 }

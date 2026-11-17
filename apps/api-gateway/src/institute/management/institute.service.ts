@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BusinessException, ErrorCode, INSTITUTE_STATE_MACHINE } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  INSTITUTE_STATE_MACHINE,
+  validInstituteLocales,
+} from '@roviq/common-types';
 import { instituteContactSchema } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
@@ -9,6 +14,7 @@ import type { InstituteFilterInput } from './dto/institute-filter.input';
 import type { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
 import type { UpdateInstituteConfigInput } from './dto/update-institute-config.input';
 import type { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
+import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.input';
 import { InstituteRepository } from './repositories/institute.repository';
 import type { InstituteRecord, UpdateInstituteConfigData } from './repositories/types';
 import { InstituteSetupService } from './seed/institute-setup.service';
@@ -130,6 +136,29 @@ export class InstituteService {
       instituteId,
       tenantId: instituteId,
       branding: input,
+    });
+    return record;
+  }
+
+  async updateLocales(id: string, input: UpdateInstituteLocalesInput): Promise<InstituteRecord> {
+    if (!validInstituteLocales(input)) {
+      throw new BusinessException(
+        ErrorCode.INVALID_LOCALE_SETTINGS,
+        'Choose supported languages including English and the default language.',
+      );
+    }
+    const record = await this.instituteRepo.updateLocales(
+      id,
+      {
+        supportedLocales: input.supportedLocales,
+        defaultLocale: input.defaultLocale,
+      },
+      input.version,
+    );
+    this.emitEvent(EVENT_PATTERNS.INSTITUTE.config_updated, {
+      instituteId: id,
+      tenantId: id,
+      changedFields: ['supportedLocales', 'defaultLocale'],
     });
     return record;
   }

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { i18nTextOptionalSchema, i18nTextSchema } from '../i18n-text-schema';
+import {
+  buildI18nTextOptionalSchema,
+  buildI18nTextSchema,
+  i18nTextOptionalSchema,
+  i18nTextSchema,
+} from '../i18n-text-schema';
 
 describe('i18nTextSchema', () => {
   it('accepts valid English-only input', () => {
@@ -79,5 +84,28 @@ describe('i18nTextOptionalSchema', () => {
   it('rejects non-empty input without default locale', () => {
     const result = i18nTextOptionalSchema.safeParse({ hi: 'हिन्दी' });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('institute default locale validation', () => {
+  it('requires both English and the institute default', () => {
+    const schema = buildI18nTextSchema('Required', 'ta');
+    expect(schema.safeParse({ en: 'Science' }).success).toBe(false);
+    expect(schema.safeParse({ ta: 'அறிவியல்' }).success).toBe(false);
+    expect(schema.parse({ en: 'Science', ta: 'அறிவியல்', hi: '' })).toEqual({
+      en: 'Science',
+      ta: 'அறிவியல்',
+    });
+  });
+  it('attaches missing default errors to the corresponding input', () => {
+    const result = buildI18nTextSchema('Required', 'ta').safeParse({ en: 'Science' });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.map((issue) => issue.path)).toEqual([['ta']]);
+  });
+  it('keeps blank optional fields optional and validates nonempty fields', () => {
+    const schema = buildI18nTextOptionalSchema('ta');
+    expect(schema.parse({ en: '', ta: '' })).toBeUndefined();
+    expect(schema.safeParse({ en: 'Kumar' }).success).toBe(false);
+    expect(schema.parse({ en: 'Kumar', ta: 'குமார்' })).toEqual({ en: 'Kumar', ta: 'குமார்' });
   });
 });

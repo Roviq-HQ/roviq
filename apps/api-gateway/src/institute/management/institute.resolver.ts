@@ -13,6 +13,7 @@ import { InstituteFilterInput } from './dto/institute-filter.input';
 import { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
 import { UpdateInstituteConfigInput } from './dto/update-institute-config.input';
 import { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
+import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.input';
 import { InstituteService } from './institute.service';
 import { InstituteModel } from './models/institute.model';
 import { InstituteConnection } from './models/institute-connection.model';
@@ -67,6 +68,16 @@ export class InstituteResolver {
   ) {
     assertTenantContext(user);
     return this.instituteService.updateBranding(user.tenantId, input);
+  }
+
+  @Mutation(() => InstituteModel)
+  @CheckAbility('update_config', 'Institute')
+  async updateInstituteLocales(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: UpdateInstituteLocalesInput,
+  ) {
+    assertTenantContext(user);
+    return this.instituteService.updateLocales(user.tenantId, input);
   }
 
   @Mutation(() => InstituteModel)

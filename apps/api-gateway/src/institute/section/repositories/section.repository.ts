@@ -1,6 +1,7 @@
 import type { CreateSectionData, SectionRecord, UpdateSectionData } from './types';
 
 export abstract class SectionRepository {
+  abstract searchByName(query: string): Promise<SectionRecord[]>;
   abstract findById(id: string): Promise<SectionRecord | null>;
   abstract findByStandard(standardId: string): Promise<SectionRecord[]>;
   abstract findByAcademicYear(academicYearId: string): Promise<SectionRecord[]>;

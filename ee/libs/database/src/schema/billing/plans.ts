@@ -52,6 +52,8 @@ export const plans = pgTable(
     ...entityColumns,
   },
   (table) => [
+    index('idx_plans_name_gin').using('gin', table.name),
+    index('idx_plans_name_trgm').using('gin', sql`i18n_text_to_string(${table.name}) gin_trgm_ops`),
     index('plans_reseller_id_idx').on(table.resellerId),
     index('plans_status_idx').on(table.status),
     // Reseller: read own plans. Soft-delete visibility lives in `plansLive`,

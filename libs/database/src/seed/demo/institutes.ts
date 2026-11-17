@@ -63,7 +63,8 @@ export async function seedInstitutes(tx: DrizzleDB) {
         country: 'IN',
         coordinates: { lat: 28.4595, lng: 77.0266 },
       },
-      settings: { supportedLocales: ['en', 'hi'] },
+      supportedLocales: ['en', 'hi'],
+      defaultLocale: 'en',
       ...BY,
     })
     .onConflictDoUpdate({
@@ -109,7 +110,8 @@ export async function seedInstitutes(tx: DrizzleDB) {
         country: 'IN',
         coordinates: { lat: 26.9124, lng: 75.7873 },
       },
-      settings: { supportedLocales: ['en', 'hi'] },
+      supportedLocales: ['en', 'hi'],
+      defaultLocale: 'en',
       ...BY,
     })
     .onConflictDoUpdate({

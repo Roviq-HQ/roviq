@@ -1,5 +1,5 @@
 import { ATTENDANCE_TYPE_VALUES, addressSchema } from '@roviq/common-types';
-import { i18nTextSchema } from '@roviq/i18n';
+import { buildI18nTextSchema } from '@roviq/i18n';
 import { z } from 'zod';
 
 // ── Phone schema (camelCase — matches Drizzle InstitutePhone / GraphQL InstitutePhoneInput) ──
@@ -54,19 +54,20 @@ const contactSchema = z
 
 // ── Institute Info form schema ──
 
-export const instituteInfoSchema = z.object({
-  name: i18nTextSchema,
-  // code is read-only in the UI — included so form state tracks it but never submitted
-  code: z.string().max(50).optional(),
-  contact: contactSchema,
-  // addressSchema uses camelCase (postalCode) — matches Drizzle/GraphQL contract
-  address: addressSchema,
-  timezone: z.string().optional(),
-  currency: z.string().length(3).optional(),
-  version: z.number().int(),
-});
+export const buildInstituteInfoSchema = (defaultLocale: string) =>
+  z.object({
+    name: buildI18nTextSchema('Required', defaultLocale),
+    // code is read-only in the UI — included so form state tracks it but never submitted
+    code: z.string().max(50).optional(),
+    contact: contactSchema,
+    // addressSchema uses camelCase (postalCode) — matches Drizzle/GraphQL contract
+    address: addressSchema,
+    timezone: z.string().optional(),
+    currency: z.string().length(3).optional(),
+    version: z.number().int(),
+  });
 
-export type InstituteInfoFormValues = z.infer<typeof instituteInfoSchema>;
+export type InstituteInfoFormValues = z.infer<ReturnType<typeof buildInstituteInfoSchema>>;
 
 // ── Hex color validation ──
 

@@ -44,6 +44,8 @@ export const roles = pgTable(
     ...entityColumns,
   },
   (table) => [
+    index('idx_roles_name_gin').using('gin', table.name),
+    index('idx_roles_name_trgm').using('gin', sql`i18n_text_to_string(${table.name}) gin_trgm_ops`),
     foreignKey({
       columns: [table.tenantId],
       foreignColumns: [institutes.id],

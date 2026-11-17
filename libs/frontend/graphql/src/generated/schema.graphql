@@ -3011,6 +3011,9 @@ type InstituteModel {
   contact: InstituteContactObject!
   createdAt: DateTime!
   currency: String!
+
+  """Fallback language for institute-authored text; must be enabled."""
+  defaultLocale: String!
   departments: [String!]
   groupId: String
 
@@ -3034,6 +3037,11 @@ type InstituteModel {
   slug: String!
   status: InstituteStatus!
   structureFramework: StructureFramework!
+
+  """
+  Languages enabled for institute-authored text. English is always included.
+  """
+  supportedLocales: [String!]!
   timezone: String!
   type: InstituteType!
   updatedAt: DateTime!
@@ -3834,6 +3842,7 @@ type Mutation {
   updateInstituteConfig(input: UpdateInstituteConfigInput!): InstituteModel!
   updateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
   updateInstituteInfo(id: ID!, input: UpdateInstituteInfoInput!): InstituteModel!
+  updateInstituteLocales(input: UpdateInstituteLocalesInput!): InstituteModel!
 
   """Edit a PENDING leave before it is decided."""
   updateLeave(id: ID!, input: UpdateLeaveInput!): LeaveModel!
@@ -6073,6 +6082,14 @@ input UpdateInstituteInfoInput {
   """
   Current version — used for optimistic concurrency. Fails with ConflictException if stale.
   """
+  version: Int!
+}
+
+input UpdateInstituteLocalesInput {
+  defaultLocale: String!
+  supportedLocales: [String!]!
+
+  """Current institute version for optimistic concurrency."""
   version: Int!
 }
 

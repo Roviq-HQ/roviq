@@ -2,7 +2,13 @@
 
 import { extractGraphQLError } from '@roviq/graphql';
 import type { StreamObject } from '@roviq/graphql/generated';
-import { buildI18nTextSchema, Link as LocaleLink, useI18nField, zodValidator } from '@roviq/i18n';
+import {
+  buildI18nTextSchema,
+  Link as LocaleLink,
+  useI18nField,
+  useInstituteLocales,
+  zodValidator,
+} from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -595,9 +601,12 @@ type SectionFormValues = {
   batchStatus: BatchStatusValue;
 };
 
-function buildSectionSchema(t: ReturnType<typeof useTranslations<'academics'>>) {
+function buildSectionSchema(
+  t: ReturnType<typeof useTranslations<'academics'>>,
+  defaultLocale: string,
+) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.SECTION_NAME_DUPLICATE')),
+    name: buildI18nTextSchema(t('errors.SECTION_NAME_DUPLICATE'), defaultLocale),
     displayLabel: z.string(),
     streamName: z.string(),
     streamCode: z.string(),
@@ -623,7 +632,8 @@ function CreateSectionDialog({
   const [open, setOpen] = React.useState(false);
   const [yearId] = useQueryState('year', parseAsString);
 
-  const schema = React.useMemo(() => buildSectionSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildSectionSchema(t, defaultLocale), [t, defaultLocale]);
 
   const defaults = React.useMemo<SectionFormValues>(
     () => ({

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  i18nNameSearch,
   mkResellerCtx,
   softDelete,
   withReseller,
@@ -17,6 +18,17 @@ export class PlanRepository {
 
   private get userId(): string {
     return getRequestContext().userId;
+  }
+
+  async searchByName(resellerId: string, query: string) {
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:plan'), async (tx) =>
+      tx
+        .select()
+        .from(plansLive)
+        .where(i18nNameSearch(plansLive.name, query))
+        .orderBy(desc(plansLive.createdAt), desc(plansLive.id))
+        .limit(20),
+    );
   }
 
   async findById(resellerId: string, id: string) {

@@ -17,6 +17,7 @@ import {
   Link as LocaleLink,
   useFormatDate,
   useI18nField,
+  useInstituteLocales,
   zodValidator,
 } from '@roviq/i18n';
 import {
@@ -758,10 +759,10 @@ function StudentHeader({ student, onBack }: { student: StudentDetailNode; onBack
  * Built lazily inside the component so the i18n `t()` function can supply
  * translated error messages on the i18nText fields.
  */
-function buildProfileSchema(t: ReturnType<typeof useTranslations>) {
+function buildProfileSchema(t: ReturnType<typeof useTranslations>, defaultLocale: string) {
   return z.object({
-    firstName: buildI18nTextSchema(t('detail.profile.firstNameRequired')),
-    lastName: buildI18nTextSchema(t('detail.profile.lastNameRequired')).optional(),
+    firstName: buildI18nTextSchema(t('detail.profile.firstNameRequired'), defaultLocale),
+    lastName: buildI18nTextSchema(t('detail.profile.lastNameRequired'), defaultLocale).optional(),
     gender: emptyStringToUndefined(z.enum(['MALE', 'FEMALE', 'OTHER']).optional()),
     socialCategory: z.enum(['GENERAL', 'OBC', 'SC', 'ST', 'EWS']),
     bloodGroup: emptyStringToUndefined(z.string().optional()),
@@ -785,7 +786,8 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
   const { format } = useFormatDate();
   const [updateStudent, { loading }] = useUpdateStudent();
 
-  const schema = React.useMemo(() => buildProfileSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildProfileSchema(t, defaultLocale), [t, defaultLocale]);
 
   // Backfill every locale key with `''` so TanStack's `form.Field
   // name="firstName.hi"` always sees a string, matching the I18nField row

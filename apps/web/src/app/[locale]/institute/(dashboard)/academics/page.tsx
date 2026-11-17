@@ -1,7 +1,7 @@
 'use client';
 
 import { extractGraphQLError } from '@roviq/graphql';
-import { buildI18nTextSchema, useI18nField, zodValidator } from '@roviq/i18n';
+import { buildI18nTextSchema, useI18nField, useInstituteLocales, zodValidator } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -76,9 +76,12 @@ const NEP_STAGE_VALUES = ['FOUNDATIONAL', 'PREPARATORY', 'MIDDLE', 'SECONDARY'] 
 type LevelValue = (typeof LEVEL_VALUES)[number];
 type NepStageValue = (typeof NEP_STAGE_VALUES)[number];
 
-function buildStandardSchema(t: ReturnType<typeof useTranslations<'academics'>>) {
+function buildStandardSchema(
+  t: ReturnType<typeof useTranslations<'academics'>>,
+  defaultLocale: string,
+) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.STANDARD_NAME_DUPLICATE')),
+    name: buildI18nTextSchema(t('errors.STANDARD_NAME_DUPLICATE'), defaultLocale),
     numericOrder: z.number().int().min(0),
     level: z.union([z.enum(LEVEL_VALUES), z.literal('')]),
     nepStage: z.union([z.enum(NEP_STAGE_VALUES), z.literal('')]),
@@ -396,7 +399,8 @@ function CreateStandardDialog({ yearId }: { yearId: string }) {
   const { createStandard, loading } = useCreateStandard();
   const [open, setOpen] = React.useState(false);
 
-  const schema = React.useMemo(() => buildStandardSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildStandardSchema(t, defaultLocale), [t, defaultLocale]);
   const levelOptions = buildLevelOptions(t);
   const nepStageOptions = buildNepStageOptions(t);
 
@@ -583,7 +587,8 @@ function EditStandardSheet({
   const t = useTranslations('academics');
   const { updateStandard, loading } = useUpdateStandard();
 
-  const schema = React.useMemo(() => buildStandardSchema(t), [t]);
+  const { defaultLocale } = useInstituteLocales();
+  const schema = React.useMemo(() => buildStandardSchema(t, defaultLocale), [t, defaultLocale]);
   const levelOptions = buildLevelOptions(t);
   const nepStageOptions = buildNepStageOptions(t);
 

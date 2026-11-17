@@ -512,3 +512,18 @@ Use the same environment variable when running Playwright on Ubuntu 26.04 until 
 **Root cause:** The transport tests correctly refused a DLQ with application consumers. Application integration tests boot real NATS consumers on the same `NATS_URL`, so two DLQ cases failed in the full suite despite passing on a standalone broker.
 
 **Fix:** Transport and stream-configuration tests use `NATS_TEST_URL` (default port 4224). Application tests keep `NATS_URL` (port 4222). Compose and the integration infrastructure check provide a separate `nats-test` broker; CI starts and checks both. The DLQ safety check and every integration test remain enabled.
+
+
+## 2026-11-17 — fixed: classic JSX runtime in the i18n library tests
+
+ROV-86 introduced the library's first React context provider. The per-library Nx Vitest configuration uses the classic JSX runtime, while the root DOM project uses the automatic runtime. The provider now uses React's `createElement`, and its regression test does the same, so both supported runners execute the same provider without a missing `React` global. Verified with `pnpm test` and the root unit suite.
+
+
+## 2026-11-17 — fixed: captured E2E sessions overwrote institute switches
+
+The session restore init script replayed the storage-state access token on every navigation. An institute switch rotated the token and user metadata, then a reload restored the old token, leaving authentication scoped to one institute and the stored user scoped to another. ROV-86's current-institute data check correctly refused that mismatch. Both shared init-script entry points now consume captured session values once and preserve any existing current session. Unit regression coverage also proves logout cannot resurrect the captured token. The Playwright institute-language journey verifies switching to another institute and back after a locale change.
+
+
+## 2026-11-17 — fixed: parallel portal language tests shared one user
+
+The platform and institute account-language journeys both authenticated as the seeded admin, whose preferred locale belongs to the user across all scopes. Running both journeys together let one reset the preference while the other checked refresh persistence. The institute setup now captures a separate teacher session for its account-language journey; platform, reseller and institute preference tests use distinct users. The existing institute administrator session remains available for configuration tests. Assertions and parallel execution remain enabled.
