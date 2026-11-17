@@ -130,12 +130,17 @@ async function flushTestRedis(): Promise<void> {
 // True for a new database and for one left half-created by a failed push: no migration
 // baseline (db-reset always writes one) and no users, so there is no data to lose.
 async function needsBootstrap(db: ReturnType<typeof drizzle>): Promise<boolean> {
-  const state = await db.execute<{ baselined: boolean; has_users_table: boolean }>(sql`
-    SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS baselined,
+  const state = await db.execute<{ has_migrations_table: boolean; has_users_table: boolean }>(sql`
+    SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS has_migrations_table,
            to_regclass('public.users') IS NOT NULL AS has_users_table
   `);
   const row = state.rows[0];
-  if (!row || row.baselined) return false;
+  if (!row) return false;
+  if (row.has_migrations_table) {
+    // A failed `drizzle-kit migrate` on a bare database leaves the table behind, empty.
+    const applied = await db.execute(sql`SELECT 1 FROM drizzle.__drizzle_migrations LIMIT 1`);
+    if (applied.rows.length > 0) return false;
+  }
   if (!row.has_users_table) return true;
   const users = await db.execute(sql`SELECT 1 FROM users LIMIT 1`);
   return users.rows.length === 0;

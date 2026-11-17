@@ -573,3 +573,12 @@ This supersedes the note in the 2026-04-17 entry that pre-commit was "intentiona
 
 Still CI-only: the codegen-drift step (needs a running gateway). Still pre-push-only: `check:no-double-cast` and `check:db-drift`.
 
+
+## 2026-11-17 — fixed: `pnpm test:int` failed before any test on a never-bootstrapped `roviq_test`
+
+In a new dev instance (slot 2) `pnpm test:int` stopped in the global setup with `drizzle-kit migrate failed (exit 1) against localhost:5474/roviq_test — its output is above`, and nothing was above: drizzle-kit printed only its spinner. The instance's `roviq_test` had never been set up (0 tables), so the first migration hit missing prereq functions. Each failed attempt also left an empty `drizzle.__drizzle_migrations` table behind, which made `pnpm db:reset --if-empty` report "already set up" because it treated the table's existence as a baseline.
+
+`vitest.integration.global-setup.ts` now runs `pnpm db:reset --test --if-empty` before `drizzle-kit migrate`, the same bootstrap Tilt's `db-push` does for the dev database. `needsBootstrap()` in `scripts/db-reset.ts` now requires at least one row in `drizzle.__drizzle_migrations` before it calls a database baselined. A database that is set up is untouched: the bootstrap is a no-op and migrate runs as before.
+
+**Verification:** in slot 2 the first run bootstrapped and seeded `roviq_test`, then ran the suite; the next run printed `Database is already set up; nothing to bootstrap.` and passed 543 tests.
+
