@@ -68,7 +68,7 @@ Three separate login mutations, one per portal:
 5. User calls `selectInstitute(membershipId)` → issues scoped tokens
 
 ### Institute Switching
-- `switchInstitute(membershipId)` — revokes old refresh token, issues new tokens. No re-auth.
+- `switchInstitute(membershipId, currentRefreshToken)` — institute scope only, refused during impersonation. `currentRefreshToken` must be a live refresh token of the caller; that one row is revoked (reason `user_initiated`) and new tokens are issued. No re-auth. Every check runs before the revoke, so a rejected switch leaves the session usable.
 
 ## JWT Structure
 
@@ -83,6 +83,7 @@ All tokens are `type: 'access'` — no more separate 'platform' type.
 
 ### Token Refresh
 - Refresh token rotation: each use invalidates the old token and issues a new pair (reason `rotation`)
+- Each refresh re-reads the user and the membership named in the token (`membershipId` claim). An inactive user gets `ACCOUNT_INACTIVE`; a missing, inactive or soft-deleted membership, a deleted institute or a suspended reseller gets `SESSION_EXPIRED`. A refresh never moves a session to a different membership. The old token is rotated only after these checks pass, so a rejected refresh does not arm reuse detection.
 - Reason-aware revocation: `refresh_tokens.revoked_reason` records why a row was revoked. Every revocation path tags itself so the reuse-detection cascade can tell a rotation-replay attack from a late client retry. Values:
   - `rotation` — normal rotate-then-reuse signal. Replay triggers the cascade.
   - `user_initiated` — `logout`, `revokeSession`, `revokeAllOtherSessions`, scope switch (`switchInstitute`).
@@ -108,6 +109,16 @@ Applied at resolver class level. Combines `GqlAuthGuard` (JWT validation) + scop
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes
 - Frontend: `<ProtectedRoute>` component redirects to `/login` with return URL
+
+## WebSocket Authentication (ws-ticket, ROV-95)
+
+graphql-ws connections never carry the JWT. The client exchanges its access token for a short-lived ticket and sends only the ticket in `connectionParams`.
+
+1. `GET /api/auth/ws-ticket` with `Authorization: Bearer <access token>` returns `{ ticket }` (a UUID). `issueWsTicket` stores the full `AuthUser` in Redis under `ws-ticket:<uuid>` for 30 seconds.
+2. The client opens the socket with `connectionParams: { ticket }`. `onConnect` in `app.module.ts` calls `consumeWsTicket`, which reads and deletes the key in one `GETDEL`, so a ticket works once even when two sockets race on it.
+3. The user is put on `ctx.extra.user` and copied to `req.user` by the GraphQL `context()` wrapper, so `@CurrentUser()`, scope guards and CASL work as on HTTP.
+
+A missing, malformed, unknown, expired or reused ticket closes the socket with code 4403. The stored user is validated on the way in and out (`ws-ticket.store.ts`) and keeps `isImpersonated`, `impersonationSessionId` and `mustChangePassword`, which `ImpersonationSessionGuard` and `MustChangePasswordGuard` read on the subscription path. On reconnect the frontend (`libs/frontend/graphql/src/lib/client.ts`) fetches a new ticket.
 
 ## Session Management
 

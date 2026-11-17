@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
 import type {
   AuthPayload,
   ImpersonationAuthPayload,
@@ -8,8 +9,9 @@ import type {
 import { describe, expect, it } from 'vitest';
 import { E2E_USERS, SEED_IDS } from '../../shared/seed-fixtures';
 import { E2eMeDocument } from './__generated__/graphql';
-import { loginAsPlatformAdmin, loginAsTeacher } from './helpers/auth';
+import { loginAsInstituteAdmin, loginAsPlatformAdmin, loginAsTeacher } from './helpers/auth';
 import { gql } from './helpers/gql-client';
+import { connectWithParams, exchangeWsTicket } from './helpers/ws-client';
 
 // Strip only the trailing `/graphql` so the NestJS global prefix (`/api`)
 // stays intact — `POST /api/graphql` (GraphQL) vs `GET /api/auth/ws-ticket`
@@ -18,6 +20,17 @@ import { gql } from './helpers/gql-client';
 const API_BASE_URL = (
   process.env.API_URL || `http://localhost:${process.env.E2E_API_PORT ?? '3004'}/api/graphql`
 ).replace(/\/graphql$/, '');
+
+const REFRESH_MUTATION = `mutation Refresh($token: String!) {
+  refreshToken(token: $token) { accessToken refreshToken }
+}`;
+
+const SWITCH_MUTATION = `mutation SwitchInstitute($membershipId: String!, $currentRefreshToken: String!) {
+  switchInstitute(membershipId: $membershipId, currentRefreshToken: $currentRefreshToken) {
+    accessToken
+    refreshToken
+  }
+}`;
 
 describe('Security Invariant E2E Tests', () => {
   // ── 7. Impersonation token cannot be refreshed ──────────────────────
@@ -320,9 +333,68 @@ describe('Security Invariant E2E Tests', () => {
       assert(switchedUser);
       expect(switchedUser.tenantId).toBe(secondMembership.tenantId);
 
-      // Note: switchInstitute currently does NOT revoke the old refresh token
-      // (currentRefreshTokenId is passed as undefined from the resolver).
-      // When that is wired up, add a test here to verify the old refresh token is rejected.
+      // The session that was switched away from is revoked.
+      const staleRefresh = await gql(REFRESH_MUTATION, { token: firstRefreshToken });
+      expect(staleRefresh.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+
+      // Revoked as a deliberate switch, not a rotation: replaying the old
+      // token must not cascade onto the new session.
+      const freshRefresh = await gql<{ refreshToken: AuthPayload }>(REFRESH_MUTATION, {
+        token: newRefreshToken,
+      });
+      expect(freshRefresh.errors).toBeUndefined();
+      expect(freshRefresh.data?.refreshToken.accessToken).toBeTruthy();
+    });
+
+    it('a rejected switch keeps the current session usable', async () => {
+      const { accessToken, refreshToken } = await loginAsInstituteAdmin();
+
+      const switchRes = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: refreshToken },
+        accessToken,
+      );
+      expect(switchRes.errors?.[0]?.extensions?.code).toBe('NO_ACTIVE_MEMBERSHIP');
+
+      const refreshRes = await gql<{ refreshToken: AuthPayload }>(REFRESH_MUTATION, {
+        token: refreshToken,
+      });
+      expect(refreshRes.errors).toBeUndefined();
+      expect(refreshRes.data?.refreshToken.accessToken).toBeTruthy();
+    });
+
+    it('rejects a switch that does not present a live refresh token of the caller', async () => {
+      const { accessToken } = await loginAsInstituteAdmin();
+      const { refreshToken: teacherRefreshToken } = await loginAsTeacher();
+
+      const unknown = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: 'not-a-refresh-token' },
+        accessToken,
+      );
+      expect(unknown.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+      expect(unknown.data).toBeNull();
+
+      const foreign = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: teacherRefreshToken },
+        accessToken,
+      );
+      expect(foreign.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+      expect(foreign.data).toBeNull();
+    });
+
+    it('rejects switchInstitute from a platform-scope token', async () => {
+      const { accessToken, refreshToken } = await loginAsPlatformAdmin();
+
+      const res = await gql(
+        SWITCH_MUTATION,
+        { membershipId: randomUUID(), currentRefreshToken: refreshToken },
+        accessToken,
+      );
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+      expect(res.data).toBeNull();
     });
   });
 
@@ -401,6 +473,56 @@ describe('Security Invariant E2E Tests', () => {
 
       // Each request must mint a distinct single-use ticket
       expect(body2.ticket).not.toBe(body1.ticket);
+    });
+
+    // graphql-ws closes with 4403 when onConnect refuses the connection.
+    const REJECTED = { acknowledged: false, closeCode: 4403 };
+
+    it('acknowledges a connection that presents a fresh ticket', async () => {
+      const { accessToken } = await loginAsTeacher();
+      const ticket = await exchangeWsTicket(accessToken);
+
+      expect(await connectWithParams({ ticket })).toEqual({ acknowledged: true });
+    });
+
+    it('rejects a ticket that was already used', async () => {
+      const { accessToken } = await loginAsTeacher();
+      const ticket = await exchangeWsTicket(accessToken);
+      expect(await connectWithParams({ ticket })).toEqual({ acknowledged: true });
+
+      expect(await connectWithParams({ ticket })).toEqual(REJECTED);
+    });
+
+    it('lets only one of two connections racing on the same ticket through', async () => {
+      const { accessToken } = await loginAsTeacher();
+      const ticket = await exchangeWsTicket(accessToken);
+
+      const outcomes = await Promise.all([
+        connectWithParams({ ticket }),
+        connectWithParams({ ticket }),
+      ]);
+
+      expect(outcomes.filter((outcome) => outcome.acknowledged)).toHaveLength(1);
+      expect(outcomes).toContainEqual(REJECTED);
+    });
+
+    it('rejects a connection without a ticket', async () => {
+      expect(await connectWithParams({})).toEqual(REJECTED);
+    });
+
+    it('rejects a ticket that was never issued', async () => {
+      expect(await connectWithParams({ ticket: randomUUID() })).toEqual(REJECTED);
+    });
+
+    it('rejects a malformed ticket', async () => {
+      expect(await connectWithParams({ ticket: 'not-a-ticket' })).toEqual(REJECTED);
+    });
+
+    it('rejects a raw access token sent in place of a ticket', async () => {
+      const { accessToken } = await loginAsTeacher();
+
+      expect(await connectWithParams({ ticket: accessToken })).toEqual(REJECTED);
+      expect(await connectWithParams({ Authorization: `Bearer ${accessToken}` })).toEqual(REJECTED);
     });
   });
 
