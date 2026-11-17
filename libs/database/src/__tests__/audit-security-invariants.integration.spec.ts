@@ -1,5 +1,5 @@
 /**
- * Audit logging security invariant tests (ROV-103).
+ * Audit logging security invariant tests (ROV-103, ROV-64).
  *
  * These tests run against a real PostgreSQL instance with actual roles,
  * GRANTs, RLS policies, and CHECK constraints. They verify every audit
@@ -53,54 +53,6 @@ async function asRole(
   }
 }
 
-/**
- * Seed audit test data via superuser (bypasses all RLS).
- * Wrapped in a SAVEPOINT so it can be rolled back after use.
- */
-async function seedAuditData(client: pg.PoolClient, rows: AuditSeedRow[]): Promise<void> {
-  for (const r of rows) {
-    await client.query(
-      `INSERT INTO audit_logs
-        (id, scope, tenant_id, reseller_id, user_id, actor_id,
-         impersonator_id, impersonation_session_id,
-         action, action_type, entity_type, entity_id,
-         correlation_id, source, created_at)
-      VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())`,
-      [
-        r.id ?? crypto.randomUUID(),
-        r.scope,
-        r.tenantId ?? null,
-        r.resellerId ?? null,
-        r.userId ?? SEED.USER_ADMIN,
-        r.impersonatorId ?? null,
-        r.impersonationSessionId ?? null,
-        r.action ?? 'testAction',
-        r.actionType ?? 'CREATE',
-        r.entityType ?? 'TestEntity',
-        r.entityId ?? null,
-        r.correlationId ?? crypto.randomUUID(),
-        r.source ?? 'TEST',
-      ],
-    );
-  }
-}
-
-interface AuditSeedRow {
-  id?: string;
-  scope: 'platform' | 'reseller' | 'institute';
-  tenantId?: string | null;
-  resellerId?: string | null;
-  userId?: string;
-  impersonatorId?: string | null;
-  impersonationSessionId?: string | null;
-  action?: string;
-  actionType?: string;
-  entityType?: string;
-  entityId?: string | null;
-  correlationId?: string;
-  source?: string;
-}
-
 beforeAll(async () => {
   poolerPool = new pg.Pool({ connectionString: POOLER_URL, max: 5 });
   superPool = new pg.Pool({ connectionString: SUPERUSER_URL, max: 2 });
@@ -121,15 +73,6 @@ afterAll(async () => {
 
 describe('Invariant 1: roviq_app RLS scope filtering', () => {
   it('roviq_app cannot read platform-scoped audit entries', async () => {
-    await asRole('roviq_admin', {}, async (adminClient) => {
-      // Seed platform-scoped entry as admin
-      await seedAuditData(adminClient, [{ scope: 'platform', action: 'inv1_platform' }]);
-
-      // Now check as roviq_app — should not see it
-      await adminClient.query('ROLLBACK');
-      // Need a fresh transaction since we rolled back
-    });
-
     // Seed via superuser so data persists for the app role check
     const superClient = await superPool.connect();
     const correlationId = crypto.randomUUID();
@@ -479,6 +422,302 @@ describe('Invariant 10: Masked fields in changes JSONB', () => {
       const rawJson = JSON.stringify(changes);
       expect(rawJson).not.toContain('secret');
       expect(rawJson).not.toContain('1234-5678');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-64: scoped visibility per role (positive + negative)
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-64: scoped visibility per role', () => {
+  const correlationId = crypto.randomUUID();
+  const otherReseller = crypto.randomUUID();
+
+  async function visibleRows(
+    role: string,
+    vars: Record<string, string>,
+  ): Promise<Array<{ scope: string; tenant_id: string | null; reseller_id: string | null }>> {
+    let rows: Array<{ scope: string; tenant_id: string | null; reseller_id: string | null }> = [];
+    await asRole(role, vars, async (client) => {
+      const res = await client.query(
+        `SELECT scope, tenant_id, reseller_id FROM audit_logs
+         WHERE correlation_id = $1 ORDER BY scope, tenant_id, reseller_id`,
+        [correlationId],
+      );
+      rows = res.rows;
+    });
+    return rows;
+  }
+
+  beforeAll(async () => {
+    await superPool.query(
+      `INSERT INTO resellers (id, name, slug, status) VALUES ($1, 'ROV-64 Other Reseller', $2, '${ResellerStatus.ACTIVE}')`,
+      [otherReseller, `rov-64-other-${otherReseller.slice(0, 8)}`],
+    );
+    const rows: Array<[string, string | null, string | null]> = [
+      ['institute', SEED.INSTITUTE_1, null],
+      ['institute', SEED.INSTITUTE_2, null],
+      ['reseller', null, SEED.RESELLER_DIRECT],
+      ['reseller', null, otherReseller],
+      ['platform', null, null],
+    ];
+    for (const [scope, tenantId, resellerId] of rows) {
+      await superPool.query(
+        `INSERT INTO audit_logs
+          (scope, tenant_id, reseller_id, user_id, actor_id, action, action_type, entity_type, correlation_id, source)
+        VALUES ($1, $2, $3, $4, $4, 'rov64_visibility', 'CREATE', 'Test', $5, 'TEST')`,
+        [scope, tenantId, resellerId, SEED.USER_ADMIN, correlationId],
+      );
+    }
+  });
+
+  afterAll(async () => {
+    await superPool.query(`DELETE FROM audit_logs WHERE correlation_id = $1`, [correlationId]);
+    await superPool.query(`DELETE FROM resellers WHERE id = $1`, [otherReseller]);
+  });
+
+  it('roviq_app sees only institute-scoped rows of its own tenant', async () => {
+    const rows = await visibleRows('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 });
+    expect(rows).toEqual([{ scope: 'institute', tenant_id: SEED.INSTITUTE_1, reseller_id: null }]);
+  });
+
+  it('roviq_reseller sees its institutes plus its own reseller entries', async () => {
+    const rows = await visibleRows('roviq_reseller', {
+      'app.current_reseller_id': SEED.RESELLER_DIRECT,
+    });
+    expect(rows).toEqual([
+      { scope: 'institute', tenant_id: SEED.INSTITUTE_1, reseller_id: null },
+      { scope: 'institute', tenant_id: SEED.INSTITUTE_2, reseller_id: null },
+      { scope: 'reseller', tenant_id: null, reseller_id: SEED.RESELLER_DIRECT },
+    ]);
+  });
+
+  it('a reseller with no institutes sees only its own reseller entries', async () => {
+    const rows = await visibleRows('roviq_reseller', { 'app.current_reseller_id': otherReseller });
+    expect(rows).toEqual([{ scope: 'reseller', tenant_id: null, reseller_id: otherReseller }]);
+  });
+
+  it('roviq_admin sees entries of every scope', async () => {
+    const rows = await visibleRows('roviq_admin', {});
+    expect(rows.map((r) => r.scope)).toEqual([
+      'institute',
+      'institute',
+      'platform',
+      'reseller',
+      'reseller',
+    ]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-64: partition children are not a side door
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-64: partition children are sealed', () => {
+  const RUNTIME_ROLES = ['roviq_app', 'roviq_reseller', 'roviq_admin'];
+  // Partition DDL on audit_logs locks the FK-referenced tables and deadlocks
+  // parallel suites, so the create/detach paths run on an FK-free scratch parent.
+  const SCRATCH_PARENT = `rov64_scratch_${crypto.randomUUID().slice(0, 8)}`;
+  const SCRATCH_MONTH = '2099-01-01T00:00:00Z';
+  const SCRATCH_PARTITION = `${SCRATCH_PARENT}_2099_01`;
+  let currentPartition: string;
+
+  async function partitionState(name: string): Promise<{ sealed: boolean; grantees: number }> {
+    const res = await superPool.query<{ sealed: boolean; grantees: number }>(
+      `SELECT (c.relrowsecurity AND c.relforcerowsecurity) AS sealed,
+              (SELECT COUNT(DISTINCT a.grantee)::int FROM aclexplode(c.relacl) a WHERE a.grantee <> c.relowner) AS grantees
+       FROM pg_class c WHERE c.relname = $1 AND c.relnamespace = 'public'::regnamespace`,
+      [name],
+    );
+    expect(res.rows).toHaveLength(1);
+    return res.rows[0];
+  }
+
+  beforeAll(async () => {
+    const res = await superPool.query<{ name: string }>(
+      `SELECT 'audit_logs' || to_char(date_trunc('month', NOW()), '_YYYY_MM') AS name`,
+    );
+    currentPartition = res.rows[0].name;
+    await superPool.query(
+      `CREATE TABLE ${SCRATCH_PARENT} (id uuid NOT NULL, created_at timestamptz NOT NULL)
+       PARTITION BY RANGE (created_at)`,
+    );
+  });
+
+  afterAll(async () => {
+    await superPool.query(`DROP TABLE IF EXISTS ${SCRATCH_PARTITION}`);
+    await superPool.query(`DROP TABLE IF EXISTS ${SCRATCH_PARENT}`);
+  });
+
+  it.each(RUNTIME_ROLES)('%s cannot SELECT a partition directly', async (role) => {
+    await asRole(role, {}, async (client) => {
+      await expect(client.query(`SELECT 1 FROM ${currentPartition} LIMIT 1`)).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it.each(RUNTIME_ROLES)('%s cannot UPDATE a partition directly', async (role) => {
+    await asRole(role, {}, async (client) => {
+      await expect(
+        client.query(`UPDATE ${currentPartition} SET action = 'hacked'`),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it.each(RUNTIME_ROLES)('%s cannot DELETE from a partition directly', async (role) => {
+    await asRole(role, {}, async (client) => {
+      await expect(client.query(`DELETE FROM ${currentPartition}`)).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it.each(RUNTIME_ROLES)('%s cannot INSERT into a partition directly', async (role) => {
+    await asRole(role, {}, async (client) => {
+      await expect(
+        client.query(
+          `INSERT INTO ${currentPartition}
+            (scope, user_id, actor_id, action, action_type, entity_type, correlation_id, source)
+          VALUES ('platform', $1, $1, 'side_door', 'CREATE', 'Test', $2, 'TEST')`,
+          [SEED.USER_ADMIN, crypto.randomUUID()],
+        ),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it('every child of every partitioned table is sealed with no non-owner grants', async () => {
+    const res = await superPool.query<{ name: string }>(
+      `SELECT c.relname AS name
+       FROM pg_inherits i
+       JOIN pg_class c ON c.oid = i.inhrelid
+       JOIN pg_class p ON p.oid = i.inhparent
+       WHERE p.relkind = 'p' AND p.relnamespace = 'public'::regnamespace
+         AND (NOT (c.relrowsecurity AND c.relforcerowsecurity)
+              OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee <> c.relowner))`,
+    );
+    expect(res.rows).toEqual([]);
+  });
+
+  it('a partition created by ensure_monthly_partition is born sealed', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await client.query(`SELECT ensure_monthly_partition($1::regclass, $2)`, [
+        SCRATCH_PARENT,
+        SCRATCH_MONTH,
+      ]);
+      await client.query('COMMIT');
+    });
+    expect(await partitionState(SCRATCH_PARTITION)).toEqual({ sealed: true, grantees: 0 });
+  });
+
+  it('ensure_monthly_partition re-seals a partition reopened by a later GRANT', async () => {
+    await superPool.query(`GRANT SELECT, UPDATE ON ${SCRATCH_PARTITION} TO roviq_app`);
+    await superPool.query(`ALTER TABLE ${SCRATCH_PARTITION} NO FORCE ROW LEVEL SECURITY`);
+    expect(await partitionState(SCRATCH_PARTITION)).toEqual({ sealed: false, grantees: 1 });
+
+    await asRole('roviq_admin', {}, async (client) => {
+      await client.query(`SELECT ensure_monthly_partition($1::regclass, $2)`, [
+        SCRATCH_PARENT,
+        SCRATCH_MONTH,
+      ]);
+      await client.query('COMMIT');
+    });
+    expect(await partitionState(SCRATCH_PARTITION)).toEqual({ sealed: true, grantees: 0 });
+  });
+
+  it('a detached partition stays sealed', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await client.query(`SELECT detach_monthly_partition($1::regclass, $2)`, [
+        SCRATCH_PARENT,
+        SCRATCH_PARTITION,
+      ]);
+      await client.query('COMMIT');
+    });
+
+    const attached = await superPool.query(
+      `SELECT 1 FROM pg_inherits WHERE inhrelid = $1::regclass`,
+      [SCRATCH_PARTITION],
+    );
+    expect(attached.rows).toEqual([]);
+    expect(await partitionState(SCRATCH_PARTITION)).toEqual({ sealed: true, grantees: 0 });
+
+    await asRole('roviq_app', {}, async (client) => {
+      await expect(client.query(`SELECT 1 FROM ${SCRATCH_PARTITION}`)).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+
+  it('detach_monthly_partition rejects a table that is not a partition of the parent', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(
+        client.query(`SELECT detach_monthly_partition('audit_logs'::regclass, 'users')`),
+      ).rejects.toThrow(/is not a partition of audit_logs/);
+    });
+  });
+
+  it.each([
+    'roviq_app',
+    'roviq_reseller',
+  ])('%s cannot call the partition functions', async (role) => {
+    await asRole(role, {}, async (client) => {
+      await client.query('SAVEPOINT s');
+      await expect(
+        client.query(`SELECT ensure_monthly_partition('audit_logs'::regclass, NOW())`),
+      ).rejects.toThrow(/permission denied for function/);
+      await client.query('ROLLBACK TO SAVEPOINT s');
+      await expect(
+        client.query(`SELECT detach_monthly_partition('audit_logs'::regclass, $1)`, [
+          currentPartition,
+        ]),
+      ).rejects.toThrow(/permission denied for function/);
+      await client.query('ROLLBACK TO SAVEPOINT s');
+      await expect(
+        client.query(`SELECT lock_down_partitions('audit_logs'::regclass)`),
+      ).rejects.toThrow(/permission denied for function/);
+    });
+  });
+
+  it('roviq_admin cannot call lock_down_partitions directly', async () => {
+    await asRole('roviq_admin', {}, async (client) => {
+      await expect(
+        client.query(`SELECT lock_down_partitions('audit_logs'::regclass)`),
+      ).rejects.toThrow(/permission denied for function/);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROV-64: partition pruning
+// ═══════════════════════════════════════════════════════
+
+describe('ROV-64: partition pruning', () => {
+  function scannedRelations(node: unknown, out: string[] = []): string[] {
+    if (Array.isArray(node)) {
+      for (const child of node) scannedRelations(child, out);
+    } else if (node !== null && typeof node === 'object') {
+      for (const [key, value] of Object.entries(node)) {
+        if (key === 'Relation Name' && typeof value === 'string') out.push(value);
+        else scannedRelations(value, out);
+      }
+    }
+    return out;
+  }
+
+  it('a single-month range scans exactly that month partition', async () => {
+    const now = new Date();
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const expected = `audit_logs_${from.getUTCFullYear()}_${String(from.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    await asRole('roviq_admin', {}, async (client) => {
+      const res = await client.query(
+        `EXPLAIN (ANALYZE, FORMAT JSON)
+         SELECT * FROM audit_logs
+         WHERE created_at >= '${from.toISOString()}' AND created_at < '${to.toISOString()}'`,
+      );
+      expect(scannedRelations(res.rows[0]['QUERY PLAN'])).toEqual([expected]);
     });
   });
 });

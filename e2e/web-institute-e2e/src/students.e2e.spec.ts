@@ -92,6 +92,10 @@ test.describe('Student detail', () => {
     // case above.
     // Data rows have multiple td cells; the empty state row has a single td with colspan.
     const dataRows = page.getByTestId(t.table).locator('tbody tr:has(td:nth-child(3))');
+    // count() does not wait, so settle on rows-or-empty first or the skip is a race.
+    await expect(dataRows.first().or(page.getByTestId(t.emptyState))).toBeVisible({
+      timeout: 15_000,
+    });
     const rowCount = await dataRows.count();
     test.skip(rowCount === 0, 'No students seeded in this environment');
 
@@ -102,45 +106,28 @@ test.describe('Student detail', () => {
     await expect(page).toHaveURL(/\/people\/students\/[0-9a-f-]{36}/, { timeout: 10_000 });
 
     // All six tabs render
-    await expect(page.getByTestId(t.detailTabProfile)).toBeVisible();
-    await expect(page.getByTestId(t.detailTabAcademics)).toBeVisible();
-    await expect(page.getByTestId(t.detailTabGuardians)).toBeVisible();
-    await expect(page.getByTestId(t.detailTabDocuments)).toBeVisible();
-    await expect(page.getByTestId(t.detailTabTcHistory)).toBeVisible();
-    await expect(page.getByTestId(t.detailTabAudit)).toBeVisible();
+    await expect(page.getByTestId(t.detailTab('profile'))).toBeVisible();
+    await expect(page.getByTestId(t.detailTab('academics'))).toBeVisible();
+    await expect(page.getByTestId(t.detailTab('guardians'))).toBeVisible();
+    await expect(page.getByTestId(t.detailTab('documents'))).toBeVisible();
+    await expect(page.getByTestId(t.detailTab('tc-history'))).toBeVisible();
+    await expect(page.getByTestId(t.detailTab('audit'))).toBeVisible();
 
     // Profile tab is active by default and shows the form
-    await expect(page.getByTestId(t.detailFirstNameEn)).toBeVisible();
-    await expect(page.getByTestId(t.detailSocialCategory)).toBeVisible();
-    await expect(page.getByTestId(t.detailSaveBtn)).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'First name (English)' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Social category' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save changes' })).toBeVisible();
 
-    // Academics tab — renders current year summary or empty state
-    await page.getByTestId(t.detailTabAcademics).click();
-    await expect(page.getByRole('tabpanel', { name: 'Academics' })).toBeVisible({ timeout: 5_000 });
-
-    // Guardians tab
-    await page.getByTestId(t.detailTabGuardians).click();
-    await expect(
-      page.getByTestId(t.detailGuardiansEmpty).or(page.getByTestId(t.table).first()),
-    ).toBeVisible({ timeout: 5_000 });
-
-    // Documents tab
-    await page.getByTestId(t.detailTabDocuments).click();
-    await expect(
-      page.getByTestId(t.detailDocumentsEmpty).or(page.getByTestId(t.table).first()),
-    ).toBeVisible({ timeout: 5_000 });
-
-    // TC History tab
-    await page.getByTestId(t.detailTabTcHistory).click();
-    await expect(
-      page.getByTestId(t.detailTcEmpty).or(page.getByTestId(t.table).first()),
-    ).toBeVisible({ timeout: 5_000 });
-
-    // Audit tab
-    await page.getByTestId(t.detailTabAudit).click();
-    await expect(
-      page.getByTestId(t.detailAuditEmpty).or(page.getByTestId(t.table).first()),
-    ).toBeVisible({ timeout: 5_000 });
+    for (const [tab, panel] of [
+      ['academics', 'Academics'],
+      ['guardians', 'Guardians'],
+      ['documents', 'Documents'],
+      ['tc-history', 'TC History'],
+      ['audit', 'Audit'],
+    ] as const) {
+      await page.getByTestId(t.detailTab(tab)).click();
+      await expect(page.getByRole('tabpanel', { name: panel })).toBeVisible({ timeout: 5_000 });
+    }
   });
 });
 

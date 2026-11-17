@@ -37,6 +37,6 @@ description: Use when starting work on a Linear issue — provides the full work
 - Prepare the fixture insert during implementation. Reuse the running environment; the user should do no setup.
 - Keep one-time review tooling out of the feature commit and remove it after completed review. Preserve regression tests; do not delete DB fixtures without a request.
 
-## 7. Report (DO NOT commit)
+## 7. Report
 - Summarize changes, list files, show test results, note concerns
-- Wait for explicit commit approval
+- Commit only under the [NACPR] rule in root `CLAUDE.md` (tested thoroughly in the browser and by automated tests); otherwise wait for explicit commit approval

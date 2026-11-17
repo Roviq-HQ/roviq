@@ -19,9 +19,9 @@ Scoring: +5 for every standard/proper approach, -5 for every simplest-but-not-pr
 
 ---
 
-### [NACPR] No Auto Commits/Push
+### [NACPR] Auto Commit Only When Fully Tested
 
-Output the full `git add` + `git commit` commands for the user to copy-paste. Never commit or push automatically.
+Committing automatically is allowed only if the change was tested thoroughly in the browser and by automated tests. If either is missing, output the full `git add` + `git commit` commands for the user to copy-paste instead. Push and merge only when the user asks for it.
 
 Commit message format:
 - Header ≤100 chars with detailed message

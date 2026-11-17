@@ -35,7 +35,7 @@ Use `tilt logs <resource>` to check output when things fail (e.g., `tilt logs db
 If any of below rule applies to you then you `MUST` read full details: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules-reference.md`
 
 - [NWKRD] **No workarounds — proper fixes only.** Root-cause bugs, don't patch symptoms. +5 proper, -5 hack
-- [NACPR] **No auto commits/push.** Output `git add` + `git commit` for copy-paste. Conventional commits, header ≤100 chars
+- [NACPR] **Auto commit only when fully tested.** Committing automatically is allowed only if the change was tested thoroughly in the browser and by automated tests; otherwise output `git add` + `git commit` for copy-paste. Push/merge only when the user asks. Conventional commits, header ≤100 chars
 - [LNFST] **Linear first** — read the full issue (especially "Does NOT Change" + "Verification") before coding. Keep in sync
 - [RSBFC] Instead of try-catch on errors: (1) web search latest docs + (2) Context7 MCP. Do BOTH every time
 - [NTESC] **No type escape hatches** — never `any`, `as unknown`, `as never`. Search codebase → context7 → web → discuss with user

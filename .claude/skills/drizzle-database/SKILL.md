@@ -156,6 +156,8 @@ Static `CREATE TABLE foo_YYYY_MM PARTITION OF foo` lists silently break the day 
 - **App boot + daily**: add an `OnModuleInit` provider on the dedicated pool. Pattern: `apps/api-gateway/src/audit/audit-partition-maintainer.ts`. Boot alone misses long-lived pods.
 - **`scripts/db-reset.ts`**: append to `PARTITIONED_TABLES` in `ensureMonthlyPartitions()` so dev/e2e/integration DBs share the buffer.
 
+Parent RLS/GRANTs do not cover a partition queried by name. `ensure_monthly_partition` calls `lock_down_partitions(parent)` (ROV-64), which strips every non-owner privilege from each child and FORCEs RLS with no policies. Never create a partition with raw `CREATE TABLE … PARTITION OF` (it is born open, and `roviq_admin` cannot run the DDL anyway) and never name a partition in application SQL. Detach via `detach_monthly_partition(parent, name)`.
+
 ### Gotchas
 
 - `drizzle-kit push` does NOT diff RLS policies — it skips them. Drop+recreate schema for clean policy state
