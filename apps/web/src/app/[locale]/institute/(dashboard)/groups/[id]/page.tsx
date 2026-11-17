@@ -462,7 +462,7 @@ function RulesPanel({ groupId, version }: { groupId: string; version: number }) 
         </div>
 
         <pre className="overflow-x-auto rounded-md border bg-muted/40 p-4 text-xs">
-          {t('detail.rules.placeholderJson')}
+          {t.raw('detail.rules.placeholderJson')}
         </pre>
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
