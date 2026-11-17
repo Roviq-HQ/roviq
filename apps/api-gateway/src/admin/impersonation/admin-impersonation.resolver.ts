@@ -40,8 +40,7 @@ export class AdminImpersonationResolver {
     @Context() ctx: GqlContext,
   ): Promise<StartImpersonationResult> {
     return this.impersonationService.startImpersonation(
-      user.userId,
-      user.scope,
+      user,
       targetUserId,
       targetTenantId,
       reason,
@@ -57,7 +56,7 @@ export class AdminImpersonationResolver {
     @Args('otp') otp: string,
     @CurrentUser() user: AuthUser,
   ): Promise<StartImpersonationResult> {
-    return this.impersonationService.verifyOtp(sessionId, otp, user.userId);
+    return this.impersonationService.verifyOtp(user, sessionId, otp);
   }
 
   @NoAudit()
@@ -66,7 +65,7 @@ export class AdminImpersonationResolver {
     @Args('sessionId') sessionId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<boolean> {
-    await this.impersonationService.endImpersonation(sessionId, user.userId);
+    await this.impersonationService.endImpersonation(sessionId, user);
     return true;
   }
 }

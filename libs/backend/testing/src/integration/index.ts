@@ -36,6 +36,8 @@ export {
   type GqlResponse,
   gqlRequest,
 } from './gql-request.js';
+// Redis fake that stores values
+export { createInMemoryRedis } from './in-memory-redis.js';
 // NestJS integration app bootstrapper
 export {
   createIntegrationApp,
