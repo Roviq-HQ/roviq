@@ -582,3 +582,12 @@ In a new dev instance (slot 2) `pnpm test:int` stopped in the global setup with 
 
 **Verification:** in slot 2 the first run bootstrapped and seeded `roviq_test`, then ran the suite; the next run printed `Database is already set up; nothing to bootstrap.` and passed 543 tests.
 
+
+## 2026-11-17 — fixed: `pnpm test:int` in a parallel instance started instance 0's infra
+
+After a reboot, `pnpm test:int` in slot 2 found its Postgres/Redis/NATS down and ran `docker compose -f docker/compose.infra.yaml up` with no project name. Compose fell back to the default project `docker`, which is instance 0's, so it started `docker-postgres-1`, `docker-redis-1`, `docker-nats-1` and `docker-nats-test-1` and then failed with `Started the dev infra but still cannot connect: postgres (… localhost:5474) …` because slot 2's own containers were still down.
+
+`scripts/int-infra.ts` now passes `-p $ROVIQ_COMPOSE_PROJECT` when it is set, so the instance's own project is started. Instance 0 and CI do not set the variable and behave as before. `pnpm infra:up` / `infra:down` in `package.json` have the same gap and are unchanged.
+
+**Verification:** with slot 2's infra stopped, `pnpm test:int` started `roviq-2-postgres-1`, `roviq-2-redis-1` and `roviq-2-nats-1` and ran the suite.
+
