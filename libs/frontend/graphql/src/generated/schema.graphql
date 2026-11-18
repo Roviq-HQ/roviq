@@ -117,6 +117,19 @@ enum AcademicYearStatus {
   PLANNING
 }
 
+"""A firing Prometheus alert"""
+type ActiveAlert {
+  """Alert summary (falls back to description, then the alert name)"""
+  message: String!
+
+  """Prometheus alertname label"""
+  name: String!
+  severity: AlertSeverity!
+
+  """When the alert became active"""
+  since: DateTime!
+}
+
 """Append a period, break, or extra slot to a timetable."""
 input AddTimetablePeriodInput {
   """Defaults to the timetable period duration."""
@@ -441,6 +454,13 @@ enum AffiliationStatus {
   PROVISIONAL
   REGULAR
   REVOKED
+}
+
+"""Severity label of a firing Prometheus alert"""
+enum AlertSeverity {
+  CRITICAL
+  INFO
+  WARNING
 }
 
 type ApplicationConnection {
@@ -1039,6 +1059,15 @@ enum ComplianceReportType {
   RTE_REPORT
   TC_REGISTER
   UDISE_DCF
+}
+
+"""Live connections held by this api-gateway instance"""
+type ConnectionStats {
+  """HTTP requests currently in flight"""
+  http: Int!
+
+  """Open graphql-ws subscription connections"""
+  websocket: Int!
 }
 
 """DPDP Act 2023 verifiable parental consent record (append-only)"""
@@ -3414,6 +3443,16 @@ enum MinorityType {
   SIKH
 }
 
+"""Platform dependency watched by the system health poller"""
+enum MonitoredService {
+  API_GATEWAY
+  MINIO
+  NATS
+  POSTGRES
+  REDIS
+  TEMPORAL
+}
+
 type Mutation {
   activateAcademicYear(id: ID!): AcademicYearModel!
 
@@ -3950,6 +3989,13 @@ type MyStudentProfile {
   userProfile: UserProfileData!
 }
 
+"""Backlog of one JetStream stream"""
+type NatsStreamLag {
+  """Sum of pending (undelivered) messages over all consumers of the stream"""
+  consumerLag: Int!
+  name: String!
+}
+
 """NEP 2020 stage a standard belongs to (Foundational → Secondary)."""
 enum NepStage {
   FOUNDATIONAL
@@ -4134,6 +4180,9 @@ type Query {
   ): [AdminAttendanceSummaryModel!]!
   adminAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
   adminAuthEvents(first: Int = 50): [AuthEventModel!]!
+
+  """Platform admin: live connections on the answering api-gateway instance"""
+  adminConnectionMetrics: ConnectionStats!
   adminGetInstitute(id: ID!): InstituteModel!
 
   """
@@ -4163,6 +4212,25 @@ type Query {
   Typeahead search for users by name, username, or phone (platform admin)
   """
   adminSearchUsers(limit: Int! = 10, query: String!): [AdminUserModel!]!
+
+  """
+  Platform admin: status of every platform dependency, stream lag, alerts (ROV-184)
+  """
+  adminSystemHealth: SystemHealth!
+
+  """Platform admin: per-institute active users and API usage (ROV-184)"""
+  adminTenantAnalytics(
+    """Opaque cursor from a previous page"""
+    after: String
+
+    """Page size (1–100)"""
+    first: Int = 25
+
+    """Only institutes owned by this reseller"""
+    resellerId: ID
+    sortBy: TenantAnalyticsSortField = API_CALLS_24H
+    sortOrder: SortOrder = DESC
+  ): TenantAnalyticsConnection!
 
   """Admission funnel statistics"""
   admissionStatistics(filter: AdmissionStatisticsFilterInput): AdmissionStatisticsModel!
@@ -5015,6 +5083,32 @@ type SectionStrengthNormsModel {
   optimal: Float!
 }
 
+"""Latest health check result for one platform dependency"""
+type ServiceHealth {
+  checkedAt: DateTime!
+  name: MonitoredService!
+
+  """
+  Check round-trip in milliseconds (API_GATEWAY: event-loop delay p99); null when DOWN
+  """
+  responseMs: Float
+  status: ServiceHealthStatus!
+
+  """
+  Share of successful checks over the rolling last 24 hours (0–100); null until the first sample
+  """
+  uptimePercent: Float
+}
+
+"""
+HEALTHY = under latency threshold; DEGRADED = reachable but slow; DOWN = unreachable
+"""
+enum ServiceHealthStatus {
+  DEGRADED
+  DOWN
+  HEALTHY
+}
+
 type SessionInfo {
   createdAt: DateTime!
   deviceInfo: String
@@ -5084,6 +5178,12 @@ enum SocialCategory {
   OBC
   SC
   ST
+}
+
+"""Sort direction"""
+enum SortOrder {
+  ASC
+  DESC
 }
 
 type SourceBreakdown {
@@ -5484,6 +5584,11 @@ type Subscription {
   adminResellerTierChanged: AdminResellerModel!
   adminResellerUpdated: AdminResellerModel!
 
+  """
+  Platform admin: the current snapshot on subscribe, then a new one whenever a service status, stream lag, the alert set or the DLQ count changes
+  """
+  adminSystemHealthUpdated: SystemHealth!
+
   """Real-time application status changes"""
   applicationStatusChanged: ApplicationStatusUpdate!
 
@@ -5568,6 +5673,26 @@ enum SubscriptionStatus {
   TRIALING
 }
 
+"""Platform-wide health snapshot (ROV-184)"""
+type SystemHealth {
+  """Firing Prometheus alerts only"""
+  alerts: [ActiveAlert!]!
+
+  """
+  False when Prometheus is unreachable — `alerts` is then empty, not "all clear"
+  """
+  alertsAvailable: Boolean!
+  checkedAt: DateTime!
+  connections: ConnectionStats!
+
+  """Dead-lettered messages awaiting admin action"""
+  dlqPendingCount: Int!
+  natsStreams: [NatsStreamLag!]!
+
+  """Always all six services, in MonitoredService order"""
+  services: [ServiceHealth!]!
+}
+
 """Transfer Certificate register entry"""
 type TCModel {
   academicYearId: String!
@@ -5621,6 +5746,49 @@ type TeacherOptionModel {
 
   """Staff membership id — matches timetable entry teacherId."""
   membershipId: ID!
+}
+
+"""Per-institute usage for the platform monitoring page"""
+type TenantAnalytics {
+  """Distinct users with a refresh token created or used in the last 24h"""
+  activeUsers24h: Int!
+
+  """
+  7 daily API-call totals, oldest to newest (each a 24h window ending at that point); null when Prometheus is unavailable
+  """
+  activityTrend7d: [Int!]
+
+  """
+  Institute-scope GraphQL operations in the last 24h; null when Prometheus is unavailable
+  """
+  apiCalls24h: Int
+  instituteId: ID!
+  instituteName: I18nText!
+  resellerId: ID!
+  resellerName: String!
+}
+
+type TenantAnalyticsConnection {
+  edges: [TenantAnalyticsEdge!]!
+
+  """
+  False when Prometheus could not be queried; API-call columns are then null
+  """
+  metricsAvailable: Boolean!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type TenantAnalyticsEdge {
+  cursor: String!
+  node: TenantAnalytics!
+}
+
+"""Column the tenant analytics table is sorted by"""
+enum TenantAnalyticsSortField {
+  ACTIVE_USERS_24H
+  API_CALLS_24H
+  INSTITUTE_NAME
 }
 
 """Term/semester period within an academic year"""

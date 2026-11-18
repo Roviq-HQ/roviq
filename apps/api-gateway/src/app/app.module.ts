@@ -13,6 +13,11 @@ import { REDIS_CLIENT, RedisModule } from '@roviq/redis';
 import { TelemetryModule } from '@roviq/telemetry';
 import type Redis from 'ioredis';
 import { AdminModule } from '../admin/admin.module';
+import {
+  ConnectionTracker,
+  ConnectionTrackerModule,
+  InFlightRequestMiddleware,
+} from '../admin/monitoring/connections/connection-tracker';
 import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -48,6 +53,7 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     NatsJetStreamModule,
     EventBusModule,
     TelemetryModule,
+    ConnectionTrackerModule,
     // Needed by the global `ImpersonationSessionGuard`, which decodes the
     // Bearer token itself (`JwtService.verify`) rather than reading
     // `req.user` — APP_GUARD runs before passport-jwt populates the user.
@@ -57,8 +63,9 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     }),
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      inject: [ConfigService, REDIS_CLIENT],
-      useFactory: (config: ConfigService, redis: Redis) => ({
+      imports: [ConnectionTrackerModule],
+      inject: [ConfigService, REDIS_CLIENT, ConnectionTracker],
+      useFactory: (config: ConfigService, redis: Redis, connections: ConnectionTracker) => ({
         autoSchemaFile: true,
         buildSchemaOptions: { fieldMiddleware: [readFieldMiddleware] },
         path: 'api/graphql',
@@ -85,7 +92,12 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
 
               const extra = ctx.extra as Record<string, unknown>;
               extra.user = user;
+              connections.websocketOpened();
               return true;
+            },
+            // graphql-ws calls this only for acknowledged connections, mirroring onConnect's increment.
+            onDisconnect: () => {
+              connections.websocketClosed();
             },
           },
         },
@@ -147,6 +159,6 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes('*path');
+    consumer.apply(InFlightRequestMiddleware, TenantMiddleware).forRoutes('*path');
   }
 }

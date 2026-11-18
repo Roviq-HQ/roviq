@@ -142,6 +142,8 @@ export const AppSubject = {
   Export: 'Export',
   /** Dead-lettered NATS message — platform admin inspects, replays, or discards (ROV-19) */
   DlqMessage: 'DlqMessage',
+  /** Platform infrastructure health — dependency status, stream lag, alerts (ROV-184) */
+  SystemHealth: 'SystemHealth',
 } as const;
 
 export type AppSubject = (typeof AppSubject)[keyof typeof AppSubject];

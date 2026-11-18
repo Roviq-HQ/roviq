@@ -1,0 +1,36 @@
+query E2eAdminTenantAnalytics(
+  $first: Int
+  $after: String
+  $sortBy: TenantAnalyticsSortField
+  $sortOrder: SortOrder
+  $resellerId: ID
+) {
+  adminTenantAnalytics(
+    first: $first
+    after: $after
+    sortBy: $sortBy
+    sortOrder: $sortOrder
+    resellerId: $resellerId
+  ) {
+    totalCount
+    metricsAvailable
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    edges {
+      cursor
+      node {
+        instituteId
+        instituteName
+        resellerId
+        resellerName
+        activeUsers24h
+        apiCalls24h
+        activityTrend7d
+      }
+    }
+  }
+}
