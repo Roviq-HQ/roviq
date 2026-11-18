@@ -143,7 +143,18 @@ function TimelineItem({
             </button>
             {expanded && (
               <div className="mt-1.5">
-                <AuditDiffRenderer changes={event.changes} actionType={event.actionType} />
+                <AuditDiffRenderer
+                  changes={event.changes}
+                  actionType={event.actionType}
+                  labels={{
+                    noChanges: t('detail.noChanges'),
+                    fieldsDeleted: (count) => t('diff.fieldsDeleted', { count }),
+                    deletedSnapshot: t('diff.deletedSnapshot'),
+                    fieldHeader: t('diff.field'),
+                    oldValueHeader: t('diff.oldValue'),
+                    newValueHeader: t('diff.newValue'),
+                  }}
+                />
               </div>
             )}
           </div>

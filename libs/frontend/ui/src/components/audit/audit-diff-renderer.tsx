@@ -8,6 +8,10 @@ export interface AuditDiffRendererLabels {
   noChanges?: string;
   fieldsDeleted?: (count: number) => string;
   deletedSnapshot?: string;
+  /** Screen-reader column headers of the diff table. */
+  fieldHeader?: string;
+  oldValueHeader?: string;
+  newValueHeader?: string;
 }
 
 export interface AuditDiffRendererProps {
@@ -168,10 +172,10 @@ export function AuditDiffRenderer({ changes, actionType, labels }: AuditDiffRend
       <table className="w-full text-left">
         <thead className="sr-only">
           <tr>
-            <th>Field</th>
-            {actionType !== 'CREATE' && <th>Old value</th>}
+            <th>{labels?.fieldHeader ?? 'Field'}</th>
+            {actionType !== 'CREATE' && <th>{labels?.oldValueHeader ?? 'Old value'}</th>}
             {actionType === 'UPDATE' && <th />}
-            {actionType !== 'DELETE' && <th>New value</th>}
+            {actionType !== 'DELETE' && <th>{labels?.newValueHeader ?? 'New value'}</th>}
           </tr>
         </thead>
         <tbody>

@@ -1,90 +1,63 @@
 'use client';
 
-import { useFormatDate } from '@roviq/i18n';
+import type { AuditLogFilterInput } from '@roviq/graphql/generated';
+import { Can, Tabs, TabsContent, TabsList, TabsTrigger } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import type { AuditColumnKey } from '@web/components/audit/audit-log-columns';
+import { AuditLogFilters, useAuditLogFilters } from '@web/components/audit/audit-log-filters';
+import { AuditLogTable } from '@web/components/audit/audit-log-table';
 import {
-  Button,
-  Can,
-  DataTable,
-  DataTablePagination,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@roviq/ui';
-import { ScrollText, SearchX, ShieldAlert, Users, X } from 'lucide-react';
+  buildAuditLogFilter,
+  CLEARED_AUDIT_FILTERS,
+  hasActiveAuditFilters,
+} from '@web/components/audit/audit-utils';
+import { ScrollText, ShieldAlert, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
-import { createAuditLogColumns } from './audit-log-columns';
-import { AuditLogDetail } from './audit-log-detail';
-import { AuditLogFilters, useAuditLogFilters } from './audit-log-filters';
 import { ImpersonationScopeFilter, useImpersonatorScopeFilter } from './impersonation-scope-filter';
 import { ImpersonationSessionPanel } from './impersonation-session-panel';
-import { type AuditLogNode, useAuditLogs } from './use-audit-logs';
+import { useAuditLogs } from './use-audit-logs';
 
 const { adminAuditLogs } = testIds;
-type AuditTab = 'all' | 'impersonation' | 'reseller';
+
+const COLUMNS: readonly AuditColumnKey[] = [
+  'createdAt',
+  'actorId',
+  'action',
+  'actionType',
+  'entityType',
+  'entityId',
+  'source',
+  'ipAddress',
+];
+const RESELLER_TAB_COLUMNS: readonly AuditColumnKey[] = [
+  'createdAt',
+  'actorId',
+  'resellerName',
+  'resellerTier',
+  ...COLUMNS.slice(2),
+];
 
 export default function AuditLogsPage() {
   const t = useTranslations('auditLogs');
-  const { format } = useFormatDate();
   const [filters, setFilters] = useAuditLogFilters();
-  const [selectedLog, setSelectedLog] = React.useState<AuditLogNode | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [activeTab, setActiveTab] = useQueryState('tab', parseAsString.withDefault('all'));
   const [impScope] = useImpersonatorScopeFilter();
   const [sessionPanelId, setSessionPanelId] = React.useState<string | null>(null);
-  const hasFilters = Object.values(filters).some(Boolean);
 
-  const queryFilter = React.useMemo(() => {
-    const f: Record<string, unknown> = {};
-    if (filters.entityType) f.entityType = filters.entityType;
-    if (filters.actionType) f.actionTypes = [filters.actionType];
-    if (filters.userId) f.userId = filters.userId;
-
-    // Tab-specific preset filters
+  const filter = React.useMemo(() => {
+    const preset: AuditLogFilterInput = {};
     if (activeTab === 'impersonation') {
-      f.impersonatedOnly = true;
-      if (impScope.length > 0) f.impersonatorScope = impScope;
+      preset.impersonatedOnly = true;
+      if (impScope.length > 0) preset.impersonatorScope = impScope;
     } else if (activeTab === 'reseller') {
-      f.scopes = ['RESELLER'];
+      preset.scopes = ['reseller'];
     }
-
-    return Object.keys(f).length > 0 ? f : undefined;
+    return buildAuditLogFilter(filters, preset);
   }, [filters, activeTab, impScope]);
 
-  const { logs, totalCount, hasNextPage, loading, loadMore } = useAuditLogs({
-    filter: queryFilter as Parameters<typeof useAuditLogs>[0]['filter'],
-    first: 20,
-  });
-
-  const formatDate = React.useCallback(
-    (date: Date) => format(date, 'dd MMM yyyy, HH:mm:ss'),
-    [format],
-  );
-
-  const columns = React.useMemo(
-    () => createAuditLogColumns(t, formatDate, activeTab === 'reseller'),
-    [t, formatDate, activeTab],
-  );
-
-  const handleLoadMore = async () => {
-    setIsLoadingMore(true);
-    try {
-      await loadMore();
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab as AuditTab);
-  };
+  const { logs, totalCount, hasNextPage, loading, loadMore } = useAuditLogs({ filter, first: 20 });
 
   return (
     <div className="space-y-4" data-testid={adminAuditLogs.page}>
@@ -100,7 +73,7 @@ export default function AuditLogsPage() {
       <Can I="read" a="AuditLog" passThrough>
         {(allowed: boolean) =>
           allowed ? (
-            <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
                 <TabsTrigger value="all" data-testid={adminAuditLogs.tabAll}>
                   <ScrollText className="me-1.5 size-4" />
@@ -118,76 +91,23 @@ export default function AuditLogsPage() {
 
               {/* All three tabs share the same content — only the filter preset changes */}
               <TabsContent value={activeTab} forceMount className="mt-4 space-y-4">
-                <AuditLogFilters />
+                <AuditLogFilters scope="admin" />
 
                 {activeTab === 'impersonation' && <ImpersonationScopeFilter />}
 
-                <DataTable
+                <AuditLogTable
                   data-testid={adminAuditLogs.table}
-                  columns={columns}
-                  data={logs}
-                  isLoading={loading && logs.length === 0}
-                  emptyState={
-                    hasFilters || activeTab !== 'all' ? (
-                      <Empty className="py-12">
-                        <EmptyHeader>
-                          <EmptyMedia variant="icon">
-                            <SearchX />
-                          </EmptyMedia>
-                          <EmptyTitle>{t('emptyFilteredTitle')}</EmptyTitle>
-                          <EmptyDescription>{t('emptyFilteredDescription')}</EmptyDescription>
-                        </EmptyHeader>
-                        {hasFilters && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setFilters({ entityType: null, actionType: null, userId: null })
-                            }
-                          >
-                            <X className="me-1 size-4" />
-                            {t('filters.clearFilters')}
-                          </Button>
-                        )}
-                      </Empty>
-                    ) : (
-                      <Empty className="py-12">
-                        <EmptyHeader>
-                          <EmptyMedia variant="icon">
-                            <ScrollText />
-                          </EmptyMedia>
-                          <EmptyTitle>{t('emptyTitle')}</EmptyTitle>
-                          <EmptyDescription>{t('emptyDescription')}</EmptyDescription>
-                        </EmptyHeader>
-                      </Empty>
-                    )
-                  }
-                  onRowClick={setSelectedLog}
-                />
-
-                <DataTablePagination
-                  hasNextPage={hasNextPage}
-                  isLoadingMore={isLoadingMore}
-                  onLoadMore={handleLoadMore}
+                  scope="admin"
+                  columns={activeTab === 'reseller' ? RESELLER_TAB_COLUMNS : COLUMNS}
+                  logs={logs}
+                  loading={loading}
                   totalCount={totalCount}
-                  currentCount={logs.length}
-                  labels={{
-                    loadMore: t('pagination.loadMore'),
-                    showing: t('pagination.showing'),
-                    of: t('pagination.of'),
-                  }}
-                />
-
-                <AuditLogDetail
-                  log={selectedLog}
-                  open={selectedLog !== null}
-                  onOpenChange={(open) => {
-                    if (!open) setSelectedLog(null);
-                  }}
-                  onViewSession={(id) => {
-                    setSelectedLog(null);
-                    setSessionPanelId(id);
-                  }}
+                  hasNextPage={hasNextPage}
+                  loadMore={loadMore}
+                  hasFilters={hasActiveAuditFilters(filters)}
+                  onClearFilters={() => setFilters(CLEARED_AUDIT_FILTERS)}
+                  hasPreset={activeTab !== 'all'}
+                  onViewSession={setSessionPanelId}
                 />
 
                 <ImpersonationSessionPanel
@@ -209,5 +129,3 @@ export default function AuditLogsPage() {
     </div>
   );
 }
-
-import { testIds } from '@roviq/ui/testing/testid-registry';

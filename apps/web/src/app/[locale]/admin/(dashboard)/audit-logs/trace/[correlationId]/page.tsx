@@ -69,7 +69,7 @@ export default function CorrelationTracePage() {
     <div className="space-y-6">
       <div>
         <Link
-          href="/audit-logs"
+          href="/admin/audit-logs"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />

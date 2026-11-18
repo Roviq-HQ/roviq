@@ -28,7 +28,11 @@
     "dateFrom": "From",
     "dateTo": "To",
     "clearFilters": "Clear filters",
-    "impersonatorScope": "Impersonator scope"
+    "impersonatorScope": "Impersonator scope",
+    "actionTypesSelected": "{count} types selected",
+    "clearSelection": "Clear selection",
+    "clearEntityType": "Clear entity type",
+    "clearInstitute": "Clear institute"
   },
   "scopes": {
     "platform": "Platform",
@@ -82,7 +86,8 @@
     "sections": {
       "identity": "Identity",
       "request": "Request"
-    }
+    },
+    "openEntity": "Open this record"
   },
   "session": {
     "title": "Impersonation Session",
@@ -131,7 +136,8 @@
     "placeholder": "Search by entity ID...",
     "button": "Search",
     "invalidId": "Please enter a valid UUID",
-    "noResults": "No changes found for this entity"
+    "noResults": "No changes found for this entity",
+    "clear": "Clear entity ID search"
   },
   "accessDenied": "You do not have permission to view audit logs.",
   "errorTitle": "Failed to load audit logs",
@@ -141,5 +147,26 @@
     "noHistory": "No activity history for this entity.",
     "changes": "View changes",
     "loadMore": "Load older events"
+  },
+  "table": {
+    "showChanges": "Show changes",
+    "hideChanges": "Hide changes"
+  },
+  "diff": {
+    "fieldsDeleted": "{count, plural, =1 {1 field deleted} other {# fields deleted}}",
+    "deletedSnapshot": "Deleted record snapshot",
+    "field": "Field",
+    "oldValue": "Old value",
+    "newValue": "New value"
+  },
+  "impersonation": {
+    "badge": "Impersonated by {name}",
+    "tooltip": "This action was performed by {name} ({scope}) via impersonation",
+    "tooltipWithUser": "This action was performed by {name} ({scope}) while impersonating {userName}",
+    "scopeLabels": {
+      "platform": "platform admin",
+      "reseller": "reseller admin",
+      "institute": "institute admin"
+    }
   }
 }
