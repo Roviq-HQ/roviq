@@ -11,12 +11,16 @@
     "institute": "Institute",
     "startedAt": "Started",
     "status": "Status",
-    "actions": "Actions"
+    "actions": "Actions",
+    "impersonatorAny": "Started by",
+    "reason": "Reason",
+    "expiresAt": "Expires"
   },
   "status": {
     "ACTIVE": "Active",
     "ENDED": "Ended",
-    "EXPIRED": "Expired"
+    "EXPIRED": "Expired",
+    "REVOKED": "Revoked"
   },
   "terminate": "Terminate",
   "terminateSuccess": "Impersonation session terminated.",
@@ -24,5 +28,26 @@
   "terminateConfirmTitle": "Terminate this session?",
   "terminateConfirmDescription": "The team member will be signed out of the impersonated account immediately.",
   "cancel": "Cancel",
-  "accessDenied": "You do not have permission to view impersonation sessions."
+  "accessDenied": "You do not have permission to view impersonation sessions.",
+  "scopes": {
+    "platform": "Platform",
+    "reseller": "Reseller",
+    "institute": "Institute"
+  },
+  "admin": {
+    "title": "Impersonation Sessions",
+    "description": "Every session in which someone signed in as an institute user. New sessions appear here as they start.",
+    "show": "Show",
+    "showActive": "Active only",
+    "showAll": "All sessions",
+    "emptyActiveTitle": "No active sessions",
+    "emptyActiveDescription": "Nobody is viewing as another user right now.",
+    "emptyDescription": "Sessions will appear here once someone views as an institute user.",
+    "loadError": "Could not load the sessions. Refresh the page to try again.",
+    "terminateConfirmDescription": "{impersonator} will be signed out of {target}'s account immediately.",
+    "terminateForbidden": "You are not allowed to terminate this session.",
+    "terminateGone": "This session has already ended."
+  },
+  "terminateTitle": "End this session now",
+  "noReason": "—"
 }

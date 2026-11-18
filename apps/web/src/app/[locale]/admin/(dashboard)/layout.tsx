@@ -9,6 +9,7 @@ import {
   BarChart2,
   Building2,
   ClipboardCheck,
+  Eye,
   FileText,
   FolderTree,
   LayoutDashboard,
@@ -119,6 +120,12 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
         items: [
           { title: t('roles'), href: '/roles', icon: Shield },
           { title: t('auditLogs'), href: '/audit-logs', icon: FileText },
+          {
+            title: t('impersonationSessions'),
+            href: '/impersonation-sessions',
+            icon: Eye,
+            ability: { action: 'read', subject: 'AuditLog' },
+          },
           { title: t('attendance'), href: '/attendance', icon: ClipboardCheck },
           { title: t('observability'), href: '/observability', icon: BarChart2 },
           {

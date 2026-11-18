@@ -232,7 +232,7 @@ The Team page (`/reseller/team`) lists the people from your organisation who can
 | Role | Can do |
 |---|---|
 | Reseller admin | Manage institutes, billing and the team. |
-| Reseller support | Read everything, view as institute users, and manage Support and Viewer members. |
+| Reseller support | Read everything, view as institute users **in view-only mode**, and manage Support and Viewer members. |
 | Reseller viewer | Read only. The Team page shows no Invite button and no row actions. |
 
 You can give roles up to your own, and never above your organisation's plan tier. You cannot change members who hold a role above yours, and you cannot change your own role or status.
@@ -273,9 +273,15 @@ Audit Logs record every significant action taken in the reseller portal.
 Review and control the impersonation sessions started by your team (when a team member logs in as an institute user).
 
 1. Open **Audit Logs > Impersonation** (`/reseller/audit/impersonation`).
-2. The table lists each session with the team member, target user, institute, start time, and a **status** badge (Active, Ended, or Expired).
+2. The table lists each session with the team member, target user, institute, reason, start and expiry time, and a **status** badge: Active, Ended (the team member left), Revoked (someone else ended it) or Expired.
 3. Use the **Institute** dropdown to filter sessions to a single managed institute.
-4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm).
+4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm). Viewers see the list without the Terminate button.
+
+### View as an institute user
+
+1. On an institute's **Users** tab click **View as** and give a reason of at least 10 characters.
+2. The institute admin is sent a 6-digit code. Ask them for it and enter it. **Send a new code** becomes available 30 seconds after the last one.
+3. A new tab opens signed in as that user. If your role is **Reseller support**, the banner says **View only**: you can look at every screen the user sees, but nothing can be changed in that session.
 
 ---
 

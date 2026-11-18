@@ -243,6 +243,27 @@ On the **Impersonation** tab, an additional **scope** filter lets you show entri
 
 ---
 
+## Impersonation
+
+### View as an institute user
+
+1. Open an institute's **Users** tab, or a user's **Memberships** tab (`/admin/users/<id>`), and click **View as** on the row. The button is shown for an active user with an active membership, and not on your own account.
+2. Enter a **reason** of at least 10 characters. It is stored with the session and shown on the sessions page.
+3. If the institute requires consent, its admin is sent a 6-digit code. Enter it in the dialog. **Send a new code** becomes available 30 seconds after the last one.
+4. A new tab opens in the institute portal, signed in as that user, with an amber banner across the top. Your admin tab is untouched.
+5. To leave, click **Exit Impersonation** in the banner or in the user menu (it replaces Log out in that tab). The tab closes and the session ends.
+
+### Impersonation Sessions
+
+**Impersonation Sessions** in the sidebar (`/admin/impersonation-sessions`) lists every session, from all three scopes.
+
+- Columns: who started it and from which scope (Platform, Reseller, Institute), the target user, the institute, the reason, start and expiry time, and the **status**: Active, Ended (the impersonator left), Revoked (someone else ended it) or Expired.
+- **Show**: *Active only* (default) or *All sessions*. The choice is kept in the page address.
+- The list updates by itself when a session starts or ends.
+- **Terminate** on an active session signs the impersonator out of the impersonated account at once, after a confirmation. It needs the impersonate permission; read-only platform roles see the list without it.
+
+---
+
 ## Observability
 
 1. From the sidebar, open **Observability**.

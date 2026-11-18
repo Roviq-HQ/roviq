@@ -7,6 +7,8 @@ interface JwtPayload {
   isImpersonated?: boolean;
   /** Present on impersonation tokens; the session to end on exit. */
   impersonationSessionId?: string;
+  /** The session may read but not change anything. */
+  impersonationReadOnly?: boolean;
 }
 
 export function decodeJwt(token: string): JwtPayload | null {

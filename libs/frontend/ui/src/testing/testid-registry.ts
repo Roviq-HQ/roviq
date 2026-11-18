@@ -234,12 +234,30 @@ export const testIds = {
     removeInstituteBtn: (instituteId: string) => `reseller-group-remove-institute-${instituteId}`,
   },
 
+  // ── Admin: impersonation sessions page (ROV-183) ──────────────────────
+  adminImpersonationSessions: {
+    page: 'admin-impersonation-sessions-page',
+    title: 'admin-impersonation-sessions-title',
+    showFilter: 'admin-impersonation-sessions-show-filter',
+    accessDenied: 'admin-impersonation-sessions-access-denied',
+    loadError: 'admin-impersonation-sessions-load-error',
+    table: 'admin-impersonation-sessions-table',
+    empty: 'admin-impersonation-sessions-empty',
+    row: (id: string) => `admin-impersonation-session-row-${id}`,
+    statusBadge: (id: string) => `admin-impersonation-session-status-${id}`,
+    terminateBtn: (id: string) => `admin-impersonation-session-terminate-btn-${id}`,
+    terminateDialog: 'admin-impersonation-session-terminate-dialog',
+    terminateConfirm: 'admin-impersonation-session-terminate-confirm',
+  },
+
   // ── Reseller: impersonation sessions page (ROV-144) ───────────────────
   resellerImpersonation: {
     page: 'reseller-impersonation-page',
     table: 'reseller-impersonation-table',
     instituteFilter: 'reseller-impersonation-institute-filter',
+    empty: 'reseller-impersonation-empty',
     row: (id: string) => `reseller-impersonation-row-${id}`,
+    statusBadge: (id: string) => `reseller-impersonation-status-${id}`,
     terminateBtn: (id: string) => `reseller-impersonation-terminate-btn-${id}`,
     terminateDialog: 'reseller-impersonation-terminate-dialog',
     terminateConfirm: 'reseller-impersonation-terminate-confirm',
@@ -353,6 +371,7 @@ export const testIds = {
   impersonationBanner: {
     banner: 'impersonation-banner',
     exitBtn: 'impersonation-exit-btn',
+    viewOnlyBadge: 'impersonation-view-only-badge',
     endedNotice: 'impersonation-ended-notice',
     closeBtn: 'impersonation-ended-close-btn',
   },
@@ -363,6 +382,8 @@ export const testIds = {
     reasonInput: 'impersonation-reason-input',
     reasonError: 'impersonation-reason-error',
     otpInput: 'impersonation-otp-input',
+    otpResendBtn: 'impersonation-otp-resend-btn',
+    otpResentNotice: 'impersonation-otp-resent-notice',
     error: 'impersonation-error',
     cancelBtn: 'impersonation-cancel-btn',
     submitBtn: 'impersonation-submit-btn',
@@ -570,6 +591,7 @@ export const testIds = {
       `admin-user-tab-content-${name}`,
     membershipRow: (id: string) => `admin-user-membership-${id}`,
     viewInstituteBtn: (id: string) => `admin-user-view-institute-${id}`,
+    impersonateBtn: (membershipId: string) => `admin-user-impersonate-btn-${membershipId}`,
     resellerMembershipRow: (id: string) => `admin-user-reseller-membership-${id}`,
     platformMembershipRow: 'admin-user-platform-membership',
     identifierRow: (id: string) => `admin-user-identifier-${id}`,
