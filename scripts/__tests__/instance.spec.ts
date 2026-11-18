@@ -30,6 +30,8 @@ describe('portsForSlot', () => {
     expect(ports.DEV_POSTGRES_PORT).toBe(5434);
     expect(ports.E2E_API_PORT).toBe(3004);
     expect(ports.TILT_PORT).toBe(10350);
+    expect(ports.API_GATEWAY_INSPECT_PORT).toBe(9229);
+    expect(ports.NOTIFICATION_SERVICE_INSPECT_PORT).toBe(9230);
   });
 
   it('should shift every port by 20 per slot', () => {
@@ -38,6 +40,7 @@ describe('portsForSlot', () => {
     expect(ports.WEB_PORT).toBe(4240);
     expect(ports.DEV_POSTGRES_PORT).toBe(5474);
     expect(ports.E2E_POSTGRES_PORT).toBe(5475);
+    expect(ports.API_GATEWAY_INSPECT_PORT).toBe(9269);
   });
 
   it('should never give the same port to two services across all slots', () => {

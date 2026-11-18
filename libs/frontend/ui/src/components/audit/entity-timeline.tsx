@@ -46,6 +46,20 @@ export interface EntityTimelineEvent {
   metadata: Record<string, unknown> | null;
 }
 
+/** Narrows an audit log's untyped `changes` JSON to the `{ old, new }` entries the timeline renders. */
+export function toTimelineChanges(
+  changes: Record<string, unknown> | null,
+): EntityTimelineEvent['changes'] {
+  if (!changes) return null;
+  const result: Record<string, { old: unknown; new: unknown }> = {};
+  for (const [field, value] of Object.entries(changes)) {
+    if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
+      result[field] = { old: value.old, new: value.new };
+    }
+  }
+  return result;
+}
+
 export interface EntityTimelineData {
   events: EntityTimelineEvent[];
   totalCount: number;

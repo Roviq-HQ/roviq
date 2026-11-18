@@ -6,6 +6,7 @@ import enAdminAttendance from '../../messages/en/adminAttendance.json';
 import enAdminInstitutes from '../../messages/en/adminInstitutes.json';
 import enAdminMonitoring from '../../messages/en/adminMonitoring.json';
 import enAdminResellers from '../../messages/en/adminResellers.json';
+import enAdminUsers from '../../messages/en/adminUsers.json';
 import enAdmission from '../../messages/en/admission.json';
 import enAttendance from '../../messages/en/attendance.json';
 import enAuditLogs from '../../messages/en/auditLogs.json';
@@ -49,6 +50,7 @@ import hiAdminAttendance from '../../messages/hi/adminAttendance.json';
 import hiAdminInstitutes from '../../messages/hi/adminInstitutes.json';
 import hiAdminMonitoring from '../../messages/hi/adminMonitoring.json';
 import hiAdminResellers from '../../messages/hi/adminResellers.json';
+import hiAdminUsers from '../../messages/hi/adminUsers.json';
 import hiAdmission from '../../messages/hi/admission.json';
 import hiAttendance from '../../messages/hi/attendance.json';
 import hiAuditLogs from '../../messages/hi/auditLogs.json';
@@ -95,6 +97,7 @@ const en = {
   adminInstitutes: enAdminInstitutes,
   adminMonitoring: enAdminMonitoring,
   adminResellers: enAdminResellers,
+  adminUsers: enAdminUsers,
   admission: enAdmission,
   auditLogs: enAuditLogs,
   auth: enAuth,
@@ -141,6 +144,7 @@ const hi = {
   adminInstitutes: hiAdminInstitutes,
   adminMonitoring: hiAdminMonitoring,
   adminResellers: hiAdminResellers,
+  adminUsers: hiAdminUsers,
   admission: hiAdmission,
   auditLogs: hiAuditLogs,
   auth: hiAuth,

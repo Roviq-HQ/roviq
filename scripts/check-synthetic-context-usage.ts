@@ -38,8 +38,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
   'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
+  // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
+  'apps/api-gateway/src/admin/user/__tests__/admin-user.integration.spec.ts',
   'apps/api-gateway/src/admin/reseller/admin-reseller.service.ts',
-  'apps/api-gateway/src/admin/user/admin-user.service.ts',
+  'apps/api-gateway/src/admin/user/repositories/admin-user.drizzle-repository.ts',
   'apps/api-gateway/src/audit/repositories/audit-partition.drizzle-repository.ts',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts',
   'apps/api-gateway/src/audit/workflows/partition.activities.ts',

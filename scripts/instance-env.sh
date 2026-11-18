@@ -8,7 +8,7 @@ if [ -f "$_roviq_env_file" ]; then
     case "$_roviq_key" in
       *[!A-Z0-9_]*) continue ;;
       ROVIQ_INSTANCE | ROVIQ_COMPOSE_PROJECT | ROVIQ_E2E_COMPOSE_PROJECT | TILT_PORT | \
-        API_GATEWAY_PORT | WEB_PORT | NOTIFICATION_SERVICE_PORT | DEV_*_PORT | E2E_*_PORT)
+        API_GATEWAY_PORT | WEB_PORT | NOTIFICATION_SERVICE_PORT | *_INSPECT_PORT | DEV_*_PORT | E2E_*_PORT)
         eval "[ -n \"\${${_roviq_key}+set}\" ]" || export "${_roviq_key}=${_roviq_value}"
         ;;
     esac

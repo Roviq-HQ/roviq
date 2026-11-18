@@ -455,6 +455,56 @@ export const testIds = {
     cancelBtn: 'cancel-create-reseller-btn',
   },
 
+  // ── Admin: users list ──────────────────────────────────────────────────
+  adminUsers: {
+    page: 'admin-users-page',
+    title: 'admin-users-title',
+    table: 'admin-users-table',
+    emptyTitle: 'admin-users-empty-title',
+    emptyFilteredTitle: 'admin-users-empty-filtered-title',
+    stat: (name: 'total' | 'active' | 'new' | 'multi') => `admin-users-stat-${name}`,
+    statsError: 'admin-users-stats-error',
+    jumpTrigger: 'admin-users-jump-trigger',
+    jumpInput: 'admin-users-jump-input',
+    jumpResult: (id: string) => `admin-users-jump-result-${id}`,
+    searchInput: 'admin-users-search-input',
+    statusFilter: 'admin-users-status-filter',
+    scopeFilter: (scope: 'institute' | 'reseller' | 'platform') =>
+      `admin-users-scope-filter-${scope}`,
+    createdAfter: 'admin-users-created-after',
+    createdBefore: 'admin-users-created-before',
+    clearFilters: 'admin-users-clear-filters',
+    nameCell: (id: string) => `admin-users-name-cell-${id}`,
+    membershipCount: (id: string) => `admin-users-membership-count-${id}`,
+  },
+
+  // ── Admin: user detail ─────────────────────────────────────────────────
+  adminUserDetail: {
+    page: 'admin-user-detail-page',
+    loading: 'admin-user-detail-loading',
+    notFound: 'admin-user-not-found',
+    loadError: 'admin-user-load-error',
+    profileCard: 'admin-user-profile-card',
+    name: 'admin-user-name',
+    username: 'admin-user-username',
+    statusBadge: 'admin-user-status-badge',
+    tab: (name: 'memberships' | 'identity' | 'documents' | 'addresses' | 'audit') =>
+      `admin-user-tab-${name}`,
+    tabContent: (name: 'memberships' | 'identity' | 'documents' | 'addresses' | 'audit') =>
+      `admin-user-tab-content-${name}`,
+    membershipRow: (id: string) => `admin-user-membership-${id}`,
+    viewInstituteBtn: (id: string) => `admin-user-view-institute-${id}`,
+    resellerMembershipRow: (id: string) => `admin-user-reseller-membership-${id}`,
+    platformMembershipRow: 'admin-user-platform-membership',
+    identifierRow: (id: string) => `admin-user-identifier-${id}`,
+    identifierValue: (id: string) => `admin-user-identifier-value-${id}`,
+    documentRow: (id: string) => `admin-user-document-${id}`,
+    addressCard: (id: string) => `admin-user-address-${id}`,
+    empty: (name: 'memberships' | 'identity' | 'documents' | 'addresses') =>
+      `admin-user-empty-${name}`,
+    auditTab: 'admin-user-audit-tab',
+  },
+
   authLogin: {
     error: 'login-error',
     username: 'login-username-input',

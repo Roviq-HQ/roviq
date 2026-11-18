@@ -9,6 +9,7 @@ export {
   ImpersonationBadge,
   type ImpersonationBadgeLabels,
   type ImpersonationBadgeProps,
+  toTimelineChanges,
 } from './components/audit';
 export {
   AbilityContext,

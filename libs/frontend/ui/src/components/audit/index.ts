@@ -8,6 +8,7 @@ export {
   type EntityTimelineData,
   type EntityTimelineEvent,
   type EntityTimelineProps,
+  toTimelineChanges,
 } from './entity-timeline';
 export {
   ImpersonationBadge,

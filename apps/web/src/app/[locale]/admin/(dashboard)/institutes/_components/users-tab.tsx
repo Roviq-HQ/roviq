@@ -91,7 +91,7 @@ interface MembershipNode {
   status: string;
   roleId: string;
   roleName: Record<string, string>;
-  instituteName?: string | null;
+  instituteName?: Record<string, string> | null;
 }
 
 interface UserNode {
