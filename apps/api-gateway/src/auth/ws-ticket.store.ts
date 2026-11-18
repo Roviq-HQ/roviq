@@ -15,6 +15,8 @@ const baseUserSchema = z.object({
   isImpersonated: z.boolean().optional(),
   impersonatorId: z.string().optional(),
   impersonationSessionId: z.string().optional(),
+  // Dropping this would let a view-only session send mutations over the socket.
+  impersonationReadOnly: z.boolean().optional(),
 });
 
 // Mirrors AuthUser so the socket carries the same claims the HTTP guards read
