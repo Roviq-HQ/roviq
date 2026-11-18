@@ -403,18 +403,18 @@ describe('SystemHealthService', () => {
     await stream.return(undefined);
   });
 
-  it('should poll on the interval and stop after module destroy', async () => {
+  it('should not probe at boot, poll on the interval, and stop after module destroy', async () => {
     vi.useFakeTimers();
     service.onModuleInit();
     await vi.advanceTimersByTimeAsync(0);
-    expect(postgres.probe).toHaveBeenCalledTimes(1);
+    expect(postgres.probe).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(SYSTEM_HEALTH_POLL_INTERVAL_MS);
-    expect(postgres.probe).toHaveBeenCalledTimes(2);
+    expect(postgres.probe).toHaveBeenCalledTimes(1);
 
     service.onModuleDestroy();
     await vi.advanceTimersByTimeAsync(SYSTEM_HEALTH_POLL_INTERVAL_MS * 2);
-    expect(postgres.probe).toHaveBeenCalledTimes(2);
+    expect(postgres.probe).toHaveBeenCalledTimes(1);
   });
 
   it('should keep polling when a dependency throws unexpectedly', async () => {
