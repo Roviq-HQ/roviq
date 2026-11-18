@@ -33,16 +33,28 @@ const ACTION_PREFIXES: [string, ActionType][] = [
  * @example extractActionType('customMutation') → 'UPDATE' (fallback)
  */
 export function extractActionType(mutationName: string): ActionType {
+  const name = stripScopePrefix(mutationName);
   for (const [prefix, type] of ACTION_PREFIXES) {
-    if (mutationName.startsWith(prefix)) {
+    if (name.startsWith(prefix)) {
       return type;
     }
   }
   return 'UPDATE';
 }
 
-/** Scope prefixes stripped from mutation names before extracting entity type */
+/** Scope prefixes stripped from mutation names before extracting action and entity type */
 const SCOPE_PREFIXES = ['admin', 'reseller', 'institute'];
+
+/** `adminCreateInstitute` → `createInstitute`; `administrator` is left alone (next char not uppercase). */
+function stripScopePrefix(mutationName: string): string {
+  for (const scopePrefix of SCOPE_PREFIXES) {
+    const rest = mutationName.slice(scopePrefix.length);
+    if (mutationName.startsWith(scopePrefix) && rest && rest[0] === rest[0].toUpperCase()) {
+      return rest[0].toLowerCase() + rest.slice(1);
+    }
+  }
+  return mutationName;
+}
 
 /**
  * Extract the entity type from a mutation name, stripping action and scope prefixes.
@@ -53,19 +65,7 @@ const SCOPE_PREFIXES = ['admin', 'reseller', 'institute'];
  * @example extractEntityType('customMutation') → 'CustomMutation' (no recognized prefix)
  */
 export function extractEntityType(mutationName: string): string {
-  let name = mutationName;
-
-  // Strip scope prefix first (admin/reseller/institute)
-  for (const scopePrefix of SCOPE_PREFIXES) {
-    if (name.startsWith(scopePrefix) && name.length > scopePrefix.length) {
-      const rest = name.slice(scopePrefix.length);
-      // Only strip if next char is uppercase (e.g., "adminCreate..." but not "administrator")
-      if (rest[0] === rest[0]?.toUpperCase()) {
-        name = rest[0].toLowerCase() + rest.slice(1);
-        break;
-      }
-    }
-  }
+  const name = stripScopePrefix(mutationName);
 
   // Strip action prefix
   for (const [prefix] of ACTION_PREFIXES) {

@@ -519,6 +519,23 @@ describe('extractActionType', () => {
     expect(extractActionType(input)).toBe(expected);
   });
 
+  it.each([
+    ['adminCreateReseller', 'CREATE'],
+    ['adminSuspendReseller', 'SUSPEND'],
+    ['adminDeleteReseller', 'DELETE'],
+    ['adminRestoreInstitute', 'RESTORE'],
+    ['resellerCreateInstitute', 'CREATE'],
+    ['resellerSuspendInstitute', 'SUSPEND'],
+    ['instituteDeleteSection', 'DELETE'],
+    ['adminChangeResellerTier', 'UPDATE'],
+  ])('reads the action after a scope prefix: %s → %s', (input, expected) => {
+    expect(extractActionType(input)).toBe(expected);
+  });
+
+  it('does not treat a word that merely starts with a scope name as a prefix', () => {
+    expect(extractActionType('administratorCreate')).toBe('UPDATE');
+  });
+
   it('falls back to UPDATE for unrecognized prefixes', () => {
     expect(extractActionType('doSomething')).toBe('UPDATE');
     expect(extractActionType('customMutation')).toBe('UPDATE');
