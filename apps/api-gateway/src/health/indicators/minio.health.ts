@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { PROBE_TIMEOUT_MS, type ProbeResult, runProbe } from './probe';
+import { logProbeFailure, PROBE_TIMEOUT_MS, type ProbeResult, runProbe } from './probe';
 
 @Injectable()
 export class MinioHealthIndicator {
@@ -26,8 +26,8 @@ export class MinioHealthIndicator {
   async isHealthy(): Promise<HealthIndicatorResult<'minio'>> {
     const indicator = this.healthIndicatorService.check('minio');
     const result = await this.probe();
-    return result.up
-      ? indicator.up({ responseMs: result.responseMs })
-      : indicator.down({ message: result.error });
+    if (result.up) return indicator.up({ responseMs: result.responseMs });
+    logProbeFailure('minio', result);
+    return indicator.down();
   }
 }

@@ -64,7 +64,7 @@ describe('TemporalHealthIndicator', () => {
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ temporal: { status: 'down', message: 'Temporal status 2' } });
+    expect(result).toEqual({ temporal: { status: 'down' } });
   });
 
   it('should be down when TEMPORAL_ADDRESS is unset', async () => {
@@ -74,7 +74,7 @@ describe('TemporalHealthIndicator', () => {
     const result = await indicator.isHealthy();
 
     expect(result).toEqual({
-      temporal: { status: 'down', message: 'TEMPORAL_ADDRESS is not configured' },
+      temporal: { status: 'down' },
     });
     expect(Connection.lazy).not.toHaveBeenCalled();
   });

@@ -1,4 +1,5 @@
 import type { NatsConnection } from '@nats-io/nats-core';
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import type { DrizzleDB } from '@roviq/database';
@@ -20,6 +21,7 @@ function configWith(values: Record<string, string>): ConfigService {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('runProbe', () => {
@@ -63,15 +65,19 @@ describe('PostgresHealthIndicator', () => {
     expect(db.execute).toHaveBeenCalledTimes(1);
   });
 
-  it('should be down with the driver error when the query fails', async () => {
+  it('should be down without leaking the driver error into the public response', async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const db = createMock<DrizzleDB>({
-      execute: vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+      execute: vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.5:5432')),
     });
     const indicator = new PostgresHealthIndicator(healthIndicatorService, db);
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ postgres: { status: 'down', message: 'ECONNREFUSED' } });
+    expect(result).toEqual({ postgres: { status: 'down' } });
+    expect(warn).toHaveBeenCalledWith(
+      'postgres health check failed: connect ECONNREFUSED 10.0.0.5:5432',
+    );
   });
 });
 
@@ -91,7 +97,7 @@ describe('RedisHealthIndicator', () => {
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ redis: { status: 'down', message: 'closed' } });
+    expect(result).toEqual({ redis: { status: 'down' } });
   });
 });
 
@@ -114,7 +120,7 @@ describe('NatsHealthIndicator', () => {
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ nats: { status: 'down', message: 'CONNECTION_CLOSED' } });
+    expect(result).toEqual({ nats: { status: 'down' } });
   });
 });
 
@@ -146,7 +152,7 @@ describe('MinioHealthIndicator', () => {
     const result = await indicator.isHealthy();
 
     expect(result).toEqual({
-      minio: { status: 'down', message: 'MinIO liveness returned HTTP 503' },
+      minio: { status: 'down' },
     });
   });
 
@@ -157,7 +163,7 @@ describe('MinioHealthIndicator', () => {
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ minio: { status: 'down', message: 'S3_ENDPOINT is not configured' } });
+    expect(result).toEqual({ minio: { status: 'down' } });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

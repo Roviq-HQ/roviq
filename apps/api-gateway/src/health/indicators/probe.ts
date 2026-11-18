@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+
 /** Upper bound for a single dependency check, so one hung dependency cannot stall `/health` or the poller. */
 export const PROBE_TIMEOUT_MS = 2_000;
 
@@ -29,4 +31,11 @@ export async function runProbe(
   } finally {
     clearTimeout(timer);
   }
+}
+
+const logger = new Logger('HealthCheck');
+
+// /health is unauthenticated: the failure reason (hosts, ports, driver text) goes to the log, never the response.
+export function logProbeFailure(dependency: string, result: ProbeResult): void {
+  logger.warn(`${dependency} health check failed: ${result.error ?? 'unknown error'}`);
 }
