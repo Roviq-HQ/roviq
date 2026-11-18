@@ -9,6 +9,7 @@ export * from './holiday';
 export * from './institute';
 export * from './institute-group';
 export * from './leave';
+export * from './monitoring';
 export * from './reseller';
 export * from './timetable';
 export * from './user-profile';

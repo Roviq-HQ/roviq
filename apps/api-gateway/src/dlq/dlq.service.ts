@@ -92,6 +92,17 @@ export class DlqService {
     };
   }
 
+  /** Messages still awaiting an admin decision — the monitoring page's DLQ banner. */
+  async countPending(): Promise<number> {
+    return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {
+      const [row] = await tx
+        .select({ value: sql<number>`count(*)::int` })
+        .from(dlqMessages)
+        .where(eq(dlqMessages.status, 'pending'));
+      return row?.value ?? 0;
+    });
+  }
+
   /** Re-publish a message to its original subject (pending|replayed → replayed). */
   async replay(id: string, replayedBy: string) {
     return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {

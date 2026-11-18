@@ -55,7 +55,15 @@ vi.mock('@temporalio/client', async (importOriginal) => {
   return {
     ...actual,
     Client: FakeTemporalClient,
-    Connection: { connect: vi.fn(() => Promise.resolve({ close: vi.fn() })) },
+    Connection: {
+      connect: vi.fn(() => Promise.resolve({ close: vi.fn() })),
+      // AppModule's TemporalHealthIndicator builds a lazy connection at boot.
+      lazy: vi.fn(() => ({
+        close: vi.fn(() => Promise.resolve()),
+        withDeadline: <T>(_deadline: number, fn: () => Promise<T>) => fn(),
+        healthService: { check: vi.fn(() => Promise.resolve({ status: 1 })) },
+      })),
+    },
   };
 });
 
