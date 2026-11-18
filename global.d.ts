@@ -35,6 +35,8 @@ declare global {
       NEXT_PUBLIC_GRAFANA_URL?: string;
       /** Host port of this instance's isolated NATS test broker (slot 0: 4224). */
       DEV_NATS_TEST_PORT?: string;
+      /** Host port of this instance's dev API gateway (slot 0: 3005). */
+      API_GATEWAY_PORT?: string;
       E2E_API_PORT?: string;
       E2E_WEB_PORT?: string;
       E2E_POSTGRES_PORT?: string;

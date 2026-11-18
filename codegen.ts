@@ -1,6 +1,8 @@
 import type { CodegenConfig } from '@graphql-codegen/cli';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005';
+// The package script sources scripts/instance-env.sh, so API_GATEWAY_PORT is this instance's.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? `http://localhost:${process.env.API_GATEWAY_PORT ?? '3005'}`;
 const LIVE_SCHEMA = `${API_URL}/api/graphql`;
 const LOCAL_SCHEMA = 'libs/frontend/graphql/src/generated/schema.graphql';
 
