@@ -1,3 +1,4 @@
+import type { FieldPolicy } from '@apollo/client/cache';
 import { ApolloClient, InMemoryCache } from '@apollo/client/core';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { ApolloLink } from '@apollo/client/link';
@@ -77,6 +78,30 @@ function processGraphQLError(
     return handleAuthError(config, operation, forward);
   }
   return false;
+}
+
+interface CursorConnection {
+  edges?: readonly unknown[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Cursor pagination for connections whose cursor travels in `filter.after`, not a top-level `after`. */
+export function filterCursorPagination(): FieldPolicy<CursorConnection> {
+  return {
+    keyArgs: (args) => {
+      const filter = isRecord(args?.filter) ? args.filter : {};
+      const { after: _after, first: _first, ...rest } = filter;
+      return `filter:${JSON.stringify(rest)}`;
+    },
+    merge(existing, incoming, { args }) {
+      const after = isRecord(args?.filter) ? args.filter.after : undefined;
+      if (!existing || !after) return incoming;
+      return { ...incoming, edges: [...(existing.edges ?? []), ...(incoming.edges ?? [])] };
+    },
+  };
 }
 
 export function createApolloClient(config: ApolloClientConfig) {
@@ -163,8 +188,12 @@ export function createApolloClient(config: ApolloClientConfig) {
       Query: {
         fields: {
           auditLogs: relayStylePagination(['filter']),
+          adminAuditLogs: relayStylePagination(['filter']),
           subscriptions: relayStylePagination(['filter']),
           invoices: relayStylePagination(['instituteId', 'filter']),
+          adminListUsers: filterCursorPagination(),
+          adminListResellers: filterCursorPagination(),
+          adminListInstitutes: filterCursorPagination(),
         },
       },
     },

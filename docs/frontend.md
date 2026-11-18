@@ -68,6 +68,7 @@ Apollo Client setup:
 - Auth link (injects Bearer token)
 - Error link (handles 401 → auth refresh, network errors)
 - Cache normalization for core entities
+- Load-more pagination: every paginated query field needs a merge policy in `client.ts`, or `fetchMore` replaces page 1 instead of appending. Top-level `first`/`after` args use `relayStylePagination([...])`; connections that take the cursor inside `filter` (`adminListUsers`, `adminListResellers`, `adminListInstitutes`) use `filterCursorPagination()`
 
 ### @roviq/i18n
 Internationalization powered by next-intl and date-fns:
