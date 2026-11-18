@@ -204,6 +204,65 @@ export const DefaultRoles = {
 
 export type DefaultRole = (typeof DefaultRoles)[keyof typeof DefaultRoles];
 
+const FULL_CONTROL_RANK = 100;
+const CUSTOM_ROLE_RANK = 50;
+
+/**
+ * Seniority of the default institute roles. A user may impersonate only
+ * members whose role ranks strictly below their own.
+ */
+export const INSTITUTE_ROLE_RANK: Record<DefaultRole, number> = {
+  // Full control of the institute
+  institute_admin: FULL_CONTROL_RANK,
+  // Head of the institute
+  principal: 90,
+  // Deputy head
+  vice_principal: 80,
+  // Academic and technical leads
+  academic_coordinator: 70,
+  it_admin: 70,
+  // Office and examination staff
+  exam_coordinator: 60,
+  admin_clerk: 60,
+  accountant: 60,
+  // Teaching and specialist staff
+  class_teacher: 50,
+  subject_teacher: 50,
+  activity_teacher: 50,
+  lab_assistant: 50,
+  librarian: 50,
+  transport_incharge: 50,
+  hostel_warden: 50,
+  counselor: 50,
+  sports_coach: 50,
+  receptionist: 50,
+  nurse: 50,
+  // Non-teaching support
+  support_staff: 40,
+  // Learners and their guardians
+  student: 10,
+  parent: 10,
+};
+
+function isDefaultRole(name: string): name is DefaultRole {
+  return Object.hasOwn(INSTITUTE_ROLE_RANK, name);
+}
+
+/**
+ * Rank of an institute role. A role that grants `manage all` ranks with the
+ * institute admin whatever it is called; other custom roles rank as staff.
+ */
+export function instituteRoleRank(
+  roleName: string,
+  abilities: readonly { action: unknown; subject: unknown }[],
+): number {
+  const fullControl = abilities.some(
+    (rule) => rule.action === AppAction.Manage && rule.subject === AppSubject.All,
+  );
+  if (fullControl) return FULL_CONTROL_RANK;
+  return isDefaultRole(roleName) ? INSTITUTE_ROLE_RANK[roleName] : CUSTOM_ROLE_RANK;
+}
+
 // Auth scopes are now exported from `./enums/auth` (canonical X_VALUES + type
 // + const-object pattern, per the backend-service skill enum convention).
 // Existing `import type { AuthScope } from '@roviq/common-types'` keeps working
@@ -377,6 +436,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     // Principal manages leave approvals + institute-wide holidays.
     { action: 'manage', subject: 'Leave' },
     { action: 'manage', subject: 'Holiday' },
+    // Support: act as a teacher, student or parent ranked below (INSTITUTE_ROLE_RANK).
+    { action: 'impersonate', subject: 'User' },
   ],
 
   // ── 3. vice_principal — same as principal minus TC approval ──

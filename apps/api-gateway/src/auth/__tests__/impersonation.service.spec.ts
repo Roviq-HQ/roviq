@@ -20,11 +20,15 @@
  */
 
 import { randomInt, randomUUID } from 'node:crypto';
-import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
-import type { AppAbility } from '@roviq/common-types';
+import type {
+  AppAbility,
+  InstituteContext,
+  PlatformContext,
+  ResellerContext,
+} from '@roviq/common-types';
 import { ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
@@ -175,6 +179,71 @@ function setTx(tx: unknown): void {
 // ── Common factories ───────────────────────────────────────────
 
 const REASON_VALID = 'investigating attendance bug';
+const FIXED_UUID = 'fixed-uuid-0000-0000-0000-000000000000';
+
+const platformActor: PlatformContext = {
+  _scope: 'platform',
+  scope: 'platform',
+  userId: 'imp-1',
+  membershipId: 'imp-mem',
+  roleId: 'imp-role',
+  type: 'access',
+};
+
+const resellerActor: ResellerContext = {
+  _scope: 'reseller',
+  scope: 'reseller',
+  userId: 'imp-1',
+  membershipId: 'imp-mem',
+  roleId: 'imp-role',
+  type: 'access',
+  resellerId: 'reseller-1',
+};
+
+const instituteActor: InstituteContext = {
+  _scope: 'institute',
+  scope: 'institute',
+  userId: 'imp-1',
+  membershipId: 'imp-mem',
+  roleId: 'imp-role',
+  type: 'access',
+  tenantId: 'tenant-1',
+};
+
+function impersonated(actor: InstituteContext): InstituteContext {
+  return {
+    ...actor,
+    isImpersonated: true,
+    impersonatorId: 'real-admin',
+    impersonationSessionId: 'outer-session',
+  };
+}
+
+const TARGET_USER: SelectStep = { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] };
+const ADMIN_RECIPIENT: SelectStep = { table: 'memberships', rows: [{ userId: 'admin-1' }] };
+const ACTIVE_RESELLER_MEMBERSHIP: SelectStep = {
+  table: 'reseller_memberships',
+  rows: [{ id: 'imp-mem' }],
+};
+const ADMIN_PHONE: SelectStep = {
+  table: 'phone_numbers',
+  rows: [{ countryCode: '+91', number: '9999999999' }],
+};
+
+function targetMembership(roleName: string, roleAbilities: unknown[] = []): SelectStep {
+  return { table: 'memberships', rows: [{ id: 'tgt-mem', roleName, roleAbilities }] };
+}
+
+function actorMembership(roleName: string, roleAbilities: unknown[]): SelectStep {
+  return {
+    table: 'memberships',
+    rows: [{ id: 'imp-mem', roleId: 'imp-role', roleName, roleAbilities }],
+  };
+}
+
+function institute(row: { resellerId: string; requireImpersonationConsent: boolean }): SelectStep {
+  return { table: 'institutes', rows: [{ id: 'tenant-1', ...row }] };
+}
 
 function createSubject() {
   const config = createMock<ConfigService>({
@@ -193,7 +262,8 @@ function createSubject() {
     set: vi.fn().mockResolvedValue('OK'),
     del: vi.fn().mockResolvedValue(1),
     getdel: vi.fn().mockResolvedValue(null),
-    ttl: vi.fn().mockResolvedValue(120),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(1),
   });
   const eventBus = createMock<EventBusService>({ emit: vi.fn() });
 
@@ -227,21 +297,25 @@ describe('ImpersonationService', () => {
     it('rejects reason shorter than 10 chars', async () => {
       const { service } = createSubject();
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', 'short'),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', 'short'),
       ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_FAILED });
     });
 
-    it('rejects an unknown impersonator scope', async () => {
+    it('rejects a caller that is itself an impersonation session', async () => {
       const { service } = createSubject();
+      const { tx } = createTx();
+      setTx(tx);
+
       await expect(
-        service.startImpersonation('imp-1', 'martian', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(impersonated(instituteActor), 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(tx.select).not.toHaveBeenCalled();
     });
 
     it('rejects self-impersonation', async () => {
       const { service } = createSubject();
       await expect(
-        service.startImpersonation('same', 'platform', 'same', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'imp-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
@@ -250,7 +324,7 @@ describe('ImpersonationService', () => {
       const { tx } = createTx({ selects: [{ table: 'users', rows: [] }] });
       setTx(tx);
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
@@ -261,254 +335,233 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
     it('rejects when target has no active membership in the target tenant', async () => {
       const { service } = createSubject();
       const { tx } = createTx({
-        selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          { table: 'memberships', rows: [] },
-        ],
+        selects: [TARGET_USER, { table: 'memberships', rows: [] }],
       });
       setTx(tx);
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_TARGET_INVALID });
     });
 
     it('rejects when target institute is not found', async () => {
       const { service } = createSubject();
       const { tx } = createTx({
-        selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          { table: 'institutes', rows: [] },
-        ],
+        selects: [TARGET_USER, targetMembership('student'), { table: 'institutes', rows: [] }],
       });
       setTx(tx);
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.INSTITUTE_NOT_FOUND });
     });
   });
 
   describe('startImpersonation — OTP gating', () => {
-    it('reseller scope owning the institute always requires OTP and emits AUTH_SECURITY', async () => {
+    it('reseller scope owning the institute always requires OTP and parks the request in Redis', async () => {
       const { service, redis, eventBus } = createSubject();
-      const { tx } = createTx({
+      const { tx, inserted } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: false }],
-          },
-          {
-            table: 'reseller_memberships',
-            rows: [{ resellerId: 'reseller-1' }],
-          },
-          { table: 'institutes', rows: [{ resellerId: 'reseller-1' }] },
-          { table: 'memberships', rows: [{ userId: 'admin-1' }] },
-          {
-            table: 'phone_numbers',
-            rows: [{ countryCode: '+91', number: '9999999999' }],
-          },
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+          ACTIVE_RESELLER_MEMBERSHIP,
+          ADMIN_RECIPIENT,
+          ADMIN_PHONE,
         ],
-        insertReturning: [{ id: 'session-7' }],
       });
       setTx(tx);
 
       const result = await service.startImpersonation(
-        'imp-1',
-        'reseller',
+        resellerActor,
         'tgt-1',
         'tenant-1',
-        REASON_VALID,
+        `  ${REASON_VALID}  `,
+        { ip: '10.0.0.1', userAgent: 'vitest' },
       );
 
-      expect(result).toEqual({ sessionId: 'session-7', requiresOtp: true });
-      expect(redis.set).toHaveBeenCalledWith(
-        `${REDIS_KEYS.IMPERSONATION_OTP}session-7`,
-        expect.stringContaining('"otp":"123456"'),
-        'EX',
-        300,
-      );
+      expect(result).toEqual({ sessionId: FIXED_UUID, requiresOtp: true });
+      // No session row until the OTP is verified.
+      expect(inserted).toEqual([]);
+      expect(redis.set).toHaveBeenCalledTimes(1);
+      const [key, value, mode, ttl] = vi.mocked(redis.set).mock.calls[0];
+      expect(key).toBe(`${REDIS_KEYS.IMPERSONATION_OTP}${FIXED_UUID}`);
+      expect(JSON.parse(String(value))).toEqual({
+        otp: '123456',
+        impersonatorId: 'imp-1',
+        impersonatorScope: 'reseller',
+        targetUserId: 'tgt-1',
+        targetMembershipId: 'tgt-mem',
+        tenantId: 'tenant-1',
+        reason: REASON_VALID,
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        verifierUserId: 'admin-1',
+      });
+      expect(mode).toBe('EX');
+      expect(ttl).toBe(300);
       expect(eventBus.emit).toHaveBeenCalledTimes(1);
-      const emitArgs = vi.mocked(eventBus.emit).mock.calls[0];
-      expect(emitArgs[0]).toBe(NOTIFICATION_SUBJECTS.AUTH_SECURITY);
-      const event = emitArgs[1] as { eventType: string; metadata: { otp: string } };
-      expect(event.eventType).toBe('IMPERSONATION_OTP');
-      expect(event.metadata.otp).toBe('123456');
+      expect(eventBus.emit).toHaveBeenCalledWith(NOTIFICATION_SUBJECTS.AUTH_SECURITY, {
+        tenantId: 'tenant-1',
+        userId: 'admin-1',
+        eventType: 'IMPERSONATION_OTP',
+        metadata: {
+          otp: '123456',
+          recipientPhone: '+919999999999',
+          purpose: 'impersonation_consent',
+          impersonator_id: 'imp-1',
+          target_user_id: 'tgt-1',
+          session_id: FIXED_UUID,
+        },
+      });
     });
 
-    it('reseller scope rejects when institute belongs to a different reseller', async () => {
+    it('reseller scope rejects when the institute belongs to a different reseller than the token', async () => {
       const { service, redis, eventBus } = createSubject();
-      const { tx } = createTx({
+      const { tx, inserted } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: false }],
-          },
-          {
-            table: 'reseller_memberships',
-            rows: [{ resellerId: 'reseller-A' }],
-          },
-          { table: 'institutes', rows: [{ resellerId: 'reseller-B' }] },
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-B', requireImpersonationConsent: false }),
         ],
       });
       setTx(tx);
 
       await expect(
-        service.startImpersonation('imp-1', 'reseller', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(resellerActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(redis.set).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(inserted).toEqual([]);
     });
 
-    it('platform scope with consent flag returns sessionId+requiresOtp and dispatches OTP', async () => {
+    it('reseller scope rejects a caller whose reseller membership is no longer active', async () => {
       const { service, redis, eventBus } = createSubject();
-      const { tx } = createTx({
+      const { tx, inserted } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: true }],
-          },
-          { table: 'memberships', rows: [{ userId: 'admin-1' }] },
-          {
-            table: 'phone_numbers',
-            rows: [{ countryCode: '+91', number: '9999999999' }],
-          },
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+          { table: 'reseller_memberships', rows: [] },
         ],
-        insertReturning: [{ id: 'session-9' }],
+      });
+      setTx(tx);
+
+      await expect(
+        service.startImpersonation(resellerActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(redis.set).not.toHaveBeenCalled();
+      expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(inserted).toEqual([]);
+    });
+
+    it('platform scope with consent flag returns the request id and dispatches OTP without a session row', async () => {
+      const { service, redis, eventBus } = createSubject();
+      const { tx, inserted } = createTx({
+        selects: [
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: true }),
+          ADMIN_RECIPIENT,
+          ADMIN_PHONE,
+        ],
       });
       setTx(tx);
 
       const result = await service.startImpersonation(
-        'imp-1',
-        'platform',
+        platformActor,
         'tgt-1',
         'tenant-1',
         REASON_VALID,
       );
 
-      expect(result).toEqual({ sessionId: 'session-9', requiresOtp: true });
-      expect(redis.set).toHaveBeenCalledWith(
-        `${REDIS_KEYS.IMPERSONATION_OTP}session-9`,
-        expect.any(String),
-        'EX',
-        300,
+      expect(result).toEqual({ sessionId: FIXED_UUID, requiresOtp: true });
+      expect(inserted).toEqual([]);
+      expect(redis.set).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(redis.set).mock.calls[0][0]).toBe(
+        `${REDIS_KEYS.IMPERSONATION_OTP}${FIXED_UUID}`,
       );
-      const emitArgs = vi.mocked(eventBus.emit).mock.calls[0];
-      const event = emitArgs[1] as { eventType: string };
-      expect(event.eventType).toBe('IMPERSONATION_OTP');
+      expect(eventBus.emit).toHaveBeenCalledTimes(1);
     });
 
-    it('platform scope without consent flag skips OTP and returns an exchange code', async () => {
+    it('platform scope without consent flag skips OTP, writes the session and returns an exchange code', async () => {
       const { service, redis, eventBus } = createSubject();
-      const { tx } = createTx({
+      const { tx, inserted } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: false }],
-          },
+          TARGET_USER,
+          targetMembership('institute_admin', [{ action: 'manage', subject: 'all' }]),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
         ],
         insertReturning: [{ id: 'session-11' }],
       });
       setTx(tx);
 
       const result = await service.startImpersonation(
-        'imp-1',
-        'platform',
+        platformActor,
         'tgt-1',
         'tenant-1',
         REASON_VALID,
+        { ip: '10.0.0.1', userAgent: 'vitest' },
       );
 
-      expect(result).toEqual({ code: 'fixed-uuid-0000-0000-0000-000000000000' });
-      // Only the exchange-code SET, no OTP SET
+      expect(result).toEqual({ code: FIXED_UUID });
+      expect(inserted).toHaveLength(1);
+      const row = inserted[0].values as { startedAt: Date; expiresAt: Date };
+      expect(inserted[0].values).toEqual({
+        impersonatorId: 'imp-1',
+        impersonatorScope: 'platform',
+        targetUserId: 'tgt-1',
+        targetTenantId: 'tenant-1',
+        reason: REASON_VALID,
+        ipAddress: '10.0.0.1',
+        userAgent: 'vitest',
+        startedAt: row.startedAt,
+        expiresAt: row.expiresAt,
+        otpVerified: null,
+        otpVerifiedBy: null,
+      });
+      expect(row.expiresAt.getTime() - row.startedAt.getTime()).toBe(60 * 60 * 1000);
       expect(redis.set).toHaveBeenCalledTimes(1);
       expect(redis.set).toHaveBeenCalledWith(
-        `${REDIS_KEYS.IMPERSONATION_CODE}fixed-uuid-0000-0000-0000-000000000000`,
-        expect.any(String),
+        `${REDIS_KEYS.IMPERSONATION_CODE}${FIXED_UUID}`,
+        JSON.stringify({
+          sessionId: 'session-11',
+          targetUserId: 'tgt-1',
+          targetMembershipId: 'tgt-mem',
+          tenantId: 'tenant-1',
+        }),
         'EX',
         30,
       );
-      // No NATS dispatch for IMPERSONATION_OTP
-      const otpEmits = vi
-        .mocked(eventBus.emit)
-        .mock.calls.filter(
-          ([, payload]) => (payload as { eventType?: string })?.eventType === 'IMPERSONATION_OTP',
-        );
-      expect(otpEmits).toHaveLength(0);
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
     it('institute scope (intra-institute) never requires OTP regardless of consent flag', async () => {
-      const { service, redis, eventBus, abilityFactory } = createSubject();
-      const stubAbility = createMock<AppAbility>({ can: vi.fn(() => true) });
-      vi.mocked(abilityFactory.createForUser).mockResolvedValue(stubAbility);
-
+      const { service, redis, eventBus } = createSubject();
       const { tx } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'tgt-mem', tenantId: 'tenant-1', roleId: 'role-student' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: true }],
-          },
-          // validateIntraInstituteImpersonation: impersonator membership lookup
-          {
-            table: 'memberships',
-            rows: [{ id: 'imp-mem', roleId: 'role-admin' }],
-          },
-          // role hierarchy lookup
-          {
-            table: 'roles',
-            rows: [
-              { id: 'role-admin', name: { en: 'institute_admin' } },
-              { id: 'role-student', name: { en: 'student' } },
-            ],
-          },
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: true }),
+          actorMembership('institute_admin', [{ action: 'manage', subject: 'all' }]),
         ],
         insertReturning: [{ id: 'session-13' }],
       });
       setTx(tx);
 
       const result = await service.startImpersonation(
-        'imp-1',
-        'institute',
+        instituteActor,
         'tgt-1',
         'tenant-1',
         REASON_VALID,
       );
 
-      expect(result).toEqual({ code: 'fixed-uuid-0000-0000-0000-000000000000' });
+      expect(result).toEqual({ code: FIXED_UUID });
       const otpSets = vi
         .mocked(redis.set)
         .mock.calls.filter(([key]) => (key as string).startsWith(REDIS_KEYS.IMPERSONATION_OTP));
@@ -518,36 +571,21 @@ describe('ImpersonationService', () => {
 
     it('OTP path: when no institute_admin is found, rejects without writing the Redis OTP key', async () => {
       const { service, redis, eventBus } = createSubject();
-      const otpSetCallsBefore = vi.mocked(redis.set).mock.calls.length;
       const { tx } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: true }],
-          },
-          // institute_admin lookup returns NULL
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: true }),
           { table: 'memberships', rows: [] },
         ],
-        insertReturning: [{ id: 'session-15' }],
       });
       setTx(tx);
 
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE });
 
-      // After Track A's fix the admin lookup happens BEFORE the Redis write,
-      // so the OTP key is never persisted on the no-admin path.
-      const otpSetCalls = vi
-        .mocked(redis.set)
-        .mock.calls.slice(otpSetCallsBefore)
-        .filter(([key]) => (key as string).startsWith(REDIS_KEYS.IMPERSONATION_OTP));
-      expect(otpSetCalls).toHaveLength(0);
+      expect(redis.set).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
@@ -555,157 +593,351 @@ describe('ImpersonationService', () => {
       const { service, redis, eventBus } = createSubject();
       const { tx } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', status: 'ACTIVE' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', requireImpersonationConsent: true }],
-          },
-          // institute_admin found
-          { table: 'memberships', rows: [{ userId: 'admin-1' }] },
-          // primary phone lookup returns empty
+          TARGET_USER,
+          targetMembership('student'),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: true }),
+          ADMIN_RECIPIENT,
           { table: 'phone_numbers', rows: [] },
         ],
-        insertReturning: [{ id: 'session-17' }],
       });
       setTx(tx);
 
       await expect(
-        service.startImpersonation('imp-1', 'platform', 'tgt-1', 'tenant-1', REASON_VALID),
+        service.startImpersonation(platformActor, 'tgt-1', 'tenant-1', REASON_VALID),
       ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE });
 
-      const otpSetCalls = vi
-        .mocked(redis.set)
-        .mock.calls.filter(([key]) => (key as string).startsWith(REDIS_KEYS.IMPERSONATION_OTP));
-      expect(otpSetCalls).toHaveLength(0);
+      expect(redis.set).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
   });
 
+  describe('startImpersonation — intra-institute authorization', () => {
+    const MANAGE_ALL = [{ action: 'manage', subject: 'all' }];
+    const IMPERSONATE = [{ action: 'impersonate', subject: 'User' }];
+
+    function arrange(targetRole: string, targetAbilities: unknown[], actor: SelectStep) {
+      const subject = createSubject();
+      const stub = createTx({
+        selects: [
+          TARGET_USER,
+          targetMembership(targetRole, targetAbilities),
+          institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+          actor,
+        ],
+        insertReturning: [{ id: 'session-21' }],
+      });
+      setTx(stub.tx);
+      return { ...subject, ...stub };
+    }
+
+    it('ranks a target by the most senior of its memberships in the institute', async () => {
+      const { service, inserted } = (() => {
+        const subject = createSubject();
+        const stub = createTx({
+          selects: [
+            TARGET_USER,
+            {
+              table: 'memberships',
+              rows: [
+                { id: 'tgt-mem', roleName: 'student', roleAbilities: [] },
+                { id: 'tgt-mem-2', roleName: 'institute_admin', roleAbilities: MANAGE_ALL },
+              ],
+            },
+            institute({ resellerId: 'reseller-1', requireImpersonationConsent: false }),
+            actorMembership('principal', IMPERSONATE),
+          ],
+        });
+        setTx(stub.tx);
+        return { ...subject, ...stub };
+      })();
+
+      await expect(
+        service.startImpersonation(instituteActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(inserted).toEqual([]);
+    });
+
+    it('rejects a token for a different institute than the target', async () => {
+      const { service, inserted } = arrange(
+        'student',
+        [],
+        actorMembership('institute_admin', MANAGE_ALL),
+      );
+
+      await expect(
+        service.startImpersonation(
+          { ...instituteActor, tenantId: 'tenant-other' },
+          'tgt-1',
+          'tenant-1',
+          REASON_VALID,
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(inserted).toEqual([]);
+    });
+
+    it('rejects when the caller membership is no longer active', async () => {
+      const { service, inserted } = arrange('student', [], { table: 'memberships', rows: [] });
+
+      await expect(
+        service.startImpersonation(instituteActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(inserted).toEqual([]);
+    });
+
+    it('rejects a caller without the impersonate ability', async () => {
+      const { service, abilityFactory, inserted } = arrange(
+        'student',
+        [],
+        actorMembership('class_teacher', []),
+      );
+      vi.mocked(abilityFactory.createForUser).mockResolvedValue(
+        createMock<AppAbility>({ can: vi.fn(() => false) }),
+      );
+
+      await expect(
+        service.startImpersonation(instituteActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(abilityFactory.createForUser).toHaveBeenCalledWith({
+        userId: 'imp-1',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        membershipId: 'imp-mem',
+        roleId: 'imp-role',
+      });
+      expect(inserted).toEqual([]);
+    });
+
+    it.each([
+      ['principal', IMPERSONATE, 'class_teacher', []],
+      ['principal', IMPERSONATE, 'student', []],
+      ['principal', IMPERSONATE, 'parent', []],
+      ['principal', IMPERSONATE, 'vice_principal', []],
+      ['institute_admin', MANAGE_ALL, 'principal', IMPERSONATE],
+      ['institute_admin', MANAGE_ALL, 'custom_role', []],
+    ])('lets %s impersonate a lower-ranked %3$s', async (actorRole, actorAbilities, targetRole, targetAbilities) => {
+      const { service } = arrange(
+        targetRole,
+        targetAbilities,
+        actorMembership(actorRole, actorAbilities),
+      );
+
+      await expect(
+        service.startImpersonation(instituteActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).resolves.toEqual({ code: FIXED_UUID });
+    });
+
+    it.each([
+      ['principal', IMPERSONATE, 'institute_admin', MANAGE_ALL],
+      ['principal', IMPERSONATE, 'principal', IMPERSONATE],
+      ['institute_admin', MANAGE_ALL, 'institute_admin', MANAGE_ALL],
+      // A custom role with manage:all ranks with the institute admin whatever its name.
+      ['principal', IMPERSONATE, 'custom_super_role', MANAGE_ALL],
+      ['institute_admin', MANAGE_ALL, 'custom_super_role', MANAGE_ALL],
+      // A custom role ranks as staff, so it cannot reach other staff.
+      ['custom_role', IMPERSONATE, 'class_teacher', []],
+    ])('refuses %s impersonating %3$s (same or higher rank)', async (actorRole, actorAbilities, targetRole, targetAbilities) => {
+      const { service, inserted, redis } = arrange(
+        targetRole,
+        targetAbilities,
+        actorMembership(actorRole, actorAbilities),
+      );
+
+      await expect(
+        service.startImpersonation(instituteActor, 'tgt-1', 'tenant-1', REASON_VALID),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(inserted).toEqual([]);
+      expect(redis.set).not.toHaveBeenCalled();
+    });
+  });
+
   describe('verifyOtp', () => {
-    // Track A landed: verifyOtp now resolves the session FIRST, binds the
-    // caller to session.impersonatorId, and only then checks the OTP. Every
-    // test below must enqueue an `impersonation_sessions` select for that
-    // initial lookup.
-    const liveSession = {
-      id: 'session-1',
+    const KEY = `${REDIS_KEYS.IMPERSONATION_OTP}request-1`;
+    const ATTEMPTS_KEY = `${KEY}:attempts`;
+    const pending = {
+      otp: '111111',
       impersonatorId: 'imp-1',
+      impersonatorScope: 'reseller',
       targetUserId: 'tgt-1',
-      targetTenantId: 'tenant-1',
-      endedAt: null,
+      targetMembershipId: 'tgt-mem',
+      tenantId: 'tenant-1',
+      reason: REASON_VALID,
+      ip: '10.0.0.1',
+      userAgent: 'vitest',
+      verifierUserId: 'admin-1',
     };
 
-    it('rejects when the impersonation session no longer exists', async () => {
-      const { service } = createSubject();
-      const { tx } = createTx({ selects: [{ table: 'impersonation_sessions', rows: [] }] });
-      setTx(tx);
+    it('rejects a caller that is itself an impersonation session', async () => {
+      const { service, redis } = createSubject();
 
-      await expect(service.verifyOtp('session-1', '123456', 'imp-1')).rejects.toThrow(
-        /session not found/,
-      );
+      await expect(
+        service.verifyOtp(impersonated(instituteActor), 'request-1', '111111'),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(redis.get).not.toHaveBeenCalled();
     });
 
-    it('rejects when caller userId does not match session.impersonatorId', async () => {
-      const { service } = createSubject();
-      const { tx } = createTx({
-        selects: [{ table: 'impersonation_sessions', rows: [liveSession] }],
-      });
-      setTx(tx);
-
-      await expect(service.verifyOtp('session-1', '123456', 'someone-else')).rejects.toThrow(
-        /not authorized for this session/,
-      );
-    });
-
-    it('rejects when the impersonation session has already ended', async () => {
-      const { service } = createSubject();
-      const { tx } = createTx({
-        selects: [
-          {
-            table: 'impersonation_sessions',
-            rows: [{ ...liveSession, endedAt: new Date() }],
-          },
-        ],
-      });
-      setTx(tx);
-
-      await expect(service.verifyOtp('session-1', '123456', 'imp-1')).rejects.toThrow(
-        /already ended/,
-      );
-    });
-
-    it('rejects when OTP key is missing from Redis', async () => {
+    it('rejects when the pending request is missing or expired', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.get).mockResolvedValue(null);
-      const { tx } = createTx({
-        selects: [{ table: 'impersonation_sessions', rows: [liveSession] }],
-      });
-      setTx(tx);
 
-      await expect(service.verifyOtp('session-1', '123456', 'imp-1')).rejects.toThrow(
-        /expired or not found/,
-      );
+      await expect(service.verifyOtp(resellerActor, 'request-1', '111111')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_EXPIRED,
+      });
+      expect(redis.get).toHaveBeenCalledWith(KEY);
     });
 
-    it('on mismatch with attempts < MAX-1 increments counter and preserves TTL via SET', async () => {
+    it('rejects a caller who did not start the request, without spending an attempt', async () => {
       const { service, redis } = createSubject();
-      vi.mocked(redis.get).mockResolvedValue(JSON.stringify({ otp: '111111', attempts: 0 }));
-      vi.mocked(redis.ttl).mockResolvedValue(120);
-      const { tx } = createTx({
-        selects: [{ table: 'impersonation_sessions', rows: [liveSession] }],
-      });
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+
+      await expect(
+        service.verifyOtp({ ...resellerActor, userId: 'someone-else' }, 'request-1', '111111'),
+      ).rejects.toMatchObject({ code: ErrorCode.IMPERSONATION_OTP_INVALID });
+      expect(redis.incr).not.toHaveBeenCalled();
+      expect(redis.getdel).not.toHaveBeenCalled();
+    });
+
+    it('on mismatch below the limit counts the attempt atomically and keeps the request', async () => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.incr).mockResolvedValue(1);
+      const { tx, inserted } = createTx();
       setTx(tx);
 
-      await expect(service.verifyOtp('session-1', '999999', 'imp-1')).rejects.toMatchObject({
+      await expect(service.verifyOtp(resellerActor, 'request-1', '999999')).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_OTP_INVALID,
       });
 
-      expect(redis.set).toHaveBeenCalledWith(
-        `${REDIS_KEYS.IMPERSONATION_OTP}session-1`,
-        JSON.stringify({ otp: '111111', attempts: 1 }),
-        'EX',
-        120,
-      );
+      expect(redis.incr).toHaveBeenCalledWith(ATTEMPTS_KEY);
+      expect(redis.expire).toHaveBeenCalledWith(ATTEMPTS_KEY, 300);
       expect(redis.del).not.toHaveBeenCalled();
+      expect(redis.getdel).not.toHaveBeenCalled();
+      expect(inserted).toEqual([]);
     });
 
-    it('on mismatch reaching MAX_OTP_ATTEMPTS deletes the key and surfaces a max-attempts error', async () => {
+    it('rejects an OTP of a different length', async () => {
       const { service, redis } = createSubject();
-      // attempts=2 → next attempt becomes 3 ≥ MAX_OTP_ATTEMPTS
-      vi.mocked(redis.get).mockResolvedValue(JSON.stringify({ otp: '111111', attempts: 2 }));
-      const { tx } = createTx({
-        selects: [{ table: 'impersonation_sessions', rows: [liveSession] }],
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.incr).mockResolvedValue(1);
+
+      await expect(service.verifyOtp(resellerActor, 'request-1', '1111')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_INVALID,
+      });
+    });
+
+    it('on the third mismatch deletes the request and its counter', async () => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.incr).mockResolvedValue(3);
+      const { tx, inserted } = createTx();
+      setTx(tx);
+
+      await expect(service.verifyOtp(resellerActor, 'request-1', '999999')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
+      });
+      expect(redis.del).toHaveBeenCalledWith(KEY, ATTEMPTS_KEY);
+      expect(inserted).toEqual([]);
+    });
+
+    it('refuses even the correct OTP once the attempts are used up', async () => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      // A parallel guess already took the last attempt.
+      vi.mocked(redis.incr).mockResolvedValue(4);
+      const { tx, inserted } = createTx();
+      setTx(tx);
+
+      await expect(service.verifyOtp(resellerActor, 'request-1', '111111')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
+      });
+      expect(redis.del).toHaveBeenCalledWith(KEY, ATTEMPTS_KEY);
+      expect(redis.getdel).not.toHaveBeenCalled();
+      expect(inserted).toEqual([]);
+    });
+
+    it('rejects when a parallel request consumed the OTP first', async () => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.getdel).mockResolvedValue(null);
+      const { tx, inserted } = createTx();
+      setTx(tx);
+
+      await expect(service.verifyOtp(resellerActor, 'request-1', '111111')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_OTP_EXPIRED,
+      });
+      expect(inserted).toEqual([]);
+    });
+
+    it.each([
+      ['the caller uses a token of another scope', platformActor, []],
+      [
+        'the reseller membership was deactivated meanwhile',
+        resellerActor,
+        [{ table: 'reseller_memberships', rows: [] }],
+      ],
+      [
+        'the institute moved to another reseller meanwhile',
+        resellerActor,
+        [ACTIVE_RESELLER_MEMBERSHIP, { table: 'institutes', rows: [{ resellerId: 'reseller-B' }] }],
+      ],
+    ])('opens no session with the right OTP when %s', async (_label, actor, selects) => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.getdel).mockResolvedValue(JSON.stringify(pending));
+      const { tx, inserted } = createTx({ selects });
+      setTx(tx);
+
+      await expect(service.verifyOtp(actor, 'request-1', '111111')).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
+      expect(inserted).toEqual([]);
+      expect(redis.set).not.toHaveBeenCalled();
+    });
+
+    it('on match consumes the request, writes the verified session and returns an exchange code', async () => {
+      const { service, redis } = createSubject();
+      vi.mocked(redis.get).mockResolvedValue(JSON.stringify(pending));
+      vi.mocked(redis.getdel).mockResolvedValue(JSON.stringify(pending));
+      const { tx, inserted } = createTx({
+        selects: [
+          ACTIVE_RESELLER_MEMBERSHIP,
+          { table: 'institutes', rows: [{ resellerId: 'reseller-1' }] },
+        ],
+        insertReturning: [{ id: 'session-31' }],
       });
       setTx(tx);
 
-      const err = await service.verifyOtp('session-1', '999999', 'imp-1').catch((e: unknown) => e);
-      expect(err).toMatchObject({ code: ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED });
-      expect((err as UnauthorizedException).message).toContain('maximum attempts exceeded');
-      expect(redis.del).toHaveBeenCalledWith(`${REDIS_KEYS.IMPERSONATION_OTP}session-1`);
-      // The mismatch branch must not also persist a fresh attempt counter
-      const otpSetCalls = vi
-        .mocked(redis.set)
-        .mock.calls.filter(([key]) => (key as string).startsWith(REDIS_KEYS.IMPERSONATION_OTP));
-      expect(otpSetCalls).toHaveLength(0);
-    });
+      const result = await service.verifyOtp(resellerActor, 'request-1', '111111');
 
-    it('on match deletes the OTP key, issues an exchange code, and returns it', async () => {
-      const { service, redis } = createSubject();
-      vi.mocked(redis.get).mockResolvedValue(JSON.stringify({ otp: '123456', attempts: 0 }));
-      const { tx } = createTx({
-        selects: [{ table: 'impersonation_sessions', rows: [liveSession] }],
+      expect(result).toEqual({ code: FIXED_UUID });
+      expect(redis.getdel).toHaveBeenCalledWith(KEY);
+      expect(redis.del).toHaveBeenCalledWith(ATTEMPTS_KEY);
+      // The attempt is reserved before the comparison.
+      expect(redis.incr).toHaveBeenCalledTimes(1);
+      expect(redis.incr).toHaveBeenCalledWith(ATTEMPTS_KEY);
+      expect(inserted).toHaveLength(1);
+      const row = inserted[0].values as { startedAt: Date; expiresAt: Date; otpVerified: Date };
+      expect(inserted[0].values).toEqual({
+        impersonatorId: 'imp-1',
+        impersonatorScope: 'reseller',
+        targetUserId: 'tgt-1',
+        targetTenantId: 'tenant-1',
+        reason: REASON_VALID,
+        ipAddress: '10.0.0.1',
+        userAgent: 'vitest',
+        startedAt: row.startedAt,
+        expiresAt: row.expiresAt,
+        otpVerified: row.startedAt,
+        otpVerifiedBy: 'admin-1',
       });
-      setTx(tx);
-
-      const result = await service.verifyOtp('session-1', '123456', 'imp-1');
-      expect(result).toEqual({ code: 'fixed-uuid-0000-0000-0000-000000000000' });
-      expect(redis.del).toHaveBeenCalledWith(`${REDIS_KEYS.IMPERSONATION_OTP}session-1`);
+      expect(row.otpVerified).toBeInstanceOf(Date);
       expect(redis.set).toHaveBeenCalledWith(
-        `${REDIS_KEYS.IMPERSONATION_CODE}fixed-uuid-0000-0000-0000-000000000000`,
-        expect.any(String),
+        `${REDIS_KEYS.IMPERSONATION_CODE}${FIXED_UUID}`,
+        JSON.stringify({
+          sessionId: 'session-31',
+          targetUserId: 'tgt-1',
+          targetMembershipId: 'tgt-mem',
+          tenantId: 'tenant-1',
+        }),
         'EX',
         30,
       );
@@ -713,19 +945,46 @@ describe('ImpersonationService', () => {
   });
 
   describe('exchangeCode', () => {
+    const CODE_PAYLOAD = JSON.stringify({
+      sessionId: 'session-1',
+      targetUserId: 'tgt-1',
+      targetMembershipId: 'mem-1',
+      tenantId: 'tenant-1',
+    });
+    const EXCHANGE_USER = { table: 'users', rows: [{ id: 'tgt-1', username: 'student-jane' }] };
+    const EXCHANGE_MEMBERSHIP = {
+      table: 'memberships',
+      rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-student' }],
+    };
+    const EXCHANGE_INSTITUTE = {
+      table: 'institutes',
+      rows: [{ id: 'tenant-1', name: { en: 'Test Institute' }, resellerId: 'reseller-1' }],
+    };
+    const liveSession = (overrides: Record<string, unknown> = {}) => ({
+      table: 'impersonation_sessions',
+      rows: [
+        {
+          id: 'session-1',
+          impersonatorId: 'imp-1',
+          endedAt: null,
+          expiresAt: new Date(Date.now() + 60_000),
+          ...overrides,
+        },
+      ],
+    });
+
     it('rejects when the code is not in Redis', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(null);
       await expect(service.exchangeCode('missing-code')).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_CODE_EXPIRED,
       });
+      expect(redis.getdel).toHaveBeenCalledWith(`${REDIS_KEYS.IMPERSONATION_CODE}missing-code`);
     });
 
     it('rejects when the target user is no longer ACTIVE', async () => {
       const { service, redis } = createSubject();
-      vi.mocked(redis.getdel).mockResolvedValue(
-        JSON.stringify({ sessionId: 'session-1', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
-      );
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
       const { tx } = createTx({
         selects: [
           { table: 'users', rows: [] },
@@ -736,53 +995,54 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      await expect(service.exchangeCode('code-1')).rejects.toThrow(/no longer active/);
+      await expect(service.exchangeCode('code-1')).rejects.toMatchObject({
+        code: ErrorCode.ACCOUNT_INACTIVE,
+      });
     });
 
     it('rejects when the target lost their active membership', async () => {
       const { service, redis } = createSubject();
-      vi.mocked(redis.getdel).mockResolvedValue(
-        JSON.stringify({ sessionId: 'session-1', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
-      );
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
       const { tx } = createTx({
         selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', username: 'student-jane' }] },
+          EXCHANGE_USER,
           { table: 'memberships', rows: [] },
-          {
-            table: 'impersonation_sessions',
-            rows: [{ id: 'session-1', impersonatorId: 'imp-1' }],
-          },
-          { table: 'institutes', rows: [{ id: 'tenant-1', name: { en: 'Test' } }] },
+          liveSession(),
+          EXCHANGE_INSTITUTE,
         ],
       });
       setTx(tx);
 
-      await expect(service.exchangeCode('code-1')).rejects.toThrow(/no longer has an active/);
+      await expect(service.exchangeCode('code-1')).rejects.toMatchObject({
+        code: ErrorCode.NO_ACTIVE_MEMBERSHIP,
+      });
     });
 
-    it('happy path returns AccessToken + user + institute', async () => {
+    it.each([
+      ['ended or revoked', { endedAt: new Date() }],
+      ['past its expiry', { expiresAt: new Date(Date.now() - 1000) }],
+    ])('issues no token when the session is %s', async (_label, overrides) => {
       const { service, redis, jwt, authEventService } = createSubject();
-      vi.mocked(redis.getdel).mockResolvedValue(
-        JSON.stringify({ sessionId: 'session-1', targetUserId: 'tgt-1', tenantId: 'tenant-1' }),
-      );
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
+      const { tx } = createTx({
+        selects: [EXCHANGE_USER, EXCHANGE_MEMBERSHIP, liveSession(overrides), EXCHANGE_INSTITUTE],
+      });
+      setTx(tx);
+
+      await expect(service.exchangeCode('code-1')).rejects.toMatchObject({
+        code: ErrorCode.IMPERSONATION_SESSION_INVALID,
+      });
+      expect(jwt.sign).not.toHaveBeenCalled();
+      expect(authEventService.emit).not.toHaveBeenCalled();
+    });
+
+    it('happy path returns a 15-minute token carrying the impersonation and reseller claims', async () => {
+      const { service, redis, jwt, authEventService } = createSubject();
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
       vi.mocked(jwt.sign).mockReturnValue('fake-jwt');
 
       const { tx } = createTx({
-        selects: [
-          { table: 'users', rows: [{ id: 'tgt-1', username: 'student-jane' }] },
-          {
-            table: 'memberships',
-            rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-student' }],
-          },
-          {
-            table: 'impersonation_sessions',
-            rows: [{ id: 'session-1', impersonatorId: 'imp-1' }],
-          },
-          {
-            table: 'institutes',
-            rows: [{ id: 'tenant-1', name: { en: 'Test Institute' } }],
-          },
-        ],
+        selects: [EXCHANGE_USER, EXCHANGE_MEMBERSHIP, liveSession(), EXCHANGE_INSTITUTE],
       });
       setTx(tx);
 
@@ -792,109 +1052,221 @@ describe('ImpersonationService', () => {
         user: { id: 'tgt-1', username: 'student-jane' },
         institute: { id: 'tenant-1', name: { en: 'Test Institute' } },
       });
+      expect(jwt.sign).toHaveBeenCalledWith(
+        {
+          sub: 'tgt-1',
+          scope: 'institute',
+          tenantId: 'tenant-1',
+          resellerId: 'reseller-1',
+          membershipId: 'mem-1',
+          roleId: 'role-student',
+          isImpersonated: true,
+          impersonatorId: 'imp-1',
+          impersonationSessionId: 'session-1',
+          type: 'access',
+        },
+        { secret: 'test-secret', expiresIn: 900 },
+      );
       // Allow the fire-and-forget audit emit a chance to run before assertion.
       await Promise.resolve();
-      expect(authEventService.emit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'imp-1',
-          type: 'impersonation_start',
-          tenantId: 'tenant-1',
-        }),
-      );
+      expect(authEventService.emit).toHaveBeenCalledWith({
+        userId: 'imp-1',
+        type: 'impersonation_start',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        metadata: {
+          target_user_id: 'tgt-1',
+          target_tenant_id: 'tenant-1',
+          session_id: 'session-1',
+        },
+      });
     });
   });
 
   describe('endImpersonation', () => {
+    const session = (overrides: Record<string, unknown> = {}) => ({
+      table: 'impersonation_sessions',
+      rows: [
+        {
+          id: 'session-1',
+          impersonatorId: 'imp-1',
+          impersonatorScope: 'reseller',
+          targetUserId: 'tgt-1',
+          targetTenantId: 'tenant-1',
+          endedAt: null,
+          ...overrides,
+        },
+      ],
+    });
+    const outsider = { userId: 'someone-else', membershipId: 'other-mem', roleId: 'other-role' };
+
+    function withAbility(abilityFactory: AbilityFactory, allowed: boolean) {
+      vi.mocked(abilityFactory.createForUser).mockResolvedValue(
+        createMock<AppAbility>({ can: vi.fn(() => allowed) }),
+      );
+    }
+
     it('rejects when the session is not found', async () => {
       const { service } = createSubject();
       const { tx } = createTx({ selects: [{ table: 'impersonation_sessions', rows: [] }] });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', 'imp-1')).rejects.toMatchObject({
+      await expect(service.endImpersonation('session-1', platformActor)).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_SESSION_INVALID,
       });
     });
 
     it('rejects when the session is already ended', async () => {
       const { service } = createSubject();
-      const { tx } = createTx({
-        selects: [
-          {
-            table: 'impersonation_sessions',
-            rows: [
-              {
-                id: 'session-1',
-                impersonatorId: 'imp-1',
-                targetUserId: 'tgt-1',
-                endedAt: new Date(),
-              },
-            ],
-          },
-        ],
-      });
+      const { tx, updated } = createTx({ selects: [session({ endedAt: new Date() })] });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', 'imp-1')).rejects.toMatchObject({
+      await expect(service.endImpersonation('session-1', platformActor)).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_SESSION_INVALID,
       });
+      expect(updated).toEqual([]);
     });
 
-    it('rejects when caller is neither impersonator nor target', async () => {
-      const { service } = createSubject();
-      const { tx } = createTx({
-        selects: [
-          {
-            table: 'impersonation_sessions',
-            rows: [
-              {
-                id: 'session-1',
-                impersonatorId: 'imp-1',
-                targetUserId: 'tgt-1',
-                endedAt: null,
-              },
-            ],
-          },
-        ],
-      });
-      setTx(tx);
-      await expect(service.endImpersonation('session-1', 'someone-else')).rejects.toMatchObject({
-        code: ErrorCode.FORBIDDEN,
-      });
-    });
-
-    it('happy path: updates row, deletes session cache, emits impersonation_end', async () => {
-      const { service, redis, authEventService } = createSubject();
-      const { tx, updated } = createTx({
-        selects: [
-          {
-            table: 'impersonation_sessions',
-            rows: [
-              {
-                id: 'session-1',
-                impersonatorId: 'imp-1',
-                targetUserId: 'tgt-1',
-                endedAt: null,
-              },
-            ],
-          },
-        ],
-      });
+    it('impersonator ends its own session as manual, clears the cache and emits impersonation_end', async () => {
+      const { service, redis, authEventService, abilityFactory } = createSubject();
+      const { tx, updated } = createTx({ selects: [session()] });
       setTx(tx);
 
-      await service.endImpersonation('session-1', 'imp-1');
+      await service.endImpersonation('session-1', resellerActor);
 
       expect(updated).toHaveLength(1);
       const setValues = updated[0].values as { endedAt: Date; endedReason: string };
       expect(setValues.endedReason).toBe('manual');
       expect(setValues.endedAt).toBeInstanceOf(Date);
+      expect(abilityFactory.createForUser).not.toHaveBeenCalled();
       expect(redis.del).toHaveBeenCalledWith(`${REDIS_KEYS.IMPERSONATION_SESSION}session-1`);
+      expect(redis.set).toHaveBeenCalledWith(
+        `${REDIS_KEYS.IMPERSONATION_SESSION}session-1:tombstone`,
+        '1',
+        'EX',
+        70,
+      );
       // Allow the fire-and-forget audit emit a chance to run before assertion.
       await Promise.resolve();
-      expect(authEventService.emit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'imp-1',
-          type: 'impersonation_end',
-          metadata: expect.objectContaining({ session_id: 'session-1', ended_reason: 'manual' }),
-        }),
+      expect(authEventService.emit).toHaveBeenCalledWith({
+        userId: 'imp-1',
+        type: 'impersonation_end',
+        metadata: { session_id: 'session-1', ended_reason: 'manual' },
+      });
+    });
+
+    it('the impersonated user ends the session from the impersonation token as manual', async () => {
+      const { service } = createSubject();
+      const { tx, updated } = createTx({ selects: [session()] });
+      setTx(tx);
+
+      await service.endImpersonation(
+        'session-1',
+        impersonated({ ...instituteActor, userId: 'tgt-1' }),
       );
+
+      expect((updated[0].values as { endedReason: string }).endedReason).toBe('manual');
+    });
+
+    it('an impersonation token cannot end a session it is not part of', async () => {
+      const { service, abilityFactory } = createSubject();
+      const { tx, updated } = createTx({ selects: [session()] });
+      setTx(tx);
+
+      await expect(
+        service.endImpersonation('session-1', impersonated({ ...instituteActor, ...outsider })),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(abilityFactory.createForUser).not.toHaveBeenCalled();
+      expect(updated).toEqual([]);
+    });
+
+    it('a platform user with the impersonate ability revokes any session', async () => {
+      const { service, abilityFactory, authEventService } = createSubject();
+      withAbility(abilityFactory, true);
+      const { tx, updated } = createTx({ selects: [session()] });
+      setTx(tx);
+
+      await service.endImpersonation('session-1', { ...platformActor, ...outsider });
+
+      expect((updated[0].values as { endedReason: string }).endedReason).toBe('revoked');
+      await Promise.resolve();
+      expect(authEventService.emit).toHaveBeenCalledWith({
+        userId: 'someone-else',
+        type: 'impersonation_end',
+        metadata: { session_id: 'session-1', ended_reason: 'revoked' },
+      });
+    });
+
+    it('a third party without the impersonate ability is refused', async () => {
+      const { service, abilityFactory } = createSubject();
+      withAbility(abilityFactory, false);
+      const { tx, updated } = createTx({ selects: [session()] });
+      setTx(tx);
+
+      await expect(
+        service.endImpersonation('session-1', { ...platformActor, ...outsider }),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(updated).toEqual([]);
+    });
+
+    it('a reseller user revokes a session started by a teammate', async () => {
+      const { service, abilityFactory } = createSubject();
+      withAbility(abilityFactory, true);
+      const { tx, updated } = createTx({
+        selects: [session(), { table: 'reseller_memberships', rows: [{ id: 'team-mem' }] }],
+      });
+      setTx(tx);
+
+      await service.endImpersonation('session-1', { ...resellerActor, ...outsider });
+
+      expect((updated[0].values as { endedReason: string }).endedReason).toBe('revoked');
+    });
+
+    it('a reseller user cannot revoke a session started outside their team', async () => {
+      const { service, abilityFactory } = createSubject();
+      withAbility(abilityFactory, true);
+      const { tx, updated } = createTx({
+        selects: [session(), { table: 'reseller_memberships', rows: [] }],
+      });
+      setTx(tx);
+
+      await expect(
+        service.endImpersonation('session-1', { ...resellerActor, ...outsider }),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(updated).toEqual([]);
+    });
+
+    it('a reseller user cannot revoke a platform-started session', async () => {
+      const { service, abilityFactory } = createSubject();
+      withAbility(abilityFactory, true);
+      const { tx, updated } = createTx({ selects: [session({ impersonatorScope: 'platform' })] });
+      setTx(tx);
+
+      await expect(
+        service.endImpersonation('session-1', { ...resellerActor, ...outsider }),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(updated).toEqual([]);
+    });
+
+    it('an institute admin revokes a session into their own institute', async () => {
+      const { service, abilityFactory } = createSubject();
+      withAbility(abilityFactory, true);
+      const { tx, updated } = createTx({ selects: [session()] });
+      setTx(tx);
+
+      await service.endImpersonation('session-1', { ...instituteActor, ...outsider });
+
+      expect((updated[0].values as { endedReason: string }).endedReason).toBe('revoked');
+    });
+
+    it('an institute admin cannot revoke a session into another institute', async () => {
+      const { service, abilityFactory } = createSubject();
+      withAbility(abilityFactory, true);
+      const { tx, updated } = createTx({ selects: [session({ targetTenantId: 'tenant-other' })] });
+      setTx(tx);
+
+      await expect(
+        service.endImpersonation('session-1', { ...instituteActor, ...outsider }),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(updated).toEqual([]);
     });
   });
 

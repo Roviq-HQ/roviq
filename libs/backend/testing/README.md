@@ -153,6 +153,6 @@ Re-exported from `@golevelup/ts-vitest`. Available from both subpaths.
 ## What this lib does NOT do
 
 - **Mock Temporal.** Tests that hit resolvers enqueueing Temporal workflows (TC issuance, bulk imports, audit partition management) will try to connect to a real Temporal server. Mock the client manually via `overrides`.
-- **Provide a fully-featured Redis fake.** The default Redis mock only stubs `get`/`set`/`del`. Tests that exercise rate limiting, ws-tickets, or pipeline ops need to override `REDIS_CLIENT` themselves.
+- **Provide a fully-featured Redis fake.** The default Redis mock only stubs `get`/`set`/`del` and stores nothing. For flows that read back what they wrote (one-time codes, OTP requests, ws-tickets), pass `overrides: [{ provide: REDIS_CLIENT, useValue: createInMemoryRedis() }]` — it implements `get`, `set … EX`, `getdel`, `del`, `incr`, `expire` and `ttl`. Rate limiting or pipeline ops still need their own override.
 - **Create academic years, branding, configs, identifiers, or any non-essential institute children.** `createTestInstitute` is intentionally minimal so unrelated tests don't pay for setup they don't use. Extend the factory only when a real test needs more.
 - **Clean up the audit_logs partition.** If a test inserts audit rows manually, it must delete them in `afterAll`.

@@ -218,13 +218,40 @@ A new `institutes.require_impersonation_consent BOOLEAN NOT NULL DEFAULT false` 
 Flow when the OTP gate fires:
 
 1. Caller invokes `<scope>StartImpersonation(input)`.
-2. Backend creates the `impersonation_sessions` row, generates a 6-digit OTP, stores it at Redis key `impersonation-otp:{sessionId}` with `EX 300` (5 min), and emits `NOTIFICATION.auth.security` with `eventType: 'IMPERSONATION_OTP'`. The notification-service delivers it to the institute admin via Novu.
-3. Resolver returns `{ sessionId, requiresOtp: true }` instead of `{ code }`.
+2. Backend generates a 6-digit OTP and parks the whole request (impersonator, target, reason, IP, recipient) at Redis key `impersonation-otp:{requestId}` with `EX 300` (5 min). It emits `NOTIFICATION.auth.security` with `eventType: 'IMPERSONATION_OTP'`; the notification-service delivers it via Novu to the institute's longest-standing active `institute_admin`. **No `impersonation_sessions` row exists yet**, so an abandoned request never shows up as an active session.
+3. Resolver returns `{ sessionId, requiresOtp: true }` instead of `{ code }`. `sessionId` here is the pending request id.
 4. Institute admin reads the OTP and shares it with the impersonator out-of-band.
 5. Caller submits `<scope>VerifyImpersonationOtp(sessionId, otp)`.
-   - Wrong OTP increments an attempt counter; after **3 wrong attempts** the OTP key is invalidated and the session is marked failed.
-   - Correct OTP returns the same `{ code }` payload the no-OTP path returns and the existing new-tab exchange flow takes over.
+   - Only the user who started the request may verify it; anyone else is refused without spending an attempt.
+   - With the right OTP the scope checks of the start step run again (same scope, reseller membership still active, institute still owned by that reseller) before the session is written.
+   - Every attempt is reserved with an atomic `INCR` on `impersonation-otp:{requestId}:attempts` before the OTP is compared, so parallel guesses cannot share an attempt; after **3 wrong attempts** the request is deleted.
+   - Correct OTP consumes the request with `GETDEL`, writes the session row with `otp_verified` and `otp_verified_by` (the admin the OTP went to), and returns the same `{ code }` payload the no-OTP path returns.
 6. When OTP is not required (institute has consent disabled and impersonator is platform), `startImpersonation` returns `{ code, requiresOtp: false }` directly.
+
+### Who may impersonate whom (ROV-94)
+
+- Starting impersonation and verifying its OTP need `impersonate User` in every scope. By default: `platform_admin`, `platform_support`, `reseller_full_admin`, `reseller_support_admin`, `institute_admin` and `principal`.
+- **Reseller**: the institute's `reseller_id` must equal the `resellerId` in the caller's token, and that reseller membership must still be active.
+- **Intra-institute**: the target's role must rank strictly below the caller's (`INSTITUTE_ROLE_RANK` / `instituteRoleRank()` in `@roviq/common-types`). A target with several memberships in the institute is ranked by the most senior one. An institute admin cannot impersonate another institute admin; a principal reaches teachers, students and parents but not the admin. Any role granting `manage all` ranks with the institute admin whatever it is called; other custom roles rank as staff.
+- **No nesting**: an impersonation token can neither start nor OTP-verify another impersonation.
+- The impersonation token carries the same `resellerId` claim as a normal institute token, lasts 15 minutes and has no refresh token.
+- The membership checked at start is pinned in the OTP request and the one-time code; `exchangeImpersonationCode` issues the token for exactly that membership.
+- `exchangeImpersonationCode` issues no token if the session was ended or has expired since the code was created.
+- Frontend: a tab holding `roviq-impersonation-token` loads the impersonated user through `me` (`AuthProvider` `currentUserQuery`) and acts as that user, whether or not the impersonator has a session of their own in the browser. A rejected token is dropped and the tab is signed out.
+
+### Ending and revoking a session (ROV-94)
+
+`adminEndImpersonation`, `resellerEndImpersonation` and `endImpersonation` all call `ImpersonationService.endImpersonation(sessionId, actor)`:
+
+| Caller | Result |
+|---|---|
+| The impersonator, or the impersonated user (from the impersonation token) | `ended_reason = 'manual'` |
+| A platform user with `impersonate User` | `revoked` — any session |
+| A reseller user with `impersonate User` | `revoked` — sessions started by their own reseller team |
+| An institute user with `impersonate User` | `revoked` — sessions into their own institute |
+| Anyone else, or an impersonation token for a different session | `FORBIDDEN` |
+
+Either way the next request with that impersonation token fails with `IMPERSONATION_ENDED`.
 
 ### Session Revocation Guard
 

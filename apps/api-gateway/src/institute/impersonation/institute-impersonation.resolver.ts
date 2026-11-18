@@ -9,7 +9,6 @@ import {
 } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { StartImpersonationResult } from '../../auth/dto/impersonation.dto';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ImpersonationService } from '../../auth/impersonation.service';
@@ -29,15 +28,8 @@ export class InstituteImpersonationResolver {
     @Context() ctx: GqlContext,
   ): Promise<StartImpersonationResult> {
     assertTenantContext(user);
-    if (!user.tenantId) {
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Institute scope required for intra-institute impersonation',
-      );
-    }
     return this.impersonationService.startImpersonation(
-      user.userId,
-      user.scope,
+      user,
       targetUserId,
       user.tenantId,
       reason,
@@ -51,7 +43,7 @@ export class InstituteImpersonationResolver {
     @Args('sessionId') sessionId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<boolean> {
-    await this.impersonationService.endImpersonation(sessionId, user.userId);
+    await this.impersonationService.endImpersonation(sessionId, user);
     return true;
   }
 }

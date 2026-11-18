@@ -521,3 +521,73 @@ describe('account language preference', () => {
     expect(result.current.preferredLocale).toBeNull();
   });
 });
+
+describe('AuthProvider — impersonation tab', () => {
+  const IMPERSONATED_USER: AuthUser = { ...MOCK_USER, id: 'target-1', username: 'teacher1' };
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  it('should act as the impersonated user when the tab holds only an impersonation token', async () => {
+    const token = makeJwt(FUTURE);
+    sessionStorage.setItem('roviq-impersonation-token', token);
+    const currentUserQuery = vi.fn().mockResolvedValue(IMPERSONATED_USER);
+
+    const { result } = renderUseAuth({ ...makeDefaultProps(), currentUserQuery });
+
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    expect(currentUserQuery).toHaveBeenCalledWith(token);
+    expect(result.current.user).toEqual(IMPERSONATED_USER);
+    expect(result.current.getAccessToken()).toBe(token);
+    expect(result.current.getRefreshToken()).toBeNull();
+  });
+
+  it('should show the impersonated user even when the impersonator has a session of their own', async () => {
+    sessionStorage.setItem('roviq-institute-access-token', makeJwt(FUTURE));
+    localStorage.setItem('roviq-institute-refresh-token', 'rt');
+    localStorage.setItem('roviq-institute-user', JSON.stringify(MOCK_USER));
+    sessionStorage.setItem('roviq-impersonation-token', makeJwt(FUTURE));
+    const props = {
+      ...makeDefaultProps(),
+      currentUserQuery: vi.fn().mockResolvedValue(IMPERSONATED_USER),
+    };
+
+    const { result } = renderUseAuth(props);
+
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    expect(result.current.user).toEqual(IMPERSONATED_USER);
+    expect(props.refreshMutation).not.toHaveBeenCalled();
+    // The impersonator's own session is left untouched.
+    expect(localStorage.getItem('roviq-institute-refresh-token')).toBe('rt');
+  });
+
+  it('should drop a rejected impersonation token and stay signed out', async () => {
+    sessionStorage.setItem('roviq-impersonation-token', makeJwt(FUTURE));
+    const currentUserQuery = vi.fn().mockRejectedValue(new Error('IMPERSONATION_ENDED'));
+
+    const { result } = renderUseAuth({ ...makeDefaultProps(), currentUserQuery });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.user).toBeNull();
+    expect(sessionStorage.getItem('roviq-impersonation-token')).toBeNull();
+  });
+
+  it('should ignore an expired impersonation token', async () => {
+    sessionStorage.setItem('roviq-impersonation-token', makeJwt(PAST));
+    const currentUserQuery = vi.fn();
+
+    const { result } = renderUseAuth({ ...makeDefaultProps(), currentUserQuery });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(currentUserQuery).not.toHaveBeenCalled();
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+});
