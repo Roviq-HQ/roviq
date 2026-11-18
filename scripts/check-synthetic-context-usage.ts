@@ -120,6 +120,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-290: isolated reseller/group fixtures and direct group-link assertions only.
   'apps/api-gateway/src/reseller/institute-group/__tests__/reseller-institute-group.integration.spec.ts',
   'apps/api-gateway/src/reseller/team/reseller-team.service.ts',
+  // ROV-101 fixture: reads the teacher role's stored name to compare with the API.
+  'apps/api-gateway/src/reseller/user/__tests__/user-listing-roles.integration.spec.ts',
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',
