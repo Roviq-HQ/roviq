@@ -1,6 +1,6 @@
 {
-  "id": "38a56db2-d186-4668-a15d-827a1c9147ef",
-  "prevIds": ["1b24e1c1-e570-47eb-b048-a6359c9f5c04"],
+  "id": "e96051f0-8e55-4282-b3e4-0a014b2d0ea3",
+  "prevIds": ["15e00f51-6f33-426c-a1aa-50b30a4caa40"],
   "version": "8",
   "dialect": "postgres",
   "ddl": [
@@ -3446,6 +3446,19 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "name": "portal",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
       "name": "scope",
       "entityType": "columns",
       "schema": "public",
@@ -3530,7 +3543,7 @@
       "table": "auth_events"
     },
     {
-      "type": "text",
+      "type": "varchar(40)",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -27720,6 +27733,48 @@
       "entityType": "checks",
       "schema": "public",
       "table": "audit_logs"
+    },
+    {
+      "value": "\"portal\" IN ('platform', 'reseller', 'institute')",
+      "name": "chk_auth_events_portal",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "value": "\"scope\" IN ('platform', 'reseller', 'institute')",
+      "name": "chk_auth_events_scope",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "value": "\"failure_reason\" IN ('UNKNOWN_USER', 'INVALID_PASSWORD', 'ACCOUNT_INACTIVE', 'ACCOUNT_LOCKED', 'NO_PORTAL_ACCESS', 'PASSKEY_UNKNOWN', 'PASSKEY_VERIFICATION_FAILED', 'TOO_MANY_ATTEMPTS')",
+      "name": "chk_auth_events_failure_reason",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "value": "\"event_type\" NOT IN ('login_success', 'login_failed', 'account_locked') OR \"portal\" IS NOT NULL",
+      "name": "chk_auth_events_login_portal",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "value": "\"event_type\" <> 'login_success' OR \"scope\" = \"portal\"",
+      "name": "chk_auth_events_login_success_scope",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "value": "\"event_type\" NOT IN ('login_failed', 'account_locked') OR (\"scope\" IS NULL AND \"tenant_id\" IS NULL AND \"reseller_id\" IS NULL AND \"failure_reason\" IS NOT NULL)",
+      "name": "chk_auth_events_refused_attempt",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "auth_events"
     },
     {
       "value": "\"impersonator_scope\" IN ('platform', 'reseller', 'institute')",
