@@ -46,6 +46,9 @@ const REMOVE = `mutation ($instituteId: ID!) {
   resellerRemoveInstituteFromGroup(instituteId: $instituteId)
 }`;
 const MY_GROUP = 'query { myInstituteGroup { id } }';
+const CREATE_REQUEST = `mutation ($input: ResellerCreateInstituteRequestInput!) {
+  resellerCreateInstituteRequest(input: $input) { id groupId }
+}`;
 
 interface ListData {
   resellerListInstituteGroups: {
@@ -177,6 +180,11 @@ describe('Reseller institute groups (integration)', () => {
     for (const tenant of [a1, a2, b1]) {
       if (tenant) await cleanupTestInstitute(result.db, tenant);
     }
+    // Institutes created through the API in these tests, if one failed before its own cleanup.
+    const resellerIds = [r1, r2, r3].filter(Boolean).map((r) => r.resellerId);
+    await withAdmin(result.db, mkAdminCtx(CTX), async (tx) => {
+      await tx.delete(institutes).where(inArray(institutes.resellerId, resellerIds));
+    });
     const groupIds = [platformGroupId, g1, g2].filter((id): id is string => Boolean(id));
     if (groupIds.length > 0) {
       await withAdmin(result.db, mkAdminCtx(CTX), async (tx) => {
@@ -298,5 +306,57 @@ describe('Reseller institute groups (integration)', () => {
     });
     expect(none.errors).toBeUndefined();
     expect(none.data?.myInstituteGroup).toBeNull();
+  });
+
+  describe('institute request with a group', () => {
+    const requestInput = (groupId: string) => {
+      const suffix = `${Date.now().toString(36)}${Math.floor(performance.now())}`;
+      return { name: { en: `Requested ${suffix}` }, slug: `req-${suffix}`, groupId };
+    };
+
+    async function instituteCount(resellerId: string): Promise<number> {
+      return withAdmin(result.db, mkAdminCtx(CTX), async (tx) => {
+        const rows = await tx
+          .select({ id: institutes.id })
+          .from(institutes)
+          .where(eq(institutes.resellerId, resellerId));
+        return rows.length;
+      });
+    }
+
+    it.each([
+      ['another reseller’s group', () => g2],
+      ['a platform-managed group', () => platformGroupId],
+    ])('refuses a request that names %s', async (_label, groupId) => {
+      const before = await instituteCount(r1.resellerId);
+
+      const res = await gqlRequest(result.httpServer, {
+        query: CREATE_REQUEST,
+        variables: { input: requestInput(groupId()) },
+        token: r1Token,
+      });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('INSTITUTE_GROUP_NOT_FOUND');
+      expect(await instituteCount(r1.resellerId)).toBe(before);
+    });
+
+    it('accepts a request that names the reseller’s own group', async () => {
+      const res = await gqlRequest<{
+        resellerCreateInstituteRequest: { id: string; groupId: string | null };
+      }>(result.httpServer, {
+        query: CREATE_REQUEST,
+        variables: { input: requestInput(g1) },
+        token: r1Token,
+      });
+      expect(res.errors).toBeUndefined();
+      assert(res.data);
+      expect(res.data.resellerCreateInstituteRequest.groupId).toBe(g1);
+
+      await withAdmin(result.db, mkAdminCtx(CTX), async (tx) => {
+        await tx
+          .delete(institutes)
+          .where(eq(institutes.id, res.data.resellerCreateInstituteRequest.id));
+      });
+    });
   });
 });

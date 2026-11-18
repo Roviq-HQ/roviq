@@ -4,6 +4,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
+import { InstituteGroupService } from '../../institute/institute-group/institute-group.service';
 import { InstituteRepository } from '../../institute/management/repositories/institute.repository';
 import type { ResellerCreateInstituteRequestInput } from './dto/reseller-create-institute-request.input';
 
@@ -11,6 +12,7 @@ import type { ResellerCreateInstituteRequestInput } from './dto/reseller-create-
 export class ResellerInstituteService {
   constructor(
     private readonly instituteRepo: InstituteRepository,
+    private readonly groupService: InstituteGroupService,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -24,6 +26,7 @@ export class ResellerInstituteService {
   async createRequest(input: ResellerCreateInstituteRequestInput) {
     const { userId } = getRequestContext();
     const resellerId = this.getResellerId();
+    if (input.groupId) await this.groupService.assertOwnedByReseller(resellerId, input.groupId);
 
     // Create via repository with reseller auto-assigned
     const record = await this.instituteRepo.create({

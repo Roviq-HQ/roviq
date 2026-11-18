@@ -134,6 +134,17 @@ export class InstituteGroupService {
     return true;
   }
 
+  /** Throws unless the reseller owns the group; another owner's group reads as not found. */
+  async assertOwnedByReseller(resellerId: string, groupId: string): Promise<void> {
+    const group = await this.groupRepo.findOwnedByReseller(resellerId, groupId);
+    if (!group) {
+      throw new BusinessException(
+        ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+        `Institute group ${groupId} not found`,
+      );
+    }
+  }
+
   async addInstituteToGroupForReseller(
     resellerId: string,
     instituteId: string,

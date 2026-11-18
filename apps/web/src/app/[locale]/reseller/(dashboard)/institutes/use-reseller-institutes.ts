@@ -21,6 +21,7 @@ const RESELLER_INSTITUTES_QUERY = gql`
           type
           status
           setupStatus
+          groupId
           createdAt
         }
       }
@@ -202,7 +203,22 @@ export function useResellerAddInstituteToGroup() {
   return useMutation<
     { resellerAddInstituteToGroup: boolean },
     { instituteId: string; groupId: string }
-  >(ADD_INSTITUTE_TO_GROUP, { refetchQueries: ['ResellerInstituteGroups'] });
+  >(ADD_INSTITUTE_TO_GROUP, {
+    refetchQueries: ['ResellerInstituteGroups', 'ResellerInstitutes'],
+  });
+}
+
+const REMOVE_INSTITUTE_FROM_GROUP = gql`
+  mutation ResellerRemoveInstituteFromGroup($instituteId: ID!) {
+    resellerRemoveInstituteFromGroup(instituteId: $instituteId)
+  }
+`;
+
+export function useResellerRemoveInstituteFromGroup() {
+  return useMutation<{ resellerRemoveInstituteFromGroup: boolean }, { instituteId: string }>(
+    REMOVE_INSTITUTE_FROM_GROUP,
+    { refetchQueries: ['ResellerInstituteGroups', 'ResellerInstitutes'] },
+  );
 }
 
 // ─── Types (codegen-derived) ─────────────────────────────────────────────────

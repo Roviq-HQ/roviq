@@ -37,7 +37,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { FolderOpen, Loader2, Plus } from 'lucide-react';
+import { Building2, FolderOpen, Loader2, Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -46,6 +46,7 @@ import {
   useResellerCreateInstituteGroup,
   useResellerInstituteGroups,
   useResellerInstitutes,
+  useResellerRemoveInstituteFromGroup,
 } from '../institutes/use-reseller-institutes';
 
 const { resellerGroups } = testIds;
@@ -68,6 +69,19 @@ export default function InstituteGroupsPage() {
   const [targetGroup, setTargetGroup] = React.useState<{ id: string; name: string } | null>(null);
   const [instituteId, setInstituteId] = React.useState('');
 
+  const [removeInstitute, { loading: removing }] = useResellerRemoveInstituteFromGroup();
+  const members = institutes.filter((institute) => institute.groupId === targetGroup?.id);
+  const candidates = institutes.filter((institute) => institute.groupId !== targetGroup?.id);
+
+  const handleRemoveInstitute = async (id: string) => {
+    try {
+      await removeInstitute({ variables: { instituteId: id } });
+      toast.success(t('addInstitute.removeSuccess'));
+    } catch {
+      toast.error(t('addInstitute.removeError'));
+    }
+  };
+
   const closeAddDialog = () => {
     setTargetGroup(null);
     setInstituteId('');
@@ -78,7 +92,7 @@ export default function InstituteGroupsPage() {
     try {
       await addInstitute({ variables: { instituteId, groupId: targetGroup.id } });
       toast.success(t('addInstitute.success'));
-      closeAddDialog();
+      setInstituteId('');
     } catch (err) {
       const notAllowed = extractGraphQLErrorCode(err) === 'INSTITUTE_NOT_FOUND';
       toast.error(t(notAllowed ? 'addInstitute.notAllowed' : 'addInstitute.error'));
@@ -184,7 +198,7 @@ export default function InstituteGroupsPage() {
                               setTargetGroup({ id: String(group.id), name: String(group.name) })
                             }
                           >
-                            <Plus className="size-4" />
+                            <Building2 className="size-4" />
                             {t('addInstitute.button')}
                           </Button>
                         </Can>
@@ -278,8 +292,37 @@ export default function InstituteGroupsPage() {
           </DialogHeader>
           <FieldGroup>
             <Field>
+              <FieldLabel>{t('addInstitute.members')}</FieldLabel>
+              {members.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('addInstitute.noMembers')}</p>
+              ) : (
+                <ul className="divide-y rounded-md border">
+                  {members.map((institute) => (
+                    <li
+                      key={institute.id}
+                      className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                      data-testid={resellerGroups.member(institute.id)}
+                    >
+                      <span>{resolveI18n(institute.name)}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title={t('addInstitute.remove')}
+                        disabled={removing}
+                        data-testid={resellerGroups.removeInstituteBtn(institute.id)}
+                        onClick={() => handleRemoveInstitute(institute.id)}
+                      >
+                        <X className="size-4" />
+                        {t('addInstitute.remove')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Field>
+            <Field>
               <FieldLabel>{t('addInstitute.institute')}</FieldLabel>
-              {institutes.length === 0 ? (
+              {candidates.length === 0 ? (
                 <p className="text-muted-foreground text-sm">{t('addInstitute.noInstitutes')}</p>
               ) : (
                 <Select value={instituteId} onValueChange={setInstituteId}>
@@ -287,7 +330,7 @@ export default function InstituteGroupsPage() {
                     <SelectValue placeholder={t('addInstitute.institutePlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {institutes.map((institute) => (
+                    {candidates.map((institute) => (
                       <SelectItem key={institute.id} value={institute.id}>
                         {resolveI18n(institute.name)}
                       </SelectItem>
