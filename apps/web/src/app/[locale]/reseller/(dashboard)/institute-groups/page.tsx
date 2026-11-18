@@ -1,7 +1,9 @@
 'use client';
 
+import { useAuth } from '@roviq/auth';
 import { GROUP_TYPE_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { useI18nField } from '@roviq/i18n';
 import {
   Button,
   Can,
@@ -34,14 +36,19 @@ import {
   TableHeader,
   TableRow,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { FolderOpen, Loader2, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import {
+  useResellerAddInstituteToGroup,
   useResellerCreateInstituteGroup,
   useResellerInstituteGroups,
+  useResellerInstitutes,
 } from '../institutes/use-reseller-institutes';
+
+const { resellerGroups } = testIds;
 
 export default function InstituteGroupsPage() {
   const t = useTranslations('resellerInstitutes.groups');
@@ -54,6 +61,29 @@ export default function InstituteGroupsPage() {
 
   const { data, loading } = useResellerInstituteGroups();
   const [createGroup, { loading: creating }] = useResellerCreateInstituteGroup();
+  const { user } = useAuth();
+  const resolveI18n = useI18nField();
+  const { institutes } = useResellerInstitutes({ first: 100 });
+  const [addInstitute, { loading: adding }] = useResellerAddInstituteToGroup();
+  const [targetGroup, setTargetGroup] = React.useState<{ id: string; name: string } | null>(null);
+  const [instituteId, setInstituteId] = React.useState('');
+
+  const closeAddDialog = () => {
+    setTargetGroup(null);
+    setInstituteId('');
+  };
+
+  const handleAddInstitute = async () => {
+    if (!targetGroup || !instituteId) return;
+    try {
+      await addInstitute({ variables: { instituteId, groupId: targetGroup.id } });
+      toast.success(t('addInstitute.success'));
+      closeAddDialog();
+    } catch (err) {
+      const notAllowed = extractGraphQLErrorCode(err) === 'INSTITUTE_NOT_FOUND';
+      toast.error(t(notAllowed ? 'addInstitute.notAllowed' : 'addInstitute.error'));
+    }
+  };
 
   const groups = data?.resellerListInstituteGroups?.edges?.map((e) => e.node) ?? [];
 
@@ -126,11 +156,15 @@ export default function InstituteGroupsPage() {
                   <TableHead>{t('columns.type')}</TableHead>
                   <TableHead>{t('registrationNumber')}</TableHead>
                   <TableHead>{t('columns.count')}</TableHead>
+                  <TableHead>{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {groups.map((group) => (
-                  <TableRow key={String(group.id)}>
+                  <TableRow
+                    key={String(group.id)}
+                    data-testid={resellerGroups.row(String(group.id))}
+                  >
                     <TableCell className="font-medium">{String(group.name ?? '')}</TableCell>
                     <TableCell className="font-mono text-xs">{String(group.code ?? '')}</TableCell>
                     <TableCell>{String(group.type ?? '')}</TableCell>
@@ -138,6 +172,28 @@ export default function InstituteGroupsPage() {
                       {String(group.registrationNumber ?? '\u2014')}
                     </TableCell>
                     <TableCell>{String(group.instituteCount ?? '0')}</TableCell>
+                    <TableCell>
+                      {group.resellerId && group.resellerId === user?.resellerId ? (
+                        <Can I="manage" a="InstituteGroup">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title={t('addInstitute.button')}
+                            data-testid={resellerGroups.addInstituteBtn(String(group.id))}
+                            onClick={() =>
+                              setTargetGroup({ id: String(group.id), name: String(group.name) })
+                            }
+                          >
+                            <Plus className="size-4" />
+                            {t('addInstitute.button')}
+                          </Button>
+                        </Can>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          {t('managedByPlatform')}
+                        </span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -209,6 +265,51 @@ export default function InstituteGroupsPage() {
                 </>
               ) : (
                 t('create.submit')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={targetGroup !== null} onOpenChange={(open) => !open && closeAddDialog()}>
+        <DialogContent className="sm:max-w-[420px]" data-testid={resellerGroups.addInstituteDialog}>
+          <DialogHeader>
+            <DialogTitle>{t('addInstitute.title', { group: targetGroup?.name ?? '' })}</DialogTitle>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel>{t('addInstitute.institute')}</FieldLabel>
+              {institutes.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('addInstitute.noInstitutes')}</p>
+              ) : (
+                <Select value={instituteId} onValueChange={setInstituteId}>
+                  <SelectTrigger data-testid={resellerGroups.addInstituteSelect}>
+                    <SelectValue placeholder={t('addInstitute.institutePlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {institutes.map((institute) => (
+                      <SelectItem key={institute.id} value={institute.id}>
+                        {resolveI18n(institute.name)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              onClick={handleAddInstitute}
+              disabled={adding || !instituteId}
+              data-testid={resellerGroups.addInstituteSubmit}
+            >
+              {adding ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  {t('addInstitute.adding')}
+                </>
+              ) : (
+                t('addInstitute.submit')
               )}
             </Button>
           </DialogFooter>

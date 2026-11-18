@@ -18,68 +18,26 @@ export class InstituteGroupService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  async search(filter: InstituteGroupFilterInput) {
-    const { records, total } = await this.groupRepo.search({
-      search: filter.search,
-      status: filter.status,
-      type: filter.type,
-      first: (filter.first ?? 20) + 1, // Fetch one extra to determine hasNextPage
-      after: filter.after,
-    });
-
-    const limit = filter.first ?? 20;
-    const hasNextPage = records.length > limit;
-    const nodes = hasNextPage ? records.slice(0, limit) : records;
-
-    const edges = nodes.map((record) => ({
-      node: record,
-      cursor: encodeCursor({ id: record.id }),
-    }));
-
-    return {
-      edges,
-      pageInfo: {
-        hasNextPage,
-        hasPreviousPage: !!filter.after,
-        startCursor: edges[0]?.cursor,
-        endCursor: edges[edges.length - 1]?.cursor,
-      },
-      totalCount: total,
-    };
+  /** Every group, with its institute count (platform scope). */
+  async searchWithInstituteCounts(filter: InstituteGroupFilterInput) {
+    const { records, total } = await this.groupRepo.search(toSearchParams(filter));
+    const nodes = records.slice(0, pageSize(filter));
+    const counts = await this.groupRepo.countInstitutesByGroup(nodes.map((r) => r.id));
+    return toConnection(filter, records, total, counts);
   }
 
-  /** Search groups and include institute count per group */
-  async searchWithInstituteCounts(filter: InstituteGroupFilterInput) {
-    const { records, total } = await this.groupRepo.search({
-      search: filter.search,
-      status: filter.status,
-      type: filter.type,
-      first: (filter.first ?? 20) + 1,
-      after: filter.after,
-    });
-
-    const limit = filter.first ?? 20;
-    const hasNextPage = records.length > limit;
-    const nodes = hasNextPage ? records.slice(0, limit) : records;
-
-    const groupIds = nodes.map((r) => r.id);
-    const counts = await this.groupRepo.countInstitutesByGroup(groupIds);
-
-    const edges = nodes.map((record) => ({
-      node: { ...record, instituteCount: counts[record.id] ?? 0 },
-      cursor: encodeCursor({ id: record.id }),
-    }));
-
-    return {
-      edges,
-      pageInfo: {
-        hasNextPage,
-        hasPreviousPage: !!filter.after,
-        startCursor: edges[0]?.cursor,
-        endCursor: edges[edges.length - 1]?.cursor,
-      },
-      totalCount: total,
-    };
+  /** Groups the reseller owns or that contain its institutes, counting only its own institutes. */
+  async searchForReseller(resellerId: string, filter: InstituteGroupFilterInput) {
+    const { records, total } = await this.groupRepo.searchForReseller(
+      resellerId,
+      toSearchParams(filter),
+    );
+    const nodes = records.slice(0, pageSize(filter));
+    const counts = await this.groupRepo.countInstitutesByGroupForReseller(
+      resellerId,
+      nodes.map((r) => r.id),
+    );
+    return toConnection(filter, records, total, counts);
   }
 
   async findById(id: string): Promise<InstituteGroupRecord> {
@@ -93,8 +51,16 @@ export class InstituteGroupService {
     return record;
   }
 
-  async create(input: CreateInstituteGroupInput): Promise<InstituteGroupRecord> {
-    const group = await this.groupRepo.create(input);
+  async findForTenant(tenantId: string): Promise<InstituteGroupRecord | null> {
+    return this.groupRepo.findForTenant(tenantId);
+  }
+
+  /** `resellerId` is the owning reseller, or null for a platform-managed group. */
+  async create(
+    input: CreateInstituteGroupInput,
+    resellerId: string | null,
+  ): Promise<InstituteGroupRecord> {
+    const group = await this.groupRepo.create({ ...input, resellerId });
 
     this.eventBus.emit(EVENT_PATTERNS.INSTITUTE.group.created, { id: group.id, name: group.name });
     return group;
@@ -168,6 +134,27 @@ export class InstituteGroupService {
     return true;
   }
 
+  async addInstituteToGroupForReseller(
+    resellerId: string,
+    instituteId: string,
+    groupId: string,
+  ): Promise<boolean> {
+    await this.groupRepo.addInstituteToGroupForReseller(resellerId, instituteId, groupId);
+
+    this.eventBus.emit(EVENT_PATTERNS.INSTITUTE.group.institute_added, { groupId, instituteId });
+    return true;
+  }
+
+  async removeInstituteFromGroupForReseller(
+    resellerId: string,
+    instituteId: string,
+  ): Promise<boolean> {
+    await this.groupRepo.removeInstituteFromGroupForReseller(resellerId, instituteId);
+
+    this.eventBus.emit(EVENT_PATTERNS.INSTITUTE.group.institute_removed, { instituteId });
+    return true;
+  }
+
   async addMember(groupId: string, userId: string, roleId: string): Promise<GroupMembershipRecord> {
     await this.requireGroup(groupId);
     const membership = await this.groupRepo.addMember(groupId, userId, roleId);
@@ -199,4 +186,42 @@ export class InstituteGroupService {
     }
     return record;
   }
+}
+
+function pageSize(filter: InstituteGroupFilterInput): number {
+  return filter.first ?? 20;
+}
+
+function toSearchParams(filter: InstituteGroupFilterInput) {
+  return {
+    search: filter.search,
+    status: filter.status,
+    type: filter.type,
+    first: pageSize(filter) + 1, // one extra row tells us whether a next page exists
+    after: filter.after,
+  };
+}
+
+function toConnection(
+  filter: InstituteGroupFilterInput,
+  records: InstituteGroupRecord[],
+  total: number,
+  counts: Record<string, number>,
+) {
+  const limit = pageSize(filter);
+  const edges = records.slice(0, limit).map((record) => ({
+    node: { ...record, instituteCount: counts[record.id] ?? 0 },
+    cursor: encodeCursor({ id: record.id }),
+  }));
+
+  return {
+    edges,
+    pageInfo: {
+      hasNextPage: records.length > limit,
+      hasPreviousPage: !!filter.after,
+      startCursor: edges[0]?.cursor,
+      endCursor: edges[edges.length - 1]?.cursor,
+    },
+    totalCount: total,
+  };
 }

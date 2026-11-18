@@ -2,28 +2,14 @@
  * Institute Group domain E2E tests — migrated from
  *   e2e/api-gateway-e2e/hurl/institute-group/*.hurl
  *
- * Covers the 4 Hurl scenarios:
- *   01-crud-institute-group — adminCreate / adminUpdate / adminList / adminDelete
- *                             (@PlatformScope — admin token)
- *   02-status-transitions   — create / deactivate / activate / suspend / delete
- *                             (@InstituteScope — institute-admin token)
- *   03-institute-linking    — create / addInstituteToGroup /
- *                             removeInstituteFromGroup / delete
- *                             (@InstituteScope — institute-admin token)
- *   04-not-found-errors     — adminDelete with zero-UUID returns errors
- *                             (@PlatformScope — admin token)
- *
- * Scope fix vs. Hurl: the Hurl suites for 02 and 03 used `{{admin_token}}`
- * against the non-admin (InstituteScope) resolver, which would be rejected
- * as FORBIDDEN by the scope guard. We authenticate those scenarios with
- * `loginAsInstituteAdmin()` so they actually exercise the intended
- * `InstituteGroupResolver` path.
+ * Group management is platform scope: every scenario runs with the platform
+ * admin token against the `admin*` operations (ROV-290).
  */
 import assert from 'node:assert';
 import { GroupStatus, GroupType } from '@roviq/common-types';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SEED } from '../../shared/seed-fixtures';
-import { loginAsInstituteAdmin, loginAsPlatformAdmin } from './helpers/auth';
+import { loginAsPlatformAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
 interface InstituteGroupNode {
@@ -57,11 +43,9 @@ const SUFFIX = Date.now().toString(36);
 
 describe('Institute Group E2E', () => {
   let adminToken: string;
-  let instituteAdminToken: string;
 
   beforeAll(async () => {
     adminToken = (await loginAsPlatformAdmin()).accessToken;
-    instituteAdminToken = (await loginAsInstituteAdmin()).accessToken;
   });
 
   // ─────────────────────────────────────────────────────
@@ -167,99 +151,99 @@ describe('Institute Group E2E', () => {
   });
 
   // ─────────────────────────────────────────────────────
-  // 02 — Status transitions (@InstituteScope)
+  // 02 — Status transitions (@PlatformScope)
   // ─────────────────────────────────────────────────────
   describe('status transitions', () => {
     it('ACTIVE → INACTIVE → ACTIVE → SUSPENDED → ACTIVE → delete', async () => {
       const code = `chain-status-${SUFFIX}`;
 
       // create
-      const createRes = await gql<{ createInstituteGroup: InstituteGroupNode }>(
+      const createRes = await gql<{ adminCreateInstituteGroup: InstituteGroupNode }>(
         `mutation CreateInstituteGroup($input: CreateInstituteGroupInput!) {
-          createInstituteGroup(input: $input) { id name code type status }
+          adminCreateInstituteGroup(input: $input) { id name code type status }
         }`,
         { input: { name: 'Chain Status Test', code, type: GroupType.CHAIN } },
-        instituteAdminToken,
+        adminToken,
       );
       expect(createRes.errors).toBeUndefined();
-      const created = createRes.data?.createInstituteGroup;
+      const created = createRes.data?.adminCreateInstituteGroup;
       assert(created);
       expect(created.status).toBe(GroupStatus.ACTIVE);
       const groupId = created.id;
 
       // deactivate
-      const deactivateRes = await gql<{ deactivateInstituteGroup: InstituteGroupNode }>(
+      const deactivateRes = await gql<{ adminDeactivateInstituteGroup: InstituteGroupNode }>(
         `mutation Deactivate($id: ID!) {
-          deactivateInstituteGroup(id: $id) { id status }
+          adminDeactivateInstituteGroup(id: $id) { id status }
         }`,
         { id: groupId },
-        instituteAdminToken,
+        adminToken,
       );
       expect(deactivateRes.errors).toBeUndefined();
-      expect(deactivateRes.data?.deactivateInstituteGroup.id).toBe(groupId);
-      expect(deactivateRes.data?.deactivateInstituteGroup.status).toBe(GroupStatus.INACTIVE);
+      expect(deactivateRes.data?.adminDeactivateInstituteGroup.id).toBe(groupId);
+      expect(deactivateRes.data?.adminDeactivateInstituteGroup.status).toBe(GroupStatus.INACTIVE);
 
       // activate (INACTIVE → ACTIVE)
-      const activateRes = await gql<{ activateInstituteGroup: InstituteGroupNode }>(
+      const activateRes = await gql<{ adminActivateInstituteGroup: InstituteGroupNode }>(
         `mutation Activate($id: ID!) {
-          activateInstituteGroup(id: $id) { id status }
+          adminActivateInstituteGroup(id: $id) { id status }
         }`,
         { id: groupId },
-        instituteAdminToken,
+        adminToken,
       );
       expect(activateRes.errors).toBeUndefined();
-      expect(activateRes.data?.activateInstituteGroup.status).toBe(GroupStatus.ACTIVE);
+      expect(activateRes.data?.adminActivateInstituteGroup.status).toBe(GroupStatus.ACTIVE);
 
       // suspend
-      const suspendRes = await gql<{ suspendInstituteGroup: InstituteGroupNode }>(
+      const suspendRes = await gql<{ adminSuspendInstituteGroup: InstituteGroupNode }>(
         `mutation Suspend($id: ID!) {
-          suspendInstituteGroup(id: $id) { id status }
+          adminSuspendInstituteGroup(id: $id) { id status }
         }`,
         { id: groupId },
-        instituteAdminToken,
+        adminToken,
       );
       expect(suspendRes.errors).toBeUndefined();
-      expect(suspendRes.data?.suspendInstituteGroup.status).toBe(GroupStatus.SUSPENDED);
+      expect(suspendRes.data?.adminSuspendInstituteGroup.status).toBe(GroupStatus.SUSPENDED);
 
       // activate (SUSPENDED → ACTIVE)
-      const reactivateRes = await gql<{ activateInstituteGroup: InstituteGroupNode }>(
+      const reactivateRes = await gql<{ adminActivateInstituteGroup: InstituteGroupNode }>(
         `mutation Activate($id: ID!) {
-          activateInstituteGroup(id: $id) { id status }
+          adminActivateInstituteGroup(id: $id) { id status }
         }`,
         { id: groupId },
-        instituteAdminToken,
+        adminToken,
       );
       expect(reactivateRes.errors).toBeUndefined();
-      expect(reactivateRes.data?.activateInstituteGroup.status).toBe(GroupStatus.ACTIVE);
+      expect(reactivateRes.data?.adminActivateInstituteGroup.status).toBe(GroupStatus.ACTIVE);
 
       // delete (cleanup)
-      const deleteRes = await gql<{ deleteInstituteGroup: boolean }>(
-        `mutation Delete($id: ID!) { deleteInstituteGroup(id: $id) }`,
+      const deleteRes = await gql<{ adminDeleteInstituteGroup: boolean }>(
+        `mutation Delete($id: ID!) { adminDeleteInstituteGroup(id: $id) }`,
         { id: groupId },
-        instituteAdminToken,
+        adminToken,
       );
       expect(deleteRes.errors).toBeUndefined();
-      expect(deleteRes.data?.deleteInstituteGroup).toBe(true);
+      expect(deleteRes.data?.adminDeleteInstituteGroup).toBe(true);
     });
   });
 
   // ─────────────────────────────────────────────────────
-  // 03 — Institute linking (@InstituteScope)
+  // 03 — Institute linking (@PlatformScope)
   // ─────────────────────────────────────────────────────
   describe('institute linking', () => {
     it('create group → add institute_1 → add institute_2 → remove institute_1 → cleanup', async () => {
       const code = `society-link-${SUFFIX}`;
 
       // create group
-      const createRes = await gql<{ createInstituteGroup: InstituteGroupNode }>(
+      const createRes = await gql<{ adminCreateInstituteGroup: InstituteGroupNode }>(
         `mutation CreateInstituteGroup($input: CreateInstituteGroupInput!) {
-          createInstituteGroup(input: $input) { id name code type status }
+          adminCreateInstituteGroup(input: $input) { id name code type status }
         }`,
         { input: { name: 'Society Link Test', code, type: GroupType.SOCIETY } },
-        instituteAdminToken,
+        adminToken,
       );
       expect(createRes.errors).toBeUndefined();
-      const created = createRes.data?.createInstituteGroup;
+      const created = createRes.data?.adminCreateInstituteGroup;
       assert(created);
       expect(created.type).toBe(GroupType.SOCIETY);
       expect(created.status).toBe(GroupStatus.ACTIVE);
@@ -267,46 +251,46 @@ describe('Institute Group E2E', () => {
 
       try {
         // add institute_1
-        const add1Res = await gql<{ addInstituteToGroup: boolean }>(
+        const add1Res = await gql<{ adminAddInstituteToGroup: boolean }>(
           `mutation AddToGroup($instituteId: ID!, $groupId: ID!) {
-            addInstituteToGroup(instituteId: $instituteId, groupId: $groupId)
+            adminAddInstituteToGroup(instituteId: $instituteId, groupId: $groupId)
           }`,
           { instituteId: SEED.INSTITUTE_1.id, groupId },
-          instituteAdminToken,
+          adminToken,
         );
         expect(add1Res.errors).toBeUndefined();
-        expect(add1Res.data?.addInstituteToGroup).toBe(true);
+        expect(add1Res.data?.adminAddInstituteToGroup).toBe(true);
 
         // add institute_2
-        const add2Res = await gql<{ addInstituteToGroup: boolean }>(
+        const add2Res = await gql<{ adminAddInstituteToGroup: boolean }>(
           `mutation AddToGroup($instituteId: ID!, $groupId: ID!) {
-            addInstituteToGroup(instituteId: $instituteId, groupId: $groupId)
+            adminAddInstituteToGroup(instituteId: $instituteId, groupId: $groupId)
           }`,
           { instituteId: SEED.INSTITUTE_2.id, groupId },
-          instituteAdminToken,
+          adminToken,
         );
         expect(add2Res.errors).toBeUndefined();
-        expect(add2Res.data?.addInstituteToGroup).toBe(true);
+        expect(add2Res.data?.adminAddInstituteToGroup).toBe(true);
 
         // remove institute_1
-        const removeRes = await gql<{ removeInstituteFromGroup: boolean }>(
+        const removeRes = await gql<{ adminRemoveInstituteFromGroup: boolean }>(
           `mutation RemoveFromGroup($instituteId: ID!) {
-            removeInstituteFromGroup(instituteId: $instituteId)
+            adminRemoveInstituteFromGroup(instituteId: $instituteId)
           }`,
           { instituteId: SEED.INSTITUTE_1.id },
-          instituteAdminToken,
+          adminToken,
         );
         expect(removeRes.errors).toBeUndefined();
-        expect(removeRes.data?.removeInstituteFromGroup).toBe(true);
+        expect(removeRes.data?.adminRemoveInstituteFromGroup).toBe(true);
       } finally {
         // Always unlink institute_2 and delete the group so the seed is left
         // clean for other tests (institutes belong to the shared tenant seed).
         await gql(
           `mutation RemoveFromGroup($instituteId: ID!) {
-            removeInstituteFromGroup(instituteId: $instituteId)
+            adminRemoveInstituteFromGroup(instituteId: $instituteId)
           }`,
           { instituteId: SEED.INSTITUTE_2.id },
-          instituteAdminToken,
+          adminToken,
         );
         await gql(
           `mutation AdminDelete($id: ID!) { adminDeleteInstituteGroup(id: $id) }`,

@@ -36,7 +36,7 @@
     "allStatuses": "All statuses",
     "allTypes": "All types",
     "allGroups": "All groups",
-    "groupPlaceholder": "Filter by group\u2026"
+    "groupPlaceholder": "Filter by group…"
   },
   "empty": {
     "title": "No institutes found",
@@ -222,13 +222,27 @@
       "name": "Group Name",
       "namePlaceholder": "e.g. Delhi Public School Trust",
       "code": "Group Code",
-      "codePlaceholder": "e.g. DPS-TRUST",
+      "codePlaceholder": "e.g. dps-trust",
       "type": "Group Type",
       "typePlaceholder": "Select type",
       "submit": "Create Group",
       "creating": "Creating…",
       "success": "Institute group created.",
       "error": "Failed to create group."
-    }
+    },
+    "actions": "Actions",
+    "addInstitute": {
+      "button": "Add institute",
+      "title": "Add institute to {group}",
+      "institute": "Institute",
+      "institutePlaceholder": "Select an institute",
+      "noInstitutes": "You have no institutes to add yet.",
+      "submit": "Add to group",
+      "adding": "Adding…",
+      "success": "Institute added to the group.",
+      "error": "Could not add the institute.",
+      "notAllowed": "This institute already belongs to a group you do not manage."
+    },
+    "managedByPlatform": "Managed by Roviq"
   }
 }

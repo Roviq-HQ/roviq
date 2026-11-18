@@ -106,6 +106,15 @@ Class-level decorators from `@roviq/auth-backend`:
 
 Applied at resolver class level. Combines `GqlAuthGuard` (JWT validation) + scope check.
 
+### A scope guard is not tenant isolation (ROV-290)
+
+A scope guard only proves the token's scope. Which rows the caller may touch is decided by the DB wrapper: `withTenant` and `withReseller` run under RLS, `withAdmin` bypasses it. An institute- or reseller-scope resolver must therefore never pass a caller-supplied id to a query that runs as admin.
+
+- Institute lifecycle (create, activate, suspend, delete, restore) and institute-group management live in `admin/` resolvers; resellers get their own `reseller*` operations, limited to institutes and groups they own.
+- Institute scope reads and edits only its own institute (`myInstitute`, `updateInstituteInfo(input)`, `myInstituteGroup`).
+- `institute_admin` holds `manage all` minus institute-group management and platform-level `Institute` actions.
+- `pnpm check:admin-context-reach` lists every admin-context file reachable from an institute or reseller resolver; a new one fails CI until it is listed with a reason.
+
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes
 - Frontend: `<ProtectedRoute>` component redirects to `/login` with return URL

@@ -2,7 +2,10 @@
   "title": "संस्थान",
   "description": "अपने रीसेलर खाते के तहत संस्थानों का प्रबंधन करें।",
   "requestInstitute": "नया संस्थान अनुरोध करें",
-  "tabs": { "all": "सभी संस्थान", "pending": "अनुमोदन लंबित" },
+  "tabs": {
+    "all": "सभी संस्थान",
+    "pending": "अनुमोदन लंबित"
+  },
   "columns": {
     "name": "नाम",
     "code": "कोड",
@@ -11,7 +14,11 @@
     "group": "समूह",
     "createdAt": "बनाया गया"
   },
-  "types": { "SCHOOL": "विद्यालय", "COACHING": "कोचिंग", "LIBRARY": "पुस्तकालय" },
+  "types": {
+    "SCHOOL": "विद्यालय",
+    "COACHING": "कोचिंग",
+    "LIBRARY": "पुस्तकालय"
+  },
   "statuses": {
     "PENDING_APPROVAL": "अनुमोदन लंबित",
     "PENDING": "लंबित",
@@ -29,7 +36,7 @@
     "allStatuses": "सभी स्थितियां",
     "allTypes": "सभी प्रकार",
     "allGroups": "सभी समूह",
-    "groupPlaceholder": "समूह द्वारा फ़िल्टर करें\u2026"
+    "groupPlaceholder": "समूह द्वारा फ़िल्टर करें…"
   },
   "empty": {
     "title": "कोई संस्थान नहीं मिला",
@@ -39,7 +46,11 @@
     "noPending": "कोई लंबित अनुरोध नहीं",
     "noPendingDescription": "सभी संस्थान अनुरोधों की समीक्षा हो चुकी है।"
   },
-  "pagination": { "loadMore": "और लोड करें", "showing": "दिखा रहे हैं", "of": "में से" },
+  "pagination": {
+    "loadMore": "और लोड करें",
+    "showing": "दिखा रहे हैं",
+    "of": "में से"
+  },
   "pendingBanner": "प्लेटफ़ॉर्म व्यवस्थापक की स्वीकृति की प्रतीक्षा में। स्वीकृत होने पर आपको सूचित किया जाएगा।",
   "setupBanner": "संस्थान सेटअप प्रगति पर है।",
   "detail": {
@@ -136,8 +147,16 @@
     "success": "संस्थान अनुरोध सबमिट। प्लेटफ़ॉर्म व्यवस्थापक की स्वीकृति की प्रतीक्षा में।",
     "error": "संस्थान अनुरोध सबमिट करने में विफल।",
     "codeDuplicate": "इस कोड वाला संस्थान पहले से मौजूद है।",
-    "frameworks": { "NEP": "NEP (5+3+3+4)", "TRADITIONAL": "पारंपरिक (10+2)" },
-    "boards": { "cbse": "CBSE", "bseh": "BSEH", "rbse": "RBSE", "icse": "ICSE" },
+    "frameworks": {
+      "NEP": "NEP (5+3+3+4)",
+      "TRADITIONAL": "पारंपरिक (10+2)"
+    },
+    "boards": {
+      "cbse": "CBSE",
+      "bseh": "BSEH",
+      "rbse": "RBSE",
+      "icse": "ICSE"
+    },
     "countryCode": "कोड",
     "phoneNumber": "फ़ोन नंबर",
     "phonePlaceholder": "9876543210",
@@ -188,7 +207,12 @@
     "registrationNumberPlaceholder": "जैसे REG-12345",
     "registrationState": "पंजीकरण राज्य",
     "registrationStatePlaceholder": "जैसे हरियाणा",
-    "columns": { "name": "नाम", "code": "कोड", "type": "प्रकार", "count": "संस्थान" },
+    "columns": {
+      "name": "नाम",
+      "code": "कोड",
+      "type": "प्रकार",
+      "count": "संस्थान"
+    },
     "empty": {
       "title": "अभी कोई समूह नहीं",
       "description": "अपने संस्थानों को व्यवस्थित करने के लिए एक समूह बनाएं।"
@@ -198,13 +222,27 @@
       "name": "समूह का नाम",
       "namePlaceholder": "जैसे दिल्ली पब्लिक स्कूल ट्रस्ट",
       "code": "समूह कोड",
-      "codePlaceholder": "जैसे DPS-TRUST",
+      "codePlaceholder": "जैसे dps-trust",
       "type": "समूह प्रकार",
       "typePlaceholder": "प्रकार चुनें",
       "submit": "समूह बनाएं",
       "creating": "बना रहे हैं…",
       "success": "संस्थान समूह बनाया गया।",
       "error": "समूह बनाने में विफल।"
-    }
+    },
+    "actions": "कार्रवाई",
+    "addInstitute": {
+      "button": "संस्थान जोड़ें",
+      "title": "{group} में संस्थान जोड़ें",
+      "institute": "संस्थान",
+      "institutePlaceholder": "संस्थान चुनें",
+      "noInstitutes": "जोड़ने के लिए अभी कोई संस्थान नहीं है।",
+      "submit": "समूह में जोड़ें",
+      "adding": "जोड़ा जा रहा है…",
+      "success": "संस्थान समूह में जोड़ दिया गया।",
+      "error": "संस्थान नहीं जोड़ा जा सका।",
+      "notAllowed": "यह संस्थान पहले से ऐसे समूह में है जिसे आप प्रबंधित नहीं करते।"
+    },
+    "managedByPlatform": "Roviq द्वारा प्रबंधित"
   }
 }

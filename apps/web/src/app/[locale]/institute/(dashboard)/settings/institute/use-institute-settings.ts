@@ -113,8 +113,8 @@ export function useMyInstitute() {
 // ─── Mutations ───────────────────────────────────────────────────────────────
 
 const UPDATE_INSTITUTE_INFO = gql`
-  mutation UpdateInstituteInfo($id: ID!, $input: UpdateInstituteInfoInput!) {
-    updateInstituteInfo(id: $id, input: $input) {
+  mutation UpdateInstituteInfo($input: UpdateInstituteInfoInput!) {
+    updateInstituteInfo(input: $input) {
       ...InstituteFields
     }
   }
@@ -140,7 +140,7 @@ const UPDATE_INSTITUTE_CONFIG = gql`
 `;
 
 export function useUpdateInstituteInfo() {
-  return useMutation<UpdateInstituteInfoData, { id: string; input: Record<string, unknown> }>(
+  return useMutation<UpdateInstituteInfoData, { input: Record<string, unknown> }>(
     UPDATE_INSTITUTE_INFO,
   );
 }

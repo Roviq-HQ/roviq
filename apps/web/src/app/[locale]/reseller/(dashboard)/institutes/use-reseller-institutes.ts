@@ -109,13 +109,13 @@ const CREATE_INSTITUTE_REQUEST = gql`
 
 const SUSPEND_INSTITUTE = gql`
   mutation SuspendInstitute($id: ID!) {
-    suspendInstitute(id: $id) { id status }
+    resellerSuspendInstitute(id: $id) { id status }
   }
 `;
 
 const ACTIVATE_INSTITUTE = gql`
   mutation ResellerActivateInstitute($id: ID!) {
-    activateInstitute(id: $id) { id status }
+    resellerReactivateInstitute(id: $id) { id status }
   }
 `;
 
@@ -134,15 +134,16 @@ export function useResellerCreateInstituteRequest() {
 }
 
 export function useResellerSuspendInstitute() {
-  return useMutation<{ suspendInstitute: { id: string; status: string } }, { id: string }>(
+  return useMutation<{ resellerSuspendInstitute: { id: string; status: string } }, { id: string }>(
     SUSPEND_INSTITUTE,
   );
 }
 
 export function useResellerReactivateInstitute() {
-  return useMutation<{ activateInstitute: { id: string; status: string } }, { id: string }>(
-    ACTIVATE_INSTITUTE,
-  );
+  return useMutation<
+    { resellerReactivateInstitute: { id: string; status: string } },
+    { id: string }
+  >(ACTIVATE_INSTITUTE);
 }
 
 // ─── Institute Groups ────────────────────────────────────────────────────
@@ -159,6 +160,7 @@ const RESELLER_GROUPS_QUERY = gql`
           status
           registrationNumber
           instituteCount
+          resellerId
         }
       }
       totalCount
@@ -188,6 +190,19 @@ export function useResellerCreateInstituteGroup() {
     { resellerCreateInstituteGroup: InstituteGroupModel },
     { input: Record<string, unknown> }
   >(CREATE_GROUP, { refetchQueries: ['ResellerInstituteGroups'] });
+}
+
+const ADD_INSTITUTE_TO_GROUP = gql`
+  mutation ResellerAddInstituteToGroup($instituteId: ID!, $groupId: ID!) {
+    resellerAddInstituteToGroup(instituteId: $instituteId, groupId: $groupId)
+  }
+`;
+
+export function useResellerAddInstituteToGroup() {
+  return useMutation<
+    { resellerAddInstituteToGroup: boolean },
+    { instituteId: string; groupId: string }
+  >(ADD_INSTITUTE_TO_GROUP, { refetchQueries: ['ResellerInstituteGroups'] });
 }
 
 // ─── Types (codegen-derived) ─────────────────────────────────────────────────
