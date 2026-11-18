@@ -256,10 +256,15 @@ services:
     # notification-service so two Nx processes never write the shared
     # dist/libs at once. Novu creds (written by novu-bootstrap) are a shell
     # script with `export NOVU_* = ...` lines.
+    # It builds once and runs that output, with no watcher: a watcher rebuilt
+    # only the app (never dist/libs) and restarted the gateway mid-test-run.
+    # E2E_BACKEND_FINGERPRINT changes with the backend source, so the next
+    # `up` (pnpm e2e:up) recreates this container and it rebuilds.
     command: >
       sh -c '. /shared/novu-creds.env
       && pnpm exec nx run-many -t build -p api-gateway notification-service --parallel=3
-      && exec pnpm exec nx serve api-gateway'
+      && mkdir -p /tmp/node_path && ln -sfn "$$PWD/dist/libs" /tmp/node_path/@roviq
+      && NODE_PATH=/tmp/node_path exec node --require ./dist/libs/telemetry/src/init-telemetry.js dist/apps/api-gateway/src/main.js'
     volumes:
       - ..:${E2E_WORKSPACE}
       - ../.e2e/dist:${E2E_WORKSPACE}/dist
@@ -286,6 +291,7 @@ services:
       # Enable EE modules — the frontend references EE billing operations and the
       # schema-drift gate compares them against the running api-gateway's schema.
       ROVIQ_EE: "true"
+      E2E_BACKEND_FINGERPRINT: ${E2E_BACKEND_FINGERPRINT:?run via scripts/e2e-compose.sh}
     depends_on:
       migrate-and-seed:
         condition: service_completed_successfully
@@ -299,11 +305,9 @@ services:
         condition: service_completed_successfully
     ports:
       - "${E2E_API_PORT:-3004}:3004"
-    # Real GraphQL probe — nx serve binds the HTTP port before its module
-    # graph is compiled, so /api/health returns 200 while early queries still
-    # hit UND_ERR_SOCKET. Probing the actual GraphQL endpoint defers "healthy"
-    # until the resolver chain is wired up. start_period covers a cold build
-    # of both apps with an empty Nx cache.
+    # Real GraphQL probe: "healthy" means the resolver chain answers, not only
+    # that the HTTP port is bound. start_period covers a cold build of both
+    # apps with an empty Nx cache.
     healthcheck:
       test:
         [
@@ -314,6 +318,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 120s
+      start_interval: 1s
 
   notification-service:
     <<: *backend
@@ -335,6 +340,7 @@ services:
       # env_file carries the host instance's port; in-network callers use 3002.
       NOTIFICATION_SERVICE_PORT: "3002"
       NODE_ENV: test
+      E2E_BACKEND_FINGERPRINT: ${E2E_BACKEND_FINGERPRINT:?run via scripts/e2e-compose.sh}
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -350,6 +356,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
+      start_interval: 1s
 
   # --- Test runners (activated via profiles) ---
 

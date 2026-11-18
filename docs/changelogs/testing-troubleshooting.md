@@ -693,3 +693,58 @@ All three compose files now set `SQL_MAX_CONNS: 10`, `SQL_MAX_IDLE_CONNS: 2`, `S
 The service now polls only on its timer; `getSystemHealth()` already checks on demand when there is no recent snapshot. The rule from the ROV-96 entry stands: no database work in `onModuleInit` of a provider that every `AppModule` boot loads.
 
 **Verification:** two consecutive `pnpm test:int` runs failed before the change; two consecutive runs passed after it (64 files, 676 tests).
+
+
+## 2026-11-18 — fixed: dev gateway died with `EADDRINUSE` after a file change (ROV-288)
+
+Resolves problem 1 of ROV-288 for the dev stack. The Nx `@nx/js:node` watcher sends SIGTERM to the old process and starts the new one without waiting for the old one to exit (`node.impl.js`: `await previousTask.stop('SIGTERM')` returns once the signal is sent). The old process did not exit at once: the SIGTERM handler in `libs/backend/telemetry/src/init-telemetry.ts` waited for `sdk.shutdown()`, and with no collector listening the OTLP flush took about 4 seconds. The new process reached `listen()` first and died with `EADDRINUSE`; the inspector port failed the same way.
+
+Outside production the handler now exits immediately. In production it still flushes, with a 5 second limit.
+
+**Verification:** before, SIGTERM to exit took 4.1 s, and of three file changes made while the gateway was running, two ended in `EADDRINUSE`. After, ten file changes in a row all ended in `Application is running`, with no inspector warning.
+
+
+## 2026-11-18 — fixed: the e2e gateway no longer runs a watcher, and the gate rebuilds it (ROV-288)
+
+Resolves the two 2026-11-18 `diagnosed` entries above ("e2e gateway stays unhealthy after a file change", "never rebuilds `dist/libs` after a library change") and problems 2 and 3 of ROV-288.
+
+The `api-gateway` container in `docker/compose.e2e.yaml` now builds once at start and runs the output with plain `node` (the same layout `notification-service` already used), with no `nx serve`. So nothing restarts the gateway in the middle of a test run, and no half-updated watcher state exists. Source changes reach the container only when it is recreated:
+
+- `scripts/e2e-compose.sh` hashes the backend's inputs (`apps/api-gateway`, `apps/notification-service`, `libs` without `libs/frontend`, `ee`, lockfile, root configs, the compose file and Dockerfile, `.env`; spec files excluded; tracked, modified and untracked files) into `E2E_BACKEND_FINGERPRINT`, which is in the environment of `api-gateway` and `notification-service`. Compose recreates a container whose environment changed, so any `up` rebuilds the backend exactly when its source changed.
+- `scripts/ci-check.sh` phase 3 starts both with `--force-recreate` regardless, so every push tests the pushed source even if the fingerprint misses an input.
+- `e2e/shared/preflight.ts` lost its "restart the container" fallback; it existed for a parked `nx serve`.
+
+Also in this change:
+
+- The `ci:check` lock is per instance (`/tmp/roviq-ci-check-<slot>.lock`), so two instances can run the gate at once.
+- `pnpm check:jetstream-drift` read `nats://localhost:4222` when `NATS_URL` was unset, which is slot 0's dev NATS from any slot. It now defaults to this instance's e2e NATS (`E2E_NATS_PORT`).
+
+Three things made a warm `pnpm e2e:up` slow, found while timing it:
+
+- Compose starts the exited one-shot `migrate-and-seed` again on every `up`, and on every `run` that has it as a dependency: 11 s each. `novu-bridge-sync` was run with dependencies, so the database was reset and seeded a second time under the live gateway. It now runs with `--no-deps` (15 s → 3 s), in `e2e:up` and in `ci:check`.
+- `pnpm test:e2e:api` ran `e2e:clean` right after `e2e:up`: a third seed. Removed.
+- The backend health checks probed every 5 s from the start. Both now use `start_interval: 1s`.
+
+`pnpm e2e:up` on a running stack: 16 s when the backend is unchanged (27 s before this work), about 45 s when it changed.
+
+**Do NOT:**
+
+- Add `--force-recreate` to `e2e:up`: it costs 30 s on every call.
+- Run a one-shot with dependencies (`run` without `--no-deps`) against a running stack: it re-seeds the database under the gateway.
+- Add a backend build input (a new top-level folder, a config file) without adding it to `backend_inputs` in `scripts/e2e-compose.sh`.
+
+**Verification:** in slot 2, a cold `pnpm e2e:up` came up healthy with `node … dist/apps/api-gateway/src/main.js` as the container process. A new export added to `libs/shared/common-types` and logged from `apps/api-gateway/src/main.ts` appeared in the gateway log after the next `pnpm e2e:up`, with no manual restart. `pnpm check:jetstream-drift` reported `nats://localhost:4263`. A spec-only edit did not recreate the containers; an untracked file under `libs/` did.
+
+`ci:check` also runs `CI=true pnpm codegen` (6 s, from the committed schema, no gateway needed) before the web build, so git-ignored generated types that went stale in a rebase no longer fail it.
+
+
+## 2026-11-18 — fixed: `pubsub.integration.spec.ts` "keeps the durable consumer … across a worker reconnect" failed once in CI
+
+Seen once on PR #285 and not reproduced locally: the stream still held one message when the 5 second poll ended. Likely cause: after the first worker closes, the server can still hold that worker's pull request for a moment, hand it the next published message, and redeliver only after the 30 second ack wait. The test now waits for the consumer's `num_waiting` to reach 0 before it publishes again. The cause is not proven, so reopen this if the test fails again.
+
+**Verification:** the file passed 8 of 8 local runs with the guard.
+
+
+## 2026-11-18 — fixed: two Claude sessions in one checkout locked each other out of the Playwright MCP browser
+
+Playwright MCP keeps one persistent browser profile per workspace, and a profile can be open in one browser at a time. A second session in the same checkout got "profile in use" and lost about 15 minutes. `.claude/settings.json` now sets `PLAYWRIGHT_MCP_ISOLATED=true`, so each session's browser uses an in-memory profile. Logins do not survive a browser close. Takes effect in sessions started after the change; not yet confirmed with two live sessions.

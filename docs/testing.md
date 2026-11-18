@@ -119,7 +119,7 @@ Convenience scripts:
 
 ```bash
 pnpm infra:up       # docker compose -f docker/compose.infra.yaml up -d
-pnpm e2e:up         # scripts/e2e-compose.sh up -d --build --wait, then run --rm novu-bridge-sync
+pnpm e2e:up         # scripts/e2e-compose.sh up -d --build --wait (re-seeds; recreates the backend if its source changed), then novu-bridge-sync
 pnpm e2e:clean      # re-run migrate+seed on existing e2e stack
 pnpm e2e:down       # stop e2e stack, keep volumes and .e2e/
 pnpm e2e:nuke       # stop e2e stack, wipe volumes and .e2e/
@@ -175,7 +175,8 @@ Each row is a decision with its reason. Evidence and timings: `docs/changelogs/t
 | CI caches `.e2e/nx/cache` together with `.e2e/nx/workspace-data` | Nx ignores the cache folder without its index (`machine.db`) | Cache the cache folder alone |
 | CI runs the Nx test targets directly after `pnpm e2e:up` | `pnpm test:e2e:*` start and re-seed the stack a second time | Use `pnpm test:e2e:*` in CI steps |
 | Playwright uses its default worker count (no CI override) | One worker made the suite fully serial; tests are `fullyParallel`-safe | Reintroduce `workers: 1` to hide a flaky test |
-| Preflight polls 20s, prints the gateway log, runs `e2e:up`, then restarts the api-gateway container | A single 1s probe misfired; and a gateway that boots during a DB reset exits and `nx serve` parks until restarted | Shorten it back to a single probe |
+| Preflight polls 20s, prints the gateway log, then runs `e2e:up` | A single 1s probe misfired | Shorten it back to a single probe |
+| The gateway container builds once and runs that output with plain `node`. `scripts/e2e-compose.sh` puts a hash of the backend source in the backend containers' environment (`E2E_BACKEND_FINGERPRINT`), so `up` recreates them when that source changed; `ci:check` always recreates them (ROV-288) | `nx serve` in the container rebuilt only the app, never `dist/libs`, so a library change left it failing to compile; its restarts died with `EADDRINUSE` or failed unrelated Playwright tests mid-run | Put a watcher back in the e2e stack |
 | **The Playwright CI job is paused on push/PR** (manual `workflow_dispatch` only) | Owner decision for a single-developer repo: the job took ~11.5 min and the suite already runs on every push via pre-push. Planned for a few months | Delete the job; re-enable by removing its `if:` |
 | The UI target's cache hashes backend sources (`e2eStack`) | With the CI job paused, a backend-only change would otherwise replay a cached UI pass and never run the suite | Remove `e2eStack` from `e2eFrontend` while the CI job is paused |
 
@@ -388,4 +389,5 @@ Both scripts are pure grep — fast enough to run in the `lint` job without extr
 These are the instance 0 values. In a parallel dev instance every port is shifted by `slot × 20` and the compose project is `roviq-e2e-<slot>`: see `docs/infrastructure.md` → "Parallel dev instances".
 | Full reset | `pnpm e2e:down && pnpm e2e:up` |
 | Re-seed only | `pnpm e2e:clean` |
-| Code changes | Edit files on the host — the checkout is bind-mounted, so `nx serve` inside the api-gateway container rebuilds and restarts. notification-service changes need `scripts/e2e-compose.sh restart api-gateway notification-service` |
+| Code changes | Backend containers run a fixed build. After editing backend code run `pnpm e2e:up` (or `pnpm test:e2e:api`, which calls it): it recreates api-gateway and notification-service when the backend source changed |
+| Seeding | Every `compose up` re-runs `migrate-and-seed` (an exited one-shot is started again), so `pnpm e2e:up` already resets and seeds `roviq_test`. Pass `--no-deps` to `run` for anything that must not re-seed |
