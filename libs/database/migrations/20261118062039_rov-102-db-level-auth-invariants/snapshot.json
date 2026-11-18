@@ -1,8 +1,8 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "bf077a1d-979e-49f6-bd1d-23b62bf8a821",
-  "prevIds": ["0d64cb86-49e8-4a86-ad43-886cf0212795"],
+  "id": "5cef75fe-5746-48eb-b02b-af19ba556efe",
+  "prevIds": ["e96051f0-8e55-4282-b3e4-0a014b2d0ea3"],
   "ddl": [
     {
       "values": [
@@ -10623,6 +10623,19 @@
       "generated": null,
       "identity": null,
       "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "institute_groups"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "reseller_id",
       "entityType": "columns",
       "schema": "public",
       "table": "institute_groups"
@@ -21632,6 +21645,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "reseller_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "institute_groups_reseller_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "institute_groups"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "code",
           "isExpression": false,
           "asc": true,
@@ -25797,6 +25831,19 @@
       "entityType": "fks",
       "schema": "public",
       "table": "institute_group_branding"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["reseller_id"],
+      "schemaTo": "public",
+      "tableTo": "resellers",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "institute_groups_reseller_id_resellers_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institute_groups"
     },
     {
       "nameExplicit": true,
@@ -30275,7 +30322,7 @@
       "as": "PERMISSIVE",
       "for": "SELECT",
       "roles": ["roviq_reseller"],
-      "using": "id IN (\n        SELECT group_id FROM institutes\n        WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid\n          AND group_id IS NOT NULL\n      )",
+      "using": "reseller_id = current_setting('app.current_reseller_id', true)::uuid\n        OR id IN (\n          SELECT group_id FROM institutes\n          WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid\n            AND group_id IS NOT NULL\n        )",
       "withCheck": null,
       "name": "institute_groups_reseller_read",
       "entityType": "policies",
@@ -33198,7 +33245,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"name\", \"code\", \"type\", \"registration_number\", \"registration_state\", \"contact\", \"address\", \"status\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institute_groups\" where (\"institute_groups\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"name\", \"code\", \"type\", \"registration_number\", \"registration_state\", \"contact\", \"address\", \"status\", \"reseller_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institute_groups\" where (\"institute_groups\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
