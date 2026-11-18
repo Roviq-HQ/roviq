@@ -66,6 +66,8 @@ const membershipWriteReturning = {
   updatedAt: groupMemberships.updatedAt,
 } as const;
 
+// SECURITY: withAdmin methods here are for admin resolvers only. Institute scope uses
+// findForTenant; reseller scope uses the *ForReseller methods, which run under RLS (ROV-290).
 @Injectable()
 export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {

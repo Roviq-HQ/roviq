@@ -1,18 +1,21 @@
-// CI guard — lists every file that runs queries as the admin DB role
-// (`withAdmin` / `mkAdminCtx`, RLS bypassed) and is reachable from a resolver
-// that a non-platform token can call (every resolver outside `admin/`).
+// CI guard — finds every function that runs queries as the admin DB role
+// (`withAdmin` / `mkAdminCtx`, RLS bypassed) and can be called, directly or
+// through services and repositories, from a resolver outside `admin/`.
 //
-// Why: ROV-290. Institute-scope resolvers reached repositories that ran as
-// admin with caller-supplied ids, so any institute login could read and change
-// other tenants' rows. `check:synthetic-context-usage` allowlists files, but
-// not who reaches them; this gate tracks the reach.
+// Why: ROV-290. Institute- and reseller-scope resolvers reached repositories
+// that ran as admin with caller-supplied ids, so one tenant could read and
+// change another's rows.
 //
-// Limit: the check is per file, not per method. It flags a new edge and forces
-// a written reason, but the reason is what a reviewer must verify.
+// Limit: static analysis. It flags a new reachable admin-context function when
+// the type checker can resolve the calls to it; calls it cannot resolve
+// (dataloaders, event handlers) fall back to the file list. It does not prove a
+// listed function is safe: the proof for an operation is a test that sends
+// another tenant's id and asserts refusal.
 
 import { type Dirent, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
+import { collectAdminMethods } from './lib/admin-method-reach';
 
 const ROOT = process.cwd();
 
@@ -20,62 +23,167 @@ const ROOT = process.cwd();
 const RESOLVER_ROOT_DIRS = ['apps/api-gateway/src', 'ee/apps/api-gateway/src'];
 const PLATFORM_ONLY_DIR = 'admin';
 
-// Reached admin-context file → why no caller-chosen id reaches an admin query in it.
-export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
-  'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts':
+// Admin-context function reachable from a non-admin resolver → why a caller cannot aim it at
+// another tenant's or reseller's rows. One entry per function: a new one fails CI.
+// These are reviewed claims, not proofs — re-check the function when you touch it.
+export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
+  'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#AuditQueryDrizzleRepository.findAuditLogs':
     'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
-  'apps/api-gateway/src/auth/auth-event.service.ts':
+  'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#runInContext':
+    'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
+  'apps/api-gateway/src/auth/auth-event.service.ts#AuthEventService.emit':
     'Insert-only writer of auth events; reads nothing back.',
-  'apps/api-gateway/src/auth/identity.service.ts':
-    'Creates users on platform-level tables; tenant and reseller ids come from the caller token, never from arguments.',
-  'apps/api-gateway/src/auth/impersonation.service.ts':
-    'Every lookup is checked against the actor scope, tenant, reseller and role rank before a session is issued (ROV-94).',
-  'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts':
-    'Login and token flows: memberships are looked up for the authenticated user id; a membership id from the client is matched against that user before use (ROV-92).',
-  'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts':
-    'Looked up by the authenticated user id during login and refresh.',
-  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts':
-    'Tokens are found by their own hash or id and checked against the calling user before revocation (ROV-92).',
-  'apps/api-gateway/src/auth/repositories/reseller-membership.drizzle-repository.ts':
-    'Looked up by the authenticated user id during login and refresh.',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts':
-    'Users are a platform-level table; lookups use the login identifier or the token user id.',
-  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts':
-    'Passkeys are read and deleted by the token user id; login lookups use the credential id presented by the authenticator.',
-  'apps/api-gateway/src/institute/academic-year/academic-year.service.ts':
-    'Reads the type of the institute named by the token tenant id.',
-  'apps/api-gateway/src/institute/bot/bot.service.ts':
-    'Writes platform-level user rows for a bot created in the token tenant; the membership id comes from a tenant-scoped lookup.',
-  'apps/api-gateway/src/institute/certificate/certificate.service.ts':
-    'Reads user_profiles for a user id taken from a tenant-scoped student lookup.',
-  'apps/api-gateway/src/institute/group/group.service.ts':
-    'Reads usernames for user ids taken from tenant-scoped membership rows.',
-  'apps/api-gateway/src/institute/guardian/guardian.service.ts':
-    'Writes platform-level user tables for a user id taken from a tenant-scoped guardian row.',
-  'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts':
-    'Institute scope reaches only findForTenant (tenant RLS) and findMembershipsByUser(token user id); reseller scope reaches the *ForReseller methods (reseller RLS) and create with its own reseller id. The admin-context methods are called from the admin resolver only.',
-  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts':
-    'Institute scope passes only the token tenant id. Reseller scope uses the *ByReseller methods, checks ownership through findByReseller before a status change, and creates with its own reseller id and a group it owns (assertOwnedByReseller).',
-  'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts':
-    'Runs from institute activation, which only admin and reseller resolvers can trigger after their own ownership checks.',
-  'apps/api-gateway/src/institute/staff/staff.service.ts':
-    'Writes platform-level user tables for the user it just created in the token tenant.',
-  'apps/api-gateway/src/institute/student/student.service.ts':
-    'Touches platform-level user tables for a user id taken from a tenant-scoped student row. KNOWN GAP (ROV-292): create reuses an existing user matched by phone number without consent, and later updates write that shared profile.',
-  'apps/api-gateway/src/institute/user/profile.service.ts':
-    'Reads and writes the profile of the token user id only.',
-  'apps/api-gateway/src/reseller/team/reseller-team.service.ts':
-    'Role lookup is filtered by the token reseller id.',
-  'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts':
-    'Counts subscribers for plan ids already returned to the caller by a reseller-scoped query.',
-  'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts':
-    'Looked up by the token reseller id or by an invoice the caller was already shown.',
-  'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts':
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.createMembership':
+    'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.createUser':
+    'Creates a new platform-level user; no existing row is read or changed.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertActiveResellerMembership':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertStillAuthorized':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.createSession':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.dispatchImpersonationOtp':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.endImpersonation':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.exchangeCode':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.listSessions':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.resolveEndReason':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.startImpersonation':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.validateIntraInstituteImpersonation':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findActiveByUserId':
+    'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
+  'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findByIdAndUser':
+    'A membership id from the client is matched against the authenticated user id in the same query.',
+  'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts#PlatformMembershipDrizzleRepository.findByUserId':
+    'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.create':
+    'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.findActiveByUserId':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.findByHash':
+    'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.findByIdWithRelations':
+    'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.revoke':
+    'Tokens are found by their own hash or by the id inside the verified refresh JWT, and checked against the calling user before revocation (ROV-92).',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.revokeAllForUser':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts#RefreshTokenDrizzleRepository.revokeAllOtherForUser':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/reseller-membership.drizzle-repository.ts#ResellerMembershipDrizzleRepository.findByUserId':
+    'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.create':
+    'Self-registration creates a new user. KNOWN GAP (ROV-286): the public register mutation itself.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findById':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findByUsername':
+    'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.getPreferredLocale':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePassword':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePreferredLocale':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.lookupInstituteType':
+    'Keyed by the tenant id in the verified token. Reads only the institute type.',
+  'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.createBot':
+    'Creates a new platform-level user for a bot in the token tenant.',
+  'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.deleteBot':
+    'Revokes the membership id read from a bot profile fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.findOrCreateBotRole':
+    'Keyed by the tenant id in the verified token.',
+  'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.previewCertificate':
+    'Reads user_profiles for a user id taken from a student row fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate':
+    'Reads user_profiles for a user id taken from a student row fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/group/group.service.ts#GroupService.listMembers':
+    'Reads usernames for user ids taken from membership rows fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/guardian/guardian.service.ts#GuardianService.create':
+    'Writes platform-level user tables for the user it just created.',
+  'apps/api-gateway/src/institute/guardian/guardian.service.ts#GuardianService.update':
+    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. KNOWN GAP (ROV-292): the profile row is shared across institutes.',
+  'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.create':
+    'Reseller scope passes its own reseller id from the token as owner; no existing group is read or changed.',
+  'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.findMembershipsByUser':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.create':
+    'Reseller scope only: reseller id comes from the token and a named group must be owned by that reseller (assertOwnedByReseller).',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findAffiliations':
+    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findBranding':
+    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findById':
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findConfig':
+    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findIdentifiers':
+    'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateBranding':
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateConfig':
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateInfo':
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateLocales':
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+  'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateStatus':
+    'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership.',
+  'apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create':
+    'Writes platform-level user tables for the user it just created.',
+  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.applyUserProfileUpdates':
+    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. KNOWN GAP (ROV-292): the profile row is shared across institutes.',
+  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.create':
+    'KNOWN GAP (ROV-292): reuses an existing user matched by phone number without consent. Otherwise writes rows for the user it just created.',
+  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.uploadDocument':
+    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS.',
+  'apps/api-gateway/src/institute/user/profile.service.ts#ProfileService.getMyProfile':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/institute/user/profile.service.ts#ProfileService.updateMyProfile':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.countOtherPasskeys':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.create':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.deletePasskey':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findByActiveUsername':
+    'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findByCredentialId':
+    'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.findPasskeysByUserId':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.updateProviderData':
+    'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
+  'apps/api-gateway/src/reseller/team/reseller-team.service.ts#ResellerTeamService.invite':
+    'Role lookup is filtered by the reseller id in the verified token.',
+  'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts#PaymentGatewayConfigDrizzleRepository.findActiveByResellerId':
+    'Keyed by the reseller id in the verified token.',
+  'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findAbilities':
     'Loads abilities for the membership id and tenant id in the verified token.',
-  'libs/backend/casl/src/repositories/role.drizzle-repository.ts':
+  'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findReadAssignments':
+    'Loads abilities for the membership id and tenant id in the verified token.',
+  'libs/backend/casl/src/repositories/role.drizzle-repository.ts#RoleDrizzleRepository.findAbilities':
     'Loads abilities for the role id in the verified token.',
+  'libs/backend/casl/src/repositories/role.drizzle-repository.ts#RoleDrizzleRepository.findPrimaryNavSlugs':
+    'Loads abilities for the role id in the verified token.',
+};
+
+// Reached admin-context file with no function found by the method analysis (reached through
+// a dataloader, a module binding or a re-export) → why it is safe.
+export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
+  'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts':
+    'Imported by InstituteService; runs only from institute activation, which no non-admin resolver method calls.',
+  'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts':
+    'Reached through a dataloader: counts subscribers for plan ids already returned to the caller by a reseller-scoped query.',
   'libs/backend/casl/src/seed-roles.ts':
-    'Seeds default roles for a tenant id chosen by institute creation, not by a request argument.',
+    'Imported with the casl library; seeds default roles for a tenant chosen by institute creation, not by a request argument.',
   'libs/database/src/tenant-db.ts': 'Defines the wrappers themselves.',
 };
 
@@ -243,6 +351,20 @@ function loadCompilerOptions(): ts.CompilerOptions {
   return ts.convertCompilerOptionsFromJson(config.config?.compilerOptions ?? {}, ROOT).options;
 }
 
+/** Keys found but not listed, and keys listed but no longer found. */
+export function diffAllowlist(
+  found: Iterable<string>,
+  allowlist: Readonly<Record<string, string>>,
+): { unlisted: string[]; stale: string[] } {
+  const foundSet = new Set(found);
+  return {
+    unlisted: [...foundSet].filter((key) => !(key in allowlist)).sort(),
+    stale: Object.keys(allowlist)
+      .filter((key) => !foundSet.has(key))
+      .sort(),
+  };
+}
+
 function main(): number {
   const roots: string[] = [];
   for (const dir of RESOLVER_ROOT_DIRS) findResolvers(join(ROOT, dir), roots);
@@ -257,32 +379,58 @@ function main(): number {
     ROOT,
     collectImplementations(sources, compilerOptions),
   );
-  const { unlisted, stale } = findViolations(reach, ADMIN_REACH_ALLOWLIST);
+  const methods = collectAdminMethods(
+    roots,
+    [...reach.keys()].map((file) => join(ROOT, file)),
+    compilerOptions,
+    ROOT,
+  );
+  const methodDiff = diffAllowlist(methods.keys(), ADMIN_METHOD_ALLOWLIST);
 
-  if (unlisted.length === 0 && stale.length === 0) {
+  // Files the method analysis already covers need no file-level entry.
+  const covered = new Set([...methods.keys()].map((key) => key.split('#')[0]));
+  const uncovered = new Map([...reach].filter(([file]) => !covered.has(file)));
+  const fileDiff = findViolations(uncovered, ADMIN_REACH_ALLOWLIST);
+
+  const clean =
+    methodDiff.unlisted.length + methodDiff.stale.length === 0 &&
+    fileDiff.unlisted.length + fileDiff.stale.length === 0;
+  if (clean) {
     process.stdout.write(
-      `check:admin-context-reach — ${Object.keys(ADMIN_REACH_ALLOWLIST).length} admin-context file(s) reachable from non-platform resolvers, all listed with a reason.\n`,
+      `check:admin-context-reach — ${methods.size} admin-context function(s) and ${Object.keys(ADMIN_REACH_ALLOWLIST).length} file(s) reachable from non-admin resolvers, all listed with a reason.\n`,
     );
     return 0;
   }
 
-  if (unlisted.length > 0) {
-    process.stderr.write(
-      `check:admin-context-reach — ${unlisted.length} admin-context file(s) newly reachable from an institute or reseller resolver:\n\n`,
+  const err = (text: string) => process.stderr.write(text);
+  if (methodDiff.unlisted.length > 0) {
+    err(
+      `check:admin-context-reach — ${methodDiff.unlisted.length} admin-context function(s) newly reachable from a non-admin resolver:\n\n`,
     );
-    for (const hit of unlisted)
-      process.stderr.write(`  ${hit.file}\n    reached from ${hit.root}\n`);
-    process.stderr.write(
-      '\nThese files run queries as roviq_admin (RLS bypassed). Check every admin-context method the resolver can reach:\n' +
-        'an id that the caller supplies must be verified against the caller’s tenant or reseller first, or the query must\n' +
-        'move to withTenant / withReseller. Then add the file to ADMIN_REACH_ALLOWLIST with the reason.\n',
+    for (const key of methodDiff.unlisted) {
+      err(`  ${key}\n    reached from ${methods.get(key)}\n`);
+    }
+    err(
+      '\nThese run queries as roviq_admin (RLS bypassed). An id the caller supplies must be checked against the\n' +
+        'caller’s tenant or reseller first, or the query must move to withTenant / withReseller. Add a cross-tenant\n' +
+        'test, then list the function in ADMIN_METHOD_ALLOWLIST with the reason.\n',
     );
   }
+  if (fileDiff.unlisted.length > 0) {
+    err(
+      `\ncheck:admin-context-reach — ${fileDiff.unlisted.length} admin-context file(s) reachable with no function resolved:\n\n`,
+    );
+    for (const hit of fileDiff.unlisted) err(`  ${hit.file}\n    reached from ${hit.root}\n`);
+    err(
+      '\nCheck how the file is reached, then list it in ADMIN_REACH_ALLOWLIST with the reason.\n',
+    );
+  }
+  const stale = [...methodDiff.stale, ...fileDiff.stale];
   if (stale.length > 0) {
-    process.stderr.write(
+    err(
       `\ncheck:admin-context-reach — ${stale.length} allowlist entr${stale.length === 1 ? 'y is' : 'ies are'} no longer reached; remove:\n\n`,
     );
-    for (const file of stale) process.stderr.write(`  ${file}\n`);
+    for (const key of stale) err(`  ${key}\n`);
   }
   return 1;
 }

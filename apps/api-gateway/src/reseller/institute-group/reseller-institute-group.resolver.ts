@@ -13,6 +13,7 @@ import { InstituteGroupModel } from '../../institute/institute-group/models/inst
 import { InstituteGroupConnection } from '../../institute/institute-group/models/institute-group-connection.model';
 import { ResellerInstituteGroupService } from './reseller-institute-group.service';
 
+// SECURITY: the reseller id always comes from the token, never from an argument (ROV-290).
 @UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver(() => InstituteGroupModel)
 export class ResellerInstituteGroupResolver {

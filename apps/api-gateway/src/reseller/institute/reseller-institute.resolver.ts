@@ -9,6 +9,7 @@ import { InstituteStatisticsModel } from '../../institute/management/models/inst
 import { ResellerCreateInstituteRequestInput } from './dto/reseller-create-institute-request.input';
 import { ResellerInstituteService } from './reseller-institute.service';
 
+// SECURITY: every id argument must pass through a *ByReseller lookup before any write (ROV-290).
 @UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
 export class ResellerInstituteResolver {

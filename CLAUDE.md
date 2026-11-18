@@ -154,6 +154,7 @@ Full rationale + enforcing CI gate for each line: `docs/references/mistake-refer
 - `selectInstitute(membershipId)`, not `tenantId` · abilities live on `Membership`, not `User`
 - `withTenant/withReseller/withAdmin(db, ctx, fn)` with the branded ctx — no `$transaction`, no `tenantTransaction()`
 - `assertTenantContext()` / `assertResellerContext()` / `assertPlatformContext()` / `assertInstituteWithReseller()` instead of inline `ForbiddenException`
+- A scope guard is not tenant isolation: institute/reseller code never passes a caller-supplied id to `withAdmin` code without an ownership check · platform operations live in `admin/` resolvers (`pnpm check:admin-context-reach`, `docs/auth.md`)
 - `mk*Ctx()` only in workflow activities, seeders, event-consumer repos, integration fixtures (`pnpm check:synthetic-context-usage`)
 - `ability.can()`, never role checks · scope decorators at class level, not `APP_GUARD` · `GqlAuthGuard` from `@roviq/auth-backend`
 - Every `@CheckAbility` pair must be reachable by a role, every grant used (`ability-coverage.spec.ts`)
