@@ -167,4 +167,51 @@ describe('ResellerAccessGuard', () => {
 
     await expectBusinessError(() => guard.canActivate(context), ErrorCode.UNAUTHENTICATED);
   });
+
+  describe('team member changes', () => {
+    const MEMBER_KEY = 'auth:reseller-member-access:membership-1';
+
+    it('rejects every token of a deactivated member', async () => {
+      stubRequest({ user: resellerUser() });
+      const { guard } = createGuard({ [CACHE_KEY]: 'allowed', [MEMBER_KEY]: 'blocked' });
+
+      await expectBusinessError(() => guard.canActivate(context), ErrorCode.UNAUTHENTICATED);
+    });
+
+    it('rejects a token that carries the role the member no longer holds', async () => {
+      stubRequest({ user: resellerUser() });
+      const { guard } = createGuard({ [CACHE_KEY]: 'allowed', [MEMBER_KEY]: 'role-9' });
+
+      await expectBusinessError(() => guard.canActivate(context), ErrorCode.UNAUTHENTICATED);
+    });
+
+    it('lets through a token issued with the role the member now holds', async () => {
+      stubRequest({ user: resellerUser() });
+      const { guard } = createGuard({ [CACHE_KEY]: 'allowed', [MEMBER_KEY]: 'role-1' });
+
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+    });
+
+    it('reads the membership and role from the Bearer token before req.user is set', async () => {
+      stubRequest({ headers: { authorization: 'Bearer some.jwt.token' } });
+      const { guard } = createGuard({ [CACHE_KEY]: 'allowed', [MEMBER_KEY]: 'role-9' }, () => ({
+        scope: 'reseller',
+        resellerId: RESELLER_ID,
+        membershipId: 'membership-1',
+        roleId: 'role-1',
+      }));
+
+      await expectBusinessError(() => guard.canActivate(context), ErrorCode.UNAUTHENTICATED);
+    });
+
+    it('ignores a marker written for another membership', async () => {
+      stubRequest({ user: resellerUser() });
+      const { guard } = createGuard({
+        [CACHE_KEY]: 'allowed',
+        'auth:reseller-member-access:membership-7': 'blocked',
+      });
+
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+    });
+  });
 });

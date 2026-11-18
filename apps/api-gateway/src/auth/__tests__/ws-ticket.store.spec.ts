@@ -115,6 +115,7 @@ describe('ws-ticket store', () => {
         isImpersonated: true,
         impersonatorId: 'admin-1',
         impersonationSessionId: 'session-1',
+        impersonationReadOnly: true,
       };
       const ticket = await issueWsTicket(fake.redis, impersonated);
 

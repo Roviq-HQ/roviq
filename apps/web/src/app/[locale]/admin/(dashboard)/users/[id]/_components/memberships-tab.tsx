@@ -19,12 +19,14 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { AdminImpersonateButton } from '@web/components/impersonation/admin-impersonate-button';
 import { useRoleName } from '@web/hooks/use-role-name';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { UserDetail } from '../../types';
 import { MEMBERSHIP_STATUS_VARIANT } from '../../user-badge-styles';
+import { useUserDisplayName } from './profile-card';
 
 const { adminUserDetail } = testIds;
 
@@ -33,6 +35,7 @@ export function MembershipsTab({ user }: { user: UserDetail }) {
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
   const roleName = useRoleName();
+  const displayName = useUserDisplayName();
   const date = (d: string) => format(new Date(d), 'dd/MM/yyyy');
   const activeLabel = (isActive: boolean) => (isActive ? t('active') : t('inactive'));
   const hasAny =
@@ -81,7 +84,16 @@ export function MembershipsTab({ user }: { user: UserDetail }) {
                       </Badge>
                     </TableCell>
                     <TableCell>{date(m.joinedAt)}</TableCell>
-                    <TableCell className="text-end">
+                    <TableCell className="space-x-2 text-end">
+                      {user.status === 'ACTIVE' && m.status === 'ACTIVE' && (
+                        <AdminImpersonateButton
+                          userId={user.id}
+                          tenantId={m.tenantId}
+                          targetName={displayName(user)}
+                          instituteName={resolveI18n(m.instituteName)}
+                          testId={adminUserDetail.impersonateBtn(m.id)}
+                        />
+                      )}
                       <Button
                         asChild
                         variant="ghost"

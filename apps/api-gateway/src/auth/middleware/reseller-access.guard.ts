@@ -10,11 +10,13 @@ import {
   RESELLER_ACCESS,
   RESELLER_ACCESS_CACHE_TTL_SECONDS,
   resellerAccessKeys,
+  resellerMemberAccessKey,
 } from '../reseller-access-cache';
 import { readRequestTokenClaims } from './request-token-claims';
 
 /**
- * Rejects reseller-scope tokens whose reseller is suspended or deleted.
+ * Rejects reseller-scope tokens whose reseller is suspended or deleted, and tokens of a
+ * team member who was deactivated or moved to another role after the token was issued.
  *
  * SECURITY: revoking refresh tokens is not enough — an access token already issued stays
  * valid for its full lifetime, so without this guard suspended staff keep working for
@@ -39,11 +41,15 @@ export class ResellerAccessGuard implements CanActivate {
     if (claims?.scope !== 'reseller' || !claims.resellerId) return true;
 
     const keys = resellerAccessKeys(claims.resellerId);
-    const [blocked, cached] = await Promise.all([
+    const [blocked, cached, requiredRole] = await Promise.all([
       this.redis.get(keys.blocked),
       this.redis.get(keys.cache),
+      claims.membershipId ? this.redis.get(resellerMemberAccessKey(claims.membershipId)) : null,
     ]);
     if (blocked) throw suspended();
+    if (requiredRole && requiredRole !== claims.roleId) {
+      throw new BusinessException(ErrorCode.UNAUTHENTICATED, 'Reseller membership has changed');
+    }
 
     const access = cached ?? (await this.loadAndCache(claims.resellerId, keys.cache));
     if (access !== RESELLER_ACCESS.ALLOWED) throw suspended();

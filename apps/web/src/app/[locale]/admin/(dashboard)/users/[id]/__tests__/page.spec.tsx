@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const useAdminUserMock = vi.fn();
@@ -14,6 +15,9 @@ vi.mock('../../use-users', () => ({
 vi.mock('../_components/audit-tab', () => ({
   UserAuditTab: () => null,
 }));
+
+const signedIn = vi.hoisted(() => ({ id: 'platform-admin-1' }));
+vi.mock('@roviq/auth', () => ({ useAuth: () => ({ user: { id: signedIn.id } }) }));
 
 vi.mock('next/navigation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('next/navigation')>();
@@ -115,6 +119,60 @@ describe('UserDetailPage', () => {
       'href',
       '/admin/institutes/inst-1',
     );
+  });
+
+  describe('View as on an institute membership (ROV-183)', () => {
+    const viewAs = () => screen.queryByTestId(adminUserDetail.impersonateBtn('m-1'));
+
+    beforeEach(() => {
+      signedIn.id = 'platform-admin-1';
+    });
+
+    it('opens the reason dialog naming the user and the institute', async () => {
+      mockUser(makeUser());
+      renderWithProviders(<UserDetailPage />);
+
+      const button = viewAs();
+      expect(button).toHaveAttribute('title', 'Open a new tab signed in as this user');
+      await userEvent.click(button as HTMLElement);
+
+      const dialog = await screen.findByTestId(testIds.impersonation.dialog);
+      expect(dialog).toHaveTextContent('View as Priya Sharma');
+      expect(dialog).toHaveTextContent('Saraswati Vidya Mandir');
+    });
+
+    it('is not offered for a membership that is not active', () => {
+      const user = makeUser();
+      mockUser(makeUser({ memberships: [{ ...user.memberships[0], status: 'SUSPENDED' }] }));
+      renderWithProviders(<UserDetailPage />);
+
+      expect(screen.getByTestId(adminUserDetail.membershipRow('m-1'))).toBeInTheDocument();
+      expect(viewAs()).not.toBeInTheDocument();
+    });
+
+    it('is not offered for a user who is not active', () => {
+      mockUser(makeUser({ status: 'SUSPENDED' }));
+      renderWithProviders(<UserDetailPage />);
+
+      expect(viewAs()).not.toBeInTheDocument();
+    });
+
+    it('is not offered to a platform role without the impersonate ability', () => {
+      mockUser(makeUser());
+      renderWithProviders(<UserDetailPage />, {
+        abilityRules: [{ action: 'read', subject: 'all' }],
+      });
+
+      expect(viewAs()).not.toBeInTheDocument();
+    });
+
+    it('is not offered on your own account', () => {
+      signedIn.id = 'user-1';
+      mockUser(makeUser());
+      renderWithProviders(<UserDetailPage />);
+
+      expect(viewAs()).not.toBeInTheDocument();
+    });
   });
 
   it('should show Aadhaar only as the masked value the API returns', () => {

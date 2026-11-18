@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImpersonationBanner } from '../impersonation-banner';
-import { EndOwnImpersonationDocument } from '../impersonation-banner.generated';
 import {
   IMPERSONATION_TOKEN_KEY,
   readImpersonatedUser,
   storeImpersonation,
 } from '../impersonation-storage';
+import { EndOwnImpersonationDocument } from '../use-impersonation-session.generated';
 
 const auth = vi.hoisted(() => ({ impersonationEnded: false }));
 vi.mock('@roviq/auth', async (importOriginal) => ({
@@ -73,6 +73,35 @@ describe('ImpersonationBanner', () => {
     renderWithProviders(<ImpersonationBanner />);
 
     expect(screen.getByRole('status')).toHaveTextContent('You are viewing as teacher1');
+  });
+
+  it('marks a view-only session and says what that means', () => {
+    storeImpersonation(token({ isImpersonated: true, impersonationReadOnly: true }), {
+      username: 'teacher1',
+      firstName: null,
+      lastName: null,
+    });
+
+    renderWithProviders(<ImpersonationBanner />);
+
+    const badge = screen.getByTestId('impersonation-view-only-badge');
+    expect(badge).toHaveTextContent('View only');
+    expect(badge).toHaveAttribute(
+      'title',
+      'You can look around as this user, but this session cannot change anything.',
+    );
+  });
+
+  it('shows no view-only mark on a session that may write', () => {
+    storeImpersonation(token({ isImpersonated: true }), {
+      username: 'teacher1',
+      firstName: null,
+      lastName: null,
+    });
+
+    renderWithProviders(<ImpersonationBanner />);
+
+    expect(screen.queryByTestId('impersonation-view-only-badge')).not.toBeInTheDocument();
   });
 
   it('ends the session on the server before leaving, then drops the token', async () => {

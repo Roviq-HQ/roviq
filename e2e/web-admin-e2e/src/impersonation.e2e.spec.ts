@@ -1,36 +1,90 @@
 /**
- * Impersonation flow — admin impersonates an institute user.
+ * Impersonation flow (ROV-183) — a platform admin views as an institute user.
  *
- * Status: BLOCKED — The admin UI button that generates an impersonation code
- * and opens the institute session in a new tab is not yet implemented.
- * The backend exchange endpoint (exchangeImpersonationCode mutation) and the
- * impersonation landing page (/institute/auth/impersonate?code=...) exist, but
- * there is no visible UI in the admin portal to trigger the flow.
- *
- * These tests describe the INTENDED behaviour once the feature is wired.
- * Fill them in when the following are implemented:
- *   1. Admin institute detail → "Impersonate" button (generates code, opens tab)
- *   2. ImpersonationBanner component rendered in institute portal layout
- *   3. "Exit impersonation" button in the banner that clears the session
- *
- * Deferred tracking: .claude/sessions/a8ad88da-92a0-48c4-a5ec-a945dd66497a/todos.md
+ * Starts from the admin user's Memberships tab, follows the new tab into the
+ * institute portal, and checks the session on the admin sessions page. Each run
+ * opens its own session and ends it, so the seeded sessions are left alone.
  */
-import { test } from '../../shared/console-guardian';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { expect, test } from '../../shared/console-guardian';
+import { SEED, SEED_IDS } from '../../shared/seed-fixtures';
+
+const {
+  adminImpersonationSessions: sessions,
+  impersonation,
+  impersonationBanner,
+  layout,
+} = testIds;
+
+const REASON = `E2E check of the view-as flow ${Date.now()}`;
 
 test.describe('Impersonation flow', () => {
-  test.skip('admin institute detail page has an "Impersonate" button that generates a one-time code', async () => {});
+  test('view as a teacher from their Memberships tab, then exit from the user menu', async ({
+    page,
+    context,
+  }) => {
+    await page.goto(`/en/admin/users/${SEED_IDS.USER_TEACHER}`);
+    await page.getByTestId(testIds.adminUserDetail.tab('memberships')).click();
+    await page
+      .getByTestId(/^admin-user-impersonate-btn-/)
+      .first()
+      .click();
 
-  test.skip('clicking Impersonate opens the institute portal in a new tab with an impersonation session', async () => {});
+    const dialog = page.getByTestId(impersonation.dialog);
+    await expect(dialog).toContainText(SEED.INSTITUTE_1.name);
 
-  test.skip('impersonated tab shows the ImpersonationBanner with the impersonator name and scope', async () => {});
+    // A reason under 10 characters never reaches the server.
+    await page.getByTestId(impersonation.reasonInput).fill('too short');
+    await page.getByTestId(impersonation.submitBtn).click();
+    await expect(page.getByTestId(impersonation.reasonError)).toBeVisible();
 
-  test.skip('original admin tab remains unchanged and unaffected while the impersonation tab is open', async () => {});
+    await page.getByTestId(impersonation.reasonInput).fill(REASON);
+    const [tab] = await Promise.all([
+      context.waitForEvent('page'),
+      page.getByTestId(impersonation.submitBtn).click(),
+    ]);
 
-  test.skip('"Exit impersonation" button in the banner ends the session and closes/redirects the tab', async () => {});
+    const banner = tab.getByTestId(impersonationBanner.banner);
+    await expect(banner).toBeVisible({ timeout: 30_000 });
+    await expect(banner).toContainText('You are viewing as');
+    // A platform admin's session may write.
+    await expect(tab.getByTestId(impersonationBanner.viewOnlyBadge)).toHaveCount(0);
 
-  test.skip('impersonation event is recorded in the admin audit log (audit-logs-tab-impersonation)', async () => {});
+    // The token lives in sessionStorage, so it dies with the tab.
+    const stored = await tab.evaluate(() => ({
+      session: sessionStorage.getItem('roviq-impersonation-token') !== null,
+      local: Object.keys(localStorage).some((key) => key.includes('impersonation')),
+    }));
+    expect(stored).toEqual({ session: true, local: false });
 
-  test.skip('impersonation token is stored in sessionStorage (not localStorage) so it dies with the tab', async () => {});
+    // The admin's own tab stays where it was, signed in, with the dialog gone.
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`/admin/users/${SEED_IDS.USER_TEACHER}`));
 
-  test.skip('reloading the impersonated tab after the token expires redirects to the login page', async () => {});
+    // The session shows as active on the sessions page.
+    await page.goto('/en/admin/impersonation-sessions');
+    const row = page.getByRole('row').filter({ hasText: REASON });
+    await expect(row).toContainText('Active');
+    await expect(row).toContainText('Platform');
+
+    // The banner takes its own row: the user menu under it is reachable, and
+    // "Log out" there has become Exit.
+    await tab.bringToFront();
+    await tab.getByTestId(layout.userMenuTrigger).click();
+    const exit = tab.getByTestId(layout.userMenuLogout);
+    await expect(exit).toHaveText('Exit Impersonation');
+    await Promise.all([tab.waitForEvent('close'), exit.click()]);
+
+    // The sessions page drops it without a reload: by the live event, or by the
+    // 15-second fallback poll when the event was missed.
+    await page.bringToFront();
+    await expect(row).toHaveCount(0, { timeout: 20_000 });
+    await page.getByTestId(sessions.showFilter).click();
+    await page.getByRole('option', { name: 'All sessions' }).click();
+    await expect(row).toContainText('Ended');
+
+    // Exiting the impersonated tab did not sign the admin out.
+    await page.reload();
+    await expect(page.getByTestId(sessions.page)).toBeVisible();
+  });
 });

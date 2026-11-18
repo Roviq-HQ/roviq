@@ -257,4 +257,108 @@ describe('ImpersonationSessionGuard', () => {
       expect(keys).toEqual(keys.filter((k) => k.endsWith(':tombstone')));
     });
   });
+
+  describe('view-only sessions (ROV-183)', () => {
+    const live = { endedAt: null, endedReason: null, expiresAt: new Date(Date.now() + 60_000) };
+
+    function stubOperation(
+      user: AuthUser,
+      operation: 'query' | 'mutation' | 'subscription',
+      fieldName: string,
+      nested = false,
+    ): void {
+      mockedGqlCreate.mockReturnValue(
+        createMock<GqlExecutionContext>({
+          getContext: () => ({ req: { user } }),
+          getInfo: () => ({
+            operation: { operation },
+            fieldName,
+            path: { key: fieldName, prev: nested ? { key: 'parent' } : undefined },
+          }),
+        }),
+      );
+    }
+
+    const viewOnly = () => makeImpersonatedUser({ impersonationReadOnly: true });
+
+    it('refuses a mutation', async () => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      stubOperation(viewOnly(), 'mutation', 'markAttendance');
+
+      await expectBusinessError(
+        () => guard.canActivate(makeExecutionContext()),
+        ErrorCode.IMPERSONATION_READ_ONLY,
+      );
+    });
+
+    it.each([
+      ['query', 'me'],
+      ['subscription', 'studentUpdated'],
+    ] as const)('lets a %s through', async (operation, fieldName) => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      stubOperation(viewOnly(), operation, fieldName);
+
+      await expect(guard.canActivate(makeExecutionContext())).resolves.toBe(true);
+    });
+
+    it('lets the session end itself', async () => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      stubOperation(viewOnly(), 'mutation', 'endImpersonation');
+
+      await expect(guard.canActivate(makeExecutionContext())).resolves.toBe(true);
+    });
+
+    it('does not mistake a field resolved under a mutation result for a second mutation', async () => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      stubOperation(viewOnly(), 'mutation', 'endImpersonation', true);
+
+      await expect(guard.canActivate(makeExecutionContext())).resolves.toBe(true);
+    });
+
+    it('leaves a normal impersonation session free to write', async () => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      stubOperation(makeImpersonatedUser(), 'mutation', 'markAttendance');
+
+      await expect(guard.canActivate(makeExecutionContext())).resolves.toBe(true);
+    });
+
+    it('reports an ended session as ended, not as view-only', async () => {
+      const { guard } = createGuard();
+      setSessionRow({ ...live, endedAt: new Date() });
+      stubOperation(viewOnly(), 'mutation', 'markAttendance');
+
+      await expectImpersonationEnded(() => guard.canActivate(makeExecutionContext()));
+    });
+
+    it.each([
+      ['POST', false],
+      ['DELETE', false],
+      ['GET', true],
+    ])('on a plain HTTP route, %s is allowed: %s', async (method, allowed) => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      const user = viewOnly();
+      mockedGqlCreate.mockReturnValue(
+        createMock<GqlExecutionContext>({ getContext: () => ({ req: { user } }) }),
+      );
+      const context = createMock<ExecutionContext>({
+        getType: vi.fn().mockReturnValue('http'),
+        switchToHttp: vi.fn().mockReturnValue({ getRequest: () => ({ user, method }) }),
+      });
+
+      if (allowed) {
+        await expect(guard.canActivate(context)).resolves.toBe(true);
+      } else {
+        await expectBusinessError(
+          () => guard.canActivate(context),
+          ErrorCode.IMPERSONATION_READ_ONLY,
+        );
+      }
+    });
+  });
 });

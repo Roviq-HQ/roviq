@@ -9,7 +9,18 @@
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { authEvents, impersonationSessions, mkAdminCtx, withAdmin } from '@roviq/database';
+import type { ResellerSystemRoleName } from '@roviq/common-types';
+import {
+  authEvents,
+  impersonationSessions,
+  mkAdminCtx,
+  phoneNumbers,
+  platformMemberships,
+  provisionResellerSystemRoles,
+  resellerMemberships,
+  roles,
+  withAdmin,
+} from '@roviq/database';
 import { REDIS_CLIENT } from '@roviq/redis';
 import {
   cleanupTestInstitute,
@@ -26,6 +37,7 @@ import {
   gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
+  type TestReseller,
   type TestTeacher,
 } from '@roviq/testing/integration';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -66,6 +78,7 @@ interface Claims {
   isImpersonated: boolean;
   impersonatorId: string;
   impersonationSessionId: string;
+  impersonationReadOnly?: boolean;
   exp: number;
   iat: number;
 }
@@ -81,6 +94,8 @@ describe('Impersonation (integration)', () => {
   let teacher: TestTeacher;
   let instituteAdminToken: string;
   let teacherToken: string;
+
+  const redis = createInMemoryRedis();
 
   const platformAdminToken = createPlatformToken({
     sub: SEED_IDS.USER_ADMIN,
@@ -132,7 +147,7 @@ describe('Impersonation (integration)', () => {
     result = await createIntegrationApp({
       modules: [AppModule],
       // Codes and session tombstones are read back, so Redis must store them.
-      overrides: [{ provide: REDIS_CLIENT, useValue: createInMemoryRedis() }],
+      overrides: [{ provide: REDIS_CLIENT, useValue: redis }],
     });
     tenant = await createTestInstitute(result.db);
     otherTenant = await createTestInstitute(result.db);
@@ -420,6 +435,70 @@ describe('Impersonation (integration)', () => {
     });
   });
 
+  describe('platform support → institute, view-only (ROV-183)', () => {
+    const WRITE = `mutation { updateMyPreferredLocale(input: { locale: "hi" }) }`;
+    let supportMembershipId: string;
+
+    beforeAll(async () => {
+      // A second platform user holding the read-only support role.
+      const [row] = await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+        tx
+          .insert(platformMemberships)
+          .values({
+            userId: otherTenant.userId,
+            roleId: SEED_IDS.ROLE_PLATFORM_SUPPORT,
+            createdBy: otherTenant.userId,
+            updatedBy: otherTenant.userId,
+          })
+          .returning({ id: platformMemberships.id }),
+      );
+      supportMembershipId = row.id;
+    });
+
+    afterAll(async () => {
+      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+        tx.delete(platformMemberships).where(eq(platformMemberships.id, supportMembershipId)),
+      );
+    });
+
+    it('a platform support session reads and refuses a write; a platform admin session writes', async () => {
+      const start = await gqlRequest(result.httpServer, {
+        query: ADMIN_START,
+        variables: {
+          targetUserId: teacher.userId,
+          targetTenantId: tenant.tenantId,
+          reason: REASON,
+        },
+        token: createPlatformToken({
+          sub: otherTenant.userId,
+          membershipId: supportMembershipId,
+          roleId: SEED_IDS.ROLE_PLATFORM_SUPPORT,
+        }),
+      });
+      expect(start.errors).toBeUndefined();
+      const exchange = await gqlRequest(result.httpServer, {
+        query: EXCHANGE,
+        variables: { code: start.data?.adminStartImpersonation.code },
+      });
+      const supportToken = exchange.data?.exchangeImpersonationCode.accessToken as string;
+      expect(claimsOf(supportToken).impersonationReadOnly).toBe(true);
+
+      const read = await gqlRequest(result.httpServer, {
+        query: MY_INSTITUTE,
+        token: supportToken,
+      });
+      expect(read.errors).toBeUndefined();
+      const write = await gqlRequest(result.httpServer, { query: WRITE, token: supportToken });
+      expect(write.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_READ_ONLY');
+
+      const admin = await impersonate(teacher.userId);
+      expect(admin.claims.impersonationReadOnly).toBeUndefined();
+      // Reaches the resolver, which has its own rule for this one mutation.
+      const adminWrite = await gqlRequest(result.httpServer, { query: WRITE, token: admin.token });
+      expect(adminWrite.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    });
+  });
+
   describe('reseller → institute', () => {
     it('refuses a reseller whose token is for another reseller than the institute owner', async () => {
       const otherReseller = await createTestReseller(result.db);
@@ -456,7 +535,174 @@ describe('Impersonation (integration)', () => {
     });
   });
 
+  describe('reseller → institute, view-only for roles below full admin (ROV-183)', () => {
+    const RESELLER_START = `
+      mutation($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
+        resellerStartImpersonation(
+          targetUserId: $targetUserId
+          targetTenantId: $targetTenantId
+          reason: $reason
+        ) { code requiresOtp sessionId }
+      }
+    `;
+    const RESELLER_VERIFY = `
+      mutation($sessionId: String!, $otp: String!) {
+        resellerVerifyImpersonationOtp(sessionId: $sessionId, otp: $otp) { code }
+      }
+    `;
+    const WRITE = `mutation { updateMyPreferredLocale(input: { locale: "hi" }) }`;
+    const END = `mutation($id: String!) { endImpersonation(sessionId: $id) }`;
+
+    let reseller: TestReseller;
+    let owned: TestInstitute;
+    let ownedTeacher: TestTeacher;
+
+    beforeAll(async () => {
+      reseller = await createTestReseller(result.db);
+      owned = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      ownedTeacher = await createTestTeacher(result.db, owned.tenantId);
+      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), async (tx) => {
+        // The OTP goes to the institute_admin's primary phone.
+        await tx
+          .update(roles)
+          .set({ name: { en: 'institute_admin' } })
+          .where(eq(roles.id, owned.roleId));
+        await tx.insert(phoneNumbers).values({
+          userId: owned.userId,
+          countryCode: '+91',
+          number: `98${Math.floor(Math.random() * 1e8)
+            .toString()
+            .padStart(8, '0')}`,
+          isPrimary: true,
+          createdBy: owned.userId,
+          updatedBy: owned.userId,
+        });
+      });
+    });
+
+    afterAll(async () => {
+      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), async (tx) => {
+        await tx
+          .delete(impersonationSessions)
+          .where(eq(impersonationSessions.targetTenantId, owned.tenantId));
+        await tx
+          .delete(authEvents)
+          .where(inArray(authEvents.userId, [reseller.userId, owned.userId, ownedTeacher.userId]));
+        await tx.delete(phoneNumbers).where(eq(phoneNumbers.userId, owned.userId));
+      });
+      await cleanupTestTeacher(result.db, ownedTeacher);
+      await cleanupTestInstitute(result.db, owned);
+      await cleanupTestReseller(result.db, reseller);
+    });
+
+    /** The reseller's one staff member, holding `role`, opens a session through the OTP. */
+    async function impersonateAs(role: ResellerSystemRoleName) {
+      const roleId = await withAdmin(
+        result.db,
+        mkAdminCtx('test:impersonation-integration'),
+        async (tx) => {
+          const ids = await provisionResellerSystemRoles(tx, reseller.resellerId, reseller.userId);
+          await tx
+            .update(resellerMemberships)
+            .set({ roleId: ids[role], abilities: [] })
+            .where(eq(resellerMemberships.id, reseller.membershipId));
+          return ids[role];
+        },
+      );
+      const token = createResellerToken({
+        sub: reseller.userId,
+        resellerId: reseller.resellerId,
+        membershipId: reseller.membershipId,
+        roleId,
+      });
+      const start = await gqlRequest(result.httpServer, {
+        query: RESELLER_START,
+        variables: {
+          targetUserId: ownedTeacher.userId,
+          targetTenantId: owned.tenantId,
+          reason: REASON,
+        },
+        token,
+      });
+      expect(start.errors).toBeUndefined();
+      expect(start.data?.resellerStartImpersonation.requiresOtp).toBe(true);
+      const requestId = start.data?.resellerStartImpersonation.sessionId;
+      const pending = await redis.get(`impersonation-otp:${requestId}`);
+      assert(pending);
+      const verify = await gqlRequest(result.httpServer, {
+        query: RESELLER_VERIFY,
+        variables: { sessionId: requestId, otp: JSON.parse(pending).otp },
+        token,
+      });
+      expect(verify.errors).toBeUndefined();
+      const exchange = await gqlRequest(result.httpServer, {
+        query: EXCHANGE,
+        variables: { code: verify.data?.resellerVerifyImpersonationOtp.code },
+      });
+      expect(exchange.errors).toBeUndefined();
+      const accessToken = exchange.data?.exchangeImpersonationCode.accessToken as string;
+      return { accessToken, claims: claimsOf(accessToken) };
+    }
+
+    it('a reseller support admin session reads, refuses every write, and can still end itself', async () => {
+      const { accessToken, claims } = await impersonateAs('reseller_support_admin');
+      expect(claims.impersonationReadOnly).toBe(true);
+
+      const read = await gqlRequest(result.httpServer, { query: MY_INSTITUTE, token: accessToken });
+      expect(read.errors).toBeUndefined();
+      expect(read.data?.myInstitute.id).toBe(owned.tenantId);
+
+      const write = await gqlRequest(result.httpServer, { query: WRITE, token: accessToken });
+      expect(write.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_READ_ONLY');
+
+      const end = await gqlRequest(result.httpServer, {
+        query: END,
+        variables: { id: claims.impersonationSessionId },
+        token: accessToken,
+      });
+      expect(end.errors).toBeUndefined();
+      expect(end.data?.endImpersonation).toBe(true);
+    });
+
+    it('a reseller full admin session is not view-only', async () => {
+      const { accessToken, claims } = await impersonateAs('reseller_full_admin');
+      expect(claims.impersonationReadOnly).toBeUndefined();
+
+      // Reaches the resolver, which has its own rule for this one mutation.
+      const write = await gqlRequest(result.httpServer, { query: WRITE, token: accessToken });
+      expect(write.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    });
+  });
+
   describe('intra-institute', () => {
+    const CAN = `query($id: String!) { canImpersonateUser(targetUserId: $id) }`;
+
+    it('tells the institute admin whom they can view as, by the rule startImpersonation applies', async () => {
+      const can = async (id: string) => {
+        const response = await gqlRequest(result.httpServer, {
+          query: CAN,
+          variables: { id },
+          token: instituteAdminToken,
+        });
+        expect(response.errors).toBeUndefined();
+        return response.data?.canImpersonateUser;
+      };
+      expect(await can(teacher.userId)).toBe(true);
+      // Themselves, and a user of another institute.
+      expect(await can(tenant.userId)).toBe(false);
+      expect(await can(otherTenant.userId)).toBe(false);
+      expect(await can(randomUUID())).toBe(false);
+    });
+
+    it('refuses the question itself from a teacher, who cannot impersonate anyone', async () => {
+      const response = await gqlRequest(result.httpServer, {
+        query: CAN,
+        variables: { id: tenant.userId },
+        token: teacherToken,
+      });
+      expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    });
+
     it('lets the institute admin impersonate a teacher without OTP', async () => {
       const start = await gqlRequest(result.httpServer, {
         query: IMPERSONATE_USER,

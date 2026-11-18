@@ -1,5 +1,5 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, Field, ID, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   assertResellerContext,
   CurrentUser,
@@ -12,14 +12,15 @@ import { ResellerInviteTeamMemberInput } from './dto/reseller-invite-team-member
 import { ResellerTeamFilterInput } from './dto/reseller-team-filter.input';
 import {
   ResellerTeamMemberConnection,
+  ResellerTeamMemberDetailModel,
   ResellerTeamMemberModel,
+  ResellerTeamRoleModel,
 } from './models/reseller-team-member.model';
-import { ResellerTeamService } from './reseller-team.service';
+import { ResellerTeamService, type TeamActor } from './reseller-team.service';
 
-@ObjectType({ description: 'Result of inviting a new reseller team member' })
-class ResellerInviteTeamMemberResult {
-  @Field(() => ID)
-  membershipId!: string;
+function actorOf(user: AuthUser): TeamActor {
+  assertResellerContext(user);
+  return { resellerId: user.resellerId, userId: user.userId };
 }
 
 @UseGuards(GqlAuthGuard, ResellerScopeGuard, AbilityGuard)
@@ -28,41 +29,80 @@ export class ResellerTeamResolver {
   constructor(private readonly service: ResellerTeamService) {}
 
   @Query(() => ResellerTeamMemberConnection, {
-    description: 'List team members with a reseller-scope membership in this reseller organisation',
+    description: "The reseller's own staff, active and deactivated, oldest membership first",
   })
-  @CheckAbility({ action: 'read', subject: 'User' })
+  @CheckAbility({ action: 'read', subject: 'ResellerTeam' })
   async resellerListTeamMembers(
     @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: ResellerTeamFilterInput,
   ) {
-    assertResellerContext(user);
-    return this.service.list(user.resellerId, filter ?? {});
+    return this.service.list(actorOf(user), filter ?? {});
   }
 
-  @Mutation(() => ResellerInviteTeamMemberResult, {
-    description:
-      'Create a new user and assign them a reseller-scope membership. A welcome notification with a temporary password is dispatched automatically.',
+  @Query(() => ResellerTeamMemberDetailModel, {
+    description: 'One team member with their live sessions',
   })
-  @CheckAbility({ action: 'create', subject: 'User' })
+  @CheckAbility({ action: 'read', subject: 'ResellerTeam' })
+  async resellerGetTeamMember(
+    @Args('membershipId', { type: () => ID }) membershipId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.get(actorOf(user), membershipId);
+  }
+
+  @Query(() => [ResellerTeamRoleModel], {
+    description:
+      "Roles the caller may give a team member: none senior to their own role or to the reseller's tier. Empty for a viewer.",
+  })
+  @CheckAbility({ action: 'read', subject: 'ResellerTeam' })
+  async resellerAssignableTeamRoles(@CurrentUser() user: AuthUser) {
+    return this.service.assignableRoles(actorOf(user));
+  }
+
+  @Mutation(() => ResellerTeamMemberModel, {
+    description:
+      'Add a person to the team by email. An existing account is linked; a new one is created and sent a temporary password.',
+  })
+  @CheckAbility({ action: 'create', subject: 'ResellerTeam' })
   async resellerInviteTeamMember(
     @Args('input') input: ResellerInviteTeamMemberInput,
     @CurrentUser() user: AuthUser,
-  ): Promise<ResellerInviteTeamMemberResult> {
-    assertResellerContext(user);
-    return this.service.invite(user.resellerId, user.userId, input);
+  ) {
+    return this.service.invite(actorOf(user), input);
   }
 
-  @Mutation(() => Boolean, {
-    description:
-      "Deactivate a team member's reseller-scope membership. The user account is preserved.",
+  @Mutation(() => ResellerTeamMemberModel, {
+    description: "Give a team member another of this reseller's roles",
   })
-  @CheckAbility({ action: 'delete', subject: 'User' })
-  async resellerRemoveTeamMember(
+  @CheckAbility({ action: 'update', subject: 'ResellerTeam' })
+  async resellerChangeTeamMemberRole(
+    @Args('membershipId', { type: () => ID }) membershipId: string,
+    @Args('roleId', { type: () => ID }) roleId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.changeRole(actorOf(user), membershipId, roleId);
+  }
+
+  @Mutation(() => ResellerTeamMemberModel, {
+    description:
+      "Deactivate a team member's membership and end their sessions. The user account is preserved.",
+  })
+  @CheckAbility({ action: 'update', subject: 'ResellerTeam' })
+  async resellerDeactivateTeamMember(
     @Args('membershipId', { type: () => ID }) membershipId: string,
     @CurrentUser() user: AuthUser,
-  ): Promise<boolean> {
-    assertResellerContext(user);
-    await this.service.remove(user.resellerId, membershipId);
-    return true;
+  ) {
+    return this.service.deactivate(actorOf(user), membershipId);
+  }
+
+  @Mutation(() => ResellerTeamMemberModel, {
+    description: "Reactivate a deactivated team member's membership",
+  })
+  @CheckAbility({ action: 'update', subject: 'ResellerTeam' })
+  async resellerReactivateTeamMember(
+    @Args('membershipId', { type: () => ID }) membershipId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.reactivate(actorOf(user), membershipId);
   }
 }

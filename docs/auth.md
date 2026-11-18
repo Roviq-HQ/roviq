@@ -38,6 +38,7 @@ Auth failures carry a machine-readable `extensions.code` (see `docs/architecture
 | `NO_ACTIVE_MEMBERSHIP` | 403 | Selected/target membership is missing or not ACTIVE |
 | `SESSION_NOT_FOUND` | 403 | Session to revoke does not belong to the user |
 | `IMPERSONATION_ENDED` | 401 | Impersonation session ended, expired or revoked |
+| `IMPERSONATION_READ_ONLY` | 403 | A view-only impersonation session tried to change something |
 | `PASSKEY_CHALLENGE_EXPIRED` | 400 | WebAuthn challenge expired or already used |
 | `PASSKEY_VERIFICATION_FAILED` | 400 | Passkey registration response rejected |
 | `PASSKEY_AUTHENTICATION_FAILED` | 401 | Passkey sign-in rejected (unknown credential or bad signature — deliberately one code) |
@@ -77,7 +78,7 @@ All tokens are `type: 'access'` — no more separate 'platform' type.
 - **Access token:** `{ sub, scope, tenantId?, resellerId?, membershipId, roleId, mustChangePassword?, type: 'access' }`
   - TTL: platform 5m, reseller 10m, institute 15m
   - `mustChangePassword: true` is set when the user's `users.must_change_password` column is true (see [First-Login Password Change](#first-login-password-change-rov-96)).
-- **Impersonation token:** same as access + `{ isImpersonated, impersonatorId, impersonationSessionId }`
+- **Impersonation token:** same as access + `{ isImpersonated, impersonatorId, impersonationSessionId }`, and `impersonationReadOnly: true` on a view-only session (see Impersonation)
   - TTL: 15m, non-renewable (no refresh token created)
 - **Refresh token:** `{ sub, tokenId, membershipId, type: 'refresh' }` — 7d TTL
 
@@ -265,6 +266,9 @@ Flow when the OTP gate fires:
 - The impersonation token carries the same `resellerId` claim as a normal institute token, lasts 15 minutes and has no refresh token.
 - The membership checked at start is pinned in the OTP request and the one-time code; `exchangeImpersonationCode` issues the token for exactly that membership.
 - `exchangeImpersonationCode` issues no token if the session was ended or has expired since the code was created.
+- **View-only sessions (ROV-183).** Impersonation must not hand someone writes their own role withholds. A reseller user below `reseller_full_admin`, and a platform user whose role lacks `manage all` (`platform_support`), hold read-only roles, so the session they open is view-only: `exchangeImpersonationCode` looks up the impersonator's role and adds `impersonationReadOnly: true` to the token. `ImpersonationSessionGuard` then refuses every GraphQL mutation except `endImpersonation`, and every non-GET HTTP call, with `IMPERSONATION_READ_ONLY`. It is enforced there and not through CASL because many mutations carry no `@CheckAbility`. A `platform_admin` session and intra-institute sessions are never view-only (the latter are bounded by the role-rank rule). The banner shows "View only" and the Apollo error link raises one toast for a refused write.
+- `canImpersonateUser(targetUserId)` (institute scope, needs `impersonate User`) answers whether `impersonateUser` would accept the target, using the same rule. The institute "View as" button renders only on `true`, so it is not offered for a member whose role is equal to or above the caller's.
+- **Live session list.** Opening a session emits `IMPERSONATION.session_started`; ending, revoking or sweeping one emits `IMPERSONATION.session_ended`. Platform subscriptions `adminImpersonationSessionCreated` / `adminImpersonationSessionEnded` carry only the session id and impersonator scope; the admin sessions page re-reads `adminImpersonationSessions` (which checks `read AuditLog`) on each. Sessions ended by a database trigger (reseller suspended, team member deactivated) emit nothing, and an event can be missed while the socket connects, so the page also re-reads every 15 seconds.
 - Frontend: a tab holding `roviq-impersonation-token` loads the impersonated user through `me` (`AuthProvider` `currentUserQuery`) and acts as that user, whether or not the impersonator has a session of their own in the browser. A rejected token is dropped and the tab is signed out.
 
 ### Ending and revoking a session (ROV-94)
@@ -417,9 +421,9 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 | Scope | Role | Abilities |
 |-------|------|-----------|
 | platform | platform_admin | manage all |
-| platform | platform_support | read all + impersonate |
+| platform | platform_support | read all + impersonate (view-only sessions) |
 | reseller | reseller_full_admin | manage institutes, manage team, impersonate |
-| reseller | reseller_support_admin | read-only + impersonation |
+| reseller | reseller_support_admin | read-only + impersonation, manage team members up to its own role |
 | reseller | reseller_viewer | read stats |
 | institute | institute_admin | manage all (within tenant) |
 | institute | teacher | read students/sections/standards/subjects/timetables, CRU attendance |
@@ -431,6 +435,22 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 - Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
 - Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed only maintains the Roviq Direct copies (fixed seed ids). Migration `rov-91-reseller-role-backfill` gives resellers that predate this their own copies and moves any `reseller_memberships` row that still points at another reseller's role onto them.
 - `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
+
+### Reseller team (ROV-185)
+
+A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (`reseller/team/`) lists them and lets a team manager invite, change a role, deactivate and reactivate. All operations take the membership id.
+
+- **Ability.** Subject `ResellerTeam`. `reseller_full_admin` and `reseller_support_admin` hold `manage`; `reseller_viewer` reads through `read all`.
+- **Rank rules**, in `libs/shared/common-types/src/lib/reseller-roles.ts` and enforced by `ResellerTeamService` from the caller's membership in the database, not from the token:
+  - Roles rank `reseller_full_admin` > `reseller_support_admin` > `reseller_viewer`.
+  - A caller may assign only roles at or below their own, and at or below the reseller's tier (`RESELLER_TIER_ROLE`). `resellerAssignableTeamRoles` returns that list.
+  - A caller may change only members whose role is at or below their own, and never themselves. So a reseller always keeps the admin who is acting.
+- **Invite** takes an email and a role. An existing account with that email (case-insensitive) is linked; otherwise a user is created with the email as Roviq ID and sent a temporary password. An address that belongs to a deleted account, to several accounts, or that is another account's Roviq ID is refused with `TEAM_MEMBER_EMAIL_UNAVAILABLE`, whatever the reason. `IdentityService.findOrCreateUserByEmail` holds this rule for both this resolver and `adminCreateReseller`.
+- **Deactivate** sets `is_active = false`. The `reseller_memberships_revoke_sessions` trigger revokes the member's refresh tokens (`admin_revoked`) and ends their reseller impersonation sessions; the user account and other memberships are untouched.
+- **Tokens issued before a change.** A reseller access token carries `roleId` and lives 10 minutes. After a role change, deactivation or tier change the service writes `auth:reseller-member-access:<membershipId>`; `ResellerAccessGuard` then answers `UNAUTHENTICATED` to a token whose role differs (or to every token of a deactivated member). The client refreshes and gets the new role, or is signed out.
+- **Tier change.** `adminChangeResellerTier` no longer puts every member on the tier's role. `resellerRoleAfterTierChange`: holders of the old tier's top role move to the new tier's top role; anyone still above the new tier is brought down to it; everyone else keeps their role.
+- **Member detail.** `resellerGetTeamMember` returns `sessions` (live refresh tokens, with IP and device) only to the member themselves or to a caller who may manage them (`canManage`); others get `null`, so a support admin does not see a full admin's sessions. Recent activity comes from `resellerAuditLogs(filter: { userId })`.
+- Tests: `reseller-roles.spec.ts`, `reseller-team.service.spec.ts`, `reseller-team.integration.spec.ts` (role caps, another reseller's member, stale tokens, tier change), `auth-invariants-db.integration.spec.ts` → "reseller member deactivation".
 - Database guards: `chk_role_scope` rejects unknown scopes and wrong tenant/reseller combinations; role names are unique per platform (`roles_platform_name_key`) and per reseller (`roles_reseller_id_name_key`) among live rows. `refresh_tokens.membership_scope` and `impersonation_sessions.impersonator_scope` accept only `platform`, `reseller`, `institute`.
 - `auth_events`: `roviq_app` and `roviq_reseller` hold the INSERT table privilege only; `roviq_admin` reads.
 

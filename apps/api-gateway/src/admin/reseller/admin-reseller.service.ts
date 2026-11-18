@@ -1,5 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode, ResellerStatus, ResellerTier } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  isResellerSystemRoleName,
+  RESELLER_TIER_ROLE,
+  ResellerStatus,
+  ResellerTier,
+  resellerRoleAfterTierChange,
+} from '@roviq/common-types';
 import {
   authEvents,
   DRIZZLE_DB,
@@ -9,7 +17,6 @@ import {
   institutesLive,
   mkAdminCtx,
   provisionResellerSystemRoles,
-  type ResellerSystemRoleName,
   resellerMemberships,
   resellerMembershipsLive,
   resellers,
@@ -27,7 +34,11 @@ import type Redis from 'ioredis';
 import { AuthEventService } from '../../auth/auth-event.service';
 import { IdentityService } from '../../auth/identity.service';
 import { invalidateImpersonationSessions } from '../../auth/impersonation-session-cache';
-import { blockResellerAccess, clearResellerAccess } from '../../auth/reseller-access-cache';
+import {
+  blockResellerAccess,
+  clearResellerAccess,
+  requireResellerMemberRole,
+} from '../../auth/reseller-access-cache';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { AdminCreateResellerInput } from './dto/admin-create-reseller.input';
 import type { AdminListResellersFilterInput } from './dto/admin-list-resellers-filter.input';
@@ -38,17 +49,6 @@ const DEFAULT_RESELLER_ID = '00000000-0000-7000-a000-000000000011';
 
 /** Minimum days a reseller must be suspended before deletion */
 const GRACE_PERIOD_DAYS = 30;
-
-/**
- * Role name per tier. Each reseller owns its own copy of these roles, created
- * in `create`. The initial admin receives the copy matching the chosen tier;
- * `changeTier` moves every reseller_membership to the new tier's copy.
- */
-const TIER_TO_ROLE_NAME: Record<ResellerTier, ResellerSystemRoleName> = {
-  FULL_MANAGEMENT: 'reseller_full_admin',
-  SUPPORT_MANAGEMENT: 'reseller_support_admin',
-  READ_ONLY: 'reseller_viewer',
-};
 
 function buildListConditions(filter: AdminListResellersFilterInput): SQL[] {
   const { search, status, tier, isSystem, after } = filter;
@@ -277,7 +277,7 @@ export class AdminResellerService {
           .returning();
 
         const roleIds = await provisionResellerSystemRoles(tx, created.id, actorId);
-        return { reseller: created, roleId: roleIds[TIER_TO_ROLE_NAME[input.tier]] };
+        return { reseller: created, roleId: roleIds[RESELLER_TIER_ROLE[input.tier]] };
       },
     );
 
@@ -367,7 +367,7 @@ export class AdminResellerService {
       throw new BusinessException(ErrorCode.INVALID_TIER, `Unknown reseller tier: ${newTier}`);
     }
 
-    const { record, oldTier } = await withAdmin(
+    const { record, oldTier, moved } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
       async (tx) => {
@@ -390,7 +390,8 @@ export class AdminResellerService {
             'Tier can only be changed while the reseller is active — unsuspend first',
           );
         }
-        if (existing.tier === newTier) return { record: existing, oldTier: existing.tier };
+        if (existing.tier === newTier)
+          return { record: existing, oldTier: existing.tier, moved: [] };
 
         // Also covers resellers created before each reseller owned its roles
         const roleIds = await provisionResellerSystemRoles(tx, resellerId, actorId);
@@ -401,18 +402,44 @@ export class AdminResellerService {
           .where(eq(resellers.id, resellerId))
           .returning();
 
-        await tx
-          .update(resellerMemberships)
-          .set({ roleId: roleIds[TIER_TO_ROLE_NAME[newTier]], updatedBy: actorId })
-          .where(eq(resellerMemberships.resellerId, resellerId));
+        const members = await tx
+          .select({
+            id: resellerMembershipsLive.id,
+            roleId: resellerMembershipsLive.roleId,
+            roleName: sql<string>`${rolesLive.name}->>'en'`,
+          })
+          .from(resellerMembershipsLive)
+          .innerJoin(rolesLive, eq(rolesLive.id, resellerMembershipsLive.roleId))
+          .where(eq(resellerMembershipsLive.resellerId, resellerId));
 
-        return { record: updated, oldTier: existing.tier };
+        const moved: { id: string; roleId: string }[] = [];
+        for (const member of members) {
+          // A role outside the ladder is treated as the old tier's top role and follows the tier.
+          const current = isResellerSystemRoleName(member.roleName)
+            ? member.roleName
+            : RESELLER_TIER_ROLE[existing.tier];
+          const roleId = roleIds[resellerRoleAfterTierChange(current, existing.tier, newTier)];
+          if (roleId !== member.roleId) moved.push({ id: member.id, roleId });
+        }
+        for (const member of moved) {
+          await tx
+            .update(resellerMemberships)
+            .set({ roleId: member.roleId, updatedBy: actorId })
+            .where(eq(resellerMemberships.id, member.id));
+        }
+
+        return { record: updated, oldTier: existing.tier, moved };
       },
     );
 
     const model = await this.withCounts(record);
     // Tier unchanged: nothing was written, so nothing to announce.
     if (oldTier === newTier) return model;
+
+    // Tokens issued under the old role stop working now, not when they expire.
+    await Promise.all(
+      moved.map((member) => requireResellerMemberRole(this.redis, member.id, member.roleId)),
+    );
 
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.tier_changed, {
       ...model,
@@ -733,28 +760,17 @@ export class AdminResellerService {
     email: string,
     actorId: string,
   ): Promise<{ userId: string; tempPassword: string | null }> {
-    const matches = await this.identityService.findUsersByEmail(email);
-    if (matches.length > 1) {
+    const resolved = await this.identityService.findOrCreateUserByEmail(email, actorId);
+    if (resolved.kind === 'unavailable') {
       throw new BusinessException(
         ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
-        'More than one account uses this email',
+        `Initial admin email cannot be used (${resolved.reason})`,
       );
     }
-    const [existing] = matches;
-    if (existing?.isDeleted) {
-      throw new BusinessException(
-        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
-        'This email belongs to a deleted account and cannot be reused',
-      );
-    }
-    if (existing) return { userId: existing.userId, tempPassword: null };
-    if (await this.identityService.isUsernameTaken(email)) {
-      throw new BusinessException(
-        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
-        'This email is already used as the Roviq ID of another account',
-      );
-    }
-    return this.identityService.createUser({ email, username: email, actorId });
+    return {
+      userId: resolved.userId,
+      tempPassword: resolved.kind === 'created' ? resolved.tempPassword : null,
+    };
   }
 
   private async assertSlugFree(slug: string): Promise<void> {

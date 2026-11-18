@@ -234,6 +234,7 @@ describe('ResellerDetailPage', () => {
           ],
         },
         address: {
+          coordinates: null,
           line1: '12 MI Road',
           line2: null,
           line3: null,

@@ -8,6 +8,7 @@ import { AdminAttendanceModule } from './attendance/admin-attendance.module';
 import { AdminAuditResolver } from './audit/admin-audit.resolver';
 import { AdminDlqResolver } from './dlq/admin-dlq.resolver';
 import { AdminImpersonationResolver } from './impersonation/admin-impersonation.resolver';
+import { AdminImpersonationSubscriptionResolver } from './impersonation/admin-impersonation.subscription';
 import { AdminInstituteLoaders } from './institute/admin-institute.loaders';
 import { AdminInstituteResolver } from './institute/admin-institute.resolver';
 import { AdminInstituteService } from './institute/admin-institute.service';
@@ -44,6 +45,7 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminInstituteLoaders, // request-scoped DataLoaders for the field resolver
     AdminInstituteSubscriptionResolver,
     AdminImpersonationResolver,
+    AdminImpersonationSubscriptionResolver,
     AdminAuditResolver,
     AdminDlqResolver,
   ],

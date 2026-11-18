@@ -1,5 +1,6 @@
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
@@ -11,6 +12,7 @@ import {
 } from '@roviq/database';
 import { REDIS_CLIENT } from '@roviq/redis';
 import { eq } from 'drizzle-orm';
+import type { GraphQLResolveInfo } from 'graphql';
 import type Redis from 'ioredis';
 import { tombstoneKey as tombstoneKeyOf } from '../impersonation-session-cache';
 import { REDIS_KEYS } from '../redis-keys';
@@ -21,6 +23,30 @@ const SESSION_CACHE_TTL = 60; // 60 second cache
 interface ImpersonationTokenClaims {
   isImpersonated?: boolean;
   impersonationSessionId?: string;
+  impersonationReadOnly?: boolean;
+}
+
+/** What a view-only session may still call: leaving the session. */
+const READ_ONLY_ALLOWED_MUTATIONS = new Set(['endImpersonation']);
+const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * A view-only session reads and nothing else. Checked here, not through CASL: plenty of
+ * mutations carry no `@CheckAbility` (self-service, consent), and all of them must be refused.
+ */
+function assertNoWrite(context: ExecutionContext): void {
+  const refused = new BusinessException(
+    ErrorCode.IMPERSONATION_READ_ONLY,
+    'This impersonation session is view-only',
+  );
+  if (context.getType<'graphql' | 'http'>() === 'graphql') {
+    const info = GqlExecutionContext.create(context).getInfo<GraphQLResolveInfo>();
+    const isRootMutation = info.operation.operation === 'mutation' && !info.path.prev;
+    if (isRootMutation && !READ_ONLY_ALLOWED_MUTATIONS.has(info.fieldName)) throw refused;
+    return;
+  }
+  const method = context.switchToHttp().getRequest<{ method?: string }>()?.method;
+  if (method && !SAFE_HTTP_METHODS.has(method.toUpperCase())) throw refused;
 }
 
 /**
@@ -54,6 +80,9 @@ interface ImpersonationTokenClaims {
  *
  * Only impersonation-flagged tokens enter the DB/Redis check; normal
  * requests fast-path out by detecting `isImpersonated !== true`.
+ *
+ * View-only sessions (`impersonationReadOnly`, ROV-183): once the session is known to be
+ * live, every mutation except `endImpersonation`, and every non-GET HTTP call, is refused.
  */
 @Injectable()
 export class ImpersonationSessionGuard implements CanActivate {
@@ -127,6 +156,8 @@ export class ImpersonationSessionGuard implements CanActivate {
     if (new Date(parsed.expiresAt) < new Date()) {
       throw new BusinessException(ErrorCode.IMPERSONATION_ENDED, 'Impersonation session expired');
     }
+
+    if (claims.impersonationReadOnly) assertNoWrite(context);
 
     return true;
   }

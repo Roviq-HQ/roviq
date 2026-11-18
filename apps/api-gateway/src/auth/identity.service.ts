@@ -89,6 +89,11 @@ export interface CreateUserWithMembershipResult extends CreateUserResult, Create
  *  - Returns the plaintext password for callers that need to surface it
  *    inline (e.g. admin "reset password and show once" flows).
  */
+export type EmailUserResolution =
+  | { kind: 'existing'; userId: string; email: string }
+  | { kind: 'created'; userId: string; email: string; tempPassword: string }
+  | { kind: 'unavailable'; reason: 'ambiguous' | 'deleted' | 'username_taken' };
+
 @Injectable()
 export class IdentityService {
   constructor(
@@ -122,6 +127,24 @@ export class IdentityService {
         .limit(1),
     );
     return row !== undefined;
+  }
+
+  /**
+   * The account a new membership should attach to, matched by email only: the existing
+   * owner of the address, or a new user whose Roviq ID is the address. `unavailable` when
+   * the address cannot safely identify one live account.
+   */
+  async findOrCreateUserByEmail(rawEmail: string, actorId: string): Promise<EmailUserResolution> {
+    const email = rawEmail.trim().toLowerCase();
+    const matches = await this.findUsersByEmail(email);
+    if (matches.length > 1) return { kind: 'unavailable', reason: 'ambiguous' };
+    const [existing] = matches;
+    if (existing?.isDeleted) return { kind: 'unavailable', reason: 'deleted' };
+    if (existing) return { kind: 'existing', userId: existing.userId, email };
+    // Never link by Roviq ID: an unrelated account may use this address as its username.
+    if (await this.isUsernameTaken(email)) return { kind: 'unavailable', reason: 'username_taken' };
+    const created = await this.createUser({ email, username: email, actorId });
+    return { kind: 'created', userId: created.userId, email, tempPassword: created.tempPassword };
   }
 
   async createUser(input: CreateUserInput): Promise<CreateUserResult> {

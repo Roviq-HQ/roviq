@@ -1,5 +1,5 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,6 +106,77 @@ describe('ImpersonateUserDialog', () => {
     expect(tab.location.replace).toHaveBeenCalledWith(
       'http://localhost:3000/en/auth/impersonate?code=after-otp',
     );
+  });
+
+  describe('asking for a new code', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function reachOtpStep(start: ReturnType<typeof vi.fn>) {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderDialog({ start, verifyOtp: vi.fn() });
+      await user.type(screen.getByRole('textbox', { name: 'Reason' }), REASON);
+      await user.click(screen.getByRole('button', { name: 'Start' }));
+      await screen.findByRole('textbox', { name: 'Approval code' });
+      return user;
+    }
+
+    it('waits 30 seconds, then sends a fresh request under the same reason without opening a tab', async () => {
+      const start = vi
+        .fn()
+        .mockResolvedValueOnce({ requiresOtp: true, sessionId: 'request-1' })
+        .mockResolvedValueOnce({ requiresOtp: true, sessionId: 'request-2' });
+      const verifyOtp = vi.fn().mockResolvedValue({ code: 'after-otp' });
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderDialog({ start, verifyOtp });
+      await user.type(screen.getByRole('textbox', { name: 'Reason' }), REASON);
+      await user.click(screen.getByRole('button', { name: 'Start' }));
+      const otp = await screen.findByRole('textbox', { name: 'Approval code' });
+
+      const resend = screen.getByRole('button', { name: 'Send a new code' });
+      expect(resend).toBeDisabled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(resend).toBeEnabled();
+
+      await user.type(otp, '111');
+      openSpy.mockClear();
+      await user.click(resend);
+
+      expect(await screen.findByText('A new code was sent.')).toBeInTheDocument();
+      expect(start).toHaveBeenLastCalledWith(REASON);
+      expect(openSpy).not.toHaveBeenCalled();
+      // The half-typed old code is cleared and the wait starts again.
+      expect(otp).toHaveValue('');
+      expect(resend).toBeDisabled();
+
+      await user.type(otp, '654321');
+      await user.click(screen.getByRole('button', { name: 'Verify and open' }));
+      await waitFor(() => expect(verifyOtp).toHaveBeenCalledWith('request-2', '654321'));
+    });
+
+    it('shows why a new code could not be sent and keeps the current request', async () => {
+      const start = vi
+        .fn()
+        .mockResolvedValueOnce({ requiresOtp: true, sessionId: 'request-1' })
+        .mockRejectedValueOnce(graphQLError('IMPERSONATION_CONSENT_UNAVAILABLE'));
+      const user = await reachOtpStep(start);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      await user.click(screen.getByRole('button', { name: 'Send a new code' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'No institute admin can approve this request right now.',
+      );
+      expect(screen.queryByText('A new code was sent.')).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Approval code' })).toBeInTheDocument();
+    });
   });
 
   it('shows the translated error for the server code, never the raw message', async () => {

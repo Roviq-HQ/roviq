@@ -29,3 +29,25 @@ export async function clearResellerAccess(redis: Redis, resellerId: string): Pro
   const keys = resellerAccessKeys(resellerId);
   await redis.del(keys.cache, keys.blocked);
 }
+
+// Outlives a reseller access token (10 min), so no token issued before the change survives it.
+const MEMBER_ACCESS_TTL_SECONDS = 11 * 60;
+
+export const RESELLER_MEMBER_BLOCKED = 'blocked';
+
+export function resellerMemberAccessKey(membershipId: string): string {
+  return `${REDIS_KEYS.RESELLER_MEMBER_ACCESS}${membershipId}`;
+}
+
+/**
+ * Make `ResellerAccessGuard` reject this member's already-issued access tokens: all of
+ * them after a deactivation, those carrying another role after a role change. The
+ * client's refresh then fails (deactivated) or picks up the new role.
+ */
+export async function requireResellerMemberRole(
+  redis: Redis,
+  membershipId: string,
+  roleId: string | typeof RESELLER_MEMBER_BLOCKED,
+): Promise<void> {
+  await redis.set(resellerMemberAccessKey(membershipId), roleId, 'EX', MEMBER_ACCESS_TTL_SECONDS);
+}

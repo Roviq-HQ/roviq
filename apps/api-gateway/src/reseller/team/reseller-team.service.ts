@@ -1,209 +1,287 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  mkAdminCtx,
-  mkResellerCtx,
-  resellerMemberships,
-  resellerMembershipsLive,
-  rolesLive,
-  userProfilesLive,
-  usersLive,
-  withAdmin,
-  withReseller,
-} from '@roviq/database';
-import { getRequestContext } from '@roviq/request-context';
-import { and, asc, count, eq, ilike, or, sql } from 'drizzle-orm';
+  assignableResellerRoleNames,
+  BusinessException,
+  canManageResellerMember,
+  ErrorCode,
+  type ResellerTier,
+} from '@roviq/common-types';
+import { REDIS_CLIENT } from '@roviq/redis';
+import type Redis from 'ioredis';
 import { IdentityService } from '../../auth/identity.service';
+import {
+  RESELLER_MEMBER_BLOCKED,
+  requireResellerMemberRole,
+} from '../../auth/reseller-access-cache';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { ResellerInviteTeamMemberInput } from './dto/reseller-invite-team-member.input';
 import type { ResellerTeamFilterInput } from './dto/reseller-team-filter.input';
+import {
+  ResellerTeamRepository,
+  type TeamMemberRecord,
+  type TeamRoleRecord,
+} from './repositories/reseller-team.repository';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface TeamActor {
+  resellerId: string;
+  userId: string;
+}
+
+/** What the caller is allowed to do, read from the database rather than the token. */
+interface ActorStanding {
+  actor: TeamActor;
+  roles: Map<string, TeamRoleRecord>;
+  actorRoleName: string | null;
+  tier: ResellerTier;
+}
 
 @Injectable()
 export class ResellerTeamService {
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: ResellerTeamRepository,
     private readonly identityService: IdentityService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  /**
-   * List users who hold an active reseller-scope membership in this reseller.
-   * Uses `withReseller` so RLS enforces visibility to the caller's reseller.
-   */
-  async list(resellerId: string, filter: ResellerTeamFilterInput) {
-    return withReseller(this.db, mkResellerCtx(resellerId, 'service:reseller-team'), async (tx) => {
-      const searchCondition =
-        filter.search && filter.search.trim().length >= 2
-          ? or(
-              ilike(usersLive.username, `%${filter.search.trim()}%`),
-              sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${filter.search.trim()})`,
-            )
-          : undefined;
-
-      let cursorCondition: ReturnType<typeof sql> | undefined;
-      if (filter.after) {
-        const cursor = decodeCursor(filter.after);
-        if (cursor.id) {
-          cursorCondition = sql`${resellerMembershipsLive.id} > ${cursor.id as string}`;
-        }
-      }
-
-      const where = and(
-        eq(resellerMembershipsLive.resellerId, resellerId),
-        eq(resellerMembershipsLive.isActive, true),
-        searchCondition,
-        cursorCondition,
-      );
-
-      const limit = filter.first ?? 20;
-
-      const [totalResult, rows] = await Promise.all([
-        tx
-          .select({ value: count() })
-          .from(resellerMembershipsLive)
-          .leftJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, resellerMembershipsLive.userId))
-          .where(where),
-        tx
-          .select({
-            membershipId: resellerMembershipsLive.id,
-            roleId: resellerMembershipsLive.roleId,
-            isActive: resellerMembershipsLive.isActive,
-            membershipCreatedAt: resellerMembershipsLive.createdAt,
-            userId: usersLive.id,
-            email: usersLive.email,
-            username: usersLive.username,
-            userCreatedAt: usersLive.createdAt,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
-            profileImageUrl: userProfilesLive.profileImageUrl,
-          })
-          .from(resellerMembershipsLive)
-          .innerJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, resellerMembershipsLive.userId))
-          .where(where)
-          .orderBy(asc(resellerMembershipsLive.createdAt))
-          .limit(limit + 1),
-      ]);
-
-      const hasNextPage = rows.length > limit;
-      const nodes = hasNextPage ? rows.slice(0, limit) : rows;
-
-      const edges = nodes.map((row) => ({
-        node: {
-          id: row.userId,
-          email: row.email,
-          username: row.username,
-          membershipId: row.membershipId,
-          roleId: row.roleId,
-          isActive: row.isActive,
-          createdAt: row.userCreatedAt,
-          profile:
-            row.firstName != null
-              ? {
-                  firstName: row.firstName,
-                  lastName: row.lastName,
-                  profileImageUrl: row.profileImageUrl,
-                }
-              : null,
-        },
-        cursor: encodeCursor({ id: row.membershipId }),
-      }));
-
-      return {
-        edges,
-        pageInfo: {
-          hasNextPage,
-          hasPreviousPage: !!filter.after,
-          startCursor: edges[0]?.cursor,
-          endCursor: edges[edges.length - 1]?.cursor,
-        },
-        totalCount: totalResult[0]?.value ?? 0,
-      };
+  async list(actor: TeamActor, filter: ResellerTeamFilterInput) {
+    const first = filter.first ?? 20;
+    const standing = await this.loadStanding(actor);
+    const { rows, totalCount } = await this.repo.list(actor.resellerId, {
+      search: filter.search,
+      isActive: filter.isActive,
+      first: first + 1,
+      afterId: filter.after ? parseCursor(filter.after) : undefined,
     });
+
+    const hasNextPage = rows.length > first;
+    const page = hasNextPage ? rows.slice(0, first) : rows;
+    const lastActive = await this.repo.findLastActive(page.map((row) => row.userId));
+    const edges = page.map((row) => ({
+      node: toModel(row, standing, lastActive),
+      cursor: encodeCursor({ id: row.id }),
+    }));
+
+    return {
+      edges,
+      pageInfo: {
+        hasNextPage,
+        hasPreviousPage: !!filter.after,
+        startCursor: edges[0]?.cursor,
+        endCursor: edges[edges.length - 1]?.cursor,
+      },
+      totalCount,
+    };
   }
 
-  /**
-   * Invite a new user and immediately create their reseller-scope membership.
-   * Delegates user + membership creation to IdentityService so the welcome
-   * notification (temp password) is delivered via Novu automatically.
-   */
-  async invite(
-    resellerId: string,
-    actorId: string,
-    input: ResellerInviteTeamMemberInput,
-  ): Promise<{ membershipId: string }> {
-    const [role] = await withAdmin(this.db, mkAdminCtx('service:reseller-team'), (tx) =>
-      tx
-        .select({ id: rolesLive.id })
-        .from(rolesLive)
-        .where(
-          and(
-            eq(rolesLive.id, input.roleId),
-            eq(rolesLive.scope, 'reseller'),
-            eq(rolesLive.resellerId, resellerId),
-          ),
-        )
-        .limit(1),
-    );
-    if (!role) {
+  async get(actor: TeamActor, membershipId: string) {
+    const standing = await this.loadStanding(actor);
+    const member = await this.requireMember(actor.resellerId, membershipId);
+    const lastActive = await this.repo.findLastActive([member.userId]);
+    // Sessions carry IP and device: only for the member themselves or someone ranked to manage them.
+    const maySeeSessions = member.userId === actor.userId || canManage(standing, member);
+    return {
+      ...toModel(member, standing, lastActive),
+      sessions: maySeeSessions ? await this.repo.listSessions(member.id) : null,
+    };
+  }
+
+  /** Roles the caller may hand out, most senior first. Empty for a viewer. */
+  async assignableRoles(actor: TeamActor): Promise<TeamRoleRecord[]> {
+    const standing = await this.loadStanding(actor);
+    return this.assignableRoleIds(standing).flatMap((id) => standing.roles.get(id) ?? []);
+  }
+
+  async invite(actor: TeamActor, input: ResellerInviteTeamMemberInput) {
+    const standing = await this.loadStanding(actor);
+    this.assertAssignable(standing, input.roleId);
+
+    const resolved = await this.identityService.findOrCreateUserByEmail(input.email, actor.userId);
+    if (resolved.kind === 'unavailable') {
+      // One code for every reason: the caller must not learn why an address is taken.
       throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Supplied roleId does not belong to this reseller',
+        ErrorCode.TEAM_MEMBER_EMAIL_UNAVAILABLE,
+        'This email cannot be used for a team member',
+      );
+    }
+    if (
+      resolved.kind === 'existing' &&
+      (await this.repo.findMemberByUser(actor.resellerId, resolved.userId))
+    ) {
+      throw new BusinessException(
+        ErrorCode.TEAM_MEMBER_ALREADY_EXISTS,
+        'This person is already on the team',
       );
     }
 
-    const result = await this.identityService.createUserWithMembership({
-      username: input.username,
-      email: input.email,
-      firstName: input.firstName,
-      lastName: input.lastName,
+    const { membershipId } = await this.identityService.createMembership({
+      userId: resolved.userId,
       scope: 'reseller',
-      resellerId,
+      resellerId: actor.resellerId,
       roleId: input.roleId,
-      actorId,
+      actorId: actor.userId,
     });
 
-    return { membershipId: result.membershipId };
+    // An existing user keeps their password, so only a new one gets the welcome.
+    if (resolved.kind === 'created') {
+      this.identityService.sendWelcomeNotification({
+        userId: resolved.userId,
+        username: resolved.email,
+        email: resolved.email,
+        tempPassword: resolved.tempPassword,
+        scope: 'reseller',
+        resellerId: actor.resellerId,
+      });
+    }
+
+    return this.reload(standing, membershipId);
   }
 
-  /**
-   * Deactivate a team member's reseller-scope membership.
-   * The user account and all other memberships remain intact.
-   */
-  async remove(resellerId: string, membershipId: string): Promise<void> {
-    const [existing] = await withReseller(
-      this.db,
-      mkResellerCtx(resellerId, 'service:reseller-team'),
-      (tx) =>
-        tx
-          .select({
-            id: resellerMembershipsLive.id,
-            resellerId: resellerMembershipsLive.resellerId,
-          })
-          .from(resellerMembershipsLive)
-          .where(
-            and(
-              eq(resellerMembershipsLive.id, membershipId),
-              eq(resellerMembershipsLive.resellerId, resellerId),
-            ),
-          )
-          .limit(1),
-    );
+  async changeRole(actor: TeamActor, membershipId: string, roleId: string) {
+    const standing = await this.loadStanding(actor);
+    const member = await this.requireMember(actor.resellerId, membershipId);
+    this.assertManageable(standing, member);
+    this.assertAssignable(standing, roleId);
+    if (member.roleId === roleId) return this.reload(standing, membershipId);
 
-    if (!existing) {
+    await this.repo.updateRole(actor.resellerId, membershipId, roleId, actor.userId);
+    // Tokens issued under the old role stop working now, not when they expire.
+    await requireResellerMemberRole(this.redis, membershipId, roleId);
+    return this.reload(standing, membershipId);
+  }
+
+  /** The user account and their other memberships are untouched; a DB trigger ends the sessions. */
+  async deactivate(actor: TeamActor, membershipId: string) {
+    const standing = await this.loadStanding(actor);
+    const member = await this.requireMember(actor.resellerId, membershipId);
+    this.assertManageable(standing, member);
+    if (!member.isActive) {
+      throw new BusinessException(
+        ErrorCode.TEAM_MEMBER_STATUS_UNCHANGED,
+        'Team member is already inactive',
+      );
+    }
+
+    await this.repo.setActive(actor.resellerId, membershipId, false, actor.userId);
+    await requireResellerMemberRole(this.redis, membershipId, RESELLER_MEMBER_BLOCKED);
+    return this.reload(standing, membershipId);
+  }
+
+  async reactivate(actor: TeamActor, membershipId: string) {
+    const standing = await this.loadStanding(actor);
+    const member = await this.requireMember(actor.resellerId, membershipId);
+    this.assertManageable(standing, member);
+    if (member.isActive) {
+      throw new BusinessException(
+        ErrorCode.TEAM_MEMBER_STATUS_UNCHANGED,
+        'Team member is already active',
+      );
+    }
+    // The tier may have dropped below the member's role while they were inactive.
+    this.assertAssignable(standing, member.roleId);
+
+    await this.repo.setActive(actor.resellerId, membershipId, true, actor.userId);
+    await requireResellerMemberRole(this.redis, membershipId, member.roleId);
+    return this.reload(standing, membershipId);
+  }
+
+  private async loadStanding(actor: TeamActor): Promise<ActorStanding> {
+    const [roles, self, tier] = await Promise.all([
+      this.repo.listRoles(actor.resellerId),
+      this.repo.findMemberByUser(actor.resellerId, actor.userId),
+      this.repo.findTier(actor.resellerId),
+    ]);
+    if (!self?.isActive || !tier) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this reseller');
+    }
+    const roleMap = new Map(roles.map((role) => [role.id, role]));
+    return {
+      actor,
+      roles: roleMap,
+      actorRoleName: roleMap.get(self.roleId)?.name.en ?? null,
+      tier,
+    };
+  }
+
+  private assignableRoleIds(standing: ActorStanding): string[] {
+    const idByName = new Map([...standing.roles.values()].map((role) => [role.name.en, role.id]));
+    return assignableResellerRoleNames(standing.actorRoleName, standing.tier).flatMap(
+      (name) => idByName.get(name) ?? [],
+    );
+  }
+
+  private assertAssignable(standing: ActorStanding, roleId: string): void {
+    if (!standing.roles.has(roleId)) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Role does not belong to this reseller');
+    }
+    if (!this.assignableRoleIds(standing).includes(roleId)) {
+      throw new BusinessException(
+        ErrorCode.TEAM_ROLE_NOT_ASSIGNABLE,
+        "Role is senior to the caller's own role or to the reseller's tier",
+      );
+    }
+  }
+
+  private assertManageable(standing: ActorStanding, member: TeamMemberRecord): void {
+    if (member.userId === standing.actor.userId) {
+      throw new BusinessException(
+        ErrorCode.TEAM_MEMBER_SELF_CHANGE,
+        'Team members cannot change their own role or status',
+      );
+    }
+    if (!canManage(standing, member)) {
+      throw new BusinessException(
+        ErrorCode.TEAM_ROLE_NOT_ASSIGNABLE,
+        "Team member holds a role senior to the caller's own",
+      );
+    }
+  }
+
+  private async requireMember(resellerId: string, membershipId: string): Promise<TeamMemberRecord> {
+    const member = UUID_RE.test(membershipId)
+      ? await this.repo.findMember(resellerId, membershipId)
+      : null;
+    if (!member) {
       throw new BusinessException(
         ErrorCode.TEAM_MEMBER_NOT_FOUND,
         'Team member not found in this reseller',
       );
     }
-
-    await withReseller(this.db, mkResellerCtx(resellerId, 'service:reseller-team'), (tx) =>
-      tx
-        .update(resellerMemberships)
-        .set({ isActive: false, updatedBy: getRequestContext().userId })
-        .where(eq(resellerMemberships.id, membershipId)),
-    );
+    return member;
   }
+
+  private async reload(standing: ActorStanding, membershipId: string) {
+    const member = await this.requireMember(standing.actor.resellerId, membershipId);
+    return toModel(member, standing, await this.repo.findLastActive([member.userId]));
+  }
+}
+
+function canManage(standing: ActorStanding, member: TeamMemberRecord): boolean {
+  return (
+    member.userId !== standing.actor.userId &&
+    canManageResellerMember(standing.actorRoleName, standing.roles.get(member.roleId)?.name.en)
+  );
+}
+
+function toModel(member: TeamMemberRecord, standing: ActorStanding, lastActive: Map<string, Date>) {
+  return {
+    ...member,
+    roleName: standing.roles.get(member.roleId)?.name ?? null,
+    lastActiveAt: lastActive.get(member.userId) ?? null,
+    canManage: canManage(standing, member),
+  };
+}
+
+function parseCursor(after: string): string {
+  let id: unknown;
+  try {
+    ({ id } = decodeCursor(after));
+  } catch {
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor');
+  }
+  if (typeof id !== 'string' || !UUID_RE.test(id)) {
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor');
+  }
+  return id;
 }

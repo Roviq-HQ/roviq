@@ -112,6 +112,13 @@ export const STREAMS: Record<string, StreamConfig> = {
     storage: 'file',
     maxDeliver: 3,
   },
+  IMPERSONATION: {
+    name: 'IMPERSONATION',
+    subjects: ['IMPERSONATION.>'],
+    retention: 'workqueue',
+    storage: 'file',
+    maxDeliver: 3,
+  },
   RESELLER: {
     name: 'RESELLER',
     subjects: ['RESELLER.>'],
