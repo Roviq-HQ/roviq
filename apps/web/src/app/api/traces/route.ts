@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdminAuth } from '../_lib/admin-auth';
 
-const TEMPO_URL = process.env.TEMPO_URL ?? 'http://localhost:3200';
+const TEMPO_URL =
+  process.env.TEMPO_URL ?? `http://localhost:${process.env.DEV_TEMPO_PORT ?? '3200'}`;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const MAX_LIMIT = 100;
 const MAX_RANGE_SECONDS = 30 * 24 * 60 * 60; // 30 days
