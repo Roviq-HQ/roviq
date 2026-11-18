@@ -81,6 +81,8 @@ interface TxStubOpts {
   selects?: SelectStep[];
   /** Row(s) returned from `insert().values().returning()` for impersonationSessions. */
   insertReturning?: unknown[];
+  /** Rows returned from `update().set().where().returning()`. */
+  updateReturning?: unknown[];
 }
 
 interface TxStub {
@@ -163,7 +165,10 @@ function createTx(opts: TxStubOpts = {}): TxStub {
       set: (values: unknown) => {
         updated.push({ values });
         return {
-          where: () => Promise.resolve(),
+          where: () =>
+            Object.assign(Promise.resolve(), {
+              returning: () => Promise.resolve(opts.updateReturning ?? []),
+            }),
         };
       },
     })),
@@ -179,6 +184,7 @@ function setTx(tx: unknown): void {
 // ── Common factories ───────────────────────────────────────────
 
 const REASON_VALID = 'investigating attendance bug';
+const META = { ip: '10.0.0.9', userAgent: 'vitest-agent' };
 const FIXED_UUID = 'fixed-uuid-0000-0000-0000-000000000000';
 
 const platformActor: PlatformContext = {
@@ -976,6 +982,7 @@ describe('ImpersonationService', () => {
         {
           id: 'session-1',
           impersonatorId: 'imp-1',
+          impersonatorScope: 'reseller',
           endedAt: null,
           expiresAt: new Date(Date.now() + 60_000),
           ...overrides,
@@ -986,7 +993,7 @@ describe('ImpersonationService', () => {
     it('rejects when the code is not in Redis', async () => {
       const { service, redis } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(null);
-      await expect(service.exchangeCode('missing-code')).rejects.toMatchObject({
+      await expect(service.exchangeCode('missing-code', META)).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_CODE_EXPIRED,
       });
       expect(redis.getdel).toHaveBeenCalledWith(`${REDIS_KEYS.IMPERSONATION_CODE}missing-code`);
@@ -1005,7 +1012,7 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      await expect(service.exchangeCode('code-1')).rejects.toMatchObject({
+      await expect(service.exchangeCode('code-1', META)).rejects.toMatchObject({
         code: ErrorCode.ACCOUNT_INACTIVE,
       });
     });
@@ -1023,7 +1030,7 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      await expect(service.exchangeCode('code-1')).rejects.toMatchObject({
+      await expect(service.exchangeCode('code-1', META)).rejects.toMatchObject({
         code: ErrorCode.NO_ACTIVE_MEMBERSHIP,
       });
     });
@@ -1039,7 +1046,7 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      await expect(service.exchangeCode('code-1')).rejects.toMatchObject({
+      await expect(service.exchangeCode('code-1', META)).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_SESSION_INVALID,
       });
       expect(jwt.sign).not.toHaveBeenCalled();
@@ -1056,7 +1063,7 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      const result = await service.exchangeCode('code-1');
+      const result = await service.exchangeCode('code-1', META);
       expect(result).toEqual({
         accessToken: 'fake-jwt',
         user: { id: 'tgt-1', username: 'student-jane' },
@@ -1082,8 +1089,10 @@ describe('ImpersonationService', () => {
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'imp-1',
         type: 'impersonation_start',
-        scope: 'institute',
+        scope: 'reseller',
         tenantId: 'tenant-1',
+        ip: '10.0.0.9',
+        userAgent: 'vitest-agent',
         metadata: {
           target_user_id: 'tgt-1',
           target_tenant_id: 'tenant-1',
@@ -1120,7 +1129,9 @@ describe('ImpersonationService', () => {
       const { service } = createSubject();
       const { tx } = createTx({ selects: [{ table: 'impersonation_sessions', rows: [] }] });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', platformActor)).rejects.toMatchObject({
+      await expect(
+        service.endImpersonation('session-1', platformActor, META),
+      ).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_SESSION_INVALID,
       });
     });
@@ -1129,7 +1140,9 @@ describe('ImpersonationService', () => {
       const { service } = createSubject();
       const { tx, updated } = createTx({ selects: [session({ endedAt: new Date() })] });
       setTx(tx);
-      await expect(service.endImpersonation('session-1', platformActor)).rejects.toMatchObject({
+      await expect(
+        service.endImpersonation('session-1', platformActor, META),
+      ).rejects.toMatchObject({
         code: ErrorCode.IMPERSONATION_SESSION_INVALID,
       });
       expect(updated).toEqual([]);
@@ -1140,7 +1153,7 @@ describe('ImpersonationService', () => {
       const { tx, updated } = createTx({ selects: [session()] });
       setTx(tx);
 
-      await service.endImpersonation('session-1', resellerActor);
+      await service.endImpersonation('session-1', resellerActor, META);
 
       expect(updated).toHaveLength(1);
       const setValues = updated[0].values as { endedAt: Date; endedReason: string };
@@ -1159,6 +1172,10 @@ describe('ImpersonationService', () => {
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'imp-1',
         type: 'impersonation_end',
+        scope: 'reseller',
+        tenantId: 'tenant-1',
+        ip: '10.0.0.9',
+        userAgent: 'vitest-agent',
         metadata: { session_id: 'session-1', ended_reason: 'manual' },
       });
     });
@@ -1171,6 +1188,7 @@ describe('ImpersonationService', () => {
       await service.endImpersonation(
         'session-1',
         impersonated({ ...instituteActor, userId: 'tgt-1' }),
+        META,
       );
 
       expect((updated[0].values as { endedReason: string }).endedReason).toBe('manual');
@@ -1182,7 +1200,11 @@ describe('ImpersonationService', () => {
       setTx(tx);
 
       await expect(
-        service.endImpersonation('session-1', impersonated({ ...instituteActor, ...outsider })),
+        service.endImpersonation(
+          'session-1',
+          impersonated({ ...instituteActor, ...outsider }),
+          META,
+        ),
       ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(abilityFactory.createForUser).not.toHaveBeenCalled();
       expect(updated).toEqual([]);
@@ -1194,13 +1216,17 @@ describe('ImpersonationService', () => {
       const { tx, updated } = createTx({ selects: [session()] });
       setTx(tx);
 
-      await service.endImpersonation('session-1', { ...platformActor, ...outsider });
+      await service.endImpersonation('session-1', { ...platformActor, ...outsider }, META);
 
       expect((updated[0].values as { endedReason: string }).endedReason).toBe('revoked');
       await Promise.resolve();
       expect(authEventService.emit).toHaveBeenCalledWith({
         userId: 'someone-else',
         type: 'impersonation_end',
+        scope: 'platform',
+        tenantId: 'tenant-1',
+        ip: '10.0.0.9',
+        userAgent: 'vitest-agent',
         metadata: { session_id: 'session-1', ended_reason: 'revoked' },
       });
     });
@@ -1225,7 +1251,7 @@ describe('ImpersonationService', () => {
       });
       setTx(tx);
 
-      await service.endImpersonation('session-1', { ...resellerActor, ...outsider });
+      await service.endImpersonation('session-1', { ...resellerActor, ...outsider }, META);
 
       expect((updated[0].values as { endedReason: string }).endedReason).toBe('revoked');
     });
@@ -1262,7 +1288,7 @@ describe('ImpersonationService', () => {
       const { tx, updated } = createTx({ selects: [session()] });
       setTx(tx);
 
-      await service.endImpersonation('session-1', { ...instituteActor, ...outsider });
+      await service.endImpersonation('session-1', { ...instituteActor, ...outsider }, META);
 
       expect((updated[0].values as { endedReason: string }).endedReason).toBe('revoked');
     });
@@ -1277,6 +1303,58 @@ describe('ImpersonationService', () => {
         service.endImpersonation('session-1', { ...instituteActor, ...outsider }),
       ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
       expect(updated).toEqual([]);
+    });
+  });
+
+  describe('expireOverdueSessions', () => {
+    it('closes overdue sessions as expired and records impersonation_end for each', async () => {
+      const { service, authEventService } = createSubject();
+      const { tx, updated } = createTx({
+        updateReturning: [
+          {
+            id: 'session-1',
+            impersonatorId: 'imp-1',
+            impersonatorScope: 'reseller',
+            targetTenantId: 'tenant-1',
+          },
+          {
+            id: 'session-2',
+            impersonatorId: 'imp-2',
+            impersonatorScope: 'platform',
+            targetTenantId: null,
+          },
+        ],
+      });
+      setTx(tx);
+
+      const count = await service.expireOverdueSessions();
+
+      expect(count).toBe(2);
+      expect((updated[0].values as { endedReason: string }).endedReason).toBe('expired');
+      expect(authEventService.emit).toHaveBeenCalledTimes(2);
+      expect(authEventService.emit).toHaveBeenCalledWith({
+        userId: 'imp-1',
+        type: 'impersonation_end',
+        scope: 'reseller',
+        tenantId: 'tenant-1',
+        metadata: { session_id: 'session-1', ended_reason: 'expired' },
+      });
+      expect(authEventService.emit).toHaveBeenCalledWith({
+        userId: 'imp-2',
+        type: 'impersonation_end',
+        scope: 'platform',
+        tenantId: undefined,
+        metadata: { session_id: 'session-2', ended_reason: 'expired' },
+      });
+    });
+
+    it('records nothing when no session is overdue', async () => {
+      const { service, authEventService } = createSubject();
+      const { tx } = createTx();
+      setTx(tx);
+
+      expect(await service.expireOverdueSessions()).toBe(0);
+      expect(authEventService.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -1316,6 +1394,12 @@ describe('ImpersonationService', () => {
                 expiresAt: new Date('2020-01-01T00:00:00Z'),
                 endedAt: null,
               }),
+              baseRow({
+                id: 'swept',
+                expiresAt: new Date('2020-01-01T00:00:00Z'),
+                endedAt: new Date('2020-01-01T00:00:00Z'),
+                endedReason: 'expired',
+              }),
             ],
           },
         ],
@@ -1328,6 +1412,7 @@ describe('ImpersonationService', () => {
         ['active', ImpersonationSessionStatus.ACTIVE],
         ['ended', ImpersonationSessionStatus.ENDED],
         ['expired', ImpersonationSessionStatus.EXPIRED],
+        ['swept', ImpersonationSessionStatus.EXPIRED],
       ]);
     });
 

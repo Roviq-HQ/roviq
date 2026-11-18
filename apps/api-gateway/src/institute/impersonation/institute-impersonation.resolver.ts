@@ -42,8 +42,9 @@ export class InstituteImpersonationResolver {
   async endImpersonation(
     @Args('sessionId') sessionId: string,
     @CurrentUser() user: AuthUser,
+    @Context() ctx: GqlContext,
   ): Promise<boolean> {
-    await this.impersonationService.endImpersonation(sessionId, user);
+    await this.impersonationService.endImpersonation(sessionId, user, extractMeta(ctx));
     return true;
   }
 }

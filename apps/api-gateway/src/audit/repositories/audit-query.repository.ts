@@ -9,6 +9,7 @@ export interface AuthEventRow {
   id: string;
   userId: string | null;
   eventType: string;
+  portal: string | null;
   scope: string | null;
   tenantId: string | null;
   resellerId: string | null;

@@ -25,6 +25,7 @@ description: Use when starting work on a Linear issue — provides the full work
 - Write tests (unit: `*.spec.ts`, integration: `*.integration.test.ts`)
 - Run issue's Verification commands, compare to expected output
 - Run the full pre-commit gate (see Hard Rules in CLAUDE.md)
+- **Browser-verify without being asked**: drive every touched code path in the running app, backend-only changes included (root `CLAUDE.md` → "Browser Verification")
 - `git diff | grep -i "school"` — zero results
 - **When e2e/UI tests fail**: Use the Playwright MCP tool to debug interactively — take screenshots, inspect DOM snapshots, check console messages, and trace network requests to identify the root cause before changing code
 
@@ -39,4 +40,4 @@ description: Use when starting work on a Linear issue — provides the full work
 
 ## 7. Report
 - Summarize changes, list files, show test results, note concerns
-- Commit only under the [NACPR] rule in root `CLAUDE.md` (tested thoroughly in the browser and by automated tests); otherwise wait for explicit commit approval
+- Browser-verify every touched code path yourself before reporting (root `CLAUDE.md` → "Browser Verification"), then commit under the [NACPR] rule. Never hand the commit back because the browser pass was skipped

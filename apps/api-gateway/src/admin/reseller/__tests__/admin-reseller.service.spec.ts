@@ -294,7 +294,13 @@ describe('AdminResellerService', () => {
       expect(calls.updateImpersonation).toHaveBeenCalledTimes(1);
       expect(calls.updateImpersonation.mock.calls[0][0].values.endedReason).toBe('revoked');
 
-      expect(authEventService.emit).toHaveBeenCalledTimes(2);
+      expect(authEventService.emit).toHaveBeenCalledTimes(3);
+      expect(authEventService.emit).toHaveBeenCalledWith({
+        userId: ACTOR_ID,
+        type: 'impersonation_end',
+        scope: 'platform',
+        metadata: { session_id: 'session-1', ended_reason: 'revoked' },
+      });
       expect(authEventService.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'all_sessions_revoked',

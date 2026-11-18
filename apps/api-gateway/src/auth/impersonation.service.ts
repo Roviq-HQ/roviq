@@ -29,7 +29,7 @@ import { EventBusService } from '@roviq/event-bus';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { and, asc, desc, eq, gt, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lte, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type Redis from 'ioredis';
 import { AuthEventService } from './auth-event.service';
@@ -104,10 +104,12 @@ const MAX_OTP_ATTEMPTS = 3;
 /** Derives session lifecycle status: ended (manual/revoked) → expired (past TTL) → active. */
 function deriveSessionStatus(
   endedAt: Date | null,
+  endedReason: string | null,
   expiresAt: Date,
   now: number,
 ): ImpersonationSessionStatus {
-  if (endedAt) return ImpersonationSessionStatus.ENDED;
+  // The expiry sweep closes the row too; it must still read as EXPIRED.
+  if (endedAt && endedReason !== 'expired') return ImpersonationSessionStatus.ENDED;
   if (expiresAt.getTime() <= now) return ImpersonationSessionStatus.EXPIRED;
   return ImpersonationSessionStatus.ACTIVE;
 }
@@ -344,7 +346,7 @@ export class ImpersonationService {
 
   // ── Exchange one-time code ───────────────────────────────
 
-  async exchangeCode(code: string): Promise<ImpersonationAuthPayload> {
+  async exchangeCode(code: string, meta: ImpersonationMeta): Promise<ImpersonationAuthPayload> {
     // Atomic read-and-delete (GETDEL, Redis 6.2+) — prevents TOCTOU race on concurrent exchanges
     const stored = await this.redis.getdel(`${REDIS_KEYS.IMPERSONATION_CODE}${code}`);
     if (!stored) {
@@ -390,6 +392,7 @@ export class ImpersonationService {
             .select({
               id: impersonationSessions.id,
               impersonatorId: impersonationSessions.impersonatorId,
+              impersonatorScope: impersonationSessions.impersonatorScope,
               endedAt: impersonationSessions.endedAt,
               expiresAt: impersonationSessions.expiresAt,
             })
@@ -452,8 +455,10 @@ export class ImpersonationService {
       .emit({
         userId: session.impersonatorId,
         type: 'impersonation_start',
-        scope: 'institute',
+        scope: session.impersonatorScope as AuthScope,
         tenantId,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
         metadata: {
           target_user_id: targetUserId,
           target_tenant_id: tenantId,
@@ -482,7 +487,11 @@ export class ImpersonationService {
    * themselves (`manual`); anyone else with authority over it revokes it
    * (`revoked`) — see {@link resolveEndReason}.
    */
-  async endImpersonation(sessionId: string, actor: AuthUser): Promise<void> {
+  async endImpersonation(
+    sessionId: string,
+    actor: AuthUser,
+    meta: ImpersonationMeta,
+  ): Promise<void> {
     const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
@@ -547,9 +556,53 @@ export class ImpersonationService {
       .emit({
         userId: actor.userId,
         type: 'impersonation_end',
+        scope: actor.scope,
+        tenantId: session.targetTenantId ?? undefined,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
         metadata: { session_id: sessionId, ended_reason: endedReason },
       })
       .catch(() => {});
+  }
+
+  // ── Expire overdue sessions ──────────────────────────────
+
+  /**
+   * Closes sessions that ran past `expires_at` and records `impersonation_end`
+   * for each. The UPDATE claims rows atomically, so concurrent gateway
+   * replicas never record the same session twice.
+   */
+  async expireOverdueSessions(): Promise<number> {
+    const expired = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .update(impersonationSessions)
+        .set({ endedAt: impersonationSessions.expiresAt, endedReason: 'expired' })
+        .where(
+          and(
+            isNull(impersonationSessions.endedAt),
+            lte(impersonationSessions.expiresAt, sql`now()`),
+          ),
+        )
+        .returning({
+          id: impersonationSessions.id,
+          impersonatorId: impersonationSessions.impersonatorId,
+          impersonatorScope: impersonationSessions.impersonatorScope,
+          targetTenantId: impersonationSessions.targetTenantId,
+        }),
+    );
+
+    for (const session of expired) {
+      this.authEventService
+        .emit({
+          userId: session.impersonatorId,
+          type: 'impersonation_end',
+          scope: session.impersonatorScope as AuthScope,
+          tenantId: session.targetTenantId ?? undefined,
+          metadata: { session_id: session.id, ended_reason: 'expired' },
+        })
+        .catch(() => {});
+    }
+    return expired.length;
   }
 
   // ── List impersonation sessions ──────────────────────────
@@ -631,7 +684,7 @@ export class ImpersonationService {
           row.impersonatorId,
           row.targetTenantId,
         ),
-        status: deriveSessionStatus(row.endedAt, row.expiresAt, now),
+        status: deriveSessionStatus(row.endedAt, row.endedReason, row.expiresAt, now),
       }));
     });
   }

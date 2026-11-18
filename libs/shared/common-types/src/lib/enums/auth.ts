@@ -97,3 +97,32 @@ export type AuthSecurityEventType = (typeof AUTH_SECURITY_EVENT_TYPE_VALUES)[num
 export const AuthSecurityEventType = Object.fromEntries(
   AUTH_SECURITY_EVENT_TYPE_VALUES.map((v) => [v, v]),
 ) as { readonly [K in AuthSecurityEventType]: K };
+
+// ─── AuthFailureReason ──────────────────────────────────────────────────────
+// Why a sign-in attempt was refused, stored in `auth_events.failure_reason`.
+// Internal only: the API answers every one of these with the same generic
+// error so a caller cannot tell them apart.
+
+export const AUTH_FAILURE_REASON_VALUES = [
+  // No account has the submitted username
+  'UNKNOWN_USER',
+  // The account exists but the password is wrong
+  'INVALID_PASSWORD',
+  // The account exists but is not ACTIVE (suspended, deactivated)
+  'ACCOUNT_INACTIVE',
+  // The attempt arrived while the username was locked out
+  'ACCOUNT_LOCKED',
+  // Credentials were valid, but the account has no usable membership in the portal used
+  'NO_PORTAL_ACCESS',
+  // The presented passkey credential is not registered
+  'PASSKEY_UNKNOWN',
+  // The passkey is registered but its signed response failed verification
+  'PASSKEY_VERIFICATION_FAILED',
+  // The failed attempt that reached the lockout threshold (on `account_locked` events)
+  'TOO_MANY_ATTEMPTS',
+] as const;
+
+export type AuthFailureReason = (typeof AUTH_FAILURE_REASON_VALUES)[number];
+export const AuthFailureReason = Object.fromEntries(
+  AUTH_FAILURE_REASON_VALUES.map((v) => [v, v]),
+) as { readonly [K in AuthFailureReason]: K };

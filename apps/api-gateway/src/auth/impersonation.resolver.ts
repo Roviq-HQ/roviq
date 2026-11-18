@@ -1,6 +1,7 @@
-import { Args, Mutation, Resolver } from '@nestjs/graphql';
+import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
 import { ImpersonationAuthPayload } from './dto/impersonation.dto';
+import { extractMeta, type GqlContext } from './gql-context';
 import { ImpersonationService } from './impersonation.service';
 
 /**
@@ -16,7 +17,10 @@ export class ImpersonationResolver {
 
   @NoAudit()
   @Mutation(() => ImpersonationAuthPayload)
-  async exchangeImpersonationCode(@Args('code') code: string): Promise<ImpersonationAuthPayload> {
-    return this.impersonationService.exchangeCode(code);
+  async exchangeImpersonationCode(
+    @Args('code') code: string,
+    @Context() ctx: GqlContext,
+  ): Promise<ImpersonationAuthPayload> {
+    return this.impersonationService.exchangeCode(code, extractMeta(ctx));
   }
 }

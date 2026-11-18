@@ -9,6 +9,7 @@ import { AuthEventService } from './auth-event.service';
 import { IdentityService } from './identity.service';
 import { ImpersonationResolver } from './impersonation.resolver';
 import { ImpersonationService } from './impersonation.service';
+import { ImpersonationExpirySweeper } from './impersonation-expiry.sweeper';
 import { JwtStrategy } from './jwt.strategy';
 import { LoginLockoutService } from './login-lockout.service';
 import { AuthRepositoryModule } from './repositories/auth-repository.module';
@@ -30,6 +31,7 @@ import { WsTicketController } from './ws-ticket.controller';
     IdentityService,
     ImpersonationService,
     ImpersonationResolver,
+    ImpersonationExpirySweeper,
     JwtStrategy,
     LoginLockoutService,
   ],

@@ -44,11 +44,11 @@ Several agents work at the same time, each in its own git worktree with its own 
 If any of below rule applies to you then you `MUST` read full details: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules-reference.md`
 
 - [NWKRD] **No workarounds — proper fixes only.** Root-cause bugs, don't patch symptoms. +5 proper, -5 hack
-- [NACPR] **Auto commit only when fully tested.** Committing automatically is allowed only if the change was tested thoroughly in the browser and by automated tests; otherwise output `git add` + `git commit` for copy-paste. Push/merge only when the user asks. Conventional commits, header ≤100 chars
+- [NACPR] **Test fully, then commit.** A change is committed automatically once it is tested thoroughly in the browser and by automated tests. Doing both is your job: never skip the browser pass and hand back `git add` + `git commit` instead. Output the commands for copy-paste only when the browser pass is truly impossible, and name the blocker. Push/merge only when the user asks. Conventional commits, header ≤100 chars
 - [LNFST] **Linear first** — read the full issue (especially "Does NOT Change" + "Verification") before coding. Keep in sync
 - [RSBFC] Instead of try-catch on errors: (1) web search latest docs + (2) Context7 MCP. Do BOTH every time
 - [NTESC] **No type escape hatches** — never `any`, `as unknown`, `as never`. Search codebase → context7 → web → discuss with user
-- [BFCMT] **Before commit** — Playwright-verify every touched code path, write/update tests, run `pnpm lint:fix`
+- [BFCMT] **Before commit** — browser-verify every touched code path yourself, without being asked (see "Browser Verification"); write/update tests; run `pnpm lint:fix`. Backend-only changes count: drive the UI flows that reach the changed code
 - [PXERR] Found pre-existing issue? Fix it right now. It's bigger? Discuss user to create a linear issue using skill. — fix and commit them separately
 - [RDPKG] Read `package.json` scripts before running app commands. Run `pnpm lint:fix` frequently
 - [NPENV] `process.env['FOO']` banned (Biome); `process.env.FOO` banned until `FOO` is on `ProcessEnv` (TS)
@@ -101,18 +101,30 @@ Folder trees for `apps/api-gateway` and `apps/web`: `docs/architecture.md` → "
 
 Compilation passing does NOT mean it works. After any change to NX project.json, tsconfig, path aliases, Docker compose, infra configs, env vars, or new library scaffolding — **you MUST run the actual app** (`pnpm tilt trigger api-gateway` and check `pnpm tilt logs api-gateway`) and verify it starts without runtime errors. Fix iteratively until clean.
 
+### Browser Verification — automatic, never optional
+
+Automated tests passing does NOT mean it works for a user. Before you report any code change as done, open the running app in a browser (Playwright MCP) and exercise it. Do this on your own initiative: do not wait to be asked, do not ask permission, and do not end with an offer to "run a browser pass if you want".
+
+- **What to cover**: every touched code path through the real UI — the normal flow, one boundary or forbidden case, then a refresh and an account or portal switch. For a backend change, find the screens that call the changed resolver or service and drive those (an auth change means logging in on each portal, a wrong-portal login, logout, impersonation start and end).
+- **Check the result, not just the click**: read the screen, the browser console and the network responses, and confirm the stored effect (the row, the event, the status) through the UI or a query.
+- **Where**: this instance's dev app (`pnpm instance:ports`), in a browser context of its own. If the dev app or database is broken or behind, fix it first (`pnpm tilt trigger …`, including `db-clean`); that is part of the task, not a reason to skip.
+- **No UI reaches the code?** Say so, and verify the same paths against the running gateway (GraphQL requests plus a database read) instead.
+- **Report**: list each flow you drove and what you saw. Anything you could not verify is named with its reason. "Not browser-tested" is acceptable only with a blocker you tried and failed to remove.
+- A failed browser check is a bug: fix it, add a regression test, and verify again.
+
 ### Phase Completion — Bug-Free Gate
 
 After completing each phase/issue, before declaring done:
 
 1. **Run tests**: `pnpm test` — fix any failures iteratively until all pass
-2. **Run lint**: `pnpm lint:fix` — fix any errors
-3. **Run typecheck**: `pnpm typecheck` if touching TypeScript (runs `nx run-many -t build`; raw `tsc --noEmit` is a no-op here because root tsconfig uses composite project references with `files: []`)
-4. **Write/update tests**: Every new code path must have tests before moving on
-5. **Write/update docs**: Update relevant docs in the same batch
-6. **Re-read the original Linear issue + comments**: Cross-check every spec item against your implementation. Confirm no deviation or missed requirement
-7. **RLS audit**: When changing models, verify and report RLS status for every affected table
-8. **Fix iteratively**: If anything fails, fix and re-run until clean. Do NOT move to the next phase with known failures
+2. **Browser-verify**: follow "Browser Verification" above for every touched code path — fix and re-verify until clean
+3. **Run lint**: `pnpm lint:fix` — fix any errors
+4. **Run typecheck**: `pnpm typecheck` if touching TypeScript (runs `nx run-many -t build`; raw `tsc --noEmit` is a no-op here because root tsconfig uses composite project references with `files: []`)
+5. **Write/update tests**: Every new code path must have tests before moving on
+6. **Write/update docs**: Update relevant docs in the same batch
+7. **Re-read the original Linear issue + comments**: Cross-check every spec item against your implementation. Confirm no deviation or missed requirement
+8. **RLS audit**: When changing models, verify and report RLS status for every affected table
+9. **Fix iteratively**: If anything fails, fix and re-run until clean. Do NOT move to the next phase with known failures
 
 ### Manual acceptance handoff
 
