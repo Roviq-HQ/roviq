@@ -40,6 +40,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `account/LanguagePreference` — shared account language setting for all three portals; saved preferences apply after authentication, with browser language then English as fallback. The topbar selector remains a per-visit override.
 - `AccountLocaleSync` — applies the authenticated account language once per account load, preserving the route, query and fragment.
 - `people/DeletedRecordsButton` + `people/DeletePersonButton` — delete, Deleted list and Restore for students, staff and guardians (`kind` prop). Delete states the consequence and offers Undo on the toast; both are gated by `<Can>` (`delete` / `restore`).
+- `audit/AuditLogFilters` + `audit/AuditLogTable` — the audit log list used by all three portals: URL-backed filters (multi-select action type, entity ID search, date range, optional institute dropdown), expandable rows showing the old → new diff, entity IDs linked to their detail page (`auditEntityHref` in `audit/audit-utils.ts` holds the entity type → route map), and the detail sheet. A portal page only picks its columns and passes its query result. `useAuditLabels()` supplies the translated `labels` for `AuditDiffRenderer` / `ImpersonationBadge`.
 
 ## Shared Libraries
 
@@ -50,6 +51,8 @@ shadcn/ui components + layout shell. Key exports:
 - `OrgSwitcher` — dropdown in topbar for switching between institutes (visible when user has >1 membership)
 - `AbilityProvider`, `Can`, `useAbility` — CASL React integration
 - `RouteGuard` — page-level permission check with 403 fallback
+- `DataTable` — pass `expansion={{ render, canExpand?, labels }}` for expandable rows (a leading toggle column; the expanded content spans the full width). Pass `getRowId` with it whenever rows can change.
+- `MultiSelect` — popover checkbox list for multi-value filters; pair with nuqs `parseAsArrayOf(parseAsString)`.
 
 ### @roviq/auth
 Client-side auth state management:

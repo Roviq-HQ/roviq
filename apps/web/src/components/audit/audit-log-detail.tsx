@@ -1,8 +1,7 @@
 'use client';
 
-import { useFormatDate } from '@roviq/i18n';
+import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
-  AuditDiffRenderer,
   Badge,
   ImpersonationBadge,
   ScrollArea,
@@ -12,15 +11,27 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@roviq/ui';
-import { Check, Clock, Copy, ShieldAlert } from 'lucide-react';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { Check, Clock, Copy, ExternalLink, ShieldAlert } from 'lucide-react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
-import type { AuditLogNode } from './use-audit-logs';
+import { AuditChanges, JsonBlock } from './audit-changes';
+import {
+  type AuditLogRow,
+  type AuditScope,
+  auditEntityHref,
+  getImpersonatorScope,
+} from './audit-utils';
+import { useAuditLabels } from './use-audit-labels';
 
-interface AuditLogDetailProps {
-  log: AuditLogNode | null;
+export interface AuditLogDetailProps {
+  log: AuditLogRow | null;
+  scope: AuditScope;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When provided and the entry has a session id, shows a button to open the session panel. */
+  onViewSession?: (sessionId: string) => void;
 }
 
 const ACTION_TYPE_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -54,11 +65,13 @@ const ACTION_TYPE_STYLES: Record<string, { bg: string; text: string; dot: string
     text: 'text-rose-700 dark:text-rose-400',
     dot: 'bg-rose-500',
   },
+  /** Entity suspended (still exists but disabled) */
   SUSPEND: {
     bg: 'bg-orange-500/10 dark:bg-orange-500/15',
     text: 'text-orange-700 dark:text-orange-400',
     dot: 'bg-orange-500',
   },
+  /** Suspended entity re-activated */
   ACTIVATE: {
     bg: 'bg-teal-500/10 dark:bg-teal-500/15',
     text: 'text-teal-700 dark:text-teal-400',
@@ -78,6 +91,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     try {
       await navigator.clipboard.writeText(value);
     } catch {
+      // Fallback for non-HTTPS or denied clipboard permissions
       const textarea = document.createElement('textarea');
       textarea.value = value;
       textarea.style.position = 'fixed';
@@ -129,7 +143,7 @@ function FieldRow({
 }) {
   return (
     <div className="group grid grid-cols-[120px_1fr] gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/40">
-      <span className="pt-0.5 text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground pt-0.5">{label}</span>
       <div className="flex min-w-0 items-center gap-1 overflow-hidden">
         <span className={`min-w-0 truncate text-sm ${mono ? 'font-mono text-xs' : ''}`}>
           {children}
@@ -158,21 +172,23 @@ function NameWithId({ name, id }: { name: string | null; id: string }) {
   return <span className="font-mono text-xs">{id}</span>;
 }
 
-function getImpersonatorScope(log: AuditLogNode): 'platform' | 'reseller' | 'institute' {
-  const meta = log.metadata as Record<string, unknown> | null;
-  if (meta?.impersonator_scope === 'platform') return 'platform';
-  if (meta?.impersonator_scope === 'reseller') return 'reseller';
-  return 'institute';
-}
-
-export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps) {
+export function AuditLogDetail({
+  log,
+  scope,
+  open,
+  onOpenChange,
+  onViewSession,
+}: AuditLogDetailProps) {
   const t = useTranslations('auditLogs');
   const { format } = useFormatDate();
   const formatDate = (date: Date) => format(date, 'dd MMM yyyy, HH:mm:ss');
-
+  const ti = useI18nField();
+  const labels = useAuditLabels();
   if (!log) return null;
 
   const style = getActionTypeStyle(log.actionType);
+  const entityHref = auditEntityHref(scope, log.entityType, log.entityId);
+  const sessionId = log.impersonationSessionId;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -205,7 +221,19 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
                 {log.entityId && (
                   <>
                     <span className="text-border">·</span>
-                    <span className="truncate font-mono text-xs">{log.entityId}</span>
+                    {entityHref ? (
+                      <Link
+                        href={entityHref}
+                        title={t('detail.openEntity')}
+                        className="inline-flex min-w-0 items-center gap-1 font-mono text-xs text-primary underline-offset-2 hover:underline"
+                        data-testid={testIds.auditLogs.detailEntityLink}
+                      >
+                        <span className="truncate">{log.entityId}</span>
+                        <ExternalLink className="size-3 shrink-0" />
+                      </Link>
+                    ) : (
+                      <span className="truncate font-mono text-xs">{log.entityId}</span>
+                    )}
                   </>
                 )}
               </div>
@@ -216,7 +244,7 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
               </div>
             </div>
 
-            {/* Impersonation warning with scope badge */}
+            {/* Impersonation warning */}
             {log.impersonatorId && (
               <div className="mt-4 flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/10">
                 <ShieldAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -228,6 +256,8 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
                     <ImpersonationBadge
                       impersonatorName={log.actorName ?? log.actorId.slice(0, 8)}
                       actorScope={getImpersonatorScope(log)}
+                      userName={log.userName ?? undefined}
+                      labels={labels.impersonation}
                     />
                   </div>
                   <span className="block truncate font-mono text-[11px] text-amber-600/70 dark:text-amber-400/60">
@@ -236,6 +266,18 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
                 </div>
                 <CopyButton value={log.impersonatorId} label={t('detail.impersonatorId')} />
               </div>
+            )}
+
+            {sessionId && onViewSession && (
+              <button
+                type="button"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:underline dark:text-amber-300"
+                onClick={() => onViewSession(sessionId)}
+                data-testid={testIds.adminAuditLogs.viewSessionBtn}
+              >
+                <ShieldAlert className="size-3.5" />
+                {t('detail.viewSession')}
+              </button>
             )}
 
             {/* Identity Section */}
@@ -247,13 +289,29 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
               <FieldRow label={t('detail.userId')} copyValue={log.userId}>
                 <NameWithId name={log.userName} id={log.userId} />
               </FieldRow>
+              {log.tenantId && (
+                <FieldRow label={t('detail.tenantId')} copyValue={log.tenantId}>
+                  <NameWithId name={ti(log.tenantName) || null} id={log.tenantId} />
+                </FieldRow>
+              )}
             </div>
 
             {/* Request Context Section */}
             <SectionHeader>{t('detail.sections.request')}</SectionHeader>
             <div>
               <FieldRow label={t('detail.correlationId')} mono copyValue={log.correlationId}>
-                {log.correlationId}
+                {scope === 'admin' ? (
+                  <Link
+                    href={`/admin/audit-logs/trace/${log.correlationId}`}
+                    title={t('detail.viewTrace')}
+                    className="inline-flex items-center gap-1 text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                  >
+                    {log.correlationId}
+                    <ExternalLink className="size-3 shrink-0" />
+                  </Link>
+                ) : (
+                  log.correlationId
+                )}
               </FieldRow>
               <FieldRow label={t('detail.source')}>{log.source}</FieldRow>
               <FieldRow label={t('detail.ipAddress')} mono copyValue={log.ipAddress ?? undefined}>
@@ -262,39 +320,18 @@ export function AuditLogDetail({ log, open, onOpenChange }: AuditLogDetailProps)
               <FieldRow label={t('detail.userAgent')}>{log.userAgent ?? '—'}</FieldRow>
             </div>
 
-            {/* Changes Section — uses AuditDiffRenderer */}
+            {/* Changes Section */}
             <SectionHeader>{t('detail.changes')}</SectionHeader>
-            {log.changes && Object.keys(log.changes).length > 0 ? (
-              <AuditDiffRenderer
-                changes={log.changes as Record<string, { old: unknown; new: unknown }>}
-                actionType={log.actionType}
-              />
-            ) : (
-              <div className="mt-1.5 rounded-lg border border-dashed border-border/50 px-3 py-3">
-                <span className="text-xs italic text-muted-foreground/50">
-                  {t('detail.noChanges')}
-                </span>
-              </div>
-            )}
+            <AuditChanges log={log} />
 
             {/* Metadata Section */}
             <SectionHeader>{t('detail.metadata')}</SectionHeader>
-            {log.metadata && Object.keys(log.metadata).length > 0 ? (
-              <pre className="mt-1.5 max-h-[240px] overflow-auto rounded-lg border bg-muted/30 p-3 font-mono text-xs leading-relaxed text-foreground/80">
-                {JSON.stringify(log.metadata, null, 2)}
-              </pre>
-            ) : (
-              <div className="mt-1.5 rounded-lg border border-dashed border-border/50 px-3 py-3">
-                <span className="text-xs italic text-muted-foreground/50">
-                  {t('detail.noMetadata')}
-                </span>
-              </div>
-            )}
+            <JsonBlock data={log.metadata} emptyMessage={t('detail.noMetadata')} />
 
             {/* Footer: Event ID */}
             <div className="mt-6 grid grid-cols-[40px_1fr] items-center gap-2 rounded-lg bg-muted/30 px-3 py-2.5">
               <span className="text-[11px] text-muted-foreground/60">{t('detail.id')}</span>
-              <div className="flex items-center justify-end gap-1 overflow-hidden">
+              <div className="flex items-center gap-1 overflow-hidden justify-end">
                 <span className="truncate font-mono text-[11px] text-muted-foreground/50">
                   {log.id}
                 </span>

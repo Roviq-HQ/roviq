@@ -1,11 +1,13 @@
 export {
   AuditDiffRenderer,
+  type AuditDiffRendererLabels,
   type AuditDiffRendererProps,
   EntityTimeline as EntityTimelineBase,
   type EntityTimelineData,
   type EntityTimelineEvent,
   type EntityTimelineProps as EntityTimelineBaseProps,
   ImpersonationBadge,
+  type ImpersonationBadgeLabels,
   type ImpersonationBadgeProps,
 } from './components/audit';
 export {
@@ -16,7 +18,11 @@ export {
 } from './components/auth/ability-provider';
 export { RouteGuard } from './components/auth/route-guard';
 export { CapacityBar } from './components/capacity-bar';
-export { DataTable, type DataTableProps } from './components/data-table/data-table';
+export {
+  DataTable,
+  type DataTableExpansion,
+  type DataTableProps,
+} from './components/data-table/data-table';
 export {
   DataTablePagination,
   type DataTablePaginationProps,
@@ -180,6 +186,11 @@ export {
 } from './components/ui/input-group';
 export { Kbd, KbdGroup } from './components/ui/kbd';
 export { Label } from './components/ui/label';
+export {
+  MultiSelect,
+  type MultiSelectOption,
+  type MultiSelectProps,
+} from './components/ui/multi-select';
 export {
   Pagination,
   PaginationContent,

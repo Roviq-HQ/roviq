@@ -28,7 +28,11 @@
     "dateFrom": "से",
     "dateTo": "तक",
     "clearFilters": "फ़िल्टर हटाएँ",
-    "impersonatorScope": "प्रतिरूपक स्कोप"
+    "impersonatorScope": "प्रतिरूपक स्कोप",
+    "actionTypesSelected": "{count} प्रकार चुने गए",
+    "clearSelection": "चयन हटाएं",
+    "clearEntityType": "एंटिटी प्रकार हटाएं",
+    "clearInstitute": "संस्थान हटाएं"
   },
   "scopes": {
     "platform": "प्लेटफ़ॉर्म",
@@ -82,7 +86,8 @@
     "sections": {
       "identity": "पहचान",
       "request": "अनुरोध"
-    }
+    },
+    "openEntity": "यह रिकॉर्ड खोलें"
   },
   "session": {
     "title": "प्रतिरूपण सत्र",
@@ -131,7 +136,8 @@
     "placeholder": "इकाई ID से खोजें...",
     "button": "खोजें",
     "invalidId": "कृपया एक वैध UUID दर्ज करें",
-    "noResults": "इस इकाई के लिए कोई परिवर्तन नहीं मिला"
+    "noResults": "इस इकाई के लिए कोई परिवर्तन नहीं मिला",
+    "clear": "एंटिटी आईडी खोज हटाएं"
   },
   "accessDenied": "आपको ऑडिट लॉग देखने की अनुमति नहीं है।",
   "errorTitle": "ऑडिट लॉग लोड करने में विफल",
@@ -141,5 +147,26 @@
     "noHistory": "इस इकाई के लिए कोई गतिविधि इतिहास नहीं।",
     "changes": "परिवर्तन देखें",
     "loadMore": "पुराने इवेंट लोड करें"
+  },
+  "table": {
+    "showChanges": "बदलाव दिखाएं",
+    "hideChanges": "बदलाव छिपाएं"
+  },
+  "diff": {
+    "fieldsDeleted": "{count, plural, =1 {1 फ़ील्ड हटाया गया} other {# फ़ील्ड हटाए गए}}",
+    "deletedSnapshot": "हटाए गए रिकॉर्ड का स्नैपशॉट",
+    "field": "फ़ील्ड",
+    "oldValue": "पुराना मान",
+    "newValue": "नया मान"
+  },
+  "impersonation": {
+    "badge": "{name} द्वारा प्रतिरूपित",
+    "tooltip": "यह कार्रवाई {name} ({scope}) ने प्रतिरूपण के ज़रिए की",
+    "tooltipWithUser": "यह कार्रवाई {name} ({scope}) ने {userName} का प्रतिरूपण करते हुए की",
+    "scopeLabels": {
+      "platform": "प्लेटफ़ॉर्म एडमिन",
+      "reseller": "रीसेलर एडमिन",
+      "institute": "संस्थान एडमिन"
+    }
   }
 }

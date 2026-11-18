@@ -208,7 +208,19 @@ export const testIds = {
   // ── Reseller: audit logs page (ROV-145) ───────────────────────────────
   resellerAudit: {
     resellerContext: 'reseller-audit-context',
-    instituteFilter: 'reseller-audit-institute-filter',
+  },
+
+  // ── Audit log list shared by all three portals (ROV-146) ──────────────
+  auditLogs: {
+    table: 'audit-log-table',
+    entityIdSearch: 'audit-log-entity-id-search',
+    actionTypeFilter: 'audit-log-action-type-filter',
+    actionTypeOption: (actionType: string) => `audit-log-action-type-option-${actionType}`,
+    instituteFilter: 'audit-log-institute-filter',
+    instituteFilterClear: 'audit-log-institute-filter-clear',
+    clearFilters: 'audit-log-clear-filters',
+    entityLink: (logId: string) => `audit-log-entity-link-${logId}`,
+    detailEntityLink: 'audit-log-detail-entity-link',
   },
 
   // ── Reseller: impersonation sessions page (ROV-144) ───────────────────

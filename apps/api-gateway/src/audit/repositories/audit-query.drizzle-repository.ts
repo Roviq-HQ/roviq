@@ -76,6 +76,7 @@ function buildAuditConditions(
   if (filter?.syntheticOrigin) {
     conditions.push(eq(auditLogs.syntheticOrigin, filter.syntheticOrigin));
   }
+  if (filter?.scopes?.length) conditions.push(inArray(auditLogs.scope, filter.scopes));
   if (filter?.impersonatedOnly) conditions.push(isNotNull(auditLogs.impersonationSessionId));
   if (filter?.impersonationSessionId) {
     conditions.push(eq(auditLogs.impersonationSessionId, filter.impersonationSessionId));
