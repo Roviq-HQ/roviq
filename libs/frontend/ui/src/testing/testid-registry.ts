@@ -277,6 +277,51 @@ export const testIds = {
     errorRetryBtn: 'dlq-error-retry-btn',
   },
 
+  // ── Common metrics components (apps/web/src/components/metrics) ────────
+  metrics: {
+    serviceStatus: (key: string) => `metric-service-status-${key}`,
+    serviceResponse: (key: string) => `metric-service-response-${key}`,
+    serviceUptime: (key: string) => `metric-service-uptime-${key}`,
+    cardValue: (key: string) => `metric-card-value-${key}`,
+    sparkline: 'metric-sparkline',
+    sparklineEmpty: 'metric-sparkline-empty',
+    statusGridLoading: 'metric-status-grid-loading',
+  },
+
+  // ── Admin: monitoring ─────────────────────────────────────────────────
+  adminMonitoring: {
+    page: 'admin-monitoring-page',
+    title: 'admin-monitoring-title',
+    serviceGrid: 'admin-monitoring-service-grid',
+    serviceCard: (service: string) => `admin-monitoring-service-${service}`,
+    healthError: 'admin-monitoring-health-error',
+    healthRetryBtn: 'admin-monitoring-health-retry-btn',
+    liveIndicator: 'admin-monitoring-live-indicator',
+    dlqBanner: 'admin-monitoring-dlq-banner',
+    dlqLink: 'admin-monitoring-dlq-link',
+    alertsPanel: 'admin-monitoring-alerts-panel',
+    alertsUnavailable: 'admin-monitoring-alerts-unavailable',
+    alertsEmpty: 'admin-monitoring-alerts-empty',
+    alertItem: (name: string) => `admin-monitoring-alert-${name}`,
+    natsPanel: 'admin-monitoring-nats-panel',
+    natsEmpty: 'admin-monitoring-nats-empty',
+    natsStream: (name: string) => `admin-monitoring-nats-stream-${name}`,
+    connectionsPanel: 'admin-monitoring-connections-panel',
+    connectionsError: 'admin-monitoring-connections-error',
+    observabilityLink: 'admin-monitoring-observability-link',
+    tenantTable: 'admin-monitoring-tenant-table',
+    tenantRow: (id: string) => `admin-monitoring-tenant-row-${id}`,
+    tenantSort: (field: string) => `admin-monitoring-tenant-sort-${field}`,
+    tenantResellerFilter: 'admin-monitoring-tenant-reseller-filter',
+    tenantEmpty: 'admin-monitoring-tenant-empty',
+    tenantError: 'admin-monitoring-tenant-error',
+    tenantRetryBtn: 'admin-monitoring-tenant-retry-btn',
+    tenantMetricsUnavailable: 'admin-monitoring-tenant-metrics-unavailable',
+    tenantNextPage: 'admin-monitoring-tenant-next-page',
+    tenantPrevPage: 'admin-monitoring-tenant-prev-page',
+    tenantPageInfo: 'admin-monitoring-tenant-page-info',
+  },
+
   // ── Admin: attendance ─────────────────────────────────────────────────
   adminAttendance: {
     page: 'admin-attendance-page',

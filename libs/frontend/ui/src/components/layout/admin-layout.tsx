@@ -1,8 +1,9 @@
 'use client';
 
 import { ThemeProvider } from 'next-themes';
-import type * as React from 'react';
+import * as React from 'react';
 import { cn } from '../../lib/utils';
+import { useAbility } from '../auth/ability-provider';
 import { BottomTabBar } from './bottom-tab-bar';
 import { CommandPalette } from './command-palette';
 import { PageErrorBoundary } from './error-boundary';
@@ -11,12 +12,13 @@ import { Topbar } from './topbar';
 import type { LayoutConfig } from './types';
 
 export function AdminLayout({
-  config,
+  config: rawConfig,
   children,
 }: {
   config: LayoutConfig;
   children: React.ReactNode;
 }) {
+  const config = useAbilityFilteredConfig(rawConfig);
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <SidebarProvider>
@@ -68,4 +70,19 @@ export function AdminLayout({
       </SidebarProvider>
     </ThemeProvider>
   );
+}
+
+function useAbilityFilteredConfig(config: LayoutConfig): LayoutConfig {
+  const ability = useAbility();
+  return React.useMemo(() => {
+    const navGroups = config.navGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) => !item.ability || ability.can(item.ability.action, item.ability.subject),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+    return { ...config, navGroups };
+  }, [config, ability]);
 }

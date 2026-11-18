@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest';
+import { createMongoAbility, type RawRuleOf } from '@casl/ability';
+import type { AppAbility } from '@roviq/common-types';
 import { render, screen } from '@testing-library/react';
 import { Home } from 'lucide-react';
 import type * as React from 'react';
@@ -45,6 +47,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+import { AbilityContext } from '../../auth/ability-provider';
 import { AdminLayout } from '../admin-layout';
 import type { LayoutConfig, NavRegistryEntry } from '../types';
 
@@ -113,5 +116,54 @@ describe('AdminLayout', () => {
 
     expect(screen.queryByTestId('bottom-tab-bar')).not.toBeInTheDocument();
     expect(screen.getByText('page-content')).toBeInTheDocument();
+  });
+
+  describe('nav item abilities', () => {
+    const gatedConfig: LayoutConfig = {
+      appName: 'Roviq',
+      navGroups: [
+        {
+          title: 'Main',
+          items: [{ title: 'Dashboard', href: '/dashboard', icon: Home }],
+        },
+        {
+          title: 'System',
+          items: [
+            {
+              title: 'Monitoring',
+              href: '/monitoring',
+              icon: Home,
+              ability: { action: 'read', subject: 'SystemHealth' },
+            },
+          ],
+        },
+      ],
+    };
+
+    function renderWithRules(rules: RawRuleOf<AppAbility>[]) {
+      const ability = createMongoAbility<AppAbility>(rules);
+      return render(
+        <AbilityContext.Provider value={ability}>
+          <AdminLayout config={gatedConfig}>
+            <div>page-content</div>
+          </AdminLayout>
+        </AbilityContext.Provider>,
+      );
+    }
+
+    it('shows a gated item when the viewer has its ability', () => {
+      renderWithRules([{ action: 'read', subject: 'SystemHealth' }]);
+
+      expect(screen.getAllByRole('link', { name: 'Monitoring' }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('link', { name: 'Dashboard' }).length).toBeGreaterThan(0);
+    });
+
+    it('hides a gated item and its emptied group when the viewer lacks the ability', () => {
+      renderWithRules([{ action: 'read', subject: 'Institute' }]);
+
+      expect(screen.queryByRole('link', { name: 'Monitoring' })).not.toBeInTheDocument();
+      expect(screen.queryByText('System')).not.toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: 'Dashboard' }).length).toBeGreaterThan(0);
+    });
   });
 });

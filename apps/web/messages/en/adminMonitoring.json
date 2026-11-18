@@ -1,0 +1,96 @@
+{
+  "title": "Monitoring",
+  "description": "Live health of platform services, queues and institute activity.",
+  "live": {
+    "connected": "Live",
+    "lastUpdated": "Updated {time}"
+  },
+  "services": {
+    "heading": "Services",
+    "loading": "Loading service health",
+    "names": {
+      "API_GATEWAY": "API gateway",
+      "POSTGRES": "PostgreSQL",
+      "REDIS": "Redis",
+      "NATS": "NATS",
+      "TEMPORAL": "Temporal",
+      "MINIO": "MinIO storage"
+    },
+    "status": {
+      "healthy": "Healthy",
+      "degraded": "Degraded",
+      "down": "Down"
+    },
+    "responseTime": "Response time",
+    "uptime": "Uptime (24h)",
+    "responseMs": "{value} ms",
+    "uptimePercent": "{value}%"
+  },
+  "dlq": {
+    "banner": "{count, plural, one {# failed event is} other {# failed events are}} waiting in the dead letter queue.",
+    "action": "Review failed events"
+  },
+  "alerts": {
+    "heading": "Active alerts",
+    "unavailable": "Metrics unavailable — Prometheus cannot be reached, so alerts cannot be shown.",
+    "empty": "No alerts are firing.",
+    "since": "Since {time}",
+    "severity": {
+      "CRITICAL": "Critical",
+      "WARNING": "Warning",
+      "INFO": "Info"
+    }
+  },
+  "nats": {
+    "heading": "Queue backlog (NATS)",
+    "description": "Messages waiting for consumers, per stream. The chart shows the changes received while this page is open.",
+    "empty": "No streams reported.",
+    "pending": "{count, plural, one {# pending} other {# pending}}",
+    "chartLabel": "Pending messages for {stream}: {values}",
+    "historyHint": "Last {count, plural, one {# update} other {# updates}}"
+  },
+  "connections": {
+    "heading": "Live connections",
+    "websocket": "Real-time (WebSocket)",
+    "http": "In-flight HTTP requests",
+    "trendLabel": "{label}, recent values: {values}",
+    "hint": "Refreshes every 10 seconds"
+  },
+  "observability": {
+    "heading": "Latency, error rate and request charts",
+    "description": "Detailed request and event charts live on the Observability page.",
+    "action": "Open Observability"
+  },
+  "tenants": {
+    "heading": "Institute activity",
+    "description": "Active users and API calls per institute over the last 24 hours. Refreshes every minute.",
+    "columns": {
+      "institute": "Institute",
+      "reseller": "Reseller",
+      "activeUsers": "Active users (24h)",
+      "apiCalls": "API calls (24h)",
+      "trend": "7-day trend"
+    },
+    "sortBy": "Sort by {column}",
+    "sortedAsc": "sorted ascending",
+    "sortedDesc": "sorted descending",
+    "trendLabel": "API calls per day for {institute}, last 7 days: {values}",
+    "resellerFilter": "Reseller",
+    "allResellers": "All resellers",
+    "metricsUnavailable": "API call metrics are unavailable right now. Active users are still shown.",
+    "empty": "No institutes yet.",
+    "emptyFiltered": "No institutes for this reseller.",
+    "pageInfo": "{from}–{to} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "previousTitle": "Show the previous page of institutes",
+    "nextTitle": "Show the next page of institutes"
+  },
+  "errors": {
+    "loadFailed": "Could not load this section.",
+    "FORBIDDEN": "You do not have permission to view system health.",
+    "UNAUTHENTICATED": "Your session has expired. Please sign in again.",
+    "retry": "Retry",
+    "retryTitle": "Try loading this section again"
+  }
+}

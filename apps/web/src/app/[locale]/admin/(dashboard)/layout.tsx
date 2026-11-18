@@ -5,6 +5,7 @@ import { NAV_SLUGS } from '@roviq/common-types';
 import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
 import {
+  Activity,
   BarChart2,
   Building2,
   ClipboardCheck,
@@ -120,6 +121,12 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
           { title: t('auditLogs'), href: '/audit-logs', icon: FileText },
           { title: t('attendance'), href: '/attendance', icon: ClipboardCheck },
           { title: t('observability'), href: '/observability', icon: BarChart2 },
+          {
+            title: t('monitoring'),
+            href: '/monitoring',
+            icon: Activity,
+            ability: { action: 'read', subject: 'SystemHealth' },
+          },
           { title: t('settings'), href: '/settings', icon: Settings },
           { title: t('account'), href: '/account', icon: UserCog },
         ],
