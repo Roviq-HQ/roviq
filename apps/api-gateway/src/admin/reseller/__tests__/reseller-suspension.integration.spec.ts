@@ -15,6 +15,7 @@ import {
   authEvents,
   impersonationSessions,
   institutes,
+  memberships,
   mkAdminCtx,
   refreshTokens,
   resellerMemberships,
@@ -177,14 +178,27 @@ describe('Reseller suspension and deletion (integration)', () => {
       ({ reseller, institute } = await setUpReseller());
       tokens = await login(reseller);
 
-      // The same person signed in elsewhere: a session suspension must not touch.
+      // The same person is also a member of an institute and signed in there: a
+      // session the suspension must not touch.
+      const [instituteMembership] = await admin((tx) =>
+        tx
+          .insert(memberships)
+          .values({
+            userId: reseller.userId,
+            tenantId: institute.tenantId,
+            roleId: institute.roleId,
+            createdBy: reseller.userId,
+            updatedBy: reseller.userId,
+          })
+          .returning({ id: memberships.id }),
+      );
       const [other] = await admin((tx) =>
         tx
           .insert(refreshTokens)
           .values({
             userId: reseller.userId,
             tenantId: institute.tenantId,
-            membershipId: randomUUID(),
+            membershipId: instituteMembership.id,
             membershipScope: 'institute',
             tokenHash: randomUUID(),
             expiresAt: new Date(Date.now() + DAY_MS),
@@ -196,7 +210,12 @@ describe('Reseller suspension and deletion (integration)', () => {
       otherSessionTokenId = other.id;
 
       resellerSessionId = await startImpersonationSession(reseller.userId, 'reseller', institute);
-      platformSessionId = await startImpersonationSession(reseller.userId, 'platform', institute);
+      // A platform admin's session in the same institute must survive the suspension.
+      platformSessionId = await startImpersonationSession(
+        SEED_IDS.USER_ADMIN,
+        'platform',
+        institute,
+      );
     });
 
     it('lets staff and their impersonation session work while the reseller is active', async () => {
@@ -246,7 +265,7 @@ describe('Reseller suspension and deletion (integration)', () => {
       expect(otherRow.revokedAt).toBeNull();
     });
 
-    it('ends impersonation sessions the staff opened as reseller, and only those', async () => {
+    it('ends impersonation sessions the staff opened as reseller, and no one else’s', async () => {
       const impersonated = await gql(
         MY_INSTITUTE,
         undefined,

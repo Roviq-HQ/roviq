@@ -125,9 +125,21 @@ export const institutes = pgTable(
       using: sql`id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
 
-    // roviq_reseller: ALL on their reseller's institutes (GRANTs limit to SELECT + INSERT + UPDATE)
-    pgPolicy('institutes_reseller_all', {
-      for: 'all',
+    // roviq_reseller: its own institutes.
+    // SECURITY: no DELETE policy — removing an institute is a platform decision (ROV-102).
+    // The `institutes_delete_admin_only` trigger refuses a reseller soft-delete as well.
+    pgPolicy('institutes_reseller_select', {
+      for: 'select',
+      to: roviqReseller,
+      using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
+    }),
+    pgPolicy('institutes_reseller_insert', {
+      for: 'insert',
+      to: roviqReseller,
+      withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
+    }),
+    pgPolicy('institutes_reseller_update', {
+      for: 'update',
       to: roviqReseller,
       using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,
       withCheck: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid`,

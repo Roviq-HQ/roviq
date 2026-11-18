@@ -202,6 +202,7 @@ jobs:
         run: >-
           pnpm vitest run --project integration
           libs/database/src/__tests__/security-invariants.integration.spec.ts
+          libs/database/src/__tests__/auth-invariants-db.integration.spec.ts
           apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts
           apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts
       - name: Integration tests

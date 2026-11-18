@@ -115,6 +115,19 @@ describe('Impersonation (integration)', () => {
     return response.data?.adminImpersonationSessions[0];
   }
 
+  /**
+   * Make a live session overdue. Only `expires_at` may move, and only earlier: the
+   * database refuses to change when a session started (ROV-102).
+   */
+  async function expireNow(sessionId: string): Promise<void> {
+    await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+      tx
+        .update(impersonationSessions)
+        .set({ expiresAt: sql`${impersonationSessions.startedAt}` })
+        .where(eq(impersonationSessions.id, sessionId)),
+    );
+  }
+
   beforeAll(async () => {
     result = await createIntegrationApp({
       modules: [AppModule],
@@ -276,14 +289,7 @@ describe('Impersonation (integration)', () => {
     it('leaves expired and ended sessions out of activeOnly', async () => {
       const live = await impersonate(teacher.userId);
       const expired = await impersonate(teacher.userId);
-      // One clock read: two would drift a millisecond past chk_max_duration.
-      const expiresAt = new Date(Date.now() - 60 * 60 * 1000);
-      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
-        tx
-          .update(impersonationSessions)
-          .set({ startedAt: new Date(expiresAt.getTime() - 60 * 60 * 1000), expiresAt })
-          .where(eq(impersonationSessions.id, expired.claims.impersonationSessionId)),
-      );
+      await expireNow(expired.claims.impersonationSessionId);
 
       const list = await gqlRequest(result.httpServer, {
         query: `query { adminImpersonationSessions(activeOnly: true, first: 100) { id status } }`,
@@ -308,13 +314,7 @@ describe('Impersonation (integration)', () => {
     it('closes an overdue session as expired and records one impersonation_end', async () => {
       const { claims } = await impersonate(teacher.userId);
       const sessionId = claims.impersonationSessionId;
-      const expiresAt = new Date(Date.now() - 60 * 60 * 1000);
-      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
-        tx
-          .update(impersonationSessions)
-          .set({ startedAt: new Date(expiresAt.getTime() - 60 * 60 * 1000), expiresAt })
-          .where(eq(impersonationSessions.id, sessionId)),
-      );
+      await expireNow(sessionId);
       const service = result.module.get(ImpersonationService);
 
       await service.expireOverdueSessions();
