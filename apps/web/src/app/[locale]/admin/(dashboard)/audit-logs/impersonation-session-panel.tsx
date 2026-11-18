@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useRoleName } from '@web/hooks/use-role-name';
 import { useTranslations } from 'next-intl';
 import { useAuditLogs } from './use-audit-logs';
 import { useImpersonationSessions } from './use-impersonation-sessions';
@@ -41,6 +42,7 @@ export function ImpersonationSessionPanel({
   const t = useTranslations('auditLogs');
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
+  const roleName = useRoleName();
 
   const { sessions, loading } = useImpersonationSessions(
     sessionId ? { sessionId } : { sessionId: undefined },
@@ -89,7 +91,7 @@ export function ImpersonationSessionPanel({
                 <Field label={t('session.impersonator')} value={session.impersonatorName} />
                 <Field
                   label={t('session.impersonatorRole')}
-                  value={session.impersonatorRole ? resolveI18n(session.impersonatorRole) : '—'}
+                  value={session.impersonatorRole ? roleName(session.impersonatorRole) : '—'}
                 />
                 <Field label={t('session.targetUser')} value={session.targetUserName} />
                 <Field

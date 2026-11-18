@@ -46,6 +46,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `metrics/StatusGrid` — responsive 1→6 column grid for `ServiceCard`s with a skeleton state (`loading`, `skeletonCount`, `aria-busy`).
 - `metrics/Sparkline` — tiny Recharts line (loaded client-side only via `next/dynamic`) with an accessible `label`; renders `emptyText` (`—`) for null/empty data.
 - `impersonation/ImpersonateUserDialog` — start an impersonation from any portal: reason (≥10 characters), the approval-code step when the server asks for it, then opens the institute portal on `/auth/impersonate`. The caller passes its scope's start and verify mutations. `impersonation/ViewAsButton` wraps it for intra-institute "View as" (gated by `impersonate User`); `impersonation/ImpersonationBanner` is the banner and ended notice in the impersonated tab.
+- `useRoleName()` (`@web/hooks/use-role-name`) — display name for any role. System roles store their key as the name (`class_teacher`, matched by the server), so they get a translated label from the `roles` namespace; a role an institute named itself is shown as written. Use it wherever a role name is shown, never `useI18nField()` on a role name.
 
 ## Shared Libraries
 

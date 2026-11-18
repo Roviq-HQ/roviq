@@ -5,6 +5,7 @@ import { isAppError, resolveAuthErrorMessage, sanitizeReturnUrl, useAuth } from 
 import { useI18nField } from '@roviq/i18n';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
+import { useRoleName } from '@web/hooks/use-role-name';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -15,6 +16,7 @@ export default function SelectInstitutePage() {
   const t = useTranslations('selectInstitute');
   const errorLabels = useAuthErrorLabels();
   const ti = useI18nField();
+  const roleName = useRoleName();
   const { memberships, needsInstituteSelection, isAuthenticated, isLoading, selectInstitute } =
     useAuth();
   const router = useRouter();
@@ -112,7 +114,7 @@ export default function SelectInstitutePage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium">{ti(membership.instituteName)}</div>
                     <div className="text-muted-foreground text-xs">
-                      {t('role')}: {ti(membership.roleName)}
+                      {t('role')}: {roleName(membership.roleName)}
                     </div>
                   </div>
                   {selecting === membership.membershipId && (

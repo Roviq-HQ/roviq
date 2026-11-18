@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { ImpersonateUserDialog } from '@web/components/impersonation/impersonate-user-dialog';
+import { useRoleName } from '@web/hooks/use-role-name';
 import { Eye, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -122,6 +123,7 @@ export function InstituteUsersTab({
   const t = useTranslations('adminInstitutes.users');
   const tImp = useTranslations('impersonation');
   const resolveI18n = useI18nField();
+  const roleName = useRoleName();
   const [target, setTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [startMutation] = useMutation(AdminImpersonateStartDocument);
   const [verifyMutation] = useMutation(AdminImpersonateVerifyOtpDocument);
@@ -212,7 +214,7 @@ export function InstituteUsersTab({
                     <div className="flex flex-wrap gap-1">
                       {membershipsInInstitute.map((m) => (
                         <Badge key={m.id} variant="outline" className="text-xs">
-                          {resolveI18n(m.roleName)}
+                          {roleName(m.roleName)}
                         </Badge>
                       ))}
                     </div>

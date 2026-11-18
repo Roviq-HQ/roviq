@@ -6,6 +6,7 @@ import { useI18nField } from '@roviq/i18n';
 import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
 import { ImpersonationBanner } from '@web/components/impersonation/impersonation-banner';
+import { useRoleName } from '@web/hooks/use-role-name';
 import {
   Award,
   BarChart3,
@@ -44,6 +45,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const tCommon = useTranslations('common');
   const { logout, user, memberships, switchInstitute } = useAuth();
   const ti = useI18nField();
+  const roleName = useRoleName();
 
   usePushNotifications();
 
@@ -72,7 +74,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             instituteName: ti(m.instituteName),
             instituteSlug: m.instituteSlug,
             instituteLogoUrl: m.instituteLogoUrl,
-            roleName: ti(m.roleName),
+            roleName: roleName(m.roleName),
           })),
           onSwitch: (tenantId: string) => {
             const target = memberships?.find((m) => m.tenantId === tenantId);
