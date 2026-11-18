@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useRoleName } from '@web/hooks/use-role-name';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -31,6 +32,7 @@ export function MembershipsTab({ user }: { user: UserDetail }) {
   const t = useTranslations('adminUsers.memberships');
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
+  const roleName = useRoleName();
   const date = (d: string) => format(new Date(d), 'dd/MM/yyyy');
   const activeLabel = (isActive: boolean) => (isActive ? t('active') : t('inactive'));
   const hasAny =
@@ -72,7 +74,7 @@ export function MembershipsTab({ user }: { user: UserDetail }) {
                     <TableCell className="font-medium">
                       {resolveI18n(m.instituteName) || '—'}
                     </TableCell>
-                    <TableCell>{resolveI18n(m.roleName) || '—'}</TableCell>
+                    <TableCell>{roleName(m.roleName) || '—'}</TableCell>
                     <TableCell>
                       <Badge variant={MEMBERSHIP_STATUS_VARIANT[m.status]}>
                         {t(`statuses.${m.status}`)}
@@ -124,7 +126,7 @@ export function MembershipsTab({ user }: { user: UserDetail }) {
                         {m.resellerName}
                       </Link>
                     </TableCell>
-                    <TableCell>{resolveI18n(m.roleName) || '—'}</TableCell>
+                    <TableCell>{roleName(m.roleName) || '—'}</TableCell>
                     <TableCell>
                       <Badge variant={m.isActive ? 'default' : 'outline'}>
                         {activeLabel(m.isActive)}
@@ -145,9 +147,7 @@ export function MembershipsTab({ user }: { user: UserDetail }) {
             <CardTitle>{t('platform')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="font-medium">
-              {resolveI18n(user.platformMembership.roleName) || '—'}
-            </span>
+            <span className="font-medium">{roleName(user.platformMembership.roleName) || '—'}</span>
             <Badge variant={user.platformMembership.isActive ? 'default' : 'outline'}>
               {activeLabel(user.platformMembership.isActive)}
             </Badge>
