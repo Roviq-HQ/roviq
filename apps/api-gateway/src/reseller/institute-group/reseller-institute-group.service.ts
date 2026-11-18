@@ -6,13 +6,19 @@ import { InstituteGroupService } from '../../institute/institute-group/institute
 export class ResellerInstituteGroupService {
   constructor(private readonly groupService: InstituteGroupService) {}
 
-  async create(input: CreateInstituteGroupInput) {
-    return this.groupService.create(input);
+  async create(resellerId: string, input: CreateInstituteGroupInput) {
+    return this.groupService.create(input, resellerId);
   }
 
-  async list() {
-    // RLS via roviq_reseller policy scopes to groups containing their institutes
-    // Includes institute count per group
-    return this.groupService.searchWithInstituteCounts({});
+  async list(resellerId: string) {
+    return this.groupService.searchForReseller(resellerId, {});
+  }
+
+  async addInstitute(resellerId: string, instituteId: string, groupId: string) {
+    return this.groupService.addInstituteToGroupForReseller(resellerId, instituteId, groupId);
+  }
+
+  async removeInstitute(resellerId: string, instituteId: string) {
+    return this.groupService.removeInstituteFromGroupForReseller(resellerId, instituteId);
   }
 }

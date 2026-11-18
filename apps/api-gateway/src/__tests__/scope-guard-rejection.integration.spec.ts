@@ -235,8 +235,8 @@ const INSTITUTE_OPS: readonly Op[] = [
   },
   // InstituteResolver
   {
-    name: 'institutes',
-    query: 'query { institutes { totalCount } }',
+    name: 'myInstitute',
+    query: 'query { myInstitute { id } }',
   },
   // AcademicYearResolver
   {
@@ -250,8 +250,8 @@ const INSTITUTE_OPS: readonly Op[] = [
   },
   // InstituteGroupResolver
   {
-    name: 'instituteGroups',
-    query: 'query { instituteGroups { totalCount } }',
+    name: 'myGroups',
+    query: 'query { myGroups { id } }',
   },
   // InstituteAuditResolver — institute-scoped @Query
   {

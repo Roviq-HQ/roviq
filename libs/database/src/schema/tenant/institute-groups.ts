@@ -1,9 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, jsonb, pgPolicy, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  foreignKey,
+  index,
+  jsonb,
+  pgPolicy,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { entityColumns } from '../common/columns';
 import { groupStatus, groupType } from '../common/enums';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
+import { resellers } from '../reseller/resellers';
 import type { InstituteAddress, InstituteContact } from './institutes';
 
 export const instituteGroups = pgTable(
@@ -18,9 +28,12 @@ export const instituteGroups = pgTable(
     contact: jsonb().$type<InstituteContact>().default({ phones: [], emails: [] }).notNull(),
     address: jsonb().$type<InstituteAddress>(),
     status: groupStatus().default('ACTIVE').notNull(),
+    /** Owning reseller; null for groups managed by the platform. */
+    resellerId: uuid('reseller_id').references(() => resellers.id),
     ...entityColumns,
   },
   (table) => [
+    index('institute_groups_reseller_id_idx').on(table.resellerId),
     uniqueIndex('institute_groups_code_key').on(table.code).where(sql`${table.deletedAt} IS NULL`),
 
     // FK: createdBy → users.id (from entityColumns)
@@ -42,15 +55,16 @@ export const instituteGroups = pgTable(
       withCheck: sql`true`,
     }),
 
-    // roviq_reseller: read groups containing their institutes
+    // roviq_reseller: read groups they own or that contain their institutes
     pgPolicy('institute_groups_reseller_read', {
       for: 'select',
       to: roviqReseller,
-      using: sql`id IN (
-        SELECT group_id FROM institutes
-        WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid
-          AND group_id IS NOT NULL
-      )`,
+      using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid
+        OR id IN (
+          SELECT group_id FROM institutes
+          WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid
+            AND group_id IS NOT NULL
+        )`,
     }),
 
     // roviq_app: read own institute's group

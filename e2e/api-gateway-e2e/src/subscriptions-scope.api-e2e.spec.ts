@@ -101,11 +101,10 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
       );
       if (cur.data?.myInstitute) {
         await gql(
-          `mutation ($id: ID!, $input: UpdateInstituteInfoInput!) {
-            updateInstituteInfo(id: $id, input: $input) { id }
+          `mutation ($input: UpdateInstituteInfoInput!) {
+            updateInstituteInfo(input: $input) { id }
           }`,
           {
-            id: instituteId,
             input: { version: cur.data.myInstitute.version, code: originalCode ?? undefined },
           },
           instituteToken,
@@ -142,10 +141,10 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
       await wait(WS_REGISTRATION_DELAY_MS);
 
       const res = await gql<Pick<Mutation, 'updateInstituteInfo'>>(
-        `mutation ($id: ID!, $input: UpdateInstituteInfoInput!) {
-          updateInstituteInfo(id: $id, input: $input) { id code version }
+        `mutation ($input: UpdateInstituteInfoInput!) {
+          updateInstituteInfo(input: $input) { id code version }
         }`,
-        { id: instituteId, input: { version: instituteVersion, code: newCode } },
+        { input: { version: instituteVersion, code: newCode } },
         instituteToken,
       );
       if (res.errors) {

@@ -10,8 +10,12 @@ import {
   institutes,
   institutesLive,
   mkAdminCtx,
+  mkInstituteCtx,
+  mkResellerCtx,
   softDelete,
   withAdmin,
+  withReseller,
+  withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, count, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
@@ -35,6 +39,7 @@ const groupColumns = {
   contact: instituteGroupsLive.contact,
   address: instituteGroupsLive.address,
   status: instituteGroupsLive.status,
+  resellerId: instituteGroupsLive.resellerId,
   version: instituteGroupsLive.version,
   createdBy: instituteGroupsLive.createdBy,
   createdAt: instituteGroupsLive.createdAt,
@@ -70,50 +75,18 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
   async search(
     params: InstituteGroupSearchParams,
   ): Promise<{ records: InstituteGroupRecord[]; total: number }> {
-    const { search, status, type, first = 20, after } = params;
+    return withAdmin(this.db, mkAdminCtx('repository:institute-group'), (tx) =>
+      searchGroups(tx, params),
+    );
+  }
 
-    return withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
-      const conditions: SQL[] = [];
-
-      if (status)
-        conditions.push(
-          eq(instituteGroupsLive.status, status as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'),
-        );
-      if (type) conditions.push(eq(instituteGroupsLive.type, type as GroupType));
-      if (search) {
-        const pattern = `%${search}%`;
-        const searchCondition = or(
-          ilike(instituteGroupsLive.name, pattern),
-          ilike(instituteGroupsLive.code, pattern),
-        );
-        if (searchCondition) conditions.push(searchCondition);
-      }
-
-      // Cursor pagination
-      if (after) {
-        const cursor = decodeCursor(after);
-        if (cursor.id) {
-          conditions.push(sql`${instituteGroupsLive.id} > ${cursor.id as string}`);
-        }
-      }
-
-      const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-      const [totalResult, records] = await Promise.all([
-        tx.select({ value: count() }).from(instituteGroupsLive).where(where),
-        tx
-          .select(groupColumns)
-          .from(instituteGroupsLive)
-          .where(where)
-          .orderBy(asc(instituteGroupsLive.createdAt))
-          .limit(first),
-      ]);
-
-      return {
-        records: records as InstituteGroupRecord[],
-        total: totalResult[0]?.value ?? 0,
-      };
-    });
+  async searchForReseller(
+    resellerId: string,
+    params: InstituteGroupSearchParams,
+  ): Promise<{ records: InstituteGroupRecord[]; total: number }> {
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:institute-group'), (tx) =>
+      searchGroups(tx, params),
+    );
   }
 
   async findById(id: string): Promise<InstituteGroupRecord | null> {
@@ -124,6 +97,17 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .where(eq(instituteGroupsLive.id, id));
       return (rows[0] as InstituteGroupRecord | undefined) ?? null;
     });
+  }
+
+  async findForTenant(tenantId: string): Promise<InstituteGroupRecord | null> {
+    return withTenant(
+      this.db,
+      mkInstituteCtx(tenantId, 'repository:institute-group'),
+      async (tx) => {
+        const rows = await tx.select(groupColumns).from(instituteGroupsLive).limit(1);
+        return (rows[0] as InstituteGroupRecord | undefined) ?? null;
+      },
+    );
   }
 
   async create(data: CreateInstituteGroupData): Promise<InstituteGroupRecord> {
@@ -141,6 +125,7 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
           contact: data.contact ?? { phones: [], emails: [] },
           address: data.address,
           status: 'ACTIVE',
+          resellerId: data.resellerId,
           createdBy: userId,
           updatedBy: userId,
         })
@@ -227,20 +212,106 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
 
   async countInstitutesByGroup(groupIds: string[]): Promise<Record<string, number>> {
     if (groupIds.length === 0) return {};
+    return withAdmin(this.db, mkAdminCtx('repository:institute-group'), (tx) =>
+      countInstitutes(tx, groupIds),
+    );
+  }
 
-    return withAdmin(this.db, mkAdminCtx('repository:institute-group'), async (tx) => {
-      const rows = await tx
-        .select({ groupId: institutesLive.groupId, count: count() })
-        .from(institutesLive)
-        .where(inArray(institutesLive.groupId, groupIds))
-        .groupBy(institutesLive.groupId);
+  async countInstitutesByGroupForReseller(
+    resellerId: string,
+    groupIds: string[],
+  ): Promise<Record<string, number>> {
+    if (groupIds.length === 0) return {};
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:institute-group'), (tx) =>
+      countInstitutes(tx, groupIds),
+    );
+  }
 
-      const result: Record<string, number> = {};
-      for (const row of rows) {
-        if (row.groupId) result[row.groupId] = row.count;
-      }
-      return result;
-    });
+  async addInstituteToGroupForReseller(
+    resellerId: string,
+    instituteId: string,
+    groupId: string,
+  ): Promise<void> {
+    await withReseller(
+      this.db,
+      mkResellerCtx(resellerId, 'repository:institute-group'),
+      async (tx) => {
+        const ownedGroups = tx
+          .select({ id: instituteGroupsLive.id })
+          .from(instituteGroupsLive)
+          .where(eq(instituteGroupsLive.resellerId, resellerId));
+
+        const [group] = await tx
+          .select({ id: instituteGroupsLive.id })
+          .from(instituteGroupsLive)
+          .where(
+            and(
+              eq(instituteGroupsLive.id, groupId),
+              eq(instituteGroupsLive.resellerId, resellerId),
+            ),
+          );
+        if (!group) {
+          throw new BusinessException(
+            ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
+            `Institute group ${groupId} not found`,
+          );
+        }
+
+        // RLS limits the update to the reseller's own institutes; an institute already in a
+        // group the reseller does not own stays where the platform put it.
+        const rows = await tx
+          .update(institutes)
+          .set({ groupId })
+          .where(
+            and(
+              eq(institutes.id, instituteId),
+              isNull(institutes.deletedAt),
+              or(isNull(institutes.groupId), inArray(institutes.groupId, ownedGroups)),
+            ),
+          )
+          .returning({ id: institutes.id });
+        if (rows.length === 0) {
+          throw new BusinessException(
+            ErrorCode.INSTITUTE_NOT_FOUND,
+            `Institute ${instituteId} not found`,
+          );
+        }
+      },
+    );
+  }
+
+  async removeInstituteFromGroupForReseller(
+    resellerId: string,
+    instituteId: string,
+  ): Promise<void> {
+    await withReseller(
+      this.db,
+      mkResellerCtx(resellerId, 'repository:institute-group'),
+      async (tx) => {
+        const ownedGroups = tx
+          .select({ id: instituteGroupsLive.id })
+          .from(instituteGroupsLive)
+          .where(eq(instituteGroupsLive.resellerId, resellerId));
+
+        const rows = await tx
+          .update(institutes)
+          .set({ groupId: null })
+          .where(
+            and(
+              eq(institutes.id, instituteId),
+              isNull(institutes.deletedAt),
+              inArray(institutes.groupId, ownedGroups),
+            ),
+          )
+          .returning({ id: institutes.id });
+        if (rows.length === 0) {
+          throw new BusinessException(
+            ErrorCode.INSTITUTE_NOT_FOUND,
+            `Institute ${instituteId} not found`,
+          );
+        }
+      },
+    );
   }
 
   async addInstituteToGroup(instituteId: string, groupId: string): Promise<void> {
@@ -334,4 +405,63 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
       return rows as GroupMembershipRecord[];
     });
   }
+}
+
+async function searchGroups(
+  tx: DrizzleDB,
+  params: InstituteGroupSearchParams,
+): Promise<{ records: InstituteGroupRecord[]; total: number }> {
+  const { search, status, type, first = 20, after } = params;
+  const conditions: SQL[] = [];
+
+  if (status)
+    conditions.push(eq(instituteGroupsLive.status, status as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'));
+  if (type) conditions.push(eq(instituteGroupsLive.type, type as GroupType));
+  if (search) {
+    const pattern = `%${search}%`;
+    const searchCondition = or(
+      ilike(instituteGroupsLive.name, pattern),
+      ilike(instituteGroupsLive.code, pattern),
+    );
+    if (searchCondition) conditions.push(searchCondition);
+  }
+
+  // Cursor pagination
+  if (after) {
+    const cursor = decodeCursor(after);
+    if (cursor.id) {
+      conditions.push(sql`${instituteGroupsLive.id} > ${cursor.id as string}`);
+    }
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [totalResult, records] = await Promise.all([
+    tx.select({ value: count() }).from(instituteGroupsLive).where(where),
+    tx
+      .select(groupColumns)
+      .from(instituteGroupsLive)
+      .where(where)
+      .orderBy(asc(instituteGroupsLive.createdAt))
+      .limit(first),
+  ]);
+
+  return {
+    records: records as InstituteGroupRecord[],
+    total: totalResult[0]?.value ?? 0,
+  };
+}
+
+async function countInstitutes(tx: DrizzleDB, groupIds: string[]): Promise<Record<string, number>> {
+  const rows = await tx
+    .select({ groupId: institutesLive.groupId, count: count() })
+    .from(institutesLive)
+    .where(inArray(institutesLive.groupId, groupIds))
+    .groupBy(institutesLive.groupId);
+
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.groupId) result[row.groupId] = row.count;
+  }
+  return result;
 }

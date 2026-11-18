@@ -438,9 +438,31 @@ const SELF_SERVICE_ABILITIES: AbilityRule[] = [
   { action: 'update', subject: 'User', conditions: { userId: '$user.sub' } },
 ];
 
+/** Institute actions no institute role may hold — they act on the tenant itself. */
+const PLATFORM_ONLY_INSTITUTE_ACTIONS: AppAction[] = [
+  'create',
+  'update',
+  'delete',
+  'restore',
+  'approve',
+  'reject',
+  'activate',
+  'deactivate',
+  'suspend',
+  'view_statistics',
+];
+
 export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
-  // ── 1. institute_admin — full control ──────────────────
-  institute_admin: [{ action: 'manage', subject: 'all' }],
+  // ── 1. institute_admin — full control of its own institute ──
+  // Institute lifecycle and institute groups are platform/reseller matters; later rules win.
+  institute_admin: [
+    { action: 'manage', subject: 'all' },
+    { action: 'manage', subject: 'InstituteGroup', inverted: true },
+    { action: 'read', subject: 'InstituteGroup' },
+    ...PLATFORM_ONLY_INSTITUTE_ACTIONS.map(
+      (action): AbilityRule => ({ action, subject: 'Institute', inverted: true }),
+    ),
+  ],
 
   // ── 2. principal — manages students, staff, sections; approves TCs ──
   principal: [

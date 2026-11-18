@@ -1,121 +1,36 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
+import { Query, Resolver } from '@nestjs/graphql';
+import {
+  assertTenantContext,
+  CurrentUser,
+  GqlAuthGuard,
+  InstituteScopeGuard,
+} from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
-import { CreateInstituteGroupInput } from './dto/create-institute-group.input';
-import { InstituteGroupFilterInput } from './dto/institute-group-filter.input';
-import { UpdateInstituteGroupInput } from './dto/update-institute-group.input';
 import { InstituteGroupService } from './institute-group.service';
 import { GroupMembershipModel } from './models/group-membership.model';
 import { InstituteGroupModel } from './models/institute-group.model';
-import { InstituteGroupConnection } from './models/institute-group-connection.model';
 
+// Group management is platform scope (AdminInstituteGroupResolver); an institute only reads its own.
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => InstituteGroupModel)
 export class InstituteGroupResolver {
   constructor(private readonly instituteGroupService: InstituteGroupService) {}
 
-  @Query(() => InstituteGroupConnection)
+  @Query(() => InstituteGroupModel, {
+    nullable: true,
+    description: "The group the caller's own institute belongs to, or null when it has none.",
+  })
   @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
-  async instituteGroups(
-    @Args('filter', { nullable: true }) filter?: InstituteGroupFilterInput,
-  ): Promise<InstanceType<typeof InstituteGroupConnection>> {
-    return this.instituteGroupService.search(filter ?? {});
-  }
-
-  @Query(() => InstituteGroupModel)
-  @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
-  async instituteGroup(@Args('id', { type: () => ID }) id: string): Promise<InstituteGroupModel> {
-    return this.instituteGroupService.findById(id);
+  async myInstituteGroup(@CurrentUser() user: AuthUser): Promise<InstituteGroupModel | null> {
+    assertTenantContext(user);
+    return this.instituteGroupService.findForTenant(user.tenantId);
   }
 
   @Query(() => [GroupMembershipModel])
   @CheckAbility({ action: 'read', subject: 'InstituteGroup' })
   async myGroups(@CurrentUser() user: AuthUser): Promise<GroupMembershipModel[]> {
     return this.instituteGroupService.findMyGroups(user.userId);
-  }
-
-  @Mutation(() => InstituteGroupModel)
-  @CheckAbility({ action: 'create', subject: 'InstituteGroup' })
-  async createInstituteGroup(
-    @Args('input') input: CreateInstituteGroupInput,
-  ): Promise<InstituteGroupModel> {
-    return this.instituteGroupService.create(input);
-  }
-
-  @Mutation(() => InstituteGroupModel)
-  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
-  async updateInstituteGroup(
-    @Args('id', { type: () => ID }) id: string,
-    @Args('input') input: UpdateInstituteGroupInput,
-  ): Promise<InstituteGroupModel> {
-    return this.instituteGroupService.update(id, input);
-  }
-
-  @Mutation(() => InstituteGroupModel)
-  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
-  async activateInstituteGroup(
-    @Args('id', { type: () => ID }) id: string,
-  ): Promise<InstituteGroupModel> {
-    return this.instituteGroupService.activate(id);
-  }
-
-  @Mutation(() => InstituteGroupModel)
-  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
-  async deactivateInstituteGroup(
-    @Args('id', { type: () => ID }) id: string,
-  ): Promise<InstituteGroupModel> {
-    return this.instituteGroupService.deactivate(id);
-  }
-
-  @Mutation(() => InstituteGroupModel)
-  @CheckAbility({ action: 'update', subject: 'InstituteGroup' })
-  async suspendInstituteGroup(
-    @Args('id', { type: () => ID }) id: string,
-  ): Promise<InstituteGroupModel> {
-    return this.instituteGroupService.suspend(id);
-  }
-
-  @Mutation(() => Boolean)
-  @CheckAbility({ action: 'delete', subject: 'InstituteGroup' })
-  async deleteInstituteGroup(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
-    return this.instituteGroupService.delete(id);
-  }
-
-  @Mutation(() => Boolean)
-  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
-  async addInstituteToGroup(
-    @Args('instituteId', { type: () => ID }) instituteId: string,
-    @Args('groupId', { type: () => ID }) groupId: string,
-  ): Promise<boolean> {
-    return this.instituteGroupService.addInstituteToGroup(instituteId, groupId);
-  }
-
-  @Mutation(() => Boolean)
-  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
-  async removeInstituteFromGroup(
-    @Args('instituteId', { type: () => ID }) instituteId: string,
-  ): Promise<boolean> {
-    return this.instituteGroupService.removeInstituteFromGroup(instituteId);
-  }
-
-  @Mutation(() => GroupMembershipModel)
-  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
-  async addGroupMember(
-    @Args('groupId', { type: () => ID }) groupId: string,
-    @Args('userId', { type: () => ID }) userId: string,
-    @Args('roleId', { type: () => ID }) roleId: string,
-  ): Promise<GroupMembershipModel> {
-    return this.instituteGroupService.addMember(groupId, userId, roleId);
-  }
-
-  @Mutation(() => Boolean)
-  @CheckAbility({ action: 'manage', subject: 'InstituteGroup' })
-  async removeGroupMember(
-    @Args('groupId', { type: () => ID }) groupId: string,
-    @Args('userId', { type: () => ID }) userId: string,
-  ): Promise<boolean> {
-    return this.instituteGroupService.removeMember(groupId, userId);
   }
 }

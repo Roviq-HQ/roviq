@@ -48,6 +48,12 @@ export class InstituteGroupModel {
   @Field(() => GroupStatus)
   status!: GroupStatus;
 
+  @Field(() => ID, {
+    nullable: true,
+    description: 'Reseller that owns and manages the group; null for a platform-managed group.',
+  })
+  resellerId?: string | null;
+
   @Field()
   createdBy!: string;
 

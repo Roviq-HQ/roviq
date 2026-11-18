@@ -66,13 +66,13 @@ describe('CASL @CheckAbility enforcement', () => {
   });
 
   describe('Positive admin path (false-positive guard)', () => {
-    it('admin (manage:all) can read institutes — guard does NOT reject', async () => {
+    it('admin (manage:all) can read its institute — guard does NOT reject', async () => {
       // Sanity check: a misconfigured AbilityGuard could reject every
       // request, making the negative tests below pass for the wrong
       // reason. Verify the admin token, which has manage:all on every
       // membership, is allowed through the guard for a known-good query.
       const response = await gqlRequest(result.httpServer, {
-        query: `query { institutes { totalCount } }`,
+        query: `query { myInstitute { id } }`,
         token: adminToken,
       });
       if (response.errors) {
@@ -116,23 +116,13 @@ describe('CASL @CheckAbility enforcement', () => {
     it('teacher cannot update institute info (no update_info:Institute ability)', async () => {
       const response = await gqlRequest(result.httpServer, {
         query: `
-          mutation UpdateInstituteInfo($id: ID!, $input: UpdateInstituteInfoInput!) {
-            updateInstituteInfo(id: $id, input: $input) { id }
+          mutation UpdateInstituteInfo($input: UpdateInstituteInfoInput!) {
+            updateInstituteInfo(input: $input) { id }
           }
         `,
         variables: {
-          id: FAKE_ID,
           input: { version: 1, name: { en: 'Hacked' } },
         },
-        token: teacherToken,
-      });
-      expect(response.errors).toBeDefined();
-      expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
-    });
-
-    it('teacher cannot delete an institute (no delete:Institute ability)', async () => {
-      const response = await gqlRequest(result.httpServer, {
-        query: `mutation { deleteInstitute(id: "${FAKE_ID}") }`,
         token: teacherToken,
       });
       expect(response.errors).toBeDefined();

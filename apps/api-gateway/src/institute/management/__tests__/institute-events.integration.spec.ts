@@ -55,8 +55,8 @@ async function waitForEvent<T>(channel: string, timeoutMs = 3_000): Promise<T> {
 }
 
 const UPDATE_INSTITUTE_INFO = /* GraphQL */ `
-  mutation UpdateInstituteInfo($id: ID!, $input: UpdateInstituteInfoInput!) {
-    updateInstituteInfo(id: $id, input: $input) {
+  mutation UpdateInstituteInfo($input: UpdateInstituteInfoInput!) {
+    updateInstituteInfo(input: $input) {
       id
     }
   }
@@ -102,7 +102,6 @@ describe('Institute management — domain events (integration)', () => {
       query: UPDATE_INSTITUTE_INFO,
       token: instituteToken,
       variables: {
-        id: tenantId,
         input: {
           version: 1,
           name: { en: 'Renamed Test Institute' },

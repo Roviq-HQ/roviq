@@ -112,6 +112,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/user/profile.service.ts',
   'apps/api-gateway/src/institute/notification-config/repositories/notification-config.drizzle-repository.ts',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts',
+  // ROV-290: isolated reseller/group fixtures and direct group-link assertions only.
+  'apps/api-gateway/src/reseller/institute-group/__tests__/reseller-institute-group.integration.spec.ts',
   'apps/api-gateway/src/reseller/team/reseller-team.service.ts',
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',

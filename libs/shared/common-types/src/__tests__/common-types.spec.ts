@@ -103,10 +103,12 @@ describe('DEFAULT_ROLE_ABILITIES with CASL', () => {
         adminAbility.can('read', subject),
         `institute_admin should read AppSubject.${subject}`,
       ).toBe(true);
+      // Institute groups are managed by the platform or a reseller (ROV-290).
+      const platformManaged = subject === AppSubject.InstituteGroup;
       expect(
         adminAbility.can('manage', subject),
-        `institute_admin should manage AppSubject.${subject}`,
-      ).toBe(true);
+        `institute_admin manage AppSubject.${subject}`,
+      ).toBe(!platformManaged);
     }
   });
 });

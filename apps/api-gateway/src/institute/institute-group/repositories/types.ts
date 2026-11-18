@@ -11,6 +11,8 @@ export interface InstituteGroupRecord {
   contact: InstituteContact;
   address: InstituteAddress | null;
   status: GroupStatus;
+  /** Owning reseller; null for platform-managed groups. */
+  resellerId: string | null;
   version: number;
   createdBy: string;
   createdAt: Date;
@@ -25,6 +27,7 @@ export interface CreateInstituteGroupData {
   registrationState?: string;
   contact?: InstituteContact;
   address?: InstituteAddress;
+  resellerId: string | null;
 }
 
 export interface UpdateInstituteGroupData {

@@ -1465,47 +1465,6 @@ input CreateInstituteGroupInput {
   type: GroupType!
 }
 
-"""
-Fields required to create a new institute. Slug must be globally unique.
-"""
-input CreateInstituteInput {
-  """Physical address of the institute."""
-  address: InstituteAddressInput
-  board: BoardType
-
-  """
-  Short internal code for the institute, e.g. "SAJ". Unique per reseller.
-  """
-  code: String
-
-  """Phone and email contact details."""
-  contact: InstituteContactInput
-
-  """Education levels offered, e.g. ["PRIMARY", "UPPER_PRIMARY"]."""
-  departments: [EducationLevel!]
-
-  """
-  Whether this is a demo/sandbox institute — excludes it from production reports.
-  """
-  isDemo: Boolean = false
-
-  """
-  Localised institute name, e.g. { en: "Sunrise Academy", hi: "सनराइज़ अकैडमी" }.
-  """
-  name: I18nText!
-
-  """
-  URL-safe slug — globally unique, lowercase alphanumerics and hyphens only, e.g. "sunrise-academy-jaipur".
-  """
-  slug: String!
-
-  """Academic structure — NEP 2020 (5+3+3+4 stages) or legacy 10+2."""
-  structureFramework: StructureFramework = TRADITIONAL
-
-  """Type of educational institution."""
-  type: InstituteType = SCHOOL
-}
-
 """Apply for a new leave. Submits in PENDING status awaiting approval."""
 input CreateLeaveInput {
   """Inclusive leave end date (ISO YYYY-MM-DD)."""
@@ -3008,6 +2967,11 @@ type InstituteGroupModel {
   name: String!
   registrationNumber: String
   registrationState: IndianState
+
+  """
+  Reseller that owns and manages the group; null for a platform-managed group.
+  """
+  resellerId: ID
   status: GroupStatus!
   type: GroupType!
   updatedAt: DateTime!
@@ -3447,14 +3411,10 @@ enum MinorityType {
 
 type Mutation {
   activateAcademicYear(id: ID!): AcademicYearModel!
-  activateInstitute(id: ID!): InstituteModel!
-  activateInstituteGroup(id: ID!): InstituteGroupModel!
 
   """Publish a timetable (DRAFT/INACTIVE → ACTIVE)."""
   activateTimetable(id: ID!): TimetableModel!
   addExamSchedule(input: CreateExamScheduleInput!): ExamScheduleModel!
-  addGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
-  addInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
   addTimetablePeriod(input: AddTimetablePeriodInput!): TimetablePeriodModel!
   addTimetableSection(sectionId: ID!, timetableId: ID!): TimetableSectionModel!
 
@@ -3462,6 +3422,9 @@ type Mutation {
   Activate institute (PENDING/INACTIVE/SUSPENDED → ACTIVE). Requires setup_status COMPLETED.
   """
   adminActivateInstitute(id: ID!): InstituteModel!
+  adminActivateInstituteGroup(id: ID!): InstituteGroupModel!
+  adminAddInstituteGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
+  adminAddInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
   adminApproveInstitute(id: ID!): InstituteModel!
 
   """Assign an institute to a group (franchise/trust)"""
@@ -3477,6 +3440,7 @@ type Mutation {
   """Create a new reseller + initial admin user attached to the tier role"""
   adminCreateReseller(input: AdminCreateResellerInput!): AdminResellerModel!
   adminDeactivateInstitute(id: ID!): InstituteModel!
+  adminDeactivateInstituteGroup(id: ID!): InstituteGroupModel!
   adminDeleteInstitute(id: ID!): Boolean!
   adminDeleteInstituteGroup(id: ID!): Boolean!
 
@@ -3491,9 +3455,11 @@ type Mutation {
   """Reassign an institute to a different active reseller"""
   adminReassignInstituteReseller(id: ID!, newResellerId: ID!): InstituteModel!
   adminRejectInstitute(id: ID!, reason: String!): InstituteModel!
+  adminRemoveInstituteFromGroup(instituteId: ID!): Boolean!
 
   """Remove an institute from its group (clears the group assignment)"""
   adminRemoveInstituteGroup(id: ID!): InstituteModel!
+  adminRemoveInstituteGroupMember(groupId: ID!, userId: ID!): Boolean!
 
   """Re-publish a dead-lettered message to its original subject"""
   adminReplayDlqMessage(id: ID!): DlqMessageModel!
@@ -3505,6 +3471,7 @@ type Mutation {
   adminRetryInstituteSetup(id: ID!): InstituteModel!
   adminStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
   adminSuspendInstitute(id: ID!, reason: String): InstituteModel!
+  adminSuspendInstituteGroup(id: ID!): InstituteGroupModel!
 
   """Suspend a reseller and revoke all staff sessions"""
   adminSuspendReseller(reason: String, resellerId: String!): Boolean!
@@ -3609,8 +3576,6 @@ type Mutation {
 
   """Publish a new holiday or break."""
   createHoliday(input: CreateHolidayInput!): HolidayModel!
-  createInstitute(input: CreateInstituteInput!): InstituteModel!
-  createInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
   createReportCard(input: CreateReportCardInput!): ReportCardModel!
 
   """
@@ -3638,8 +3603,6 @@ type Mutation {
   Add a per-date override (substitution, cancellation, room/subject change, extra).
   """
   createTimetableDayOverride(input: CreateTimetableDayOverrideInput!): TimetableDayOverrideModel!
-  deactivateInstitute(id: ID!): InstituteModel!
-  deactivateInstituteGroup(id: ID!): InstituteGroupModel!
 
   """Retire the active timetable (ACTIVE → INACTIVE)."""
   deactivateTimetable(id: ID!): TimetableModel!
@@ -3664,8 +3627,6 @@ type Mutation {
 
   """Soft-delete a holiday."""
   deleteHoliday(id: ID!): Boolean!
-  deleteInstitute(id: ID!): Boolean!
-  deleteInstituteGroup(id: ID!): Boolean!
 
   """
   Soft-delete a leave application. Returns true on success. Mirrors `deleteHoliday`.
@@ -3765,7 +3726,6 @@ type Mutation {
 
   """Reject an application"""
   rejectApplication(id: ID!, reason: String): ApplicationModel!
-  rejectInstitute(id: ID!): InstituteModel!
 
   """Reject a PENDING leave."""
   rejectLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
@@ -3774,8 +3734,6 @@ type Mutation {
   rejectTC(id: ID!, reason: String!): TCModel!
   rejectUpiPayment(input: RejectUpiInput!): PaymentModel!
   removeExamSchedule(id: ID!): Boolean!
-  removeGroupMember(groupId: ID!, userId: ID!): Boolean!
-  removeInstituteFromGroup(instituteId: ID!): Boolean!
   removePasskey(passkeyId: String!): Boolean!
 
   """Remove the subject from a section (idempotent). Returns the subject."""
@@ -3797,6 +3755,11 @@ type Mutation {
 
   """Request a Transfer Certificate — starts TCIssuanceWorkflow"""
   requestTC(input: RequestTCInput!): TCModel!
+
+  """Links one of the reseller's institutes to a group the reseller owns."""
+  resellerAddInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
+
+  """Creates a group owned by the caller's reseller."""
   resellerCreateInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
   resellerCreateInstituteRequest(input: ResellerCreateInstituteRequestInput!): InstituteModel!
   resellerEndImpersonation(sessionId: String!): Boolean!
@@ -3807,6 +3770,11 @@ type Mutation {
   resellerInviteTeamMember(input: ResellerInviteTeamMemberInput!): ResellerInviteTeamMemberResult!
   resellerLogin(password: String!, username: String!): AuthPayload!
   resellerReactivateInstitute(id: ID!): InstituteModel!
+
+  """
+  Unlinks one of the reseller's institutes from a group the reseller owns.
+  """
+  resellerRemoveInstituteFromGroup(instituteId: ID!): Boolean!
 
   """
   Deactivate a team member's reseller-scope membership. The user account is preserved.
@@ -3822,7 +3790,6 @@ type Mutation {
 
   """Restore a soft-deleted guardian."""
   restoreGuardian(id: ID!): Boolean!
-  restoreInstitute(id: ID!): InstituteModel!
 
   """
   Restore an archived plan back to active. New subscriptions can be created against it again.
@@ -3858,8 +3825,6 @@ type Mutation {
   """
   setGroupMemberExcluded(excluded: Boolean!, groupId: ID!, memberId: ID!): GroupMemberModel!
   submitUpiProof(input: SubmitUpiProofInput!): PaymentModel!
-  suspendInstitute(id: ID!): InstituteModel!
-  suspendInstituteGroup(id: ID!): InstituteGroupModel!
   switchInstitute(currentRefreshToken: String!, membershipId: String!): AuthPayload!
 
   """
@@ -3896,8 +3861,7 @@ type Mutation {
   updateHoliday(id: ID!, input: UpdateHolidayInput!): HolidayModel!
   updateInstituteBranding(input: UpdateInstituteBrandingInput!): InstituteModel!
   updateInstituteConfig(input: UpdateInstituteConfigInput!): InstituteModel!
-  updateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
-  updateInstituteInfo(id: ID!, input: UpdateInstituteInfoInput!): InstituteModel!
+  updateInstituteInfo(input: UpdateInstituteInfoInput!): InstituteModel!
   updateInstituteLocales(input: UpdateInstituteLocalesInput!): InstituteModel!
 
   """Edit a PENDING leave before it is decided."""
@@ -4313,13 +4277,9 @@ type Query {
     """ISO YYYY-MM-DD date to look up."""
     date: String!
   ): [HolidayModel!]!
-  institute(id: ID!): InstituteModel!
-  instituteGroup(id: ID!): InstituteGroupModel!
-  instituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
 
   """List institute roles available for primary-nav customization."""
   instituteRoles: [Role!]!
-  institutes(filter: InstituteFilterInput): InstituteConnection!
   invoices(after: String, filter: BillingFilterInput, first: Int = 20, instituteId: ID): [InvoiceModel!]!
   leave(id: ID!): LeaveModel!
 
@@ -4403,6 +4363,11 @@ type Query {
   myConsentStatus: [ConsentStatus!]!
   myGroups: [GroupMembershipModel!]!
   myInstitute: InstituteModel!
+
+  """
+  The group the caller's own institute belongs to, or null when it has none.
+  """
+  myInstituteGroup: InstituteGroupModel
   myInvoice(id: ID!): InvoiceModel
   myInvoices(after: String, filter: BillingFilterInput, first: Int = 20): [InvoiceModel!]!
   myPasskeys: [PasskeyInfo!]!
@@ -4444,6 +4409,10 @@ type Query {
   resellerGetInstitute(id: ID!): InstituteModel!
   resellerImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   resellerInstituteStatistics: InstituteStatisticsModel!
+
+  """
+  Groups the reseller owns or that contain its institutes; counts cover only its own institutes.
+  """
   resellerListInstituteGroups: InstituteGroupConnection!
   resellerListInstitutes(filter: InstituteFilterInput): InstituteConnection!
 

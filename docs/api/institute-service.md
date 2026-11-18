@@ -17,6 +17,10 @@
 | `adminCreateInstituteGroup(input)` | `create:InstituteGroup` | `CreateInstituteGroupInput` | `InstituteGroupModel` |
 | `adminUpdateInstituteGroup(id, input)` | `update:InstituteGroup` | ID + `UpdateInstituteGroupInput` | `InstituteGroupModel` |
 | `adminDeleteInstituteGroup(id)` | `delete:InstituteGroup` | ID | `Boolean` |
+| `adminActivateInstituteGroup(id)` / `adminDeactivateInstituteGroup(id)` / `adminSuspendInstituteGroup(id)` | `update:InstituteGroup` | ID | `InstituteGroupModel` |
+| `adminAddInstituteToGroup(instituteId, groupId)` / `adminRemoveInstituteFromGroup(instituteId)` | `manage:InstituteGroup` | IDs | `Boolean` |
+| `adminAddInstituteGroupMember(groupId, userId, roleId)` | `manage:InstituteGroup` | IDs | `GroupMembershipModel` |
+| `adminRemoveInstituteGroupMember(groupId, userId)` | `manage:InstituteGroup` | IDs | `Boolean` |
 
 ### Queries
 
@@ -45,7 +49,8 @@
 | `resellerCreateInstituteRequest(input)` | `create:Institute` | full_management | `InstituteModel` |
 | `resellerSuspendInstitute(id, reason?)` | `suspend:Institute` | full_management | `InstituteModel` |
 | `resellerReactivateInstitute(id)` | `activate:Institute` | full_management | `InstituteModel` |
-| `resellerCreateInstituteGroup(input)` | `create:InstituteGroup` | full_management | `JSON` |
+| `resellerCreateInstituteGroup(input)` | `create:InstituteGroup` | full_management | `InstituteGroupModel` (owned by the caller's reseller) |
+| `resellerAddInstituteToGroup(instituteId, groupId)` / `resellerRemoveInstituteFromGroup(instituteId)` | `manage:InstituteGroup` | full_management | `Boolean` — own institutes into own groups only |
 
 ### Queries
 
@@ -54,7 +59,7 @@
 | `resellerListInstitutes(filter?)` | `read:Institute` | `InstituteConnection` |
 | `resellerGetInstitute(id)` | `read:Institute` | `InstituteModel` |
 | `resellerInstituteStatistics` | `view_statistics:Institute` | `JSON` |
-| `resellerListInstituteGroups` | `read:InstituteGroup` | `[JSON]` |
+| `resellerListInstituteGroups` | `read:InstituteGroup` | `InstituteGroupConnection` — groups the reseller owns or that contain its institutes; `instituteCount` counts only its own |
 
 ### Subscriptions
 
@@ -67,20 +72,15 @@
 
 ## Institute Scope
 
+Every operation here acts on the caller's own institute (the tenant in the token). Institute lifecycle and institute-group management are platform or reseller operations and are not exposed in this scope (ROV-290).
+
 ### Mutations
 
 | Mutation | CASL | Returns |
 |----------|------|---------|
-| `updateInstituteInfo(id, input)` | `update_info:Institute` | `InstituteModel` |
+| `updateInstituteInfo(input)` | `update_info:Institute` | `InstituteModel` |
 | `updateInstituteBranding(input)` | `update_branding:Institute` | `InstituteModel` |
 | `updateInstituteConfig(input)` | `update_config:Institute` | `InstituteModel` |
-| `createInstitute(input)` | `create:Institute` | `InstituteModel` |
-| `activateInstitute(id)` | `activate:Institute` | `InstituteModel` |
-| `deactivateInstitute(id)` | `deactivate:Institute` | `InstituteModel` |
-| `suspendInstitute(id)` | `suspend:Institute` | `InstituteModel` |
-| `rejectInstitute(id)` | `reject:Institute` | `InstituteModel` |
-| `deleteInstitute(id)` | `delete:Institute` | `Boolean` |
-| `restoreInstitute(id)` | `restore:Institute` | `InstituteModel` |
 | `createAcademicYear(input)` | `create:AcademicYear` | `AcademicYearModel` |
 | `updateAcademicYear(id, input)` | `update:AcademicYear` | `AcademicYearModel` |
 | `activateAcademicYear(id)` | `activate:AcademicYear` | `AcademicYearModel` |
@@ -105,8 +105,7 @@
 | Query | CASL | Returns |
 |-------|------|---------|
 | `myInstitute` | `read:Institute` | `InstituteModel` (with branding/config/identifiers/affiliations via @ResolveField) |
-| `institutes(filter?)` | `read:Institute` | `InstituteConnection` |
-| `institute(id)` | `read:Institute` | `InstituteModel` |
+| `myInstituteGroup` | `read:InstituteGroup` | `InstituteGroupModel?` — the group the caller's institute belongs to |
 | `academicYears` | `read:AcademicYear` | `[AcademicYearModel]` |
 | `activeAcademicYear` | `read:AcademicYear` | `AcademicYearModel?` |
 | `standards(academicYearId)` | `read:Standard` | `[StandardModel]` |

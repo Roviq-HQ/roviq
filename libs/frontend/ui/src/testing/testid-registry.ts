@@ -211,6 +211,15 @@ export const testIds = {
     instituteFilter: 'reseller-audit-institute-filter',
   },
 
+  // ── Reseller: institute groups page (ROV-290) ─────────────────────────
+  resellerGroups: {
+    row: (id: string) => `reseller-group-row-${id}`,
+    addInstituteBtn: (id: string) => `reseller-group-add-institute-${id}`,
+    addInstituteDialog: 'reseller-group-add-institute-dialog',
+    addInstituteSelect: 'reseller-group-add-institute-select',
+    addInstituteSubmit: 'reseller-group-add-institute-submit',
+  },
+
   // ── Reseller: impersonation sessions page (ROV-144) ───────────────────
   resellerImpersonation: {
     page: 'reseller-impersonation-page',
