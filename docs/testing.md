@@ -60,6 +60,40 @@ The local gate health-checks long-running infrastructure first, then waits for t
 - The UI job starts the stack in the background and installs Playwright browsers and runs codegen meanwhile; `Wait for E2E stack` prints the start-up log and fails the job if start-up failed.
 - Playwright uses its default worker count everywhere (half the logical cores: 2 on a 4-vCPU GitHub runner). Tests must stay safe under `fullyParallel`.
 
+## Security invariants
+
+The auth invariants from Auth PRD v3.0 Section 21 (ROV-102). Each row names the test that proves it. A test counts only if it exercises the layer that enforces the invariant: a database test for roles, GRANTs and RLS, and a test through the running API for anything the application enforces. A test that writes a row and reads it back proves nothing and does not belong here.
+
+`DB` = `libs/database/src/__tests__/security-invariants.integration.spec.ts`, `E2E` = `e2e/api-gateway-e2e/src/security-invariants.api-e2e.spec.ts`.
+
+| # | Invariant | Proven by |
+|---|---|---|
+| 1 | `roviq_pooler` cannot query without `SET LOCAL ROLE` | DB, test 1 |
+| 2 | `roviq_app` cannot read `platform_memberships` | DB, test 2 |
+| 3 | `roviq_app` cannot read `reseller_memberships` | DB, test 3 |
+| 4 | `roviq_reseller` cannot read another reseller's institutes | DB, test 4 |
+| 5 | `roviq_reseller` cannot write to tenant tables | DB, test 5 |
+| 6 | `roviq_admin` sees all data | DB, test 6 |
+| 7 | An impersonation token cannot be refreshed | E2E, sections 7 and 8 (no `refreshToken` field; the token is refused by `refreshToken`) |
+| 8 | A revoked impersonation session rejects requests | E2E, section 8; `impersonation.integration.spec.ts` |
+| 9 | Reseller suspension revokes all staff sessions | `reseller-suspension.integration.spec.ts` |
+| 10 | Reseller suspension ends active impersonations | `reseller-suspension.integration.spec.ts` |
+| 11 | A password change invalidates all sessions | `e2e/api-gateway-e2e/src/password-change.api-e2e.spec.ts` |
+| 12 | A wrong portal is indistinguishable from a wrong password | E2E, section 12 |
+| 13 | Cross-tenant data isolation | DB, test 13 |
+| 14 | A one-time impersonation code cannot be reused | E2E, section 14 |
+| 15 | Intra-institute impersonation respects the role hierarchy | E2E, section 15; `impersonation.integration.spec.ts` → "intra-institute" |
+| 16 | Switching institute revokes the previous refresh token | E2E, section 16 |
+| 17 | A reseller cannot delete institutes | E2E, section 17; `libs/database/src/__tests__/reseller-system-roles.spec.ts` |
+| 18 | The system reseller cannot be suspended or deleted | E2E, section 18 |
+| 19 | A ws-ticket is single-use and expires | E2E, section 19; `apps/api-gateway/src/auth/__tests__/ws-ticket.store.spec.ts` (30-second TTL) |
+| 20 | `revokeAllOtherSessions` keeps the current session | E2E, section 20 |
+| 21 | `selectInstitute` needs a valid selection token | E2E, section 21 |
+
+The E2E sections keep the numbering used when the suite was first written, which is one higher than the issue's from 16 on; the table follows the E2E numbers.
+
+CI runs the database and session specs as the named step **Auth Security Invariants** in the `test` job, before the full integration suite. The E2E spec runs in the `e2e-api` job.
+
 ## Docker Compose Files
 
 Compose files live under `docker/` and are selected explicitly per use case — this project does not use named `--profile` flags.

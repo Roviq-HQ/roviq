@@ -1,14 +1,13 @@
 /**
- * Security invariant integration tests (ROV-102).
+ * Security invariants at the database level (ROV-102): roles, GRANTs and RLS
+ * policies, checked against a real PostgreSQL by assuming each role in turn.
  *
- * These tests run against a real PostgreSQL instance with the actual roles,
- * GRANTs, and RLS policies from Phase 1. They verify every security invariant
- * holds at the database level.
- *
- * Setup: requires a running postgres with all roles (roviq_pooler, roviq_app,
- * roviq_reseller, roviq_admin) and schema pushed via db:push + FORCE RLS.
- *
- * Run: pnpm nx test database --testPathPattern=security-invariants
+ * Only invariants the database itself enforces belong here. An invariant the
+ * application enforces (token refresh, session revocation, portal checks) must
+ * be tested through the application: a test that writes a row and reads it back
+ * passes whether or not the application is correct. The full list of the
+ * invariants and the test that proves each is in docs/testing.md →
+ * "Security invariants".
  */
 import { ResellerTier } from '@roviq/common-types';
 import pg from 'pg';
@@ -168,134 +167,9 @@ describe('Role isolation', () => {
   });
 });
 
-// ── Token security (7-8) ──────────────────────────────────────
-
-describe('Token security', () => {
-  it('7. Impersonation tokens have no refresh token in DB', async () => {
-    // Impersonation tokens are issued without creating a refresh_token row.
-    // Verify: there are no refresh tokens with membership_scope that would
-    // indicate an impersonation session. The impersonation code exchange
-    // never calls issueTokens() — it generates an access-only JWT.
-    await asRole('roviq_admin', {}, async (client) => {
-      // All refresh tokens should have scope = platform|reseller|institute
-      const res = await client.query(
-        `SELECT * FROM refresh_tokens WHERE membership_scope NOT IN ('platform', 'reseller', 'institute')`,
-      );
-      expect(res.rows).toHaveLength(0);
-    });
-  });
-
-  it('8. Revoked impersonation session has ended_at set', async () => {
-    // When a session is revoked (e.g., reseller suspended), ended_at and
-    // ended_reason must be set. This is enforced by the suspension flow.
-    await asRole('roviq_admin', {}, async (client) => {
-      // Insert a test session and mark as revoked
-      const sessionId = 'ffffffff-0000-0000-0000-000000000001';
-      await client.query(
-        `INSERT INTO impersonation_sessions
-         (id, impersonator_id, impersonator_scope, target_user_id, target_tenant_id, reason, started_at, expires_at, ended_at, ended_reason)
-         VALUES ($1, $2, 'platform', $3, $4, 'Test reason for security', now(), now() + interval '1 hour', now(), 'revoked')`,
-        [sessionId, SEED.USER_ADMIN, SEED.USER_TEACHER, SEED.INSTITUTE_1],
-      );
-
-      const res = await client.query(
-        'SELECT ended_at, ended_reason FROM impersonation_sessions WHERE id = $1',
-        [sessionId],
-      );
-      expect(res.rows[0].ended_at).not.toBeNull();
-      expect(res.rows[0].ended_reason).toBe('revoked');
-    });
-  });
-});
-
-// ── Session management (9-11) ─────────────────────────────────
-
-describe('Session management', () => {
-  it('9. Reseller suspension can revoke all staff refresh tokens', async () => {
-    await asRole('roviq_admin', {}, async (client) => {
-      // Insert a test refresh token for a reseller staff member
-      const tokenId = 'ffffffff-0000-0000-0000-000000000010';
-      await client.query(
-        `INSERT INTO refresh_tokens (id, user_id, token_hash, membership_id, membership_scope, expires_at, created_by, updated_by)
-         VALUES ($1, $2, 'test-hash-9', $3, 'reseller', now() + interval '7 days', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
-        [tokenId, SEED.USER_ADMIN, SEED.ROLE_RESELLER_FULL_ADMIN],
-      );
-
-      // Simulate suspension: revoke all reseller-scope tokens
-      await client.query(
-        `UPDATE refresh_tokens SET revoked_at = now()
-         WHERE membership_scope = 'reseller' AND revoked_at IS NULL AND id = $1`,
-        [tokenId],
-      );
-
-      const res = await client.query('SELECT revoked_at FROM refresh_tokens WHERE id = $1', [
-        tokenId,
-      ]);
-      expect(res.rows[0].revoked_at).not.toBeNull();
-    });
-  });
-
-  it('10. Reseller suspension can terminate active impersonation sessions', async () => {
-    await asRole('roviq_admin', {}, async (client) => {
-      const sessionId = 'ffffffff-0000-0000-0000-000000000011';
-      await client.query(
-        `INSERT INTO impersonation_sessions
-         (id, impersonator_id, impersonator_scope, target_user_id, target_tenant_id, reason, started_at, expires_at)
-         VALUES ($1, $2, 'reseller', $3, $4, 'Reseller test impersonation', now(), now() + interval '1 hour')`,
-        [sessionId, SEED.USER_ADMIN, SEED.USER_TEACHER, SEED.INSTITUTE_1],
-      );
-
-      // Simulate suspension: terminate all active sessions
-      await client.query(
-        `UPDATE impersonation_sessions SET ended_at = now(), ended_reason = 'revoked'
-         WHERE id = $1 AND ended_at IS NULL`,
-        [sessionId],
-      );
-
-      const res = await client.query(
-        'SELECT ended_at, ended_reason FROM impersonation_sessions WHERE id = $1',
-        [sessionId],
-      );
-      expect(res.rows[0].ended_at).not.toBeNull();
-      expect(res.rows[0].ended_reason).toBe('revoked');
-    });
-  });
-
-  it('11. Password change timestamp can invalidate sessions', async () => {
-    await asRole('roviq_admin', {}, async (client) => {
-      // Insert a refresh token created BEFORE the password change
-      const tokenId = 'ffffffff-0000-0000-0000-000000000012';
-      const tokenCreatedAt = new Date(Date.now() - 60_000); // 1 min ago
-      const passwordChangedAt = new Date(); // now
-
-      await client.query(
-        `INSERT INTO refresh_tokens (id, user_id, token_hash, membership_id, membership_scope, expires_at, created_at, created_by, updated_by)
-         VALUES ($1, $2, 'test-hash-11', $3, 'institute', now() + interval '7 days', $4, '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')`,
-        [tokenId, SEED.USER_TEACHER, SEED.ROLE_PLATFORM_ADMIN, tokenCreatedAt],
-      );
-
-      // Verify: token was created before password change
-      const res = await client.query(`SELECT created_at FROM refresh_tokens WHERE id = $1`, [
-        tokenId,
-      ]);
-      expect(new Date(res.rows[0].created_at).getTime()).toBeLessThan(passwordChangedAt.getTime());
-    });
-  });
-});
-
 // ── Data isolation (12-13) ────────────────────────────────────
 
 describe('Data isolation', () => {
-  it('12. Wrong portal returns no data (role-based isolation)', async () => {
-    // Platform admin user has no institute membership accessible via roviq_app
-    // if the tenant context doesn't match
-    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
-      await expect(client.query('SELECT * FROM platform_memberships')).rejects.toThrow(
-        /permission denied/,
-      );
-    });
-  });
-
   it('13. Cross-tenant data isolation', async () => {
     // Seed a test row via superuser (persistent, not rolled back)
     const testId = 'ffffffff-0000-0000-0000-000000000020';
@@ -390,40 +264,9 @@ describe('Impersonation security', () => {
   });
 });
 
-// ── Institute switching (16) ──────────────────────────────────
-
-describe('Institute switching', () => {
-  it('16. Refresh tokens track membership scope', async () => {
-    await asRole('roviq_admin', {}, async (client) => {
-      // Every refresh token must have a membership_scope
-      const res = await client.query(
-        `SELECT * FROM refresh_tokens WHERE membership_scope IS NULL OR membership_scope = ''`,
-      );
-      expect(res.rows).toHaveLength(0);
-
-      // membership_id is NOT NULL
-      const nullMembership = await client.query(
-        'SELECT * FROM refresh_tokens WHERE membership_id IS NULL',
-      );
-      expect(nullMembership.rows).toHaveLength(0);
-    });
-  });
-});
-
 // ── System protection (17-18) ─────────────────────────────────
 
 describe('System protection', () => {
-  it('17. System reseller cannot be deleted', async () => {
-    await asRole('roviq_admin', {}, async (client) => {
-      // Attempting to delete the system reseller should fail
-      // (enforced by application logic, but verify the is_system flag)
-      const res = await client.query('SELECT is_system FROM resellers WHERE id = $1', [
-        SEED.RESELLER_DIRECT,
-      ]);
-      expect(res.rows[0].is_system).toBe(true);
-    });
-  });
-
   it('18. Audit logs are immutable via roviq_app', async () => {
     // Insert via roviq_admin role (FORCE RLS requires a policy-matched role)
     const testId = 'ffffffff-0000-0000-0000-000000000030';

@@ -197,7 +197,14 @@ jobs:
       # Named gate so a CASL-to-SQL / RLS regression is visible before the full suite runs.
       - name: User & Groups Security Invariants
         run: pnpm vitest run --project integration apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts
-      - name: Security Invariant Tests (integration)
+      # Named gate (ROV-102): roles/RLS at the database, then session revocation through the app.
+      - name: Auth Security Invariants
+        run: >-
+          pnpm vitest run --project integration
+          libs/database/src/__tests__/security-invariants.integration.spec.ts
+          apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts
+          apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts
+      - name: Integration tests
         run: pnpm test:int
 
   build:
