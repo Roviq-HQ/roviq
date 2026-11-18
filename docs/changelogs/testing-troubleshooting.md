@@ -748,3 +748,8 @@ Seen once on PR #285 and not reproduced locally: the stream still held one messa
 ## 2026-11-18 — fixed: two Claude sessions in one checkout locked each other out of the Playwright MCP browser
 
 Playwright MCP keeps one persistent browser profile per workspace, and a profile can be open in one browser at a time. A second session in the same checkout got "profile in use" and lost about 15 minutes. `.claude/settings.json` now sets `PLAYWRIGHT_MCP_ISOLATED=true`, so each session's browser uses an in-memory profile. Logins do not survive a browser close. Takes effect in sessions started after the change; not yet confirmed with two live sessions.
+
+
+## 2026-11-18 — seen once, cause unknown: `switchers.e2e.spec.ts` "switching back to English restores /en/ URL" timed out in `ci:check`
+
+One uncached `ci:check` run in slot 2 (16 Playwright workers, three instances' stacks on the machine) failed this test: after `goto('/hi/dashboard')` and a click on the locale switcher, `locale-option-en` never appeared within 30 s. The page snapshot showed the English dashboard. The spec then passed 8 of 8 with `--repeat-each 8`, and the next full gate run passed. No backend restart was involved (the e2e gateway has no watcher). Not fixed. If it fails again, start from `dist/.playwright/e2e/test-output/…/error-context.md` and check whether `/hi/dashboard` was redirected to `/en`.
