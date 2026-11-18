@@ -88,6 +88,8 @@ export const ErrorCode = {
   INVALID_TIER: 'INVALID_TIER',
   /** Tier change attempted on a non-active reseller (must be unsuspended first) */
   TIER_CHANGE_REQUIRES_ACTIVE: 'TIER_CHANGE_REQUIRES_ACTIVE',
+  /** Initial reseller admin email is held by a deleted user, by several users, or is another user's Roviq ID */
+  RESELLER_ADMIN_EMAIL_UNAVAILABLE: 'RESELLER_ADMIN_EMAIL_UNAVAILABLE',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',
   /** Suspend attempted on a reseller that is already suspended */
@@ -368,6 +370,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   RESELLER_HAS_ACTIVE_INSTITUTES: HttpStatus.UNPROCESSABLE_ENTITY,
   INVALID_TIER: HttpStatus.BAD_REQUEST,
   TIER_CHANGE_REQUIRES_ACTIVE: HttpStatus.UNPROCESSABLE_ENTITY,
+  RESELLER_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
   INVALID_SLUG: HttpStatus.BAD_REQUEST,
   RESELLER_ALREADY_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,

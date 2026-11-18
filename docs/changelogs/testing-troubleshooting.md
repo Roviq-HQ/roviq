@@ -670,3 +670,17 @@ After `pnpm typecheck` (which runs `web:build`) ran while Tilt served `web`, eve
 The test read every membership twice inside one transaction, before and after the backfill, and compared the lists. At the default READ COMMITTED level each read sees rows other integration files commit in between, so parallel specs that create or delete test institutes changed the count (152 vs 154, 195 vs 196). The comparison now covers only the memberships of the two seeded institutes, which no other file commits to (`m0-schema-constraints` writes there only inside a rolled-back transaction), and the reads are ordered by id. A first attempt ran the transaction at REPEATABLE READ instead; that made the other tests in the file fail with serialization errors whenever a parallel spec updated a row their inserts reference, so it was dropped.
 
 **Verification:** with a second session committing and deleting memberships in a loop, the old version failed and the fixed one passed; the full integration suite passed afterwards.
+
+
+## 2026-11-18 — diagnosed: the e2e gateway container never rebuilds `dist/libs` after a library change (ROV-234)
+
+A cause of the "e2e gateway stays unhealthy" entry above. The container builds `dist/libs` once, in its start command (`nx run-many -t build -p api-gateway notification-service`), into the `.e2e/dist` volume; its watcher then recompiles only `apps/api-gateway`. After a change to `libs/database` (new `resellers` columns) and `libs/shared/common-types` (new error code), the watcher kept failing with `Property 'registrationNumber' does not exist` and `Property 'RESELLER_ADMIN_EMAIL_UNAVAILABLE' does not exist`, although the source compiled. `pnpm e2e:up` (`up -d --build --wait`) does not recreate a container that is already running, so it failed with `dependency api-gateway failed to start`. `scripts/e2e-compose.sh restart api-gateway` reruns the start command, rebuilds the libraries, and the stack comes up. Not fixed.
+
+
+## 2026-11-18 — fixed: Temporal held half of each Postgres's connections, so `ci:check` integration runs failed at random
+
+The pre-push gate failed twice in a row with `remaining connection slots are reserved for roles with the SUPERUSER attribute` and `sorry, too many clients already`, in a different set of integration files each run (`membership-rls-invariants`, `reseller-suspension`, `student-read-authorization`, `tenant-analytics`, …). `pg_stat_activity` showed 45–52 idle connections from `temporal` on both the dev and the e2e Postgres (100 allowed). `temporalio/auto-setup` runs frontend, history, matching and worker in one container; each opens its own pool, and the image defaults (`maxConns`/`maxIdleConns` 20/20 for the main database, 10/10 for visibility) keep every opened connection for up to an hour. With `ci:check` running integration and e2e at once, the forks ran out of slots. Same pressure as the 2026-11-18 ROV-96 sweeper entry.
+
+All three compose files now set `SQL_MAX_CONNS: 10`, `SQL_MAX_IDLE_CONNS: 2`, `SQL_VIS_MAX_CONNS: 5`, `SQL_VIS_MAX_IDLE_CONNS: 1` on `temporal`. After recreating the containers Temporal holds 12 connections per Postgres.
+
+**Verification:** see the `ci:check` run that follows this entry's commit.

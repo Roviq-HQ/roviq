@@ -16,7 +16,11 @@ import { AdminResellerService } from './admin-reseller.service';
 import { AdminCreateResellerInput } from './dto/admin-create-reseller.input';
 import { AdminListResellersFilterInput } from './dto/admin-list-resellers-filter.input';
 import { AdminUpdateResellerInput } from './dto/admin-update-reseller.input';
-import { AdminResellerConnection, AdminResellerModel } from './models/admin-reseller.model';
+import {
+  AdminResellerConnection,
+  AdminResellerModel,
+  AdminResellerTeamMemberModel,
+} from './models/admin-reseller.model';
 
 @UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => AdminResellerModel)
@@ -43,6 +47,14 @@ export class AdminResellerResolver {
     return this.resellerService.getById(id);
   }
 
+  @Query(() => [AdminResellerTeamMemberModel], {
+    description: 'Staff (reseller_memberships) of one reseller, read-only for platform admins',
+  })
+  @CheckAbility({ action: 'read', subject: 'Reseller' })
+  async adminListResellerTeam(@Args('resellerId', { type: () => ID }) resellerId: string) {
+    return this.resellerService.listTeam(resellerId);
+  }
+
   // ── Write ───────────────────────────────────────────────────
 
   @Mutation(() => AdminResellerModel, {
@@ -57,7 +69,8 @@ export class AdminResellerResolver {
   }
 
   @Mutation(() => AdminResellerModel, {
-    description: 'Update mutable reseller fields (name, branding, customDomain)',
+    description:
+      'Update reseller profile fields (name, branding, domain, registration, contact, address)',
   })
   @CheckAbility({ action: 'update', subject: 'Reseller' })
   async adminUpdateReseller(
@@ -83,7 +96,7 @@ export class AdminResellerResolver {
 
   // ── Lifecycle (ROV-97, preserved) ───────────────────────────
 
-  @Mutation(() => Boolean, {
+  @Mutation(() => AdminResellerModel, {
     description: 'Suspend a reseller and revoke all staff sessions',
   })
   @CheckAbility({ action: 'suspend', subject: 'Reseller' })
@@ -91,32 +104,26 @@ export class AdminResellerResolver {
     @Args('resellerId') resellerId: string,
     @CurrentUser() user: AuthUser,
     @Args('reason', { nullable: true }) reason?: string,
-  ): Promise<boolean> {
-    await this.resellerService.suspendReseller(resellerId, user.userId, reason);
-    return true;
+  ) {
+    return this.resellerService.suspendReseller(resellerId, user.userId, reason);
   }
 
-  @Mutation(() => Boolean, {
+  @Mutation(() => AdminResellerModel, {
     description: 'Unsuspend a previously suspended reseller (reactivates staff login)',
   })
   @CheckAbility({ action: 'update', subject: 'Reseller' })
   async adminUnsuspendReseller(
     @Args('resellerId') resellerId: string,
     @CurrentUser() user: AuthUser,
-  ): Promise<boolean> {
-    await this.resellerService.unsuspendReseller(resellerId, user.userId);
-    return true;
+  ) {
+    return this.resellerService.unsuspendReseller(resellerId, user.userId);
   }
 
-  @Mutation(() => Boolean, {
+  @Mutation(() => AdminResellerModel, {
     description: 'Delete a suspended reseller after 30-day grace period',
   })
   @CheckAbility({ action: 'delete', subject: 'Reseller' })
-  async adminDeleteReseller(
-    @Args('resellerId') resellerId: string,
-    @CurrentUser() user: AuthUser,
-  ): Promise<boolean> {
-    await this.resellerService.deleteReseller(resellerId, user.userId);
-    return true;
+  async adminDeleteReseller(@Args('resellerId') resellerId: string, @CurrentUser() user: AuthUser) {
+    return this.resellerService.deleteReseller(resellerId, user.userId);
   }
 }

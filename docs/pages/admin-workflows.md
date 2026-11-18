@@ -153,18 +153,22 @@ The tier controls what a reseller's staff can do with their assigned institutes.
 
 1. Click any reseller row to open its detail page.
 2. The breadcrumb shows the reseller name.
-3. The header shows status, tier, and system badges. A banner appears if the reseller is the system reseller (Roviq Direct) explaining its protections.
+3. The header shows status, tier, and system badges. A banner appears if the reseller is the system reseller (Roviq Direct) explaining its protections. Its Edit, Change Tier, Suspend and Delete buttons are shown disabled, with "System reseller cannot be modified" as the hover text.
 4. The detail page has five tabs:
-   - **Overview** -- identity fields, statistics (institute count, team size, creation/update timestamps), and branding preview.
-   - **Institutes** / **Team** / **Activity** / **Billing** -- placeholders reserved for a future release.
+   - **Overview** -- identity fields, statistics (institute count, team size, creation/update timestamps), business details (registration number and state, primary contact email and phone, registered address) and branding preview.
+   - **Institutes** -- the institutes assigned to this reseller, 20 at a time with **Load more**. **Reassign** on a row moves that institute to another active reseller.
+   - **Team** -- the reseller's staff with role, status, last sign-in and join date. Read-only: the reseller manages its own team from the reseller portal.
+   - **Activity** -- the audit trail of the reseller's own staff, of actions inside its institutes, and of platform actions on the reseller itself (create, edit, tier change, suspend, unsuspend, delete).
+   - **Billing** -- monthly recurring revenue, active subscriptions, 30-day churn and overdue invoices. Shown only when the billing edition is enabled.
 
 ### Editing a Reseller
 
 1. Open the reseller detail page.
 2. Click **Edit**.
-3. You can update **name**, **custom domain**, and **branding** (logo URL, favicon URL, primary/secondary colors).
+3. You can update **name**, **custom domain**, **registration number and state**, **contact** phones and emails, **registered address**, and **branding** (logo URL, favicon URL, primary/secondary colors). Clearing the custom domain, registration fields or the address's first line removes them.
 4. The **slug** is read-only and cannot be changed.
-5. Save to apply. If you leave all branding fields blank, existing server-side branding is preserved (submitting the edit does not clobber prior branding).
+5. Click **Save Changes**. If you leave all branding fields blank, existing branding is preserved.
+6. If another admin saved this reseller after you opened the dialog, the save is refused with a message, the page reloads the latest details, and you can review them and save again.
 
 ### Changing a Reseller's Tier
 
@@ -196,9 +200,9 @@ Suspension freezes a reseller's staff access. Their assigned institutes remain a
 
 Deletion is permanent and only permitted after a mandatory **30-day grace period** following suspension. This gives impacted institutes time to be reassigned.
 
-1. Open the detail page of a **SUSPENDED** reseller whose grace period has elapsed.
+1. Open the detail page of a **SUSPENDED** reseller whose grace period has elapsed. Before that, **Delete** is disabled and its hover text explains the 30-day rule.
 2. Click **Delete**.
-3. Confirm. Status changes to **DELETED** and the reseller is archived. Institutes previously assigned to this reseller must be reassigned separately.
+3. Confirm. Status changes to **DELETED**, its institutes move to Roviq Direct, and its staff memberships are removed.
 
 > The system reseller cannot be deleted.
 

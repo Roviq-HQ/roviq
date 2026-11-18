@@ -76,12 +76,21 @@
     "brandingPrimaryColor": "Primary Color",
     "brandingSecondaryColor": "Secondary Color",
     "noBranding": "No branding configured.",
-    "comingSoonTitle": "Coming soon",
-    "institutesPlaceholder": "Institutes assigned to this reseller will be listed here in a future release.",
-    "teamPlaceholder": "Reseller team members and role assignments will be shown here in a future release.",
-    "activityPlaceholder": "The reseller's audit trail will appear here in a future release.",
-    "billingPlaceholder": "Reseller billing summary and invoices will appear here in a future release.",
-    "notFound": "Reseller not found."
+    "notFound": "Reseller not found.",
+    "business": "Business details",
+    "contact": "Contact",
+    "address": "Registered address",
+    "fieldRegistrationNumber": "Registration number",
+    "fieldRegistrationState": "Registration state",
+    "fieldContactEmail": "Contact email",
+    "fieldContactPhone": "Contact phone",
+    "registrationNumberHint": "Company or business registration number, such as CIN or GSTIN.",
+    "registrationStatePlaceholder": "Select a state",
+    "customDomainHint": "Optional. Custom domains are not live yet; the value is saved for later.",
+    "contactHint": "How Roviq reaches this reseller about billing and support.",
+    "addressHint": "Leave the first line empty to keep no address on file.",
+    "systemLocked": "System reseller cannot be modified",
+    "tierNeedsActive": "Unsuspend the reseller before changing its tier"
   },
   "actions": {
     "edit": "Edit",
@@ -95,7 +104,7 @@
     "success": "Action completed successfully.",
     "error": "Action failed. Please try again.",
     "editTitle": "Edit Reseller",
-    "editDescription": "Update name, branding, or custom domain.",
+    "editDescription": "Update the name, business details, contact, address and branding.",
     "changeTierTitle": "Change Tier",
     "changeTierDescription": "Changing the tier updates all staff role permissions immediately on their next login.",
     "newTier": "New Tier",
@@ -116,7 +125,8 @@
     "tierSuccess": "Tier changed successfully.",
     "suspendSuccess": "Reseller suspended.",
     "unsuspendSuccess": "Reseller unsuspended.",
-    "deleteSuccess": "Reseller deleted."
+    "deleteSuccess": "Reseller deleted.",
+    "saveChanges": "Save Changes"
   },
   "create": {
     "title": "Create Reseller",
@@ -171,5 +181,76 @@
     "domainInvalid": "Please enter a valid fully qualified domain name.",
     "urlInvalid": "Please enter a valid URL (https://…).",
     "colorInvalid": "Please enter a valid hex color (e.g. #1677FF)."
+  },
+  "institutes": {
+    "title": "{count, plural, one {# institute} other {# institutes}}",
+    "emptyTitle": "No institutes yet",
+    "emptyDescription": "Institutes assigned to this reseller will appear here.",
+    "showing": "Showing {shown} of {total}",
+    "loadMore": "Load more",
+    "reassign": "Reassign",
+    "reassignHint": "Move this institute to another reseller",
+    "reassignTitle": "Reassign {name}",
+    "reassignDescription": "The institute moves to the reseller you pick. That reseller's staff gain access to it, and this reseller's staff lose it.",
+    "newReseller": "New reseller",
+    "sameReseller": "The institute is already with this reseller. Pick a different one.",
+    "reassignConfirm": "Reassign",
+    "reassignSuccess": "{name} was reassigned",
+    "cancel": "Cancel",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "status": "Status",
+      "created": "Created",
+      "actions": "Actions"
+    }
+  },
+  "team": {
+    "title": "{count, plural, one {# team member} other {# team members}}",
+    "readOnlyNote": "Read-only. The reseller manages its own team from the reseller portal.",
+    "empty": "This reseller has no team members.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "neverActive": "Never signed in",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "lastActive": "Last active",
+      "joined": "Joined"
+    }
+  },
+  "activity": {
+    "title": "Activity",
+    "description": "Actions by this reseller's staff, actions inside its institutes, and platform actions on this reseller."
+  },
+  "billing": {
+    "mrr": "Monthly recurring revenue",
+    "mrrHint": "All active plans, converted to a monthly amount",
+    "activeSubscriptions": "Active subscriptions",
+    "churn": "Churn (30 days)",
+    "churnHint": "{count, plural, one {# subscription cancelled} other {# subscriptions cancelled}} in the last 30 days",
+    "overdueInvoices": "Overdue invoices",
+    "actionRequired": "Needs follow-up",
+    "note": "Plans, subscriptions and invoices are managed by the reseller in its own portal.",
+    "disabledTitle": "Billing is not enabled",
+    "disabledDescription": "This Roviq installation runs without the billing edition."
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "SYSTEM_RESELLER_PROTECTED": "Roviq Direct cannot be modified.",
+    "SLUG_DUPLICATE": "This slug is already used by another reseller.",
+    "INVALID_SLUG": "Enter a slug, or a name a slug can be made from.",
+    "RESELLER_ADMIN_EMAIL_UNAVAILABLE": "This email can't be used for the reseller admin: it belongs to a deleted account or is already another account's Roviq ID.",
+    "CONCURRENT_MODIFICATION": "Someone else changed this reseller. The latest details have been loaded; review them and save again.",
+    "TIER_CHANGE_REQUIRES_ACTIVE": "Unsuspend the reseller before changing its tier.",
+    "INVALID_TIER": "Pick one of the listed tiers.",
+    "RESELLER_ALREADY_SUSPENDED": "This reseller is already suspended.",
+    "RESELLER_NOT_SUSPENDED": "Only a suspended reseller can be unsuspended or deleted.",
+    "GRACE_PERIOD_NOT_ELAPSED": "A reseller can be deleted only after 30 days of suspension.",
+    "RESELLER_NOT_FOUND": "This reseller no longer exists.",
+    "RESELLER_INVALID": "This action is not possible for a deleted or inactive reseller.",
+    "FORBIDDEN": "You do not have permission to do this."
   }
 }
