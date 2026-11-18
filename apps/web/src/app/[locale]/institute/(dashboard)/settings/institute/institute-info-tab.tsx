@@ -95,16 +95,19 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
       if (!institute) return;
       setConcurrentError(false);
 
+      // Parsing drops keys the schema does not declare — the cached query objects the
+      // form was seeded from carry `__typename`, which the input types reject.
+      const parsed = instituteInfoSchema.parse(value);
+
       try {
         await updateInfo({
           variables: {
-            id: institute.id,
             input: {
-              version: value.version,
-              name: value.name,
+              version: parsed.version,
+              name: parsed.name,
               // code is read-only — never submitted
-              contact: value.contact,
-              address: value.address,
+              contact: parsed.contact,
+              address: parsed.address,
             },
           },
         });
