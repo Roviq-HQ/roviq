@@ -43,6 +43,17 @@ Keep Linear in sync — update issues when scope changes.
 
 ---
 
+### [SECLG] Security Findings Log
+
+Every security vulnerability found, by any means (code review, audit, test, automated review, report), gets an entry in the Linear document **Security Findings Log** (team Roviq). The log is the history that makes security review possible: what went wrong before, which classes of bug recur, and which fixes must be re-checked.
+
+- Append an `SF-NNN` entry using the template at the top of the document: found (date, how), severity, affected, impact, root cause, fix and the layer it lives in (database, application, both), the test that proves it, issue and PR, status.
+- **Append only.** Never edit or delete an entry. A status change (fixed, merged, reopened, found to be wrong) is a new entry that names the original one.
+- Each finding also has a Linear issue for the work. The log is the record; the issue is the task.
+- Read the log before a security review and before changing code that an entry names.
+
+---
+
 ## RESEARCH & DOCUMENTATION
 
 ### [RSBFC] Research Before Coding — NO EXCEPTIONS
