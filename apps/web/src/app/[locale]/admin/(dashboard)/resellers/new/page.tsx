@@ -1,7 +1,7 @@
 'use client';
 
 import { RESELLER_TIER_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { emptyStringToUndefined, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -27,6 +27,7 @@ import {
   HTTP_URL_RE,
   SLUG_RE,
 } from '../reseller-validators';
+import { useResellerErrorMessage } from '../use-reseller-error-message';
 import { useCreateReseller } from '../use-resellers';
 
 const { adminResellerCreate } = testIds;
@@ -92,6 +93,7 @@ const EMPTY_DEFAULTS: CreateResellerFormValues = {
 export default function NewResellerPage() {
   const t = useTranslations('adminResellers');
   const router = useRouter();
+  const errorMessage = useResellerErrorMessage();
   const [createReseller] = useCreateReseller();
 
   const schema = React.useMemo(() => buildSchema(t), [t]);
@@ -117,10 +119,26 @@ export default function NewResellerPage() {
         toast.success(t('create.success'));
         router.push(id ? `/admin/resellers/${id}` : '/admin/resellers');
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('create.error')));
+        if (extractGraphQLErrorCode(err) === 'SLUG_DUPLICATE') {
+          form.setFieldMeta('slug', (prev) => ({
+            ...prev,
+            isTouched: true,
+            errorMap: { ...prev.errorMap, onServer: t('errors.SLUG_DUPLICATE') },
+          }));
+          return;
+        }
+        toast.error(errorMessage(err));
       }
     },
   });
+
+  // Validators never clear the onServer slot, so drop it once the user edits what the slug comes from.
+  const clearSlugServerError = () =>
+    form.setFieldMeta('slug', (prev) =>
+      prev.errorMap.onServer
+        ? { ...prev, errorMap: { ...prev.errorMap, onServer: undefined } }
+        : prev,
+    );
 
   const tierOptions = RESELLER_TIER_VALUES.map((tier) => ({
     value: tier,
@@ -187,7 +205,7 @@ export default function NewResellerPage() {
           </CardHeader>
           <CardContent>
             <FieldGroup>
-              <form.AppField name="name">
+              <form.AppField name="name" listeners={{ onChange: clearSlugServerError }}>
                 {(field) => (
                   <field.TextField
                     label={t('create.name')}
@@ -198,7 +216,7 @@ export default function NewResellerPage() {
                 )}
               </form.AppField>
 
-              <form.AppField name="slug">
+              <form.AppField name="slug" listeners={{ onChange: clearSlugServerError }}>
                 {(field) => (
                   <field.TextField
                     label={t('create.slug')}
