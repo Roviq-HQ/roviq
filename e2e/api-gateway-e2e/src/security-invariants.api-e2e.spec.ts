@@ -6,10 +6,15 @@ import type {
   InstituteLoginResult,
   StartImpersonationResult,
 } from '@roviq/graphql/generated';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { E2E_USERS, SEED_IDS } from '../../shared/seed-fixtures';
 import { E2eMeDocument } from './__generated__/graphql';
-import { loginAsInstituteAdmin, loginAsPlatformAdmin, loginAsTeacher } from './helpers/auth';
+import {
+  loginAsInstituteAdmin,
+  loginAsPlatformAdmin,
+  loginAsReseller,
+  loginAsTeacher,
+} from './helpers/auth';
 import { gql } from './helpers/gql-client';
 import { connectWithParams, exchangeWsTicket } from './helpers/ws-client';
 
@@ -52,10 +57,10 @@ describe('Security Invariant E2E Tests', () => {
       // The GraphQL schema should reject `refreshToken` on ImpersonationAuthPayload
       expect(res.errors).toBeDefined();
       assert(res.errors);
-      const fieldError = res.errors.some(
-        (e) => e.message.includes('refreshToken') || e.message.includes('Cannot query field'),
+      expect(res.errors[0].extensions?.code).toBe('GRAPHQL_VALIDATION_FAILED');
+      expect(res.errors.map((e) => e.message).join('\n')).toContain(
+        'Cannot query field "refreshToken" on type "ImpersonationAuthPayload"',
       );
-      expect(fieldError).toBe(true);
     });
   });
 
@@ -107,6 +112,11 @@ describe('Security Invariant E2E Tests', () => {
       );
       expect(meRes1.errors).toBeUndefined();
 
+      // 3b. Invariant 7: the token itself cannot be traded for a longer session.
+      const refreshAttempt = await gql(REFRESH_MUTATION, { token: impersonationToken });
+      expect(refreshAttempt.data ?? null).toBeNull();
+      expect(refreshAttempt.errors?.[0]?.extensions?.code).toBe('SESSION_EXPIRED');
+
       // 4. End the impersonation (either party can end — use the impersonator here)
       //    We need the sessionId from the JWT itself.
       const payload = JSON.parse(
@@ -124,9 +134,8 @@ describe('Security Invariant E2E Tests', () => {
 
       // 5. The impersonation token should now be rejected by ImpersonationSessionGuard
       const meRes2 = await gql(E2eMeDocument, undefined, impersonationToken);
-      expect(meRes2.errors).toBeDefined();
-      assert(meRes2.errors);
-      expect(meRes2.errors[0].message).toMatch(/session|unauthor|ended|forbidden|invalid/i);
+      expect(meRes2.data ?? null).toBeNull();
+      expect(meRes2.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_ENDED');
     });
   });
 
@@ -461,9 +470,68 @@ describe('Security Invariant E2E Tests', () => {
 
   // ── 17. Reseller cannot delete institutes ───────────────────────────
   describe('17 — Reseller cannot delete institutes', () => {
-    it.skip('no deleteInstitute mutation exists for reseller scope yet — skipped', () => {
-      // When a reseller-scoped deleteInstitute mutation is added,
-      // verify that reseller users cannot call it (only platform admin can).
+    const institute = () =>
+      gql<{ adminGetInstitute: { id: string } }>(
+        'query($id: ID!) { adminGetInstitute(id: $id) { id } }',
+        { id: SEED_IDS.INSTITUTE_2 },
+        adminToken,
+      );
+    let adminToken: string;
+    let resellerToken: string;
+
+    beforeAll(async () => {
+      adminToken = (await loginAsPlatformAdmin()).accessToken;
+      resellerToken = (await loginAsReseller()).accessToken;
+    });
+
+    it('the platform delete mutation refuses a reseller token and deletes nothing', async () => {
+      const res = await gql(
+        'mutation($id: ID!) { adminDeleteInstitute(id: $id) }',
+        { id: SEED_IDS.INSTITUTE_2 },
+        resellerToken,
+      );
+      expect(res.data ?? null).toBeNull();
+      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+
+      const after = await institute();
+      expect(after.errors).toBeUndefined();
+      expect(after.data?.adminGetInstitute.id).toBe(SEED_IDS.INSTITUTE_2);
+    });
+
+    it('the reseller API has no delete mutation at all', async () => {
+      const res = await gql(
+        'mutation($id: ID!) { resellerDeleteInstitute(id: $id) }',
+        { id: SEED_IDS.INSTITUTE_2 },
+        resellerToken,
+      );
+      expect(res.errors?.[0]?.extensions?.code).toBe('GRAPHQL_VALIDATION_FAILED');
+      expect(res.errors?.map((e) => e.message).join('\n')).toContain(
+        'Cannot query field "resellerDeleteInstitute"',
+      );
+    });
+
+    it('the signed-in reseller holds no delete grant on Institute', async () => {
+      const res = await gql<{
+        resellerLogin: {
+          user: { abilityRules: { action: string; subject: string; inverted?: boolean }[] };
+        };
+      }>(
+        `mutation($username: String!, $password: String!) {
+          resellerLogin(username: $username, password: $password) { user { abilityRules } }
+        }`,
+        { username: E2E_USERS.RESELLER.username, password: E2E_USERS.RESELLER.password },
+      );
+      expect(res.errors).toBeUndefined();
+      assert(res.data);
+      const rules = res.data.resellerLogin.user.abilityRules;
+      expect(rules.length).toBeGreaterThan(0);
+      const grantsDelete = rules.some(
+        (rule) =>
+          rule.inverted !== true &&
+          ['delete', 'manage'].includes(rule.action) &&
+          ['Institute', 'all'].includes(rule.subject),
+      );
+      expect(grantsDelete).toBe(false);
     });
   });
 
