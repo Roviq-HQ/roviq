@@ -379,24 +379,6 @@ export class AdminResellerService {
           .where(eq(resellerMembershipsLive.resellerId, resellerId));
         const staffUserIds = [...new Set(staff.map((s) => s.userId))];
 
-        // Read before the status change: the `resellers_revoke_sessions` trigger ends these
-        // sessions and revokes the staff's refresh tokens as part of that UPDATE. The ids
-        // are needed afterwards to drop the guards' Redis caches.
-        const liveSessions =
-          staffUserIds.length === 0
-            ? []
-            : await tx
-                .select({ id: impersonationSessions.id })
-                .from(impersonationSessions)
-                .where(
-                  and(
-                    inArray(impersonationSessions.impersonatorId, staffUserIds),
-                    eq(impersonationSessions.impersonatorScope, 'reseller'),
-                    isNull(impersonationSessions.endedAt),
-                  ),
-                );
-        const endedSessionIds = liveSessions.map((s) => s.id);
-
         const [updated] = await tx
           .update(resellers)
           .set({
@@ -407,6 +389,28 @@ export class AdminResellerService {
           })
           .where(eq(resellers.id, resellerId))
           .returning();
+
+        // The `resellers_revoke_sessions` trigger ended the staff's sessions inside that
+        // UPDATE, stamping them with this transaction's now(). Read back exactly those, so a
+        // session opened while the suspension ran still has its Redis cache dropped.
+        const ended = await tx
+          .select({ id: impersonationSessions.id })
+          .from(impersonationSessions)
+          .where(
+            and(
+              eq(impersonationSessions.impersonatorScope, 'reseller'),
+              eq(impersonationSessions.endedReason, 'revoked'),
+              eq(impersonationSessions.endedAt, sql`now()`),
+              inArray(
+                impersonationSessions.impersonatorId,
+                tx
+                  .select({ userId: resellerMemberships.userId })
+                  .from(resellerMemberships) // allow-base-read: matches the trigger, which ends sessions of every membership row
+                  .where(eq(resellerMemberships.resellerId, resellerId)),
+              ),
+            ),
+          );
+        const endedSessionIds = ended.map((s) => s.id);
 
         return { record: updated, previousStatus: reseller.status, staffUserIds, endedSessionIds };
       },
