@@ -50,7 +50,7 @@ interface StagedRow {
 
 interface TxStages {
   resellerRows?: StagedRow[];
-  staffRows?: { id: string; userId: string }[];
+  staffRows?: ({ id: string; userId: string } | { id: string; roleId: string; roleName: string })[];
   sessionRows?: { id: string }[];
   instituteRows?: { id: string }[];
   /** Rows to return in sequence from additional selects (slug conflict, role lookup) */
@@ -127,6 +127,7 @@ function createTxMock(stages: TxStages) {
         Object.assign(Promise.resolve(resolveSelectRows(table)), {
           groupBy: () => Promise.resolve(countRowsFor(table)),
         }),
+      innerJoin: () => ({ where: () => Promise.resolve(resolveSelectRows(table)) }),
     }),
   });
 
@@ -249,6 +250,10 @@ describe('AdminResellerService', () => {
         .mockResolvedValue({ membershipId: 'new-membership-id', scope: 'reseller' }),
       sendWelcomeNotification: vi.fn(),
     });
+    // The real resolution runs on top of the mocked lookups, so these tests still cover it.
+    identityService.findOrCreateUserByEmail = vi.fn((email: string, actorId: string) =>
+      IdentityService.prototype.findOrCreateUserByEmail.call(identityService, email, actorId),
+    );
 
     service = new AdminResellerService(
       createMock(),
@@ -944,7 +949,7 @@ describe('AdminResellerService', () => {
       expect(result.id).toBe(NORMAL_RESELLER_ID);
     });
 
-    it('cascades role update to memberships and emits RESELLER.tier_changed', async () => {
+    it('moves each member by the tier rule, expires moved tokens and emits RESELLER.tier_changed', async () => {
       const { tx, calls } = createTxMock({
         resellerRows: [
           {
@@ -954,23 +959,79 @@ describe('AdminResellerService', () => {
             tier: ResellerTier.FULL_MANAGEMENT,
           },
         ],
+        staffRows: [
+          { id: 'm-admin', roleId: 'role-reseller_full_admin', roleName: 'reseller_full_admin' },
+          {
+            id: 'm-support',
+            roleId: 'role-reseller_support_admin',
+            roleName: 'reseller_support_admin',
+          },
+          { id: 'm-viewer', roleId: 'role-reseller_viewer', roleName: 'reseller_viewer' },
+        ],
       });
       setTx(tx);
 
-      await service.changeTier(NORMAL_RESELLER_ID, ResellerTier.READ_ONLY, ACTOR_ID);
+      await service.changeTier(NORMAL_RESELLER_ID, ResellerTier.SUPPORT_MANAGEMENT, ACTOR_ID);
 
       expect(calls.updateReseller).toHaveBeenCalled();
-      expect(calls.updateReseller.mock.calls[0][0].values.tier).toBe(ResellerTier.READ_ONLY);
-      expect(calls.updateMemberships).toHaveBeenCalledTimes(1);
+      expect(calls.updateReseller.mock.calls[0][0].values.tier).toBe(
+        ResellerTier.SUPPORT_MANAGEMENT,
+      );
       expect(calls.insertRoles.mock.calls[0][0].values[0].resellerId).toBe(NORMAL_RESELLER_ID);
-      expect(calls.updateMemberships.mock.calls[0][0].values.roleId).toBe('role-reseller_viewer');
+      // Only the full admin holds a role above the new tier; the other two keep theirs.
+      expect(calls.updateMemberships).toHaveBeenCalledTimes(1);
+      expect(calls.updateMemberships.mock.calls[0][0].values.roleId).toBe(
+        'role-reseller_support_admin',
+      );
+      expect(redis.set).toHaveBeenCalledWith(
+        'auth:reseller-member-access:m-admin',
+        'role-reseller_support_admin',
+        'EX',
+        660,
+      );
+      expect(redis.set).toHaveBeenCalledTimes(1);
       expect(eventBus.emit).toHaveBeenCalledWith(
         'RESELLER.tier_changed',
         expect.objectContaining({
           oldTier: ResellerTier.FULL_MANAGEMENT,
-          newTier: ResellerTier.READ_ONLY,
+          newTier: ResellerTier.SUPPORT_MANAGEMENT,
           actorId: ACTOR_ID,
         }),
+      );
+    });
+
+    it('promotes holders of the old top role on an upgrade and nobody else', async () => {
+      const { tx, calls } = createTxMock({
+        resellerRows: [
+          {
+            id: NORMAL_RESELLER_ID,
+            isSystem: false,
+            status: ResellerStatus.ACTIVE,
+            tier: ResellerTier.SUPPORT_MANAGEMENT,
+          },
+        ],
+        staffRows: [
+          {
+            id: 'm-support',
+            roleId: 'role-reseller_support_admin',
+            roleName: 'reseller_support_admin',
+          },
+          { id: 'm-viewer', roleId: 'role-reseller_viewer', roleName: 'reseller_viewer' },
+        ],
+      });
+      setTx(tx);
+
+      await service.changeTier(NORMAL_RESELLER_ID, ResellerTier.FULL_MANAGEMENT, ACTOR_ID);
+
+      expect(calls.updateMemberships).toHaveBeenCalledTimes(1);
+      expect(calls.updateMemberships.mock.calls[0][0].values.roleId).toBe(
+        'role-reseller_full_admin',
+      );
+      expect(redis.set).toHaveBeenCalledWith(
+        'auth:reseller-member-access:m-support',
+        'role-reseller_full_admin',
+        'EX',
+        660,
       );
     });
   });

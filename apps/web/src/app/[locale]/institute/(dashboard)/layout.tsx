@@ -5,7 +5,8 @@ import { NAV_SLUGS } from '@roviq/common-types';
 import { useI18nField } from '@roviq/i18n';
 import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
-import { ImpersonationBanner } from '@web/components/impersonation/impersonation-banner';
+import { ImpersonationBannerView } from '@web/components/impersonation/impersonation-banner';
+import { useImpersonationSession } from '@web/components/impersonation/use-impersonation-session';
 import { useRoleName } from '@web/hooks/use-role-name';
 import {
   Award,
@@ -43,6 +44,8 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tGroups = useTranslations('groups');
   const tCommon = useTranslations('common');
+  const tAuth = useTranslations('auth');
+  const impersonation = useImpersonationSession();
   const { logout, user, memberships, switchInstitute } = useAuth();
   const ti = useI18nField();
   const roleName = useRoleName();
@@ -253,7 +256,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const config: LayoutConfig = {
     appName: tCommon('appNameInstitute'),
     user: user ? { username: user.username, email: user.email } : undefined,
-    onLogout: logout,
+    // Log out would sign the impersonator out of their own account; this tab only exits.
+    onLogout: impersonation.active ? impersonation.exit : logout,
+    logoutLabel: impersonation.active ? tAuth('exitImpersonation') : undefined,
     instituteSwitcher,
     notifications: process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER
       ? {
@@ -360,10 +365,15 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
       <AbilityProvider rules={user?.abilityRules ?? []}>
-        <ImpersonationBanner />
-
         <TenantThemeProvider>
-          <AdminLayout config={config}>{children}</AdminLayout>
+          <AdminLayout
+            config={config}
+            banner={
+              impersonation.active ? <ImpersonationBannerView session={impersonation} /> : undefined
+            }
+          >
+            {children}
+          </AdminLayout>
         </TenantThemeProvider>
       </AbilityProvider>
     </ProtectedRoute>

@@ -196,6 +196,7 @@ Domain-specific rules live in `.claude/skills/` and load only when relevant:
 
 ## Key Docs
 
+- When you need the product requirements document (PRD), read it in Linear.
 - `docs/architecture.md` — system architecture
 - `docs/auth.md` — authentication (three-scope model, JWT, refresh, impersonation)
 - `docs/frontend.md` — frontend patterns

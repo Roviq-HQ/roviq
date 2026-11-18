@@ -219,6 +219,42 @@ When institutes make UPI peer-to-peer payments, those payments appear here for m
 
 ---
 
+## Team
+
+The Team page (`/reseller/team`) lists the people from your organisation who can sign in to the Reseller Portal.
+
+1. Click **Team** in the sidebar. Each row shows the member's name, email, **role**, **status** (Active or Inactive), when they were last active and when they joined. Your own row carries a **You** badge.
+2. Use the search box (name, email or Roviq ID) and the **status** filter to narrow the list. Filters are kept in the page address, so a filtered view can be bookmarked or shared.
+3. Click a row to open the member's detail panel: profile, **active sessions** (device, IP address, sign-in time) and their **recent activity** from the audit log. Sessions are shown only for yourself and for members you are allowed to manage.
+
+### Roles
+
+| Role | Can do |
+|---|---|
+| Reseller admin | Manage institutes, billing and the team. |
+| Reseller support | Read everything, view as institute users **in view-only mode**, and manage Support and Viewer members. |
+| Reseller viewer | Read only. The Team page shows no Invite button and no row actions. |
+
+You can give roles up to your own, and never above your organisation's plan tier. You cannot change members who hold a role above yours, and you cannot change your own role or status.
+
+### Invite a member
+
+1. Click **Invite member**.
+2. Enter the person's **email** and choose a **role**.
+3. Click **Invite**. If the email already has a Roviq account, that account is added to your team and keeps its password. Otherwise a new account is created and a temporary password is sent to the address.
+
+If the person is already on your team (even as an inactive member) the invite is refused; reactivate them from the list.
+
+### Change a role, deactivate, reactivate
+
+Open the **⋯** menu at the end of a member's row.
+
+- **Change role** -- pick another role and confirm. It applies at once.
+- **Deactivate** -- the member is signed out immediately and cannot sign in to this portal until reactivated. Their Roviq account and any other memberships are untouched.
+- **Reactivate** -- shown for inactive members; they can sign in again with their existing role.
+
+---
+
 ## Audit Logs
 
 Audit Logs record every significant action taken in the reseller portal.
@@ -237,9 +273,15 @@ Audit Logs record every significant action taken in the reseller portal.
 Review and control the impersonation sessions started by your team (when a team member logs in as an institute user).
 
 1. Open **Audit Logs > Impersonation** (`/reseller/audit/impersonation`).
-2. The table lists each session with the team member, target user, institute, start time, and a **status** badge (Active, Ended, or Expired).
+2. The table lists each session with the team member, target user, institute, reason, start and expiry time, and a **status** badge: Active, Ended (the team member left), Revoked (someone else ended it) or Expired.
 3. Use the **Institute** dropdown to filter sessions to a single managed institute.
-4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm).
+4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm). Viewers see the list without the Terminate button.
+
+### View as an institute user
+
+1. On an institute's **Users** tab click **View as** and give a reason of at least 10 characters.
+2. The institute admin is sent a 6-digit code. Ask them for it and enter it. **Send a new code** becomes available 30 seconds after the last one.
+3. A new tab opens signed in as that user. If your role is **Reseller support**, the banner says **View only**: you can look at every screen the user sees, but nothing can be changed in that session.
 
 ---
 

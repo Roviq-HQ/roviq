@@ -141,7 +141,7 @@ Resellers are partner organizations that manage institutes on Roviq's behalf. Ea
 
 ### Reseller Tiers
 
-The tier controls what a reseller's staff can do with their assigned institutes. Changing the tier cascades to every reseller-staff membership, so abilities take effect on each staff member's next token refresh.
+The tier controls what a reseller's staff can do with their assigned institutes. Changing the tier moves staff who held the old tier's top role to the new tier's top role, brings anyone still above the new tier down to it, and leaves everyone else's role alone. Staff whose role moved are asked for a fresh token on their next request, so the change takes effect at once.
 
 | Tier                | Abilities                                                      |
 | ------------------- | -------------------------------------------------------------- |
@@ -240,6 +240,27 @@ On the **Impersonation** tab, an additional **scope** filter lets you show entri
 2. The detail shows the full event payload, including before/after values where applicable.
 3. The **Correlation ID** is displayed and links to a **trace page** showing a timeline of all related events in that operation.
 4. For an impersonated entry, **View session details** opens a panel with the session's impersonator, target user, institute, reason, IP, start/expiry/end times, OTP verifier, and every audit entry recorded during that session.
+
+---
+
+## Impersonation
+
+### View as an institute user
+
+1. Open an institute's **Users** tab, or a user's **Memberships** tab (`/admin/users/<id>`), and click **View as** on the row. The button is shown for an active user with an active membership, and not on your own account.
+2. Enter a **reason** of at least 10 characters. It is stored with the session and shown on the sessions page.
+3. If the institute requires consent, its admin is sent a 6-digit code. Enter it in the dialog. **Send a new code** becomes available 30 seconds after the last one.
+4. A new tab opens in the institute portal, signed in as that user, with an amber banner across the top. Your admin tab is untouched. If your role is **Platform support**, the banner says **View only**: you can look at every screen the user sees, but nothing can be changed in that session. Platform admins can make changes.
+5. To leave, click **Exit Impersonation** in the banner or in the user menu (it replaces Log out in that tab). The tab closes and the session ends.
+
+### Impersonation Sessions
+
+**Impersonation Sessions** in the sidebar (`/admin/impersonation-sessions`) lists every session, from all three scopes.
+
+- Columns: who started it and from which scope (Platform, Reseller, Institute), the target user, the institute, the reason, start and expiry time, and the **status**: Active, Ended (the impersonator left), Revoked (someone else ended it) or Expired.
+- **Show**: *Active only* (default) or *All sessions*. The choice is kept in the page address.
+- The list updates by itself when a session starts or ends, within 15 seconds at most.
+- **Terminate** on an active session signs the impersonator out of the impersonated account at once, after a confirmation. It needs the impersonate permission; read-only platform roles see the list without it.
 
 ---
 

@@ -11,6 +11,9 @@ export const SEED_SLUGS = {
   INSTITUTE_2: 'rajasthan-public-school',
 } as const;
 
+/** Primary phone of the seeded institute admin: where impersonation approval codes go. */
+export const SEED_ADMIN_PHONE = { countryCode: '+91', number: '9876500001' } as const;
+
 export const SEED_CREDENTIALS = {
   ADMIN: { username: 'admin', password: 'admin123' },
   RESELLER: { username: 'reseller1', password: 'reseller123' },

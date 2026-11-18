@@ -117,7 +117,15 @@ function ThemeToggle() {
   );
 }
 
-function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: string }) {
+function UserMenu({
+  onLogout,
+  logoutLabel,
+  username,
+}: {
+  onLogout?: () => void;
+  logoutLabel?: string;
+  username?: string;
+}) {
   const t = useTranslations('auth');
   const locale = useLocale();
   const initial = username ? username.charAt(0).toUpperCase() : 'U';
@@ -146,7 +154,7 @@ function UserMenu({ onLogout, username }: { onLogout?: () => void; username?: st
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onLogout} data-testid={layout.userMenuLogout}>
-          {t('logout')}
+          {logoutLabel ?? t('logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -178,7 +186,11 @@ export function Topbar({ config }: { config: LayoutConfig }) {
         <div className="hidden xl:block">
           <LocaleSwitcher />
         </div>
-        <UserMenu onLogout={config.onLogout} username={config.user?.username} />
+        <UserMenu
+          onLogout={config.onLogout}
+          logoutLabel={config.logoutLabel}
+          username={config.user?.username}
+        />
       </div>
     </header>
   );

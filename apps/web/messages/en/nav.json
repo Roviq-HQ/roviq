@@ -23,6 +23,7 @@
   "resellers": "Resellers",
   "roles": "Roles",
   "auditLogs": "Audit Logs",
+  "impersonationSessions": "Impersonation Sessions",
   "billing": "Billing",
   "plans": "Plans",
   "subscriptions": "Subscriptions",

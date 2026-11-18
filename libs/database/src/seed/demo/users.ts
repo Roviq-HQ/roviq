@@ -12,6 +12,7 @@ import {
   authProviders,
   guardianProfiles,
   memberships,
+  phoneNumbers,
   platformMemberships,
   resellerMemberships,
   roles,
@@ -22,7 +23,7 @@ import {
   users,
 } from '../..';
 import type { DrizzleDB } from '../../providers';
-import { SEED_CREDENTIALS } from '../fixtures';
+import { SEED_ADMIN_PHONE, SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -166,6 +167,19 @@ export async function seedUsersAndMemberships(
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
     .returning();
+
+  // The institute admin approves reseller impersonation by OTP, which needs a primary phone.
+  await tx
+    .insert(phoneNumbers)
+    .values({
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+      userId: admin.id,
+      countryCode: SEED_ADMIN_PHONE.countryCode,
+      number: SEED_ADMIN_PHONE.number,
+      isPrimary: true,
+    })
+    .onConflictDoNothing();
 
   // ── User profiles (needed by myProfile resolver + profile page) ──
   for (const { userId, firstName, lastName, gender } of [

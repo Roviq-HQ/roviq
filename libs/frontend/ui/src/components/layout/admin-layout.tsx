@@ -13,9 +13,12 @@ import type { LayoutConfig } from './types';
 
 export function AdminLayout({
   config: rawConfig,
+  banner,
   children,
 }: {
   config: LayoutConfig;
+  /** Full-width strip above the sidebar and top bar; it takes its own row, covering nothing. */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const config = useAbilityFilteredConfig(rawConfig);
@@ -34,36 +37,39 @@ export function AdminLayout({
             only. `contents` keeps flex layout untouched on screen. The scroll
             containers below must also release their clipping, otherwise only
             the visible viewport prints. */}
-        <div className="flex h-screen overflow-hidden print:block print:h-auto print:overflow-visible">
-          <div className="contents print:hidden">
-            <DesktopSidebar config={config} />
-          </div>
-          <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+        <div className="flex h-screen flex-col overflow-hidden print:block print:h-auto print:overflow-visible">
+          {banner && <div className="shrink-0 print:hidden">{banner}</div>}
+          <div className="flex min-h-0 flex-1 overflow-hidden print:block print:overflow-visible">
             <div className="contents print:hidden">
-              <Topbar config={config} />
+              <DesktopSidebar config={config} />
             </div>
-            {config.bottomNav && config.navRegistry && (
+            <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
               <div className="contents print:hidden">
-                <BottomTabBar bottomNav={config.bottomNav} navRegistry={config.navRegistry} />
+                <Topbar config={config} />
               </div>
-            )}
-            <main
-              id="main-content"
-              tabIndex={-1}
-              className={cn(
-                'flex-1 overflow-y-auto p-4 md:p-6 print:h-auto print:overflow-visible',
-                // Content scrolls all the way under the fixed bottom-tab bar
-                // so the bar's translucent backdrop-blur picks up the page
-                // content beneath it (matches iOS App Store behaviour). The
-                // last item is kept reachable via scroll-padding so the
-                // browser snaps it above the bar when scrolled into view.
-                config.bottomNav &&
-                  config.navRegistry &&
-                  '[scroll-padding-bottom:5rem] xl:[scroll-padding-bottom:0]',
+              {config.bottomNav && config.navRegistry && (
+                <div className="contents print:hidden">
+                  <BottomTabBar bottomNav={config.bottomNav} navRegistry={config.navRegistry} />
+                </div>
               )}
-            >
-              <PageErrorBoundary>{children}</PageErrorBoundary>
-            </main>
+              <main
+                id="main-content"
+                tabIndex={-1}
+                className={cn(
+                  'flex-1 overflow-y-auto p-4 md:p-6 print:h-auto print:overflow-visible',
+                  // Content scrolls all the way under the fixed bottom-tab bar
+                  // so the bar's translucent backdrop-blur picks up the page
+                  // content beneath it (matches iOS App Store behaviour). The
+                  // last item is kept reachable via scroll-padding so the
+                  // browser snaps it above the bar when scrolled into view.
+                  config.bottomNav &&
+                    config.navRegistry &&
+                    '[scroll-padding-bottom:5rem] xl:[scroll-padding-bottom:0]',
+                )}
+              >
+                <PageErrorBoundary>{children}</PageErrorBoundary>
+              </main>
+            </div>
           </div>
         </div>
         <CommandPalette config={config} />

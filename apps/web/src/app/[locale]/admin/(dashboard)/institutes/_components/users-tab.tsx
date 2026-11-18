@@ -1,11 +1,9 @@
 'use client';
 
-import { gql, useMutation, useQuery } from '@roviq/graphql';
+import { gql, useQuery } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Badge,
-  Button,
-  Can,
   Card,
   CardContent,
   CardHeader,
@@ -23,15 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from '@roviq/ui';
-import { ImpersonateUserDialog } from '@web/components/impersonation/impersonate-user-dialog';
+import { AdminImpersonateButton } from '@web/components/impersonation/admin-impersonate-button';
 import { useRoleName } from '@web/hooks/use-role-name';
-import { Eye, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import * as React from 'react';
-import {
-  AdminImpersonateStartDocument,
-  AdminImpersonateVerifyOtpDocument,
-} from './users-tab.generated';
 
 const LIST_INSTITUTE_USERS = gql`
   query AdminListInstituteUsers($tenantId: String!) {
@@ -57,30 +50,6 @@ const LIST_INSTITUTE_USERS = gql`
           }
         }
       }
-    }
-  }
-`;
-
-export const ADMIN_IMPERSONATE_START = gql`
-  mutation AdminImpersonateStart($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
-    adminStartImpersonation(
-      targetUserId: $targetUserId
-      targetTenantId: $targetTenantId
-      reason: $reason
-    ) {
-      code
-      requiresOtp
-      sessionId
-    }
-  }
-`;
-
-export const ADMIN_IMPERSONATE_VERIFY_OTP = gql`
-  mutation AdminImpersonateVerifyOtp($sessionId: String!, $otp: String!) {
-    adminVerifyImpersonationOtp(sessionId: $sessionId, otp: $otp) {
-      code
-      requiresOtp
-      sessionId
     }
   }
 `;
@@ -121,24 +90,8 @@ export function InstituteUsersTab({
   instituteName: string;
 }) {
   const t = useTranslations('adminInstitutes.users');
-  const tImp = useTranslations('impersonation');
   const resolveI18n = useI18nField();
   const roleName = useRoleName();
-  const [target, setTarget] = React.useState<{ id: string; name: string } | null>(null);
-  const [startMutation] = useMutation(AdminImpersonateStartDocument);
-  const [verifyMutation] = useMutation(AdminImpersonateVerifyOtpDocument);
-
-  const start = async (reason: string) => {
-    if (!target) throw new Error('No impersonation target');
-    const { data } = await startMutation({
-      variables: { targetUserId: target.id, targetTenantId: instituteId, reason },
-    });
-    return data?.adminStartImpersonation ?? {};
-  };
-  const verifyOtp = async (sessionId: string, otp: string) => {
-    const { data } = await verifyMutation({ variables: { sessionId, otp } });
-    return data?.adminVerifyImpersonationOtp ?? {};
-  };
   const { data, loading } = useQuery<Data>(LIST_INSTITUTE_USERS, {
     variables: { tenantId: instituteId },
     fetchPolicy: 'cache-and-network',
@@ -227,18 +180,13 @@ export function InstituteUsersTab({
                   <TableCell className="text-end">
                     {user.status === 'ACTIVE' &&
                       membershipsInInstitute.some((m) => m.status === 'ACTIVE') && (
-                        <Can I="impersonate" a="User">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            title={tImp('actionTitle')}
-                            data-testid={testIds.impersonation.trigger(user.id)}
-                            onClick={() => setTarget({ id: user.id, name })}
-                          >
-                            <Eye aria-hidden="true" />
-                            {tImp('action')}
-                          </Button>
-                        </Can>
+                        <AdminImpersonateButton
+                          userId={user.id}
+                          tenantId={instituteId}
+                          targetName={name}
+                          instituteName={instituteName}
+                          testId={testIds.impersonation.trigger(user.id)}
+                        />
                       )}
                   </TableCell>
                 </TableRow>
@@ -247,14 +195,6 @@ export function InstituteUsersTab({
           </TableBody>
         </Table>
       </CardContent>
-      <ImpersonateUserDialog
-        open={target !== null}
-        onOpenChange={(open) => !open && setTarget(null)}
-        targetName={target?.name ?? ''}
-        instituteName={instituteName}
-        start={start}
-        verifyOtp={verifyOtp}
-      />
     </Card>
   );
 }

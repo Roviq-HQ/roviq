@@ -1,15 +1,18 @@
 'use client';
 
 import { useAuth } from '@roviq/auth';
-import { gql, useMutation } from '@roviq/graphql';
+import { gql, useMutation, useQuery } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
-import { Button, Can } from '@roviq/ui';
+import { Button, useAbility } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { Eye } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { ImpersonateUserDialog } from './impersonate-user-dialog';
-import { InstituteImpersonateStartDocument } from './view-as-button.generated';
+import {
+  CanImpersonateUserDocument,
+  InstituteImpersonateStartDocument,
+} from './view-as-button.generated';
 
 export const INSTITUTE_IMPERSONATE_START = gql`
   mutation InstituteImpersonateStart($targetUserId: String!, $reason: String!) {
@@ -21,9 +24,16 @@ export const INSTITUTE_IMPERSONATE_START = gql`
   }
 `;
 
+export const CAN_IMPERSONATE_USER = gql`
+  query CanImpersonateUser($targetUserId: String!) {
+    canImpersonateUser(targetUserId: $targetUserId)
+  }
+`;
+
 /**
- * "View as" for institute staff (intra-institute impersonation). Shown to roles that can
- * impersonate; the server refuses a target whose role ranks equal to or above the caller's.
+ * "View as" for institute staff (intra-institute impersonation). Shown only when the
+ * server says this person can be viewed as: it knows every role they hold, and refuses
+ * one that ranks equal to or above the caller's.
  */
 export function ViewAsButton({ userId, name }: { userId: string; name: string }) {
   const t = useTranslations('impersonation');
@@ -31,9 +41,15 @@ export function ViewAsButton({ userId, name }: { userId: string; name: string })
   const { user, memberships, isImpersonated } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [startMutation] = useMutation(InstituteImpersonateStartDocument);
-
+  const ability = useAbility();
   // An impersonation tab cannot start another one, and no one views as themselves.
-  if (isImpersonated || user?.id === userId) return null;
+  const eligible = !isImpersonated && user?.id !== userId && ability.can('impersonate', 'User');
+  const { data } = useQuery(CanImpersonateUserDocument, {
+    variables: { targetUserId: userId },
+    skip: !eligible,
+  });
+
+  if (!eligible || !data?.canImpersonateUser) return null;
 
   const instituteName = resolveI18n(
     memberships?.find((m) => m.tenantId === user?.tenantId)?.instituteName,
@@ -45,7 +61,7 @@ export function ViewAsButton({ userId, name }: { userId: string; name: string })
   };
 
   return (
-    <Can I="impersonate" a="User">
+    <>
       <Button
         variant="outline"
         size="sm"
@@ -64,6 +80,6 @@ export function ViewAsButton({ userId, name }: { userId: string; name: string })
         instituteName={instituteName}
         start={start}
       />
-    </Can>
+    </>
   );
 }

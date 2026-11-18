@@ -122,6 +122,10 @@ export const EVENT_PATTERNS = {
     deleted: 'HOLIDAY.deleted',
     updated: 'HOLIDAY.updated',
   },
+  IMPERSONATION: {
+    session_ended: 'IMPERSONATION.session_ended',
+    session_started: 'IMPERSONATION.session_started',
+  },
   INSTITUTE: {
     activated: 'INSTITUTE.activated',
     approval_requested: 'INSTITUTE.approval_requested',

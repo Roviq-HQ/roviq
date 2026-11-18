@@ -1,18 +1,13 @@
-import type { AbilityRule } from '@roviq/common-types';
+import {
+  type AbilityRule,
+  RESELLER_SYSTEM_ROLE_NAMES,
+  type ResellerSystemRoleName,
+} from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import type { DrizzleDB } from './providers';
 import { roles } from './schema/tenant/roles';
 
-export const RESELLER_SYSTEM_ROLE_NAMES = [
-  // FULL_MANAGEMENT tier — manages institutes, team and billing
-  'reseller_full_admin',
-  // SUPPORT_MANAGEMENT tier — read access plus impersonation for support
-  'reseller_support_admin',
-  // READ_ONLY tier — read access only
-  'reseller_viewer',
-] as const;
-
-export type ResellerSystemRoleName = (typeof RESELLER_SYSTEM_ROLE_NAMES)[number];
+export { RESELLER_SYSTEM_ROLE_NAMES, type ResellerSystemRoleName };
 
 export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, AbilityRule[]> = {
   reseller_full_admin: [
@@ -40,10 +35,13 @@ export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, Abil
     { action: 'manage', subject: 'PaymentGatewayConfig' },
     { action: 'read', subject: 'BillingDashboard' },
     { action: 'read', subject: 'AuditLog' },
+    { action: 'manage', subject: 'ResellerTeam' },
   ],
   reseller_support_admin: [
     { action: 'read', subject: 'all' },
     { action: 'impersonate', subject: 'User' },
+    // Capped in ResellerTeamService: never a member or a role senior to their own.
+    { action: 'manage', subject: 'ResellerTeam' },
   ],
   reseller_viewer: [{ action: 'read', subject: 'all' }],
 };

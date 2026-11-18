@@ -48,6 +48,8 @@ export const ErrorCode = {
   SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
   /** Impersonation session ended, expired or was revoked */
   IMPERSONATION_ENDED: 'IMPERSONATION_ENDED',
+  /** A view-only impersonation session attempted to change something */
+  IMPERSONATION_READ_ONLY: 'IMPERSONATION_READ_ONLY',
 
   // ── Passkey ────────────────────────────────────────────
   /** WebAuthn challenge expired or was already consumed */
@@ -249,6 +251,16 @@ export const ErrorCode = {
   TC_NOT_FOUND: 'TC_NOT_FOUND',
   /** Reseller team member not found */
   TEAM_MEMBER_NOT_FOUND: 'TEAM_MEMBER_NOT_FOUND',
+  /** The invited person already has a membership (active or inactive) in this reseller */
+  TEAM_MEMBER_ALREADY_EXISTS: 'TEAM_MEMBER_ALREADY_EXISTS',
+  /** Invite email cannot be used: its account is deleted, ambiguous, or it is another account's Roviq ID */
+  TEAM_MEMBER_EMAIL_UNAVAILABLE: 'TEAM_MEMBER_EMAIL_UNAVAILABLE',
+  /** A team member tried to change their own role or deactivate themselves */
+  TEAM_MEMBER_SELF_CHANGE: 'TEAM_MEMBER_SELF_CHANGE',
+  /** The member, or the role being assigned, ranks above what the caller or the reseller's tier allows */
+  TEAM_ROLE_NOT_ASSIGNABLE: 'TEAM_ROLE_NOT_ASSIGNABLE',
+  /** Deactivate attempted on an inactive member, or reactivate on an active one */
+  TEAM_MEMBER_STATUS_UNCHANGED: 'TEAM_MEMBER_STATUS_UNCHANGED',
   /** Timetable override not found */
   TIMETABLE_OVERRIDE_NOT_FOUND: 'TIMETABLE_OVERRIDE_NOT_FOUND',
   /** Period does not exist in the timetable */
@@ -354,6 +366,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   NO_ACTIVE_MEMBERSHIP: HttpStatus.FORBIDDEN,
   SESSION_NOT_FOUND: HttpStatus.FORBIDDEN,
   IMPERSONATION_ENDED: HttpStatus.UNAUTHORIZED,
+  IMPERSONATION_READ_ONLY: HttpStatus.FORBIDDEN,
   PASSKEY_CHALLENGE_EXPIRED: HttpStatus.BAD_REQUEST,
   PASSKEY_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,
   PASSKEY_AUTHENTICATION_FAILED: HttpStatus.UNAUTHORIZED,
@@ -446,6 +459,11 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SUBSCRIPTION_PLAN_NOT_FOUND: HttpStatus.NOT_FOUND,
   TC_NOT_FOUND: HttpStatus.NOT_FOUND,
   TEAM_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TEAM_MEMBER_ALREADY_EXISTS: HttpStatus.CONFLICT,
+  TEAM_MEMBER_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
+  TEAM_MEMBER_SELF_CHANGE: HttpStatus.FORBIDDEN,
+  TEAM_ROLE_NOT_ASSIGNABLE: HttpStatus.FORBIDDEN,
+  TEAM_MEMBER_STATUS_UNCHANGED: HttpStatus.UNPROCESSABLE_ENTITY,
   TIMETABLE_OVERRIDE_NOT_FOUND: HttpStatus.NOT_FOUND,
   TIMETABLE_PERIOD_NOT_FOUND: HttpStatus.NOT_FOUND,
   USER_PROFILE_NOT_FOUND: HttpStatus.NOT_FOUND,

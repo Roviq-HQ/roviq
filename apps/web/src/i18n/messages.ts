@@ -37,6 +37,7 @@ import enObservability from '../../messages/en/observability.json';
 import enPeopleLinks from '../../messages/en/peopleLinks.json';
 import enProfile from '../../messages/en/profile.json';
 import enResellerInstitutes from '../../messages/en/resellerInstitutes.json';
+import enResellerTeam from '../../messages/en/resellerTeam.json';
 import enRoles from '../../messages/en/roles.json';
 import enSelectInstitute from '../../messages/en/selectInstitute.json';
 import enSessions from '../../messages/en/sessions.json';
@@ -82,6 +83,7 @@ import hiObservability from '../../messages/hi/observability.json';
 import hiPeopleLinks from '../../messages/hi/peopleLinks.json';
 import hiProfile from '../../messages/hi/profile.json';
 import hiResellerInstitutes from '../../messages/hi/resellerInstitutes.json';
+import hiResellerTeam from '../../messages/hi/resellerTeam.json';
 import hiRoles from '../../messages/hi/roles.json';
 import hiSelectInstitute from '../../messages/hi/selectInstitute.json';
 import hiSessions from '../../messages/hi/sessions.json';
@@ -129,6 +131,7 @@ const en = {
   observability: enObservability,
   profile: enProfile,
   resellerInstitutes: enResellerInstitutes,
+  resellerTeam: enResellerTeam,
   roles: enRoles,
   selectInstitute: enSelectInstitute,
   sessions: enSessions,
@@ -177,6 +180,7 @@ const hi = {
   observability: hiObservability,
   profile: hiProfile,
   resellerInstitutes: hiResellerInstitutes,
+  resellerTeam: hiResellerTeam,
   roles: hiRoles,
   selectInstitute: hiSelectInstitute,
   sessions: hiSessions,

@@ -18,6 +18,8 @@ export interface ApolloClientConfig {
   onNetworkError: (message: string) => void;
   /** Called when a GraphQL error with code IMPERSONATION_ENDED is received. */
   onImpersonationEnded?: () => void;
+  /** Called when a view-only impersonation session tried to change something. */
+  onImpersonationReadOnly?: () => void;
   /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
   apiUrl?: string;
   /** Called to refresh the access token. If provided, auth errors retry once after refresh. */
@@ -71,6 +73,10 @@ function processGraphQLError(
 ): ReturnType<ConstructorParameters<typeof ErrorLink>[0]> | false {
   if (err.extensions?.code === 'IMPERSONATION_ENDED') {
     handleImpersonationEnded(config);
+    return false;
+  }
+  if (err.extensions?.code === 'IMPERSONATION_READ_ONLY') {
+    config.onImpersonationReadOnly?.();
     return false;
   }
   // SESSION_EXPIRED: the refresh token sent with a session operation was rejected.
@@ -197,6 +203,7 @@ export function createApolloClient(config: ApolloClientConfig) {
           adminListUsers: filterCursorPagination(),
           adminListResellers: filterCursorPagination(),
           adminListInstitutes: filterCursorPagination(),
+          resellerListTeamMembers: filterCursorPagination(),
         },
       },
     },

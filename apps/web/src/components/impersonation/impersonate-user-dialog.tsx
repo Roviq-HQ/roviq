@@ -26,6 +26,8 @@ const { impersonation: ids } = testIds;
 
 export const MIN_REASON_LENGTH = 10;
 const OTP_PATTERN = /^\d{6}$/;
+/** How long after a code is sent before another can be asked for. */
+export const OTP_RESEND_COOLDOWN_MS = 30_000;
 
 /** What every start or verify mutation returns: a code, or a request waiting for an OTP. */
 export interface ImpersonationStep {
@@ -62,6 +64,8 @@ export function ImpersonateUserDialog({
   const [touched, setTouched] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+  const [canResend, setCanResend] = React.useState(false);
+  const [resent, setResent] = React.useState(false);
 
   React.useEffect(() => {
     if (open) return;
@@ -70,7 +74,17 @@ export function ImpersonateUserDialog({
     setOtp('');
     setTouched(false);
     setError(null);
+    setResent(false);
   }, [open]);
+
+  // Each code that goes out starts the wait before the next one may be asked for.
+  const requestId = stage.kind === 'otp' ? stage.requestId : null;
+  React.useEffect(() => {
+    if (!requestId) return;
+    setCanResend(false);
+    const timer = setTimeout(() => setCanResend(true), OTP_RESEND_COOLDOWN_MS);
+    return () => clearTimeout(timer);
+  }, [requestId]);
 
   const reasonTooShort = reason.trim().length < MIN_REASON_LENGTH;
   const otpInvalid = !OTP_PATTERN.test(otp);
@@ -115,6 +129,28 @@ export function ImpersonateUserDialog({
       setError(t('errors.generic'));
     } catch (err) {
       tab?.close();
+      setError(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  /** Asks for a fresh code under the same reason; no tab is opened for this. */
+  const resend = async () => {
+    setError(null);
+    setResent(false);
+    setPending(true);
+    try {
+      const step = await start(reason.trim());
+      if (step.requiresOtp && step.sessionId) {
+        setOtp('');
+        setTouched(false);
+        setStage({ kind: 'otp', requestId: step.sessionId });
+        setResent(true);
+        return;
+      }
+      setError(t('errors.generic'));
+    } catch (err) {
       setError(errorMessage(err));
     } finally {
       setPending(false);
@@ -186,6 +222,29 @@ export function ImpersonateUserDialog({
               {touched && otpInvalid && (
                 <FieldError errors={[{ message: t('otpInvalidFormat') }]} />
               )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0"
+                  onClick={resend}
+                  disabled={pending || !canResend}
+                  title={canResend ? t('otpResendTitle') : t('otpResendWait')}
+                  data-testid={ids.otpResendBtn}
+                >
+                  {t('otpResend')}
+                </Button>
+                {resent && (
+                  <span
+                    role="status"
+                    className="text-sm text-muted-foreground"
+                    data-testid={ids.otpResentNotice}
+                  >
+                    {t('otpResent')}
+                  </span>
+                )}
+              </div>
             </Field>
           )}
 

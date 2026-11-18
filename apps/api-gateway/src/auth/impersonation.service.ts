@@ -5,10 +5,13 @@ import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
 import type { AuthScope, AuthUser, InstituteContext, ResellerContext } from '@roviq/common-types';
 import {
+  AppAction,
+  AppSubject,
   BusinessException,
   canImpersonateInstituteRole,
   DefaultRoles,
   ErrorCode,
+  RESELLER_TIER_ROLE,
 } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
@@ -27,6 +30,7 @@ import {
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
@@ -447,6 +451,12 @@ export class ImpersonationService {
     if (!institute)
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
 
+    const readOnly = await this.isReadOnlyImpersonator(
+      session.impersonatorScope,
+      session.impersonatorId,
+      institute.resellerId,
+    );
+
     // Generate impersonation access token (non-renewable, no refresh token)
     const accessToken = this.generateImpersonationToken({
       targetUserId,
@@ -456,6 +466,7 @@ export class ImpersonationService {
       roleId: membership.roleId,
       impersonatorId: session.impersonatorId,
       sessionId,
+      readOnly,
     });
 
     // Emit impersonation_start event
@@ -544,6 +555,7 @@ export class ImpersonationService {
     );
 
     await invalidateImpersonationSessions(this.redis, [sessionId]);
+    this.emitSessionEnded(session.id, session.targetTenantId, session.impersonatorScope);
 
     // Emit impersonation_end event
     this.authEventService
@@ -586,6 +598,7 @@ export class ImpersonationService {
     );
 
     for (const session of expired) {
+      this.emitSessionEnded(session.id, session.targetTenantId, session.impersonatorScope);
       this.authEventService
         .emit({
           userId: session.impersonatorId,
@@ -820,14 +833,52 @@ export class ImpersonationService {
     }
   }
 
+  /**
+   * Whether `startImpersonation` would accept this target for an institute user: the same
+   * checks, without starting anything. Lets the UI hide "View as" instead of offering a
+   * button that always fails.
+   */
+  async canImpersonateInInstitute(actor: InstituteContext, targetUserId: string): Promise<boolean> {
+    if (actor.isImpersonated || actor.userId === targetUserId) return false;
+
+    const targetRoles = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({
+          name: sql<string>`${rolesLive.name}->>'en'`,
+          abilities: rolesLive.abilities,
+        })
+        .from(membershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
+        .innerJoin(usersLive, eq(usersLive.id, membershipsLive.userId))
+        .where(
+          and(
+            eq(membershipsLive.userId, targetUserId),
+            eq(membershipsLive.tenantId, actor.tenantId),
+            eq(membershipsLive.status, 'ACTIVE'),
+            eq(usersLive.status, 'ACTIVE'),
+          ),
+        ),
+    );
+    if (targetRoles.length === 0) return false;
+    return (await this.intraInstituteRefusal(actor, actor.tenantId, targetRoles)) === null;
+  }
+
   private async validateIntraInstituteImpersonation(
     actor: InstituteContext,
     tenantId: string,
     targetRoles: RoleInfo[],
   ): Promise<void> {
-    if (actor.tenantId !== tenantId) {
-      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this institute');
-    }
+    const refusal = await this.intraInstituteRefusal(actor, tenantId, targetRoles);
+    if (refusal) throw new BusinessException(ErrorCode.FORBIDDEN, refusal);
+  }
+
+  /** Why this actor may not impersonate a holder of `targetRoles`, or null when they may. */
+  private async intraInstituteRefusal(
+    actor: InstituteContext,
+    tenantId: string,
+    targetRoles: RoleInfo[],
+  ): Promise<string | null> {
+    if (actor.tenantId !== tenantId) return 'No active membership in this institute';
 
     const [actorMembership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
@@ -850,9 +901,7 @@ export class ImpersonationService {
         .limit(1),
     );
 
-    if (!actorMembership) {
-      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this institute');
-    }
+    if (!actorMembership) return 'No active membership in this institute';
 
     const ability = await this.abilityFactory.createForUser({
       userId: actor.userId,
@@ -863,19 +912,14 @@ export class ImpersonationService {
     });
 
     if (!ability.can('impersonate', 'User')) {
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to impersonate users',
-      );
+      return 'You do not have permission to impersonate users';
     }
 
     const actorRole = { name: actorMembership.roleName, abilities: actorMembership.roleAbilities };
     if (!targetRoles.every((targetRole) => canImpersonateInstituteRole(actorRole, targetRole))) {
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'You are not allowed to impersonate a user with this role',
-      );
+      return 'You are not allowed to impersonate a user with this role';
     }
+    return null;
   }
 
   /**
@@ -932,6 +976,67 @@ export class ImpersonationService {
     return 'revoked';
   }
 
+  /**
+   * Impersonation must not hand someone writes their own role withholds. Reseller staff
+   * below full admin, and platform staff without `manage all` (platform_support), hold
+   * read-only roles, so the session they open is view-only. Intra-institute sessions are
+   * bounded by the role-rank rule instead.
+   */
+  private async isReadOnlyImpersonator(
+    scope: string,
+    userId: string,
+    resellerId: string,
+  ): Promise<boolean> {
+    if (scope === 'reseller') return !(await this.isResellerFullAdmin(userId, resellerId));
+    if (scope === 'platform') return !(await this.isPlatformFullAdmin(userId));
+    return false;
+  }
+
+  private async isPlatformFullAdmin(userId: string): Promise<boolean> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ abilities: rolesLive.abilities })
+        .from(platformMembershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, platformMembershipsLive.roleId))
+        .where(
+          and(
+            eq(platformMembershipsLive.userId, userId),
+            eq(platformMembershipsLive.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+    return (row?.abilities ?? []).some(
+      (rule) => rule.action === AppAction.Manage && rule.subject === AppSubject.All,
+    );
+  }
+
+  private async isResellerFullAdmin(userId: string, resellerId: string): Promise<boolean> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ roleName: sql<string>`${rolesLive.name}->>'en'` })
+        .from(resellerMembershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, resellerMembershipsLive.roleId))
+        .where(
+          and(
+            eq(resellerMembershipsLive.userId, userId),
+            eq(resellerMembershipsLive.resellerId, resellerId),
+            eq(resellerMembershipsLive.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+    return row?.roleName === RESELLER_TIER_ROLE.FULL_MANAGEMENT;
+  }
+
+  private emitSessionEnded(id: string, tenantId: string | null, impersonatorScope: string): void {
+    this.eventBus.emit(EVENT_PATTERNS.IMPERSONATION.session_ended, {
+      id,
+      tenantId,
+      impersonatorScope,
+    });
+  }
+
   // ── Private: session row ─────────────────────────────────
 
   private async createSession(
@@ -957,6 +1062,11 @@ export class ImpersonationService {
         })
         .returning({ id: impersonationSessions.id }),
     );
+    this.eventBus.emit(EVENT_PATTERNS.IMPERSONATION.session_started, {
+      id: session.id,
+      tenantId: request.tenantId,
+      impersonatorScope: request.impersonatorScope,
+    });
     return session.id;
   }
 
@@ -1066,6 +1176,7 @@ export class ImpersonationService {
     roleId: string;
     impersonatorId: string;
     sessionId: string;
+    readOnly: boolean;
   }): string {
     return this.jwtService.sign(
       {
@@ -1079,6 +1190,7 @@ export class ImpersonationService {
         isImpersonated: true,
         impersonatorId: opts.impersonatorId,
         impersonationSessionId: opts.sessionId,
+        ...(opts.readOnly ? { impersonationReadOnly: true } : {}),
         type: 'access',
       },
       {

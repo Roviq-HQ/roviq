@@ -11,12 +11,16 @@
     "institute": "संस्थान",
     "startedAt": "आरंभ",
     "status": "स्थिति",
-    "actions": "कार्रवाइयाँ"
+    "actions": "कार्रवाइयाँ",
+    "impersonatorAny": "शुरू करने वाला",
+    "reason": "कारण",
+    "expiresAt": "समाप्ति"
   },
   "status": {
     "ACTIVE": "सक्रिय",
     "ENDED": "समाप्त",
-    "EXPIRED": "अवधि समाप्त"
+    "EXPIRED": "अवधि समाप्त",
+    "REVOKED": "रद्द किया गया"
   },
   "terminate": "समाप्त करें",
   "terminateSuccess": "प्रतिरूपण सत्र समाप्त किया गया।",
@@ -24,5 +28,26 @@
   "terminateConfirmTitle": "यह सत्र समाप्त करें?",
   "terminateConfirmDescription": "टीम सदस्य को तुरंत प्रतिरूपित खाते से साइन आउट कर दिया जाएगा।",
   "cancel": "रद्द करें",
-  "accessDenied": "आपको प्रतिरूपण सत्र देखने की अनुमति नहीं है।"
+  "accessDenied": "आपको प्रतिरूपण सत्र देखने की अनुमति नहीं है।",
+  "scopes": {
+    "platform": "प्लेटफ़ॉर्म",
+    "reseller": "रीसेलर",
+    "institute": "संस्थान"
+  },
+  "admin": {
+    "title": "प्रतिरूपण सत्र",
+    "description": "हर वह सत्र जिसमें किसी ने संस्थान के उपयोगकर्ता के रूप में साइन इन किया। नए सत्र शुरू होते ही यहाँ दिखते हैं।",
+    "show": "दिखाएँ",
+    "showActive": "केवल सक्रिय",
+    "showAll": "सभी सत्र",
+    "emptyActiveTitle": "कोई सक्रिय सत्र नहीं",
+    "emptyActiveDescription": "अभी कोई किसी दूसरे उपयोगकर्ता के रूप में नहीं देख रहा है।",
+    "emptyDescription": "जब कोई संस्थान के उपयोगकर्ता के रूप में देखेगा, सत्र यहाँ दिखेंगे।",
+    "loadError": "सत्र लोड नहीं हो सके। दोबारा कोशिश करने के लिए पेज रीफ़्रेश करें।",
+    "terminateConfirmDescription": "{impersonator} को {target} के खाते से तुरंत साइन आउट कर दिया जाएगा।",
+    "terminateForbidden": "आपको यह सत्र समाप्त करने की अनुमति नहीं है।",
+    "terminateGone": "यह सत्र पहले ही समाप्त हो चुका है।"
+  },
+  "terminateTitle": "यह सत्र अभी समाप्त करें",
+  "noReason": "—"
 }

@@ -694,6 +694,14 @@ The service now polls only on its timer; `getSystemHealth()` already checks on d
 
 **Verification:** two consecutive `pnpm test:int` runs failed before the change; two consecutive runs passed after it (64 files, 676 tests).
 
+## 2026-11-18 — diagnosed: a Playwright run started right after a restart of the e2e gateway fails unrelated institute tests (ROV-183, ROV-185)
+
+A `pnpm test:e2e:ui` run failed 17 tests; 9 were institute pages untouched by the branch (`academic-years*.e2e.spec.ts`, `academics.e2e.spec.ts`), each with `net::ERR_CONNECTION_RESET` or `ERR_EMPTY_RESPONSE` on `http://localhost:<e2e API port>/api/graphql` and "Could not load institute languages" on screen. Just before, the e2e gateway had been restarted by hand (`scripts/e2e-compose.sh restart api-gateway`, for the stale `dist/libs` entry above) and was still recompiling; `e2e:up --wait` passed on the container's health check while `nx serve` restarted the process underneath it.
+
+Running the suite again without touching the stack gave 271 passed and 1 failed (a real test bug, fixed in the same commit as this entry).
+
+**Not fixed.** Workaround: after restarting the e2e gateway, wait for `Found 0 errors` in `docker logs <e2e project>-api-gateway-1` and a 200 from `/api/health/ready` before starting Playwright. A fix belongs with the stale `dist/libs` one: once the container rebuilds libraries itself, the manual restart goes away.
+
 
 ## 2026-11-18 — fixed: dev gateway died with `EADDRINUSE` after a file change (ROV-288)
 
@@ -760,3 +768,8 @@ One uncached `ci:check` run in slot 2 (16 Playwright workers, three instances' s
 With the lock per instance, `pnpm ci:check` was started at the same moment in slots 2 and 4 with the Nx cache off. Both passed in full (322 s and 329 s; alone, slot 2 takes about 190 s). Lock files: `/tmp/roviq-ci-check-2.lock`, `/tmp/roviq-ci-check-4.lock`.
 
 Also found: `NX_SKIP_NX_CACHE=1` does nothing. Nx only honours the value `true`, so earlier "uncached" runs replayed cached results (integration in 1 s). The bypass note in `scripts/ci-check.sh` and the docs now say `NX_SKIP_NX_CACHE=true`.
+
+
+## 2026-11-18 — fixed: Playwright run right after an e2e gateway restart (ROV-288)
+
+Resolves the 2026-11-18 `diagnosed` entry "a Playwright run started right after a restart of the e2e gateway fails unrelated institute tests". Its cause was `nx serve` restarting the process underneath a container that had already passed its health check. The container no longer runs `nx serve`: it builds, then starts one `node` process, and is healthy only once that process answers GraphQL. No manual restart is needed after a library change either.

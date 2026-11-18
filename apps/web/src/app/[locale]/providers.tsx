@@ -11,6 +11,7 @@ import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { useTranslations } from 'next-intl';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import * as React from 'react';
+import { toast } from 'sonner';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005';
 const GRAPHQL_HTTP = `${API_URL}/api/graphql`;
@@ -48,6 +49,7 @@ function GraphQLBridge({
   children: React.ReactNode;
 }) {
   const { notifyImpersonationEnded, refreshSession } = useAuth();
+  const t = useTranslations('auth');
 
   const handleImpersonationEnded = React.useCallback(() => {
     notifyImpersonationEnded();
@@ -79,6 +81,10 @@ function GraphQLBridge({
       }}
       onTokenRefresh={handleTokenRefresh}
       onImpersonationEnded={handleImpersonationEnded}
+      // One id, so a page that fires several refused writes shows one message.
+      onImpersonationReadOnly={() =>
+        toast.error(t('impersonationViewOnlyRefused'), { id: 'impersonation-view-only' })
+      }
     >
       {children}
     </GraphQLProvider>

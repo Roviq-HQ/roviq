@@ -94,6 +94,8 @@ export interface LayoutConfig {
   navGroups: NavGroup[];
   user?: UserInfo;
   onLogout?: () => void;
+  /** Replaces "Log out" in the user menu, e.g. while the tab is an impersonation session. */
+  logoutLabel?: string;
   instituteSwitcher?: InstituteSwitcherConfig;
   notifications?: NotificationConfig;
   /**
