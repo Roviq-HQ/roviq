@@ -194,6 +194,7 @@ export function createApolloClient(config: ApolloClientConfig) {
           adminListUsers: filterCursorPagination(),
           adminListResellers: filterCursorPagination(),
           adminListInstitutes: filterCursorPagination(),
+          resellerListTeamMembers: filterCursorPagination(),
         },
       },
     },

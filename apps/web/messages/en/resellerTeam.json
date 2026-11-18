@@ -1,0 +1,112 @@
+{
+  "title": "Team",
+  "description": "People from your organisation who can sign in to this portal.",
+  "invite": "Invite member",
+  "you": "You",
+  "never": "Never",
+  "columns": {
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "lastActive": "Last active",
+    "joined": "Joined",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "filters": {
+    "search": "Search by name, email or Roviq ID",
+    "allStatuses": "All statuses",
+    "clear": "Clear filters"
+  },
+  "empty": {
+    "title": "No members match",
+    "description": "Try another search or clear the filters.",
+    "noData": "No team members yet",
+    "noDataDescription": "Invite a colleague to give them access to this portal."
+  },
+  "loadError": "Could not load the team. Refresh the page to try again.",
+  "pagination": {
+    "loadMore": "Load more",
+    "showing": "Showing",
+    "of": "of"
+  },
+  "actions": {
+    "menu": "Actions for {name}",
+    "changeRole": "Change role",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "cancel": "Cancel",
+    "saving": "Saving…"
+  },
+  "inviteDialog": {
+    "title": "Invite a team member",
+    "description": "If this email already has a Roviq account, that account is added to your team. Otherwise a new account is created and a temporary password is sent to the address.",
+    "email": "Email",
+    "emailPlaceholder": "name@example.com",
+    "role": "Role",
+    "rolePlaceholder": "Choose a role",
+    "roleHint": "You can give roles up to your own.",
+    "submit": "Invite",
+    "submitting": "Inviting…",
+    "success": "{email} was added to the team."
+  },
+  "roleDialog": {
+    "title": "Change role of {name}",
+    "description": "The new role applies at once. They are asked to sign in again only if their session cannot be renewed.",
+    "role": "Role",
+    "unchanged": "Choose a different role to save.",
+    "submit": "Change role",
+    "success": "{name} is now {role}."
+  },
+  "deactivateDialog": {
+    "title": "Deactivate {name}?",
+    "description": "They are signed out at once and cannot sign in to this portal until reactivated. Their Roviq account and any other memberships stay as they are.",
+    "confirm": "Deactivate",
+    "success": "{name} was deactivated."
+  },
+  "reactivateDialog": {
+    "title": "Reactivate {name}?",
+    "description": "They can sign in to this portal again with their existing role.",
+    "confirm": "Reactivate",
+    "success": "{name} was reactivated."
+  },
+  "roleHelp": {
+    "reseller_full_admin": "Manages institutes, billing and the team.",
+    "reseller_support_admin": "Reads everything, can view as institute users, and manages support and viewer members.",
+    "reseller_viewer": "Read-only access."
+  },
+  "detail": {
+    "title": "Team member",
+    "loading": "Loading member…",
+    "notFound": "This team member was not found.",
+    "roviqId": "Roviq ID",
+    "role": "Role",
+    "status": "Status",
+    "joined": "Joined",
+    "lastActive": "Last active",
+    "sessions": "Active sessions",
+    "sessionsEmpty": "No active sessions.",
+    "sessionsHidden": "Only team admins can see a member's sessions.",
+    "sessionStarted": "Signed in {date}",
+    "sessionLastUsed": "Last used {date}",
+    "sessionUnknownDevice": "Unknown device",
+    "activity": "Recent activity",
+    "activityEmpty": "No recorded activity yet.",
+    "activityHidden": "You do not have access to the audit log."
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "FORBIDDEN": "You are not allowed to do this.",
+    "VALIDATION_FAILED": "Enter a valid email address.",
+    "TEAM_MEMBER_NOT_FOUND": "This team member no longer exists. Refresh the page.",
+    "TEAM_MEMBER_ALREADY_EXISTS": "This person is already on your team. If they are inactive, reactivate them from the list.",
+    "TEAM_MEMBER_EMAIL_UNAVAILABLE": "This email cannot be used for a team member. Use another address.",
+    "TEAM_MEMBER_SELF_CHANGE": "You cannot change your own role or status. Ask another admin.",
+    "TEAM_ROLE_NOT_ASSIGNABLE": "This role is above what you, or your organisation's plan, can assign.",
+    "TEAM_MEMBER_STATUS_UNCHANGED": "This member's status has already changed. Refresh the page."
+  }
+}

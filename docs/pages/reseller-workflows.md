@@ -219,6 +219,42 @@ When institutes make UPI peer-to-peer payments, those payments appear here for m
 
 ---
 
+## Team
+
+The Team page (`/reseller/team`) lists the people from your organisation who can sign in to the Reseller Portal.
+
+1. Click **Team** in the sidebar. Each row shows the member's name, email, **role**, **status** (Active or Inactive), when they were last active and when they joined. Your own row carries a **You** badge.
+2. Use the search box (name, email or Roviq ID) and the **status** filter to narrow the list. Filters are kept in the page address, so a filtered view can be bookmarked or shared.
+3. Click a row to open the member's detail panel: profile, **active sessions** (device, IP address, sign-in time) and their **recent activity** from the audit log. Sessions are shown to team admins only.
+
+### Roles
+
+| Role | Can do |
+|---|---|
+| Reseller admin | Manage institutes, billing and the team. |
+| Reseller support | Read everything, view as institute users, and manage Support and Viewer members. |
+| Reseller viewer | Read only. The Team page shows no Invite button and no row actions. |
+
+You can give roles up to your own, and never above your organisation's plan tier. You cannot change members who hold a role above yours, and you cannot change your own role or status.
+
+### Invite a member
+
+1. Click **Invite member**.
+2. Enter the person's **email** and choose a **role**.
+3. Click **Invite**. If the email already has a Roviq account, that account is added to your team and keeps its password. Otherwise a new account is created and a temporary password is sent to the address.
+
+If the person is already on your team (even as an inactive member) the invite is refused; reactivate them from the list.
+
+### Change a role, deactivate, reactivate
+
+Open the **⋯** menu at the end of a member's row.
+
+- **Change role** -- pick another role and confirm. It applies at once.
+- **Deactivate** -- the member is signed out immediately and cannot sign in to this portal until reactivated. Their Roviq account and any other memberships are untouched.
+- **Reactivate** -- shown for inactive members; they can sign in again with their existing role.
+
+---
+
 ## Audit Logs
 
 Audit Logs record every significant action taken in the reseller portal.
