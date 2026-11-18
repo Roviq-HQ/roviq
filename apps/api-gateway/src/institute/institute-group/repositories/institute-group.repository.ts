@@ -13,6 +13,11 @@ export abstract class InstituteGroupRepository {
   abstract search(
     params: InstituteGroupSearchParams,
   ): Promise<{ records: InstituteGroupRecord[]; total: number }>;
+  /** A group the reseller owns, or null — including when it exists but belongs to someone else. */
+  abstract findOwnedByReseller(
+    resellerId: string,
+    groupId: string,
+  ): Promise<InstituteGroupRecord | null>;
   /** Groups the reseller owns or that contain its institutes, read under reseller RLS. */
   abstract searchForReseller(
     resellerId: string,

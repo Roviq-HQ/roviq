@@ -1,6 +1,6 @@
 // CI guard — lists every file that runs queries as the admin DB role
-// (`withAdmin` / `mkAdminCtx`, RLS bypassed) and is reachable from an
-// institute- or reseller-scope resolver.
+// (`withAdmin` / `mkAdminCtx`, RLS bypassed) and is reachable from a resolver
+// that a non-platform token can call (every resolver outside `admin/`).
 //
 // Why: ROV-290. Institute-scope resolvers reached repositories that ran as
 // admin with caller-supplied ids, so any institute login could read and change
@@ -16,13 +16,9 @@ import ts from 'typescript';
 
 const ROOT = process.cwd();
 
-/** Directories whose resolvers serve non-platform scopes. */
-const NON_PLATFORM_RESOLVER_DIRS = [
-  'apps/api-gateway/src/institute',
-  'apps/api-gateway/src/reseller',
-  'ee/apps/api-gateway/src/billing/institute',
-  'ee/apps/api-gateway/src/billing/reseller',
-];
+/** Every resolver outside an `admin/` directory can be called with a non-platform token. */
+const RESOLVER_ROOT_DIRS = ['apps/api-gateway/src', 'ee/apps/api-gateway/src'];
+const PLATFORM_ONLY_DIR = 'admin';
 
 // Reached admin-context file → why no caller-chosen id reaches an admin query in it.
 export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
@@ -34,6 +30,18 @@ export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
     'Creates users on platform-level tables; tenant and reseller ids come from the caller token, never from arguments.',
   'apps/api-gateway/src/auth/impersonation.service.ts':
     'Every lookup is checked against the actor scope, tenant, reseller and role rank before a session is issued (ROV-94).',
+  'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts':
+    'Login and token flows: memberships are looked up for the authenticated user id; a membership id from the client is matched against that user before use (ROV-92).',
+  'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts':
+    'Looked up by the authenticated user id during login and refresh.',
+  'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts':
+    'Tokens are found by their own hash or id and checked against the calling user before revocation (ROV-92).',
+  'apps/api-gateway/src/auth/repositories/reseller-membership.drizzle-repository.ts':
+    'Looked up by the authenticated user id during login and refresh.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts':
+    'Users are a platform-level table; lookups use the login identifier or the token user id.',
+  'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts':
+    'Passkeys are read and deleted by the token user id; login lookups use the credential id presented by the authenticator.',
   'apps/api-gateway/src/institute/academic-year/academic-year.service.ts':
     'Reads the type of the institute named by the token tenant id.',
   'apps/api-gateway/src/institute/bot/bot.service.ts':
@@ -47,13 +55,13 @@ export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts':
     'Institute scope reaches only findForTenant (tenant RLS) and findMembershipsByUser(token user id); reseller scope reaches the *ForReseller methods (reseller RLS) and create with its own reseller id. The admin-context methods are called from the admin resolver only.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts':
-    'Institute scope passes only the token tenant id; reseller scope uses the *ByReseller methods or checks ownership through findByReseller first.',
+    'Institute scope passes only the token tenant id. Reseller scope uses the *ByReseller methods, checks ownership through findByReseller before a status change, and creates with its own reseller id and a group it owns (assertOwnedByReseller).',
   'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts':
     'Runs from institute activation, which only admin and reseller resolvers can trigger after their own ownership checks.',
   'apps/api-gateway/src/institute/staff/staff.service.ts':
     'Writes platform-level user tables for the user it just created in the token tenant.',
   'apps/api-gateway/src/institute/student/student.service.ts':
-    'Touches platform-level user tables for a user id taken from a tenant-scoped student row, or a phone lookup on create.',
+    'Touches platform-level user tables for a user id taken from a tenant-scoped student row. KNOWN GAP (ROV-292): create reuses an existing user matched by phone number without consent, and later updates write that shared profile.',
   'apps/api-gateway/src/institute/user/profile.service.ts':
     'Reads and writes the profile of the token user id only.',
   'apps/api-gateway/src/reseller/team/reseller-team.service.ts':
@@ -221,7 +229,8 @@ function findResolvers(dir: string, out: string[]): void {
   for (const entry of entries) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name !== '__tests__' && entry.name !== 'node_modules') findResolvers(full, out);
+      const skip = ['__tests__', 'node_modules', PLATFORM_ONLY_DIR].includes(entry.name);
+      if (!skip) findResolvers(full, out);
     } else if (/\.(resolver|subscription)\.ts$/.test(entry.name)) {
       out.push(full);
     }
@@ -236,7 +245,7 @@ function loadCompilerOptions(): ts.CompilerOptions {
 
 function main(): number {
   const roots: string[] = [];
-  for (const dir of NON_PLATFORM_RESOLVER_DIRS) findResolvers(join(ROOT, dir), roots);
+  for (const dir of RESOLVER_ROOT_DIRS) findResolvers(join(ROOT, dir), roots);
 
   const compilerOptions = loadCompilerOptions();
   const sources: string[] = [];

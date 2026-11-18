@@ -49,7 +49,12 @@ export async function seedInstituteRoles(tx: DrizzleDB, inst1Id: string, inst2Id
       })
       .onConflictDoUpdate({
         target: [roles.tenantId, roles.name],
-        set: { updatedAt: new Date(), primaryNavSlugs },
+        // Default roles follow the code: a re-seed refreshes abilities too.
+        set: {
+          updatedAt: new Date(),
+          primaryNavSlugs,
+          abilities: JSON.parse(JSON.stringify(abilities)),
+        },
       })
       .returning();
     roleIds[roleName] = role.id;
@@ -67,7 +72,12 @@ export async function seedInstituteRoles(tx: DrizzleDB, inst1Id: string, inst2Id
       })
       .onConflictDoUpdate({
         target: [roles.tenantId, roles.name],
-        set: { updatedAt: new Date(), primaryNavSlugs },
+        // Default roles follow the code: a re-seed refreshes abilities too.
+        set: {
+          updatedAt: new Date(),
+          primaryNavSlugs,
+          abilities: JSON.parse(JSON.stringify(abilities)),
+        },
       })
       .returning();
     roleIds2[roleName] = role2.id;

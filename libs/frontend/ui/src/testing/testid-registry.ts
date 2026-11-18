@@ -218,6 +218,8 @@ export const testIds = {
     addInstituteDialog: 'reseller-group-add-institute-dialog',
     addInstituteSelect: 'reseller-group-add-institute-select',
     addInstituteSubmit: 'reseller-group-add-institute-submit',
+    member: (instituteId: string) => `reseller-group-member-${instituteId}`,
+    removeInstituteBtn: (instituteId: string) => `reseller-group-remove-institute-${instituteId}`,
   },
 
   // ── Reseller: impersonation sessions page (ROV-144) ───────────────────

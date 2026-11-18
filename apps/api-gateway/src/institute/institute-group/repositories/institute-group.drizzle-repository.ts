@@ -80,6 +80,28 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
     );
   }
 
+  async findOwnedByReseller(
+    resellerId: string,
+    groupId: string,
+  ): Promise<InstituteGroupRecord | null> {
+    return withReseller(
+      this.db,
+      mkResellerCtx(resellerId, 'repository:institute-group'),
+      async (tx) => {
+        const rows = await tx
+          .select(groupColumns)
+          .from(instituteGroupsLive)
+          .where(
+            and(
+              eq(instituteGroupsLive.id, groupId),
+              eq(instituteGroupsLive.resellerId, resellerId),
+            ),
+          );
+        return (rows[0] as InstituteGroupRecord | undefined) ?? null;
+      },
+    );
+  }
+
   async searchForReseller(
     resellerId: string,
     params: InstituteGroupSearchParams,
