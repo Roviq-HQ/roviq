@@ -48,23 +48,21 @@ export const impersonationSessions = pgTable(
     index('impersonation_sessions_impersonator_idx').on(table.impersonatorId),
     index('impersonation_sessions_target_user_idx').on(table.targetUserId),
     index('impersonation_sessions_target_tenant_idx').on(table.targetTenantId),
-    // roviq_app: SELECT + INSERT (for audit trail)
+    // SECURITY: sessions are written only as roviq_admin (ImpersonationService). The other
+    // roles read the sessions on their own institutes and can change nothing, so tenant or
+    // reseller code cannot forge, reopen or read another tenant's session (ROV-102).
     pgPolicy('impersonation_sessions_app_select', {
       for: 'select',
       to: roviqApp,
-      using: sql`true`,
+      using: sql`target_tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
-    pgPolicy('impersonation_sessions_app_insert', {
-      for: 'insert',
-      to: roviqApp,
-      withCheck: sql`true`,
-    }),
-    // roviq_reseller: SELECT + INSERT + UPDATE (can start/end sessions)
-    pgPolicy('impersonation_sessions_reseller_all', {
-      for: 'all',
+    pgPolicy('impersonation_sessions_reseller_select', {
+      for: 'select',
       to: roviqReseller,
-      using: sql`true`,
-      withCheck: sql`true`,
+      using: sql`target_tenant_id IN (
+        SELECT id FROM institutes
+        WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid
+      )`,
     }),
     // roviq_admin: full access
     pgPolicy('impersonation_sessions_admin_all', {

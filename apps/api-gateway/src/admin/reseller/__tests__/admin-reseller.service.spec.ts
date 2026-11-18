@@ -116,12 +116,8 @@ function createTxMock(stages: TxStages) {
         where: (cond: unknown) => {
           whereFn(cond);
           return Object.assign(Promise.resolve(), {
-            returning: () => {
-              if (tableName === 'impersonation_sessions') {
-                return Promise.resolve(stages.sessionRows ?? []);
-              }
-              return Promise.resolve(primaryReseller ? [{ ...primaryReseller, ...values }] : []);
-            },
+            returning: () =>
+              Promise.resolve(primaryReseller ? [{ ...primaryReseller, ...values }] : []),
           });
         },
       };
@@ -278,7 +274,7 @@ describe('AdminResellerService', () => {
       });
     });
 
-    it('suspends reseller, revokes tokens, terminates impersonation, emits events', async () => {
+    it('suspends reseller, drops the session caches and emits events', async () => {
       const { tx, calls } = createTxMock({
         resellerRows: [{ id: NORMAL_RESELLER_ID, isSystem: false, status: ResellerStatus.ACTIVE }],
         staffRows: [
@@ -298,13 +294,10 @@ describe('AdminResellerService', () => {
       expect(resellerUpdate.values.isActive).toBe(false);
       expect(resellerUpdate.values.updatedBy).toBe(ACTOR_ID);
 
-      expect(calls.updateRefreshTokens).toHaveBeenCalledTimes(1);
-      const tokenUpdate = calls.updateRefreshTokens.mock.calls[0][0];
-      expect(tokenUpdate.values.revokedAt).toBeInstanceOf(Date);
-      // Any other reason (or none) makes the next refresh look like token theft.
-      expect(tokenUpdate.values.revokedReason).toBe('admin_revoked');
-      expect(calls.updateImpersonation).toHaveBeenCalledTimes(1);
-      expect(calls.updateImpersonation.mock.calls[0][0].values.endedReason).toBe('revoked');
+      // Tokens and sessions are revoked by the `resellers_revoke_sessions` database trigger,
+      // proven in reseller-suspension.integration.spec.ts; the service must not race it.
+      expect(calls.updateRefreshTokens).not.toHaveBeenCalled();
+      expect(calls.updateImpersonation).not.toHaveBeenCalled();
 
       expect(authEventService.emit).toHaveBeenCalledTimes(3);
       expect(authEventService.emit).toHaveBeenCalledWith({

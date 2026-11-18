@@ -288,7 +288,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
       tx
         .update(refreshTokens)
         .set({ revokedAt: new Date(), revokedReason: reason })
-        .where(eq(refreshTokens.id, id)),
+        .where(and(eq(refreshTokens.id, id), isNull(refreshTokens.revokedAt))),
     );
   }
 

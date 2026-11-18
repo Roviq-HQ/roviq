@@ -62,35 +62,44 @@ The local gate health-checks long-running infrastructure first, then waits for t
 
 ## Security invariants
 
-The auth invariants from Auth PRD v3.0 Section 21 (ROV-102). Each row names the test that proves it. A test counts only if it exercises the layer that enforces the invariant: a database test for roles, GRANTs and RLS, and a test through the running API for anything the application enforces. A test that writes a row and reads it back proves nothing and does not belong here.
+The auth invariants from Auth PRD v3.0 Section 21 (ROV-102). Where the database can enforce an invariant, it does, through a constraint, trigger, policy or GRANT, so a buggy or new code path cannot skip it. The application checks the same rules first to return a clear error. Where the rule lives outside PostgreSQL (an HTTP response, a code or ticket held in Redis), it is tested through the running API.
 
-`DB` = `libs/database/src/__tests__/security-invariants.integration.spec.ts`, `E2E` = `e2e/api-gateway-e2e/src/security-invariants.api-e2e.spec.ts`.
+A test counts only if it attempts the forbidden action and expects a refusal. A test that writes a row and reads it back proves nothing and does not belong here.
 
-| # | Invariant | Proven by |
-|---|---|---|
-| 1 | `roviq_pooler` cannot query without `SET LOCAL ROLE` | DB, test 1 |
-| 2 | `roviq_app` cannot read `platform_memberships` | DB, test 2 |
-| 3 | `roviq_app` cannot read `reseller_memberships` | DB, test 3 |
-| 4 | `roviq_reseller` cannot read another reseller's institutes | DB, test 4 |
-| 5 | `roviq_reseller` cannot write to tenant tables | DB, test 5 |
-| 6 | `roviq_admin` sees all data | DB, test 6 |
-| 7 | An impersonation token cannot be refreshed | E2E, sections 7 and 8 (no `refreshToken` field; the token is refused by `refreshToken`) |
-| 8 | A revoked impersonation session rejects requests | E2E, section 8; `impersonation.integration.spec.ts` |
-| 9 | Reseller suspension revokes all staff sessions | `reseller-suspension.integration.spec.ts` |
-| 10 | Reseller suspension ends active impersonations | `reseller-suspension.integration.spec.ts` |
-| 11 | A password change invalidates all sessions | `e2e/api-gateway-e2e/src/password-change.api-e2e.spec.ts` |
-| 12 | A wrong portal is indistinguishable from a wrong password | E2E, section 12 |
-| 13 | Cross-tenant data isolation | DB, test 13 |
-| 14 | A one-time impersonation code cannot be reused | E2E, section 14 |
-| 15 | Intra-institute impersonation respects the role hierarchy | E2E, section 15; `impersonation.integration.spec.ts` → "intra-institute" |
-| 16 | Switching institute revokes the previous refresh token | E2E, section 16 |
-| 17 | A reseller cannot delete institutes | E2E, section 17; `libs/database/src/__tests__/reseller-system-roles.spec.ts` |
-| 18 | The system reseller cannot be suspended or deleted | E2E, section 18 |
-| 19 | A ws-ticket is single-use and expires | E2E, section 19; `apps/api-gateway/src/auth/__tests__/ws-ticket.store.spec.ts` (30-second TTL) |
-| 20 | `revokeAllOtherSessions` keeps the current session | E2E, section 20 |
-| 21 | `selectInstitute` needs a valid selection token | E2E, section 21 |
+`DB` = `libs/database/src/__tests__/auth-invariants-db.integration.spec.ts` (rules from the `rov-102-*` migrations), `RLS` = `libs/database/src/__tests__/security-invariants.integration.spec.ts`, `E2E` = `e2e/api-gateway-e2e/src/security-invariants.api-e2e.spec.ts`.
 
-The E2E sections keep the numbering used when the suite was first written, which is one higher than the issue's from 16 on; the table follows the E2E numbers.
+| # | Invariant | Enforced by | Proven by |
+|---|---|---|---|
+| 1 | `roviq_pooler` cannot query without `SET LOCAL ROLE` | GRANTs | RLS 1 |
+| 2 | `roviq_app` cannot read `platform_memberships` | GRANTs | RLS 2 |
+| 3 | `roviq_app` cannot read `reseller_memberships` | GRANTs | RLS 3 |
+| 4 | `roviq_reseller` cannot read another reseller's institutes | RLS | RLS 4 |
+| 5 | `roviq_reseller` cannot write to tenant tables | GRANTs | RLS 5 |
+| 6 | `roviq_admin` sees all data | RLS | RLS 6 |
+| 7 | An impersonation token cannot be refreshed | `chk_refresh_token_membership_scope`; refresh tokens only for a live membership (`refresh_tokens_guard`) | DB; E2E 7, 8 |
+| 8 | An ended impersonation session stays ended | `impersonation_sessions_guard`; only `roviq_admin` writes sessions | DB; E2E 8 |
+| 9 | Reseller suspension revokes every staff session | `resellers_revoke_sessions` trigger | DB; `reseller-suspension.integration.spec.ts` |
+| 10 | Reseller suspension ends staff impersonations | `resellers_revoke_sessions` trigger | DB; `reseller-suspension.integration.spec.ts` |
+| 11 | A password change revokes every session | `users_revoke_sessions_on_password_change` trigger | DB; `password-change.api-e2e.spec.ts` |
+| 12 | A wrong portal is indistinguishable from a wrong password | application | E2E 12 |
+| 13 | Cross-tenant data isolation | RLS | RLS 13 |
+| 14 | A one-time impersonation code cannot be reused | Redis `GETDEL` | E2E 14 |
+| 15 | Intra-institute impersonation respects the role hierarchy | application; the database refuses an impersonator with no membership in the institute | E2E 15; DB |
+| 16 | Switching institute revokes the previous refresh token | application; a revoked token stays revoked (`refresh_tokens_guard`) | E2E 16; DB |
+| 17 | A reseller cannot delete institutes | no reseller DELETE policy or GRANT; `institutes_delete_admin_only` refuses a soft delete | DB; E2E 17; `reseller-system-roles.spec.ts` |
+| 18 | The system reseller cannot be suspended or deleted | `resellers_protect_system` trigger, which also stops the database superuser | DB; E2E 18 |
+| 19 | A ws-ticket is single-use and expires | Redis `GETDEL` and 30-second TTL | E2E 19; `ws-ticket.store.spec.ts` |
+| 20 | `revokeAllOtherSessions` keeps the current session | application | E2E 20 |
+| 21 | `selectInstitute` needs a valid selection token | application | E2E 21 |
+
+Further rules the database enforces, tested in DB:
+
+- A refresh token is issued only to an active membership of that user (for institute scope, in that institute), and a suspended or deleted reseller gets none.
+- A revoked refresh token must carry a reason and cannot be un-revoked. A token cannot be re-pointed at another user or membership, or extended.
+- An impersonation session can be opened only by someone with active access of that scope to the target institute (a reseller only into its own institutes). It cannot be re-pointed or extended.
+- `roviq_app` reads only the sessions in its own institute and `roviq_reseller` only those in its own institutes. Neither can write any.
+
+The E2E sections keep the numbering used when the suite was first written, which is one higher than the issue's from 16 on.
 
 CI runs the database and session specs as the named step **Auth Security Invariants** in the `test` job, before the full integration suite. The E2E spec runs in the `e2e-api` job.
 

@@ -139,14 +139,14 @@ A missing, malformed, unknown, expired or reused ticket closes the socket with c
 
 ## Reseller suspension and deletion (ROV-97)
 
-Platform admins suspend, unsuspend and delete resellers through `adminSuspendReseller`, `adminUnsuspendReseller` and `adminDeleteReseller` (`apps/api-gateway/src/admin/reseller/`). The system reseller "Roviq Direct" refuses all three with `SYSTEM_RESELLER_PROTECTED`.
+Platform admins suspend, unsuspend and delete resellers through `adminSuspendReseller`, `adminUnsuspendReseller` and `adminDeleteReseller` (`apps/api-gateway/src/admin/reseller/`). The system reseller "Roviq Direct" refuses all three with `SYSTEM_RESELLER_PROTECTED`. The `resellers_protect_system` trigger refuses the same changes in the database, for every role including the superuser.
 
 **Suspension** cuts off the reseller's staff at once:
 
-- Every reseller-scope refresh token of the reseller's memberships is revoked with reason `admin_revoked`. The reason is required: a revoked token with no reason is treated as token theft on its next use and revokes every other session of that user. Tokens are matched by membership, so the same person's institute sessions are untouched.
-- Access tokens already issued are rejected by `ResellerAccessGuard`, a global guard that checks the reseller's status on every reseller-scope request and answers `UNAUTHENTICATED`. Without it a suspended reseller's staff could keep working until their access token expired (up to 10 minutes). The guard caches the answer in Redis for 60 seconds; suspension writes a `blocked` marker that the guard checks first, so there is no wait for the cache to expire.
-- Impersonation sessions the staff opened as reseller are ended with reason `revoked`, and `ImpersonationSessionGuard` rejects their tokens on the next request (`IMPERSONATION_ENDED`).
-- `resellerLogin` and `refreshToken` refuse a reseller that is not `ACTIVE`. Login answers `INVALID_CREDENTIALS`, the same as a wrong password, so it does not confirm the password.
+- The database does the revocation. The `resellers_revoke_sessions` trigger runs when a reseller leaves `ACTIVE`, whatever code changed it. It revokes every reseller-scope refresh token of the reseller's memberships with reason `admin_revoked`, and ends the impersonation sessions its staff opened as reseller with reason `revoked`. Tokens are matched by membership, so the same person's institute sessions are untouched. The reason is required (`chk_refresh_token_revoked_reason`): a revoked token without one would be treated as token theft and revoke every other session of the user.
+- Access tokens already issued are rejected by `ResellerAccessGuard`, a global guard that checks the reseller's status on every reseller-scope request and answers `UNAUTHENTICATED`. The database cannot see an access token, so this check stays in the application. The guard caches the answer in Redis for 60 seconds; suspension writes a `blocked` marker that the guard checks first, so there is no wait for the cache to expire.
+- The service drops the Redis caches of the ended impersonation sessions, so `ImpersonationSessionGuard` rejects their tokens on the next request (`IMPERSONATION_ENDED`).
+- `resellerLogin` and `refreshToken` refuse a reseller that is not `ACTIVE`. Login answers `INVALID_CREDENTIALS`, the same as a wrong password, so it does not confirm the password. The database also refuses a new refresh token for such a reseller.
 
 Institute users of a suspended reseller are not affected. Their institute-scope tokens also carry a `resellerId`, and the guard ignores them on purpose.
 

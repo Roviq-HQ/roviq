@@ -9,7 +9,6 @@ import {
   mkAdminCtx,
   provisionResellerSystemRoles,
   type ResellerSystemRoleName,
-  refreshTokens,
   resellerMemberships,
   resellerMembershipsLive,
   resellers,
@@ -374,56 +373,40 @@ export class AdminResellerService {
           );
         }
 
-        const now = new Date();
+        const staff = await tx
+          .select({ userId: resellerMembershipsLive.userId })
+          .from(resellerMembershipsLive)
+          .where(eq(resellerMembershipsLive.resellerId, resellerId));
+        const staffUserIds = [...new Set(staff.map((s) => s.userId))];
+
+        // Read before the status change: the `resellers_revoke_sessions` trigger ends these
+        // sessions and revokes the staff's refresh tokens as part of that UPDATE. The ids
+        // are needed afterwards to drop the guards' Redis caches.
+        const liveSessions =
+          staffUserIds.length === 0
+            ? []
+            : await tx
+                .select({ id: impersonationSessions.id })
+                .from(impersonationSessions)
+                .where(
+                  and(
+                    inArray(impersonationSessions.impersonatorId, staffUserIds),
+                    eq(impersonationSessions.impersonatorScope, 'reseller'),
+                    isNull(impersonationSessions.endedAt),
+                  ),
+                );
+        const endedSessionIds = liveSessions.map((s) => s.id);
+
         const [updated] = await tx
           .update(resellers)
           .set({
             status: ResellerStatus.SUSPENDED,
-            suspendedAt: now,
+            suspendedAt: new Date(),
             isActive: false,
             updatedBy: actorId,
           })
           .where(eq(resellers.id, resellerId))
           .returning();
-
-        const staff = await tx
-          .select({ id: resellerMembershipsLive.id, userId: resellerMembershipsLive.userId })
-          .from(resellerMembershipsLive)
-          .where(eq(resellerMembershipsLive.resellerId, resellerId));
-        const staffUserIds = [...new Set(staff.map((s) => s.userId))];
-
-        let endedSessionIds: string[] = [];
-        if (staff.length > 0) {
-          // By membership, not by user: the same person's institute sessions must survive.
-          // The reason matters — a NULL reason reads as token theft on the next refresh
-          // and revokes every other session the user has.
-          await tx
-            .update(refreshTokens)
-            .set({ revokedAt: now, revokedReason: 'admin_revoked', updatedBy: actorId })
-            .where(
-              and(
-                inArray(
-                  refreshTokens.membershipId,
-                  staff.map((s) => s.id),
-                ),
-                eq(refreshTokens.membershipScope, 'reseller'),
-                isNull(refreshTokens.revokedAt),
-              ),
-            );
-
-          const ended = await tx
-            .update(impersonationSessions)
-            .set({ endedAt: now, endedReason: 'revoked' })
-            .where(
-              and(
-                inArray(impersonationSessions.impersonatorId, staffUserIds),
-                eq(impersonationSessions.impersonatorScope, 'reseller'),
-                isNull(impersonationSessions.endedAt),
-              ),
-            )
-            .returning({ id: impersonationSessions.id });
-          endedSessionIds = ended.map((s) => s.id);
-        }
 
         return { record: updated, previousStatus: reseller.status, staffUserIds, endedSessionIds };
       },

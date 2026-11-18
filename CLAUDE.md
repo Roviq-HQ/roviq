@@ -167,6 +167,7 @@ Full rationale + enforcing CI gate for each line: `docs/references/mistake-refer
 - Errors: `BusinessException(ErrorCode.X, …)` on the backend; frontend branches on `extensions.code` (`isAppError`, `extractGraphQLErrorCode`) and shows translated copy — never `err.message`
 - `REDIS_KEYS` constants · new `@roviq/*` lib → add vitest alias in `apps/api-gateway/vitest.config.ts` · impersonation tokens never refresh
 - Save test/build output to a temp file and grep it — don't re-run · e2e DB is `roviq_test` · verify docs/assertions against source, not memory
+- Security rules live in PostgreSQL where possible (GRANT, RLS, CHECK, trigger), not only in services; test by attempting the forbidden write as the role
 - `pnpm tilt …`, never bare `tilt` · no hardcoded dev/e2e ports in code or tests — instance variables with slot 0 defaults
 
 ## Skills (when needed, not always loaded)

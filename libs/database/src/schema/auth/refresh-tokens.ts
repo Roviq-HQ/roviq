@@ -39,9 +39,7 @@ export const refreshTokens = pgTable(
      *                        password; same semantics as user_initiated.
      *  - `admin_revoked`   — platform/reseller admin revoked the session.
      *
-     * Nullable because the column was added after the feature shipped;
-     * older rows have NULL and fall back to the stricter "treat as
-     * rotation" cascade path.
+     * NULL exactly while the token is live (`chk_refresh_token_revoked_reason`).
      */
     revokedReason: varchar('revoked_reason', { length: 32 }),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
@@ -51,6 +49,15 @@ export const refreshTokens = pgTable(
     check(
       'chk_refresh_token_membership_scope',
       sql`${table.membershipScope} IN ('platform', 'reseller', 'institute')`,
+    ),
+    // SECURITY: a revoked token with no reason reads as token theft on its next use and
+    // revokes every other session of the user (ROV-97), so the database refuses one.
+    check(
+      'chk_refresh_token_revoked_reason',
+      sql`(${table.revokedAt} IS NULL AND ${table.revokedReason} IS NULL)
+        OR (${table.revokedAt} IS NOT NULL
+          AND ${table.revokedReason} IS NOT NULL
+          AND ${table.revokedReason} IN ('rotation', 'user_initiated', 'password_change', 'admin_revoked'))`,
     ),
     index('refresh_tokens_tenant_id_idx').using('btree', table.tenantId.asc().nullsLast()),
     index('refresh_tokens_token_hash_idx').using('btree', table.tokenHash.asc().nullsLast()),
