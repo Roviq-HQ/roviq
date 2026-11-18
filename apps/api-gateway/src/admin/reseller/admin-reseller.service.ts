@@ -1,6 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode, ResellerStatus, ResellerTier } from '@roviq/common-types';
 import {
+  authEvents,
   DRIZZLE_DB,
   type DrizzleDB,
   impersonationSessions,
@@ -13,12 +14,15 @@ import {
   resellerMembershipsLive,
   resellers,
   roles,
+  rolesLive,
+  userProfilesLive,
+  usersLive,
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { and, count, desc, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, or, type SQL, sql } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import { AuthEventService } from '../../auth/auth-event.service';
 import { IdentityService } from '../../auth/identity.service';
@@ -59,11 +63,38 @@ function buildListConditions(filter: AdminListResellersFilterInput): SQL[] {
     if (cond) conditions.push(cond);
   }
   if (after) {
-    const cursor = decodeCursor(after);
-    if (cursor.id) conditions.push(sql`${resellers.id} < ${cursor.id as string}`);
+    const { createdAt, id } = parseListCursor(after);
+    conditions.push(
+      sql`(${resellers.createdAt}, ${resellers.id}) < (${createdAt}::timestamptz, ${id}::uuid)`,
+    );
   }
   return conditions;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The cursor must carry both sort keys: seeded resellers have ids out of created_at order.
+function parseListCursor(after: string): { createdAt: string; id: string } {
+  let cursor: Record<string, unknown>;
+  try {
+    cursor = decodeCursor(after);
+  } catch {
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor');
+  }
+  const { createdAt, id } = cursor;
+  if (
+    typeof createdAt !== 'string' ||
+    Number.isNaN(Date.parse(createdAt)) ||
+    typeof id !== 'string' ||
+    !UUID_RE.test(id)
+  ) {
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor');
+  }
+  return { createdAt, id };
+}
+
+/** Activity events that count as the user being active — same set as the admin user list. */
+const ACTIVITY_EVENT_TYPES = ['login_success', 'token_refresh', 'institute_switch'];
 
 function slugify(name: string): string {
   return name
@@ -75,10 +106,19 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
+type ResellerRow = typeof resellers.$inferSelect;
+
+function toModel(record: ResellerRow, instituteCount: number, teamSize: number) {
+  return {
+    ...record,
+    branding: (record.branding ?? null) as Record<string, unknown> | null,
+    instituteCount,
+    teamSize,
+  };
+}
+
 @Injectable()
 export class AdminResellerService {
-  private readonly logger = new Logger(AdminResellerService.name);
-
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
@@ -125,13 +165,8 @@ export class AdminResellerService {
     const { instituteCount, teamSize } = await this.loadCounts(nodes.map((r) => r.id));
 
     const edges = nodes.map((record) => ({
-      node: {
-        ...record,
-        branding: (record.branding ?? null) as Record<string, unknown> | null,
-        instituteCount: instituteCount.get(record.id) ?? 0,
-        teamSize: teamSize.get(record.id) ?? 0,
-      },
-      cursor: encodeCursor({ id: record.id }),
+      node: toModel(record, instituteCount.get(record.id) ?? 0, teamSize.get(record.id) ?? 0),
+      cursor: encodeCursor({ createdAt: record.createdAt.toISOString(), id: record.id }),
     }));
 
     return {
@@ -155,13 +190,49 @@ export class AdminResellerService {
     if (!record) {
       throw new BusinessException(ErrorCode.RESELLER_NOT_FOUND, `Reseller ${resellerId} not found`);
     }
-    const { instituteCount, teamSize } = await this.loadCounts([resellerId]);
-    return {
-      ...record,
-      branding: (record.branding ?? null) as Record<string, unknown> | null,
-      instituteCount: instituteCount.get(resellerId) ?? 0,
-      teamSize: teamSize.get(resellerId) ?? 0,
-    };
+    return this.withCounts(record);
+  }
+
+  /** Staff of one reseller with their role and last sign-in, newest member first. */
+  async listTeam(resellerId: string) {
+    return withAdmin(this.db, mkAdminCtx('service:admin-reseller'), async (tx) => {
+      const [exists] = await tx
+        .select({ id: resellers.id })
+        .from(resellers) // allow-base-read: a deleted reseller's team page must answer, not 404
+        .where(eq(resellers.id, resellerId));
+      if (!exists) {
+        throw new BusinessException(
+          ErrorCode.RESELLER_NOT_FOUND,
+          `Reseller ${resellerId} not found`,
+        );
+      }
+      return tx
+        .select({
+          id: resellerMembershipsLive.id,
+          userId: usersLive.id,
+          username: usersLive.username,
+          email: usersLive.email,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+          roleName: rolesLive.name,
+          isActive: resellerMembershipsLive.isActive,
+          joinedAt: resellerMembershipsLive.createdAt,
+          lastActiveAt: sql<Date | null>`(
+            SELECT max(ae.created_at) FROM auth_events ae
+            WHERE ae.user_id = ${usersLive.id}
+            AND ae.event_type IN (${sql.join(
+              ACTIVITY_EVENT_TYPES.map((t) => sql`${t}`),
+              sql`, `,
+            )})
+          )`.mapWith(authEvents.createdAt),
+        })
+        .from(resellerMembershipsLive)
+        .innerJoin(usersLive, eq(usersLive.id, resellerMembershipsLive.userId))
+        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
+        .leftJoin(rolesLive, eq(rolesLive.id, resellerMembershipsLive.roleId))
+        .where(eq(resellerMembershipsLive.resellerId, resellerId))
+        .orderBy(desc(resellerMembershipsLive.createdAt), asc(usersLive.username));
+    });
   }
 
   // ── Mutations ───────────────────────────────────────────────
@@ -178,19 +249,17 @@ export class AdminResellerService {
         'Unable to derive slug from name; provide a slug explicitly',
       );
     }
+    await this.assertSlugFree(slug);
+
+    // Resolve the admin before the reseller exists, so a failure leaves nothing half-made
+    // and a retry with the same email links the user created by the failed attempt.
+    const email = input.initialAdminEmail.trim().toLowerCase();
+    const admin = await this.resolveInitialAdmin(email, actorId);
 
     const { reseller, roleId } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
       async (tx) => {
-        const [conflict] = await tx.select().from(resellers).where(eq(resellers.slug, slug)); // allow-base-read: slug uniqueness must include trashed (DB unique constraint covers all)
-        if (conflict) {
-          throw new BusinessException(
-            ErrorCode.SLUG_DUPLICATE,
-            `Slug "${slug}" is already taken by another reseller`,
-          );
-        }
-
         const [created] = await tx
           .insert(resellers)
           .values({
@@ -212,38 +281,35 @@ export class AdminResellerService {
       },
     );
 
-    // Provision the initial admin user + membership outside the admin tx —
-    // IdentityService manages its own transactions across scopes and emits the
-    // NOTIFICATION.user.created event so the welcome email/SMS fires via Novu.
-    try {
-      await this.identityService.createUserWithMembership({
-        email: input.initialAdminEmail,
-        username: input.initialAdminEmail,
-        scope: 'reseller',
-        resellerId: reseller.id,
-        roleId,
-        actorId,
-      });
-    } catch (err) {
-      this.logger.warn(
-        `Reseller ${reseller.id} created but initial admin provisioning failed: ${String(err)}`,
-      );
-      // Don't rollback the reseller — admin can re-invite. Event still emits below.
-    }
-
-    const resellerWithCounts = this.attachEmptyCounts(reseller);
-    this.eventBus.emit(EVENT_PATTERNS.RESELLER.created, {
-      ...resellerWithCounts,
-      scope: 'platform',
+    await this.identityService.createMembership({
+      userId: admin.userId,
+      scope: 'reseller',
+      resellerId: reseller.id,
+      roleId,
+      actorId,
     });
 
-    return resellerWithCounts;
+    // An existing user keeps their password, so only a new one gets the welcome.
+    if (admin.tempPassword) {
+      this.identityService.sendWelcomeNotification({
+        userId: admin.userId,
+        username: email,
+        email,
+        tempPassword: admin.tempPassword,
+        scope: 'reseller',
+        resellerId: reseller.id,
+      });
+    }
+
+    const model = await this.withCounts(reseller);
+    this.eventBus.emit(EVENT_PATTERNS.RESELLER.created, { ...model, scope: 'platform' });
+    return model;
   }
 
-  /** Update editable reseller fields (name, branding, customDomain). Tier + slug not editable here. */
+  /** Update profile fields under optimistic concurrency. Tier and slug are not editable here. */
   async update(resellerId: string, input: AdminUpdateResellerInput, actorId: string) {
     const record = await withAdmin(this.db, mkAdminCtx('service:admin-reseller'), async (tx) => {
-      const [existing] = await tx.select().from(resellers).where(eq(resellers.id, resellerId)); // allow-base-read: admin update may target trashed (TODO: validate)
+      const [existing] = await tx.select().from(resellers).where(eq(resellers.id, resellerId)); // allow-base-read: a deleted reseller must answer RESELLER_INVALID, not NOT_FOUND
       if (!existing) {
         throw new BusinessException(
           ErrorCode.RESELLER_NOT_FOUND,
@@ -260,22 +326,35 @@ export class AdminResellerService {
         throw new BusinessException(ErrorCode.RESELLER_INVALID, 'Cannot update a deleted reseller');
       }
 
-      const patch: Record<string, unknown> = {};
-      if (input.name !== undefined) patch.name = input.name;
-      if (input.branding !== undefined) patch.branding = input.branding;
-      if (input.customDomain !== undefined) patch.customDomain = input.customDomain;
-      patch.updatedBy = actorId;
+      const { version, ...fields } = input;
+      const patch: Partial<typeof resellers.$inferInsert> = {};
+      if (fields.name !== undefined) patch.name = fields.name;
+      if (fields.branding !== undefined) patch.branding = fields.branding;
+      if (fields.customDomain !== undefined) patch.customDomain = fields.customDomain;
+      if (fields.registrationNumber !== undefined)
+        patch.registrationNumber = fields.registrationNumber;
+      if (fields.registrationState !== undefined)
+        patch.registrationState = fields.registrationState;
+      if (fields.contact !== undefined) patch.contact = fields.contact;
+      if (fields.address !== undefined) patch.address = fields.address;
 
       const [updated] = await tx
         .update(resellers)
-        .set(patch)
-        .where(eq(resellers.id, resellerId))
+        .set({ ...patch, updatedBy: actorId, version: sql`${resellers.version} + 1` })
+        .where(and(eq(resellers.id, resellerId), eq(resellers.version, version)))
         .returning();
+      if (!updated) {
+        throw new BusinessException(
+          ErrorCode.CONCURRENT_MODIFICATION,
+          'Reseller was modified by someone else. Refresh and try again.',
+        );
+      }
       return updated;
     });
 
-    this.eventBus.emit(EVENT_PATTERNS.RESELLER.updated, { ...record, actorId, scope: 'platform' });
-    return this.attachEmptyCounts(record);
+    const model = await this.withCounts(record);
+    this.eventBus.emit(EVENT_PATTERNS.RESELLER.updated, { ...model, actorId, scope: 'platform' });
+    return model;
   }
 
   /**
@@ -318,7 +397,7 @@ export class AdminResellerService {
 
         const [updated] = await tx
           .update(resellers)
-          .set({ tier: newTier, updatedBy: actorId })
+          .set({ tier: newTier, updatedBy: actorId, version: sql`${resellers.version} + 1` })
           .where(eq(resellers.id, resellerId))
           .returning();
 
@@ -331,23 +410,23 @@ export class AdminResellerService {
       },
     );
 
-    // No-op: tier unchanged — no DB write, no event, return as-is.
-    if (oldTier === newTier) return this.attachEmptyCounts(record);
+    const model = await this.withCounts(record);
+    // Tier unchanged: nothing was written, so nothing to announce.
+    if (oldTier === newTier) return model;
 
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.tier_changed, {
-      ...record,
+      ...model,
       oldTier,
       newTier,
       actorId,
       scope: 'platform',
     });
-
-    return this.attachEmptyCounts(record);
+    return model;
   }
 
   // ── Existing lifecycle mutations (preserved from ROV-97) ────
 
-  async suspendReseller(resellerId: string, actorId: string, reason?: string): Promise<void> {
+  async suspendReseller(resellerId: string, actorId: string, reason?: string) {
     const { record, previousStatus, staffUserIds, endedSessionIds } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
@@ -386,6 +465,7 @@ export class AdminResellerService {
             suspendedAt: new Date(),
             isActive: false,
             updatedBy: actorId,
+            version: sql`${resellers.version} + 1`,
           })
           .where(eq(resellers.id, resellerId))
           .returning();
@@ -442,16 +522,18 @@ export class AdminResellerService {
         .catch(() => {});
     }
 
+    const model = await this.withCounts(record);
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.status_changed, {
-      ...record,
+      ...model,
       previousStatus,
       newStatus: ResellerStatus.SUSPENDED,
       reason,
       scope: 'platform',
     });
+    return model;
   }
 
-  async unsuspendReseller(resellerId: string, actorId: string): Promise<void> {
+  async unsuspendReseller(resellerId: string, actorId: string) {
     const record = await withAdmin(this.db, mkAdminCtx('service:admin-reseller'), async (tx) => {
       const [reseller] = await tx.select().from(resellers).where(eq(resellers.id, resellerId)); // allow-base-read: admin unsuspend may target trashed (TODO: validate)
       if (!reseller)
@@ -479,6 +561,7 @@ export class AdminResellerService {
           suspendedAt: null,
           isActive: true,
           updatedBy: actorId,
+          version: sql`${resellers.version} + 1`,
         })
         .where(eq(resellers.id, resellerId))
         .returning();
@@ -487,15 +570,17 @@ export class AdminResellerService {
 
     await clearResellerAccess(this.redis, resellerId);
 
+    const model = await this.withCounts(record);
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.status_changed, {
-      ...record,
+      ...model,
       previousStatus: ResellerStatus.SUSPENDED,
       newStatus: ResellerStatus.ACTIVE,
       scope: 'platform',
     });
+    return model;
   }
 
-  async deleteReseller(resellerId: string, actorId: string): Promise<void> {
+  async deleteReseller(resellerId: string, actorId: string) {
     const { record, affectedInstituteIds } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
@@ -574,6 +659,7 @@ export class AdminResellerService {
             deletedAt,
             deletedBy: actorId,
             updatedBy: actorId,
+            version: sql`${resellers.version} + 1`,
           })
           .where(eq(resellers.id, resellerId))
           .returning();
@@ -582,13 +668,15 @@ export class AdminResellerService {
       },
     );
 
+    const model = await this.withCounts(record);
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.status_changed, {
-      ...record,
+      ...model,
       previousStatus: ResellerStatus.SUSPENDED,
       newStatus: ResellerStatus.DELETED,
       affectedInstituteIds,
       scope: 'platform',
     });
+    return model;
   }
 
   // ── Internal helpers ────────────────────────────────────────
@@ -632,17 +720,55 @@ export class AdminResellerService {
     return { instituteCount, teamSize };
   }
 
+  private async withCounts(record: ResellerRow) {
+    const { instituteCount, teamSize } = await this.loadCounts([record.id]);
+    return toModel(record, instituteCount.get(record.id) ?? 0, teamSize.get(record.id) ?? 0);
+  }
+
   /**
-   * Returned shape for single-reseller mutations (create/update/changeTier).
-   * Counts default to 0 — callers usually refetch via getById on next frontend
-   * query, so avoiding a second roundtrip here keeps mutations snappy.
+   * Links only an account whose email matches; a Roviq ID that merely equals the address
+   * could belong to someone else, so it blocks the email instead of being linked.
    */
-  private attachEmptyCounts(record: typeof resellers.$inferSelect) {
-    return {
-      ...record,
-      branding: (record.branding ?? null) as Record<string, unknown> | null,
-      instituteCount: 0,
-      teamSize: 0,
-    };
+  private async resolveInitialAdmin(
+    email: string,
+    actorId: string,
+  ): Promise<{ userId: string; tempPassword: string | null }> {
+    const matches = await this.identityService.findUsersByEmail(email);
+    if (matches.length > 1) {
+      throw new BusinessException(
+        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        'More than one account uses this email',
+      );
+    }
+    const [existing] = matches;
+    if (existing?.isDeleted) {
+      throw new BusinessException(
+        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        'This email belongs to a deleted account and cannot be reused',
+      );
+    }
+    if (existing) return { userId: existing.userId, tempPassword: null };
+    if (await this.identityService.isUsernameTaken(email)) {
+      throw new BusinessException(
+        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        'This email is already used as the Roviq ID of another account',
+      );
+    }
+    return this.identityService.createUser({ email, username: email, actorId });
+  }
+
+  private async assertSlugFree(slug: string): Promise<void> {
+    const [conflict] = await withAdmin(this.db, mkAdminCtx('service:admin-reseller'), (tx) =>
+      tx
+        .select({ id: resellers.id })
+        .from(resellers) // allow-base-read: slug stays globally unique after deletion
+        .where(eq(resellers.slug, slug)),
+    );
+    if (conflict) {
+      throw new BusinessException(
+        ErrorCode.SLUG_DUPLICATE,
+        `Slug "${slug}" is already taken by another reseller`,
+      );
+    }
   }
 }

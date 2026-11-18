@@ -26,6 +26,11 @@ function makeReseller(overrides: Partial<ResellerNode> = {}): ResellerNode {
     updatedAt: '2026-01-01T00:00:00.000Z',
     instituteCount: 3,
     teamSize: 5,
+    version: 1,
+    registrationNumber: null,
+    registrationState: null,
+    contact: { phones: [], emails: [] },
+    address: null,
     branding: null,
     ...overrides,
   };

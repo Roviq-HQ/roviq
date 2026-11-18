@@ -43,11 +43,14 @@ vi.mock('nuqs', async (importOriginal) => {
 });
 
 import adminResellersMessages from '../../../../../../../../messages/en/adminResellers.json';
+import geographyMessages from '../../../../../../../../messages/en/geography.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 import type { ResellerNode } from '../../types';
 import ResellerDetailPage from '../page';
 
-const messages = { adminResellers: adminResellersMessages };
+const messages = { adminResellers: adminResellersMessages, geography: geographyMessages };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function makeReseller(overrides: Partial<ResellerNode> = {}): ResellerNode {
   return {
@@ -65,7 +68,12 @@ function makeReseller(overrides: Partial<ResellerNode> = {}): ResellerNode {
     updatedAt: '2026-01-01T00:00:00.000Z',
     instituteCount: 3,
     teamSize: 5,
+    version: 1,
     branding: null,
+    registrationNumber: null,
+    registrationState: null,
+    contact: { phones: [], emails: [] },
+    address: null,
     ...overrides,
   };
 }
@@ -130,36 +138,60 @@ describe('ResellerDetailPage', () => {
       expect(screen.queryByTestId('action-delete-btn')).not.toBeInTheDocument();
     });
 
-    it('SUSPENDED non-system reseller: Edit + ChangeTier + Unsuspend + Delete visible; Suspend hidden', () => {
-      mockReseller(makeReseller({ status: 'SUSPENDED', isSystem: false }));
+    it('SUSPENDED under 30 days: Unsuspend enabled, Delete disabled with the grace-period reason', () => {
+      mockReseller(
+        makeReseller({
+          status: 'SUSPENDED',
+          suspendedAt: new Date(Date.now() - 5 * DAY_MS).toISOString(),
+        }),
+      );
       renderWithProviders(<ResellerDetailPage />, { messages });
 
-      expect(screen.getByTestId('action-edit-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('action-change-tier-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('action-unsuspend-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('action-delete-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('action-unsuspend-btn')).toBeEnabled();
+      const del = screen.getByTestId('action-delete-btn');
+      expect(del).toBeDisabled();
+      expect(del).toHaveAttribute('title', adminResellersMessages.actions.deleteGracePeriod);
+      expect(screen.getByTestId('action-change-tier-btn')).toBeDisabled();
       expect(screen.queryByTestId('action-suspend-btn')).not.toBeInTheDocument();
     });
 
-    it('DELETED reseller: only Edit visible; all other lifecycle actions hidden', () => {
+    it('SUSPENDED for 30+ days: Delete is enabled', () => {
+      mockReseller(
+        makeReseller({
+          status: 'SUSPENDED',
+          suspendedAt: new Date(Date.now() - 40 * DAY_MS).toISOString(),
+        }),
+      );
+      renderWithProviders(<ResellerDetailPage />, { messages });
+      expect(screen.getByTestId('action-delete-btn')).toBeEnabled();
+    });
+
+    it('DELETED reseller: Edit disabled; every lifecycle action hidden', () => {
       mockReseller(makeReseller({ status: 'DELETED', isSystem: false }));
       renderWithProviders(<ResellerDetailPage />, { messages });
 
-      expect(screen.getByTestId('action-edit-btn')).toBeInTheDocument();
-      expect(screen.queryByTestId('action-suspend-btn')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('action-unsuspend-btn')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('action-delete-btn')).not.toBeInTheDocument();
-    });
-
-    it('ACTIVE system reseller: only Edit visible; ChangeTier + Suspend/Unsuspend/Delete all hidden', () => {
-      mockReseller(makeReseller({ status: 'ACTIVE', isSystem: true, name: 'Roviq Direct' }));
-      renderWithProviders(<ResellerDetailPage />, { messages });
-
-      expect(screen.getByTestId('action-edit-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('action-edit-btn')).toBeDisabled();
       expect(screen.queryByTestId('action-change-tier-btn')).not.toBeInTheDocument();
       expect(screen.queryByTestId('action-suspend-btn')).not.toBeInTheDocument();
       expect(screen.queryByTestId('action-unsuspend-btn')).not.toBeInTheDocument();
       expect(screen.queryByTestId('action-delete-btn')).not.toBeInTheDocument();
+    });
+
+    it('system reseller: Edit, ChangeTier, Suspend and Delete shown disabled with the reason', () => {
+      mockReseller(makeReseller({ status: 'ACTIVE', isSystem: true, name: 'Roviq Direct' }));
+      renderWithProviders(<ResellerDetailPage />, { messages });
+
+      for (const testId of [
+        'action-edit-btn',
+        'action-change-tier-btn',
+        'action-suspend-btn',
+        'action-delete-btn',
+      ]) {
+        const btn = screen.getByTestId(testId);
+        expect(btn).toBeDisabled();
+        expect(btn).toHaveAttribute('title', adminResellersMessages.detail.systemLocked);
+      }
+      expect(screen.queryByTestId('action-unsuspend-btn')).not.toBeInTheDocument();
     });
   });
 
@@ -179,5 +211,58 @@ describe('ResellerDetailPage', () => {
     renderWithProviders(<ResellerDetailPage />, { messages });
     expect(screen.getByTestId('detail-institute-count')).toHaveTextContent('42');
     expect(screen.getByTestId('detail-team-size')).toHaveTextContent('11');
+  });
+
+  it('renders registration, primary contact and address in the business card', () => {
+    mockReseller(
+      makeReseller({
+        registrationNumber: 'U72900RJ2024PTC012345',
+        registrationState: 'RAJASTHAN',
+        contact: {
+          phones: [
+            {
+              countryCode: '+91',
+              number: '9876543210',
+              isPrimary: true,
+              isWhatsappEnabled: false,
+              label: 'Office',
+            },
+          ],
+          emails: [
+            { address: 'ops@other.test', isPrimary: false, label: 'Ops' },
+            { address: 'hello@acme.test', isPrimary: true, label: 'Main' },
+          ],
+        },
+        address: {
+          line1: '12 MI Road',
+          line2: null,
+          line3: null,
+          city: 'Jaipur',
+          district: 'Jaipur',
+          state: 'RAJASTHAN',
+          postalCode: '302001',
+          country: 'IN',
+        },
+      }),
+    );
+    renderWithProviders(<ResellerDetailPage />, { messages });
+
+    expect(screen.getByTestId('detail-registration-number')).toHaveTextContent(
+      'U72900RJ2024PTC012345',
+    );
+    expect(screen.getByTestId('detail-registration-state')).toHaveTextContent('Rajasthan');
+    expect(screen.getByTestId('detail-contact-email')).toHaveTextContent('hello@acme.test');
+    expect(screen.getByTestId('detail-contact-phone')).toHaveTextContent('+91 9876543210');
+    expect(screen.getByTestId('detail-address')).toHaveTextContent(
+      '12 MI Road, Jaipur, Jaipur, Rajasthan, 302001',
+    );
+  });
+
+  it('shows dashes when no business details are on file', () => {
+    mockReseller(makeReseller());
+    renderWithProviders(<ResellerDetailPage />, { messages });
+    expect(screen.getByTestId('detail-registration-number')).toHaveTextContent('—');
+    expect(screen.getByTestId('detail-contact-email')).toHaveTextContent('—');
+    expect(screen.getByTestId('detail-address')).toHaveTextContent('—');
   });
 });

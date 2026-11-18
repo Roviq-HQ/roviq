@@ -16,12 +16,21 @@ import {
   E2eAdminDeleteResellerDocument,
   E2eAdminGetResellerDocument,
   E2eAdminListResellersDocument,
+  E2eAdminListResellerTeamDocument,
+  E2eAdminResellerAuditLogsDocument,
   E2eAdminSuspendResellerDocument,
   E2eAdminUnsuspendResellerDocument,
   E2eAdminUpdateResellerDocument,
 } from './__generated__/graphql';
 import { loginAsPlatformAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
+
+async function currentVersion(token: string, id: string): Promise<number> {
+  const res = await gql(E2eAdminGetResellerDocument, { id }, token);
+  expect(res.errors).toBeUndefined();
+  assert(res.data);
+  return res.data.adminGetReseller.version;
+}
 
 // Superuser URL required — RLS would otherwise block writes to the
 // resellers table under the pooler role. Matches the pattern in
@@ -139,7 +148,11 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
 
     expect(res.errors).toBeUndefined();
     assert(res.data);
-    expect(res.data.adminSuspendReseller).toBe(true);
+    expect(res.data.adminSuspendReseller).toMatchObject({
+      id: TEST_RESELLER_ID,
+      status: 'SUSPENDED',
+    });
+    expect(res.data.adminSuspendReseller.suspendedAt).not.toBeNull();
 
     const after = await getResellerStatus(pool, TEST_RESELLER_ID);
     expect(after.status).toBe('SUSPENDED');
@@ -174,7 +187,11 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
 
     expect(res.errors).toBeUndefined();
     assert(res.data);
-    expect(res.data.adminUnsuspendReseller).toBe(true);
+    expect(res.data.adminUnsuspendReseller).toEqual({
+      id: TEST_RESELLER_ID,
+      status: 'ACTIVE',
+      suspendedAt: null,
+    });
 
     const after = await getResellerStatus(pool, TEST_RESELLER_ID);
     expect(after.status).toBe('ACTIVE');
@@ -237,7 +254,11 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
 
     expect(res.errors).toBeUndefined();
     assert(res.data);
-    expect(res.data.adminDeleteReseller).toBe(true);
+    expect(res.data.adminDeleteReseller).toMatchObject({
+      id: TEST_RESELLER_ID_FOR_DELETE,
+      status: 'DELETED',
+    });
+    expect(res.data.adminDeleteReseller.deletedAt).not.toBeNull();
 
     const after = await getResellerStatus(pool, TEST_RESELLER_ID_FOR_DELETE);
     expect(after.status).toBe('DELETED');
@@ -283,6 +304,39 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
       for (const edge of res.data.adminListResellers.edges) {
         expect(edge.node.status).toBe('SUSPENDED');
       }
+    });
+
+    it('walks every page once with first=1 (cursor carries created_at and id)', async () => {
+      const all = await gql(E2eAdminListResellersDocument, { filter: { first: 100 } }, adminToken);
+      expect(all.errors).toBeUndefined();
+      assert(all.data);
+      const expected = all.data.adminListResellers.edges.map((e) => e.node.id);
+
+      const walked: string[] = [];
+      let after: string | null | undefined;
+      for (let page = 0; page <= expected.length; page++) {
+        const res = await gql(
+          E2eAdminListResellersDocument,
+          { filter: { first: 1, ...(after ? { after } : {}) } },
+          adminToken,
+        );
+        expect(res.errors).toBeUndefined();
+        assert(res.data);
+        walked.push(...res.data.adminListResellers.edges.map((e) => e.node.id));
+        if (!res.data.adminListResellers.pageInfo.hasNextPage) break;
+        after = res.data.adminListResellers.pageInfo.endCursor;
+      }
+      expect(walked).toEqual(expected);
+    });
+
+    it('rejects a malformed cursor with VALIDATION_FAILED', async () => {
+      const res = await gql(
+        E2eAdminListResellersDocument,
+        { filter: { after: 'not-a-cursor' } },
+        adminToken,
+      );
+      assert(res.errors);
+      expect(res.errors[0].extensions?.code).toBe('VALIDATION_FAILED');
     });
 
     it('filters by isSystem=true to isolate Roviq Direct', async () => {
@@ -360,7 +414,43 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
       expect(res.data.adminCreateReseller.tier).toBe('FULL_MANAGEMENT');
       expect(res.data.adminCreateReseller.status).toBe('ACTIVE');
       expect(res.data.adminCreateReseller.isSystem).toBe(false);
+      expect(res.data.adminCreateReseller.teamSize).toBe(1);
       createdId = res.data.adminCreateReseller.id;
+    });
+
+    it('lists the initial admin on the team with the full-admin role', async () => {
+      assert(createdId);
+      const res = await gql(
+        E2eAdminListResellerTeamDocument,
+        { resellerId: createdId },
+        adminToken,
+      );
+      expect(res.errors).toBeUndefined();
+      assert(res.data);
+      expect(res.data.adminListResellerTeam).toHaveLength(1);
+      expect(res.data.adminListResellerTeam[0]).toMatchObject({
+        roleName: { en: 'reseller_full_admin' },
+        isActive: true,
+        lastActiveAt: null,
+      });
+    });
+
+    it('records the create in the audit trail, found through the resellerId filter', async () => {
+      assert(createdId);
+      const deadline = Date.now() + 10_000;
+      let actions: string[] = [];
+      while (Date.now() < deadline) {
+        const res = await gql(
+          E2eAdminResellerAuditLogsDocument,
+          { filter: { resellerId: createdId } },
+          adminToken,
+        );
+        expect(res.errors).toBeUndefined();
+        actions = res.data?.adminAuditLogs.edges.map((e) => e.node.action) ?? [];
+        if (actions.includes('adminCreateReseller')) break;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      expect(actions).toContain('adminCreateReseller');
     });
 
     it('gives the new reseller its own system roles and puts the initial admin on its full-admin copy', async () => {
@@ -407,7 +497,7 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
         E2eAdminUpdateResellerDocument,
         {
           id: '00000000-0000-7000-a000-000000000011',
-          input: { name: 'Tampered' },
+          input: { version: 1, name: 'Tampered' },
         },
         adminToken,
       );
@@ -423,97 +513,137 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
         [TEST_RESELLER_ID],
       );
 
+      const version = await currentVersion(adminToken, TEST_RESELLER_ID);
       const res = await gql(
         E2eAdminUpdateResellerDocument,
         {
           id: TEST_RESELLER_ID,
-          input: { name: 'Renamed Test Reseller', branding: { primaryColor: '#FF4500' } },
+          input: {
+            version,
+            name: 'Renamed Test Reseller',
+            branding: { primaryColor: '#FF4500' },
+            registrationNumber: 'U72900RJ2024PTC012345',
+            registrationState: 'RAJASTHAN',
+            address: {
+              line1: '12 MI Road',
+              city: 'Jaipur',
+              district: 'Jaipur',
+              state: 'Rajasthan',
+              postalCode: '302001',
+              country: 'India',
+            },
+          },
         },
         adminToken,
       );
 
       expect(res.errors).toBeUndefined();
       assert(res.data);
-      expect(res.data.adminUpdateReseller.name).toBe('Renamed Test Reseller');
-      expect(res.data.adminUpdateReseller.branding?.primaryColor).toBe('#FF4500');
+      expect(res.data.adminUpdateReseller).toEqual({
+        id: TEST_RESELLER_ID,
+        name: 'Renamed Test Reseller',
+        version: version + 1,
+        registrationNumber: 'U72900RJ2024PTC012345',
+        registrationState: 'RAJASTHAN',
+        instituteCount: 0,
+        teamSize: 0,
+        address: { city: 'Jaipur', state: 'Rajasthan' },
+        branding: { primaryColor: '#FF4500' },
+      });
+    });
+
+    it('rejects a stale version with CONCURRENT_MODIFICATION', async () => {
+      const version = await currentVersion(adminToken, TEST_RESELLER_ID);
+      const res = await gql(
+        E2eAdminUpdateResellerDocument,
+        { id: TEST_RESELLER_ID, input: { version: version - 1, name: 'Stale Write' } },
+        adminToken,
+      );
+      assert(res.errors);
+      expect(res.errors[0].extensions?.code).toBe('CONCURRENT_MODIFICATION');
     });
   });
 
-  // ── ROV-234: adminCreateReseller — provisioning failure (log-and-continue) ──
+  // ── ROV-234: adminCreateReseller — initial admin email already registered ──
 
-  describe('adminCreateReseller — identity provisioning failure (ROV-234)', () => {
-    // Use a per-run suffix so slugs and emails never collide across test runs.
+  describe('adminCreateReseller — existing admin email (ROV-234)', () => {
     const suffix = Date.now().toString(36);
-    const slug1 = `e2e-pf1-${suffix}`;
-    const slug2 = `e2e-pf2-${suffix}`;
-    // Both resellers share the same initialAdminEmail — the second call will
-    // find a duplicate user and trigger the catch-and-continue path.
-    const sharedEmail = `e2e-collision-${suffix}@roviq.test`;
-    let resellerId1: string | null = null;
-    let resellerId2: string | null = null;
+    const sharedEmail = `e2e-shared-${suffix}@roviq.test`;
+    const deletedEmail = `e2e-deleted-${suffix}@roviq.test`;
+    const createdIds: string[] = [];
 
     afterAll(async () => {
-      for (const id of [resellerId1, resellerId2]) {
-        if (id) await deleteTestReseller(pool, id);
-      }
-      // Also remove the user created by the first mutation (unique email, no FK deps).
-      await pool.query('DELETE FROM users WHERE email = $1', [sharedEmail]);
+      for (const id of createdIds) await deleteTestReseller(pool, id);
+      await pool.query('DELETE FROM users WHERE email = ANY($1)', [
+        [sharedEmail, deletedEmail, `e2e-owner-${suffix}@roviq.test`],
+      ]);
     });
 
-    it('first creation with unique email succeeds normally', async () => {
-      const res = await gql(
+    async function create(slug: string, email: string) {
+      return gql(
         E2eAdminCreateResellerDocument,
         {
-          input: {
-            name: `E2E PF1 ${suffix}`,
-            slug: slug1,
-            tier: 'READ_ONLY',
-            initialAdminEmail: sharedEmail,
-          },
+          input: { name: `E2E ${slug}`, slug, tier: 'READ_ONLY', initialAdminEmail: email },
         },
         adminToken,
       );
+    }
 
-      expect(res.errors).toBeUndefined();
-      assert(res.data);
-      expect(res.data.adminCreateReseller.status).toBe('ACTIVE');
-      resellerId1 = res.data.adminCreateReseller.id;
+    it('links the existing user instead of creating a second one', async () => {
+      const first = await create(`e2e-ex1-${suffix}`, sharedEmail);
+      expect(first.errors).toBeUndefined();
+      assert(first.data);
+      createdIds.push(first.data.adminCreateReseller.id);
+
+      const second = await create(`e2e-ex2-${suffix}`, sharedEmail);
+      expect(second.errors).toBeUndefined();
+      assert(second.data);
+      createdIds.push(second.data.adminCreateReseller.id);
+      expect(second.data.adminCreateReseller.teamSize).toBe(1);
+
+      const users = await pool.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [
+        sharedEmail,
+      ]);
+      expect(users.rows).toHaveLength(1);
+      const members = await pool.query<{ user_id: string }>(
+        'SELECT user_id FROM reseller_memberships WHERE reseller_id = ANY($1)',
+        [createdIds],
+      );
+      expect(members.rows).toEqual([{ user_id: users.rows[0].id }, { user_id: users.rows[0].id }]);
     });
 
-    it('second creation with same email still commits the reseller (provisioning failure is non-fatal)', async () => {
-      // sharedEmail is now taken — IdentityService.createUser() will throw a
-      // unique-constraint violation. The service catches it, logs a warning,
-      // and commits the reseller row anyway.
-      const res = await gql(
-        E2eAdminCreateResellerDocument,
-        {
-          input: {
-            name: `E2E PF2 ${suffix}`,
-            slug: slug2,
-            tier: 'READ_ONLY',
-            initialAdminEmail: sharedEmail,
-          },
-        },
-        adminToken,
-      );
+    it('does not link an account whose Roviq ID merely equals the email', async () => {
+      const lookalike = `e2e-lookalike-${suffix}@roviq.test`;
+      const owner = await create(`e2e-own-${suffix}`, `e2e-owner-${suffix}@roviq.test`);
+      expect(owner.errors).toBeUndefined();
+      assert(owner.data);
+      createdIds.push(owner.data.adminCreateReseller.id);
+      await pool.query('UPDATE users SET username = $1 WHERE email = $2', [
+        lookalike,
+        `e2e-owner-${suffix}@roviq.test`,
+      ]);
 
-      // GraphQL must succeed — provisioning failure is non-fatal
-      expect(res.errors).toBeUndefined();
-      assert(res.data);
-      expect(res.data.adminCreateReseller.status).toBe('ACTIVE');
-      expect(res.data.adminCreateReseller.slug).toBe(slug2);
-      expect(res.data.adminCreateReseller.instituteCount).toBe(0);
-      expect(res.data.adminCreateReseller.teamSize).toBe(0);
+      const slug = `e2e-look-${suffix}`;
+      const res = await create(slug, lookalike);
+      assert(res.errors);
+      expect(res.errors[0].extensions?.code).toBe('RESELLER_ADMIN_EMAIL_UNAVAILABLE');
+      const rows = await pool.query('SELECT 1 FROM resellers WHERE slug = $1', [slug]);
+      expect(rows.rowCount).toBe(0);
+    });
 
-      resellerId2 = res.data.adminCreateReseller.id;
+    it('rejects an email owned by a deleted user and creates nothing', async () => {
+      const seeded = await create(`e2e-del-${suffix}`, deletedEmail);
+      expect(seeded.errors).toBeUndefined();
+      assert(seeded.data);
+      createdIds.push(seeded.data.adminCreateReseller.id);
+      await pool.query('UPDATE users SET deleted_at = now() WHERE email = $1', [deletedEmail]);
 
-      // Reseller row must be persisted even without a provisioned admin
-      const row = await pool.query<{ id: string; status: string }>(
-        'SELECT id, status FROM resellers WHERE id = $1',
-        [resellerId2],
-      );
-      expect(row.rows[0]).toBeDefined();
-      expect(row.rows[0].status).toBe('ACTIVE');
+      const slug = `e2e-del2-${suffix}`;
+      const res = await create(slug, deletedEmail);
+      assert(res.errors);
+      expect(res.errors[0].extensions?.code).toBe('RESELLER_ADMIN_EMAIL_UNAVAILABLE');
+      const rows = await pool.query('SELECT 1 FROM resellers WHERE slug = $1', [slug]);
+      expect(rows.rowCount).toBe(0);
     });
   });
 

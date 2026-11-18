@@ -56,9 +56,9 @@ const RESELLER_LOGIN = `
 const REFRESH = `mutation($token: String!) { refreshToken(token: $token) { accessToken } }`;
 const LIST_INSTITUTES = `query { resellerListInstitutes { totalCount } }`;
 const MY_INSTITUTE = `query { myInstitute { id } }`;
-const SUSPEND = `mutation($id: String!) { adminSuspendReseller(resellerId: $id, reason: "integration test") }`;
-const UNSUSPEND = `mutation($id: String!) { adminUnsuspendReseller(resellerId: $id) }`;
-const DELETE = `mutation($id: String!) { adminDeleteReseller(resellerId: $id) }`;
+const SUSPEND = `mutation($id: String!) { adminSuspendReseller(resellerId: $id, reason: "integration test") { id status } }`;
+const UNSUSPEND = `mutation($id: String!) { adminUnsuspendReseller(resellerId: $id) { id status } }`;
+const DELETE = `mutation($id: String!) { adminDeleteReseller(resellerId: $id) { id status } }`;
 
 describe('Reseller suspension and deletion (integration)', () => {
   let result: IntegrationAppResult;
@@ -101,7 +101,7 @@ describe('Reseller suspension and deletion (integration)', () => {
   async function suspend(resellerId: string) {
     const response = await gql(SUSPEND, { id: resellerId }, platformAdminToken);
     expect(response.errors).toBeUndefined();
-    expect(response.data?.adminSuspendReseller).toBe(true);
+    expect(response.data?.adminSuspendReseller).toEqual({ id: resellerId, status: 'SUSPENDED' });
   }
 
   async function startImpersonationSession(
@@ -367,7 +367,10 @@ describe('Reseller suspension and deletion (integration)', () => {
 
       const response = await gql(DELETE, { id: reseller.resellerId }, platformAdminToken);
       expect(response.errors).toBeUndefined();
-      expect(response.data?.adminDeleteReseller).toBe(true);
+      expect(response.data?.adminDeleteReseller).toEqual({
+        id: reseller.resellerId,
+        status: 'DELETED',
+      });
 
       const state = await admin(async (tx) => {
         const [owner] = await tx

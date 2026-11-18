@@ -4,6 +4,7 @@ import {
   jsonb,
   pgPolicy,
   pgTable,
+  text,
   timestamp,
   uniqueIndex,
   uuid,
@@ -12,6 +13,7 @@ import {
 import { entityColumns } from '../common/columns';
 import { resellerStatus, resellerTier } from '../common/enums';
 import { roviqAdmin, roviqReseller } from '../common/rls-policies';
+import type { InstituteAddress, InstituteContact } from '../tenant/institutes';
 
 export const resellers = pgTable(
   'resellers',
@@ -26,6 +28,10 @@ export const resellers = pgTable(
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
     branding: jsonb().default({}),
     customDomain: varchar('custom_domain', { length: 255 }),
+    registrationNumber: text('registration_number'),
+    registrationState: text('registration_state'),
+    contact: jsonb().$type<InstituteContact>().default({ phones: [], emails: [] }).notNull(),
+    address: jsonb().$type<InstituteAddress>(),
     ...entityColumns,
   },
   (table) => [

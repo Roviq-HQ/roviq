@@ -1,5 +1,5 @@
 import { expect, test } from '../../shared/console-guardian';
-import { SEED_IDS } from '../../shared/seed-fixtures';
+import { SEED, SEED_IDS } from '../../shared/seed-fixtures';
 
 test.describe('Admin Resellers', () => {
   test.describe('Resellers list', () => {
@@ -76,18 +76,34 @@ test.describe('Admin Resellers', () => {
       await expect(page.getByTestId('tab-billing')).toBeVisible();
     });
 
-    test('system reseller hides destructive actions; only Edit is visible', async ({ page }) => {
+    test('system reseller shows its actions disabled with the reason', async ({ page }) => {
       await expect(page.getByTestId('reseller-actions')).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByTestId('action-edit-btn')).toBeVisible();
-      await expect(page.getByTestId('action-change-tier-btn')).toHaveCount(0);
-      await expect(page.getByTestId('action-suspend-btn')).toHaveCount(0);
+      for (const testId of [
+        'action-edit-btn',
+        'action-change-tier-btn',
+        'action-suspend-btn',
+        'action-delete-btn',
+      ]) {
+        const btn = page.getByTestId(testId);
+        await expect(btn).toBeDisabled();
+        await expect(btn).toHaveAttribute('title', 'System reseller cannot be modified');
+      }
       await expect(page.getByTestId('action-unsuspend-btn')).toHaveCount(0);
-      await expect(page.getByTestId('action-delete-btn')).toHaveCount(0);
     });
 
-    test('switching to Institutes tab shows the coming-soon placeholder', async ({ page }) => {
+    test('Institutes tab lists the seeded institutes', async ({ page }) => {
       await page.getByTestId('tab-institutes').click();
-      await expect(page.getByTestId('institutes-placeholder')).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByTestId(`reseller-institute-row-${SEED.INSTITUTE_1.id}`)).toContainText(
+        SEED.INSTITUTE_1.name,
+        { timeout: 10_000 },
+      );
+    });
+
+    test('Team and Activity tabs render', async ({ page }) => {
+      await page.getByTestId('tab-team').click();
+      await expect(page.getByTestId('reseller-team-tab')).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId('tab-activity').click();
+      await expect(page.getByTestId('reseller-activity-tab')).toBeVisible({ timeout: 10_000 });
     });
 
     test('invalid tab URL param falls back to overview', async ({ page }) => {

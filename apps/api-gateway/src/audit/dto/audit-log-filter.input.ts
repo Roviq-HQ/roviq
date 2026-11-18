@@ -27,6 +27,15 @@ export class AuditLogFilterInput {
   @IsUUID()
   tenantId?: string;
 
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      "Filter to one reseller's activity: its own staff's actions, actions inside its current institutes, and platform actions on the reseller itself.",
+  })
+  @IsOptional()
+  @IsUUID()
+  resellerId?: string;
+
   @Field(() => String, {
     nullable: true,
     description: 'Filter by entity type, e.g. "Student", "Staff", "Section".',

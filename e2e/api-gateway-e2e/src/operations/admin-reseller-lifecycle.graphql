@@ -1,18 +1,35 @@
 mutation E2eAdminSuspendReseller($id: String!, $reason: String) {
-  adminSuspendReseller(resellerId: $id, reason: $reason)
+  adminSuspendReseller(resellerId: $id, reason: $reason) {
+    id
+    status
+    suspendedAt
+    version
+  }
 }
 
 mutation E2eAdminUnsuspendReseller($id: String!) {
-  adminUnsuspendReseller(resellerId: $id)
+  adminUnsuspendReseller(resellerId: $id) {
+    id
+    status
+    suspendedAt
+  }
 }
 
 mutation E2eAdminDeleteReseller($id: String!) {
-  adminDeleteReseller(resellerId: $id)
+  adminDeleteReseller(resellerId: $id) {
+    id
+    status
+    deletedAt
+  }
 }
 
 query E2eAdminListResellers($filter: AdminListResellersFilterInput) {
   adminListResellers(filter: $filter) {
     totalCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
     edges {
       node {
         id
@@ -36,6 +53,17 @@ query E2eAdminListInstitutes($filter: AdminListInstitutesFilterInput) {
 query E2eAdminGetReseller($id: ID!) {
   adminGetReseller(id: $id) {
     id
+    version
+    registrationNumber
+    registrationState
+    contact {
+      emails {
+        address
+      }
+    }
+    address {
+      city
+    }
     slug
     tier
     status
@@ -64,6 +92,15 @@ mutation E2eAdminUpdateReseller($id: ID!, $input: AdminUpdateResellerInput!) {
   adminUpdateReseller(id: $id, input: $input) {
     id
     name
+    version
+    registrationNumber
+    registrationState
+    instituteCount
+    teamSize
+    address {
+      city
+      state
+    }
     branding {
       primaryColor
     }
@@ -74,5 +111,29 @@ mutation E2eAdminChangeResellerTier($id: ID!, $tier: ResellerTier!) {
   adminChangeResellerTier(id: $id, newTier: $tier) {
     id
     tier
+    teamSize
+  }
+}
+
+query E2eAdminListResellerTeam($resellerId: ID!) {
+  adminListResellerTeam(resellerId: $resellerId) {
+    id
+    userId
+    email
+    roleName
+    isActive
+    lastActiveAt
+  }
+}
+
+query E2eAdminResellerAuditLogs($filter: AuditLogFilterInput) {
+  adminAuditLogs(filter: $filter, first: 50) {
+    edges {
+      node {
+        action
+        entityId
+        tenantId
+      }
+    }
   }
 }

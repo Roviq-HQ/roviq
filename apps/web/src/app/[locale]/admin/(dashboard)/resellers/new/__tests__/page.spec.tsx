@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +22,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));
 
+import { toast } from 'sonner';
 import adminResellersMessages from '../../../../../../../../messages/en/adminResellers.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 import NewResellerPage from '../page';
@@ -97,6 +99,63 @@ describe('NewResellerPage', () => {
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith('/admin/resellers/new-reseller-id');
     });
+  });
+
+  function serverError(code: string) {
+    return new CombinedGraphQLErrors({
+      errors: [{ message: 'raw server text', extensions: { code } }],
+    });
+  }
+
+  async function fillAndSubmit() {
+    await userEvent.type(screen.getByTestId('reseller-name-input'), 'Acme Partners');
+    await userEvent.type(screen.getByTestId('reseller-admin-email-input'), 'admin@acme.test');
+    await userEvent.click(screen.getByTestId('submit-create-reseller-btn'));
+  }
+
+  it('shows SLUG_DUPLICATE inline on the slug field instead of a toast', async () => {
+    createResellerMock.mockRejectedValueOnce(serverError('SLUG_DUPLICATE'));
+    renderWithProviders(<NewResellerPage />, { messages });
+
+    await fillAndSubmit();
+
+    expect(
+      await screen.findByText(adminResellersMessages.errors.SLUG_DUPLICATE),
+    ).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the slug error and allows resubmitting once the slug is edited', async () => {
+    createResellerMock.mockRejectedValueOnce(serverError('SLUG_DUPLICATE')).mockResolvedValueOnce({
+      data: { adminCreateReseller: { id: 'new-reseller-id' } },
+    });
+    renderWithProviders(<NewResellerPage />, { messages });
+
+    await fillAndSubmit();
+    await screen.findByText(adminResellersMessages.errors.SLUG_DUPLICATE);
+
+    await userEvent.type(screen.getByTestId('reseller-slug-input'), 'acme-two');
+    expect(
+      screen.queryByText(adminResellersMessages.errors.SLUG_DUPLICATE),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('submit-create-reseller-btn'));
+
+    await waitFor(() => expect(createResellerMock).toHaveBeenCalledTimes(2));
+    expect(createResellerMock.mock.calls[1]?.[0].variables.input.slug).toBe('acme-two');
+  });
+
+  it('shows translated copy, never the raw server message, for other failures', async () => {
+    createResellerMock.mockRejectedValueOnce(serverError('RESELLER_ADMIN_EMAIL_UNAVAILABLE'));
+    renderWithProviders(<NewResellerPage />, { messages });
+
+    await fillAndSubmit();
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        adminResellersMessages.errors.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+      ),
+    );
   });
 
   it('rejects invalid slug (uppercase / trailing hyphen)', async () => {

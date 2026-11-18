@@ -541,9 +541,9 @@ describe('Security Invariant E2E Tests', () => {
       const { accessToken: adminToken } = await loginAsPlatformAdmin();
 
       // Try to suspend the system reseller "Roviq Direct"
-      const res = await gql<{ adminSuspendReseller: boolean }>(
+      const res = await gql<{ adminSuspendReseller: { id: string } }>(
         `mutation SuspendReseller($resellerId: String!) {
-          adminSuspendReseller(resellerId: $resellerId)
+          adminSuspendReseller(resellerId: $resellerId) { id }
         }`,
         { resellerId: SEED_IDS.RESELLER_DIRECT },
         adminToken,
@@ -558,9 +558,9 @@ describe('Security Invariant E2E Tests', () => {
       const { accessToken: adminToken } = await loginAsPlatformAdmin();
 
       // Try to delete the system reseller "Roviq Direct"
-      const res = await gql<{ adminDeleteReseller: boolean }>(
+      const res = await gql<{ adminDeleteReseller: { id: string } }>(
         `mutation DeleteReseller($resellerId: String!) {
-          adminDeleteReseller(resellerId: $resellerId)
+          adminDeleteReseller(resellerId: $resellerId) { id }
         }`,
         { resellerId: SEED_IDS.RESELLER_DIRECT },
         adminToken,

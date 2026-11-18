@@ -4,6 +4,7 @@ import type {
   CreateResellerData,
   CreateResellerInput,
   ResellerDetailData,
+  ResellerNode,
   ResellersConnectionData,
   UpdateResellerData,
   UpdateResellerInput,
@@ -43,8 +44,35 @@ const RESELLER_DETAIL_FIELDS = gql`
     deletedAt
     createdAt
     updatedAt
+    version
     instituteCount
     teamSize
+    registrationNumber
+    registrationState
+    contact {
+      phones {
+        countryCode
+        number
+        isPrimary
+        isWhatsappEnabled
+        label
+      }
+      emails {
+        address
+        isPrimary
+        label
+      }
+    }
+    address {
+      line1
+      line2
+      line3
+      city
+      district
+      state
+      postalCode
+      country
+    }
     branding {
       logoUrl
       faviconUrl
@@ -170,36 +198,48 @@ export function useChangeResellerTier() {
 
 const SUSPEND_RESELLER = gql`
   mutation AdminSuspendReseller($resellerId: String!, $reason: String) {
-    adminSuspendReseller(resellerId: $resellerId, reason: $reason)
+    adminSuspendReseller(resellerId: $resellerId, reason: $reason) {
+      ...ResellerDetailFields
+    }
   }
+  ${RESELLER_DETAIL_FIELDS}
 `;
 
 export function useSuspendReseller() {
-  return useMutation<{ adminSuspendReseller: boolean }, { resellerId: string; reason?: string }>(
-    SUSPEND_RESELLER,
-  );
+  return useMutation<
+    { adminSuspendReseller: ResellerNode },
+    { resellerId: string; reason?: string }
+  >(SUSPEND_RESELLER);
 }
 
 const UNSUSPEND_RESELLER = gql`
   mutation AdminUnsuspendReseller($resellerId: String!) {
-    adminUnsuspendReseller(resellerId: $resellerId)
+    adminUnsuspendReseller(resellerId: $resellerId) {
+      ...ResellerDetailFields
+    }
   }
+  ${RESELLER_DETAIL_FIELDS}
 `;
 
 export function useUnsuspendReseller() {
-  return useMutation<{ adminUnsuspendReseller: boolean }, { resellerId: string }>(
+  return useMutation<{ adminUnsuspendReseller: ResellerNode }, { resellerId: string }>(
     UNSUSPEND_RESELLER,
   );
 }
 
 const DELETE_RESELLER = gql`
   mutation AdminDeleteReseller($resellerId: String!) {
-    adminDeleteReseller(resellerId: $resellerId)
+    adminDeleteReseller(resellerId: $resellerId) {
+      ...ResellerDetailFields
+    }
   }
+  ${RESELLER_DETAIL_FIELDS}
 `;
 
 export function useDeleteReseller() {
-  return useMutation<{ adminDeleteReseller: boolean }, { resellerId: string }>(DELETE_RESELLER);
+  return useMutation<{ adminDeleteReseller: ResellerNode }, { resellerId: string }>(
+    DELETE_RESELLER,
+  );
 }
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────

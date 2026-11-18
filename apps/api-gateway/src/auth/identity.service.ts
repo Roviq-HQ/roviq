@@ -19,6 +19,7 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
+import { eq, sql } from 'drizzle-orm';
 
 export interface CreateUserInput {
   /** Email address (placeholder allowed for system-created users without one). */
@@ -95,6 +96,33 @@ export class IdentityService {
     private readonly eventBus: EventBusService,
     // private readonly authEventService: AuthEventService, // TODO: Add this back in when we have a way to emit the event
   ) {}
+
+  /**
+   * Users whose email equals `email`, ignoring case, soft-deleted ones included: the email
+   * stays globally unique after deletion, so a deleted owner still holds it.
+   */
+  async findUsersByEmail(email: string): Promise<{ userId: string; isDeleted: boolean }[]> {
+    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .select({ id: users.id, deletedAt: users.deletedAt })
+        .from(users) // allow-base-read: a soft-deleted user still owns its email
+        .where(sql`lower(${users.email}) = lower(${email})`)
+        .orderBy(users.id),
+    );
+    return rows.map((r) => ({ userId: r.id, isDeleted: r.deletedAt !== null }));
+  }
+
+  /** Whether any user, soft-deleted included, already has this Roviq ID. */
+  async isUsernameTaken(username: string): Promise<boolean> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .select({ id: users.id })
+        .from(users) // allow-base-read: a soft-deleted user still owns its username
+        .where(eq(users.username, username))
+        .limit(1),
+    );
+    return row !== undefined;
+  }
 
   async createUser(input: CreateUserInput): Promise<CreateUserResult> {
     const tempPassword = randomBytes(16).toString('base64url');
@@ -225,7 +253,7 @@ export class IdentityService {
     });
 
     if (!input.skipWelcomeNotification) {
-      this.emitWelcomeNotification({
+      this.sendWelcomeNotification({
         userId: userResult.userId,
         username: input.username,
         email: input.email,
@@ -242,7 +270,8 @@ export class IdentityService {
     return { ...userResult, ...membership };
   }
 
-  private emitWelcomeNotification(payload: {
+  /** Welcome message carrying the temp password; for callers that create the user and membership separately. */
+  sendWelcomeNotification(payload: {
     userId: string;
     username: string;
     email: string;
