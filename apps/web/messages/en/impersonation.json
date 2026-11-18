@@ -1,0 +1,28 @@
+{
+  "title": "View as {name}",
+  "description": "You are about to sign in as {name} at {institute}. A new tab opens with their access. Everything you do there is recorded in the audit log with your name.",
+  "otpDescription": "The institute admin of {institute} has been sent a 6-digit code. Ask them for it and enter it here.",
+  "reasonLabel": "Reason",
+  "reasonHint": "At least {min} characters. {count} entered.",
+  "reasonTooShort": "Write a reason of at least {min} characters.",
+  "otpLabel": "Approval code",
+  "otpInvalidFormat": "Enter the 6-digit code.",
+  "cancel": "Cancel",
+  "start": "Start",
+  "verify": "Verify and open",
+  "opened": "Opened a new tab as {name}.",
+  "action": "View as",
+  "actionTitle": "Open a new tab signed in as this user",
+  "errors": {
+    "generic": "Could not start the session. Try again.",
+    "VALIDATION_FAILED": "Write a reason of at least 10 characters.",
+    "FORBIDDEN": "You are not allowed to view as this user.",
+    "IMPERSONATION_TARGET_INVALID": "This user cannot be viewed as: the account is inactive, has no active membership here, or holds a role equal to or above yours.",
+    "IMPERSONATION_CONSENT_UNAVAILABLE": "No institute admin can approve this request right now.",
+    "IMPERSONATION_OTP_INVALID": "That code is not correct.",
+    "IMPERSONATION_OTP_EXPIRED": "The code has expired. Start again.",
+    "IMPERSONATION_OTP_ATTEMPTS_EXCEEDED": "Too many wrong codes. Start again.",
+    "IMPERSONATION_SESSION_INVALID": "This request is no longer valid. Start again.",
+    "INSTITUTE_NOT_FOUND": "The institute was not found."
+  }
+}

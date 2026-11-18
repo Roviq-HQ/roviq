@@ -47,6 +47,7 @@ import {
   useResellerReactivateInstitute,
   useResellerSuspendInstitute,
 } from '../use-reseller-institutes';
+import { ResellerInstituteUsersTab } from './users-tab';
 
 const STATUS_COLOR: Record<InstituteStatus, string> = {
   /** Awaiting platform admin approval after reseller request. */
@@ -377,14 +378,7 @@ export default function ResellerInstituteDetailPage() {
 
         {/* ── Users Tab ── */}
         <TabsContent value="users" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{td('usersList')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{td('noUsers')}</p>
-            </CardContent>
-          </Card>
+          <ResellerInstituteUsersTab instituteId={institute.id} instituteName={instituteName} />
         </TabsContent>
 
         {/* ── Audit Tab ── */}

@@ -93,8 +93,6 @@
     "complianceData": "Compliance Data",
     "complianceDescription": "Read-only regulatory data for this institute.",
     "noComplianceData": "No compliance data available.",
-    "usersList": "Users",
-    "noUsers": "No users in this institute.",
     "auditPlaceholder": "Audit logs for this institute will be displayed here.",
     "notFound": "Institute not found.",
     "setupProgress": "Setup in progress…"
@@ -250,5 +248,23 @@
       "notAllowed": "This institute already belongs to a group you do not manage."
     },
     "managedByPlatform": "Managed by Roviq"
+  },
+  "users": {
+    "title": "Members",
+    "emptyTitle": "No members yet",
+    "emptyDescription": "People appear here once they join this institute.",
+    "loadFailed": "Could not load the members",
+    "loadFailedHint": "Refresh the page to try again.",
+    "columns": {
+      "name": "Name",
+      "username": "Roviq ID",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "SUSPENDED": "Suspended",
+      "LOCKED": "Locked"
+    }
   }
 }

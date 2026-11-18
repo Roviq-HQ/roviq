@@ -45,6 +45,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `metrics/ServiceCard` — one dependency's health: status badge with icon + text (healthy / degraded / down, never colour alone), response time and uptime; labels come in as props.
 - `metrics/StatusGrid` — responsive 1→6 column grid for `ServiceCard`s with a skeleton state (`loading`, `skeletonCount`, `aria-busy`).
 - `metrics/Sparkline` — tiny Recharts line (loaded client-side only via `next/dynamic`) with an accessible `label`; renders `emptyText` (`—`) for null/empty data.
+- `impersonation/ImpersonateUserDialog` — start an impersonation from any portal: reason (≥10 characters), the approval-code step when the server asks for it, then opens the institute portal on `/auth/impersonate`. The caller passes its scope's start and verify mutations. `impersonation/ViewAsButton` wraps it for intra-institute "View as" (gated by `impersonate User`); `impersonation/ImpersonationBanner` is the banner and ended notice in the impersonated tab.
 
 ## Shared Libraries
 

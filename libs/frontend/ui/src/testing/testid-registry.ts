@@ -334,6 +334,41 @@ export const testIds = {
     row: (id: string) => `admin-attendance-row-${id}`,
   },
 
+  // ── Reseller: institute detail ─────────────────────────────────────────
+  resellerInstituteDetail: {
+    usersTab: 'reseller-institute-users-tab',
+    usersLoading: 'reseller-institute-users-loading',
+    usersEmpty: 'reseller-institute-users-empty',
+    userRow: (userId: string) => `reseller-institute-user-row-${userId}`,
+  },
+
+  // ── Impersonation: code exchange page in the institute portal ──────────
+  impersonationExchange: {
+    loading: 'impersonation-exchange-loading',
+    error: 'impersonation-exchange-error',
+    closeBtn: 'impersonation-exchange-close-btn',
+  },
+
+  // ── Impersonation: banner in the impersonated tab ─────────────────────
+  impersonationBanner: {
+    banner: 'impersonation-banner',
+    exitBtn: 'impersonation-exit-btn',
+    endedNotice: 'impersonation-ended-notice',
+    closeBtn: 'impersonation-ended-close-btn',
+  },
+
+  // ── Impersonation: start dialog and trigger buttons (ROV-101) ─────────
+  impersonation: {
+    dialog: 'impersonation-dialog',
+    reasonInput: 'impersonation-reason-input',
+    reasonError: 'impersonation-reason-error',
+    otpInput: 'impersonation-otp-input',
+    error: 'impersonation-error',
+    cancelBtn: 'impersonation-cancel-btn',
+    submitBtn: 'impersonation-submit-btn',
+    trigger: (userId: string) => `impersonate-btn-${userId}`,
+  },
+
   // ── Admin: resellers list ──────────────────────────────────────────────
   adminResellers: {
     page: 'resellers-page',

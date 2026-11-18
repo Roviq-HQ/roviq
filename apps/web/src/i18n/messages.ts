@@ -23,6 +23,7 @@ import enGeography from '../../messages/en/geography.json';
 import enGroups from '../../messages/en/groups.json';
 import enGuardians from '../../messages/en/guardians.json';
 import enHoliday from '../../messages/en/holiday.json';
+import enImpersonation from '../../messages/en/impersonation.json';
 import enImpersonationSessions from '../../messages/en/impersonationSessions.json';
 import enInstituteBilling from '../../messages/en/instituteBilling.json';
 import enInstituteGroups from '../../messages/en/instituteGroups.json';
@@ -64,6 +65,7 @@ import hiGeography from '../../messages/hi/geography.json';
 import hiGroups from '../../messages/hi/groups.json';
 import hiGuardians from '../../messages/hi/guardians.json';
 import hiHoliday from '../../messages/hi/holiday.json';
+import hiImpersonation from '../../messages/hi/impersonation.json';
 import hiImpersonationSessions from '../../messages/hi/impersonationSessions.json';
 import hiInstituteBilling from '../../messages/hi/instituteBilling.json';
 import hiInstituteGroups from '../../messages/hi/instituteGroups.json';
@@ -107,6 +109,7 @@ const en = {
   groups: enGroups,
   guardians: enGuardians,
   holiday: enHoliday,
+  impersonation: enImpersonation,
   impersonationSessions: enImpersonationSessions,
   instituteBilling: enInstituteBilling,
   instituteGroups: enInstituteGroups,
@@ -151,6 +154,7 @@ const hi = {
   groups: hiGroups,
   guardians: hiGuardians,
   holiday: hiHoliday,
+  impersonation: hiImpersonation,
   impersonationSessions: hiImpersonationSessions,
   instituteBilling: hiInstituteBilling,
   instituteGroups: hiInstituteGroups,

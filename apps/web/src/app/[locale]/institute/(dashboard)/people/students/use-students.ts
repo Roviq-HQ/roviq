@@ -192,6 +192,7 @@ const STUDENT_DETAIL_QUERY = gql`
   query InstituteStudent($id: ID!) {
     getStudent(id: $id) {
       id
+      userId
       membershipId
       admissionNumber
       firstName

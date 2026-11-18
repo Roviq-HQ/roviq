@@ -37,6 +37,8 @@ declare global {
       NEXT_PUBLIC_GRAFANA_URL?: string;
       DEV_TEMPO_PORT?: string;
       DEV_LOKI_PORT?: string;
+      /** Origin of the institute portal, e.g. https://app.roviq.com. Unset: derived from the current host. */
+      NEXT_PUBLIC_INSTITUTE_URL?: string;
       /** Host port of this instance's isolated NATS test broker (slot 0: 4224). */
       DEV_NATS_TEST_PORT?: string;
       /** Host port of this instance's dev API gateway (slot 0: 3005). */

@@ -289,6 +289,13 @@ Because `APP_GUARD` runs BEFORE the per-resolver `GqlAuthGuard` has populated `r
 
 `endImpersonation` writes both a cache `del` AND a `${key}:tombstone` marker (TTL > session cache TTL) so a concurrent guard mid-lookup can't repopulate a stale "not-ended" entry. The tombstone is checked before the cache read.
 
+### Starting and ending in the web app (ROV-101)
+
+- **Where it starts.** Admin portal: institute → Users tab. Reseller portal: institute → Users tab (`resellerListUsers`; `reseller_full_admin` holds `read User` for this). Institute portal: "View as" on the staff and student detail pages. Each shows the action only with `impersonate User` and only for an active user with an active membership in that institute; the server still decides (role rank, reseller ownership, OTP).
+- **The new tab.** `ImpersonateUserDialog` asks for a reason (≥10 characters) and, when `requiresOtp` comes back, the institute admin's 6-digit code. The tab is opened on the click, before the request, so popup blockers allow it; it is then pointed at `<institute portal>/<locale>/auth/impersonate?code=…` with `opener` cleared. The institute portal's origin is `NEXT_PUBLIC_INSTITUTE_URL` when set (production: `https://app.roviq.com`), otherwise the current host without its `admin.`/`reseller.` label.
+- **The code exchange page** trades the one-time code for the token and keeps it in `sessionStorage` only, so it dies with the tab and never touches a session the browser holds on that portal. A spent or unknown code shows "Code expired or invalid"; error text is always translated, never the server's message.
+- **Ending.** "Exit Impersonation" calls `endImpersonation` first, so the session stops showing as active, then drops the token and closes the tab. Token expiry and a server refusal (`IMPERSONATION_ENDED`, e.g. after a reseller suspension) show the same "session ended" notice. Browsers may refuse `window.close()`, so the notice keeps a "Close tab" button.
+
 ### Session Management UI (ROV-144)
 
 Read models over `impersonation_sessions` surface sessions for review and termination:

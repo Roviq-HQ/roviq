@@ -708,7 +708,7 @@ export default function InstituteDetailPage() {
 
         {/* ── Users Tab ── */}
         <TabsContent value="users" className="mt-6">
-          <InstituteUsersTab instituteId={institute.id} />
+          <InstituteUsersTab instituteId={institute.id} instituteName={instituteName} />
         </TabsContent>
 
         {/* ── Configuration Tab ── */}
