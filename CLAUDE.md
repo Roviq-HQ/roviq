@@ -11,7 +11,7 @@
 - `pnpm tilt trigger web` — restart web app
 - `pnpm tilt trigger e2e-gateway` — run API e2e tests
 - `pnpm tilt trigger e2e-ui` — run Playwright UI tests across all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e)
-- `pnpm e2e:up` — start Docker e2e infra (run once, stays running), MUST run it before e2e testing. if already running, just re-seed and continue.
+- `pnpm e2e:up` — start Docker e2e infra (stays running), MUST run it before e2e testing. It re-seeds every time. The e2e backend runs a fixed build with no watcher: run it again after a backend change and it rebuilds and recreates api-gateway and notification-service (about 45 s; 16 s when the backend is unchanged). `pnpm test:e2e:api` and `pnpm ci:check` do this themselves.
 - `pnpm test:e2e:api` — Vitest E2E API tests against running api-gateway. **All new E2E API tests go here.**
 - `pnpm test:e2e:ui` — Playwright UI tests across the 3 portal e2e projects plus cross-portal.
 - `pnpm test:all` — full test pipeline: unit + integration + e2e:api + e2e:ui
@@ -136,6 +136,17 @@ After completing each phase/issue, before declaring done:
 - Report what was verified, what remains unverified, and supporting evidence; distinguish automated results from pending manual acceptance.
 - Keep one-time scripts, hooks and generated review files out of the feature commit. Remove them after the user finishes review; retain regression tests. Delete database fixtures only when requested.
 - Preserve database approval scope; production writes require explicit approval.
+
+### Do not waste the user's time
+
+Each line is a mistake that cost a session 10 to 40 minutes.
+
+- **Search Linear before coding.** `list_issues` with a keyword query for the area, newest first. An old or reopened issue may be partly replaced by a newer one; if so, ask which applies before building anything.
+- **Commit each pre-existing fix the moment it is tested**, before going back to the feature. Splitting mixed work into commits afterwards is slow and error-prone.
+- **Read the real result of `git push`.** Redirect its output to a file and look for `[ci:check] FAILED`. Never append `; echo exit=$?` or pipe it through `tail`: both report success for a failed push.
+- **Typecheck one project**: `pnpm nx run <project>:typecheck`. A hand-run `tsc` over the workspace prints hundreds of unrelated lines.
+- **Browser pass**: run a whole flow (log in, navigate, act, wait for the final text, return what you need) in one `browser_run_code` call (`browser_run_code_unsafe` in newer Playwright MCP versions) instead of one click per call. Wait for the expected text before a screenshot. If the browser is unavailable, find out why first; do not write a headless script and then repeat the pass.
+- **In a parallel instance**, check `pnpm tilt get uiresources` at the start of a session: its Tilt and containers may have stopped with the previous session.
 
 ### Deviations & Deferred Work
 

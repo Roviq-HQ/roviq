@@ -8,6 +8,7 @@ description: Use when starting work on a Linear issue — provides the full work
 ## 1. Understand
 - Read the Linear issue fully — prerequisites, steps, file paths, verification, "Does NOT Change"
 - If it references a feature spec (Linear Document), read that too
+- Search Linear for newer issues on the same area (`list_issues` with a keyword query). Old or reopened issues are often partly replaced by a newer one — if you find one, ask which applies before coding
 
 ## 2. Verify Prerequisites
 - Working tree must be clean — commit or resolve pending changes first
@@ -20,6 +21,7 @@ description: Use when starting work on a Linear issue — provides the full work
 ## 3. Implement
 - Branch: `git checkout -b <linear-branch-name> origin/main`
 - Follow issue's "Steps" in order, create files at exact paths specified
+- A pre-existing bug you fix along the way gets its own commit as soon as it is tested, before you continue the feature
 
 ## 4. Test & Verify (MANDATORY before commit/PR)
 - Write tests (unit: `*.spec.ts`, integration: `*.integration.test.ts`)
