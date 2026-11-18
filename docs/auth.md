@@ -185,7 +185,7 @@ Every newly-provisioned user is born with `users.must_change_password = true` an
   ```
 
 - **Whitelist** — handlers decorated with `@AllowWhenPasswordChangeRequired()` are reachable while the bit is set. Currently: `changePassword`, `logout`, `me`. Add the decorator on any future handler the change-password screen needs to call.
-- **Frontend contract** — on receiving `code: 'PASSWORD_CHANGE_REQUIRED'` the web app redirects to `/auth/change-password`. The screen calls `changePassword(currentPassword, newPassword)`; the next access token will not carry the bit.
+- **Frontend contract** — on receiving `code: 'PASSWORD_CHANGE_REQUIRED'` the web app redirects to `/auth/change-password`. After `changePassword(currentPassword, newPassword)` succeeds, the calling browser clears its tokens. Every browser must sign in again with the new password when its session needs renewing.
 
 ## Ending access tokens on a password change (ROV-232)
 
