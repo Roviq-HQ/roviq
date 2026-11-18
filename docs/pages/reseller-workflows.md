@@ -225,7 +225,7 @@ The Team page (`/reseller/team`) lists the people from your organisation who can
 
 1. Click **Team** in the sidebar. Each row shows the member's name, email, **role**, **status** (Active or Inactive), when they were last active and when they joined. Your own row carries a **You** badge.
 2. Use the search box (name, email or Roviq ID) and the **status** filter to narrow the list. Filters are kept in the page address, so a filtered view can be bookmarked or shared.
-3. Click a row to open the member's detail panel: profile, **active sessions** (device, IP address, sign-in time) and their **recent activity** from the audit log. Sessions are shown to team admins only.
+3. Click a row to open the member's detail panel: profile, **active sessions** (device, IP address, sign-in time) and their **recent activity** from the audit log. Sessions are shown only for yourself and for members you are allowed to manage.
 
 ### Roles
 

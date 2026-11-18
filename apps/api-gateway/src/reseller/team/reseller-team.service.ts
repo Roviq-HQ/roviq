@@ -79,8 +79,8 @@ export class ResellerTeamService {
     const standing = await this.loadStanding(actor);
     const member = await this.requireMember(actor.resellerId, membershipId);
     const lastActive = await this.repo.findLastActive([member.userId]);
-    const maySeeSessions =
-      member.userId === actor.userId || this.assignableRoleIds(standing).length > 0;
+    // Sessions carry IP and device: only for the member themselves or someone ranked to manage them.
+    const maySeeSessions = member.userId === actor.userId || canManage(standing, member);
     return {
       ...toModel(member, standing, lastActive),
       sessions: maySeeSessions ? await this.repo.listSessions(member.id) : null,

@@ -450,7 +450,7 @@ describe('ResellerTeamPage', () => {
       expect(entry).toHaveTextContent('Suspend · Institute');
     });
 
-    it('says sessions are for team admins when the server withholds them', async () => {
+    it('explains who can see sessions when the server withholds them', async () => {
       renderPage([listMock([me, arjun]), rolesMock([]), detailMock(null), activityMock], {
         searchParams: '?member=m-arjun',
         abilityRules: [{ action: 'read', subject: 'all' }],
@@ -458,7 +458,9 @@ describe('ResellerTeamPage', () => {
 
       const sessions = await screen.findByTestId('reseller-team-detail-sessions');
       await waitFor(() =>
-        expect(sessions).toHaveTextContent("Only team admins can see a member's sessions."),
+        expect(sessions).toHaveTextContent(
+          'You can see sessions only for yourself and for members you manage.',
+        ),
       );
     });
 

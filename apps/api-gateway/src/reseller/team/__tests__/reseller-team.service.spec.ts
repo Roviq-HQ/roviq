@@ -152,7 +152,7 @@ describe('ResellerTeamService', () => {
   });
 
   describe('get', () => {
-    it('shows sessions to a team manager', async () => {
+    it('shows sessions to someone who may manage the member', async () => {
       const sessions = [
         {
           id: 's1',
@@ -168,6 +168,11 @@ describe('ResellerTeamService', () => {
       const result = await service.get(actor(support), viewer.id);
       expect(result.sessions).toEqual(sessions);
       expect(repo.listSessions).toHaveBeenCalledWith(viewer.id);
+    });
+
+    it('hides the sessions of a senior member from a support admin', async () => {
+      expect((await service.get(actor(support), admin.id)).sessions).toBeNull();
+      expect(repo.listSessions).not.toHaveBeenCalled();
     });
 
     it('hides a colleague sessions from a viewer but shows the viewer their own', async () => {

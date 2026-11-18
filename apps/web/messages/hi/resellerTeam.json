@@ -90,7 +90,7 @@
     "lastActive": "अंतिम सक्रियता",
     "sessions": "सक्रिय सत्र",
     "sessionsEmpty": "कोई सक्रिय सत्र नहीं।",
-    "sessionsHidden": "सदस्य के सत्र केवल टीम एडमिन देख सकते हैं।",
+    "sessionsHidden": "आप केवल अपने और उन सदस्यों के सत्र देख सकते हैं जिनका प्रबंधन आप करते हैं।",
     "sessionStarted": "{date} को साइन इन किया",
     "sessionLastUsed": "अंतिम उपयोग {date}",
     "sessionUnknownDevice": "अज्ञात डिवाइस",

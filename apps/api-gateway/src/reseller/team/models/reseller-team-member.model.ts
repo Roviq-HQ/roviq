@@ -93,7 +93,7 @@ export class ResellerTeamMemberDetailModel extends ResellerTeamMemberModel {
   @Field(() => [ResellerTeamSessionModel], {
     nullable: true,
     description:
-      'Live sessions. Null unless the caller manages the team (full or support admin) or is this member.',
+      'Live sessions. Null unless the caller is this member or may manage them (see canManage).',
   })
   sessions?: ResellerTeamSessionModel[] | null;
 }

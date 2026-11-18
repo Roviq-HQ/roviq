@@ -331,8 +331,13 @@ describe('Reseller team management (integration)', () => {
       ]);
     });
 
-    it('refuses a support admin acting on the full admin or handing out the full-admin role', async () => {
+    it('refuses a support admin acting on the full admin, seeing their sessions, or handing out the full-admin role', async () => {
       const token = supportTokens.accessToken;
+      const senior = await gql(GET, { id: team.reseller.membershipId }, token);
+      expect(senior.data?.resellerGetTeamMember.sessions).toBeNull();
+      const junior = await gql(GET, { id: viewer.id }, token);
+      expect(junior.data?.resellerGetTeamMember.sessions).toHaveLength(1);
+
       const deactivate = await gql(DEACTIVATE, { id: team.reseller.membershipId }, token);
       expect(codeOf(deactivate)).toBe(ErrorCode.TEAM_ROLE_NOT_ASSIGNABLE);
 
