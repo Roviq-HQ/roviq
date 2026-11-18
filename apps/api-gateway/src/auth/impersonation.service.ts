@@ -38,6 +38,7 @@ import {
   type ImpersonationSessionModel,
   ImpersonationSessionStatus,
 } from './dto/impersonation-session.model';
+import { invalidateImpersonationSessions } from './impersonation-session-cache';
 import { REDIS_KEYS } from './redis-keys';
 
 // ── Constants ──────────────────────────────────────────────
@@ -533,23 +534,7 @@ export class ImpersonationService {
         .where(and(eq(impersonationSessions.id, sessionId), isNull(impersonationSessions.endedAt))),
     );
 
-    // Invalidate session cache so ImpersonationSessionGuard rejects immediately.
-    //
-    // Race: another request may be mid-way through a cache-miss DB lookup when
-    // we hit this point — it has already read the DB row (endedAt still null
-    // because that SELECT raced the UPDATE above) and is about to SET the
-    // cache entry. A bare `del` would be silently overwritten, keeping an
-    // ended session visible as live for up to SESSION_CACHE_TTL.
-    //
-    // Fix: write a tombstone the guard checks BEFORE its cache read. Any
-    // concurrent in-flight guard that subsequently SETs the session cache
-    // is harmless — the next guard invocation will see the tombstone and
-    // short-circuit. Tombstone TTL (70s) is strictly > SESSION_CACHE_TTL so
-    // it cannot expire before the stale cache entry it shadows.
-    await Promise.all([
-      this.redis.del(`${REDIS_KEYS.IMPERSONATION_SESSION}${sessionId}`),
-      this.redis.set(`${REDIS_KEYS.IMPERSONATION_SESSION}${sessionId}:tombstone`, '1', 'EX', 70),
-    ]);
+    await invalidateImpersonationSessions(this.redis, [sessionId]);
 
     // Emit impersonation_end event
     this.authEventService

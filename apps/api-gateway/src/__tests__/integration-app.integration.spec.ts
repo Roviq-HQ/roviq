@@ -40,6 +40,7 @@ import {
   createTestReseller,
   gqlRequest,
   type IntegrationAppResult,
+  RESELLER_DIRECT_ID,
   waitForAuditLog,
 } from '@roviq/testing/integration';
 import { eq, sql } from 'drizzle-orm';
@@ -75,7 +76,7 @@ const FAKE_USER_ID = '00000000-0000-7000-a000-000000000999';
 const FAKE_MEMBERSHIP_ID = '00000000-0000-7000-a000-000000000998';
 const FAKE_ROLE_ID = '00000000-0000-7000-a000-000000000997';
 const FAKE_TENANT_ID = '00000000-0000-7000-a000-000000000996';
-const FAKE_RESELLER_ID = '00000000-0000-7000-a000-000000000995';
+const FAKE_RESELLER_ID = RESELLER_DIRECT_ID;
 
 describe('@roviq/testing/integration — proof-of-concept', () => {
   let result: IntegrationAppResult;

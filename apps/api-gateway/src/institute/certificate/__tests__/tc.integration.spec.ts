@@ -35,6 +35,7 @@ import {
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  RESELLER_DIRECT_ID,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -163,7 +164,7 @@ const FAKE = {
   USER: '00000000-0000-7000-a000-000000000eff',
   MEMBERSHIP: '00000000-0000-7000-a000-000000000efe',
   ROLE: '00000000-0000-7000-a000-000000000efd',
-  RESELLER: '00000000-0000-7000-a000-000000000efb',
+  RESELLER: RESELLER_DIRECT_ID,
 } as const;
 
 const REQUEST_TC = /* GraphQL */ `

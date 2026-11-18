@@ -23,6 +23,7 @@ import {
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  RESELLER_DIRECT_ID,
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -33,7 +34,7 @@ const FAKE = {
   USER: '00000000-0000-7000-a000-000000000aa1',
   MEMBERSHIP: '00000000-0000-7000-a000-000000000aa2',
   ROLE: '00000000-0000-7000-a000-000000000aa3',
-  RESELLER: '00000000-0000-7000-a000-000000000aa4',
+  RESELLER: RESELLER_DIRECT_ID,
 } as const;
 
 interface StaffNode {
