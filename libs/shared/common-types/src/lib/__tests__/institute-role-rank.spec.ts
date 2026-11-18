@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canImpersonateInstituteRole,
   DEFAULT_ROLE_ABILITIES,
+  type DefaultRole,
   DefaultRoles,
   INSTITUTE_ROLE_RANK,
   instituteRoleRank,
@@ -59,5 +61,46 @@ describe('instituteRoleRank', () => {
       .sort();
 
     expect(canImpersonate).toEqual(['institute_admin', 'principal']);
+  });
+});
+
+describe('canImpersonateInstituteRole', () => {
+  const ROLE_NAMES = Object.keys(INSTITUTE_ROLE_RANK) as DefaultRole[];
+  const role = (name: DefaultRole) => ({ name, abilities: DEFAULT_ROLE_ABILITIES[name] });
+
+  it('should let the institute admin reach every role below it, but not another admin', () => {
+    const reachable = ROLE_NAMES.filter((name) =>
+      canImpersonateInstituteRole(role('institute_admin'), role(name)),
+    ).sort();
+
+    expect(reachable).toEqual(ROLE_NAMES.filter((name) => name !== 'institute_admin').sort());
+  });
+
+  it('should let the principal reach only teachers, students and parents', () => {
+    const reachable = ROLE_NAMES.filter((name) =>
+      canImpersonateInstituteRole(role('principal'), role(name)),
+    ).sort();
+
+    expect(reachable).toEqual([
+      'activity_teacher',
+      'class_teacher',
+      'parent',
+      'student',
+      'subject_teacher',
+    ]);
+  });
+
+  it('should keep a custom role away from a non-admin impersonator', () => {
+    const custom = { name: 'lab_volunteer', abilities: [] };
+
+    expect(canImpersonateInstituteRole(role('principal'), custom)).toBe(false);
+    expect(canImpersonateInstituteRole(role('institute_admin'), custom)).toBe(true);
+  });
+
+  it('should refuse a target named like a student that grants manage:all', () => {
+    const disguised = { name: 'student', abilities: [{ action: 'manage', subject: 'all' }] };
+
+    expect(canImpersonateInstituteRole(role('principal'), disguised)).toBe(false);
+    expect(canImpersonateInstituteRole(role('institute_admin'), disguised)).toBe(false);
   });
 });

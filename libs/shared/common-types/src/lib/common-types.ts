@@ -263,6 +263,35 @@ export function instituteRoleRank(
   return isDefaultRole(roleName) ? INSTITUTE_ROLE_RANK[roleName] : CUSTOM_ROLE_RANK;
 }
 
+/**
+ * Roles a non-admin impersonator (the principal by default) may act as. Other
+ * staff roles hold abilities a principal lacks (fees, health records,
+ * counselor notes, system settings), so only a full-control role reaches them.
+ */
+const OPEN_IMPERSONATION_TARGETS: ReadonlySet<string> = new Set<DefaultRole>([
+  'class_teacher',
+  'subject_teacher',
+  'activity_teacher',
+  'student',
+  'parent',
+]);
+
+interface RankedRole {
+  name: string;
+  abilities: readonly { action: unknown; subject: unknown }[];
+}
+
+/**
+ * Whether a member holding `actor` may impersonate a member holding `target`
+ * inside one institute. The target must rank strictly below the actor; unless
+ * the actor has full control, it must also be a teacher, student or parent.
+ */
+export function canImpersonateInstituteRole(actor: RankedRole, target: RankedRole): boolean {
+  const actorRank = instituteRoleRank(actor.name, actor.abilities);
+  if (instituteRoleRank(target.name, target.abilities) >= actorRank) return false;
+  return actorRank === FULL_CONTROL_RANK || OPEN_IMPERSONATION_TARGETS.has(target.name);
+}
+
 // Auth scopes are now exported from `./enums/auth` (canonical X_VALUES + type
 // + const-object pattern, per the backend-service skill enum convention).
 // Existing `import type { AuthScope } from '@roviq/common-types'` keeps working

@@ -4,7 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
 import type { AuthScope, AuthUser, InstituteContext, ResellerContext } from '@roviq/common-types';
-import { BusinessException, DefaultRoles, ErrorCode, instituteRoleRank } from '@roviq/common-types';
+import {
+  BusinessException,
+  canImpersonateInstituteRole,
+  DefaultRoles,
+  ErrorCode,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -817,14 +822,11 @@ export class ImpersonationService {
       );
     }
 
-    const actorRank = instituteRoleRank(actorMembership.roleName, actorMembership.roleAbilities);
-    const targetRank = Math.max(
-      ...targetRoles.map((role) => instituteRoleRank(role.name, role.abilities)),
-    );
-    if (targetRank >= actorRank) {
+    const actorRole = { name: actorMembership.roleName, abilities: actorMembership.roleAbilities };
+    if (!targetRoles.every((targetRole) => canImpersonateInstituteRole(actorRole, targetRole))) {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
-        'You can only impersonate users whose role is below your own',
+        'You are not allowed to impersonate a user with this role',
       );
     }
   }

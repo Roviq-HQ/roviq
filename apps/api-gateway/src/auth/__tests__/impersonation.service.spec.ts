@@ -709,12 +709,14 @@ describe('ImpersonationService', () => {
 
     it.each([
       ['principal', IMPERSONATE, 'class_teacher', []],
+      ['principal', IMPERSONATE, 'subject_teacher', []],
       ['principal', IMPERSONATE, 'student', []],
       ['principal', IMPERSONATE, 'parent', []],
-      ['principal', IMPERSONATE, 'vice_principal', []],
+      ['custom_role', IMPERSONATE, 'student', []],
       ['institute_admin', MANAGE_ALL, 'principal', IMPERSONATE],
+      ['institute_admin', MANAGE_ALL, 'accountant', []],
       ['institute_admin', MANAGE_ALL, 'custom_role', []],
-    ])('lets %s impersonate a lower-ranked %3$s', async (actorRole, actorAbilities, targetRole, targetAbilities) => {
+    ])('lets %s impersonate %3$s', async (actorRole, actorAbilities, targetRole, targetAbilities) => {
       const { service } = arrange(
         targetRole,
         targetAbilities,
@@ -727,15 +729,23 @@ describe('ImpersonationService', () => {
     });
 
     it.each([
+      // Same or higher rank.
       ['principal', IMPERSONATE, 'institute_admin', MANAGE_ALL],
       ['principal', IMPERSONATE, 'principal', IMPERSONATE],
       ['institute_admin', MANAGE_ALL, 'institute_admin', MANAGE_ALL],
       // A custom role with manage:all ranks with the institute admin whatever its name.
       ['principal', IMPERSONATE, 'custom_super_role', MANAGE_ALL],
       ['institute_admin', MANAGE_ALL, 'custom_super_role', MANAGE_ALL],
-      // A custom role ranks as staff, so it cannot reach other staff.
+      // Lower rank, but holding abilities a principal does not have.
+      ['principal', IMPERSONATE, 'vice_principal', []],
+      ['principal', IMPERSONATE, 'accountant', []],
+      ['principal', IMPERSONATE, 'nurse', []],
+      ['principal', IMPERSONATE, 'counselor', []],
+      ['principal', IMPERSONATE, 'it_admin', []],
+      ['principal', IMPERSONATE, 'custom_role', []],
+      // A custom role ranks as staff, so it cannot reach teachers.
       ['custom_role', IMPERSONATE, 'class_teacher', []],
-    ])('refuses %s impersonating %3$s (same or higher rank)', async (actorRole, actorAbilities, targetRole, targetAbilities) => {
+    ])('refuses %s impersonating %3$s', async (actorRole, actorAbilities, targetRole, targetAbilities) => {
       const { service, inserted, redis } = arrange(
         targetRole,
         targetAbilities,
