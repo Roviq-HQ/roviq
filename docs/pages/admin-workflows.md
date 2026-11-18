@@ -141,7 +141,7 @@ Resellers are partner organizations that manage institutes on Roviq's behalf. Ea
 
 ### Reseller Tiers
 
-The tier controls what a reseller's staff can do with their assigned institutes. Changing the tier cascades to every reseller-staff membership, so abilities take effect on each staff member's next token refresh.
+The tier controls what a reseller's staff can do with their assigned institutes. Changing the tier moves staff who held the old tier's top role to the new tier's top role, brings anyone still above the new tier down to it, and leaves everyone else's role alone. Staff whose role moved are asked for a fresh token on their next request, so the change takes effect at once.
 
 | Tier                | Abilities                                                      |
 | ------------------- | -------------------------------------------------------------- |

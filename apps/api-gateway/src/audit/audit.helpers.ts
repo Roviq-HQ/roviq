@@ -14,7 +14,11 @@ type ActionType =
 
 /** Ordered longest-first so "suspend" matches before "su" (if any prefix collision existed) */
 const ACTION_PREFIXES: [string, ActionType][] = [
+  ['reactivate', 'ACTIVATE'],
+  // No DEACTIVATE action type; listed so the entity is `Institute`, not `DeactivateInstitute`.
+  ['deactivate', 'UPDATE'],
   ['activate', 'ACTIVATE'],
+  ['invite', 'CREATE'],
   ['suspend', 'SUSPEND'],
   ['restore', 'RESTORE'],
   ['create', 'CREATE'],

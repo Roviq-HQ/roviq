@@ -37,6 +37,10 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first.',
   'apps/api-gateway/src/auth/identity.service.ts#IdentityService.createUser':
     'Creates a new platform-level user; no existing row is read or changed.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.findUsersByEmail':
+    'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.isUsernameTaken':
+    'Boolean existence check; the reseller invite answers every unusable address with one error code.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertActiveResellerMembership':
     'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertStillAuthorized':
@@ -161,8 +165,12 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.updateProviderData':
     'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
-  'apps/api-gateway/src/reseller/team/reseller-team.service.ts#ResellerTeamService.invite':
-    'Role lookup is filtered by the reseller id in the verified token.',
+  'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.findLastActive':
+    'Team (ROV-185): takes user ids the service read under withReseller for the caller token reseller; returns only a timestamp per id.',
+  'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.listRoles':
+    'Team (ROV-185): filters on the reseller id from the caller token; no caller-supplied id.',
+  'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.listSessions':
+    'Team (ROV-185): takes a membership id the service first found under withReseller for the caller token reseller.',
   'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts#PaymentGatewayConfigDrizzleRepository.findActiveByResellerId':
     'Keyed by the reseller id in the verified token.',
   'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findAbilities':

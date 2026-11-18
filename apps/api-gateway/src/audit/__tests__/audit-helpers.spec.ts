@@ -536,6 +536,18 @@ describe('extractActionType', () => {
     expect(extractActionType('administratorCreate')).toBe('UPDATE');
   });
 
+  it.each([
+    ['resellerInviteTeamMember', 'CREATE', 'TeamMember'],
+    ['resellerReactivateTeamMember', 'ACTIVATE', 'TeamMember'],
+    ['resellerDeactivateTeamMember', 'UPDATE', 'TeamMember'],
+    ['adminDeactivateInstitute', 'UPDATE', 'Institute'],
+    ['resellerReactivateInstitute', 'ACTIVATE', 'Institute'],
+    ['activateInstitute', 'ACTIVATE', 'Institute'],
+  ])('reads invite, deactivate and reactivate as verbs: %s → %s on %s', (name, action, entity) => {
+    expect(extractActionType(name)).toBe(action);
+    expect(extractEntityType(name)).toBe(entity);
+  });
+
   it('falls back to UPDATE for unrecognized prefixes', () => {
     expect(extractActionType('doSomething')).toBe('UPDATE');
     expect(extractActionType('customMutation')).toBe('UPDATE');

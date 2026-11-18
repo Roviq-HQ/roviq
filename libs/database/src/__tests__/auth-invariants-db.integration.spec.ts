@@ -293,6 +293,147 @@ describe('reseller suspension', () => {
   });
 });
 
+describe('reseller member deactivation (ROV-185)', () => {
+  /** A second staff member of the same reseller. */
+  async function addColleague(client: pg.PoolClient, staff: Staff): Promise<Staff> {
+    const tag = randomUUID().slice(0, 8);
+    const user = await client.query<{ id: string }>(
+      `INSERT INTO users (email, username, password_hash, created_by, updated_by)
+       VALUES ($1, $2, 'x', $3, $3) RETURNING id`,
+      [`colleague-${tag}@test.local`, `colleague_${tag}`, SYSTEM],
+    );
+    const membership = await client.query<{ id: string }>(
+      `INSERT INTO reseller_memberships (user_id, reseller_id, role_id, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $4) RETURNING id`,
+      [user.rows[0].id, staff.resellerId, SEED_IDS.ROLE_RESELLER_VIEWER, SYSTEM],
+    );
+    return { ...staff, userId: user.rows[0].id, membershipId: membership.rows[0].id };
+  }
+
+  const resellerSession = (client: pg.PoolClient, staff: Staff) =>
+    client
+      .query<{ id: string }>(INSERT_SESSION, [
+        staff.userId,
+        'reseller',
+        SEED_IDS.USER_TEACHER,
+        staff.instituteId,
+      ])
+      .then((res) => res.rows[0].id);
+
+  async function readBack(client: pg.PoolClient, tokenIds: string[], sessionIds: string[]) {
+    const tokens = await client.query<{ id: string; revoked_reason: string | null }>(
+      'SELECT id, revoked_reason FROM refresh_tokens WHERE id = ANY($1)',
+      [tokenIds],
+    );
+    const sessions = await client.query<{ id: string; ended_reason: string | null }>(
+      'SELECT id, ended_reason FROM impersonation_sessions WHERE id = ANY($1)',
+      [sessionIds],
+    );
+    return {
+      token: (id: string) => tokens.rows.find((row) => row.id === id)?.revoked_reason,
+      session: (id: string) => sessions.rows.find((row) => row.id === id)?.ended_reason,
+    };
+  }
+
+  it('revokes that member tokens and ends their impersonations when the reseller role deactivates them, and only theirs', async () => {
+    await asAdmin(async (client) => {
+      const admin = await createReseller(client);
+      const member = await addColleague(client, admin);
+      const adminToken = await resellerToken(client, admin);
+      const memberToken = await resellerToken(client, member);
+      const adminSession = await resellerSession(client, admin);
+      const memberSession = await resellerSession(client, member);
+
+      // The application deactivates as roviq_reseller, which can write neither other table.
+      await client.query('SET LOCAL ROLE roviq_reseller');
+      await client.query(`SELECT set_config('app.current_reseller_id', $1, true)`, [
+        admin.resellerId,
+      ]);
+      const updated = await client.query(
+        'UPDATE reseller_memberships SET is_active = false WHERE id = $1',
+        [member.membershipId],
+      );
+      expect(updated.rowCount).toBe(1);
+      await client.query('SET LOCAL ROLE roviq_admin');
+
+      const after = await readBack(
+        client,
+        [adminToken, memberToken],
+        [adminSession, memberSession],
+      );
+      expect(after.token(memberToken)).toBe('admin_revoked');
+      expect(after.session(memberSession)).toBe('revoked');
+      expect(after.token(adminToken)).toBeNull();
+      expect(after.session(adminSession)).toBeNull();
+    });
+  });
+
+  it('does the same when the membership is soft-deleted', async () => {
+    await asAdmin(async (client) => {
+      const admin = await createReseller(client);
+      const member = await addColleague(client, admin);
+      const memberToken = await resellerToken(client, member);
+      const memberSession = await resellerSession(client, member);
+
+      await client.query(
+        'UPDATE reseller_memberships SET deleted_at = now(), deleted_by = $2 WHERE id = $1',
+        [member.membershipId, SYSTEM],
+      );
+
+      const after = await readBack(client, [memberToken], [memberSession]);
+      expect(after.token(memberToken)).toBe('admin_revoked');
+      expect(after.session(memberSession)).toBe('revoked');
+    });
+  });
+
+  it('leaves sessions alone on a role change and refuses a new token while inactive', async () => {
+    await asAdmin(async (client) => {
+      const admin = await createReseller(client);
+      const member = await addColleague(client, admin);
+      const memberToken = await resellerToken(client, member);
+
+      await client.query('UPDATE reseller_memberships SET role_id = $2 WHERE id = $1', [
+        member.membershipId,
+        SEED_IDS.ROLE_RESELLER_SUPPORT_ADMIN,
+      ]);
+      expect((await readBack(client, [memberToken], [])).token(memberToken)).toBeNull();
+
+      await client.query('UPDATE reseller_memberships SET is_active = false WHERE id = $1', [
+        member.membershipId,
+      ]);
+      await expectRefused(client, /refresh token refused/, INSERT_TOKEN, [
+        member.userId,
+        null,
+        member.membershipId,
+        'reseller',
+        randomUUID(),
+        SYSTEM,
+      ]);
+    });
+  });
+
+  it('a reseller cannot deactivate a member of another reseller', async () => {
+    await asAdmin(async (client) => {
+      const mine = await createReseller(client);
+      const theirs = await createReseller(client);
+      const theirToken = await resellerToken(client, theirs);
+
+      await client.query('SET LOCAL ROLE roviq_reseller');
+      await client.query(`SELECT set_config('app.current_reseller_id', $1, true)`, [
+        mine.resellerId,
+      ]);
+      const updated = await client.query(
+        'UPDATE reseller_memberships SET is_active = false WHERE id = $1',
+        [theirs.membershipId],
+      );
+      expect(updated.rowCount).toBe(0);
+      await client.query('SET LOCAL ROLE roviq_admin');
+
+      expect((await readBack(client, [theirToken], [])).token(theirToken)).toBeNull();
+    });
+  });
+});
+
 describe('impersonation sessions', () => {
   it('refuses a reseller impersonating into an institute it does not own', async () => {
     await asAdmin(async (client) => {

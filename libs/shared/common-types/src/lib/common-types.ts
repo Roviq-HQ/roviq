@@ -94,6 +94,8 @@ export const AppSubject = {
   BillingDashboard: 'BillingDashboard',
   /** Reseller account itself — platform admin manages tier, suspension, branding, assigned institutes */
   Reseller: 'Reseller',
+  /** A reseller's own staff (reseller_memberships) — invite, change role, deactivate */
+  ResellerTeam: 'ResellerTeam',
   /** A logical group of institutes managed together (e.g. a franchise or trust with multiple branches) */
   InstituteGroup: 'InstituteGroup',
   /** DPDP Act 2023 parental consent record — append-only audit trail for data processing purposes */

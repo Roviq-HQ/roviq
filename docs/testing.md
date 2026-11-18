@@ -91,6 +91,8 @@ A test counts only if it attempts the forbidden action and expects a refusal. A 
 | 19 | A ws-ticket is single-use and expires | Redis `GETDEL` and 30-second TTL | E2E 19; `ws-ticket.store.spec.ts` |
 | 20 | `revokeAllOtherSessions` keeps the current session | application | E2E 20 |
 | 21 | `selectInstitute` needs a valid selection token | application | E2E 21 |
+| 22 | A deactivated or deleted reseller team member loses their refresh tokens and reseller impersonation sessions; a reseller cannot deactivate another reseller's member | `reseller_memberships_revoke_sessions` trigger; `reseller_membership_own` policy | DB ("reseller member deactivation"); `reseller-team.integration.spec.ts` |
+| 23 | A reseller access token issued before a role change or deactivation is refused | application: `ResellerAccessGuard` reads `auth:reseller-member-access:<id>` | `reseller-access.guard.spec.ts`; `reseller-team.integration.spec.ts` |
 
 Further rules the database enforces, tested in DB:
 

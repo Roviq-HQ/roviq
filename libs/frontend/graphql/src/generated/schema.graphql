@@ -4015,27 +4015,33 @@ type Mutation {
   """Links one of the reseller's institutes to a group the reseller owns."""
   resellerAddInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
 
+  """Give a team member another of this reseller's roles"""
+  resellerChangeTeamMemberRole(membershipId: ID!, roleId: ID!): ResellerTeamMemberModel!
+
   """Creates a group owned by the caller's reseller."""
   resellerCreateInstituteGroup(input: CreateInstituteGroupInput!): InstituteGroupModel!
   resellerCreateInstituteRequest(input: ResellerCreateInstituteRequestInput!): InstituteModel!
+
+  """
+  Deactivate a team member's membership and end their sessions. The user account is preserved.
+  """
+  resellerDeactivateTeamMember(membershipId: ID!): ResellerTeamMemberModel!
   resellerEndImpersonation(sessionId: String!): Boolean!
 
   """
-  Create a new user and assign them a reseller-scope membership. A welcome notification with a temporary password is dispatched automatically.
+  Add a person to the team by email. An existing account is linked; a new one is created and sent a temporary password.
   """
-  resellerInviteTeamMember(input: ResellerInviteTeamMemberInput!): ResellerInviteTeamMemberResult!
+  resellerInviteTeamMember(input: ResellerInviteTeamMemberInput!): ResellerTeamMemberModel!
   resellerLogin(password: String!, username: String!): AuthPayload!
   resellerReactivateInstitute(id: ID!): InstituteModel!
+
+  """Reactivate a deactivated team member's membership"""
+  resellerReactivateTeamMember(membershipId: ID!): ResellerTeamMemberModel!
 
   """
   Unlinks one of the reseller's institutes from a group the reseller owns.
   """
   resellerRemoveInstituteFromGroup(instituteId: ID!): Boolean!
-
-  """
-  Deactivate a team member's reseller-scope membership. The user account is preserved.
-  """
-  resellerRemoveTeamMember(membershipId: ID!): Boolean!
   resellerStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
   resellerSuspendInstitute(id: ID!, reason: String): InstituteModel!
   resellerVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
@@ -4707,9 +4713,17 @@ type Query {
   """Base64-encoded report-card PDF."""
   reportCardPdf(instanceId: ID!): String!
   reportCards(academicYearId: ID!): [ReportCardModel!]!
+
+  """
+  Roles the caller may give a team member: none senior to their own role or to the reseller's tier. Empty for a viewer.
+  """
+  resellerAssignableTeamRoles: [ResellerTeamRoleModel!]!
   resellerAuditLogs(after: String, filter: AuditLogFilterInput, first: Int = 20): AuditLogConnection!
   resellerBillingDashboard: BillingDashboardModel!
   resellerGetInstitute(id: ID!): InstituteModel!
+
+  """One team member with their live sessions"""
+  resellerGetTeamMember(membershipId: ID!): ResellerTeamMemberDetailModel!
   resellerImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   resellerInstituteStatistics: InstituteStatisticsModel!
 
@@ -4720,7 +4734,7 @@ type Query {
   resellerListInstitutes(filter: InstituteFilterInput): InstituteConnection!
 
   """
-  List team members with a reseller-scope membership in this reseller organisation
+  The reseller's own staff, active and deactivated, oldest membership first
   """
   resellerListTeamMembers(filter: ResellerTeamFilterInput): ResellerTeamMemberConnection!
 
@@ -5046,27 +5060,17 @@ type ResellerInstituteCount {
   resellerId: String!
 }
 
-"""Invite a new team member to the reseller organisation"""
+"""Add a person to the reseller team by email"""
 input ResellerInviteTeamMemberInput {
-  """Email address for the new team member"""
+  """
+  An existing account with this email is added to the team; otherwise a new account is created with the email as its Roviq ID and a temporary password is sent.
+  """
   email: String!
 
-  """First name — sent in the welcome notification"""
-  firstName: String
-
-  """Last name — sent in the welcome notification"""
-  lastName: String
-
-  """Reseller-scope role to assign. Must belong to this reseller."""
+  """
+  One of this reseller's roles, not senior to the caller's own role or to the reseller's tier.
+  """
   roleId: ID!
-
-  """Roviq ID (username) for the new team member — must be globally unique"""
-  username: String!
-}
-
-"""Result of inviting a new reseller team member"""
-type ResellerInviteTeamMemberResult {
-  membershipId: ID!
 }
 
 """Filters for the resellerListUsers query."""
@@ -5102,7 +5106,10 @@ input ResellerTeamFilterInput {
   after: String
   first: Int = 20
 
-  """Search against username, first name, or last name"""
+  """Only active (true) or only deactivated (false) members; omit for both"""
+  isActive: Boolean
+
+  """Search against Roviq ID, email, first name or last name"""
   search: String
 }
 
@@ -5112,26 +5119,83 @@ type ResellerTeamMemberConnection {
   totalCount: Int!
 }
 
+"""A team member with their live sessions, for the detail sheet"""
+type ResellerTeamMemberDetailModel {
+  """
+  Whether the caller may change this member: not themselves, and not someone holding a role senior to their own
+  """
+  canManage: Boolean!
+  email: String!
+
+  """reseller_memberships.id — the id every team mutation takes"""
+  id: ID!
+
+  """False when the membership has been deactivated"""
+  isActive: Boolean!
+
+  """When the person joined this reseller"""
+  joinedAt: DateTime!
+
+  """
+  Latest login, token refresh or institute switch; null if never signed in
+  """
+  lastActiveAt: DateTime
+  profile: ResellerTeamMemberProfileModel
+  roleId: ID!
+
+  """
+  System role key in `en` (reseller_full_admin, reseller_support_admin, reseller_viewer)
+  """
+  roleName: I18nText
+
+  """
+  Live sessions. Null unless the caller manages the team (full or support admin) or is this member.
+  """
+  sessions: [ResellerTeamSessionModel!]
+  userId: ID!
+
+  """Roviq ID"""
+  username: String!
+}
+
 type ResellerTeamMemberEdge {
   cursor: String!
   node: ResellerTeamMemberModel!
 }
 
 """
-A user who holds a reseller-scope membership in this reseller organisation (i.e. a team member, not a managed institute user)
+A member of the reseller's own staff (a reseller-scope membership), not a user of a managed institute
 """
 type ResellerTeamMemberModel {
-  createdAt: DateTime!
+  """
+  Whether the caller may change this member: not themselves, and not someone holding a role senior to their own
+  """
+  canManage: Boolean!
   email: String!
+
+  """reseller_memberships.id — the id every team mutation takes"""
   id: ID!
 
   """False when the membership has been deactivated"""
   isActive: Boolean!
 
-  """Reseller membership row ID"""
-  membershipId: ID!
+  """When the person joined this reseller"""
+  joinedAt: DateTime!
+
+  """
+  Latest login, token refresh or institute switch; null if never signed in
+  """
+  lastActiveAt: DateTime
   profile: ResellerTeamMemberProfileModel
   roleId: ID!
+
+  """
+  System role key in `en` (reseller_full_admin, reseller_support_admin, reseller_viewer)
+  """
+  roleName: I18nText
+  userId: ID!
+
+  """Roviq ID"""
   username: String!
 }
 
@@ -5140,6 +5204,24 @@ type ResellerTeamMemberProfileModel {
   firstName: I18nText
   lastName: I18nText
   profileImageUrl: String
+}
+
+"""A role the caller may give to a team member"""
+type ResellerTeamRoleModel {
+  id: ID!
+  name: I18nText!
+}
+
+"""One signed-in session (refresh token) of a team member"""
+type ResellerTeamSessionModel {
+  """When the session signed in or last renewed"""
+  createdAt: DateTime!
+  deviceInfo: String
+  expiresAt: DateTime!
+  id: ID!
+  ipAddress: String
+  lastUsedAt: DateTime
+  userAgent: String
 }
 
 """Tier controlling what a reseller can do with its assigned institutes"""

@@ -419,7 +419,7 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 | platform | platform_admin | manage all |
 | platform | platform_support | read all + impersonate |
 | reseller | reseller_full_admin | manage institutes, manage team, impersonate |
-| reseller | reseller_support_admin | read-only + impersonation |
+| reseller | reseller_support_admin | read-only + impersonation, manage team members up to its own role |
 | reseller | reseller_viewer | read stats |
 | institute | institute_admin | manage all (within tenant) |
 | institute | teacher | read students/sections/standards/subjects/timetables, CRU attendance |
@@ -431,6 +431,22 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 - Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
 - Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed only maintains the Roviq Direct copies (fixed seed ids). Migration `rov-91-reseller-role-backfill` gives resellers that predate this their own copies and moves any `reseller_memberships` row that still points at another reseller's role onto them.
 - `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
+
+### Reseller team (ROV-185)
+
+A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (`reseller/team/`) lists them and lets a team manager invite, change a role, deactivate and reactivate. All operations take the membership id.
+
+- **Ability.** Subject `ResellerTeam`. `reseller_full_admin` and `reseller_support_admin` hold `manage`; `reseller_viewer` reads through `read all`.
+- **Rank rules**, in `libs/shared/common-types/src/lib/reseller-roles.ts` and enforced by `ResellerTeamService` from the caller's membership in the database, not from the token:
+  - Roles rank `reseller_full_admin` > `reseller_support_admin` > `reseller_viewer`.
+  - A caller may assign only roles at or below their own, and at or below the reseller's tier (`RESELLER_TIER_ROLE`). `resellerAssignableTeamRoles` returns that list.
+  - A caller may change only members whose role is at or below their own, and never themselves. So a reseller always keeps the admin who is acting.
+- **Invite** takes an email and a role. An existing account with that email (case-insensitive) is linked; otherwise a user is created with the email as Roviq ID and sent a temporary password. An address that belongs to a deleted account, to several accounts, or that is another account's Roviq ID is refused with `TEAM_MEMBER_EMAIL_UNAVAILABLE`, whatever the reason. `IdentityService.findOrCreateUserByEmail` holds this rule for both this resolver and `adminCreateReseller`.
+- **Deactivate** sets `is_active = false`. The `reseller_memberships_revoke_sessions` trigger revokes the member's refresh tokens (`admin_revoked`) and ends their reseller impersonation sessions; the user account and other memberships are untouched.
+- **Tokens issued before a change.** A reseller access token carries `roleId` and lives 10 minutes. After a role change, deactivation or tier change the service writes `auth:reseller-member-access:<membershipId>`; `ResellerAccessGuard` then answers `UNAUTHENTICATED` to a token whose role differs (or to every token of a deactivated member). The client refreshes and gets the new role, or is signed out.
+- **Tier change.** `adminChangeResellerTier` no longer puts every member on the tier's role. `resellerRoleAfterTierChange`: holders of the old tier's top role move to the new tier's top role; anyone still above the new tier is brought down to it; everyone else keeps their role.
+- **Member detail.** `resellerGetTeamMember` returns `sessions` (live refresh tokens) only to a team manager or to the member themselves; others get `null`. Recent activity comes from `resellerAuditLogs(filter: { userId })`.
+- Tests: `reseller-roles.spec.ts`, `reseller-team.service.spec.ts`, `reseller-team.integration.spec.ts` (role caps, another reseller's member, stale tokens, tier change), `auth-invariants-db.integration.spec.ts` → "reseller member deactivation".
 - Database guards: `chk_role_scope` rejects unknown scopes and wrong tenant/reseller combinations; role names are unique per platform (`roles_platform_name_key`) and per reseller (`roles_reseller_id_name_key`) among live rows. `refresh_tokens.membership_scope` and `impersonation_sessions.impersonator_scope` accept only `platform`, `reseller`, `institute`.
 - `auth_events`: `roviq_app` and `roviq_reseller` hold the INSERT table privilege only; `roviq_admin` reads.
 

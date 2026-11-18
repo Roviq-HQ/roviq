@@ -34,11 +34,13 @@ Run `pnpm db:migrate` (Drizzle `migrate`, connecting with `DATABASE_URL_MIGRATE`
 | `*_rov-102-db-level-auth-invariants` | Tightens policies on `impersonation_sessions` and `institutes`; adds `chk_refresh_token_revoked_reason`. Before adding the constraint it sets `revoked_reason = 'rotation'` on revoked tokens that have none, which is how the API already treated them. |
 | `*_rov-102-auth-invariant-triggers` | The triggers that revoke staff sessions when a reseller is suspended, revoke a user's sessions when the password changes, protect the system reseller, and restrict institute deletion to the platform. |
 | `*_rov-101-reseller-full-admin-reads-users` | Adds `read User` to every stored `reseller_full_admin` role, so reseller admins can list an institute's users. |
+| `*_rov-185-reseller-team-sessions-and-abilities` | Adds the `reseller_memberships_revoke_sessions` trigger (a deactivated or deleted team member loses their refresh tokens and reseller impersonation sessions) and `manage ResellerTeam` on every stored `reseller_full_admin` and `reseller_support_admin` role. |
 
 Consequences for operations:
 
 - **Reseller suspension depends on the trigger.** The API no longer revokes refresh tokens itself when it suspends a reseller (`resellers_revoke_sessions` does). Deploying the API before the migration would let a suspended reseller's staff keep refreshing their sessions.
 - **The system reseller cannot be suspended, deactivated or deleted, even by the database owner.** A maintenance script that tries will fail with `check_violation`. This is intended (ROV-102).
+- **Deactivating a reseller team member depends on the trigger.** `resellerDeactivateTeamMember` only flips `is_active`; `reseller_memberships_revoke_sessions` ends the sessions. Until the migration runs, the Team page also answers `FORBIDDEN` for every change, because the stored roles lack `manage ResellerTeam` (cached per role for 5 minutes in `casl:role:<id>`).
 - **A refresh token can be inserted only for an active membership.** Data imports that create `refresh_tokens` rows directly will be refused for memberships that do not exist or are not active.
 
 The full list of database-enforced rules and the tests that prove them is in `docs/testing.md` → "Security invariants".
@@ -48,6 +50,7 @@ The full list of database-enforced rules and the tests that prove them is in `do
 Redis is on the request path for access control, not only for caching:
 
 - `ResellerAccessGuard` (ROV-97) reads `auth:reseller-access:<id>` on every reseller-scope request, and suspension writes a block marker there. If Redis is unreachable these requests fail rather than skip the check.
+- The same guard reads `auth:reseller-member-access:<membershipId>` (ROV-185). A role change, a deactivation and a tier change write the role the member's tokens must carry (or `blocked`) there for 11 minutes, one minute longer than a reseller access token lives. If the key is lost early, a token issued before the change keeps its old role until it expires (at most 10 minutes); refresh tokens are unaffected because the database checks the membership.
 - `ImpersonationSessionGuard` reads `impersonation-session:<id>` and its tombstone on every impersonated request.
 - One-time impersonation codes, impersonation OTP requests and ws-tickets live only in Redis.
 

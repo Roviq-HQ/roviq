@@ -7,6 +7,8 @@ import type { AuthScope, AuthUser } from '@roviq/common-types';
 export interface RequestTokenClaims {
   scope?: AuthScope;
   resellerId?: string;
+  membershipId?: string;
+  roleId?: string;
   isImpersonated?: boolean;
   impersonationSessionId?: string;
 }
@@ -34,6 +36,8 @@ export function readRequestTokenClaims(
     return {
       scope: user.scope,
       resellerId: user.scope === 'platform' ? undefined : user.resellerId,
+      membershipId: user.membershipId,
+      roleId: user.roleId,
       isImpersonated: user.isImpersonated,
       impersonationSessionId: user.impersonationSessionId,
     };
