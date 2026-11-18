@@ -453,7 +453,12 @@ export function AuthProvider({
   const refreshSession = React.useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
     if (!refreshToken) throw new Error('No refresh token');
-    const result = await refreshMutation(refreshToken);
+    const result = await refreshMutation(refreshToken).catch((err: unknown) => {
+      // The server ended the session before the token ran out (revoked, account suspended).
+      // Without this the page stays up showing empty data and no way to sign in again.
+      if (isAppError(err, 'SESSION_EXPIRED')) setSessionExpired(true);
+      throw err;
+    });
     tokenStorage.setTokens({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
