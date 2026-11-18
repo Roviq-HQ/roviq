@@ -4,6 +4,7 @@
     "commit": "",
     "pr": ""
   },
+  "switchModelsOnFlag": false,
   "permissions": {
     "allow": [
       "Bash",
