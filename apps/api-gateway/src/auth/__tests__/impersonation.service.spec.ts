@@ -1103,10 +1103,12 @@ describe('ImpersonationService', () => {
       expect(vi.mocked(jwt.sign).mock.calls[0][0]).toMatchObject({ impersonationReadOnly: true });
     });
 
-    it.each([
-      'platform',
-      'institute',
-    ])('never marks a %s-started session view-only', async (impersonatorScope) => {
+    const platformRole = (abilities: { action: string; subject: string }[]) => ({
+      table: 'platform_memberships',
+      rows: [{ abilities }],
+    });
+
+    async function exchangeAsPlatform(roleSelect: { table: string; rows: unknown[] }) {
       const { service, redis, jwt } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
       vi.mocked(jwt.sign).mockReturnValue('fake-jwt');
@@ -1114,7 +1116,45 @@ describe('ImpersonationService', () => {
         selects: [
           EXCHANGE_USER,
           EXCHANGE_MEMBERSHIP,
-          liveSession({ impersonatorScope }),
+          liveSession({ impersonatorScope: 'platform' }),
+          EXCHANGE_INSTITUTE,
+          roleSelect,
+        ],
+      });
+      setTx(tx);
+      await service.exchangeCode('code-1', META);
+      return vi.mocked(jwt.sign).mock.calls[0][0];
+    }
+
+    it('issues a view-only token to platform support, whose role only reads', async () => {
+      const claims = await exchangeAsPlatform(
+        platformRole([
+          { action: 'read', subject: 'all' },
+          { action: 'impersonate', subject: 'User' },
+        ]),
+      );
+      expect(claims).toMatchObject({ impersonationReadOnly: true });
+    });
+
+    it('issues a view-only token when the platform membership is gone', async () => {
+      const claims = await exchangeAsPlatform({ table: 'platform_memberships', rows: [] });
+      expect(claims).toMatchObject({ impersonationReadOnly: true });
+    });
+
+    it('lets a platform admin (manage all) write', async () => {
+      const claims = await exchangeAsPlatform(platformRole([{ action: 'manage', subject: 'all' }]));
+      expect(claims).not.toHaveProperty('impersonationReadOnly');
+    });
+
+    it('never marks an institute-started session view-only', async () => {
+      const { service, redis, jwt } = createSubject();
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
+      vi.mocked(jwt.sign).mockReturnValue('fake-jwt');
+      const { tx } = createTx({
+        selects: [
+          EXCHANGE_USER,
+          EXCHANGE_MEMBERSHIP,
+          liveSession({ impersonatorScope: 'institute' }),
           EXCHANGE_INSTITUTE,
         ],
       });

@@ -63,6 +63,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'View-as check (ROV-183): reads only roles the target holds in the caller token tenant and returns a boolean.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.intraInstituteRefusal':
     'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.isPlatformFullAdmin':
+    'Code exchange (ROV-183): the user comes from the session row, never from the caller; decides only whether the token is view-only.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.isResellerFullAdmin':
     'Code exchange (ROV-183): user and reseller come from the session row and its institute, never from the caller; decides only whether the token is view-only.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findActiveByUserId':

@@ -5,6 +5,8 @@ import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
 import type { AuthScope, AuthUser, InstituteContext, ResellerContext } from '@roviq/common-types';
 import {
+  AppAction,
+  AppSubject,
   BusinessException,
   canImpersonateInstituteRole,
   DefaultRoles,
@@ -449,9 +451,11 @@ export class ImpersonationService {
     if (!institute)
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
 
-    const readOnly =
-      session.impersonatorScope === 'reseller' &&
-      !(await this.isResellerFullAdmin(session.impersonatorId, institute.resellerId));
+    const readOnly = await this.isReadOnlyImpersonator(
+      session.impersonatorScope,
+      session.impersonatorId,
+      institute.resellerId,
+    );
 
     // Generate impersonation access token (non-renewable, no refresh token)
     const accessToken = this.generateImpersonationToken({
@@ -973,9 +977,40 @@ export class ImpersonationService {
   }
 
   /**
-   * Reseller staff below full admin hold read-only roles, so the session they open is
-   * view-only: impersonation must not hand them writes their own role withholds.
+   * Impersonation must not hand someone writes their own role withholds. Reseller staff
+   * below full admin, and platform staff without `manage all` (platform_support), hold
+   * read-only roles, so the session they open is view-only. Intra-institute sessions are
+   * bounded by the role-rank rule instead.
    */
+  private async isReadOnlyImpersonator(
+    scope: string,
+    userId: string,
+    resellerId: string,
+  ): Promise<boolean> {
+    if (scope === 'reseller') return !(await this.isResellerFullAdmin(userId, resellerId));
+    if (scope === 'platform') return !(await this.isPlatformFullAdmin(userId));
+    return false;
+  }
+
+  private async isPlatformFullAdmin(userId: string): Promise<boolean> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ abilities: rolesLive.abilities })
+        .from(platformMembershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, platformMembershipsLive.roleId))
+        .where(
+          and(
+            eq(platformMembershipsLive.userId, userId),
+            eq(platformMembershipsLive.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+    return (row?.abilities ?? []).some(
+      (rule) => rule.action === AppAction.Manage && rule.subject === AppSubject.All,
+    );
+  }
+
   private async isResellerFullAdmin(userId: string, resellerId: string): Promise<boolean> {
     const [row] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx

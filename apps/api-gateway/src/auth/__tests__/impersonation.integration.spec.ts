@@ -15,6 +15,7 @@ import {
   impersonationSessions,
   mkAdminCtx,
   phoneNumbers,
+  platformMemberships,
   provisionResellerSystemRoles,
   resellerMemberships,
   roles,
@@ -431,6 +432,70 @@ describe('Impersonation (integration)', () => {
       expect(await sessionRow(claims.impersonationSessionId)).toMatchObject({
         endedReason: 'revoked',
       });
+    });
+  });
+
+  describe('platform support → institute, view-only (ROV-183)', () => {
+    const WRITE = `mutation { updateMyPreferredLocale(input: { locale: "hi" }) }`;
+    let supportMembershipId: string;
+
+    beforeAll(async () => {
+      // A second platform user holding the read-only support role.
+      const [row] = await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+        tx
+          .insert(platformMemberships)
+          .values({
+            userId: otherTenant.userId,
+            roleId: SEED_IDS.ROLE_PLATFORM_SUPPORT,
+            createdBy: otherTenant.userId,
+            updatedBy: otherTenant.userId,
+          })
+          .returning({ id: platformMemberships.id }),
+      );
+      supportMembershipId = row.id;
+    });
+
+    afterAll(async () => {
+      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+        tx.delete(platformMemberships).where(eq(platformMemberships.id, supportMembershipId)),
+      );
+    });
+
+    it('a platform support session reads and refuses a write; a platform admin session writes', async () => {
+      const start = await gqlRequest(result.httpServer, {
+        query: ADMIN_START,
+        variables: {
+          targetUserId: teacher.userId,
+          targetTenantId: tenant.tenantId,
+          reason: REASON,
+        },
+        token: createPlatformToken({
+          sub: otherTenant.userId,
+          membershipId: supportMembershipId,
+          roleId: SEED_IDS.ROLE_PLATFORM_SUPPORT,
+        }),
+      });
+      expect(start.errors).toBeUndefined();
+      const exchange = await gqlRequest(result.httpServer, {
+        query: EXCHANGE,
+        variables: { code: start.data?.adminStartImpersonation.code },
+      });
+      const supportToken = exchange.data?.exchangeImpersonationCode.accessToken as string;
+      expect(claimsOf(supportToken).impersonationReadOnly).toBe(true);
+
+      const read = await gqlRequest(result.httpServer, {
+        query: MY_INSTITUTE,
+        token: supportToken,
+      });
+      expect(read.errors).toBeUndefined();
+      const write = await gqlRequest(result.httpServer, { query: WRITE, token: supportToken });
+      expect(write.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_READ_ONLY');
+
+      const admin = await impersonate(teacher.userId);
+      expect(admin.claims.impersonationReadOnly).toBeUndefined();
+      // Reaches the resolver, which has its own rule for this one mutation.
+      const adminWrite = await gqlRequest(result.httpServer, { query: WRITE, token: admin.token });
+      expect(adminWrite.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
     });
   });
 
