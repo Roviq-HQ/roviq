@@ -35,6 +35,10 @@ export async function withTenant<T>(
 /**
  * Execute a callback with admin role for policy-based RLS bypass.
  * Sets `ROLE roviq_admin` via SET LOCAL inside a transaction.
+ *
+ * SECURITY: RLS does not apply inside. Never run a query here with an id a
+ * non-platform caller chose unless ownership was checked first (ROV-290);
+ * `pnpm check:admin-context-reach` lists every such reachable function.
  */
 export async function withAdmin<T>(
   db: DrizzleDB,

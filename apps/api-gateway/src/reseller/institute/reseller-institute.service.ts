@@ -26,6 +26,7 @@ export class ResellerInstituteService {
   async createRequest(input: ResellerCreateInstituteRequestInput) {
     const { userId } = getRequestContext();
     const resellerId = this.getResellerId();
+    // SECURITY: create() runs as admin; an unchecked groupId would join another reseller's group.
     if (input.groupId) await this.groupService.assertOwnedByReseller(resellerId, input.groupId);
 
     // Create via repository with reseller auto-assigned

@@ -16,6 +16,9 @@ import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.inpu
 import { InstituteService } from './institute.service';
 import { InstituteModel } from './models/institute.model';
 
+// SECURITY: no handler here may take an institute id — the repository runs as admin, so an id
+// argument lets one institute act on another (ROV-290). Use the token tenant; platform-level
+// operations belong in admin/.
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
 export class InstituteResolver {

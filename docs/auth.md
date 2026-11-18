@@ -113,7 +113,7 @@ A scope guard only proves the token's scope. Which rows the caller may touch is 
 - Institute lifecycle (create, activate, suspend, delete, restore) and institute-group management live in `admin/` resolvers; resellers get their own `reseller*` operations, limited to institutes and groups they own.
 - Institute scope reads and edits only its own institute (`myInstitute`, `updateInstituteInfo(input)`, `myInstituteGroup`).
 - `institute_admin` holds `manage all` minus institute-group management and platform-level `Institute` actions.
-- `pnpm check:admin-context-reach` lists every admin-context file reachable from a non-admin resolver; a new one fails CI until it is listed with a reason.
+- `pnpm check:admin-context-reach` resolves calls from every resolver outside `admin/` and lists each reachable function that opens the admin context, with the reason it cannot be aimed at another tenant. A new one fails CI until it is listed. The reasons are reviewed claims, not proofs: the proof for an operation is a test that sends another tenant's id and asserts refusal.
 
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes

@@ -139,6 +139,8 @@ const instituteColumns = {
   updatedAt: institutes.updatedAt,
 } as const;
 
+// SECURITY: most methods run as admin (no RLS). Institute scope may pass only the token tenant id;
+// reseller scope must use the *ByReseller methods or prove ownership first (ROV-290).
 @Injectable()
 export class InstituteDrizzleRepository extends InstituteRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
