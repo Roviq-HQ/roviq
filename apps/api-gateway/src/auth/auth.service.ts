@@ -4,7 +4,13 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import { AbilityFactory } from '@roviq/casl';
-import type { AbilityRule, AuthScope, AuthUser, InstituteContext } from '@roviq/common-types';
+import type {
+  AbilityRule,
+  AuthFailureReason,
+  AuthScope,
+  AuthUser,
+  InstituteContext,
+} from '@roviq/common-types';
 import {
   BusinessException,
   ErrorCode,
@@ -76,6 +82,8 @@ interface RequestMeta {
   deviceInfo?: string;
 }
 
+type LoginAuthMethod = 'password' | 'passkey';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -118,7 +126,7 @@ export class AuthService {
   // ── Three login mutations ──────────────────────────────
 
   async adminLogin(username: string, password: string, meta?: RequestMeta): Promise<AuthPayload> {
-    const user = await this.verifyCredentials(username, password, meta);
+    const user = await this.verifyCredentials(username, password, 'platform', meta);
 
     const membership = await this.platformMembershipRepo.findByUserId(user.id);
     if (!membership?.isActive) {
@@ -150,6 +158,7 @@ export class AuthService {
       .emit({
         userId: user.id,
         type: 'login_success',
+        portal: 'platform',
         scope: 'platform',
         authMethod: 'password',
         ip: meta?.ip,
@@ -167,7 +176,7 @@ export class AuthService {
     password: string,
     meta?: RequestMeta,
   ): Promise<AuthPayload> {
-    const user = await this.verifyCredentials(username, password, meta);
+    const user = await this.verifyCredentials(username, password, 'reseller', meta);
 
     const memberships = await this.resellerMembershipRepo.findByUserId(user.id);
     const m = memberships[0];
@@ -190,6 +199,7 @@ export class AuthService {
       .emit({
         userId: user.id,
         type: 'login_success',
+        portal: 'reseller',
         scope: 'reseller',
         resellerId: m.resellerId,
         authMethod: 'password',
@@ -219,7 +229,7 @@ export class AuthService {
     password: string,
     meta?: RequestMeta,
   ): Promise<InstituteLoginResult> {
-    const user = await this.verifyCredentials(username, password, meta);
+    const user = await this.verifyCredentials(username, password, 'institute', meta);
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
@@ -244,6 +254,7 @@ export class AuthService {
         .emit({
           userId: user.id,
           type: 'login_success',
+          portal: 'institute',
           scope: 'institute',
           tenantId: m.tenantId,
           authMethod: 'password',
@@ -270,7 +281,7 @@ export class AuthService {
 
     // Multiple institutes — return membership list for picker
     const selectionToken = this.jwtService.sign(
-      { sub: user.id, purpose: 'institute-selection' },
+      { sub: user.id, purpose: 'institute-selection', authMethod: 'password' },
       { secret: this.config.getOrThrow<string>('JWT_SECRET'), expiresIn: 300 },
     );
 
@@ -295,11 +306,13 @@ export class AuthService {
   async instituteLoginByUserId(userId: string, meta?: RequestMeta): Promise<InstituteLoginResult> {
     const user = await this.userRepo.findById(userId);
     if (!user || user.status !== 'ACTIVE') {
+      this.emitPasskeyLoginFailed(user?.id, 'ACCOUNT_INACTIVE', meta);
       throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
     }
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
+      this.emitPasskeyLoginFailed(user.id, 'NO_PORTAL_ACCESS', meta);
       throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
 
@@ -321,6 +334,7 @@ export class AuthService {
         .emit({
           userId: user.id,
           type: 'login_success',
+          portal: 'institute',
           scope: 'institute',
           tenantId: m.tenantId,
           authMethod: 'passkey',
@@ -329,12 +343,13 @@ export class AuthService {
           deviceInfo: meta?.deviceInfo,
         })
         .catch(() => {});
+      this.emitLoginNotification(user.id, m.tenantId, meta);
 
       return result;
     }
 
     const selectionToken = this.jwtService.sign(
-      { sub: user.id, purpose: 'institute-selection' },
+      { sub: user.id, purpose: 'institute-selection', authMethod: 'passkey' },
       { secret: this.config.getOrThrow<string>('JWT_SECRET'), expiresIn: 300 },
     );
 
@@ -362,14 +377,20 @@ export class AuthService {
     meta?: RequestMeta,
   ): Promise<AuthPayload> {
     let userId: string;
+    let authMethod: LoginAuthMethod;
     try {
-      const payload = this.jwtService.verify(selectionToken, {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        purpose: string;
+        authMethod: LoginAuthMethod;
+      }>(selectionToken, {
         secret: this.config.getOrThrow<string>('JWT_SECRET'),
       });
       if (payload.purpose !== 'institute-selection') {
         throw new Error('wrong purpose');
       }
       userId = payload.sub;
+      authMethod = payload.authMethod;
     } catch {
       throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Invalid or expired selection token');
     }
@@ -415,9 +436,10 @@ export class AuthService {
       .emit({
         userId: user.id,
         type: 'login_success',
+        portal: 'institute',
         scope: 'institute',
         tenantId: membership.tenantId,
-        authMethod: 'password',
+        authMethod,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
@@ -516,7 +538,7 @@ export class AuthService {
 
   async refreshToken(token: string, meta?: RequestMeta): Promise<AuthPayload> {
     const payload = this.verifyRefreshTokenPayload(token);
-    const storedToken = await this.loadAndValidateStoredRefreshToken(token, payload);
+    const storedToken = await this.loadAndValidateStoredRefreshToken(token, payload, meta);
 
     // Fresh DB read so the new access token reflects the current status and
     // mustChangePassword, not the values joined onto the token row.
@@ -543,9 +565,12 @@ export class AuthService {
         userId: user.id,
         type: 'token_refresh',
         scope,
+        tenantId: membership.tenantId,
+        resellerId: scope === 'reseller' ? membership.resellerId : undefined,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
+        metadata: { membership_id: membership.membershipId },
       })
       .catch(() => {});
 
@@ -575,9 +600,12 @@ export class AuthService {
         userId: current.userId,
         type: 'logout',
         scope: current.scope,
+        tenantId: current.scope === 'institute' ? current.tenantId : undefined,
+        resellerId: current.scope === 'reseller' ? current.resellerId : undefined,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
+        metadata: { membership_id: current.membershipId },
       })
       .catch(() => {});
   }
@@ -764,6 +792,7 @@ export class AuthService {
   private async loadAndValidateStoredRefreshToken(
     rawToken: string,
     payload: RefreshTokenPayload,
+    meta?: RequestMeta,
   ): Promise<RefreshTokenWithRelations> {
     const tokenHash = this.hashToken(rawToken);
     const storedToken = await this.refreshTokenRepo.findByIdWithRelations(payload.tokenId);
@@ -777,6 +806,16 @@ export class AuthService {
         storedToken.revokedReason === null || storedToken.revokedReason === 'rotation';
       if (isRotationReuse) {
         await this.refreshTokenRepo.revokeAllForUser(storedToken.userId, 'rotation');
+        this.authEventService
+          .emit({
+            userId: storedToken.userId,
+            type: 'all_sessions_revoked',
+            ip: meta?.ip,
+            userAgent: meta?.userAgent,
+            deviceInfo: meta?.deviceInfo,
+            metadata: { reason: 'token_reuse' },
+          })
+          .catch(() => {});
         throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Refresh token reuse detected');
       }
       throw new BusinessException(ErrorCode.SESSION_EXPIRED, 'Refresh token revoked');
@@ -859,19 +898,48 @@ export class AuthService {
    * Correct password, no usable account in this portal. Same error as a wrong
    * password so the response does not confirm the credentials.
    */
-  private rejectWrongPortal(userId: string, scope: AuthScope, meta?: RequestMeta): never {
+  private rejectWrongPortal(userId: string, portal: AuthScope, meta?: RequestMeta): never {
+    this.emitLoginFailed({ userId, portal, authMethod: 'password' }, 'NO_PORTAL_ACCESS', meta);
+    throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
+  }
+
+  private emitPasskeyLoginFailed(
+    userId: string | undefined,
+    failureReason: AuthFailureReason,
+    meta?: RequestMeta,
+  ): void {
+    // Passkey sign-in exists on the institute portal only.
+    this.emitLoginFailed(
+      { userId, portal: 'institute', authMethod: 'passkey' },
+      failureReason,
+      meta,
+    );
+  }
+
+  private emitLoginFailed(
+    attempt: {
+      userId?: string;
+      portal: AuthScope;
+      authMethod: LoginAuthMethod;
+      usernameLower?: string;
+    },
+    failureReason: AuthFailureReason,
+    meta?: RequestMeta,
+  ): void {
     this.authEventService
       .emit({
-        userId,
+        userId: attempt.userId,
         type: 'login_failed',
-        scope,
-        failureReason: 'wrong_portal',
+        portal: attempt.portal,
+        authMethod: attempt.authMethod,
+        failureReason,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
         deviceInfo: meta?.deviceInfo,
+        // Present only when the attempt is not tied to a user row.
+        metadata: attempt.usernameLower ? { username_lower: attempt.usernameLower } : undefined,
       })
       .catch(() => {});
-    throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
   }
 
   // ── Private: credential verification ───────────────────
@@ -879,54 +947,47 @@ export class AuthService {
   private async verifyCredentials(
     username: string,
     password: string,
+    portal: AuthScope,
     meta?: RequestMeta,
   ): Promise<UserRecord> {
     const usernameLower = username.toLowerCase();
+    const authMethod = 'password';
 
+    // Checked before the user lookup: a locked username costs no account read.
     if (await this.lockout.isLocked(usernameLower)) {
+      this.emitLoginFailed({ portal, authMethod, usernameLower }, 'ACCOUNT_LOCKED', meta);
       throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
     }
 
     const user = await this.userRepo.findByUsername(username);
-    if (!user || user.status !== 'ACTIVE') {
-      const result = await this.lockout.recordFailure(usernameLower, meta);
-      this.authEventService
-        .emit({
-          type: 'login_failed',
-          failureReason: 'invalid_credentials',
-          ip: meta?.ip,
-          userAgent: meta?.userAgent,
-          deviceInfo: meta?.deviceInfo,
-          metadata: { username_lower: usernameLower },
-        })
-        .catch(() => {});
-      if (result.locked) {
-        throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
-      }
-      throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
+    if (!user) {
+      this.emitLoginFailed({ portal, authMethod, usernameLower }, 'UNKNOWN_USER', meta);
+      return this.rejectFailedAttempt(usernameLower, portal, meta);
     }
-
-    const valid = await verify(user.passwordHash, password);
-    if (!valid) {
-      this.authEventService
-        .emit({
-          userId: user.id,
-          type: 'login_failed',
-          failureReason: 'invalid_credentials',
-          ip: meta?.ip,
-          userAgent: meta?.userAgent,
-          deviceInfo: meta?.deviceInfo,
-        })
-        .catch(() => {});
-      const result = await this.lockout.recordFailure(usernameLower, meta);
-      if (result.locked) {
-        throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
-      }
-      throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
+    if (user.status !== 'ACTIVE') {
+      this.emitLoginFailed({ userId: user.id, portal, authMethod }, 'ACCOUNT_INACTIVE', meta);
+      return this.rejectFailedAttempt(usernameLower, portal, meta);
+    }
+    if (!(await verify(user.passwordHash, password))) {
+      this.emitLoginFailed({ userId: user.id, portal, authMethod }, 'INVALID_PASSWORD', meta);
+      return this.rejectFailedAttempt(usernameLower, portal, meta);
     }
 
     await this.lockout.clearOnSuccess(usernameLower);
     return user;
+  }
+
+  /** Counts the failure toward lockout, then refuses with the error the caller is allowed to see. */
+  private async rejectFailedAttempt(
+    usernameLower: string,
+    portal: AuthScope,
+    meta?: RequestMeta,
+  ): Promise<never> {
+    const result = await this.lockout.recordFailure(usernameLower, portal, meta);
+    if (result.locked) {
+      throw new BusinessException(ErrorCode.ACCOUNT_LOCKED, ACCOUNT_LOCKED_MESSAGE);
+    }
+    throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');
   }
 
   // ── Ability rules (CASL) ──────────────────────────────

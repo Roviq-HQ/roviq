@@ -735,11 +735,22 @@ type AuthEventModel {
   authMethod: String
   createdAt: DateTime!
   eventType: String!
+
+  """
+  AuthFailureReason code. Internal detail the sign-in response never reveals.
+  """
   failureReason: String
   id: ID!
   ipAddress: String
   metadata: JSON
+
+  """
+  Portal the request came through (platform, reseller, institute). Set on every sign-in attempt, successful or not.
+  """
+  portal: String
   resellerId: String
+
+  """Scope of the session that was granted. Null for a refused attempt."""
   scope: String
   tenantId: String
   userAgent: String

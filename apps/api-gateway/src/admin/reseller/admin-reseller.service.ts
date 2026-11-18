@@ -432,6 +432,17 @@ export class AdminResellerService {
             await this.redis.del(
               ...activeSessions.map((s) => `${REDIS_KEYS.IMPERSONATION_SESSION}${s.id}`),
             );
+
+            for (const session of activeSessions) {
+              this.authEventService
+                .emit({
+                  userId: actorId,
+                  type: 'impersonation_end',
+                  scope: 'platform',
+                  metadata: { session_id: session.id, ended_reason: 'revoked' },
+                })
+                .catch(() => {});
+            }
           }
 
           // 6. Emit auth events for each affected staff member

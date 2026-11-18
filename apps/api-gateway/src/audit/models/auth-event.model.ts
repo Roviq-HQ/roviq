@@ -13,7 +13,17 @@ export class AuthEventModel {
   @Field()
   eventType!: string;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Portal the request came through (platform, reseller, institute). Set on every sign-in attempt, successful or not.',
+  })
+  portal?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Scope of the session that was granted. Null for a refused attempt.',
+  })
   scope?: string | null;
 
   @Field(() => String, { nullable: true })
@@ -31,7 +41,10 @@ export class AuthEventModel {
   @Field(() => String, { nullable: true })
   userAgent?: string | null;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => String, {
+    nullable: true,
+    description: 'AuthFailureReason code. Internal detail the sign-in response never reveals.',
+  })
   failureReason?: string | null;
 
   @Field(() => GraphQLJSON, { nullable: true })

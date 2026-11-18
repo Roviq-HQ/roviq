@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AuthScope } from '@roviq/common-types';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type Redis from 'ioredis';
 import { AuthEventService } from './auth-event.service';
@@ -83,7 +84,11 @@ export class LoginLockoutService {
     return exists === 1;
   }
 
-  async recordFailure(usernameLower: string, meta?: RequestMeta): Promise<RecordFailureResult> {
+  async recordFailure(
+    usernameLower: string,
+    portal: AuthScope,
+    meta?: RequestMeta,
+  ): Promise<RecordFailureResult> {
     const failureKey = `${REDIS_KEYS.LOGIN_FAILURES}${usernameLower}`;
     const lockKey = `${REDIS_KEYS.LOGIN_LOCKED}${usernameLower}`;
 
@@ -96,6 +101,8 @@ export class LoginLockoutService {
       this.authEventService
         .emit({
           type: 'account_locked',
+          portal,
+          failureReason: 'TOO_MANY_ATTEMPTS',
           ip: meta?.ip,
           userAgent: meta?.userAgent,
           deviceInfo: meta?.deviceInfo,

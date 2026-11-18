@@ -26,10 +26,11 @@ import {
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
-import { eq, inArray } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../app/app.module';
+import { ImpersonationService } from '../impersonation.service';
 
 const REASON = 'integration test — impersonation verification list';
 
@@ -273,13 +274,12 @@ describe('Impersonation (integration)', () => {
     it('leaves expired and ended sessions out of activeOnly', async () => {
       const live = await impersonate(teacher.userId);
       const expired = await impersonate(teacher.userId);
+      // One clock read: two would drift a millisecond past chk_max_duration.
+      const expiresAt = new Date(Date.now() - 60 * 60 * 1000);
       await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
         tx
           .update(impersonationSessions)
-          .set({
-            startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            expiresAt: new Date(Date.now() - 60 * 60 * 1000),
-          })
+          .set({ startedAt: new Date(expiresAt.getTime() - 60 * 60 * 1000), expiresAt })
           .where(eq(impersonationSessions.id, expired.claims.impersonationSessionId)),
       );
 
@@ -299,6 +299,54 @@ describe('Impersonation (integration)', () => {
         token: expired.token,
       });
       expect(blocked.errors?.[0]?.extensions?.code).toBe('IMPERSONATION_ENDED');
+    });
+  });
+
+  describe('expiry sweep', () => {
+    it('closes an overdue session as expired and records one impersonation_end', async () => {
+      const { claims } = await impersonate(teacher.userId);
+      const sessionId = claims.impersonationSessionId;
+      const expiresAt = new Date(Date.now() - 60 * 60 * 1000);
+      await withAdmin(result.db, mkAdminCtx('test:impersonation-integration'), (tx) =>
+        tx
+          .update(impersonationSessions)
+          .set({ startedAt: new Date(expiresAt.getTime() - 60 * 60 * 1000), expiresAt })
+          .where(eq(impersonationSessions.id, sessionId)),
+      );
+      const service = result.module.get(ImpersonationService);
+
+      await service.expireOverdueSessions();
+      // A second sweep must not record the session again.
+      await service.expireOverdueSessions();
+
+      expect(await sessionRow(sessionId)).toMatchObject({
+        status: 'EXPIRED',
+        endedReason: 'expired',
+      });
+      const events = await vi.waitFor(async () => {
+        const rows = await withAdmin(
+          result.db,
+          mkAdminCtx('test:impersonation-integration'),
+          (tx) =>
+            tx
+              .select()
+              .from(authEvents)
+              .where(
+                and(
+                  eq(authEvents.eventType, 'impersonation_end'),
+                  sql`${authEvents.metadata}->>'session_id' = ${sessionId}`,
+                ),
+              ),
+        );
+        expect(rows).toHaveLength(1);
+        return rows;
+      });
+      expect(events[0]).toMatchObject({
+        userId: SEED_IDS.USER_ADMIN,
+        scope: 'platform',
+        tenantId: tenant.tenantId,
+        metadata: { session_id: sessionId, ended_reason: 'expired' },
+      });
     });
   });
 

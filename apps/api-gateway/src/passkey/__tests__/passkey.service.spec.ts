@@ -67,6 +67,8 @@ function createMockAuthService() {
   });
 }
 
+const META = { ip: '10.0.0.9', userAgent: 'vitest-agent' };
+
 function createMockAuthEventService() {
   return createMock<AuthEventService>({
     emit: vi.fn().mockResolvedValue(undefined),
@@ -352,7 +354,7 @@ describe('PasskeyService', () => {
       mockRedis.get.mockResolvedValue(null);
 
       const failure = await expectBusinessError(
-        service.verifyAuth('challenge-id', {} as AuthenticationResponseJSON),
+        service.verifyAuth('challenge-id', {} as AuthenticationResponseJSON, META),
         ErrorCode.PASSKEY_CHALLENGE_EXPIRED,
       );
       expect(failure.message).toBe('Challenge expired or not found');
@@ -363,10 +365,23 @@ describe('PasskeyService', () => {
       mockAuthProviderRepo.findByCredentialId.mockResolvedValue(null);
 
       const failure = await expectBusinessError(
-        service.verifyAuth('challenge-id', { id: 'unknown-cred' } as AuthenticationResponseJSON),
+        service.verifyAuth(
+          'challenge-id',
+          { id: 'unknown-cred' } as AuthenticationResponseJSON,
+          META,
+        ),
         ErrorCode.PASSKEY_AUTHENTICATION_FAILED,
       );
       expect(failure.message).toBe('Invalid credentials');
+      expect(mockAuthEvent.emit).toHaveBeenCalledWith({
+        userId: undefined,
+        type: 'login_failed',
+        portal: 'institute',
+        authMethod: 'passkey',
+        failureReason: 'PASSKEY_UNKNOWN',
+        ip: '10.0.0.9',
+        userAgent: 'vitest-agent',
+      });
     });
 
     it('should update counter and lastUsedAt, then call instituteLoginByUserId', async () => {
@@ -383,9 +398,11 @@ describe('PasskeyService', () => {
         user: { id: 'user-1', username: 'admin', email: 'admin@test.com' },
       });
 
-      const result = await service.verifyAuth('challenge-id', {
-        id: 'cred-1',
-      } as AuthenticationResponseJSON);
+      const result = await service.verifyAuth(
+        'challenge-id',
+        { id: 'cred-1' } as AuthenticationResponseJSON,
+        META,
+      );
 
       expect(result.accessToken).toBe('at');
       expect(mockRedis.del).toHaveBeenCalledWith('webauthn:auth:challenge-id');
@@ -396,7 +413,7 @@ describe('PasskeyService', () => {
           lastUsedAt: expect.any(String),
         }),
       );
-      expect(mockAuth.instituteLoginByUserId).toHaveBeenCalledWith('user-1');
+      expect(mockAuth.instituteLoginByUserId).toHaveBeenCalledWith('user-1', META);
     });
 
     it('should reject with PASSKEY_AUTHENTICATION_FAILED when the library rejects the response', async () => {
@@ -407,12 +424,21 @@ describe('PasskeyService', () => {
       );
 
       const failure = await expectBusinessError(
-        service.verifyAuth('challenge-id', { id: 'cred-1' } as AuthenticationResponseJSON),
+        service.verifyAuth('challenge-id', { id: 'cred-1' } as AuthenticationResponseJSON, META),
         ErrorCode.PASSKEY_AUTHENTICATION_FAILED,
       );
 
       expect(failure.message).toBe('Invalid credentials');
       expect(mockAuth.instituteLoginByUserId).not.toHaveBeenCalled();
+      expect(mockAuthEvent.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'login_failed',
+        portal: 'institute',
+        authMethod: 'passkey',
+        failureReason: 'PASSKEY_VERIFICATION_FAILED',
+        ip: '10.0.0.9',
+        userAgent: 'vitest-agent',
+      });
     });
   });
 

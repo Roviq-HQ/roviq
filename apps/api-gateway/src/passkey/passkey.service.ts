@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { type AuthFailureReason, BusinessException, ErrorCode } from '@roviq/common-types';
 import { REDIS_CLIENT } from '@roviq/redis';
 import type {
   AuthenticationResponseJSON,
@@ -19,6 +19,7 @@ import type Redis from 'ioredis';
 import { AuthService } from '../auth/auth.service';
 import { AuthEventService } from '../auth/auth-event.service';
 import type { InstituteLoginResult } from '../auth/dto/auth-payload';
+import type { RequestMeta } from '../auth/gql-context';
 import { UserRepository } from '../auth/repositories/user.repository';
 import type { PasskeyAuthOptions, PasskeyInfo } from './dto/passkey-info.model';
 import type { PasskeyProviderData } from './dto/passkey-provider-data';
@@ -220,6 +221,7 @@ export class PasskeyService {
   async verifyAuth(
     challengeId: string,
     credential: AuthenticationResponseJSON,
+    meta: RequestMeta,
   ): Promise<InstituteLoginResult> {
     const stored = await this.redis.get(`webauthn:auth:${challengeId}`);
     if (!stored) {
@@ -235,6 +237,7 @@ export class PasskeyService {
     const passkey = await this.authProviderRepo.findByCredentialId(credential.id);
 
     if (!passkey) {
+      this.emitLoginFailed(undefined, 'PASSKEY_UNKNOWN', meta);
       throw new BusinessException(ErrorCode.PASSKEY_AUTHENTICATION_FAILED, 'Invalid credentials');
     }
 
@@ -261,6 +264,7 @@ export class PasskeyService {
     });
 
     if (!verification?.verified) {
+      this.emitLoginFailed(passkey.userId, 'PASSKEY_VERIFICATION_FAILED', meta);
       throw new BusinessException(ErrorCode.PASSKEY_AUTHENTICATION_FAILED, 'Invalid credentials');
     }
 
@@ -271,7 +275,26 @@ export class PasskeyService {
       lastUsedAt: new Date().toISOString(),
     });
 
-    return this.authService.instituteLoginByUserId(passkey.userId);
+    return this.authService.instituteLoginByUserId(passkey.userId, meta);
+  }
+
+  private emitLoginFailed(
+    userId: string | undefined,
+    failureReason: AuthFailureReason,
+    meta: RequestMeta,
+  ): void {
+    this.authEventService
+      .emit({
+        userId,
+        type: 'login_failed',
+        // Passkey sign-in exists on the institute portal only.
+        portal: 'institute',
+        authMethod: 'passkey',
+        failureReason,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      })
+      .catch(() => {});
   }
 
   async myPasskeys(userId: string): Promise<PasskeyInfo[]> {

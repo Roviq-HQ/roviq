@@ -215,6 +215,7 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
         id: row.id,
         userId: row.userId,
         eventType: row.eventType,
+        portal: row.portal,
         scope: row.scope,
         tenantId: row.tenantId,
         resellerId: row.resellerId,

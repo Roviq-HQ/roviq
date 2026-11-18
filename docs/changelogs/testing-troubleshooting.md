@@ -634,3 +634,32 @@ The CI `Test` job failed once on `security-invariants.integration.spec.ts` › "
 The sweep now skips tables named `rov64_scratch_*`.
 
 **Verification:** `pnpm test:int` passed 575 tests after the change.
+
+
+## 2026-11-18 — fixed: a query at gateway boot exhausted the test Postgres connections (ROV-96)
+
+`pnpm test:int` failed two or three unrelated files per run (`billing`, `attendance-authorization`, `institute-events`) with `remaining connection slots are reserved for roles with the SUPERUSER attribute`. The first version of `ImpersonationExpirySweeper` ran its sweep in `onModuleInit`, so every integration app opened a database connection the moment it booted. The dev Postgres allows 100 connections and Temporal holds about 50 of them, which leaves too few for the parallel test forks.
+
+The sweeper now runs only on its one-minute timer. Do not add a database query to `onModuleInit` of a provider that every `AppModule` boot loads.
+
+**Verification:** `pnpm test:int` passed 623 tests after the change; it failed on two consecutive runs before it.
+
+
+## 2026-11-18 — fixed: `leaves expired and ended sessions out of activeOnly` failed one run in several (ROV-96)
+
+`impersonation.integration.spec.ts` backdated a session with two `Date.now()` reads, one for `startedAt` and one for `expiresAt`. When the clock ticked between them the row was 1 ms longer than an hour and `chk_max_duration` rejected the update. Both values now derive from one clock read.
+
+
+## 2026-11-18 — diagnosed: the e2e gateway container stays unhealthy after a broken intermediate save
+
+`roviq-e2e-api-gateway-1` rebuilds on every file change. If a save leaves the code not compiling, its watcher prints `Found N errors` and does not always recover when the next save fixes it; the container stays `unhealthy` and `pnpm e2e:up` fails with `dependency api-gateway failed to start`. `docker logs roviq-e2e-api-gateway-1` shows errors that no longer match the source. `scripts/e2e-compose.sh restart api-gateway` followed by `pnpm e2e:up` fixes it. Seen twice in one session. Not fixed.
+
+
+## 2026-11-18 — diagnosed: no Chromium renders a frame while the desktop session is locked
+
+A browser pass on the slot 0 machine was impossible. `requestAnimationFrame` never fired and `page.screenshot()` timed out on a blank `data:` page in every variant tried: Playwright's headless shell, new headless mode, system Chrome, with and without `--disable-gpu`, `--no-sandbox`, `--ozone-platform=headless` and an empty `DISPLAY`. The Playwright MCP Chrome timed out at launch (180 s) and then reported its profile as in use. `loginctl` showed the session `LockedHint=yes`, `IdleHint=yes`. With no frames, the login form stays `disabled` and no flow can be driven. Not fixed. Unlock the session, then retry.
+
+
+## 2026-11-18 — diagnosed: `pnpm typecheck` beside the Tilt `web` server corrupts the Turbopack cache
+
+After `pnpm typecheck` (which runs `web:build`) ran while Tilt served `web`, every page request hung. `pnpm tilt logs web` showed `Failed to restore task data (corrupted database or bug)` and `Failed to open SST file …/apps/web/.next/dev/cache/turbopack/…sst`. `pnpm tilt trigger web` restarted the server and it served again. Same cause as the `api-gateway` entry of 2026-11-17: a hand-run build shares output folders with the running dev servers.

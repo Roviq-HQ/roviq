@@ -19,9 +19,9 @@ Scoring: +5 for every standard/proper approach, -5 for every simplest-but-not-pr
 
 ---
 
-### [NACPR] Auto Commit Only When Fully Tested
+### [NACPR] Test Fully, Then Commit
 
-Committing automatically is allowed only if the change was tested thoroughly in the browser and by automated tests. If either is missing, output the full `git add` + `git commit` commands for the user to copy-paste instead. Push and merge only when the user asks for it.
+A change is committed automatically once it is tested thoroughly in the browser and by automated tests. Both are the agent's job. Skipping the browser pass and handing back `git add` + `git commit` is not allowed: run the browser pass (root `CLAUDE.md` → "Browser Verification"), then commit. Output the full commands for copy-paste only when the browser pass is truly impossible, and name the blocker you tried and failed to remove. Push and merge only when the user asks for it.
 
 Commit message format:
 - Header ≤100 chars with detailed message
@@ -73,8 +73,8 @@ Never put `any`, `as unknown`, or `as never` to silence type errors. Resolution 
 
 ### [BFCMT] Before Commit
 
-Before committing, verify every touched code path:
-1. Playwright-verify end-to-end
+Before committing, verify every touched code path, on your own initiative and without being asked:
+1. Browser-verify end-to-end with Playwright, following root `CLAUDE.md` → "Browser Verification". Backend-only changes count: drive the UI flows that reach the changed code
 2. Write/update unit + component + e2e tests
 3. Run `pnpm lint:fix` to fix formatting
 

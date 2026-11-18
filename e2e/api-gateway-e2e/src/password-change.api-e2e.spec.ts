@@ -16,8 +16,9 @@
 import assert from 'node:assert';
 import { NEW_PASSWORD_MIN_LENGTH } from '@roviq/common-types';
 import type { InstituteLoginResult } from '@roviq/graphql/generated';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { E2E_USERS } from '../../shared/seed-fixtures';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { E2E_USERS, SEED } from '../../shared/seed-fixtures';
+import { loginAsPlatformAdmin } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
 const ORIGINAL_PASSWORD = E2E_USERS.GUARDIAN.password;
@@ -40,6 +41,7 @@ describe('Password Change E2E (ROV-187)', () => {
   let accessToken: string;
   let originalRefreshToken: string;
   let passwordWasChanged = false;
+  const suiteStartedAt = new Date();
 
   beforeAll(async () => {
     const res = await loginGuardian(ORIGINAL_PASSWORD);
@@ -144,6 +146,39 @@ describe('Password Change E2E (ROV-187)', () => {
     expect(res.data.changePassword).toBe(true);
 
     passwordWasChanged = true;
+  });
+
+  it('records password_change and all_sessions_revoked auth events (ROV-96)', async () => {
+    const { accessToken: adminToken } = await loginAsPlatformAdmin();
+
+    const events = await vi.waitFor(
+      async () => {
+        const res = await gql<{
+          adminAuthEvents: {
+            userId: string | null;
+            eventType: string;
+            metadata: Record<string, unknown> | null;
+            createdAt: string;
+          }[];
+        }>(
+          `query { adminAuthEvents(first: 200) { userId eventType metadata createdAt } }`,
+          undefined,
+          adminToken,
+        );
+        expect(res.errors).toBeUndefined();
+        const mine = (res.data?.adminAuthEvents ?? []).filter(
+          (e) => e.userId === SEED.GUARDIAN_USER.id && new Date(e.createdAt) >= suiteStartedAt,
+        );
+        expect(mine.map((e) => e.eventType)).toEqual(
+          expect.arrayContaining(['password_change', 'all_sessions_revoked']),
+        );
+        return mine;
+      },
+      { timeout: 5_000, interval: 100 },
+    );
+
+    const revoked = events.find((e) => e.eventType === 'all_sessions_revoked');
+    expect(revoked?.metadata).toEqual({ reason: 'password_change' });
   });
 
   it('rejects the original refresh token after password change (all sessions revoked)', async () => {

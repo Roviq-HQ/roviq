@@ -9,6 +9,7 @@ const AUTH_EVENTS_QUERY = gql`
       id
       userId
       eventType
+      portal
       scope
       tenantId
       authMethod

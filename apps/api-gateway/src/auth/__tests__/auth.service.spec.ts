@@ -203,6 +203,7 @@ describe('AuthService', () => {
   let mockConfig: ReturnType<typeof createMockConfigService>;
   let mockAuthEventService: ReturnType<typeof createMockAuthEventService>;
   let mockLockout: ReturnType<typeof createMockLockoutService>;
+  let mockEventBus: EventBusService;
 
   beforeEach(() => {
     mockUserRepo = createMockUserRepo();
@@ -218,7 +219,7 @@ describe('AuthService', () => {
     const mockAbilityFactory = createMock<AbilityFactory>({
       createForUser: vi.fn().mockResolvedValue({ rules: [] }),
     });
-    const mockEventBus = createMock<EventBusService>({ emit: vi.fn() });
+    mockEventBus = createMock<EventBusService>({ emit: vi.fn() });
 
     authService = new AuthService(
       mockConfig,
@@ -394,11 +395,13 @@ describe('AuthService', () => {
       expect(mockAuthEventService.emit).toHaveBeenCalledWith({
         userId: 'user-1',
         type: 'login_failed',
-        scope: 'institute',
-        failureReason: 'wrong_portal',
+        portal: 'institute',
+        authMethod: 'password',
+        failureReason: 'NO_PORTAL_ACCESS',
         ip: '10.0.0.1',
         userAgent: undefined,
         deviceInfo: undefined,
+        metadata: undefined,
       });
     });
 
@@ -577,11 +580,32 @@ describe('AuthService', () => {
       mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('jwt-token');
 
-      const result = await authService.instituteLoginByUserId('user-1');
+      const result = await authService.instituteLoginByUserId('user-1', {
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+      });
 
       expect(result.accessToken).toBe('jwt-token');
       expect(result.user?.tenantId).toBe('tenant-1');
       expect(result.requiresInstituteSelection).toBeUndefined();
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'login_success',
+        portal: 'institute',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        authMethod: 'passkey',
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: undefined,
+      });
+      // Same new-login notification a password sign-in sends.
+      expect(mockEventBus.emit).toHaveBeenCalledWith('NOTIFICATION.auth.security', {
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+        eventType: 'LOGIN',
+        metadata: { ip: '10.0.0.1', userAgent: 'vitest' },
+      });
     });
 
     it('should return membership list for multi-institute user', async () => {
@@ -614,9 +638,20 @@ describe('AuthService', () => {
       mockUserRepo.findById.mockResolvedValue(null);
 
       await expectBusinessError(
-        authService.instituteLoginByUserId('nonexistent'),
+        authService.instituteLoginByUserId('nonexistent', { ip: '10.0.0.1' }),
         ErrorCode.INVALID_CREDENTIALS,
       );
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: undefined,
+        type: 'login_failed',
+        portal: 'institute',
+        authMethod: 'passkey',
+        failureReason: 'ACCOUNT_INACTIVE',
+        ip: '10.0.0.1',
+        userAgent: undefined,
+        deviceInfo: undefined,
+        metadata: undefined,
+      });
     });
 
     it('should throw when user has no active memberships', async () => {
@@ -674,7 +709,11 @@ describe('AuthService', () => {
 
   describe('selectInstitute', () => {
     beforeEach(() => {
-      mockJwt.verify.mockReturnValue({ sub: 'user-1', purpose: 'institute-selection' });
+      mockJwt.verify.mockReturnValue({
+        sub: 'user-1',
+        purpose: 'institute-selection',
+        authMethod: 'passkey',
+      });
     });
 
     it('should issue tenant-scoped JWT for valid membership', async () => {
@@ -709,11 +748,26 @@ describe('AuthService', () => {
       mockRefreshTokenRepo.create.mockResolvedValue(undefined);
       mockJwt.sign.mockReturnValue('access-jwt');
 
-      const result = await authService.selectInstitute('mock-selection-token', 'membership-1');
+      const result = await authService.selectInstitute('mock-selection-token', 'membership-1', {
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+      });
 
       expect(result.accessToken).toBe('access-jwt');
       expect(result.user?.tenantId).toBe('tenant-1');
       expect(result.user?.roleId).toBe('role-1');
+      // The method that opened the selection, not a hardcoded 'password'.
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'login_success',
+        portal: 'institute',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        authMethod: 'passkey',
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: undefined,
+      });
     });
 
     it('should reject if no active membership found', async () => {
@@ -875,10 +929,24 @@ describe('AuthService', () => {
         mustChangePassword: false,
       });
 
-      const result = await authService.refreshToken(fakeToken);
+      const result = await authService.refreshToken(fakeToken, {
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+      });
 
       expect(result.accessToken).toBe('new-jwt');
       expect(result.user?.id).toBe('user-1');
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'token_refresh',
+        scope: 'institute',
+        tenantId: 'tenant-1',
+        resellerId: undefined,
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: undefined,
+        metadata: { membership_id: 'membership-1' },
+      });
       // Every successful refresh rotates — old token gets tagged `rotation`
       // so any subsequent use triggers the reuse-cascade.
       expect(mockRefreshTokenRepo.revoke).toHaveBeenCalledWith(tokenId, 'rotation');
@@ -941,12 +1009,20 @@ describe('AuthService', () => {
       });
 
       const failure = await expectBusinessError(
-        authService.refreshToken('mock-token'),
+        authService.refreshToken('mock-token', { ip: '10.0.0.1', userAgent: 'vitest' }),
         ErrorCode.SESSION_EXPIRED,
       );
       expect(failure.message).toBe('Refresh token reuse detected');
 
       expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith('user-1', 'rotation');
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'all_sessions_revoked',
+        ip: '10.0.0.1',
+        userAgent: 'vitest',
+        deviceInfo: undefined,
+        metadata: { reason: 'token_reuse' },
+      });
     });
 
     it('does NOT cascade-revoke when the token was revoked via user-initiated action', async () => {
@@ -1504,9 +1580,12 @@ describe('AuthService', () => {
         userId: 'user-1',
         type: 'logout',
         scope: 'institute',
+        tenantId: 'tenant-1',
+        resellerId: undefined,
         ip: '10.0.0.1',
         userAgent: 'vitest',
         deviceInfo: 'laptop',
+        metadata: { membership_id: 'membership-1' },
       });
     });
 
@@ -1713,6 +1792,45 @@ describe('AuthService', () => {
         ErrorCode.ACCOUNT_LOCKED,
       );
       expect(mockUserRepo.findByUsername).not.toHaveBeenCalled();
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: undefined,
+        type: 'login_failed',
+        portal: 'institute',
+        authMethod: 'password',
+        failureReason: 'ACCOUNT_LOCKED',
+        ip: undefined,
+        userAgent: undefined,
+        deviceInfo: undefined,
+        metadata: { username_lower: 'admin' },
+      });
+    });
+
+    it.each([
+      ['an unknown username', null, 'UNKNOWN_USER', undefined, { username_lower: 'admin' }],
+      ['an inactive account', 'SUSPENDED', 'ACCOUNT_INACTIVE', 'user-1', undefined],
+      ['a wrong password', 'ACTIVE', 'INVALID_PASSWORD', 'user-1', undefined],
+    ] as const)('records %s on the portal it was tried on, with no scope', async (_label, status, failureReason, userId, metadata) => {
+      mockUserRepo.findByUsername.mockResolvedValue(status ? { ...mockUser, status } : null);
+
+      await expectBusinessError(
+        authService.adminLogin('admin', 'wrong-password', { ip: '10.0.0.1' }),
+        ErrorCode.INVALID_CREDENTIALS,
+      );
+
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId,
+        type: 'login_failed',
+        portal: 'platform',
+        authMethod: 'password',
+        failureReason,
+        ip: '10.0.0.1',
+        userAgent: undefined,
+        deviceInfo: undefined,
+        metadata,
+      });
+      expect(mockLockout.recordFailure).toHaveBeenCalledWith('admin', 'platform', {
+        ip: '10.0.0.1',
+      });
     });
 
     it('calls clearOnSuccess after a successful login', async () => {
@@ -1750,7 +1868,7 @@ describe('AuthService', () => {
         ErrorCode.INVALID_CREDENTIALS,
       );
 
-      expect(mockLockout.recordFailure).toHaveBeenCalledWith('admin', undefined);
+      expect(mockLockout.recordFailure).toHaveBeenCalledWith('admin', 'institute', undefined);
       expect(mockLockout.clearOnSuccess).not.toHaveBeenCalled();
     });
 

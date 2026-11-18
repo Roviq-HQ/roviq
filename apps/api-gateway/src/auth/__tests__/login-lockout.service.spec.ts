@@ -73,7 +73,7 @@ describe('LoginLockoutService', () => {
       const { service, redis, authEvents } = buildService();
       vi.mocked(redis.eval).mockResolvedValue(1);
 
-      const result = await service.recordFailure(USERNAME);
+      const result = await service.recordFailure(USERNAME, 'institute');
 
       expect(result).toEqual({ locked: false, remainingAttempts: DEFAULT_MAX_ATTEMPTS - 1 });
       expect(redis.eval).toHaveBeenCalledTimes(1);
@@ -93,7 +93,7 @@ describe('LoginLockoutService', () => {
       const { service, redis, authEvents } = buildService();
       vi.mocked(redis.eval).mockResolvedValue(4);
 
-      const result = await service.recordFailure(USERNAME);
+      const result = await service.recordFailure(USERNAME, 'institute');
 
       expect(result).toEqual({ locked: false, remainingAttempts: 1 });
       expect(redis.set).not.toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe('LoginLockoutService', () => {
       vi.mocked(redis.eval).mockResolvedValue(5);
 
       const meta = { ip: '10.0.0.1', userAgent: 'jest', deviceInfo: 'desktop' };
-      const result = await service.recordFailure(USERNAME, meta);
+      const result = await service.recordFailure(USERNAME, 'platform', meta);
 
       expect(result).toEqual({ locked: true, remainingAttempts: 0 });
       expect(redis.set).toHaveBeenCalledWith(LOCK_KEY, '1', 'EX', DEFAULT_LOCKOUT_SECONDS);
@@ -116,6 +116,8 @@ describe('LoginLockoutService', () => {
       await Promise.resolve();
       expect(authEvents.emit).toHaveBeenCalledWith({
         type: 'account_locked',
+        portal: 'platform',
+        failureReason: 'TOO_MANY_ATTEMPTS',
         ip: '10.0.0.1',
         userAgent: 'jest',
         deviceInfo: 'desktop',
@@ -131,7 +133,7 @@ describe('LoginLockoutService', () => {
       const { service, redis } = buildService();
       vi.mocked(redis.eval).mockResolvedValue(6);
 
-      const result = await service.recordFailure(USERNAME);
+      const result = await service.recordFailure(USERNAME, 'institute');
 
       expect(result).toEqual({ locked: true, remainingAttempts: 0 });
       expect(redis.set).toHaveBeenCalledWith(LOCK_KEY, '1', 'EX', DEFAULT_LOCKOUT_SECONDS);
@@ -143,7 +145,7 @@ describe('LoginLockoutService', () => {
       vi.mocked(redis.eval).mockResolvedValue(5);
       vi.mocked(authEvents.emit).mockRejectedValue(new Error('boom'));
 
-      const result = await service.recordFailure(USERNAME);
+      const result = await service.recordFailure(USERNAME, 'institute');
 
       expect(result).toEqual({ locked: true, remainingAttempts: 0 });
       // Allow rejection to flush so an unhandled-rejection wouldn't escape.
@@ -172,21 +174,21 @@ describe('LoginLockoutService', () => {
 
       // 1st failure → not locked, 2 remaining.
       vi.mocked(redis.eval).mockResolvedValueOnce(1);
-      await expect(service.recordFailure(USERNAME)).resolves.toEqual({
+      await expect(service.recordFailure(USERNAME, 'institute')).resolves.toEqual({
         locked: false,
         remainingAttempts: 2,
       });
 
       // 2nd failure → not locked, 1 remaining.
       vi.mocked(redis.eval).mockResolvedValueOnce(2);
-      await expect(service.recordFailure(USERNAME)).resolves.toEqual({
+      await expect(service.recordFailure(USERNAME, 'institute')).resolves.toEqual({
         locked: false,
         remainingAttempts: 1,
       });
 
       // 3rd failure → locked.
       vi.mocked(redis.eval).mockResolvedValueOnce(3);
-      const result = await service.recordFailure(USERNAME);
+      const result = await service.recordFailure(USERNAME, 'institute');
       expect(result).toEqual({ locked: true, remainingAttempts: 0 });
       expect(redis.set).toHaveBeenCalledWith(LOCK_KEY, '1', 'EX', DEFAULT_LOCKOUT_SECONDS);
 
@@ -206,7 +208,7 @@ describe('LoginLockoutService', () => {
       });
       vi.mocked(redis.eval).mockResolvedValue(5);
 
-      await service.recordFailure(USERNAME);
+      await service.recordFailure(USERNAME, 'institute');
 
       const evalCall = vi.mocked(redis.eval).mock.calls[0];
       expect(evalCall?.[3]).toBe('120');

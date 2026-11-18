@@ -51,7 +51,7 @@ Three separate login mutations, one per portal:
 ### Admin Portal: `adminLogin(username, password)`
 1. Verifies credentials
 2. Looks up `platform_memberships` for user
-3. No active membership → `INVALID_CREDENTIALS`, identical to a wrong password. A `login_failed` auth event with `failureReason: wrong_portal` records the real cause
+3. No active membership → `INVALID_CREDENTIALS`, identical to a wrong password. A `login_failed` auth event with `failure_reason = NO_PORTAL_ACCESS` and the attempted `portal` records the real cause
 4. Issues scope=platform access token (5min TTL) + refresh token
 
 ### Reseller Portal: `resellerLogin(username, password)`
@@ -284,6 +284,42 @@ Frontend:
 - **Reseller** (`/reseller/audit/impersonation`) — a sessions table with status badges, a **Terminate** action on active sessions (`resellerEndImpersonation`), and an institute filter sourced from `resellerInstitutes`.
 
 E2E fixtures live in `libs/database/src/seed/e2e/impersonation.ts` (one active + one ended reseller-scoped session, one active platform session).
+
+## Auth Events (ROV-96)
+
+`AuthEventService.emit()` writes one `auth_events` row per auth lifecycle step, straight to PostgreSQL under `withAdmin` (no NATS, so a NATS outage never drops a failed-login record). Calls are fire-and-forget: a failed insert is logged and never fails the login. `auth_events` is separate from `audit_logs` by design. Platform admins read it through `adminAuthEvents`.
+
+| `event_type` | Emitted by | Columns and `metadata` |
+| --- | --- | --- |
+| `login_success` | `adminLogin`, `resellerLogin`, `instituteLogin`, `selectInstitute`, passkey sign-in (each also sends the new-login notification) | `portal`, `scope` (always equal), `tenant_id` or `reseller_id`, `auth_method` (`password` / `passkey`), ip, user agent |
+| `login_failed` | every refused sign-in attempt | `portal`, `auth_method`, `failure_reason`; `scope`, `tenant_id`, `reseller_id` are always NULL; `user_id` is set when an account matched, otherwise `metadata.username_lower` |
+| `logout` | `logout` | `scope`, `tenant_id` or `reseller_id`, `metadata.membership_id` |
+| `token_refresh` | `refreshToken` | `scope`, `tenant_id` or `reseller_id`, ip, `metadata.membership_id` |
+| `institute_switch` | `switchInstitute` | `scope='institute'`, `metadata: { from_tenant_id, to_tenant_id }` |
+| `impersonation_start` | `exchangeImpersonationCode` | `user_id` and `scope` are the impersonator's, `tenant_id` the target institute, `metadata: { target_user_id, target_tenant_id, session_id }` |
+| `impersonation_end` | `endImpersonation` (all scopes), reseller suspension, expiry sweep | `user_id` and `scope` are the actor's (the impersonator's on expiry), `metadata: { session_id, ended_reason }` (`manual` / `revoked` / `expired`) |
+| `password_change` | `changePassword` | always followed by `all_sessions_revoked` |
+| `all_sessions_revoked` | `changePassword`, `revokeAllOtherSessions`, refresh-token reuse, reseller suspension | `metadata.reason`: `password_change`, `user_initiated`, `token_reuse`, `reseller_suspended` |
+| `account_locked` | `LoginLockoutService`, on the attempt that reaches the threshold | `portal`, `failure_reason = TOO_MANY_ATTEMPTS`, `metadata: { username_lower, attempts, lockout_seconds }` |
+| `passkey_register` | passkey registration | `metadata: { passkey_id, device_type, backed_up, aaguid }` |
+
+- `auth_events` has no `membership_id` column; the membership goes in `metadata.membership_id`.
+- **`portal` vs `scope`.** `portal` is the entry point the request came through (`platform` / `reseller` / `institute`), known before any authentication. `scope` is the authority of the session that was granted. A refused attempt has a portal and never a scope; a granted session has both and they are equal. Events with no entry point (token refresh, expiry sweep) have no portal.
+- **`failure_reason`** is an `AuthFailureReason` code from `@roviq/common-types`. It is internal detail: the API answers all of them with the same `INVALID_CREDENTIALS` (or `ACCOUNT_LOCKED`) error.
+
+| `failure_reason` | Meaning |
+| --- | --- |
+| `UNKNOWN_USER` | No account has the submitted username |
+| `INVALID_PASSWORD` | Account exists, wrong password |
+| `ACCOUNT_INACTIVE` | Account exists but is not `ACTIVE` |
+| `ACCOUNT_LOCKED` | Attempt made while the username was locked out |
+| `NO_PORTAL_ACCESS` | Credentials valid, no usable membership in that portal |
+| `PASSKEY_UNKNOWN` | Passkey credential is not registered |
+| `PASSKEY_VERIFICATION_FAILED` | Registered passkey, signed response failed verification |
+| `TOO_MANY_ATTEMPTS` | On `account_locked`: the attempt that reached the lockout threshold |
+
+- Database guards on `auth_events`: `chk_auth_events_portal`, `chk_auth_events_scope` and `chk_auth_events_failure_reason` restrict the value sets; `chk_auth_events_login_portal` requires a portal on `login_success` / `login_failed` / `account_locked`; `chk_auth_events_login_success_scope` requires `scope = portal`; `chk_auth_events_refused_attempt` requires a failure reason and forbids scope, tenant and reseller on refused attempts.
+- Expiry: `ImpersonationExpirySweeper` runs `ImpersonationService.expireOverdueSessions()` every minute. It sets `ended_at = expires_at`, `ended_reason = 'expired'` on sessions past `expires_at` and writes `impersonation_end` with the impersonator as `user_id`. The claiming `UPDATE … RETURNING` is atomic, so several gateway replicas record each session once. Such a session still lists as `EXPIRED`, not `ENDED`.
 
 ## IdentityService Boundary (ROV-209)
 
