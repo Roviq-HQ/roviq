@@ -134,6 +134,13 @@ input AddTimetablePeriodInput {
   timetableId: ID!
 }
 
+"""Which of a user’s addresses this is: permanent, current or emergency."""
+enum AddressType {
+  CURRENT
+  EMERGENCY
+  PERMANENT
+}
+
 """
 Per-institute attendance totals for a single date, aggregated across every attendance session in the tenant.
 """
@@ -253,11 +260,28 @@ input AdminListResellersFilterInput {
 
 """Filters for the adminListUsers query"""
 input AdminListUsersFilterInput {
+  """Cursor from a previous page (newest first)"""
   after: String
+
+  """Created at or after (inclusive)"""
+  createdAfter: DateTime
+
+  """Created at or before (inclusive)"""
+  createdBefore: DateTime
   first: Int = 20
 
-  """If true, only users with institute memberships"""
+  """
+  true: only users with an institute membership; false: only users without one
+  """
   hasInstituteMembership: Boolean
+
+  """true: only platform (Roviq staff) members; false: only non-members"""
+  hasPlatformMembership: Boolean
+
+  """true: only reseller team members; false: only non-members"""
+  hasResellerMembership: Boolean
+
+  """Matches profile name (prefix), username, email or phone number"""
   search: String
   status: [UserStatus!]
 
@@ -336,10 +360,70 @@ input AdminUpdateResellerInput {
   name: String
 }
 
+"""A postal address of a user"""
+type AdminUserAddressModel {
+  city: String!
+  country: String!
+  district: String
+  id: ID!
+  line1: String!
+  line2: String
+  line3: String
+  postalCode: String!
+  state: String!
+  type: AddressType!
+}
+
 type AdminUserConnection {
   edges: [AdminUserEdge!]!
   pageInfo: PageInfo!
   totalCount: Int!
+}
+
+"""Everything the admin user detail page shows about one user"""
+type AdminUserDetailModel {
+  addresses: [AdminUserAddressModel!]!
+  createdAt: DateTime!
+  documents: [AdminUserDocumentModel!]!
+  email: String!
+  id: ID!
+  identifiers: [AdminUserIdentifierModel!]!
+
+  """
+  Most recent sign-in, token refresh or institute switch; null if never seen
+  """
+  lastActiveAt: DateTime
+
+  """Institute memberships only"""
+  memberships: [AdminUserMembershipModel!]!
+  platformMembership: AdminUserPlatformMembershipModel
+  primaryPhone: AdminUserPhoneModel
+  profile: AdminUserDetailProfileModel
+  resellerMemberships: [AdminUserResellerMembershipModel!]!
+  status: UserStatus!
+  username: String!
+}
+
+"""Full profile shown on the admin user detail page"""
+type AdminUserDetailProfileModel {
+  dateOfBirth: DateOnly
+  firstName: I18nText!
+  gender: Gender
+  lastName: I18nText
+  nationality: String
+  profileImageUrl: String
+}
+
+"""A document a user has uploaded"""
+type AdminUserDocumentModel {
+  description: String
+  fileUrls: [String!]!
+  id: ID!
+  isVerified: Boolean!
+  referenceNumber: String
+  rejectionReason: String
+  type: UserDocumentType!
+  uploadedAt: DateTime!
 }
 
 type AdminUserEdge {
@@ -347,13 +431,27 @@ type AdminUserEdge {
   node: AdminUserModel!
 }
 
+"""A government or board identifier held by a user"""
+type AdminUserIdentifierModel {
+  """
+  Value safe to display. Aadhaar is reduced to its last four digits and PAN to its stored mask; the full value of an encrypted identifier is never returned.
+  """
+  displayValue: String
+  id: ID!
+  isVerified: Boolean!
+  issuingAuthority: String
+  type: UserIdentifierType!
+}
+
 """
 Membership record showing which institute a user belongs to and in what role
 """
 type AdminUserMembershipModel {
   id: ID!
-  instituteName: String
+  instituteName: I18nText
+  joinedAt: DateTime!
   roleId: ID!
+  roleName: I18nText
   status: MembershipStatus!
   tenantId: ID!
 }
@@ -363,10 +461,35 @@ type AdminUserModel {
   createdAt: DateTime!
   email: String!
   id: ID!
+
+  """
+  Most recent sign-in, token refresh or institute switch; null if never seen
+  """
+  lastActiveAt: DateTime
+
+  """Institute memberships only"""
   memberships: [AdminUserMembershipModel!]!
+  primaryPhone: AdminUserPhoneModel
   profile: AdminUserProfileModel
   status: UserStatus!
   username: String!
+}
+
+"""A phone number with its country dialling code"""
+type AdminUserPhoneModel {
+  """
+  Dialling code without the plus sign, e.g. "91"
+  """
+  countryCode: String!
+  number: String!
+}
+
+"""A user’s membership in the platform (Roviq staff) team"""
+type AdminUserPlatformMembershipModel {
+  id: ID!
+  isActive: Boolean!
+  joinedAt: DateTime!
+  roleName: I18nText
 }
 
 """User profile snapshot returned in admin user listings"""
@@ -374,6 +497,29 @@ type AdminUserProfileModel {
   firstName: I18nText!
   lastName: I18nText
   profileImageUrl: String
+}
+
+"""A user’s membership in a reseller team"""
+type AdminUserResellerMembershipModel {
+  id: ID!
+  isActive: Boolean!
+  joinedAt: DateTime!
+  resellerId: ID!
+  resellerName: String!
+  roleName: I18nText
+}
+
+"""Headline user counts for the admin users page"""
+type AdminUserStatisticsModel {
+  """Users with a sign-in or token refresh in the last 30 days"""
+  activeThisMonth: Int!
+
+  """Users holding memberships in two or more institutes"""
+  multiInstituteUsers: Int!
+
+  """Accounts created in the last 7 days"""
+  newThisWeek: Int!
+  totalUsers: Int!
 }
 
 enum AdmissionApplicationStatus {
@@ -4143,6 +4289,11 @@ type Query {
 
   """Fetch a single reseller by id with computed counts"""
   adminGetReseller(id: ID!): AdminResellerModel!
+
+  """
+  One user with profile, all memberships, identifiers, documents and addresses
+  """
+  adminGetUser(userId: ID!): AdminUserDetailModel!
   adminImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   adminInstituteStatistics: InstituteStatisticsModel!
 
@@ -4156,13 +4307,16 @@ type Query {
   """
   adminListResellers(filter: AdminListResellersFilterInput): AdminResellerConnection!
 
-  """List all users with pagination, search, and filters (platform admin)"""
+  """List all users, newest first, with search and filters (platform admin)"""
   adminListUsers(filter: AdminListUsersFilterInput): AdminUserConnection!
 
   """
-  Typeahead search for users by name, username, or phone (platform admin)
+  Typeahead search for users by name, username, email or phone (platform admin)
   """
   adminSearchUsers(limit: Int! = 10, query: String!): [AdminUserModel!]!
+
+  """Headline user counts (platform admin)"""
+  adminUserStatistics: AdminUserStatisticsModel!
 
   """Admission funnel statistics"""
   admissionStatistics(filter: AdmissionStatisticsFilterInput): AdmissionStatisticsModel!
@@ -6525,6 +6679,22 @@ enum UserDocumentType {
   REPORT_CARD
   TC_INCOMING
   TRANSFER_ORDER
+}
+
+"""Government-issued or institutional ID document type."""
+enum UserIdentifierType {
+  AADHAAR
+  APAAR
+  BSEH_ENROLLMENT
+  CBSE_REGISTRATION
+  JAN_AADHAAR
+  MIGRATION_CERTIFICATE
+  PAN
+  PARIVAR_PEHCHAN_PATRA
+  PASSPORT
+  PEN
+  SHALA_DARPAN_ID
+  VOTER_ID
 }
 
 """Common user profile data (platform-level)"""

@@ -1,255 +1,42 @@
-import { Inject, Injectable } from '@nestjs/common';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  institutesLive,
-  membershipsLive,
-  mkAdminCtx,
-  userProfilesLive,
-  usersLive,
-  withAdmin,
-} from '@roviq/database';
-import { and, asc, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
-import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
+import { Injectable } from '@nestjs/common';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import type { AdminListUsersFilterInput } from './dto/admin-list-users-filter.input';
+import { AdminUserRepository } from './repositories/admin-user.repository';
+
+const DEFAULT_PAGE_SIZE = 20;
 
 @Injectable()
 export class AdminUserService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(private readonly repo: AdminUserRepository) {}
 
-  /** Build WHERE conditions from the filter input */
-  private buildListConditions(filter: AdminListUsersFilterInput): SQL[] {
-    const conditions: SQL[] = [];
-
-    if (filter.search) {
-      const searchTerm = filter.search.trim();
-      if (searchTerm.length >= 2) {
-        const tsQuery = searchTerm
-          .split(/\s+/)
-          .map((w) => `${w}:*`)
-          .join(' & ');
-        const searchCondition = or(
-          sql`${userProfilesLive.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
-          sql`${usersLive.username} ILIKE ${`%${searchTerm}%`}`,
-          sql`EXISTS (
-            SELECT 1 FROM phone_numbers pn
-            WHERE pn.user_id = ${usersLive.id}
-            AND pn.number ILIKE ${`%${searchTerm}%`}
-          )`,
-        );
-        if (searchCondition) conditions.push(searchCondition);
-      } else {
-        const pattern = `%${searchTerm}%`;
-        const searchCondition = or(
-          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
-          sql`${usersLive.username} ILIKE ${pattern}`,
-        );
-        if (searchCondition) conditions.push(searchCondition);
-      }
-    }
-
-    if (filter.status && filter.status.length > 0) {
-      conditions.push(inArray(usersLive.status, filter.status));
-    }
-
-    if (filter.tenantId) {
-      conditions.push(
-        sql`EXISTS (
-          SELECT 1 FROM memberships m
-          WHERE m.user_id = ${usersLive.id}
-          AND m.tenant_id = ${filter.tenantId}
-          AND m.deleted_at IS NULL
-        )`,
-      );
-    } else if (filter.hasInstituteMembership === true) {
-      conditions.push(
-        sql`EXISTS (
-          SELECT 1 FROM memberships m
-          WHERE m.user_id = ${usersLive.id}
-          AND m.deleted_at IS NULL
-        )`,
-      );
-    } else if (filter.hasInstituteMembership === false) {
-      conditions.push(
-        sql`NOT EXISTS (
-          SELECT 1 FROM memberships m
-          WHERE m.user_id = ${usersLive.id}
-          AND m.deleted_at IS NULL
-        )`,
-      );
-    }
-
-    if (filter.after) {
-      const cursor = decodeCursor(filter.after);
-      if (cursor.id) {
-        conditions.push(sql`${usersLive.id} > ${cursor.id as string}`);
-      }
-    }
-
-    return conditions;
-  }
-
-  /**
-   * List users with cursor-based pagination, optional full-text search, and status filters.
-   * Uses `withAdmin` for platform-level cross-tenant access.
-   */
   async list(filter: AdminListUsersFilterInput) {
-    return withAdmin(this.db, mkAdminCtx('service:admin-user'), async (tx) => {
-      const conditions = this.buildListConditions(filter);
-      const where = conditions.length > 0 ? and(...conditions) : undefined;
-      const limit = filter.first ?? 20;
-
-      // Fetch users with left-joined profile
-      const [totalResult, userRows] = await Promise.all([
-        tx
-          .select({ value: count() })
-          .from(usersLive)
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-          .where(where),
-        tx
-          .select({
-            id: usersLive.id,
-            email: usersLive.email,
-            username: usersLive.username,
-            status: usersLive.status,
-            createdAt: usersLive.createdAt,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
-            profileImageUrl: userProfilesLive.profileImageUrl,
-          })
-          .from(usersLive)
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-          .where(where)
-          .orderBy(asc(usersLive.createdAt))
-          .limit(limit + 1),
-      ]);
-
-      const hasNextPage = userRows.length > limit;
-      const nodes = hasNextPage ? userRows.slice(0, limit) : userRows;
-
-      // Batch-load memberships for all returned users
-      const userIds = nodes.map((u) => u.id);
-      const membershipRows =
-        userIds.length > 0
-          ? await tx
-              .select({
-                id: membershipsLive.id,
-                userId: membershipsLive.userId,
-                tenantId: membershipsLive.tenantId,
-                roleId: membershipsLive.roleId,
-                status: membershipsLive.status,
-                instituteName: institutesLive.name,
-              })
-              .from(membershipsLive)
-              .innerJoin(institutesLive, eq(institutesLive.id, membershipsLive.tenantId))
-              .where(inArray(membershipsLive.userId, userIds))
-          : [];
-
-      // Group memberships by userId
-      const membershipsByUser = new Map<string, typeof membershipRows>();
-      for (const row of membershipRows) {
-        const existing = membershipsByUser.get(row.userId) ?? [];
-        existing.push(row);
-        membershipsByUser.set(row.userId, existing);
-      }
-
-      const edges = nodes.map((row) => {
-        const userMemberships = membershipsByUser.get(row.id) ?? [];
-        return {
-          node: {
-            id: row.id,
-            email: row.email,
-            username: row.username,
-            status: row.status,
-            createdAt: row.createdAt,
-            profile: row.firstName
-              ? {
-                  firstName: row.firstName,
-                  lastName: row.lastName,
-                  profileImageUrl: row.profileImageUrl,
-                }
-              : null,
-            memberships: userMemberships.map((m) => ({
-              id: m.id,
-              tenantId: m.tenantId,
-              roleId: m.roleId,
-              status: m.status,
-              instituteName: m.instituteName?.en ?? null,
-            })),
-          },
-          cursor: encodeCursor({ id: row.id }),
-        };
-      });
-
-      return {
-        edges,
-        pageInfo: {
-          hasNextPage,
-          hasPreviousPage: !!filter.after,
-          startCursor: edges[0]?.cursor,
-          endCursor: edges[edges.length - 1]?.cursor,
-        },
-        totalCount: totalResult[0]?.value ?? 0,
-      };
+    const { edges, hasNextPage, totalCount } = await this.repo.list({
+      ...filter,
+      first: filter.first ?? DEFAULT_PAGE_SIZE,
     });
+    return {
+      edges,
+      pageInfo: {
+        hasNextPage,
+        hasPreviousPage: !!filter.after,
+        startCursor: edges[0]?.cursor,
+        endCursor: edges[edges.length - 1]?.cursor,
+      },
+      totalCount,
+    };
   }
 
-  /**
-   * Typeahead search returning top N matches by name, username, or phone number.
-   * Intended for quick-pick selectors in the admin UI.
-   */
-  async search(query: string, limit: number) {
-    return withAdmin(this.db, mkAdminCtx('service:admin-user'), async (tx) => {
-      const searchTerm = query.trim();
-      if (searchTerm.length === 0) return [];
+  search(query: string, limit: number) {
+    return this.repo.search(query, limit);
+  }
 
-      const tsQuery = searchTerm
-        .split(/\s+/)
-        .map((w) => `${w}:*`)
-        .join(' & ');
+  async getUser(userId: string) {
+    const user = await this.repo.findDetail(userId);
+    if (!user) throw new BusinessException(ErrorCode.NOT_FOUND, 'User not found');
+    return user;
+  }
 
-      const rows = await tx
-        .select({
-          id: usersLive.id,
-          email: usersLive.email,
-          username: usersLive.username,
-          status: usersLive.status,
-          createdAt: usersLive.createdAt,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
-          profileImageUrl: userProfilesLive.profileImageUrl,
-        })
-        .from(usersLive)
-        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-        .where(
-          or(
-            sql`${userProfilesLive.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
-            sql`${usersLive.username} ILIKE ${`%${searchTerm}%`}`,
-            sql`EXISTS (
-              SELECT 1 FROM phone_numbers pn
-              WHERE pn.user_id = ${usersLive.id}
-              AND pn.number ILIKE ${`%${searchTerm}%`}
-            )`,
-          ),
-        )
-        .orderBy(asc(usersLive.createdAt))
-        .limit(limit);
-
-      return rows.map((row) => ({
-        id: row.id,
-        email: row.email,
-        username: row.username,
-        status: row.status,
-        createdAt: row.createdAt,
-        profile: row.firstName
-          ? {
-              firstName: row.firstName,
-              lastName: row.lastName,
-              profileImageUrl: row.profileImageUrl,
-            }
-          : null,
-        memberships: [],
-      }));
-    });
+  statistics() {
+    return this.repo.statistics(new Date());
   }
 }

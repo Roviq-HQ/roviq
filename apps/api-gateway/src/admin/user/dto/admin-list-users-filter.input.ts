@@ -1,7 +1,9 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
+import { DateTimeScalar } from '@roviq/nestjs-graphql';
 import {
   IsArray,
   IsBoolean,
+  IsDate,
   IsEnum,
   IsInt,
   IsOptional,
@@ -14,29 +16,44 @@ import { UserStatusEnum } from '../models/admin-user.model';
 
 @InputType({ description: 'Filters for the adminListUsers query' })
 export class AdminListUsersFilterInput {
-  /** Full-text search against user profile names, username, and phone number */
-  @Field({ nullable: true })
+  @Field({
+    nullable: true,
+    description: 'Matches profile name (prefix), username, email or phone number',
+  })
   @IsString()
   @IsOptional()
   search?: string;
 
-  /** Filter by user account status */
   @Field(() => [UserStatusEnum], { nullable: true })
   @IsArray()
   @IsEnum(UserStatusEnum, { each: true })
   @IsOptional()
   status?: UserStatusEnum[];
 
-  /** Filter to only users who have at least one institute membership */
-  @Field({ nullable: true, description: 'If true, only users with institute memberships' })
+  @Field({
+    nullable: true,
+    description: 'true: only users with an institute membership; false: only users without one',
+  })
   @IsBoolean()
   @IsOptional()
   hasInstituteMembership?: boolean;
 
-  /**
-   * Restrict results to users with a membership in this specific institute (tenant).
-   * Used by the admin institute-detail Users tab to list members of a single institute.
-   */
+  @Field({
+    nullable: true,
+    description: 'true: only platform (Roviq staff) members; false: only non-members',
+  })
+  @IsBoolean()
+  @IsOptional()
+  hasPlatformMembership?: boolean;
+
+  @Field({
+    nullable: true,
+    description: 'true: only reseller team members; false: only non-members',
+  })
+  @IsBoolean()
+  @IsOptional()
+  hasResellerMembership?: boolean;
+
   @Field({
     nullable: true,
     description: 'Return only users with at least one membership in this institute (tenant id)',
@@ -45,7 +62,16 @@ export class AdminListUsersFilterInput {
   @IsOptional()
   tenantId?: string;
 
-  /** Number of records to return (Relay-style forward pagination) */
+  @Field(() => DateTimeScalar, { nullable: true, description: 'Created at or after (inclusive)' })
+  @IsDate()
+  @IsOptional()
+  createdAfter?: Date;
+
+  @Field(() => DateTimeScalar, { nullable: true, description: 'Created at or before (inclusive)' })
+  @IsDate()
+  @IsOptional()
+  createdBefore?: Date;
+
   @Field(() => Int, { nullable: true, defaultValue: 20 })
   @IsInt()
   @Min(1)
@@ -53,8 +79,7 @@ export class AdminListUsersFilterInput {
   @IsOptional()
   first?: number;
 
-  /** Cursor for forward pagination */
-  @Field({ nullable: true })
+  @Field({ nullable: true, description: 'Cursor from a previous page (newest first)' })
   @IsString()
   @IsOptional()
   after?: string;

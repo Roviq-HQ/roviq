@@ -1,12 +1,7 @@
-import { Field, ID, InputType, registerEnumType } from '@nestjs/graphql';
+import { Field, ID, InputType } from '@nestjs/graphql';
 import { AuditMask } from '@roviq/audit';
-import { UserIdentifierType } from '@roviq/common-types';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-
-registerEnumType(UserIdentifierType, {
-  name: 'UserIdentifierType',
-  description: 'Government-issued or institutional ID document type.',
-});
+import { UserIdentifierType } from '../user-profile-enums';
 
 /**
  * Stub InputTypes for user_identifiers mutations (resolvers come in M2).
