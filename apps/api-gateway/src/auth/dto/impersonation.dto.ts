@@ -12,8 +12,11 @@ export class StartImpersonationResult {
   @Field({ nullable: true })
   requiresOtp?: boolean;
 
-  /** Server-side impersonation_session id — required for the verifyOtp call. */
-  @Field({ nullable: true })
+  @Field({
+    nullable: true,
+    description:
+      'Id of the pending OTP request, passed back to the verify-OTP mutation. The impersonation session itself is created only after the OTP is verified.',
+  })
   sessionId?: string;
 }
 

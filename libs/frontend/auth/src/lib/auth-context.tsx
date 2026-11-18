@@ -67,6 +67,8 @@ interface AuthProviderProps {
     refreshToken: string;
     user: AuthUser;
   }>;
+  /** Loads the user an access token acts as. Needed for the tab to adopt an impersonation token. */
+  currentUserQuery?: (accessToken: string) => Promise<AuthUser>;
   changePasswordMutation?: (
     currentPassword: string,
     newPassword: string,
@@ -87,6 +89,7 @@ export function AuthProvider({
   selectInstituteMutation,
   switchInstituteMutation,
   refreshMutation,
+  currentUserQuery,
   changePasswordMutation,
   logoutMutation,
   onAuthError,
@@ -194,6 +197,32 @@ export function AuthProvider({
 
   // Restore session on mount
   React.useEffect(() => {
+    // An impersonation tab acts as the impersonated user, whatever session of
+    // the impersonator's own happens to exist in this browser.
+    const impersonation =
+      typeof window !== 'undefined' ? sessionStorage.getItem('roviq-impersonation-token') : null;
+    if (impersonation && currentUserQuery && !isTokenExpired(impersonation)) {
+      let cancelled = false;
+      currentUserQuery(impersonation)
+        .then((impersonatedUser) => {
+          if (cancelled) return;
+          setState({
+            user: impersonatedUser,
+            tokens: { accessToken: impersonation, refreshToken: '' },
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          sessionStorage.removeItem('roviq-impersonation-token');
+          setState({ user: null, tokens: null, isAuthenticated: false, isLoading: false });
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const accessToken = tokenStorage.getAccessToken();
     const refreshToken = tokenStorage.getRefreshToken();
     const user = tokenStorage.getUser();
@@ -251,7 +280,7 @@ export function AuthProvider({
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [refreshMutation, scheduleRefresh, tokenStorage]);
+  }, [currentUserQuery, refreshMutation, scheduleRefresh, tokenStorage]);
 
   const handleLoginResult = React.useCallback(
     async (result: LoginResult) => {

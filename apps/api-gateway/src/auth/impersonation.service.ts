@@ -1,9 +1,15 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AbilityFactory } from '@roviq/casl';
-import { BusinessException, DefaultRoles, ErrorCode } from '@roviq/common-types';
+import type { AuthScope, AuthUser, InstituteContext, ResellerContext } from '@roviq/common-types';
+import {
+  BusinessException,
+  canImpersonateInstituteRole,
+  DefaultRoles,
+  ErrorCode,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -23,7 +29,7 @@ import { EventBusService } from '@roviq/event-bus';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { and, desc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type Redis from 'ioredis';
 import { AuthEventService } from './auth-event.service';
@@ -58,12 +64,29 @@ interface ImpersonationMeta {
 interface CodePayload {
   sessionId: string;
   targetUserId: string;
+  /** The membership the start checks authorized; the token is issued for exactly this one. */
+  targetMembershipId: string;
   tenantId: string;
 }
 
-interface OtpPayload {
+/** An impersonation request waiting for the institute admin's OTP. No session row exists yet. */
+interface PendingOtp {
   otp: string;
-  attempts: number;
+  impersonatorId: string;
+  impersonatorScope: AuthScope;
+  targetUserId: string;
+  targetMembershipId: string;
+  tenantId: string;
+  reason: string;
+  ip: string | null;
+  userAgent: string | null;
+  /** Institute admin the OTP was sent to; recorded as `otp_verified_by`. */
+  verifierUserId: string;
+}
+
+interface RoleInfo {
+  name: string;
+  abilities: readonly { action: unknown; subject: unknown }[];
 }
 
 interface StartImpersonationResult {
@@ -78,13 +101,6 @@ const OTP_TTL_SECONDS = 300;
 /** Maximum OTP verification attempts before key invalidation */
 const MAX_OTP_ATTEMPTS = 3;
 
-// ── Allowed scope transitions ──────────────────────────────
-// platform → institute (platform admin impersonating institute user)
-// reseller → institute (reseller impersonating managed institute user)
-// institute → institute (intra-institute: admin impersonating a member)
-
-const ALLOWED_IMPERSONATOR_SCOPES = new Set(['platform', 'reseller', 'institute']);
-
 /** Derives session lifecycle status: ended (manual/revoked) → expired (past TTL) → active. */
 function deriveSessionStatus(
   endedAt: Date | null,
@@ -94,6 +110,12 @@ function deriveSessionStatus(
   if (endedAt) return ImpersonationSessionStatus.ENDED;
   if (expiresAt.getTime() <= now) return ImpersonationSessionStatus.EXPIRED;
   return ImpersonationSessionStatus.ACTIVE;
+}
+
+function otpMatches(expected: string, given: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(given);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 @Injectable()
@@ -111,14 +133,14 @@ export class ImpersonationService {
   // ── Start impersonation ──────────────────────────────────
 
   async startImpersonation(
-    impersonatorUserId: string,
-    impersonatorScope: string,
+    actor: AuthUser,
     targetUserId: string,
     targetTenantId: string,
     reason: string,
     meta?: ImpersonationMeta,
   ): Promise<StartImpersonationResult> {
-    // Validate reason length
+    this.assertNotImpersonated(actor);
+
     if (!reason || reason.trim().length < MIN_REASON_LENGTH) {
       throw new BusinessException(
         ErrorCode.VALIDATION_FAILED,
@@ -126,20 +148,13 @@ export class ImpersonationService {
       );
     }
 
-    // Validate impersonator scope
-    if (!ALLOWED_IMPERSONATOR_SCOPES.has(impersonatorScope)) {
-      throw new BusinessException(ErrorCode.FORBIDDEN, 'Invalid impersonator scope');
-    }
-
-    // Cannot impersonate yourself
-    if (impersonatorUserId === targetUserId) {
+    if (actor.userId === targetUserId) {
       throw new BusinessException(
         ErrorCode.IMPERSONATION_TARGET_INVALID,
         'Cannot impersonate yourself',
       );
     }
 
-    // Verify target user exists and is active
     const targetUser = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({ id: usersLive.id, status: usersLive.status })
@@ -155,15 +170,17 @@ export class ImpersonationService {
       );
     }
 
-    // Verify target user has an active membership in the target tenant
-    const targetMembership = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+    // Every active membership the target holds here: the rank check must see
+    // the most senior one, and the session is pinned to the oldest.
+    const targetMemberships = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
           id: membershipsLive.id,
-          tenantId: membershipsLive.tenantId,
-          roleId: membershipsLive.roleId,
+          roleName: sql<string>`${rolesLive.name}->>'en'`,
+          roleAbilities: rolesLive.abilities,
         })
         .from(membershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
         .where(
           and(
             eq(membershipsLive.userId, targetUserId),
@@ -171,21 +188,22 @@ export class ImpersonationService {
             eq(membershipsLive.status, 'ACTIVE'),
           ),
         )
-        .limit(1),
+        .orderBy(asc(membershipsLive.createdAt), asc(membershipsLive.id)),
     );
+    const targetMembership = targetMemberships[0];
 
-    if (targetMembership.length === 0) {
+    if (!targetMembership) {
       throw new BusinessException(
         ErrorCode.IMPERSONATION_TARGET_INVALID,
         'Target user has no active membership in the specified institute',
       );
     }
 
-    // Verify target tenant (institute) exists; load consent flag in same query
-    const targetInstitute = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+    const [targetInstitute] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
           id: institutesLive.id,
+          resellerId: institutesLive.resellerId,
           requireImpersonationConsent: institutesLive.requireImpersonationConsent,
         })
         .from(institutesLive)
@@ -193,99 +211,60 @@ export class ImpersonationService {
         .limit(1),
     );
 
-    if (targetInstitute.length === 0) {
+    if (!targetInstitute) {
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Target institute not found');
     }
 
-    const requireConsent = targetInstitute[0].requireImpersonationConsent;
-
-    // For reseller scope: verify the reseller owns the target institute
-    if (impersonatorScope === 'reseller') {
-      // Get the impersonator's reseller ID from their reseller membership
-      const [resellerMembership] = await withAdmin(
-        this.db,
-        mkAdminCtx('service:impersonation'),
-        (tx) =>
-          tx
-            .select({ resellerId: resellerMembershipsLive.resellerId })
-            .from(resellerMembershipsLive)
-            .where(
-              and(
-                eq(resellerMembershipsLive.userId, impersonatorUserId),
-                eq(resellerMembershipsLive.isActive, true),
-              ),
-            )
-            .limit(1),
-      );
-
-      if (!resellerMembership) {
-        throw new BusinessException(ErrorCode.FORBIDDEN, 'No active reseller membership');
-      }
-
-      // Check the institute belongs to this reseller
-      const [inst] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-        tx
-          .select({ resellerId: institutesLive.resellerId })
-          .from(institutesLive)
-          .where(eq(institutesLive.id, targetTenantId))
-          .limit(1),
-      );
-
-      if (!inst || inst.resellerId !== resellerMembership.resellerId) {
+    if (actor.scope === 'reseller') {
+      if (targetInstitute.resellerId !== actor.resellerId) {
         throw new BusinessException(
           ErrorCode.FORBIDDEN,
           'Institute does not belong to your reseller',
         );
       }
+      await this.assertActiveResellerMembership(actor);
     }
 
-    // For institute scope: check CASL 'impersonate' ability
-    if (impersonatorScope === 'institute') {
-      await this.validateIntraInstituteImpersonation(impersonatorUserId, targetTenantId);
+    if (actor.scope === 'institute') {
+      await this.validateIntraInstituteImpersonation(
+        actor,
+        targetTenantId,
+        targetMemberships.map((membership) => ({
+          name: membership.roleName,
+          abilities: membership.roleAbilities,
+        })),
+      );
     }
 
-    // Create impersonation session
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + MAX_SESSION_DURATION_MS);
-
-    const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .insert(impersonationSessions)
-        .values({
-          impersonatorId: impersonatorUserId,
-          impersonatorScope,
-          targetUserId,
-          targetTenantId,
-          reason: reason.trim(),
-          ipAddress: meta?.ip ?? null,
-          userAgent: meta?.userAgent ?? null,
-          startedAt: now,
-          expiresAt,
-        })
-        .returning({ id: impersonationSessions.id }),
-    );
-
-    // ── OTP gate ───────────────────────────────────────────
-    // Reseller: ALWAYS requires institute-admin OTP approval.
-    // Platform: requires OTP only when the institute has opted-in via require_impersonation_consent.
-    // Institute (intra-institute): never requires OTP.
+    // Reseller: always needs the institute admin's OTP. Platform: only when the
+    // institute opted in. Intra-institute: never.
     const otpRequired =
-      impersonatorScope === 'reseller' || (impersonatorScope === 'platform' && requireConsent);
+      actor.scope === 'reseller' ||
+      (actor.scope === 'platform' && targetInstitute.requireImpersonationConsent);
+
+    const request = {
+      impersonatorId: actor.userId,
+      impersonatorScope: actor.scope,
+      targetUserId,
+      targetMembershipId: targetMembership.id,
+      tenantId: targetTenantId,
+      reason: reason.trim(),
+      ip: meta?.ip ?? null,
+      userAgent: meta?.userAgent ?? null,
+    };
 
     if (otpRequired) {
-      await this.dispatchImpersonationOtp({
-        sessionId: session.id,
-        impersonatorUserId,
-        targetUserId,
-        targetTenantId,
-      });
-      return { sessionId: session.id, requiresOtp: true };
+      // The session row is written only once the OTP is verified, so an
+      // abandoned request never shows up as an active session.
+      const requestId = await this.dispatchImpersonationOtp(request);
+      return { sessionId: requestId, requiresOtp: true };
     }
 
-    // Generate one-time code and store in Redis
+    const sessionId = await this.createSession(request, null);
     const code = await this.issueImpersonationCode({
-      sessionId: session.id,
+      sessionId,
       targetUserId,
+      targetMembershipId: targetMembership.id,
       tenantId: targetTenantId,
     });
 
@@ -295,86 +274,69 @@ export class ImpersonationService {
   // ── Verify OTP and issue exchange code ───────────────────
 
   async verifyOtp(
-    sessionId: string,
+    actor: AuthUser,
+    requestId: string,
     otp: string,
-    impersonatorUserId: string,
   ): Promise<StartImpersonationResult> {
-    // SECURITY: bind OTP verification to the authenticated impersonator. The
-    // session row records who started the impersonation; without this check
-    // any platform/reseller admin could verify any pending OTP given the
-    // sessionId and complete an impersonation that was never theirs to start.
-    // Resolve the session FIRST so we can authorize the caller before doing
-    // any OTP work (no information leak via timing or attempt-counter writes).
-    const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          id: impersonationSessions.id,
-          impersonatorId: impersonationSessions.impersonatorId,
-          targetUserId: impersonationSessions.targetUserId,
-          targetTenantId: impersonationSessions.targetTenantId,
-          endedAt: impersonationSessions.endedAt,
-        })
-        .from(impersonationSessions)
-        .where(eq(impersonationSessions.id, sessionId))
-        .limit(1),
-    );
+    this.assertNotImpersonated(actor);
 
-    if (!session) {
-      throw new BusinessException(
-        ErrorCode.IMPERSONATION_SESSION_INVALID,
-        'Impersonation session not found',
-      );
-    }
-    if (session.impersonatorId !== impersonatorUserId) {
-      throw new BusinessException(
-        ErrorCode.IMPERSONATION_OTP_INVALID,
-        'OTP verification not authorized for this session',
-      );
-    }
-    if (session.endedAt) {
-      throw new BusinessException(
-        ErrorCode.IMPERSONATION_SESSION_INVALID,
-        'Impersonation session already ended',
-      );
-    }
-    if (!session.targetTenantId) {
-      // OTP-gated impersonation is only meaningful for tenant-scoped sessions.
-      throw new BusinessException(
-        ErrorCode.IMPERSONATION_SESSION_INVALID,
-        'Impersonation session has no target tenant',
-      );
-    }
+    const key = `${REDIS_KEYS.IMPERSONATION_OTP}${requestId}`;
+    const attemptsKey = `${key}:attempts`;
 
-    const key = `${REDIS_KEYS.IMPERSONATION_OTP}${sessionId}`;
     const stored = await this.redis.get(key);
     if (!stored) {
       throw new BusinessException(ErrorCode.IMPERSONATION_OTP_EXPIRED, 'OTP expired or not found');
     }
+    const pending = JSON.parse(stored) as PendingOtp;
 
-    const payload = JSON.parse(stored) as OtpPayload;
+    // Only the user who asked may complete the request, and a stranger's
+    // guesses must not burn the requester's attempts.
+    if (pending.impersonatorId !== actor.userId) {
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_OTP_INVALID,
+        'OTP verification not authorized for this request',
+      );
+    }
 
-    if (payload.otp !== otp) {
-      const attempts = payload.attempts + 1;
+    // Reserve the attempt BEFORE comparing (INCR is atomic), so parallel
+    // guesses cannot all be checked against one remaining attempt.
+    const attempts = await this.redis.incr(attemptsKey);
+    await this.redis.expire(attemptsKey, OTP_TTL_SECONDS);
+    if (attempts > MAX_OTP_ATTEMPTS) {
+      await this.redis.del(key, attemptsKey);
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
+        'OTP invalid — maximum attempts exceeded',
+      );
+    }
+
+    if (!otpMatches(pending.otp, otp)) {
       if (attempts >= MAX_OTP_ATTEMPTS) {
-        await this.redis.del(key);
+        await this.redis.del(key, attemptsKey);
         throw new BusinessException(
           ErrorCode.IMPERSONATION_OTP_ATTEMPTS_EXCEEDED,
           'OTP invalid — maximum attempts exceeded',
         );
       }
-      const ttl = await this.redis.ttl(key);
-      const nextPayload: OtpPayload = { otp: payload.otp, attempts };
-      await this.redis.set(key, JSON.stringify(nextPayload), 'EX', ttl > 0 ? ttl : OTP_TTL_SECONDS);
       throw new BusinessException(ErrorCode.IMPERSONATION_OTP_INVALID, 'OTP invalid');
     }
 
-    // Consume OTP
-    await this.redis.del(key);
+    // GETDEL: two requests carrying the right OTP cannot both open a session.
+    const consumed = await this.redis.getdel(key);
+    if (!consumed) {
+      throw new BusinessException(ErrorCode.IMPERSONATION_OTP_EXPIRED, 'OTP expired or not found');
+    }
+    await this.redis.del(attemptsKey);
 
+    // Minutes may have passed since the request was started.
+    await this.assertStillAuthorized(actor, pending);
+
+    const sessionId = await this.createSession(pending, pending.verifierUserId);
     const code = await this.issueImpersonationCode({
-      sessionId: session.id,
-      targetUserId: session.targetUserId,
-      tenantId: session.targetTenantId,
+      sessionId,
+      targetUserId: pending.targetUserId,
+      targetMembershipId: pending.targetMembershipId,
+      tenantId: pending.tenantId,
     });
 
     return { code };
@@ -392,7 +354,9 @@ export class ImpersonationService {
       );
     }
 
-    const { sessionId, targetUserId, tenantId } = JSON.parse(stored) as CodePayload;
+    const { sessionId, targetUserId, targetMembershipId, tenantId } = JSON.parse(
+      stored,
+    ) as CodePayload;
 
     // Fetch all required data in parallel within a single transaction
     const [targetUsers, membershipRows, sessions, instituteRows] = await withAdmin(
@@ -414,6 +378,8 @@ export class ImpersonationService {
             .from(membershipsLive)
             .where(
               and(
+                // Exactly the membership that was authorized at start.
+                eq(membershipsLive.id, targetMembershipId),
                 eq(membershipsLive.userId, targetUserId),
                 eq(membershipsLive.tenantId, tenantId),
                 eq(membershipsLive.status, 'ACTIVE'),
@@ -424,6 +390,8 @@ export class ImpersonationService {
             .select({
               id: impersonationSessions.id,
               impersonatorId: impersonationSessions.impersonatorId,
+              endedAt: impersonationSessions.endedAt,
+              expiresAt: impersonationSessions.expiresAt,
             })
             .from(impersonationSessions)
             .where(eq(impersonationSessions.id, sessionId))
@@ -432,6 +400,7 @@ export class ImpersonationService {
             .select({
               id: institutesLive.id,
               name: institutesLive.name,
+              resellerId: institutesLive.resellerId,
             })
             .from(institutesLive)
             .where(eq(institutesLive.id, tenantId))
@@ -456,6 +425,12 @@ export class ImpersonationService {
         ErrorCode.IMPERSONATION_SESSION_INVALID,
         'Impersonation session not found',
       );
+    // Ended or revoked between start and exchange: no token at all.
+    if (session.endedAt || session.expiresAt.getTime() <= Date.now())
+      throw new BusinessException(
+        ErrorCode.IMPERSONATION_SESSION_INVALID,
+        'Impersonation session has ended',
+      );
 
     const institute = instituteRows[0];
     if (!institute)
@@ -465,6 +440,7 @@ export class ImpersonationService {
     const accessToken = this.generateImpersonationToken({
       targetUserId,
       tenantId,
+      resellerId: institute.resellerId,
       membershipId: membership.id,
       roleId: membership.roleId,
       impersonatorId: session.impersonatorId,
@@ -501,14 +477,20 @@ export class ImpersonationService {
 
   // ── End impersonation ────────────────────────────────────
 
-  async endImpersonation(sessionId: string, userId: string): Promise<void> {
-    // Verify the session exists and the user is either the impersonator or the target
+  /**
+   * Ends a session. The impersonator and the impersonated user end it
+   * themselves (`manual`); anyone else with authority over it revokes it
+   * (`revoked`) — see {@link resolveEndReason}.
+   */
+  async endImpersonation(sessionId: string, actor: AuthUser): Promise<void> {
     const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
           id: impersonationSessions.id,
           impersonatorId: impersonationSessions.impersonatorId,
+          impersonatorScope: impersonationSessions.impersonatorScope,
           targetUserId: impersonationSessions.targetUserId,
+          targetTenantId: impersonationSessions.targetTenantId,
           endedAt: impersonationSessions.endedAt,
         })
         .from(impersonationSessions)
@@ -530,22 +512,16 @@ export class ImpersonationService {
       );
     }
 
-    // Only the impersonator or the target can end the session
-    if (session.impersonatorId !== userId && session.targetUserId !== userId) {
-      throw new BusinessException(
-        ErrorCode.FORBIDDEN,
-        'Not authorized to end this impersonation session',
-      );
-    }
+    const endedReason = await this.resolveEndReason(session, actor);
 
     await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .update(impersonationSessions)
         .set({
           endedAt: new Date(),
-          endedReason: 'manual',
+          endedReason,
         })
-        .where(eq(impersonationSessions.id, sessionId)),
+        .where(and(eq(impersonationSessions.id, sessionId), isNull(impersonationSessions.endedAt))),
     );
 
     // Invalidate session cache so ImpersonationSessionGuard rejects immediately.
@@ -569,9 +545,9 @@ export class ImpersonationService {
     // Emit impersonation_end event
     this.authEventService
       .emit({
-        userId,
+        userId: actor.userId,
         type: 'impersonation_end',
-        metadata: { session_id: sessionId, ended_reason: 'manual' },
+        metadata: { session_id: sessionId, ended_reason: endedReason },
       })
       .catch(() => {});
   }
@@ -602,7 +578,11 @@ export class ImpersonationService {
         conditions.push(inArray(impersonationSessions.impersonatorId, staffIds));
       }
       if (opts.sessionId) conditions.push(eq(impersonationSessions.id, opts.sessionId));
-      if (opts.activeOnly) conditions.push(isNull(impersonationSessions.endedAt));
+      if (opts.activeOnly) {
+        // Active means neither ended nor past its expiry, matching `status`.
+        conditions.push(isNull(impersonationSessions.endedAt));
+        conditions.push(gt(impersonationSessions.expiresAt, new Date()));
+      }
 
       const impersonator = alias(usersLive, 'impersonator');
       const target = alias(usersLive, 'target_user');
@@ -734,45 +714,105 @@ export class ImpersonationService {
     };
   }
 
-  // ── Private: intra-institute validation ──────────────────
+  // ── Private: authorization helpers ───────────────────────
+
+  /** An impersonation token acts for someone else; it must not open or approve sessions. */
+  private assertNotImpersonated(actor: AuthUser): void {
+    if (actor.isImpersonated) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Cannot start impersonation from an impersonation session',
+      );
+    }
+  }
+
+  /** Re-runs the scope checks of the start step for the caller completing an OTP request. */
+  private async assertStillAuthorized(actor: AuthUser, pending: PendingOtp): Promise<void> {
+    if (actor.scope !== pending.impersonatorScope) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'OTP verification not authorized for this request',
+      );
+    }
+    if (actor.scope !== 'reseller') return;
+
+    await this.assertActiveResellerMembership(actor);
+    const [institute] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ resellerId: institutesLive.resellerId })
+        .from(institutesLive)
+        .where(eq(institutesLive.id, pending.tenantId))
+        .limit(1),
+    );
+    if (institute?.resellerId !== actor.resellerId) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Institute does not belong to your reseller',
+      );
+    }
+  }
+
+  /** The token can be minutes old; the reseller membership must still be active now. */
+  private async assertActiveResellerMembership(actor: ResellerContext): Promise<void> {
+    const [membership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ id: resellerMembershipsLive.id })
+        .from(resellerMembershipsLive)
+        .where(
+          and(
+            eq(resellerMembershipsLive.id, actor.membershipId),
+            eq(resellerMembershipsLive.userId, actor.userId),
+            eq(resellerMembershipsLive.resellerId, actor.resellerId),
+            eq(resellerMembershipsLive.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+    if (!membership) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active reseller membership');
+    }
+  }
 
   private async validateIntraInstituteImpersonation(
-    impersonatorUserId: string,
+    actor: InstituteContext,
     tenantId: string,
+    targetRoles: RoleInfo[],
   ): Promise<void> {
-    // Get impersonator's membership in this institute
-    const [impersonatorMembership] = await withAdmin(
-      this.db,
-      mkAdminCtx('service:impersonation'),
-      (tx) =>
-        tx
-          .select({ id: membershipsLive.id, roleId: membershipsLive.roleId })
-          .from(membershipsLive)
-          .where(
-            and(
-              eq(membershipsLive.userId, impersonatorUserId),
-              eq(membershipsLive.tenantId, tenantId),
-              eq(membershipsLive.status, 'ACTIVE'),
-            ),
-          )
-          .limit(1),
-    );
-
-    if (!impersonatorMembership) {
+    if (actor.tenantId !== tenantId) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this institute');
     }
 
-    // Check CASL 'impersonate' ability on 'User'. AbilityFactory resolves the
-    // impersonator's role abilities from the DB — only roles that have been
-    // explicitly granted `impersonate:User` (e.g. institute_admin) pass this
-    // check. This is the authoritative access-control gate; no secondary
-    // hardcoded role-name list is needed.
+    const [actorMembership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({
+          id: membershipsLive.id,
+          roleId: membershipsLive.roleId,
+          roleName: sql<string>`${rolesLive.name}->>'en'`,
+          roleAbilities: rolesLive.abilities,
+        })
+        .from(membershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
+        .where(
+          and(
+            eq(membershipsLive.id, actor.membershipId),
+            eq(membershipsLive.userId, actor.userId),
+            eq(membershipsLive.tenantId, tenantId),
+            eq(membershipsLive.status, 'ACTIVE'),
+          ),
+        )
+        .limit(1),
+    );
+
+    if (!actorMembership) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'No active membership in this institute');
+    }
+
     const ability = await this.abilityFactory.createForUser({
-      userId: impersonatorUserId,
+      userId: actor.userId,
       scope: 'institute',
       tenantId,
-      membershipId: impersonatorMembership.id,
-      roleId: impersonatorMembership.roleId,
+      membershipId: actorMembership.id,
+      roleId: actorMembership.roleId,
     });
 
     if (!ability.can('impersonate', 'User')) {
@@ -781,6 +821,96 @@ export class ImpersonationService {
         'You do not have permission to impersonate users',
       );
     }
+
+    const actorRole = { name: actorMembership.roleName, abilities: actorMembership.roleAbilities };
+    if (!targetRoles.every((targetRole) => canImpersonateInstituteRole(actorRole, targetRole))) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'You are not allowed to impersonate a user with this role',
+      );
+    }
+  }
+
+  /**
+   * `manual` for the two parties of the session. `revoked` for someone with
+   * authority over it who holds `impersonate User`: any platform user, a
+   * reseller user for sessions started by their own team, an institute user
+   * for sessions into their own institute. Everyone else is refused.
+   */
+  private async resolveEndReason(
+    session: {
+      impersonatorId: string;
+      impersonatorScope: string;
+      targetUserId: string;
+      targetTenantId: string | null;
+    },
+    actor: AuthUser,
+  ): Promise<'manual' | 'revoked'> {
+    if (actor.userId === session.impersonatorId || actor.userId === session.targetUserId) {
+      return 'manual';
+    }
+
+    const denied = new BusinessException(
+      ErrorCode.FORBIDDEN,
+      'Not authorized to end this impersonation session',
+    );
+    // An impersonation token may end only its own session, handled above.
+    if (actor.isImpersonated) throw denied;
+
+    const ability = await this.abilityFactory.createForUser(actor);
+    if (!ability.can('impersonate', 'User')) throw denied;
+
+    if (actor.scope === 'platform') return 'revoked';
+
+    if (actor.scope === 'institute') {
+      if (session.targetTenantId !== actor.tenantId) throw denied;
+      return 'revoked';
+    }
+
+    if (session.impersonatorScope !== 'reseller') throw denied;
+    const [teammate] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .select({ id: resellerMembershipsLive.id })
+        .from(resellerMembershipsLive)
+        .where(
+          and(
+            eq(resellerMembershipsLive.userId, session.impersonatorId),
+            eq(resellerMembershipsLive.resellerId, actor.resellerId),
+            eq(resellerMembershipsLive.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+    if (!teammate) throw denied;
+    return 'revoked';
+  }
+
+  // ── Private: session row ─────────────────────────────────
+
+  private async createSession(
+    request: Omit<PendingOtp, 'otp' | 'verifierUserId'>,
+    otpVerifiedBy: string | null,
+  ): Promise<string> {
+    const now = new Date();
+    const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
+      tx
+        .insert(impersonationSessions)
+        .values({
+          impersonatorId: request.impersonatorId,
+          impersonatorScope: request.impersonatorScope,
+          targetUserId: request.targetUserId,
+          targetTenantId: request.tenantId,
+          reason: request.reason,
+          ipAddress: request.ip,
+          userAgent: request.userAgent,
+          startedAt: now,
+          expiresAt: new Date(now.getTime() + MAX_SESSION_DURATION_MS),
+          otpVerified: otpVerifiedBy ? now : null,
+          otpVerifiedBy,
+        })
+        .returning({ id: impersonationSessions.id }),
+    );
+    return session.id;
   }
 
   // ── Private: issue exchange code ─────────────────────────
@@ -798,20 +928,12 @@ export class ImpersonationService {
 
   // ── Private: dispatch impersonation OTP ──────────────────
 
-  private async dispatchImpersonationOtp(opts: {
-    sessionId: string;
-    impersonatorUserId: string;
-    targetUserId: string;
-    targetTenantId: string;
-  }): Promise<void> {
-    // ── Pre-flight validation (Issue 4 — silent-empty-phone fix) ──
-    // Resolve the institute admin AND their primary phone BEFORE writing the
-    // OTP to Redis. If the admin has no contact phone we cannot deliver the
-    // OTP, and the caller would otherwise hang on `requiresOtp: true`
-    // forever. Validating up front avoids polluting Redis on a known-bad
-    // path.
-
-    // 1. Find the institute_admin for the target tenant
+  /** Sends the OTP to the institute admin and parks the request in Redis. Returns the request id. */
+  private async dispatchImpersonationOtp(
+    request: Omit<PendingOtp, 'otp' | 'verifierUserId'>,
+  ): Promise<string> {
+    // Resolve the admin and their phone BEFORE writing to Redis: without a
+    // phone the OTP cannot be delivered and the caller would wait forever.
     const [adminRow] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
@@ -821,24 +943,23 @@ export class ImpersonationService {
         .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
         .where(
           and(
-            eq(membershipsLive.tenantId, opts.targetTenantId),
+            eq(membershipsLive.tenantId, request.tenantId),
             eq(membershipsLive.status, 'ACTIVE'),
             sql`${rolesLive.name}->>'en' = ${DefaultRoles.InstituteAdmin}`,
           ),
         )
+        // Longest-standing admin, so the recipient is the same on every request.
+        .orderBy(asc(membershipsLive.createdAt), asc(membershipsLive.id))
         .limit(1),
     );
 
     if (!adminRow) {
-      // No institute_admin to consent — surface a clear error so the caller can retry/escalate.
       throw new BusinessException(
         ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE,
         'Cannot request impersonation consent — institute has no active institute_admin',
       );
     }
 
-    // 2. Look up admin's primary phone — fail fast if missing so the caller
-    //    isn't stuck waiting on an OTP that can never be delivered.
     const [phoneRow] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
       tx
         .select({
@@ -860,35 +981,32 @@ export class ImpersonationService {
     }
 
     const recipientPhone = `${phoneRow.countryCode}${phoneRow.number}`;
-
-    // 3. Generate cryptographically random 6-digit OTP, zero-padded
+    const requestId = randomUUID();
     const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
 
-    // 4. Persist OTP in Redis (5 min TTL) — only after we've confirmed we can
-    //    actually deliver it.
-    const otpPayload: OtpPayload = { otp, attempts: 0 };
+    const pending: PendingOtp = { ...request, otp, verifierUserId: adminRow.userId };
     await this.redis.set(
-      `${REDIS_KEYS.IMPERSONATION_OTP}${opts.sessionId}`,
-      JSON.stringify(otpPayload),
+      `${REDIS_KEYS.IMPERSONATION_OTP}${requestId}`,
+      JSON.stringify(pending),
       'EX',
       OTP_TTL_SECONDS,
     );
 
-    // 5. Emit NATS event — notification-service handles delivery via Novu
     const event: AuthSecurityEvent = {
-      tenantId: opts.targetTenantId,
+      tenantId: request.tenantId,
       userId: adminRow.userId,
       eventType: 'IMPERSONATION_OTP',
       metadata: {
         otp,
         recipientPhone,
         purpose: 'impersonation_consent',
-        impersonator_id: opts.impersonatorUserId,
-        target_user_id: opts.targetUserId,
-        session_id: opts.sessionId,
+        impersonator_id: request.impersonatorId,
+        target_user_id: request.targetUserId,
+        session_id: requestId,
       },
     };
     this.eventBus.emit(NOTIFICATION_SUBJECTS.AUTH_SECURITY, event);
+    return requestId;
   }
 
   // ── Private: generate impersonation token ────────────────
@@ -896,6 +1014,7 @@ export class ImpersonationService {
   private generateImpersonationToken(opts: {
     targetUserId: string;
     tenantId: string;
+    resellerId: string;
     membershipId: string;
     roleId: string;
     impersonatorId: string;
@@ -906,6 +1025,8 @@ export class ImpersonationService {
         sub: opts.targetUserId,
         scope: 'institute',
         tenantId: opts.tenantId,
+        // Same claim a normal institute token carries; billing reads it.
+        resellerId: opts.resellerId,
         membershipId: opts.membershipId,
         roleId: opts.roleId,
         isImpersonated: true,

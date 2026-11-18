@@ -5180,6 +5180,10 @@ type StandardModel {
 type StartImpersonationResult {
   code: String
   requiresOtp: Boolean
+
+  """
+  Id of the pending OTP request, passed back to the verify-OTP mutation. The impersonation session itself is created only after the OTP is verified.
+  """
   sessionId: String
 }
 

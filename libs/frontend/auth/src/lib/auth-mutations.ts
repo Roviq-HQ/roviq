@@ -158,6 +158,17 @@ export function createAuthMutations(graphqlUrl: string) {
       return data.updateMyPreferredLocale;
     },
 
+    /** The user an access token acts as; used to adopt an impersonation token. */
+    async currentUser(accessToken: string): Promise<AuthUser> {
+      const data = await graphqlFetch<{ me: AuthUser }>(
+        graphqlUrl,
+        `query Me { me { ${USER_FIELDS} } }`,
+        undefined,
+        { Authorization: `Bearer ${accessToken}` },
+      );
+      return data.me;
+    },
+
     async logout(accessToken: string, currentRefreshToken: string): Promise<void> {
       try {
         await graphqlFetch(

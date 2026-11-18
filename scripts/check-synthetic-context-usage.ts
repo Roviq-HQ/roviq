@@ -40,6 +40,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/audit/repositories/audit-partition.drizzle-repository.ts',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts',
   'apps/api-gateway/src/audit/workflows/partition.activities.ts',
+  'apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts',
   'apps/api-gateway/src/auth/auth-event.service.ts',
   'apps/api-gateway/src/auth/identity.service.ts',
   'apps/api-gateway/src/auth/impersonation.service.ts',
