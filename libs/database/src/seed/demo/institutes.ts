@@ -42,7 +42,7 @@ export async function seedInstitutes(tx: DrizzleDB) {
           },
           {
             countryCode: '+91',
-            number: '0124-2345678',
+            number: '1242345678',
             isPrimary: false,
             isWhatsappEnabled: false,
             label: 'Landline',
