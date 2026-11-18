@@ -22,6 +22,7 @@
     "check:testids": "pnpx tsx scripts/check-testid-literals.ts",
     "check:rls-coverage": "pnpx tsx scripts/check-rls-coverage.ts",
     "check:synthetic-context-usage": "pnpx tsx scripts/check-synthetic-context-usage.ts",
+    "check:admin-context-reach": "pnpx tsx scripts/check-admin-context-reach.ts",
     "check:direct-nats-emit": "pnpx tsx scripts/check-direct-nats-emit.ts",
     "check:codegen-drift": "pnpx tsx scripts/check-codegen-drift.ts",
     "check:jetstream-drift": "pnpx tsx scripts/check-jetstream-drift.ts",

@@ -284,6 +284,7 @@ launch gates bash -c 'set -e
   pnpm -s check:no-double-cast
   pnpm -s check:db-drift
   pnpm -s check:synthetic-context-usage
+  pnpm -s check:admin-context-reach
   pnpm -s check:direct-nats-emit
   pnpm -s test:check-integration
   pnpm -s test:check-dates'
