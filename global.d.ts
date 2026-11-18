@@ -30,9 +30,13 @@ declare global {
       FAILURE_WINDOW_SECONDS?: string;
       NATS_VALIDATE_PAYLOADS?: string;
       PROMETHEUS_URL?: string;
+      /** Host port of this instance's Prometheus (slot 0: 9090); fallback when PROMETHEUS_URL is unset. */
+      DEV_PROMETHEUS_PORT?: string;
       LOKI_URL?: string;
       TEMPO_URL?: string;
       NEXT_PUBLIC_GRAFANA_URL?: string;
+      DEV_TEMPO_PORT?: string;
+      DEV_LOKI_PORT?: string;
       /** Host port of this instance's isolated NATS test broker (slot 0: 4224). */
       DEV_NATS_TEST_PORT?: string;
       /** Host port of this instance's dev API gateway (slot 0: 3005). */
