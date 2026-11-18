@@ -60,6 +60,10 @@ const sdk = new NodeSDK({
 sdk.start();
 
 const shutdown = () => {
+  // The Nx watcher starts the next process without waiting for this one, and an unreachable
+  // collector holds the flush for seconds: outside production, free the ports at once.
+  if (!isProduction) process.exit(0);
+  setTimeout(() => process.exit(0), 5_000).unref();
   sdk
     .shutdown()
     .catch((err) => console.error('OTel SDK shutdown error', err))

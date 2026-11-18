@@ -3,7 +3,7 @@
 #
 # Bypass (local only):
 #   SKIP_PREPUSH=1 git push   |   HUSKY=0 git push   |   git push --no-verify
-#   NX_SKIP_NX_CACHE=1 git push  (forces re-execution of cached targets)
+#   NX_SKIP_NX_CACHE=true git push  (forces re-execution of cached targets)
 #
 # Requires bash >= 4.3. Linux default; macOS users: `brew install bash`.
 
@@ -33,9 +33,10 @@ if (( ! IS_CI )); then
   fi
 fi
 
-# ── Single-instance lock — concurrent runs share roviq_test DB and would race ─
+# ── One run per instance — concurrent runs in a checkout share its roviq_test ─
+# Instances have their own databases, ports and build folders, so each locks alone.
 LOCK_FD=200
-LOCK_FILE=/tmp/roviq-ci-check.lock
+LOCK_FILE="/tmp/roviq-ci-check-${ROVIQ_INSTANCE:-0}.lock"
 exec {LOCK_FD}>"$LOCK_FILE" || { log "ERROR: cannot open $LOCK_FILE"; exit 1; }
 if ! flock -n "$LOCK_FD"; then
   log "another ci:check is running (lock: $LOCK_FILE) — exiting"
@@ -165,11 +166,14 @@ if (( run_e2e )); then
   ( "${COMPOSE[@]}" build migrate-and-seed \
       > "$tmpdir/backend-build.log" 2>&1 ) & build_pid=$!
 
-  # Stream C: frontend build on host. Independent of Docker.
-  ( cd apps/web && \
-      NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
-      NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='' \
-      pnpm exec next build > "$tmpdir/web-build.log" 2>&1 ) & web_pid=$!
+  # Stream C: frontend build on host. Independent of Docker. Generated GraphQL
+  # types are git-ignored and go stale after a rebase or merge, so regenerate
+  # them first from the committed schema (CI=true: no gateway needed, as in CI).
+  ( { CI=true pnpm -s codegen \
+      && cd apps/web \
+      && NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
+         NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='' \
+         pnpm exec next build; } > "$tmpdir/web-build.log" 2>&1 ) & web_pid=$!
 
   infra_rc=0; build_rc=0; web_rc=0
   wait "$infra_pid" || infra_rc=$?
@@ -179,7 +183,7 @@ if (( run_e2e )); then
   if (( infra_rc != 0 || build_rc != 0 || web_rc != 0 )); then
     (( infra_rc != 0 )) && { log "✗ infra startup failed"; cat "$tmpdir/infra.log"; }
     (( build_rc != 0 )) && { log "✗ backend image build failed"; cat "$tmpdir/backend-build.log"; }
-    (( web_rc   != 0 )) && { log "✗ next build failed"; cat "$tmpdir/web-build.log"; }
+    (( web_rc   != 0 )) && { log "✗ codegen or next build failed"; cat "$tmpdir/web-build.log"; }
     exit 1
   fi
 
@@ -192,19 +196,18 @@ if (( run_e2e )); then
 
   # Phase 3: start app containers. Image built in phase 1 (no --build needed),
   # seed completed in phase 2 (depends_on satisfied). api-gateway builds both
-  # apps; notification-service starts once it is healthy.
-  log "phase 3: start backend apps"
-  if ! { "${COMPOSE[@]}" up -d --wait --no-deps api-gateway \
-         && "${COMPOSE[@]}" up -d --wait --no-deps notification-service \
-         && "${COMPOSE[@]}" run --rm novu-bridge-sync; } > "$tmpdir/apps.log" 2>&1; then
+  # apps; notification-service starts once it is healthy. Both are recreated
+  # unconditionally: the gate must test the pushed source even if the
+  # fingerprint in scripts/e2e-compose.sh misses an input. --no-deps on the
+  # bridge sync keeps Compose from re-running migrate-and-seed under them.
+  log "phase 3: build and start backend apps on the current source"
+  if ! { "${COMPOSE[@]}" up -d --wait --no-deps --force-recreate api-gateway \
+         && "${COMPOSE[@]}" up -d --wait --no-deps --force-recreate notification-service \
+         && "${COMPOSE[@]}" run --rm --no-deps novu-bridge-sync; } > "$tmpdir/apps.log" 2>&1; then
     log "✗ app startup failed"; cat "$tmpdir/apps.log"; exit 1
   fi
 
-  # Phase 4: GraphQL warmup probe. The basic /api/health curl says healthy as
-  # soon as the HTTP server binds, but `nx serve` lazy-compiles libraries on
-  # first use — early test queries hit UND_ERR_SOCKET while compilation
-  # finishes. Hit a real GraphQL query and wait for a stable response before
-  # declaring the api-gateway ready for tests.
+  # Phase 4: GraphQL warmup probe from the host, through the published port.
   log "phase 4: api-gateway GraphQL warmup probe"
   warmup_start=$SECONDS
   warmup_ok=0

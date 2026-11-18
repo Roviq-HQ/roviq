@@ -17,4 +17,23 @@ export E2E_GID="${E2E_GID:-$(id -g)}"
 
 . scripts/instance-env.sh
 
+# The backend containers run a fixed build made at container start. This hash of
+# the backend's inputs is part of their environment, so `up` recreates them
+# (and rebuilds) exactly when the source they would build has changed.
+backend_inputs=(
+  apps/api-gateway apps/notification-service libs ee
+  package.json pnpm-lock.yaml nx.json tsconfig.base.json
+  docker/compose.e2e.yaml docker/Dockerfile.backend
+  ':(exclude)*.spec.ts' ':(exclude)*.spec.tsx' ':(exclude)libs/frontend'
+)
+E2E_BACKEND_FINGERPRINT=$(
+  {
+    git ls-files -s -- "${backend_inputs[@]}"
+    git diff -- "${backend_inputs[@]}"
+    git ls-files -z --others --exclude-standard -- "${backend_inputs[@]}" | xargs -0 -r sha1sum
+    [[ -f .env ]] && sha1sum .env
+  } | sha1sum | cut -d' ' -f1
+)
+export E2E_BACKEND_FINGERPRINT
+
 exec docker compose -p "${ROVIQ_E2E_COMPOSE_PROJECT:-roviq-e2e}" -f docker/compose.e2e.yaml "$@"

@@ -701,3 +701,75 @@ A `pnpm test:e2e:ui` run failed 17 tests; 9 were institute pages untouched by th
 Running the suite again without touching the stack gave 271 passed and 1 failed (a real test bug, fixed in the same commit as this entry).
 
 **Not fixed.** Workaround: after restarting the e2e gateway, wait for `Found 0 errors` in `docker logs <e2e project>-api-gateway-1` and a 200 from `/api/health/ready` before starting Playwright. A fix belongs with the stale `dist/libs` one: once the container rebuilds libraries itself, the manual restart goes away.
+
+
+## 2026-11-18 — fixed: dev gateway died with `EADDRINUSE` after a file change (ROV-288)
+
+Resolves problem 1 of ROV-288 for the dev stack. The Nx `@nx/js:node` watcher sends SIGTERM to the old process and starts the new one without waiting for the old one to exit (`node.impl.js`: `await previousTask.stop('SIGTERM')` returns once the signal is sent). The old process did not exit at once: the SIGTERM handler in `libs/backend/telemetry/src/init-telemetry.ts` waited for `sdk.shutdown()`, and with no collector listening the OTLP flush took about 4 seconds. The new process reached `listen()` first and died with `EADDRINUSE`; the inspector port failed the same way.
+
+Outside production the handler now exits immediately. In production it still flushes, with a 5 second limit.
+
+**Verification:** before, SIGTERM to exit took 4.1 s, and of three file changes made while the gateway was running, two ended in `EADDRINUSE`. After, ten file changes in a row all ended in `Application is running`, with no inspector warning.
+
+
+## 2026-11-18 — fixed: the e2e gateway no longer runs a watcher, and the gate rebuilds it (ROV-288)
+
+Resolves the two 2026-11-18 `diagnosed` entries above ("e2e gateway stays unhealthy after a file change", "never rebuilds `dist/libs` after a library change") and problems 2 and 3 of ROV-288.
+
+The `api-gateway` container in `docker/compose.e2e.yaml` now builds once at start and runs the output with plain `node` (the same layout `notification-service` already used), with no `nx serve`. So nothing restarts the gateway in the middle of a test run, and no half-updated watcher state exists. Source changes reach the container only when it is recreated:
+
+- `scripts/e2e-compose.sh` hashes the backend's inputs (`apps/api-gateway`, `apps/notification-service`, `libs` without `libs/frontend`, `ee`, lockfile, root configs, the compose file and Dockerfile, `.env`; spec files excluded; tracked, modified and untracked files) into `E2E_BACKEND_FINGERPRINT`, which is in the environment of `api-gateway` and `notification-service`. Compose recreates a container whose environment changed, so any `up` rebuilds the backend exactly when its source changed.
+- `scripts/ci-check.sh` phase 3 starts both with `--force-recreate` regardless, so every push tests the pushed source even if the fingerprint misses an input.
+- `e2e/shared/preflight.ts` lost its "restart the container" fallback; it existed for a parked `nx serve`.
+
+Also in this change:
+
+- The `ci:check` lock is per instance (`/tmp/roviq-ci-check-<slot>.lock`), so two instances can run the gate at once.
+- `pnpm check:jetstream-drift` read `nats://localhost:4222` when `NATS_URL` was unset, which is slot 0's dev NATS from any slot. It now defaults to this instance's e2e NATS (`E2E_NATS_PORT`).
+
+Three things made a warm `pnpm e2e:up` slow, found while timing it:
+
+- Compose starts the exited one-shot `migrate-and-seed` again on every `up`, and on every `run` that has it as a dependency: 11 s each. `novu-bridge-sync` was run with dependencies, so the database was reset and seeded a second time under the live gateway. It now runs with `--no-deps` (15 s → 3 s), in `e2e:up` and in `ci:check`.
+- `pnpm test:e2e:api` ran `e2e:clean` right after `e2e:up`: a third seed. Removed.
+- The backend health checks probed every 5 s from the start. Both now use `start_interval: 1s`.
+
+`pnpm e2e:up` on a running stack: 16 s when the backend is unchanged (27 s before this work), about 45 s when it changed.
+
+**Do NOT:**
+
+- Add `--force-recreate` to `e2e:up`: it costs 30 s on every call.
+- Run a one-shot with dependencies (`run` without `--no-deps`) against a running stack: it re-seeds the database under the gateway.
+- Add a backend build input (a new top-level folder, a config file) without adding it to `backend_inputs` in `scripts/e2e-compose.sh`.
+
+**Verification:** in slot 2, a cold `pnpm e2e:up` came up healthy with `node … dist/apps/api-gateway/src/main.js` as the container process. A new export added to `libs/shared/common-types` and logged from `apps/api-gateway/src/main.ts` appeared in the gateway log after the next `pnpm e2e:up`, with no manual restart. `pnpm check:jetstream-drift` reported `nats://localhost:4263`. A spec-only edit did not recreate the containers; an untracked file under `libs/` did.
+
+`ci:check` also runs `CI=true pnpm codegen` (6 s, from the committed schema, no gateway needed) before the web build, so git-ignored generated types that went stale in a rebase no longer fail it.
+
+
+## 2026-11-18 — fixed: `pubsub.integration.spec.ts` "keeps the durable consumer … across a worker reconnect" failed once in CI
+
+Seen once on PR #285 and not reproduced locally: the stream still held one message when the 5 second poll ended. Likely cause: after the first worker closes, the server can still hold that worker's pull request for a moment, hand it the next published message, and redeliver only after the 30 second ack wait. The test now waits for the consumer's `num_waiting` to reach 0 before it publishes again. The cause is not proven, so reopen this if the test fails again.
+
+**Verification:** the file passed 8 of 8 local runs with the guard.
+
+
+## 2026-11-18 — fixed: two Claude sessions in one checkout locked each other out of the Playwright MCP browser
+
+Playwright MCP keeps one persistent browser profile per workspace, and a profile can be open in one browser at a time. A second session in the same checkout got "profile in use" and lost about 15 minutes. `.claude/settings.json` now sets `PLAYWRIGHT_MCP_ISOLATED=true`, so each session's browser uses an in-memory profile. Logins do not survive a browser close. Takes effect in sessions started after the change; not yet confirmed with two live sessions.
+
+
+## 2026-11-18 — seen once, cause unknown: `switchers.e2e.spec.ts` "switching back to English restores /en/ URL" timed out in `ci:check`
+
+One uncached `ci:check` run in slot 2 (16 Playwright workers, three instances' stacks on the machine) failed this test: after `goto('/hi/dashboard')` and a click on the locale switcher, `locale-option-en` never appeared within 30 s. The page snapshot showed the English dashboard. The spec then passed 8 of 8 with `--repeat-each 8`, and the next full gate run passed. No backend restart was involved (the e2e gateway has no watcher). Not fixed. If it fails again, start from `dist/.playwright/e2e/test-output/…/error-context.md` and check whether `/hi/dashboard` was redirected to `/en`.
+
+
+## 2026-11-18 — verified: two instances run `ci:check` at the same time (ROV-288)
+
+With the lock per instance, `pnpm ci:check` was started at the same moment in slots 2 and 4 with the Nx cache off. Both passed in full (322 s and 329 s; alone, slot 2 takes about 190 s). Lock files: `/tmp/roviq-ci-check-2.lock`, `/tmp/roviq-ci-check-4.lock`.
+
+Also found: `NX_SKIP_NX_CACHE=1` does nothing. Nx only honours the value `true`, so earlier "uncached" runs replayed cached results (integration in 1 s). The bypass note in `scripts/ci-check.sh` and the docs now say `NX_SKIP_NX_CACHE=true`.
+
+
+## 2026-11-18 — fixed: Playwright run right after an e2e gateway restart (ROV-288)
+
+Resolves the 2026-11-18 `diagnosed` entry "a Playwright run started right after a restart of the e2e gateway fails unrelated institute tests". Its cause was `nx serve` restarting the process underneath a container that had already passed its health check. The container no longer runs `nx serve`: it builds, then starts one `node` process, and is healthy only once that process answers GraphQL. No manual restart is needed after a library change either.

@@ -4,7 +4,7 @@
 // would either crash the api-gateway boot or destructively recreate the
 // stream (dropping un-acked messages).
 //
-// Run against the e2e Docker stack already brought up by the e2e-api job:
+// Runs against this instance's e2e Docker stack by default:
 //   pnpm e2e:up && pnpm check:jetstream-drift
 //
 // Set `NATS_URL` to point elsewhere (e.g. a staging cluster):
@@ -20,7 +20,7 @@ import { connect } from '@nats-io/transport-node';
 import type { StreamConfig } from '../libs/backend/nats-jetstream/src/interfaces/jetstream.options';
 import { STREAMS } from '../libs/backend/nats-jetstream/src/streams/stream.config';
 
-const NATS_URL = process.env.NATS_URL ?? 'nats://localhost:4222';
+const NATS_URL = process.env.NATS_URL ?? `nats://localhost:${process.env.E2E_NATS_PORT ?? '4223'}`;
 
 const RETENTION_MAP: Record<StreamConfig['retention'], RetentionPolicy> = {
   workqueue: RetentionPolicy.Workqueue,

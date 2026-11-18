@@ -5,6 +5,9 @@
     "pr": ""
   },
   "switchModelsOnFlag": false,
+  "env": {
+    "PLAYWRIGHT_MCP_ISOLATED": "true"
+  },
   "permissions": {
     "allow": [
       "Bash",

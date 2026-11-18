@@ -350,6 +350,10 @@ describe('JetStream transport with a real broker', () => {
     const created = (await jsm.consumers.info(stream.name, durable)).created;
     await first.close();
     workers = [];
+    // A pull request the server still holds for the closed worker would take the next message.
+    await expect
+      .poll(async () => (await jsm.consumers.info(stream.name, durable)).num_waiting, poll)
+      .toBe(0);
     await publish({ order: 2 });
     await publish({ order: 3 });
     expect((await jsm.streams.info(stream.name)).state.messages).toBe(2);
