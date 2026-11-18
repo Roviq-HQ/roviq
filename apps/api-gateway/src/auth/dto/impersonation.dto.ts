@@ -36,6 +36,15 @@ export class ImpersonationUserInfo {
 
   @Field()
   username!: string;
+
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: "The impersonated person's name, for the banner. Null without a profile.",
+  })
+  firstName!: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true })
+  lastName!: I18nContent | null;
 }
 
 @ObjectType()

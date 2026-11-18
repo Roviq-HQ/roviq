@@ -1,7 +1,6 @@
 'use client';
 
 import { gql, useQuery } from '@roviq/graphql';
-import { useI18nField } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -22,6 +21,7 @@ import {
   useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useRoleName } from '@web/hooks/use-role-name';
 import { ListTree, ShieldOff, Sliders } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -45,7 +45,7 @@ type Role = InstituteRolesQuery['instituteRoles'][number];
 export default function RolePrimaryNavPage() {
   const t = useTranslations('settings.roles');
   const tNav = useTranslations('nav');
-  const ti = useI18nField();
+  const roleName = useRoleName();
   const ability = useAbility();
 
   const canRead = ability.can('read', 'Role');
@@ -136,7 +136,7 @@ export default function RolePrimaryNavPage() {
                 <TableRow key={role.id} data-testid={testIds.instituteRoles.row(role.id)}>
                   <TableCell className="font-medium">
                     <div className="flex flex-col gap-1">
-                      <span>{ti(role.name)}</span>
+                      <span>{roleName(role.name)}</span>
                       <div className="flex gap-1">
                         {role.isSystem && (
                           <Badge variant="outline" className="w-fit text-xs">
@@ -195,7 +195,7 @@ export default function RolePrimaryNavPage() {
             if (!open) setActiveRole(null);
           }}
           roleId={activeRole.id}
-          roleName={ti(activeRole.name)}
+          roleName={roleName(activeRole.name)}
           roleNameEn={activeRole.name.en ?? ''}
           initialSlugs={activeRole.primaryNavSlugs}
           onSaved={() => {

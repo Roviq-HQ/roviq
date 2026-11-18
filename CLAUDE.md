@@ -189,6 +189,7 @@ Domain-specific rules live in `.claude/skills/` and load only when relevant:
 - `docs/auth.md` — authentication (three-scope model, JWT, refresh, impersonation)
 - `docs/frontend.md` — frontend patterns
 - `docs/infrastructure.md` — infra setup
+- `docs/deployment.md` — what production needs: build-time web variables, migration order, database-enforced rules, Redis on the request path. Add to it when a change needs something from production
 - `docs/getting-started.md` — onboarding
 - `docs/testing.md` — test strategy, CI jobs, compose files
 - `docs/references/mistake-reference.md` — full Quick Mistake Reference with CI gates

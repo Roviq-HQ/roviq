@@ -967,7 +967,17 @@ describe('ImpersonationService', () => {
       targetMembershipId: 'mem-1',
       tenantId: 'tenant-1',
     });
-    const EXCHANGE_USER = { table: 'users', rows: [{ id: 'tgt-1', username: 'student-jane' }] };
+    const EXCHANGE_USER = {
+      table: 'users',
+      rows: [
+        {
+          id: 'tgt-1',
+          username: 'student-jane',
+          firstName: { en: 'Jane' },
+          lastName: { en: 'Doe' },
+        },
+      ],
+    };
     const EXCHANGE_MEMBERSHIP = {
       table: 'memberships',
       rows: [{ id: 'mem-1', tenantId: 'tenant-1', roleId: 'role-student' }],
@@ -1066,7 +1076,12 @@ describe('ImpersonationService', () => {
       const result = await service.exchangeCode('code-1', META);
       expect(result).toEqual({
         accessToken: 'fake-jwt',
-        user: { id: 'tgt-1', username: 'student-jane' },
+        user: {
+          id: 'tgt-1',
+          username: 'student-jane',
+          firstName: { en: 'Jane' },
+          lastName: { en: 'Doe' },
+        },
         institute: { id: 'tenant-1', name: { en: 'Test Institute' } },
       });
       expect(jwt.sign).toHaveBeenCalledWith(

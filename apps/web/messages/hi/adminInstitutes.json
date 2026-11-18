@@ -106,7 +106,13 @@
       "username": "उपयोगकर्ता नाम",
       "email": "ईमेल",
       "roles": "भूमिका",
-      "status": "स्थिति"
+      "status": "स्थिति",
+      "actions": "कार्रवाइयाँ"
+    },
+    "statuses": {
+      "ACTIVE": "सक्रिय",
+      "SUSPENDED": "निलंबित",
+      "LOCKED": "लॉक"
     }
   },
   "config": {

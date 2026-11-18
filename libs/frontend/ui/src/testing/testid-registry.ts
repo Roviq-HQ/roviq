@@ -277,6 +277,51 @@ export const testIds = {
     errorRetryBtn: 'dlq-error-retry-btn',
   },
 
+  // ── Common metrics components (apps/web/src/components/metrics) ────────
+  metrics: {
+    serviceStatus: (key: string) => `metric-service-status-${key}`,
+    serviceResponse: (key: string) => `metric-service-response-${key}`,
+    serviceUptime: (key: string) => `metric-service-uptime-${key}`,
+    cardValue: (key: string) => `metric-card-value-${key}`,
+    sparkline: 'metric-sparkline',
+    sparklineEmpty: 'metric-sparkline-empty',
+    statusGridLoading: 'metric-status-grid-loading',
+  },
+
+  // ── Admin: monitoring ─────────────────────────────────────────────────
+  adminMonitoring: {
+    page: 'admin-monitoring-page',
+    title: 'admin-monitoring-title',
+    serviceGrid: 'admin-monitoring-service-grid',
+    serviceCard: (service: string) => `admin-monitoring-service-${service}`,
+    healthError: 'admin-monitoring-health-error',
+    healthRetryBtn: 'admin-monitoring-health-retry-btn',
+    liveIndicator: 'admin-monitoring-live-indicator',
+    dlqBanner: 'admin-monitoring-dlq-banner',
+    dlqLink: 'admin-monitoring-dlq-link',
+    alertsPanel: 'admin-monitoring-alerts-panel',
+    alertsUnavailable: 'admin-monitoring-alerts-unavailable',
+    alertsEmpty: 'admin-monitoring-alerts-empty',
+    alertItem: (name: string) => `admin-monitoring-alert-${name}`,
+    natsPanel: 'admin-monitoring-nats-panel',
+    natsEmpty: 'admin-monitoring-nats-empty',
+    natsStream: (name: string) => `admin-monitoring-nats-stream-${name}`,
+    connectionsPanel: 'admin-monitoring-connections-panel',
+    connectionsError: 'admin-monitoring-connections-error',
+    observabilityLink: 'admin-monitoring-observability-link',
+    tenantTable: 'admin-monitoring-tenant-table',
+    tenantRow: (id: string) => `admin-monitoring-tenant-row-${id}`,
+    tenantSort: (field: string) => `admin-monitoring-tenant-sort-${field}`,
+    tenantResellerFilter: 'admin-monitoring-tenant-reseller-filter',
+    tenantEmpty: 'admin-monitoring-tenant-empty',
+    tenantError: 'admin-monitoring-tenant-error',
+    tenantRetryBtn: 'admin-monitoring-tenant-retry-btn',
+    tenantMetricsUnavailable: 'admin-monitoring-tenant-metrics-unavailable',
+    tenantNextPage: 'admin-monitoring-tenant-next-page',
+    tenantPrevPage: 'admin-monitoring-tenant-prev-page',
+    tenantPageInfo: 'admin-monitoring-tenant-page-info',
+  },
+
   // ── Admin: attendance ─────────────────────────────────────────────────
   adminAttendance: {
     page: 'admin-attendance-page',
@@ -287,6 +332,41 @@ export const testIds = {
     empty: 'admin-attendance-empty',
     denied: 'admin-attendance-denied',
     row: (id: string) => `admin-attendance-row-${id}`,
+  },
+
+  // ── Reseller: institute detail ─────────────────────────────────────────
+  resellerInstituteDetail: {
+    usersTab: 'reseller-institute-users-tab',
+    usersLoading: 'reseller-institute-users-loading',
+    usersEmpty: 'reseller-institute-users-empty',
+    userRow: (userId: string) => `reseller-institute-user-row-${userId}`,
+  },
+
+  // ── Impersonation: code exchange page in the institute portal ──────────
+  impersonationExchange: {
+    loading: 'impersonation-exchange-loading',
+    error: 'impersonation-exchange-error',
+    closeBtn: 'impersonation-exchange-close-btn',
+  },
+
+  // ── Impersonation: banner in the impersonated tab ─────────────────────
+  impersonationBanner: {
+    banner: 'impersonation-banner',
+    exitBtn: 'impersonation-exit-btn',
+    endedNotice: 'impersonation-ended-notice',
+    closeBtn: 'impersonation-ended-close-btn',
+  },
+
+  // ── Impersonation: start dialog and trigger buttons (ROV-101) ─────────
+  impersonation: {
+    dialog: 'impersonation-dialog',
+    reasonInput: 'impersonation-reason-input',
+    reasonError: 'impersonation-reason-error',
+    otpInput: 'impersonation-otp-input',
+    error: 'impersonation-error',
+    cancelBtn: 'impersonation-cancel-btn',
+    submitBtn: 'impersonation-submit-btn',
+    trigger: (userId: string) => `impersonate-btn-${userId}`,
   },
 
   // ── Admin: resellers list ──────────────────────────────────────────────

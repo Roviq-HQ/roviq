@@ -81,6 +81,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
 import { useDebouncedValue } from '@web/hooks/use-debounced-value';
 import { useFormDraft } from '@web/hooks/use-form-draft';
@@ -718,7 +719,10 @@ function StudentHeader({ student, onBack }: { student: StudentDetailNode; onBack
           <ArrowLeft aria-hidden="true" className="size-4" />
           {t('detail.back')}
         </Button>
-        <DeletePersonButton kind="student" id={student.id} name={fullName} onDeleted={onBack} />
+        <div className="flex items-center gap-2">
+          {student.userId && <ViewAsButton userId={student.userId} name={fullName} />}
+          <DeletePersonButton kind="student" id={student.id} name={fullName} onDeleted={onBack} />
+        </div>
       </div>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">

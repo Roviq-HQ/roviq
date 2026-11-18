@@ -5,6 +5,8 @@ interface JwtPayload {
   exp: number;
   iat: number;
   isImpersonated?: boolean;
+  /** Present on impersonation tokens; the session to end on exit. */
+  impersonationSessionId?: string;
 }
 
 export function decodeJwt(token: string): JwtPayload | null {

@@ -25,6 +25,8 @@ export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, Abil
     { action: 'suspend', subject: 'Institute' },
     { action: 'reject', subject: 'Institute' },
     { action: 'view_statistics', subject: 'Institute' },
+    // Picking whom to impersonate needs the institute's member list (ROV-101).
+    { action: 'read', subject: 'User' },
     { action: 'impersonate', subject: 'User' },
     { action: 'manage', subject: 'InstituteGroup' },
     { action: 'read', subject: 'AcademicYear' },

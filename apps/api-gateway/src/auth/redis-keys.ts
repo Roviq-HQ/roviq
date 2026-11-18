@@ -9,4 +9,6 @@ export const REDIS_KEYS = {
   LOGIN_FAILURES: 'auth:failed-login:',
   /** Active lockout marker for a username. Presence ⇒ login is blocked for LOCKOUT_DURATION_SECONDS. */
   LOGIN_LOCKED: 'auth:locked:',
+  /** Hourly uptime bucket hash `{ up, total }`, keyed `<MonitoredService>:<hourEpoch>`. EX = 25h, read back over the last 24 buckets. */
+  SYSTEM_HEALTH_UPTIME: 'monitoring:uptime:',
 } as const;

@@ -7,6 +7,8 @@ export interface NavItem {
   icon?: LucideIcon;
   badge?: string;
   disabled?: boolean;
+  /** Hidden from the sidebar, drawer and command palette when the viewer lacks it. */
+  ability?: NavAbility;
 }
 
 export interface NavGroup {

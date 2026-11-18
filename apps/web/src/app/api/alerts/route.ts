@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdminAuth } from '../_lib/admin-auth';
 
-const PROMETHEUS_URL = process.env.PROMETHEUS_URL ?? 'http://localhost:9090';
+const PROMETHEUS_URL =
+  process.env.PROMETHEUS_URL ?? `http://localhost:${process.env.DEV_PROMETHEUS_PORT ?? '9090'}`;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 export async function GET(request: Request) {

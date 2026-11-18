@@ -1,10 +1,12 @@
 'use client';
 
-import { decodeJwt, ProtectedRoute, useAuth } from '@roviq/auth';
+import { ProtectedRoute, useAuth } from '@roviq/auth';
 import { NAV_SLUGS } from '@roviq/common-types';
 import { useI18nField } from '@roviq/i18n';
 import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
-import { AbilityProvider, AdminLayout, Button, Card, CardContent } from '@roviq/ui';
+import { AbilityProvider, AdminLayout } from '@roviq/ui';
+import { ImpersonationBanner } from '@web/components/impersonation/impersonation-banner';
+import { useRoleName } from '@web/hooks/use-role-name';
 import {
   Award,
   BarChart3,
@@ -32,7 +34,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 import { CurrentInstituteLocalesProvider } from './institute-locales-provider';
 import { TenantThemeProvider } from './tenant-theme-provider';
@@ -41,57 +43,11 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tGroups = useTranslations('groups');
   const tCommon = useTranslations('common');
-  const tAuth = useTranslations('auth');
   const { logout, user, memberships, switchInstitute } = useAuth();
   const ti = useI18nField();
+  const roleName = useRoleName();
 
   usePushNotifications();
-
-  // --- Impersonation detection ---
-  const getImpersonationState = useCallback(() => {
-    if (typeof window === 'undefined') return false;
-    const token = sessionStorage.getItem('roviq-impersonation-token');
-    if (!token) return false;
-    const payload = decodeJwt(token);
-    return payload?.isImpersonated === true;
-  }, []);
-
-  const isImpersonated = getImpersonationState();
-  const impersonatedUserName =
-    typeof window !== 'undefined' ? sessionStorage.getItem('roviq-impersonation-user-name') : null;
-  const [sessionEnded, setSessionEnded] = useState(false);
-
-  // Periodically check token expiry during impersonation
-  useEffect(() => {
-    if (!isImpersonated) return;
-
-    const interval = setInterval(() => {
-      const token = sessionStorage.getItem('roviq-impersonation-token');
-      if (!token) {
-        setSessionEnded(true);
-        return;
-      }
-      const payload = decodeJwt(token);
-      if (!payload) {
-        setSessionEnded(true);
-        return;
-      }
-      const exp = payload.exp * 1000;
-      if (Date.now() > exp) {
-        setSessionEnded(true);
-        sessionStorage.removeItem('roviq-impersonation-token');
-      }
-    }, 10_000);
-
-    return () => clearInterval(interval);
-  }, [isImpersonated]);
-
-  // Auto-close tab after session ends
-  useEffect(() => {
-    if (!sessionEnded) return;
-    const timer = setTimeout(() => window.close(), 3000);
-    return () => clearTimeout(timer);
-  }, [sessionEnded]);
 
   const subscriberId = user?.id ?? '';
   const [subscriberHash, setSubscriberHash] = useState<string>();
@@ -118,7 +74,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             instituteName: ti(m.instituteName),
             instituteSlug: m.instituteSlug,
             instituteLogoUrl: m.instituteLogoUrl,
-            roleName: ti(m.roleName),
+            roleName: roleName(m.roleName),
           })),
           onSwitch: (tenantId: string) => {
             const target = memberships?.find((m) => m.tenantId === tenantId);
@@ -404,34 +360,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
       <AbilityProvider rules={user?.abilityRules ?? []}>
-        {isImpersonated && (
-          <div className="fixed top-0 inset-x-0 z-50 bg-amber-500 text-black py-2 px-4 flex justify-between items-center">
-            <span className="font-medium">
-              {tAuth('impersonationBanner', {
-                name: impersonatedUserName ?? tAuth('or'),
-              })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-black text-black hover:bg-amber-600"
-              onClick={() => window.close()}
-            >
-              {tAuth('exitImpersonation')}
-            </Button>
-          </div>
-        )}
-
-        {sessionEnded && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-            <Card className="w-full max-w-sm">
-              <CardContent className="pt-6 text-center space-y-4">
-                <p className="font-medium">{tAuth('impersonationSessionEnded')}</p>
-                <p className="text-sm text-muted-foreground">{tAuth('impersonationTabClosing')}</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        <ImpersonationBanner />
 
         <TenantThemeProvider>
           <AdminLayout config={config}>{children}</AdminLayout>

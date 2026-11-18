@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdminAuth } from '../_lib/admin-auth';
 
-const LOKI_URL = process.env.LOKI_URL ?? 'http://localhost:3100';
+const LOKI_URL = process.env.LOKI_URL ?? `http://localhost:${process.env.DEV_LOKI_PORT ?? '3100'}`;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const MAX_LIMIT = 500;
 const MAX_RANGE_SECONDS = 30 * 24 * 60 * 60; // 30 days

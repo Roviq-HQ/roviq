@@ -59,6 +59,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
+import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
 import { parseISO } from 'date-fns';
 import {
@@ -328,7 +329,10 @@ function StaffHeader({ staff, onBack }: { staff: StaffDetailNode; onBack: () => 
           <ArrowLeft className="size-4" />
           {t('detail.back')}
         </Button>
-        <DeletePersonButton kind="staff" id={staff.id} name={fullName} onDeleted={onBack} />
+        <div className="flex items-center gap-2">
+          <ViewAsButton userId={staff.userId} name={fullName} />
+          <DeletePersonButton kind="staff" id={staff.id} name={fullName} onDeleted={onBack} />
+        </div>
       </div>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">

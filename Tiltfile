@@ -89,7 +89,7 @@ local_resource(
   deps=[],
   resource_deps=['db-push', 'redis', 'nats'],
   readiness_probe=probe(
-    http_get=http_get_action(port=int(port('API_GATEWAY_PORT', '3005')), path='/api/health'),
+    http_get=http_get_action(port=int(port('API_GATEWAY_PORT', '3005')), path='/api/health/ready'),
     period_secs=10,
   ),
   links=[local_url('API_GATEWAY_PORT', '3005', '/api/graphql')],

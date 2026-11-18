@@ -1,101 +1,104 @@
 'use client';
 
+import { extractGraphQLErrorCode, gql, useMutation } from '@roviq/graphql';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@roviq/ui';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { storeImpersonation } from '@web/components/impersonation/impersonation-storage';
+import { useSearchParams } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
+import { useEffect, useRef, useState } from 'react';
+import { ExchangeImpersonationCodeDocument } from './page.generated';
 
-const EXCHANGE_CODE_MUTATION = `
+export const EXCHANGE_IMPERSONATION_CODE = gql`
   mutation ExchangeImpersonationCode($code: String!) {
     exchangeImpersonationCode(code: $code) {
       accessToken
-      user { id username }
-      institute { id name }
+      user {
+        id
+        username
+        firstName
+        lastName
+      }
     }
   }
 `;
 
+/** A code that was already used, never existed or belongs to an ended session. */
+const SPENT_CODE_ERRORS = new Set(['IMPERSONATION_CODE_EXPIRED', 'IMPERSONATION_SESSION_INVALID']);
+
+const { impersonationExchange: ids } = testIds;
+
 export default function ImpersonatePage() {
   const tAuth = useTranslations('auth');
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const locale = useLocale();
   const code = searchParams.get('code');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [exchange] = useMutation(ExchangeImpersonationCodeDocument);
+  // The code is single-use: a second run (React strict mode, a re-render) would spend
+  // it a second time and show "expired" for a session that just opened.
+  const started = useRef(false);
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     if (!code) {
       setError(tAuth('noImpersonationCode'));
-      setLoading(false);
       return;
     }
 
-    async function exchangeCode() {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-        const response = await fetch(`${apiUrl}/api/graphql`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: EXCHANGE_CODE_MUTATION,
-            variables: { code },
-          }),
-        });
-
-        const result = await response.json();
-
-        if (result.errors) {
-          setError(result.errors[0]?.message || tAuth('codeExpiredOrInvalid'));
-          setLoading(false);
+    exchange({ variables: { code } })
+      .then(({ data }) => {
+        const session = data?.exchangeImpersonationCode;
+        if (!session) {
+          setError(tAuth('impersonationExchangeFailed'));
           return;
         }
+        storeImpersonation(session.accessToken, {
+          username: session.user.username,
+          firstName: session.user.firstName ?? null,
+          lastName: session.user.lastName ?? null,
+        });
+        // A full load, not router.replace: this tab already restored whatever session the
+        // browser holds on this portal, and a client-side move would keep showing that
+        // user's menus and permissions while requests carry the impersonation token.
+        window.location.replace(`/${locale}/dashboard`);
+      })
+      .catch((err: unknown) => {
+        const errorCode = extractGraphQLErrorCode(err);
+        setError(
+          errorCode && SPENT_CODE_ERRORS.has(errorCode)
+            ? tAuth('codeExpiredOrInvalid')
+            : tAuth('impersonationExchangeFailed'),
+        );
+      });
+  }, [code, exchange, locale, tAuth]);
 
-        const { accessToken, user } = result.data.exchangeImpersonationCode;
-
-        // Store impersonation token + user name in sessionStorage (NOT localStorage)
-        // Dies with the tab — clean separation from main session
-        sessionStorage.setItem('roviq-impersonation-token', accessToken);
-        if (user?.username) {
-          sessionStorage.setItem('roviq-impersonation-user-name', user.username);
-        }
-
-        // Redirect to institute dashboard
-        router.replace('/dashboard');
-      } catch {
-        setError(tAuth('impersonationExchangeFailed'));
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    exchangeCode();
-  }, [code, router, tAuth]);
-
-  if (loading) {
+  if (!error) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">{tAuth('establishingImpersonation')}</p>
+      <div className="flex min-h-screen items-center justify-center" aria-busy="true">
+        <p className="text-muted-foreground" data-testid={ids.loading}>
+          {tAuth('establishingImpersonation')}
+        </p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>{tAuth('impersonationFailed')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-destructive">{error}</p>
-            <Button onClick={() => window.close()} variant="outline">
-              {tAuth('closeTab')}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>{tAuth('impersonationFailed')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p role="alert" className="text-destructive" data-testid={ids.error}>
+            {error}
+          </p>
+          <Button onClick={() => window.close()} variant="outline" data-testid={ids.closeBtn}>
+            {tAuth('closeTab')}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

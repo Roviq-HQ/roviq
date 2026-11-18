@@ -14,6 +14,8 @@ import { AdminInstituteService } from './institute/admin-institute.service';
 import { AdminInstituteSubscriptionResolver } from './institute/admin-institute.subscription';
 import { AdminInstituteFieldResolver } from './institute/admin-institute-field.resolver';
 import { AdminInstituteGroupResolver } from './institute-group/admin-institute-group.resolver';
+import { AdminMonitoringModule } from './monitoring/admin-monitoring.module';
+import { AdminTenantAnalyticsModule } from './monitoring/tenant-analytics/admin-tenant-analytics.module';
 import { AdminResellerResolver } from './reseller/admin-reseller.resolver';
 import { AdminResellerService } from './reseller/admin-reseller.service';
 import { AdminResellerSubscriptionResolver } from './reseller/admin-reseller.subscription';
@@ -28,6 +30,8 @@ import { AdminUserModule } from './user/admin-user.module';
     InstituteModule, // provides InstituteService for admin institute operations
     AdminUserModule,
     AdminAttendanceModule, // cross-tenant attendance summary (ROV admin attendance view)
+    AdminMonitoringModule, // system health + tenant analytics (ROV-184)
+    AdminTenantAnalyticsModule,
   ],
   providers: [
     AdminResellerService,

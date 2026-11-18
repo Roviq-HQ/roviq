@@ -663,3 +663,10 @@ A browser pass on the slot 0 machine was impossible. `requestAnimationFrame` nev
 ## 2026-11-18 — diagnosed: `pnpm typecheck` beside the Tilt `web` server corrupts the Turbopack cache
 
 After `pnpm typecheck` (which runs `web:build`) ran while Tilt served `web`, every page request hung. `pnpm tilt logs web` showed `Failed to restore task data (corrupted database or bug)` and `Failed to open SST file …/apps/web/.next/dev/cache/turbopack/…sst`. `pnpm tilt trigger web` restarted the server and it served again. Same cause as the `api-gateway` entry of 2026-11-17: a hand-run build shares output folders with the running dev servers.
+
+
+## 2026-11-18 — fixed: `platform-membership-backfill` "should leave institute-role memberships untouched" failed one run in several
+
+The test read every membership twice inside one transaction, before and after the backfill, and compared the lists. At the default READ COMMITTED level each read sees rows other integration files commit in between, so parallel specs that create or delete test institutes changed the count (152 vs 154, 195 vs 196). The comparison now covers only the memberships of the two seeded institutes, which no other file commits to (`m0-schema-constraints` writes there only inside a rolled-back transaction), and the reads are ordered by id. A first attempt ran the transaction at REPEATABLE READ instead; that made the other tests in the file fail with serialization errors whenever a parallel spec updated a row their inserts reference, so it was dropped.
+
+**Verification:** with a second session committing and deleting memberships in a loop, the old version failed and the fixed one passed; the full integration suite passed afterwards.

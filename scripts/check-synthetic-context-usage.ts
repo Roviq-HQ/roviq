@@ -34,6 +34,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts',
   'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.loaders.ts',
+  // ROV-184: integration fixtures (refresh tokens) for the tenant analytics query.
+  'apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
   'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
@@ -120,6 +122,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-290: isolated reseller/group fixtures and direct group-link assertions only.
   'apps/api-gateway/src/reseller/institute-group/__tests__/reseller-institute-group.integration.spec.ts',
   'apps/api-gateway/src/reseller/team/reseller-team.service.ts',
+  // ROV-101 fixture: reads the teacher role's stored name to compare with the API.
+  'apps/api-gateway/src/reseller/user/__tests__/user-listing-roles.integration.spec.ts',
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',

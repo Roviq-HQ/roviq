@@ -73,7 +73,10 @@ export class AdminUserMembershipModel {
   @Field(() => ID)
   roleId!: string;
 
-  @Field(() => I18nTextScalar, { nullable: true })
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: 'Name of the role this membership holds; null if the role has been deleted.',
+  })
   roleName?: I18nContent | null;
 
   @Field(() => MembershipStatus)

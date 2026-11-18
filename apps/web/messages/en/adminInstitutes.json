@@ -106,7 +106,13 @@
       "username": "Username",
       "email": "Email",
       "roles": "Role",
-      "status": "Status"
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "SUSPENDED": "Suspended",
+      "LOCKED": "Locked"
     }
   },
   "config": {

@@ -4,6 +4,7 @@ import enAcademicYears from '../../messages/en/academicYears.json';
 import enAccount from '../../messages/en/account.json';
 import enAdminAttendance from '../../messages/en/adminAttendance.json';
 import enAdminInstitutes from '../../messages/en/adminInstitutes.json';
+import enAdminMonitoring from '../../messages/en/adminMonitoring.json';
 import enAdminResellers from '../../messages/en/adminResellers.json';
 import enAdminUsers from '../../messages/en/adminUsers.json';
 import enAdmission from '../../messages/en/admission.json';
@@ -23,6 +24,7 @@ import enGeography from '../../messages/en/geography.json';
 import enGroups from '../../messages/en/groups.json';
 import enGuardians from '../../messages/en/guardians.json';
 import enHoliday from '../../messages/en/holiday.json';
+import enImpersonation from '../../messages/en/impersonation.json';
 import enImpersonationSessions from '../../messages/en/impersonationSessions.json';
 import enInstituteBilling from '../../messages/en/instituteBilling.json';
 import enInstituteGroups from '../../messages/en/instituteGroups.json';
@@ -34,6 +36,7 @@ import enNotifications from '../../messages/en/notifications.json';
 import enObservability from '../../messages/en/observability.json';
 import enProfile from '../../messages/en/profile.json';
 import enResellerInstitutes from '../../messages/en/resellerInstitutes.json';
+import enRoles from '../../messages/en/roles.json';
 import enSelectInstitute from '../../messages/en/selectInstitute.json';
 import enSessions from '../../messages/en/sessions.json';
 import enSettings from '../../messages/en/settings.json';
@@ -45,6 +48,7 @@ import hiAcademicYears from '../../messages/hi/academicYears.json';
 import hiAccount from '../../messages/hi/account.json';
 import hiAdminAttendance from '../../messages/hi/adminAttendance.json';
 import hiAdminInstitutes from '../../messages/hi/adminInstitutes.json';
+import hiAdminMonitoring from '../../messages/hi/adminMonitoring.json';
 import hiAdminResellers from '../../messages/hi/adminResellers.json';
 import hiAdminUsers from '../../messages/hi/adminUsers.json';
 import hiAdmission from '../../messages/hi/admission.json';
@@ -64,6 +68,7 @@ import hiGeography from '../../messages/hi/geography.json';
 import hiGroups from '../../messages/hi/groups.json';
 import hiGuardians from '../../messages/hi/guardians.json';
 import hiHoliday from '../../messages/hi/holiday.json';
+import hiImpersonation from '../../messages/hi/impersonation.json';
 import hiImpersonationSessions from '../../messages/hi/impersonationSessions.json';
 import hiInstituteBilling from '../../messages/hi/instituteBilling.json';
 import hiInstituteGroups from '../../messages/hi/instituteGroups.json';
@@ -75,6 +80,7 @@ import hiNotifications from '../../messages/hi/notifications.json';
 import hiObservability from '../../messages/hi/observability.json';
 import hiProfile from '../../messages/hi/profile.json';
 import hiResellerInstitutes from '../../messages/hi/resellerInstitutes.json';
+import hiRoles from '../../messages/hi/roles.json';
 import hiSelectInstitute from '../../messages/hi/selectInstitute.json';
 import hiSessions from '../../messages/hi/sessions.json';
 import hiSettings from '../../messages/hi/settings.json';
@@ -89,6 +95,7 @@ const en = {
   attendance: enAttendance,
   adminAttendance: enAdminAttendance,
   adminInstitutes: enAdminInstitutes,
+  adminMonitoring: enAdminMonitoring,
   adminResellers: enAdminResellers,
   adminUsers: enAdminUsers,
   admission: enAdmission,
@@ -107,6 +114,7 @@ const en = {
   groups: enGroups,
   guardians: enGuardians,
   holiday: enHoliday,
+  impersonation: enImpersonation,
   impersonationSessions: enImpersonationSessions,
   instituteBilling: enInstituteBilling,
   instituteGroups: enInstituteGroups,
@@ -118,6 +126,7 @@ const en = {
   observability: enObservability,
   profile: enProfile,
   resellerInstitutes: enResellerInstitutes,
+  roles: enRoles,
   selectInstitute: enSelectInstitute,
   sessions: enSessions,
   settings: enSettings,
@@ -133,6 +142,7 @@ const hi = {
   attendance: hiAttendance,
   adminAttendance: hiAdminAttendance,
   adminInstitutes: hiAdminInstitutes,
+  adminMonitoring: hiAdminMonitoring,
   adminResellers: hiAdminResellers,
   adminUsers: hiAdminUsers,
   admission: hiAdmission,
@@ -151,6 +161,7 @@ const hi = {
   groups: hiGroups,
   guardians: hiGuardians,
   holiday: hiHoliday,
+  impersonation: hiImpersonation,
   impersonationSessions: hiImpersonationSessions,
   instituteBilling: hiInstituteBilling,
   instituteGroups: hiInstituteGroups,
@@ -162,6 +173,7 @@ const hi = {
   observability: hiObservability,
   profile: hiProfile,
   resellerInstitutes: hiResellerInstitutes,
+  roles: hiRoles,
   selectInstitute: hiSelectInstitute,
   sessions: hiSessions,
   settings: hiSettings,
