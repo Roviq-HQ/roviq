@@ -23,7 +23,8 @@ import { and, count, desc, eq, ilike, inArray, isNull, or, type SQL, sql } from 
 import type Redis from 'ioredis';
 import { AuthEventService } from '../../auth/auth-event.service';
 import { IdentityService } from '../../auth/identity.service';
-import { REDIS_KEYS } from '../../auth/redis-keys';
+import { invalidateImpersonationSessions } from '../../auth/impersonation-session-cache';
+import { blockResellerAccess, clearResellerAccess } from '../../auth/reseller-access-cache';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { AdminCreateResellerInput } from './dto/admin-create-reseller.input';
 import type { AdminListResellersFilterInput } from './dto/admin-list-resellers-filter.input';
@@ -348,12 +349,11 @@ export class AdminResellerService {
   // ── Existing lifecycle mutations (preserved from ROV-97) ────
 
   async suspendReseller(resellerId: string, actorId: string, reason?: string): Promise<void> {
-    const { record, previousStatus } = await withAdmin(
+    const { record, previousStatus, staffUserIds, endedSessionIds } = await withAdmin(
       this.db,
       mkAdminCtx('service:admin-reseller'),
       async (tx) => {
-        // 1. Verify reseller exists and is not a system reseller
-        const [reseller] = await tx.select().from(resellers).where(eq(resellers.id, resellerId)); // allow-base-read: admin suspend may target trashed (TODO: validate)
+        const [reseller] = await tx.select().from(resellers).where(eq(resellers.id, resellerId)); // allow-base-read: a deleted reseller must answer RESELLER_INVALID, not NOT_FOUND
         if (!reseller)
           throw new BusinessException(ErrorCode.RESELLER_NOT_FOUND, 'Reseller not found');
         if (reseller.isSystem)
@@ -374,92 +374,86 @@ export class AdminResellerService {
           );
         }
 
-        // 2. Update reseller status to suspended
+        const now = new Date();
         const [updated] = await tx
           .update(resellers)
           .set({
             status: ResellerStatus.SUSPENDED,
-            suspendedAt: new Date(),
+            suspendedAt: now,
             isActive: false,
             updatedBy: actorId,
           })
           .where(eq(resellers.id, resellerId))
           .returning();
 
-        // 3. Get all reseller staff user IDs
-        const staffRows = await tx
-          .select({ userId: resellerMembershipsLive.userId })
+        const staff = await tx
+          .select({ id: resellerMembershipsLive.id, userId: resellerMembershipsLive.userId })
           .from(resellerMembershipsLive)
           .where(eq(resellerMembershipsLive.resellerId, resellerId));
-        const staffUserIds = staffRows.map((s) => s.userId);
+        const staffUserIds = [...new Set(staff.map((s) => s.userId))];
 
-        if (staffUserIds.length > 0) {
-          // 4. Revoke all refresh tokens for reseller staff (scope = 'reseller')
+        let endedSessionIds: string[] = [];
+        if (staff.length > 0) {
+          // By membership, not by user: the same person's institute sessions must survive.
+          // The reason matters — a NULL reason reads as token theft on the next refresh
+          // and revokes every other session the user has.
           await tx
             .update(refreshTokens)
-            .set({ revokedAt: new Date() })
+            .set({ revokedAt: now, revokedReason: 'admin_revoked', updatedBy: actorId })
             .where(
               and(
-                inArray(refreshTokens.userId, staffUserIds),
+                inArray(
+                  refreshTokens.membershipId,
+                  staff.map((s) => s.id),
+                ),
                 eq(refreshTokens.membershipScope, 'reseller'),
                 isNull(refreshTokens.revokedAt),
               ),
             );
 
-          // 5. Terminate active impersonation sessions by reseller staff
-          const activeSessions = await tx
-            .select({ id: impersonationSessions.id })
-            .from(impersonationSessions)
+          const ended = await tx
+            .update(impersonationSessions)
+            .set({ endedAt: now, endedReason: 'revoked' })
             .where(
               and(
                 inArray(impersonationSessions.impersonatorId, staffUserIds),
+                eq(impersonationSessions.impersonatorScope, 'reseller'),
                 isNull(impersonationSessions.endedAt),
               ),
-            );
-
-          if (activeSessions.length > 0) {
-            const sessionIds = activeSessions.map((s) => s.id);
-
-            await tx
-              .update(impersonationSessions)
-              .set({
-                endedAt: new Date(),
-                endedReason: 'revoked',
-              })
-              .where(inArray(impersonationSessions.id, sessionIds));
-
-            // Invalidate Redis cache for impersonation sessions
-            await this.redis.del(
-              ...activeSessions.map((s) => `${REDIS_KEYS.IMPERSONATION_SESSION}${s.id}`),
-            );
-
-            for (const session of activeSessions) {
-              this.authEventService
-                .emit({
-                  userId: actorId,
-                  type: 'impersonation_end',
-                  scope: 'platform',
-                  metadata: { session_id: session.id, ended_reason: 'revoked' },
-                })
-                .catch(() => {});
-            }
-          }
-
-          // 6. Emit auth events for each affected staff member
-          for (const userId of staffUserIds) {
-            this.authEventService
-              .emit({
-                userId,
-                type: 'all_sessions_revoked',
-                metadata: { reason: 'reseller_suspended', resellerId, suspensionReason: reason },
-              })
-              .catch(() => {});
-          }
+            )
+            .returning({ id: impersonationSessions.id });
+          endedSessionIds = ended.map((s) => s.id);
         }
 
-        return { record: updated, previousStatus: reseller.status };
+        return { record: updated, previousStatus: reseller.status, staffUserIds, endedSessionIds };
       },
     );
+
+    // After the commit, so a rolled-back suspension locks nobody out.
+    await Promise.all([
+      blockResellerAccess(this.redis, resellerId),
+      invalidateImpersonationSessions(this.redis, endedSessionIds),
+    ]);
+
+    for (const sessionId of endedSessionIds) {
+      this.authEventService
+        .emit({
+          userId: actorId,
+          type: 'impersonation_end',
+          scope: 'platform',
+          metadata: { session_id: sessionId, ended_reason: 'revoked' },
+        })
+        .catch(() => {});
+    }
+    for (const userId of staffUserIds) {
+      this.authEventService
+        .emit({
+          userId,
+          type: 'all_sessions_revoked',
+          metadata: { reason: 'reseller_suspended', resellerId, suspensionReason: reason },
+        })
+        .catch(() => {});
+    }
 
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.status_changed, {
       ...record,
@@ -503,6 +497,8 @@ export class AdminResellerService {
         .returning();
       return updated;
     });
+
+    await clearResellerAccess(this.redis, resellerId);
 
     this.eventBus.emit(EVENT_PATTERNS.RESELLER.status_changed, {
       ...record,
@@ -556,7 +552,7 @@ export class AdminResellerService {
         // 4. Reassign institutes to "Roviq Direct" system reseller
         await tx
           .update(institutes)
-          .set({ resellerId: DEFAULT_RESELLER_ID })
+          .set({ resellerId: DEFAULT_RESELLER_ID, updatedBy: actorId })
           .where(eq(institutes.resellerId, resellerId));
 
         const deletedAt = new Date();

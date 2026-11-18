@@ -35,6 +35,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.loaders.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
+  'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
   'apps/api-gateway/src/admin/reseller/admin-reseller.service.ts',
   'apps/api-gateway/src/admin/user/admin-user.service.ts',
   'apps/api-gateway/src/audit/repositories/audit-partition.drizzle-repository.ts',
@@ -45,6 +46,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/auth/identity.service.ts',
   'apps/api-gateway/src/auth/impersonation.service.ts',
   'apps/api-gateway/src/auth/middleware/impersonation-session.guard.ts',
+  // ROV-97: global guard reads the reseller's status before any resolver runs.
+  'apps/api-gateway/src/auth/middleware/reseller-access.guard.ts',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts',
   'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts',
   'apps/api-gateway/src/auth/repositories/refresh-token.drizzle-repository.ts',

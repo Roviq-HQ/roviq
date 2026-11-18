@@ -13,6 +13,7 @@ import { authEvents, impersonationSessions, mkAdminCtx, withAdmin } from '@roviq
 import { REDIS_CLIENT } from '@roviq/redis';
 import {
   cleanupTestInstitute,
+  cleanupTestReseller,
   cleanupTestTeacher,
   createInMemoryRedis,
   createInstituteToken,
@@ -20,6 +21,7 @@ import {
   createPlatformToken,
   createResellerToken,
   createTestInstitute,
+  createTestReseller,
   createTestTeacher,
   gqlRequest,
   type IntegrationAppResult,
@@ -420,8 +422,10 @@ describe('Impersonation (integration)', () => {
 
   describe('reseller → institute', () => {
     it('refuses a reseller whose token is for another reseller than the institute owner', async () => {
-      const response = await gqlRequest(result.httpServer, {
-        query: `
+      const otherReseller = await createTestReseller(result.db);
+      try {
+        const response = await gqlRequest(result.httpServer, {
+          query: `
           mutation Start($targetUserId: String!, $targetTenantId: String!, $reason: String!) {
             resellerStartImpersonation(
               targetUserId: $targetUserId
@@ -430,22 +434,25 @@ describe('Impersonation (integration)', () => {
             ) { code requiresOtp sessionId }
           }
         `,
-        variables: {
-          targetUserId: teacher.userId,
-          targetTenantId: tenant.tenantId,
-          reason: REASON,
-        },
-        token: createResellerToken({
-          sub: randomUUID(),
-          resellerId: randomUUID(),
-          membershipId: randomUUID(),
-          roleId: SEED_IDS.ROLE_RESELLER_SUPPORT_ADMIN,
-        }),
-      });
+          variables: {
+            targetUserId: teacher.userId,
+            targetTenantId: tenant.tenantId,
+            reason: REASON,
+          },
+          token: createResellerToken({
+            sub: otherReseller.userId,
+            resellerId: otherReseller.resellerId,
+            membershipId: otherReseller.membershipId,
+            roleId: otherReseller.roleId,
+          }),
+        });
 
-      expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
-      expect(response.errors?.[0]?.message).toBe('Institute does not belong to your reseller');
-      expect(response.data).toBeNull();
+        expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+        expect(response.errors?.[0]?.message).toBe('Institute does not belong to your reseller');
+        expect(response.data).toBeNull();
+      } finally {
+        await cleanupTestReseller(result.db, otherReseller);
+      }
     });
   });
 

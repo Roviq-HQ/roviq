@@ -1,8 +1,7 @@
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
-import { type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -13,14 +12,11 @@ import {
 import { REDIS_CLIENT } from '@roviq/redis';
 import { eq } from 'drizzle-orm';
 import type Redis from 'ioredis';
+import { tombstoneKey as tombstoneKeyOf } from '../impersonation-session-cache';
 import { REDIS_KEYS } from '../redis-keys';
+import { readRequestTokenClaims } from './request-token-claims';
 
 const SESSION_CACHE_TTL = 60; // 60 second cache
-/** Tombstone suffix appended to IMPERSONATION_SESSION keys. Set by
- *  `endImpersonation` to defeat the DB→cache race described in the guard
- *  JSDoc. No dedicated constant in REDIS_KEYS — the prefix + ':tombstone'
- *  naming is self-documenting and only used in two call sites. */
-const TOMBSTONE_SUFFIX = ':tombstone';
 
 interface ImpersonationTokenClaims {
   isImpersonated?: boolean;
@@ -76,7 +72,7 @@ export class ImpersonationSessionGuard implements CanActivate {
 
     const sessionId = claims.impersonationSessionId;
     const cacheKey = `${REDIS_KEYS.IMPERSONATION_SESSION}${sessionId}`;
-    const tombstoneKey = `${cacheKey}${TOMBSTONE_SUFFIX}`;
+    const tombstoneKey = tombstoneKeyOf(sessionId);
 
     // Tombstone check — wins any race with a concurrent cache write.
     const tombstone = await this.redis.get(tombstoneKey);
@@ -135,54 +131,13 @@ export class ImpersonationSessionGuard implements CanActivate {
     return true;
   }
 
-  /**
-   * Resolves impersonation claims from two sources, in order:
-   *
-   *   1. `req.user` (AuthUser) — set by passport-jwt on HTTP, or copied
-   *      from the WS `extra.user` by the app.module.ts GraphQL context
-   *      wrapper. This is the primary source and the ONLY one available
-   *      for subscriptions (WS has no Authorization header).
-   *
-   *   2. Bearer header — fallback for HTTP requests reaching this guard
-   *      before passport-jwt has run (APP_GUARD ordering). Token is
-   *      signature-verified with JWT_SECRET; failure returns `null` and
-   *      lets `GqlAuthGuard` reject the request downstream.
-   *
-   * Returns `null` when neither source yields impersonation claims —
-   * meaning the guard treats the request as "not impersonation, not our
-   * problem".
-   */
   private extractImpersonationClaims(context: ExecutionContext): ImpersonationTokenClaims | null {
-    const gqlCtx = GqlExecutionContext.create(context).getContext();
-    const req = (gqlCtx?.req ?? context.switchToHttp().getRequest()) as
-      | {
-          user?: AuthUser;
-          headers?: Record<string, string | string[] | undefined>;
-        }
-      | undefined;
-
-    // Source 1 — authenticated AuthUser (HTTP passport-jwt OR WS extra.user).
-    const user = req?.user;
-    if (user) {
-      if (!user.isImpersonated || !user.impersonationSessionId) return null;
-      return {
-        isImpersonated: user.isImpersonated,
-        impersonationSessionId: user.impersonationSessionId,
-      };
-    }
-
-    // Source 2 — Bearer header fallback (HTTP, pre-passport-jwt).
-    const header = req?.headers?.authorization;
-    const raw = Array.isArray(header) ? header[0] : header;
-    if (!raw?.toLowerCase().startsWith('bearer ')) return null;
-    const token = raw.slice(7).trim();
-    if (!token) return null;
-    try {
-      return this.jwtService.verify<ImpersonationTokenClaims>(token, {
-        secret: this.config.getOrThrow<string>('JWT_SECRET'),
-      });
-    } catch {
-      return null;
-    }
+    const claims = readRequestTokenClaims(
+      context,
+      this.jwtService,
+      this.config.getOrThrow<string>('JWT_SECRET'),
+    );
+    if (!claims?.isImpersonated || !claims.impersonationSessionId) return null;
+    return claims;
   }
 }

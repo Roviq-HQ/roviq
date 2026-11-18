@@ -44,7 +44,7 @@ interface StagedRow {
 
 interface TxStages {
   resellerRows?: StagedRow[];
-  staffRows?: { userId: string }[];
+  staffRows?: { id: string; userId: string }[];
   sessionRows?: { id: string }[];
   instituteRows?: { id: string }[];
   /** Rows to return in sequence from additional selects (slug conflict, role lookup) */
@@ -116,8 +116,12 @@ function createTxMock(stages: TxStages) {
         where: (cond: unknown) => {
           whereFn(cond);
           return Object.assign(Promise.resolve(), {
-            returning: () =>
-              Promise.resolve(primaryReseller ? [{ ...primaryReseller, ...values }] : []),
+            returning: () => {
+              if (tableName === 'impersonation_sessions') {
+                return Promise.resolve(stages.sessionRows ?? []);
+              }
+              return Promise.resolve(primaryReseller ? [{ ...primaryReseller, ...values }] : []);
+            },
           });
         },
       };
@@ -202,6 +206,7 @@ describe('AdminResellerService', () => {
     });
     redis = createMock<Redis>({
       del: vi.fn().mockResolvedValue(1),
+      set: vi.fn().mockResolvedValue('OK'),
     });
     eventBus = createMock<EventBusService>({
       emit: vi.fn(),
@@ -276,7 +281,10 @@ describe('AdminResellerService', () => {
     it('suspends reseller, revokes tokens, terminates impersonation, emits events', async () => {
       const { tx, calls } = createTxMock({
         resellerRows: [{ id: NORMAL_RESELLER_ID, isSystem: false, status: ResellerStatus.ACTIVE }],
-        staffRows: [{ userId: 'staff-1' }, { userId: 'staff-2' }],
+        staffRows: [
+          { id: 'membership-1', userId: 'staff-1' },
+          { id: 'membership-2', userId: 'staff-2' },
+        ],
         sessionRows: [{ id: 'session-1' }],
       });
       setTx(tx);
@@ -291,6 +299,10 @@ describe('AdminResellerService', () => {
       expect(resellerUpdate.values.updatedBy).toBe(ACTOR_ID);
 
       expect(calls.updateRefreshTokens).toHaveBeenCalledTimes(1);
+      const tokenUpdate = calls.updateRefreshTokens.mock.calls[0][0];
+      expect(tokenUpdate.values.revokedAt).toBeInstanceOf(Date);
+      // Any other reason (or none) makes the next refresh look like token theft.
+      expect(tokenUpdate.values.revokedReason).toBe('admin_revoked');
       expect(calls.updateImpersonation).toHaveBeenCalledTimes(1);
       expect(calls.updateImpersonation.mock.calls[0][0].values.endedReason).toBe('revoked');
 
@@ -318,7 +330,25 @@ describe('AdminResellerService', () => {
         }),
       );
 
-      expect(redis.del).toHaveBeenCalled();
+      expect(redis.del).toHaveBeenCalledWith('impersonation-session:session-1');
+      expect(redis.set).toHaveBeenCalledWith(
+        'impersonation-session:session-1:tombstone',
+        '1',
+        'EX',
+        70,
+      );
+      expect(redis.set).toHaveBeenCalledWith(
+        `auth:reseller-access:${NORMAL_RESELLER_ID}`,
+        'blocked',
+        'EX',
+        60,
+      );
+      expect(redis.set).toHaveBeenCalledWith(
+        `auth:reseller-access:${NORMAL_RESELLER_ID}:blocked`,
+        '1',
+        'EX',
+        70,
+      );
     });
 
     it('suspends reseller with no staff (no token revocation, still emits status_changed)', async () => {
@@ -334,6 +364,14 @@ describe('AdminResellerService', () => {
       expect(calls.updateRefreshTokens).not.toHaveBeenCalled();
       expect(calls.updateImpersonation).not.toHaveBeenCalled();
       expect(authEventService.emit).not.toHaveBeenCalled();
+      expect(redis.del).not.toHaveBeenCalled();
+      // Staff added later must not slip through on a cached "allowed".
+      expect(redis.set).toHaveBeenCalledWith(
+        `auth:reseller-access:${NORMAL_RESELLER_ID}:blocked`,
+        '1',
+        'EX',
+        70,
+      );
       expect(eventBus.emit).toHaveBeenCalledWith(
         'RESELLER.status_changed',
         expect.objectContaining({ newStatus: ResellerStatus.SUSPENDED }),
@@ -401,6 +439,10 @@ describe('AdminResellerService', () => {
       expect(update.status).toBe(ResellerStatus.ACTIVE);
       expect(update.suspendedAt).toBeNull();
       expect(update.isActive).toBe(true);
+      expect(redis.del).toHaveBeenCalledWith(
+        `auth:reseller-access:${NORMAL_RESELLER_ID}`,
+        `auth:reseller-access:${NORMAL_RESELLER_ID}:blocked`,
+      );
 
       expect(eventBus.emit).toHaveBeenCalledWith(
         'RESELLER.status_changed',

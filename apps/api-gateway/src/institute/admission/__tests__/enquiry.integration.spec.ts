@@ -22,6 +22,7 @@ import {
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  RESELLER_DIRECT_ID,
 } from '@roviq/testing/integration';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
@@ -158,7 +159,7 @@ const FAKE_RESELLER = {
   USER: '00000000-0000-7000-a000-000000000aaa',
   MEMBERSHIP: '00000000-0000-7000-a000-000000000aab',
   ROLE: '00000000-0000-7000-a000-000000000aac',
-  RESELLER: '00000000-0000-7000-a000-000000000aad',
+  RESELLER: RESELLER_DIRECT_ID,
 } as const;
 
 describe('Admission enquiries (integration)', () => {

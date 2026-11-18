@@ -137,6 +137,25 @@ A missing, malformed, unknown, expired or reused ticket closes the socket with c
 - `revokeAllOtherSessions` — revoke every refresh token for the user EXCEPT the caller's current one (reason `user_initiated`). The caller keeps working on the same token; crucially, the `user_initiated` reason means a stale client replaying one of the killed tokens will hit `Refresh token revoked` without triggering the rotation-reuse cascade (see [Token Refresh](#token-refresh)), so the caller's keep-alive session is not collaterally killed.
 - `changePassword` — in addition to clearing the password, revokes every refresh token for the user with reason `password_change`. Cascading is deliberately suppressed for the same reason: a late client retry after a password change should just fail, not replay-attack-cascade.
 
+## Reseller suspension and deletion (ROV-97)
+
+Platform admins suspend, unsuspend and delete resellers through `adminSuspendReseller`, `adminUnsuspendReseller` and `adminDeleteReseller` (`apps/api-gateway/src/admin/reseller/`). The system reseller "Roviq Direct" refuses all three with `SYSTEM_RESELLER_PROTECTED`.
+
+**Suspension** cuts off the reseller's staff at once:
+
+- Every reseller-scope refresh token of the reseller's memberships is revoked with reason `admin_revoked`. The reason is required: a revoked token with no reason is treated as token theft on its next use and revokes every other session of that user. Tokens are matched by membership, so the same person's institute sessions are untouched.
+- Access tokens already issued are rejected by `ResellerAccessGuard`, a global guard that checks the reseller's status on every reseller-scope request and answers `UNAUTHENTICATED`. Without it a suspended reseller's staff could keep working until their access token expired (up to 10 minutes). The guard caches the answer in Redis for 60 seconds; suspension writes a `blocked` marker that the guard checks first, so there is no wait for the cache to expire.
+- Impersonation sessions the staff opened as reseller are ended with reason `revoked`, and `ImpersonationSessionGuard` rejects their tokens on the next request (`IMPERSONATION_ENDED`).
+- `resellerLogin` and `refreshToken` refuse a reseller that is not `ACTIVE`. Login answers `INVALID_CREDENTIALS`, the same as a wrong password, so it does not confirm the password.
+
+Institute users of a suspended reseller are not affected. Their institute-scope tokens also carry a `resellerId`, and the guard ignores them on purpose.
+
+**Unsuspending** restores login. Sessions revoked by the suspension stay revoked, so staff sign in again.
+
+**Deletion** needs the reseller to have been suspended for at least 30 days (`GRACE_PERIOD_NOT_ELAPSED` otherwise). It moves the reseller's institutes to Roviq Direct, soft-deletes its memberships and roles, and marks the reseller `DELETED`.
+
+Tests: `apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts` (sessions) and `e2e/api-gateway-e2e/src/admin-reseller-lifecycle.api-e2e.spec.ts` (state guards).
+
 ## Active session management (ROV-100)
 
 All three portals expose `/en/{scope}/settings/sessions` (`admin`, `reseller`, `institute`; Hindi uses `/hi/`). The shared session hook reads tokens from the current scope's storage at request time, including after refresh-token rotation. Impersonated tabs cannot use the original account's refresh token for session management.
