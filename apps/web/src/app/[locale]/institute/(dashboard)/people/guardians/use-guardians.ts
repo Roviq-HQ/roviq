@@ -7,6 +7,7 @@
  * frontend via `useI18nField()` — never by the server.
  */
 
+import type { ApolloCache, ObservableQuery } from '@apollo/client';
 import { gql, useMutation, useQuery } from '@roviq/graphql';
 import type {
   AuditLog,
@@ -178,13 +179,42 @@ const LINK_GUARDIAN_TO_STUDENT = gql`
 `;
 
 /**
- * Shared hook for the link-guardian-to-student mutation. Used by both the
- * guardian detail page (Children tab) and the student detail page (Guardians
- * tab). Refetches both list queries so whichever tab the user is on updates
- * in place. `awaitRefetchQueries: true` keeps the submit button in its
- * "Linking…" state until the refetch completes, so the new row is visible
- * the instant the dialog closes — no empty-for-a-frame flicker.
+ * Refetches a mounted query after a link change. A query whose component
+ * unmounts meanwhile (the unlinked row and the dialog inside it) is aborted;
+ * that is not a failed link or unlink, so it must not reject the mutation.
  */
+export function refetchUnlessUnmounted(observableQuery: Pick<ObservableQuery, 'refetch'>) {
+  return observableQuery.refetch().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === 'AbortError') return undefined;
+    throw error;
+  });
+}
+
+// Every list that shows a link: both tabs, the guardian list's linked-student
+// count and the student list's primary guardian.
+const LINK_FIELDS = ['listLinkedStudents', 'listStudentGuardians', 'listGuardians', 'listStudents'];
+
+/**
+ * Marks the link lists stale and refetches only the mounted queries that read
+ * them. Naming queries in `refetchQueries` warns when one is not mounted (the
+ * person popup mounts only one side), and evicting would blank the list for a
+ * frame. Unmounted lists refresh on their next mount (`cache-and-network`).
+ * `awaitRefetchQueries` keeps the dialog busy until the visible list is fresh.
+ */
+const REFRESH_LINK_LISTS = {
+  update: (cache: ApolloCache) => {
+    for (const field of LINK_FIELDS) {
+      cache.modify({
+        id: 'ROOT_QUERY',
+        fields: { [field]: (_value, { INVALIDATE }) => INVALIDATE },
+      });
+    }
+  },
+  onQueryUpdated: refetchUnlessUnmounted,
+  awaitRefetchQueries: true,
+} as const;
+
+/** Link-guardian-to-student, shared by the guardian Children tab and the student Guardians tab. */
 export function useLinkGuardianToStudent() {
   return useMutation<
     {
@@ -197,10 +227,7 @@ export function useLinkGuardianToStudent() {
       };
     },
     { input: LinkGuardianMutationInput }
-  >(LINK_GUARDIAN_TO_STUDENT, {
-    refetchQueries: ['InstituteGuardianLinkedStudents', 'InstituteStudentGuardians'],
-    awaitRefetchQueries: true,
-  });
+  >(LINK_GUARDIAN_TO_STUDENT, REFRESH_LINK_LISTS);
 }
 
 const UNLINK_GUARDIAN_FROM_STUDENT = gql`
@@ -213,16 +240,7 @@ export function useUnlinkGuardianFromStudent() {
   return useMutation<
     { unlinkGuardianFromStudent: boolean },
     { input: UnlinkGuardianMutationInput }
-  >(UNLINK_GUARDIAN_FROM_STUDENT, {
-    // List rows show the primary guardian and linked-student counts too.
-    refetchQueries: [
-      'InstituteGuardianLinkedStudents',
-      'InstituteStudentGuardians',
-      'InstituteStudents',
-      'InstituteGuardians',
-    ],
-    awaitRefetchQueries: true,
-  });
+  >(UNLINK_GUARDIAN_FROM_STUDENT, REFRESH_LINK_LISTS);
 }
 
 // ─── Student picker (for "Link to student" dialog) ───────────────────────

@@ -194,6 +194,7 @@ const detailMessages = {
       primaryFor: '{count, plural, one {Primary for # child} other {Primary for # children}}',
     },
     profile: {
+      ...baseGuardianMessages.detail.profile,
       firstName: 'First name',
       lastName: 'Last name',
       occupation: 'Occupation',

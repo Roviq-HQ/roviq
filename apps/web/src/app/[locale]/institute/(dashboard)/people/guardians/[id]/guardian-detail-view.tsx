@@ -460,10 +460,7 @@ function GuardianProfileTab({
           className="space-y-6"
         >
           <FieldSet>
-            <FieldLegend>
-              <UserRound className="size-4" />
-              {t('detail.tabs.profile')}
-            </FieldLegend>
+            <FieldLegend>{t('detail.profile.nameSection')}</FieldLegend>
             <FieldGroup className="grid gap-4 sm:grid-cols-2">
               <I18nField form={form} name="firstName" label={t('detail.profile.firstName')} />
               <I18nField form={form} name="lastName" label={t('detail.profile.lastName')} />
@@ -873,7 +870,7 @@ function LinkStudentDialog({
           <Field>
             <FieldLabel>{t('detail.children.linkDialog.relationshipLabel')}</FieldLabel>
             <Select
-              value={relationship || undefined}
+              value={relationship}
               onValueChange={(v) => setRelationship(v as GuardianRelationship)}
             >
               <SelectTrigger

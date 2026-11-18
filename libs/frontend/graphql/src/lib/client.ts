@@ -185,6 +185,9 @@ export function createApolloClient(config: ApolloClientConfig) {
       SubscriptionPlanModel: { keyFields: ['id'] },
       SubscriptionModel: { keyFields: ['id'] },
       InvoiceModel: { keyFields: ['id'] },
+      // Link rows have no `id`; without a key a refetch replaces them unmerged.
+      GuardianLinkedStudentModel: { keyFields: ['linkId'] },
+      StudentGuardianModel: { keyFields: ['linkId'] },
       Query: {
         fields: {
           auditLogs: relayStylePagination(['filter']),

@@ -142,7 +142,8 @@
       "saved": "Guardian profile updated",
       "concurrencyError": "Someone else modified this guardian. Refresh and try again.",
       "refresh": "Refresh",
-      "saveFailed": "Couldn't save the guardian profile"
+      "saveFailed": "Couldn't save the guardian profile",
+      "nameSection": "Name"
     },
     "lastUpdated": "Last updated {date}"
   },

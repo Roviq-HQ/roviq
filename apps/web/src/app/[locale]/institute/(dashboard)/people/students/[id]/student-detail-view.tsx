@@ -1702,7 +1702,7 @@ function LinkGuardianDialog({
           <Field>
             <FieldLabel>{t('detail.guardians.linkDialog.relationshipLabel')}</FieldLabel>
             <Select
-              value={relationship || undefined}
+              value={relationship}
               onValueChange={(v) => setRelationship(v as GuardianRelationship)}
             >
               <SelectTrigger data-testid={instituteStudents.detailLinkGuardianRelationshipSelect}>
