@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { DRIZZLE_DB, type DrizzleDB } from '@roviq/database';
 import { sql } from 'drizzle-orm';
-import { type ProbeResult, runProbe } from './probe';
+import { logProbeFailure, type ProbeResult, runProbe } from './probe';
 
 @Injectable()
 export class PostgresHealthIndicator {
@@ -20,8 +20,8 @@ export class PostgresHealthIndicator {
   async isHealthy(): Promise<HealthIndicatorResult<'postgres'>> {
     const indicator = this.healthIndicatorService.check('postgres');
     const result = await this.probe();
-    return result.up
-      ? indicator.up({ responseMs: result.responseMs })
-      : indicator.down({ message: result.error });
+    if (result.up) return indicator.up({ responseMs: result.responseMs });
+    logProbeFailure('postgres', result);
+    return indicator.down();
   }
 }

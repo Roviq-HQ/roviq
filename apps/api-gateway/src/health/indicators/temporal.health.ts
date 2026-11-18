@@ -2,7 +2,7 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { Connection } from '@temporalio/client';
-import { PROBE_TIMEOUT_MS, type ProbeResult, runProbe } from './probe';
+import { logProbeFailure, PROBE_TIMEOUT_MS, type ProbeResult, runProbe } from './probe';
 
 const SERVING = 1;
 
@@ -33,9 +33,9 @@ export class TemporalHealthIndicator implements OnModuleDestroy {
   async isHealthy(): Promise<HealthIndicatorResult<'temporal'>> {
     const indicator = this.healthIndicatorService.check('temporal');
     const result = await this.probe();
-    return result.up
-      ? indicator.up({ responseMs: result.responseMs })
-      : indicator.down({ message: result.error });
+    if (result.up) return indicator.up({ responseMs: result.responseMs });
+    logProbeFailure('temporal', result);
+    return indicator.down();
   }
 
   async onModuleDestroy(): Promise<void> {
