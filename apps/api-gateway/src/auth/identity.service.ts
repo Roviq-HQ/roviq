@@ -19,6 +19,7 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
+import { eq, or } from 'drizzle-orm';
 
 export interface CreateUserInput {
   /** Email address (placeholder allowed for system-created users without one). */
@@ -95,6 +96,21 @@ export class IdentityService {
     private readonly eventBus: EventBusService,
     // private readonly authEventService: AuthEventService, // TODO: Add this back in when we have a way to emit the event
   ) {}
+
+  /**
+   * The user whose email or Roviq ID equals `login`, soft-deleted ones included:
+   * both columns stay globally unique after deletion, so a deleted owner still blocks it.
+   */
+  async findUserByLogin(login: string): Promise<{ userId: string; isDeleted: boolean } | null> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .select({ id: users.id, deletedAt: users.deletedAt })
+        .from(users) // allow-base-read: a soft-deleted user still owns its email and username
+        .where(or(eq(users.email, login), eq(users.username, login)))
+        .limit(1),
+    );
+    return row ? { userId: row.id, isDeleted: row.deletedAt !== null } : null;
+  }
 
   async createUser(input: CreateUserInput): Promise<CreateUserResult> {
     const tempPassword = randomBytes(16).toString('base64url');
@@ -225,7 +241,7 @@ export class IdentityService {
     });
 
     if (!input.skipWelcomeNotification) {
-      this.emitWelcomeNotification({
+      this.sendWelcomeNotification({
         userId: userResult.userId,
         username: input.username,
         email: input.email,
@@ -242,7 +258,8 @@ export class IdentityService {
     return { ...userResult, ...membership };
   }
 
-  private emitWelcomeNotification(payload: {
+  /** Welcome message carrying the temp password; for callers that create the user and membership separately. */
+  sendWelcomeNotification(payload: {
     userId: string;
     username: string;
     email: string;

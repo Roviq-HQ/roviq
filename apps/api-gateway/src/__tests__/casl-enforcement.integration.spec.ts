@@ -187,7 +187,7 @@ describe('CASL @CheckAbility enforcement', () => {
 
     it('platform_support cannot suspend a reseller (no suspend:Reseller)', async () => {
       const response = await gqlRequest(result.httpServer, {
-        query: `mutation { adminSuspendReseller(resellerId: "${FAKE_ID}") }`,
+        query: `mutation { adminSuspendReseller(resellerId: "${FAKE_ID}") { id } }`,
         token: supportToken,
       });
       expect(response.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');

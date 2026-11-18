@@ -5,8 +5,8 @@
  *   - ROV-97 lifecycle: suspend / unsuspend / delete (system protection,
  *     state-machine guards, 30-day grace period, NATS event emission,
  *     canonical RESELLER.status_changed event)
- *   - ROV-234 management: create slug duplicates, update system protection,
- *     changeTier guards
+ *   - ROV-234 management: create (slug duplicates, linking an existing admin
+ *     user), versioned update, changeTier guards, real counts on every result
  *
  * The Drizzle transaction chain is mocked via a fluent test double whose
  * terminal calls resolve to the rows staged for each test. `.returning()`
@@ -14,10 +14,16 @@
  * incoming `.set()` values — good enough to cover the paths the service
  * walks without spinning up a real Postgres.
  */
-import { BusinessException, ErrorCode, ResellerStatus, ResellerTier } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  IndianState,
+  ResellerStatus,
+  ResellerTier,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
-import { getTableName } from 'drizzle-orm';
+import { getTableName, SQL } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthEventService } from '../../../auth/auth-event.service';
@@ -51,6 +57,10 @@ interface TxStages {
   extraSelectRows?: unknown[][];
   /** Row returned by insert().returning() — used by create() */
   insertedReseller?: StagedRow;
+  /** Rows the grouped count queries return, keyed by base table name */
+  countRows?: { institutes?: number; reseller_memberships?: number };
+  /** False simulates a version mismatch: the reseller UPDATE matches no row */
+  updateMatches?: boolean;
 }
 
 function createTxMock(stages: TxStages) {
@@ -95,9 +105,28 @@ function createTxMock(stages: TxStages) {
     }
   };
 
+  const tableNameOf = (table: unknown): string => {
+    const name =
+      typeof table === 'object' && table !== null ? String(getTableName(table as never)) : '';
+    return name.endsWith('_live') ? name.slice(0, -5) : name;
+  };
+
+  const countRowsFor = (table: unknown) => {
+    const name = tableNameOf(table);
+    const counted =
+      name === 'institutes' || name === 'reseller_memberships'
+        ? stages.countRows?.[name]
+        : undefined;
+    const resellerId = primaryReseller?.id ?? stages.insertedReseller?.id ?? 'new-reseller-id';
+    return counted === undefined ? [] : [{ resellerId, count: counted }];
+  };
+
   const makeSelectChain = () => ({
     from: (table: unknown) => ({
-      where: () => Promise.resolve(resolveSelectRows(table)),
+      where: () =>
+        Object.assign(Promise.resolve(resolveSelectRows(table)), {
+          groupBy: () => Promise.resolve(countRowsFor(table)),
+        }),
     }),
   });
 
@@ -117,7 +146,11 @@ function createTxMock(stages: TxStages) {
           whereFn(cond);
           return Object.assign(Promise.resolve(), {
             returning: () =>
-              Promise.resolve(primaryReseller ? [{ ...primaryReseller, ...values }] : []),
+              Promise.resolve(
+                primaryReseller && stages.updateMatches !== false
+                  ? [{ ...primaryReseller, ...values }]
+                  : [],
+              ),
           });
         },
       };
@@ -208,12 +241,12 @@ describe('AdminResellerService', () => {
       emit: vi.fn(),
     });
     identityService = createMock<IdentityService>({
-      createUserWithMembership: vi.fn().mockResolvedValue({
-        userId: 'new-user-id',
-        tempPassword: 'temp-pass',
-        membershipId: 'new-membership-id',
-        scope: 'reseller',
-      }),
+      findUserByLogin: vi.fn().mockResolvedValue(null),
+      createUser: vi.fn().mockResolvedValue({ userId: 'new-user-id', tempPassword: 'temp-pass' }),
+      createMembership: vi
+        .fn()
+        .mockResolvedValue({ membershipId: 'new-membership-id', scope: 'reseller' }),
+      sendWelcomeNotification: vi.fn(),
     });
 
     service = new AdminResellerService(
@@ -567,6 +600,7 @@ describe('AdminResellerService', () => {
       const { tx, calls } = createTxMock({
         resellerRows: [], // no slug conflict
         insertedReseller,
+        countRows: { reseller_memberships: 1 },
       });
       setTx(tx);
 
@@ -602,32 +636,90 @@ describe('AdminResellerService', () => {
       ]);
       expect(roleValues.map((r) => r.scope)).toEqual(['reseller', 'reseller', 'reseller']);
 
-      // IdentityService provisioned with correct args
-      expect(identityService.createUserWithMembership).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'admin@acme.test',
-          username: 'admin@acme.test',
-          scope: 'reseller',
-          resellerId: 'new-reseller-id',
-          roleId: 'role-reseller_full_admin',
-          actorId: ACTOR_ID,
-        }),
+      expect(identityService.createUser).toHaveBeenCalledWith({
+        email: 'admin@acme.test',
+        username: 'admin@acme.test',
+        actorId: ACTOR_ID,
+      });
+      expect(identityService.createMembership).toHaveBeenCalledWith({
+        userId: 'new-user-id',
+        scope: 'reseller',
+        resellerId: 'new-reseller-id',
+        roleId: 'role-reseller_full_admin',
+        actorId: ACTOR_ID,
+      });
+      expect(identityService.sendWelcomeNotification).toHaveBeenCalledWith({
+        userId: 'new-user-id',
+        username: 'admin@acme.test',
+        email: 'admin@acme.test',
+        tempPassword: 'temp-pass',
+        scope: 'reseller',
+        resellerId: 'new-reseller-id',
+      });
+
+      expect(eventBus.emit).toHaveBeenCalledWith('RESELLER.created', {
+        ...insertedReseller,
+        instituteCount: 0,
+        teamSize: 1,
+        scope: 'platform',
+      });
+      expect(result).toEqual({ ...insertedReseller, instituteCount: 0, teamSize: 1 });
+    });
+
+    it('links an existing user with that email and sends no welcome message', async () => {
+      vi.mocked(identityService.findUserByLogin).mockResolvedValue({
+        userId: 'existing-user-id',
+        isDeleted: false,
+      });
+      const { tx } = createTxMock({ resellerRows: [] });
+      setTx(tx);
+
+      await service.create(
+        { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: 'taken@acme.test' },
+        ACTOR_ID,
       );
 
-      // Event includes counts (0 for new reseller)
-      expect(eventBus.emit).toHaveBeenCalledWith(
-        'RESELLER.created',
-        expect.objectContaining({
-          id: 'new-reseller-id',
-          instituteCount: 0,
-          teamSize: 0,
-          scope: 'platform',
-        }),
-      );
+      expect(identityService.createUser).not.toHaveBeenCalled();
+      expect(identityService.createMembership).toHaveBeenCalledWith({
+        userId: 'existing-user-id',
+        scope: 'reseller',
+        resellerId: 'new-reseller-id',
+        roleId: 'role-reseller_viewer',
+        actorId: ACTOR_ID,
+      });
+      expect(identityService.sendWelcomeNotification).not.toHaveBeenCalled();
+    });
 
-      // Return value includes counts
-      expect(result.instituteCount).toBe(0);
-      expect(result.teamSize).toBe(0);
+    it('throws RESELLER_ADMIN_EMAIL_UNAVAILABLE for a deleted user and creates nothing', async () => {
+      vi.mocked(identityService.findUserByLogin).mockResolvedValue({
+        userId: 'deleted-user-id',
+        isDeleted: true,
+      });
+      const { tx, calls } = createTxMock({ resellerRows: [] });
+      setTx(tx);
+
+      await expect(
+        service.create(
+          { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: 'gone@acme.test' },
+          ACTOR_ID,
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE });
+      expect(calls.insertReseller).not.toHaveBeenCalled();
+      expect(identityService.createUser).not.toHaveBeenCalled();
+    });
+
+    it('checks the slug before creating any user', async () => {
+      const { tx } = createTxMock({ resellerRows: [{ id: 'other', slug: 'acme' }] });
+      setTx(tx);
+
+      await expect(
+        service.create(
+          { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: 'a@acme.test' },
+          ACTOR_ID,
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.SLUG_DUPLICATE });
+      expect(identityService.findUserByLogin).not.toHaveBeenCalled();
+      expect(identityService.createUser).not.toHaveBeenCalled();
     });
 
     it('throws SLUG_DUPLICATE when slug is already taken', async () => {
@@ -663,9 +755,13 @@ describe('AdminResellerService', () => {
         ACTOR_ID,
       );
 
-      expect(identityService.createUserWithMembership).toHaveBeenCalledWith(
-        expect.objectContaining({ resellerId: 'new-reseller-id', roleId }),
-      );
+      expect(identityService.createMembership).toHaveBeenCalledWith({
+        userId: 'new-user-id',
+        scope: 'reseller',
+        resellerId: 'new-reseller-id',
+        roleId,
+        actorId: ACTOR_ID,
+      });
     });
   });
 
@@ -676,7 +772,7 @@ describe('AdminResellerService', () => {
       });
       setTx(tx);
 
-      const promise = service.update(SYSTEM_RESELLER_ID, { name: 'Renamed' }, ACTOR_ID);
+      const promise = service.update(SYSTEM_RESELLER_ID, { version: 1, name: 'Renamed' }, ACTOR_ID);
       await expect(promise).rejects.toMatchObject({ code: ErrorCode.SYSTEM_RESELLER_PROTECTED });
     });
 
@@ -687,7 +783,7 @@ describe('AdminResellerService', () => {
       setTx(tx);
 
       await expect(
-        service.update(NORMAL_RESELLER_ID, { name: 'Renamed' }, ACTOR_ID),
+        service.update(NORMAL_RESELLER_ID, { version: 1, name: 'Renamed' }, ACTOR_ID),
       ).rejects.toMatchObject({ code: ErrorCode.RESELLER_INVALID });
     });
 
@@ -701,17 +797,50 @@ describe('AdminResellerService', () => {
             name: 'Old Name',
           },
         ],
+        countRows: { institutes: 4 },
       });
       setTx(tx);
 
-      await service.update(NORMAL_RESELLER_ID, { name: 'New Name' }, ACTOR_ID);
+      const result = await service.update(
+        NORMAL_RESELLER_ID,
+        {
+          version: 3,
+          name: 'New Name',
+          registrationNumber: 'U72900RJ2024PTC012345',
+          registrationState: IndianState.RAJASTHAN,
+          customDomain: null,
+        },
+        ACTOR_ID,
+      );
 
       expect(calls.updateReseller).toHaveBeenCalledTimes(1);
-      expect(calls.updateReseller.mock.calls[0][0].values.name).toBe('New Name');
+      const { version, ...values } = calls.updateReseller.mock.calls[0][0].values;
+      expect(values).toEqual({
+        name: 'New Name',
+        registrationNumber: 'U72900RJ2024PTC012345',
+        registrationState: IndianState.RAJASTHAN,
+        customDomain: null,
+        updatedBy: ACTOR_ID,
+      });
+      expect(version).toBeInstanceOf(SQL);
+      expect(result.instituteCount).toBe(4);
       expect(eventBus.emit).toHaveBeenCalledWith(
         'RESELLER.updated',
-        expect.objectContaining({ name: 'New Name', actorId: ACTOR_ID }),
+        expect.objectContaining({ name: 'New Name', instituteCount: 4, actorId: ACTOR_ID }),
       );
+    });
+
+    it('throws CONCURRENT_MODIFICATION when the version no longer matches', async () => {
+      const { tx } = createTxMock({
+        resellerRows: [{ id: NORMAL_RESELLER_ID, isSystem: false, status: ResellerStatus.ACTIVE }],
+        updateMatches: false,
+      });
+      setTx(tx);
+
+      await expect(
+        service.update(NORMAL_RESELLER_ID, { version: 1, name: 'Late' }, ACTOR_ID),
+      ).rejects.toMatchObject({ code: ErrorCode.CONCURRENT_MODIFICATION });
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
   });
 

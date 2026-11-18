@@ -329,7 +329,12 @@ type AdminResellerEdge {
 
 """Platform-admin view of a reseller account"""
 type AdminResellerModel {
+  """Registered address"""
+  address: InstituteAddressObject
   branding: ResellerBrandingModel
+
+  """Business contact phones and emails"""
+  contact: InstituteContactObject!
   createdAt: DateTime!
 
   """Custom vanity domain (deferred — placeholder for PRD §23.4)"""
@@ -349,6 +354,12 @@ type AdminResellerModel {
   isSystem: Boolean!
   name: String!
 
+  """Company / business registration number (e.g. CIN or GSTIN)"""
+  registrationNumber: String
+
+  """State the business is registered in"""
+  registrationState: IndianState
+
   """
   URL-safe slug, globally unique. Immutable after creation (changing it breaks URLs).
   """
@@ -364,13 +375,52 @@ type AdminResellerModel {
   teamSize: Int!
   tier: ResellerTier!
   updatedAt: DateTime!
+
+  """Optimistic concurrency version — pass it back to adminUpdateReseller"""
+  version: Int!
+}
+
+"""A staff member of a reseller, as seen by a platform admin"""
+type AdminResellerTeamMemberModel {
+  email: String!
+  firstName: I18nText
+
+  """reseller_memberships.id"""
+  id: ID!
+  isActive: Boolean!
+  joinedAt: DateTime!
+
+  """
+  Latest login, token refresh or institute switch; null if never signed in
+  """
+  lastActiveAt: DateTime
+  lastName: I18nText
+  roleName: I18nText
+  userId: ID!
+
+  """Roviq ID"""
+  username: String!
 }
 
 """Payload for adminUpdateReseller — slug and tier are not updatable here"""
 input AdminUpdateResellerInput {
+  """Pass null to clear"""
+  address: InstituteAddressInput
   branding: AdminResellerBrandingInput
+  contact: InstituteContactInput
+
+  """Pass null to clear the custom domain"""
   customDomain: String
   name: String
+
+  """Pass null to clear"""
+  registrationNumber: String
+
+  """Pass null to clear"""
+  registrationState: IndianState
+
+  """Optimistic concurrency version — must match the current server value"""
+  version: Int!
 }
 
 """A postal address of a user"""
@@ -888,6 +938,11 @@ input AuditLogFilterInput {
   Filter impersonated entries by the impersonator's originating scope (platform, reseller, institute).
   """
   impersonatorScope: [String!]
+
+  """
+  Filter to one reseller's activity: its own staff's actions, actions inside its current institutes, and platform actions on the reseller itself.
+  """
+  resellerId: ID
 
   """
   Filter by the scope the action was performed in (platform, reseller, institute).
@@ -3644,7 +3699,7 @@ type Mutation {
   adminDeleteInstituteGroup(id: ID!): Boolean!
 
   """Delete a suspended reseller after 30-day grace period"""
-  adminDeleteReseller(resellerId: String!): Boolean!
+  adminDeleteReseller(resellerId: String!): AdminResellerModel!
 
   """Discard a dead-lettered message without replaying it"""
   adminDiscardDlqMessage(id: ID!): DlqMessageModel!
@@ -3673,13 +3728,15 @@ type Mutation {
   adminSuspendInstituteGroup(id: ID!): InstituteGroupModel!
 
   """Suspend a reseller and revoke all staff sessions"""
-  adminSuspendReseller(reason: String, resellerId: String!): Boolean!
+  adminSuspendReseller(reason: String, resellerId: String!): AdminResellerModel!
 
   """Unsuspend a previously suspended reseller (reactivates staff login)"""
-  adminUnsuspendReseller(resellerId: String!): Boolean!
+  adminUnsuspendReseller(resellerId: String!): AdminResellerModel!
   adminUpdateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
 
-  """Update mutable reseller fields (name, branding, customDomain)"""
+  """
+  Update reseller profile fields (name, branding, domain, registration, contact, address)
+  """
   adminUpdateReseller(id: ID!, input: AdminUpdateResellerInput!): AdminResellerModel!
   adminVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
 
@@ -4361,12 +4418,22 @@ type Query {
   adminListInstitutes(filter: AdminListInstitutesFilterInput): InstituteConnection!
 
   """
+  Staff (reseller_memberships) of one reseller, read-only for platform admins
+  """
+  adminListResellerTeam(resellerId: ID!): [AdminResellerTeamMemberModel!]!
+
+  """
   Platform admin: list resellers with cursor pagination, search, and filters
   """
   adminListResellers(filter: AdminListResellersFilterInput): AdminResellerConnection!
 
   """List all users, newest first, with search and filters (platform admin)"""
   adminListUsers(filter: AdminListUsersFilterInput): AdminUserConnection!
+
+  """
+  Platform admin: one reseller's billing summary (MRR, subscriptions, overdue)
+  """
+  adminResellerBillingDashboard(resellerId: ID!): BillingDashboardModel!
 
   """
   Typeahead search for users by name, username, email or phone (platform admin)

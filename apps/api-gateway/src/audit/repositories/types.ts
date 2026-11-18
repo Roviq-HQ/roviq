@@ -61,6 +61,8 @@ export interface FindAuditLogsParams {
   /** Reseller scope: set resellerId for RLS via withReseller */
   resellerId?: string;
   filter?: {
+    /** One reseller's activity — see AuditLogFilterInput.resellerId. */
+    resellerId?: string;
     entityType?: string;
     entityId?: string;
     userId?: string;

@@ -7,9 +7,14 @@
  * via codegen.
  */
 import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { ResellerStatus, ResellerTier } from '@roviq/common-types';
-import { DateTimeScalar } from '@roviq/nestjs-graphql';
+import { IndianState, ResellerStatus, ResellerTier } from '@roviq/common-types';
+import type { I18nContent } from '@roviq/database';
+import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import { createConnectionType } from '../../../common/pagination/relay-pagination.model';
+import {
+  InstituteAddressObject,
+  InstituteContactObject,
+} from '../../../institute/management/models/institute.model';
 
 registerEnumType(ResellerTier, {
   name: 'ResellerTier',
@@ -85,6 +90,26 @@ export class AdminResellerModel {
   })
   customDomain?: string | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description: 'Company / business registration number (e.g. CIN or GSTIN)',
+  })
+  registrationNumber?: string | null;
+
+  @Field(() => IndianState, { nullable: true, description: 'State the business is registered in' })
+  registrationState?: IndianState | null;
+
+  @Field(() => InstituteContactObject, { description: 'Business contact phones and emails' })
+  contact!: Record<string, unknown>;
+
+  @Field(() => InstituteAddressObject, { nullable: true, description: 'Registered address' })
+  address?: Record<string, unknown> | null;
+
+  @Field(() => Int, {
+    description: 'Optimistic concurrency version — pass it back to adminUpdateReseller',
+  })
+  version!: number;
+
   @Field(() => DateTimeScalar, {
     nullable: true,
     description: 'Timestamp of most recent suspension; null when active',
@@ -112,6 +137,42 @@ export class AdminResellerModel {
     description: 'Number of active reseller_memberships (staff accounts) for this reseller',
   })
   teamSize!: number;
+}
+
+@ObjectType({ description: 'A staff member of a reseller, as seen by a platform admin' })
+export class AdminResellerTeamMemberModel {
+  @Field(() => ID, { description: 'reseller_memberships.id' })
+  id!: string;
+
+  @Field(() => ID)
+  userId!: string;
+
+  @Field(() => String, { description: 'Roviq ID' })
+  username!: string;
+
+  @Field(() => String)
+  email!: string;
+
+  @Field(() => I18nTextScalar, { nullable: true })
+  firstName?: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true })
+  lastName?: I18nContent | null;
+
+  @Field(() => I18nTextScalar, { nullable: true })
+  roleName?: I18nContent | null;
+
+  @Field(() => Boolean)
+  isActive!: boolean;
+
+  @Field(() => DateTimeScalar)
+  joinedAt!: Date;
+
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description: 'Latest login, token refresh or institute switch; null if never signed in',
+  })
+  lastActiveAt?: Date | null;
 }
 
 export const { ConnectionType: AdminResellerConnection, EdgeType: AdminResellerEdge } =

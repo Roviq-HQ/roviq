@@ -16,7 +16,7 @@ import {
   withReseller,
   withTenant,
 } from '@roviq/database';
-import { and, count, desc, eq, gte, inArray, isNotNull, lte, type SQL, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, lte, or, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { AuditQueryRepository, type AuthEventRow } from './audit-query.repository';
 import type { AuditLogQueryResult, AuditLogRow, FindAuditLogsParams } from './types';
@@ -62,6 +62,21 @@ function buildAuditConditions(
     );
   }
 
+  if (filter?.resellerId) {
+    const resellerId = filter.resellerId;
+    const resellerActivity = or(
+      eq(auditLogs.resellerId, resellerId),
+      and(
+        eq(auditLogs.scope, 'institute'),
+        inArray(
+          auditLogs.tenantId,
+          sql`(SELECT id FROM ${institutes} WHERE ${institutes.resellerId} = ${resellerId})`,
+        ),
+      ),
+      and(eq(auditLogs.scope, 'platform'), eq(auditLogs.entityId, resellerId)),
+    );
+    if (resellerActivity) conditions.push(resellerActivity);
+  }
   if (filter?.entityType) conditions.push(eq(auditLogs.entityType, filter.entityType));
   if (filter?.entityId) conditions.push(eq(auditLogs.entityId, filter.entityId));
   if (filter?.userId) conditions.push(eq(auditLogs.userId, filter.userId));
