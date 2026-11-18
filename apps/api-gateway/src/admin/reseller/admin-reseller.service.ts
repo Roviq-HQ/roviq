@@ -253,20 +253,8 @@ export class AdminResellerService {
 
     // Resolve the admin before the reseller exists, so a failure leaves nothing half-made
     // and a retry with the same email links the user created by the failed attempt.
-    const existing = await this.identityService.findUserByLogin(input.initialAdminEmail);
-    if (existing?.isDeleted) {
-      throw new BusinessException(
-        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
-        'This email belongs to a deleted account and cannot be reused',
-      );
-    }
-    const admin: { userId: string; tempPassword: string | null } = existing
-      ? { userId: existing.userId, tempPassword: null }
-      : await this.identityService.createUser({
-          email: input.initialAdminEmail,
-          username: input.initialAdminEmail,
-          actorId,
-        });
+    const email = input.initialAdminEmail.trim().toLowerCase();
+    const admin = await this.resolveInitialAdmin(email, actorId);
 
     const { reseller, roleId } = await withAdmin(
       this.db,
@@ -305,8 +293,8 @@ export class AdminResellerService {
     if (admin.tempPassword) {
       this.identityService.sendWelcomeNotification({
         userId: admin.userId,
-        username: input.initialAdminEmail,
-        email: input.initialAdminEmail,
+        username: email,
+        email,
         tempPassword: admin.tempPassword,
         scope: 'reseller',
         resellerId: reseller.id,
@@ -735,6 +723,38 @@ export class AdminResellerService {
   private async withCounts(record: ResellerRow) {
     const { instituteCount, teamSize } = await this.loadCounts([record.id]);
     return toModel(record, instituteCount.get(record.id) ?? 0, teamSize.get(record.id) ?? 0);
+  }
+
+  /**
+   * Links only an account whose email matches; a Roviq ID that merely equals the address
+   * could belong to someone else, so it blocks the email instead of being linked.
+   */
+  private async resolveInitialAdmin(
+    email: string,
+    actorId: string,
+  ): Promise<{ userId: string; tempPassword: string | null }> {
+    const matches = await this.identityService.findUsersByEmail(email);
+    if (matches.length > 1) {
+      throw new BusinessException(
+        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        'More than one account uses this email',
+      );
+    }
+    const [existing] = matches;
+    if (existing?.isDeleted) {
+      throw new BusinessException(
+        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        'This email belongs to a deleted account and cannot be reused',
+      );
+    }
+    if (existing) return { userId: existing.userId, tempPassword: null };
+    if (await this.identityService.isUsernameTaken(email)) {
+      throw new BusinessException(
+        ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        'This email is already used as the Roviq ID of another account',
+      );
+    }
+    return this.identityService.createUser({ email, username: email, actorId });
   }
 
   private async assertSlugFree(slug: string): Promise<void> {

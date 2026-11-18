@@ -574,7 +574,9 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
 
     afterAll(async () => {
       for (const id of createdIds) await deleteTestReseller(pool, id);
-      await pool.query('DELETE FROM users WHERE email = ANY($1)', [[sharedEmail, deletedEmail]]);
+      await pool.query('DELETE FROM users WHERE email = ANY($1)', [
+        [sharedEmail, deletedEmail, `e2e-owner-${suffix}@roviq.test`],
+      ]);
     });
 
     async function create(slug: string, email: string) {
@@ -608,6 +610,25 @@ describe('Admin Reseller Lifecycle E2E (ROV-97)', () => {
         [createdIds],
       );
       expect(members.rows).toEqual([{ user_id: users.rows[0].id }, { user_id: users.rows[0].id }]);
+    });
+
+    it('does not link an account whose Roviq ID merely equals the email', async () => {
+      const lookalike = `e2e-lookalike-${suffix}@roviq.test`;
+      const owner = await create(`e2e-own-${suffix}`, `e2e-owner-${suffix}@roviq.test`);
+      expect(owner.errors).toBeUndefined();
+      assert(owner.data);
+      createdIds.push(owner.data.adminCreateReseller.id);
+      await pool.query('UPDATE users SET username = $1 WHERE email = $2', [
+        lookalike,
+        `e2e-owner-${suffix}@roviq.test`,
+      ]);
+
+      const slug = `e2e-look-${suffix}`;
+      const res = await create(slug, lookalike);
+      assert(res.errors);
+      expect(res.errors[0].extensions?.code).toBe('RESELLER_ADMIN_EMAIL_UNAVAILABLE');
+      const rows = await pool.query('SELECT 1 FROM resellers WHERE slug = $1', [slug]);
+      expect(rows.rowCount).toBe(0);
     });
 
     it('rejects an email owned by a deleted user and creates nothing', async () => {

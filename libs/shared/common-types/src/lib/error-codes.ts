@@ -88,7 +88,7 @@ export const ErrorCode = {
   INVALID_TIER: 'INVALID_TIER',
   /** Tier change attempted on a non-active reseller (must be unsuspended first) */
   TIER_CHANGE_REQUIRES_ACTIVE: 'TIER_CHANGE_REQUIRES_ACTIVE',
-  /** Initial reseller admin email belongs to a deleted user and cannot be reused */
+  /** Initial reseller admin email is held by a deleted user, by several users, or is another user's Roviq ID */
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: 'RESELLER_ADMIN_EMAIL_UNAVAILABLE',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',

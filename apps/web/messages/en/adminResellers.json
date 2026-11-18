@@ -242,7 +242,7 @@
     "SYSTEM_RESELLER_PROTECTED": "Roviq Direct cannot be modified.",
     "SLUG_DUPLICATE": "This slug is already used by another reseller.",
     "INVALID_SLUG": "Enter a slug, or a name a slug can be made from.",
-    "RESELLER_ADMIN_EMAIL_UNAVAILABLE": "This email belongs to a deleted account and cannot be reused.",
+    "RESELLER_ADMIN_EMAIL_UNAVAILABLE": "This email can't be used for the reseller admin: it belongs to a deleted account or is already another account's Roviq ID.",
     "CONCURRENT_MODIFICATION": "Someone else changed this reseller. The latest details have been loaded; review them and save again.",
     "TIER_CHANGE_REQUIRES_ACTIVE": "Unsuspend the reseller before changing its tier.",
     "INVALID_TIER": "Pick one of the listed tiers.",

@@ -19,7 +19,7 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
-import { eq, or } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export interface CreateUserInput {
   /** Email address (placeholder allowed for system-created users without one). */
@@ -98,18 +98,30 @@ export class IdentityService {
   ) {}
 
   /**
-   * The user whose email or Roviq ID equals `login`, soft-deleted ones included:
-   * both columns stay globally unique after deletion, so a deleted owner still blocks it.
+   * Users whose email equals `email`, ignoring case, soft-deleted ones included: the email
+   * stays globally unique after deletion, so a deleted owner still holds it.
    */
-  async findUserByLogin(login: string): Promise<{ userId: string; isDeleted: boolean } | null> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+  async findUsersByEmail(email: string): Promise<{ userId: string; isDeleted: boolean }[]> {
+    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
       tx
         .select({ id: users.id, deletedAt: users.deletedAt })
-        .from(users) // allow-base-read: a soft-deleted user still owns its email and username
-        .where(or(eq(users.email, login), eq(users.username, login)))
+        .from(users) // allow-base-read: a soft-deleted user still owns its email
+        .where(sql`lower(${users.email}) = lower(${email})`)
+        .orderBy(users.id),
+    );
+    return rows.map((r) => ({ userId: r.id, isDeleted: r.deletedAt !== null }));
+  }
+
+  /** Whether any user, soft-deleted included, already has this Roviq ID. */
+  async isUsernameTaken(username: string): Promise<boolean> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .select({ id: users.id })
+        .from(users) // allow-base-read: a soft-deleted user still owns its username
+        .where(eq(users.username, username))
         .limit(1),
     );
-    return row ? { userId: row.id, isDeleted: row.deletedAt !== null } : null;
+    return row !== undefined;
   }
 
   async createUser(input: CreateUserInput): Promise<CreateUserResult> {

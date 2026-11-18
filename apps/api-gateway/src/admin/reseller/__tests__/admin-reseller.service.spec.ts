@@ -241,7 +241,8 @@ describe('AdminResellerService', () => {
       emit: vi.fn(),
     });
     identityService = createMock<IdentityService>({
-      findUserByLogin: vi.fn().mockResolvedValue(null),
+      findUsersByEmail: vi.fn().mockResolvedValue([]),
+      isUsernameTaken: vi.fn().mockResolvedValue(false),
       createUser: vi.fn().mockResolvedValue({ userId: 'new-user-id', tempPassword: 'temp-pass' }),
       createMembership: vi
         .fn()
@@ -667,10 +668,9 @@ describe('AdminResellerService', () => {
     });
 
     it('links an existing user with that email and sends no welcome message', async () => {
-      vi.mocked(identityService.findUserByLogin).mockResolvedValue({
-        userId: 'existing-user-id',
-        isDeleted: false,
-      });
+      vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
+        { userId: 'existing-user-id', isDeleted: false },
+      ]);
       const { tx } = createTxMock({ resellerRows: [] });
       setTx(tx);
 
@@ -691,10 +691,9 @@ describe('AdminResellerService', () => {
     });
 
     it('throws RESELLER_ADMIN_EMAIL_UNAVAILABLE for a deleted user and creates nothing', async () => {
-      vi.mocked(identityService.findUserByLogin).mockResolvedValue({
-        userId: 'deleted-user-id',
-        isDeleted: true,
-      });
+      vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
+        { userId: 'deleted-user-id', isDeleted: true },
+      ]);
       const { tx, calls } = createTxMock({ resellerRows: [] });
       setTx(tx);
 
@@ -708,6 +707,56 @@ describe('AdminResellerService', () => {
       expect(identityService.createUser).not.toHaveBeenCalled();
     });
 
+    it('refuses an email that is another account Roviq ID instead of linking that account', async () => {
+      vi.mocked(identityService.isUsernameTaken).mockResolvedValue(true);
+      const { tx, calls } = createTxMock({ resellerRows: [] });
+      setTx(tx);
+
+      await expect(
+        service.create(
+          { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: 'x@acme.test' },
+          ACTOR_ID,
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE });
+      expect(identityService.isUsernameTaken).toHaveBeenCalledWith('x@acme.test');
+      expect(identityService.createMembership).not.toHaveBeenCalled();
+      expect(calls.insertReseller).not.toHaveBeenCalled();
+    });
+
+    it('refuses when several accounts share the email in different case', async () => {
+      vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
+        { userId: 'user-a', isDeleted: false },
+        { userId: 'user-b', isDeleted: false },
+      ]);
+      const { tx, calls } = createTxMock({ resellerRows: [] });
+      setTx(tx);
+
+      await expect(
+        service.create(
+          { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: 'x@acme.test' },
+          ACTOR_ID,
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE });
+      expect(calls.insertReseller).not.toHaveBeenCalled();
+    });
+
+    it('looks the email up trimmed and lower-cased and stores it that way', async () => {
+      const { tx } = createTxMock({ resellerRows: [] });
+      setTx(tx);
+
+      await service.create(
+        { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: '  Admin@Acme.TEST ' },
+        ACTOR_ID,
+      );
+
+      expect(identityService.findUsersByEmail).toHaveBeenCalledWith('admin@acme.test');
+      expect(identityService.createUser).toHaveBeenCalledWith({
+        email: 'admin@acme.test',
+        username: 'admin@acme.test',
+        actorId: ACTOR_ID,
+      });
+    });
+
     it('checks the slug before creating any user', async () => {
       const { tx } = createTxMock({ resellerRows: [{ id: 'other', slug: 'acme' }] });
       setTx(tx);
@@ -718,7 +767,7 @@ describe('AdminResellerService', () => {
           ACTOR_ID,
         ),
       ).rejects.toMatchObject({ code: ErrorCode.SLUG_DUPLICATE });
-      expect(identityService.findUserByLogin).not.toHaveBeenCalled();
+      expect(identityService.findUsersByEmail).not.toHaveBeenCalled();
       expect(identityService.createUser).not.toHaveBeenCalled();
     });
 
