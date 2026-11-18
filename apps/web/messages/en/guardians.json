@@ -41,7 +41,7 @@
     "fieldHelp": {
       "educationLevelTitle": "Education level",
       "educationLevelBody": "The highest qualification the guardian has completed. Used for UDISE+ parent-education census and to tailor parent communication (e.g. sending PDF newsletters vs. audio bulletins). Only the category is stored — not the specific degree or university.",
-      "educationLevelOptions": "No formal education — never enrolled in school. Primary — up to Class 5. Secondary — Class 10 or 12 pass. Graduate — any 3 or 4 year bachelor's degree. Post-graduate — master's or above. Professional — MBBS, LLB, CA, and similar chartered qualifications."
+      "educationLevelOptions": "No formal education — never studied at any institute. Primary — up to Class 5. Secondary — Class 10 or 12 pass. Graduate — any 3 or 4 year bachelor's degree. Post-graduate — master's or above. Professional — MBBS, LLB, CA, and similar chartered qualifications."
     },
     "genders": {
       "MALE": "Male",
@@ -115,7 +115,8 @@
         "submitting": "Linking…",
         "cancel": "Cancel",
         "linked": "Student linked to guardian",
-        "primaryWarning": "If the selected student already has a primary contact, marking this guardian as primary will replace the existing one."
+        "primaryWarning": "If the selected student already has a primary contact, marking this guardian as primary will replace the existing one.",
+        "linkFailed": "Couldn't link the student"
       }
     },
     "back": "Back to guardians",
@@ -140,8 +141,11 @@
       "saving": "Saving…",
       "saved": "Guardian profile updated",
       "concurrencyError": "Someone else modified this guardian. Refresh and try again.",
-      "refresh": "Refresh"
-    }
+      "refresh": "Refresh",
+      "saveFailed": "Couldn't save the guardian profile",
+      "nameSection": "Name"
+    },
+    "lastUpdated": "Last updated {date}"
   },
   "fields": {
     "firstName": "First name",
@@ -191,7 +195,7 @@
   "errorLoading": "Failed to load guardians",
   "empty": {
     "title": "No guardians yet",
-    "description": "Guardians are added when students are enrolled",
+    "description": "Add a guardian here, or link one from a student's Guardians tab.",
     "filteredTitle": "No guardians match your search",
     "filteredDescription": "Try a different name or phone number"
   },

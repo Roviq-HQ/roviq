@@ -21,6 +21,7 @@ import {
   mkAdminCtx,
   mkInstituteCtx,
   phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   softDelete,
   studentGuardianLinks,
@@ -34,7 +35,7 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
@@ -90,7 +91,7 @@ export class GuardianService {
       profileImageUrl: userProfilesLive.profileImageUrl,
       gender: userProfilesLive.gender,
       // phone_numbers join (primary phone only)
-      primaryPhone: phoneNumbers.number,
+      primaryPhone: phoneNumbersLive.number,
       // Scalar subquery: count of linked students (excludes soft-deleted links).
       // Cast to int so Drizzle returns `number`, not `string` (PG COUNT returns bigint).
       linkedStudentCount: sql<number>`(
@@ -112,10 +113,10 @@ export class GuardianService {
           .from(guardianProfilesLive)
           .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
           .leftJoin(
-            phoneNumbers,
+            phoneNumbersLive,
             and(
-              eq(phoneNumbers.userId, guardianProfilesLive.userId),
-              eq(phoneNumbers.isPrimary, true),
+              eq(phoneNumbersLive.userId, guardianProfilesLive.userId),
+              eq(phoneNumbersLive.isPrimary, true),
             ),
           )
           .where(eq(guardianProfilesLive.id, id))
@@ -345,9 +346,14 @@ export class GuardianService {
         this.db,
         mkInstituteCtx(tenantId, 'service:guardian'),
         async (tx) => {
+          // Links to already-deleted guardians do not count as another guardian.
           return tx
             .select({ id: studentGuardianLinksLive.id })
             .from(studentGuardianLinksLive)
+            .innerJoin(
+              guardianProfilesLive,
+              eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
+            )
             .where(
               and(
                 eq(studentGuardianLinksLive.studentProfileId, link.studentProfileId),
@@ -518,75 +524,72 @@ export class GuardianService {
   async unlinkFromStudent(input: UnlinkGuardianInput) {
     const tenantId = this.tenantId;
 
-    // Find the link
-    const link = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        return tx
-          .select()
-          .from(studentGuardianLinksLive)
-          .where(
-            and(
-              eq(studentGuardianLinksLive.studentProfileId, input.studentProfileId),
-              eq(studentGuardianLinksLive.guardianProfileId, input.guardianProfileId),
-            ),
-          )
-          .limit(1);
-      },
-    );
-    if (link.length === 0)
-      throw new BusinessException(
-        ErrorCode.GUARDIAN_LINK_NOT_FOUND,
-        'Guardian-student link not found',
-      );
-
-    // If removing primary contact, require replacement
-    if (link[0].isPrimaryContact && !input.newPrimaryGuardianId) {
-      throw new BusinessException(
-        ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
-        'Cannot unlink primary contact without providing newPrimaryGuardianId',
-      );
-    }
-
-    // Check: not the last guardian for this student
-    const allLinks = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        return tx
-          .select({ id: studentGuardianLinksLive.id })
-          .from(studentGuardianLinksLive)
-          .where(eq(studentGuardianLinksLive.studentProfileId, input.studentProfileId));
-      },
-    );
-
-    if (allLinks.length <= 1) {
-      throw new BusinessException(
-        ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
-        'Cannot unlink the last guardian from a student',
-      );
-    }
-
     await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      await softDelete(tx, studentGuardianLinks, link[0].id);
-    });
+      // Locks the student's live links so two concurrent unlinks cannot both
+      // pass the last-guardian check. A link to a deleted guardian is not a
+      // guardian the student still has, so the join drops it.
+      const links = await tx
+        .select({
+          id: studentGuardianLinks.id,
+          guardianProfileId: studentGuardianLinks.guardianProfileId,
+          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
+        })
+        .from(studentGuardianLinks) // allow-base-read: FOR UPDATE row lock, filtered to live rows
+        .innerJoin(
+          guardianProfilesLive,
+          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
+        )
+        .where(
+          and(
+            eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
+            isNull(studentGuardianLinks.deletedAt),
+          ),
+        )
+        .for('update', { of: studentGuardianLinks });
 
-    // If new primary provided, set it
-    if (input.newPrimaryGuardianId) {
-      const newPrimaryId = input.newPrimaryGuardianId;
-      await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
+      const link = links.find((l) => l.guardianProfileId === input.guardianProfileId);
+      if (!link)
+        throw new BusinessException(
+          ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+          'Guardian-student link not found',
+        );
+      if (links.length <= 1)
+        throw new BusinessException(
+          ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
+          'Cannot unlink the last guardian from a student',
+        );
+
+      const replacement = input.newPrimaryGuardianId;
+      if (link.isPrimaryContact && !replacement)
+        throw new BusinessException(
+          ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
+          'Cannot unlink primary contact without providing newPrimaryGuardianId',
+        );
+      const replacementLink = replacement
+        ? links.find((l) => l.guardianProfileId === replacement && l.id !== link.id)
+        : undefined;
+      if (replacement && (!link.isPrimaryContact || !replacementLink))
+        throw new BusinessException(
+          ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID,
+          'newPrimaryGuardianId must be another guardian linked to this student, and only when unlinking the primary contact',
+        );
+
+      // Soft delete first: the one-primary-per-student index ignores deleted rows.
+      await softDelete(tx, studentGuardianLinks, link.id);
+      if (replacementLink) {
         await tx
           .update(studentGuardianLinks)
           .set({ isPrimaryContact: true, updatedBy: this.userId })
-          .where(
-            and(
-              eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
-              eq(studentGuardianLinks.guardianProfileId, newPrimaryId),
-            ),
-          );
-      });
-    }
+          .where(eq(studentGuardianLinks.id, replacementLink.id));
+      }
+    });
+
+    this.eventBus.emit(EVENT_PATTERNS.GUARDIAN.unlinked, {
+      guardianProfileId: input.guardianProfileId,
+      studentProfileId: input.studentProfileId,
+      newPrimaryGuardianId: input.newPrimaryGuardianId ?? null,
+      tenantId,
+    });
 
     return true;
   }

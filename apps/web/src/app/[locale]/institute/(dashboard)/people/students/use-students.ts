@@ -38,6 +38,7 @@ const STUDENT_LIST_FIELDS = `
   currentSectionId
   currentStandardName
   currentSectionName
+  primaryGuardianProfileId
   primaryGuardianFirstName
   primaryGuardianLastName
   admissionDate

@@ -115,6 +115,7 @@ export const EVENT_PATTERNS = {
   },
   GUARDIAN: {
     linked: 'GUARDIAN.linked',
+    unlinked: 'GUARDIAN.unlinked',
   },
   HOLIDAY: {
     created: 'HOLIDAY.created',

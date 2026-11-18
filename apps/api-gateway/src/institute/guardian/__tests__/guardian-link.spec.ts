@@ -227,8 +227,7 @@ describe('GuardianService — unlinkFromStudent last-guardian guard (unit)', () 
   });
 
   it('throws when attempting to unlink the last guardian', async () => {
-    queueResult([{ id: 'link-1', isPrimaryContact: false }]); // find link
-    queueResult([{ id: 'link-1' }]); // allLinks → exactly one
+    queueResult([{ id: 'link-1', guardianProfileId: 'g-1', isPrimaryContact: false }]); // only live link
 
     const err = await service
       .unlinkFromStudent({ guardianProfileId: 'g-1', studentProfileId: 's-1' })

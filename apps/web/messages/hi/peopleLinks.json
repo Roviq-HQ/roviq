@@ -1,0 +1,36 @@
+{
+  "openDetails": "{name} का विवरण खोलें",
+  "dialog": {
+    "studentTitle": "छात्र विवरण",
+    "guardianTitle": "अभिभावक विवरण",
+    "description": "जुड़े हुए छात्र या अभिभावक का विवरण। पिछले पेज पर लौटने के लिए बंद करें।",
+    "back": "वापस",
+    "openFullPage": "पूरा पेज खोलें"
+  },
+  "unlink": {
+    "button": "अनलिंक करें",
+    "buttonTitle": "{guardian} को {student} से अनलिंक करें",
+    "title": "{guardian} को {student} से अनलिंक करें?",
+    "consequence": "{guardian} अब {student} के अभिभावक नहीं रहेंगे, और {student} के लिए पिकअप का अधिकार और अभिभावक पोर्टल की पहुँच खो देंगे। आप उन्हें बाद में फिर से जोड़ सकते हैं।",
+    "primaryNotice": "{guardian} {student} के मुख्य संपर्क हैं। चुनें कि अब मुख्य संपर्क कौन होगा।",
+    "replacementLabel": "नया मुख्य संपर्क",
+    "replacementPlaceholder": "अभिभावक चुनें",
+    "lastGuardian": "{guardian} {student} के एकमात्र अभिभावक हैं। पहले कोई दूसरा अभिभावक जोड़ें, फिर {guardian} को अनलिंक करें।",
+    "confirm": "अनलिंक करें",
+    "unlinking": "अनलिंक हो रहा है…",
+    "cancel": "रद्द करें",
+    "success": "{guardian} को {student} से अनलिंक किया गया",
+    "failed": "{guardian} को अनलिंक नहीं किया जा सका",
+    "errors": {
+      "GUARDIAN_LINK_NOT_FOUND": "{guardian} अब {student} से जुड़े नहीं हैं। पेज रीफ़्रेश करें।",
+      "LAST_GUARDIAN_CANNOT_BE_DELETED": "{student} का कम से कम एक अभिभावक होना ज़रूरी है।",
+      "PRIMARY_GUARDIAN_REQUIRED": "{student} के लिए नया मुख्य संपर्क चुनें।",
+      "REPLACEMENT_PRIMARY_GUARDIAN_INVALID": "चुना गया मुख्य संपर्क {student} से जुड़ा नहीं है। रीफ़्रेश करके फिर से चुनें।"
+    }
+  },
+  "linkErrors": {
+    "GUARDIAN_ALREADY_LINKED": "यह अभिभावक पहले से इस छात्र से जुड़ा है।",
+    "STUDENT_NOT_FOUND": "यह छात्र अब मौजूद नहीं है। पेज रीफ़्रेश करें।",
+    "GUARDIAN_NOT_FOUND": "यह अभिभावक अब मौजूद नहीं है। पेज रीफ़्रेश करें।"
+  }
+}

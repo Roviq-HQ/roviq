@@ -5812,6 +5812,11 @@ type StudentModel {
   previousSchoolName: String
   primaryGuardianFirstName: I18nText
   primaryGuardianLastName: I18nText
+
+  """
+  Guardian profile id of the primary contact, for linking to that guardian
+  """
+  primaryGuardianProfileId: ID
   profileImageUrl: String
   religion: String
   rollNumber: String

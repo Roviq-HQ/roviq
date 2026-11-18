@@ -685,6 +685,15 @@ All three compose files now set `SQL_MAX_CONNS: 10`, `SQL_MAX_IDLE_CONNS: 2`, `S
 
 **Verification:** see the `ci:check` run that follows this entry's commit.
 
+
+## 2026-11-18 — fixed: integration runs exhausted the test Postgres again (system health poll at boot)
+
+`pnpm test:int` and the pre-push `ci:check` failed four to six unrelated files per run (`billing`, `scope-guard-rejection`, `casl-enforcement`, `admission-number-series`, …) with `remaining connection slots are reserved for roles with the SUPERUSER attribute`, the same symptom as the ROV-96 entry above. `SystemHealthService` (ROV-184) ran a health poll in `onModuleInit`: a Postgres `select 1`, uptime writes and probes of the other services, in every integration app at boot. With Temporal holding about 40 of the 100 connections, the parallel forks ran out.
+
+The service now polls only on its timer; `getSystemHealth()` already checks on demand when there is no recent snapshot. The rule from the ROV-96 entry stands: no database work in `onModuleInit` of a provider that every `AppModule` boot loads.
+
+**Verification:** two consecutive `pnpm test:int` runs failed before the change; two consecutive runs passed after it (64 files, 676 tests).
+
 ## 2026-11-18 — diagnosed: a Playwright run started right after a restart of the e2e gateway fails unrelated institute tests (ROV-183, ROV-185)
 
 A `pnpm test:e2e:ui` run failed 17 tests; 9 were institute pages untouched by the branch (`academic-years*.e2e.spec.ts`, `academics.e2e.spec.ts`), each with `net::ERR_CONNECTION_RESET` or `ERR_EMPTY_RESPONSE` on `http://localhost:<e2e API port>/api/graphql` and "Could not load institute languages" on screen. Just before, the e2e gateway had been restarted by hand (`scripts/e2e-compose.sh restart api-gateway`, for the stale `dist/libs` entry above) and was still recompiling; `e2e:up --wait` passed on the container's health check while `nx serve` restarted the process underneath it.

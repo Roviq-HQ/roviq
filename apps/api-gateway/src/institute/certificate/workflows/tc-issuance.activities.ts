@@ -14,7 +14,7 @@ import {
 } from '@roviq/common-types';
 import {
   type DrizzleDB,
-  guardianProfiles,
+  guardianProfilesLive,
   mkAdminCtx,
   mkInstituteCtx,
   studentAcademicsLive,
@@ -375,10 +375,10 @@ export function createTCIssuanceActivities(
             })
             .from(studentGuardianLinksLive)
             .innerJoin(
-              guardianProfiles,
-              eq(studentGuardianLinksLive.guardianProfileId, guardianProfiles.id),
+              guardianProfilesLive,
+              eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
             )
-            .innerJoin(userProfilesLive, eq(guardianProfiles.userId, userProfilesLive.userId))
+            .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId))
             .where(eq(studentGuardianLinksLive.studentProfileId, studentProfileId));
         },
       );

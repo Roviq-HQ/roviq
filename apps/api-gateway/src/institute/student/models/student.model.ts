@@ -214,6 +214,12 @@ export class StudentModel {
    * onto the list row to avoid N+1 lookups on the students table.
    * Resolved from user_profiles joined through guardian_profiles.
    */
+  @Field(() => ID, {
+    nullable: true,
+    description: 'Guardian profile id of the primary contact, for linking to that guardian',
+  })
+  primaryGuardianProfileId?: string | null;
+
   @Field(() => I18nTextScalar, { nullable: true })
   primaryGuardianFirstName?: I18nContent | null;
 
