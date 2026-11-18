@@ -103,6 +103,33 @@ Both dialogs share the same UX contract:
   `awaitRefetchQueries: true`, so the new row is visible the instant the
   dialog closes.
 
+### Unlinking
+
+Both tabs show an **Unlink** button per link (`UnlinkGuardianButton` in
+[unlink-guardian-dialog.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/unlink-guardian-dialog.tsx),
+gated by `update Guardian`). The dialog reads the student's guardians first, so the rules
+`unlinkGuardianFromStudent` enforces are visible before submitting:
+
+- **Only guardian** — Unlink is disabled with an explanation (`LAST_GUARDIAN_CANNOT_BE_DELETED`).
+- **Primary contact** — the user must pick the new primary contact from the student's other
+  guardians (`newPrimaryGuardianId`). The server rejects a replacement that is not another live
+  guardian of that student (`REPLACEMENT_PRIMARY_GUARDIAN_INVALID`), and a replacement sent when
+  the unlinked guardian is not the primary.
+- The service locks the student's live links (`FOR UPDATE`), soft-deletes the link and promotes the
+  replacement in **one transaction**, then emits `GUARDIAN.unlinked`. Links whose guardian profile
+  is deleted do not count as another guardian, in unlink and in `deleteGuardian`.
+
+### Linked-person popup
+
+Every linked student or guardian name (guardian Children tab, student Guardians tab, the student
+list's primary-guardian column) is a `PersonNameLink` from
+[person-detail-dialog.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/person-detail-dialog.tsx).
+It opens the same `StudentDetailView` / `GuardianDetailView` the detail routes render, inside a
+Dialog (Sheet below `lg`), without leaving the page. Names inside the popup swap its content and
+add a **Back** step; **Open full page** goes to the route. `people/layout.tsx` mounts the provider.
+In the popup the views hide the back button and breadcrumbs, a delete returns to the previous
+popup step, and the student Attendance tab keeps its date range in local state instead of the URL.
+
 ## Self-verification (manual smoke test)
 
 1. `pnpm tilt trigger db-clean`, wait for `pnpm tilt logs db-clean` to show seed complete.

@@ -4,10 +4,12 @@
  * Mocks the use-students.ts hook module so this spec focuses on the page's
  * own rendering: 6 tab triggers, sidebar admission number, profile form fields.
  */
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { AcademicStatus, AdmissionType, Gender, SocialCategory } from '@roviq/common-types';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
+import peopleLinksEn from '@web-messages/en/peopleLinks.json';
 import messagesEn from '@web-messages/en/students.json';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -156,6 +158,12 @@ vi.mock('@web/hooks/use-form-draft', () => ({
 
 // Import AFTER mocks.
 import StudentDetailPage from '../[id]/page';
+
+function graphQLError(code: string) {
+  return new CombinedGraphQLErrors({
+    errors: [{ message: 'raw server text', extensions: { code } }],
+  });
+}
 
 function renderPage() {
   return renderWithProviders(<StudentDetailPage />, {
@@ -393,7 +401,7 @@ describe('StudentDetailPage › Guardians tab › LinkGuardianDialog', () => {
   });
 
   it('renders an error toast when the mutation fails', async () => {
-    linkMutationMock.mockRejectedValueOnce(new Error('backend exploded'));
+    linkMutationMock.mockRejectedValueOnce(graphQLError('GUARDIAN_ALREADY_LINKED'));
     const user = userEvent.setup();
     await openGuardiansTab(user);
     await user.click(screen.getByTestId('student-detail-link-guardian-btn'));
@@ -405,7 +413,9 @@ describe('StudentDetailPage › Guardians tab › LinkGuardianDialog', () => {
     await user.click(screen.getByTestId('student-detail-link-guardian-submit'));
 
     await waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith('backend exploded');
+      expect(toastError).toHaveBeenCalledWith(messagesEn.detail.guardians.linkDialog.linkFailed, {
+        description: peopleLinksEn.linkErrors.GUARDIAN_ALREADY_LINKED,
+      });
     });
     // Dialog stays open on error so the user can retry.
     expect(screen.getByTestId('student-detail-link-guardian-dialog')).toBeInTheDocument();

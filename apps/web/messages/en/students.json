@@ -289,7 +289,8 @@
       "draftFound": "Unsaved draft found",
       "draftFoundDescription": "You have unsaved changes from a previous session. Restore them or discard?",
       "draftRestore": "Restore",
-      "draftDiscard": "Discard"
+      "draftDiscard": "Discard",
+      "saveFailed": "Couldn't save the student profile"
     },
     "sidebar": {
       "photoAlt": "Profile photo of {name}",
@@ -346,13 +347,6 @@
       "linking": "Linking…",
       "linkSuccess": "Guardian linked",
       "linkFailed": "Failed to link guardian",
-      "unlinkButton": "Unlink",
-      "unlinkConfirmTitle": "Unlink guardian",
-      "unlinkConfirmDescription": "Are you sure you want to unlink this guardian from the student?",
-      "unlinkConfirm": "Unlink",
-      "unlinkCancel": "Cancel",
-      "unlinkSuccess": "Guardian unlinked",
-      "unlinkFailed": "Failed to unlink guardian",
       "guardianLabel": "Guardian {id}",
       "count": "{count, plural, one {# linked guardian} other {# linked guardians}}",
       "linkDialog": {
@@ -373,7 +367,8 @@
         "submitting": "Linking…",
         "cancel": "Cancel",
         "linked": "Guardian linked to student",
-        "primaryWarning": "Another guardian is already the primary contact. Linking this guardian as primary will replace the existing one."
+        "primaryWarning": "Another guardian is already the primary contact. Linking this guardian as primary will replace the existing one.",
+        "linkFailed": "Couldn't link the guardian"
       },
       "relationships": {
         "FATHER": "Father",

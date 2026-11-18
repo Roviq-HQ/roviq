@@ -249,6 +249,7 @@ export class StudentReadRepository {
           rollNumber: studentAcademicsLive.rollNumber,
           currentStandardName: standardsLive.name,
           currentSectionName: sectionsLive.name,
+          primaryGuardianProfileId: guardianProfilesLive.id,
           primaryGuardianFirstName: guardianUserProfiles.firstName,
           primaryGuardianLastName: guardianUserProfiles.lastName,
         })

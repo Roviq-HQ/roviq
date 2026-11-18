@@ -115,7 +115,8 @@
         "submitting": "Linking…",
         "cancel": "Cancel",
         "linked": "Student linked to guardian",
-        "primaryWarning": "If the selected student already has a primary contact, marking this guardian as primary will replace the existing one."
+        "primaryWarning": "If the selected student already has a primary contact, marking this guardian as primary will replace the existing one.",
+        "linkFailed": "Couldn't link the student"
       }
     },
     "back": "Back to guardians",
@@ -140,8 +141,10 @@
       "saving": "Saving…",
       "saved": "Guardian profile updated",
       "concurrencyError": "Someone else modified this guardian. Refresh and try again.",
-      "refresh": "Refresh"
-    }
+      "refresh": "Refresh",
+      "saveFailed": "Couldn't save the guardian profile"
+    },
+    "lastUpdated": "Last updated {date}"
   },
   "fields": {
     "firstName": "First name",

@@ -990,6 +990,20 @@ export const testIds = {
     deleteCancelBtn: (kind: string) => `delete-${kind}-cancel-btn`,
   },
 
+  // ── Institute: people → linked-person popup + guardian unlink ─────────
+  institutePeople: {
+    personLink: (kind: string, id: string) => `person-link-${kind}-${id}`,
+    personDialog: 'person-detail-dialog',
+    personDialogBack: 'person-detail-dialog-back',
+    personDialogOpenPage: 'person-detail-dialog-open-page',
+    unlinkBtn: (linkId: string) => `guardian-unlink-btn-${linkId}`,
+    unlinkDialog: 'guardian-unlink-dialog',
+    unlinkReplacementSelect: 'guardian-unlink-replacement-select',
+    unlinkLastGuardianNotice: 'guardian-unlink-last-guardian-notice',
+    unlinkConfirmBtn: 'guardian-unlink-confirm-btn',
+    unlinkCancelBtn: 'guardian-unlink-cancel-btn',
+  },
+
   // ── Institute: people → staff ──────────────────────────────────────────
   instituteStaff: {
     title: 'staff-title',

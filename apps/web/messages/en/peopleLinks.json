@@ -1,0 +1,36 @@
+{
+  "openDetails": "Open details of {name}",
+  "dialog": {
+    "studentTitle": "Student details",
+    "guardianTitle": "Guardian details",
+    "description": "Details of a linked student or guardian. Close to return to the page you were on.",
+    "back": "Back",
+    "openFullPage": "Open full page"
+  },
+  "unlink": {
+    "button": "Unlink",
+    "buttonTitle": "Unlink {guardian} from {student}",
+    "title": "Unlink {guardian} from {student}?",
+    "consequence": "{guardian} will no longer be a guardian of {student}, and loses pickup rights and parent-portal access for {student}. You can link them again later.",
+    "primaryNotice": "{guardian} is the primary contact for {student}. Choose who takes over as primary contact.",
+    "replacementLabel": "New primary contact",
+    "replacementPlaceholder": "Select a guardian",
+    "lastGuardian": "{guardian} is the only guardian of {student}. Link another guardian first, then unlink {guardian}.",
+    "confirm": "Unlink",
+    "unlinking": "Unlinking…",
+    "cancel": "Cancel",
+    "success": "{guardian} unlinked from {student}",
+    "failed": "Couldn't unlink {guardian}",
+    "errors": {
+      "GUARDIAN_LINK_NOT_FOUND": "{guardian} is no longer linked to {student}. Refresh the page.",
+      "LAST_GUARDIAN_CANNOT_BE_DELETED": "{student} must keep at least one guardian.",
+      "PRIMARY_GUARDIAN_REQUIRED": "Choose a new primary contact for {student}.",
+      "REPLACEMENT_PRIMARY_GUARDIAN_INVALID": "The chosen primary contact is not linked to {student}. Refresh and choose again."
+    }
+  },
+  "linkErrors": {
+    "GUARDIAN_ALREADY_LINKED": "This guardian is already linked to this student.",
+    "STUDENT_NOT_FOUND": "This student no longer exists. Refresh the page.",
+    "GUARDIAN_NOT_FOUND": "This guardian no longer exists. Refresh the page."
+  }
+}

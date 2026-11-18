@@ -75,6 +75,7 @@ import {
 import * as React from 'react';
 import { toast } from 'sonner';
 import { useMediaQuery } from '../../../../../../hooks/use-media-query';
+import { PersonNameLink } from '../person-detail-dialog';
 import {
   type SectionPickerNode,
   type StandardPickerNode,
@@ -733,7 +734,12 @@ export default function StudentsPage() {
         header: t('columns.primaryGuardian'),
         cell: ({ row }) => {
           const name = guardianName(row.original);
-          return name ? (
+          const guardianId = row.original.primaryGuardianProfileId;
+          return name && guardianId ? (
+            <PersonNameLink kind="guardian" id={guardianId} className="text-sm">
+              {name}
+            </PersonNameLink>
+          ) : name ? (
             <span className="text-sm">{name}</span>
           ) : (
             <span className="text-sm text-muted-foreground">{t('columns.notAssigned')}</span>

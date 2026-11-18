@@ -72,6 +72,7 @@ vi.mock('@roviq/database', () => ({
   DRIZZLE_DB: Symbol('DRIZZLE_DB'),
   withAdmin: vi.fn(mockWithContext),
   withTenant: vi.fn(mockWithContext),
+  softDelete: vi.fn(async () => undefined),
   guardianProfiles: { id: 'id', deletedAt: 'deleted_at', version: 'version' },
   studentProfiles: { id: 'id' },
   studentGuardianLinks: {
@@ -79,6 +80,7 @@ vi.mock('@roviq/database', () => ({
     studentProfileId: 'student_profile_id',
     guardianProfileId: 'guardian_profile_id',
     isPrimaryContact: 'is_primary_contact',
+    deletedAt: 'deleted_at',
   },
   memberships: {},
   roles: {},
@@ -200,33 +202,100 @@ describe('Guardian — Unlink Validation', () => {
     service = await createService();
   });
 
-  it('unlinkFromStudent rejects when link not found', async () => {
-    queueResult([]); // find link → empty
+  const primaryG1 = { id: 'link-1', guardianProfileId: 'g1', isPrimaryContact: true };
+  const otherG2 = { id: 'link-2', guardianProfileId: 'g2', isPrimaryContact: false };
 
-    await expect(
-      service.unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' }),
-    ).rejects.toMatchObject({ code: ErrorCode.GUARDIAN_LINK_NOT_FOUND });
+  async function unlinkError(input: Parameters<typeof service.unlinkFromStudent>[0]) {
+    const err = await service.unlinkFromStudent(input).catch((e: unknown) => e);
+    assert(err instanceof BusinessException);
+    return err.code;
+  }
+
+  it('unlinkFromStudent rejects when link not found', async () => {
+    queueResult([otherG2]); // locked live links → g1 not among them
+
+    expect(await unlinkError({ guardianProfileId: 'g1', studentProfileId: 's1' })).toBe(
+      ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+    );
   });
 
   it('unlinkFromStudent rejects unlink of primary without replacement', async () => {
-    queueResult([{ id: 'link-1', isPrimaryContact: true }]); // find link → primary
+    queueResult([primaryG1, otherG2]);
 
-    await expect(
-      service.unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' }),
-    ).rejects.toMatchObject({ code: ErrorCode.PRIMARY_GUARDIAN_REQUIRED });
+    expect(await unlinkError({ guardianProfileId: 'g1', studentProfileId: 's1' })).toBe(
+      ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
+    );
   });
 
   it('unlinkFromStudent rejects unlinking the last guardian', async () => {
-    queueResult([{ id: 'link-1', isPrimaryContact: false }]); // find link → not primary
-    queueResult([{ id: 'link-1' }]); // allLinks → only 1 link
+    queueResult([{ ...primaryG1, isPrimaryContact: false }]);
 
-    const err = await service
-      .unlinkFromStudent({ guardianProfileId: 'g1', studentProfileId: 's1' })
-      .catch((e: unknown) => e);
+    expect(await unlinkError({ guardianProfileId: 'g1', studentProfileId: 's1' })).toBe(
+      ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
+    );
+  });
 
-    expect(err).toBeInstanceOf(BusinessException);
-    assert(err instanceof BusinessException);
-    expect(err.code).toBe(ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED);
+  it('unlinkFromStudent rejects a replacement primary that is not linked to the student', async () => {
+    queueResult([primaryG1, otherG2]);
+
+    expect(
+      await unlinkError({
+        guardianProfileId: 'g1',
+        studentProfileId: 's1',
+        newPrimaryGuardianId: 'g9',
+      }),
+    ).toBe(ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID);
+  });
+
+  it('unlinkFromStudent rejects the removed guardian as its own replacement', async () => {
+    queueResult([primaryG1, otherG2]);
+
+    expect(
+      await unlinkError({
+        guardianProfileId: 'g1',
+        studentProfileId: 's1',
+        newPrimaryGuardianId: 'g1',
+      }),
+    ).toBe(ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID);
+  });
+
+  it('unlinkFromStudent rejects a replacement when the removed link is not primary', async () => {
+    queueResult([
+      { ...otherG2, isPrimaryContact: true },
+      { ...primaryG1, isPrimaryContact: false },
+    ]);
+
+    expect(
+      await unlinkError({
+        guardianProfileId: 'g1',
+        studentProfileId: 's1',
+        newPrimaryGuardianId: 'g2',
+      }),
+    ).toBe(ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID);
+  });
+
+  it('unlinkFromStudent soft-deletes the link, promotes the replacement and emits GUARDIAN.unlinked', async () => {
+    const { softDelete, studentGuardianLinks, withTenant } = await import('@roviq/database');
+    queueResult([primaryG1, otherG2]);
+
+    await expect(
+      service.unlinkFromStudent({
+        guardianProfileId: 'g1',
+        studentProfileId: 's1',
+        newPrimaryGuardianId: 'g2',
+      }),
+    ).resolves.toBe(true);
+
+    expect(withTenant).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(softDelete).mock.calls).toEqual([
+      [expect.anything(), studentGuardianLinks, 'link-1'],
+    ]);
+    expect(service.eventBus.emit).toHaveBeenCalledWith('GUARDIAN.unlinked', {
+      guardianProfileId: 'g1',
+      studentProfileId: 's1',
+      newPrimaryGuardianId: 'g2',
+      tenantId: 'tenant-1',
+    });
   });
 });
 

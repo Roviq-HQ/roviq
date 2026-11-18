@@ -275,6 +275,8 @@ export const ErrorCode = {
   GUARDIAN_ALREADY_LINKED: 'GUARDIAN_ALREADY_LINKED',
   /** Unlinking the primary contact needs a replacement primary guardian */
   PRIMARY_GUARDIAN_REQUIRED: 'PRIMARY_GUARDIAN_REQUIRED',
+  /** The replacement primary guardian is not another guardian linked to the same student */
+  REPLACEMENT_PRIMARY_GUARDIAN_INVALID: 'REPLACEMENT_PRIMARY_GUARDIAN_INVALID',
 
   // ── Attendance / leave ─────────────────────────────────
   /** Past-day attendance edits need the AttendanceOverride permission */
@@ -454,6 +456,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   FILE_URLS_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
   GUARDIAN_ALREADY_LINKED: HttpStatus.CONFLICT,
   PRIMARY_GUARDIAN_REQUIRED: HttpStatus.BAD_REQUEST,
+  REPLACEMENT_PRIMARY_GUARDIAN_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   ATTENDANCE_OVERRIDE_FORBIDDEN: HttpStatus.FORBIDDEN,
   ATTENDANCE_EDIT_WINDOW_CLOSED: HttpStatus.FORBIDDEN,
   ATTENDANCE_SLOT_TAKEN: HttpStatus.CONFLICT,

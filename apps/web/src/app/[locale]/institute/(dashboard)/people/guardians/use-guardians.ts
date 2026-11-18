@@ -214,7 +214,13 @@ export function useUnlinkGuardianFromStudent() {
     { unlinkGuardianFromStudent: boolean },
     { input: UnlinkGuardianMutationInput }
   >(UNLINK_GUARDIAN_FROM_STUDENT, {
-    refetchQueries: ['InstituteGuardianLinkedStudents', 'InstituteStudentGuardians'],
+    // List rows show the primary guardian and linked-student counts too.
+    refetchQueries: [
+      'InstituteGuardianLinkedStudents',
+      'InstituteStudentGuardians',
+      'InstituteStudents',
+      'InstituteGuardians',
+    ],
     awaitRefetchQueries: true,
   });
 }
