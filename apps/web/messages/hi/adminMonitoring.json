@@ -1,0 +1,96 @@
+{
+  "title": "मॉनिटरिंग",
+  "description": "प्लेटफ़ॉर्म सेवाओं, कतारों और संस्थानों की गतिविधि की लाइव स्थिति।",
+  "live": {
+    "connected": "लाइव",
+    "lastUpdated": "{time} अपडेट हुआ"
+  },
+  "services": {
+    "heading": "सेवाएँ",
+    "loading": "सेवाओं की स्थिति लोड हो रही है",
+    "names": {
+      "API_GATEWAY": "API गेटवे",
+      "POSTGRES": "PostgreSQL",
+      "REDIS": "Redis",
+      "NATS": "NATS",
+      "TEMPORAL": "Temporal",
+      "MINIO": "MinIO स्टोरेज"
+    },
+    "status": {
+      "healthy": "ठीक",
+      "degraded": "धीमा",
+      "down": "बंद"
+    },
+    "responseTime": "प्रतिक्रिया समय",
+    "uptime": "अपटाइम (24 घंटे)",
+    "responseMs": "{value} मि.से.",
+    "uptimePercent": "{value}%"
+  },
+  "dlq": {
+    "banner": "{count, plural, one {# विफल इवेंट} other {# विफल इवेंट}} डेड लेटर कतार में प्रतीक्षा कर रहे हैं।",
+    "action": "विफल इवेंट देखें"
+  },
+  "alerts": {
+    "heading": "सक्रिय अलर्ट",
+    "unavailable": "मेट्रिक्स उपलब्ध नहीं हैं — Prometheus से संपर्क नहीं हो पा रहा, इसलिए अलर्ट नहीं दिखाए जा सकते।",
+    "empty": "कोई अलर्ट सक्रिय नहीं है।",
+    "since": "{time} से",
+    "severity": {
+      "CRITICAL": "गंभीर",
+      "WARNING": "चेतावनी",
+      "INFO": "सूचना"
+    }
+  },
+  "nats": {
+    "heading": "कतार में बाकी संदेश (NATS)",
+    "description": "हर स्ट्रीम में उपभोक्ताओं की प्रतीक्षा कर रहे संदेश। चार्ट में वे बदलाव दिखते हैं जो इस पेज के खुले रहने के दौरान मिले।",
+    "empty": "कोई स्ट्रीम नहीं मिली।",
+    "pending": "{count, plural, one {# बाकी} other {# बाकी}}",
+    "chartLabel": "{stream} के बाकी संदेश: {values}",
+    "historyHint": "पिछले {count, plural, one {# अपडेट} other {# अपडेट}}"
+  },
+  "connections": {
+    "heading": "लाइव कनेक्शन",
+    "websocket": "रीयल-टाइम (WebSocket)",
+    "http": "चल रहे HTTP अनुरोध",
+    "trendLabel": "{label}, हाल के मान: {values}",
+    "hint": "हर 10 सेकंड में ताज़ा होता है"
+  },
+  "observability": {
+    "heading": "लेटेंसी, त्रुटि दर और अनुरोध चार्ट",
+    "description": "अनुरोधों और इवेंट्स के विस्तृत चार्ट ऑब्ज़र्वेबिलिटी पेज पर हैं।",
+    "action": "ऑब्ज़र्वेबिलिटी खोलें"
+  },
+  "tenants": {
+    "heading": "संस्थानों की गतिविधि",
+    "description": "पिछले 24 घंटों में हर संस्थान के सक्रिय उपयोगकर्ता और API कॉल। हर मिनट ताज़ा होता है।",
+    "columns": {
+      "institute": "संस्थान",
+      "reseller": "रीसेलर",
+      "activeUsers": "सक्रिय उपयोगकर्ता (24 घंटे)",
+      "apiCalls": "API कॉल (24 घंटे)",
+      "trend": "7 दिन का रुझान"
+    },
+    "sortBy": "{column} के अनुसार क्रमबद्ध करें",
+    "sortedAsc": "आरोही क्रम में",
+    "sortedDesc": "अवरोही क्रम में",
+    "trendLabel": "{institute} के लिए पिछले 7 दिनों की दैनिक API कॉल: {values}",
+    "resellerFilter": "रीसेलर",
+    "allResellers": "सभी रीसेलर",
+    "metricsUnavailable": "API कॉल के मेट्रिक्स अभी उपलब्ध नहीं हैं। सक्रिय उपयोगकर्ता फिर भी दिखाए जा रहे हैं।",
+    "empty": "अभी कोई संस्थान नहीं है।",
+    "emptyFiltered": "इस रीसेलर का कोई संस्थान नहीं है।",
+    "pageInfo": "{total} में से {from}–{to}",
+    "previous": "पिछला",
+    "next": "अगला",
+    "previousTitle": "संस्थानों का पिछला पेज दिखाएँ",
+    "nextTitle": "संस्थानों का अगला पेज दिखाएँ"
+  },
+  "errors": {
+    "loadFailed": "यह भाग लोड नहीं हो सका।",
+    "FORBIDDEN": "आपको सिस्टम की स्थिति देखने की अनुमति नहीं है।",
+    "UNAUTHENTICATED": "आपका सत्र समाप्त हो गया है। कृपया फिर से साइन इन करें।",
+    "retry": "फिर से कोशिश करें",
+    "retryTitle": "इस भाग को फिर से लोड करें"
+  }
+}

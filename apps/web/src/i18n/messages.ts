@@ -4,6 +4,7 @@ import enAcademicYears from '../../messages/en/academicYears.json';
 import enAccount from '../../messages/en/account.json';
 import enAdminAttendance from '../../messages/en/adminAttendance.json';
 import enAdminInstitutes from '../../messages/en/adminInstitutes.json';
+import enAdminMonitoring from '../../messages/en/adminMonitoring.json';
 import enAdminResellers from '../../messages/en/adminResellers.json';
 import enAdmission from '../../messages/en/admission.json';
 import enAttendance from '../../messages/en/attendance.json';
@@ -44,6 +45,7 @@ import hiAcademicYears from '../../messages/hi/academicYears.json';
 import hiAccount from '../../messages/hi/account.json';
 import hiAdminAttendance from '../../messages/hi/adminAttendance.json';
 import hiAdminInstitutes from '../../messages/hi/adminInstitutes.json';
+import hiAdminMonitoring from '../../messages/hi/adminMonitoring.json';
 import hiAdminResellers from '../../messages/hi/adminResellers.json';
 import hiAdmission from '../../messages/hi/admission.json';
 import hiAttendance from '../../messages/hi/attendance.json';
@@ -87,6 +89,7 @@ const en = {
   attendance: enAttendance,
   adminAttendance: enAdminAttendance,
   adminInstitutes: enAdminInstitutes,
+  adminMonitoring: enAdminMonitoring,
   adminResellers: enAdminResellers,
   admission: enAdmission,
   auditLogs: enAuditLogs,
@@ -130,6 +133,7 @@ const hi = {
   attendance: hiAttendance,
   adminAttendance: hiAdminAttendance,
   adminInstitutes: hiAdminInstitutes,
+  adminMonitoring: hiAdminMonitoring,
   adminResellers: hiAdminResellers,
   admission: hiAdmission,
   auditLogs: hiAuditLogs,

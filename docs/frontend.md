@@ -41,6 +41,10 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `AccountLocaleSync` — applies the authenticated account language once per account load, preserving the route, query and fragment.
 - `people/DeletedRecordsButton` + `people/DeletePersonButton` — delete, Deleted list and Restore for students, staff and guardians (`kind` prop). Delete states the consequence and offers Undo on the toast; both are gated by `<Can>` (`delete` / `restore`).
 - `audit/AuditLogFilters` + `audit/AuditLogTable` — the audit log list used by all three portals: URL-backed filters (multi-select action type, entity ID search, date range, optional institute dropdown), expandable rows showing the old → new diff, entity IDs linked to their detail page (`auditEntityHref` in `audit/audit-utils.ts` holds the entity type → route map), and the detail sheet. A portal page only picks its columns and passes its query result. `useAuditLabels()` supplies the translated `labels` for `AuditDiffRenderer` / `ImpersonationBadge`.
+- `metrics/MetricCard` — titled stat tile (value, optional icon, hint line and a slot for a trend such as `Sparkline`); `—` for unknown values.
+- `metrics/ServiceCard` — one dependency's health: status badge with icon + text (healthy / degraded / down, never colour alone), response time and uptime; labels come in as props.
+- `metrics/StatusGrid` — responsive 1→6 column grid for `ServiceCard`s with a skeleton state (`loading`, `skeletonCount`, `aria-busy`).
+- `metrics/Sparkline` — tiny Recharts line (loaded client-side only via `next/dynamic`) with an accessible `label`; renders `emptyText` (`—`) for null/empty data.
 
 ## Shared Libraries
 
@@ -186,6 +190,11 @@ user lacks. The same registry is reused by the drawer, so customization that
 includes a slug a viewer cannot use never produces a broken link or empty tab —
 it just renders fewer items. Custom roles with no curated `slugs` fall through
 to the per-portal `defaultSlugs`.
+
+Sidebar items (`NavItem` in `navGroups`) take the same optional `ability`.
+`AdminLayout` drops items the viewer cannot use — and any group left empty —
+before the sidebar, drawer and command palette render, so a gated page never
+shows a link that leads to a forbidden screen.
 
 ### Active-tab / sidebar highlighting
 
