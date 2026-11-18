@@ -10,6 +10,7 @@ import {
   DataTable,
   DataTableToolbar,
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -242,7 +243,7 @@ export default function GuardiansPage() {
                     </EmptyHeader>
                   </Empty>
                 ) : (
-                  <Empty className="py-12">
+                  <Empty className="py-12" data-testid={instituteGuardians.empty}>
                     <EmptyHeader>
                       <EmptyMedia variant="icon">
                         <Users />
@@ -250,6 +251,17 @@ export default function GuardiansPage() {
                       <EmptyTitle>{t('empty.title')}</EmptyTitle>
                       <EmptyDescription>{t('empty.description')}</EmptyDescription>
                     </EmptyHeader>
+                    <Can I="create" a="Guardian">
+                      <EmptyContent>
+                        <Button
+                          onClick={() => router.push('/people/guardians/new')}
+                          data-testid={instituteGuardians.emptyAddBtn}
+                        >
+                          <Plus className="size-4" aria-hidden="true" />
+                          {t('addGuardian')}
+                        </Button>
+                      </EmptyContent>
+                    </Can>
                   </Empty>
                 )
               }

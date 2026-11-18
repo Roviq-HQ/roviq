@@ -35,7 +35,7 @@
  * const alias, and downstream Postgres pgEnum all update automatically.
  */
 export const GUARDIAN_EDUCATION_LEVEL_VALUES = [
-  // No formal education — guardian never attended school
+  // No formal education — guardian never studied at any institute
   'ILLITERATE',
   // Up to Class 5 — foundational literacy and numeracy
   'PRIMARY',

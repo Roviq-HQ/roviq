@@ -953,6 +953,8 @@ export const testIds = {
     title: 'guardians-title',
     searchInput: 'guardians-search-input',
     filteredEmpty: 'guardians-filtered-empty',
+    empty: 'guardians-empty',
+    emptyAddBtn: 'guardians-empty-add-btn',
     // Detail page
     detailTitle: 'guardian-detail-title',
     detailNotFoundTitle: 'guardian-detail-not-found-title',
