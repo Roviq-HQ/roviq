@@ -48,6 +48,8 @@ export const ErrorCode = {
   SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
   /** Impersonation session ended, expired or was revoked */
   IMPERSONATION_ENDED: 'IMPERSONATION_ENDED',
+  /** A view-only impersonation session attempted to change something */
+  IMPERSONATION_READ_ONLY: 'IMPERSONATION_READ_ONLY',
 
   // ── Passkey ────────────────────────────────────────────
   /** WebAuthn challenge expired or was already consumed */
@@ -362,6 +364,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   NO_ACTIVE_MEMBERSHIP: HttpStatus.FORBIDDEN,
   SESSION_NOT_FOUND: HttpStatus.FORBIDDEN,
   IMPERSONATION_ENDED: HttpStatus.UNAUTHORIZED,
+  IMPERSONATION_READ_ONLY: HttpStatus.FORBIDDEN,
   PASSKEY_CHALLENGE_EXPIRED: HttpStatus.BAD_REQUEST,
   PASSKEY_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,
   PASSKEY_AUTHENTICATION_FAILED: HttpStatus.UNAUTHORIZED,

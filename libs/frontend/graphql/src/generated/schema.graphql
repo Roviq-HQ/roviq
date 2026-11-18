@@ -2953,6 +2953,18 @@ type ImpersonationInstituteInfo {
   name: I18nText!
 }
 
+"""
+Signal that an impersonation session started or ended. Carries no session detail: clients re-read the list, which checks their ability.
+"""
+type ImpersonationSessionEventModel {
+  id: ID!
+
+  """
+  Scope the impersonator acted from: 'platform', 'reseller' or 'institute'
+  """
+  impersonatorScope: String!
+}
+
 type ImpersonationSessionModel {
   endedAt: DateTime
   endedReason: String
@@ -4503,6 +4515,11 @@ type Query {
 
   """Get bulk import progress by workflow ID"""
   bulkImportProgress(workflowId: String!): BulkImportProgressModel!
+
+  """
+  Whether the caller may view as this user: an active member of the same institute whose every role ranks below the caller. Same rule as impersonateUser.
+  """
+  canImpersonateUser(targetUserId: String!): Boolean!
   coScholasticAreas: [CoScholasticAreaModel!]!
 
   """
@@ -5149,7 +5166,7 @@ type ResellerTeamMemberDetailModel {
   roleName: I18nText
 
   """
-  Live sessions. Null unless the caller manages the team (full or support admin) or is this member.
+  Live sessions. Null unless the caller is this member or may manage them (see canManage).
   """
   sessions: [ResellerTeamSessionModel!]
   userId: ID!
@@ -5887,6 +5904,11 @@ input SubmitUpiProofInput {
 }
 
 type Subscription {
+  """A session was opened anywhere on the platform"""
+  adminImpersonationSessionCreated: ImpersonationSessionEventModel!
+
+  """A session was ended, revoked or expired by the sweeper"""
+  adminImpersonationSessionEnded: ImpersonationSessionEventModel!
   adminInstituteApprovalRequested: InstituteModel!
   adminInstituteCreated: InstituteModel!
 

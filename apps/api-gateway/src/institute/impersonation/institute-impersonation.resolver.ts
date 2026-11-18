@@ -1,5 +1,5 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
+import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { NoAudit } from '@roviq/audit';
 import {
   assertTenantContext,
@@ -17,6 +17,19 @@ import { ImpersonationService } from '../../auth/impersonation.service';
 @Resolver()
 export class InstituteImpersonationResolver {
   constructor(private readonly impersonationService: ImpersonationService) {}
+
+  @Query(() => Boolean, {
+    description:
+      'Whether the caller may view as this user: an active member of the same institute whose every role ranks below the caller. Same rule as impersonateUser.',
+  })
+  @CheckAbility({ action: 'impersonate', subject: 'User' })
+  async canImpersonateUser(
+    @Args('targetUserId') targetUserId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<boolean> {
+    assertTenantContext(user);
+    return this.impersonationService.canImpersonateInInstitute(user, targetUserId);
+  }
 
   @NoAudit()
   @Mutation(() => StartImpersonationResult)

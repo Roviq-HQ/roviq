@@ -20,6 +20,7 @@ describe('STREAMS config', () => {
     'SUBJECT',
     'HOLIDAY',
     'LEAVE',
+    'IMPERSONATION',
     'RESELLER',
     'STANDARD',
     'BOT',

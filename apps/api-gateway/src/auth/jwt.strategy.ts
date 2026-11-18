@@ -18,6 +18,7 @@ interface JwtPayload {
   isImpersonated?: boolean;
   impersonatorId?: string;
   impersonationSessionId?: string;
+  impersonationReadOnly?: boolean;
 }
 
 @Injectable()
@@ -41,6 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       isImpersonated: payload.isImpersonated,
       impersonatorId: payload.impersonatorId,
       impersonationSessionId: payload.impersonationSessionId,
+      impersonationReadOnly: payload.impersonationReadOnly,
     };
     switch (payload.scope) {
       case 'platform':

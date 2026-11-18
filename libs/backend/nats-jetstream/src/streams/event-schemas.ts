@@ -531,6 +531,15 @@ const RESELLER_SCHEMAS = {
   'RESELLER.updated': z.object({ scope: str }).catchall(z.unknown()),
 } as const;
 
+const IMPERSONATION_SCHEMAS = {
+  'IMPERSONATION.session_ended': z.object({
+    id: uuid,
+    tenantId: uuid.nullable(),
+    impersonatorScope: str,
+  }),
+  'IMPERSONATION.session_started': z.object({ id: uuid, tenantId: uuid, impersonatorScope: str }),
+} as const;
+
 const TIMETABLE_SCHEMAS = {
   'TIMETABLE.activated': z.object({
     timetableId: uuid,
@@ -629,6 +638,7 @@ export const _DOMAIN_SCHEMA_MAPS = [
   HOLIDAY_SCHEMAS,
   ENQUIRY_SCHEMAS,
   RESELLER_SCHEMAS,
+  IMPERSONATION_SCHEMAS,
   TIMETABLE_SCHEMAS,
 ] as const;
 

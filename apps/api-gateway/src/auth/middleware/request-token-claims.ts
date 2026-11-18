@@ -11,6 +11,7 @@ export interface RequestTokenClaims {
   roleId?: string;
   isImpersonated?: boolean;
   impersonationSessionId?: string;
+  impersonationReadOnly?: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ export function readRequestTokenClaims(
       roleId: user.roleId,
       isImpersonated: user.isImpersonated,
       impersonationSessionId: user.impersonationSessionId,
+      impersonationReadOnly: user.impersonationReadOnly,
     };
   }
 

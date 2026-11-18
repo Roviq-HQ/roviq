@@ -544,7 +544,13 @@ describe('ImpersonationService', () => {
         'EX',
         30,
       );
-      expect(eventBus.emit).not.toHaveBeenCalled();
+      // No OTP notification; only the signal that a session opened.
+      expect(eventBus.emit).toHaveBeenCalledTimes(1);
+      expect(eventBus.emit).toHaveBeenCalledWith('IMPERSONATION.session_started', {
+        id: 'session-11',
+        tenantId: 'tenant-1',
+        impersonatorScope: 'platform',
+      });
     });
 
     it('institute scope (intra-institute) never requires OTP regardless of consent flag', async () => {
@@ -572,7 +578,12 @@ describe('ImpersonationService', () => {
         .mocked(redis.set)
         .mock.calls.filter(([key]) => (key as string).startsWith(REDIS_KEYS.IMPERSONATION_OTP));
       expect(otpSets).toHaveLength(0);
-      expect(eventBus.emit).not.toHaveBeenCalled();
+      expect(eventBus.emit).toHaveBeenCalledTimes(1);
+      expect(eventBus.emit).toHaveBeenCalledWith('IMPERSONATION.session_started', {
+        id: 'session-13',
+        tenantId: 'tenant-1',
+        impersonatorScope: 'institute',
+      });
     });
 
     it('OTP path: when no institute_admin is found, rejects without writing the Redis OTP key', async () => {
@@ -1063,13 +1074,70 @@ describe('ImpersonationService', () => {
       expect(authEventService.emit).not.toHaveBeenCalled();
     });
 
+    const impersonatorRole = (roleName: string) => ({
+      table: 'reseller_memberships',
+      rows: [{ roleName }],
+    });
+
+    it.each([
+      ['a reseller support admin', [impersonatorRole('reseller_support_admin')]],
+      ['a reseller viewer', [impersonatorRole('reseller_viewer')]],
+      ['a reseller user whose membership is gone', [{ table: 'reseller_memberships', rows: [] }]],
+    ])('issues a view-only token to %s', async (_who, roleSelect) => {
+      const { service, redis, jwt } = createSubject();
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
+      vi.mocked(jwt.sign).mockReturnValue('fake-jwt');
+      const { tx } = createTx({
+        selects: [
+          EXCHANGE_USER,
+          EXCHANGE_MEMBERSHIP,
+          liveSession(),
+          EXCHANGE_INSTITUTE,
+          ...roleSelect,
+        ],
+      });
+      setTx(tx);
+
+      await service.exchangeCode('code-1', META);
+
+      expect(vi.mocked(jwt.sign).mock.calls[0][0]).toMatchObject({ impersonationReadOnly: true });
+    });
+
+    it.each([
+      'platform',
+      'institute',
+    ])('never marks a %s-started session view-only', async (impersonatorScope) => {
+      const { service, redis, jwt } = createSubject();
+      vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
+      vi.mocked(jwt.sign).mockReturnValue('fake-jwt');
+      const { tx } = createTx({
+        selects: [
+          EXCHANGE_USER,
+          EXCHANGE_MEMBERSHIP,
+          liveSession({ impersonatorScope }),
+          EXCHANGE_INSTITUTE,
+        ],
+      });
+      setTx(tx);
+
+      await service.exchangeCode('code-1', META);
+
+      expect(vi.mocked(jwt.sign).mock.calls[0][0]).not.toHaveProperty('impersonationReadOnly');
+    });
+
     it('happy path returns a 15-minute token carrying the impersonation and reseller claims', async () => {
       const { service, redis, jwt, authEventService } = createSubject();
       vi.mocked(redis.getdel).mockResolvedValue(CODE_PAYLOAD);
       vi.mocked(jwt.sign).mockReturnValue('fake-jwt');
 
       const { tx } = createTx({
-        selects: [EXCHANGE_USER, EXCHANGE_MEMBERSHIP, liveSession(), EXCHANGE_INSTITUTE],
+        selects: [
+          EXCHANGE_USER,
+          EXCHANGE_MEMBERSHIP,
+          liveSession(),
+          EXCHANGE_INSTITUTE,
+          impersonatorRole('reseller_full_admin'),
+        ],
       });
       setTx(tx);
 

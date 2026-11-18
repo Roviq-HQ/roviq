@@ -337,6 +337,8 @@ interface AuthUserBase {
   isImpersonated?: boolean;
   impersonatorId?: string;
   impersonationSessionId?: string;
+  /** The impersonator may look but not change anything (a reseller role below full admin). */
+  impersonationReadOnly?: boolean;
 }
 
 export interface PlatformContext extends AuthUserBase {

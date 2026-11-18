@@ -38,6 +38,7 @@ Auth failures carry a machine-readable `extensions.code` (see `docs/architecture
 | `NO_ACTIVE_MEMBERSHIP` | 403 | Selected/target membership is missing or not ACTIVE |
 | `SESSION_NOT_FOUND` | 403 | Session to revoke does not belong to the user |
 | `IMPERSONATION_ENDED` | 401 | Impersonation session ended, expired or revoked |
+| `IMPERSONATION_READ_ONLY` | 403 | A view-only impersonation session tried to change something |
 | `PASSKEY_CHALLENGE_EXPIRED` | 400 | WebAuthn challenge expired or already used |
 | `PASSKEY_VERIFICATION_FAILED` | 400 | Passkey registration response rejected |
 | `PASSKEY_AUTHENTICATION_FAILED` | 401 | Passkey sign-in rejected (unknown credential or bad signature — deliberately one code) |
@@ -77,7 +78,7 @@ All tokens are `type: 'access'` — no more separate 'platform' type.
 - **Access token:** `{ sub, scope, tenantId?, resellerId?, membershipId, roleId, mustChangePassword?, type: 'access' }`
   - TTL: platform 5m, reseller 10m, institute 15m
   - `mustChangePassword: true` is set when the user's `users.must_change_password` column is true (see [First-Login Password Change](#first-login-password-change-rov-96)).
-- **Impersonation token:** same as access + `{ isImpersonated, impersonatorId, impersonationSessionId }`
+- **Impersonation token:** same as access + `{ isImpersonated, impersonatorId, impersonationSessionId }`, and `impersonationReadOnly: true` on a view-only session (see Impersonation)
   - TTL: 15m, non-renewable (no refresh token created)
 - **Refresh token:** `{ sub, tokenId, membershipId, type: 'refresh' }` — 7d TTL
 
@@ -265,6 +266,9 @@ Flow when the OTP gate fires:
 - The impersonation token carries the same `resellerId` claim as a normal institute token, lasts 15 minutes and has no refresh token.
 - The membership checked at start is pinned in the OTP request and the one-time code; `exchangeImpersonationCode` issues the token for exactly that membership.
 - `exchangeImpersonationCode` issues no token if the session was ended or has expired since the code was created.
+- **View-only sessions (ROV-183).** A reseller user below `reseller_full_admin` holds a read-only role, so the session they open is view-only: `exchangeImpersonationCode` looks up the impersonator's role in the institute's reseller and adds `impersonationReadOnly: true` to the token. `ImpersonationSessionGuard` then refuses every GraphQL mutation except `endImpersonation`, and every non-GET HTTP call, with `IMPERSONATION_READ_ONLY`. It is enforced there and not through CASL because many mutations carry no `@CheckAbility`. Platform and intra-institute sessions are never view-only. The banner shows "View only" and the Apollo error link raises one toast for a refused write.
+- `canImpersonateUser(targetUserId)` (institute scope, needs `impersonate User`) answers whether `impersonateUser` would accept the target, using the same rule. The institute "View as" button renders only on `true`, so it is not offered for a member whose role is equal to or above the caller's.
+- **Live session list.** Opening a session emits `IMPERSONATION.session_started`; ending, revoking or sweeping one emits `IMPERSONATION.session_ended`. Platform subscriptions `adminImpersonationSessionCreated` / `adminImpersonationSessionEnded` carry only the session id and impersonator scope; the admin sessions page re-reads `adminImpersonationSessions` (which checks `read AuditLog`) on each. Sessions ended by a database trigger (reseller suspended, team member deactivated) emit nothing; the page shows them on its next read.
 - Frontend: a tab holding `roviq-impersonation-token` loads the impersonated user through `me` (`AuthProvider` `currentUserQuery`) and acts as that user, whether or not the impersonator has a session of their own in the browser. A rejected token is dropped and the tab is signed out.
 
 ### Ending and revoking a session (ROV-94)
