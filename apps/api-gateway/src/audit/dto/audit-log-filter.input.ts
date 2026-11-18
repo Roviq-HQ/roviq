@@ -1,4 +1,5 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
+import { AUTH_SCOPE_VALUES } from '@roviq/common-types';
 import { DateTimeScalar } from '@roviq/nestjs-graphql';
 import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
@@ -84,6 +85,15 @@ export class AuditLogFilterInput {
   @IsString()
   @MaxLength(200)
   syntheticOrigin?: string;
+
+  @Field(() => [String], {
+    nullable: true,
+    description: 'Filter by the scope the action was performed in (platform, reseller, institute).',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(AUTH_SCOPE_VALUES, { each: true })
+  scopes?: string[];
 
   @Field(() => Boolean, {
     nullable: true,
