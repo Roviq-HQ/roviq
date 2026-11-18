@@ -62,7 +62,7 @@
     "instance:env": "pnpx tsx scripts/dev-instance.ts env",
     "instance:ports": "pnpx tsx scripts/dev-instance.ts ports",
     "tilt": ". scripts/instance-env.sh && tilt",
-    "codegen": "graphql-codegen --config codegen.ts",
+    "codegen": ". scripts/instance-env.sh && graphql-codegen --config codegen.ts",
     "codegen:watch": "graphql-codegen --config codegen.ts --watch",
     "prepare": "husky"
   },
