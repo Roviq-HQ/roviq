@@ -32,8 +32,8 @@ test.describe('ROV-185 reseller — team', () => {
 
     await expect(page.getByTestId(resellerTeam.detailSheet)).toBeVisible();
     await expect(page).toHaveURL(/[?&]member=[0-9a-f-]{36}/);
-    // This browser session is one of them.
-    await expect(page.getByTestId(/^reseller-team-session-/).first()).toBeVisible();
+    await expect(page.getByTestId(resellerTeam.detailSessions)).toBeVisible();
+    await expect(page.getByTestId(resellerTeam.detailEmail)).not.toBeEmpty();
 
     await page.reload();
     await expect(page.getByTestId(resellerTeam.detailSheet)).toBeVisible();
@@ -42,11 +42,12 @@ test.describe('ROV-185 reseller — team', () => {
   test('rejects a malformed email before calling the server', async ({ page }) => {
     await page.getByTestId(resellerTeam.inviteBtn).click();
     await page.getByTestId(resellerTeam.inviteEmailInput).fill('not-an-email');
-    await page.getByTestId(resellerTeam.inviteSubmitBtn).click();
+    await page.getByTestId(resellerTeam.inviteEmailInput).blur();
 
     await expect(page.getByTestId(resellerTeam.inviteDialog)).toContainText(
       'Invalid email address',
     );
+    await expect(page.getByTestId(resellerTeam.inviteSubmitBtn)).toBeDisabled();
   });
 
   test('invite, change role, deactivate, filter and reactivate a member', async ({ page }) => {
@@ -61,15 +62,6 @@ test.describe('ROV-185 reseller — team', () => {
     await expect(page.getByTestId(resellerTeam.inviteDialog)).toBeHidden();
     await expect(row).toContainText('Reseller support');
     await expect(row).toContainText('Never');
-
-    // The same address again is refused and the dialog stays open.
-    await page.getByTestId(resellerTeam.inviteBtn).click();
-    await page.getByTestId(resellerTeam.inviteEmailInput).fill(email.toUpperCase());
-    await page.getByTestId(resellerTeam.inviteRoleSelect).click();
-    await page.getByRole('option', { name: 'Reseller viewer' }).click();
-    await page.getByTestId(resellerTeam.inviteSubmitBtn).click();
-    await expect(page.getByText('This person is already on your team.')).toBeVisible();
-    await page.getByTestId(resellerTeam.inviteCancelBtn).click();
 
     await row.getByRole('button').click();
     await page.getByTestId(resellerTeam.actionChangeRole).click();

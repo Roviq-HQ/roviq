@@ -20,7 +20,8 @@ test.describe('ROV-183 admin — impersonation sessions', () => {
   test('is reachable from the sidebar', async ({ page }) => {
     await page.goto('/en/admin/dashboard');
     await page.getByRole('link', { name: 'Impersonation Sessions' }).click();
-    await expect(page).toHaveURL(/\/admin\/impersonation-sessions$/);
+    // On the admin host the path carries no /admin prefix.
+    await expect(page).toHaveURL(/\/impersonation-sessions$/);
     await expect(page.getByTestId(ids.title)).toBeVisible();
   });
 

@@ -684,3 +684,11 @@ The pre-push gate failed twice in a row with `remaining connection slots are res
 All three compose files now set `SQL_MAX_CONNS: 10`, `SQL_MAX_IDLE_CONNS: 2`, `SQL_VIS_MAX_CONNS: 5`, `SQL_VIS_MAX_IDLE_CONNS: 1` on `temporal`. After recreating the containers Temporal holds 12 connections per Postgres.
 
 **Verification:** see the `ci:check` run that follows this entry's commit.
+
+## 2026-11-18 — diagnosed: a Playwright run started right after a restart of the e2e gateway fails unrelated institute tests (ROV-183, ROV-185)
+
+A `pnpm test:e2e:ui` run failed 17 tests; 9 were institute pages untouched by the branch (`academic-years*.e2e.spec.ts`, `academics.e2e.spec.ts`), each with `net::ERR_CONNECTION_RESET` or `ERR_EMPTY_RESPONSE` on `http://localhost:<e2e API port>/api/graphql` and "Could not load institute languages" on screen. Just before, the e2e gateway had been restarted by hand (`scripts/e2e-compose.sh restart api-gateway`, for the stale `dist/libs` entry above) and was still recompiling; `e2e:up --wait` passed on the container's health check while `nx serve` restarted the process underneath it.
+
+Running the suite again without touching the stack gave 271 passed and 1 failed (a real test bug, fixed in the same commit as this entry).
+
+**Not fixed.** Workaround: after restarting the e2e gateway, wait for `Found 0 errors` in `docker logs <e2e project>-api-gateway-1` and a 200 from `/api/health/ready` before starting Playwright. A fix belongs with the stale `dist/libs` one: once the container rebuilds libraries itself, the manual restart goes away.
