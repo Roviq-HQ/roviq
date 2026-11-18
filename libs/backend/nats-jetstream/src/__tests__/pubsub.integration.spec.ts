@@ -20,7 +20,9 @@ import { JetStreamServer } from '../server/jetstream.server';
 import { DEFAULT_DLQ_STREAM } from '../streams/stream.config';
 import { ensureStreams } from '../streams/stream.manager';
 
-const servers = [process.env.NATS_TEST_URL ?? 'nats://localhost:4224'];
+const servers = [
+  process.env.NATS_TEST_URL ?? `nats://localhost:${process.env.DEV_NATS_TEST_PORT ?? '4224'}`,
+];
 const poll = { timeout: 5_000, interval: 20 };
 type Handler = (payload: unknown, context: JetStreamContext) => Promise<void>;
 

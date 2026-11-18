@@ -58,7 +58,7 @@ export async function ensureIntegrationInfra(workspaceRoot: string): Promise<voi
     target(
       'nats-test',
       'NATS_TEST_URL',
-      process.env.NATS_TEST_URL ?? 'nats://localhost:4224',
+      process.env.NATS_TEST_URL ?? `nats://localhost:${process.env.DEV_NATS_TEST_PORT ?? '4224'}`,
       4222,
     ),
   ];

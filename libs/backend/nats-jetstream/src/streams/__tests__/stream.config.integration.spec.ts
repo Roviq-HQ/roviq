@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { STREAMS } from '../stream.config';
 import { ensureStreams } from '../stream.manager';
 
-const NATS_URL = process.env.NATS_TEST_URL ?? 'nats://localhost:4224';
+const NATS_URL =
+  process.env.NATS_TEST_URL ?? `nats://localhost:${process.env.DEV_NATS_TEST_PORT ?? '4224'}`;
 
 describe('STREAMS runtime configuration', () => {
   let nc: NatsConnection;
