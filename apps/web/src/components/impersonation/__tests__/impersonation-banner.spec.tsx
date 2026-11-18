@@ -2,12 +2,13 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ImpersonationBanner } from '../impersonation-banner';
+import { EndOwnImpersonationDocument } from '../impersonation-banner.generated';
 import {
   IMPERSONATION_TOKEN_KEY,
-  IMPERSONATION_USER_NAME_KEY,
-  ImpersonationBanner,
-} from '../impersonation-banner';
-import { EndOwnImpersonationDocument } from '../impersonation-banner.generated';
+  readImpersonatedUser,
+  storeImpersonation,
+} from '../impersonation-storage';
 
 const auth = vi.hoisted(() => ({ impersonationEnded: false }));
 vi.mock('@roviq/auth', async (importOriginal) => ({
@@ -50,9 +51,24 @@ describe('ImpersonationBanner', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('names the impersonated user', () => {
-    sessionStorage.setItem(IMPERSONATION_TOKEN_KEY, token({ isImpersonated: true }));
-    sessionStorage.setItem(IMPERSONATION_USER_NAME_KEY, 'teacher1');
+  it('names the impersonated person in the current language', () => {
+    storeImpersonation(token({ isImpersonated: true }), {
+      username: 'teacher1',
+      firstName: { en: 'Rajesh', hi: 'राजेश' },
+      lastName: { en: 'Sharma', hi: 'शर्मा' },
+    });
+
+    renderWithProviders(<ImpersonationBanner />, { locale: 'hi' });
+
+    expect(screen.getByRole('status')).toHaveTextContent('राजेश शर्मा');
+  });
+
+  it('falls back to the username when the person has no profile name', () => {
+    storeImpersonation(token({ isImpersonated: true }), {
+      username: 'teacher1',
+      firstName: null,
+      lastName: null,
+    });
 
     renderWithProviders(<ImpersonationBanner />);
 
@@ -74,6 +90,7 @@ describe('ImpersonationBanner', () => {
       'Impersonation session ended.',
     );
     expect(sessionStorage.getItem(IMPERSONATION_TOKEN_KEY)).toBeNull();
+    expect(readImpersonatedUser()).toBeNull();
     expect(closeSpy).toHaveBeenCalled();
   });
 

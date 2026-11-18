@@ -51,6 +51,7 @@ const LIST_INSTITUTE_USERS = gql`
             tenantId
             status
             roleId
+            roleName
             instituteName
           }
         }
@@ -88,6 +89,7 @@ interface MembershipNode {
   tenantId: string;
   status: string;
   roleId: string;
+  roleName: Record<string, string>;
   instituteName?: string | null;
 }
 
@@ -210,7 +212,7 @@ export function InstituteUsersTab({
                     <div className="flex flex-wrap gap-1">
                       {membershipsInInstitute.map((m) => (
                         <Badge key={m.id} variant="outline" className="text-xs">
-                          {m.roleId}
+                          {resolveI18n(m.roleName)}
                         </Badge>
                       ))}
                     </div>

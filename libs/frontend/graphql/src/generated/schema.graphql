@@ -367,6 +367,9 @@ type AdminUserMembershipModel {
   id: ID!
   instituteName: String
   roleId: ID!
+
+  """Name of the role this membership holds."""
+  roleName: I18nText!
   status: MembershipStatus!
   tenantId: ID!
 }
@@ -2778,7 +2781,12 @@ enum ImpersonationSessionStatus {
 }
 
 type ImpersonationUserInfo {
+  """
+  The impersonated person's name, for the banner. Null without a profile.
+  """
+  firstName: I18nText
   id: String!
+  lastName: I18nText
   username: String!
 }
 
@@ -4935,6 +4943,9 @@ type ResellerUserMembershipModel {
   id: ID!
   instituteName: String
   roleId: ID!
+
+  """Name of the role this membership holds."""
+  roleName: I18nText!
   status: MembershipStatus!
   tenantId: ID!
 }

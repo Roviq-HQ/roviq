@@ -2,11 +2,17 @@
 
 import { decodeJwt, useAuth } from '@roviq/auth';
 import { gql, useMutation } from '@roviq/graphql';
+import { useI18nField } from '@roviq/i18n';
 import { Button, Card, CardContent } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { EndOwnImpersonationDocument } from './impersonation-banner.generated';
+import {
+  clearImpersonation,
+  readImpersonatedUser,
+  readImpersonationToken,
+} from './impersonation-storage';
 
 export const END_OWN_IMPERSONATION = gql`
   mutation EndOwnImpersonation($sessionId: String!) {
@@ -14,16 +20,10 @@ export const END_OWN_IMPERSONATION = gql`
   }
 `;
 
-export const IMPERSONATION_TOKEN_KEY = 'roviq-impersonation-token';
-export const IMPERSONATION_USER_NAME_KEY = 'roviq-impersonation-user-name';
 const EXPIRY_CHECK_MS = 10_000;
 const AUTO_CLOSE_MS = 3_000;
 
 const { impersonationBanner: ids } = testIds;
-
-function readToken(): string | null {
-  return typeof window === 'undefined' ? null : sessionStorage.getItem(IMPERSONATION_TOKEN_KEY);
-}
 
 function tokenExpired(token: string | null): boolean {
   const payload = token ? decodeJwt(token) : null;
@@ -41,17 +41,20 @@ function tokenExpired(token: string | null): boolean {
 export function ImpersonationBanner() {
   const t = useTranslations('auth');
   const { impersonationEnded } = useAuth();
-  const [token] = React.useState(readToken);
+  const [token] = React.useState(readImpersonationToken);
   const [ended, setEnded] = React.useState(false);
   const [exiting, setExiting] = React.useState(false);
   const [endSession] = useMutation(EndOwnImpersonationDocument);
-  const userName =
-    typeof window === 'undefined' ? null : sessionStorage.getItem(IMPERSONATION_USER_NAME_KEY);
+  const resolveI18n = useI18nField();
+  const [person] = React.useState(readImpersonatedUser);
+  const displayName = person
+    ? [resolveI18n(person.firstName), resolveI18n(person.lastName)].filter(Boolean).join(' ') ||
+      person.username
+    : null;
   const active = token !== null && decodeJwt(token)?.isImpersonated === true;
 
   const finish = React.useCallback(() => {
-    sessionStorage.removeItem(IMPERSONATION_TOKEN_KEY);
-    sessionStorage.removeItem(IMPERSONATION_USER_NAME_KEY);
+    clearImpersonation();
     setEnded(true);
   }, []);
 
@@ -62,7 +65,7 @@ export function ImpersonationBanner() {
   React.useEffect(() => {
     if (!active || ended) return;
     const interval = setInterval(() => {
-      if (tokenExpired(readToken())) finish();
+      if (tokenExpired(readImpersonationToken())) finish();
     }, EXPIRY_CHECK_MS);
     return () => clearInterval(interval);
   }, [active, ended, finish]);
@@ -114,7 +117,9 @@ export function ImpersonationBanner() {
       role="status"
       data-testid={ids.banner}
     >
-      <span className="font-medium">{t('impersonationBanner', { name: userName ?? t('or') })}</span>
+      <span className="font-medium">
+        {t('impersonationBanner', { name: displayName ?? t('or') })}
+      </span>
       <Button
         variant="outline"
         size="sm"

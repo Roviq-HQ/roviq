@@ -51,6 +51,7 @@ export const RESELLER_INSTITUTE_USERS = gql`
             id
             tenantId
             status
+            roleName
           }
         }
       }
@@ -163,6 +164,7 @@ export function ResellerInstituteUsersTab({
             <TableRow>
               <TableHead>{t('columns.name')}</TableHead>
               <TableHead>{t('columns.username')}</TableHead>
+              <TableHead>{t('columns.role')}</TableHead>
               <TableHead>{t('columns.status')}</TableHead>
               <TableHead>
                 <span className="sr-only">{t('columns.actions')}</span>
@@ -176,13 +178,21 @@ export function ResellerInstituteUsersTab({
                     .filter(Boolean)
                     .join(' ')
                 : user.username;
-              const activeHere = user.memberships.some(
-                (m) => m.tenantId === instituteId && m.status === 'ACTIVE',
-              );
+              const membershipsHere = user.memberships.filter((m) => m.tenantId === instituteId);
+              const activeHere = membershipsHere.some((m) => m.status === 'ACTIVE');
               return (
                 <TableRow key={user.id} data-testid={ids.userRow(user.id)}>
                   <TableCell className="font-medium">{name}</TableCell>
                   <TableCell className="font-mono text-xs">{user.username}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {membershipsHere.map((m) => (
+                        <Badge key={m.id} variant="outline" className="text-xs">
+                          {resolveI18n(m.roleName)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={user.status === 'ACTIVE' ? 'default' : 'secondary'}>
                       {t(`statuses.${user.status}`)}

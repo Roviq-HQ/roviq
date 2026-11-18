@@ -3,8 +3,9 @@
 import { extractGraphQLErrorCode, gql, useMutation } from '@roviq/graphql';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { storeImpersonation } from '@web/components/impersonation/impersonation-storage';
+import { useSearchParams } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { ExchangeImpersonationCodeDocument } from './page.generated';
 
@@ -15,6 +16,8 @@ export const EXCHANGE_IMPERSONATION_CODE = gql`
       user {
         id
         username
+        firstName
+        lastName
       }
     }
   }
@@ -28,7 +31,7 @@ const { impersonationExchange: ids } = testIds;
 export default function ImpersonatePage() {
   const tAuth = useTranslations('auth');
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const locale = useLocale();
   const code = searchParams.get('code');
   const [error, setError] = useState<string | null>(null);
   const [exchange] = useMutation(ExchangeImpersonationCodeDocument);
@@ -51,11 +54,15 @@ export default function ImpersonatePage() {
           setError(tAuth('impersonationExchangeFailed'));
           return;
         }
-        // sessionStorage, not localStorage: the session dies with this tab and never
-        // touches a session the same browser holds on this portal.
-        sessionStorage.setItem('roviq-impersonation-token', session.accessToken);
-        sessionStorage.setItem('roviq-impersonation-user-name', session.user.username);
-        router.replace('/dashboard');
+        storeImpersonation(session.accessToken, {
+          username: session.user.username,
+          firstName: session.user.firstName ?? null,
+          lastName: session.user.lastName ?? null,
+        });
+        // A full load, not router.replace: this tab already restored whatever session the
+        // browser holds on this portal, and a client-side move would keep showing that
+        // user's menus and permissions while requests carry the impersonation token.
+        window.location.replace(`/${locale}/dashboard`);
       })
       .catch((err: unknown) => {
         const errorCode = extractGraphQLErrorCode(err);
@@ -65,7 +72,7 @@ export default function ImpersonatePage() {
             : tAuth('impersonationExchangeFailed'),
         );
       });
-  }, [code, exchange, router, tAuth]);
+  }, [code, exchange, locale, tAuth]);
 
   if (!error) {
     return (

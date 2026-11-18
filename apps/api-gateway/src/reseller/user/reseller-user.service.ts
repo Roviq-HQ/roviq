@@ -5,6 +5,7 @@ import {
   institutesLive,
   membershipsLive,
   mkResellerCtx,
+  rolesLive,
   userProfilesLive,
   usersLive,
   withReseller,
@@ -132,11 +133,13 @@ export class ResellerUserService {
                 userId: membershipsLive.userId,
                 tenantId: membershipsLive.tenantId,
                 roleId: membershipsLive.roleId,
+                roleName: rolesLive.name,
                 status: membershipsLive.status,
                 instituteName: institutesLive.name,
               })
               .from(membershipsLive)
               .innerJoin(institutesLive, eq(institutesLive.id, membershipsLive.tenantId))
+              .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
               .where(inArray(membershipsLive.userId, userIds))
           : [];
 
@@ -168,6 +171,7 @@ export class ResellerUserService {
               id: m.id,
               tenantId: m.tenantId,
               roleId: m.roleId,
+              roleName: m.roleName,
               status: m.status,
               instituteName: (m.instituteName as Record<string, string> | null)?.en ?? null,
             })),

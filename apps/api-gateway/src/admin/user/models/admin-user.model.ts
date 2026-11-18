@@ -48,6 +48,9 @@ export class AdminUserMembershipModel {
   @Field(() => ID)
   roleId!: string;
 
+  @Field(() => I18nTextScalar, { description: 'Name of the role this membership holds.' })
+  roleName!: I18nContent;
+
   @Field(() => MembershipStatus)
   status!: MembershipStatus;
 

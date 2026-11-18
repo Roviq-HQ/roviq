@@ -259,7 +259,8 @@
       "name": "Name",
       "username": "Roviq ID",
       "status": "Status",
-      "actions": "Actions"
+      "actions": "Actions",
+      "role": "Role"
     },
     "statuses": {
       "ACTIVE": "Active",

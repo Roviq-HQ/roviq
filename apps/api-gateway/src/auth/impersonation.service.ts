@@ -22,6 +22,7 @@ import {
   platformMembershipsLive,
   resellerMembershipsLive,
   rolesLive,
+  userProfilesLive,
   usersLive,
   withAdmin,
 } from '@roviq/database';
@@ -368,8 +369,14 @@ export class ImpersonationService {
       (tx) =>
         Promise.all([
           tx
-            .select({ id: usersLive.id, username: usersLive.username })
+            .select({
+              id: usersLive.id,
+              username: usersLive.username,
+              firstName: userProfilesLive.firstName,
+              lastName: userProfilesLive.lastName,
+            })
             .from(usersLive)
+            .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
             .where(and(eq(usersLive.id, targetUserId), eq(usersLive.status, 'ACTIVE')))
             .limit(1),
           tx
@@ -473,6 +480,8 @@ export class ImpersonationService {
       user: {
         id: targetUser.id,
         username: targetUser.username,
+        firstName: targetUser.firstName,
+        lastName: targetUser.lastName,
       },
       institute: {
         id: institute.id,
