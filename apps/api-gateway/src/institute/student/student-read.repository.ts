@@ -10,7 +10,7 @@ import {
   sectionsLive,
   standardsLive,
   studentAcademicsLive,
-  studentGuardianLinks,
+  studentGuardianLinksLive,
   studentProfilesLive,
   userDocumentsLive,
   userProfilesLive,
@@ -261,15 +261,15 @@ export class StudentReadRepository {
         .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
         .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
         .leftJoin(
-          studentGuardianLinks,
+          studentGuardianLinksLive,
           and(
-            eq(studentGuardianLinks.studentProfileId, studentProfilesLive.id),
-            eq(studentGuardianLinks.isPrimaryContact, true),
+            eq(studentGuardianLinksLive.studentProfileId, studentProfilesLive.id),
+            eq(studentGuardianLinksLive.isPrimaryContact, true),
           ),
         )
         .leftJoin(
           guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
+          eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
         )
         .leftJoin(
           guardianUserProfiles,

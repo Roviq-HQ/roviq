@@ -72,22 +72,29 @@ function listFiles(): string[] {
   return all;
 }
 
-function scan(file: string): Hit[] {
-  const text = readFileSync(file, 'utf8');
+export function findBaseTableReads(text: string, tables: readonly string[]): Omit<Hit, 'file'>[] {
   const lines = text.split('\n');
-  const hits: Hit[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.includes('// allow-base-read')) continue;
-    for (const table of SOFT_DELETABLE_TABLES) {
-      // Trailing `)` or `,` avoids matching `<table>Live`; joins leak trashed
-      // rows the same way `.from` does. Writes are unaffected.
-      const re = new RegExp(`\\.(from|\\w+Join)\\(\\s*${table}\\s*[),]`);
-      if (!re.test(line)) continue;
-      hits.push({ file, line: i + 1, text: line.trim(), table });
+  const lineAt = (offset: number) => text.slice(0, offset).split('\n').length;
+  const hits: Omit<Hit, 'file'>[] = [];
+  for (const table of tables) {
+    // `\s*` spans newlines: Biome wraps long joins so the table lands on the
+    // line after `.leftJoin(`. Trailing `)` or `,` avoids matching `<table>Live`.
+    const re = new RegExp(`\\.(from|\\w+Join)\\(\\s*${table}\\s*[),]`, 'g');
+    for (const match of text.matchAll(re)) {
+      const start = lineAt(match.index);
+      const end = lineAt(match.index + match[0].length);
+      if (lines.slice(start - 1, end).some((l) => l.includes('// allow-base-read'))) continue;
+      hits.push({ line: end, text: lines[end - 1].trim(), table });
     }
   }
-  return hits;
+  return hits.sort((a, b) => a.line - b.line);
+}
+
+function scan(file: string): Hit[] {
+  return findBaseTableReads(readFileSync(file, 'utf8'), SOFT_DELETABLE_TABLES).map((h) => ({
+    file,
+    ...h,
+  }));
 }
 
 function main(): number {
@@ -110,4 +117,7 @@ function main(): number {
   return 1;
 }
 
-process.exit(main());
+// Only run main() when invoked as a script (not when imported by tests).
+if (process.argv[1]?.endsWith('check-live-views.ts')) {
+  process.exit(main());
+}

@@ -21,6 +21,7 @@ import {
   mkAdminCtx,
   mkInstituteCtx,
   phoneNumbers,
+  phoneNumbersLive,
   rolesLive,
   softDelete,
   studentGuardianLinks,
@@ -90,7 +91,7 @@ export class GuardianService {
       profileImageUrl: userProfilesLive.profileImageUrl,
       gender: userProfilesLive.gender,
       // phone_numbers join (primary phone only)
-      primaryPhone: phoneNumbers.number,
+      primaryPhone: phoneNumbersLive.number,
       // Scalar subquery: count of linked students (excludes soft-deleted links).
       // Cast to int so Drizzle returns `number`, not `string` (PG COUNT returns bigint).
       linkedStudentCount: sql<number>`(
@@ -112,10 +113,10 @@ export class GuardianService {
           .from(guardianProfilesLive)
           .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
           .leftJoin(
-            phoneNumbers,
+            phoneNumbersLive,
             and(
-              eq(phoneNumbers.userId, guardianProfilesLive.userId),
-              eq(phoneNumbers.isPrimary, true),
+              eq(phoneNumbersLive.userId, guardianProfilesLive.userId),
+              eq(phoneNumbersLive.isPrimary, true),
             ),
           )
           .where(eq(guardianProfilesLive.id, id))
