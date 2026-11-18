@@ -412,6 +412,7 @@ const USER_SCHEMAS = {
 
 const GUARDIAN_SCHEMAS = {
   'GUARDIAN.linked': tenantBase.catchall(z.unknown()),
+  'GUARDIAN.unlinked': tenantBase.catchall(z.unknown()),
 } as const;
 
 const STAFF_SCHEMAS = {

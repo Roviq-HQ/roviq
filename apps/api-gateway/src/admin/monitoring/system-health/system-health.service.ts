@@ -157,7 +157,8 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(() => void this.poll(), SYSTEM_HEALTH_POLL_INTERVAL_MS);
     // Never keep the process (or a test runner) alive just for the poller.
     this.timer.unref();
-    void this.poll();
+    // No poll at boot: every integration app boots this module, and a probe each
+    // exhausts the shared test Postgres. getSystemHealth() checks on demand.
   }
 
   onModuleDestroy(): void {

@@ -5,6 +5,9 @@
  * form. Uses role-based queries exclusively.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+
+const { institutePeople } = testIds;
 
 export class GuardianDetailPage {
   constructor(private readonly page: Page) {}
@@ -127,5 +130,38 @@ export class GuardianDetailPage {
 
     await expect(this.linkStudentSubmit()).toBeEnabled();
     await this.linkStudentSubmit().click();
+  }
+
+  // ── Linked-person popup + unlink ─────────────────────────────────────
+  personLink(kind: 'student' | 'guardian', id: string): Locator {
+    return this.page.getByTestId(institutePeople.personLink(kind, id));
+  }
+
+  personDialog(): Locator {
+    return this.page.getByTestId(institutePeople.personDialog);
+  }
+
+  personDialogBack(): Locator {
+    return this.personDialog().getByTestId(institutePeople.personDialogBack);
+  }
+
+  unlinkButton(linkId: string): Locator {
+    return this.page.getByTestId(institutePeople.unlinkBtn(linkId));
+  }
+
+  unlinkDialog(): Locator {
+    return this.page.getByTestId(institutePeople.unlinkDialog);
+  }
+
+  unlinkLastGuardianNotice(): Locator {
+    return this.page.getByTestId(institutePeople.unlinkLastGuardianNotice);
+  }
+
+  unlinkConfirm(): Locator {
+    return this.page.getByTestId(institutePeople.unlinkConfirmBtn);
+  }
+
+  unlinkCancel(): Locator {
+    return this.page.getByTestId(institutePeople.unlinkCancelBtn);
   }
 }

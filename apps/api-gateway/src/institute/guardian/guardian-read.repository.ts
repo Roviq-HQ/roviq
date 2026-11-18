@@ -5,7 +5,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   guardianProfilesLive,
-  phoneNumbers,
+  phoneNumbersLive,
   sectionsLive,
   standardsLive,
   studentAcademicsLive,
@@ -40,7 +40,7 @@ export class GuardianReadRepository {
       profileImageUrl: userProfilesLive.profileImageUrl,
       gender: userProfilesLive.gender,
 
-      primaryPhone: phoneNumbers.number,
+      primaryPhone: phoneNumbersLive.number,
 
       linkedStudentCount: sql<number>`(
         SELECT COUNT(*)::int FROM ${studentGuardianLinksLive}
@@ -61,10 +61,10 @@ export class GuardianReadRepository {
         .from(guardianProfilesLive)
         .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
         .leftJoin(
-          phoneNumbers,
+          phoneNumbersLive,
           and(
-            eq(phoneNumbers.userId, guardianProfilesLive.userId),
-            eq(phoneNumbers.isPrimary, true),
+            eq(phoneNumbersLive.userId, guardianProfilesLive.userId),
+            eq(phoneNumbersLive.isPrimary, true),
           ),
         )
         .where(and(eq(guardianProfilesLive.id, id), guardianReadPredicate(access.ability)))
@@ -84,17 +84,17 @@ export class GuardianReadRepository {
         .from(guardianProfilesLive)
         .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
         .leftJoin(
-          phoneNumbers,
+          phoneNumbersLive,
           and(
-            eq(phoneNumbers.userId, guardianProfilesLive.userId),
-            eq(phoneNumbers.isPrimary, true),
+            eq(phoneNumbersLive.userId, guardianProfilesLive.userId),
+            eq(phoneNumbersLive.isPrimary, true),
           ),
         );
 
       const searchClause = search
         ? or(
             sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${search})`,
-            ilike(phoneNumbers.number, `%${search}%`),
+            ilike(phoneNumbersLive.number, `%${search}%`),
           )
         : undefined;
 

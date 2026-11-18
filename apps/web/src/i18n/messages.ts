@@ -34,6 +34,7 @@ import enLocale from '../../messages/en/locale.json';
 import enNav from '../../messages/en/nav.json';
 import enNotifications from '../../messages/en/notifications.json';
 import enObservability from '../../messages/en/observability.json';
+import enPeopleLinks from '../../messages/en/peopleLinks.json';
 import enProfile from '../../messages/en/profile.json';
 import enResellerInstitutes from '../../messages/en/resellerInstitutes.json';
 import enRoles from '../../messages/en/roles.json';
@@ -78,6 +79,7 @@ import hiLocale from '../../messages/hi/locale.json';
 import hiNav from '../../messages/hi/nav.json';
 import hiNotifications from '../../messages/hi/notifications.json';
 import hiObservability from '../../messages/hi/observability.json';
+import hiPeopleLinks from '../../messages/hi/peopleLinks.json';
 import hiProfile from '../../messages/hi/profile.json';
 import hiResellerInstitutes from '../../messages/hi/resellerInstitutes.json';
 import hiRoles from '../../messages/hi/roles.json';
@@ -107,6 +109,7 @@ const en = {
   consent: enConsent,
   dashboard: enDashboard,
   deletedRecords: enDeletedRecords,
+  peopleLinks: enPeopleLinks,
   dlq: enDlq,
   error: enError,
   examinations: enExaminations,
@@ -154,6 +157,7 @@ const hi = {
   consent: hiConsent,
   dashboard: hiDashboard,
   deletedRecords: hiDeletedRecords,
+  peopleLinks: hiPeopleLinks,
   dlq: hiDlq,
   error: hiError,
   examinations: hiExaminations,

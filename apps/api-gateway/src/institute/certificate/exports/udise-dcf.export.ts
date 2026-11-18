@@ -12,7 +12,7 @@ import { GuardianRelationship, QualificationType } from '@roviq/common-types';
 import { UDISE_STUDENT_HEADERS, UDISE_TEACHER_HEADERS } from '@roviq/compliance';
 import {
   type DrizzleDB,
-  guardianProfiles,
+  guardianProfilesLive,
   mkAdminCtx,
   mkInstituteCtx,
   staffProfilesLive,
@@ -81,10 +81,10 @@ export async function generateUdiseDcfExport(
         })
         .from(studentGuardianLinksLive)
         .innerJoin(
-          guardianProfiles,
-          eq(studentGuardianLinksLive.guardianProfileId, guardianProfiles.id),
+          guardianProfilesLive,
+          eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
         )
-        .innerJoin(userProfilesLive, eq(guardianProfiles.userId, userProfilesLive.userId));
+        .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId));
     },
   );
 

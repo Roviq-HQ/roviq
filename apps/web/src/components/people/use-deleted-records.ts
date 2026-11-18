@@ -74,10 +74,18 @@ const DELETE = {
 // Root fields a delete or restore makes stale. Evicting them refetches every
 // mounted query that reads them; naming queries in `refetchQueries` warns when
 // the list page is not mounted (delete runs on the detail page).
+// Guardian and student lists also show each other (linked children, guardians
+// tab, primary guardian column), so a delete makes the other side stale too.
 const STALE_FIELDS: Record<PersonKind, string[]> = {
-  student: ['listStudents', 'listDeletedStudents', 'studentStatistics'],
+  student: [
+    'listStudents',
+    'listDeletedStudents',
+    'studentStatistics',
+    'listLinkedStudents',
+    'listGuardians',
+  ],
   staff: ['listStaff', 'listDeletedStaff', 'staffStatistics'],
-  guardian: ['listGuardians', 'listDeletedGuardians'],
+  guardian: ['listGuardians', 'listDeletedGuardians', 'listStudentGuardians', 'listStudents'],
 };
 
 function evictStale(kind: PersonKind, cache: ApolloCache) {

@@ -684,3 +684,12 @@ The pre-push gate failed twice in a row with `remaining connection slots are res
 All three compose files now set `SQL_MAX_CONNS: 10`, `SQL_MAX_IDLE_CONNS: 2`, `SQL_VIS_MAX_CONNS: 5`, `SQL_VIS_MAX_IDLE_CONNS: 1` on `temporal`. After recreating the containers Temporal holds 12 connections per Postgres.
 
 **Verification:** see the `ci:check` run that follows this entry's commit.
+
+
+## 2026-11-18 — fixed: integration runs exhausted the test Postgres again (system health poll at boot)
+
+`pnpm test:int` and the pre-push `ci:check` failed four to six unrelated files per run (`billing`, `scope-guard-rejection`, `casl-enforcement`, `admission-number-series`, …) with `remaining connection slots are reserved for roles with the SUPERUSER attribute`, the same symptom as the ROV-96 entry above. `SystemHealthService` (ROV-184) ran a health poll in `onModuleInit`: a Postgres `select 1`, uptime writes and probes of the other services, in every integration app at boot. With Temporal holding about 40 of the 100 connections, the parallel forks ran out.
+
+The service now polls only on its timer; `getSystemHealth()` already checks on demand when there is no recent snapshot. The rule from the ROV-96 entry stands: no database work in `onModuleInit` of a provider that every `AppModule` boot loads.
+
+**Verification:** two consecutive `pnpm test:int` runs failed before the change; two consecutive runs passed after it (64 files, 676 tests).

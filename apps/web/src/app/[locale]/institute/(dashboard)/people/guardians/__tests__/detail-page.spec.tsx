@@ -8,11 +8,12 @@
  * so those assertions live next to the shared enum drift check in
  * `new-page.spec.tsx`.
  */
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
-
 import baseGuardianMessages from '@web-messages/en/guardians.json';
+import peopleLinksEn from '@web-messages/en/peopleLinks.json';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 
@@ -193,6 +194,7 @@ const detailMessages = {
       primaryFor: '{count, plural, one {Primary for # child} other {Primary for # children}}',
     },
     profile: {
+      ...baseGuardianMessages.detail.profile,
       firstName: 'First name',
       lastName: 'Last name',
       occupation: 'Occupation',
@@ -214,6 +216,12 @@ const detailMessages = {
 };
 
 const commonMessages = { loading: 'Loading', error: 'Error', cancel: 'Cancel' };
+
+function graphQLError(code: string) {
+  return new CombinedGraphQLErrors({
+    errors: [{ message: 'raw server text', extensions: { code } }],
+  });
+}
 
 function renderPage() {
   return renderWithProviders(<GuardianDetailPage />, {
@@ -333,7 +341,7 @@ describe('GuardianDetailPage (component)', () => {
   });
 
   it('concurrency error on save shows error toast with refresh action', async () => {
-    updateGuardianMock.mockRejectedValueOnce(new Error('version mismatch: CONCURRENT update'));
+    updateGuardianMock.mockRejectedValueOnce(graphQLError('CONCURRENT_MODIFICATION'));
     const user = userEvent.setup();
     renderPage();
 
@@ -540,7 +548,7 @@ describe('GuardianDetailPage › Children tab › LinkStudentDialog', () => {
   });
 
   it('renders error toast on mutation failure and keeps dialog open', async () => {
-    linkMutationMock.mockRejectedValueOnce(new Error('backend rejected'));
+    linkMutationMock.mockRejectedValueOnce(graphQLError('GUARDIAN_ALREADY_LINKED'));
     const user = userEvent.setup();
     await openChildrenTab(user);
     await user.click(screen.getByTestId('guardian-detail-link-student-btn'));
@@ -551,7 +559,12 @@ describe('GuardianDetailPage › Children tab › LinkStudentDialog', () => {
     await user.click(screen.getByTestId('guardian-detail-link-student-submit'));
 
     await waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith('backend rejected');
+      expect(toastError).toHaveBeenCalledWith(
+        detailMessages.detail.children.linkDialog.linkFailed,
+        {
+          description: peopleLinksEn.linkErrors.GUARDIAN_ALREADY_LINKED,
+        },
+      );
     });
     expect(screen.getByTestId('guardian-detail-link-student-dialog')).toBeInTheDocument();
   });

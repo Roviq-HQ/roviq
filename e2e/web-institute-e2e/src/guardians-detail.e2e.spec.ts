@@ -6,9 +6,14 @@
  * shared state with other specs. We do not use the GraphQL helper here
  * because a reliable helper does not exist in this project yet.
  */
+
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { expect, test } from '../../shared/console-guardian';
+import { SEED_IDS, SEED_PEOPLE } from '../../shared/seed-fixtures';
 import { EDUCATION_LEVEL_LABELS_EN, GuardianCreatePage } from './pages/GuardianCreatePage';
 import { GuardianDetailPage } from './pages/GuardianDetailPage';
+
+const { instituteGuardians, instituteStudents } = testIds;
 
 async function createGuardianViaUI(
   page: import('@playwright/test').Page,
@@ -158,5 +163,51 @@ test.describe('Guardians — detail page', () => {
       // at least one child card is now visible (empty state gone).
       await expect(detail.childrenTab()).toHaveAttribute('data-state', 'active');
     });
+  });
+
+  // Read-only against the e2e seed: guardian2 is linked to student2 and student3.
+  test('a linked child opens in a popup, and its guardian links swap the popup with Back', async ({
+    page,
+  }) => {
+    const detail = new GuardianDetailPage(page);
+    await detail.gotoById(SEED_IDS.GUARDIAN_PROFILE_2, 'en');
+    await detail.clickChildrenTab();
+    const pageUrl = page.url();
+
+    await detail.personLink('student', SEED_IDS.STUDENT_PROFILE_2).click();
+
+    const dialog = detail.personDialog();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId(instituteStudents.detailTitle)).toHaveText(
+      SEED_PEOPLE.STUDENTS[1].name,
+    );
+    await expect(detail.personDialogBack()).toHaveCount(0);
+    expect(page.url()).toBe(pageUrl);
+
+    await dialog.getByTestId(instituteStudents.detailTab('guardians')).click();
+    await dialog
+      .getByTestId(testIds.institutePeople.personLink('guardian', SEED_IDS.GUARDIAN_PROFILE_1))
+      .click();
+    await expect(dialog.getByTestId(instituteGuardians.detailTabChildren)).toBeVisible();
+    await expect(detail.personDialog()).toHaveCount(1);
+
+    await detail.personDialogBack().click();
+    await expect(dialog.getByTestId(instituteStudents.detailTitle)).toHaveText(
+      SEED_PEOPLE.STUDENTS[1].name,
+    );
+  });
+
+  test('unlinking a student’s only guardian is blocked before submitting', async ({ page }) => {
+    const detail = new GuardianDetailPage(page);
+    await detail.gotoById(SEED_IDS.GUARDIAN_PROFILE_2, 'en');
+    await detail.clickChildrenTab();
+
+    await detail.unlinkButton(SEED_IDS.LINK_G2_S3).click();
+
+    await expect(detail.unlinkDialog()).toBeVisible();
+    await expect(detail.unlinkLastGuardianNotice()).toContainText(SEED_PEOPLE.STUDENTS[2].name);
+    await expect(detail.unlinkConfirm()).toBeDisabled();
+    await detail.unlinkCancel().click();
+    await expect(detail.unlinkDialog()).toHaveCount(0);
   });
 });

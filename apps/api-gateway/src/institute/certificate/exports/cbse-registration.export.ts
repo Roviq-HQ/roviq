@@ -9,7 +9,7 @@ import { GuardianRelationship } from '@roviq/common-types';
 import { CBSE_REGISTRATION_HEADERS } from '@roviq/compliance';
 import {
   type DrizzleDB,
-  guardianProfiles,
+  guardianProfilesLive,
   mkAdminCtx,
   mkInstituteCtx,
   studentAcademicsLive,
@@ -81,10 +81,10 @@ export async function generateCbseRegistrationExport(
         })
         .from(studentGuardianLinksLive)
         .innerJoin(
-          guardianProfiles,
-          eq(studentGuardianLinksLive.guardianProfileId, guardianProfiles.id),
+          guardianProfilesLive,
+          eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
         )
-        .innerJoin(userProfilesLive, eq(guardianProfiles.userId, userProfilesLive.userId));
+        .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId));
     },
   );
 
