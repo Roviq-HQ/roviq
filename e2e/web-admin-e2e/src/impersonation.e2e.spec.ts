@@ -75,9 +75,10 @@ test.describe('Impersonation flow', () => {
     await expect(exit).toHaveText('Exit Impersonation');
     await Promise.all([tab.waitForEvent('close'), exit.click()]);
 
-    // The sessions page hears about it without a reload: nothing active with this reason.
+    // The sessions page drops it without a reload: by the live event, or by the
+    // 15-second fallback poll when the event was missed.
     await page.bringToFront();
-    await expect(row).toHaveCount(0);
+    await expect(row).toHaveCount(0, { timeout: 20_000 });
     await page.getByTestId(sessions.showFilter).click();
     await page.getByRole('option', { name: 'All sessions' }).click();
     await expect(row).toContainText('Ended');

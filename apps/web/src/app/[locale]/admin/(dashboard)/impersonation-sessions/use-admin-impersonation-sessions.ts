@@ -49,15 +49,21 @@ export const ADMIN_IMPERSONATION_SESSION_ENDED = gql`
   }
 `;
 
+// An event can be missed (socket not yet connected, a session ended by a database trigger
+// or by expiry between sweeps), so the list also re-reads on this interval.
+const FALLBACK_POLL_MS = 15_000;
+
 /**
  * Sessions across the platform, newest first. The list re-reads itself whenever any
- * session starts or ends, so the page stays current without a reload.
+ * session starts or ends, and on a slow poll as a fallback, so the page stays current
+ * without a reload.
  */
 export function useAdminImpersonationSessions(activeOnly: boolean, enabled: boolean) {
   const { data, loading, error, refetch } = useQuery(AdminImpersonationSessionsDocument, {
     variables: { activeOnly, first: 100 },
     fetchPolicy: 'cache-and-network',
     skip: !enabled,
+    pollInterval: FALLBACK_POLL_MS,
   });
   const onData = () => void refetch();
   useSubscription(AdminImpersonationSessionCreatedDocument, { skip: !enabled, onData });

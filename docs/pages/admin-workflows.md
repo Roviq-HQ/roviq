@@ -259,7 +259,7 @@ On the **Impersonation** tab, an additional **scope** filter lets you show entri
 
 - Columns: who started it and from which scope (Platform, Reseller, Institute), the target user, the institute, the reason, start and expiry time, and the **status**: Active, Ended (the impersonator left), Revoked (someone else ended it) or Expired.
 - **Show**: *Active only* (default) or *All sessions*. The choice is kept in the page address.
-- The list updates by itself when a session starts or ends.
+- The list updates by itself when a session starts or ends, within 15 seconds at most.
 - **Terminate** on an active session signs the impersonator out of the impersonated account at once, after a confirmation. It needs the impersonate permission; read-only platform roles see the list without it.
 
 ---
