@@ -753,3 +753,10 @@ Playwright MCP keeps one persistent browser profile per workspace, and a profile
 ## 2026-11-18 — seen once, cause unknown: `switchers.e2e.spec.ts` "switching back to English restores /en/ URL" timed out in `ci:check`
 
 One uncached `ci:check` run in slot 2 (16 Playwright workers, three instances' stacks on the machine) failed this test: after `goto('/hi/dashboard')` and a click on the locale switcher, `locale-option-en` never appeared within 30 s. The page snapshot showed the English dashboard. The spec then passed 8 of 8 with `--repeat-each 8`, and the next full gate run passed. No backend restart was involved (the e2e gateway has no watcher). Not fixed. If it fails again, start from `dist/.playwright/e2e/test-output/…/error-context.md` and check whether `/hi/dashboard` was redirected to `/en`.
+
+
+## 2026-11-18 — verified: two instances run `ci:check` at the same time (ROV-288)
+
+With the lock per instance, `pnpm ci:check` was started at the same moment in slots 2 and 4 with the Nx cache off. Both passed in full (322 s and 329 s; alone, slot 2 takes about 190 s). Lock files: `/tmp/roviq-ci-check-2.lock`, `/tmp/roviq-ci-check-4.lock`.
+
+Also found: `NX_SKIP_NX_CACHE=1` does nothing. Nx only honours the value `true`, so earlier "uncached" runs replayed cached results (integration in 1 s). The bypass note in `scripts/ci-check.sh` and the docs now say `NX_SKIP_NX_CACHE=true`.

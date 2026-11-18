@@ -3,7 +3,7 @@
 #
 # Bypass (local only):
 #   SKIP_PREPUSH=1 git push   |   HUSKY=0 git push   |   git push --no-verify
-#   NX_SKIP_NX_CACHE=1 git push  (forces re-execution of cached targets)
+#   NX_SKIP_NX_CACHE=true git push  (forces re-execution of cached targets)
 #
 # Requires bash >= 4.3. Linux default; macOS users: `brew install bash`.
 
