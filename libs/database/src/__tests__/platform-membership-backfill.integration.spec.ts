@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AbilityRule } from '@roviq/common-types';
-import { eq, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { SYSTEM_USER_ID } from '../constants';
 import type { DrizzleDB } from '../providers';
@@ -153,14 +153,26 @@ describe('ROV-88 platform membership backfill migration', () => {
     });
   });
 
+  // Only the seeded institutes: other integration files create and delete memberships in
+  // their own test institutes while this runs, which would change a table-wide count.
+  const SEEDED_INSTITUTES = [SEED_IDS.INSTITUTE_1, SEED_IDS.INSTITUTE_2];
+
   it('should leave institute-role memberships untouched', async () => {
     await inRolledBackTx(async (tx) => {
-      const before = await tx.select({ id: memberships.id }).from(memberships);
+      const before = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(inArray(memberships.tenantId, SEEDED_INSTITUTES))
+        .orderBy(asc(memberships.id));
       expect(before.length).toBeGreaterThanOrEqual(1);
 
       await runBackfill(tx);
 
-      const after = await tx.select({ id: memberships.id }).from(memberships);
+      const after = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(inArray(memberships.tenantId, SEEDED_INSTITUTES))
+        .orderBy(asc(memberships.id));
       expect(after).toEqual(before);
     });
   });
