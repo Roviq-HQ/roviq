@@ -484,7 +484,11 @@ type AdminUserDetailProfileModel {
 """A document a user has uploaded"""
 type AdminUserDocumentModel {
   description: String
-  fileUrls: [String!]!
+
+  """
+  Pages of the document, in order. Their `url` is null: download each with `adminUserDocumentDownloadUrl`.
+  """
+  files: [FileRef!]!
   id: ID!
   isVerified: Boolean!
   referenceNumber: String
@@ -2529,6 +2533,7 @@ enum FilePurpose {
   BULK_IMPORT_REPORT
   LEAVE_ATTACHMENT
   PROFILE_PHOTO
+  USER_DOCUMENT
 }
 
 """A stored file. `url` is signed when the response is built and expires."""
@@ -3828,6 +3833,11 @@ type Mutation {
   Update reseller profile fields (name, branding, domain, registration, contact, address)
   """
   adminUpdateReseller(id: ID!, input: AdminUpdateResellerInput!): AdminResellerModel!
+
+  """
+  Get a download URL for one page of a user document, valid for 60 seconds. A mutation, so every call is audited.
+  """
+  adminUserDocumentDownloadUrl(fileId: ID!): String!
   adminVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
 
   """Submit a new leave application (PENDING)."""
@@ -4302,7 +4312,7 @@ type Mutation {
   updateTimetablePeriod(input: UpdateTimetablePeriodInput!, periodId: ID!, timetableId: ID!): TimetablePeriodModel!
 
   """
-  Records an uploaded document (client uploads file bytes to object storage first, then calls this mutation with the resulting URLs).
+  Saves a document for a student from files uploaded beforehand with `requestFileUpload`.
   """
   uploadStudentDocument(input: UploadStudentDocumentInput!): StudentDocumentModel!
   verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): InstituteLoginResult!
@@ -5918,7 +5928,11 @@ type StudentDocumentModel {
   createdAt: DateTime!
   description: String
   expiryDate: DateOnly
-  fileUrls: [String!]!
+
+  """
+  Pages of the document, in order. Their `url` is null: download each with `fileDownloadUrl`.
+  """
+  files: [FileRef!]!
   id: ID!
   isVerified: Boolean!
   referenceNumber: String
@@ -7258,14 +7272,14 @@ input UpdateTimetablePeriodInput {
 }
 
 """
-Input for uploading document metadata (with pre-uploaded MinIO/S3 URLs) against a student profile.
+A document for a student. Upload each page first with `requestFileUpload` (purpose USER_DOCUMENT, `subjectUserId` = the student's user), then pass the file ids here.
 """
 input UploadStudentDocumentInput {
   """Optional human-readable description of the document contents."""
   description: String
 
-  """One or more MinIO/S3 URLs — one URL per page for multi-page scans."""
-  fileUrls: [String!]!
+  """Ids of the uploaded pages, in page order. 1 to 10 files."""
+  fileIds: [ID!]!
 
   """
   Document reference number for traceability, e.g. TC number, certificate serial number.

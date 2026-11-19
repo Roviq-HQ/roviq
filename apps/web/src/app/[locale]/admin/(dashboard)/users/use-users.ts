@@ -131,7 +131,11 @@ export const ADMIN_GET_USER = gql`
         id
         type
         description
-        fileUrls
+        files {
+          id
+          name
+          contentType
+        }
         referenceNumber
         isVerified
         rejectionReason

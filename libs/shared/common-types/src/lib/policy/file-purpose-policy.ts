@@ -138,6 +138,18 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     // Row-level security already limits these to members of the person's institutes.
     readAbility: 'AUTHENTICATED',
   },
+  USER_DOCUMENT: {
+    visibility: 'PRIVATE',
+    owner: 'USER',
+    allowedContentTypes: DOCUMENT_TYPES,
+    maxSizeBytes: 10 * MB,
+    // Identity scans: no link in lists, every download goes through the audited call.
+    sensitive: true,
+    image: DOCUMENT_IMAGE,
+    uploadAbility: { action: 'update', subject: 'Student' },
+    // Checked against the very student the document belongs to, see FileService.canRead.
+    readAbility: { action: 'read', subject: 'Student' },
+  },
 };
 
 const EXTENSION: { readonly [T in FileContentType]: string } = {

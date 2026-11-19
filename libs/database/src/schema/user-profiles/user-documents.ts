@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, index, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, date, index, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { entityColumns } from '../common/columns';
 import { userDocumentType } from '../common/enums';
@@ -9,8 +9,8 @@ import { userScopedPolicies } from '../common/rls-policies';
  * Uploaded scans/photos of identity and academic documents — platform-level, keyed by user.
  * RLS: readable only where the user holds a membership; writes are admin-only.
  *
- * Stores references to S3/MinIO file URLs. Document verification workflow
- * tracks approval/rejection status.
+ * The scans themselves are rows in `files`, linked through `user_document_files`. Document
+ * verification workflow tracks approval/rejection status.
  */
 export const userDocuments = pgTable(
   'user_documents',
@@ -43,8 +43,6 @@ export const userDocuments = pgTable(
      */
     type: userDocumentType('type').notNull(),
     description: varchar('description', { length: 255 }),
-    /** Array of S3/MinIO file URLs — supports multi-page document scans */
-    fileUrls: text('file_urls').array().notNull(),
     /** Document's own reference/serial number (e.g., TC number, certificate number) */
     referenceNumber: varchar('reference_number', { length: 100 }),
 

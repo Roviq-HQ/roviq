@@ -194,6 +194,14 @@ export class FileService {
     return this.urlFor(file, variant, DOWNLOAD_URL_TTL_SECONDS);
   }
 
+  /**
+   * Short-lived URL for a file the caller has already been allowed to read by its own checks
+   * (platform screens, which have no institute ability to test).
+   */
+  signedDownloadUrl(file: FileRecord): Promise<string> {
+    return this.urlFor(file, 'FULL', AUDITED_DOWNLOAD_URL_TTL_SECONDS);
+  }
+
   /** Short-lived URL for one file, checked against the ability its purpose requires. */
   async downloadUrl(user: AuthUser, fileId: string): Promise<string> {
     const file = await this.repo.findById(fileId);
@@ -221,6 +229,12 @@ export class FileService {
         readAbility !== 'AUTHENTICATED' &&
         ability.can(readAbility.action, subject('Leave', leave))
       );
+    }
+    if (file.purpose === 'USER_DOCUMENT') {
+      const document = await this.repo.findStudentDocumentForFile(file.id, ability);
+      if (!document) return false;
+      // Same field rule as the document list: the scan shows the Aadhaar number itself.
+      return document.type !== 'AADHAAR_CARD' || ability.can('read', 'Student', 'aadhaar');
     }
     return this.allows(ability, readAbility);
   }

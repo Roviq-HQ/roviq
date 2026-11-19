@@ -353,7 +353,11 @@ const STUDENT_DOCUMENTS_QUERY = gql`
       userId
       type
       description
-      fileUrls
+      files {
+        id
+        name
+        contentType
+      }
       referenceNumber
       isVerified
       verifiedAt
@@ -380,7 +384,11 @@ const UPLOAD_STUDENT_DOCUMENT_MUTATION = gql`
       userId
       type
       description
-      fileUrls
+      files {
+        id
+        name
+        contentType
+      }
       referenceNumber
       isVerified
       createdAt
@@ -390,9 +398,8 @@ const UPLOAD_STUDENT_DOCUMENT_MUTATION = gql`
 `;
 
 /**
- * Mutation hook for the "Upload Document" button on the student detail
- * Documents tab (ROV-167). The client uploads file bytes directly to
- * MinIO/S3 and then calls this mutation with the resulting URLs.
+ * Saves a document for a student. The pages are uploaded first with
+ * `<FileUpload purpose="USER_DOCUMENT">`; this takes their file ids.
  */
 export function useUploadStudentDocument() {
   return useMutation<

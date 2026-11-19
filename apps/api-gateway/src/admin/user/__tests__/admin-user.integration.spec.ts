@@ -6,11 +6,13 @@ import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import {
   authEvents,
+  files,
   memberships,
   mkAdminCtx,
   phoneNumbers,
   SYSTEM_USER_ID,
   userAddresses,
+  userDocumentFiles,
   userDocuments,
   userIdentifiers,
   userProfiles,
@@ -45,7 +47,7 @@ const GET_USER = /* GraphQL */ `
       resellerMemberships { id }
       platformMembership { id }
       identifiers { type displayValue isVerified }
-      documents { type fileUrls isVerified }
+      documents { type isVerified files { id name contentType url } }
       addresses { type city district }
     }
   }
@@ -94,6 +96,8 @@ describe('Admin user queries (integration)', () => {
   let instituteA: TestInstitute;
   let instituteB: TestInstitute;
   let platformToken: string;
+  let documentFileId: string;
+  let unattachedFileId: string;
   const run = randomUUID().slice(0, 6);
   const firstName = `Zorvik${run}`;
   const phone = `9${Date.now().toString().slice(-9)}`;
@@ -144,10 +148,35 @@ describe('Admin user queries (integration)', () => {
         },
         { userId, type: 'APAAR', valuePlain: '123456789012', ...audit },
       ]);
-      await tx.insert(userDocuments).values({
+      const [document] = await tx
+        .insert(userDocuments)
+        .values({ userId, type: 'BIRTH_CERTIFICATE', ...audit })
+        .returning({ id: userDocuments.id });
+      assert(document);
+      const fileRow = (name: string) => ({
+        subjectUserId: userId,
+        visibility: 'PRIVATE' as const,
+        purpose: 'USER_DOCUMENT' as const,
+        objectKey: `users/${userId}/user-document/${randomUUID()}.pdf`,
+        originalName: name,
+        contentType: 'application/pdf',
+        sizeBytes: 2048,
+        status: 'READY' as const,
+        uploadedBy: userId,
+        ...audit,
+      });
+      const stored = await tx
+        .insert(files)
+        .values([fileRow('birth-page-1.pdf'), fileRow('unattached.pdf')])
+        .returning({ id: files.id });
+      assert(stored[0] && stored[1]);
+      documentFileId = stored[0].id;
+      unattachedFileId = stored[1].id;
+      await tx.insert(userDocumentFiles).values({
+        documentId: document.id,
         userId,
-        type: 'BIRTH_CERTIFICATE',
-        fileUrls: ['https://files.test/birth.pdf'],
+        fileId: documentFileId,
+        position: 0,
         ...audit,
       });
       await tx.insert(userAddresses).values({
@@ -171,6 +200,7 @@ describe('Admin user queries (integration)', () => {
         await tx.delete(authEvents).where(inArray(authEvents.userId, userIds));
         await tx.delete(userAddresses).where(inArray(userAddresses.userId, userIds));
         await tx.delete(userDocuments).where(inArray(userDocuments.userId, userIds));
+        await tx.delete(files).where(inArray(files.subjectUserId, userIds));
         await tx.delete(userIdentifiers).where(inArray(userIdentifiers.userId, userIds));
         await tx.delete(phoneNumbers).where(inArray(phoneNumbers.userId, userIds));
         await tx.delete(userProfiles).where(inArray(userProfiles.userId, userIds));
@@ -193,7 +223,11 @@ describe('Admin user queries (integration)', () => {
         resellerMemberships: unknown[];
         platformMembership: unknown;
         identifiers: Array<{ type: string; displayValue: string; isVerified: boolean }>;
-        documents: Array<{ type: string; fileUrls: string[]; isVerified: boolean }>;
+        documents: Array<{
+          type: string;
+          isVerified: boolean;
+          files: Array<{ id: string; name: string; contentType: string; url: string | null }>;
+        }>;
         addresses: Array<{ type: string; city: string; district: string }>;
       };
     }>(GET_USER, { userId: instituteA.userId });
@@ -222,9 +256,57 @@ describe('Admin user queries (integration)', () => {
       { type: 'APAAR', displayValue: '123456789012', isVerified: false },
     ]);
     expect(user?.documents).toEqual([
-      { type: 'BIRTH_CERTIFICATE', fileUrls: ['https://files.test/birth.pdf'], isVerified: false },
+      {
+        type: 'BIRTH_CERTIFICATE',
+        isVerified: false,
+        // A sensitive file carries no link in a list.
+        files: [
+          {
+            id: documentFileId,
+            name: 'birth-page-1.pdf',
+            contentType: 'application/pdf',
+            url: null,
+          },
+        ],
+      },
     ]);
     expect(user?.addresses).toEqual([{ type: 'PERMANENT', city: 'Hisar', district: 'Hisar' }]);
+  });
+
+  describe('adminUserDocumentDownloadUrl', () => {
+    const DOWNLOAD = /* GraphQL */ `
+      mutation ($fileId: ID!) { adminUserDocumentDownloadUrl(fileId: $fileId) }
+    `;
+
+    it('gives a 60-second link to a page of a user document', async () => {
+      const res = await gql<{ adminUserDocumentDownloadUrl: string }>(DOWNLOAD, {
+        fileId: documentFileId,
+      });
+
+      expect(res.errors).toBeUndefined();
+      const url = new URL(res.data?.adminUserDocumentDownloadUrl ?? '');
+      expect(url.pathname).toContain(`/users/${instituteA.userId}/user-document/`);
+      expect(url.searchParams.get('X-Amz-Expires')).toBe('60');
+    });
+
+    it('answers FILE_NOT_FOUND for a file that is not a page of a document', async () => {
+      const res = await gql(DOWNLOAD, { fileId: unattachedFileId });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('FILE_NOT_FOUND');
+    });
+
+    it('refuses an institute token', async () => {
+      const instituteToken = createInstituteToken({
+        sub: instituteB.userId,
+        tenantId: instituteB.tenantId,
+        membershipId: instituteB.membershipId,
+        roleId: instituteB.roleId,
+      });
+
+      const res = await gql(DOWNLOAD, { fileId: documentFileId }, instituteToken);
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    });
   });
 
   it('returns NOT_FOUND for an unknown user and rejects a malformed id', async () => {

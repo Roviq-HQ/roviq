@@ -6,6 +6,7 @@ import type {
   UserIdentifierType,
 } from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
+import type { FileRecord } from '../../../files/repositories/types';
 
 export type AdminUserStatus = 'ACTIVE' | 'SUSPENDED' | 'LOCKED';
 
@@ -96,7 +97,7 @@ export interface AdminUserDocumentRecord {
   id: string;
   type: UserDocumentType;
   description: string | null;
-  fileUrls: string[];
+  files: FileRecord[];
   referenceNumber: string | null;
   isVerified: boolean;
   rejectionReason: string | null;

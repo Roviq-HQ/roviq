@@ -19,6 +19,7 @@ import {
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
+import { loadUserDocumentFiles } from '../../files/user-document-files';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { StudentStatisticsModel } from './models/student-statistics.model';
 import { activeAcademicYearIds, studentReadPredicate } from './student-read-predicate';
@@ -405,7 +406,6 @@ export class StudentReadRepository {
           userId: userDocumentsLive.userId,
           type: userDocumentsLive.type,
           description: userDocumentsLive.description,
-          fileUrls: userDocumentsLive.fileUrls,
           referenceNumber: userDocumentsLive.referenceNumber,
           isVerified: userDocumentsLive.isVerified,
           verifiedAt: userDocumentsLive.verifiedAt,
@@ -419,17 +419,19 @@ export class StudentReadRepository {
         .where(eq(userDocumentsLive.userId, userId))
         .orderBy(sql`${userDocumentsLive.createdAt} DESC`);
 
-      return rows
-        .filter(
-          (row) =>
-            !['AADHAAR_CARD', 'PAN_CARD'].includes(row.type) ||
-            access.ability.can('read', 'Student', row.type === 'AADHAAR_CARD' ? 'aadhaar' : 'pan'),
-        )
-        .map((row) => ({
-          ...row,
-          verifiedAt: row.verifiedAt ? row.verifiedAt.toISOString() : null,
-          expiryDate: row.expiryDate ?? null,
-        }));
+      const visible = rows.filter(
+        (row) => row.type !== 'AADHAAR_CARD' || access.ability.can('read', 'Student', 'aadhaar'),
+      );
+      const files = await loadUserDocumentFiles(
+        tx,
+        visible.map((row) => row.id),
+      );
+      return visible.map((row) => ({
+        ...row,
+        files: files.get(row.id) ?? [],
+        verifiedAt: row.verifiedAt ? row.verifiedAt.toISOString() : null,
+        expiryDate: row.expiryDate ?? null,
+      }));
     });
   }
 

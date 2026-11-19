@@ -30,6 +30,8 @@ const KEY = `institutes/${TENANT_ID}/leave-attachment/${FILE_ID}.pdf`;
 const PENDING_KEY = `pending/${KEY}`;
 const LEAVE_ID = '00000000-0000-7000-a000-000000000004';
 const OTHER_USER_ID = '00000000-0000-7000-a000-000000000005';
+const DOCUMENT_ID = '00000000-0000-7000-a000-000000000006';
+const DOCUMENT_KEY = `users/${OTHER_USER_ID}/user-document/${FILE_ID}.pdf`;
 const PDF = Buffer.from('%PDF-1.7\nhello');
 
 const user = createMock<InstituteContext>({ scope: 'institute', tenantId: TENANT_ID });
@@ -120,6 +122,9 @@ describe('FileService', () => {
   let countPending: ReturnType<typeof vi.fn<FileRepository['countPendingByCurrentUser']>>;
   let markRejected: ReturnType<typeof vi.fn<FileRepository['markRejected']>>;
   let findLeaveForFile: ReturnType<typeof vi.fn<FileRepository['findLeaveForFile']>>;
+  let findStudentDocumentForFile: ReturnType<
+    typeof vi.fn<FileRepository['findStudentDocumentForFile']>
+  >;
   let createForUser: ReturnType<typeof vi.fn<AbilityFactory['createForUser']>>;
   let saveProcessedImage: ReturnType<typeof vi.fn<FileRepository['saveProcessedImage']>>;
   let images: FakeImageProcessor;
@@ -146,6 +151,9 @@ describe('FileService', () => {
     findLeaveForFile = vi
       .fn<FileRepository['findLeaveForFile']>()
       .mockResolvedValue({ id: LEAVE_ID, tenantId: TENANT_ID, userId: USER_ID });
+    findStudentDocumentForFile = vi
+      .fn<FileRepository['findStudentDocumentForFile']>()
+      .mockResolvedValue({ id: DOCUMENT_ID, type: 'BIRTH_CERTIFICATE' });
     createForUser = vi
       .fn<AbilityFactory['createForUser']>()
       .mockResolvedValue(createMock<AppAbility>({ can }));
@@ -160,6 +168,7 @@ describe('FileService', () => {
         countPendingByCurrentUser: countPending,
         markRejected,
         findLeaveForFile,
+        findStudentDocumentForFile,
         saveProcessedImage,
         isMemberOfCurrentTenant: isMember,
       }),
@@ -679,6 +688,74 @@ describe('FileService', () => {
       await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
         code: ErrorCode.FILE_NOT_FOUND,
       });
+    });
+  });
+
+  describe('downloadUrl for a user document', () => {
+    const documentFile = () =>
+      buildFile({
+        status: 'READY',
+        purpose: 'USER_DOCUMENT',
+        tenantId: null,
+        subjectUserId: OTHER_USER_ID,
+        objectKey: DOCUMENT_KEY,
+      });
+
+    it('should return a short-lived URL when the document belongs to a student the user may read', async () => {
+      findById.mockResolvedValue(documentFile());
+      const ability = createMock<AppAbility>({ can });
+      createForUser.mockResolvedValue(ability);
+
+      const url = await service.downloadUrl(user, FILE_ID);
+
+      expect(url).toBe(
+        `fake://private/${DOCUMENT_KEY}?get&expires=${AUDITED_DOWNLOAD_URL_TTL_SECONDS}&at=now`,
+      );
+      expect(findStudentDocumentForFile).toHaveBeenCalledWith(FILE_ID, ability);
+    });
+
+    it('should answer not found when no readable student of this institute owns the document', async () => {
+      findById.mockResolvedValue(documentFile());
+      findStudentDocumentForFile.mockResolvedValue(null);
+
+      await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
+        code: ErrorCode.FILE_NOT_FOUND,
+      });
+    });
+
+    it('should refuse an Aadhaar scan to a user who may not read the Aadhaar field', async () => {
+      findById.mockResolvedValue(documentFile());
+      findStudentDocumentForFile.mockResolvedValue({ id: DOCUMENT_ID, type: 'AADHAAR_CARD' });
+      createForUser.mockResolvedValue(
+        createMongoAbility<AppAbility>([
+          { action: 'read', subject: 'Student', fields: ['id', 'admissionNumber'] },
+        ]),
+      );
+
+      await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
+        code: ErrorCode.FILE_NOT_FOUND,
+      });
+    });
+
+    it('should allow an Aadhaar scan to a user who may read every student field', async () => {
+      findById.mockResolvedValue(documentFile());
+      findStudentDocumentForFile.mockResolvedValue({ id: DOCUMENT_ID, type: 'AADHAAR_CARD' });
+      createForUser.mockResolvedValue(
+        createMongoAbility<AppAbility>([{ action: 'read', subject: 'Student' }]),
+      );
+
+      await expect(service.downloadUrl(user, FILE_ID)).resolves.toContain(DOCUMENT_KEY);
+    });
+  });
+
+  describe('signedDownloadUrl', () => {
+    it('should sign a 60-second link without consulting abilities', async () => {
+      const url = await service.signedDownloadUrl(buildFile({ status: 'READY' }));
+
+      expect(url).toBe(
+        `fake://private/${KEY}?get&expires=${AUDITED_DOWNLOAD_URL_TTL_SECONDS}&at=now`,
+      );
+      expect(createForUser).not.toHaveBeenCalled();
     });
   });
 });

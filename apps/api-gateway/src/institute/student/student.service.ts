@@ -44,6 +44,9 @@ import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
 import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
+import { FileService } from '../../files/file.service';
+import { markFilesReady } from '../../files/file-attachment';
+import { attachUserDocumentFiles, loadUserDocumentFiles } from '../../files/user-document-files';
 import { nextAdmissionNumber } from './admission-number.sequence';
 import type { CreateStudentInput } from './dto/create-student.input';
 import type { StudentFilterInput } from './dto/student-filter.input';
@@ -51,6 +54,8 @@ import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
 import { StudentReadRepository } from './student-read.repository';
+
+const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
 
 @Injectable()
 export class StudentService {
@@ -61,6 +66,7 @@ export class StudentService {
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
     private readonly readRepository: StudentReadRepository,
+    private readonly files: FileService,
   ) {}
 
   private getTenantId(): string {
@@ -269,35 +275,15 @@ export class StudentService {
   // ── READ ──────────────────────────────────────────────────
 
   /**
-   * Returns all uploaded documents for a single student. The student is
-   * verified to belong to the current tenant via `withTenant` (RLS on
-   * `student_profiles`); the actual `user_documents` rows are then read via
-   * `withAdmin` because that table is platform-level (no RLS).
-   *
-   * Used by the Documents tab on the student detail page (ROV-167).
-   * Returns the most-recently uploaded documents first.
-   */
-  /**
-   * Records an uploaded document against a student's `user_documents` row.
-   *
-   * Flow (mirrors `listDocumentsForStudent`):
-   *   1. Verify the student belongs to the current tenant via `withTenant`
-   *      on `student_profiles` (RLS enforces tenant isolation) and resolve
-   *      the owning `userId`.
-   *   2. Insert into the platform-level `user_documents` table via
-   *      `withAdmin` (no RLS on that table).
-   *
-   * The file bytes themselves are uploaded directly to MinIO/S3 by the
-   * client; this mutation only persists the resulting URLs.
-   *
-   * Used by the "Upload Document" button on the student detail page
-   * Documents tab (ROV-167).
+   * Saves a document for a student from files uploaded beforehand. The student must belong
+   * to this institute (RLS on `student_profiles`); `user_documents` is platform-level and
+   * written as admin. Files become READY only together with the document row.
    */
   async uploadDocument(input: {
     studentProfileId: string;
     type: UserDocumentType;
     description?: string;
-    fileUrls: string[];
+    fileIds: string[];
     referenceNumber?: string;
   }): Promise<StudentDocumentModel> {
     const tenantId = this.getTenantId();
@@ -310,14 +296,7 @@ export class StudentService {
         `Invalid document type '${input.type}'`,
       );
     }
-    if (input.fileUrls.length === 0) {
-      throw new BusinessException(
-        ErrorCode.FILE_URLS_REQUIRED,
-        'At least one file URL is required',
-      );
-    }
 
-    // 1. Verify the student belongs to this tenant and resolve their userId.
     const studentRows = await withTenant(
       this.db,
       mkInstituteCtx(tenantId, 'service:student'),
@@ -334,22 +313,41 @@ export class StudentService {
     }
     const userId = studentRows[0].userId;
 
-    // 2. Insert the new user_documents row (platform-level, no RLS).
-    const inserted = await withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
-      const rows = await tx
-        .insert(userDocuments)
-        .values({
-          createdBy: actorId,
-          updatedBy: actorId,
+    await this.files.verifyUploads(input.fileIds, DOCUMENT_FILE_PURPOSE);
+
+    const { inserted, files } = await withAdmin(
+      this.db,
+      mkAdminCtx('service:student'),
+      async (tx) => {
+        // The files must have been uploaded for this very student.
+        await markFilesReady(tx, {
+          fileIds: input.fileIds,
+          purpose: DOCUMENT_FILE_PURPOSE,
+          userId: actorId,
+          subjectUserId: userId,
+        });
+        const rows = await tx
+          .insert(userDocuments)
+          .values({
+            createdBy: actorId,
+            updatedBy: actorId,
+            userId,
+            type: input.type,
+            description: input.description ?? null,
+            referenceNumber: input.referenceNumber ?? null,
+          })
+          .returning();
+        const document = rows[0];
+        await attachUserDocumentFiles(tx, {
+          documentId: document.id,
           userId,
-          type: input.type,
-          description: input.description ?? null,
-          fileUrls: input.fileUrls,
-          referenceNumber: input.referenceNumber ?? null,
-        })
-        .returning();
-      return rows[0];
-    });
+          fileIds: input.fileIds,
+          actorId,
+        });
+        const attached = await loadUserDocumentFiles(tx, [document.id]);
+        return { inserted: document, files: attached.get(document.id) ?? [] };
+      },
+    );
 
     this.logger.log(
       `Student document uploaded: student=${input.studentProfileId} type=${input.type} actor=${actorId}`,
@@ -360,7 +358,7 @@ export class StudentService {
       userId: inserted.userId,
       type: inserted.type,
       description: inserted.description,
-      fileUrls: inserted.fileUrls,
+      files,
       referenceNumber: inserted.referenceNumber,
       isVerified: inserted.isVerified,
       verifiedAt: inserted.verifiedAt ? inserted.verifiedAt.toISOString() : null,

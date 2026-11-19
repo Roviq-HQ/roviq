@@ -1,5 +1,11 @@
-import type { FilePurpose } from '@roviq/common-types';
-import type { CreateFileData, FileLeaveOwner, FileRecord, ProcessedImageData } from './types';
+import type { AppAbility, FilePurpose } from '@roviq/common-types';
+import type {
+  CreateFileData,
+  FileDocumentOwner,
+  FileLeaveOwner,
+  FileRecord,
+  ProcessedImageData,
+} from './types';
 
 /** Institute-scoped access to `files`. Tenant and actor come from the request context. */
 export abstract class FileRepository {
@@ -16,4 +22,12 @@ export abstract class FileRepository {
   abstract saveProcessedImage(id: string, image: ProcessedImageData): Promise<void>;
   /** Null when the file is not attached to a live leave. */
   abstract findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null>;
+  /**
+   * The user document a file is a page of. Null unless the document belongs to a student of
+   * this institute whom `ability` may read.
+   */
+  abstract findStudentDocumentForFile(
+    fileId: string,
+    ability: AppAbility,
+  ): Promise<FileDocumentOwner | null>;
 }

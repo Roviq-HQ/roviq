@@ -1,18 +1,23 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { UserDocumentType } from '@roviq/common-types';
-import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
-/**
- * Input for the `uploadStudentDocument` mutation (ROV-167).
- *
- * The actual file bytes are uploaded by the client directly to object
- * storage (MinIO/S3); this mutation records the resulting URLs against
- * the student's `user_documents` row. Multi-page scans are supported via
- * the `fileUrls` array.
- */
+/** Most pages one document may have. */
+export const MAX_DOCUMENT_FILES = 10;
+
 @InputType({
   description:
-    'Input for uploading document metadata (with pre-uploaded MinIO/S3 URLs) against a student profile.',
+    "A document for a student. Upload each page first with `requestFileUpload` (purpose USER_DOCUMENT, `subjectUserId` = the student's user), then pass the file ids here.",
 })
 export class UploadStudentDocumentInput {
   @Field(() => ID, { description: 'Target student profile ID (tenant-scoped UUIDv7).' })
@@ -35,12 +40,15 @@ export class UploadStudentDocumentInput {
   @IsString()
   description?: string;
 
-  @Field(() => [String], {
-    description: 'One or more MinIO/S3 URLs — one URL per page for multi-page scans.',
+  @Field(() => [ID], {
+    description: `Ids of the uploaded pages, in page order. 1 to ${MAX_DOCUMENT_FILES} files.`,
   })
   @IsArray()
-  @IsUrl({}, { each: true })
-  fileUrls!: string[];
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_DOCUMENT_FILES)
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  fileIds!: string[];
 
   @Field(() => String, {
     nullable: true,

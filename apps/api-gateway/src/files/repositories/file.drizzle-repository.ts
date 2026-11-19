@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { FilePurpose } from '@roviq/common-types';
+import type { AppAbility, FilePurpose } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -9,13 +9,23 @@ import {
   leavesLive,
   membershipsLive,
   mkInstituteCtx,
+  studentProfilesLive,
+  userDocumentFilesLive,
+  userDocumentsLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { studentReadPredicate } from '../../institute/student/student-read-predicate';
 import { FileRepository } from './file.repository';
 import { fileLiveColumns } from './file-columns';
-import type { CreateFileData, FileLeaveOwner, FileRecord, ProcessedImageData } from './types';
+import type {
+  CreateFileData,
+  FileDocumentOwner,
+  FileLeaveOwner,
+  FileRecord,
+  ProcessedImageData,
+} from './types';
 
 const writeReturning = {
   id: files.id,
@@ -126,6 +136,23 @@ export class FileDrizzleRepository extends FileRepository {
         .from(leaveFilesLive)
         .innerJoin(leavesLive, eq(leavesLive.id, leaveFilesLive.leaveId))
         .where(eq(leaveFilesLive.fileId, fileId));
+      return rows[0] ?? null;
+    });
+  }
+
+  async findStudentDocumentForFile(
+    fileId: string,
+    ability: AppAbility,
+  ): Promise<FileDocumentOwner | null> {
+    const { tenantId } = this.context();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+      const rows = await tx
+        .select({ id: userDocumentsLive.id, type: userDocumentsLive.type })
+        .from(userDocumentFilesLive)
+        .innerJoin(userDocumentsLive, eq(userDocumentsLive.id, userDocumentFilesLive.documentId))
+        .innerJoin(studentProfilesLive, eq(studentProfilesLive.userId, userDocumentsLive.userId))
+        .where(and(eq(userDocumentFilesLive.fileId, fileId), studentReadPredicate(ability, null)))
+        .limit(1);
       return rows[0] ?? null;
     });
   }

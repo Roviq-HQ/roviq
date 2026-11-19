@@ -43,6 +43,8 @@ export const FILE_PURPOSE_VALUES = [
   'BULK_IMPORT_REPORT',
   // A person's profile picture; belongs to the user, shown in every institute they are in
   'PROFILE_PHOTO',
+  // Scan of a person's identity or academic document (birth certificate, Aadhaar, TC)
+  'USER_DOCUMENT',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];

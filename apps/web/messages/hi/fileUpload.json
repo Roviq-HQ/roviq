@@ -10,7 +10,9 @@
   "cancelNamed": "{name} का अपलोड रद्द करें",
   "remove": "हटाएँ",
   "removeNamed": "{name} हटाएँ",
-  "download": "{name} डाउनलोड करें",
+  "download": {
+    "failed": "फ़ाइल नहीं खुल सकी। फिर से प्रयास करें।"
+  },
   "errors": {
     "FILE_TYPE_NOT_ALLOWED": "इस प्रकार की फ़ाइल यहाँ स्वीकार नहीं की जाती।",
     "FILE_TOO_LARGE": "यह फ़ाइल बहुत बड़ी है।",
