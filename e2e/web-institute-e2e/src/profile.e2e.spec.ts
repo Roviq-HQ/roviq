@@ -9,6 +9,7 @@
  *   - Navigation from sidebar works
  */
 
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { expect, test } from '../../shared/console-guardian';
 
 test.describe('My Profile', () => {
@@ -33,12 +34,22 @@ test.describe('My Profile', () => {
     await expect(personal.getByText('MALE', { exact: true })).toBeVisible();
   });
 
-  test('shows editable details card with phone and image URL inputs', async ({ page }) => {
+  test('shows editable details card with the phone input', async ({ page }) => {
     const editable = page.getByTestId('profile-editable-section');
     await expect(editable).toBeVisible();
     await expect(page.getByTestId('profile-phone-input')).toBeVisible();
-    await expect(page.getByTestId('profile-image-url-input')).toBeVisible();
     await expect(page.getByTestId('profile-save-btn')).toBeEnabled();
+  });
+
+  test('opens the profile picture dialog, with saving disabled until a photo is uploaded', async ({
+    page,
+  }) => {
+    await page.getByTestId(testIds.profilePhoto.changeBtn).click();
+
+    await expect(page.getByTestId(testIds.profilePhoto.dialog)).toBeVisible();
+    await expect(page.getByTestId(testIds.profilePhoto.saveBtn)).toBeDisabled();
+    await page.getByTestId(testIds.profilePhoto.cancelBtn).click();
+    await expect(page.getByTestId(testIds.profilePhoto.dialog)).toBeHidden();
   });
 
   test('rejects invalid phone number and shows error', async ({ page }) => {
