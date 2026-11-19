@@ -16,6 +16,9 @@ import {
   mkInstituteCtx,
   mkResellerCtx,
   SYSTEM_USER_ID,
+  userDocumentFiles,
+  userDocumentFilesLive,
+  userDocuments,
   withAdmin,
   withReseller,
   withTenant,
@@ -46,6 +49,7 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
   let fileA: string;
   const userLevelFileIds: string[] = [];
   const resellerFileIds: string[] = [];
+  const documentIds: string[] = [];
 
   function fileValues(tenantId: string, uploadedBy: string) {
     return {
@@ -112,6 +116,10 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
       await tx.delete(leaves).where(inArray(leaves.tenantId, tenantIds));
       await tx.delete(files).where(inArray(files.tenantId, tenantIds));
       const looseIds = [...userLevelFileIds, ...resellerFileIds];
+      if (documentIds.length > 0) {
+        // Its pages go with it (ON DELETE CASCADE).
+        await tx.delete(userDocuments).where(inArray(userDocuments.id, documentIds));
+      }
       if (looseIds.length > 0) await tx.delete(files).where(inArray(files.id, looseIds));
     });
     await cleanupTestInstitute(db, tenantA);
@@ -478,6 +486,113 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
           }),
         ),
       ).rejects.toMatchObject({ code: ErrorCode.FILE_NOT_FOUND });
+    });
+  });
+
+  describe("user_document_files (pages of a person's document)", () => {
+    async function insertDocumentFile(subjectUserId: string): Promise<string> {
+      return withAdmin(db, mkAdminCtx(ORIGIN), async (tx) => {
+        const [row] = await tx
+          .insert(files)
+          .values({
+            subjectUserId,
+            visibility: 'PRIVATE',
+            purpose: 'USER_DOCUMENT',
+            objectKey: `users/${subjectUserId}/user-document/${randomUUID()}.pdf`,
+            originalName: 'birth-certificate.pdf',
+            contentType: 'application/pdf',
+            sizeBytes: 2048,
+            status: 'READY',
+            uploadedBy: SYSTEM_USER_ID,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: files.id });
+        assert(row);
+        userLevelFileIds.push(row.id);
+        return row.id;
+      });
+    }
+
+    async function insertDocument(userId: string): Promise<string> {
+      return withAdmin(db, mkAdminCtx(ORIGIN), async (tx) => {
+        const [row] = await tx
+          .insert(userDocuments)
+          .values({
+            userId,
+            type: 'BIRTH_CERTIFICATE',
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: userDocuments.id });
+        assert(row);
+        documentIds.push(row.id);
+        return row.id;
+      });
+    }
+
+    function pageValues(documentId: string, userId: string, fileId: string) {
+      return {
+        documentId,
+        userId,
+        fileId,
+        position: 0,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+      };
+    }
+
+    async function attachedPage(userId: string): Promise<{ documentId: string; fileId: string }> {
+      const documentId = await insertDocument(userId);
+      const fileId = await insertDocumentFile(userId);
+      await withAdmin(db, mkAdminCtx(ORIGIN), (tx) =>
+        tx.insert(userDocumentFiles).values(pageValues(documentId, userId, fileId)),
+      );
+      return { documentId, fileId };
+    }
+
+    const pagesSeenBy = (tenant: TestInstitute, documentId: string) =>
+      withTenant(db, mkInstituteCtx(tenant.tenantId, ORIGIN), (tx) =>
+        tx
+          .select({ fileId: userDocumentFilesLive.fileId })
+          .from(userDocumentFilesLive)
+          .where(eq(userDocumentFilesLive.documentId, documentId)),
+      );
+
+    it("should show a document's pages to an institute the person is a member of", async () => {
+      const { documentId, fileId } = await attachedPage(tenantA.userId);
+
+      expect(await pagesSeenBy(tenantA, documentId)).toEqual([{ fileId }]);
+    });
+
+    it('should hide the pages from an institute the person is not a member of', async () => {
+      const { documentId } = await attachedPage(tenantA.userId);
+
+      expect(await pagesSeenBy(tenantB, documentId)).toEqual([]);
+    });
+
+    it('should refuse an institute role writing a page, even for its own member', async () => {
+      const documentId = await insertDocument(tenantA.userId);
+      const fileId = await insertDocumentFile(tenantA.userId);
+
+      const attempt = withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
+        tx.insert(userDocumentFiles).values(pageValues(documentId, tenantA.userId, fileId)),
+      );
+
+      await expect(attempt).rejects.toMatchObject({ cause: { code: '42501' } });
+    });
+
+    it('should refuse one file being a page of two documents', async () => {
+      const { fileId } = await attachedPage(tenantA.userId);
+      const second = await insertDocument(tenantA.userId);
+
+      const attempt = withAdmin(db, mkAdminCtx(ORIGIN), (tx) =>
+        tx.insert(userDocumentFiles).values(pageValues(second, tenantA.userId, fileId)),
+      );
+
+      await expect(attempt).rejects.toMatchObject({
+        cause: { code: '23505', constraint: 'user_document_files_file_id_key' },
+      });
     });
   });
 

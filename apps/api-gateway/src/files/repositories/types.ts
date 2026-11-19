@@ -1,4 +1,9 @@
-import type { FilePurpose, FileStatus, FileVisibility } from '@roviq/common-types';
+import type {
+  FilePurpose,
+  FileStatus,
+  FileVisibility,
+  UserDocumentType,
+} from '@roviq/common-types';
 import type { StoredImageVariant } from '@roviq/database';
 
 export interface FileRecord {
@@ -27,6 +32,12 @@ export interface FileLeaveOwner {
   id: string;
   tenantId: string;
   userId: string;
+}
+
+/** The user document a file is a page of. */
+export interface FileDocumentOwner {
+  id: string;
+  type: UserDocumentType;
 }
 
 /** What processing turned an uploaded image into. */

@@ -286,7 +286,6 @@ export const ErrorCode = {
   /** Student document type is not one of the supported types */
   INVALID_DOCUMENT_TYPE: 'INVALID_DOCUMENT_TYPE',
   /** A student document needs at least one file URL */
-  FILE_URLS_REQUIRED: 'FILE_URLS_REQUIRED',
   /** Guardian is already linked to this student */
   GUARDIAN_ALREADY_LINKED: 'GUARDIAN_ALREADY_LINKED',
   /** Unlinking the primary contact needs a replacement primary guardian */
@@ -487,7 +486,6 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SECTION_STANDARD_MISMATCH: HttpStatus.BAD_REQUEST,
   STUDENT_NOT_ENROLLED: HttpStatus.BAD_REQUEST,
   INVALID_DOCUMENT_TYPE: HttpStatus.UNPROCESSABLE_ENTITY,
-  FILE_URLS_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
   GUARDIAN_ALREADY_LINKED: HttpStatus.CONFLICT,
   PRIMARY_GUARDIAN_REQUIRED: HttpStatus.BAD_REQUEST,
   REPLACEMENT_PRIMARY_GUARDIAN_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,

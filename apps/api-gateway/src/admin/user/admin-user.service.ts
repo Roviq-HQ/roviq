@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { FileService } from '../../files/file.service';
 import type { AdminListUsersFilterInput } from './dto/admin-list-users-filter.input';
 import { AdminUserRepository } from './repositories/admin-user.repository';
 
@@ -7,7 +8,10 @@ const DEFAULT_PAGE_SIZE = 20;
 
 @Injectable()
 export class AdminUserService {
-  constructor(private readonly repo: AdminUserRepository) {}
+  constructor(
+    private readonly repo: AdminUserRepository,
+    private readonly files: FileService,
+  ) {}
 
   async list(filter: AdminListUsersFilterInput) {
     const { edges, hasNextPage, totalCount } = await this.repo.list({
@@ -34,6 +38,13 @@ export class AdminUserService {
     const user = await this.repo.findDetail(userId);
     if (!user) throw new BusinessException(ErrorCode.NOT_FOUND, 'User not found');
     return user;
+  }
+
+  /** 60-second link to one page of a user document. */
+  async documentDownloadUrl(fileId: string): Promise<string> {
+    const file = await this.repo.findDocumentFile(fileId);
+    if (!file) throw new BusinessException(ErrorCode.FILE_NOT_FOUND, 'File not found.');
+    return this.files.signedDownloadUrl(file);
   }
 
   statistics() {

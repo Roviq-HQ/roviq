@@ -303,6 +303,14 @@ describe('ImpersonationSessionGuard', () => {
       await expect(guard.canActivate(makeExecutionContext())).resolves.toBe(true);
     });
 
+    it('lets a file be opened, which is a mutation only to be audited', async () => {
+      const { guard } = createGuard();
+      setSessionRow(live);
+      stubOperation(viewOnly(), 'mutation', 'fileDownloadUrl');
+
+      await expect(guard.canActivate(makeExecutionContext())).resolves.toBe(true);
+    });
+
     it('lets the session end itself', async () => {
       const { guard } = createGuard();
       setSessionRow(live);

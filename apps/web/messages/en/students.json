@@ -415,20 +415,19 @@
       "upload": {
         "uploadButton": "Upload Document",
         "dialogTitle": "Upload student document",
-        "dialogDescription": "Record an uploaded document against this student's file.",
+        "dialogDescription": "Add scans of a document to this student's record.",
         "typeLabel": "Document type",
         "descriptionLabel": "Description",
         "descriptionPlaceholder": "Optional notes about this document",
-        "fileUrlsLabel": "File URLs",
-        "fileUrlsPlaceholder": "https://storage.example.com/file1.pdf",
-        "fileUrlsHelp": "Paste the file URLs from MinIO (one per line). Direct browser upload coming soon.",
         "referenceNumberLabel": "Reference number",
         "referenceNumberPlaceholder": "TC number, certificate number, etc.",
         "submitLabel": "Upload document",
         "submitting": "Uploading…",
         "cancel": "Cancel",
         "success": "Document uploaded",
-        "error": "Failed to upload document"
+        "error": "Failed to upload document",
+        "filesLabel": "Document pages",
+        "filesHint": "Upload one file per page, in page order."
       }
     },
     "tc": {

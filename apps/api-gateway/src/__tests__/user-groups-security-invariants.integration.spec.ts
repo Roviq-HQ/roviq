@@ -359,7 +359,6 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
           updatedBy: SYSTEM_USER_ID,
           userId,
           type: UserDocumentType.BIRTH_CERTIFICATE,
-          fileUrls: ['https://files.test.local/birth-certificate.pdf'],
         })),
       );
       await tx.insert(userAddresses).values(

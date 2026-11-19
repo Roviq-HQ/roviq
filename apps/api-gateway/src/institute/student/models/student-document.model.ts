@@ -1,6 +1,8 @@
 import { Field, ID, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { UserDocumentType } from '@roviq/common-types';
 import { DateOnlyScalar, DateTimeScalar } from '@roviq/nestjs-graphql';
+import { FileRefModel } from '../../../files/models/file-ref.model';
+import type { FileRecord } from '../../../files/repositories/types';
 
 registerEnumType(UserDocumentType, {
   name: 'UserDocumentType',
@@ -12,9 +14,9 @@ registerEnumType(UserDocumentType, {
  * A single uploaded document for a student, used by the "Documents" tab
  * on the student detail page (ROV-167).
  *
- * Backed by the platform-level `user_documents` table (no RLS — scoped per
- * tenant via the join through `student_profiles → users`). Each row may
- * have multiple file URLs because some documents are multi-page scans.
+ * Backed by the platform-level `user_documents` table (scoped per tenant via
+ * the join through `student_profiles → users`). A document may have several
+ * files because some are multi-page scans.
  */
 @ObjectType({
   description: 'A user document upload (birth certificate, TC, report card, etc.)',
@@ -36,9 +38,11 @@ export class StudentDocumentModel {
   @Field(() => String, { nullable: true })
   description?: string | null;
 
-  /** Array of S3/MinIO URLs — supports multi-page scans. */
-  @Field(() => [String])
-  fileUrls!: string[];
+  @Field(() => [FileRefModel], {
+    description:
+      'Pages of the document, in order. Their `url` is null: download each with `fileDownloadUrl`.',
+  })
+  files!: FileRecord[];
 
   /** Document's own reference/serial number (TC number, certificate number). */
   @Field(() => String, { nullable: true })

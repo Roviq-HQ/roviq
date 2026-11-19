@@ -16,6 +16,7 @@ import type { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IdentityService } from '../../../auth/identity.service';
+import type { FileService } from '../../../files/file.service';
 import type { StudentReadRepository } from '../student-read.repository';
 
 // ── Sequential result queue ───────────────────────────────────
@@ -87,6 +88,10 @@ vi.mock('@roviq/database', () => ({
   guardianProfiles: col,
   studentGuardianLinks: col,
   userDocuments: col,
+  userDocumentFiles: col,
+  files: col,
+  filesLive: { __tableName: 'filesLive' },
+  userDocumentFilesLive: { __tableName: 'userDocumentFilesLive' },
   academicYearsLive: { __tableName: 'academicYearsLive' },
   admissionApplicationsLive: { __tableName: 'admissionApplicationsLive' },
   attendanceEntriesLive: { __tableName: 'attendanceEntriesLive' },
@@ -223,6 +228,7 @@ async function createService(eventBus: MockEventBus) {
     createMock<EventBusService>({ emit: eventBus.emit }),
     createMock<IdentityService>(),
     readRepository,
+    createMock<FileService>(),
   );
 }
 

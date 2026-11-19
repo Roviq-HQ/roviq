@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { FileText } from 'lucide-react';
+import { FileDownloadButton } from '@web/components/file-upload/file-download-button';
 import { useTranslations } from 'next-intl';
 import type { UserDetail } from '../../types';
 
@@ -79,17 +79,14 @@ export function DocumentsTab({ documents }: { documents: UserDetail['documents']
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
-                      {doc.fileUrls.map((url, i) => (
-                        <a
-                          key={url}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                        >
-                          <FileText className="size-4" aria-hidden />
-                          {t('file', { n: i + 1 })}
-                        </a>
+                      {doc.files.map((file, i) => (
+                        <FileDownloadButton
+                          key={file.id}
+                          fileId={file.id}
+                          scope="admin"
+                          testId={adminUserDetail.documentFileBtn(file.id)}
+                          label={t('file', { n: i + 1 })}
+                        />
                       ))}
                     </div>
                   </TableCell>

@@ -26,8 +26,11 @@ interface ImpersonationTokenClaims {
   impersonationReadOnly?: boolean;
 }
 
-/** What a view-only session may still call: leaving the session. */
-const READ_ONLY_ALLOWED_MUTATIONS = new Set(['endImpersonation']);
+/**
+ * What a view-only session may still call: leaving the session, and opening a file. The
+ * download is a mutation only so that it is audited; it changes nothing.
+ */
+const READ_ONLY_ALLOWED_MUTATIONS = new Set(['endImpersonation', 'fileDownloadUrl']);
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**

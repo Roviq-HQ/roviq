@@ -113,7 +113,7 @@ export class StudentResolver {
 
   @Mutation(() => StudentDocumentModel, {
     description:
-      'Records an uploaded document (client uploads file bytes to object storage first, then calls this mutation with the resulting URLs).',
+      'Saves a document for a student from files uploaded beforehand with `requestFileUpload`.',
   })
   @CheckAbility({ action: 'update', subject: 'Student' })
   async uploadStudentDocument(

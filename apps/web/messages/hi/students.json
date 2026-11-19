@@ -415,20 +415,19 @@
       "upload": {
         "uploadButton": "दस्तावेज़ अपलोड करें",
         "dialogTitle": "विद्यार्थी दस्तावेज़ अपलोड करें",
-        "dialogDescription": "इस विद्यार्थी की फ़ाइल में एक अपलोड किया गया दस्तावेज़ दर्ज करें।",
+        "dialogDescription": "इस विद्यार्थी के रिकॉर्ड में दस्तावेज़ की स्कैन प्रतियाँ जोड़ें।",
         "typeLabel": "दस्तावेज़ प्रकार",
         "descriptionLabel": "विवरण",
         "descriptionPlaceholder": "इस दस्तावेज़ के बारे में वैकल्पिक टिप्पणी",
-        "fileUrlsLabel": "फ़ाइल URL",
-        "fileUrlsPlaceholder": "https://storage.example.com/file1.pdf",
-        "fileUrlsHelp": "MinIO से फ़ाइल URL चिपकाएँ (प्रति पंक्ति एक)। सीधा ब्राउज़र अपलोड जल्द ही आ रहा है।",
         "referenceNumberLabel": "संदर्भ क्रमांक",
         "referenceNumberPlaceholder": "TC क्रमांक, प्रमाण पत्र क्रमांक आदि",
         "submitLabel": "दस्तावेज़ अपलोड करें",
         "submitting": "अपलोड हो रहा है…",
         "cancel": "रद्द करें",
         "success": "दस्तावेज़ अपलोड हो गया",
-        "error": "दस्तावेज़ अपलोड करने में विफल"
+        "error": "दस्तावेज़ अपलोड करने में विफल",
+        "filesLabel": "दस्तावेज़ के पृष्ठ",
+        "filesHint": "हर पृष्ठ के लिए एक फ़ाइल, पृष्ठ क्रम में अपलोड करें।"
       }
     },
     "tc": {

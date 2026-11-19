@@ -8,6 +8,7 @@ export * from './student-academics';
 export * from './student-guardian-links';
 export * from './student-profiles';
 export * from './user-addresses';
+export * from './user-document-files';
 export * from './user-documents';
 export * from './user-identifiers';
 export * from './user-profiles';

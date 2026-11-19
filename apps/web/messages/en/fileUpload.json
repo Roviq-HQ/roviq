@@ -10,7 +10,9 @@
   "cancelNamed": "Cancel upload of {name}",
   "remove": "Remove",
   "removeNamed": "Remove {name}",
-  "download": "Download {name}",
+  "download": {
+    "failed": "Could not open the file. Try again."
+  },
   "errors": {
     "FILE_TYPE_NOT_ALLOWED": "This file type is not accepted here.",
     "FILE_TOO_LARGE": "This file is too large.",
