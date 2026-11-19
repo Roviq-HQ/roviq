@@ -3,6 +3,7 @@ import type { AbilityFactory } from '@roviq/casl';
 import {
   type AppAbility,
   ErrorCode,
+  FILE_PURPOSE_POLICY,
   type FilePurpose,
   type InstituteContext,
 } from '@roviq/common-types';
@@ -337,7 +338,11 @@ describe('FileService', () => {
 
       await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
 
-      expect(images.process).toHaveBeenCalledWith(PHOTO, { square: false, fullPx: 2560 });
+      expect(images.process).toHaveBeenCalledWith(PHOTO, {
+        square: false,
+        fullPx: 2560,
+        cacheableThumbnails: false,
+      });
       expect((await storage.get('private', `${IMAGE_BASE}/sm.webp`)).toString()).toBe('sm');
       expect((await storage.get('private', `${IMAGE_BASE}/md.webp`)).toString()).toBe('medium');
       expect((await storage.get('private', `${IMAGE_BASE}/full.webp`)).toString()).toBe(
@@ -432,8 +437,11 @@ describe('FileService', () => {
   });
 
   describe('refUrl', () => {
+    const leaveAttachmentPolicy = FILE_PURPOSE_POLICY.LEAVE_ATTACHMENT;
+
     afterEach(() => {
       vi.useRealTimers();
+      Object.assign(FILE_PURPOSE_POLICY, { LEAVE_ATTACHMENT: leaveAttachmentPolicy });
     });
 
     it('should sign a private file for the normal download lifetime', async () => {
@@ -465,7 +473,22 @@ describe('FileService', () => {
       );
     });
 
-    it('should give the same thumbnail link to every request in one window', async () => {
+    it('should keep thumbnail links of document scans short-lived', async () => {
+      const url = await service.refUrl(buildStoredImage(), 'SM');
+
+      expect(url).toBe(
+        `fake://private/${IMAGE_BASE}/sm.webp?get&expires=${DOWNLOAD_URL_TTL_SECONDS}&at=now`,
+      );
+    });
+
+    it('should give the same thumbnail link to every request in one window when the purpose allows caching', async () => {
+      // No purpose opts in yet, so one is switched on for this test and restored after it.
+      Object.assign(FILE_PURPOSE_POLICY, {
+        LEAVE_ATTACHMENT: {
+          ...leaveAttachmentPolicy,
+          image: { square: true, fullPx: 1600, cacheableThumbnails: true },
+        },
+      });
       const windowMs = THUMBNAIL_URL_WINDOW_SECONDS * 1000;
       const windowStart = Math.floor(Date.UTC(2026, 10, 19, 14, 30) / windowMs) * windowMs;
       vi.useFakeTimers();
@@ -482,6 +505,28 @@ describe('FileService', () => {
       );
       expect(late).toBe(early);
       expect(nextWindow).not.toBe(early);
+    });
+
+    it('should mark stored private images cacheable by the browser only, public ones by anyone', async () => {
+      const put = vi.spyOn(storage, 'put');
+      findClaimable.mockResolvedValue([buildImage()]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      findClaimable.mockResolvedValue([buildImage({ visibility: 'PUBLIC' })]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      expect(put.mock.calls.map(([bucket, , , options]) => [bucket, options.cacheControl])).toEqual(
+        [
+          ['private', `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`],
+          ['private', `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`],
+          ['private', `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`],
+          ['public', 'public, max-age=31536000, immutable'],
+          ['public', 'public, max-age=31536000, immutable'],
+          ['public', 'public, max-age=31536000, immutable'],
+        ],
+      );
     });
 
     it('should give a public image a stable URL per size', async () => {

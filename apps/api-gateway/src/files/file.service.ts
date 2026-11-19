@@ -30,14 +30,16 @@ export const AUDITED_DOWNLOAD_URL_TTL_SECONDS = 60;
 /** Uploads a user may have started and not yet attached; stops storage being filled unnoticed. */
 export const MAX_PENDING_UPLOADS_PER_USER = 20;
 /**
- * Thumbnail links are signed at the start of a fixed window, so every request in that window
- * gets the same URL and the browser cache hits. The cost: a leaked thumbnail link works for up
- * to THUMBNAIL_URL_TTL_SECONDS instead of ten minutes.
+ * Where a purpose allows it (`cacheableThumbnails`), thumbnail links are signed at the start of
+ * a fixed window, so every request in that window gets the same URL and the browser cache hits.
+ * The cost: a leaked thumbnail link works for up to THUMBNAIL_URL_TTL_SECONDS, not ten minutes.
  */
 export const THUMBNAIL_URL_WINDOW_SECONDS = 6 * 60 * 60;
 export const THUMBNAIL_URL_TTL_SECONDS = 12 * 60 * 60;
 /** Objects never change once written: a new upload is a new file id and key. */
-const IMMUTABLE_CACHE_CONTROL = 'max-age=31536000, immutable';
+const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+/** Private objects: the user's own browser only, and no longer than a link to them can live. */
+const PRIVATE_CACHE_CONTROL = `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`;
 
 type UploadVerdict = 'ACCEPTED' | 'CONTENT_MISMATCH' | 'IMAGE_INVALID';
 
@@ -213,7 +215,8 @@ export class FileService {
       type: isImage ? ('inline' as const) : ('attachment' as const),
       filename: isImage ? file.originalName.replace(/\.[^.]*$/, '.webp') : file.originalName,
     };
-    if (isImage && variant !== 'FULL') {
+    const cacheable = FILE_PURPOSE_POLICY[file.purpose].image?.cacheableThumbnails === true;
+    if (isImage && variant !== 'FULL' && cacheable) {
       const windowMs = THUMBNAIL_URL_WINDOW_SECONDS * 1000;
       return this.storage.presignGet('private', key, {
         expiresInSeconds: THUMBNAIL_URL_TTL_SECONDS,
@@ -288,7 +291,7 @@ export class FileService {
     for (const variant of processed.variants) {
       await this.storage.put(bucket, variantKeyOf(file, variant.name), variant.data, {
         contentType: 'image/webp',
-        cacheControl: IMMUTABLE_CACHE_CONTROL,
+        cacheControl: bucket === 'public' ? PUBLIC_CACHE_CONTROL : PRIVATE_CACHE_CONTROL,
       });
     }
     const full = processed.variants.find((variant) => variant.name === 'FULL');
