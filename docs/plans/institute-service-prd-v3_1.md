@@ -781,6 +781,7 @@ During impersonation:
 #### Phase 2: Infrastructure (Parallel)
 
 1. Create storage bucket (MinIO/S3) for the institute
+   > Superseded 2026-11-19 (ROV-210): there are no per-institute buckets. See `docs/architecture.md` → "File storage".
 2. Create wallets (fund, virtual, cash, expense) via Finance Service
 3. Request Identity Service to create default roles for all user types (teacher, student, parent, accountant, etc.)
 

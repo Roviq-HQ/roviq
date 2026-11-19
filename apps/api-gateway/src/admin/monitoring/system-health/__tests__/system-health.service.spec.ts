@@ -5,11 +5,11 @@ import type Redis from 'ioredis';
 import type { ChainableCommander } from 'ioredis';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import type { DlqService } from '../../../../dlq/dlq.service';
-import type { MinioHealthIndicator } from '../../../../health/indicators/minio.health';
 import type { NatsHealthIndicator } from '../../../../health/indicators/nats.health';
 import type { PostgresHealthIndicator } from '../../../../health/indicators/postgres.health';
 import type { ProbeResult } from '../../../../health/indicators/probe';
 import type { RedisHealthIndicator } from '../../../../health/indicators/redis.health';
+import type { StorageHealthIndicator } from '../../../../health/indicators/storage.health';
 import type { TemporalHealthIndicator } from '../../../../health/indicators/temporal.health';
 import { ConnectionTracker } from '../../connections/connection-tracker';
 import {
@@ -241,7 +241,7 @@ describe('SystemHealthService', () => {
   let redisIndicator: RedisHealthIndicator;
   let nats: NatsHealthIndicator;
   let temporal: TemporalHealthIndicator;
-  let minio: MinioHealthIndicator;
+  let storage: StorageHealthIndicator;
   let prometheus: PrometheusClient;
   let dlq: DlqService;
   let connections: ConnectionTracker;
@@ -258,7 +258,7 @@ describe('SystemHealthService', () => {
     redisIndicator = createMock<RedisHealthIndicator>({ probe: vi.fn().mockResolvedValue(UP) });
     nats = createMock<NatsHealthIndicator>({ probe: vi.fn().mockResolvedValue(UP) });
     temporal = createMock<TemporalHealthIndicator>({ probe: vi.fn().mockResolvedValue(UP) });
-    minio = createMock<MinioHealthIndicator>({ probe: vi.fn().mockResolvedValue(DOWN) });
+    storage = createMock<StorageHealthIndicator>({ probe: vi.fn().mockResolvedValue(DOWN) });
     prometheus = createMock<PrometheusClient>({
       alerts: vi
         .fn()
@@ -278,7 +278,7 @@ describe('SystemHealthService', () => {
       redisIndicator,
       nats,
       temporal,
-      minio,
+      storage,
       redis.redis,
       createMock<NatsConnection>(),
       prometheus,
@@ -301,14 +301,14 @@ describe('SystemHealthService', () => {
       ['REDIS', 'HEALTHY'],
       ['NATS', 'HEALTHY'],
       ['TEMPORAL', 'HEALTHY'],
-      ['MINIO', 'DOWN'],
+      ['OBJECT_STORAGE', 'DOWN'],
     ]);
   });
 
   it('should null responseMs for a DOWN service and keep it for an up one', async () => {
     const health = await service.getSystemHealth();
 
-    expect(health.services.find((s) => s.name === 'MINIO')?.responseMs).toBeNull();
+    expect(health.services.find((s) => s.name === 'OBJECT_STORAGE')?.responseMs).toBeNull();
     expect(health.services.find((s) => s.name === 'POSTGRES')?.responseMs).toBe(5);
   });
 
@@ -320,7 +320,7 @@ describe('SystemHealthService', () => {
     const health = await service.getSystemHealth();
 
     expect(health.services.find((s) => s.name === 'POSTGRES')?.uptimePercent).toBe(50);
-    expect(health.services.find((s) => s.name === 'MINIO')?.uptimePercent).toBe(0);
+    expect(health.services.find((s) => s.name === 'OBJECT_STORAGE')?.uptimePercent).toBe(0);
     expect(health.services.find((s) => s.name === 'REDIS')?.uptimePercent).toBe(100);
   });
 

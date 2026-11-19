@@ -36,17 +36,18 @@ services:
       timeout: 3s
       retries: 5
 
-  minio:
-    image: quay.io/minio/minio:latest
+  object-storage:
+    image: rustfs/rustfs:1.0.6
     networks: [roviq-net]
     # Published so the browser can reach presigned URLs. Create the buckets once with `pnpm storage:init`.
     ports: ["9002:9000"]
-    command: server /data --console-address ":9001"
+    command: /data
     environment:
-      MINIO_ROOT_USER: roviq_minio
-      MINIO_ROOT_PASSWORD: roviq_minio_dev
+      RUSTFS_ACCESS_KEY: roviq_storage
+      RUSTFS_SECRET_KEY: roviq_storage_dev
+      RUSTFS_ADDRESS: ":9000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -101,9 +102,9 @@ services:
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: roviq_minio
-      S3_SECRET_KEY: roviq_minio_dev
+      S3_ENDPOINT: http://object-storage:9000
+      S3_ACCESS_KEY: roviq_storage
+      S3_SECRET_KEY: roviq_storage_dev
       S3_PUBLIC_ENDPOINT: http://localhost:9002
       S3_REGION: us-east-1
       S3_BUCKET_PRIVATE: roviq-private

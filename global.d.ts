@@ -13,6 +13,7 @@ declare global {
       NATS_TEST_URL?: string;
       NATS_STREAM_DRIFT_RECREATE?: string;
       REDIS_URL?: string;
+      ALLOWED_ORIGINS?: string;
       S3_ENDPOINT?: string;
       S3_PUBLIC_ENDPOINT?: string;
       S3_REGION?: string;
@@ -57,7 +58,7 @@ declare global {
       E2E_NATS_PORT?: string;
       E2E_NOVU_API_PORT?: string;
       /** Host port of this instance's e2e object storage (slot 0: 9004). */
-      E2E_MINIO_PORT?: string;
+      E2E_STORAGE_PORT?: string;
       ROVIQ_E2E_COMPOSE_PROJECT?: string;
     }
   }

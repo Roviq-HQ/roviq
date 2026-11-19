@@ -29,7 +29,7 @@ const SERVICES: SystemHealthFieldsFragment['services'] = [
   },
   {
     __typename: 'ServiceHealth',
-    name: 'MINIO',
+    name: 'OBJECT_STORAGE',
     status: 'DOWN',
     responseMs: null,
     uptimePercent: null,
@@ -45,9 +45,9 @@ describe('ServiceStatusGrid', () => {
     expect(screen.getByTestId(metrics.serviceResponse('API_GATEWAY'))).toHaveTextContent('12 ms');
     expect(screen.getByTestId(metrics.serviceStatus('POSTGRES'))).toHaveTextContent('Degraded');
     expect(screen.getByTestId(metrics.serviceUptime('POSTGRES'))).toHaveTextContent('99.46%');
-    expect(screen.getByTestId(metrics.serviceStatus('MINIO'))).toHaveTextContent('Down');
-    expect(screen.getByTestId(metrics.serviceResponse('MINIO'))).toHaveTextContent('—');
-    expect(screen.getByText('MinIO storage')).toBeInTheDocument();
+    expect(screen.getByTestId(metrics.serviceStatus('OBJECT_STORAGE'))).toHaveTextContent('Down');
+    expect(screen.getByTestId(metrics.serviceResponse('OBJECT_STORAGE'))).toHaveTextContent('—');
+    expect(screen.getByText('Object storage')).toBeInTheDocument();
   });
 
   it('should render in Hindi', () => {
@@ -55,7 +55,7 @@ describe('ServiceStatusGrid', () => {
 
     expect(screen.getByText('सेवाएँ')).toBeInTheDocument();
     expect(screen.getByTestId(metrics.serviceStatus('API_GATEWAY'))).toHaveTextContent('ठीक');
-    expect(screen.getByTestId(metrics.serviceStatus('MINIO'))).toHaveTextContent('बंद');
+    expect(screen.getByTestId(metrics.serviceStatus('OBJECT_STORAGE'))).toHaveTextContent('बंद');
   });
 
   it('should show a busy skeleton before the first snapshot', () => {

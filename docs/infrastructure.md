@@ -21,7 +21,7 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | PostgreSQL 18 | 5434 | Primary database with RLS |
 | Redis 7 | 6379 | CASL ability caching |
 | NATS 2.10 | 4222 (client), 8222 (monitoring) | Inter-service messaging (JetStream) |
-| MinIO | 9002 (API), 9003 (console), 9004 (e2e API) | S3-compatible object storage |
+| Object storage (RustFS) | 9002 (API), 9003 (console), 9004 (e2e API) | S3-compatible object storage |
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
 | OTel Collector | 4317 (gRPC), 4318 (HTTP), 13133 (health) | OpenTelemetry collector — receives traces/metrics/logs, fans out to Tempo/Loki/Prometheus |
@@ -30,23 +30,31 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | Prometheus | 9090 | Metrics scraping and storage |
 | Grafana | 3001 | Observability dashboards — also embedded in admin-portal at `/observability` |
 
-### Object storage (MinIO)
+### Object storage
 
-The dev, e2e and app Compose stacks run MinIO as the S3-compatible store. The local API is at
-`http://localhost:9002`; the console is at `http://localhost:9003`. The e2e stack publishes its
-own MinIO on `E2E_MINIO_PORT` (9004), because tests and browsers on the host open presigned URLs.
+The dev, e2e and app Compose stacks run [RustFS](https://github.com/rustfs/rustfs)
+(`rustfs/rustfs`, pinned, Apache 2.0) as the S3-compatible store, in the `object-storage`
+service. Production uses a managed S3 service instead (`docs/deployment.md` → "Object storage").
+The local API is at `http://localhost:9002`; the console is at `http://localhost:9003`. The e2e
+stack publishes its own store on `E2E_STORAGE_PORT` (9004), because tests and browsers on the
+host open presigned URLs.
 
 - **Buckets**: two, split by visibility: `roviq-private` (signed URLs only) and `roviq-public`
   (readable without sign-in, branding only). `pnpm storage:init` (`scripts/storage-init.ts`)
-  creates both and sets the public read policy; it is safe to re-run. Tilt runs it as the
+  creates both, sets the public read policy and a CORS rule on the private bucket for the
+  origins in `ALLOWED_ORIGINS`; it is safe to re-run. Tilt runs it as the
   `storage-init` resource before the gateway, and the e2e stack runs it in `migrate-and-seed`.
   The app never creates buckets.
-- **Image**: all three stacks reference `quay.io/minio/minio:latest`. As of 2026-11-19 that image
-  can no longer be pulled (`unauthorized`), and `minio/minio` on Docker Hub is gone too: MinIO
-  stopped publishing community images. A machine that already has the image cached keeps working;
-  a fresh machine or CI runner cannot start MinIO. The application talks plain S3
-  (`@aws-sdk/client-s3`), so any S3-compatible server can replace it without code changes.
-- Retry a failed start with `pnpm tilt trigger minio`, then check `pnpm tilt logs minio`.
+- **Acceptance check**: `pnpm storage:check` (`scripts/storage-check.ts`) tests the store behind
+  the `S3_*` variables for everything the app relies on (uploads refused when size or type
+  differ, server-side copy, private bucket closed to anonymous reads, stable signed URLs). Run it
+  before pointing any environment at a new provider or a new RustFS version.
+- **Why not MinIO**: MinIO stopped publishing community images in 2025; `quay.io/minio/minio`
+  and `minio/minio` can no longer be pulled. The application talks plain S3
+  (`@aws-sdk/client-s3`) and uses nothing provider-specific.
+- The image runs as uid 10001, so `/data` must be a named volume, not a host bind mount.
+- Retry a failed start with `pnpm tilt trigger object-storage`, then check
+  `pnpm tilt logs object-storage`.
 
 How files are stored and served: `docs/architecture.md` → "File storage".
 
@@ -113,9 +121,9 @@ App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
 
 ### Health checks and system health (ROV-184)
 
-- **`GET /api/health`** (terminus) checks all five dependencies and returns 503 if any is down: Postgres (`select 1` on the shared pool), Redis (`PING`), NATS (`rtt()` on the shared DLQ NATS connection), Temporal (gRPC health service on one lazy connection) and MinIO (`$S3_ENDPOINT/minio/health/live`). Each check times out after 2s. Indicators live in `apps/api-gateway/src/health/indicators/`. The e2e stack has no MinIO, so its `/api/health` is 503 by design; its own readiness probe is a GraphQL query.
-- **`GET /api/health/ready`** checks only Postgres, Redis and NATS, which every request needs. Readiness probes (Tilt's api-gateway resource) use it, so a Temporal or MinIO outage degrades the features that use them without taking the gateway out of rotation.
-- **System health poller**: `SystemHealthService` (`apps/api-gateway/src/admin/monitoring/system-health/`) probes the same five plus `API_GATEWAY` (event-loop delay p99 from `perf_hooks.monitorEventLoopDelay`) every 15s. A reachable service slower than its threshold in `DEGRADED_THRESHOLD_MS` is `DEGRADED` (API_GATEWAY 200ms, Postgres 500ms, Redis 100ms, NATS 200ms, Temporal and MinIO 1s). Each poll increments hourly Redis hashes `monitoring:uptime:<SERVICE>:<hourEpoch>` (`REDIS_KEYS.SYSTEM_HEALTH_UPTIME`, `{ up, total }`, TTL 25h); `uptimePercent` sums the last 24 buckets.
+- **`GET /api/health`** (terminus) checks all five dependencies and returns 503 if any is down: Postgres (`select 1` on the shared pool), Redis (`PING`), NATS (`rtt()` on the shared DLQ NATS connection), Temporal (gRPC health service on one lazy connection) and object storage (both buckets answer a `HeadBucket`). Each check times out after 2s. Indicators live in `apps/api-gateway/src/health/indicators/`. The e2e stack's own readiness probe is a GraphQL query.
+- **`GET /api/health/ready`** checks only Postgres, Redis and NATS, which every request needs. Readiness probes (Tilt's api-gateway resource) use it, so a Temporal or object storage outage degrades the features that use them without taking the gateway out of rotation.
+- **System health poller**: `SystemHealthService` (`apps/api-gateway/src/admin/monitoring/system-health/`) probes the same five plus `API_GATEWAY` (event-loop delay p99 from `perf_hooks.monitorEventLoopDelay`) every 15s. A reachable service slower than its threshold in `DEGRADED_THRESHOLD_MS` is `DEGRADED` (API_GATEWAY 200ms, Postgres 500ms, Redis 100ms, NATS 200ms, Temporal and object storage 1s). Each poll increments hourly Redis hashes `monitoring:uptime:<SERVICE>:<hourEpoch>` (`REDIS_KEYS.SYSTEM_HEALTH_UPTIME`, `{ up, total }`, TTL 25h); `uptimePercent` sums the last 24 buckets.
 - **GraphQL** (platform scope, ability `read SystemHealth`): `adminSystemHealth` (services, per-stream JetStream lag = summed `num_pending` of the stream's consumers, connections, firing Prometheus alerts, pending DLQ count), `adminConnectionMetrics` (graphql-ws connections and in-flight HTTP requests on the answering instance) and the subscription `adminSystemHealthUpdated`, which sends the current snapshot on subscribe and then a new one whenever a service status, stream lag, the alert set or the DLQ count changes. The change signal is the in-process pubSub topic `MONITORING.system_health_updated`; it is never published to NATS. Counters and the subscription are per gateway instance.
 - **Prometheus client**: `PrometheusClient` (`apps/api-gateway/src/admin/monitoring/prometheus.client.ts`) reads `PROMETHEUS_URL`, else `http://localhost:$DEV_PROMETHEUS_PORT`, with a 3s timeout. When Prometheus is unreachable, `alertsAvailable` is `false` and `alerts` is empty.
 

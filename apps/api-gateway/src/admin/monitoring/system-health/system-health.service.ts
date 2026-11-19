@@ -20,11 +20,11 @@ import type Redis from 'ioredis';
 import { REDIS_KEYS } from '../../../auth/redis-keys';
 import { DlqService } from '../../../dlq/dlq.service';
 import { DLQ_NATS_CONNECTION } from '../../../dlq/dlq-nats.provider';
-import { MinioHealthIndicator } from '../../../health/indicators/minio.health';
 import { NatsHealthIndicator } from '../../../health/indicators/nats.health';
 import { PostgresHealthIndicator } from '../../../health/indicators/postgres.health';
 import type { ProbeResult } from '../../../health/indicators/probe';
 import { RedisHealthIndicator } from '../../../health/indicators/redis.health';
+import { StorageHealthIndicator } from '../../../health/indicators/storage.health';
 import { TemporalHealthIndicator } from '../../../health/indicators/temporal.health';
 import { type ConnectionCounts, ConnectionTracker } from '../connections/connection-tracker';
 import { type PromAlert, PrometheusClient } from '../prometheus.client';
@@ -144,7 +144,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     private readonly redisIndicator: RedisHealthIndicator,
     private readonly nats: NatsHealthIndicator,
     private readonly temporal: TemporalHealthIndicator,
-    private readonly minio: MinioHealthIndicator,
+    private readonly storage: StorageHealthIndicator,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(DLQ_NATS_CONNECTION) private readonly nc: NatsConnection,
     private readonly prometheus: PrometheusClient,
@@ -260,14 +260,14 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async probeAll(): Promise<Record<MonitoredService, ProbeResult>> {
-    const [POSTGRES, REDIS, NATS, TEMPORAL, MINIO] = await Promise.all([
+    const [POSTGRES, REDIS, NATS, TEMPORAL, OBJECT_STORAGE] = await Promise.all([
       this.postgres.probe(),
       this.redisIndicator.probe(),
       this.nats.probe(),
       this.temporal.probe(),
-      this.minio.probe(),
+      this.storage.probe(),
     ]);
-    return { API_GATEWAY: this.probeEventLoop(), POSTGRES, REDIS, NATS, TEMPORAL, MINIO };
+    return { API_GATEWAY: this.probeEventLoop(), POSTGRES, REDIS, NATS, TEMPORAL, OBJECT_STORAGE };
   }
 
   /** The gateway is up by definition if it is answering; its latency is event-loop delay p99 since the last poll. */
@@ -313,7 +313,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
       REDIS: null,
       NATS: null,
       TEMPORAL: null,
-      MINIO: null,
+      OBJECT_STORAGE: null,
     };
     let replies: Array<[Error | null, unknown]> | null = null;
     try {

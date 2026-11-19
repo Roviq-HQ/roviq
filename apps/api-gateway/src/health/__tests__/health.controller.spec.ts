@@ -2,10 +2,10 @@ import { HealthCheckService } from '@nestjs/terminus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HealthController } from '../health.controller';
-import { MinioHealthIndicator } from '../indicators/minio.health';
 import { NatsHealthIndicator } from '../indicators/nats.health';
 import { PostgresHealthIndicator } from '../indicators/postgres.health';
 import { RedisHealthIndicator } from '../indicators/redis.health';
+import { StorageHealthIndicator } from '../indicators/storage.health';
 import { TemporalHealthIndicator } from '../indicators/temporal.health';
 
 function createMockHealthCheckService() {
@@ -25,7 +25,7 @@ describe('HealthController', () => {
   let redis: RedisHealthIndicator;
   let nats: NatsHealthIndicator;
   let temporal: TemporalHealthIndicator;
-  let minio: MinioHealthIndicator;
+  let storage: StorageHealthIndicator;
 
   beforeEach(() => {
     mockHealth = createMockHealthCheckService();
@@ -41,11 +41,11 @@ describe('HealthController', () => {
     temporal = createMock<TemporalHealthIndicator>({
       isHealthy: vi.fn().mockResolvedValue({ temporal: { status: 'up' } }),
     });
-    minio = createMock<MinioHealthIndicator>({
-      isHealthy: vi.fn().mockResolvedValue({ minio: { status: 'up' } }),
+    storage = createMock<StorageHealthIndicator>({
+      isHealthy: vi.fn().mockResolvedValue({ storage: { status: 'up' } }),
     });
 
-    controller = new HealthController(mockHealth, postgres, redis, nats, temporal, minio);
+    controller = new HealthController(mockHealth, postgres, redis, nats, temporal, storage);
   });
 
   it('should report every platform dependency', async () => {
@@ -57,14 +57,14 @@ describe('HealthController', () => {
       redis: { status: 'up' },
       nats: { status: 'up' },
       temporal: { status: 'up' },
-      minio: { status: 'up' },
+      storage: { status: 'up' },
     });
   });
 
   it('should call each indicator exactly once per check', async () => {
     await controller.check();
 
-    for (const indicator of [postgres, redis, nats, temporal, minio]) {
+    for (const indicator of [postgres, redis, nats, temporal, storage]) {
       expect(indicator.isHealthy).toHaveBeenCalledTimes(1);
     }
     expect(mockHealth.check).toHaveBeenCalledTimes(1);
@@ -79,6 +79,6 @@ describe('HealthController', () => {
       nats: { status: 'up' },
     });
     expect(temporal.isHealthy).not.toHaveBeenCalled();
-    expect(minio.isHealthy).not.toHaveBeenCalled();
+    expect(storage.isHealthy).not.toHaveBeenCalled();
   });
 });

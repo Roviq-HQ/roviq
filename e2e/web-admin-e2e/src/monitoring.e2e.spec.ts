@@ -7,7 +7,14 @@ import { expect, test } from '../../shared/console-guardian';
 
 const { adminMonitoring: ids, metrics, layout } = testIds;
 
-const SERVICES = ['API_GATEWAY', 'POSTGRES', 'REDIS', 'NATS', 'TEMPORAL', 'MINIO'] as const;
+const SERVICES = [
+  'API_GATEWAY',
+  'POSTGRES',
+  'REDIS',
+  'NATS',
+  'TEMPORAL',
+  'OBJECT_STORAGE',
+] as const;
 const STATUS_TEXT = /^(Healthy|Degraded|Down)$/;
 
 test.describe('Admin Monitoring', () => {

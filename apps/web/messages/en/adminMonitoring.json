@@ -14,7 +14,7 @@
       "REDIS": "Redis",
       "NATS": "NATS",
       "TEMPORAL": "Temporal",
-      "MINIO": "MinIO storage"
+      "OBJECT_STORAGE": "Object storage"
     },
     "status": {
       "healthy": "Healthy",

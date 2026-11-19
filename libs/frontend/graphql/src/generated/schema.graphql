@@ -3715,8 +3715,8 @@ enum MinorityType {
 """Platform dependency watched by the system health poller"""
 enum MonitoredService {
   API_GATEWAY
-  MINIO
   NATS
+  OBJECT_STORAGE
   POSTGRES
   REDIS
   TEMPORAL

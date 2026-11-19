@@ -11,8 +11,8 @@ export const MONITORED_SERVICE_VALUES = [
   'NATS',
   // Temporal workflow engine
   'TEMPORAL',
-  // MinIO S3-compatible object storage
-  'MINIO',
+  // S3-compatible object storage (both buckets reachable)
+  'OBJECT_STORAGE',
 ] as const;
 
 export type MonitoredService = (typeof MONITORED_SERVICE_VALUES)[number];

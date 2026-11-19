@@ -114,7 +114,7 @@ Compose files live under `docker/` and are selected explicitly per use case — 
 |---|---|---|
 | `compose.infra.yaml` | Postgres, Redis, NATS (infra only) | Local dev infrastructure — apps run via Tilt |
 | `compose.dev.yaml` | Full dev stack (infra + apps, port 3000) | Running the stack in Docker instead of Tilt |
-| `compose.e2e.yaml` | Migrated+seeded `roviq_test` stack on port 3004 (host 5435 for PG, 9004 for object storage) | `pnpm test:e2e:api`, `pnpm test:e2e:ui`, CI `e2e-api`/`e2e-ui` jobs |
+| `compose.e2e.yaml` | Migrated+seeded `roviq_test` stack on port 3004 (host 5435 for PG, 9004 for object storage (`E2E_STORAGE_PORT`)) | `pnpm test:e2e:api`, `pnpm test:e2e:ui`, CI `e2e-api`/`e2e-ui` jobs |
 | `compose.app.yaml` | Application-only bundle (no infra) | Compose-in-compose reuse |
 | `compose.novu.yaml` | Novu notification stack | Notification smoke tests |
 

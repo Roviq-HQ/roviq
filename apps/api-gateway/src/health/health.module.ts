@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { DlqModule } from '../dlq/dlq.module';
 import { HealthController } from './health.controller';
-import { MinioHealthIndicator } from './indicators/minio.health';
 import { NatsHealthIndicator } from './indicators/nats.health';
 import { PostgresHealthIndicator } from './indicators/postgres.health';
 import { RedisHealthIndicator } from './indicators/redis.health';
+import { StorageHealthIndicator } from './indicators/storage.health';
 import { TemporalHealthIndicator } from './indicators/temporal.health';
 
 const INDICATORS = [
@@ -13,7 +13,7 @@ const INDICATORS = [
   RedisHealthIndicator,
   NatsHealthIndicator,
   TemporalHealthIndicator,
-  MinioHealthIndicator,
+  StorageHealthIndicator,
 ];
 
 @Module({
