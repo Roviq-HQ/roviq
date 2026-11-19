@@ -12,8 +12,9 @@ This guide walks you through the key features of the Roviq Reseller Portal. It i
 4. [Billing](#billing)
 5. [Audit Logs](#audit-logs)
 6. [Impersonation Sessions](#impersonation-sessions)
-7. [Sessions](#sessions)
-8. [Account -- Passkeys](#account--passkeys)
+7. [Settings](#settings)
+8. [Sessions](#sessions)
+9. [Account -- Passkeys](#account--passkeys)
 
 ---
 
@@ -285,11 +286,41 @@ Review and control the impersonation sessions started by your team (when a team 
 
 ---
 
+## Settings
+
+Click **Settings** in the sidebar. The page has four sections: **Profile**, **Branding**, **Custom domain** and **Sessions**. Only a **Reseller admin** can change the first two; other roles see them read-only.
+
+### Profile
+
+- **Name** -- your organisation's name. (The built-in Roviq Direct reseller cannot be renamed.)
+- **Slug**, **Tier** and **Status** are shown for reference. They are set by Roviq and cannot be changed here.
+- **Business registration** -- registration number (CIN, GSTIN) and state.
+- **Contact** and **Registered address** -- how Roviq reaches you. Leave the first address line empty to keep no address on file.
+
+Click **Save changes**. If a colleague saved while you were editing, you are told so and the latest version is loaded; make your change again.
+
+### Branding
+
+The form is on the left and a **live preview** on the right (below the form on a small screen).
+
+- **Primary colour** and **Secondary colour** -- pick with the colour box or type a six-digit hex code such as `#1677FF`. **Use default** clears your choice.
+- **Colour scheme** -- Light, Dark, or Match device.
+- **Advanced > Custom CSS** -- extra style rules, up to 20,000 characters. Rules that would load a file from another site (`@import`, `url(...)`) or contain HTML are refused, and the message names what to remove.
+- **Logo and favicon** -- image upload is coming soon.
+
+Your branding is saved now and will be applied to your portal when white-label support launches. Until then the preview is the only place it shows.
+
+### Custom domain
+
+Custom domains are not available yet. The page shows the address your portal uses today and, if Roviq has recorded a domain for you, that domain in a disabled field. Use **Contact support** to ask about it.
+
+---
+
 ## Sessions
 
 Manage your active login sessions to keep your account secure.
 
-1. Click **Settings > Sessions** in the sidebar.
+1. Click **Settings** in the sidebar, then the **Sessions** section.
 2. View all active sessions, including device and browser information.
 3. To end a specific session, click **Revoke** next to it.
 4. To end all sessions except the one you are currently using, click **Revoke All Others**.

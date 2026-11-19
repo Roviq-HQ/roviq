@@ -407,6 +407,34 @@ export const testIds = {
     clearFilters: 'reseller-clear-filters',
   },
 
+  // ── Reseller: settings pages (ROV-186) ─────────────────────────────────
+  resellerSettings: {
+    title: 'reseller-settings-title',
+    tabs: 'reseller-settings-tabs',
+    tab: (name: string) => `reseller-settings-tab-${name}`,
+    loading: 'reseller-settings-loading',
+    loadError: 'reseller-settings-load-error',
+    retryBtn: 'reseller-settings-retry-btn',
+    readOnlyNotice: 'reseller-settings-read-only-notice',
+    profileForm: 'reseller-settings-profile-form',
+    profileSlug: 'reseller-settings-profile-slug',
+    profileTier: 'reseller-settings-profile-tier',
+    profileStatus: 'reseller-settings-profile-status',
+    brandingForm: 'reseller-settings-branding-form',
+    brandingNotAppliedNotice: 'reseller-settings-branding-not-applied',
+    brandingLogoPlaceholder: 'reseller-settings-branding-logo-placeholder',
+    brandingPrimaryColorPicker: 'reseller-settings-branding-primary-picker',
+    brandingSecondaryColorPicker: 'reseller-settings-branding-secondary-picker',
+    brandingPrimaryColorInfo: 'reseller-settings-branding-primary-info',
+    brandingCustomCssInfo: 'reseller-settings-branding-css-info',
+    brandingAdvanced: 'reseller-settings-branding-advanced',
+    brandingPreview: 'reseller-settings-branding-preview',
+    customDomainNotice: 'reseller-settings-domain-notice',
+    customDomainCurrentUrl: 'reseller-settings-domain-current-url',
+    customDomainInput: 'reseller-settings-domain-input',
+    customDomainSupportLink: 'reseller-settings-domain-support-link',
+  },
+
   // ── Reseller: team page (ROV-185) ──────────────────────────────────────
   resellerTeam: {
     page: 'reseller-team-page',

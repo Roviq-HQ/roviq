@@ -1,0 +1,108 @@
+{
+  "title": "Settings",
+  "description": "Your organisation's profile, branding and sign-in sessions.",
+  "tabs": {
+    "label": "Settings sections",
+    "profile": "Profile",
+    "branding": "Branding",
+    "customDomain": "Custom domain",
+    "sessions": "Sessions"
+  },
+  "save": "Save changes",
+  "saving": "Saving…",
+  "saved": "Changes saved",
+  "readOnly": "You can view these settings. Only a full admin can change them.",
+  "loadError": "Could not load your settings.",
+  "retry": "Try again",
+  "unsaved": "You have unsaved changes.",
+  "errors": {
+    "CONCURRENT_MODIFICATION": "Someone else changed these settings. The latest version has been loaded; make your change again.",
+    "SYSTEM_RESELLER_PROTECTED": "The name of the Roviq Direct reseller cannot be changed.",
+    "FORBIDDEN": "Only a full admin can change these settings.",
+    "RESELLER_NOT_FOUND": "Your reseller record could not be found.",
+    "generic": "Could not save. Try again."
+  },
+  "profile": {
+    "identity": "Organisation",
+    "identityDescription": "How your organisation appears to institutes and to Roviq.",
+    "name": "Name",
+    "nameSystemHint": "The name of the Roviq Direct reseller is fixed.",
+    "slug": "Slug",
+    "slugHint": "Used in links. It cannot be changed.",
+    "tier": "Tier",
+    "tierHint": "Set by Roviq. Contact support to change it.",
+    "status": "Status",
+    "tiers": {
+      "FULL_MANAGEMENT": "Full Management",
+      "SUPPORT_MANAGEMENT": "Support Only",
+      "READ_ONLY": "Read Only"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "SUSPENDED": "Suspended",
+      "DELETED": "Deleted"
+    },
+    "business": "Business registration",
+    "registrationNumber": "Registration number",
+    "registrationNumberHint": "Company or business registration number, such as CIN or GSTIN.",
+    "registrationState": "State of registration",
+    "registrationStatePlaceholder": "Select a state",
+    "contact": "Contact",
+    "contactHint": "How Roviq reaches you about billing and support.",
+    "address": "Registered address",
+    "addressHint": "Leave the first line empty to keep no address on file."
+  },
+  "branding": {
+    "title": "Branding",
+    "description": "Colours and styling for your white-label portal.",
+    "notAppliedYet": "Your branding is saved now and will be applied to your portal when white-label support launches.",
+    "logo": "Logo and favicon",
+    "logoComingSoon": "Image upload is coming soon.",
+    "primaryColor": "Primary colour",
+    "primaryColorDescription": "Buttons, links and the active menu item.",
+    "secondaryColor": "Secondary colour",
+    "secondaryColorDescription": "The sidebar and other quiet surfaces.",
+    "colorPlaceholder": "#1677FF",
+    "colorInvalid": "Enter a six-digit hex colour, such as #1677FF.",
+    "useDefault": "Use default",
+    "theme": "Colour scheme",
+    "themeDescription": "Whether your portal is light, dark, or follows each person's device.",
+    "themes": {
+      "LIGHT": "Light",
+      "DARK": "Dark",
+      "AUTO": "Match device"
+    },
+    "advanced": "Advanced",
+    "customCss": "Custom CSS",
+    "customCssDescription": "Extra style rules, up to {max} characters. They cannot load anything from another site.",
+    "customCssTooLong": "Keep the stylesheet under {max} characters.",
+    "customCssForbidden": "Remove \"{token}\". Styles cannot load files from other sites or contain HTML.",
+    "fieldHelp": {
+      "primaryColorTitle": "Primary colour",
+      "primaryColorBody": "Pick a colour dark enough for white text to stay readable on it.",
+      "customCssTitle": "Custom CSS",
+      "customCssBody": "Plain style rules only. @import, url(), image(), backslashes and angle brackets are refused so a stylesheet can never pull content from another server.",
+      "customCssExample": "Preview classes: .brand-header, .brand-sidebar, .brand-nav-item, .brand-button, .brand-card"
+    },
+    "preview": "Live preview",
+    "previewFrameTitle": "Preview of your portal with this branding",
+    "previewSample": {
+      "dashboard": "Dashboard",
+      "institutes": "Institutes",
+      "team": "Team",
+      "settings": "Settings",
+      "heading": "Welcome back",
+      "body": "This is how headings, text and buttons will look.",
+      "button": "Add institute"
+    }
+  },
+  "customDomain": {
+    "title": "Custom domain",
+    "comingSoon": "Custom domain support is coming soon.",
+    "currentUrl": "Your portal is currently available at",
+    "domainLabel": "Custom domain",
+    "domainEmpty": "No custom domain set",
+    "domainHint": "Roviq sets this for you. It is not active yet.",
+    "contactSupport": "Contact support"
+  }
+}
