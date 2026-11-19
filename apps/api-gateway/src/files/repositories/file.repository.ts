@@ -1,5 +1,5 @@
 import type { FilePurpose } from '@roviq/common-types';
-import type { CreateFileData, FileRecord } from './types';
+import type { CreateFileData, FileLeaveOwner, FileRecord } from './types';
 
 /** Institute-scoped access to `files`. Tenant and actor come from the request context. */
 export abstract class FileRepository {
@@ -10,4 +10,6 @@ export abstract class FileRepository {
   abstract findClaimable(ids: string[], purpose: FilePurpose): Promise<FileRecord[]>;
   abstract countPendingByCurrentUser(): Promise<number>;
   abstract markRejected(id: string): Promise<void>;
+  /** Null when the file is not attached to a live leave. */
+  abstract findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null>;
 }

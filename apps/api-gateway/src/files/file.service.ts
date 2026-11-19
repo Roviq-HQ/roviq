@@ -1,6 +1,8 @@
+import { subject } from '@casl/ability';
 import { Injectable, Logger } from '@nestjs/common';
 import { AbilityFactory } from '@roviq/casl';
 import {
+  type AppAbility,
   type AuthUser,
   BusinessException,
   ErrorCode,
@@ -30,6 +32,15 @@ const INLINE_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/png', 'i
 
 function bucketOf(file: Pick<FileRecord, 'visibility'>): StorageBucket {
   return file.visibility === 'PUBLIC' ? 'public' : 'private';
+}
+
+/**
+ * Where the browser uploads to. Always in the private bucket, and never the key a file is
+ * served from: the upload URL stays valid for minutes, so the object behind it can still
+ * change after it was checked.
+ */
+function pendingKeyOf(file: Pick<FileRecord, 'objectKey'>): string {
+  return `pending/${file.objectKey}`;
 }
 
 function cleanFileName(name: string): string {
@@ -81,7 +92,7 @@ export class FileService {
       status: 'PENDING',
     });
 
-    const presigned = await this.storage.presignPut(bucketOf(file), file.objectKey, {
+    const presigned = await this.storage.presignPut('private', pendingKeyOf(file), {
       contentType,
       contentLength: input.sizeBytes,
       expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
@@ -109,7 +120,7 @@ export class FileService {
       );
     }
     for (const file of claimable) {
-      if (!(await this.contentIsValid(file))) {
+      if (!(await this.acceptUpload(file))) {
         await this.repo.markRejected(file.id);
         await this.storage.delete(bucketOf(file), [file.objectKey]);
         throw new BusinessException(
@@ -142,13 +153,25 @@ export class FileService {
     if (!file || file.status !== 'READY') {
       throw new BusinessException(ErrorCode.FILE_NOT_FOUND, 'File not found.');
     }
-    const { readAbility } = FILE_PURPOSE_POLICY[file.purpose];
     const ability = await this.abilities.createForUser(user);
-    if (!ability.can(readAbility.action, readAbility.subject)) {
+    if (!(await this.canRead(ability, file))) {
       // Same answer as a missing file, so ids cannot be probed.
       throw new BusinessException(ErrorCode.FILE_NOT_FOUND, 'File not found.');
     }
     return this.urlFor(file, AUDITED_DOWNLOAD_URL_TTL_SECONDS);
+  }
+
+  /**
+   * Checks the ability against the record the file is attached to, not only the subject type:
+   * a rule such as "read own leaves" must not open every leave attachment in the institute.
+   */
+  private async canRead(ability: AppAbility, file: FileRecord): Promise<boolean> {
+    const { readAbility } = FILE_PURPOSE_POLICY[file.purpose];
+    if (file.purpose === 'LEAVE_ATTACHMENT') {
+      const leave = await this.repo.findLeaveForFile(file.id);
+      return leave !== null && ability.can(readAbility.action, subject('Leave', leave));
+    }
+    return ability.can(readAbility.action, readAbility.subject);
   }
 
   private urlFor(file: FileRecord, expiresInSeconds: number): Promise<string> {
@@ -164,8 +187,21 @@ export class FileService {
     });
   }
 
-  private async contentIsValid(file: FileRecord): Promise<boolean> {
+  /**
+   * Moves the upload to the key it will be served from, then checks that copy. The checked
+   * object cannot be replaced afterwards, because no upload URL was ever issued for its key.
+   */
+  private async acceptUpload(file: FileRecord): Promise<boolean> {
     const bucket = bucketOf(file);
+    const pendingKey = pendingKeyOf(file);
+    // No pending object means a retry after the copy already happened; the final key decides.
+    if (await this.storage.head('private', pendingKey)) {
+      await this.storage.copy(
+        { bucket: 'private', key: pendingKey },
+        { bucket, key: file.objectKey },
+      );
+      await this.storage.delete('private', [pendingKey]);
+    }
     const stored = await this.storage.head(bucket, file.objectKey);
     if (!stored || stored.size !== file.sizeBytes) return false;
     if (!isFileContentType(file.contentType)) return false;

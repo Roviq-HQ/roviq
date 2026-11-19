@@ -5,13 +5,15 @@ import {
   type DrizzleDB,
   files,
   filesLive,
+  leaveFilesLive,
+  leavesLive,
   mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { FileRepository } from './file.repository';
-import type { CreateFileData, FileRecord } from './types';
+import type { CreateFileData, FileLeaveOwner, FileRecord } from './types';
 
 const liveColumns = {
   id: filesLive.id,
@@ -121,6 +123,18 @@ export class FileDrizzleRepository extends FileRepository {
         .from(filesLive)
         .where(and(eq(filesLive.uploadedBy, userId), eq(filesLive.status, 'PENDING')));
       return rows[0]?.value ?? 0;
+    });
+  }
+
+  async findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null> {
+    const { tenantId } = this.context();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+      const rows = await tx
+        .select({ id: leavesLive.id, tenantId: leavesLive.tenantId, userId: leavesLive.userId })
+        .from(leaveFilesLive)
+        .innerJoin(leavesLive, eq(leavesLive.id, leaveFilesLive.leaveId))
+        .where(eq(leaveFilesLive.fileId, fileId));
+      return rows[0] ?? null;
     });
   }
 

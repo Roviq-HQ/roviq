@@ -1,3 +1,4 @@
+import { createMongoAbility, subject } from '@casl/ability';
 import type { AbilityFactory } from '@roviq/casl';
 import {
   type AppAbility,
@@ -22,6 +23,9 @@ const TENANT_ID = '00000000-0000-7000-a000-000000000001';
 const USER_ID = '00000000-0000-7000-a000-000000000002';
 const FILE_ID = '00000000-0000-7000-a000-000000000003';
 const KEY = `institutes/${TENANT_ID}/leave-attachment/${FILE_ID}.pdf`;
+const PENDING_KEY = `pending/${KEY}`;
+const LEAVE_ID = '00000000-0000-7000-a000-000000000004';
+const OTHER_USER_ID = '00000000-0000-7000-a000-000000000005';
 const PDF = Buffer.from('%PDF-1.7\nhello');
 
 const user = createMock<InstituteContext>({ scope: 'institute', tenantId: TENANT_ID });
@@ -63,6 +67,8 @@ describe('FileService', () => {
   let findById: ReturnType<typeof vi.fn<FileRepository['findById']>>;
   let countPending: ReturnType<typeof vi.fn<FileRepository['countPendingByCurrentUser']>>;
   let markRejected: ReturnType<typeof vi.fn<FileRepository['markRejected']>>;
+  let findLeaveForFile: ReturnType<typeof vi.fn<FileRepository['findLeaveForFile']>>;
+  let createForUser: ReturnType<typeof vi.fn<AbilityFactory['createForUser']>>;
   let service: FileService;
 
   beforeEach(() => {
@@ -82,6 +88,12 @@ describe('FileService', () => {
     findById = vi.fn<FileRepository['findById']>().mockResolvedValue(null);
     countPending = vi.fn<FileRepository['countPendingByCurrentUser']>().mockResolvedValue(0);
     markRejected = vi.fn<FileRepository['markRejected']>().mockResolvedValue(undefined);
+    findLeaveForFile = vi
+      .fn<FileRepository['findLeaveForFile']>()
+      .mockResolvedValue({ id: LEAVE_ID, tenantId: TENANT_ID, userId: USER_ID });
+    createForUser = vi
+      .fn<AbilityFactory['createForUser']>()
+      .mockResolvedValue(createMock<AppAbility>({ can }));
     service = new FileService(
       createMock<FileRepository>({
         create,
@@ -89,20 +101,19 @@ describe('FileService', () => {
         findById,
         countPendingByCurrentUser: countPending,
         markRejected,
+        findLeaveForFile,
       }),
       storage,
-      createMock<AbilityFactory>({
-        createForUser: vi.fn().mockResolvedValue(createMock<AppAbility>({ can })),
-      }),
+      createMock<AbilityFactory>({ createForUser }),
     );
   });
 
   describe('requestUpload', () => {
-    it('should store a pending file under the institute prefix and return a signed PUT', async () => {
+    it('should return a signed PUT for the pending key, never the key the file is served from', async () => {
       const ticket = await service.requestUpload(user, buildInput());
 
       expect(ticket.fileId).toBe(FILE_ID);
-      expect(ticket.uploadUrl).toBe(`fake://private/${KEY}?put&length=${PDF.length}`);
+      expect(ticket.uploadUrl).toBe(`fake://private/${PENDING_KEY}?put&length=${PDF.length}`);
       expect(ticket.headers).toEqual([{ name: 'Content-Type', value: 'application/pdf' }]);
       expect(can).toHaveBeenCalledWith('create', 'Leave');
     });
@@ -167,17 +178,49 @@ describe('FileService', () => {
   });
 
   describe('verifyUploads', () => {
-    it('should pass when the stored object matches the declared size and type', async () => {
+    it('should move a matching upload to its final key and remove the pending object', async () => {
       findClaimable.mockResolvedValue([buildFile()]);
-      storage.simulateUpload('private', KEY, PDF, 'application/pdf');
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
 
       await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).resolves.toBeUndefined();
+
       expect(markRejected).not.toHaveBeenCalled();
+      expect((await storage.get('private', KEY)).equals(PDF)).toBe(true);
+      expect(storage.has('private', PENDING_KEY)).toBe(false);
+    });
+
+    it('should not let a later write through the upload URL change the verified file', async () => {
+      findClaimable.mockResolvedValue([buildFile()]);
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      const replaced = Buffer.from('MZ executable!');
+      storage.simulateUpload('private', PENDING_KEY, replaced, 'application/pdf');
+
+      expect((await storage.get('private', KEY)).equals(PDF)).toBe(true);
+    });
+
+    it('should pass again when retried after the copy already happened', async () => {
+      findClaimable.mockResolvedValue([buildFile()]);
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).resolves.toBeUndefined();
+    });
+
+    it('should move a public-purpose upload from the private pending key to the public bucket', async () => {
+      findClaimable.mockResolvedValue([buildFile({ visibility: 'PUBLIC' })]);
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
+
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      expect(storage.has('public', KEY)).toBe(true);
+      expect(storage.has('private', KEY)).toBe(false);
     });
 
     it('should look each id up once when it is given twice', async () => {
       findClaimable.mockResolvedValue([buildFile()]);
-      storage.simulateUpload('private', KEY, PDF, 'application/pdf');
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
 
       await service.verifyUploads([FILE_ID, FILE_ID], 'LEAVE_ATTACHMENT');
 
@@ -204,18 +247,19 @@ describe('FileService', () => {
     it('should reject and delete an object whose bytes are not the declared type', async () => {
       const exe = Buffer.from('MZ not a pdf!!');
       findClaimable.mockResolvedValue([buildFile({ sizeBytes: exe.length })]);
-      storage.simulateUpload('private', KEY, exe, 'application/pdf');
+      storage.simulateUpload('private', PENDING_KEY, exe, 'application/pdf');
 
       await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
         code: ErrorCode.FILE_CONTENT_MISMATCH,
       });
       expect(markRejected).toHaveBeenCalledWith(FILE_ID);
       expect(storage.has('private', KEY)).toBe(false);
+      expect(storage.has('private', PENDING_KEY)).toBe(false);
     });
 
     it('should reject an object whose size differs from the declared size', async () => {
       findClaimable.mockResolvedValue([buildFile({ sizeBytes: PDF.length + 1 })]);
-      storage.simulateUpload('private', KEY, PDF, 'application/pdf');
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
 
       await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
         code: ErrorCode.FILE_CONTENT_MISMATCH,
@@ -258,7 +302,48 @@ describe('FileService', () => {
       expect(url).toBe(
         `fake://private/${KEY}?get&expires=${AUDITED_DOWNLOAD_URL_TTL_SECONDS}&at=now`,
       );
-      expect(can).toHaveBeenCalledWith('read', 'Leave');
+      expect(can).toHaveBeenCalledWith(
+        'read',
+        subject('Leave', { id: LEAVE_ID, tenantId: TENANT_ID, userId: USER_ID }),
+      );
+    });
+
+    it("should refuse another person's leave attachment to a user who may read only own leaves", async () => {
+      findById.mockResolvedValue(buildFile({ status: 'READY' }));
+      findLeaveForFile.mockResolvedValue({
+        id: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: OTHER_USER_ID,
+      });
+      createForUser.mockResolvedValue(
+        createMongoAbility<AppAbility>([
+          { action: 'read', subject: 'Leave', conditions: { userId: USER_ID } },
+        ]),
+      );
+
+      await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
+        code: ErrorCode.FILE_NOT_FOUND,
+      });
+    });
+
+    it('should allow the own leave attachment to a user who may read only own leaves', async () => {
+      findById.mockResolvedValue(buildFile({ status: 'READY' }));
+      createForUser.mockResolvedValue(
+        createMongoAbility<AppAbility>([
+          { action: 'read', subject: 'Leave', conditions: { userId: USER_ID } },
+        ]),
+      );
+
+      await expect(service.downloadUrl(user, FILE_ID)).resolves.toContain(KEY);
+    });
+
+    it('should answer not found for a leave file that is no longer attached to a leave', async () => {
+      findById.mockResolvedValue(buildFile({ status: 'READY' }));
+      findLeaveForFile.mockResolvedValue(null);
+
+      await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
+        code: ErrorCode.FILE_NOT_FOUND,
+      });
     });
 
     it.each([
