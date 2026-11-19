@@ -48,3 +48,20 @@ export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];
 export const FilePurpose = Object.fromEntries(FILE_PURPOSE_VALUES.map((v) => [v, v])) as {
   readonly [K in FilePurpose]: K;
 };
+
+// ─── ImageVariant ─────────────────────────────────────────────────────────────
+
+export const IMAGE_VARIANT_VALUES = [
+  // 128 px: lists and avatars
+  'SM',
+  // 512 px: cards and detail headers
+  'MD',
+  // Largest stored size: viewing
+  'FULL',
+] as const;
+
+export type ImageVariant = (typeof IMAGE_VARIANT_VALUES)[number];
+
+export const ImageVariant = Object.fromEntries(IMAGE_VARIANT_VALUES.map((v) => [v, v])) as {
+  readonly [K in ImageVariant]: K;
+};

@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert';
 import { ErrorCode, FilePurpose, LeaveType } from '@roviq/common-types';
+import sharp from 'sharp';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../shared/seed-fixtures';
 import {
@@ -28,6 +29,13 @@ interface FileRef {
   sizeBytes: number;
   url: string | null;
 }
+interface ImageRef extends FileRef {
+  width: number | null;
+  height: number | null;
+  placeholder: string | null;
+  sm: string | null;
+  md: string | null;
+}
 interface Leave {
   id: string;
   files: FileRef[];
@@ -44,6 +52,18 @@ const UPDATE_LEAVE = `mutation Update($id: ID!, $input: UpdateLeaveInput!) {
 }`;
 const LEAVE = `query Leave($id: ID!) {
   leave(id: $id) { id files { id name contentType sizeBytes url } }
+}`;
+const APPLY_LEAVE_WITH_IMAGE = `mutation ApplyImage($input: CreateLeaveInput!) {
+  applyLeave(input: $input) {
+    id
+    files {
+      id name contentType sizeBytes width height placeholder
+      url sm: url(variant: SM) md: url(variant: MD)
+    }
+  }
+}`;
+const LEAVE_IMAGE_LINKS = `query LeaveImage($id: ID!) {
+  leave(id: $id) { files { id sm: url(variant: SM) } }
 }`;
 const DOWNLOAD_URL = `mutation Download($fileId: ID!) { fileDownloadUrl(fileId: $fileId) }`;
 
@@ -86,8 +106,9 @@ async function uploadFile(
   token: string,
   body: Buffer = PDF,
   fileName = 'medical-certificate.pdf',
+  contentType = 'application/pdf',
 ): Promise<string> {
-  const res = await requestUpload(token, { sizeBytes: body.length, fileName });
+  const res = await requestUpload(token, { sizeBytes: body.length, fileName, contentType });
   expect(res.errors).toBeUndefined();
   const ticket = res.data?.requestFileUpload;
   assert(ticket);
@@ -231,6 +252,84 @@ describe('File storage E2E', () => {
       expect(res.data?.updateLeave.files.map((file) => file.id)).toEqual([replacement]);
       const removed = await gql(DOWNLOAD_URL, { fileId: attachedFileId }, tokenA);
       expect(codeOf(removed)).toBe(ErrorCode.FILE_NOT_FOUND);
+    });
+  });
+
+  describe('images', () => {
+    let imageLeaveId: string;
+    let image: ImageRef;
+
+    it('should store a photo as three WebP sizes without its location data', async () => {
+      // 3000x2000 with GPS in EXIF, like a phone photo.
+      const photo = await sharp({
+        create: { width: 3000, height: 2000, channels: 3, background: { r: 90, g: 140, b: 60 } },
+      })
+        .withExif({ IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '28/1 36/1 50/1' } })
+        .jpeg()
+        .toBuffer();
+      expect((await sharp(photo).metadata()).exif).toBeDefined();
+      const fileId = await uploadFile(tokenA, photo, 'prescription.jpg', 'image/jpeg');
+
+      const res = await gql<{ applyLeave: { id: string; files: ImageRef[] } }>(
+        APPLY_LEAVE_WITH_IMAGE,
+        {
+          input: {
+            userId: SEED_IDS.MEMBERSHIP_ADMIN_INST1,
+            startDate: '2027-03-01',
+            endDate: '2027-03-01',
+            type: LeaveType.MEDICAL,
+            reason: 'file storage e2e image',
+            fileIds: [fileId],
+          },
+        },
+        tokenA,
+      );
+
+      expect(res.errors).toBeUndefined();
+      assert(res.data);
+      imageLeaveId = res.data.applyLeave.id;
+      const [file] = res.data.applyLeave.files;
+      assert(file?.url && file.sm && file.md);
+      image = file;
+      expect(file).toMatchObject({ contentType: 'image/webp', width: 2560, height: 1707 });
+      expect(file.placeholder).toMatch(/^data:image\/webp;base64,/);
+      const expected = { sm: [128, 85], md: [512, 341], full: [2560, 1707] } as const;
+      for (const [size, url] of [
+        ['sm', file.sm],
+        ['md', file.md],
+        ['full', file.url],
+      ] as const) {
+        const response = await fetch(url);
+        expect(response.status, size).toBe(200);
+        expect(response.headers.get('cache-control'), size).toBe('max-age=31536000, immutable');
+        const meta = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
+        expect(meta.format, size).toBe('webp');
+        expect([meta.width, meta.height], size).toEqual(expected[size]);
+        expect(meta.exif, size).toBeUndefined();
+      }
+    });
+
+    it('should return the same thumbnail link on a later request, so browsers can cache it', async () => {
+      const res = await gql<{ leave: { files: { id: string; sm: string }[] } }>(
+        LEAVE_IMAGE_LINKS,
+        { id: imageLeaveId },
+        tokenA,
+      );
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.leave.files[0]?.sm).toBe(image.sm);
+    });
+
+    it('should refuse a file that claims to be a JPEG and is not an image', async () => {
+      const fake = Buffer.concat([
+        Buffer.from([0xff, 0xd8, 0xff]),
+        Buffer.from('not image data at all'),
+      ]);
+      const fileId = await uploadFile(tokenA, fake, 'fake.jpg', 'image/jpeg');
+
+      const res = await applyLeave(tokenA, SEED_IDS.MEMBERSHIP_ADMIN_INST1, '2027-03-02', [fileId]);
+
+      expect(codeOf(res)).toBe(ErrorCode.FILE_IMAGE_INVALID);
     });
   });
 

@@ -1,5 +1,5 @@
 import type { AppAction, AppSubject } from '../common-types';
-import type { FilePurpose, FileVisibility } from '../enums/file';
+import type { FilePurpose, FileVisibility, ImageVariant } from '../enums/file';
 
 const MB = 1024 * 1024;
 
@@ -20,12 +20,46 @@ const DOCUMENT_TYPES = [
   FILE_CONTENT_TYPE.WEBP,
 ] as const;
 
+/** How an uploaded image of a purpose is stored. Every image is re-encoded to WebP. */
+export interface ImageStoragePolicy {
+  /** Square crop for avatars; false keeps the picture's own shape. */
+  square: boolean;
+  /** Long side of the FULL size, in pixels. */
+  fullPx: number;
+}
+
+/** Scans of documents: shape kept, large enough to read small print. */
+const DOCUMENT_IMAGE: ImageStoragePolicy = { square: false, fullPx: 2560 };
+
+/** Long side of the SM and MD sizes, in pixels; FULL comes from the purpose. */
+export const IMAGE_VARIANT_PX: { readonly [V in Exclude<ImageVariant, 'FULL'>]: number } = {
+  SM: 128,
+  MD: 512,
+};
+
+const IMAGE_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+export function isImageContentType(contentType: string): boolean {
+  return IMAGE_TYPES.has(contentType);
+}
+
+/** Images wider or taller than this are scaled down in the browser before upload. */
+export const IMAGE_UPLOAD_MAX_PX = 2560;
+
+/**
+ * Largest image a user may pick. It is scaled down in the browser first, and the result must
+ * then fit the purpose's own size limit.
+ */
+export const IMAGE_PICK_MAX_BYTES = 50 * MB;
+
 export interface FilePurposePolicy {
   visibility: FileVisibility;
   allowedContentTypes: readonly FileContentType[];
   maxSizeBytes: number;
   /** Sensitive files expose no URL in list queries; download goes through the audited call. */
   sensitive: boolean;
+  /** How images of this purpose are stored. Null: the purpose accepts no images. */
+  image: ImageStoragePolicy | null;
   /** Ability a user needs to upload for this purpose. Null: written by the server only. */
   uploadAbility: { action: AppAction; subject: AppSubject } | null;
   /** Ability a user needs to download a file of this purpose. */
@@ -39,6 +73,7 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     allowedContentTypes: DOCUMENT_TYPES,
     maxSizeBytes: 10 * MB,
     sensitive: false,
+    image: DOCUMENT_IMAGE,
     uploadAbility: { action: 'create', subject: 'Leave' },
     readAbility: { action: 'read', subject: 'Leave' },
   },
@@ -47,6 +82,7 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     allowedContentTypes: [FILE_CONTENT_TYPE.CSV],
     maxSizeBytes: 10 * MB,
     sensitive: false,
+    image: null,
     uploadAbility: { action: 'create', subject: 'Student' },
     readAbility: { action: 'create', subject: 'Student' },
   },
@@ -55,6 +91,7 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     allowedContentTypes: [FILE_CONTENT_TYPE.CSV],
     maxSizeBytes: 50 * MB,
     sensitive: false,
+    image: null,
     uploadAbility: null,
     readAbility: { action: 'create', subject: 'Student' },
   },

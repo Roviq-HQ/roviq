@@ -313,6 +313,8 @@ export const ErrorCode = {
   FILE_TOO_LARGE: 'FILE_TOO_LARGE',
   /** The uploaded bytes are missing, or do not match the declared size or type */
   FILE_CONTENT_MISMATCH: 'FILE_CONTENT_MISMATCH',
+  /** The image could not be read, or has more pixels than is accepted */
+  FILE_IMAGE_INVALID: 'FILE_IMAGE_INVALID',
   /** Too many uploads started and not yet attached to anything */
   FILE_UPLOAD_LIMIT_REACHED: 'FILE_UPLOAD_LIMIT_REACHED',
 
@@ -498,6 +500,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   FILE_TYPE_NOT_ALLOWED: HttpStatus.BAD_REQUEST,
   FILE_TOO_LARGE: HttpStatus.BAD_REQUEST,
   FILE_CONTENT_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_IMAGE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_UPLOAD_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   IMPERSONATION_TARGET_INVALID: HttpStatus.BAD_REQUEST,
   IMPERSONATION_SESSION_INVALID: HttpStatus.BAD_REQUEST,

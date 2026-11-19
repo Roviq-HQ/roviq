@@ -12,12 +12,14 @@ import {
   type FilePurpose,
   fileContentMatchesType,
   fileExtensionFor,
+  type ImageVariant,
   type InstituteContext,
   isFileContentType,
+  isImageContentType,
 } from '@roviq/common-types';
 import { type StorageBucket, StorageClient } from '@roviq/storage';
 import type { RequestFileUploadInput } from './dto/request-file-upload.input';
-import type { FileRefModel } from './models/file-ref.model';
+import { ImageProcessor, InvalidImageError } from './image/image-processor';
 import type { FileUploadTicket } from './models/file-upload-ticket.model';
 import { FileRepository } from './repositories/file.repository';
 import type { FileRecord } from './repositories/types';
@@ -27,8 +29,17 @@ export const DOWNLOAD_URL_TTL_SECONDS = 10 * 60;
 export const AUDITED_DOWNLOAD_URL_TTL_SECONDS = 60;
 /** Uploads a user may have started and not yet attached; stops storage being filled unnoticed. */
 export const MAX_PENDING_UPLOADS_PER_USER = 20;
+/**
+ * Thumbnail links are signed at the start of a fixed window, so every request in that window
+ * gets the same URL and the browser cache hits. The cost: a leaked thumbnail link works for up
+ * to THUMBNAIL_URL_TTL_SECONDS instead of ten minutes.
+ */
+export const THUMBNAIL_URL_WINDOW_SECONDS = 6 * 60 * 60;
+export const THUMBNAIL_URL_TTL_SECONDS = 12 * 60 * 60;
+/** Objects never change once written: a new upload is a new file id and key. */
+const IMMUTABLE_CACHE_CONTROL = 'max-age=31536000, immutable';
 
-const INLINE_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/png', 'image/webp']);
+type UploadVerdict = 'ACCEPTED' | 'CONTENT_MISMATCH' | 'IMAGE_INVALID';
 
 function bucketOf(file: Pick<FileRecord, 'visibility'>): StorageBucket {
   return file.visibility === 'PUBLIC' ? 'public' : 'private';
@@ -41,6 +52,21 @@ function bucketOf(file: Pick<FileRecord, 'visibility'>): StorageBucket {
  */
 function pendingKeyOf(file: Pick<FileRecord, 'objectKey'>): string {
   return `pending/${file.objectKey}`;
+}
+
+/** Key of one stored size of an image: `…/{fileId}/sm.webp`. */
+function variantKeyOf(file: Pick<FileRecord, 'objectKey'>, variant: ImageVariant): string {
+  return `${file.objectKey.replace(/\.[a-z0-9]+$/, '')}/${variant.toLowerCase()}.webp`;
+}
+
+/** Every key a file may occupy in its own bucket, for cleanup. */
+function storedKeysOf(file: Pick<FileRecord, 'objectKey'>): string[] {
+  return [
+    file.objectKey,
+    variantKeyOf(file, 'SM'),
+    variantKeyOf(file, 'MD'),
+    variantKeyOf(file, 'FULL'),
+  ];
 }
 
 function cleanFileName(name: string): string {
@@ -57,6 +83,7 @@ export class FileService {
     private readonly repo: FileRepository,
     private readonly storage: StorageClient,
     private readonly abilities: AbilityFactory,
+    private readonly images: ImageProcessor,
   ) {}
 
   async requestUpload(
@@ -120,31 +147,30 @@ export class FileService {
       );
     }
     for (const file of claimable) {
-      if (!(await this.acceptUpload(file))) {
-        await this.repo.markRejected(file.id);
-        await this.storage.delete(bucketOf(file), [file.objectKey]);
-        throw new BusinessException(
-          ErrorCode.FILE_CONTENT_MISMATCH,
-          `The uploaded file "${file.originalName}" is missing or does not match its type.`,
-        );
-      }
+      const verdict = await this.acceptUpload(file);
+      if (verdict === 'ACCEPTED') continue;
+      await this.repo.markRejected(file.id);
+      await this.storage.delete('private', [pendingKeyOf(file)]);
+      await this.storage.delete(bucketOf(file), storedKeysOf(file));
+      throw verdict === 'IMAGE_INVALID'
+        ? new BusinessException(
+            ErrorCode.FILE_IMAGE_INVALID,
+            `The image "${file.originalName}" could not be read or has too many pixels.`,
+          )
+        : new BusinessException(
+            ErrorCode.FILE_CONTENT_MISMATCH,
+            `The uploaded file "${file.originalName}" is missing or does not match its type.`,
+          );
     }
   }
 
-  async toRef(file: FileRecord): Promise<FileRefModel> {
-    return {
-      id: file.id,
-      name: file.originalName,
-      contentType: file.contentType,
-      sizeBytes: file.sizeBytes,
-      url: FILE_PURPOSE_POLICY[file.purpose].sensitive
-        ? null
-        : await this.urlFor(file, DOWNLOAD_URL_TTL_SECONDS),
-    };
-  }
-
-  toRefs(records: FileRecord[]): Promise<FileRefModel[]> {
-    return Promise.all(records.map((file) => this.toRef(file)));
+  /**
+   * Link shown in ordinary responses. Null for sensitive files, which are downloaded through
+   * `downloadUrl` instead. `variant` picks the size of an image and is ignored for other files.
+   */
+  refUrl(file: FileRecord, variant: ImageVariant): Promise<string | null> {
+    if (FILE_PURPOSE_POLICY[file.purpose].sensitive) return Promise.resolve(null);
+    return this.urlFor(file, variant, DOWNLOAD_URL_TTL_SECONDS);
   }
 
   /** Short-lived URL for one file, checked against the ability its purpose requires. */
@@ -158,7 +184,7 @@ export class FileService {
       // Same answer as a missing file, so ids cannot be probed.
       throw new BusinessException(ErrorCode.FILE_NOT_FOUND, 'File not found.');
     }
-    return this.urlFor(file, AUDITED_DOWNLOAD_URL_TTL_SECONDS);
+    return this.urlFor(file, 'FULL', AUDITED_DOWNLOAD_URL_TTL_SECONDS);
   }
 
   /**
@@ -174,24 +200,39 @@ export class FileService {
     return ability.can(readAbility.action, readAbility.subject);
   }
 
-  private urlFor(file: FileRecord, expiresInSeconds: number): Promise<string> {
-    if (file.visibility === 'PUBLIC') {
-      return Promise.resolve(this.storage.publicUrl(file.objectKey));
+  private urlFor(
+    file: FileRecord,
+    variant: ImageVariant,
+    expiresInSeconds: number,
+  ): Promise<string> {
+    const isImage = file.variants !== null;
+    const key = isImage ? variantKeyOf(file, variant) : file.objectKey;
+    if (file.visibility === 'PUBLIC') return Promise.resolve(this.storage.publicUrl(key));
+
+    const disposition = {
+      type: isImage ? ('inline' as const) : ('attachment' as const),
+      filename: isImage ? file.originalName.replace(/\.[^.]*$/, '.webp') : file.originalName,
+    };
+    if (isImage && variant !== 'FULL') {
+      const windowMs = THUMBNAIL_URL_WINDOW_SECONDS * 1000;
+      return this.storage.presignGet('private', key, {
+        expiresInSeconds: THUMBNAIL_URL_TTL_SECONDS,
+        disposition,
+        signingDate: new Date(Math.floor(Date.now() / windowMs) * windowMs),
+      });
     }
-    return this.storage.presignGet('private', file.objectKey, {
-      expiresInSeconds,
-      disposition: {
-        type: INLINE_TYPES.has(file.contentType) ? 'inline' : 'attachment',
-        filename: file.originalName,
-      },
-    });
+    return this.storage.presignGet('private', key, { expiresInSeconds, disposition });
   }
 
   /**
-   * Moves the upload to the key it will be served from, then checks that copy. The checked
-   * object cannot be replaced afterwards, because no upload URL was ever issued for its key.
+   * Moves the upload to the key it will be served from, then checks what was stored there. The
+   * checked object cannot be replaced afterwards: no upload URL was ever issued for its key.
    */
-  private async acceptUpload(file: FileRecord): Promise<boolean> {
+  private acceptUpload(file: FileRecord): Promise<UploadVerdict> {
+    return isImageContentType(file.contentType) ? this.acceptImage(file) : this.acceptFile(file);
+  }
+
+  private async acceptFile(file: FileRecord): Promise<UploadVerdict> {
     const bucket = bucketOf(file);
     const pendingKey = pendingKeyOf(file);
     // No pending object means a retry after the copy already happened; the final key decides.
@@ -203,19 +244,69 @@ export class FileService {
       await this.storage.delete('private', [pendingKey]);
     }
     const stored = await this.storage.head(bucket, file.objectKey);
-    if (!stored || stored.size !== file.sizeBytes) return false;
-    if (!isFileContentType(file.contentType)) return false;
+    if (!stored || stored.size !== file.sizeBytes) return 'CONTENT_MISMATCH';
+    if (!isFileContentType(file.contentType)) return 'CONTENT_MISMATCH';
     const head = await this.storage.getRange(
       bucket,
       file.objectKey,
       0,
       Math.min(stored.size, FILE_SIGNATURE_BYTES) - 1,
     );
-    const matches = fileContentMatchesType(head, file.contentType);
-    if (!matches) {
+    if (!fileContentMatchesType(head, file.contentType)) {
       this.logger.warn(`File ${file.id} content does not match ${file.contentType}`);
+      return 'CONTENT_MISMATCH';
     }
-    return matches;
+    return 'ACCEPTED';
+  }
+
+  /** An image is never stored as uploaded: only the sizes produced here are kept. */
+  private async acceptImage(file: FileRecord): Promise<UploadVerdict> {
+    const policy = FILE_PURPOSE_POLICY[file.purpose].image;
+    if (!policy) return 'CONTENT_MISMATCH';
+    const bucket = bucketOf(file);
+    const pendingKey = pendingKeyOf(file);
+
+    const pending = await this.storage.head('private', pendingKey);
+    if (!pending) {
+      // A retry after processing already ran: the stored sizes decide.
+      const done =
+        file.variants !== null && (await this.storage.head(bucket, variantKeyOf(file, 'FULL')));
+      return done ? 'ACCEPTED' : 'CONTENT_MISMATCH';
+    }
+    if (pending.size !== file.sizeBytes) return 'CONTENT_MISMATCH';
+
+    const original = await this.storage.get('private', pendingKey);
+    let processed: Awaited<ReturnType<ImageProcessor['process']>>;
+    try {
+      processed = await this.images.process(original, policy);
+    } catch (err) {
+      if (!(err instanceof InvalidImageError)) throw err;
+      this.logger.warn(`Image ${file.id} was refused: ${err.message}`);
+      return 'IMAGE_INVALID';
+    }
+
+    for (const variant of processed.variants) {
+      await this.storage.put(bucket, variantKeyOf(file, variant.name), variant.data, {
+        contentType: 'image/webp',
+        cacheControl: IMMUTABLE_CACHE_CONTROL,
+      });
+    }
+    const full = processed.variants.find((variant) => variant.name === 'FULL');
+    if (!full) throw new Error('Image processing produced no FULL size');
+    await this.repo.saveProcessedImage(file.id, {
+      width: full.width,
+      height: full.height,
+      placeholder: processed.placeholder,
+      variants: processed.variants.map(({ name, data, width, height }) => ({
+        name,
+        width,
+        height,
+        sizeBytes: data.length,
+      })),
+      sizeBytes: processed.variants.reduce((sum, variant) => sum + variant.data.length, 0),
+    });
+    await this.storage.delete('private', [pendingKey]);
+    return 'ACCEPTED';
   }
 
   private assertAllowedType(purpose: FilePurpose, contentType: string): FileContentType {

@@ -2524,20 +2524,31 @@ enum FilePurpose {
 
 """A stored file. `url` is signed when the response is built and expires."""
 type FileRef {
-  """Verified MIME type."""
+  """Verified MIME type. Every image is stored as `image/webp`."""
   contentType: String!
+
+  """Pixel height of the FULL size; images only."""
+  height: Int
   id: ID!
 
   """File name as the uploader had it; display only."""
   name: String!
 
-  """Size in bytes."""
+  """
+  Tiny blurred preview as a data URI, to show while the image loads; images only.
+  """
+  placeholder: String
+
+  """Size in bytes; for an image, all stored sizes together."""
   sizeBytes: Float!
 
   """
-  Download URL, valid for about 10 minutes. Null for sensitive files: call `fileDownloadUrl` instead.
+  Download URL. For an image, `variant` picks the size; SM and MD links stay the same for hours so browsers can cache them. Null for sensitive files: call `fileDownloadUrl` instead.
   """
-  url: String
+  url(variant: ImageVariant! = FULL): String
+
+  """Pixel width of the FULL size; images only."""
+  width: Int
 }
 
 """An HTTP header the browser must send with the upload."""
@@ -2987,6 +2998,13 @@ enum IdentifierType {
   SOCIETY_REGISTRATION
   STATE_RECOGNITION
   UDISE_PLUS
+}
+
+"""Stored size of an image: SM (128 px), MD (512 px) or FULL."""
+enum ImageVariant {
+  FULL
+  MD
+  SM
 }
 
 type ImpersonationAuthPayload {

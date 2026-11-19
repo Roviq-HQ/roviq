@@ -1,9 +1,15 @@
 'use client';
 
-import { FILE_PURPOSE_POLICY, type FilePurpose } from '@roviq/common-types';
+import {
+  FILE_PURPOSE_POLICY,
+  type FilePurpose,
+  IMAGE_PICK_MAX_BYTES,
+  isImageContentType,
+} from '@roviq/common-types';
 import { extractGraphQLErrorCode, gql, useMutation } from '@roviq/graphql';
 import type { FileUploadTicket, RequestFileUploadInput } from '@roviq/graphql/generated';
 import * as React from 'react';
+import { prepareImage } from './prepare-image';
 
 const REQUEST_FILE_UPLOAD = gql`
   mutation RequestFileUpload($input: RequestFileUploadInput!) {
@@ -26,6 +32,7 @@ export const FILE_UPLOAD_ERROR_KEYS = [
   'FILE_TOO_LARGE',
   'FILE_UPLOAD_LIMIT_REACHED',
   'FILE_CONTENT_MISMATCH',
+  'FILE_IMAGE_INVALID',
   'FILE_NOT_FOUND',
   'FORBIDDEN',
   'TOO_MANY_FILES',
@@ -99,19 +106,26 @@ export function useFileUpload(purpose: FilePurpose) {
       tracked.current.set(key, { file, abort });
       patch(key, { status: 'uploading', progress: 0, errorKey: null, fileId: null });
       try {
+        // Phone photos are far larger than anything shown; shrink them before they leave the device.
+        const upload = isImageContentType(file.type) ? await prepareImage(file) : file;
+        if (abort.signal.aborted) return;
+        if (upload.size > policy.maxSizeBytes) {
+          patch(key, { status: 'error', errorKey: 'FILE_TOO_LARGE' });
+          return;
+        }
         const { data } = await requestUpload({
           variables: {
             input: {
               purpose,
-              fileName: file.name,
-              contentType: file.type,
-              sizeBytes: file.size,
+              fileName: upload.name,
+              contentType: upload.type,
+              sizeBytes: upload.size,
             },
           },
         });
         const ticket = data?.requestFileUpload;
         if (!ticket) throw new Error();
-        await putWithProgress(ticket, file, abort.signal, (progress) => patch(key, { progress }));
+        await putWithProgress(ticket, upload, abort.signal, (progress) => patch(key, { progress }));
         patch(key, { status: 'done', progress: 100, fileId: ticket.fileId });
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -121,7 +135,7 @@ export function useFileUpload(purpose: FilePurpose) {
         });
       }
     },
-    [patch, purpose, requestUpload],
+    [patch, policy, purpose, requestUpload],
   );
 
   const add = React.useCallback(
@@ -130,7 +144,8 @@ export function useFileUpload(purpose: FilePurpose) {
       const added = files.map((file) => {
         const errorKey: FileUploadErrorKey | null = !allowed.includes(file.type)
           ? 'FILE_TYPE_NOT_ALLOWED'
-          : file.size > policy.maxSizeBytes
+          : // A photo is shrunk before upload, so its limit applies to the result (see `start`).
+            file.size > (isImageContentType(file.type) ? IMAGE_PICK_MAX_BYTES : policy.maxSizeBytes)
             ? 'FILE_TOO_LARGE'
             : null;
         const item: UploadItem = {

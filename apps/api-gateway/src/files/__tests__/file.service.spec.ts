@@ -8,14 +8,17 @@ import {
 } from '@roviq/common-types';
 import { FakeStorageClient } from '@roviq/storage';
 import { createMock } from '@roviq/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestFileUploadInput } from '../dto/request-file-upload.input';
 import {
   AUDITED_DOWNLOAD_URL_TTL_SECONDS,
   DOWNLOAD_URL_TTL_SECONDS,
   FileService,
   MAX_PENDING_UPLOADS_PER_USER,
+  THUMBNAIL_URL_TTL_SECONDS,
+  THUMBNAIL_URL_WINDOW_SECONDS,
 } from '../file.service';
+import { ImageProcessor, InvalidImageError, type ProcessedImage } from '../image/image-processor';
 import type { FileRepository } from '../repositories/file.repository';
 import type { CreateFileData, FileRecord } from '../repositories/types';
 
@@ -42,6 +45,10 @@ function buildFile(overrides: Partial<FileRecord> = {}): FileRecord {
     originalName: 'certificate.pdf',
     contentType: 'application/pdf',
     sizeBytes: PDF.length,
+    width: null,
+    height: null,
+    variants: null,
+    placeholder: null,
     status: 'PENDING',
     uploadedBy: USER_ID,
     createdAt: new Date('2026-11-19T10:00:00Z'),
@@ -59,6 +66,50 @@ function buildInput(overrides: Partial<RequestFileUploadInput> = {}): RequestFil
   };
 }
 
+const IMAGE_KEY = `institutes/${TENANT_ID}/leave-attachment/${FILE_ID}.jpg`;
+const IMAGE_BASE = `institutes/${TENANT_ID}/leave-attachment/${FILE_ID}`;
+const PHOTO = Buffer.from('raw photo bytes as uploaded');
+const PROCESSED: ProcessedImage = {
+  variants: [
+    { name: 'SM', data: Buffer.from('sm'), width: 128, height: 96 },
+    { name: 'MD', data: Buffer.from('medium'), width: 512, height: 384 },
+    { name: 'FULL', data: Buffer.from('full-size'), width: 2000, height: 1500 },
+  ],
+  placeholder: 'data:image/webp;base64,AAAA',
+};
+
+function buildImage(overrides: Partial<FileRecord> = {}): FileRecord {
+  return buildFile({
+    objectKey: IMAGE_KEY,
+    originalName: 'scan.jpg',
+    contentType: 'image/jpeg',
+    sizeBytes: PHOTO.length,
+    ...overrides,
+  });
+}
+
+/** A stored, processed image as the repository returns it. */
+function buildStoredImage(overrides: Partial<FileRecord> = {}): FileRecord {
+  return buildImage({
+    contentType: 'image/webp',
+    status: 'READY',
+    width: 2000,
+    height: 1500,
+    placeholder: PROCESSED.placeholder,
+    variants: [
+      { name: 'SM', width: 128, height: 96, sizeBytes: 2 },
+      { name: 'MD', width: 512, height: 384, sizeBytes: 6 },
+      { name: 'FULL', width: 2000, height: 1500, sizeBytes: 9 },
+    ],
+    sizeBytes: 17,
+    ...overrides,
+  });
+}
+
+class FakeImageProcessor extends ImageProcessor {
+  process = vi.fn<ImageProcessor['process']>().mockResolvedValue(PROCESSED);
+}
+
 describe('FileService', () => {
   let storage: FakeStorageClient;
   let can: ReturnType<typeof vi.fn<AppAbility['can']>>;
@@ -69,6 +120,8 @@ describe('FileService', () => {
   let markRejected: ReturnType<typeof vi.fn<FileRepository['markRejected']>>;
   let findLeaveForFile: ReturnType<typeof vi.fn<FileRepository['findLeaveForFile']>>;
   let createForUser: ReturnType<typeof vi.fn<AbilityFactory['createForUser']>>;
+  let saveProcessedImage: ReturnType<typeof vi.fn<FileRepository['saveProcessedImage']>>;
+  let images: FakeImageProcessor;
   let service: FileService;
 
   beforeEach(() => {
@@ -94,6 +147,8 @@ describe('FileService', () => {
     createForUser = vi
       .fn<AbilityFactory['createForUser']>()
       .mockResolvedValue(createMock<AppAbility>({ can }));
+    saveProcessedImage = vi.fn<FileRepository['saveProcessedImage']>().mockResolvedValue(undefined);
+    images = new FakeImageProcessor();
     service = new FileService(
       createMock<FileRepository>({
         create,
@@ -102,9 +157,11 @@ describe('FileService', () => {
         countPendingByCurrentUser: countPending,
         markRejected,
         findLeaveForFile,
+        saveProcessedImage,
       }),
       storage,
       createMock<AbilityFactory>({ createForUser }),
+      images,
     );
   });
 
@@ -273,23 +330,164 @@ describe('FileService', () => {
     });
   });
 
-  describe('toRef', () => {
-    it('should sign a private file for the normal download lifetime', async () => {
-      const ref = await service.toRef(buildFile({ status: 'READY' }));
+  describe('verifyUploads for images', () => {
+    it('should store only the processed sizes, as WebP, and drop the original', async () => {
+      findClaimable.mockResolvedValue([buildImage()]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
 
-      expect(ref).toEqual({
-        id: FILE_ID,
-        name: 'certificate.pdf',
-        contentType: 'application/pdf',
-        sizeBytes: PDF.length,
-        url: `fake://private/${KEY}?get&expires=${DOWNLOAD_URL_TTL_SECONDS}&at=now`,
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      expect(images.process).toHaveBeenCalledWith(PHOTO, { square: false, fullPx: 2560 });
+      expect((await storage.get('private', `${IMAGE_BASE}/sm.webp`)).toString()).toBe('sm');
+      expect((await storage.get('private', `${IMAGE_BASE}/md.webp`)).toString()).toBe('medium');
+      expect((await storage.get('private', `${IMAGE_BASE}/full.webp`)).toString()).toBe(
+        'full-size',
+      );
+      expect(await storage.head('private', `${IMAGE_BASE}/sm.webp`)).toEqual({
+        size: 2,
+        contentType: 'image/webp',
+      });
+      expect(storage.has('private', `pending/${IMAGE_KEY}`)).toBe(false);
+      expect(storage.has('private', IMAGE_KEY)).toBe(false);
+    });
+
+    it('should record the sizes, placeholder and total bytes of the image', async () => {
+      findClaimable.mockResolvedValue([buildImage()]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
+
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      expect(saveProcessedImage).toHaveBeenCalledWith(FILE_ID, {
+        width: 2000,
+        height: 1500,
+        placeholder: 'data:image/webp;base64,AAAA',
+        variants: [
+          { name: 'SM', width: 128, height: 96, sizeBytes: 2 },
+          { name: 'MD', width: 512, height: 384, sizeBytes: 6 },
+          { name: 'FULL', width: 2000, height: 1500, sizeBytes: 9 },
+        ],
+        sizeBytes: 17,
       });
     });
 
-    it('should give a public file its stable URL', async () => {
-      const ref = await service.toRef(buildFile({ status: 'READY', visibility: 'PUBLIC' }));
+    it('should reject an image the processor cannot read and leave nothing stored', async () => {
+      findClaimable.mockResolvedValue([buildImage()]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
+      images.process.mockRejectedValue(new InvalidImageError('too many pixels'));
 
-      expect(ref.url).toBe(`fake://public/${KEY}`);
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
+        code: ErrorCode.FILE_IMAGE_INVALID,
+      });
+
+      expect(markRejected).toHaveBeenCalledWith(FILE_ID);
+      expect(storage.has('private', `pending/${IMAGE_KEY}`)).toBe(false);
+      expect(storage.has('private', `${IMAGE_BASE}/full.webp`)).toBe(false);
+      expect(saveProcessedImage).not.toHaveBeenCalled();
+    });
+
+    it('should reject an image whose uploaded size differs from the declared size', async () => {
+      findClaimable.mockResolvedValue([buildImage({ sizeBytes: PHOTO.length + 5 })]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
+
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
+        code: ErrorCode.FILE_CONTENT_MISMATCH,
+      });
+      expect(images.process).not.toHaveBeenCalled();
+    });
+
+    it('should reject an image that was never uploaded', async () => {
+      findClaimable.mockResolvedValue([buildImage()]);
+
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
+        code: ErrorCode.FILE_CONTENT_MISMATCH,
+      });
+    });
+
+    it('should pass without processing again when retried after the sizes were stored', async () => {
+      findClaimable.mockResolvedValue([buildStoredImage({ status: 'PENDING' })]);
+      await storage.put('private', `${IMAGE_BASE}/full.webp`, Buffer.from('full-size'), {
+        contentType: 'image/webp',
+      });
+
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).resolves.toBeUndefined();
+      expect(images.process).not.toHaveBeenCalled();
+    });
+
+    it('should not let a later write through the upload URL change the stored image', async () => {
+      findClaimable.mockResolvedValue([buildImage()]);
+      storage.simulateUpload('private', `pending/${IMAGE_KEY}`, PHOTO, 'image/jpeg');
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      storage.simulateUpload(
+        'private',
+        `pending/${IMAGE_KEY}`,
+        Buffer.from('swapped'),
+        'image/jpeg',
+      );
+
+      expect((await storage.get('private', `${IMAGE_BASE}/full.webp`)).toString()).toBe(
+        'full-size',
+      );
+    });
+  });
+
+  describe('refUrl', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should sign a private file for the normal download lifetime', async () => {
+      const url = await service.refUrl(buildFile({ status: 'READY' }), 'FULL');
+
+      expect(url).toBe(`fake://private/${KEY}?get&expires=${DOWNLOAD_URL_TTL_SECONDS}&at=now`);
+    });
+
+    it('should ignore the size argument for a file that is not an image', async () => {
+      const url = await service.refUrl(buildFile({ status: 'READY' }), 'SM');
+
+      expect(url).toBe(`fake://private/${KEY}?get&expires=${DOWNLOAD_URL_TTL_SECONDS}&at=now`);
+    });
+
+    it('should give a public file its stable URL', async () => {
+      const url = await service.refUrl(
+        buildFile({ status: 'READY', visibility: 'PUBLIC' }),
+        'FULL',
+      );
+
+      expect(url).toBe(`fake://public/${KEY}`);
+    });
+
+    it('should serve the FULL size of an image with a short-lived link', async () => {
+      const url = await service.refUrl(buildStoredImage(), 'FULL');
+
+      expect(url).toBe(
+        `fake://private/${IMAGE_BASE}/full.webp?get&expires=${DOWNLOAD_URL_TTL_SECONDS}&at=now`,
+      );
+    });
+
+    it('should give the same thumbnail link to every request in one window', async () => {
+      const windowMs = THUMBNAIL_URL_WINDOW_SECONDS * 1000;
+      const windowStart = Math.floor(Date.UTC(2026, 10, 19, 14, 30) / windowMs) * windowMs;
+      vi.useFakeTimers();
+
+      vi.setSystemTime(windowStart + 1000);
+      const early = await service.refUrl(buildStoredImage(), 'SM');
+      vi.setSystemTime(windowStart + windowMs - 1000);
+      const late = await service.refUrl(buildStoredImage(), 'SM');
+      vi.setSystemTime(windowStart + windowMs);
+      const nextWindow = await service.refUrl(buildStoredImage(), 'SM');
+
+      expect(early).toBe(
+        `fake://private/${IMAGE_BASE}/sm.webp?get&expires=${THUMBNAIL_URL_TTL_SECONDS}&at=${windowStart}`,
+      );
+      expect(late).toBe(early);
+      expect(nextWindow).not.toBe(early);
+    });
+
+    it('should give a public image a stable URL per size', async () => {
+      const image = buildStoredImage({ visibility: 'PUBLIC' });
+
+      expect(await service.refUrl(image, 'MD')).toBe(`fake://public/${IMAGE_BASE}/md.webp`);
     });
   });
 

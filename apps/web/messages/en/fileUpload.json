@@ -16,9 +16,17 @@
     "FILE_TOO_LARGE": "This file is too large.",
     "FILE_UPLOAD_LIMIT_REACHED": "You have too many unfinished uploads. Wait a little, then try again.",
     "FILE_CONTENT_MISMATCH": "A file did not upload correctly or is not the type it claims to be. Remove it and upload it again.",
+    "FILE_IMAGE_INVALID": "This image could not be read, or it has too many pixels. Try another picture.",
     "FILE_NOT_FOUND": "An uploaded file is no longer available. Remove it and upload it again.",
     "FORBIDDEN": "You are not allowed to upload files here.",
     "TOO_MANY_FILES": "{count, plural, one {Only one file can be added here.} other {Only # files can be added here.}}",
     "UPLOAD_FAILED": "The upload did not finish. Check your connection and try again."
+  },
+  "crop": {
+    "title": "Position your picture",
+    "description": "Drag to move. Use the slider, or pinch, to zoom. The part inside the circle is kept.",
+    "zoom": "Zoom",
+    "cancel": "Cancel",
+    "confirm": "Use this picture"
   }
 }
