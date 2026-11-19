@@ -798,3 +798,10 @@ Fixed: `pnpm storage:init` sets a CORS rule on the private bucket for the origin
 ## 2026-11-19 — seen once, not investigated: `people-restore.e2e.spec.ts` guardian restore finds the name in two cells
 
 In one full `pnpm test:e2e:ui` run in slot 4 (273 passed, 1 failed, 3 did not run), "a deleted guardian moves to Deleted guardians and comes back on restore" failed on its last line: after the restore and a reload, `getByRole('cell', { name: firstName })` matched two cells in the guardian directory (strict mode violation). The branch under test (ROV-210, file storage) changes no guardian code, so this is either a locator that matches a second column or a guardian shown twice after restore. Not investigated and not fixed.
+
+## 2026-11-19 — CI "Test" job failed: missing `S3_*` environment variables (fixed)
+
+- **Symptom:** PR #296: integration tests failed in GitHub Actions with "Missing required environment variables … S3_ENDPOINT …"; the same suite passed locally and in `pnpm ci:check`. The failure also skipped the "E2E UI" job.
+- **Cause:** ROV-210 made the eight `S3_*` variables required at gateway start. Locally they come from `.env`; the `test` job in `.github/workflows/ci.yml` lists its variables by hand and had none of them. The e2e jobs copy `.env.example`, so they passed.
+- **Fix:** added the `S3_*` values to the `test` job env. No integration test talks to a live object store, so no storage service was added.
+- **Lesson:** a new required environment variable must be added to the `test` job env in `ci.yml` in the same change; `pnpm ci:check` cannot catch this because it reads `.env`.

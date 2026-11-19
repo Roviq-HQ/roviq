@@ -94,6 +94,16 @@ jobs:
       NOVU_WS_URL: http://localhost:3342
       NOVU_JWT_SECRET: novu-local-jwt-secret-change-me
       NOVU_STORE_ENCRYPTION_KEY: novulocalstoreencrkey12345678abc
+      # Object storage — env validation requires these at AppModule load. No integration
+      # test talks to a live store, so nothing listens on this endpoint.
+      S3_ENDPOINT: http://localhost:9002
+      S3_PUBLIC_ENDPOINT: http://localhost:9002
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: roviq_storage
+      S3_SECRET_KEY: roviq_storage_dev
+      S3_BUCKET_PRIVATE: roviq-private
+      S3_BUCKET_PUBLIC: roviq-public
+      S3_PUBLIC_BASE_URL: http://localhost:9002/roviq-public
     services:
       postgres:
         image: postgres:18-alpine
