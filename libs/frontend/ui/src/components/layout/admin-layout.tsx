@@ -57,14 +57,13 @@ export function AdminLayout({
                 tabIndex={-1}
                 className={cn(
                   'flex-1 overflow-y-auto p-4 md:p-6 print:h-auto print:overflow-visible',
-                  // Content scrolls all the way under the fixed bottom-tab bar
-                  // so the bar's translucent backdrop-blur picks up the page
-                  // content beneath it (matches iOS App Store behaviour). The
-                  // last item is kept reachable via scroll-padding so the
-                  // browser snaps it above the bar when scrolled into view.
+                  // Content scrolls under the fixed bottom-tab bar so its
+                  // backdrop-blur picks up the page. The end padding lets the
+                  // last control (a Save button) come to rest above the bar;
+                  // scroll-padding alone does not move what is already at the end.
                   config.bottomNav &&
                     config.navRegistry &&
-                    '[scroll-padding-bottom:5rem] xl:[scroll-padding-bottom:0]',
+                    'pb-24 [scroll-padding-bottom:5rem] md:pb-24 xl:pb-6 xl:[scroll-padding-bottom:0]',
                 )}
               >
                 <PageErrorBoundary>{children}</PageErrorBoundary>

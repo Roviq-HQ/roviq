@@ -201,6 +201,12 @@ Sidebar items (`NavItem` in `navGroups`) take the same optional `ability`.
 before the sidebar, drawer and command palette render, so a gated page never
 shows a link that leads to a forbidden screen.
 
+### Space under the last control
+
+Below the `xl` breakpoint the bar floats over the page. `AdminLayout` gives `<main>`
+`pb-24` there, so a page's last control (usually a Save button) comes to rest above
+the bar instead of under it. Pages must not add their own bottom spacer for this.
+
 ### Active-tab / sidebar highlighting
 
 Highlighting uses **longest-prefix match** against `pathname` (after stripping
