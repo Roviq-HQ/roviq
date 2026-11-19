@@ -68,7 +68,7 @@ export class StaffService {
       lastName: userProfilesLive.lastName,
       gender: userProfilesLive.gender,
       dateOfBirth: userProfilesLive.dateOfBirth,
-      profileImageUrl: userProfilesLive.profileImageUrl,
+      profileImageFileId: userProfilesLive.profileImageFileId,
       employeeId: staffProfilesLive.employeeId,
       designation: staffProfilesLive.designation,
       department: staffProfilesLive.department,

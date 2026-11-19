@@ -55,7 +55,7 @@ function makeUser(overrides: Partial<UserDetail> = {}): UserDetail {
       __typename: 'AdminUserDetailProfileModel',
       firstName: { en: 'Priya' },
       lastName: { en: 'Sharma' },
-      profileImageUrl: null,
+      profileImage: null,
       gender: 'FEMALE',
       dateOfBirth: '1990-04-15',
       nationality: 'Indian',

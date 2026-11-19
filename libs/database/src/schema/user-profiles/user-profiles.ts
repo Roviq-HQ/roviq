@@ -4,6 +4,7 @@ import { users } from '../auth/users';
 import { entityColumns, i18nText } from '../common/columns';
 import { gender } from '../common/enums';
 import { userScopedPolicies } from '../common/rls-policies';
+import { files } from '../storage/files';
 
 /**
  * Drizzle custom type for a PostgreSQL `tsvector` column.
@@ -63,7 +64,11 @@ export const userProfiles = pgTable(
     motherTongue: varchar('mother_tongue', { length: 50 }),
 
     // ── Images ──────────────────────────────────────────
-    profileImageUrl: text('profile_image_url'),
+    /** The person's profile picture (`files`, purpose PROFILE_PHOTO). */
+    profileImageFileId: uuid('profile_image_file_id').references(() => files.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
     coverImageUrl: text('cover_image_url'),
 
     // ── Full-text search ────────────────────────────────

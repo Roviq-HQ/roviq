@@ -40,6 +40,8 @@ export interface ProcessedImageData {
 }
 
 export interface CreateFileData {
+  /** Set for a file owned by a person; it then has no institute. */
+  subjectUserId: string | null;
   visibility: FileVisibility;
   purpose: FilePurpose;
   /** Builds the storage key from the new row's id. */

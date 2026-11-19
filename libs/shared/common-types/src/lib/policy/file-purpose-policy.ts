@@ -13,6 +13,12 @@ export const FILE_CONTENT_TYPE = {
 
 export type FileContentType = (typeof FILE_CONTENT_TYPE)[keyof typeof FILE_CONTENT_TYPE];
 
+const IMAGE_CONTENT_TYPES = [
+  FILE_CONTENT_TYPE.JPEG,
+  FILE_CONTENT_TYPE.PNG,
+  FILE_CONTENT_TYPE.WEBP,
+] as const;
+
 const DOCUMENT_TYPES = [
   FILE_CONTENT_TYPE.PDF,
   FILE_CONTENT_TYPE.JPEG,
@@ -62,8 +68,19 @@ export const IMAGE_UPLOAD_MAX_PX = 2560;
  */
 export const IMAGE_PICK_MAX_BYTES = 50 * MB;
 
+/** A fixed ability, or any signed-in member (the real check is where the file gets attached). */
+export type FileAbility = { action: AppAction; subject: AppSubject } | 'AUTHENTICATED';
+
+/** Profile pictures: square, shown small and often, so their thumbnails may be cached. */
+const AVATAR_IMAGE: ImageStoragePolicy = { square: true, fullPx: 1024, cacheableThumbnails: true };
+
 export interface FilePurposePolicy {
   visibility: FileVisibility;
+  /**
+   * INSTITUTE: the file belongs to the uploader's institute. USER: it belongs to the person it
+   * is about (`subject_user_id`) and is visible in every institute that person is a member of.
+   */
+  owner: 'INSTITUTE' | 'USER';
   allowedContentTypes: readonly FileContentType[];
   maxSizeBytes: number;
   /** Sensitive files expose no URL in list queries; download goes through the audited call. */
@@ -71,15 +88,16 @@ export interface FilePurposePolicy {
   /** How images of this purpose are stored. Null: the purpose accepts no images. */
   image: ImageStoragePolicy | null;
   /** Ability a user needs to upload for this purpose. Null: written by the server only. */
-  uploadAbility: { action: AppAction; subject: AppSubject } | null;
+  uploadAbility: FileAbility | null;
   /** Ability a user needs to download a file of this purpose. */
-  readAbility: { action: AppAction; subject: AppSubject };
+  readAbility: FileAbility;
 }
 
 /** The single place that says what each file purpose allows. */
 export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePolicy } = {
   LEAVE_ATTACHMENT: {
     visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
     allowedContentTypes: DOCUMENT_TYPES,
     maxSizeBytes: 10 * MB,
     sensitive: false,
@@ -89,6 +107,7 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
   },
   BULK_IMPORT_CSV: {
     visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
     allowedContentTypes: [FILE_CONTENT_TYPE.CSV],
     maxSizeBytes: 10 * MB,
     sensitive: false,
@@ -98,12 +117,26 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
   },
   BULK_IMPORT_REPORT: {
     visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
     allowedContentTypes: [FILE_CONTENT_TYPE.CSV],
     maxSizeBytes: 50 * MB,
     sensitive: false,
     image: null,
     uploadAbility: null,
     readAbility: { action: 'create', subject: 'Student' },
+  },
+  PROFILE_PHOTO: {
+    visibility: 'PRIVATE',
+    owner: 'USER',
+    allowedContentTypes: IMAGE_CONTENT_TYPES,
+    maxSizeBytes: 10 * MB,
+    sensitive: false,
+    image: AVATAR_IMAGE,
+    // Who may set a person's picture is decided by the mutation that attaches it (update
+    // student, staff, guardian or own profile); an unattached upload is never shown.
+    uploadAbility: 'AUTHENTICATED',
+    // Row-level security already limits these to members of the person's institutes.
+    readAbility: 'AUTHENTICATED',
   },
 };
 

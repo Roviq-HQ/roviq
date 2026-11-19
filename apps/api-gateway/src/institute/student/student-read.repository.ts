@@ -93,7 +93,7 @@ export class StudentReadRepository {
           bloodGroup: userProfilesLive.bloodGroup,
           religion: userProfilesLive.religion,
           motherTongue: userProfilesLive.motherTongue,
-          profileImageUrl: userProfilesLive.profileImageUrl,
+          profileImageFileId: userProfilesLive.profileImageFileId,
           // current academic
           currentStudentAcademicId: studentAcademicsLive.id,
           currentStandardId: studentAcademicsLive.standardId,
@@ -241,7 +241,7 @@ export class StudentReadRepository {
           bloodGroup: userProfilesLive.bloodGroup,
           religion: userProfilesLive.religion,
           motherTongue: userProfilesLive.motherTongue,
-          profileImageUrl: userProfilesLive.profileImageUrl,
+          profileImageFileId: userProfilesLive.profileImageFileId,
           currentStudentAcademicId: studentAcademicsLive.id,
           currentStandardId: studentAcademicsLive.standardId,
           currentSectionId: studentAcademicsLive.sectionId,

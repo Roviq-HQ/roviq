@@ -11,6 +11,15 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  profilePhoto: {
+    changeBtn: 'profile-photo-change-btn',
+    dialog: 'profile-photo-dialog',
+    saveBtn: 'profile-photo-save-btn',
+    removeBtn: 'profile-photo-remove-btn',
+    cancelBtn: 'profile-photo-cancel-btn',
+    avatar: 'profile-photo-avatar',
+  },
+
   fileUpload: {
     root: (name: string) => `file-upload-${name}`,
     dropzone: (name: string) => `file-upload-${name}-dropzone`,

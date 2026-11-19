@@ -55,7 +55,7 @@ const memberColumns = {
   joinedAt: resellerMembershipsLive.createdAt,
   firstName: userProfilesLive.firstName,
   lastName: userProfilesLive.lastName,
-  profileImageUrl: userProfilesLive.profileImageUrl,
+  profileImageFileId: userProfilesLive.profileImageFileId,
 };
 
 interface MemberRow {
@@ -68,14 +68,14 @@ interface MemberRow {
   joinedAt: Date;
   firstName: I18nContent | null;
   lastName: I18nContent | null;
-  profileImageUrl: string | null;
+  profileImageFileId: string | null;
 }
 
 function toRecord(row: MemberRow): TeamMemberRecord {
-  const { firstName, lastName, profileImageUrl, ...member } = row;
+  const { firstName, lastName, profileImageFileId, ...member } = row;
   return {
     ...member,
-    profile: firstName ? { firstName, lastName, profileImageUrl } : null,
+    profile: firstName ? { firstName, lastName, profileImageFileId } : null,
   };
 }
 

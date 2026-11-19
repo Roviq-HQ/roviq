@@ -41,11 +41,8 @@ export class GuardianModel {
   })
   lastName?: I18nContent | null;
 
-  @Field(() => String, {
-    nullable: true,
-    description: 'Absolute URL of the guardian profile photo, or null before any upload.',
-  })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 
   @Field(() => Gender, { nullable: true })
   gender?: Gender | null;
@@ -168,11 +165,8 @@ export class StudentGuardianModel {
   })
   lastName?: I18nContent | null;
 
-  @Field(() => String, {
-    nullable: true,
-    description: 'Profile photo URL, or null before upload.',
-  })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 
   @Field(() => String, {
     nullable: true,
@@ -254,11 +248,8 @@ export class GuardianLinkedStudentModel {
   })
   currentSectionName?: I18nContent | null;
 
-  @Field(() => String, {
-    nullable: true,
-    description: 'Student profile photo URL, or null before upload.',
-  })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 
   @Field(() => GuardianRelationship, {
     description: 'Relationship of the guardian to the student.',

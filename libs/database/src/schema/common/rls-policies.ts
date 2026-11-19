@@ -157,27 +157,30 @@ export const userScopedPolicies = (tableName: string) => [
   }),
 ];
 
+/** A file that belongs to a person, not to an institute or reseller (a profile picture). */
+const userLevelFile = sql`tenant_id IS NULL AND reseller_id IS NULL`;
+/** The person a user-level file is about is a member of the current institute. */
+const subjectInCurrentTenant = sql`subject_user_id IN (
+  SELECT m.user_id FROM memberships m
+  WHERE m.tenant_id = current_setting('app.current_tenant_id', true)::uuid
+)`;
+const ownTenantFile = sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`;
+const appFileAccess = sql`${ownTenantFile} OR (${userLevelFile} AND ${subjectInCurrentTenant})`;
+
 /**
- * RLS policies for `files`. A row belongs to an institute (`tenant_id`) or a reseller
- * (`reseller_id`); rows with neither are user-level and visible to platform admins only.
- * Resellers read only: they have no write GRANT until a reseller upload purpose exists.
+ * RLS policies for `files`. A row belongs to an institute (`tenant_id`), a reseller
+ * (`reseller_id`) or a person (neither set, `subject_user_id` only). An institute reads and
+ * writes its own files and the user-level files of its members. Resellers read only: they have
+ * no write GRANT until a reseller upload purpose exists.
  */
 export const filePolicies = (tableName: string) => [
-  pgPolicy(`${tableName}_app_select`, {
-    for: 'select',
-    to: roviqApp,
-    using: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-  }),
-  pgPolicy(`${tableName}_app_insert`, {
-    for: 'insert',
-    to: roviqApp,
-    withCheck: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-  }),
+  pgPolicy(`${tableName}_app_select`, { for: 'select', to: roviqApp, using: appFileAccess }),
+  pgPolicy(`${tableName}_app_insert`, { for: 'insert', to: roviqApp, withCheck: appFileAccess }),
   pgPolicy(`${tableName}_app_update`, {
     for: 'update',
     to: roviqApp,
-    using: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
-    withCheck: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+    using: appFileAccess,
+    withCheck: appFileAccess,
   }),
   pgPolicy(`${tableName}_app_delete`, {
     for: 'delete',
@@ -191,7 +194,18 @@ export const filePolicies = (tableName: string) => [
       OR tenant_id IN (
         SELECT id FROM institutes
         WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid
-      )`,
+      )
+      OR (${userLevelFile} AND (
+        subject_user_id IN (
+          SELECT m.user_id FROM memberships m
+          JOIN institutes i ON i.id = m.tenant_id
+          WHERE i.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+        )
+        OR subject_user_id IN (
+          SELECT rm.user_id FROM reseller_memberships rm
+          WHERE rm.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+        )
+      ))`,
   }),
   pgPolicy(`${tableName}_admin_all`, {
     for: 'all',

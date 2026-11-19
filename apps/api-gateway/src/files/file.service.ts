@@ -8,6 +8,7 @@ import {
   ErrorCode,
   FILE_PURPOSE_POLICY,
   FILE_SIGNATURE_BYTES,
+  type FileAbility,
   type FileContentType,
   type FilePurpose,
   fileContentMatchesType,
@@ -94,11 +95,22 @@ export class FileService {
   ): Promise<FileUploadTicket> {
     const policy = FILE_PURPOSE_POLICY[input.purpose];
     const ability = await this.abilities.createForUser(user);
-    if (
-      !policy.uploadAbility ||
-      !ability.can(policy.uploadAbility.action, policy.uploadAbility.subject)
-    ) {
+    if (!policy.uploadAbility || !this.allows(ability, policy.uploadAbility)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'You are not allowed to upload this file.');
+    }
+    const subjectUserId = policy.owner === 'USER' ? (input.subjectUserId ?? null) : null;
+    if (policy.owner === 'USER' && !subjectUserId) {
+      throw new BusinessException(
+        ErrorCode.BAD_REQUEST,
+        'subjectUserId is required for this kind of file.',
+      );
+    }
+    // RLS refuses this insert as well; checking first gives a clear answer, not a server error.
+    if (subjectUserId && !(await this.repo.isMemberOfCurrentTenant(subjectUserId))) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'This person is not a member of your institute.',
+      );
     }
     const contentType = this.assertAllowedType(input.purpose, input.contentType);
     if (input.sizeBytes > policy.maxSizeBytes) {
@@ -112,9 +124,16 @@ export class FileService {
     }
 
     const file = await this.repo.create({
+      subjectUserId,
       visibility: policy.visibility,
       purpose: input.purpose,
-      objectKey: (id) => this.objectKey(user.tenantId, input.purpose, id, contentType),
+      objectKey: (id) =>
+        this.objectKey(
+          subjectUserId ? `users/${subjectUserId}` : `institutes/${user.tenantId}`,
+          input.purpose,
+          id,
+          contentType,
+        ),
       originalName: cleanFileName(input.fileName),
       contentType,
       sizeBytes: input.sizeBytes,
@@ -197,9 +216,17 @@ export class FileService {
     const { readAbility } = FILE_PURPOSE_POLICY[file.purpose];
     if (file.purpose === 'LEAVE_ATTACHMENT') {
       const leave = await this.repo.findLeaveForFile(file.id);
-      return leave !== null && ability.can(readAbility.action, subject('Leave', leave));
+      return (
+        leave !== null &&
+        readAbility !== 'AUTHENTICATED' &&
+        ability.can(readAbility.action, subject('Leave', leave))
+      );
     }
-    return ability.can(readAbility.action, readAbility.subject);
+    return this.allows(ability, readAbility);
+  }
+
+  private allows(ability: AppAbility, required: FileAbility): boolean {
+    return required === 'AUTHENTICATED' || ability.can(required.action, required.subject);
   }
 
   private urlFor(
@@ -324,12 +351,12 @@ export class FileService {
   }
 
   private objectKey(
-    tenantId: string,
+    ownerPrefix: string,
     purpose: FilePurpose,
     fileId: string,
     contentType: FileContentType,
   ): string {
     const folder = purpose.toLowerCase().replaceAll('_', '-');
-    return `institutes/${tenantId}/${folder}/${fileId}.${fileExtensionFor(contentType)}`;
+    return `${ownerPrefix}/${folder}/${fileId}.${fileExtensionFor(contentType)}`;
   }
 }

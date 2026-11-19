@@ -39,21 +39,26 @@ export class SharpImageProcessor extends ImageProcessor {
 
   private async run(input: Buffer, policy: ImageStoragePolicy): Promise<ProcessedImage> {
     // The declared type is not trusted: sharp also reads SVG, GIF and TIFF, which are not accepted.
-    const { format } = await this.open(input).metadata();
+    const { format, autoOrient } = await this.open(input).metadata();
     if (!format || !ACCEPTED_FORMATS.has(format)) {
       throw new InvalidImageError(`Unsupported image format: ${format ?? 'unknown'}`);
     }
+    // A square is cut to the picture's short side when that is below the target: "cover" with
+    // "never enlarge" would otherwise shrink one side only and leave a rectangle.
+    const shortSide = Math.min(autoOrient.width, autoOrient.height);
+    const fullPx = policy.square ? Math.min(policy.fullPx, shortSide) : policy.fullPx;
 
     const fit = policy.square ? 'cover' : 'inside';
     // The upload is decoded once, for FULL. The smaller sizes are cut from that result, which
     // is at most a few megapixels, so their cost does not depend on what was uploaded.
-    const full = await this.encode(this.open(input), policy.fullPx, fit);
+    const full = await this.encode(this.open(input), fullPx, fit);
     const variants: ProcessedVariant[] = [];
     for (const [name, px] of [
       ['SM', IMAGE_VARIANT_PX.SM],
       ['MD', IMAGE_VARIANT_PX.MD],
     ] as const) {
-      variants.push({ name, ...(await this.encode(sharp(full.data), px, fit)) });
+      const size = policy.square ? Math.min(px, shortSide) : px;
+      variants.push({ name, ...(await this.encode(sharp(full.data), size, fit)) });
     }
     variants.push({ name: 'FULL', ...full });
 

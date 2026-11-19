@@ -3,6 +3,9 @@
 import { extractGraphQLError, gql, useMutation, useQuery } from '@roviq/graphql';
 import { useFormatDate, useI18nField, zodValidator } from '@roviq/i18n';
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
   Badge,
   Button,
   Card,
@@ -13,6 +16,7 @@ import {
   FieldGroup,
   useAppForm,
 } from '@roviq/ui';
+import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
 import { parseISO } from 'date-fns';
 import { AlertTriangle, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -37,7 +41,7 @@ interface UserProfileData {
   gender: string | null;
   bloodGroup: string | null;
   nationality: string | null;
-  profileImageUrl: string | null;
+  profileImage: { id: string; url: string | null; placeholder: string | null } | null;
 }
 
 interface LinkedChild {
@@ -79,7 +83,6 @@ interface MyProfileQueryResult {
 
 interface UpdateMyProfileInput {
   phone?: string | null;
-  profileImageUrl?: string | null;
   nationality?: string | null;
   religion?: string | null;
   motherTongue?: string | null;
@@ -108,7 +111,11 @@ const MY_PROFILE_QUERY = gql`
           gender
           bloodGroup
           nationality
-          profileImageUrl
+          profileImage {
+            id
+            url(variant: MD)
+            placeholder
+          }
         }
         studentProfile
         academics
@@ -124,7 +131,11 @@ const MY_PROFILE_QUERY = gql`
           gender
           bloodGroup
           nationality
-          profileImageUrl
+          profileImage {
+            id
+            url(variant: MD)
+            placeholder
+          }
         }
         staffProfile
       }
@@ -139,7 +150,11 @@ const MY_PROFILE_QUERY = gql`
           gender
           bloodGroup
           nationality
-          profileImageUrl
+          profileImage {
+            id
+            url(variant: MD)
+            placeholder
+          }
         }
         guardianProfile
         children {
@@ -165,7 +180,11 @@ const UPDATE_MY_PROFILE_MUTATION = gql`
       gender
       bloodGroup
       nationality
-      profileImageUrl
+      profileImage {
+        id
+        url(variant: MD)
+        placeholder
+      }
     }
   }
 `;
@@ -184,21 +203,6 @@ function buildProfileEditSchema(t: ReturnType<typeof useTranslations>) {
       .refine((v) => v === '' || INDIAN_MOBILE_REGEX.test(v), {
         message: t('errors.phoneInvalid'),
       }),
-    profileImageUrl: z
-      .string()
-      .trim()
-      .refine(
-        (v) => {
-          if (v === '') return true;
-          try {
-            new URL(v);
-            return true;
-          } catch {
-            return false;
-          }
-        },
-        { message: t('errors.urlInvalid') },
-      ),
   });
 }
 
@@ -210,6 +214,7 @@ type ProfileEditFormValues = z.infer<ReturnType<typeof buildProfileEditSchema>>;
 
 export default function MyProfilePage() {
   const t = useTranslations('profile');
+  const resolveI18n = useI18nField();
   const { data, loading, error, refetch } = useQuery<MyProfileQueryResult>(MY_PROFILE_QUERY, {
     fetchPolicy: 'cache-and-network',
   });
@@ -224,7 +229,7 @@ export default function MyProfilePage() {
   const profileEditSchema = React.useMemo(() => buildProfileEditSchema(t), [t]);
 
   const form = useAppForm({
-    defaultValues: { phone: '', profileImageUrl: '' } as ProfileEditFormValues,
+    defaultValues: { phone: '' } as ProfileEditFormValues,
     validators: {
       onChange: zodValidator(profileEditSchema),
       onSubmit: zodValidator(profileEditSchema),
@@ -233,7 +238,6 @@ export default function MyProfilePage() {
       const parsed = profileEditSchema.parse(value);
       const input: UpdateMyProfileInput = {
         phone: parsed.phone === '' ? null : parsed.phone,
-        profileImageUrl: parsed.profileImageUrl === '' ? null : parsed.profileImageUrl,
       };
       try {
         await updateMyProfile({ variables: { input } });
@@ -249,10 +253,7 @@ export default function MyProfilePage() {
   // Hydrate form defaults once we have data
   React.useEffect(() => {
     if (userProfile) {
-      form.reset({
-        phone: '',
-        profileImageUrl: userProfile.profileImageUrl ?? '',
-      });
+      form.reset({ phone: '' });
     }
   }, [userProfile, form]);
 
@@ -317,15 +318,29 @@ export default function MyProfilePage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-          <UserRound className="size-5" />
-        </div>
-        <div>
+        <Avatar className="size-16" data-testid={testIds.profilePhoto.avatar}>
+          {userProfile.profileImage?.url ? (
+            <AvatarImage
+              src={userProfile.profileImage.url}
+              alt={resolveI18n(userProfile.firstName)}
+            />
+          ) : null}
+          <AvatarFallback>
+            <UserRound className="size-6" aria-hidden="true" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight" data-testid={instituteProfile.title}>
             {t('title')}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
         </div>
+        <ProfilePhotoButton
+          kind="self"
+          userId={userProfile.userId}
+          name={resolveI18n(userProfile.firstName)}
+          hasPhoto={Boolean(userProfile.profileImage)}
+        />
       </header>
 
       {draft.hasDraft && (
@@ -378,25 +393,6 @@ export default function MyProfilePage() {
                     placeholder="9876543210"
                     testId="profile-phone-input"
                   />
-                )}
-              </form.AppField>
-
-              <form.AppField name="profileImageUrl">
-                {(field) => (
-                  <>
-                    <field.TextField
-                      label={t('fields.profileImageUrl')}
-                      description={t('fieldDescriptions.profileImageUrl')}
-                      type="url"
-                      placeholder="https://..."
-                      testId="profile-image-url-input"
-                    />
-                    {userProfile.profileImageUrl && (
-                      <p className="mt-1 break-all text-xs text-muted-foreground">
-                        {userProfile.profileImageUrl}
-                      </p>
-                    )}
-                  </>
                 )}
               </form.AppField>
             </FieldGroup>

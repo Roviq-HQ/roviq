@@ -214,7 +214,11 @@ const STUDENT_DETAIL_QUERY = gql`
       currentSectionId
       currentAcademicYearId
       rollNumber
-      profileImageUrl
+      profileImage {
+        id
+        url(variant: SM)
+        placeholder
+      }
       isRteAdmitted
       isCwsn
       cwsnType
@@ -282,7 +286,11 @@ const STUDENT_GUARDIANS_QUERY = gql`
       userId
       firstName
       lastName
-      profileImageUrl
+      profileImage {
+        id
+        url(variant: SM)
+        placeholder
+      }
       occupation
       organization
       relationship

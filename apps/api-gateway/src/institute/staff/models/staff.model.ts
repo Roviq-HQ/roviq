@@ -40,8 +40,8 @@ export class StaffModel {
   @Field(() => DateOnlyScalar, { nullable: true })
   dateOfBirth?: string | null;
 
-  @Field(() => String, { nullable: true })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 
   @Field(() => String, { nullable: true, description: 'Institute-assigned employee ID' })
   employeeId?: string | null;

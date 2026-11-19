@@ -474,7 +474,11 @@ type AdminUserDetailProfileModel {
   gender: Gender
   lastName: I18nText
   nationality: String
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 }
 
 """A document a user has uploaded"""
@@ -563,7 +567,11 @@ type AdminUserPlatformMembershipModel {
 type AdminUserProfileModel {
   firstName: I18nText!
   lastName: I18nText
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 }
 
 """A user’s membership in a reseller team"""
@@ -2520,6 +2528,7 @@ enum FilePurpose {
   BULK_IMPORT_CSV
   BULK_IMPORT_REPORT
   LEAVE_ATTACHMENT
+  PROFILE_PHOTO
 }
 
 """A stored file. `url` is signed when the response is built and expires."""
@@ -2851,8 +2860,10 @@ type GuardianLinkedStudentModel {
   """True if the student lives with the linked guardian."""
   livesWith: Boolean!
 
-  """Student profile photo URL, or null before upload."""
-  profileImageUrl: String
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 
   """Relationship of the guardian to the student."""
   relationship: GuardianRelationship!
@@ -2913,8 +2924,10 @@ type GuardianModel {
   """
   primaryPhone: String
 
-  """Absolute URL of the guardian profile photo, or null before any upload."""
-  profileImageUrl: String
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 
   """Most recent update timestamp (UTC)."""
   updatedAt: DateTime!
@@ -4173,6 +4186,41 @@ type Mutation {
   Toggle the exclusion flag on a hybrid-group member (admin override for rule-resolved rows)
   """
   setGroupMemberExcluded(excluded: Boolean!, groupId: ID!, memberId: ID!): GroupMemberModel!
+
+  """Set or remove a guardian profile picture."""
+  setGuardianPhoto(
+    """
+    A file uploaded with purpose PROFILE_PHOTO and `subjectUserId` of this person. Null removes the picture.
+    """
+    fileId: ID
+    guardianProfileId: ID!
+  ): Boolean!
+
+  """Set or remove your own profile picture."""
+  setMyProfilePhoto(
+    """
+    A file uploaded with purpose PROFILE_PHOTO and `subjectUserId` of this person. Null removes the picture.
+    """
+    fileId: ID
+  ): Boolean!
+
+  """Set or remove a staff member profile picture."""
+  setStaffPhoto(
+    """
+    A file uploaded with purpose PROFILE_PHOTO and `subjectUserId` of this person. Null removes the picture.
+    """
+    fileId: ID
+    staffProfileId: ID!
+  ): Boolean!
+
+  """Set or remove a student profile picture."""
+  setStudentPhoto(
+    """
+    A file uploaded with purpose PROFILE_PHOTO and `subjectUserId` of this person. Null removes the picture.
+    """
+    fileId: ID
+    studentProfileId: ID!
+  ): Boolean!
   submitUpiProof(input: SubmitUpiProofInput!): PaymentModel!
   switchInstitute(currentRefreshToken: String!, membershipId: String!): AuthPayload!
 
@@ -5085,6 +5133,11 @@ input RequestFileUploadInput {
 
   """Exact size in bytes. Storage rejects an upload of any other size."""
   sizeBytes: Int!
+
+  """
+  The person the file is about. Required for purposes owned by a person (PROFILE_PHOTO); that person must be a member of your institute.
+  """
+  subjectUserId: ID
 }
 
 """
@@ -5308,7 +5361,11 @@ type ResellerTeamMemberModel {
 type ResellerTeamMemberProfileModel {
   firstName: I18nText
   lastName: I18nText
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 }
 
 """A role the caller may give to a team member"""
@@ -5376,7 +5433,11 @@ type ResellerUserModel {
 type ResellerUserProfileModel {
   firstName: I18nText!
   lastName: I18nText
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 }
 
 """PASS / FAIL / COMPARTMENT / ABSENT / PENDING."""
@@ -5630,7 +5691,11 @@ type StaffModel {
   isClassTeacher: Boolean!
   lastName: I18nText
   membershipId: String!
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
   socialCategory: SocialCategory
   specialization: String
   updatedAt: DateTime!
@@ -5838,8 +5903,10 @@ type StudentGuardianModel {
   """Employer / organisation (free text)."""
   organization: String
 
-  """Profile photo URL, or null before upload."""
-  profileImageUrl: String
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
 
   """Relationship of the guardian to the student."""
   relationship: GuardianRelationship!
@@ -5905,7 +5972,11 @@ type StudentModel {
   Guardian profile id of the primary contact, for linking to that guardian
   """
   primaryGuardianProfileId: ID
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
   religion: String
   rollNumber: String
   rteCertificate: String
@@ -6767,9 +6838,6 @@ input UpdateMyProfileInput {
   """10-digit Indian mobile number (starts with 6-9). Null to clear."""
   phone: String
 
-  """Absolute URL to the profile photo hosted on MinIO/S3. Null to clear."""
-  profileImageUrl: String
-
   """Religion (free text). Null to clear."""
   religion: String
 }
@@ -7154,7 +7222,11 @@ type UserProfileData {
   id: ID!
   lastName: I18nText
   nationality: String
-  profileImageUrl: String
+
+  """
+  Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
+  """
+  profileImage: FileRef
   userId: String!
 }
 

@@ -35,8 +35,8 @@ export class AdminUserProfileModel {
   @Field(() => I18nTextScalar, { nullable: true })
   lastName?: I18nContent | null;
 
-  @Field(() => String, { nullable: true })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 }
 
 @ObjectType({ description: 'Full profile shown on the admin user detail page' })

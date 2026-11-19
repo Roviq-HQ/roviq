@@ -66,7 +66,7 @@ function makeUser(overrides: Partial<UserListNode> = {}): UserListNode {
       __typename: 'AdminUserProfileModel',
       firstName: { en: 'Priya' },
       lastName: { en: 'Sharma' },
-      profileImageUrl: null,
+      profileImage: null,
     },
     memberships: [
       { __typename: 'AdminUserMembershipModel', id: 'm-1' },

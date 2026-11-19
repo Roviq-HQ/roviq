@@ -71,6 +71,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
+import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
 import { useDebouncedValue } from '@web/hooks/use-debounced-value';
 import { useFormDraft } from '@web/hooks/use-form-draft';
 import {
@@ -324,11 +325,20 @@ function GuardianSidebar({
       <Card>
         <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
           <Avatar className="size-24">
-            {guardian.profileImageUrl ? (
-              <AvatarImage src={guardian.profileImageUrl} alt={fullName} />
+            {guardian.profileImage?.url ? (
+              <AvatarImage src={guardian.profileImage?.url} alt={fullName} />
             ) : null}
             <AvatarFallback>{initials || '?'}</AvatarFallback>
           </Avatar>
+          <Can I="update" a="Guardian">
+            <ProfilePhotoButton
+              kind="guardian"
+              profileId={guardian.id}
+              userId={guardian.userId}
+              name={fullName}
+              hasPhoto={Boolean(guardian.profileImage)}
+            />
+          </Can>
           <div>
             <div data-testid={instituteGuardians.detailTitle} className="text-lg font-semibold">
               {fullName}
@@ -620,8 +630,8 @@ function GuardianChildrenTab({
               <CardContent className="space-y-3 pt-6">
                 <div className="flex items-center gap-3">
                   <Avatar className="size-12">
-                    {child.profileImageUrl ? (
-                      <AvatarImage src={child.profileImageUrl} alt={childName} />
+                    {child.profileImage?.url ? (
+                      <AvatarImage src={child.profileImage?.url} alt={childName} />
                     ) : null}
                     <AvatarFallback>{childInitials || '?'}</AvatarFallback>
                   </Avatar>

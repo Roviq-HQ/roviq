@@ -29,7 +29,11 @@ const GUARDIAN_LIST_FIELDS = `
   userId
   firstName
   lastName
-  profileImageUrl
+  profileImage {
+    id
+    url(variant: SM)
+    placeholder
+  }
   gender
   primaryPhone
   linkedStudentCount
@@ -87,7 +91,11 @@ const GUARDIAN_LINKED_STUDENTS_QUERY = gql`
       admissionNumber
       currentStandardName
       currentSectionName
-      profileImageUrl
+      profileImage {
+        id
+        url(variant: SM)
+        placeholder
+      }
       relationship
       isPrimaryContact
       isEmergencyContact

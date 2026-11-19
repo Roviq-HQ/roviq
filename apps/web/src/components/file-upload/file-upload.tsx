@@ -54,6 +54,8 @@ export interface FileUploadProps {
   maxFiles?: number;
   /** Ask the user to crop each picked image to a square first (profile pictures). */
   crop?: 'square';
+  /** The person the file is about; required by purposes owned by a person (PROFILE_PHOTO). */
+  subjectUserId?: string;
   /** Distinguishes several upload fields on one page in test ids. */
   name: string;
 }
@@ -67,11 +69,12 @@ export function FileUpload({
   error,
   maxFiles = 1,
   crop,
+  subjectUserId,
   name,
 }: FileUploadProps) {
   const t = useTranslations('fileUpload');
   const { format } = useFormatNumber();
-  const { items, add, remove, retry, policy } = useFileUpload(purpose);
+  const { items, add, remove, retry, policy } = useFileUpload(purpose, subjectUserId);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const inputId = React.useId();
   const [dragging, setDragging] = React.useState(false);

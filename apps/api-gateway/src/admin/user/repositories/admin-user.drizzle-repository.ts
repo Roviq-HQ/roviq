@@ -218,7 +218,7 @@ export class AdminUserDrizzleRepository extends AdminUserRepository {
     lastActiveAt: this.lastActiveAt,
     firstName: userProfilesLive.firstName,
     lastName: userProfilesLive.lastName,
-    profileImageUrl: userProfilesLive.profileImageUrl,
+    profileImageFileId: userProfilesLive.profileImageFileId,
   };
 
   private async hydrate(
@@ -232,7 +232,7 @@ export class AdminUserDrizzleRepository extends AdminUserRepository {
       lastActiveAt: Date | null;
       firstName: Record<string, string> | null;
       lastName: Record<string, string> | null;
-      profileImageUrl: string | null;
+      profileImageFileId: string | null;
     }>,
   ): Promise<AdminUserRecord[]> {
     const ids = rows.map((r) => r.id);
@@ -240,9 +240,9 @@ export class AdminUserDrizzleRepository extends AdminUserRepository {
       this.loadMemberships(tx, ids),
       this.loadPrimaryPhones(tx, ids),
     ]);
-    return rows.map(({ firstName, lastName, profileImageUrl, ...row }) => ({
+    return rows.map(({ firstName, lastName, profileImageFileId, ...row }) => ({
       ...row,
-      profile: firstName ? { firstName, lastName, profileImageUrl } : null,
+      profile: firstName ? { firstName, lastName, profileImageFileId } : null,
       primaryPhone: phones.get(row.id) ?? null,
       memberships: memberships.get(row.id) ?? [],
     }));

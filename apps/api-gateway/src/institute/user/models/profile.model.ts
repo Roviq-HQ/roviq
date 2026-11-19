@@ -31,8 +31,8 @@ export class UserProfileData {
   @Field(() => String, { nullable: true })
   nationality?: string | null;
 
-  @Field(() => String, { nullable: true })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 }
 
 @ObjectType({ description: 'My profile as a student' })

@@ -26,7 +26,11 @@ const STAFF_LIST_FIELDS = `
   firstName
   lastName
   gender
-  profileImageUrl
+  profileImage {
+    id
+    url(variant: SM)
+    placeholder
+  }
   employeeId
   designation
   department

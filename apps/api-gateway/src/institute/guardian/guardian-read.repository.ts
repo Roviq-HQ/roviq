@@ -37,7 +37,7 @@ export class GuardianReadRepository {
 
       firstName: userProfilesLive.firstName,
       lastName: userProfilesLive.lastName,
-      profileImageUrl: userProfilesLive.profileImageUrl,
+      profileImageFileId: userProfilesLive.profileImageFileId,
       gender: userProfilesLive.gender,
 
       primaryPhone: phoneNumbersLive.number,
@@ -117,7 +117,7 @@ export class GuardianReadRepository {
           admissionNumber: studentProfilesLive.admissionNumber,
           firstName: userProfilesLive.firstName,
           lastName: userProfilesLive.lastName,
-          profileImageUrl: userProfilesLive.profileImageUrl,
+          profileImageFileId: userProfilesLive.profileImageFileId,
           currentStandardName: standardsLive.name,
           currentSectionName: sectionsLive.name,
           relationship: studentGuardianLinksLive.relationship,
@@ -165,7 +165,7 @@ export class GuardianReadRepository {
           userId: guardianProfilesLive.userId,
           firstName: userProfilesLive.firstName,
           lastName: userProfilesLive.lastName,
-          profileImageUrl: userProfilesLive.profileImageUrl,
+          profileImageFileId: userProfilesLive.profileImageFileId,
           occupation: guardianProfilesLive.occupation,
           organization: guardianProfilesLive.organization,
           relationship: studentGuardianLinksLive.relationship,

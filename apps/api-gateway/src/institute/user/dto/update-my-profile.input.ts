@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsOptional, IsString, IsUrl, Matches } from 'class-validator';
+import { IsOptional, IsString, Matches } from 'class-validator';
 
 @InputType({
   description:
@@ -15,15 +15,6 @@ export class UpdateMyProfileInput {
   @IsString()
   @Matches(/^[6-9]\d{9}$/, { message: 'Phone must be a valid 10-digit Indian mobile number' })
   phone?: string | null;
-
-  @Field(() => String, {
-    nullable: true,
-    description: 'Absolute URL to the profile photo hosted on MinIO/S3. Null to clear.',
-  })
-  @IsOptional()
-  @IsString()
-  @IsUrl({}, { message: 'profileImageUrl must be a valid URL' })
-  profileImageUrl?: string | null;
 
   @Field(() => String, {
     nullable: true,

@@ -109,8 +109,8 @@ export class StudentModel {
   @Field(() => String, { nullable: true })
   motherTongue?: string | null;
 
-  @Field(() => String, { nullable: true })
-  profileImageUrl?: string | null;
+  /** Not a GraphQL field: `profileImage` is resolved from it (profileImageResolverFor). */
+  profileImageFileId?: string | null;
 
   // ── Admission ───────────────────────────────────────────
   @Field(() => String, { nullable: true })

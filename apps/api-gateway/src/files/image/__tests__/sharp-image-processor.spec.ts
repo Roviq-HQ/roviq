@@ -5,7 +5,7 @@ import { InvalidImageError } from '../image-processor';
 import { MAX_INPUT_PIXELS, SharpImageProcessor } from '../sharp-image-processor';
 
 const DOCUMENT = { square: false, fullPx: 2560, cacheableThumbnails: false };
-const AVATAR = { square: true, fullPx: 1600, cacheableThumbnails: true };
+const AVATAR = { square: true, fullPx: 1024, cacheableThumbnails: true };
 
 /** A solid-colour JPEG, optionally carrying EXIF like a phone photo. */
 function jpeg(
@@ -52,7 +52,28 @@ describe('SharpImageProcessor', () => {
     const result = await processor.process(await jpeg(3000, 2000), AVATAR);
 
     expect([variant(result, 'SM').width, variant(result, 'SM').height]).toEqual([128, 128]);
-    expect([variant(result, 'FULL').width, variant(result, 'FULL').height]).toEqual([1600, 1600]);
+    expect([variant(result, 'FULL').width, variant(result, 'FULL').height]).toEqual([1024, 1024]);
+  });
+
+  it('should cut a small avatar to a square of its short side, never a rectangle', async () => {
+    const result = await processor.process(await jpeg(1500, 1000), AVATAR);
+
+    expect([variant(result, 'FULL').width, variant(result, 'FULL').height]).toEqual([1000, 1000]);
+    expect([variant(result, 'MD').width, variant(result, 'MD').height]).toEqual([512, 512]);
+  });
+
+  it('should keep a tiny avatar square without enlarging it', async () => {
+    const result = await processor.process(await jpeg(90, 60), AVATAR);
+
+    for (const name of ['SM', 'MD', 'FULL']) {
+      expect([variant(result, name).width, variant(result, name).height]).toEqual([60, 60]);
+    }
+  });
+
+  it('should cut a sideways avatar photo square after turning it upright', async () => {
+    const result = await processor.process(await jpeg(900, 600, { orientation: 6 }), AVATAR);
+
+    expect([variant(result, 'FULL').width, variant(result, 'FULL').height]).toEqual([600, 600]);
   });
 
   it('should never enlarge an image smaller than the target size', async () => {

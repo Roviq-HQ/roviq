@@ -32,6 +32,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/academic-year.service.ts',
   'apps/api-gateway/src/files/repositories/file.drizzle-repository.ts',
+  // ROV-301: files read as the caller's own role; profile photo writes on the shared user profile.
+  'apps/api-gateway/src/files/file.loaders.ts',
+  'apps/api-gateway/src/files/profile-photo.service.ts',
+  'apps/api-gateway/src/institute/profile-photo/profile-photo-target.repository.ts',
   // ROV-210: isolated fixtures for the files RLS and attach-guard tests only.
   'apps/api-gateway/src/files/__tests__/files-rls.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts',

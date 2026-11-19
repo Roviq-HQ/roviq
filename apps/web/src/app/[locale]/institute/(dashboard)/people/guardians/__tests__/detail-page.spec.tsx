@@ -58,7 +58,7 @@ interface MockGuardian {
   membershipId: string;
   firstName: Record<string, string>;
   lastName: Record<string, string> | null;
-  profileImageUrl: string | null;
+  profileImage?: { id: string; url: string | null; placeholder: string | null } | null;
   gender: string | null;
   primaryPhone: string | null;
   linkedStudentCount: number;
@@ -77,7 +77,7 @@ const FIXTURE_GUARDIAN: MockGuardian = {
   membershipId: 'mem-1',
   firstName: { en: 'Priya', hi: '' },
   lastName: { en: 'Sharma', hi: '' },
-  profileImageUrl: null,
+  profileImage: null,
   gender: 'female',
   primaryPhone: '9876543210',
   linkedStudentCount: 1,
@@ -120,7 +120,7 @@ interface MockLinkedStudent {
   admissionNumber: string;
   currentStandardName: Record<string, string> | null;
   currentSectionName: Record<string, string> | null;
-  profileImageUrl: string | null;
+  profileImage?: { id: string; url: string | null; placeholder: string | null } | null;
   relationship: string;
   isPrimaryContact: boolean;
   isEmergencyContact: boolean;
@@ -525,7 +525,7 @@ describe('GuardianDetailPage › Children tab › LinkStudentDialog', () => {
         admissionNumber: 'ADM-0001',
         currentStandardName: null,
         currentSectionName: null,
-        profileImageUrl: null,
+        profileImage: null,
         relationship: 'FATHER',
         isPrimaryContact: false,
         isEmergencyContact: false,

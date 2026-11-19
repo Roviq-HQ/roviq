@@ -147,6 +147,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership.',
   'apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create':
     'Writes platform-level user tables for the user it just created.',
+  'apps/api-gateway/src/files/profile-photo.service.ts#ProfilePhotoService.set':
+    'Writes the platform-level user profile (no tenant RLS) for a user id read from a student, staff or guardian row under tenant RLS, or taken from the verified token. The file must have been uploaded for that same user. Cross-institute refusal: profile-photo.api-e2e.spec.ts.',
   'apps/api-gateway/src/institute/student/student.service.ts#StudentService.applyUserProfileUpdates':
     'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. KNOWN GAP (ROV-292): the profile row is shared across institutes.',
   'apps/api-gateway/src/institute/student/student.service.ts#StudentService.create':
@@ -192,6 +194,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
 // Reached admin-context file with no function found by the method analysis (reached through
 // a dataloader, a module binding or a re-export) → why it is safe.
 export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
+  'apps/api-gateway/src/files/file.loaders.ts':
+    'Reached through a dataloader that runs as the role of the request scope; the admin branch runs only for a platform-scope token.',
   'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts':
     'Imported by InstituteService; runs only from institute activation, which no non-admin resolver method calls.',
   'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts':
