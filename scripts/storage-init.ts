@@ -1,7 +1,7 @@
 /**
- * Creates the two storage buckets in a dev or e2e object store and makes the public one
- * anonymously readable. Safe to re-run. Production buckets are created by infrastructure
- * (docs/deployment.md), never by this script.
+ * Creates the two storage buckets in a dev or e2e object store, makes the public one
+ * anonymously readable and lets the portal origins upload to the private one. Safe to re-run.
+ * Production buckets are created by infrastructure (docs/deployment.md), never by this script.
  *
  * Usage: pnpm storage:init
  */
@@ -9,6 +9,7 @@ import 'dotenv/config';
 import {
   BucketAlreadyOwnedByYou,
   CreateBucketCommand,
+  PutBucketCorsCommand,
   PutBucketPolicyCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -29,6 +30,12 @@ function required(name: string, value: string | undefined): string {
 const endpoint = required('S3_ENDPOINT', process.env.S3_ENDPOINT);
 const privateBucket = required('S3_BUCKET_PRIVATE', process.env.S3_BUCKET_PRIVATE);
 const publicBucket = required('S3_BUCKET_PUBLIC', process.env.S3_BUCKET_PUBLIC);
+
+// Browsers upload straight to storage from these origins; without a CORS rule they are refused.
+const portalOrigins = required('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
 
 const client = new S3Client({
   endpoint,
@@ -70,6 +77,23 @@ async function init(): Promise<void> {
     }),
   );
   console.info(`Bucket ${publicBucket} is readable without sign-in`);
+  await client.send(
+    new PutBucketCorsCommand({
+      Bucket: privateBucket,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedOrigins: portalOrigins,
+            AllowedMethods: ['PUT', 'GET'],
+            AllowedHeaders: ['Content-Type'],
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 3600,
+          },
+        ],
+      },
+    }),
+  );
+  console.info(`Bucket ${privateBucket} accepts uploads from ${portalOrigins.join(', ')}`);
 }
 
 const ATTEMPTS = 30;

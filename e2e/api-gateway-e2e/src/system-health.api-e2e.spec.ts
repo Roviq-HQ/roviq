@@ -1,8 +1,8 @@
 /**
  * ROV-184 — platform system health against the full running stack.
  *
- * The e2e stack has no MinIO and no Prometheus, so MINIO is expected DOWN and
- * alerts unavailable; every other dependency is a live container and must be up.
+ * The e2e stack has no Prometheus, so alerts are unavailable; every dependency,
+ * object storage included, is a live container and must be up.
  * Status/degraded/uptime math and change detection are unit-tested in
  * apps/api-gateway/src/admin/monitoring/system-health/__tests__.
  */
@@ -44,7 +44,14 @@ const SYSTEM_HEALTH_FIELDS = `
 
 const SYSTEM_HEALTH_QUERY = `query { adminSystemHealth { ${SYSTEM_HEALTH_FIELDS} } }`;
 const CONNECTION_METRICS_QUERY = `query { adminConnectionMetrics { websocket http } }`;
-const LIVE_DEPENDENCIES = ['API_GATEWAY', 'POSTGRES', 'REDIS', 'NATS', 'TEMPORAL'];
+const LIVE_DEPENDENCIES = [
+  'API_GATEWAY',
+  'POSTGRES',
+  'REDIS',
+  'NATS',
+  'TEMPORAL',
+  'OBJECT_STORAGE',
+];
 
 describe('System health E2E (ROV-184)', () => {
   let platformToken: string;

@@ -9,7 +9,7 @@ export const DEGRADED_THRESHOLD_MS: Record<MonitoredService, number> = {
   REDIS: 100,
   NATS: 200,
   TEMPORAL: 1_000,
-  MINIO: 1_000,
+  OBJECT_STORAGE: 1_000,
 };
 
 export const UPTIME_BUCKET_SECONDS = 3_600;

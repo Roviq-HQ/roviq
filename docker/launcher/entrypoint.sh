@@ -20,7 +20,7 @@ export ROVIQ_VERSION="${ROVIQ_VERSION:-latest}"
 
 # 1. Start infra
 log "Starting Roviq platform..."
-docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d postgres redis nats minio temporal temporal-ui
+docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d postgres redis nats object-storage temporal temporal-ui
 
 # 2. Wait for health checks
 log "Waiting for infrastructure..."
@@ -38,7 +38,7 @@ for svc in postgres redis nats; do
   log "✓ $display_name ready"
 done
 
-for svc in minio temporal; do
+for svc in object-storage temporal; do
   display_name="$(echo "$svc" | sed 's/^./\U&/')"
   log "✓ $display_name ready"
 done

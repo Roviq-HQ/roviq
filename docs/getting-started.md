@@ -17,7 +17,7 @@ pnpm tilt up
 Tilt handles everything automatically:
 - Creates `.env` from `.env.example` on first run
 - Installs dependencies (`pnpm install`)
-- Starts infra (Postgres, Redis, NATS, MinIO, Temporal, OTel/Grafana stack) in Docker
+- Starts infra (Postgres, Redis, NATS, object storage (RustFS), Temporal, OTel/Grafana stack) in Docker
 - Pushes Drizzle schema to database and seeds test data
 - Starts all apps locally
 

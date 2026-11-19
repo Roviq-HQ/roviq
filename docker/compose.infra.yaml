@@ -78,19 +78,24 @@ services:
       timeout: 3s
       retries: 5
 
-  minio:
-    image: quay.io/minio/minio:latest
+  # S3-compatible object storage. Production uses a managed S3 service (docs/deployment.md).
+  object-storage:
+    image: rustfs/rustfs:1.0.6
     ports:
-      - "${DEV_MINIO_PORT:-9002}:9000"
-      - "${DEV_MINIO_CONSOLE_PORT:-9003}:9001"
+      - "${DEV_STORAGE_PORT:-9002}:9000"
+      - "${DEV_STORAGE_CONSOLE_PORT:-9003}:9001"
     environment:
-      MINIO_ROOT_USER: roviq_minio
-      MINIO_ROOT_PASSWORD: roviq_minio_dev
-    command: server /data --console-address ":9001"
+      RUSTFS_ACCESS_KEY: roviq_storage
+      RUSTFS_SECRET_KEY: roviq_storage_dev
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    command: /data
     volumes:
-      - minio_data:/data
+      # A named volume: the image runs as uid 10001 and cannot write a root-owned bind mount.
+      - object_storage_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -201,7 +206,7 @@ volumes:
   redis_data:
   nats_data:
   mongodb_data:
-  minio_data:
+  object_storage_data:
   tempo_data:
   loki_data:
   prometheus_data:

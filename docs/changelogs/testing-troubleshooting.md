@@ -773,3 +773,28 @@ Also found: `NX_SKIP_NX_CACHE=1` does nothing. Nx only honours the value `true`,
 ## 2026-11-18 — fixed: Playwright run right after an e2e gateway restart (ROV-288)
 
 Resolves the 2026-11-18 `diagnosed` entry "a Playwright run started right after a restart of the e2e gateway fails unrelated institute tests". Its cause was `nx serve` restarting the process underneath a container that had already passed its health check. The container no longer runs `nx serve`: it builds, then starts one `node` process, and is healthy only once that process answers GraphQL. No manual restart is needed after a library change either.
+
+
+## 2026-11-19 — fixed: object storage could not start on a machine without a cached MinIO image (ROV-210)
+
+Resolves the "`minio` cannot start" line of the 2026-11-17 `diagnosed` entry "a two-month-old local dev stack blocks Tilt and integration tests". MinIO stopped publishing community images; `quay.io/minio/minio:latest` and `minio/minio` both refuse pulls, so the service only started where the image was already cached, and CI could not have started it at all.
+
+The dev, e2e and app Compose stacks now run RustFS (`rustfs/rustfs`, pinned) in a service named `object-storage`. The port variables are `DEV_STORAGE_PORT`, `DEV_STORAGE_CONSOLE_PORT` and the new `E2E_STORAGE_PORT`; run `pnpm instance:env <slot>` in an existing worktree to pick them up, and copy the `S3_*` block from `.env.example` into `.env` (the dev credentials changed to `roviq_storage` / `roviq_storage_dev`). Old `minio_data` volumes are unused and can be removed.
+
+The e2e stack now includes object storage, which it did not before, so file uploads are covered by `pnpm test:e2e:api`. `pnpm storage:check` tests any S3-compatible store against what the app relies on.
+
+## 2026-11-19 — seen once, cause unconfirmed: `reseller-system-roles.integration.spec.ts` failed with a foreign-key error in a full integration run
+
+One full `vitest run --project integration` in slot 4 failed "should move a membership off the shared Roviq Direct role onto the reseller own copy" with `23503 … Key (reseller_id)=(…) is not present in table "resellers"`. The full run before it and the full run right after it both passed (716 tests), with no code change in between.
+
+Likely cause, not proven: the ROV-91 backfill statement under test inserts role copies for **every** reseller in `roviq_test`, while other integration files create and delete their own resellers at the same time (`createTestReseller` / `cleanupTestReseller`). A reseller deleted between the statement reading it and inserting its roles gives this error. ROV-210 added one more such file (`files-rls.integration.spec.ts`), which makes the overlap a little more likely. Not fixed: scoping the backfill test to the resellers it creates would remove the race.
+
+## 2026-11-19 — browser uploads fail on a store with no CORS rule while every API test passes (ROV-210)
+
+After switching dev from MinIO to RustFS, unit, integration and e2e API tests all passed, but an upload from the web app failed with `net::ERR_FAILED` on the PUT to storage. MinIO allows all origins by default; RustFS (like AWS S3 and R2) allows none until the bucket has a CORS rule. Tests that upload from Node never send a preflight, so they cannot see this.
+
+Fixed: `pnpm storage:init` sets a CORS rule on the private bucket for the origins in `ALLOWED_ORIGINS` (the e2e stack passes the e2e web origins), and `pnpm storage:check` sends a preflight from a portal origin and from an unknown origin. Only the browser pass caught it; keep one browser upload in any change to storage setup.
+
+## 2026-11-19 — seen once, not investigated: `people-restore.e2e.spec.ts` guardian restore finds the name in two cells
+
+In one full `pnpm test:e2e:ui` run in slot 4 (273 passed, 1 failed, 3 did not run), "a deleted guardian moves to Deleted guardians and comes back on restore" failed on its last line: after the restore and a reload, `getByRole('cell', { name: firstName })` matched two cells in the guardian directory (strict mode violation). The branch under test (ROV-210, file storage) changes no guardian code, so this is either a locator that matches a second column or a guardian shown twice after restore. Not investigated and not fixed.

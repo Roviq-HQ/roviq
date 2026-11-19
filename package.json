@@ -52,6 +52,7 @@
     "db:push": "nx run database:db:push",
     "db:reset": "pnpx tsx scripts/db-reset.ts",
     "storage:init": "pnpx tsx scripts/storage-init.ts",
+    "storage:check": "pnpx tsx scripts/storage-check.ts",
     "db:baseline": "pnpx tsx scripts/db-baseline.ts",
     "db:studio": "nx run database:db:studio",
     "e2e:up": "scripts/e2e-compose.sh up -d --build --wait && scripts/e2e-compose.sh run --rm --no-deps novu-bridge-sync",

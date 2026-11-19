@@ -7,7 +7,7 @@ description: Use when writing, modifying, or reviewing E2E API tests (*.api-e2e.
 
 ## What this skill covers
 
-Vitest `*.api-e2e.spec.ts` tests that run against a **fully running external stack** — api-gateway, postgres, redis, nats, temporal, notification-service, novu-api, minio. Nothing is in-process, nothing is mocked. The test is a pure external HTTP / graphql-ws client.
+Vitest `*.api-e2e.spec.ts` tests that run against a **fully running external stack** — api-gateway, postgres, redis, nats, temporal, notification-service, novu-api, object storage (RustFS). Nothing is in-process, nothing is mocked. The test is a pure external HTTP / graphql-ws client.
 
 Hurl (`*.hurl`) is **dead**. Do not add new `.hurl` files. Any leftover files in `e2e/api-gateway-e2e/hurl/` are pending deletion as their domains finish migration — they are not an extension point.
 

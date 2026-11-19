@@ -245,7 +245,7 @@ reference `files.id`; no table stores a URL. Design and remaining work: Linear R
 | Attach | The mutation that owns the record takes `fileIds`. Its service calls `FileService.verifyUploads`, which copies the upload from its `pending/…` key (always in the private bucket) to the key it is served from and checks that copy (size, leading bytes). No upload URL exists for the served key, so a verified file cannot be overwritten. Then its repository calls `markFilesReady(tx, …)` inside the transaction that saves the record. A file is `READY` only together with that record. |
 | Download | GraphQL returns `FileRef { id name contentType sizeBytes url }`. `url` is signed when the response is built (10 minutes) and is null for sensitive purposes, which use the `fileDownloadUrl` mutation instead (60 seconds, audited like every mutation). `fileDownloadUrl` checks the ability against the record the file is attached to (for example the leave), not only the subject type. |
 | Delete | `markFilesDeleted(tx, …)` in the same transaction that detaches the file. The object stays until a sweeper purges it (ROV-300). |
-| Client library | `@roviq/storage` wraps `@aws-sdk/client-s3`. Application code never calls S3 directly and uses nothing MinIO-specific. `FakeStorageClient` is the in-memory version for unit tests. |
+| Client library | `@roviq/storage` wraps `@aws-sdk/client-s3`. Application code never calls S3 directly and uses nothing provider-specific; `pnpm storage:check` tests a provider against what the app relies on. `FakeStorageClient` is the in-memory version for unit tests. |
 
 Status flow: `PENDING` → `READY` → `DELETED`, or `PENDING` → `REJECTED` when verification fails
 (`FILE_STATE_MACHINE`).

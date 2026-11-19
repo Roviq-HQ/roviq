@@ -84,7 +84,7 @@ local_resource(
   'storage-init',
   cmd='pnpm run storage:init',
   deps=['scripts/storage-init.ts'],
-  resource_deps=['pnpm-install', 'minio'],
+  resource_deps=['pnpm-install', 'object-storage'],
   labels=['dev'],
 )
 
@@ -148,8 +148,8 @@ dc_resource('redis', labels=['infra'])
 dc_resource('nats', labels=['infra'],
             links=[local_url('DEV_NATS_MONITOR_PORT', '8222')])
 dc_resource('mongodb', labels=['infra'])
-dc_resource('minio', labels=['infra'],
-            links=[local_url('DEV_MINIO_CONSOLE_PORT', '9003')])
+dc_resource('object-storage', labels=['infra'],
+            links=[local_url('DEV_STORAGE_CONSOLE_PORT', '9003')])
 
 # Temporal — workflow engine, only needed when working on async workflows
 dc_resource('temporal', labels=['infra'], resource_deps=['postgres'])

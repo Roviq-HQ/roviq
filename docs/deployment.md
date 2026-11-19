@@ -48,22 +48,46 @@ The full list of database-enforced rules and the tests that prove them is in `do
 ## Object storage
 
 The gateway needs an S3-compatible store and all eight `S3_*` variables (see `.env.example`);
-it refuses to start without them. Buckets are created by infrastructure, never by the app:
+it refuses to start without them. Production uses a managed service: **AWS S3 or Cloudflare R2**
+(not decided as of 2026-11-19). Dev and CI use RustFS. Buckets are created by infrastructure,
+never by the app.
+
+Before pointing an environment at a provider, create both buckets, set the variables and run
+`pnpm storage:check`. It must pass in full; it is the test of whether a provider is usable.
+
+Required on any provider:
 
 - **Two buckets**: `S3_BUCKET_PRIVATE` with all public access blocked, and `S3_BUCKET_PUBLIC`
-  with anonymous `s3:GetObject` only. The public bucket holds branding and nothing else.
+  readable without sign-in (objects only, no listing). The public bucket holds branding and
+  nothing else.
 - **`S3_PUBLIC_ENDPOINT`** must be the address browsers reach, because presigned URLs are signed
   for that host. **`S3_PUBLIC_BASE_URL`** is the public bucket's base URL; put a CDN there.
 - **CORS** on the private bucket: allow `PUT` and `GET` from the three portal origins only, with
-  the `Content-Type` request header.
+  the `Content-Type` request header. Without it every browser upload fails, while server-side
+  tests still pass. `scripts/storage-init.ts` shows the exact rule used in dev.
 - **Separate origin**: serve storage from a domain that is not a portal domain, so an uploaded
   file can never run script in a portal's origin.
-- **Encryption at rest** as the bucket default, and a bucket policy that refuses non-TLS requests.
-- **Region**: India (`ap-south-1` on AWS) for student data.
+- **Encryption at rest** and TLS only.
 - **Lifecycle**: abort incomplete multipart uploads after one day. Do not enable versioning
   without a plan for erasure requests, which must remove every version.
 - **Backups**: replicate or back up the private bucket; the database alone cannot restore files.
+- **Credentials**: an access key limited to these two buckets (get, put, delete, list, copy).
 - `/api/health` reports storage down when either bucket is missing or unreachable.
+
+Provider notes:
+
+| | AWS S3 | Cloudflare R2 |
+|---|---|---|
+| `S3_REGION` | `ap-south-1` (Mumbai) | `auto` |
+| `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` | `https://s3.ap-south-1.amazonaws.com` | `https://<account-id>.r2.cloudflarestorage.com` |
+| Public bucket | bucket policy allowing `s3:GetObject` to everyone, behind CloudFront | no bucket policies: connect a custom domain to the bucket (public access) |
+| `S3_PUBLIC_BASE_URL` | the CloudFront domain | the custom domain |
+| Data location | stays in the Mumbai region | pick the location or jurisdiction when creating the bucket; confirm it meets the data-residency position for student records before choosing R2 |
+| Cost shape | storage plus per-GB download fees | lower storage price, no download fees |
+
+The R2 column is from Cloudflare's documentation and has not been run against this codebase.
+`pnpm storage:check` decides: in particular it proves that a presigned upload is refused when the
+body's size or type differs from what was signed, which the upload design depends on.
 
 ## Redis
 

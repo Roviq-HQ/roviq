@@ -6,11 +6,11 @@ import { FakeStorageClient } from '@roviq/storage';
 import { createMock } from '@roviq/testing';
 import type Redis from 'ioredis';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MinioHealthIndicator } from '../minio.health';
 import { NatsHealthIndicator } from '../nats.health';
 import { PostgresHealthIndicator } from '../postgres.health';
 import { PROBE_TIMEOUT_MS, runProbe } from '../probe';
 import { RedisHealthIndicator } from '../redis.health';
+import { StorageHealthIndicator } from '../storage.health';
 
 const healthIndicatorService = new HealthIndicatorService();
 
@@ -120,7 +120,7 @@ describe('NatsHealthIndicator', () => {
   });
 });
 
-describe('MinioHealthIndicator', () => {
+describe('StorageHealthIndicator', () => {
   function storageWith(buckets: { private: boolean; public: boolean }): FakeStorageClient {
     const storage = new FakeStorageClient();
     vi.spyOn(storage, 'bucketExists').mockImplementation(async (bucket) => buckets[bucket]);
@@ -128,14 +128,14 @@ describe('MinioHealthIndicator', () => {
   }
 
   it('should be up when both buckets exist', async () => {
-    const indicator = new MinioHealthIndicator(
+    const indicator = new StorageHealthIndicator(
       healthIndicatorService,
       storageWith({ private: true, public: true }),
     );
 
     const result = await indicator.isHealthy();
 
-    expect(result.minio.status).toBe('up');
+    expect(result.storage.status).toBe('up');
   });
 
   it.each([
@@ -143,21 +143,21 @@ describe('MinioHealthIndicator', () => {
     ['public', { private: true, public: false }],
   ] as const)('should be down when the %s bucket is missing', async (_name, buckets) => {
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    const indicator = new MinioHealthIndicator(healthIndicatorService, storageWith(buckets));
+    const indicator = new StorageHealthIndicator(healthIndicatorService, storageWith(buckets));
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ minio: { status: 'down' } });
+    expect(result).toEqual({ storage: { status: 'down' } });
   });
 
   it('should be down when storage cannot be reached', async () => {
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const storage = new FakeStorageClient();
     vi.spyOn(storage, 'bucketExists').mockRejectedValue(new Error('connect ECONNREFUSED'));
-    const indicator = new MinioHealthIndicator(healthIndicatorService, storage);
+    const indicator = new StorageHealthIndicator(healthIndicatorService, storage);
 
     const result = await indicator.isHealthy();
 
-    expect(result).toEqual({ minio: { status: 'down' } });
+    expect(result).toEqual({ storage: { status: 'down' } });
   });
 });

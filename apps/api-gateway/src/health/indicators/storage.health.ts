@@ -4,7 +4,7 @@ import { StorageClient } from '@roviq/storage';
 import { logProbeFailure, type ProbeResult, runProbe } from './probe';
 
 @Injectable()
-export class MinioHealthIndicator {
+export class StorageHealthIndicator {
   constructor(
     private readonly healthIndicatorService: HealthIndicatorService,
     private readonly storage: StorageClient,
@@ -22,11 +22,11 @@ export class MinioHealthIndicator {
     });
   }
 
-  async isHealthy(): Promise<HealthIndicatorResult<'minio'>> {
-    const indicator = this.healthIndicatorService.check('minio');
+  async isHealthy(): Promise<HealthIndicatorResult<'storage'>> {
+    const indicator = this.healthIndicatorService.check('storage');
     const result = await this.probe();
     if (result.up) return indicator.up({ responseMs: result.responseMs });
-    logProbeFailure('minio', result);
+    logProbeFailure('storage', result);
     return indicator.down();
   }
 }
