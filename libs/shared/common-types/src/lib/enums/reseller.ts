@@ -47,3 +47,24 @@ export type ResellerStatus = (typeof RESELLER_STATUS_VALUES)[number];
 export const ResellerStatus = Object.fromEntries(RESELLER_STATUS_VALUES.map((v) => [v, v])) as {
   readonly [K in ResellerStatus]: K;
 };
+
+/**
+ * Colour scheme a reseller picks for its white-label portal.
+ *
+ * Single source of truth for the NestJS GraphQL enum, the DTO validator and the
+ * frontend Select options. Stored inside the `resellers.branding` JSONB.
+ */
+export const RESELLER_BRANDING_THEME_VALUES = [
+  // Always the light colour scheme
+  'LIGHT',
+  // Always the dark colour scheme
+  'DARK',
+  // Follows the viewer's device setting
+  'AUTO',
+] as const;
+
+export type ResellerBrandingTheme = (typeof RESELLER_BRANDING_THEME_VALUES)[number];
+
+export const ResellerBrandingTheme = Object.fromEntries(
+  RESELLER_BRANDING_THEME_VALUES.map((v) => [v, v]),
+) as { readonly [K in ResellerBrandingTheme]: K };

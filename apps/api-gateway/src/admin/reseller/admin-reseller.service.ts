@@ -117,6 +117,15 @@ function toModel(record: ResellerRow, instituteCount: number, teamSize: number) 
   };
 }
 
+/** Theme and stylesheet are edited by the reseller (ROV-186); the platform form does not carry them. */
+function withResellerOwnedBranding(
+  stored: ResellerRow['branding'],
+  incoming: NonNullable<AdminUpdateResellerInput['branding']>,
+): NonNullable<ResellerRow['branding']> {
+  const { theme, customCss } = stored ?? {};
+  return { ...(theme ? { theme } : {}), ...(customCss ? { customCss } : {}), ...incoming };
+}
+
 @Injectable()
 export class AdminResellerService {
   constructor(
@@ -329,7 +338,9 @@ export class AdminResellerService {
       const { version, ...fields } = input;
       const patch: Partial<typeof resellers.$inferInsert> = {};
       if (fields.name !== undefined) patch.name = fields.name;
-      if (fields.branding !== undefined) patch.branding = fields.branding;
+      if (fields.branding !== undefined) {
+        patch.branding = withResellerOwnedBranding(existing.branding, fields.branding);
+      }
       if (fields.customDomain !== undefined) patch.customDomain = fields.customDomain;
       if (fields.registrationNumber !== undefined)
         patch.registrationNumber = fields.registrationNumber;

@@ -4056,6 +4056,12 @@ type Mutation {
   resellerRemoveInstituteFromGroup(instituteId: ID!): Boolean!
   resellerStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
   resellerSuspendInstitute(id: ID!, reason: String): InstituteModel!
+
+  """Edit the reseller's own colours, colour scheme and extra stylesheet"""
+  resellerUpdateBranding(input: ResellerUpdateBrandingInput!): ResellerProfileModel!
+
+  """Edit the reseller's own name, registration, contact and address"""
+  resellerUpdateProfile(input: ResellerUpdateProfileInput!): ResellerProfileModel!
   resellerVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
 
   """Resolve group members (triggers rule evaluation + cache refresh)"""
@@ -4758,6 +4764,9 @@ type Query {
   """List users with memberships in institutes belonging to this reseller"""
   resellerListUsers(filter: ResellerListUsersFilterInput): ResellerUserConnection!
 
+  """The signed-in reseller's own record"""
+  resellerMyProfile: ResellerProfileModel!
+
   """Fetch a section by id."""
   section(id: ID!): SectionModel!
 
@@ -5017,6 +5026,11 @@ input RequestTCInput {
 
 """Reseller branding configuration (logo, colors, favicon)"""
 type ResellerBrandingModel {
+  """
+  Extra stylesheet written by the reseller. Stored, not yet applied to any portal.
+  """
+  customCss: String
+
   """URL of the reseller favicon"""
   faviconUrl: String
 
@@ -5028,6 +5042,16 @@ type ResellerBrandingModel {
 
   """Secondary/accent brand colour as a hex code"""
   secondaryColor: String
+
+  """Colour scheme; absent means it follows the viewer's device"""
+  theme: ResellerBrandingTheme
+}
+
+"""Colour scheme of the reseller white-label portal"""
+enum ResellerBrandingTheme {
+  AUTO
+  DARK
+  LIGHT
 }
 
 """
@@ -5108,6 +5132,46 @@ input ResellerListUsersFilterInput {
 
   """Full-text search against user profile names and username."""
   search: String
+}
+
+"""The signed-in reseller's own record, as its staff see it"""
+type ResellerProfileModel {
+  """Registered address"""
+  address: InstituteAddressObject
+  branding: ResellerBrandingModel
+
+  """Business contact phones and emails"""
+  contact: InstituteContactObject!
+  createdAt: DateTime!
+
+  """Custom domain, set by the platform. Not yet served (auth PRD §23.4)."""
+  customDomain: String
+  id: ID!
+
+  """
+  True for the built-in "Roviq Direct" reseller, whose name cannot be changed
+  """
+  isSystem: Boolean!
+  name: String!
+
+  """Company / business registration number (e.g. CIN or GSTIN)"""
+  registrationNumber: String
+
+  """State the business is registered in"""
+  registrationState: IndianState
+
+  """URL-safe identifier. Fixed at creation."""
+  slug: String!
+  status: ResellerStatus!
+
+  """Set by the platform; a reseller cannot change it"""
+  tier: ResellerTier!
+  updatedAt: DateTime!
+
+  """
+  Optimistic concurrency version — pass it back to resellerUpdateProfile and resellerUpdateBranding
+  """
+  version: Int!
 }
 
 """Lifecycle state of a reseller account"""
@@ -5246,6 +5310,49 @@ enum ResellerTier {
   FULL_MANAGEMENT
   READ_ONLY
   SUPPORT_MANAGEMENT
+}
+
+"""
+Payload for resellerUpdateBranding. An omitted field is left as it is; null resets it to the default. Logo and favicon are not set here.
+"""
+input ResellerUpdateBrandingInput {
+  """
+  Extra stylesheet, at most 20000 characters. Refused if it contains a backslash, "<", @import, url(), image(), image-set(), expression() or javascript:.
+  """
+  customCss: String
+
+  """
+  Six-digit hex colour, e.g. "#1677FF"
+  """
+  primaryColor: String
+
+  """
+  Six-digit hex colour, e.g. "#5BC0EB"
+  """
+  secondaryColor: String
+  theme: ResellerBrandingTheme
+
+  """Optimistic concurrency version — must match the current server value"""
+  version: Int!
+}
+
+"""
+Payload for resellerUpdateProfile. An omitted field is left as it is. Slug, tier and custom domain are platform-only.
+"""
+input ResellerUpdateProfileInput {
+  """Pass null to clear"""
+  address: InstituteAddressInput
+  contact: InstituteContactInput
+  name: String
+
+  """Pass null to clear"""
+  registrationNumber: String
+
+  """Pass null to clear"""
+  registrationState: IndianState
+
+  """Optimistic concurrency version — must match the current server value"""
+  version: Int!
 }
 
 type ResellerUserConnection {

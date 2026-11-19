@@ -35,12 +35,14 @@ Run `pnpm db:migrate` (Drizzle `migrate`, connecting with `DATABASE_URL_MIGRATE`
 | `*_rov-102-auth-invariant-triggers` | The triggers that revoke staff sessions when a reseller is suspended, revoke a user's sessions when the password changes, protect the system reseller, and restrict institute deletion to the platform. |
 | `*_rov-101-reseller-full-admin-reads-users` | Adds `read User` to every stored `reseller_full_admin` role, so reseller admins can list an institute's users. |
 | `*_rov-185-reseller-team-sessions-and-abilities` | Adds the `reseller_memberships_revoke_sessions` trigger (a deactivated or deleted team member loses their refresh tokens and reseller impersonation sessions) and `manage ResellerTeam` on every stored `reseller_full_admin` and `reseller_support_admin` role. |
+| `*_rov-186-reseller-self-update` | Lets a reseller edit its own record: the `reseller_own_update` policy, an `UPDATE` grant to `roviq_reseller` on the settings columns only (`name`, `branding`, `registration_number`, `registration_state`, `contact`, `address` and the audit columns), and `read`/`update Reseller` on every stored `reseller_full_admin` role. |
 
 Consequences for operations:
 
 - **Reseller suspension depends on the trigger.** The API no longer revokes refresh tokens itself when it suspends a reseller (`resellers_revoke_sessions` does). Deploying the API before the migration would let a suspended reseller's staff keep refreshing their sessions.
 - **The system reseller cannot be suspended, deactivated or deleted, even by the database owner.** A maintenance script that tries will fail with `check_violation`. This is intended (ROV-102).
 - **Deactivating a reseller team member depends on the trigger.** `resellerDeactivateTeamMember` only flips `is_active`; `reseller_memberships_revoke_sessions` ends the sessions. Until the migration runs, the Team page also answers `FORBIDDEN` for every change, because the stored roles lack `manage ResellerTeam` (cached per role for 5 minutes in `casl:role:<id>`).
+- **Reseller settings depend on the grant.** Until `*_rov-186-reseller-self-update` runs, `resellerUpdateProfile` and `resellerUpdateBranding` answer `FORBIDDEN` (the stored role lacks `update Reseller`, cached for 5 minutes in `casl:role:<id>`), and would fail with `permission denied` even with the ability.
 - **A refresh token can be inserted only for an active membership.** Data imports that create `refresh_tokens` rows directly will be refused for memberships that do not exist or are not active.
 
 The full list of database-enforced rules and the tests that prove them is in `docs/testing.md` → "Security invariants".
