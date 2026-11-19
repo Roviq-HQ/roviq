@@ -128,6 +128,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts',
   // ROV-290: isolated reseller/group fixtures and direct group-link assertions only.
   'apps/api-gateway/src/reseller/institute-group/__tests__/reseller-institute-group.integration.spec.ts',
+  // ROV-186 fixtures: system roles, role switches and stored-row assertions for the settings spec.
+  'apps/api-gateway/src/reseller/settings/__tests__/reseller-settings.integration.spec.ts',
   // ROV-185 fixtures: system roles, known passwords and stored-row assertions for the team spec.
   'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
   // ROV-185: roles, auth_events and refresh_tokens are unreadable as roviq_reseller.

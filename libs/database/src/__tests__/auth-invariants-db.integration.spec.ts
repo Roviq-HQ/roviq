@@ -665,3 +665,78 @@ describe('institute deletion', () => {
     });
   });
 });
+
+describe('reseller self-service profile (ROV-186)', () => {
+  it('25. a reseller edits only the settings columns of its own record', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE roviq_admin');
+      const own = await createReseller(client);
+      const other = await createReseller(client);
+
+      await client.query('SET LOCAL ROLE roviq_reseller');
+      await client.query('SELECT set_config($1, $2, true)', [
+        'app.current_reseller_id',
+        own.resellerId,
+      ]);
+
+      const edited = await client.query(
+        `UPDATE resellers
+            SET name = 'Renamed', branding = '{"primaryColor": "#112233"}'::jsonb,
+                registration_number = 'U123', registration_state = 'RAJASTHAN',
+                contact = '{"phones": [], "emails": []}'::jsonb, address = NULL,
+                updated_at = now(), updated_by = $2, version = version + 1
+          WHERE id = $1`,
+        [own.resellerId, own.userId],
+      );
+      expect(edited.rowCount).toBe(1);
+
+      const platformOnly = [
+        `slug = 'taken-over'`,
+        `tier = 'FULL_MANAGEMENT'`,
+        `status = 'ACTIVE'`,
+        'is_system = true',
+        'is_active = true',
+        'suspended_at = NULL',
+        `custom_domain = 'portal.example.com'`,
+        'deleted_at = now()',
+        'created_by = updated_by',
+      ];
+      for (const assignment of platformOnly) {
+        await expectRefused(
+          client,
+          /permission denied/,
+          `UPDATE resellers SET ${assignment} WHERE id = $1`,
+          [own.resellerId],
+        );
+      }
+
+      const foreign = await client.query(`UPDATE resellers SET name = 'Hijacked' WHERE id = $1`, [
+        other.resellerId,
+      ]);
+      expect(foreign.rowCount).toBe(0);
+
+      await client.query('SET LOCAL ROLE roviq_admin');
+      const names = await client.query<{ id: string; name: string }>(
+        'SELECT id, name FROM resellers WHERE id = ANY($1)',
+        [[own.resellerId, other.resellerId]],
+      );
+      const nameOf = (id: string) => names.rows.find((row) => row.id === id)?.name;
+      expect(nameOf(own.resellerId)).toBe('Renamed');
+      expect(nameOf(other.resellerId)).not.toBe('Hijacked');
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
+  it('an institute role cannot edit any reseller', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED_IDS.INSTITUTE_1 }, async (client) => {
+      const res = await client.query(`UPDATE resellers SET name = 'Hijacked' WHERE id = $1`, [
+        SEED_IDS.RESELLER_DIRECT,
+      ]);
+      expect(res.rowCount).toBe(0);
+    });
+  });
+});

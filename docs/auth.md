@@ -454,6 +454,20 @@ A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (
 - Database guards: `chk_role_scope` rejects unknown scopes and wrong tenant/reseller combinations; role names are unique per platform (`roles_platform_name_key`) and per reseller (`roles_reseller_id_name_key`) among live rows. `refresh_tokens.membership_scope` and `impersonation_sessions.impersonator_scope` accept only `platform`, `reseller`, `institute`.
 - `auth_events`: `roviq_app` and `roviq_reseller` hold the INSERT table privilege only; `roviq_admin` reads.
 
+### Reseller settings (ROV-186)
+
+`ResellerSettingsResolver` (`reseller/settings/`) lets a reseller read and edit its own record. No operation takes a reseller id: the row is always the one in the token, and the repository runs as `roviq_reseller` with the caller's own context (`withReseller(db, user, …)`, no synthetic context).
+
+- **Ability.** Subject `Reseller`. `reseller_full_admin` holds `read` and `update`; the other two roles read through `read all`. In reseller scope the subject can only ever mean the caller's own reseller.
+- **What can change.** `resellerUpdateProfile`: name, registration number and state, contact, address. `resellerUpdateBranding`: primary and secondary colour, colour scheme (`ResellerBrandingTheme`), custom CSS. Slug, tier, status and custom domain have no input field, and the database refuses them too: `roviq_reseller` holds `UPDATE` on the settings columns only, and the `reseller_own_update` policy limits the row.
+- **System reseller.** "Roviq Direct" edits everything except its name (`SYSTEM_RESELLER_PROTECTED`).
+- **Concurrency.** Both mutations take `version`; a mismatch answers `CONCURRENT_MODIFICATION`.
+- **Branding merge.** `resellers.branding` is one JSONB (`ResellerBranding`). The reseller's mutation writes only its four keys and keeps `logoUrl` / `faviconUrl`; `adminUpdateReseller` keeps `theme` and `customCss`. A key sent as `null` is removed.
+- **Custom CSS.** At most 20,000 characters, and refused if it contains a backslash, `<`, `@import`, `url(`, `image(`, `image-set(`, `expression(` or `javascript:` (`findForbiddenCustomCss` in `@roviq/common-types`, shared by the DTO and the form). The rule keeps a stylesheet from loading anything from another server or leaving its `<style>` element. The stylesheet is **stored but not applied to any portal yet** (Auth PRD §23.3); the settings page previews it inside an `<iframe sandbox>`. Whoever applies it to a real page must review the rule again for that context.
+- **Not built yet.** Logo and favicon upload waits for the image pipeline (ROV-299). Custom domain is a read-only placeholder (Auth PRD §23.4).
+- Each change emits `RESELLER.updated`, so the platform's reseller pages refresh.
+- Tests: `reseller-branding.spec.ts`, `reseller-settings.service.spec.ts`, `reseller-settings.integration.spec.ts`, `auth-invariants-db.integration.spec.ts` → "reseller self-service profile", `reseller-settings.api-e2e.spec.ts`.
+
 
 ## Account language
 

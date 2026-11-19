@@ -10,6 +10,7 @@ import { ResellerInstituteService } from './institute/reseller-institute.service
 import { ResellerInstituteSubscriptionResolver } from './institute/reseller-institute.subscription';
 import { ResellerInstituteGroupResolver } from './institute-group/reseller-institute-group.resolver';
 import { ResellerInstituteGroupService } from './institute-group/reseller-institute-group.service';
+import { ResellerSettingsModule } from './settings/reseller-settings.module';
 import { ResellerTeamModule } from './team/reseller-team.module';
 import { ResellerUserModule } from './user/reseller-user.module';
 
@@ -21,6 +22,7 @@ import { ResellerUserModule } from './user/reseller-user.module';
     InstituteGroupModule,
     ResellerUserModule,
     ResellerTeamModule,
+    ResellerSettingsModule,
   ],
   providers: [
     ResellerInstituteSubscriptionResolver,

@@ -36,6 +36,9 @@ export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, Abil
     { action: 'read', subject: 'BillingDashboard' },
     { action: 'read', subject: 'AuditLog' },
     { action: 'manage', subject: 'ResellerTeam' },
+    // Its own reseller record only: RLS and column grants bound what "update" reaches.
+    { action: 'read', subject: 'Reseller' },
+    { action: 'update', subject: 'Reseller' },
   ],
   reseller_support_admin: [
     { action: 'read', subject: 'all' },

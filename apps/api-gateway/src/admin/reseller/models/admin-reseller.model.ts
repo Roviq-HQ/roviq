@@ -7,7 +7,12 @@
  * via codegen.
  */
 import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { IndianState, ResellerStatus, ResellerTier } from '@roviq/common-types';
+import {
+  IndianState,
+  ResellerBrandingTheme,
+  ResellerStatus,
+  ResellerTier,
+} from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
 import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import { createConnectionType } from '../../../common/pagination/relay-pagination.model';
@@ -24,6 +29,11 @@ registerEnumType(ResellerTier, {
 registerEnumType(ResellerStatus, {
   name: 'ResellerStatus',
   description: 'Lifecycle state of a reseller account',
+});
+
+registerEnumType(ResellerBrandingTheme, {
+  name: 'ResellerBrandingTheme',
+  description: 'Colour scheme of the reseller white-label portal',
 });
 
 /**
@@ -50,6 +60,18 @@ export class ResellerBrandingModel {
     description: 'Secondary/accent brand colour as a hex code',
   })
   secondaryColor?: string | null;
+
+  @Field(() => ResellerBrandingTheme, {
+    nullable: true,
+    description: "Colour scheme; absent means it follows the viewer's device",
+  })
+  theme?: ResellerBrandingTheme | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Extra stylesheet written by the reseller. Stored, not yet applied to any portal.',
+  })
+  customCss?: string | null;
 }
 
 @ObjectType({ description: 'Platform-admin view of a reseller account' })

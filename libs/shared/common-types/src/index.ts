@@ -9,6 +9,7 @@ export * from './lib/institute-locales';
 export * from './lib/nav-slugs';
 export * from './lib/policy/file-purpose-policy';
 export * from './lib/policy/password-policy';
+export * from './lib/reseller-branding';
 export * from './lib/reseller-roles';
 export * from './lib/schemas/address';
 export * from './lib/state-machine';
