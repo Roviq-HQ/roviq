@@ -62,7 +62,17 @@ interface LeaveFixture {
   type: 'MEDICAL' | 'CASUAL' | 'BEREAVEMENT' | 'EXAM' | 'OTHER';
   reason: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-  files: { id: string; name: string; contentType: string; sizeBytes: number; url: string | null }[];
+  files: {
+    id: string;
+    name: string;
+    contentType: string;
+    sizeBytes: number;
+    url: string | null;
+    thumbnailUrl: string | null;
+    width: number | null;
+    height: number | null;
+    placeholder: string | null;
+  }[];
   decidedBy: string | null;
   createdAt: string;
   updatedAt: string;

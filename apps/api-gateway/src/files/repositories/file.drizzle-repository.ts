@@ -13,23 +13,8 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { FileRepository } from './file.repository';
-import type { CreateFileData, FileLeaveOwner, FileRecord } from './types';
-
-const liveColumns = {
-  id: filesLive.id,
-  tenantId: filesLive.tenantId,
-  resellerId: filesLive.resellerId,
-  subjectUserId: filesLive.subjectUserId,
-  visibility: filesLive.visibility,
-  purpose: filesLive.purpose,
-  objectKey: filesLive.objectKey,
-  originalName: filesLive.originalName,
-  contentType: filesLive.contentType,
-  sizeBytes: filesLive.sizeBytes,
-  status: filesLive.status,
-  uploadedBy: filesLive.uploadedBy,
-  createdAt: filesLive.createdAt,
-} as const;
+import { fileLiveColumns } from './file-columns';
+import type { CreateFileData, FileLeaveOwner, FileRecord, ProcessedImageData } from './types';
 
 const writeReturning = {
   id: files.id,
@@ -42,6 +27,10 @@ const writeReturning = {
   originalName: files.originalName,
   contentType: files.contentType,
   sizeBytes: files.sizeBytes,
+  width: files.width,
+  height: files.height,
+  variants: files.variants,
+  placeholder: files.placeholder,
   status: files.status,
   uploadedBy: files.uploadedBy,
   createdAt: files.createdAt,
@@ -91,9 +80,10 @@ export class FileDrizzleRepository extends FileRepository {
     if (ids.length === 0) return [];
     const { tenantId } = this.context();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
-      return tx.select(liveColumns).from(filesLive).where(inArray(filesLive.id, ids)) as Promise<
-        FileRecord[]
-      >;
+      return tx
+        .select(fileLiveColumns)
+        .from(filesLive)
+        .where(inArray(filesLive.id, ids)) as Promise<FileRecord[]>;
     });
   }
 
@@ -102,7 +92,7 @@ export class FileDrizzleRepository extends FileRepository {
     const { tenantId, userId } = this.context();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
       return tx
-        .select(liveColumns)
+        .select(fileLiveColumns)
         .from(filesLive)
         .where(
           and(
@@ -135,6 +125,16 @@ export class FileDrizzleRepository extends FileRepository {
         .innerJoin(leavesLive, eq(leavesLive.id, leaveFilesLive.leaveId))
         .where(eq(leaveFilesLive.fileId, fileId));
       return rows[0] ?? null;
+    });
+  }
+
+  async saveProcessedImage(id: string, image: ProcessedImageData): Promise<void> {
+    const { tenantId, userId } = this.context();
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+      await tx
+        .update(files)
+        .set({ ...image, contentType: 'image/webp', updatedBy: userId })
+        .where(and(eq(files.id, id), eq(files.status, 'PENDING'), isNull(files.deletedAt)));
     });
   }
 

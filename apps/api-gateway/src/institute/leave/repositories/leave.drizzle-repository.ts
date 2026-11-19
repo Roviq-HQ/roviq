@@ -15,6 +15,7 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
+import { fileLiveColumns } from '../../../files/repositories/file-columns';
 import type { FileRecord } from '../../../files/repositories/types';
 import { LeaveRepository } from './leave.repository';
 import type {
@@ -62,22 +63,7 @@ async function loadFiles(tx: DrizzleDB, leaveIds: string[]): Promise<Map<string,
   const byLeave = new Map<string, FileRecord[]>();
   if (leaveIds.length === 0) return byLeave;
   const rows = await tx
-    .select({
-      leaveId: leaveFilesLive.leaveId,
-      id: filesLive.id,
-      tenantId: filesLive.tenantId,
-      resellerId: filesLive.resellerId,
-      subjectUserId: filesLive.subjectUserId,
-      visibility: filesLive.visibility,
-      purpose: filesLive.purpose,
-      objectKey: filesLive.objectKey,
-      originalName: filesLive.originalName,
-      contentType: filesLive.contentType,
-      sizeBytes: filesLive.sizeBytes,
-      status: filesLive.status,
-      uploadedBy: filesLive.uploadedBy,
-      createdAt: filesLive.createdAt,
-    })
+    .select({ leaveId: leaveFilesLive.leaveId, ...fileLiveColumns })
     .from(leaveFilesLive)
     .innerJoin(filesLive, eq(filesLive.id, leaveFilesLive.fileId))
     .where(inArray(leaveFilesLive.leaveId, leaveIds))

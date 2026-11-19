@@ -4,6 +4,7 @@ import { LEAVE_STATUS_VALUES, LEAVE_TYPE_VALUES } from '@roviq/common-types';
 import { gql, useMutation, useQuery } from '@roviq/graphql';
 import type {
   CreateLeaveInput,
+  FileRef,
   LeaveModel,
   LeaveStatus,
   LeaveType,
@@ -11,7 +12,12 @@ import type {
 } from '@roviq/graphql/generated';
 
 export type { LeaveStatus, LeaveType };
-export type LeaveRecord = LeaveModel;
+/** An attachment as the leave queries select it. `thumbnailUrl` is the MD size of an image. */
+export type LeaveFile = Pick<
+  FileRef,
+  'id' | 'name' | 'contentType' | 'sizeBytes' | 'url' | 'width' | 'height' | 'placeholder'
+> & { thumbnailUrl: string | null };
+export type LeaveRecord = Omit<LeaveModel, 'files'> & { files: LeaveFile[] };
 export type ApplyLeaveInput = CreateLeaveInput;
 export type UpdateLeavePayload = UpdateLeaveInput;
 export { LEAVE_STATUS_VALUES, LEAVE_TYPE_VALUES };
@@ -46,6 +52,10 @@ const LEAVE_FIELDS = `
     contentType
     sizeBytes
     url
+    thumbnailUrl: url(variant: MD)
+    width
+    height
+    placeholder
   }
   decidedBy
   createdAt

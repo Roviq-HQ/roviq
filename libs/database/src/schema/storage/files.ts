@@ -1,11 +1,29 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { entityColumns } from '../common/columns';
 import { filePurpose, fileStatus, fileVisibility } from '../common/enums';
 import { filePolicies } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
 import { institutes } from '../tenant/institutes';
+
+/** One stored size of an image. Its object key is derived from the file's key and `name`. */
+export interface StoredImageVariant {
+  name: 'SM' | 'MD' | 'FULL';
+  width: number;
+  height: number;
+  sizeBytes: number;
+}
 
 /**
  * One row per stored object. Domain tables reference `files.id`, never a URL, so RLS here is
@@ -38,6 +56,13 @@ export const files = pgTable(
     originalName: text('original_name').notNull(),
     contentType: text('content_type').notNull(),
     sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    /** Pixels of the FULL size. Null for anything that is not an image. */
+    width: integer('width'),
+    height: integer('height'),
+    /** Stored sizes of an image; `size_bytes` is their sum. Null for anything else. */
+    variants: jsonb('variants').$type<StoredImageVariant[]>(),
+    /** Tiny blurred preview as a data URI, shown while the image loads. */
+    placeholder: text('placeholder'),
     status: fileStatus('status').default('PENDING').notNull(),
     uploadedBy: uuid('uploaded_by').notNull(),
     ...entityColumns,

@@ -17,7 +17,13 @@ function pdf(name: string, sizeBytes = 2048): File {
   return new File([new Uint8Array(sizeBytes)], name, { type: 'application/pdf' });
 }
 
-function renderUpload(props: { maxFiles?: number; onChange?: (ids: string[]) => void } = {}) {
+function photo(name: string, sizeBytes: number): File {
+  return new File([new Uint8Array(sizeBytes)], name, { type: 'image/jpeg' });
+}
+
+function renderUpload(
+  props: { maxFiles?: number; crop?: 'square'; onChange?: (ids: string[]) => void } = {},
+) {
   const onChange = props.onChange ?? vi.fn();
   renderWithProviders(
     <FileUpload
@@ -25,6 +31,7 @@ function renderUpload(props: { maxFiles?: number; onChange?: (ids: string[]) => 
       purpose="LEAVE_ATTACHMENT"
       label="Supporting documents"
       maxFiles={props.maxFiles ?? 3}
+      crop={props.crop}
       onChange={onChange}
     />,
   );
@@ -64,6 +71,57 @@ describe('FileUpload', () => {
       'This file is too large.',
     );
     expect(requestUpload).not.toHaveBeenCalled();
+  });
+
+  it('should let a photo larger than the limit be picked, since it is shrunk before upload', async () => {
+    const { user } = renderUpload();
+
+    await user.upload(screen.getByTestId('file-upload-test-input'), photo('big.jpg', 12 * MB));
+
+    // This test browser cannot shrink images, so the limit applies to the photo as picked.
+    await waitFor(() =>
+      expect(screen.getByTestId('file-upload-item-error-big.jpg')).toHaveTextContent(
+        'This file is too large.',
+      ),
+    );
+    expect(requestUpload).not.toHaveBeenCalled();
+  });
+
+  it('should refuse a photo over 50 MB without trying to shrink it', async () => {
+    const { user } = renderUpload();
+
+    await user.upload(screen.getByTestId('file-upload-test-input'), photo('huge.jpg', 50 * MB + 1));
+
+    expect(screen.getByTestId('file-upload-item-error-huge.jpg')).toHaveTextContent(
+      'This file is too large.',
+    );
+  });
+
+  it('should open the crop step for a picked picture and upload nothing on cancel', async () => {
+    const { user } = renderUpload({ crop: 'square', maxFiles: 1 });
+
+    await user.upload(screen.getByTestId('file-upload-test-input'), photo('me.jpg', 2048));
+
+    expect(await screen.findByTestId('file-upload-crop-dialog')).toBeInTheDocument();
+    expect(screen.queryByTestId('file-upload-item-me.jpg')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('file-upload-crop-cancel-btn'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('file-upload-crop-dialog')).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('file-upload-item-me.jpg')).not.toBeInTheDocument();
+    expect(requestUpload).not.toHaveBeenCalled();
+  });
+
+  it('should skip the crop step for a file that is not a picture', async () => {
+    const { user } = renderUpload({ crop: 'square', maxFiles: 1 });
+    const exe = new File(['MZ'], 'tool.exe', { type: 'application/x-msdownload' });
+
+    await user.upload(screen.getByTestId('file-upload-test-input'), exe);
+
+    expect(screen.queryByTestId('file-upload-crop-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('file-upload-item-error-tool.exe')).toBeInTheDocument();
   });
 
   it('should keep only as many files as allowed and say so', async () => {

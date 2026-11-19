@@ -5,6 +5,7 @@ import { extractGraphQLError } from '@roviq/graphql';
 import { useFormatDate } from '@roviq/i18n';
 import { Badge, Button, Can, Card, CardContent, CardHeader, CardTitle } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { StoredImage } from '@web/components/stored-image/stored-image';
 import { ArrowLeft, CalendarOff, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -258,7 +259,17 @@ function LeaveDetailCard({ leave }: { leave: LeaveRecord }) {
                       className="text-primary underline-offset-4 hover:underline break-all"
                       data-testid={instituteLeave.detailFile(file.id)}
                     >
-                      {file.name}
+                      {file.width ? (
+                        <StoredImage
+                          file={{ ...file, url: file.thumbnailUrl }}
+                          alt={file.name}
+                          fallback={file.name}
+                          className="my-1 w-40 rounded-md border"
+                          testId={instituteLeave.detailFileImage(file.id)}
+                        />
+                      ) : (
+                        file.name
+                      )}
                     </a>
                   ) : (
                     <span data-testid={instituteLeave.detailFile(file.id)}>{file.name}</span>

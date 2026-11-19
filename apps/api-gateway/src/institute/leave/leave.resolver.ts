@@ -3,8 +3,8 @@ import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nest
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
 import { type AppAbility, LeaveStatus, LeaveType } from '@roviq/common-types';
-import { FileService } from '../../files/file.service';
 import { FileRefModel } from '../../files/models/file-ref.model';
+import type { FileRecord } from '../../files/repositories/types';
 import { CreateLeaveInput } from './dto/create-leave.input';
 import { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveService } from './leave.service';
@@ -14,17 +14,14 @@ import type { LeaveRecord } from './repositories/types';
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => LeaveModel)
 export class LeaveResolver {
-  constructor(
-    private readonly service: LeaveService,
-    private readonly fileService: FileService,
-  ) {}
+  constructor(private readonly service: LeaveService) {}
 
   @ResolveField(() => [FileRefModel])
   files(
     @Parent() leave: LeaveRecord,
     @CurrentAbility() ability: AppAbility | undefined,
-  ): Promise<FileRefModel[]> {
-    return this.fileService.toRefs(this.service.filesVisibleTo(ability, leave));
+  ): FileRecord[] {
+    return this.service.filesVisibleTo(ability, leave);
   }
 
   @Query(() => [LeaveModel], {

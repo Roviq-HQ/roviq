@@ -22,6 +22,10 @@ export const testIds = {
     itemError: (fileName: string) => `file-upload-item-error-${fileName}`,
     itemRetry: (fileName: string) => `file-upload-item-retry-${fileName}`,
     itemRemove: (fileName: string) => `file-upload-item-remove-${fileName}`,
+    cropDialog: 'file-upload-crop-dialog',
+    cropZoom: 'file-upload-crop-zoom',
+    cropCancelBtn: 'file-upload-crop-cancel-btn',
+    cropConfirmBtn: 'file-upload-crop-confirm-btn',
   },
 
   instituteLocales: {
@@ -1053,6 +1057,7 @@ export const testIds = {
     detailType: 'leave-detail-type',
     detailFiles: 'leave-detail-files',
     detailFile: (fileId: string) => `leave-detail-file-${fileId}`,
+    detailFileImage: (fileId: string) => `leave-detail-file-image-${fileId}`,
     detailBackBtn: 'leave-detail-back-btn',
     detailApproveBtn: 'leave-detail-approve-btn',
     detailRejectBtn: 'leave-detail-reject-btn',

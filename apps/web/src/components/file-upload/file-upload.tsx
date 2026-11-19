@@ -1,6 +1,12 @@
 'use client';
 
-import { FILE_CONTENT_TYPE, type FileContentType, type FilePurpose } from '@roviq/common-types';
+import {
+  FILE_CONTENT_TYPE,
+  type FileContentType,
+  type FilePurpose,
+  IMAGE_PICK_MAX_BYTES,
+  isImageContentType,
+} from '@roviq/common-types';
 import { useFormatNumber } from '@roviq/i18n';
 import {
   Button,
@@ -16,6 +22,8 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { CircleAlert, CircleCheck, FileText, RotateCcw, Upload, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
+import { CropDialog } from './crop-dialog';
+import { prepareImage } from './prepare-image';
 import { type UploadItem, useFileUpload } from './use-file-upload';
 
 const { fileUpload: ids } = testIds;
@@ -44,6 +52,8 @@ export interface FileUploadProps {
   error?: string;
   /** Most files allowed. Default 1. */
   maxFiles?: number;
+  /** Ask the user to crop each picked image to a square first (profile pictures). */
+  crop?: 'square';
   /** Distinguishes several upload fields on one page in test ids. */
   name: string;
 }
@@ -56,6 +66,7 @@ export function FileUpload({
   description,
   error,
   maxFiles = 1,
+  crop,
   name,
 }: FileUploadProps) {
   const t = useTranslations('fileUpload');
@@ -65,6 +76,7 @@ export function FileUpload({
   const inputId = React.useId();
   const [dragging, setDragging] = React.useState(false);
   const [tooMany, setTooMany] = React.useState(false);
+  const [toCrop, setToCrop] = React.useState<File | null>(null);
 
   const doneIds = items.flatMap((item) => (item.fileId ? [item.fileId] : []));
   const doneKey = doneIds.join(',');
@@ -95,7 +107,13 @@ export function FileUpload({
   const accept = (files: File[]) => {
     if (files.length === 0) return;
     setTooMany(files.length > remaining);
-    add(files.slice(0, Math.max(remaining, 0)));
+    const accepted = files.slice(0, Math.max(remaining, 0));
+    const [first] = accepted;
+    // Only a picture the purpose accepts is worth cropping; anything else goes on to be refused.
+    const croppable =
+      crop && first && isImageContentType(first.type) && first.size <= IMAGE_PICK_MAX_BYTES;
+    if (croppable) setToCrop(first);
+    else add(accepted);
   };
 
   const types = policy.allowedContentTypes.map((type) => TYPE_LABEL[type]).join(', ');
@@ -180,6 +198,16 @@ export function FileUpload({
         </FieldError>
       ) : null}
       {error ? <FieldError>{error}</FieldError> : null}
+      {crop ? (
+        <CropDialog
+          file={toCrop}
+          onCancel={() => setToCrop(null)}
+          onConfirm={(file, area) => {
+            setToCrop(null);
+            void prepareImage(file, area).then((cropped) => add([cropped]));
+          }}
+        />
+      ) : null}
     </Field>
   );
 }

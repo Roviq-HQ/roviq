@@ -1,4 +1,5 @@
 import type { FilePurpose, FileStatus, FileVisibility } from '@roviq/common-types';
+import type { StoredImageVariant } from '@roviq/database';
 
 export interface FileRecord {
   id: string;
@@ -11,6 +12,11 @@ export interface FileRecord {
   originalName: string;
   contentType: string;
   sizeBytes: number;
+  /** Pixels of the FULL size; null unless the file is an image. */
+  width: number | null;
+  height: number | null;
+  variants: StoredImageVariant[] | null;
+  placeholder: string | null;
   status: FileStatus;
   uploadedBy: string;
   createdAt: Date;
@@ -21,6 +27,16 @@ export interface FileLeaveOwner {
   id: string;
   tenantId: string;
   userId: string;
+}
+
+/** What processing turned an uploaded image into. */
+export interface ProcessedImageData {
+  width: number;
+  height: number;
+  variants: StoredImageVariant[];
+  placeholder: string;
+  /** Sum of the stored sizes. */
+  sizeBytes: number;
 }
 
 export interface CreateFileData {
