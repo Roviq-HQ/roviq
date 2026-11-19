@@ -85,7 +85,7 @@ function putWithProgress(
   });
 }
 
-export function useFileUpload(purpose: FilePurpose) {
+export function useFileUpload(purpose: FilePurpose, subjectUserId?: string) {
   const policy = FILE_PURPOSE_POLICY[purpose];
   const [items, setItems] = React.useState<UploadItem[]>([]);
   const tracked = React.useRef(new Map<string, Tracked>());
@@ -117,6 +117,7 @@ export function useFileUpload(purpose: FilePurpose) {
           variables: {
             input: {
               purpose,
+              subjectUserId,
               fileName: upload.name,
               contentType: upload.type,
               sizeBytes: upload.size,
@@ -135,7 +136,7 @@ export function useFileUpload(purpose: FilePurpose) {
         });
       }
     },
-    [patch, policy, purpose, requestUpload],
+    [patch, policy, purpose, requestUpload, subjectUserId],
   );
 
   const add = React.useCallback(

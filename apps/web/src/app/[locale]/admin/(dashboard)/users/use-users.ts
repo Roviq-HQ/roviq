@@ -33,7 +33,11 @@ export const ADMIN_LIST_USERS = gql`
           profile {
             firstName
             lastName
-            profileImageUrl
+            profileImage {
+              id
+              url(variant: SM)
+              placeholder
+            }
           }
           memberships {
             id
@@ -85,7 +89,11 @@ export const ADMIN_GET_USER = gql`
       profile {
         firstName
         lastName
-        profileImageUrl
+        profileImage {
+          id
+          url(variant: SM)
+          placeholder
+        }
         gender
         dateOfBirth
         nationality

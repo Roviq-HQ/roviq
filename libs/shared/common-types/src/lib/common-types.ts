@@ -745,7 +745,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     {
       action: 'read',
       subject: 'Student',
-      fields: ['id', 'firstName', 'lastName', 'profileImageUrl'],
+      fields: ['id', 'firstName', 'lastName', 'profileImage'],
     },
     { action: 'read', subject: 'Institute' },
   ],

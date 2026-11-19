@@ -405,8 +405,8 @@ export default function AttendancePage() {
                           >
                             <div className="flex items-center gap-3">
                               <Avatar className="size-10 shrink-0">
-                                {stu.profileImageUrl ? (
-                                  <AvatarImage src={stu.profileImageUrl} alt={fullName} />
+                                {stu.profileImage?.url ? (
+                                  <AvatarImage src={stu.profileImage?.url} alt={fullName} />
                                 ) : null}
                                 <AvatarFallback>{initial}</AvatarFallback>
                               </Avatar>
@@ -598,8 +598,8 @@ function buildStudentColumns({
             data-testid={`attendance-row-${stu.membershipId}`}
           >
             <Avatar className="size-7">
-              {stu.profileImageUrl ? (
-                <AvatarImage src={stu.profileImageUrl} alt={resolveI18n(stu.firstName) ?? ''} />
+              {stu.profileImage?.url ? (
+                <AvatarImage src={stu.profileImage?.url} alt={resolveI18n(stu.firstName) ?? ''} />
               ) : null}
               <AvatarFallback className="text-xs">{initial}</AvatarFallback>
             </Avatar>

@@ -15,12 +15,10 @@
     "nationality": "राष्ट्रीयता",
     "religion": "धर्म",
     "motherTongue": "मातृभाषा",
-    "phone": "फ़ोन",
-    "profileImageUrl": "प्रोफ़ाइल फ़ोटो URL"
+    "phone": "फ़ोन"
   },
   "fieldDescriptions": {
     "phone": "10-अंकीय भारतीय मोबाइल नंबर",
-    "profileImageUrl": "आपके प्रोफ़ाइल फ़ोटो का URL (अपलोड जल्द आएगा)",
     "adminOnly": "इस फ़ील्ड को बदलने के लिए अपने इंस्टीट्यूट एडमिन से संपर्क करें"
   },
   "fieldHelp": {
@@ -45,8 +43,7 @@
   "errors": {
     "loadFailed": "आपकी प्रोफ़ाइल लोड नहीं हो सकी",
     "updateFailed": "आपकी प्रोफ़ाइल अपडेट नहीं हो सकी",
-    "phoneInvalid": "वैध 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें",
-    "urlInvalid": "वैध URL दर्ज करें"
+    "phoneInvalid": "वैध 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें"
   },
   "staffSection": {
     "title": "रोजगार विवरण",

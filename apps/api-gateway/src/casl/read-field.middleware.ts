@@ -60,7 +60,7 @@ export const readFieldMiddleware: FieldMiddleware<
     firstName: 'firstName',
     lastName: 'lastName',
     admissionNumber: 'admissionNumber',
-    profileImageUrl: 'profileImageUrl',
+    profileImage: 'profileImage',
     currentStandardName: 'currentStandardName',
     currentSectionName: 'currentSectionName',
   };

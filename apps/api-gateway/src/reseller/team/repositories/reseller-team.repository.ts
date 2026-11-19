@@ -13,7 +13,7 @@ export interface TeamMemberRecord {
   profile: {
     firstName: I18nContent;
     lastName: I18nContent | null;
-    profileImageUrl: string | null;
+    profileImageFileId: string | null;
   } | null;
 }
 

@@ -93,7 +93,7 @@ interface MockGuardian {
   userId: string;
   firstName: Record<string, string>;
   lastName: Record<string, string> | null;
-  profileImageUrl: string | null;
+  profileImage?: { id: string; url: string | null; placeholder: string | null } | null;
   occupation: string | null;
   organization: string | null;
   relationship: string;
@@ -342,7 +342,7 @@ describe('StudentDetailPage › Guardians tab › LinkGuardianDialog', () => {
         userId: 'u-existing',
         firstName: { en: 'Existing' },
         lastName: { en: 'Primary' },
-        profileImageUrl: null,
+        profileImage: null,
         occupation: null,
         organization: null,
         relationship: 'FATHER',
@@ -375,7 +375,7 @@ describe('StudentDetailPage › Guardians tab › LinkGuardianDialog', () => {
         userId: 'u-1',
         firstName: { en: 'Anita' },
         lastName: { en: 'Verma' },
-        profileImageUrl: null,
+        profileImage: null,
         occupation: null,
         organization: null,
         relationship: 'MOTHER',

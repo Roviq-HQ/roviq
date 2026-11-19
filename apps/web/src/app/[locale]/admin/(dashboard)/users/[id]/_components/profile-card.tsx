@@ -57,7 +57,9 @@ export function ProfileCard({ user }: { user: UserDetail }) {
       <CardContent className="space-y-4 pt-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <Avatar className="size-20">
-            {profile?.profileImageUrl && <AvatarImage src={profile.profileImageUrl} alt={name} />}
+            {profile?.profileImage?.url && (
+              <AvatarImage src={profile.profileImage?.url} alt={name} />
+            )}
             <AvatarFallback className="text-lg">{name.slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
           <h1 className="text-xl font-semibold" data-testid={adminUserDetail.name}>

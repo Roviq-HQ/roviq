@@ -91,8 +91,8 @@ export default function GuardiansPage() {
         header: t('columns.photo'),
         cell: ({ row }) => (
           <Avatar className="size-8">
-            {row.original.profileImageUrl ? (
-              <AvatarImage src={row.original.profileImageUrl} alt={fullName(row.original)} />
+            {row.original.profileImage?.url ? (
+              <AvatarImage src={row.original.profileImage?.url} alt={fullName(row.original)} />
             ) : null}
             <AvatarFallback>{initials(row.original)}</AvatarFallback>
           </Avatar>

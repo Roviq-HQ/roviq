@@ -130,7 +130,11 @@ const LIST_STUDENTS_IN_SECTION = gql`
           firstName
           lastName
           admissionNumber
-          profileImageUrl
+          profileImage {
+            id
+            url(variant: SM)
+            placeholder
+          }
         }
       }
     }
@@ -152,7 +156,7 @@ export type AttendanceEntry = AttendanceEntryModel;
 export type StatusCount = AttendanceStatusCount;
 export type SectionStudent = Pick<
   StudentModel,
-  'id' | 'membershipId' | 'firstName' | 'lastName' | 'admissionNumber' | 'profileImageUrl'
+  'id' | 'membershipId' | 'firstName' | 'lastName' | 'admissionNumber' | 'profileImage'
 > & { membershipId: string };
 
 // ── Hooks ────────────────────────────────────────────────────────────

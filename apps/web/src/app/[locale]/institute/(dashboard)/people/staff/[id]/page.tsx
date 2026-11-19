@@ -61,6 +61,7 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
+import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
 import { parseISO } from 'date-fns';
 import {
   AlertTriangle,
@@ -255,11 +256,20 @@ function StaffSidebar({ staff }: { staff: StaffDetailNode }) {
       <CardContent className="pt-6 space-y-4">
         <div className="flex flex-col items-center text-center space-y-3">
           <Avatar className="size-24">
-            {staff.profileImageUrl ? (
-              <AvatarImage src={staff.profileImageUrl} alt={fullName} />
+            {staff.profileImage?.url ? (
+              <AvatarImage src={staff.profileImage?.url} alt={fullName} />
             ) : null}
             <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
           </Avatar>
+          <Can I="update" a="Staff">
+            <ProfilePhotoButton
+              kind="staff"
+              profileId={staff.id}
+              userId={staff.userId}
+              name={fullName}
+              hasPhoto={Boolean(staff.profileImage)}
+            />
+          </Can>
           <div className="space-y-1">
             <p className="font-semibold leading-tight">{fullName}</p>
             {staff.employeeId ? (

@@ -123,6 +123,7 @@ describe('FileService', () => {
   let createForUser: ReturnType<typeof vi.fn<AbilityFactory['createForUser']>>;
   let saveProcessedImage: ReturnType<typeof vi.fn<FileRepository['saveProcessedImage']>>;
   let images: FakeImageProcessor;
+  let isMember: ReturnType<typeof vi.fn<FileRepository['isMemberOfCurrentTenant']>>;
   let service: FileService;
 
   beforeEach(() => {
@@ -150,6 +151,7 @@ describe('FileService', () => {
       .mockResolvedValue(createMock<AppAbility>({ can }));
     saveProcessedImage = vi.fn<FileRepository['saveProcessedImage']>().mockResolvedValue(undefined);
     images = new FakeImageProcessor();
+    isMember = vi.fn<FileRepository['isMemberOfCurrentTenant']>().mockResolvedValue(true);
     service = new FileService(
       createMock<FileRepository>({
         create,
@@ -159,6 +161,7 @@ describe('FileService', () => {
         markRejected,
         findLeaveForFile,
         saveProcessedImage,
+        isMemberOfCurrentTenant: isMember,
       }),
       storage,
       createMock<AbilityFactory>({ createForUser }),
@@ -223,6 +226,58 @@ describe('FileService', () => {
       await expect(
         service.requestUpload(user, buildInput({ purpose, contentType: 'text/csv' })),
       ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+    });
+
+    it('should store a profile photo under the person, not under the institute', async () => {
+      const ticket = await service.requestUpload(
+        user,
+        buildInput({
+          purpose: 'PROFILE_PHOTO',
+          contentType: 'image/jpeg',
+          fileName: 'me.jpg',
+          subjectUserId: OTHER_USER_ID,
+        }),
+      );
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ subjectUserId: OTHER_USER_ID, purpose: 'PROFILE_PHOTO' }),
+      );
+      expect(ticket.uploadUrl).toContain(
+        `fake://private/pending/users/${OTHER_USER_ID}/profile-photo/${FILE_ID}.jpg`,
+      );
+    });
+
+    it('should refuse a profile photo upload that names no person', async () => {
+      await expect(
+        service.requestUpload(
+          user,
+          buildInput({ purpose: 'PROFILE_PHOTO', contentType: 'image/jpeg' }),
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('should refuse a profile photo for someone who is not a member of the institute', async () => {
+      isMember.mockResolvedValue(false);
+
+      await expect(
+        service.requestUpload(
+          user,
+          buildInput({
+            purpose: 'PROFILE_PHOTO',
+            contentType: 'image/jpeg',
+            subjectUserId: OTHER_USER_ID,
+          }),
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('should ignore a named person for a file that belongs to the institute', async () => {
+      await service.requestUpload(user, buildInput({ subjectUserId: OTHER_USER_ID }));
+
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ subjectUserId: null }));
+      expect(isMember).not.toHaveBeenCalled();
     });
 
     it('should refuse a new upload once the user has the maximum pending', async () => {
@@ -505,6 +560,14 @@ describe('FileService', () => {
       );
       expect(late).toBe(early);
       expect(nextWindow).not.toBe(early);
+    });
+
+    it('should give profile photos cacheable thumbnail links', async () => {
+      const photo = buildStoredImage({ purpose: 'PROFILE_PHOTO' });
+
+      const url = await service.refUrl(photo, 'SM');
+
+      expect(url).toContain(`expires=${THUMBNAIL_URL_TTL_SECONDS}`);
     });
 
     it('should mark stored private images cacheable by the browser only, public ones by anyone', async () => {

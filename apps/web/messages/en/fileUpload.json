@@ -28,5 +28,18 @@
     "zoom": "Zoom",
     "cancel": "Cancel",
     "confirm": "Use this picture"
+  },
+  "photo": {
+    "change": "Change photo",
+    "title": "Profile picture of {name}",
+    "description": "Pick a clear, front-facing photo. You can position it before it is saved.",
+    "label": "Photo",
+    "save": "Save photo",
+    "saving": "Saving...",
+    "remove": "Remove photo",
+    "cancel": "Cancel",
+    "saved": "Profile picture updated",
+    "removed": "Profile picture removed",
+    "failed": "The profile picture could not be saved. Try again."
   }
 }

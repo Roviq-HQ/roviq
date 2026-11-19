@@ -15,12 +15,10 @@
     "nationality": "Nationality",
     "religion": "Religion",
     "motherTongue": "Mother tongue",
-    "phone": "Phone",
-    "profileImageUrl": "Profile photo URL"
+    "phone": "Phone"
   },
   "fieldDescriptions": {
     "phone": "10-digit Indian mobile number",
-    "profileImageUrl": "URL of your profile photo (upload coming soon)",
     "adminOnly": "Contact your institute admin to change this field"
   },
   "fieldHelp": {
@@ -45,8 +43,7 @@
   "errors": {
     "loadFailed": "Could not load your profile",
     "updateFailed": "Could not update your profile",
-    "phoneInvalid": "Enter a valid 10-digit Indian mobile number",
-    "urlInvalid": "Enter a valid URL"
+    "phoneInvalid": "Enter a valid 10-digit Indian mobile number"
   },
   "staffSection": {
     "title": "Employment details",

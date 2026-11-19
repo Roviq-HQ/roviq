@@ -111,7 +111,7 @@ export class ResellerUserService {
             createdAt: usersLive.createdAt,
             firstName: userProfilesLive.firstName,
             lastName: userProfilesLive.lastName,
-            profileImageUrl: userProfilesLive.profileImageUrl,
+            profileImageFileId: userProfilesLive.profileImageFileId,
           })
           .from(usersLive)
           .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
@@ -164,7 +164,7 @@ export class ResellerUserService {
               ? {
                   firstName: row.firstName,
                   lastName: row.lastName,
-                  profileImageUrl: row.profileImageUrl,
+                  profileImageFileId: row.profileImageFileId,
                 }
               : null,
             memberships: userMemberships.map((m) => ({

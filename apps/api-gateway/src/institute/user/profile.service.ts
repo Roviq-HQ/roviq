@@ -103,7 +103,7 @@ export class ProfileService {
       dateOfBirth: profile.dateOfBirth,
       bloodGroup: profile.bloodGroup,
       nationality: profile.nationality,
-      profileImageUrl: profile.profileImageUrl,
+      profileImageFileId: profile.profileImageFileId,
     };
 
     // ── Student profile ────────────────────────────────
@@ -232,7 +232,6 @@ export class ProfileService {
       const rows = await tx
         .update(userProfiles)
         .set({
-          ...(input.profileImageUrl != null && { profileImageUrl: input.profileImageUrl }),
           ...(input.nationality != null && { nationality: input.nationality }),
           ...(input.religion != null && { religion: input.religion }),
           ...(input.motherTongue != null && { motherTongue: input.motherTongue }),

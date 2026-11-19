@@ -10,6 +10,8 @@ export abstract class FileRepository {
   abstract findClaimable(ids: string[], purpose: FilePurpose): Promise<FileRecord[]>;
   abstract countPendingByCurrentUser(): Promise<number>;
   abstract markRejected(id: string): Promise<void>;
+  /** Whether the user has a membership in the caller's institute. */
+  abstract isMemberOfCurrentTenant(userId: string): Promise<boolean>;
   /** Records the stored sizes of a pending image; it is WebP from then on. */
   abstract saveProcessedImage(id: string, image: ProcessedImageData): Promise<void>;
   /** Null when the file is not attached to a live leave. */

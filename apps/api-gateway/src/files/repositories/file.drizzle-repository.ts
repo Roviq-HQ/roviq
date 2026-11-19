@@ -7,6 +7,7 @@ import {
   filesLive,
   leaveFilesLive,
   leavesLive,
+  membershipsLive,
   mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
@@ -61,7 +62,8 @@ export class FileDrizzleRepository extends FileRepository {
           ...data,
           id,
           objectKey: data.objectKey(id),
-          tenantId,
+          // A person's file has no institute; RLS only lets it in for a member of this one.
+          tenantId: data.subjectUserId ? null : tenantId,
           uploadedBy: userId,
           createdBy: userId,
           updatedBy: userId,
@@ -135,6 +137,18 @@ export class FileDrizzleRepository extends FileRepository {
         .update(files)
         .set({ ...image, contentType: 'image/webp', updatedBy: userId })
         .where(and(eq(files.id, id), eq(files.status, 'PENDING'), isNull(files.deletedAt)));
+    });
+  }
+
+  async isMemberOfCurrentTenant(userId: string): Promise<boolean> {
+    const { tenantId } = this.context();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+      const rows = await tx
+        .select({ id: membershipsLive.id })
+        .from(membershipsLive)
+        .where(eq(membershipsLive.userId, userId))
+        .limit(1);
+      return rows.length > 0;
     });
   }
 

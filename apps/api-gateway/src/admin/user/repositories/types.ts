@@ -25,7 +25,7 @@ export interface AdminUserListQuery {
 export interface AdminUserProfileRecord {
   firstName: I18nContent;
   lastName: I18nContent | null;
-  profileImageUrl: string | null;
+  profileImageFileId: string | null;
 }
 
 export interface AdminUserPhoneRecord {

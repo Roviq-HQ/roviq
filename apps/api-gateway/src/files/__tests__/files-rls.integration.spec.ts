@@ -44,6 +44,7 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
   let tenantA: TestInstitute;
   let tenantB: TestInstitute;
   let fileA: string;
+  const userLevelFileIds: string[] = [];
 
   function fileValues(tenantId: string, uploadedBy: string) {
     return {
@@ -109,6 +110,9 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
       await tx.delete(leaveFiles).where(inArray(leaveFiles.tenantId, tenantIds));
       await tx.delete(leaves).where(inArray(leaves.tenantId, tenantIds));
       await tx.delete(files).where(inArray(files.tenantId, tenantIds));
+      if (userLevelFileIds.length > 0) {
+        await tx.delete(files).where(inArray(files.id, userLevelFileIds));
+      }
     });
     await cleanupTestInstitute(db, tenantA);
     await cleanupTestInstitute(db, tenantB);
@@ -269,6 +273,103 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
             fileIds: [fileA],
             purpose: 'LEAVE_ATTACHMENT',
             userId: tenantA.userId,
+          }),
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.FILE_NOT_FOUND });
+    });
+  });
+
+  describe('files that belong to a person (profile pictures)', () => {
+    function photoValues(subjectUserId: string, uploadedBy: string) {
+      return {
+        subjectUserId,
+        visibility: 'PRIVATE' as const,
+        purpose: 'PROFILE_PHOTO' as const,
+        objectKey: `users/${subjectUserId}/profile-photo/${randomUUID()}.jpg`,
+        originalName: 'me.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 2048,
+        uploadedBy,
+        createdBy: uploadedBy,
+        updatedBy: uploadedBy,
+      };
+    }
+
+    async function insertPhoto(tenant: TestInstitute, subjectUserId: string): Promise<string> {
+      return withTenant(db, mkInstituteCtx(tenant.tenantId, ORIGIN), async (tx) => {
+        const [row] = await tx
+          .insert(files)
+          .values(photoValues(subjectUserId, tenant.userId))
+          .returning({ id: files.id });
+        assert(row);
+        userLevelFileIds.push(row.id);
+        return row.id;
+      });
+    }
+
+    it('should let an institute store and read a picture of its own member', async () => {
+      const photoId = await insertPhoto(tenantA, tenantA.userId);
+
+      const rows = await withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
+        tx.select({ id: files.id }).from(files).where(eq(files.id, photoId)),
+      );
+
+      expect(rows).toEqual([{ id: photoId }]);
+    });
+
+    it('should hide the picture from an institute the person is not a member of', async () => {
+      const photoId = await insertPhoto(tenantA, tenantA.userId);
+
+      const rows = await withTenant(db, mkInstituteCtx(tenantB.tenantId, ORIGIN), (tx) =>
+        tx.select({ id: files.id }).from(files).where(eq(files.id, photoId)),
+      );
+
+      expect(rows).toEqual([]);
+    });
+
+    it('should refuse an institute storing a picture of someone who is not its member', async () => {
+      await expect(
+        withTenant(db, mkInstituteCtx(tenantB.tenantId, ORIGIN), (tx) =>
+          tx.insert(files).values(photoValues(tenantA.userId, tenantB.userId)),
+        ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
+    });
+
+    it("should not let a non-member institute change the picture's row", async () => {
+      const photoId = await insertPhoto(tenantA, tenantA.userId);
+
+      const updated = await withTenant(db, mkInstituteCtx(tenantB.tenantId, ORIGIN), (tx) =>
+        tx
+          .update(files)
+          .set({ status: 'DELETED', updatedBy: tenantB.userId })
+          .where(eq(files.id, photoId))
+          .returning({ id: files.id }),
+      );
+
+      expect(updated).toEqual([]);
+    });
+
+    it("should show the picture to the reseller of the member's institute only", async () => {
+      const photoId = await insertPhoto(tenantA, tenantA.userId);
+      const read = (reseller: TestReseller) =>
+        withReseller(db, mkResellerCtx(reseller.resellerId, ORIGIN), (tx) =>
+          tx.select({ id: files.id }).from(files).where(eq(files.id, photoId)),
+        );
+
+      expect(await read(owningReseller)).toEqual([{ id: photoId }]);
+      expect(await read(otherReseller)).toEqual([]);
+    });
+
+    it('should refuse attaching a picture to a different person than it was uploaded for', async () => {
+      const photoId = await insertPhoto(tenantA, tenantA.userId);
+
+      await expect(
+        withAdmin(db, mkAdminCtx(ORIGIN), (tx) =>
+          markFilesReady(tx, {
+            fileIds: [photoId],
+            purpose: 'PROFILE_PHOTO',
+            userId: tenantA.userId,
+            subjectUserId: tenantB.userId,
           }),
         ),
       ).rejects.toMatchObject({ code: ErrorCode.FILE_NOT_FOUND });

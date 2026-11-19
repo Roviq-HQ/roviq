@@ -88,7 +88,7 @@ export class GuardianService {
       // user_profile join
       firstName: userProfilesLive.firstName,
       lastName: userProfilesLive.lastName,
-      profileImageUrl: userProfilesLive.profileImageUrl,
+      profileImageFileId: userProfilesLive.profileImageFileId,
       gender: userProfilesLive.gender,
       // phone_numbers join (primary phone only)
       primaryPhone: phoneNumbersLive.number,

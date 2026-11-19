@@ -8,7 +8,13 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
  */
 export async function markFilesReady(
   tx: DrizzleDB,
-  params: { fileIds: string[]; purpose: FilePurpose; userId: string },
+  params: {
+    fileIds: string[];
+    purpose: FilePurpose;
+    userId: string;
+    /** For a person's file: the person it must be about, so one cannot be attached to another. */
+    subjectUserId?: string;
+  },
 ): Promise<void> {
   if (params.fileIds.length === 0) return;
   const rows = await tx
@@ -21,6 +27,7 @@ export async function markFilesReady(
         eq(files.status, 'PENDING'),
         eq(files.purpose, params.purpose),
         eq(files.uploadedBy, params.userId),
+        params.subjectUserId ? eq(files.subjectUserId, params.subjectUserId) : undefined,
         isNull(files.deletedAt),
       ),
     )

@@ -83,6 +83,7 @@ import { useStore } from '@tanstack/react-form';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
+import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
 import { useDebouncedValue } from '@web/hooks/use-debounced-value';
 import { useFormDraft } from '@web/hooks/use-form-draft';
 import { parseISO } from 'date-fns';
@@ -468,11 +469,22 @@ function StudentSidebar({ student }: { student: StudentDetailNode }) {
       <CardContent className="pt-6 space-y-4">
         <div className="flex flex-col items-center text-center space-y-3">
           <Avatar className="size-24">
-            {student.profileImageUrl ? (
-              <AvatarImage src={student.profileImageUrl} alt={fullName} />
+            {student.profileImage?.url ? (
+              <AvatarImage src={student.profileImage?.url} alt={fullName} />
             ) : null}
             <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
           </Avatar>
+          {student.userId ? (
+            <Can I="update" a="Student">
+              <ProfilePhotoButton
+                kind="student"
+                profileId={student.id}
+                userId={student.userId}
+                name={fullName}
+                hasPhoto={Boolean(student.profileImage)}
+              />
+            </Can>
+          ) : null}
           <div className="space-y-1">
             <p className="font-semibold leading-tight">{fullName}</p>
             <p className="text-xs font-mono text-muted-foreground">{student.admissionNumber}</p>
