@@ -26,10 +26,20 @@ export interface ImageStoragePolicy {
   square: boolean;
   /** Long side of the FULL size, in pixels. */
   fullPx: number;
+  /**
+   * Give SM and MD links that stay the same for hours, so lists of them load from the browser
+   * cache. A leaked link then works for hours too: only for pictures shown widely anyway
+   * (avatars), never for scans of documents.
+   */
+  cacheableThumbnails: boolean;
 }
 
-/** Scans of documents: shape kept, large enough to read small print. */
-const DOCUMENT_IMAGE: ImageStoragePolicy = { square: false, fullPx: 2560 };
+/** Scans of documents: shape kept, large enough to read small print, short-lived links only. */
+const DOCUMENT_IMAGE: ImageStoragePolicy = {
+  square: false,
+  fullPx: 2560,
+  cacheableThumbnails: false,
+};
 
 /** Long side of the SM and MD sizes, in pixels; FULL comes from the purpose. */
 export const IMAGE_VARIANT_PX: { readonly [V in Exclude<ImageVariant, 'FULL'>]: number } = {

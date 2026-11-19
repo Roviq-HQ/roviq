@@ -301,7 +301,9 @@ describe('File storage E2E', () => {
       ] as const) {
         const response = await fetch(url);
         expect(response.status, size).toBe(200);
-        expect(response.headers.get('cache-control'), size).toBe('max-age=31536000, immutable');
+        expect(response.headers.get('cache-control'), size).toBe(
+          'private, max-age=43200, immutable',
+        );
         const meta = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
         expect(meta.format, size).toBe('webp');
         expect([meta.width, meta.height], size).toEqual(expected[size]);
@@ -309,7 +311,7 @@ describe('File storage E2E', () => {
       }
     });
 
-    it('should return the same thumbnail link on a later request, so browsers can cache it', async () => {
+    it('should keep the thumbnail link of a document scan short-lived', async () => {
       const res = await gql<{ leave: { files: { id: string; sm: string }[] } }>(
         LEAVE_IMAGE_LINKS,
         { id: imageLeaveId },
@@ -317,7 +319,10 @@ describe('File storage E2E', () => {
       );
 
       expect(res.errors).toBeUndefined();
-      expect(res.data?.leave.files[0]?.sm).toBe(image.sm);
+      const link = res.data?.leave.files[0]?.sm;
+      assert(link && image.sm);
+      // Ten minutes, like any other private link: scans are not given cacheable links.
+      expect(new URL(link).searchParams.get('X-Amz-Expires')).toBe('600');
     });
 
     it('should refuse a file that claims to be a JPEG and is not an image', async () => {

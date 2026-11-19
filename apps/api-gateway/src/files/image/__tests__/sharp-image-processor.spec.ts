@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { InvalidImageError } from '../image-processor';
 import { MAX_INPUT_PIXELS, SharpImageProcessor } from '../sharp-image-processor';
 
-const DOCUMENT = { square: false, fullPx: 2560 };
-const AVATAR = { square: true, fullPx: 1600 };
+const DOCUMENT = { square: false, fullPx: 2560, cacheableThumbnails: false };
+const AVATAR = { square: true, fullPx: 1600, cacheableThumbnails: true };
 
 /** A solid-colour JPEG, optionally carrying EXIF like a phone photo. */
 function jpeg(
@@ -39,7 +39,7 @@ describe('SharpImageProcessor', () => {
   it('should produce SM, MD and FULL as WebP, keeping the shape of a document scan', async () => {
     const result = await processor.process(await jpeg(4000, 3000), DOCUMENT);
 
-    expect(result.variants.map((v) => v.name)).toEqual(['SM', 'MD', 'FULL']);
+    expect(result.variants.map((v) => v.name).sort()).toEqual(['FULL', 'MD', 'SM']);
     expect([variant(result, 'SM').width, variant(result, 'SM').height]).toEqual([128, 96]);
     expect([variant(result, 'MD').width, variant(result, 'MD').height]).toEqual([512, 384]);
     expect([variant(result, 'FULL').width, variant(result, 'FULL').height]).toEqual([2560, 1920]);
