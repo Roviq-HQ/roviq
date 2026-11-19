@@ -3,7 +3,7 @@
  *
  * Orchestrates institute provisioning after creation/approval:
  *   Phase 1: Identity (sequential) — admin role, membership, system role
- *   Phase 2: Infrastructure (parallel) — storage, wallets, default roles
+ *   Phase 2: Infrastructure (parallel) — wallets, default roles
  *   Phase 3: Academic Structure (parallel per department) — standards, sections, subjects
  *   Phase 4: Configuration (parallel) — notifications, strength norms, first academic year
  *   Phase 5: Demo Data (conditional) — only if isDemo=true
@@ -78,7 +78,6 @@ export async function InstituteSetupWorkflow(
   });
 
   await Promise.all([
-    activities.createStorageBucket(instituteId),
     activities.createWallets(instituteId),
     activities.createDefaultRoles(instituteId, creatingUserId),
   ]);

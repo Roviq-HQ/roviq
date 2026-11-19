@@ -17,6 +17,28 @@ const envSchema = z.looseObject({
     error: 'NATS_URL — NATS server URL for event streaming (e.g. nats://localhost:4222)',
   }),
 
+  // Object storage (S3-compatible)
+  S3_ENDPOINT: z.url({
+    error: 'S3_ENDPOINT — object storage endpoint the server uses (e.g. http://localhost:9002)',
+  }),
+  S3_PUBLIC_ENDPOINT: z.url({
+    error:
+      'S3_PUBLIC_ENDPOINT — object storage endpoint the browser can reach; presigned URLs are signed for it',
+  }),
+  S3_REGION: z.string({ error: 'S3_REGION — object storage region (e.g. us-east-1)' }),
+  S3_ACCESS_KEY: z.string({ error: 'S3_ACCESS_KEY — object storage access key' }),
+  S3_SECRET_KEY: z.string({ error: 'S3_SECRET_KEY — object storage secret key' }),
+  S3_BUCKET_PRIVATE: z.string({
+    error: 'S3_BUCKET_PRIVATE — bucket for files served through signed URLs (e.g. roviq-private)',
+  }),
+  S3_BUCKET_PUBLIC: z.string({
+    error: 'S3_BUCKET_PUBLIC — bucket for files readable without sign-in (e.g. roviq-public)',
+  }),
+  S3_PUBLIC_BASE_URL: z.url({
+    error:
+      'S3_PUBLIC_BASE_URL — stable base URL of the public bucket (e.g. http://localhost:9002/roviq-public)',
+  }),
+
   // JWT
   JWT_SECRET: z.string({
     error: 'JWT_SECRET — signing key for access tokens',

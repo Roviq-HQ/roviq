@@ -241,23 +241,28 @@ function LeaveDetailCard({ leave }: { leave: LeaveRecord }) {
           testId="leave-detail-dates"
         />
         <DetailRow label={t('detail.reason')} value={leave.reason} testId="leave-detail-reason" />
-        {leave.fileUrls.length > 0 ? (
+        {leave.files.length > 0 ? (
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">{t('fields.fileUrls')}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t('fields.files')}</p>
             <ul
-              className="list-disc pl-5 space-y-0.5 text-sm"
-              data-testid={instituteLeave.detailFileUrls}
+              className="list-disc ps-5 space-y-0.5 text-sm"
+              data-testid={instituteLeave.detailFiles}
             >
-              {leave.fileUrls.map((url) => (
-                <li key={url}>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-primary underline-offset-4 hover:underline break-all"
-                  >
-                    {url}
-                  </a>
+              {leave.files.map((file) => (
+                <li key={file.id}>
+                  {file.url ? (
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-primary underline-offset-4 hover:underline break-all"
+                      data-testid={instituteLeave.detailFile(file.id)}
+                    >
+                      {file.name}
+                    </a>
+                  ) : (
+                    <span data-testid={instituteLeave.detailFile(file.id)}>{file.name}</span>
+                  )}
                 </li>
               ))}
             </ul>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@roviq/auth';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField, useRouter, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -13,7 +13,6 @@ import {
   CommandItem,
   CommandList,
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -23,6 +22,8 @@ import {
   useAppForm,
   useDebounce,
 } from '@roviq/ui';
+import { FileUpload } from '@web/components/file-upload/file-upload';
+import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload';
 import { ArrowLeft, Check, ChevronsUpDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -34,6 +35,7 @@ import { LEAVE_TYPE_VALUES, type LeaveType, useApplyLeave } from '../use-leave';
 const { instituteLeave } = testIds;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const REASON_MAX = 1000;
+const MAX_LEAVE_FILES = 10;
 
 interface ApplyLeaveFormValues {
   userId: string;
@@ -41,7 +43,7 @@ interface ApplyLeaveFormValues {
   startDate: string;
   endDate: string;
   reason: string;
-  fileUrlsText: string;
+  fileIds: string[];
 }
 
 const EMPTY_FORM: ApplyLeaveFormValues = {
@@ -50,15 +52,8 @@ const EMPTY_FORM: ApplyLeaveFormValues = {
   startDate: '',
   endDate: '',
   reason: '',
-  fileUrlsText: '',
+  fileIds: [],
 };
-
-function parseFileUrls(text: string): string[] {
-  return text
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
 
 function daysBetween(start: string, end: string): number {
   // Inclusive day span — a 1-day leave has start===end and spans 1 day.
@@ -78,7 +73,7 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
       startDate: z.string().regex(ISO_DATE_REGEX, t('fields.startDate')),
       endDate: z.string().regex(ISO_DATE_REGEX, t('fields.endDate')),
       reason: z.string().trim().min(1, t('fields.reason')).max(REASON_MAX),
-      fileUrlsText: z.string(),
+      fileIds: z.array(z.string()),
     })
     .refine((d) => d.startDate <= d.endDate, {
       path: ['endDate'],
@@ -88,10 +83,10 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
       (d) => {
         const days = daysBetween(d.startDate, d.endDate);
         if (days <= 2) return true;
-        return parseFileUrls(d.fileUrlsText).length >= 1;
+        return d.fileIds.length >= 1;
       },
       {
-        path: ['fileUrlsText'],
+        path: ['fileIds'],
         message: t('errors.FILES_REQUIRED_GT2_DAYS'),
       },
     );
@@ -99,8 +94,10 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
 
 export default function ApplyLeavePage() {
   const t = useTranslations('leave');
+  const tFiles = useTranslations('fileUpload');
   const router = useRouter();
   const { user } = useAuth();
+  const [uploading, setUploading] = React.useState(false);
   const { apply } = useApplyLeave();
 
   const schema = React.useMemo(() => buildSchema(t), [t]);
@@ -122,12 +119,17 @@ export default function ApplyLeavePage() {
           startDate: parsed.startDate,
           endDate: parsed.endDate,
           reason: parsed.reason,
-          fileUrls: parseFileUrls(parsed.fileUrlsText),
+          fileIds: parsed.fileIds,
         });
         toast.success(t('apply.cta'));
         router.push('/institute/leave');
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('apply.cta')));
+        const fileError = fileUploadErrorKey(extractGraphQLErrorCode(err));
+        toast.error(
+          fileError
+            ? tFiles(`errors.${fileError}`, { count: MAX_LEAVE_FILES })
+            : extractGraphQLError(err, t('apply.cta')),
+        );
       }
     },
   });
@@ -231,23 +233,22 @@ export default function ApplyLeavePage() {
                   )}
                 </form.AppField>
 
-                <form.AppField name="fileUrlsText">
+                <form.Field name="fileIds">
                   {(field) => (
-                    <field.TextField
-                      label={t('fields.fileUrls')}
-                      description={t('fields.fileUrlsHint')}
-                      placeholder="https://…, https://…"
-                      testId="leave-apply-file-urls"
+                    <FileUpload
+                      name="leave-apply"
+                      purpose="LEAVE_ATTACHMENT"
+                      label={t('fields.files')}
+                      description={t('fields.filesHint')}
+                      maxFiles={MAX_LEAVE_FILES}
+                      onChange={(fileIds) => field.handleChange(fileIds)}
+                      onBusyChange={setUploading}
+                      // Not gated on "touched": nothing but a rule about the dates makes this
+                      // field invalid, and without the message the disabled Submit is unexplained.
+                      error={collectMessages(field.state.meta.errors)[0]}
                     />
                   )}
-                </form.AppField>
-                {/* TODO(leave-upload): swap the comma-separated text input
-                    for a real file picker that uploads to MinIO/S3 and
-                    returns object URLs, matching the pattern used by
-                    `uploadStudentDocument`. */}
-                <FieldDescription className="text-xs">
-                  {/* extra hint rendered beside the text input */}
-                </FieldDescription>
+                </form.Field>
               </FieldGroup>
 
               <div className="flex items-center justify-end gap-2">
@@ -263,6 +264,7 @@ export default function ApplyLeavePage() {
                   <form.SubmitButton
                     testId="leave-apply-submit-btn"
                     submittingLabel={t('apply.submitting')}
+                    disabled={uploading}
                   >
                     {t('apply.cta')}
                   </form.SubmitButton>

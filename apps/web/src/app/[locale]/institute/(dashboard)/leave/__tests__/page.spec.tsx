@@ -62,7 +62,7 @@ interface LeaveFixture {
   type: 'MEDICAL' | 'CASUAL' | 'BEREAVEMENT' | 'EXAM' | 'OTHER';
   reason: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-  fileUrls: string[];
+  files: { id: string; name: string; contentType: string; sizeBytes: number; url: string | null }[];
   decidedBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -112,7 +112,7 @@ describe('LeavesPage', () => {
         type: 'CASUAL',
         reason: 'Family function',
         status: 'PENDING',
-        fileUrls: [],
+        files: [],
         decidedBy: null,
         createdAt: '2026-04-01T00:00:00Z',
         updatedAt: '2026-04-01T00:00:00Z',
@@ -125,7 +125,7 @@ describe('LeavesPage', () => {
         type: 'MEDICAL',
         reason: 'Sick leave',
         status: 'APPROVED',
-        fileUrls: [],
+        files: [],
         decidedBy: 'mem-1',
         createdAt: '2026-04-02T00:00:00Z',
         updatedAt: '2026-04-02T00:00:00Z',

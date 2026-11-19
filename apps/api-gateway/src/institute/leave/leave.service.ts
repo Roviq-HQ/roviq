@@ -11,18 +11,21 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
+import { FileService } from '../../files/file.service';
 import type { CreateLeaveInput } from './dto/create-leave.input';
 import type { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveRepository } from './repositories/leave.repository';
 import type { LeaveRecord } from './repositories/types';
 
 const MIN_DOCUMENTED_DAYS = 3;
+const LEAVE_FILE_PURPOSE = 'LEAVE_ATTACHMENT';
 
 @Injectable()
 export class LeaveService {
   constructor(
     private readonly repo: LeaveRepository,
     private readonly eventBus: EventBusService,
+    private readonly files: FileService,
   ) {}
 
   private get tenantId(): string {
@@ -49,10 +52,10 @@ export class LeaveService {
 
   async apply(input: CreateLeaveInput): Promise<LeaveRecord> {
     this.assertValidRange(input.startDate, input.endDate);
-    const files = input.fileUrls ?? [];
+    const fileIds = [...new Set(input.fileIds ?? [])];
     if (
       calendarDaysBetween(input.startDate, input.endDate) >= MIN_DOCUMENTED_DAYS &&
-      files.length === 0
+      fileIds.length === 0
     ) {
       throw new BusinessException(
         ErrorCode.LEAVE_DOCUMENT_REQUIRED,
@@ -60,13 +63,15 @@ export class LeaveService {
       );
     }
 
+    await this.files.verifyUploads(fileIds, LEAVE_FILE_PURPOSE);
+
     const record = await this.repo.create({
       userId: input.userId,
       startDate: input.startDate,
       endDate: input.endDate,
       type: input.type,
       reason: input.reason,
-      fileUrls: files,
+      fileIds,
     });
 
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.applied, {
@@ -95,7 +100,22 @@ export class LeaveService {
     const end = input.endDate ?? existing.endDate;
     this.assertValidRange(start, end);
 
-    const record = await this.repo.update(id, input);
+    const fileIds = input.fileIds ? [...new Set(input.fileIds)] : undefined;
+    if (fileIds) {
+      const attached = new Set(existing.files.map((file) => file.id));
+      await this.files.verifyUploads(
+        fileIds.filter((fileId) => !attached.has(fileId)),
+        LEAVE_FILE_PURPOSE,
+      );
+    }
+
+    const record = await this.repo.update(id, {
+      startDate: input.startDate,
+      endDate: input.endDate,
+      type: input.type,
+      reason: input.reason,
+      fileIds,
+    });
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.updated, {
       leaveId: record.id,
       tenantId: record.tenantId,

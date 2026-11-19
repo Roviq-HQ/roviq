@@ -27,6 +27,8 @@ export * from './reseller/reseller-memberships';
 export * from './reseller/resellers';
 // Sequences
 export * from './sequences/tenant-sequences';
+// Storage
+export * from './storage/files';
 export * from './tenant/academic-years';
 export * from './tenant/attendance/attendance-entries';
 export * from './tenant/attendance/attendance-sessions';
@@ -53,6 +55,7 @@ export * from './tenant/institute-groups';
 export * from './tenant/institute-identifiers';
 // Tenant
 export * from './tenant/institutes';
+export * from './tenant/leave-files';
 export * from './tenant/leaves';
 export * from './tenant/memberships';
 export * from './tenant/roles';

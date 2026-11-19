@@ -69,7 +69,6 @@ export interface InstituteSetupActivities {
   setInstituteRepresentative(instituteId: string, creatingUserId: string): Promise<void>;
 
   // Phase 2: Infrastructure
-  createStorageBucket(instituteId: string): Promise<void>;
   createWallets(instituteId: string): Promise<void>;
   createDefaultRoles(instituteId: string, creatingUserId: string): Promise<void>;
 

@@ -177,6 +177,7 @@ Full rationale + enforcing CI gate for each line: `docs/references/mistake-refer
 - Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`
 - Seed credentials/names only from `e2e/shared/seed-fixtures.ts`
 - Errors: `BusinessException(ErrorCode.X, …)` on the backend; frontend branches on `extensions.code` (`isAppError`, `extractGraphQLErrorCode`) and shows translated copy — never `err.message`
+- Files: reference `files.id` and return `FileRef`; upload with `<FileUpload>`, attach with `FileService.verifyUploads` + `markFilesReady(tx, …)`; never a URL column, a typed-in URL or a raw S3 call
 - `REDIS_KEYS` constants · new `@roviq/*` lib → add vitest alias in `apps/api-gateway/vitest.config.ts` · impersonation tokens never refresh
 - Save test/build output to a temp file and grep it — don't re-run · e2e DB is `roviq_test` · verify docs/assertions against source, not memory
 - Security rules live in PostgreSQL where possible (GRANT, RLS, CHECK, trigger), not only in services; test by attempting the forbidden write as the role

@@ -10,6 +10,7 @@ import { EeModule } from '@roviq/ee-gateway';
 import { EventBusModule } from '@roviq/event-bus';
 import { DateOnlyScalar, DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import { REDIS_CLIENT, RedisModule } from '@roviq/redis';
+import { StorageModule } from '@roviq/storage';
 import { TelemetryModule } from '@roviq/telemetry';
 import type Redis from 'ioredis';
 import { AdminModule } from '../admin/admin.module';
@@ -50,6 +51,7 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate }),
     RedisModule,
+    StorageModule,
     NatsJetStreamModule,
     EventBusModule,
     TelemetryModule,

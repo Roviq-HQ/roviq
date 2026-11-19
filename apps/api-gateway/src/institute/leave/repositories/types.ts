@@ -1,4 +1,5 @@
 import type { LeaveStatus, LeaveType } from '@roviq/common-types';
+import type { FileRecord } from '../../../files/repositories/types';
 
 export interface LeaveRecord {
   id: string;
@@ -9,7 +10,8 @@ export interface LeaveRecord {
   type: LeaveType;
   reason: string;
   status: LeaveStatus;
-  fileUrls: string[];
+  /** Supporting documents, oldest first. */
+  files: FileRecord[];
   decidedBy: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -21,7 +23,8 @@ export interface CreateLeaveData {
   endDate: string;
   type: LeaveType;
   reason: string;
-  fileUrls?: string[];
+  /** Verified uploads to attach (see FileService.verifyUploads). */
+  fileIds: string[];
 }
 
 export interface UpdateLeaveData {
@@ -29,7 +32,8 @@ export interface UpdateLeaveData {
   endDate?: string;
   type?: LeaveType;
   reason?: string;
-  fileUrls?: string[];
+  /** Full new set of attachments. Omitted: attachments stay as they are. */
+  fileIds?: string[];
 }
 
 export interface LeaveListQuery {

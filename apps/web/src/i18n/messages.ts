@@ -20,6 +20,7 @@ import enDeletedRecords from '../../messages/en/deletedRecords.json';
 import enDlq from '../../messages/en/dlq.json';
 import enError from '../../messages/en/error.json';
 import enExaminations from '../../messages/en/examinations.json';
+import enFileUpload from '../../messages/en/fileUpload.json';
 import enGeography from '../../messages/en/geography.json';
 import enGroups from '../../messages/en/groups.json';
 import enGuardians from '../../messages/en/guardians.json';
@@ -66,6 +67,7 @@ import hiDeletedRecords from '../../messages/hi/deletedRecords.json';
 import hiDlq from '../../messages/hi/dlq.json';
 import hiError from '../../messages/hi/error.json';
 import hiExaminations from '../../messages/hi/examinations.json';
+import hiFileUpload from '../../messages/hi/fileUpload.json';
 import hiGeography from '../../messages/hi/geography.json';
 import hiGroups from '../../messages/hi/groups.json';
 import hiGuardians from '../../messages/hi/guardians.json';
@@ -115,6 +117,7 @@ const en = {
   dlq: enDlq,
   error: enError,
   examinations: enExaminations,
+  fileUpload: enFileUpload,
   geography: enGeography,
   groups: enGroups,
   guardians: enGuardians,
@@ -164,6 +167,7 @@ const hi = {
   dlq: hiDlq,
   error: hiError,
   examinations: hiExaminations,
+  fileUpload: hiFileUpload,
   geography: hiGeography,
   groups: hiGroups,
   guardians: hiGuardians,

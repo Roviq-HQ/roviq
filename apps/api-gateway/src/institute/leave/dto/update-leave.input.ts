@@ -1,4 +1,4 @@
-import { Field, InputType } from '@nestjs/graphql';
+import { Field, ID, InputType } from '@nestjs/graphql';
 import { LeaveType } from '@roviq/common-types';
 import {
   ArrayMaxSize,
@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator';
 
@@ -36,7 +37,11 @@ export class UpdateLeaveInput {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(10)
-  @IsString({ each: true })
-  @Field(() => [String], { nullable: true })
-  fileUrls?: string[];
+  @IsUUID(undefined, { each: true })
+  @Field(() => [ID], {
+    nullable: true,
+    description:
+      'Full new set of attachments: ids already attached stay, missing ones are removed, new ones (uploaded with purpose LEAVE_ATTACHMENT) are added. Omit to leave attachments unchanged.',
+  })
+  fileIds?: string[];
 }

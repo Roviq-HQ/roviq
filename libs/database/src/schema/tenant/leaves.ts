@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { date, foreignKey, index, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { date, foreignKey, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { tenantColumns } from '../common/columns';
 import { leaveStatus, leaveType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
@@ -28,11 +28,6 @@ export const leaves = pgTable(
     type: leaveType('type').notNull(),
     reason: text('reason').notNull(),
     status: leaveStatus('status').default('PENDING').notNull(),
-    /**
-     * Array of uploaded supporting-document URLs (e.g. medical certificates).
-     * Stored as JSONB for easy extension; empty array when none provided.
-     */
-    fileUrls: jsonb('file_urls').$type<string[]>().default([]).notNull(),
     /** Membership who approved / rejected. Null until a decision is taken. */
     decidedBy: uuid('decided_by').references(() => memberships.id, {
       onDelete: 'set null',

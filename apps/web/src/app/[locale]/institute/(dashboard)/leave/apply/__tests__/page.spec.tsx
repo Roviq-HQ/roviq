@@ -127,7 +127,7 @@ describe('ApplyLeavePage', () => {
     expect(screen.getByTestId('leave-apply-start-date')).toBeInTheDocument();
     expect(screen.getByTestId('leave-apply-end-date')).toBeInTheDocument();
     expect(screen.getByTestId('leave-apply-reason')).toBeInTheDocument();
-    expect(screen.getByTestId('leave-apply-file-urls')).toBeInTheDocument();
+    expect(screen.getByTestId('file-upload-leave-apply-choose-btn')).toBeInTheDocument();
     expect(screen.getByTestId('leave-apply-submit-btn')).toBeInTheDocument();
   });
 
@@ -178,26 +178,14 @@ describe('ApplyLeavePage', () => {
     await user.type(screen.getByTestId('leave-apply-end-date'), '2026-04-13');
     await user.type(screen.getByTestId('leave-apply-reason'), 'Wedding');
 
-    // Touch the file-URLs field so `fieldErrorMessages()` surfaces errors
-    // for it (it filters out pristine fields). Typing then clearing leaves
-    // the value empty but the field marked touched.
-    const filesInput = screen.getByTestId('leave-apply-file-urls') as HTMLInputElement;
-    await user.click(filesInput);
-    filesInput.blur();
-
-    await user.click(screen.getByTestId('leave-apply-submit-btn'));
-
-    // The refine message renders as the file-URLs field error. Scope the
-    // query to the file-URLs field's surrounding <Field> so we don't match
-    // the label/help copy that happens to contain the same phrase.
-    const filesField = screen.getByTestId('leave-apply-file-urls').closest('[data-slot="field"]');
-    expect(filesField).not.toBeNull();
+    // The message shows as soon as the dates need a document: the upload field cannot be
+    // "touched" without picking a file, so it must not wait for that.
     await waitFor(() => {
-      if (!filesField) throw new Error('files field container missing');
-      expect(filesField.textContent).toContain(
+      expect(screen.getByTestId('file-upload-leave-apply')).toHaveTextContent(
         'Leaves longer than 2 days require at least one supporting document.',
       );
     });
+    expect(screen.getByTestId('leave-apply-submit-btn')).toBeDisabled();
     expect(applyMock).not.toHaveBeenCalled();
   });
 

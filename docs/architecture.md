@@ -231,6 +231,27 @@ See `docs/features/timetable.md` for the timetable feature — the 5-table norma
 
 See `docs/features/examinations.md` for the offline-examination feature — the 12-table model (grade schemes + bands, exam terms, exams, datesheet, marks, NEP subject topics + topic assessments, co-scholastic areas + assessments, report-card templates + per-student instances), the `EXAM` / `REPORT_CARD` state machines, pure grading/aggregation math (weighted term percentage, GPA, dense ranking), the GraphQL surface with granular CASL, and the server-rendered report-card PDF.
 
+## File storage
+
+Every stored file is a row in `files` plus an object in S3-compatible storage. Domain tables
+reference `files.id`; no table stores a URL. Design and remaining work: Linear ROV-210.
+
+| Topic | Decision |
+|---|---|
+| Buckets | Two, split by visibility: `S3_BUCKET_PRIVATE` and `S3_BUCKET_PUBLIC`. Owners are key prefixes (`institutes/{tenantId}/{purpose}/{fileId}.{ext}`), never separate buckets. |
+| Tenant isolation | RLS on `files` (`filePolicies`). Nobody gets storage credentials; the gateway signs a URL for one exact key after reading the row under RLS. |
+| What a purpose allows | `FILE_PURPOSE_POLICY` in `@roviq/common-types`: allowed types, size limit, visibility, sensitivity, and the abilities needed to upload and to download. Adding a file feature starts with a new `FilePurpose`. |
+| Upload | `requestFileUpload` inserts a `PENDING` row and returns a presigned PUT (5 minutes). Content type and exact size are signed, so storage itself rejects a different body. The browser uploads straight to storage. |
+| Attach | The mutation that owns the record takes `fileIds`. Its service calls `FileService.verifyUploads` (object exists, size matches, leading bytes match the type), then its repository calls `markFilesReady(tx, …)` inside the transaction that saves the record. A file is `READY` only together with that record. |
+| Download | GraphQL returns `FileRef { id name contentType sizeBytes url }`. `url` is signed when the response is built (10 minutes) and is null for sensitive purposes, which use the `fileDownloadUrl` mutation instead (60 seconds, audited like every mutation). |
+| Delete | `markFilesDeleted(tx, …)` in the same transaction that detaches the file. The object stays until a sweeper purges it (ROV-300). |
+| Client library | `@roviq/storage` wraps `@aws-sdk/client-s3`. Application code never calls S3 directly and uses nothing MinIO-specific. `FakeStorageClient` is the in-memory version for unit tests. |
+
+Status flow: `PENDING` → `READY` → `DELETED`, or `PENDING` → `REJECTED` when verification fails
+(`FILE_STATE_MACHINE`).
+
+Frontend: `<FileUpload>` and `useFileUpload()` in `apps/web/src/components/file-upload/`.
+
 ## Date & timezone contract
 
 | Layer | Format | Notes |

@@ -1,8 +1,8 @@
 import type { NatsConnection } from '@nats-io/nats-core';
 import { Logger } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import type { DrizzleDB } from '@roviq/database';
+import { FakeStorageClient } from '@roviq/storage';
 import { createMock } from '@roviq/testing';
 import type Redis from 'ioredis';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -13,10 +13,6 @@ import { PROBE_TIMEOUT_MS, runProbe } from '../probe';
 import { RedisHealthIndicator } from '../redis.health';
 
 const healthIndicatorService = new HealthIndicatorService();
-
-function configWith(values: Record<string, string>): ConfigService {
-  return createMock<ConfigService>({ get: vi.fn((key: string) => values[key]) });
-}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -125,45 +121,43 @@ describe('NatsHealthIndicator', () => {
 });
 
 describe('MinioHealthIndicator', () => {
-  it('should call the MinIO liveness endpoint under S3_ENDPOINT and be up on 200', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
+  function storageWith(buckets: { private: boolean; public: boolean }): FakeStorageClient {
+    const storage = new FakeStorageClient();
+    vi.spyOn(storage, 'bucketExists').mockImplementation(async (bucket) => buckets[bucket]);
+    return storage;
+  }
+
+  it('should be up when both buckets exist', async () => {
     const indicator = new MinioHealthIndicator(
       healthIndicatorService,
-      configWith({ S3_ENDPOINT: 'http://minio.test:9000' }),
+      storageWith({ private: true, public: true }),
     );
 
     const result = await indicator.isHealthy();
 
     expect(result.minio.status).toBe('up');
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://minio.test:9000/minio/health/live',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
   });
 
-  it('should be down on a non-2xx liveness answer', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
-    const indicator = new MinioHealthIndicator(
-      healthIndicatorService,
-      configWith({ S3_ENDPOINT: 'http://minio.test:9000' }),
-    );
-
-    const result = await indicator.isHealthy();
-
-    expect(result).toEqual({
-      minio: { status: 'down' },
-    });
-  });
-
-  it('should be down without calling anything when S3_ENDPOINT is unset', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    const indicator = new MinioHealthIndicator(healthIndicatorService, configWith({}));
+  it.each([
+    ['private', { private: false, public: true }],
+    ['public', { private: true, public: false }],
+  ] as const)('should be down when the %s bucket is missing', async (_name, buckets) => {
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const indicator = new MinioHealthIndicator(healthIndicatorService, storageWith(buckets));
 
     const result = await indicator.isHealthy();
 
     expect(result).toEqual({ minio: { status: 'down' } });
-    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('should be down when storage cannot be reached', async () => {
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const storage = new FakeStorageClient();
+    vi.spyOn(storage, 'bucketExists').mockRejectedValue(new Error('connect ECONNREFUSED'));
+    const indicator = new MinioHealthIndicator(healthIndicatorService, storage);
+
+    const result = await indicator.isHealthy();
+
+    expect(result).toEqual({ minio: { status: 'down' } });
   });
 });

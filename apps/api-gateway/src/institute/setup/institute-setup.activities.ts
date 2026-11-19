@@ -95,12 +95,6 @@ export function createInstituteSetupActivities(
 
     // ── Phase 2: Infrastructure ────────────────────────────
 
-    /** Create storage bucket (MinIO/S3) for the institute */
-    async createStorageBucket(instituteId: string): Promise<void> {
-      logger.log(`[STUB] Creating storage bucket for institute ${instituteId}`);
-      // TODO: Call MinIO client to create bucket named `institute-${instituteId}`
-    },
-
     /**
      * Create wallets via Finance Service NATS call.
      * TODO: Replace stub when Finance Service is built.

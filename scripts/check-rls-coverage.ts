@@ -36,6 +36,7 @@ const RLS_INDICATORS = [
   'tenantPolicies(',
   'entityPolicies(',
   'immutableEntityPolicies(',
+  'filePolicies(',
   'pgPolicy(',
   '.enableRLS()',
 ];

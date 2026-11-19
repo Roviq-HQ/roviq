@@ -31,6 +31,9 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-205: isolated security-invariant fixtures and RLS-scoped predicate execution only.
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/academic-year.service.ts',
+  'apps/api-gateway/src/files/repositories/file.drizzle-repository.ts',
+  // ROV-210: isolated fixtures for the files RLS and attach-guard tests only.
+  'apps/api-gateway/src/files/__tests__/files-rls.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts',
   'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.loaders.ts',

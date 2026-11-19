@@ -26,6 +26,9 @@ import {
   ENQUIRY_STATUS_VALUES,
   EXAM_STATUS_VALUES,
   EXAM_TYPE_VALUES,
+  FILE_PURPOSE_VALUES,
+  FILE_STATUS_VALUES,
+  FILE_VISIBILITY_VALUES,
   GENDER_RESTRICTION_VALUES,
   GENDER_VALUES,
   GRADING_SCHEME_KIND_VALUES,
@@ -91,6 +94,9 @@ export const leaveType = pgEnum('LeaveType', LEAVE_TYPE_VALUES);
 export type LeaveType = (typeof leaveType.enumValues)[number];
 export const leaveStatus = pgEnum('LeaveStatus', LEAVE_STATUS_VALUES);
 export type LeaveStatus = (typeof leaveStatus.enumValues)[number];
+export const fileVisibility = pgEnum('FileVisibility', FILE_VISIBILITY_VALUES);
+export const fileStatus = pgEnum('FileStatus', FILE_STATUS_VALUES);
+export const filePurpose = pgEnum('FilePurpose', FILE_PURPOSE_VALUES);
 export const holidayType = pgEnum('HolidayType', HOLIDAY_TYPE_VALUES);
 export type HolidayType = (typeof holidayType.enumValues)[number];
 export const academicYearStatus = pgEnum('AcademicYearStatus', ACADEMIC_YEAR_STATUS_VALUES);

@@ -22,6 +22,7 @@ import { groups } from './groups/groups';
 import { instituteNotificationConfigs } from './notification/notification-configs';
 import { resellerMemberships } from './reseller/reseller-memberships';
 import { resellers } from './reseller/resellers';
+import { files } from './storage/files';
 import { academicYears } from './tenant/academic-years';
 import { attendanceEntries } from './tenant/attendance/attendance-entries';
 import { attendanceSessions } from './tenant/attendance/attendance-sessions';
@@ -46,6 +47,7 @@ import { instituteGroupBranding } from './tenant/institute-group-branding';
 import { instituteGroups } from './tenant/institute-groups';
 import { instituteIdentifiers } from './tenant/institute-identifiers';
 import { institutes } from './tenant/institutes';
+import { leaveFiles } from './tenant/leave-files';
 import { leaves } from './tenant/leaves';
 import { memberships } from './tenant/memberships';
 import { roles } from './tenant/roles';
@@ -123,6 +125,12 @@ export const instituteConfigsLive = liveView('institute_configs_live').as((qb) =
 );
 export const instituteIdentifiersLive = liveView('institute_identifiers_live').as((qb) =>
   qb.select().from(instituteIdentifiers).where(isNull(instituteIdentifiers.deletedAt)),
+);
+export const filesLive = liveView('files_live').as((qb) =>
+  qb.select().from(files).where(isNull(files.deletedAt)),
+);
+export const leaveFilesLive = liveView('leave_files_live').as((qb) =>
+  qb.select().from(leaveFiles).where(isNull(leaveFiles.deletedAt)),
 );
 export const leavesLive = liveView('leaves_live').as((qb) =>
   qb.select().from(leaves).where(isNull(leaves.deletedAt)),

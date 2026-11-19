@@ -39,11 +39,11 @@ export class CreateLeaveInput {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(10)
-  @IsString({ each: true })
-  @Field(() => [String], {
+  @IsUUID(undefined, { each: true })
+  @Field(() => [ID], {
     nullable: true,
     description:
-      'Optional supporting documents. Leaves spanning more than 2 calendar days should attach at least one file.',
+      'Ids of files uploaded through `requestFileUpload` with purpose LEAVE_ATTACHMENT. Leaves of 3 or more calendar days need at least one.',
   })
-  fileUrls?: string[];
+  fileIds?: string[];
 }

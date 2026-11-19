@@ -1,0 +1,24 @@
+{
+  "dropHere": "Drag files here, or",
+  "choose": "Choose files",
+  "hint": "{types}. Up to {size} each. {count, plural, one {One file only.} other {Up to # files.}}",
+  "uploading": "Uploading {name}",
+  "uploaded": "Uploaded",
+  "retry": "Try again",
+  "retryNamed": "Try uploading {name} again",
+  "cancel": "Cancel upload",
+  "cancelNamed": "Cancel upload of {name}",
+  "remove": "Remove",
+  "removeNamed": "Remove {name}",
+  "download": "Download {name}",
+  "errors": {
+    "FILE_TYPE_NOT_ALLOWED": "This file type is not accepted here.",
+    "FILE_TOO_LARGE": "This file is too large.",
+    "FILE_UPLOAD_LIMIT_REACHED": "You have too many unfinished uploads. Wait a little, then try again.",
+    "FILE_CONTENT_MISMATCH": "A file did not upload correctly or is not the type it claims to be. Remove it and upload it again.",
+    "FILE_NOT_FOUND": "An uploaded file is no longer available. Remove it and upload it again.",
+    "FORBIDDEN": "You are not allowed to upload files here.",
+    "TOO_MANY_FILES": "{count, plural, one {Only one file can be added here.} other {Only # files can be added here.}}",
+    "UPLOAD_FAILED": "The upload did not finish. Check your connection and try again."
+  }
+}

@@ -223,6 +223,8 @@ export const ErrorCode = {
   INSTITUTE_GROUP_NOT_FOUND: 'INSTITUTE_GROUP_NOT_FOUND',
   /** Leave request not found */
   LEAVE_NOT_FOUND: 'LEAVE_NOT_FOUND',
+  /** Stored file not found, not owned by the caller, or not usable for this purpose */
+  FILE_NOT_FOUND: 'FILE_NOT_FOUND',
   /** Membership row not found */
   MEMBERSHIP_NOT_FOUND: 'MEMBERSHIP_NOT_FOUND',
   /** No active payment gateway is configured for the reseller or institute */
@@ -305,6 +307,14 @@ export const ErrorCode = {
   LEAVE_DOCUMENT_REQUIRED: 'LEAVE_DOCUMENT_REQUIRED',
   /** Only PENDING leaves can be edited */
   LEAVE_NOT_EDITABLE: 'LEAVE_NOT_EDITABLE',
+  /** The file type is not accepted for this upload purpose */
+  FILE_TYPE_NOT_ALLOWED: 'FILE_TYPE_NOT_ALLOWED',
+  /** The file is larger than this upload purpose allows */
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  /** The uploaded bytes are missing, or do not match the declared size or type */
+  FILE_CONTENT_MISMATCH: 'FILE_CONTENT_MISMATCH',
+  /** Too many uploads started and not yet attached to anything */
+  FILE_UPLOAD_LIMIT_REACHED: 'FILE_UPLOAD_LIMIT_REACHED',
 
   // ── Impersonation ──────────────────────────────────────
   /** Target user cannot be impersonated (self, inactive, or no membership in the institute) */
@@ -445,6 +455,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   HOLIDAY_NOT_FOUND: HttpStatus.NOT_FOUND,
   INSTITUTE_GROUP_NOT_FOUND: HttpStatus.NOT_FOUND,
   LEAVE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FILE_NOT_FOUND: HttpStatus.NOT_FOUND,
   MEMBERSHIP_NOT_FOUND: HttpStatus.NOT_FOUND,
   PAYMENT_GATEWAY_NOT_CONFIGURED: HttpStatus.NOT_FOUND,
   ROLE_NOT_FOUND: HttpStatus.NOT_FOUND,
@@ -484,6 +495,10 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   ATTENDANCE_ON_HOLIDAY: HttpStatus.CONFLICT,
   LEAVE_DOCUMENT_REQUIRED: HttpStatus.BAD_REQUEST,
   LEAVE_NOT_EDITABLE: HttpStatus.BAD_REQUEST,
+  FILE_TYPE_NOT_ALLOWED: HttpStatus.BAD_REQUEST,
+  FILE_TOO_LARGE: HttpStatus.BAD_REQUEST,
+  FILE_CONTENT_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_UPLOAD_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   IMPERSONATION_TARGET_INVALID: HttpStatus.BAD_REQUEST,
   IMPERSONATION_SESSION_INVALID: HttpStatus.BAD_REQUEST,
   IMPERSONATION_CONSENT_UNAVAILABLE: HttpStatus.BAD_REQUEST,
