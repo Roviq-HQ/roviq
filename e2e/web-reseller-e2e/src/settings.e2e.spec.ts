@@ -6,10 +6,11 @@
  * record ends as it started.
  */
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import sharp from 'sharp';
 import { expect, test } from '../../shared/console-guardian';
 import { SEED } from '../../shared/seed-fixtures';
 
-const { resellerSettings } = testIds;
+const { resellerSettings, fileUpload } = testIds;
 
 const SAVED = 'Changes saved';
 
@@ -80,9 +81,6 @@ test.describe('ROV-186 reseller — settings', () => {
     await page.goto('/en/reseller/settings/branding');
     const primary = page.getByTestId('reseller-settings-primary-color-input');
     await expect(primary).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId(resellerSettings.brandingLogoPlaceholder)).toContainText(
-      'Image upload is coming soon.',
-    );
     const before = await primary.inputValue();
 
     const preview = page.getByTestId(resellerSettings.brandingPreview);
@@ -106,6 +104,67 @@ test.describe('ROV-186 reseller — settings', () => {
     await expect(save).toBeDisabled();
     await page.reload();
     await expect(primary).toHaveValue(before, { timeout: 15_000 });
+  });
+
+  test('uploads a logo, shows it in the preview, keeps it after a reload, then removes it', async ({
+    page,
+  }) => {
+    const logo = await sharp({
+      create: { width: 600, height: 200, channels: 3, background: { r: 15, g: 118, b: 110 } },
+    })
+      .png()
+      .toBuffer();
+
+    await page.goto('/en/reseller/settings/branding');
+    await expect(page.getByTestId(resellerSettings.brandingForm)).toBeVisible({ timeout: 15_000 });
+    const save = page.getByTestId('reseller-settings-branding-save-btn');
+    const stored = page.getByTestId(resellerSettings.brandingCurrentImage('logo'));
+    const previewLogo = page
+      .getByTestId(resellerSettings.brandingPreview)
+      .contentFrame()
+      .locator('.brand-logo-image');
+
+    await page
+      .getByTestId(fileUpload.input('reseller-logo'))
+      .setInputFiles({ name: 'e2e-logo.png', mimeType: 'image/png', buffer: logo });
+    await expect(page.getByTestId(fileUpload.item('e2e-logo.png'))).toHaveAttribute(
+      'data-status',
+      'done',
+      { timeout: 20_000 },
+    );
+    await save.click();
+    await expect(stored.locator('img')).toHaveAttribute('src', /reseller-logo\/.+\/md\.webp$/, {
+      timeout: 20_000,
+    });
+    await expect(previewLogo).toBeVisible();
+    await expect(save).toBeDisabled();
+
+    await page.reload();
+    await expect(stored).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId(resellerSettings.brandingRemoveImageBtn('logo')).click();
+    await expect(previewLogo).toHaveCount(0);
+    await save.click();
+    await expect(stored).toHaveCount(0);
+    await expect(save).toBeDisabled();
+  });
+
+  test('refuses a file that is not an accepted image type before uploading anything', async ({
+    page,
+  }) => {
+    await page.goto('/en/reseller/settings/branding');
+    await expect(page.getByTestId(resellerSettings.brandingForm)).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId(fileUpload.input('reseller-favicon')).setInputFiles({
+      name: 'icon.gif',
+      mimeType: 'image/gif',
+      buffer: Buffer.from('GIF89a'),
+    });
+
+    await expect(page.getByTestId(fileUpload.itemError('icon.gif'))).toHaveText(
+      'This file type is not accepted here.',
+    );
+    await expect(page.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled();
   });
 
   test('refuses a stylesheet that loads a remote file, before anything is sent', async ({

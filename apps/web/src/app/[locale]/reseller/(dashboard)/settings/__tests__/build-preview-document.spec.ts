@@ -7,6 +7,7 @@ import {
 
 const input: PreviewInput = {
   name: 'Acme Partners',
+  logoUrl: null,
   locale: 'en',
   primaryColor: '#0F766E',
   secondaryColor: '#E2E8F0',
@@ -29,6 +30,17 @@ describe('buildPreviewDocument', () => {
     expect(html).toContain('--brand-primary:#0F766E');
     expect(html).toContain('--brand-secondary:#E2E8F0');
     expect(html).toContain('<span class="brand-logo">AP</span>');
+  });
+
+  it('should show the stored logo instead of the initials, with its address escaped', () => {
+    const html = buildPreviewDocument({
+      ...input,
+      logoUrl: 'http://storage.test/public/logo.webp?a=1&b="x"',
+    });
+    expect(html).toContain(
+      '<img class="brand-logo-image" src="http://storage.test/public/logo.webp?a=1&amp;b=&quot;x&quot;" alt="">',
+    );
+    expect(html).not.toContain('<span class="brand-logo">');
   });
 
   it('should fall back to the default colours when a value is not a hex colour', () => {

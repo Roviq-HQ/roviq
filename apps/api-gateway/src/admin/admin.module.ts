@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { DlqModule } from '../dlq/dlq.module';
+import { FilesModule } from '../files/files.module';
 import { InstituteGroupModule } from '../institute/institute-group/institute-group.module';
 import { InstituteModule } from '../institute/management/institute.module';
 import { AdminAttendanceModule } from './attendance/admin-attendance.module';
@@ -24,6 +25,7 @@ import { AdminUserModule } from './user/admin-user.module';
 
 @Module({
   imports: [
+    FilesModule,
     AuthModule, // provides AuthEventService
     AuditModule, // provides AuditService
     DlqModule, // provides DlqService

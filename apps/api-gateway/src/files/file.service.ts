@@ -17,6 +17,7 @@ import {
   type InstituteContext,
   isFileContentType,
   isImageContentType,
+  type ResellerContext,
 } from '@roviq/common-types';
 import { type StorageBucket, StorageClient } from '@roviq/storage';
 import type { RequestFileUploadInput } from './dto/request-file-upload.input';
@@ -72,6 +73,12 @@ function storedKeysOf(file: Pick<FileRecord, 'objectKey'>): string[] {
   ];
 }
 
+/** First part of the storage key: who owns the file. Never taken from the request body. */
+function ownerPrefix(user: InstituteContext | ResellerContext, subjectUserId: string | null) {
+  if (subjectUserId) return `users/${subjectUserId}`;
+  return user.scope === 'reseller' ? `resellers/${user.resellerId}` : `institutes/${user.tenantId}`;
+}
+
 function cleanFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? '';
   // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is being removed
@@ -90,12 +97,14 @@ export class FileService {
   ) {}
 
   async requestUpload(
-    user: InstituteContext,
+    user: InstituteContext | ResellerContext,
     input: RequestFileUploadInput,
   ): Promise<FileUploadTicket> {
     const policy = FILE_PURPOSE_POLICY[input.purpose];
     const ability = await this.abilities.createForUser(user);
-    if (!policy.uploadAbility || !this.allows(ability, policy.uploadAbility)) {
+    // A purpose is uploaded from one portal only: a reseller's branding never from an institute.
+    const ownScope = (policy.owner === 'RESELLER') === (user.scope === 'reseller');
+    if (!ownScope || !policy.uploadAbility || !this.allows(ability, policy.uploadAbility)) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'You are not allowed to upload this file.');
     }
     const subjectUserId = policy.owner === 'USER' ? (input.subjectUserId ?? null) : null;
@@ -128,12 +137,7 @@ export class FileService {
       visibility: policy.visibility,
       purpose: input.purpose,
       objectKey: (id) =>
-        this.objectKey(
-          subjectUserId ? `users/${subjectUserId}` : `institutes/${user.tenantId}`,
-          input.purpose,
-          id,
-          contentType,
-        ),
+        this.objectKey(ownerPrefix(user, subjectUserId), input.purpose, id, contentType),
       originalName: cleanFileName(input.fileName),
       contentType,
       sizeBytes: input.sizeBytes,

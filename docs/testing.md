@@ -95,6 +95,7 @@ A test counts only if it attempts the forbidden action and expects a refusal. A 
 | 23 | A reseller access token issued before a role change or deactivation is refused | application: `ResellerAccessGuard` reads `auth:reseller-member-access:<id>` | `reseller-access.guard.spec.ts`; `reseller-team.integration.spec.ts` |
 | 24 | A view-only impersonation session (reseller role below full admin, or platform support) cannot change anything | application: `ImpersonationSessionGuard` refuses mutations and non-GET HTTP on `impersonationReadOnly` | `impersonation-session.guard.spec.ts`; `impersonation.integration.spec.ts` |
 | 25 | A reseller can edit only its own record, and only the settings columns: never `slug`, `tier`, `status`, `is_system`, `is_active`, `custom_domain` or the delete columns | `reseller_own_update` policy; column-level `UPDATE` grant to `roviq_reseller` | DB ("reseller self-service profile"); `reseller-settings.integration.spec.ts` |
+| 26 | A reseller writes only files it owns itself: not a file of one of its institutes, not another reseller's, and it cannot hard-delete any | `files_reseller_insert` / `files_reseller_update` policies; no DELETE grant | `files-rls.integration.spec.ts` ("reseller role"); `reseller-settings.integration.spec.ts` |
 
 Further rules the database enforces, tested in DB:
 

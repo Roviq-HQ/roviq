@@ -24,6 +24,20 @@ const REQUEST_FILE_UPLOAD = gql`
   }
 `;
 
+// A reseller's own files (its branding) are requested through the reseller portal's mutation.
+const RESELLER_REQUEST_FILE_UPLOAD = gql`
+  mutation ResellerRequestFileUpload($input: RequestFileUploadInput!) {
+    resellerRequestFileUpload(input: $input) {
+      fileId
+      uploadUrl
+      headers {
+        name
+        value
+      }
+    }
+  }
+`;
+
 type Ticket = Pick<FileUploadTicket, 'fileId' | 'uploadUrl' | 'headers'>;
 
 /** Keys under `fileUpload.errors` in the message files. */
@@ -89,10 +103,26 @@ export function useFileUpload(purpose: FilePurpose, subjectUserId?: string) {
   const policy = FILE_PURPOSE_POLICY[purpose];
   const [items, setItems] = React.useState<UploadItem[]>([]);
   const tracked = React.useRef(new Map<string, Tracked>());
-  const [requestUpload] = useMutation<
+  const [requestInstituteUpload] = useMutation<
     { requestFileUpload: Ticket },
     { input: RequestFileUploadInput }
   >(REQUEST_FILE_UPLOAD);
+  const [requestResellerUpload] = useMutation<
+    { resellerRequestFileUpload: Ticket },
+    { input: RequestFileUploadInput }
+  >(RESELLER_REQUEST_FILE_UPLOAD);
+  const ownedByReseller = policy.owner === 'RESELLER';
+  const requestTicket = React.useCallback(
+    async (input: RequestFileUploadInput): Promise<Ticket | undefined> => {
+      if (ownedByReseller) {
+        const { data } = await requestResellerUpload({ variables: { input } });
+        return data?.resellerRequestFileUpload;
+      }
+      const { data } = await requestInstituteUpload({ variables: { input } });
+      return data?.requestFileUpload;
+    },
+    [ownedByReseller, requestInstituteUpload, requestResellerUpload],
+  );
 
   const patch = React.useCallback((key: string, change: Partial<UploadItem>) => {
     setItems((current) =>
@@ -113,18 +143,13 @@ export function useFileUpload(purpose: FilePurpose, subjectUserId?: string) {
           patch(key, { status: 'error', errorKey: 'FILE_TOO_LARGE' });
           return;
         }
-        const { data } = await requestUpload({
-          variables: {
-            input: {
-              purpose,
-              subjectUserId,
-              fileName: upload.name,
-              contentType: upload.type,
-              sizeBytes: upload.size,
-            },
-          },
+        const ticket = await requestTicket({
+          purpose,
+          subjectUserId,
+          fileName: upload.name,
+          contentType: upload.type,
+          sizeBytes: upload.size,
         });
-        const ticket = data?.requestFileUpload;
         if (!ticket) throw new Error();
         await putWithProgress(ticket, upload, abort.signal, (progress) => patch(key, { progress }));
         patch(key, { status: 'done', progress: 100, fileId: ticket.fileId });
@@ -136,7 +161,7 @@ export function useFileUpload(purpose: FilePurpose, subjectUserId?: string) {
         });
       }
     },
-    [patch, policy, purpose, requestUpload, subjectUserId],
+    [patch, policy, purpose, requestTicket, subjectUserId],
   );
 
   const add = React.useCallback(

@@ -8,7 +8,6 @@ import {
 import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { zodValidator } from '@roviq/i18n';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -25,10 +24,11 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
-import { ImageOff } from 'lucide-react';
+import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { BrandingImageField, type ImageChange } from '../_components/branding-image-field';
 import { BrandingPreview } from '../_components/branding-preview';
 import {
   ReadOnlyNotice,
@@ -78,6 +78,12 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
   const allowed = ability.can('update', 'Reseller');
   const errorMessage = useSettingsErrorMessage();
   const [updateBranding] = useUpdateResellerBranding();
+  const tUpload = useTranslations('fileUpload');
+  const [logoChange, setLogoChange] = React.useState<ImageChange>(undefined);
+  const [faviconChange, setFaviconChange] = React.useState<ImageChange>(undefined);
+  const [logoBusy, setLogoBusy] = React.useState(false);
+  const [faviconBusy, setFaviconBusy] = React.useState(false);
+  const [uploadsKey, setUploadsKey] = React.useState(0);
 
   const schema = React.useMemo(
     () =>
@@ -103,13 +109,27 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
               secondaryColor: value.secondaryColor || null,
               theme: value.theme,
               customCss: value.customCss.trim() ? value.customCss : null,
+              // An image is sent only when it changes; leaving it out keeps the stored one.
+              ...(logoChange !== undefined ? { logoFileId: logoChange } : {}),
+              ...(faviconChange !== undefined ? { faviconFileId: faviconChange } : {}),
             },
           },
         });
+        setLogoChange(undefined);
+        setFaviconChange(undefined);
+        setUploadsKey((key) => key + 1);
         toast.success(t('saved'));
       } catch (err) {
-        toast.error(errorMessage(err));
-        if (extractGraphQLErrorCode(err) === 'CONCURRENT_MODIFICATION') onStale();
+        const code = extractGraphQLErrorCode(err);
+        const fileError = fileUploadErrorKey(code);
+        toast.error(fileError ? tUpload(`errors.${fileError}`, { count: 1 }) : errorMessage(err));
+        if (fileError) {
+          // The refused upload is gone on the server; drop it here so the next save can succeed.
+          setLogoChange(undefined);
+          setFaviconChange(undefined);
+          setUploadsKey((key) => key + 1);
+        }
+        if (code === 'CONCURRENT_MODIFICATION') onStale();
       }
     },
   });
@@ -119,7 +139,9 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
   }, [form, profile]);
 
   const values = useStore(form.store, (state) => state.values);
-  const isDirty = useStore(form.store, (state) => state.isDirty);
+  const formDirty = useStore(form.store, (state) => state.isDirty);
+  const isDirty = formDirty || logoChange !== undefined || faviconChange !== undefined;
+  const uploading = logoBusy || faviconBusy;
   useUnsavedChangesWarning(isDirty);
 
   // Constant after mount, so opening or closing the section by hand is never undone.
@@ -212,15 +234,33 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
 
             <fieldset disabled={!allowed}>
               <FieldGroup>
-                <div
-                  className="flex items-center gap-3 rounded-lg border border-dashed p-3"
-                  data-testid={resellerSettings.brandingLogoPlaceholder}
-                >
-                  <ImageOff className="size-5 text-muted-foreground" aria-hidden="true" />
-                  <span className="text-sm font-medium">{tb('logo')}</span>
-                  <Badge variant="outline" className="text-xs text-muted-foreground">
-                    {tb('logoComingSoon')}
-                  </Badge>
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <BrandingImageField
+                    name="logo"
+                    purpose="RESELLER_LOGO"
+                    label={tb('logo')}
+                    description={tb('logoDescription')}
+                    current={profile.logo}
+                    change={logoChange}
+                    onChange={setLogoChange}
+                    onBusyChange={setLogoBusy}
+                    editable={allowed}
+                    resetKey={uploadsKey}
+                    imageClassName="h-12 w-32 [&>img]:object-contain"
+                  />
+                  <BrandingImageField
+                    name="favicon"
+                    purpose="RESELLER_FAVICON"
+                    label={tb('favicon')}
+                    description={tb('faviconDescription')}
+                    current={profile.favicon}
+                    change={faviconChange}
+                    onChange={setFaviconChange}
+                    onBusyChange={setFaviconBusy}
+                    editable={allowed}
+                    resetKey={uploadsKey}
+                    imageClassName="size-12"
+                  />
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-2">
@@ -295,7 +335,7 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
                   <form.AppForm>
                     <form.SubmitButton
                       testId="reseller-settings-branding-save-btn"
-                      disabled={!isDirty}
+                      disabled={!isDirty || uploading}
                       submittingLabel={t('saving')}
                     >
                       {t('save')}
@@ -311,6 +351,7 @@ function BrandingForm({ profile, onStale }: { profile: ResellerProfile; onStale:
       <div className="lg:sticky lg:top-4 lg:self-start">
         <BrandingPreview
           name={profile.name}
+          logoUrl={logoChange === null ? null : (profile.logo?.url ?? null)}
           primaryColor={values.primaryColor}
           secondaryColor={values.secondaryColor}
           theme={values.theme}

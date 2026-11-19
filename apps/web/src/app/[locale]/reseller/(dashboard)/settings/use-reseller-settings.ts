@@ -24,9 +24,23 @@ export const RESELLER_PROFILE_FIELDS = gql`
     registrationState
     version
     updatedAt
+    logo {
+      id
+      name
+      url(variant: MD)
+      width
+      height
+      placeholder
+    }
+    favicon {
+      id
+      name
+      url(variant: SM)
+      width
+      height
+      placeholder
+    }
     branding {
-      logoUrl
-      faviconUrl
       primaryColor
       secondaryColor
       theme

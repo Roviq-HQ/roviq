@@ -3,6 +3,7 @@
 import { useFormatDate } from '@roviq/i18n';
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { StoredImage } from '@web/components/stored-image/stored-image';
 import { useTranslations } from 'next-intl';
 import {
   STATUS_CLASS,
@@ -195,32 +196,26 @@ export function ResellerOverview({ reseller }: { reseller: ResellerNode }) {
             className="grid gap-3 text-sm sm:grid-cols-2"
             data-testid={adminResellerDetail.detailBranding}
           >
-            {reseller.branding.logoUrl && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('detail.brandingLogoUrl')}</span>
-                <a
-                  href={reseller.branding.logoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate text-primary underline-offset-2 hover:underline"
-                  data-testid={adminResellerDetail.detailLogoUrl}
-                >
-                  {reseller.branding.logoUrl}
-                </a>
+            {reseller.logo?.url && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('detail.brandingLogo')}</span>
+                <StoredImage
+                  file={reseller.logo}
+                  alt={t('detail.brandingLogo')}
+                  className="h-10 w-28 rounded border [&>img]:object-contain"
+                  testId={adminResellerDetail.detailLogo}
+                />
               </div>
             )}
-            {reseller.branding.faviconUrl && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('detail.brandingFaviconUrl')}</span>
-                <a
-                  href={reseller.branding.faviconUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate text-primary underline-offset-2 hover:underline"
-                  data-testid={adminResellerDetail.detailFaviconUrl}
-                >
-                  {reseller.branding.faviconUrl}
-                </a>
+            {reseller.favicon?.url && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('detail.brandingFavicon')}</span>
+                <StoredImage
+                  file={reseller.favicon}
+                  alt={t('detail.brandingFavicon')}
+                  className="size-8 rounded border"
+                  testId={adminResellerDetail.detailFavicon}
+                />
               </div>
             )}
             {reseller.branding.primaryColor && (
@@ -267,8 +262,8 @@ export function ResellerOverview({ reseller }: { reseller: ResellerNode }) {
                 </div>
               </div>
             )}
-            {!reseller.branding.logoUrl &&
-              !reseller.branding.faviconUrl &&
+            {!reseller.logo?.url &&
+              !reseller.favicon?.url &&
               !reseller.branding.primaryColor &&
               !reseller.branding.secondaryColor && (
                 <p className="text-muted-foreground">{t('detail.noBranding')}</p>

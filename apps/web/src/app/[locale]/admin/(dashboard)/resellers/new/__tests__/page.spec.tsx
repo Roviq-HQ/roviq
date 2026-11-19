@@ -52,7 +52,9 @@ describe('NewResellerPage', () => {
     expect(screen.getByTestId('reseller-tier-select')).toBeInTheDocument();
     expect(screen.getByTestId('reseller-admin-email-input')).toBeInTheDocument();
     expect(screen.getByTestId('reseller-custom-domain-input')).toBeInTheDocument();
-    expect(screen.getByTestId('reseller-logo-url-input')).toBeInTheDocument();
+    expect(screen.getByTestId('reseller-primary-color-input')).toBeInTheDocument();
+    // A logo is uploaded by the reseller itself, never typed as a URL here.
+    expect(screen.queryByTestId('reseller-logo-url-input')).not.toBeInTheDocument();
   });
 
   it('blocks submission and does not call the create mutation when required fields are blank', async () => {

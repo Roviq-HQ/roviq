@@ -18,13 +18,6 @@ export const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * http/https URL — loose enough to accept the common cases (branding logos
- * hosted on CDNs, HTTPS favicons) without pulling a full URL parser client-side.
- * Server enforces the canonical check via class-validator @IsUrl.
- */
-export const HTTP_URL_RE = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
-
-/**
  * Returns `true` when every branding slot is empty/undefined. Used on submit
  * to decide whether to omit the `branding` key entirely — sending `{}` would
  * overwrite a previously-set branding row with an empty object on the server.
@@ -32,8 +25,6 @@ export const HTTP_URL_RE = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
 export function isBrandingEmpty(
   b:
     | {
-        logoUrl?: string | null;
-        faviconUrl?: string | null;
         primaryColor?: string | null;
         secondaryColor?: string | null;
       }
@@ -41,7 +32,7 @@ export function isBrandingEmpty(
     | undefined,
 ): boolean {
   if (!b) return true;
-  return !b.logoUrl && !b.faviconUrl && !b.primaryColor && !b.secondaryColor;
+  return !b.primaryColor && !b.secondaryColor;
 }
 
 /**
@@ -52,25 +43,17 @@ export function isBrandingEmpty(
 export function compactBranding(
   b:
     | {
-        logoUrl?: string | null;
-        faviconUrl?: string | null;
         primaryColor?: string | null;
         secondaryColor?: string | null;
       }
     | null
     | undefined,
-):
-  | { logoUrl?: string; faviconUrl?: string; primaryColor?: string; secondaryColor?: string }
-  | undefined {
+): { primaryColor?: string; secondaryColor?: string } | undefined {
   if (isBrandingEmpty(b)) return undefined;
   const out: {
-    logoUrl?: string;
-    faviconUrl?: string;
     primaryColor?: string;
     secondaryColor?: string;
   } = {};
-  if (b?.logoUrl) out.logoUrl = b.logoUrl;
-  if (b?.faviconUrl) out.faviconUrl = b.faviconUrl;
   if (b?.primaryColor) out.primaryColor = b.primaryColor;
   if (b?.secondaryColor) out.secondaryColor = b.secondaryColor;
   return out;

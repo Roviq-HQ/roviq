@@ -1,4 +1,4 @@
-import { Field, InputType, Int } from '@nestjs/graphql';
+import { Field, ID, InputType, Int } from '@nestjs/graphql';
 import {
   findForbiddenCustomCss,
   RESELLER_BRAND_COLOR_RE,
@@ -10,6 +10,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   registerDecorator,
@@ -37,7 +38,7 @@ function IsSafeCustomCss() {
 
 @InputType({
   description:
-    'Payload for resellerUpdateBranding. An omitted field is left as it is; null resets it to the default. Logo and favicon are not set here.',
+    'Payload for resellerUpdateBranding. An omitted field is left as it is; null resets it to the default.',
 })
 export class ResellerUpdateBrandingInput {
   @Field(() => Int, {
@@ -70,4 +71,22 @@ export class ResellerUpdateBrandingInput {
   @IsSafeCustomCss()
   @IsOptional()
   customCss?: string | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'A finished RESELLER_LOGO upload from resellerRequestFileUpload. null removes the logo; the replaced file is deleted.',
+  })
+  @IsUUID()
+  @IsOptional()
+  logoFileId?: string | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'A finished RESELLER_FAVICON upload from resellerRequestFileUpload. null removes the favicon; the replaced file is deleted.',
+  })
+  @IsUUID()
+  @IsOptional()
+  faviconFileId?: string | null;
 }

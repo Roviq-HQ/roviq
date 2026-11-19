@@ -4,8 +4,10 @@
  * column grants, and the stored row after each change.
  */
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
 import { ErrorCode, type ResellerSystemRoleName } from '@roviq/common-types';
 import {
+  files,
   mkAdminCtx,
   provisionResellerSystemRoles,
   resellerMemberships,
@@ -26,7 +28,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 
 const PROFILE = `id name slug tier status isSystem customDomain registrationNumber registrationState version
-  branding { logoUrl faviconUrl primaryColor secondaryColor theme customCss }
+  logo { id } favicon { id }
+  branding { primaryColor secondaryColor theme customCss }
   contact { phones { countryCode number isPrimary isWhatsappEnabled label } emails { address isPrimary label } }
   address { line1 city district state postalCode country }`;
 const MY_PROFILE = `query { resellerMyProfile { ${PROFILE} } }`;
@@ -238,13 +241,7 @@ describe('Reseller settings (integration)', () => {
   });
 
   describe('editing the branding', () => {
-    it('keeps the logo the platform set and stores colours, theme and stylesheet', async () => {
-      await admin((tx) =>
-        tx
-          .update(resellers)
-          .set({ branding: { logoUrl: 'https://cdn.partners.test/logo.png' } })
-          .where(eq(resellers.id, reseller.resellerId)),
-      );
+    it('stores colours, theme and stylesheet', async () => {
       const token = await tokenAs('reseller_full_admin');
       const before = await currentProfile(token);
 
@@ -263,7 +260,6 @@ describe('Reseller settings (integration)', () => {
       );
       expect(response.errors).toBeUndefined();
       expect((await storedRow(reseller.resellerId)).branding).toEqual({
-        logoUrl: 'https://cdn.partners.test/logo.png',
         primaryColor: '#0F766E',
         secondaryColor: '#F1F5F9',
         theme: 'DARK',
@@ -281,7 +277,6 @@ describe('Reseller settings (integration)', () => {
       );
       expect(response.errors).toBeUndefined();
       expect((await storedRow(reseller.resellerId)).branding).toEqual({
-        logoUrl: 'https://cdn.partners.test/logo.png',
         primaryColor: '#0F766E',
         theme: 'DARK',
       });
@@ -312,6 +307,57 @@ describe('Reseller settings (integration)', () => {
       await expect(
         gql(UPDATE_BRANDING, { input: { version: before.version, theme: 'NEON' } }, token),
       ).rejects.toThrow('does not exist in \\"ResellerBrandingTheme\\" enum');
+    });
+
+    it('refuses a logo id that is not a pending upload of the caller', async () => {
+      const token = await tokenAs('reseller_full_admin');
+      const before = await currentProfile(token);
+      // A pending logo that belongs to another reseller: unreadable, so indistinguishable from none.
+      const [foreign] = await admin((tx) =>
+        tx
+          .insert(files)
+          .values({
+            resellerId: other.resellerId,
+            visibility: 'PUBLIC',
+            purpose: 'RESELLER_LOGO',
+            objectKey: `resellers/${other.resellerId}/reseller-logo/${randomUUID()}.png`,
+            originalName: 'logo.png',
+            contentType: 'image/png',
+            sizeBytes: 10,
+            uploadedBy: reseller.userId,
+            createdBy: reseller.userId,
+            updatedBy: reseller.userId,
+          })
+          .returning({ id: files.id }),
+      );
+      assert(foreign);
+      try {
+        for (const logoFileId of [foreign.id, randomUUID()]) {
+          const response = await gql(
+            UPDATE_BRANDING,
+            { input: { version: before.version, logoFileId } },
+            token,
+          );
+          expect(codeOf(response)).toBe(ErrorCode.FILE_NOT_FOUND);
+        }
+        const row = await storedRow(reseller.resellerId);
+        expect(row.version).toBe(before.version);
+        expect(row.logoFileId).toBeNull();
+      } finally {
+        await admin((tx) => tx.delete(files).where(eq(files.id, foreign.id)));
+      }
+    });
+
+    it('accepts null for a logo and favicon that are not set', async () => {
+      const token = await tokenAs('reseller_full_admin');
+      const before = await currentProfile(token);
+      const response = await gql(
+        UPDATE_BRANDING,
+        { input: { version: before.version, logoFileId: null, faviconFileId: null } },
+        token,
+      );
+      expect(response.errors).toBeUndefined();
+      expect(response.data?.resellerUpdateBranding).toMatchObject({ logo: null, favicon: null });
     });
 
     it('refuses a viewer', async () => {

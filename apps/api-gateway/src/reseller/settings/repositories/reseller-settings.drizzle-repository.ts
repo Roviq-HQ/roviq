@@ -10,8 +10,10 @@ import {
   withReseller,
 } from '@roviq/database';
 import { and, count, eq, sql } from 'drizzle-orm';
+import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
 import {
   type ResellerCounts,
+  type ResellerFileChanges,
   type ResellerRecord,
   type ResellerSelfPatch,
   ResellerSettingsRepository,
@@ -37,6 +39,7 @@ export class ResellerSettingsDrizzleRepository extends ResellerSettingsRepositor
     ctx: ResellerContext,
     expectedVersion: number,
     patch: ResellerSelfPatch,
+    fileChanges?: ResellerFileChanges,
   ): Promise<ResellerRecord | null> {
     return withReseller(this.db, ctx, async (tx) => {
       const [row] = await tx
@@ -49,7 +52,13 @@ export class ResellerSettingsDrizzleRepository extends ResellerSettingsRepositor
         })
         .where(and(eq(resellers.id, ctx.resellerId), eq(resellers.version, expectedVersion)))
         .returning();
-      return row ?? null;
+      // Nothing was saved, so no file may change state either.
+      if (!row || !fileChanges) return row ?? null;
+      for (const { fileId, purpose } of fileChanges.attach) {
+        await markFilesReady(tx, { fileIds: [fileId], purpose, userId: ctx.userId });
+      }
+      await markFilesDeleted(tx, { fileIds: fileChanges.detach, userId: ctx.userId });
+      return row;
     });
   }
 

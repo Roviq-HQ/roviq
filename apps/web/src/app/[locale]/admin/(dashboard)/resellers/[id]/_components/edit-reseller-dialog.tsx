@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { AddressForm } from '../../../../../institute/(dashboard)/settings/institute/components/address-form';
 import { ContactBuilder } from '../../../../../institute/(dashboard)/settings/institute/components/contact-builder';
-import { compactBranding, FQDN_RE, HEX_COLOR_RE, HTTP_URL_RE } from '../../reseller-validators';
+import { compactBranding, FQDN_RE, HEX_COLOR_RE } from '../../reseller-validators';
 import type { ResellerNode } from '../../types';
 import { useResellerErrorMessage } from '../../use-reseller-error-message';
 import { useUpdateReseller } from '../../use-resellers';
@@ -56,8 +56,6 @@ const editResellerSchema = z.object({
   }),
   address: optionalAddressSchema,
   branding: z.object({
-    logoUrl: emptyStringToUndefined(z.string().regex(HTTP_URL_RE).optional()),
-    faviconUrl: emptyStringToUndefined(z.string().regex(HTTP_URL_RE).optional()),
     primaryColor: emptyStringToUndefined(z.string().regex(HEX_COLOR_RE).optional()),
     secondaryColor: emptyStringToUndefined(z.string().regex(HEX_COLOR_RE).optional()),
   }),
@@ -106,8 +104,6 @@ function toDefaults(reseller: ResellerNode): EditResellerFormValues {
       country: address?.country ?? 'IN',
     },
     branding: {
-      logoUrl: reseller.branding?.logoUrl ?? '',
-      faviconUrl: reseller.branding?.faviconUrl ?? '',
       primaryColor: reseller.branding?.primaryColor ?? '',
       secondaryColor: reseller.branding?.secondaryColor ?? '',
     },
@@ -257,22 +253,6 @@ export function EditResellerDialog({
             <FieldSet>
               <FieldLegend>{t('detail.branding')}</FieldLegend>
               <div className="grid gap-3 sm:grid-cols-2">
-                <form.AppField name="branding.logoUrl">
-                  {(field) => (
-                    <field.TextField
-                      label={t('detail.brandingLogoUrl')}
-                      testId="edit-logo-url-input"
-                    />
-                  )}
-                </form.AppField>
-                <form.AppField name="branding.faviconUrl">
-                  {(field) => (
-                    <field.TextField
-                      label={t('detail.brandingFaviconUrl')}
-                      testId="edit-favicon-url-input"
-                    />
-                  )}
-                </form.AppField>
                 <form.AppField name="branding.primaryColor">
                   {(field) => (
                     <field.TextField

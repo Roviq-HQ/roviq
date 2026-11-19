@@ -6,6 +6,7 @@ import {
   FILE_PURPOSE_POLICY,
   type FilePurpose,
   type InstituteContext,
+  type ResellerContext,
 } from '@roviq/common-types';
 import { FakeStorageClient } from '@roviq/storage';
 import { createMock } from '@roviq/testing';
@@ -33,6 +34,8 @@ const OTHER_USER_ID = '00000000-0000-7000-a000-000000000005';
 const PDF = Buffer.from('%PDF-1.7\nhello');
 
 const user = createMock<InstituteContext>({ scope: 'institute', tenantId: TENANT_ID });
+const RESELLER_ID = '019a0000-0000-7000-8000-0000000000aa';
+const resellerUser = createMock<ResellerContext>({ scope: 'reseller', resellerId: RESELLER_ID });
 
 function buildFile(overrides: Partial<FileRecord> = {}): FileRecord {
   return {
@@ -278,6 +281,38 @@ describe('FileService', () => {
 
       expect(create).toHaveBeenCalledWith(expect.objectContaining({ subjectUserId: null }));
       expect(isMember).not.toHaveBeenCalled();
+    });
+
+    it("should store a reseller's logo under the reseller, in a public purpose", async () => {
+      const ticket = await service.requestUpload(
+        resellerUser,
+        buildInput({ purpose: 'RESELLER_LOGO', fileName: 'logo.png', contentType: 'image/png' }),
+      );
+
+      expect(ticket.uploadUrl).toContain(
+        `pending/resellers/${RESELLER_ID}/reseller-logo/${FILE_ID}.png`,
+      );
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ purpose: 'RESELLER_LOGO', visibility: 'PUBLIC' }),
+      );
+      expect(can).toHaveBeenCalledWith('update', 'Reseller');
+    });
+
+    it('should refuse reseller branding from an institute, whatever its abilities', async () => {
+      await expect(
+        service.requestUpload(
+          user,
+          buildInput({ purpose: 'RESELLER_LOGO', fileName: 'logo.png', contentType: 'image/png' }),
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('should refuse an institute purpose from a reseller, whatever its abilities', async () => {
+      await expect(service.requestUpload(resellerUser, buildInput())).rejects.toMatchObject({
+        code: ErrorCode.FORBIDDEN,
+      });
+      expect(create).not.toHaveBeenCalled();
     });
 
     it('should refuse a new upload once the user has the maximum pending', async () => {

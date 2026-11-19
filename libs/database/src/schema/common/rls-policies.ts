@@ -167,11 +167,15 @@ const subjectInCurrentTenant = sql`subject_user_id IN (
 const ownTenantFile = sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`;
 const appFileAccess = sql`${ownTenantFile} OR (${userLevelFile} AND ${subjectInCurrentTenant})`;
 
+/** A file the current reseller owns itself (its branding), not one of its institutes' files. */
+const ownResellerFile = sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid
+  AND tenant_id IS NULL`;
+
 /**
  * RLS policies for `files`. A row belongs to an institute (`tenant_id`), a reseller
  * (`reseller_id`) or a person (neither set, `subject_user_id` only). An institute reads and
- * writes its own files and the user-level files of its members. Resellers read only: they have
- * no write GRANT until a reseller upload purpose exists.
+ * writes its own files and the user-level files of its members. A reseller reads its own and
+ * its institutes' files, and writes only its own (its branding).
  */
 export const filePolicies = (tableName: string) => [
   pgPolicy(`${tableName}_app_select`, { for: 'select', to: roviqApp, using: appFileAccess }),
@@ -206,6 +210,17 @@ export const filePolicies = (tableName: string) => [
           WHERE rm.reseller_id = current_setting('app.current_reseller_id', true)::uuid
         )
       ))`,
+  }),
+  pgPolicy(`${tableName}_reseller_insert`, {
+    for: 'insert',
+    to: roviqReseller,
+    withCheck: ownResellerFile,
+  }),
+  pgPolicy(`${tableName}_reseller_update`, {
+    for: 'update',
+    to: roviqReseller,
+    using: ownResellerFile,
+    withCheck: ownResellerFile,
   }),
   pgPolicy(`${tableName}_admin_all`, {
     for: 'all',

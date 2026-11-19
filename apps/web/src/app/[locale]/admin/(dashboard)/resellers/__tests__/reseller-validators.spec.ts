@@ -3,7 +3,6 @@ import {
   compactBranding,
   FQDN_RE,
   HEX_COLOR_RE,
-  HTTP_URL_RE,
   isBrandingEmpty,
   SLUG_RE,
 } from '../reseller-validators';
@@ -66,23 +65,6 @@ describe('FQDN_RE', () => {
   });
 });
 
-describe('HTTP_URL_RE', () => {
-  it.each([
-    ['https://cdn.example.com/logo.png', true],
-    ['http://example.com', true],
-    ['https://example.com/path?q=1', true],
-    // Rejects non-http(s) schemes and loose inputs.
-    ['ftp://example.com', false],
-    ['javascript:alert(1)', false],
-    ['example.com', false],
-    ['', false],
-    // No whitespace allowed.
-    ['https://example.com /logo.png', false],
-  ])('url %s -> %s', (input, ok) => {
-    expect(HTTP_URL_RE.test(input)).toBe(ok);
-  });
-});
-
 describe('isBrandingEmpty', () => {
   it('returns true for null / undefined', () => {
     expect(isBrandingEmpty(null)).toBe(true);
@@ -91,12 +73,12 @@ describe('isBrandingEmpty', () => {
 
   it('returns true when every slot is empty or missing', () => {
     expect(isBrandingEmpty({})).toBe(true);
-    expect(isBrandingEmpty({ logoUrl: '', faviconUrl: '', primaryColor: '' })).toBe(true);
-    expect(isBrandingEmpty({ logoUrl: null, primaryColor: null })).toBe(true);
+    expect(isBrandingEmpty({ primaryColor: '', secondaryColor: '' })).toBe(true);
+    expect(isBrandingEmpty({ primaryColor: null })).toBe(true);
   });
 
   it('returns false when any slot has a value', () => {
-    expect(isBrandingEmpty({ logoUrl: 'https://x.com/l.png' })).toBe(false);
+    expect(isBrandingEmpty({ secondaryColor: '#5BC0EB' })).toBe(false);
     expect(isBrandingEmpty({ primaryColor: '#1677FF' })).toBe(false);
   });
 });
@@ -106,35 +88,18 @@ describe('compactBranding', () => {
     expect(compactBranding(null)).toBeUndefined();
     expect(compactBranding(undefined)).toBeUndefined();
     expect(compactBranding({})).toBeUndefined();
-    expect(
-      compactBranding({
-        logoUrl: '',
-        faviconUrl: '',
-        primaryColor: '',
-        secondaryColor: '',
-      }),
-    ).toBeUndefined();
+    expect(compactBranding({ primaryColor: '', secondaryColor: '' })).toBeUndefined();
   });
 
   it('includes only the populated fields', () => {
-    expect(
-      compactBranding({
-        logoUrl: 'https://x.com/l.png',
-        faviconUrl: '',
-        primaryColor: '#1677FF',
-        secondaryColor: '',
-      }),
-    ).toEqual({ logoUrl: 'https://x.com/l.png', primaryColor: '#1677FF' });
+    expect(compactBranding({ primaryColor: '#1677FF', secondaryColor: '' })).toEqual({
+      primaryColor: '#1677FF',
+    });
   });
 
   it('ignores null fields', () => {
-    expect(
-      compactBranding({
-        logoUrl: null,
-        faviconUrl: 'https://y.com/f.ico',
-        primaryColor: null,
-        secondaryColor: null,
-      }),
-    ).toEqual({ faviconUrl: 'https://y.com/f.ico' });
+    expect(compactBranding({ primaryColor: null, secondaryColor: '#5BC0EB' })).toEqual({
+      secondaryColor: '#5BC0EB',
+    });
   });
 });

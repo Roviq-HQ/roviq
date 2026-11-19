@@ -9,6 +9,8 @@ import {
   leavesLive,
   membershipsLive,
   mkInstituteCtx,
+  mkResellerCtx,
+  withReseller,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -37,21 +39,37 @@ const writeReturning = {
   createdAt: files.createdAt,
 } as const;
 
+interface FileActor {
+  userId: string;
+  tenantId: string | null;
+  resellerId: string | null;
+}
+
 @Injectable()
 export class FileDrizzleRepository extends FileRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
     super();
   }
 
-  private context(): { tenantId: string; userId: string } {
-    const { tenantId, userId } = getRequestContext();
-    if (!tenantId) throw new Error('Tenant context is required');
-    return { tenantId, userId };
+  /**
+   * Runs as the caller's own database role, so RLS decides which files exist for them. A
+   * reseller reaches only its own files and, read-only, those of its institutes.
+   */
+  private run<T>(fn: (tx: DrizzleDB, actor: FileActor) => Promise<T>): Promise<T> {
+    const { scope, tenantId, resellerId, userId } = getRequestContext();
+    if (scope === 'reseller' && resellerId) {
+      return withReseller(this.db, mkResellerCtx(resellerId, 'repository:file'), (tx) =>
+        fn(tx, { userId, tenantId: null, resellerId }),
+      );
+    }
+    if (!tenantId) throw new Error('Tenant or reseller context is required');
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), (tx) =>
+      fn(tx, { userId, tenantId, resellerId: null }),
+    );
   }
 
   async create(data: CreateFileData): Promise<FileRecord> {
-    const { tenantId, userId } = this.context();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    return this.run(async (tx, actor) => {
       // The id is needed before the insert because it is part of the object key.
       const generated = await tx.execute<{ id: string }>(sql`SELECT uuidv7() AS id`);
       const id = generated.rows[0]?.id;
@@ -63,10 +81,11 @@ export class FileDrizzleRepository extends FileRepository {
           id,
           objectKey: data.objectKey(id),
           // A person's file has no institute; RLS only lets it in for a member of this one.
-          tenantId: data.subjectUserId ? null : tenantId,
-          uploadedBy: userId,
-          createdBy: userId,
-          updatedBy: userId,
+          tenantId: data.subjectUserId ? null : actor.tenantId,
+          resellerId: actor.resellerId,
+          uploadedBy: actor.userId,
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
         })
         .returning(writeReturning);
       return rows[0] as FileRecord;
@@ -80,8 +99,7 @@ export class FileDrizzleRepository extends FileRepository {
 
   async findByIds(ids: string[]): Promise<FileRecord[]> {
     if (ids.length === 0) return [];
-    const { tenantId } = this.context();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    return this.run(async (tx) => {
       return tx
         .select(fileLiveColumns)
         .from(filesLive)
@@ -91,8 +109,7 @@ export class FileDrizzleRepository extends FileRepository {
 
   async findClaimable(ids: string[], purpose: FilePurpose): Promise<FileRecord[]> {
     if (ids.length === 0) return [];
-    const { tenantId, userId } = this.context();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    return this.run(async (tx, { userId }) => {
       return tx
         .select(fileLiveColumns)
         .from(filesLive)
@@ -108,8 +125,7 @@ export class FileDrizzleRepository extends FileRepository {
   }
 
   async countPendingByCurrentUser(): Promise<number> {
-    const { tenantId, userId } = this.context();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    return this.run(async (tx, { userId }) => {
       const rows = await tx
         .select({ value: count() })
         .from(filesLive)
@@ -119,8 +135,7 @@ export class FileDrizzleRepository extends FileRepository {
   }
 
   async findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null> {
-    const { tenantId } = this.context();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    return this.run(async (tx) => {
       const rows = await tx
         .select({ id: leavesLive.id, tenantId: leavesLive.tenantId, userId: leavesLive.userId })
         .from(leaveFilesLive)
@@ -131,8 +146,7 @@ export class FileDrizzleRepository extends FileRepository {
   }
 
   async saveProcessedImage(id: string, image: ProcessedImageData): Promise<void> {
-    const { tenantId, userId } = this.context();
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    await this.run(async (tx, { userId }) => {
       await tx
         .update(files)
         .set({ ...image, contentType: 'image/webp', updatedBy: userId })
@@ -141,8 +155,7 @@ export class FileDrizzleRepository extends FileRepository {
   }
 
   async isMemberOfCurrentTenant(userId: string): Promise<boolean> {
-    const { tenantId } = this.context();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    return this.run(async (tx) => {
       const rows = await tx
         .select({ id: membershipsLive.id })
         .from(membershipsLive)
@@ -153,8 +166,7 @@ export class FileDrizzleRepository extends FileRepository {
   }
 
   async markRejected(id: string): Promise<void> {
-    const { tenantId, userId } = this.context();
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), async (tx) => {
+    await this.run(async (tx, { userId }) => {
       await tx
         .update(files)
         .set({ status: 'REJECTED', updatedBy: userId })

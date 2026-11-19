@@ -20,13 +20,7 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import {
-  compactBranding,
-  FQDN_RE,
-  HEX_COLOR_RE,
-  HTTP_URL_RE,
-  SLUG_RE,
-} from '../reseller-validators';
+import { compactBranding, FQDN_RE, HEX_COLOR_RE, SLUG_RE } from '../reseller-validators';
 import { useResellerErrorMessage } from '../use-reseller-error-message';
 import { useCreateReseller } from '../use-resellers';
 
@@ -53,12 +47,6 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
       z.string().max(255).regex(FQDN_RE, t('create.domainInvalid')).optional(),
     ),
     branding: z.object({
-      logoUrl: emptyStringToUndefined(
-        z.string().regex(HTTP_URL_RE, t('create.urlInvalid')).optional(),
-      ),
-      faviconUrl: emptyStringToUndefined(
-        z.string().regex(HTTP_URL_RE, t('create.urlInvalid')).optional(),
-      ),
       primaryColor: emptyStringToUndefined(
         z.string().regex(HEX_COLOR_RE, t('create.colorInvalid')).optional(),
       ),
@@ -81,8 +69,6 @@ const EMPTY_DEFAULTS: CreateResellerFormValues = {
   initialAdminEmail: '',
   customDomain: '',
   branding: {
-    logoUrl: '',
-    faviconUrl: '',
     primaryColor: '',
     secondaryColor: '',
   },
@@ -275,26 +261,6 @@ export default function NewResellerPage() {
           <CardContent>
             <FieldGroup>
               <div className="grid gap-4 sm:grid-cols-2">
-                <form.AppField name="branding.logoUrl">
-                  {(field) => (
-                    <field.TextField
-                      label={t('create.brandingLogoUrl')}
-                      placeholder={t('create.brandingLogoUrlPlaceholder')}
-                      testId="reseller-logo-url-input"
-                    />
-                  )}
-                </form.AppField>
-
-                <form.AppField name="branding.faviconUrl">
-                  {(field) => (
-                    <field.TextField
-                      label={t('create.brandingFaviconUrl')}
-                      placeholder={t('create.brandingFaviconUrlPlaceholder')}
-                      testId="reseller-favicon-url-input"
-                    />
-                  )}
-                </form.AppField>
-
                 <form.AppField name="branding.primaryColor">
                   {(field) => (
                     <field.TextField

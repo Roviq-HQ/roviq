@@ -306,9 +306,6 @@ input AdminListUsersFilterInput {
 
 """Optional branding configuration stored on reseller.branding (JSONB)"""
 input AdminResellerBrandingInput {
-  faviconUrl: String
-  logoUrl: String
-
   """Hex colour (e.g. #1677FF)"""
   primaryColor: String
 
@@ -342,6 +339,9 @@ type AdminResellerModel {
 
   """Soft-delete timestamp; set when status=DELETED"""
   deletedAt: DateTime
+
+  """Browser-tab icon uploaded by the reseller"""
+  favicon: FileRef
   id: ID!
 
   """Number of non-deleted institutes currently assigned to this reseller"""
@@ -352,6 +352,9 @@ type AdminResellerModel {
   True for the built-in "Roviq Direct" reseller — cannot be suspended, deleted, or have its tier changed
   """
   isSystem: Boolean!
+
+  """Logo uploaded by the reseller"""
+  logo: FileRef
   name: String!
 
   """Company / business registration number (e.g. CIN or GSTIN)"""
@@ -2529,6 +2532,8 @@ enum FilePurpose {
   BULK_IMPORT_REPORT
   LEAVE_ATTACHMENT
   PROFILE_PHOTO
+  RESELLER_FAVICON
+  RESELLER_LOGO
 }
 
 """A stored file. `url` is signed when the response is built and expires."""
@@ -4142,10 +4147,17 @@ type Mutation {
   Unlinks one of the reseller's institutes from a group the reseller owns.
   """
   resellerRemoveInstituteFromGroup(instituteId: ID!): Boolean!
+
+  """
+  Start an upload of one of the reseller's own files (its logo or favicon). Returns a URL that accepts one PUT of the declared size and type. The file is unusable until a mutation attaches it by `fileId`.
+  """
+  resellerRequestFileUpload(input: RequestFileUploadInput!): FileUploadTicket!
   resellerStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
   resellerSuspendInstitute(id: ID!, reason: String): InstituteModel!
 
-  """Edit the reseller's own colours, colour scheme and extra stylesheet"""
+  """
+  Edit the reseller's own logo, favicon, colours, colour scheme and extra stylesheet
+  """
   resellerUpdateBranding(input: ResellerUpdateBrandingInput!): ResellerProfileModel!
 
   """Edit the reseller's own name, registration, contact and address"""
@@ -5165,18 +5177,12 @@ input RequestTCInput {
   studentProfileId: ID!
 }
 
-"""Reseller branding configuration (logo, colors, favicon)"""
+"""Reseller branding configuration (colours, colour scheme, stylesheet)"""
 type ResellerBrandingModel {
   """
   Extra stylesheet written by the reseller. Stored, not yet applied to any portal.
   """
   customCss: String
-
-  """URL of the reseller favicon"""
-  faviconUrl: String
-
-  """URL of the reseller logo image"""
-  logoUrl: String
 
   """Primary brand colour as a hex code (e.g. "#1677FF")"""
   primaryColor: String
@@ -5287,12 +5293,18 @@ type ResellerProfileModel {
 
   """Custom domain, set by the platform. Not yet served (auth PRD §23.4)."""
   customDomain: String
+
+  """Browser-tab icon, stored square. Ask for `url(variant: SM)`."""
+  favicon: FileRef
   id: ID!
 
   """
   True for the built-in "Roviq Direct" reseller, whose name cannot be changed
   """
   isSystem: Boolean!
+
+  """Logo. Ask for `url(variant: MD)` in headers."""
+  logo: FileRef
   name: String!
 
   """Company / business registration number (e.g. CIN or GSTIN)"""
@@ -5458,13 +5470,23 @@ enum ResellerTier {
 }
 
 """
-Payload for resellerUpdateBranding. An omitted field is left as it is; null resets it to the default. Logo and favicon are not set here.
+Payload for resellerUpdateBranding. An omitted field is left as it is; null resets it to the default.
 """
 input ResellerUpdateBrandingInput {
   """
   Extra stylesheet, at most 20000 characters. Refused if it contains a backslash, "<", @import, url(), image(), image-set(), expression() or javascript:.
   """
   customCss: String
+
+  """
+  A finished RESELLER_FAVICON upload from resellerRequestFileUpload. null removes the favicon; the replaced file is deleted.
+  """
+  faviconFileId: ID
+
+  """
+  A finished RESELLER_LOGO upload from resellerRequestFileUpload. null removes the logo; the replaced file is deleted.
+  """
+  logoFileId: ID
 
   """
   Six-digit hex colour, e.g. "#1677FF"

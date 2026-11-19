@@ -6,9 +6,26 @@ import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResellerBrandingPage from '../branding/page';
 import { ResellerUpdateBrandingDocument } from '../use-reseller-settings.generated';
-import { buildProfile, FULL_ADMIN, profileMock, VIEWER } from './fixtures';
+import { buildImage, buildProfile, FULL_ADMIN, profileMock, VIEWER } from './fixtures';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+// The real field talks to storage; its own spec covers that. Here a button stands for a finished upload.
+vi.mock('@web/components/file-upload/file-upload', () => ({
+  FileUpload: ({
+    name,
+    label,
+    onChange,
+  }: {
+    name: string;
+    label: string;
+    onChange: (fileIds: string[]) => void;
+  }) => (
+    <button type="button" data-testid={`upload-${name}`} onClick={() => onChange([`new-${name}`])}>
+      {label}
+    </button>
+  ),
+}));
 
 function updateMock(input: Record<string, unknown>, profile: ReturnType<typeof buildProfile>) {
   return {
@@ -34,9 +51,8 @@ describe('ResellerBrandingPage', () => {
     );
     expect(screen.getByTestId('reseller-settings-secondary-color-input')).toHaveValue('');
     expect(screen.getByTestId('reseller-settings-theme-select')).toHaveTextContent('Dark');
-    expect(screen.getByTestId('reseller-settings-branding-logo-placeholder')).toHaveTextContent(
-      'Image upload is coming soon.',
-    );
+    expect(screen.getByTestId('upload-reseller-logo')).toHaveTextContent('Logo');
+    expect(screen.getByTestId('upload-reseller-favicon')).toHaveTextContent('Favicon');
     expect(screen.getByTestId('reseller-settings-branding-not-applied')).toBeInTheDocument();
 
     const preview = screen.getByTestId('reseller-settings-branding-preview');
@@ -106,8 +122,6 @@ describe('ResellerBrandingPage', () => {
       version: 5,
       branding: {
         __typename: 'ResellerBrandingModel',
-        logoUrl: null,
-        faviconUrl: null,
         primaryColor: null,
         secondaryColor: null,
         theme: 'DARK',
@@ -143,6 +157,119 @@ describe('ResellerBrandingPage', () => {
       expect(screen.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled(),
     );
     expect(screen.getByTestId('reseller-settings-primary-color-input')).toHaveValue('');
+  });
+
+  it('sends a newly uploaded logo with the save and leaves the favicon out', async () => {
+    const user = userEvent.setup();
+    const saved = buildProfile({ version: 5, logo: buildImage() });
+    renderWithProviders(<ResellerBrandingPage />, {
+      apolloMocks: [
+        profileMock(buildProfile()),
+        updateMock(
+          {
+            version: 4,
+            primaryColor: '#0F766E',
+            secondaryColor: null,
+            theme: 'DARK',
+            customCss: null,
+            logoFileId: 'new-reseller-logo',
+          },
+          saved,
+        ),
+      ],
+      abilityRules: FULL_ADMIN,
+    });
+
+    await user.click(await screen.findByTestId('upload-reseller-logo'));
+    expect(screen.getByTestId('reseller-settings-branding-save-btn')).toBeEnabled();
+    await user.click(screen.getByTestId('reseller-settings-branding-save-btn'));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Changes saved'));
+    expect(
+      await screen.findByTestId('reseller-settings-branding-current-logo'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('upload-reseller-logo')).toHaveTextContent('Replace Logo');
+    expect(
+      screen.getByTestId('reseller-settings-branding-preview').getAttribute('srcdoc'),
+    ).toContain('class="brand-logo-image"');
+    await waitFor(() =>
+      expect(screen.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled(),
+    );
+  });
+
+  it('removes the stored logo only after Remove is confirmed by saving, and lets it be kept', async () => {
+    const user = userEvent.setup();
+    const withLogo = buildProfile({ logo: buildImage() });
+    renderWithProviders(<ResellerBrandingPage />, {
+      apolloMocks: [
+        profileMock(withLogo),
+        updateMock(
+          {
+            version: 4,
+            primaryColor: '#0F766E',
+            secondaryColor: null,
+            theme: 'DARK',
+            customCss: null,
+            logoFileId: null,
+          },
+          buildProfile({ version: 5 }),
+        ),
+      ],
+      abilityRules: FULL_ADMIN,
+    });
+
+    await user.click(await screen.findByTestId('reseller-settings-branding-remove-logo-btn'));
+    expect(screen.getByText('Will be removed when you save.')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('reseller-settings-branding-preview').getAttribute('srcdoc'),
+    ).not.toContain('brand-logo-image" src');
+
+    await user.click(screen.getByTestId('reseller-settings-branding-keep-logo-btn'));
+    expect(screen.getByTestId('reseller-settings-branding-save-btn')).toBeDisabled();
+
+    await user.click(screen.getByTestId('reseller-settings-branding-remove-logo-btn'));
+    await user.click(screen.getByTestId('reseller-settings-branding-save-btn'));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Changes saved'));
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('reseller-settings-branding-current-logo'),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('shows translated copy when the server refuses the uploaded image', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ResellerBrandingPage />, {
+      apolloMocks: [
+        profileMock(buildProfile()),
+        {
+          request: {
+            query: ResellerUpdateBrandingDocument,
+            variables: {
+              input: {
+                version: 4,
+                primaryColor: '#0F766E',
+                secondaryColor: null,
+                theme: 'DARK',
+                customCss: null,
+                faviconFileId: 'new-reseller-favicon',
+              },
+            },
+          },
+          result: {
+            errors: [new GraphQLError('bad', { extensions: { code: 'FILE_IMAGE_INVALID' } })],
+          },
+        },
+      ],
+      abilityRules: FULL_ADMIN,
+    });
+
+    await user.click(await screen.findByTestId('upload-reseller-favicon'));
+    await user.click(screen.getByTestId('reseller-settings-branding-save-btn'));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(toast.error).mock.calls[0]?.[0]).toMatch(/image/i);
   });
 
   it('explains a lost race and reloads the latest version', async () => {
@@ -199,6 +326,8 @@ describe('ResellerBrandingPage', () => {
     expect(screen.getByTestId('reseller-settings-primary-color-input')).toBeDisabled();
     expect(screen.getByTestId('reseller-settings-custom-css-input')).toBeDisabled();
     expect(screen.queryByTestId('reseller-settings-branding-save-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('upload-reseller-logo')).not.toBeInTheDocument();
+    expect(screen.getByTestId('reseller-settings-branding-no-logo')).toHaveTextContent('None set.');
   });
 
   it('offers a retry when the settings cannot be loaded', async () => {

@@ -45,6 +45,7 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
   let tenantB: TestInstitute;
   let fileA: string;
   const userLevelFileIds: string[] = [];
+  const resellerFileIds: string[] = [];
 
   function fileValues(tenantId: string, uploadedBy: string) {
     return {
@@ -110,9 +111,8 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
       await tx.delete(leaveFiles).where(inArray(leaveFiles.tenantId, tenantIds));
       await tx.delete(leaves).where(inArray(leaves.tenantId, tenantIds));
       await tx.delete(files).where(inArray(files.tenantId, tenantIds));
-      if (userLevelFileIds.length > 0) {
-        await tx.delete(files).where(inArray(files.id, userLevelFileIds));
-      }
+      const looseIds = [...userLevelFileIds, ...resellerFileIds];
+      if (looseIds.length > 0) await tx.delete(files).where(inArray(files.id, looseIds));
     });
     await cleanupTestInstitute(db, tenantA);
     await cleanupTestInstitute(db, tenantB);
@@ -182,11 +182,116 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
       expect(foreign).toEqual([]);
     });
 
-    it('should not be able to write files at all', async () => {
+    const logoValues = (resellerId: string, uploadedBy: string) => ({
+      resellerId,
+      visibility: 'PUBLIC' as const,
+      purpose: 'RESELLER_LOGO' as const,
+      objectKey: `resellers/${resellerId}/reseller-logo/${randomUUID()}.png`,
+      originalName: 'logo.png',
+      contentType: 'image/png',
+      sizeBytes: 2048,
+      uploadedBy,
+      createdBy: uploadedBy,
+      updatedBy: uploadedBy,
+    });
+    const asReseller = <T>(reseller: TestReseller, fn: Parameters<typeof withReseller<T>>[2]) =>
+      withReseller(db, mkResellerCtx(reseller.resellerId, ORIGIN), fn);
+
+    it('should not write a file of one of its institutes, only read it', async () => {
       await expect(
-        withReseller(db, mkResellerCtx(owningReseller.resellerId, ORIGIN), (tx) =>
+        asReseller(owningReseller, (tx) =>
           tx.insert(files).values(fileValues(tenantA.tenantId, owningReseller.userId)),
         ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
+
+      const updated = await asReseller(owningReseller, (tx) =>
+        tx
+          .update(files)
+          .set({ originalName: 'renamed.pdf' })
+          .where(eq(files.id, fileA))
+          .returning({ id: files.id }),
+      );
+      expect(updated).toEqual([]);
+    });
+
+    it('should store and change a file it owns itself', async () => {
+      const [own] = await asReseller(owningReseller, (tx) =>
+        tx
+          .insert(files)
+          .values(logoValues(owningReseller.resellerId, owningReseller.userId))
+          .returning({ id: files.id }),
+      );
+      assert(own);
+      resellerFileIds.push(own.id);
+
+      const ready = await asReseller(owningReseller, (tx) =>
+        tx
+          .update(files)
+          .set({ status: 'READY' })
+          .where(eq(files.id, own.id))
+          .returning({ id: files.id }),
+      );
+      expect(ready).toEqual([{ id: own.id }]);
+    });
+
+    it("should neither store a file under another reseller nor see or change that reseller's", async () => {
+      await expect(
+        asReseller(owningReseller, (tx) =>
+          tx.insert(files).values(logoValues(otherReseller.resellerId, owningReseller.userId)),
+        ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
+
+      const [foreign] = await asReseller(otherReseller, (tx) =>
+        tx
+          .insert(files)
+          .values(logoValues(otherReseller.resellerId, otherReseller.userId))
+          .returning({ id: files.id }),
+      );
+      assert(foreign);
+      resellerFileIds.push(foreign.id);
+
+      const seen = await asReseller(owningReseller, (tx) =>
+        tx.select({ id: files.id }).from(files).where(eq(files.id, foreign.id)),
+      );
+      const changed = await asReseller(owningReseller, (tx) =>
+        tx
+          .update(files)
+          .set({ status: 'READY' })
+          .where(eq(files.id, foreign.id))
+          .returning({ id: files.id }),
+      );
+      expect(seen).toEqual([]);
+      expect(changed).toEqual([]);
+    });
+
+    it("should not let an institute see or attach its reseller's file", async () => {
+      const [logo] = await asReseller(owningReseller, (tx) =>
+        tx
+          .insert(files)
+          .values(logoValues(owningReseller.resellerId, owningReseller.userId))
+          .returning({ id: files.id }),
+      );
+      assert(logo);
+      resellerFileIds.push(logo.id);
+
+      const seen = await withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
+        tx.select({ id: files.id }).from(files).where(eq(files.id, logo.id)),
+      );
+      expect(seen).toEqual([]);
+    });
+
+    it('should not hard-delete even its own file', async () => {
+      const [own] = await asReseller(owningReseller, (tx) =>
+        tx
+          .insert(files)
+          .values(logoValues(owningReseller.resellerId, owningReseller.userId))
+          .returning({ id: files.id }),
+      );
+      assert(own);
+      resellerFileIds.push(own.id);
+
+      await expect(
+        asReseller(owningReseller, (tx) => tx.delete(files).where(eq(files.id, own.id))),
       ).rejects.toMatchObject({ cause: { code: '42501' } });
     });
   });

@@ -17,6 +17,8 @@ export interface PreviewLabels {
 
 export interface PreviewInput {
   name: string;
+  /** Address of the stored logo; the initials are shown when there is none. */
+  logoUrl: string | null;
   locale: string;
   primaryColor: string;
   secondaryColor: string;
@@ -73,6 +75,10 @@ export function buildPreviewDocument(input: PreviewInput): string {
     )
     .join('');
 
+  const logo = input.logoUrl
+    ? `<img class="brand-logo-image" src="${escapeHtml(input.logoUrl)}" alt="">`
+    : `<span class="brand-logo">${escapeHtml(initials(input.name))}</span>`;
+
   return `<!doctype html>
 <html lang="${escapeHtml(input.locale)}">
 <head>
@@ -84,6 +90,7 @@ ${themeCss(input.theme)}
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13px;background:var(--page);color:var(--text)}
 .brand-header{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;background:var(--brand-primary);color:var(--brand-on-primary);font-weight:600}
 .brand-logo{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:var(--brand-secondary);color:var(--brand-on-secondary);font-size:11px;font-weight:700}
+.brand-logo-image{height:28px;max-width:96px;object-fit:contain;border-radius:4px}
 .brand-layout{display:flex;min-height:calc(100vh - 48px)}
 .brand-sidebar{width:120px;padding:10px 8px;background:var(--brand-secondary);color:var(--brand-on-secondary)}
 .brand-nav-item{padding:6px 10px;border-radius:6px;margin-bottom:2px}
@@ -97,7 +104,7 @@ body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-siz
 <style>${customCss}</style>
 </head>
 <body>
-<div class="brand-header"><span class="brand-logo">${escapeHtml(initials(input.name))}</span><span>${escapeHtml(input.name)}</span></div>
+<div class="brand-header">${logo}<span>${escapeHtml(input.name)}</span></div>
 <div class="brand-layout">
 <div class="brand-sidebar">${nav}</div>
 <div class="brand-main"><div class="brand-card"><h1>${escapeHtml(labels.heading)}</h1><p>${escapeHtml(labels.body)}</p><span class="brand-button">${escapeHtml(labels.button)}</span></div></div>

@@ -20,10 +20,10 @@ export function buildProfile(overrides: Record<string, unknown> = {}) {
     registrationState: 'RAJASTHAN',
     version: 4,
     updatedAt: '2026-11-01T00:00:00.000Z',
+    logo: null,
+    favicon: null,
     branding: {
       __typename: 'ResellerBrandingModel',
-      logoUrl: null,
-      faviconUrl: null,
       primaryColor: '#0F766E',
       secondaryColor: null,
       theme: 'DARK',
@@ -31,6 +31,19 @@ export function buildProfile(overrides: Record<string, unknown> = {}) {
     },
     contact: { __typename: 'InstituteContactObject', phones: [], emails: [] },
     address: null,
+    ...overrides,
+  };
+}
+
+export function buildImage(overrides: Record<string, unknown> = {}) {
+  return {
+    __typename: 'FileRefModel',
+    id: 'file-logo-1',
+    name: 'logo.png',
+    url: 'http://storage.test/roviq-public/resellers/reseller-1/reseller-logo/file-logo-1/md.webp',
+    width: 512,
+    height: 160,
+    placeholder: null,
     ...overrides,
   };
 }

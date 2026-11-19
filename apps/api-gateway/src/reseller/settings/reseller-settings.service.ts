@@ -1,11 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode, type ResellerContext } from '@roviq/common-types';
+import {
+  BusinessException,
+  ErrorCode,
+  type FilePurpose,
+  type ResellerContext,
+} from '@roviq/common-types';
 import type { ResellerBranding } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { FileService } from '../../files/file.service';
 import type { ResellerUpdateBrandingInput } from './dto/reseller-update-branding.input';
 import type { ResellerUpdateProfileInput } from './dto/reseller-update-profile.input';
 import {
+  type ResellerFileChanges,
   type ResellerRecord,
   type ResellerSelfPatch,
   ResellerSettingsRepository,
@@ -33,6 +40,7 @@ export class ResellerSettingsService {
   constructor(
     private readonly repo: ResellerSettingsRepository,
     private readonly eventBus: EventBusService,
+    private readonly files: FileService,
   ) {}
 
   async getProfile(ctx: ResellerContext): Promise<ResellerRecord> {
@@ -77,16 +85,41 @@ export class ResellerSettingsService {
     input: ResellerUpdateBrandingInput,
   ): Promise<ResellerRecord> {
     const current = await this.getProfile(ctx);
-    const { version, ...fields } = input;
-    return this.save(ctx, version, { branding: mergeBranding(current.branding, fields) });
+    const { version, logoFileId, faviconFileId, ...fields } = input;
+    const patch: ResellerSelfPatch = { branding: mergeBranding(current.branding, fields) };
+    const changes: ResellerFileChanges = { attach: [], detach: [] };
+
+    // undefined keeps the file, null removes it, an id replaces it.
+    const slots = [
+      { column: 'logoFileId', purpose: 'RESELLER_LOGO', next: logoFileId },
+      { column: 'faviconFileId', purpose: 'RESELLER_FAVICON', next: faviconFileId },
+    ] as const satisfies readonly {
+      column: 'logoFileId' | 'faviconFileId';
+      purpose: FilePurpose;
+      next: string | null | undefined;
+    }[];
+    for (const { column, purpose, next } of slots) {
+      const stored = current[column];
+      if (next === undefined || next === stored) continue;
+      // Storage work happens before the transaction; the row and the files then change together.
+      if (next) {
+        await this.files.verifyUploads([next], purpose);
+        changes.attach.push({ fileId: next, purpose });
+      }
+      if (stored) changes.detach.push(stored);
+      patch[column] = next;
+    }
+
+    return this.save(ctx, version, patch, changes);
   }
 
   private async save(
     ctx: ResellerContext,
     version: number,
     patch: ResellerSelfPatch,
+    files?: ResellerFileChanges,
   ): Promise<ResellerRecord> {
-    const updated = await this.repo.updateOwn(ctx, version, patch);
+    const updated = await this.repo.updateOwn(ctx, version, patch, files);
     if (!updated) {
       throw new BusinessException(
         ErrorCode.CONCURRENT_MODIFICATION,
