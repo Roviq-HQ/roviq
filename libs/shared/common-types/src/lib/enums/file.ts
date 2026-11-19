@@ -43,6 +43,10 @@ export const FILE_PURPOSE_VALUES = [
   'BULK_IMPORT_REPORT',
   // A person's profile picture; belongs to the user, shown in every institute they are in
   'PROFILE_PHOTO',
+  // A reseller's logo, shown before sign-in on its white-label portal; public
+  'RESELLER_LOGO',
+  // A reseller's browser-tab icon, stored square; public
+  'RESELLER_FAVICON',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];

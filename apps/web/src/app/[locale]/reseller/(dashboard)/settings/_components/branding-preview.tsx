@@ -10,6 +10,7 @@ const { resellerSettings } = testIds;
 
 export interface BrandingPreviewProps {
   name: string;
+  logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
   theme: ResellerBrandingTheme;
@@ -19,12 +20,13 @@ export interface BrandingPreviewProps {
 export function BrandingPreview(props: BrandingPreviewProps) {
   const t = useTranslations('resellerSettings.branding');
   const locale = useLocale();
-  const { name, primaryColor, secondaryColor, theme, customCss } = props;
+  const { name, logoUrl, primaryColor, secondaryColor, theme, customCss } = props;
 
   const srcDoc = React.useMemo(
     () =>
       buildPreviewDocument({
         name,
+        logoUrl,
         locale,
         primaryColor,
         secondaryColor,
@@ -40,7 +42,7 @@ export function BrandingPreview(props: BrandingPreviewProps) {
           button: t('previewSample.button'),
         },
       }),
-    [name, locale, primaryColor, secondaryColor, theme, customCss, t],
+    [name, logoUrl, locale, primaryColor, secondaryColor, theme, customCss, t],
   );
 
   return (

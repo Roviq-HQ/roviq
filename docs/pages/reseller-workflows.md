@@ -306,7 +306,7 @@ The form is on the left and a **live preview** on the right (below the form on a
 - **Primary colour** and **Secondary colour** -- pick with the colour box or type a six-digit hex code such as `#1677FF`. **Use default** clears your choice.
 - **Colour scheme** -- Light, Dark, or Match device.
 - **Advanced > Custom CSS** -- extra style rules, up to 20,000 characters. Rules that would load a file from another site (`@import`, `url(...)`) or contain HTML are refused, and the message names what to remove.
-- **Logo and favicon** -- image upload is coming soon.
+- **Logo** and **Favicon** -- drag an image in or click **Choose files** (JPG, PNG or WebP; logo up to 5 MB, favicon up to 2 MB). The favicon is stored square. Click **Save changes** to apply; the logo then appears in the preview. **Remove** takes an image away at the next save, and **Keep it** undoes that before you save.
 
 Your branding is saved now and will be applied to your portal when white-label support launches. Until then the preview is the only place it shows.
 

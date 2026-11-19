@@ -7,11 +7,14 @@
  * (platform_support, read-only).
  */
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { CurrentUser, GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { ResellerTier } from '@roviq/common-types';
+import { FileLoaders } from '../../files/file.loaders';
+import { FileRefModel } from '../../files/models/file-ref.model';
+import type { FileRecord } from '../../files/repositories/types';
 import { AdminResellerService } from './admin-reseller.service';
 import { AdminCreateResellerInput } from './dto/admin-create-reseller.input';
 import { AdminListResellersFilterInput } from './dto/admin-list-resellers-filter.input';
@@ -25,7 +28,30 @@ import {
 @UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => AdminResellerModel)
 export class AdminResellerResolver {
-  constructor(private readonly resellerService: AdminResellerService) {}
+  constructor(
+    private readonly resellerService: AdminResellerService,
+    private readonly loaders: FileLoaders,
+  ) {}
+
+  @ResolveField(() => FileRefModel, {
+    nullable: true,
+    description: 'Logo uploaded by the reseller',
+  })
+  logo(@Parent() reseller: { logoFileId?: string | null }): Promise<FileRecord | null> {
+    return reseller.logoFileId
+      ? this.loaders.readyById.load(reseller.logoFileId)
+      : Promise.resolve(null);
+  }
+
+  @ResolveField(() => FileRefModel, {
+    nullable: true,
+    description: 'Browser-tab icon uploaded by the reseller',
+  })
+  favicon(@Parent() reseller: { faviconFileId?: string | null }): Promise<FileRecord | null> {
+    return reseller.faviconFileId
+      ? this.loaders.readyById.load(reseller.faviconFileId)
+      : Promise.resolve(null);
+  }
 
   // ── Read ────────────────────────────────────────────────────
 

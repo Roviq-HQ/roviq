@@ -125,7 +125,6 @@ test.describe('Admin Resellers', () => {
       await expect(page.getByTestId('reseller-slug-input')).toBeVisible();
       await expect(page.getByTestId('reseller-tier-select')).toBeVisible();
       await expect(page.getByTestId('reseller-admin-email-input')).toBeVisible();
-      await expect(page.getByTestId('reseller-logo-url-input')).toBeVisible();
       await expect(page.getByTestId('reseller-primary-color-input')).toBeVisible();
       await expect(page.getByTestId('reseller-custom-domain-input')).toBeVisible();
     });

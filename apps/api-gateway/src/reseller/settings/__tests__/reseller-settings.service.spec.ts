@@ -8,6 +8,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FileService } from '../../../files/file.service';
 import {
   type ResellerRecord,
   ResellerSettingsRepository,
@@ -16,6 +17,10 @@ import { mergeBranding, ResellerSettingsService } from '../reseller-settings.ser
 
 const RESELLER_ID = '019a0000-0000-7000-8000-000000000001';
 const USER_ID = '019a0000-0000-7000-8000-000000000002';
+
+const OLD_LOGO = '019a0000-0000-7000-8000-0000000000b1';
+const NEW_LOGO = '019a0000-0000-7000-8000-0000000000b2';
+const OLD_ICON = '019a0000-0000-7000-8000-0000000000b3';
 
 const ctx: ResellerContext = {
   _scope: 'reseller',
@@ -38,6 +43,8 @@ function buildReseller(overrides: Partial<ResellerRecord> = {}): ResellerRecord 
     status: 'ACTIVE',
     suspendedAt: null,
     branding: {},
+    logoFileId: null,
+    faviconFileId: null,
     customDomain: null,
     registrationNumber: null,
     registrationState: null,
@@ -55,18 +62,6 @@ function buildReseller(overrides: Partial<ResellerRecord> = {}): ResellerRecord 
 }
 
 describe('mergeBranding', () => {
-  it('should keep the logo and favicon that the editor does not own', () => {
-    const merged = mergeBranding(
-      { logoUrl: 'https://cdn.example/logo.png', faviconUrl: 'https://cdn.example/f.ico' },
-      { primaryColor: '#112233' },
-    );
-    expect(merged).toEqual({
-      logoUrl: 'https://cdn.example/logo.png',
-      faviconUrl: 'https://cdn.example/f.ico',
-      primaryColor: '#112233',
-    });
-  });
-
   it('should leave an omitted key as stored and remove a key sent as null', () => {
     const merged = mergeBranding(
       { primaryColor: '#112233', secondaryColor: '#445566', theme: 'DARK', customCss: '.a{}' },
@@ -87,6 +82,7 @@ describe('mergeBranding', () => {
 describe('ResellerSettingsService', () => {
   let repo: ReturnType<typeof createMock<ResellerSettingsRepository>>;
   let eventBus: ReturnType<typeof createMock<EventBusService>>;
+  let files: ReturnType<typeof createMock<FileService>>;
   let service: ResellerSettingsService;
 
   beforeEach(() => {
@@ -100,7 +96,8 @@ describe('ResellerSettingsService', () => {
       countOwn: vi.fn().mockResolvedValue({ instituteCount: 2, teamSize: 5 }),
     });
     eventBus = createMock<EventBusService>({ emit: vi.fn() });
-    service = new ResellerSettingsService(repo, eventBus);
+    files = createMock<FileService>({ verifyUploads: vi.fn().mockResolvedValue(undefined) });
+    service = new ResellerSettingsService(repo, eventBus, files);
   });
 
   describe('getProfile', () => {
@@ -124,10 +121,12 @@ describe('ResellerSettingsService', () => {
         name: 'Acme Education',
         registrationNumber: null,
       });
-      expect(repo.updateOwn).toHaveBeenCalledWith(ctx, 3, {
-        name: 'Acme Education',
-        registrationNumber: null,
-      });
+      expect(repo.updateOwn).toHaveBeenCalledWith(
+        ctx,
+        3,
+        { name: 'Acme Education', registrationNumber: null },
+        undefined,
+      );
     });
 
     it('should leave name and contact alone when they arrive as null', async () => {
@@ -137,7 +136,7 @@ describe('ResellerSettingsService', () => {
         contact: null,
         registrationNumber: 'U1',
       });
-      expect(repo.updateOwn).toHaveBeenCalledWith(ctx, 3, { registrationNumber: 'U1' });
+      expect(repo.updateOwn).toHaveBeenCalledWith(ctx, 3, { registrationNumber: 'U1' }, undefined);
     });
 
     it('should tell the platform about the change, with the counts its reseller list shows', async () => {
@@ -174,26 +173,84 @@ describe('ResellerSettingsService', () => {
         name: 'Roviq Direct',
         registrationNumber: 'U12345',
       });
-      expect(repo.updateOwn).toHaveBeenCalledWith(ctx, 3, {
-        name: 'Roviq Direct',
-        registrationNumber: 'U12345',
-      });
+      expect(repo.updateOwn).toHaveBeenCalledWith(
+        ctx,
+        3,
+        { name: 'Roviq Direct', registrationNumber: 'U12345' },
+        undefined,
+      );
     });
   });
 
   describe('updateBranding', () => {
     it('should merge the edited keys into the stored branding', async () => {
-      repo.findOwn.mockResolvedValue(
-        buildReseller({ branding: { logoUrl: 'https://cdn.example/logo.png', theme: 'DARK' } }),
-      );
+      repo.findOwn.mockResolvedValue(buildReseller({ branding: { theme: 'DARK' } }));
       await service.updateBranding(ctx, {
         version: 3,
         primaryColor: '#112233',
         theme: null,
       });
-      expect(repo.updateOwn).toHaveBeenCalledWith(ctx, 3, {
-        branding: { logoUrl: 'https://cdn.example/logo.png', primaryColor: '#112233' },
-      });
+      expect(repo.updateOwn).toHaveBeenCalledWith(
+        ctx,
+        3,
+        { branding: { primaryColor: '#112233' } },
+        { attach: [], detach: [] },
+      );
+    });
+
+    it('should verify a new logo, attach it and detach the one it replaces', async () => {
+      repo.findOwn.mockResolvedValue(buildReseller({ logoFileId: OLD_LOGO }));
+
+      await service.updateBranding(ctx, { version: 3, logoFileId: NEW_LOGO });
+
+      expect(files.verifyUploads).toHaveBeenCalledWith([NEW_LOGO], 'RESELLER_LOGO');
+      expect(repo.updateOwn).toHaveBeenCalledWith(
+        ctx,
+        3,
+        { branding: {}, logoFileId: NEW_LOGO },
+        { attach: [{ fileId: NEW_LOGO, purpose: 'RESELLER_LOGO' }], detach: [OLD_LOGO] },
+      );
+    });
+
+    it('should remove the favicon when it is sent as null, without touching storage', async () => {
+      repo.findOwn.mockResolvedValue(buildReseller({ faviconFileId: OLD_ICON }));
+
+      await service.updateBranding(ctx, { version: 3, faviconFileId: null });
+
+      expect(files.verifyUploads).not.toHaveBeenCalled();
+      expect(repo.updateOwn).toHaveBeenCalledWith(
+        ctx,
+        3,
+        { branding: {}, faviconFileId: null },
+        { attach: [], detach: [OLD_ICON] },
+      );
+    });
+
+    it('should leave both files alone when neither is sent or the same id is resent', async () => {
+      repo.findOwn.mockResolvedValue(
+        buildReseller({ logoFileId: OLD_LOGO, faviconFileId: OLD_ICON }),
+      );
+
+      await service.updateBranding(ctx, { version: 3, logoFileId: OLD_LOGO });
+
+      expect(files.verifyUploads).not.toHaveBeenCalled();
+      expect(repo.updateOwn).toHaveBeenCalledWith(
+        ctx,
+        3,
+        { branding: {} },
+        { attach: [], detach: [] },
+      );
+    });
+
+    it('should save nothing when the upload fails verification', async () => {
+      files.verifyUploads.mockRejectedValue(
+        new BusinessException(ErrorCode.FILE_IMAGE_INVALID, 'bad image'),
+      );
+
+      await expect(
+        service.updateBranding(ctx, { version: 3, logoFileId: NEW_LOGO }),
+      ).rejects.toMatchObject({ code: ErrorCode.FILE_IMAGE_INVALID });
+      expect(repo.updateOwn).not.toHaveBeenCalled();
     });
 
     it('should answer CONCURRENT_MODIFICATION when the version is stale', async () => {

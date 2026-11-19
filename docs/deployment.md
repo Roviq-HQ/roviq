@@ -36,6 +36,7 @@ Run `pnpm db:migrate` (Drizzle `migrate`, connecting with `DATABASE_URL_MIGRATE`
 | `*_rov-101-reseller-full-admin-reads-users` | Adds `read User` to every stored `reseller_full_admin` role, so reseller admins can list an institute's users. |
 | `*_rov-185-reseller-team-sessions-and-abilities` | Adds the `reseller_memberships_revoke_sessions` trigger (a deactivated or deleted team member loses their refresh tokens and reseller impersonation sessions) and `manage ResellerTeam` on every stored `reseller_full_admin` and `reseller_support_admin` role. |
 | `*_rov-186-reseller-self-update` | Lets a reseller edit its own record: the `reseller_own_update` policy, an `UPDATE` grant to `roviq_reseller` on the settings columns only (`name`, `branding`, `registration_number`, `registration_state`, `contact`, `address` and the audit columns), and `read`/`update Reseller` on every stored `reseller_full_admin` role. |
+| `*_rov-186-reseller-branding-files` | Adds the file purposes `RESELLER_LOGO` and `RESELLER_FAVICON`, `resellers.logo_file_id` / `favicon_file_id`, the reseller write policies on `files` with `INSERT, UPDATE` for `roviq_reseller`, and removes typed `logoUrl` / `faviconUrl` from `resellers.branding`. A logo that was typed as a URL is gone after this migration and must be uploaded. |
 
 Consequences for operations:
 

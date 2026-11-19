@@ -1,7 +1,10 @@
 import type { FilePurpose } from '@roviq/common-types';
 import type { CreateFileData, FileLeaveOwner, FileRecord, ProcessedImageData } from './types';
 
-/** Institute-scoped access to `files`. Tenant and actor come from the request context. */
+/**
+ * Access to `files` as the caller: an institute or a reseller. Owner and actor come from the
+ * request context, never from an argument.
+ */
 export abstract class FileRepository {
   abstract create(data: CreateFileData): Promise<FileRecord>;
   abstract findById(id: string): Promise<FileRecord | null>;

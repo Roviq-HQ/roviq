@@ -74,13 +74,21 @@ export type FileAbility = { action: AppAction; subject: AppSubject } | 'AUTHENTI
 /** Profile pictures: square, shown small and often, so their thumbnails may be cached. */
 const AVATAR_IMAGE: ImageStoragePolicy = { square: true, fullPx: 1024, cacheableThumbnails: true };
 
+export type FileOwner = 'INSTITUTE' | 'USER' | 'RESELLER';
+
+/** Branding shown on pages anyone can open: kept large enough for a header, never cropped. */
+const LOGO_IMAGE: ImageStoragePolicy = { square: false, fullPx: 1024, cacheableThumbnails: false };
+/** Browser-tab icons are square; 512 px covers every size a browser or phone asks for. */
+const ICON_IMAGE: ImageStoragePolicy = { square: true, fullPx: 512, cacheableThumbnails: false };
+
 export interface FilePurposePolicy {
   visibility: FileVisibility;
   /**
    * INSTITUTE: the file belongs to the uploader's institute. USER: it belongs to the person it
    * is about (`subject_user_id`) and is visible in every institute that person is a member of.
+   * RESELLER: it belongs to the uploader's reseller and is uploaded from the reseller portal.
    */
-  owner: 'INSTITUTE' | 'USER';
+  owner: FileOwner;
   allowedContentTypes: readonly FileContentType[];
   maxSizeBytes: number;
   /** Sensitive files expose no URL in list queries; download goes through the audited call. */
@@ -136,6 +144,27 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     // student, staff, guardian or own profile); an unattached upload is never shown.
     uploadAbility: 'AUTHENTICATED',
     // Row-level security already limits these to members of the person's institutes.
+    readAbility: 'AUTHENTICATED',
+  },
+  RESELLER_LOGO: {
+    visibility: 'PUBLIC',
+    owner: 'RESELLER',
+    allowedContentTypes: IMAGE_CONTENT_TYPES,
+    maxSizeBytes: 5 * MB,
+    sensitive: false,
+    image: LOGO_IMAGE,
+    uploadAbility: { action: 'update', subject: 'Reseller' },
+    // Public by design: the object is readable by anyone who has its address.
+    readAbility: 'AUTHENTICATED',
+  },
+  RESELLER_FAVICON: {
+    visibility: 'PUBLIC',
+    owner: 'RESELLER',
+    allowedContentTypes: IMAGE_CONTENT_TYPES,
+    maxSizeBytes: 2 * MB,
+    sensitive: false,
+    image: ICON_IMAGE,
+    uploadAbility: { action: 'update', subject: 'Reseller' },
     readAbility: 'AUTHENTICATED',
   },
 };

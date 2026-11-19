@@ -1,6 +1,7 @@
 import type { ResellerBrandingTheme } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   jsonb,
   pgPolicy,
@@ -14,12 +15,11 @@ import {
 import { entityColumns } from '../common/columns';
 import { resellerStatus, resellerTier } from '../common/enums';
 import { roviqAdmin, roviqReseller } from '../common/rls-policies';
+import { files } from '../storage/files';
 import type { InstituteAddress, InstituteContact } from '../tenant/institutes';
 
 /** Shape of `resellers.branding`. Every key is optional; an absent key means "use the default". */
 export interface ResellerBranding {
-  logoUrl?: string;
-  faviconUrl?: string;
   primaryColor?: string;
   secondaryColor?: string;
   theme?: ResellerBrandingTheme;
@@ -38,6 +38,17 @@ export const resellers = pgTable(
     status: resellerStatus().default('ACTIVE').notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
     branding: jsonb().$type<ResellerBranding>().default({}),
+    // files references resellers too; the explicit return type breaks the type cycle.
+    /** Logo (`files`, purpose RESELLER_LOGO). */
+    logoFileId: uuid('logo_file_id').references((): AnyPgColumn => files.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
+    /** Browser-tab icon (`files`, purpose RESELLER_FAVICON). */
+    faviconFileId: uuid('favicon_file_id').references((): AnyPgColumn => files.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
     customDomain: varchar('custom_domain', { length: 255 }),
     registrationNumber: text('registration_number'),
     registrationState: text('registration_state'),

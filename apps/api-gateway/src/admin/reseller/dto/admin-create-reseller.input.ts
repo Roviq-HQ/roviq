@@ -18,7 +18,6 @@ import {
   IsHexColor,
   IsOptional,
   IsString,
-  IsUrl,
   Matches,
   MaxLength,
   MinLength,
@@ -27,18 +26,6 @@ import {
 
 @InputType({ description: 'Optional branding configuration stored on reseller.branding (JSONB)' })
 export class AdminResellerBrandingInput {
-  @Field(() => String, { nullable: true })
-  @IsUrl()
-  @IsOptional()
-  @MaxLength(2048)
-  logoUrl?: string;
-
-  @Field(() => String, { nullable: true })
-  @IsUrl()
-  @IsOptional()
-  @MaxLength(2048)
-  faviconUrl?: string;
-
   @Field(() => String, { nullable: true, description: 'Hex colour (e.g. #1677FF)' })
   @IsHexColor()
   @IsOptional()

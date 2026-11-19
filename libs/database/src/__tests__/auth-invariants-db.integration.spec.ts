@@ -686,6 +686,7 @@ describe('reseller self-service profile (ROV-186)', () => {
             SET name = 'Renamed', branding = '{"primaryColor": "#112233"}'::jsonb,
                 registration_number = 'U123', registration_state = 'RAJASTHAN',
                 contact = '{"phones": [], "emails": []}'::jsonb, address = NULL,
+                logo_file_id = NULL, favicon_file_id = NULL,
                 updated_at = now(), updated_by = $2, version = version + 1
           WHERE id = $1`,
         [own.resellerId, own.userId],

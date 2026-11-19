@@ -39,16 +39,10 @@ registerEnumType(ResellerBrandingTheme, {
 /**
  * Structured branding descriptor stored in the `resellers.branding` JSONB column.
  * All fields optional — defaults are applied by the reseller-admin portal when
- * absent. Logo and favicon are URLs served from the tenant storage bucket.
+ * absent. Logo and favicon are files (`logo`, `favicon` on the reseller), not part of this JSON.
  */
-@ObjectType({ description: 'Reseller branding configuration (logo, colors, favicon)' })
+@ObjectType({ description: 'Reseller branding configuration (colours, colour scheme, stylesheet)' })
 export class ResellerBrandingModel {
-  @Field(() => String, { nullable: true, description: 'URL of the reseller logo image' })
-  logoUrl?: string | null;
-
-  @Field(() => String, { nullable: true, description: 'URL of the reseller favicon' })
-  faviconUrl?: string | null;
-
   @Field(() => String, {
     nullable: true,
     description: 'Primary brand colour as a hex code (e.g. "#1677FF")',

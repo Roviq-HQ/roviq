@@ -73,9 +73,21 @@ const RESELLER_DETAIL_FIELDS = gql`
       postalCode
       country
     }
+    logo {
+      id
+      url(variant: MD)
+      width
+      height
+      placeholder
+    }
+    favicon {
+      id
+      url(variant: SM)
+      width
+      height
+      placeholder
+    }
     branding {
-      logoUrl
-      faviconUrl
       primaryColor
       secondaryColor
     }
