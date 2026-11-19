@@ -38,13 +38,13 @@ export class AdminUpdateResellerInput {
   @IsOptional()
   @MinLength(2)
   @MaxLength(255)
-  name?: string;
+  name?: string | null;
 
   @Field(() => AdminResellerBrandingInput, { nullable: true })
   @ValidateNested()
   @Type(() => AdminResellerBrandingInput)
   @IsOptional()
-  branding?: AdminResellerBrandingInput;
+  branding?: AdminResellerBrandingInput | null;
 
   @Field(() => String, { nullable: true, description: 'Pass null to clear the custom domain' })
   @IsFQDN({ require_tld: true })
@@ -66,7 +66,7 @@ export class AdminUpdateResellerInput {
   @Field(() => InstituteContactInput, { nullable: true })
   @IsObject()
   @IsOptional()
-  contact?: InstituteContact;
+  contact?: InstituteContact | null;
 
   @Field(() => InstituteAddressInput, { nullable: true, description: 'Pass null to clear' })
   @IsObject()

@@ -884,6 +884,22 @@ describe('AdminResellerService', () => {
       );
     });
 
+    it('leaves name and contact alone when they arrive as null', async () => {
+      const { tx, calls } = createTxMock({
+        resellerRows: [{ id: NORMAL_RESELLER_ID, isSystem: false, status: ResellerStatus.ACTIVE }],
+      });
+      setTx(tx);
+
+      await service.update(
+        NORMAL_RESELLER_ID,
+        { version: 2, name: null, contact: null, branding: null, registrationNumber: 'U1' },
+        ACTOR_ID,
+      );
+
+      const { version: _version, ...values } = calls.updateReseller.mock.calls[0][0].values;
+      expect(values).toEqual({ registrationNumber: 'U1', updatedBy: ACTOR_ID });
+    });
+
     it("keeps the reseller's own theme and stylesheet when the platform edits branding", async () => {
       const { tx, calls } = createTxMock({
         resellerRows: [

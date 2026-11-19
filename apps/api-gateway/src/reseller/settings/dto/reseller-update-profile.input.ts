@@ -31,7 +31,7 @@ export class ResellerUpdateProfileInput {
   @IsOptional()
   @MinLength(2)
   @MaxLength(255)
-  name?: string;
+  name?: string | null;
 
   @Field(() => String, { nullable: true, description: 'Pass null to clear' })
   @IsString()
@@ -47,7 +47,7 @@ export class ResellerUpdateProfileInput {
   @Field(() => InstituteContactInput, { nullable: true })
   @IsObject()
   @IsOptional()
-  contact?: InstituteContact;
+  contact?: InstituteContact | null;
 
   @Field(() => InstituteAddressInput, { nullable: true, description: 'Pass null to clear' })
   @IsObject()

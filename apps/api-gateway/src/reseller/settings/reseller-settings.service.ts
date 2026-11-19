@@ -50,7 +50,11 @@ export class ResellerSettingsService {
     const current = await this.getProfile(ctx);
     const { version, ...fields } = input;
 
-    if (current.isSystem && fields.name !== undefined && fields.name !== current.name) {
+    // GraphQL lets a nullable field arrive as null; the two columns below are NOT NULL.
+    const name = fields.name ?? undefined;
+    const contact = fields.contact ?? undefined;
+
+    if (current.isSystem && name !== undefined && name !== current.name) {
       throw new BusinessException(
         ErrorCode.SYSTEM_RESELLER_PROTECTED,
         'The system reseller "Roviq Direct" cannot be renamed',
@@ -58,11 +62,11 @@ export class ResellerSettingsService {
     }
 
     const patch: ResellerSelfPatch = {};
-    if (fields.name !== undefined) patch.name = fields.name;
+    if (name !== undefined) patch.name = name;
     if (fields.registrationNumber !== undefined)
       patch.registrationNumber = fields.registrationNumber;
     if (fields.registrationState !== undefined) patch.registrationState = fields.registrationState;
-    if (fields.contact !== undefined) patch.contact = fields.contact;
+    if (contact !== undefined) patch.contact = contact;
     if (fields.address !== undefined) patch.address = fields.address;
 
     return this.save(ctx, version, patch);

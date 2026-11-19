@@ -337,8 +337,9 @@ export class AdminResellerService {
 
       const { version, ...fields } = input;
       const patch: Partial<typeof resellers.$inferInsert> = {};
-      if (fields.name !== undefined) patch.name = fields.name;
-      if (fields.branding !== undefined) {
+      // A nullable GraphQL field may arrive as null; name and contact are NOT NULL columns.
+      if (fields.name) patch.name = fields.name;
+      if (fields.branding) {
         patch.branding = withResellerOwnedBranding(existing.branding, fields.branding);
       }
       if (fields.customDomain !== undefined) patch.customDomain = fields.customDomain;
@@ -346,7 +347,7 @@ export class AdminResellerService {
         patch.registrationNumber = fields.registrationNumber;
       if (fields.registrationState !== undefined)
         patch.registrationState = fields.registrationState;
-      if (fields.contact !== undefined) patch.contact = fields.contact;
+      if (fields.contact) patch.contact = fields.contact;
       if (fields.address !== undefined) patch.address = fields.address;
 
       const [updated] = await tx

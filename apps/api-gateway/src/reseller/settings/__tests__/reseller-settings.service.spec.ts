@@ -130,6 +130,16 @@ describe('ResellerSettingsService', () => {
       });
     });
 
+    it('should leave name and contact alone when they arrive as null', async () => {
+      await service.updateProfile(ctx, {
+        version: 3,
+        name: null,
+        contact: null,
+        registrationNumber: 'U1',
+      });
+      expect(repo.updateOwn).toHaveBeenCalledWith(ctx, 3, { registrationNumber: 'U1' });
+    });
+
     it('should tell the platform about the change, with the counts its reseller list shows', async () => {
       const updated = await service.updateProfile(ctx, { version: 3, name: 'Acme Education' });
       expect(eventBus.emit).toHaveBeenCalledWith(EVENT_PATTERNS.RESELLER.updated, {
