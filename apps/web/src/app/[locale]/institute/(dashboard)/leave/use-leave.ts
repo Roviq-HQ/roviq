@@ -40,7 +40,13 @@ const LEAVE_FIELDS = `
   type
   reason
   status
-  fileUrls
+  files {
+    id
+    name
+    contentType
+    sizeBytes
+    url
+  }
   decidedBy
   createdAt
   updatedAt

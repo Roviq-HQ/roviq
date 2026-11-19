@@ -34,7 +34,7 @@ x-backend-volumes: &backend-volumes
   - ../.e2e/nx:${E2E_WORKSPACE}/.nx
 
 services:
-  # --- Minimal infra (no observability, no mongodb/minio) ---
+  # --- Minimal infra (no observability) ---
 
   postgres:
     image: postgres:18-alpine
@@ -73,6 +73,22 @@ services:
       - "${E2E_NATS_MONITOR_PORT:-8223}:8222"
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Object storage. The host port is published because tests and browsers on the
+  # host open presigned URLs, which are signed for S3_PUBLIC_ENDPOINT.
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: roviq_minio
+      MINIO_ROOT_PASSWORD: roviq_minio_dev
+    ports:
+      - "${E2E_MINIO_PORT:-9004}:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -222,7 +238,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.backend
       target: e2e
-    command: sh -c "pnpm run db:reset --test && DATABASE_URL_MIGRATE=$$DATABASE_URL_TEST_MIGRATE pnpm run db:seed:e2e"
+    command: sh -c "pnpm run db:reset --test && DATABASE_URL_MIGRATE=$$DATABASE_URL_TEST_MIGRATE pnpm run db:seed:e2e && pnpm run storage:init"
     volumes: *backend-volumes
     environment:
       DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
@@ -230,6 +246,7 @@ services:
       # Override host-side REDIS_URL from .env so db-reset can flush the
       # Redis-backed lockout cache (auth rate-limit) on test reset.
       REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
       # drizzle.config.ts conditionally pulls in ee/libs/database/src/schema
       # when ROVIQ_EE=true. CI's .env is provisioned from .env.example which
       # doesn't set ROVIQ_EE, so EE billing tables (plans, subscriptions,
@@ -241,6 +258,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   # --- Application services (dev mode with auto-reload) ---
@@ -282,6 +301,9 @@ services:
       REDIS_URL: redis://redis:6379
       NOTIFICATION_SERVICE_URL: http://notification-service:3002
       TEMPORAL_ADDRESS: temporal:7233
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:${E2E_MINIO_PORT:-9004}
+      S3_PUBLIC_BASE_URL: http://localhost:${E2E_MINIO_PORT:-9004}/roviq-public
       # Embedded Temporal worker so approveApplication can reach ENROLLED in e2e.
       STUDENT_ADMISSION_WORKER_ENABLED: "true"
       # E2E-specific overrides

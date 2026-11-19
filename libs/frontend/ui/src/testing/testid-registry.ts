@@ -11,6 +11,19 @@
 // migrated files no longer contain raw `data-testid="…"` literals.
 
 export const testIds = {
+  fileUpload: {
+    root: (name: string) => `file-upload-${name}`,
+    dropzone: (name: string) => `file-upload-${name}-dropzone`,
+    chooseBtn: (name: string) => `file-upload-${name}-choose-btn`,
+    input: (name: string) => `file-upload-${name}-input`,
+    list: (name: string) => `file-upload-${name}-list`,
+    tooMany: (name: string) => `file-upload-${name}-too-many`,
+    item: (fileName: string) => `file-upload-item-${fileName}`,
+    itemError: (fileName: string) => `file-upload-item-error-${fileName}`,
+    itemRetry: (fileName: string) => `file-upload-item-retry-${fileName}`,
+    itemRemove: (fileName: string) => `file-upload-item-remove-${fileName}`,
+  },
+
   instituteLocales: {
     loading: 'institute-locales-loading',
     error: 'institute-locales-error',
@@ -1038,7 +1051,8 @@ export const testIds = {
     detailCard: 'leave-detail-card',
     detailStatus: 'leave-detail-status',
     detailType: 'leave-detail-type',
-    detailFileUrls: 'leave-detail-file-urls',
+    detailFiles: 'leave-detail-files',
+    detailFile: (fileId: string) => `leave-detail-file-${fileId}`,
     detailBackBtn: 'leave-detail-back-btn',
     detailApproveBtn: 'leave-detail-approve-btn',
     detailRejectBtn: 'leave-detail-reject-btn',

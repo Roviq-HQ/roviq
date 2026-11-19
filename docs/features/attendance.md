@@ -139,5 +139,5 @@ Guard enforcement order: `GqlAuthGuard` → `InstituteScopeGuard` (or `PlatformS
 Known gaps documented here so nothing is silently dropped. Each entry should get a Linear issue when prioritised.
 
 - **Half-Day status.** `AttendanceStatus` is a four-value enum (`PRESENT / ABSENT / LEAVE / LATE`). A `HALF_DAY` status — common in Indian schools — would require (a) an enum migration, (b) UI affordance on the teacher roster, (c) a new report bucket, and (d) a notification rule (is half-day an absent? both?). Deferred.
-- **Leave file-upload UI.** `leaves.file_urls` is a JSONB string array. The apply form currently accepts a list of URLs typed/pasted manually; there is no drag-drop uploader to the tenant storage bucket. Backend accepts uploaded URLs as-is — no virus scan, no size cap at the GraphQL layer.
+- **Leave attachments.** Uploaded through `<FileUpload>` with purpose `LEAVE_ATTACHMENT` (PDF, JPG, PNG, WebP, 10 MB each, up to 10) and linked through `leave_files`. No virus scan yet (ROV-303).
 - **Parent portal surface.** Parents have `read:Attendance` and `read:Leave` by default, but there is no `/parent/...` route that renders their children's attendance / leaves today. The API is ready; the page is not.

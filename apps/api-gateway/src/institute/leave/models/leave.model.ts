@@ -1,6 +1,7 @@
 import { Field, ID, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { LeaveStatus, LeaveType } from '@roviq/common-types';
 import { DateTimeScalar } from '@roviq/nestjs-graphql';
+import { FileRefModel } from '../../../files/models/file-ref.model';
 
 registerEnumType(LeaveType, {
   name: 'LeaveType',
@@ -38,10 +39,10 @@ export class LeaveModel {
   @Field(() => LeaveStatus)
   status!: LeaveStatus;
 
-  @Field(() => [String], {
-    description: 'URLs of supporting documents (e.g. medical certificate).',
+  @Field(() => [FileRefModel], {
+    description: 'Supporting documents (e.g. medical certificate), oldest first.',
   })
-  fileUrls!: string[];
+  files!: FileRefModel[];
 
   @Field(() => ID, { nullable: true, description: 'Membership id that approved or rejected.' })
   decidedBy!: string | null;

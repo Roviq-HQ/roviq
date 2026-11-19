@@ -14,8 +14,8 @@
     "startDate": "Start date",
     "endDate": "End date",
     "reason": "Reason",
-    "fileUrls": "Supporting documents",
-    "fileUrlsHint": "Comma-separated URLs. Leaves longer than 2 days need at least one attachment."
+    "files": "Supporting documents",
+    "filesHint": "Leaves longer than 2 days need at least one document."
   },
   "status": {
     "PENDING": "Pending",

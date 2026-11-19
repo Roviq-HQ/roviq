@@ -21,7 +21,7 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | PostgreSQL 18 | 5434 | Primary database with RLS |
 | Redis 7 | 6379 | CASL ability caching |
 | NATS 2.10 | 4222 (client), 8222 (monitoring) | Inter-service messaging (JetStream) |
-| MinIO | 9002 (API), 9003 (console) | S3-compatible object storage |
+| MinIO | 9002 (API), 9003 (console), 9004 (e2e API) | S3-compatible object storage |
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
 | OTel Collector | 4317 (gRPC), 4318 (HTTP), 13133 (health) | OpenTelemetry collector — receives traces/metrics/logs, fans out to Tempo/Loki/Prometheus |
@@ -30,13 +30,25 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | Prometheus | 9090 | Metrics scraping and storage |
 | Grafana | 3001 | Observability dashboards — also embedded in admin-portal at `/observability` |
 
-### MinIO Image
+### Object storage (MinIO)
 
-Both Compose stacks use `quay.io/minio/minio:latest`, the upstream Quay image. The
-Docker Hub reference `minio/minio:latest` no longer permits pulls. See the
-[upstream container documentation](https://github.com/minio/minio/blob/master/docs/docker/README.md).
-Retry a failed deployment with `pnpm tilt trigger minio`, then check `pnpm tilt logs minio`.
-The local API is at `http://localhost:9002`; the console is at `http://localhost:9003`.
+The dev, e2e and app Compose stacks run MinIO as the S3-compatible store. The local API is at
+`http://localhost:9002`; the console is at `http://localhost:9003`. The e2e stack publishes its
+own MinIO on `E2E_MINIO_PORT` (9004), because tests and browsers on the host open presigned URLs.
+
+- **Buckets**: two, split by visibility: `roviq-private` (signed URLs only) and `roviq-public`
+  (readable without sign-in, branding only). `pnpm storage:init` (`scripts/storage-init.ts`)
+  creates both and sets the public read policy; it is safe to re-run. Tilt runs it as the
+  `storage-init` resource before the gateway, and the e2e stack runs it in `migrate-and-seed`.
+  The app never creates buckets.
+- **Image**: all three stacks reference `quay.io/minio/minio:latest`. As of 2026-11-19 that image
+  can no longer be pulled (`unauthorized`), and `minio/minio` on Docker Hub is gone too: MinIO
+  stopped publishing community images. A machine that already has the image cached keeps working;
+  a fresh machine or CI runner cannot start MinIO. The application talks plain S3
+  (`@aws-sdk/client-s3`), so any S3-compatible server can replace it without code changes.
+- Retry a failed start with `pnpm tilt trigger minio`, then check `pnpm tilt logs minio`.
+
+How files are stored and served: `docs/architecture.md` → "File storage".
 
 ## Parallel dev instances
 
@@ -164,10 +176,14 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | JWT_REFRESH_SECRET | Refresh token signing (must differ from JWT_SECRET) |
 | JWT_EXPIRATION | Access token TTL (e.g. 15m) |
 | JWT_REFRESH_EXPIRATION | Refresh token TTL (e.g. 7d) |
-| S3_ENDPOINT | MinIO/S3 endpoint |
-| S3_ACCESS_KEY | MinIO/S3 access key |
-| S3_SECRET_KEY | MinIO/S3 secret key |
-| S3_BUCKET_PREFIX | Prefix for tenant-scoped buckets |
+| S3_ENDPOINT | Object storage endpoint the server uses |
+| S3_PUBLIC_ENDPOINT | Object storage endpoint the browser can reach; presigned URLs are signed for it |
+| S3_REGION | Object storage region |
+| S3_ACCESS_KEY | Object storage access key |
+| S3_SECRET_KEY | Object storage secret key |
+| S3_BUCKET_PRIVATE | Bucket for files served through signed URLs |
+| S3_BUCKET_PUBLIC | Bucket for files readable without sign-in (branding) |
+| S3_PUBLIC_BASE_URL | Stable base URL of the public bucket (a CDN in production) |
 | TEMPORAL_ADDRESS | Temporal server (host:port) |
 | STRIPE_SECRET_KEY | Stripe API key (use sk_test_... for dev) |
 | STRIPE_WEBHOOK_SECRET | Validates incoming Stripe webhook signatures |

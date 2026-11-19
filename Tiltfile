@@ -79,6 +79,15 @@ local_resource(
   labels=['dev'],
 )
 
+# Object storage buckets — idempotent, re-runs when the script changes
+local_resource(
+  'storage-init',
+  cmd='pnpm run storage:init',
+  deps=['scripts/storage-init.ts'],
+  resource_deps=['pnpm-install', 'minio'],
+  labels=['dev'],
+)
+
 # API Gateway (NestJS) — core backend, all frontends depend on this
 # Dev server watches apps/api-gateway/src and ee/apps/api-gateway/src via tsconfig
 local_resource(
@@ -87,7 +96,7 @@ local_resource(
   serve_cmd='pnpm run dev:gateway',
   serve_dir='.',
   deps=[],
-  resource_deps=['db-push', 'redis', 'nats'],
+  resource_deps=['db-push', 'redis', 'nats', 'storage-init'],
   readiness_probe=probe(
     http_get=http_get_action(port=int(port('API_GATEWAY_PORT', '3005')), path='/api/health/ready'),
     period_secs=10,

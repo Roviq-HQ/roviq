@@ -3,6 +3,9 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  filesLive,
+  leaveFiles,
+  leaveFilesLive,
   leaves,
   leavesLive,
   mkInstituteCtx,
@@ -10,7 +13,9 @@ import {
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
+import type { FileRecord } from '../../../files/repositories/types';
 import { LeaveRepository } from './leave.repository';
 import type {
   CreateLeaveData,
@@ -30,7 +35,6 @@ const liveColumns = {
   type: leavesLive.type,
   reason: leavesLive.reason,
   status: leavesLive.status,
-  fileUrls: leavesLive.fileUrls,
   decidedBy: leavesLive.decidedBy,
   createdAt: leavesLive.createdAt,
   updatedAt: leavesLive.updatedAt,
@@ -45,11 +49,96 @@ const writeReturning = {
   type: leaves.type,
   reason: leaves.reason,
   status: leaves.status,
-  fileUrls: leaves.fileUrls,
   decidedBy: leaves.decidedBy,
   createdAt: leaves.createdAt,
   updatedAt: leaves.updatedAt,
 } as const;
+
+type LeaveRow = Omit<LeaveRecord, 'files'>;
+
+const LEAVE_FILE_PURPOSE = 'LEAVE_ATTACHMENT';
+
+async function loadFiles(tx: DrizzleDB, leaveIds: string[]): Promise<Map<string, FileRecord[]>> {
+  const byLeave = new Map<string, FileRecord[]>();
+  if (leaveIds.length === 0) return byLeave;
+  const rows = await tx
+    .select({
+      leaveId: leaveFilesLive.leaveId,
+      id: filesLive.id,
+      tenantId: filesLive.tenantId,
+      resellerId: filesLive.resellerId,
+      subjectUserId: filesLive.subjectUserId,
+      visibility: filesLive.visibility,
+      purpose: filesLive.purpose,
+      objectKey: filesLive.objectKey,
+      originalName: filesLive.originalName,
+      contentType: filesLive.contentType,
+      sizeBytes: filesLive.sizeBytes,
+      status: filesLive.status,
+      uploadedBy: filesLive.uploadedBy,
+      createdAt: filesLive.createdAt,
+    })
+    .from(leaveFilesLive)
+    .innerJoin(filesLive, eq(filesLive.id, leaveFilesLive.fileId))
+    .where(inArray(leaveFilesLive.leaveId, leaveIds))
+    .orderBy(asc(leaveFilesLive.id));
+  for (const { leaveId, ...file } of rows) {
+    const list = byLeave.get(leaveId) ?? [];
+    list.push(file);
+    byLeave.set(leaveId, list);
+  }
+  return byLeave;
+}
+
+async function withFiles(tx: DrizzleDB, rows: LeaveRow[]): Promise<LeaveRecord[]> {
+  const byLeave = await loadFiles(
+    tx,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => ({ ...row, files: byLeave.get(row.id) ?? [] }));
+}
+
+async function attachFiles(
+  tx: DrizzleDB,
+  params: { tenantId: string; userId: string; leaveId: string; fileIds: string[] },
+): Promise<void> {
+  if (params.fileIds.length === 0) return;
+  await markFilesReady(tx, {
+    fileIds: params.fileIds,
+    purpose: LEAVE_FILE_PURPOSE,
+    userId: params.userId,
+  });
+  await tx.insert(leaveFiles).values(
+    params.fileIds.map((fileId) => ({
+      tenantId: params.tenantId,
+      leaveId: params.leaveId,
+      fileId,
+      createdBy: params.userId,
+      updatedBy: params.userId,
+    })),
+  );
+}
+
+async function detachFiles(
+  tx: DrizzleDB,
+  params: { userId: string; leaveId: string; fileIds?: string[] },
+): Promise<void> {
+  const detached = await tx
+    .update(leaveFiles)
+    .set({ deletedAt: new Date(), deletedBy: params.userId, updatedBy: params.userId })
+    .where(
+      and(
+        eq(leaveFiles.leaveId, params.leaveId),
+        isNull(leaveFiles.deletedAt),
+        params.fileIds ? inArray(leaveFiles.fileId, params.fileIds) : undefined,
+      ),
+    )
+    .returning({ fileId: leaveFiles.fileId });
+  await markFilesDeleted(tx, {
+    fileIds: detached.map((row) => row.fileId),
+    userId: params.userId,
+  });
+}
 
 @Injectable()
 export class LeaveDrizzleRepository extends LeaveRepository {
@@ -67,7 +156,8 @@ export class LeaveDrizzleRepository extends LeaveRepository {
     const tenantId = this.getTenantId();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
       const rows = await tx.select(liveColumns).from(leavesLive).where(eq(leavesLive.id, id));
-      return (rows[0] as LeaveRecord | undefined) ?? null;
+      const [record] = await withFiles(tx, rows);
+      return record ?? null;
     });
   }
 
@@ -82,11 +172,12 @@ export class LeaveDrizzleRepository extends LeaveRepository {
       //   leave.startDate <= range.endDate AND leave.endDate >= range.startDate
       if (query.endDate) conditions.push(lte(leavesLive.startDate, query.endDate));
       if (query.startDate) conditions.push(gte(leavesLive.endDate, query.startDate));
-      return tx
+      const rows = await tx
         .select(liveColumns)
         .from(leavesLive)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(sql`${leavesLive.startDate} DESC`) as Promise<LeaveRecord[]>;
+        .orderBy(sql`${leavesLive.startDate} DESC`);
+      return withFiles(tx, rows);
     });
   }
 
@@ -103,12 +194,16 @@ export class LeaveDrizzleRepository extends LeaveRepository {
           endDate: data.endDate,
           type: data.type,
           reason: data.reason,
-          fileUrls: data.fileUrls ?? [],
           createdBy: userId,
           updatedBy: userId,
         })
         .returning(writeReturning);
-      return rows[0] as LeaveRecord;
+      const [row] = rows;
+      if (!row) throw new Error('Leave insert returned no row');
+      await attachFiles(tx, { tenantId, userId, leaveId: row.id, fileIds: data.fileIds });
+      const [record] = await withFiles(tx, [row]);
+      if (!record) throw new Error('Leave insert returned no row');
+      return record;
     });
   }
 
@@ -123,14 +218,24 @@ export class LeaveDrizzleRepository extends LeaveRepository {
           ...(data.endDate !== undefined && { endDate: data.endDate }),
           ...(data.type !== undefined && { type: data.type }),
           ...(data.reason !== undefined && { reason: data.reason }),
-          ...(data.fileUrls !== undefined && { fileUrls: data.fileUrls }),
           updatedBy: userId,
         })
         .where(and(eq(leaves.id, id), isNull(leaves.deletedAt)))
         .returning(writeReturning);
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
-      return rows[0] as LeaveRecord;
+      if (data.fileIds !== undefined) {
+        const wanted = new Set(data.fileIds);
+        const current = (await loadFiles(tx, [id])).get(id) ?? [];
+        const currentIds = new Set(current.map((file) => file.id));
+        const removed = [...currentIds].filter((fileId) => !wanted.has(fileId));
+        const added = [...wanted].filter((fileId) => !currentIds.has(fileId));
+        if (removed.length > 0) await detachFiles(tx, { userId, leaveId: id, fileIds: removed });
+        await attachFiles(tx, { tenantId, userId, leaveId: id, fileIds: added });
+      }
+      const [record] = await withFiles(tx, rows);
+      if (!record) throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
+      return record;
     });
   }
 
@@ -147,16 +252,18 @@ export class LeaveDrizzleRepository extends LeaveRepository {
         .set({ status, decidedBy, updatedBy: userId })
         .where(and(eq(leaves.id, id), isNull(leaves.deletedAt)))
         .returning(writeReturning);
-      if (rows.length === 0)
-        throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
-      return rows[0] as LeaveRecord;
+      const [record] = await withFiles(tx, rows);
+      if (!record) throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
+      return record;
     });
   }
 
   async softDelete(id: string): Promise<void> {
     const tenantId = this.getTenantId();
+    const { userId } = getRequestContext();
     await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
       await softDelete(tx, leaves, id);
+      await detachFiles(tx, { userId, leaveId: id });
     });
   }
 

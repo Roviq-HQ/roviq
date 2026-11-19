@@ -156,3 +156,47 @@ export const userScopedPolicies = (tableName: string) => [
     withCheck: sql`true`,
   }),
 ];
+
+/**
+ * RLS policies for `files`. A row belongs to an institute (`tenant_id`) or a reseller
+ * (`reseller_id`); rows with neither are user-level and visible to platform admins only.
+ * Resellers read only: they have no write GRANT until a reseller upload purpose exists.
+ */
+export const filePolicies = (tableName: string) => [
+  pgPolicy(`${tableName}_app_select`, {
+    for: 'select',
+    to: roviqApp,
+    using: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+  }),
+  pgPolicy(`${tableName}_app_insert`, {
+    for: 'insert',
+    to: roviqApp,
+    withCheck: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+  }),
+  pgPolicy(`${tableName}_app_update`, {
+    for: 'update',
+    to: roviqApp,
+    using: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+    withCheck: sql`tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+  }),
+  pgPolicy(`${tableName}_app_delete`, {
+    for: 'delete',
+    to: roviqApp,
+    using: sql`false`,
+  }),
+  pgPolicy(`${tableName}_reseller_select`, {
+    for: 'select',
+    to: roviqReseller,
+    using: sql`reseller_id = current_setting('app.current_reseller_id', true)::uuid
+      OR tenant_id IN (
+        SELECT id FROM institutes
+        WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid
+      )`,
+  }),
+  pgPolicy(`${tableName}_admin_all`, {
+    for: 'all',
+    to: roviqAdmin,
+    using: sql`true`,
+    withCheck: sql`true`,
+  }),
+];

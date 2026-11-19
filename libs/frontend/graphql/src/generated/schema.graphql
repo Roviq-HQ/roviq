@@ -1710,9 +1710,9 @@ input CreateLeaveInput {
   endDate: String!
 
   """
-  Optional supporting documents. Leaves spanning more than 2 calendar days should attach at least one file.
+  Ids of files uploaded through `requestFileUpload` with purpose LEAVE_ATTACHMENT. Leaves of 3 or more calendar days need at least one.
   """
-  fileUrls: [String!]
+  fileIds: [ID!]
 
   """Short explanation visible to the approver."""
   reason: String!
@@ -2511,6 +2511,53 @@ input ExtraClassSlotInput {
 
   """When this block of extra periods starts (HH:mm)."""
   startTime: String!
+}
+
+"""
+What a file is uploaded for. Decides allowed types, size limit and visibility.
+"""
+enum FilePurpose {
+  BULK_IMPORT_CSV
+  BULK_IMPORT_REPORT
+  LEAVE_ATTACHMENT
+}
+
+"""A stored file. `url` is signed when the response is built and expires."""
+type FileRef {
+  """Verified MIME type."""
+  contentType: String!
+  id: ID!
+
+  """File name as the uploader had it; display only."""
+  name: String!
+
+  """Size in bytes."""
+  sizeBytes: Float!
+
+  """
+  Download URL, valid for about 10 minutes. Null for sensitive files: call `fileDownloadUrl` instead.
+  """
+  url: String
+}
+
+"""An HTTP header the browser must send with the upload."""
+type FileUploadHeader {
+  name: String!
+  value: String!
+}
+
+"""
+Permission to upload one file. PUT the bytes to `uploadUrl` with `headers`, then pass `fileId` to the mutation that attaches it.
+"""
+type FileUploadTicket {
+  expiresAt: DateTime!
+  fileId: ID!
+  headers: [FileUploadHeader!]!
+
+  """
+  Accepts one PUT of exactly the declared size and type before `expiresAt`.
+  """
+  uploadUrl: String!
 }
 
 type FunnelStage {
@@ -3437,8 +3484,8 @@ type LeaveModel {
   """Inclusive end date as ISO YYYY-MM-DD."""
   endDate: String!
 
-  """URLs of supporting documents (e.g. medical certificate)."""
-  fileUrls: [String!]!
+  """Supporting documents (e.g. medical certificate), oldest first."""
+  files: [FileRef!]!
   id: ID!
   reason: String!
 
@@ -3939,6 +3986,11 @@ type Mutation {
   Start a compliance export workflow — returns workflowId for progress tracking
   """
   exportComplianceReport(input: ExportComplianceReportInput!): ExportStartResult!
+
+  """
+  Get a download URL for one file, valid for 60 seconds. A mutation, so every call is audited.
+  """
+  fileDownloadUrl(fileId: ID!): String!
   generateInvoice(input: GenerateInvoiceInput!): InvoiceModel!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
   generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
@@ -4020,6 +4072,11 @@ type Mutation {
   Request duplicate TC (PRD §5.3) — is_duplicate=true, references original
   """
   requestDuplicateTC(input: RequestDuplicateTCInput!): TCModel!
+
+  """
+  Start a file upload. Returns a URL that accepts one PUT of the declared size and type. The file is unusable until a mutation attaches it by `fileId`.
+  """
+  requestFileUpload(input: RequestFileUploadInput!): FileUploadTicket!
 
   """Request a Transfer Certificate — starts TCIssuanceWorkflow"""
   requestTC(input: RequestTCInput!): TCModel!
@@ -4997,6 +5054,19 @@ input RequestDuplicateTCInput {
   Reason for the duplicate request, e.g. FIR reference number or affidavit details.
   """
   reason: String!
+}
+
+"""Ask for permission to upload one file."""
+input RequestFileUploadInput {
+  """MIME type of the file, e.g. "application/pdf"."""
+  contentType: String!
+
+  """File name on the device, e.g. "certificate.pdf"."""
+  fileName: String!
+  purpose: FilePurpose!
+
+  """Exact size in bytes. Storage rejects an upload of any other size."""
+  sizeBytes: Int!
 }
 
 """
@@ -6651,7 +6721,11 @@ input UpdateInstituteLocalesInput {
 """Edit a PENDING leave — dates, type, reason, or supporting files."""
 input UpdateLeaveInput {
   endDate: String
-  fileUrls: [String!]
+
+  """
+  Full new set of attachments: ids already attached stay, missing ones are removed, new ones (uploaded with purpose LEAVE_ATTACHMENT) are added. Omit to leave attachments unchanged.
+  """
+  fileIds: [ID!]
   reason: String
   startDate: String
   type: LeaveType

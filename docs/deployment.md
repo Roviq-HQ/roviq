@@ -45,6 +45,26 @@ Consequences for operations:
 
 The full list of database-enforced rules and the tests that prove them is in `docs/testing.md` → "Security invariants".
 
+## Object storage
+
+The gateway needs an S3-compatible store and all eight `S3_*` variables (see `.env.example`);
+it refuses to start without them. Buckets are created by infrastructure, never by the app:
+
+- **Two buckets**: `S3_BUCKET_PRIVATE` with all public access blocked, and `S3_BUCKET_PUBLIC`
+  with anonymous `s3:GetObject` only. The public bucket holds branding and nothing else.
+- **`S3_PUBLIC_ENDPOINT`** must be the address browsers reach, because presigned URLs are signed
+  for that host. **`S3_PUBLIC_BASE_URL`** is the public bucket's base URL; put a CDN there.
+- **CORS** on the private bucket: allow `PUT` and `GET` from the three portal origins only, with
+  the `Content-Type` request header.
+- **Separate origin**: serve storage from a domain that is not a portal domain, so an uploaded
+  file can never run script in a portal's origin.
+- **Encryption at rest** as the bucket default, and a bucket policy that refuses non-TLS requests.
+- **Region**: India (`ap-south-1` on AWS) for student data.
+- **Lifecycle**: abort incomplete multipart uploads after one day. Do not enable versioning
+  without a plan for erasure requests, which must remove every version.
+- **Backups**: replicate or back up the private bucket; the database alone cannot restore files.
+- `/api/health` reports storage down when either bucket is missing or unreachable.
+
 ## Redis
 
 Redis is on the request path for access control, not only for caching:

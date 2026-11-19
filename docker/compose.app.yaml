@@ -39,6 +39,8 @@ services:
   minio:
     image: quay.io/minio/minio:latest
     networks: [roviq-net]
+    # Published so the browser can reach presigned URLs. Create the buckets once with `pnpm storage:init`.
+    ports: ["9002:9000"]
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: roviq_minio
@@ -102,7 +104,11 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: roviq_minio
       S3_SECRET_KEY: roviq_minio_dev
-      S3_BUCKET_PREFIX: roviq-
+      S3_PUBLIC_ENDPOINT: http://localhost:9002
+      S3_REGION: us-east-1
+      S3_BUCKET_PRIVATE: roviq-private
+      S3_BUCKET_PUBLIC: roviq-public
+      S3_PUBLIC_BASE_URL: http://localhost:9002/roviq-public
       TEMPORAL_ADDRESS: temporal:7233
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}

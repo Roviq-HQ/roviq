@@ -14,7 +14,10 @@
  */
 
 import { BusinessException, ErrorCode, LeaveStatus, LeaveType } from '@roviq/common-types';
+import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import type { FileService } from '../../../files/file.service';
+import type { FileRecord } from '../../../files/repositories/types';
 import { LeaveService } from '../leave.service';
 import type { LeaveRepository } from '../repositories/leave.repository';
 import type { LeaveRecord } from '../repositories/types';
@@ -22,6 +25,8 @@ import type { LeaveRecord } from '../repositories/types';
 const TENANT_ID = '00000000-0000-7000-a000-000000000001';
 const LEAVE_ID = '00000000-0000-7000-a000-000000000002';
 const USER_ID = '00000000-0000-7000-a000-000000000003';
+const FILE_ID = '00000000-0000-7000-a000-000000000005';
+const OTHER_FILE_ID = '00000000-0000-7000-a000-000000000006';
 
 // LeaveService now reads `tenantId` from request context (delete event includes
 // it for downstream routing — HL-009). `vi.mock` is hoisted to the top of the
@@ -47,7 +52,7 @@ function buildLeave(overrides: Partial<LeaveRecord> = {}): LeaveRecord {
     type: LeaveType.CASUAL,
     reason: 'family function',
     status: LeaveStatus.PENDING,
-    fileUrls: [],
+    files: [],
     decidedBy: null,
     createdAt: FIXED_TS,
     updatedAt: FIXED_TS,
@@ -59,6 +64,25 @@ function buildLeave(overrides: Partial<LeaveRecord> = {}): LeaveRecord {
  * Minimal EventBusService stand-in — exposes a synchronous `emit` so the
  * service can call `eventBus.emit(pattern, data)` without going through NATS.
  */
+function buildFile(overrides: Partial<FileRecord> = {}): FileRecord {
+  return {
+    id: FILE_ID,
+    tenantId: TENANT_ID,
+    resellerId: null,
+    subjectUserId: null,
+    visibility: 'PRIVATE',
+    purpose: 'LEAVE_ATTACHMENT',
+    objectKey: `institutes/${TENANT_ID}/leave-attachment/${FILE_ID}.pdf`,
+    originalName: 'med-cert.pdf',
+    contentType: 'application/pdf',
+    sizeBytes: 1024,
+    status: 'READY',
+    uploadedBy: USER_ID,
+    createdAt: FIXED_TS,
+    ...overrides,
+  };
+}
+
 function buildEventBusMock() {
   const emit = vi.fn();
   return { emit, eventBus: { emit } };
@@ -88,16 +112,19 @@ describe('LeaveService (unit)', () => {
   let service: LeaveService;
   let repo: MockedRepo;
   let eventBusMock: ReturnType<typeof buildEventBusMock>;
+  let verifyUploads: Mock<FileService['verifyUploads']>;
 
   beforeEach(() => {
     repo = buildRepoMock();
     eventBusMock = buildEventBusMock();
+    verifyUploads = vi.fn<FileService['verifyUploads']>().mockResolvedValue(undefined);
     // Build the instance via the prototype so we skip the real constructor.
     // The constructor uses TS parameter-property shorthand which esbuild
     // does not fully wire under Vitest — private fields end up undefined.
     service = Object.assign(Object.create(LeaveService.prototype), {
       repo,
       eventBus: eventBusMock.eventBus,
+      files: createMock<FileService>({ verifyUploads }),
     });
   });
 
@@ -169,7 +196,7 @@ describe('LeaveService (unit)', () => {
         endDate: '2026-05-03',
         type: LeaveType.MEDICAL,
         reason: 'flu',
-        fileUrls: [],
+        fileIds: [],
       };
 
       await expect(service.apply(input)).rejects.toMatchObject({
@@ -179,21 +206,21 @@ describe('LeaveService (unit)', () => {
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
 
-    it('accepts a 4-day leave when fileUrls is non-empty, creates the record and emits LEAVE.applied', async () => {
+    it('should verify the uploads, then create a 4-day leave with them and emit LEAVE.applied', async () => {
       const input = {
         userId: USER_ID,
         startDate: '2026-05-01',
         endDate: '2026-05-05',
         type: LeaveType.MEDICAL,
         reason: 'flu with doctor note',
-        fileUrls: ['https://files.example.com/med-cert.pdf'],
+        fileIds: [FILE_ID],
       };
       const created = buildLeave({
         startDate: input.startDate,
         endDate: input.endDate,
         type: input.type,
         reason: input.reason,
-        fileUrls: input.fileUrls,
+        files: [buildFile()],
       });
       repo.create.mockResolvedValue(created);
 
@@ -206,8 +233,9 @@ describe('LeaveService (unit)', () => {
         endDate: '2026-05-05',
         type: LeaveType.MEDICAL,
         reason: 'flu with doctor note',
-        fileUrls: ['https://files.example.com/med-cert.pdf'],
+        fileIds: [FILE_ID],
       });
+      expect(verifyUploads).toHaveBeenCalledWith([FILE_ID], 'LEAVE_ATTACHMENT');
       expect(eventBusMock.emit).toHaveBeenCalledWith(
         'LEAVE.applied',
         expect.objectContaining({
@@ -233,7 +261,6 @@ describe('LeaveService (unit)', () => {
       const created = buildLeave({
         startDate: input.startDate,
         endDate: input.endDate,
-        fileUrls: [],
       });
       repo.create.mockResolvedValue(created);
 
@@ -243,14 +270,85 @@ describe('LeaveService (unit)', () => {
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: USER_ID,
-          fileUrls: [],
+          fileIds: [],
         }),
       );
       expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.applied', expect.anything());
     });
   });
 
+  describe('apply with rejected uploads', () => {
+    it('should not create the leave when an upload fails verification', async () => {
+      verifyUploads.mockRejectedValue(
+        new BusinessException(ErrorCode.FILE_CONTENT_MISMATCH, 'bad file'),
+      );
+
+      await expect(
+        service.apply({
+          userId: USER_ID,
+          startDate: '2026-05-01',
+          endDate: '2026-05-05',
+          type: LeaveType.MEDICAL,
+          reason: 'flu',
+          fileIds: [FILE_ID],
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.FILE_CONTENT_MISMATCH });
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(eventBusMock.emit).not.toHaveBeenCalled();
+    });
+
+    it('should pass a file id given twice to the repo once', async () => {
+      repo.create.mockResolvedValue(buildLeave({ files: [buildFile()] }));
+
+      await service.apply({
+        userId: USER_ID,
+        startDate: '2026-05-01',
+        endDate: '2026-05-01',
+        type: LeaveType.CASUAL,
+        reason: 'short',
+        fileIds: [FILE_ID, FILE_ID],
+      });
+
+      expect(verifyUploads).toHaveBeenCalledWith([FILE_ID], 'LEAVE_ATTACHMENT');
+      expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ fileIds: [FILE_ID] }));
+    });
+  });
+
   describe('update', () => {
+    it('should verify only the newly added files when the attachment set changes', async () => {
+      repo.findById.mockResolvedValue(buildLeave({ files: [buildFile()] }));
+      repo.update.mockResolvedValue(
+        buildLeave({ files: [buildFile(), buildFile({ id: OTHER_FILE_ID })] }),
+      );
+
+      await service.update(LEAVE_ID, { fileIds: [FILE_ID, OTHER_FILE_ID] });
+
+      expect(verifyUploads).toHaveBeenCalledWith([OTHER_FILE_ID], 'LEAVE_ATTACHMENT');
+      expect(repo.update).toHaveBeenCalledWith(LEAVE_ID, {
+        startDate: undefined,
+        endDate: undefined,
+        type: undefined,
+        reason: undefined,
+        fileIds: [FILE_ID, OTHER_FILE_ID],
+      });
+    });
+
+    it('should leave attachments alone when fileIds is omitted', async () => {
+      repo.findById.mockResolvedValue(buildLeave({ files: [buildFile()] }));
+      repo.update.mockResolvedValue(buildLeave({ reason: 'new', files: [buildFile()] }));
+
+      await service.update(LEAVE_ID, { reason: 'new' });
+
+      expect(verifyUploads).not.toHaveBeenCalled();
+      expect(repo.update).toHaveBeenCalledWith(LEAVE_ID, {
+        startDate: undefined,
+        endDate: undefined,
+        type: undefined,
+        reason: 'new',
+        fileIds: undefined,
+      });
+    });
+
     it('rejects when the existing leave is already APPROVED', async () => {
       const existing = buildLeave({ status: LeaveStatus.APPROVED });
       repo.findById.mockResolvedValue(existing);
