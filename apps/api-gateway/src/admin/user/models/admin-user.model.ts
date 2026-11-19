@@ -3,6 +3,8 @@ import { AddressType, Gender, MembershipStatus, UserDocumentType } from '@roviq/
 import type { I18nContent } from '@roviq/database';
 import { DateOnlyScalar, DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
 import { createConnectionType } from '../../../common/pagination/relay-pagination.model';
+import { FileRefModel } from '../../../files/models/file-ref.model';
+import type { FileRecord } from '../../../files/repositories/types';
 import { UserIdentifierType } from '../../../user-profile/user-profile-enums';
 
 /** GraphQL enum mirroring the database `UserStatus` pgEnum */
@@ -158,8 +160,11 @@ export class AdminUserDocumentModel {
   @Field(() => String, { nullable: true })
   description?: string | null;
 
-  @Field(() => [String])
-  fileUrls!: string[];
+  @Field(() => [FileRefModel], {
+    description:
+      'Pages of the document, in order. Their `url` is null: download each with `adminUserDocumentDownloadUrl`.',
+  })
+  files!: FileRecord[];
 
   @Field(() => String, { nullable: true })
   referenceNumber?: string | null;

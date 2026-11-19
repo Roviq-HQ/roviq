@@ -1,5 +1,5 @@
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
-import { Args, ID, Int, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { AdminUserService } from './admin-user.service';
@@ -41,6 +41,17 @@ export class AdminUserResolver {
   @CheckAbility({ action: 'read', subject: 'User' })
   async adminGetUser(@Args('userId', { type: () => ID }, ParseUUIDPipe) userId: string) {
     return this.service.getUser(userId);
+  }
+
+  @Mutation(() => String, {
+    description:
+      'Get a download URL for one page of a user document, valid for 60 seconds. A mutation, so every call is audited.',
+  })
+  @CheckAbility({ action: 'read', subject: 'User' })
+  async adminUserDocumentDownloadUrl(
+    @Args('fileId', { type: () => ID }, ParseUUIDPipe) fileId: string,
+  ): Promise<string> {
+    return this.service.documentDownloadUrl(fileId);
   }
 
   @Query(() => AdminUserStatisticsModel, { description: 'Headline user counts (platform admin)' })

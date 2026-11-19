@@ -47,6 +47,8 @@ export const FILE_PURPOSE_VALUES = [
   'RESELLER_LOGO',
   // A reseller's browser-tab icon, stored square; public
   'RESELLER_FAVICON',
+  // Scan of a person's identity or academic document (birth certificate, Aadhaar, TC)
+  'USER_DOCUMENT',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];

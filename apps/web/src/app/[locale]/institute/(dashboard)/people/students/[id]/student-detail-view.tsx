@@ -81,6 +81,9 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { FileDownloadButton } from '@web/components/file-upload/file-download-button';
+import { FileUpload } from '@web/components/file-upload/file-upload';
+import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload';
 import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
 import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
@@ -96,7 +99,6 @@ import {
   CheckCircle2,
   ChevronsUpDown,
   ClipboardList,
-  FileDown,
   FileText,
   GraduationCap,
   History,
@@ -166,10 +168,12 @@ const DOCUMENT_TYPES = [
   'OTHER',
 ] as const;
 
+const MAX_DOCUMENT_FILES = 10;
+
 const uploadDocumentSchema = z.object({
   type: z.enum(DOCUMENT_TYPES),
   description: emptyStringToUndefined(z.string().max(255).optional()),
-  fileUrlsRaw: z.string().min(1),
+  fileIds: z.array(z.string()).min(1).max(MAX_DOCUMENT_FILES),
   referenceNumber: emptyStringToUndefined(z.string().max(100).optional()),
 });
 type UploadDocumentSchema = typeof uploadDocumentSchema;
@@ -405,7 +409,7 @@ export function StudentDetailView({ studentId }: { studentId: string }) {
                   </TabsContent>
                   <TabsContent value="documents">
                     <ErrorBoundary FallbackComponent={TabErrorFallback}>
-                      <DocumentsTab studentProfileId={student.id} />
+                      <DocumentsTab studentProfileId={student.id} userId={student.userId ?? null} />
                     </ErrorBoundary>
                   </TabsContent>
                   <TabsContent value="tc">
@@ -1815,15 +1819,19 @@ function GuardianLinkToggle({
 
 function UploadDocumentDialog({
   studentProfileId,
+  userId,
   open,
   onOpenChange,
 }: {
   studentProfileId: string;
+  userId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations('students');
+  const tFiles = useTranslations('fileUpload');
   const [uploadDocument, { loading }] = useUploadStudentDocument();
+  const [uploading, setUploading] = useState(false);
 
   const documentTypeOptions = DOCUMENT_TYPES.map((dt) => ({
     value: dt,
@@ -1834,7 +1842,7 @@ function UploadDocumentDialog({
     defaultValues: {
       type: 'BIRTH_CERTIFICATE' as (typeof DOCUMENT_TYPES)[number],
       description: '',
-      fileUrlsRaw: '',
+      fileIds: [] as string[],
       referenceNumber: '',
     } satisfies UploadDocumentFormValues,
     validators: {
@@ -1843,14 +1851,6 @@ function UploadDocumentDialog({
     },
     onSubmit: async ({ value }) => {
       const parsed = uploadDocumentSchema.parse(value);
-      const fileUrls = parsed.fileUrlsRaw
-        .split('\n')
-        .map((url) => url.trim())
-        .filter((url) => url.length > 0);
-      if (fileUrls.length === 0) {
-        toast.error(t('detail.documents.upload.error'));
-        return;
-      }
       try {
         await uploadDocument({
           variables: {
@@ -1858,7 +1858,7 @@ function UploadDocumentDialog({
               studentProfileId,
               type: parsed.type,
               description: parsed.description,
-              fileUrls,
+              fileIds: parsed.fileIds,
               referenceNumber: parsed.referenceNumber,
             },
           },
@@ -1866,7 +1866,12 @@ function UploadDocumentDialog({
         toast.success(t('detail.documents.upload.success'));
         onOpenChange(false);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('detail.documents.upload.error'));
+        const fileError = fileUploadErrorKey(extractGraphQLErrorCode(err));
+        toast.error(
+          fileError
+            ? tFiles(`errors.${fileError}`, { count: MAX_DOCUMENT_FILES })
+            : t('detail.documents.upload.error'),
+        );
       }
     },
   });
@@ -1913,18 +1918,22 @@ function UploadDocumentDialog({
                 />
               )}
             </form.AppField>
-            <form.AppField name="fileUrlsRaw">
+            <form.Field name="fileIds">
               {(field) => (
-                <field.TextareaField
-                  label={t('detail.documents.upload.fileUrlsLabel')}
-                  placeholder={t('detail.documents.upload.fileUrlsPlaceholder')}
-                  rows={3}
-                  description={t('detail.documents.upload.fileUrlsHelp')}
-                  testId="students-detail-upload-doc-urls-input"
-                  errorTestId="students-detail-upload-doc-urls-error"
+                <FileUpload
+                  // Remounted with the dialog so a closed dialog forgets its uploads.
+                  key={String(open)}
+                  name="student-document"
+                  purpose="USER_DOCUMENT"
+                  subjectUserId={userId}
+                  label={t('detail.documents.upload.filesLabel')}
+                  description={t('detail.documents.upload.filesHint')}
+                  maxFiles={MAX_DOCUMENT_FILES}
+                  onChange={(fileIds) => field.handleChange(fileIds)}
+                  onBusyChange={setUploading}
                 />
               )}
-            </form.AppField>
+            </form.Field>
             <form.AppField name="referenceNumber">
               {(field) => (
                 <field.TextField
@@ -1947,7 +1956,7 @@ function UploadDocumentDialog({
             </Button>
             <form.AppForm>
               <form.SubmitButton
-                disabled={loading}
+                disabled={loading || uploading}
                 submittingLabel={t('detail.documents.upload.submitting')}
                 testId="students-detail-upload-doc-submit-btn"
               >
@@ -1963,7 +1972,14 @@ function UploadDocumentDialog({
   );
 }
 
-function DocumentsTab({ studentProfileId }: { studentProfileId: string }) {
+function DocumentsTab({
+  studentProfileId,
+  userId,
+}: {
+  studentProfileId: string;
+  /** Null when the caller may not read it; documents can then be viewed but not added. */
+  userId: string | null;
+}) {
   const t = useTranslations('students');
   const { format } = useFormatDate();
   const { data, loading } = useStudentDocuments(studentProfileId);
@@ -1975,10 +1991,15 @@ function DocumentsTab({ studentProfileId }: { studentProfileId: string }) {
 
   const docs = data?.listStudentDocuments ?? [];
 
-  const header = (
+  const header = userId && (
     <Can I="update" a="Student">
       <div className="flex justify-end">
-        <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => setUploadOpen(true)}
+          data-testid={instituteStudents.detailUploadDocBtn}
+        >
           <FileText aria-hidden="true" className="size-4" />
           {t('detail.documents.upload.uploadButton')}
         </Button>
@@ -2001,11 +2022,14 @@ function DocumentsTab({ studentProfileId }: { studentProfileId: string }) {
             <EmptyDescription>{t('detail.documents.emptyDescription')}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <UploadDocumentDialog
-          studentProfileId={studentProfileId}
-          open={uploadOpen}
-          onOpenChange={setUploadOpen}
-        />
+        {userId && (
+          <UploadDocumentDialog
+            studentProfileId={studentProfileId}
+            userId={userId}
+            open={uploadOpen}
+            onOpenChange={setUploadOpen}
+          />
+        )}
       </div>
     );
   }
@@ -2056,17 +2080,20 @@ function DocumentsTab({ studentProfileId }: { studentProfileId: string }) {
                     : ''}
                 </p>
               </div>
-              {doc.fileUrls.length > 0 && (
+              {doc.files.length > 0 && (
                 <div className="flex flex-col gap-1 print:hidden">
-                  {doc.fileUrls.map((url, idx) => (
-                    <Button key={url} variant="outline" size="sm" asChild>
-                      <a href={url} target="_blank" rel="noopener noreferrer">
-                        <FileDown aria-hidden="true" className="size-3" />
-                        {doc.fileUrls.length > 1
+                  {doc.files.map((file, idx) => (
+                    <FileDownloadButton
+                      key={file.id}
+                      fileId={file.id}
+                      scope="institute"
+                      testId={instituteStudents.detailDocumentFileBtn(file.id)}
+                      label={
+                        doc.files.length > 1
                           ? t('detail.documents.page', { n: idx + 1 })
-                          : t('detail.documents.download')}
-                      </a>
-                    </Button>
+                          : t('detail.documents.download')
+                      }
+                    />
                   ))}
                 </div>
               )}
@@ -2074,11 +2101,14 @@ function DocumentsTab({ studentProfileId }: { studentProfileId: string }) {
           </CardContent>
         </Card>
       ))}
-      <UploadDocumentDialog
-        studentProfileId={studentProfileId}
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-      />
+      {userId && (
+        <UploadDocumentDialog
+          studentProfileId={studentProfileId}
+          userId={userId}
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+        />
+      )}
     </div>
   );
 }

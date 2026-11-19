@@ -654,6 +654,7 @@ export const testIds = {
     identifierRow: (id: string) => `admin-user-identifier-${id}`,
     identifierValue: (id: string) => `admin-user-identifier-value-${id}`,
     documentRow: (id: string) => `admin-user-document-${id}`,
+    documentFileBtn: (id: string) => `admin-user-document-file-${id}`,
     addressCard: (id: string) => `admin-user-address-${id}`,
     empty: (name: 'memberships' | 'identity' | 'documents' | 'addresses') =>
       `admin-user-empty-${name}`,
@@ -745,6 +746,8 @@ export const testIds = {
     detailSaveBtn: 'students-detail-save-btn',
     detailGuardiansEmpty: 'students-detail-guardians-empty',
     detailDocumentsEmpty: 'students-detail-documents-empty',
+    detailUploadDocBtn: 'students-detail-upload-doc-btn',
+    detailDocumentFileBtn: (id: string) => `students-detail-document-file-${id}`,
     detailTcEmpty: 'students-detail-tc-empty',
     detailAuditEmpty: 'students-detail-audit-empty',
     detailAcademicsEmpty: 'students-detail-academics-empty',

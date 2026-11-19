@@ -805,3 +805,10 @@ In one full `pnpm test:e2e:ui` run in slot 4 (273 passed, 1 failed, 3 did not ru
 - **Cause:** ROV-210 made the eight `S3_*` variables required at gateway start. Locally they come from `.env`; the `test` job in `.github/workflows/ci.yml` lists its variables by hand and had none of them. The e2e jobs copy `.env.example`, so they passed.
 - **Fix:** added the `S3_*` values to the `test` job env. No integration test talks to a live object store, so no storage service was added.
 - **Lesson:** a new required environment variable must be added to the `test` job env in `ci.yml` in the same change; `pnpm ci:check` cannot catch this because it reads `.env`.
+
+## 2026-11-19 — Integration setup failed: "Non-commutative migrations detected" after two branches merged (fixed)
+
+- **Symptom:** `pnpm test:int` stopped in global setup with `drizzle-kit migrate failed` and "Non-commutative migrations detected … create_policy on resellers table".
+- **Cause:** ROV-186 and the storage work (ROV-210 onward) were written in parallel, so their migrations both have the ROV-185 snapshot as parent: two branches. The storage snapshots do not know the `reseller_own_update` policy from ROV-186. The next `drizzle-kit generate` (ROV-301 student documents) therefore put that policy into its migration and snapshot a second time, and drizzle-kit saw two branches creating the same policy.
+- **Fix:** removed the duplicate `CREATE POLICY` line from the new migration and gave its `snapshot.json` both branch tips as `prevIds`, which makes it the merge point. `drizzle-kit check` passes and `drizzle-kit generate` reports no changes.
+- **Lesson:** after merging branches that each added a migration, the first `drizzle-kit generate` re-emits whatever the other branch added. Read the generated SQL for statements that are not yours, delete them, and add the other branch's last snapshot id to `prevIds`.

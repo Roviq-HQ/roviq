@@ -3,6 +3,7 @@ import {
   authEvents,
   DRIZZLE_DB,
   type DrizzleDB,
+  filesLive,
   institutesLive,
   membershipsLive,
   mkAdminCtx,
@@ -12,6 +13,7 @@ import {
   resellersLive,
   rolesLive,
   userAddressesLive,
+  userDocumentFilesLive,
   userDocumentsLive,
   userIdentifiersLive,
   userProfilesLive,
@@ -35,6 +37,9 @@ import {
   sql,
 } from 'drizzle-orm';
 import { decodeCursor, encodeCursor } from '../../../common/pagination/relay-pagination.model';
+import { fileLiveColumns } from '../../../files/repositories/file-columns';
+import type { FileRecord } from '../../../files/repositories/types';
+import { loadUserDocumentFiles } from '../../../files/user-document-files';
 import { AdminUserRepository } from './admin-user.repository';
 import type {
   AdminUserDetailRecord,
@@ -378,7 +383,6 @@ export class AdminUserDrizzleRepository extends AdminUserRepository {
               id: userDocumentsLive.id,
               type: userDocumentsLive.type,
               description: userDocumentsLive.description,
-              fileUrls: userDocumentsLive.fileUrls,
               referenceNumber: userDocumentsLive.referenceNumber,
               isVerified: userDocumentsLive.isVerified,
               rejectionReason: userDocumentsLive.rejectionReason,
@@ -405,6 +409,11 @@ export class AdminUserDrizzleRepository extends AdminUserRepository {
             .orderBy(asc(userAddressesLive.type)),
         ]);
 
+      const documentFiles = await loadUserDocumentFiles(
+        tx,
+        documents.map((document) => document.id),
+      );
+
       return {
         ...user,
         profile: user.profile ? { ...user.profile, gender, dateOfBirth, nationality } : null,
@@ -416,9 +425,23 @@ export class AdminUserDrizzleRepository extends AdminUserRepository {
             displayValue: identifierDisplayValue(rest.type, valueMasked, valuePlain),
           }),
         ),
-        documents,
+        documents: documents.map((document) => ({
+          ...document,
+          files: documentFiles.get(document.id) ?? [],
+        })),
         addresses,
       };
+    });
+  }
+
+  async findDocumentFile(fileId: string): Promise<FileRecord | null> {
+    return withAdmin(this.db, mkAdminCtx('service:admin-user'), async (tx) => {
+      const [row] = await tx
+        .select(fileLiveColumns)
+        .from(userDocumentFilesLive)
+        .innerJoin(filesLive, eq(filesLive.id, userDocumentFilesLive.fileId))
+        .where(and(eq(userDocumentFilesLive.fileId, fileId), eq(filesLive.status, 'READY')));
+      return (row as FileRecord | undefined) ?? null;
     });
   }
 
