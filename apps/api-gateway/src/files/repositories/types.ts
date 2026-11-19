@@ -16,6 +16,13 @@ export interface FileRecord {
   createdAt: Date;
 }
 
+/** The leave a file is attached to, with the fields leave abilities are conditioned on. */
+export interface FileLeaveOwner {
+  id: string;
+  tenantId: string;
+  userId: string;
+}
+
 export interface CreateFileData {
   visibility: FileVisibility;
   purpose: FilePurpose;

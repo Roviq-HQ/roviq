@@ -54,6 +54,12 @@ export abstract class StorageClient {
     options: PutOptions,
   ): Promise<void>;
 
+  /** Server-side copy; the source and destination may be in different buckets. */
+  abstract copy(
+    from: { bucket: StorageBucket; key: string },
+    to: { bucket: StorageBucket; key: string },
+  ): Promise<void>;
+
   /** Null when the object does not exist. */
   abstract head(bucket: StorageBucket, key: string): Promise<StoredObjectInfo | null>;
 

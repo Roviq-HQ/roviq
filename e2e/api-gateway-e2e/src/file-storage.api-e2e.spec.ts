@@ -12,6 +12,7 @@ import {
   loginAsInstituteAdmin,
   loginAsInstituteAdminSecondInstitute,
   loginAsPlatformAdmin,
+  loginAsStudent,
 } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
@@ -149,6 +150,55 @@ describe('File storage E2E', () => {
       expect(download.headers.get('content-disposition')).toContain('attachment');
     });
 
+    it('should keep serving the verified bytes when the upload URL is used again', async () => {
+      const ticketRes = await requestUpload(tokenA);
+      const ticket = ticketRes.data?.requestFileUpload;
+      assert(ticket);
+      expect(await put(ticket, PDF)).toBe(200);
+      const attached = await applyLeave(tokenA, SEED_IDS.MEMBERSHIP_ADMIN_INST1, '2027-01-18', [
+        ticket.fileId,
+      ]);
+      expect(attached.errors).toBeUndefined();
+      const url = attached.data?.applyLeave.files[0]?.url;
+      assert(url);
+
+      // Same size and type, so storage accepts the write; it must not reach the served file.
+      const replacement = Buffer.concat([Buffer.from('MZ-not-a'), Buffer.alloc(4097, 0x41)]);
+      expect(replacement.length).toBe(PDF.length);
+      await put(ticket, replacement);
+
+      const served = Buffer.from(await (await fetch(url)).arrayBuffer());
+      expect(served.equals(PDF)).toBe(true);
+    });
+
+    it('should refuse removing the only document from a leave of 3 or more days', async () => {
+      const fileId = await uploadFile(tokenA);
+      const created = await gql<{ applyLeave: Leave }>(
+        APPLY_LEAVE,
+        {
+          input: {
+            userId: SEED_IDS.MEMBERSHIP_ADMIN_INST1,
+            startDate: '2027-02-01',
+            endDate: '2027-02-04',
+            type: LeaveType.MEDICAL,
+            reason: 'file storage e2e',
+            fileIds: [fileId],
+          },
+        },
+        tokenA,
+      );
+      expect(created.errors).toBeUndefined();
+      assert(created.data);
+
+      const res = await gql(
+        UPDATE_LEAVE,
+        { id: created.data.applyLeave.id, input: { fileIds: [] } },
+        tokenA,
+      );
+
+      expect(codeOf(res)).toBe(ErrorCode.LEAVE_DOCUMENT_REQUIRED);
+    });
+
     it('should return the file again when the leave is read later', async () => {
       const res = await gql<{ leave: Leave }>(LEAVE, { id: leaveId }, tokenA);
 
@@ -280,6 +330,27 @@ describe('File storage E2E', () => {
       const res = await requestUpload(accessToken);
 
       expect(codeOf(res)).toBe(ErrorCode.FORBIDDEN);
+    });
+
+    it("should not show or serve another person's leave attachment to a student", async () => {
+      const fileId = await uploadFile(tokenA);
+      const attached = await applyLeave(tokenA, SEED_IDS.MEMBERSHIP_ADMIN_INST1, '2027-01-19', [
+        fileId,
+      ]);
+      expect(attached.errors).toBeUndefined();
+      assert(attached.data);
+      const { accessToken: studentToken } = await loginAsStudent();
+
+      const read = await gql<{ leave: Leave }>(
+        LEAVE,
+        { id: attached.data.applyLeave.id },
+        studentToken,
+      );
+      const download = await gql(DOWNLOAD_URL, { fileId }, studentToken);
+
+      // Whether the leave itself is readable is a leave rule; its documents must not be.
+      expect(read.data?.leave?.files ?? []).toEqual([]);
+      expect(codeOf(download)).toBe(ErrorCode.FILE_NOT_FOUND);
     });
 
     it("should not let another institute attach this institute's pending upload", async () => {

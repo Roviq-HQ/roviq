@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
@@ -111,6 +112,20 @@ export class S3StorageClient extends StorageClient {
         Body: body,
         ContentType: options.contentType,
         ...(options.cacheControl && { CacheControl: options.cacheControl }),
+      }),
+    );
+  }
+
+  async copy(
+    from: { bucket: StorageBucket; key: string },
+    to: { bucket: StorageBucket; key: string },
+  ): Promise<void> {
+    const sourceKey = from.key.split('/').map(encodeURIComponent).join('/');
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.buckets[to.bucket],
+        Key: to.key,
+        CopySource: `${this.buckets[from.bucket]}/${sourceKey}`,
       }),
     );
   }

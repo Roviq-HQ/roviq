@@ -63,6 +63,15 @@ export class FakeStorageClient extends StorageClient {
     });
   }
 
+  async copy(
+    from: { bucket: StorageBucket; key: string },
+    to: { bucket: StorageBucket; key: string },
+  ): Promise<void> {
+    const object = this.objects.get(this.id(from.bucket, from.key));
+    if (!object) throw new Error(`No such object: ${this.id(from.bucket, from.key)}`);
+    this.objects.set(this.id(to.bucket, to.key), { ...object });
+  }
+
   async head(bucket: StorageBucket, key: string): Promise<StoredObjectInfo | null> {
     const object = this.objects.get(this.id(bucket, key));
     return object ? { size: object.body.length, contentType: object.contentType } : null;

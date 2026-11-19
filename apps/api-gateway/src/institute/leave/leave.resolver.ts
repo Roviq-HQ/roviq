@@ -1,8 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
-import { AbilityGuard, CheckAbility } from '@roviq/casl';
-import { LeaveStatus, LeaveType } from '@roviq/common-types';
+import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
+import { type AppAbility, LeaveStatus, LeaveType } from '@roviq/common-types';
 import { FileService } from '../../files/file.service';
 import { FileRefModel } from '../../files/models/file-ref.model';
 import { CreateLeaveInput } from './dto/create-leave.input';
@@ -20,8 +20,11 @@ export class LeaveResolver {
   ) {}
 
   @ResolveField(() => [FileRefModel])
-  files(@Parent() leave: LeaveRecord): Promise<FileRefModel[]> {
-    return this.fileService.toRefs(leave.files);
+  files(
+    @Parent() leave: LeaveRecord,
+    @CurrentAbility() ability: AppAbility | undefined,
+  ): Promise<FileRefModel[]> {
+    return this.fileService.toRefs(this.service.filesVisibleTo(ability, leave));
   }
 
   @Query(() => [LeaveModel], {

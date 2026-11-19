@@ -13,7 +13,14 @@
  * does not reliably wire private fields under esbuild/Vitest).
  */
 
-import { BusinessException, ErrorCode, LeaveStatus, LeaveType } from '@roviq/common-types';
+import { createMongoAbility } from '@casl/ability';
+import {
+  type AppAbility,
+  BusinessException,
+  ErrorCode,
+  LeaveStatus,
+  LeaveType,
+} from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { FileService } from '../../../files/file.service';
@@ -277,6 +284,35 @@ describe('LeaveService (unit)', () => {
     });
   });
 
+  describe('filesVisibleTo', () => {
+    const ownLeavesOnly = createMongoAbility<AppAbility>([
+      { action: 'read', subject: 'Leave', conditions: { userId: USER_ID } },
+    ]);
+
+    it('should show the files of a leave the ability covers', () => {
+      const leave = buildLeave({ files: [buildFile()] });
+
+      expect(service.filesVisibleTo(ownLeavesOnly, leave)).toEqual([buildFile()]);
+    });
+
+    it("should hide the files of another person's leave from an own-leaves-only ability", () => {
+      const leave = buildLeave({ userId: APPROVER_ID, files: [buildFile()] });
+
+      expect(service.filesVisibleTo(ownLeavesOnly, leave)).toEqual([]);
+    });
+
+    it("should show every leave's files to an unconditional read ability", () => {
+      const readAll = createMongoAbility<AppAbility>([{ action: 'read', subject: 'Leave' }]);
+      const leave = buildLeave({ userId: APPROVER_ID, files: [buildFile()] });
+
+      expect(service.filesVisibleTo(readAll, leave)).toEqual([buildFile()]);
+    });
+
+    it('should hide files when no ability was resolved for the request', () => {
+      expect(service.filesVisibleTo(undefined, buildLeave({ files: [buildFile()] }))).toEqual([]);
+    });
+  });
+
   describe('apply with rejected uploads', () => {
     it('should not create the leave when an upload fails verification', async () => {
       verifyUploads.mockRejectedValue(
@@ -330,6 +366,42 @@ describe('LeaveService (unit)', () => {
         type: undefined,
         reason: undefined,
         fileIds: [FILE_ID, OTHER_FILE_ID],
+      });
+    });
+
+    it('should refuse stretching an undocumented leave to 3 or more days', async () => {
+      repo.findById.mockResolvedValue(
+        buildLeave({ startDate: '2026-05-01', endDate: '2026-05-02' }),
+      );
+
+      await expect(service.update(LEAVE_ID, { endDate: '2026-05-03' })).rejects.toMatchObject({
+        code: ErrorCode.LEAVE_DOCUMENT_REQUIRED,
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('should refuse removing every document from a leave of 3 or more days', async () => {
+      repo.findById.mockResolvedValue(
+        buildLeave({ startDate: '2026-05-01', endDate: '2026-05-05', files: [buildFile()] }),
+      );
+
+      await expect(service.update(LEAVE_ID, { fileIds: [] })).rejects.toMatchObject({
+        code: ErrorCode.LEAVE_DOCUMENT_REQUIRED,
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow stretching a documented leave to 3 or more days', async () => {
+      const existing = buildLeave({
+        startDate: '2026-05-01',
+        endDate: '2026-05-02',
+        files: [buildFile()],
+      });
+      repo.findById.mockResolvedValue(existing);
+      repo.update.mockResolvedValue(buildLeave({ endDate: '2026-05-06', files: [buildFile()] }));
+
+      await expect(service.update(LEAVE_ID, { endDate: '2026-05-06' })).resolves.toMatchObject({
+        endDate: '2026-05-06',
       });
     });
 

@@ -1,5 +1,7 @@
+import { subject } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
 import {
+  type AppAbility,
   BusinessException,
   calendarDaysBetween,
   ErrorCode,
@@ -12,6 +14,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { FileService } from '../../files/file.service';
+import type { FileRecord } from '../../files/repositories/types';
 import type { CreateLeaveInput } from './dto/create-leave.input';
 import type { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveRepository } from './repositories/leave.repository';
@@ -50,18 +53,23 @@ export class LeaveService {
     return this.repo.list(filter);
   }
 
+  /**
+   * Attachments (often medical documents) are shown only to someone who may read this very
+   * leave, so a rule limited to "own leaves" never exposes another person's documents.
+   */
+  filesVisibleTo(ability: AppAbility | undefined, leave: LeaveRecord): FileRecord[] {
+    const record = subject('Leave', {
+      id: leave.id,
+      tenantId: leave.tenantId,
+      userId: leave.userId,
+    });
+    return ability?.can('read', record) ? leave.files : [];
+  }
+
   async apply(input: CreateLeaveInput): Promise<LeaveRecord> {
     this.assertValidRange(input.startDate, input.endDate);
     const fileIds = [...new Set(input.fileIds ?? [])];
-    if (
-      calendarDaysBetween(input.startDate, input.endDate) >= MIN_DOCUMENTED_DAYS &&
-      fileIds.length === 0
-    ) {
-      throw new BusinessException(
-        ErrorCode.LEAVE_DOCUMENT_REQUIRED,
-        'Leaves spanning 3 or more calendar days require at least one supporting document.',
-      );
-    }
+    this.assertDocumented(input.startDate, input.endDate, fileIds.length);
 
     await this.files.verifyUploads(fileIds, LEAVE_FILE_PURPOSE);
 
@@ -101,6 +109,7 @@ export class LeaveService {
     this.assertValidRange(start, end);
 
     const fileIds = input.fileIds ? [...new Set(input.fileIds)] : undefined;
+    this.assertDocumented(start, end, fileIds ? fileIds.length : existing.files.length);
     if (fileIds) {
       const attached = new Set(existing.files.map((file) => file.id));
       await this.files.verifyUploads(
@@ -189,6 +198,15 @@ export class LeaveService {
   async approvedOnDate(date: string, userIds: string[]): Promise<string[]> {
     if (userIds.length === 0) return [];
     return this.repo.approvedOnDate({ date, userIds });
+  }
+
+  private assertDocumented(start: string, end: string, fileCount: number) {
+    if (calendarDaysBetween(start, end) >= MIN_DOCUMENTED_DAYS && fileCount === 0) {
+      throw new BusinessException(
+        ErrorCode.LEAVE_DOCUMENT_REQUIRED,
+        'Leaves spanning 3 or more calendar days require at least one supporting document.',
+      );
+    }
   }
 
   private assertValidRange(start: string, end: string) {
