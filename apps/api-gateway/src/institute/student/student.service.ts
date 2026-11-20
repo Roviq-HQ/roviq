@@ -282,17 +282,20 @@ export class StudentService {
   // ── READ ──────────────────────────────────────────────────
 
   /**
-   * Saves a document for a student from files uploaded beforehand. The student must belong
-   * to this institute (RLS on `student_profiles`); `user_documents` is platform-level and
+   * Saves a document for a student from files uploaded beforehand. The student must be one
+   * the caller can read in this institute; `user_documents` is platform-level and
    * written as admin. Files become READY only together with the document row.
    */
-  async uploadDocument(input: {
-    studentProfileId: string;
-    type: UserDocumentType;
-    description?: string;
-    fileIds: string[];
-    referenceNumber?: string;
-  }): Promise<StudentDocumentModel> {
+  async uploadDocument(
+    input: {
+      studentProfileId: string;
+      type: UserDocumentType;
+      description?: string;
+      fileIds: string[];
+      referenceNumber?: string;
+    },
+    ability: AppAbility,
+  ): Promise<StudentDocumentModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
@@ -311,12 +314,22 @@ export class StudentService {
         return tx
           .select({ userId: studentProfilesLive.userId })
           .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, input.studentProfileId))
+          .where(
+            and(
+              eq(studentProfilesLive.id, input.studentProfileId),
+              studentReadPredicate(ability, null),
+            ),
+          )
           .limit(1);
       },
     );
     if (studentRows.length === 0) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
+    }
+
+    // Same field rule as the document list: a caller who cannot see Aadhaar cannot add one.
+    if (input.type === 'AADHAAR_CARD' && !ability.can('read', 'Student', 'aadhaar')) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Not allowed to add this document type');
     }
     const userId = studentRows[0].userId;
 

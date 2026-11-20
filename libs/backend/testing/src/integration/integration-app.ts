@@ -18,7 +18,7 @@ import { setupTestEnv } from './test-env.js';
  * typos in the token and mismatches between the token and its value.
  */
 export interface ProviderOverride<T = unknown> {
-  provide: string | symbol | (new (...args: never[]) => T);
+  provide: string | symbol | (abstract new (...args: never[]) => T);
   useValue: T;
 }
 

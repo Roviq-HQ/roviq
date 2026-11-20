@@ -118,8 +118,9 @@ export class StudentResolver {
   @CheckAbility({ action: 'update', subject: 'Student' })
   async uploadStudentDocument(
     @Args('input') input: UploadStudentDocumentInput,
+    @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentDocumentModel> {
-    return this.studentService.uploadDocument(input);
+    return this.studentService.uploadDocument(input, access.ability);
   }
 
   @Mutation(() => Boolean, {

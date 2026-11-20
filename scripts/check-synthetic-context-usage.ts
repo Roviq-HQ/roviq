@@ -120,6 +120,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/__tests__/student-detail.integration.spec.ts',
   // ROV-300: isolated fixtures for the student document removal tests only.
   'apps/api-gateway/src/institute/student/__tests__/student-document-removal.integration.spec.ts',
+  // ROV-300: isolated fixtures for the student document upload tests only.
+  'apps/api-gateway/src/institute/student/__tests__/student-document-upload.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student.service.spec.ts',
   'apps/api-gateway/src/institute/student/student-academic.service.ts',
   'apps/api-gateway/src/institute/student/student-event.handler.ts',
