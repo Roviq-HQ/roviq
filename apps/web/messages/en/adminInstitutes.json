@@ -201,7 +201,8 @@
       "users": "Users",
       "config": "Configuration",
       "branding": "Branding",
-      "audit": "Audit Log"
+      "audit": "Audit Log",
+      "exports": "Exports"
     },
     "identity": "Identity",
     "resellerInfo": "Reseller",
@@ -431,6 +432,98 @@
       "groupTitle": "Institute group",
       "groupBody": "Use this to link multiple branches of the same chain (e.g. DPS Society, Amity Group). Grouped institutes can share branding, plan tiers, and cross-institute analytics while each branch still has its own tenant data. Leave blank for standalone institutes.",
       "groupExample": "Example: 'DPS Group' can contain DPS-GBN-01, DPS-GBN-02, DPS-DLI-03. A parent who has children in two branches can switch between them from the same login."
+    }
+  },
+  "exports": {
+    "title": "Compliance exports",
+    "description": "Generate government and board returns for this institute as Excel files. Exports run in the background; this page updates when they finish.",
+    "academicYear": "Academic year",
+    "academicYearPlaceholder": "Choose an academic year",
+    "activeYear": "{label} (current)",
+    "noAcademicYears": "This institute has no academic year yet, so there is nothing to export.",
+    "generate": "Generate export",
+    "generateHint": "Build this report for the chosen academic year",
+    "regenerate": "Generate again",
+    "queued": "Waiting to start…",
+    "running": "Generating…",
+    "ready": "Ready · {count, plural, =0 {no records} one {# record} other {# records}}",
+    "generatedOn": "Generated {date}",
+    "download": "Download",
+    "notGenerated": "Not generated for this year yet.",
+    "reportTypes": {
+      "UDISE_DCF": {
+        "title": "UDISE+ DCF",
+        "description": "Students and teachers in the UDISE+ data capture format."
+      },
+      "CBSE_REGISTRATION": {
+        "title": "CBSE registration (Class 9 and 11)",
+        "description": "Candidate list for Pariksha Sangam registration."
+      },
+      "CBSE_LOC": {
+        "title": "CBSE LOC (Class 10 and 12)",
+        "description": "List of candidates for the board examination."
+      },
+      "BSEH_STAFF_STATEMENT": {
+        "title": "BSEH staff statement",
+        "description": "Staff employed during the year, for the Haryana board."
+      },
+      "SHALA_DARPAN": {
+        "title": "Shala Darpan (Rajasthan)",
+        "description": "Student and staff return for the Rajasthan education department."
+      },
+      "RTE_REPORT": {
+        "title": "RTE enrolment",
+        "description": "RTE-admitted students by class."
+      },
+      "TC_REGISTER": {
+        "title": "TC register",
+        "description": "Every transfer certificate issued in the year."
+      },
+      "AWR": {
+        "title": "Admission register",
+        "description": "All admissions, by admission number."
+      }
+    },
+    "statuses": {
+      "PENDING": "Queued",
+      "RUNNING": "Generating",
+      "COMPLETED": "Ready",
+      "FAILED": "Failed"
+    },
+    "errors": {
+      "EXPORT_GENERATION_FAILED": "The export could not be built. Try again; if it fails again, contact support.",
+      "EXPORT_START_FAILED": "The export could not be started. Try again in a few minutes.",
+      "EXPORT_TIMED_OUT": "The export took too long and was stopped. Generate it again.",
+      "EXPORT_TYPE_NOT_AVAILABLE": "This institute does not qualify for this report (board affiliation or state).",
+      "FILE_TOO_LARGE": "The export is too large to store. Contact support.",
+      "INVALID_STATE_TRANSITION": "The export was interrupted. Generate it again.",
+      "ACADEMIC_YEAR_NOT_FOUND": "That academic year does not belong to this institute.",
+      "INSTITUTE_NOT_FOUND": "This institute no longer exists.",
+      "FORBIDDEN": "You do not have permission to generate exports.",
+      "unknown": "Something went wrong. Try again."
+    },
+    "toast": {
+      "started": "Export started. It will be ready here in a moment.",
+      "failed": "Could not start the export"
+    },
+    "history": {
+      "title": "Past exports",
+      "columns": {
+        "type": "Report",
+        "year": "Academic year",
+        "requestedAt": "Requested",
+        "requestedBy": "Requested by",
+        "status": "Status",
+        "rows": "Records",
+        "size": "Size",
+        "download": "File"
+      },
+      "empty": "No exports yet",
+      "emptyDescription": "Generated exports appear here, newest first.",
+      "loadFailed": "Past exports could not be loaded.",
+      "retry": "Retry",
+      "sizeKb": "{size} KB",
+      "sizeMb": "{size} MB"
     }
   }
 }

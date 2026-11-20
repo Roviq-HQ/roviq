@@ -157,7 +157,7 @@ it('instituteConfigUpdated fires after updateInstituteConfig', async () => {
 
 ## Temporal-backed workflows
 
-`StudentAdmissionWorkflow` runs in the e2e stack (the api-gateway sets `STUDENT_ADMISSION_WORKER_ENABLED`), so admission specs assert the real `ENROLLED` outcome — subscribe to `applicationStatusChanged` before `approveApplication` and await the event. `BulkStudentImportWorkflow` runs there too (`STUDENT_IMPORT_WORKER_ENABLED`): `student-bulk-import.api-e2e.spec.ts` polls `bulkImportProgress` until `COMPLETED`. TC issuance (`TCIssuanceWorkflow`), institute setup, and compliance export workers are not yet registered in the e2e stack (tracked in **ROV-232**). For those:
+`StudentAdmissionWorkflow` runs in the e2e stack (the api-gateway sets `STUDENT_ADMISSION_WORKER_ENABLED`), so admission specs assert the real `ENROLLED` outcome — subscribe to `applicationStatusChanged` before `approveApplication` and await the event. `BulkStudentImportWorkflow` runs there too (`STUDENT_IMPORT_WORKER_ENABLED`): `student-bulk-import.api-e2e.spec.ts` polls `bulkImportProgress` until `COMPLETED`. `ComplianceExportWorkflow` runs there too (`COMPLIANCE_EXPORT_WORKER_ENABLED`): `compliance-export.api-e2e.spec.ts` polls `adminListExportReports` until `COMPLETED`. TC issuance (`TCIssuanceWorkflow`) and institute setup workers are not yet registered in the e2e stack (tracked in **ROV-232**). For those:
 
 - Mutations that enqueue a workflow still return successfully — assert the response envelope.
 - Assertions that depend on a post-workflow state (e.g. `ENROLLED`, `GENERATED`, `ISSUED`) go in a `describe.skip(...)` that names **ROV-232** in the title so the suite can be unskipped in one pass when the worker lands.

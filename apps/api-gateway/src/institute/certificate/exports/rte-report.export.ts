@@ -1,62 +1,75 @@
 /**
- * RTE Enrollment Report Export (ROV-171, PRD §8).
+ * RTE Enrollment Report Export (ROV-171, ROV-296).
  *
- * RTE student count by class, fee reimbursement amounts.
- * Batch-fetches all data (no N+1).
+ * One row per class of the chosen academic year, in class order: RTE-admitted students
+ * (Section 12(1)(c)) and all students enrolled. No official layout was found; the class is
+ * shown by its name.
  */
 import {
   type DrizzleDB,
   mkInstituteCtx,
+  standardsLive,
   studentAcademicsLive,
   studentProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
+import { resolveI18n } from './export-helpers';
+import type { ComplianceExportOutput } from './types';
 
-const RTE_HEADERS = ['Class (Standard ID)', 'RTE Students Count', 'Total Students'];
+export const RTE_HEADERS = ['Class', 'RTE Students Count', 'Total Students'];
+
+const ORIGIN = 'workflow:compliance-export-rte-report';
+
+export interface RteEnrolmentRow {
+  standardId: string;
+  standardName: Record<string, string>;
+  isRteAdmitted: boolean;
+}
 
 export async function generateRteReport(
   db: DrizzleDB,
   tenantId: string,
   academicYearId: string,
-): Promise<Buffer> {
-  const academics = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-rte-report-export'),
-    async (tx) => {
-      return tx
-        .select()
-        .from(studentAcademicsLive)
-        .where(eq(studentAcademicsLive.academicYearId, academicYearId));
-    },
+): Promise<ComplianceExportOutput> {
+  const enrolments = await withTenant(db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+    tx
+      .select({
+        standardId: studentAcademicsLive.standardId,
+        standardName: standardsLive.name,
+        isRteAdmitted: studentProfilesLive.isRteAdmitted,
+      })
+      .from(studentAcademicsLive)
+      .innerJoin(
+        studentProfilesLive,
+        eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
+      )
+      .innerJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
+      .where(eq(studentAcademicsLive.academicYearId, academicYearId))
+      .orderBy(asc(standardsLive.numericOrder)),
   );
+  return buildRteReport(enrolments);
+}
 
-  // Batch fetch all student profiles (single query instead of per-row)
-  const allStudents = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-rte-report-export'),
-    async (tx) => {
-      return tx
-        .select({ id: studentProfilesLive.id, isRteAdmitted: studentProfilesLive.isRteAdmitted })
-        .from(studentProfilesLive);
-    },
-  );
-  const rteMap = new Map(allStudents.map((s) => [s.id, s.isRteAdmitted]));
-
-  // Group by standardId
-  const standardMap = new Map<string, { total: number; rte: number }>();
-  for (const acad of academics) {
-    const entry = standardMap.get(acad.standardId) ?? { total: 0, rte: 0 };
+/** `enrolments` arrive in class order; the sheet keeps it. */
+export function buildRteReport(enrolments: readonly RteEnrolmentRow[]): ComplianceExportOutput {
+  const byClass = new Map<string, { name: string; total: number; rte: number }>();
+  for (const row of enrolments) {
+    const entry = byClass.get(row.standardId) ?? {
+      name: resolveI18n(row.standardName),
+      total: 0,
+      rte: 0,
+    };
     entry.total++;
-    if (rteMap.get(acad.studentProfileId)) entry.rte++;
-    standardMap.set(acad.standardId, entry);
+    if (row.isRteAdmitted) entry.rte++;
+    byClass.set(row.standardId, entry);
   }
 
-  const rows = Array.from(standardMap.entries()).map(([standardId, data]) => ({
-    'Class (Standard ID)': standardId,
-    'RTE Students Count': data.rte,
-    'Total Students': data.total,
+  const rows = [...byClass.values()].map((entry) => ({
+    Class: entry.name,
+    'RTE Students Count': entry.rte,
+    'Total Students': entry.total,
   }));
 
   const wb = XLSX.utils.book_new();
@@ -65,5 +78,8 @@ export async function generateRteReport(
     XLSX.utils.json_to_sheet(rows, { header: RTE_HEADERS }),
     'RTE Report',
   );
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  return {
+    buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+    rowCount: rows.length,
+  };
 }

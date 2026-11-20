@@ -39,6 +39,7 @@ Run `pnpm db:migrate` (Drizzle `migrate`, connecting with `DATABASE_URL_MIGRATE`
 | `*_rov-186-reseller-branding-files` | Adds the file purposes `RESELLER_LOGO` and `RESELLER_FAVICON`, `resellers.logo_file_id` / `favicon_file_id`, the reseller write policies on `files` with `INSERT, UPDATE` for `roviq_reseller`, and removes typed `logoUrl` / `faviconUrl` from `resellers.branding`. A logo that was typed as a URL is gone after this migration and must be uploaded. |
 | `*_rov-195-drop-branding-urls`, `*_rov-195-branding-files` | Drops the typed URL columns (`institute_branding.logo_url` / `favicon_url` / `cover_image_url`, `institute_group_branding.logo_url` / `favicon_url`, `institutes.logo_url`) and adds file references in their place, with the purposes `INSTITUTE_LOGO`, `INSTITUTE_FAVICON` and `INSTITUTE_COVER`. An institute logo that was typed as a URL is gone after these migrations and must be uploaded. |
 | `*_rov-291-payment-gateway-ids` | Adds an index on `payments.gateway_order_id` and a unique index on `payments.gateway_payment_id` (where not null). It fails if two payment rows already share a gateway payment id; find them with `SELECT gateway_payment_id FROM payments WHERE gateway_payment_id IS NOT NULL GROUP BY 1 HAVING count(*) > 1` and resolve them first. |
+| `*_rov-296-export-reports` | Adds the `ComplianceReportType` and `ExportReportStatus` enums, the file purpose `COMPLIANCE_EXPORT`, and the `export_reports` table (with `export_reports_live`, tenant RLS and CHECK constraints tying `COMPLETED` to a file, a row count and a completion time, and `FAILED` to an error code). Compliance exports answer with a database error until it runs. |
 
 Consequences for operations:
 
@@ -109,6 +110,13 @@ that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
   running it, stale uploads and deleted files are never removed from storage. The storage
   access key needs delete rights on both buckets (already in the list under "Object storage").
   It connects with `DATABASE_URL` and runs its queries as `roviq_admin`.
+- **`COMPLIANCE_EXPORT_WORKER_ENABLED`** (ROV-296): runs `ComplianceExportWorkflow` on task
+  queue `compliance-export`, which builds a compliance export (UDISE+, CBSE, BSEH, Shala Darpan,
+  RTE, TC register, admission register) and stores it as a `COMPLIANCE_EXPORT` file. Without any
+  instance running it, a requested export stays `PENDING` and is never built. An export still `PENDING` or `RUNNING` 35 minutes after it was requested (the 30-minute workflow timeout plus a margin) is marked `FAILED` with `EXPORT_TIMED_OUT` the next time that institute's exports are listed or requested. More than one instance is safe: Temporal hands each export to one worker.
+  It connects with `DATABASE_URL` and runs every query as the institute being exported
+  (`roviq_app` with RLS). Needs `TEMPORAL_ADDRESS` and the object storage write access the
+  gateway already has.
 
 ## Redis
 

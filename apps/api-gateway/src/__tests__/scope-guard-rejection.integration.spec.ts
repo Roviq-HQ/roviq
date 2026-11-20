@@ -78,6 +78,11 @@ const PLATFORM_OPS: readonly Op[] = [
     name: 'adminListUsers',
     query: 'query { adminListUsers { totalCount } }',
   },
+  // AdminComplianceExportResolver (ROV-296)
+  {
+    name: 'adminListExportReports',
+    query: `query { adminListExportReports(instituteId: "${FAKE.TENANT}") { id } }`,
+  },
   // AdminAuditResolver — platform-scoped @Query adminAuditLogs
   {
     name: 'adminAuditLogs',

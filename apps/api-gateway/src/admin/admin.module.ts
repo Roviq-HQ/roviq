@@ -7,6 +7,7 @@ import { InstituteGroupModule } from '../institute/institute-group/institute-gro
 import { InstituteModule } from '../institute/management/institute.module';
 import { AdminAttendanceModule } from './attendance/admin-attendance.module';
 import { AdminAuditResolver } from './audit/admin-audit.resolver';
+import { AdminComplianceExportModule } from './compliance-export/admin-compliance-export.module';
 import { AdminDlqResolver } from './dlq/admin-dlq.resolver';
 import { AdminImpersonationResolver } from './impersonation/admin-impersonation.resolver';
 import { AdminImpersonationSubscriptionResolver } from './impersonation/admin-impersonation.subscription';
@@ -35,6 +36,7 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminAttendanceModule, // cross-tenant attendance summary (ROV admin attendance view)
     AdminMonitoringModule, // system health + tenant analytics (ROV-184)
     AdminTenantAnalyticsModule,
+    AdminComplianceExportModule, // compliance exports of any institute (ROV-296)
   ],
   providers: [
     AdminResellerService,

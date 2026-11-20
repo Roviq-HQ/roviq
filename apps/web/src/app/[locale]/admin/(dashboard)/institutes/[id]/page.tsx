@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
   Badge,
   Button,
+  Can,
   Card,
   CardContent,
   CardHeader,
@@ -48,6 +49,7 @@ import { AcademicTreeTab } from '../_components/academic-tree';
 import { InstituteAuditTab } from '../_components/audit-tab';
 import { BrandingDisplay, type InstituteBranding } from '../_components/branding-display';
 import { ConfigDisplay, type InstituteConfig } from '../_components/config-display';
+import { InstituteExportsTab } from '../_components/exports-tab';
 import { InstituteGroupCombobox } from '../_components/institute-group-combobox';
 import { ResellerCombobox } from '../_components/reseller-combobox';
 import { SetupProgressPanel } from '../_components/setup-progress';
@@ -111,7 +113,7 @@ function ActionButtons({
   setActionDialog: (d: ActionDialog) => void;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       {institute.status === 'INACTIVE' && (
         <ActivateWithTooltip canActivate={canActivate} ta={ta} setActionDialog={setActionDialog} />
       )}
@@ -632,10 +634,10 @@ export default function InstituteDetailPage() {
   const showSetupTab = institute.status === 'PENDING' || institute.setupStatus !== 'COMPLETED';
 
   return (
-    <div className="space-y-6" data-testid={testIds.adminInstituteDetail.page}>
+    <div className="min-w-0 space-y-6" data-testid={testIds.adminInstituteDetail.page}>
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1
             className="text-2xl font-bold tracking-tight"
             data-testid={testIds.adminInstituteDetail.title}
@@ -662,32 +664,52 @@ export default function InstituteDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview" data-testid={testIds.adminInstituteDetail.tab('overview')}>
-            {td('tabs.overview')}
-          </TabsTrigger>
-          {showSetupTab && (
-            <TabsTrigger value="setup" data-testid={testIds.adminInstituteDetail.tab('setup')}>
-              {td('tabs.setup')}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+        {/* Scrolls sideways on its own; the hidden y-axis clips the triggers' invisible underline (::after, 5px below). */}
+        <div className="max-w-full overflow-x-auto overflow-y-hidden">
+          <TabsList>
+            <TabsTrigger
+              value="overview"
+              data-testid={testIds.adminInstituteDetail.tab('overview')}
+            >
+              {td('tabs.overview')}
             </TabsTrigger>
-          )}
-          <TabsTrigger value="academic" data-testid={testIds.adminInstituteDetail.tab('academic')}>
-            {td('tabs.academic')}
-          </TabsTrigger>
-          <TabsTrigger value="users" data-testid={testIds.adminInstituteDetail.tab('users')}>
-            {td('tabs.users')}
-          </TabsTrigger>
-          <TabsTrigger value="config" data-testid={testIds.adminInstituteDetail.tab('config')}>
-            {td('tabs.config')}
-          </TabsTrigger>
-          <TabsTrigger value="branding" data-testid={testIds.adminInstituteDetail.tab('branding')}>
-            {td('tabs.branding')}
-          </TabsTrigger>
-          <TabsTrigger value="audit" data-testid={testIds.adminInstituteDetail.tab('audit')}>
-            {td('tabs.audit')}
-          </TabsTrigger>
-        </TabsList>
+            {showSetupTab && (
+              <TabsTrigger value="setup" data-testid={testIds.adminInstituteDetail.tab('setup')}>
+                {td('tabs.setup')}
+              </TabsTrigger>
+            )}
+            <TabsTrigger
+              value="academic"
+              data-testid={testIds.adminInstituteDetail.tab('academic')}
+            >
+              {td('tabs.academic')}
+            </TabsTrigger>
+            <TabsTrigger value="users" data-testid={testIds.adminInstituteDetail.tab('users')}>
+              {td('tabs.users')}
+            </TabsTrigger>
+            <TabsTrigger value="config" data-testid={testIds.adminInstituteDetail.tab('config')}>
+              {td('tabs.config')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="branding"
+              data-testid={testIds.adminInstituteDetail.tab('branding')}
+            >
+              {td('tabs.branding')}
+            </TabsTrigger>
+            <TabsTrigger value="audit" data-testid={testIds.adminInstituteDetail.tab('audit')}>
+              {td('tabs.audit')}
+            </TabsTrigger>
+            <Can I="read" a="Export">
+              <TabsTrigger
+                value="exports"
+                data-testid={testIds.adminInstituteDetail.tab('exports')}
+              >
+                {td('tabs.exports')}
+              </TabsTrigger>
+            </Can>
+          </TabsList>
+        </div>
 
         <OverviewTab institute={institute} t={t} td={td} resolveI18n={resolveI18n} />
 
@@ -725,6 +747,13 @@ export default function InstituteDetailPage() {
         <TabsContent value="audit" className="mt-6">
           <InstituteAuditTab instituteId={institute.id} />
         </TabsContent>
+
+        {/* ── Compliance Exports Tab (ROV-296) ── */}
+        <Can I="read" a="Export">
+          <TabsContent value="exports" className="mt-6">
+            <InstituteExportsTab instituteId={institute.id} institute={institute} />
+          </TabsContent>
+        </Can>
       </Tabs>
 
       <ActionConfirmationDialog

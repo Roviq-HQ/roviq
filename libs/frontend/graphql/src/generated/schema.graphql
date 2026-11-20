@@ -249,6 +249,20 @@ input AdminCreateResellerInput {
   tier: ResellerTier!
 }
 
+"""
+Input for a platform admin generating a compliance export of an institute.
+"""
+input AdminExportComplianceReportInput {
+  """Academic year the report data is drawn from."""
+  academicYearId: ID!
+
+  """The institute to export."""
+  instituteId: ID!
+
+  """Report format to generate."""
+  reportType: ComplianceReportType!
+}
+
 """Filters for the adminListInstitutes query"""
 input AdminListInstitutesFilterInput {
   """
@@ -1301,12 +1315,16 @@ enum CompetencyLevel {
   PROGRESSING
 }
 
-"""Government/board compliance report format to export."""
+"""
+Government or board report format: UDISE+ DCF, CBSE registration (9/11) and LOC (10/12), BSEH staff statement, Shala Darpan (Rajasthan), RTE enrolment, TC register, admission register.
+"""
 enum ComplianceReportType {
   AWR
+  BSEH_STAFF_STATEMENT
   CBSE_LOC
   CBSE_REGISTRATION
   RTE_REPORT
+  SHALA_DARPAN
   TC_REGISTER
   UDISE_DCF
 }
@@ -2518,7 +2536,20 @@ enum ExamType {
   UNIT_TEST
 }
 
-"""Input for generating and downloading a compliance export report."""
+"""An academic year an export can be generated for."""
+type ExportAcademicYearModel {
+  endDate: DateOnly!
+  id: ID!
+
+  """The institute’s current academic year."""
+  isActive: Boolean!
+
+  """Display label, e.g. 2025-26."""
+  label: String!
+  startDate: DateOnly!
+}
+
+"""Input for generating a compliance export of the caller’s institute."""
 input ExportComplianceReportInput {
   """Academic year the report data is drawn from."""
   academicYearId: ID!
@@ -2527,22 +2558,52 @@ input ExportComplianceReportInput {
   reportType: ComplianceReportType!
 }
 
-"""A generated compliance report with download URL"""
+"""One requested compliance export, its progress and its file."""
 type ExportReportModel {
-  academicYearId: String!
+  academicYearId: ID!
+
+  """Label of the academic year, e.g. 2025-26."""
+  academicYearLabel: String
   completedAt: DateTime
-  fileSize: Int
-  fileUrl: String
+
+  """
+  An `ErrorCode` value saying why the export FAILED; translate it, never show it raw.
+  """
+  errorCode: String
+
+  """
+  The XLSX once COMPLETED. Sensitive: `url` is null; download through `fileDownloadUrl` (institute) or `adminExportReportDownloadUrl` (platform).
+  """
+  file: FileRef
   id: ID!
-  reportType: String!
+  reportType: ComplianceReportType!
   requestedAt: DateTime!
-  status: String!
+
+  """The user who asked for the export."""
+  requestedBy: ID!
+
+  """
+  Requester's first name; null when the caller may not read their profile.
+  """
+  requesterFirstName: I18nText
+  requesterLastName: I18nText
+
+  """
+  Records exported (students, staff, classes or TCs); set when COMPLETED.
+  """
+  rowCount: Int
+  status: ExportReportStatus!
+
+  """The institute the export is of."""
+  tenantId: ID!
 }
 
-"""Result of starting a compliance export — workflow ID for tracking"""
-type ExportStartResult {
-  """Temporal workflow ID for progress tracking"""
-  workflowId: String!
+"""PENDING → RUNNING → COMPLETED, or FAILED with an error code."""
+enum ExportReportStatus {
+  COMPLETED
+  FAILED
+  PENDING
+  RUNNING
 }
 
 """A block of morning (prepended) or evening (appended) extra periods."""
@@ -2567,6 +2628,7 @@ enum FilePurpose {
   APPLICATION_DOCUMENT
   BULK_IMPORT_CSV
   BULK_IMPORT_REPORT
+  COMPLIANCE_EXPORT
   INSTITUTE_COVER
   INSTITUTE_FAVICON
   INSTITUTE_LOGO
@@ -3877,6 +3939,16 @@ type Mutation {
   """Discard a dead-lettered message without replaying it"""
   adminDiscardDlqMessage(id: ID!): DlqMessageModel!
   adminEndImpersonation(sessionId: String!): Boolean!
+
+  """
+  Start a compliance export of any institute (platform admin). Returns the PENDING export; poll `adminListExportReports` until it is COMPLETED or FAILED.
+  """
+  adminExportComplianceReport(input: AdminExportComplianceReportInput!): ExportReportModel!
+
+  """
+  Get a download URL for a COMPLETED export file, valid for 60 seconds. A mutation, so every call is audited.
+  """
+  adminExportReportDownloadUrl(fileId: ID!): String!
   adminLogin(password: String!, username: String!): AuthPayload!
 
   """Reassign an institute to a different active reseller"""
@@ -4109,9 +4181,9 @@ type Mutation {
   exchangeImpersonationCode(code: String!): ImpersonationAuthPayload!
 
   """
-  Start a compliance export workflow — returns workflowId for progress tracking
+  Start a compliance export of your institute. Returns the PENDING export; poll `listExportReports` until it is COMPLETED or FAILED.
   """
-  exportComplianceReport(input: ExportComplianceReportInput!): ExportStartResult!
+  exportComplianceReport(input: ExportComplianceReportInput!): ExportReportModel!
 
   """
   Get a download URL for one file, valid for 60 seconds. A mutation, so every call is audited.
@@ -4666,6 +4738,14 @@ type Query {
 
   """Platform admin: list dead-lettered NATS messages (ROV-19)"""
   adminListDlqMessages(filter: DlqMessageFilterInput): DlqMessageConnection!
+
+  """
+  Academic years of one institute, newest first, to pick the year of an export.
+  """
+  adminListExportAcademicYears(instituteId: ID!): [ExportAcademicYearModel!]!
+
+  """Past compliance exports of one institute, newest first (last 50)."""
+  adminListExportReports(instituteId: ID!): [ExportReportModel!]!
   adminListInstituteGroups(filter: InstituteGroupFilterInput): InstituteGroupConnection!
   adminListInstitutes(filter: AdminListInstitutesFilterInput): InstituteConnection!
 
@@ -4873,7 +4953,7 @@ type Query {
   listEnquiries(filter: EnquiryFilterInput): EnquiryConnection!
 
   """
-  List past compliance export reports (stub — returns empty until export history table is added)
+  Past compliance exports of your institute, newest first (last 50). Download a COMPLETED file with `fileDownloadUrl`.
   """
   listExportReports: [ExportReportModel!]!
 
