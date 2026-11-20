@@ -9,12 +9,6 @@ interface RawBodyRequest extends Request {
   rawBody?: Buffer;
 }
 
-/** Typed shape of webhook event payload containing billing metadata */
-interface WebhookPayload {
-  invoiceId?: string;
-  tenantId?: string;
-}
-
 @Controller('webhooks')
 export class CashfreeWebhookController {
   private readonly logger = new Logger(CashfreeWebhookController.name);
@@ -47,20 +41,18 @@ export class CashfreeWebhookController {
         );
         return res.json({ status: 'ok' });
       }
-      // Failed and refund events carry a payment id and amount too; only a capture pays the invoice.
-      if (event.status !== 'SUCCESS') {
+      // Failed and refund events carry a payment id and amount too; only a capture pays.
+      if (!event.isCapture) {
         this.logger.log(
-          `Cashfree webhook ignored — payment status ${event.status} (type: ${event.eventType}, reseller: ${resellerId})`,
+          `Cashfree webhook ignored — not a capture (type: ${event.eventType}, status: ${event.status}, reseller: ${resellerId})`,
         );
         return res.json({ status: 'ok' });
       }
 
-      const payload = event.payload as WebhookPayload;
       await this.paymentService.handleWebhookPayment(resellerId, {
         gatewayPaymentId: event.gatewayPaymentId,
         gatewayOrderId: event.gatewayOrderId,
-        invoiceId: payload.invoiceId ?? '',
-        tenantId: payload.tenantId ?? '',
+        owner: event.owner,
         method: PaymentMethod.CASHFREE,
         amountPaise: BigInt(event.amountPaise),
         gatewayProvider: 'CASHFREE',

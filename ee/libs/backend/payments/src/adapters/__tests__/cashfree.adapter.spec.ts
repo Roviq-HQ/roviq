@@ -85,6 +85,7 @@ describe('CashfreeAdapter', () => {
       currency: 'INR',
       customer: { name: 'Saraswati Vidya Mandir', email: 'a@svm.example', phone: '9000000002' },
       returnUrl: 'https://app.roviq.com/billing/invoices/inv-1?order_id={order_id}',
+      owner: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
     };
     const ACTIVE = {
       order_status: 'ACTIVE',
@@ -110,6 +111,7 @@ describe('CashfreeAdapter', () => {
         },
         order_meta: { return_url: ORDER_INPUT.returnUrl },
         order_note: undefined,
+        order_tags: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
       });
       expect(result.gatewayOrderId).toMatch(/^ord_[0-9a-f-]{36}$/);
       expect(result).toEqual({
@@ -166,11 +168,78 @@ describe('CashfreeAdapter', () => {
       });
     });
 
+    it('should close an order these credentials do not know', async () => {
+      mockPGFetchOrder.mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 404'), {
+          isAxiosError: true,
+          response: { status: 404, data: { message: 'order not found' } },
+        }),
+      );
+
+      expect(await adapter.resumeOrder('ord_sandbox', ORDER_INPUT)).toEqual({ state: 'CLOSED' });
+    });
+
+    it('should report a failed lookup as a gateway error, not as an unpaid order', async () => {
+      mockPGFetchOrder.mockRejectedValue(new Error('socket hang up'));
+
+      await expect(adapter.verifyPayment({ gatewayOrderId: 'ord_1' })).rejects.toMatchObject({
+        name: 'PaymentGatewayError',
+        provider: 'CASHFREE',
+      });
+    });
+
     it('should not confirm an order that is not paid', async () => {
       mockPGFetchOrder.mockResolvedValue({ data: ACTIVE });
 
       expect(await adapter.verifyPayment({ gatewayOrderId: 'ord_1' })).toBeNull();
       expect(mockPGOrderFetchPayments).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('parseWebhook', () => {
+    function successBody(type: string, paymentStatus: string) {
+      return {
+        type,
+        event_time: '2026-11-20T11:16:10+05:30',
+        data: {
+          order: {
+            order_id: 'ord_1',
+            order_amount: 1180,
+            order_tags: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
+          },
+          payment: {
+            cf_payment_id: 1453002795,
+            payment_status: paymentStatus,
+            payment_amount: 1180,
+          },
+        },
+      };
+    }
+    const headers = { 'x-webhook-signature': 'sig', 'x-webhook-timestamp': '1' };
+
+    it('should read the order and payment from where Cashfree puts them', () => {
+      const raw = successBody('PAYMENT_SUCCESS_WEBHOOK', 'SUCCESS');
+
+      const event = adapter.parseWebhook(Buffer.from(JSON.stringify(raw)), headers);
+
+      expect(event).toEqual({
+        eventType: 'PAYMENT_SUCCESS_WEBHOOK',
+        gatewayEventId: event.gatewayEventId,
+        gatewayOrderId: 'ord_1',
+        gatewayPaymentId: '1453002795',
+        amountPaise: 118000,
+        status: 'SUCCESS',
+        isCapture: true,
+        owner: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
+        payload: raw,
+      });
+      expect(event.gatewayEventId).toMatch(/^cf_PAYMENT_SUCCESS_WEBHOOK_/);
+    });
+
+    it('should not treat a failed payment as a capture', () => {
+      const raw = successBody('PAYMENT_FAILED_WEBHOOK', 'FAILED');
+
+      expect(adapter.parseWebhook(Buffer.from(JSON.stringify(raw)), headers).isCapture).toBe(false);
     });
   });
 

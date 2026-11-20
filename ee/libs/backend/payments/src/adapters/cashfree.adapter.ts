@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
 import { isAxiosError } from 'axios';
-import { Cashfree, CFEnvironment } from 'cashfree-pg';
+import { Cashfree, CFEnvironment, type OrderEntity } from 'cashfree-pg';
 import type {
   BillingInterval,
   CreateOrderInput,
@@ -290,7 +290,8 @@ export class CashfreeAdapter implements PaymentGateway {
           customer_phone: input.customer.phone,
         },
         order_meta: { return_url: input.returnUrl },
-        order_note: input.notes?.description ?? undefined,
+        order_note: input.description,
+        order_tags: { invoiceId: input.owner.invoiceId, tenantId: input.owner.tenantId },
       });
       const sessionId = response?.data?.payment_session_id;
       if (!sessionId) throw new Error('Cashfree returned no payment_session_id');
@@ -306,21 +307,12 @@ export class CashfreeAdapter implements PaymentGateway {
   }
 
   async resumeOrder(gatewayOrderId: string, input: CreateOrderInput): Promise<ExistingOrder> {
+    let order: OrderEntity | undefined;
     try {
-      const order = (await this.client.PGFetchOrder(gatewayOrderId))?.data;
-      if (order?.order_status === 'PAID') return { state: 'PAID' };
-      if (
-        order?.order_status !== 'ACTIVE' ||
-        !order.payment_session_id ||
-        Math.round((order.order_amount ?? 0) * 100) !== Number(input.amountPaise)
-      ) {
-        return { state: 'CLOSED' };
-      }
-      return {
-        state: 'OPEN',
-        checkout: this.checkoutFor(gatewayOrderId, order.payment_session_id),
-      };
+      order = (await this.client.PGFetchOrder(gatewayOrderId))?.data;
     } catch (error) {
+      // An order made with other credentials (sandbox → production) does not exist for these ones.
+      if (isAxiosError(error) && error.response?.status === 404) return { state: 'CLOSED' };
       throw new PaymentGatewayError(
         `Failed to fetch order: ${cashfreeErrorDetail(error)}`,
         'CASHFREE',
@@ -328,19 +320,37 @@ export class CashfreeAdapter implements PaymentGateway {
         error,
       );
     }
+    if (order?.order_status === 'PAID') return { state: 'PAID' };
+    if (
+      order?.order_status !== 'ACTIVE' ||
+      !order.payment_session_id ||
+      Math.round((order.order_amount ?? 0) * 100) !== Number(input.amountPaise)
+    ) {
+      return { state: 'CLOSED' };
+    }
+    return { state: 'OPEN', checkout: this.checkoutFor(gatewayOrderId, order.payment_session_id) };
   }
 
   // Cashfree's return carries only the order id, so the paid order and its payment id
   // are read from Cashfree rather than taken from the browser.
   async verifyPayment(input: VerifyPaymentInput): Promise<VerifiedPayment | null> {
+    return this.findPaidPayment(input.gatewayOrderId);
+  }
+
+  async findPaidPayment(gatewayOrderId: string): Promise<VerifiedPayment | null> {
     try {
-      const order = (await this.client.PGFetchOrder(input.gatewayOrderId))?.data;
+      const order = (await this.client.PGFetchOrder(gatewayOrderId))?.data;
       if (order?.order_status !== 'PAID') return null;
-      const payments = (await this.client.PGOrderFetchPayments(input.gatewayOrderId))?.data ?? [];
+      const payments = (await this.client.PGOrderFetchPayments(gatewayOrderId))?.data ?? [];
       const paid = payments.find((p) => p.payment_status === 'SUCCESS' && p.cf_payment_id);
       return paid?.cf_payment_id ? { gatewayPaymentId: String(paid.cf_payment_id) } : null;
-    } catch {
-      return null;
+    } catch (error) {
+      throw new PaymentGatewayError(
+        `Failed to fetch order payments: ${cashfreeErrorDetail(error)}`,
+        'CASHFREE',
+        undefined,
+        error,
+      );
     }
   }
 
@@ -389,15 +399,23 @@ export class CashfreeAdapter implements PaymentGateway {
     }
 
     const parsed = JSON.parse(rawBody) as CfWebhookBody<CfOrderPaymentData>;
-    const paymentData = parsed.data;
-    const amount = paymentData?.payment_amount;
+    const order = parsed.data?.order;
+    const payment = parsed.data?.payment;
+    const amount = payment?.payment_amount;
+    const tags = order?.order_tags;
     return {
       eventType: parsed.type ?? 'unknown',
       gatewayEventId: `cf_${parsed.type ?? 'unknown'}_${randomUUID()}`,
-      gatewayOrderId: paymentData?.order_id,
-      gatewayPaymentId: paymentData?.cf_payment_id,
+      gatewayOrderId: order?.order_id,
+      gatewayPaymentId:
+        payment?.cf_payment_id === undefined ? undefined : String(payment.cf_payment_id),
       amountPaise: amount ? Math.round(Number(amount) * 100) : undefined,
-      status: paymentData?.payment_status,
+      status: payment?.payment_status,
+      isCapture: parsed.type === 'PAYMENT_SUCCESS_WEBHOOK' && payment?.payment_status === 'SUCCESS',
+      owner:
+        tags?.invoiceId && tags.tenantId
+          ? { invoiceId: tags.invoiceId, tenantId: tags.tenantId }
+          : undefined,
       payload: { ...parsed },
     };
   }

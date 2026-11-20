@@ -6,9 +6,9 @@ import {
   mkResellerCtx,
   withReseller,
 } from '@roviq/database';
-import { payments } from '@roviq/ee-database';
+import { invoices, payments } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, desc, eq, isNotNull, type SQL, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
 
 @Injectable()
 export class PaymentRepository {
@@ -25,23 +25,30 @@ export class PaymentRepository {
     });
   }
 
-  /** Idempotent: returns existing payment if gatewayPaymentId already exists */
-  async findOrCreateByGatewayId(
-    resellerId: string,
-    gatewayPaymentId: string,
-    data: typeof payments.$inferInsert,
-  ) {
+  /**
+   * Records a captured gateway payment that has no order row, and applies it to the invoice in
+   * the same transaction. Idempotent on `gatewayPaymentId`: a repeat returns the stored row.
+   */
+  async recordGatewayPayment(resellerId: string, data: typeof payments.$inferInsert) {
     return withReseller(this.db, mkResellerCtx(resellerId, 'repository:payment'), async (tx) => {
-      // Check existing first (idempotent webhook handling)
+      const [created] = await tx
+        .insert(payments)
+        .values(data)
+        .onConflictDoNothing({
+          target: payments.gatewayPaymentId,
+          where: sql`gateway_payment_id IS NOT NULL`,
+        })
+        .returning();
+      if (created) {
+        const invoice = await applyToInvoice(tx, created, data.updatedBy);
+        return { payment: created, invoice, created: true };
+      }
       const [existing] = await tx
         .select()
         .from(payments)
-        .where(eq(payments.gatewayPaymentId, gatewayPaymentId))
+        .where(eq(payments.gatewayPaymentId, data.gatewayPaymentId ?? ''))
         .limit(1);
-      if (existing) return { payment: existing, created: false };
-
-      const [payment] = await tx.insert(payments).values(data).returning();
-      return { payment, created: true };
+      return { payment: existing, invoice: null, created: false };
     });
   }
 
@@ -83,9 +90,10 @@ export class PaymentRepository {
   }
 
   /**
-   * Marks the pending payment of a gateway order as captured. Browser verify and the
-   * gateway webhook can race: only one settles the row; the other gets `settled: false`
-   * with the row the first one wrote. Returns null when the order has no payment row.
+   * Marks the payment row of a gateway order as captured and adds it to the invoice, in one
+   * transaction. The row may be PENDING, or FAILED when a newer order replaced it but the payer
+   * still paid the old one. Browser verify and the webhook can race: only one settles; the other
+   * gets `settled: false` with the stored row. Returns null when the order has no payment row.
    */
   async settleGatewayOrder(
     resellerId: string,
@@ -110,19 +118,30 @@ export class PaymentRepository {
           gatewayPaymentId: input.gatewayPaymentId,
           ...(input.gatewayResponse !== undefined && { gatewayResponse: input.gatewayResponse }),
           paidAt: new Date(),
+          failedAt: null,
+          failureReason: null,
           updatedAt: new Date(),
           updatedBy: input.actorId,
         })
-        .where(and(...scope, eq(payments.status, 'PENDING')))
+        .where(
+          and(
+            ...scope,
+            inArray(payments.status, ['PENDING', 'FAILED']),
+            isNull(payments.gatewayPaymentId),
+          ),
+        )
         .returning();
-      if (settled) return { payment: settled, settled: true };
+      if (settled) {
+        const invoice = await applyToInvoice(tx, settled, input.actorId);
+        return { payment: settled, invoice, settled: true };
+      }
 
       const [existing] = await tx
         .select()
         .from(payments)
         .where(and(...scope, eq(payments.gatewayPaymentId, input.gatewayPaymentId)))
         .limit(1);
-      return existing ? { payment: existing, settled: false } : null;
+      return existing ? { payment: existing, invoice: null, settled: false } : null;
     });
   }
 
@@ -240,4 +259,25 @@ export class PaymentRepository {
       return { items, totalCount: total };
     });
   }
+}
+
+/** Adds a captured payment to its invoice; PAID once the total is covered. */
+async function applyToInvoice(
+  tx: DrizzleDB,
+  payment: { invoiceId: string; amountPaise: bigint },
+  actorId: string,
+) {
+  const covered = sql`${invoices.paidAmount} + ${payment.amountPaise} >= ${invoices.totalAmount}`;
+  const [invoice] = await tx
+    .update(invoices)
+    .set({
+      paidAmount: sql`${invoices.paidAmount} + ${payment.amountPaise}`,
+      status: sql`CASE WHEN ${covered} THEN 'PAID' ELSE 'PARTIALLY_PAID' END::"InvoiceStatus"`,
+      paidAt: sql`CASE WHEN ${covered} THEN now() ELSE ${invoices.paidAt} END`,
+      updatedAt: new Date(),
+      updatedBy: actorId,
+    })
+    .where(eq(invoices.id, payment.invoiceId))
+    .returning();
+  return invoice ?? null;
 }

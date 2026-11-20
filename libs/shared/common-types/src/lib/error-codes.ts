@@ -372,6 +372,8 @@ export const ErrorCode = {
   UTR_INVALID: 'UTR_INVALID',
   /** A payment with this UTR was already submitted */
   UTR_ALREADY_SUBMITTED: 'UTR_ALREADY_SUBMITTED',
+  /** The institute has no phone number or email, which the payment gateway needs on the order */
+  PAYER_CONTACT_MISSING: 'PAYER_CONTACT_MISSING',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -556,4 +558,5 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   REFUND_EXCEEDS_PAID: HttpStatus.UNPROCESSABLE_ENTITY,
   UTR_INVALID: HttpStatus.BAD_REQUEST,
   UTR_ALREADY_SUBMITTED: HttpStatus.CONFLICT,
+  PAYER_CONTACT_MISSING: HttpStatus.UNPROCESSABLE_ENTITY,
 };

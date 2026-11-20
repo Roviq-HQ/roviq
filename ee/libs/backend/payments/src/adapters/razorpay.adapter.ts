@@ -272,7 +272,7 @@ export class RazorpayAdapter implements PaymentGateway {
         amount: Number(input.amountPaise),
         currency: input.currency,
         receipt: input.invoiceId,
-        notes: input.notes ?? {},
+        notes: { invoiceId: input.owner.invoiceId, tenantId: input.owner.tenantId },
       });
       return this.checkoutFor(result, input);
     } catch (error) {
@@ -286,15 +286,33 @@ export class RazorpayAdapter implements PaymentGateway {
   }
 
   async resumeOrder(gatewayOrderId: string, input: CreateOrderInput): Promise<ExistingOrder> {
+    let order: Orders.RazorpayOrder;
     try {
-      const order: Orders.RazorpayOrder = await this.instance.orders.fetch(gatewayOrderId);
-      if (order.status === 'paid') return { state: 'PAID' };
-      // A changed balance (for example a partial payment since) needs an order for the new amount.
-      if (Number(order.amount_due) !== Number(input.amountPaise)) return { state: 'CLOSED' };
-      return { state: 'OPEN', checkout: this.checkoutFor(order, input) };
+      order = await this.instance.orders.fetch(gatewayOrderId);
     } catch (error) {
+      // An order made with other keys (test → live) does not exist for these ones.
+      if (isRazorpayError(error) && Number(error.statusCode) === 400) return { state: 'CLOSED' };
       throw new PaymentGatewayError(
         `Failed to fetch order: ${razorpayErrorDetail(error)}`,
+        'RAZORPAY',
+        undefined,
+        error,
+      );
+    }
+    if (order.status === 'paid') return { state: 'PAID' };
+    // A changed balance (for example a partial payment since) needs an order for the new amount.
+    if (Number(order.amount_due) !== Number(input.amountPaise)) return { state: 'CLOSED' };
+    return { state: 'OPEN', checkout: this.checkoutFor(order, input) };
+  }
+
+  async findPaidPayment(gatewayOrderId: string): Promise<VerifiedPayment | null> {
+    try {
+      const { items } = await this.instance.orders.fetchPayments(gatewayOrderId);
+      const captured = items.find((p) => p.status === 'captured');
+      return captured ? { gatewayPaymentId: captured.id } : null;
+    } catch (error) {
+      throw new PaymentGatewayError(
+        `Failed to fetch order payments: ${razorpayErrorDetail(error)}`,
         'RAZORPAY',
         undefined,
         error,
@@ -328,7 +346,7 @@ export class RazorpayAdapter implements PaymentGateway {
         order_id: order.id,
         amount: order.amount,
         currency: order.currency,
-        ...(input.notes?.description && { description: input.notes.description }),
+        ...(input.description && { description: input.description }),
       },
     };
   }
@@ -360,13 +378,21 @@ export class RazorpayAdapter implements PaymentGateway {
 
     const parsed = JSON.parse(rawBody) as RazorpayWebhookBody;
     const payment = parsed.payload.payment?.entity;
+    const invoiceId = payment?.notes?.invoiceId;
+    const tenantId = payment?.notes?.tenantId;
     return {
       eventType: parsed.event,
       gatewayEventId: `rzp_${parsed.event}_${payment?.id ?? randomUUID()}`,
-      gatewayOrderId: payment?.order_id as string | undefined,
+      gatewayOrderId: payment?.order_id ?? undefined,
       gatewayPaymentId: payment?.id,
       amountPaise: payment?.amount ? Number(payment.amount) : undefined,
-      status: payment?.status as string | undefined,
+      status: payment?.status,
+      // Refund events also carry the payment, still in status captured.
+      isCapture: parsed.event === 'payment.captured' && payment?.status === 'captured',
+      owner:
+        typeof invoiceId === 'string' && typeof tenantId === 'string'
+          ? { invoiceId, tenantId }
+          : undefined,
       payload: { ...parsed },
     };
   }

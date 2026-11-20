@@ -22,6 +22,7 @@ export type BillingErrorCode = Extract<
   | 'CONCURRENT_MODIFICATION'
   | 'UTR_INVALID'
   | 'UTR_ALREADY_SUBMITTED'
+  | 'PAYER_CONTACT_MISSING'
 >;
 
 export function billingError(code: BillingErrorCode, message: string): never {

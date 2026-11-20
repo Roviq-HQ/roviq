@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   verify: vi.fn(),
   openRazorpay: vi.fn(),
   redirectCashfree: vi.fn(),
+  refetchInvoice: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -61,7 +62,7 @@ const INVOICE = {
 };
 
 vi.mock('../../../use-billing', () => ({
-  useMyInvoice: () => ({ invoice: INVOICE, loading: false }),
+  useMyInvoice: () => ({ invoice: INVOICE, loading: false, refetch: state.refetchInvoice }),
   useMyPaymentHistory: () => ({ payments: [], loading: false }),
   useSubmitUpiProof: () => [vi.fn(), { loading: false }],
   useGenerateInvoicePdf: () => [vi.fn(), { loading: false }],
@@ -94,6 +95,7 @@ beforeEach(() => {
   state.verify.mockReset().mockResolvedValue({ data: { verifyPayment: { id: 'pay-1' } } });
   state.openRazorpay.mockReset();
   state.redirectCashfree.mockReset().mockResolvedValue(undefined);
+  state.refetchInvoice.mockReset();
   vi.mocked(toast.error).mockClear();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.info).mockClear();
@@ -186,6 +188,63 @@ describe('InvoiceDetailPage', () => {
       }),
     );
     expect(state.verify).toHaveBeenCalledTimes(1);
+  });
+
+  it('should ask again while Cashfree has not yet marked the returned order paid', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      state.search = new URLSearchParams('order_id=ord_1');
+      state.verify
+        .mockRejectedValueOnce(graphQLError('PAYMENT_VERIFICATION_FAILED'))
+        .mockResolvedValueOnce({ data: { verifyPayment: { id: 'pay-1' } } });
+      renderWithProviders(<InvoiceDetailPage />);
+
+      await waitFor(() => expect(state.verify).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(3000);
+
+      await waitFor(() => expect(state.verify).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(toast.success).toHaveBeenCalledWith('Payment received. This invoice is now paid.'),
+      );
+      expect(toast.error).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should stop asking and explain after the last attempt', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      state.search = new URLSearchParams('order_id=ord_1');
+      state.verify.mockRejectedValue(graphQLError('PAYMENT_VERIFICATION_FAILED'));
+      renderWithProviders(<InvoiceDetailPage />);
+
+      await waitFor(() => expect(state.verify).toHaveBeenCalledTimes(1));
+      for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(3000);
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          'The payment gateway has not confirmed this payment. If money was deducted, it will be confirmed shortly.',
+        ),
+      );
+      expect(state.verify).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should refresh the invoice when an earlier payment turns out to have gone through', async () => {
+    state.initiate.mockRejectedValue(graphQLError('INVOICE_ALREADY_PAID'));
+    renderWithProviders(<InvoiceDetailPage />);
+
+    await userEvent.click(screen.getByTestId(ids.payOnlineBtn));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'This invoice has already been paid. The page now shows its latest status.',
+      ),
+    );
+    expect(state.refetchInvoice).toHaveBeenCalledTimes(1);
   });
 
   it('should show translated copy for a coded error, never the server text', async () => {

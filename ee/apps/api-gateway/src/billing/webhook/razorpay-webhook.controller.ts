@@ -9,12 +9,6 @@ interface RawBodyRequest extends Request {
   rawBody?: Buffer;
 }
 
-/** Typed shape of webhook event payload containing billing metadata */
-interface WebhookPayload {
-  invoiceId?: string;
-  tenantId?: string;
-}
-
 @Controller('webhooks')
 export class RazorpayWebhookController {
   private readonly logger = new Logger(RazorpayWebhookController.name);
@@ -47,20 +41,18 @@ export class RazorpayWebhookController {
         );
         return res.json({ status: 'ok' });
       }
-      // Failed and refund events carry a payment id and amount too; only a capture pays the invoice.
-      if (event.status !== 'captured') {
+      // Failed and refund events carry a payment id and amount too; only a capture pays.
+      if (!event.isCapture) {
         this.logger.log(
-          `Razorpay webhook ignored — payment status ${event.status} (type: ${event.eventType}, reseller: ${resellerId})`,
+          `Razorpay webhook ignored — not a capture (type: ${event.eventType}, status: ${event.status}, reseller: ${resellerId})`,
         );
         return res.json({ status: 'ok' });
       }
 
-      const payload = event.payload as WebhookPayload;
       await this.paymentService.handleWebhookPayment(resellerId, {
         gatewayPaymentId: event.gatewayPaymentId,
         gatewayOrderId: event.gatewayOrderId,
-        invoiceId: payload.invoiceId ?? '',
-        tenantId: payload.tenantId ?? '',
+        owner: event.owner,
         method: PaymentMethod.RAZORPAY,
         amountPaise: BigInt(event.amountPaise),
         gatewayProvider: 'RAZORPAY',

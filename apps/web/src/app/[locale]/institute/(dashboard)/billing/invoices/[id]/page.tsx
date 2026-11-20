@@ -1,5 +1,6 @@
 'use client';
 
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import type { InvoiceStatus } from '@roviq/graphql/generated';
 import { useFormatDate, useFormatNumber } from '@roviq/i18n';
 import {
@@ -20,6 +21,7 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { keyedLineItems } from '@web/lib/keyed-line-items';
 import { parseISO } from 'date-fns';
 import { ArrowLeft, CreditCard, Download, FileText, Loader2, QrCode } from 'lucide-react';
 import Link from 'next/link';
@@ -40,6 +42,10 @@ import {
 import { useBillingErrorMessage } from '../../use-billing-error-message';
 
 const { instituteBillingInvoice: ids } = testIds;
+
+/** Cashfree return: how often, and how far apart, to ask whether the order was paid. */
+const RETURN_CONFIRM_ATTEMPTS = 4;
+const RETURN_CONFIRM_DELAY_MS = 3000;
 
 /** Invoice status to badge variant mapping */
 const INVOICE_STATUS_VARIANT: Record<
@@ -94,7 +100,7 @@ export default function InvoiceDetailPage() {
   const t = useTranslations('instituteBilling');
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
-  const { invoice, loading } = useMyInvoice(invoiceId);
+  const { invoice, loading, refetch: refetchInvoice } = useMyInvoice(invoiceId);
   const { payments: allPayments, loading: paymentsLoading } = useMyPaymentHistory(100);
 
   const [submitUpiProof, { loading: submittingProof }] = useSubmitUpiProof();
@@ -155,25 +161,38 @@ export default function InvoiceDetailPage() {
     }
   }, [utrNumber, invoiceId, submitUpiProof, t, errorMessage]);
 
+  /** Confirms an order; resolves with the error code when it failed. */
   const confirmPayment = useCallback(
     async (input: { gatewayOrderId: string; gatewayPaymentId?: string; signature?: string }) => {
       try {
         await verifyPayment({ variables: { input } });
         toast.success(t('invoiceDetail.paymentReceived'));
+        return null;
       } catch (err) {
-        toast.error(errorMessage(err));
+        return { err, code: extractGraphQLErrorCode(err) };
       }
     },
-    [verifyPayment, t, errorMessage],
+    [verifyPayment, t],
   );
 
-  // Cashfree sends the payer back here with `?order_id=`; confirm that order once.
+  // Cashfree sends the payer back here with `?order_id=`. The order can turn PAID a few
+  // seconds after the redirect, so an unconfirmed payment is asked about again.
   useEffect(() => {
     if (!returnedOrderId || handledReturn.current === returnedOrderId) return;
     handledReturn.current = returnedOrderId;
     window.history.replaceState(null, '', window.location.pathname);
-    void confirmPayment({ gatewayOrderId: returnedOrderId });
-  }, [returnedOrderId, confirmPayment]);
+    void (async () => {
+      for (let attempt = 1; ; attempt++) {
+        const failure = await confirmPayment({ gatewayOrderId: returnedOrderId });
+        if (!failure) return;
+        if (failure.code !== 'PAYMENT_VERIFICATION_FAILED' || attempt >= RETURN_CONFIRM_ATTEMPTS) {
+          toast.error(errorMessage(failure.err));
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, RETURN_CONFIRM_DELAY_MS));
+      }
+    })();
+  }, [returnedOrderId, confirmPayment, errorMessage]);
 
   const handlePayOnline = useCallback(async () => {
     try {
@@ -194,16 +213,27 @@ export default function InvoiceDetailPage() {
         toast.info(t('invoiceDetail.paymentCancelled'));
         return;
       }
-      await confirmPayment({
+      const failure = await confirmPayment({
         gatewayOrderId: order.gatewayOrderId,
         gatewayPaymentId: result.razorpay_payment_id,
         signature: result.razorpay_signature,
       });
+      if (failure) toast.error(errorMessage(failure.err));
     } catch (err) {
       setCheckoutOpen(false);
+      // An earlier order turned out to be paid; show the invoice as it is now.
+      if (extractGraphQLErrorCode(err) === 'INVOICE_ALREADY_PAID') void refetchInvoice();
       toast.error(errorMessage(err));
     }
-  }, [initiatePayment, invoiceId, invoice?.invoiceNumber, confirmPayment, t, errorMessage]);
+  }, [
+    initiatePayment,
+    invoiceId,
+    invoice?.invoiceNumber,
+    confirmPayment,
+    t,
+    errorMessage,
+    refetchInvoice,
+  ]);
 
   if (loading) {
     return (
@@ -324,11 +354,8 @@ export default function InvoiceDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lineItems.map((item, index) => (
-                  <TableRow
-                    key={`${item.description}-${item.unitAmountPaise}`}
-                    data-testid={ids.lineItemRow(index)}
-                  >
+                {keyedLineItems(lineItems).map(({ key, item }, index) => (
+                  <TableRow key={key} data-testid={ids.lineItemRow(index)}>
                     <TableCell>{item.description}</TableCell>
                     <TableCell className="text-end">{item.quantity}</TableCell>
                     <TableCell className="text-end">

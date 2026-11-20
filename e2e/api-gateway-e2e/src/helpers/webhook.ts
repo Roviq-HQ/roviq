@@ -46,9 +46,9 @@ export interface SimulatedWebhookResult {
 }
 
 /**
- * Build a Razorpay webhook event body shaped like the real Razorpay payload.
- * The adapter only reads `event` + `payload.payment.entity.{id, order_id, amount, status}`,
- * so we keep the body minimal.
+ * Build a Razorpay webhook event body shaped like the real Razorpay payload. The adapter reads
+ * `event` and `payload.payment.entity.{id, order_id, amount, status, notes}`; `notes` carries
+ * the invoice and institute the order was created for.
  */
 function buildRazorpayBody(options: SimulatePaymentWebhookOptions): string {
   const { status, invoiceId, tenantId, amountPaise, gatewayPaymentId, gatewayOrderId } = options;
@@ -65,9 +65,6 @@ function buildRazorpayBody(options: SimulatePaymentWebhookOptions): string {
     event: eventType,
     contains: ['payment'],
     created_at: Math.floor(Date.now() / 1000),
-    // Top-level metadata read by RazorpayWebhookController as `payload.invoiceId`/`payload.tenantId`
-    invoiceId,
-    tenantId,
     payload: {
       payment: {
         entity: {
@@ -80,6 +77,7 @@ function buildRazorpayBody(options: SimulatePaymentWebhookOptions): string {
           invoice_id: null,
           method: 'card',
           captured: status === 'captured',
+          notes: { invoiceId, tenantId },
           created_at: Math.floor(Date.now() / 1000),
         },
       },
@@ -89,22 +87,25 @@ function buildRazorpayBody(options: SimulatePaymentWebhookOptions): string {
 }
 
 /**
- * Build a Cashfree webhook body. The Cashfree adapter parses a different
- * shape than Razorpay; this is a minimal envelope matching the fields the
- * adapter reads. Refer to ee/libs/backend/payments/src/adapters/cashfree.* for
- * the exact contract before relying on this in tests.
+ * Build a Cashfree order payment webhook body shaped like the real payload: the order under
+ * `data.order` (with the invoice and institute in `order_tags`), the payment under `data.payment`.
  */
 function buildCashfreeBody(options: SimulatePaymentWebhookOptions): string {
   const { status, invoiceId, tenantId, amountPaise, gatewayPaymentId, gatewayOrderId } = options;
   const cfStatus = status === 'captured' ? 'SUCCESS' : status === 'failed' ? 'FAILED' : 'REFUNDED';
   const body = {
-    type: status === 'refunded' ? 'REFUND_STATUS_WEBHOOK' : 'PAYMENT_SUCCESS_WEBHOOK',
-    invoiceId,
-    tenantId,
+    type:
+      status === 'refunded'
+        ? 'REFUND_STATUS_WEBHOOK'
+        : status === 'failed'
+          ? 'PAYMENT_FAILED_WEBHOOK'
+          : 'PAYMENT_SUCCESS_WEBHOOK',
+    event_time: new Date().toISOString(),
     data: {
       order: {
         order_id: gatewayOrderId ?? `order_${gatewayPaymentId}`,
         order_amount: amountPaise / 100,
+        order_tags: { invoiceId, tenantId },
       },
       payment: {
         cf_payment_id: gatewayPaymentId,

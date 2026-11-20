@@ -145,11 +145,11 @@ export function useMySubscription() {
 }
 
 export function useMyInvoice(id: string) {
-  const { data, loading, error } = useQuery<MyInvoiceQuery>(MY_INVOICE_QUERY, {
+  const { data, loading, error, refetch } = useQuery<MyInvoiceQuery>(MY_INVOICE_QUERY, {
     variables: { id },
     skip: !id,
   });
-  return { invoice: data?.myInvoice ?? null, loading, error };
+  return { invoice: data?.myInvoice ?? null, loading, error, refetch };
 }
 
 export function useMyInvoices(first = 20, after?: string) {

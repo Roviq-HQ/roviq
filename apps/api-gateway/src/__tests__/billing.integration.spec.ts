@@ -27,7 +27,7 @@
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { mkAdminCtx, withAdmin } from '@roviq/database';
+import { institutes, mkAdminCtx, withAdmin } from '@roviq/database';
 import { BillingInterval, PaymentMethod } from '@roviq/ee-billing-types';
 import {
   invoices,
@@ -36,7 +36,7 @@ import {
   resellerInvoiceSequences,
   subscriptions,
 } from '@roviq/ee-database';
-import { type PaymentGateway, PaymentGatewayFactory } from '@roviq/ee-payments';
+import { type PaymentGateway, PaymentGatewayFactory, type WebhookEvent } from '@roviq/ee-payments';
 import {
   cleanupTestInstitute,
   cleanupTestReseller,
@@ -51,6 +51,7 @@ import {
   type TestReseller,
 } from '@roviq/testing/integration';
 import { and, eq, inArray } from 'drizzle-orm';
+import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
 
@@ -90,13 +91,26 @@ const checkoutOf = (gatewayOrderId: string) => ({
   gatewayProvider: 'RAZORPAY',
   checkoutPayload: { key: 'rzp_test_fake', order_id: gatewayOrderId },
 });
-// Stands in for Razorpay/Cashfree: orders get fresh ids and stay open, and only VALID_SIG
-// passes verification.
-const fakeGateway: Pick<PaymentGateway, 'createOrder' | 'resumeOrder' | 'verifyPayment'> = {
+// Orders the fake gateway reports as paid, with their captured payment id.
+const paidOrders = new Map<string, string>();
+// Stands in for Razorpay/Cashfree: orders get fresh ids and stay open until marked paid, only
+// VALID_SIG passes verification, and webhooks arrive unsigned as the event itself.
+const fakeGateway: Pick<
+  PaymentGateway,
+  'createOrder' | 'resumeOrder' | 'verifyPayment' | 'findPaidPayment' | 'parseWebhook'
+> = {
   createOrder: async () => checkoutOf(`order_${randomUUID()}`),
-  resumeOrder: async (gatewayOrderId) => ({ state: 'OPEN', checkout: checkoutOf(gatewayOrderId) }),
+  resumeOrder: async (gatewayOrderId) =>
+    paidOrders.has(gatewayOrderId)
+      ? { state: 'PAID' }
+      : { state: 'OPEN', checkout: checkoutOf(gatewayOrderId) },
   verifyPayment: async ({ gatewayPaymentId, signature }) =>
     gatewayPaymentId && signature === VALID_SIG ? { gatewayPaymentId } : null,
+  findPaidPayment: async (gatewayOrderId) => {
+    const gatewayPaymentId = paidOrders.get(gatewayOrderId);
+    return gatewayPaymentId ? { gatewayPaymentId } : null;
+  },
+  parseWebhook: (body) => JSON.parse(body.toString()),
 };
 
 describe('Billing Integration', () => {
@@ -471,6 +485,8 @@ describe('Billing Integration', () => {
     `;
     let own: TestInstitute;
     let other: TestInstitute;
+    let late: TestInstitute;
+    let replaced: TestInstitute;
     let tokenA: string;
     let tokenB: string;
 
@@ -607,12 +623,39 @@ describe('Billing Integration', () => {
     beforeAll(async () => {
       own = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
       other = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      late = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      replaced = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      // The gateway needs the payer's phone and email on every order.
+      await withAdmin(result.db, mkAdminCtx('test:billing'), (tx) =>
+        tx
+          .update(institutes)
+          .set({
+            contact: {
+              phones: [
+                {
+                  countryCode: '+91',
+                  number: '9000000001',
+                  isPrimary: true,
+                  isWhatsappEnabled: false,
+                  label: 'Office',
+                },
+              ],
+              emails: [{ address: 'accounts@institute.test', isPrimary: true, label: 'Accounts' }],
+            },
+          })
+          .where(
+            inArray(
+              institutes.id,
+              [own, other, late, replaced].map((i) => i.tenantId),
+            ),
+          ),
+      );
       tokenA = instituteTokenFor(own);
       tokenB = instituteTokenFor(other);
     });
 
     afterAll(async () => {
-      for (const inst of [own, other]) {
+      for (const inst of [own, other, late, replaced]) {
         if (!inst) continue;
         await cleanupBillingForTenant(result.db, inst.tenantId);
         await cleanupTestInstitute(result.db, inst);
@@ -699,6 +742,56 @@ describe('Billing Integration', () => {
       expect(b.errors).toBeUndefined();
       expect(b.data?.verifyPayment.status).toBe('SUCCEEDED');
       expect(await invoiceAmounts(invoiceId)).toEqual({ status: 'PAID', paidEqualsTotal: true });
+    });
+
+    it('should record an earlier order the gateway reports as paid when Pay online is clicked again', async () => {
+      const invoiceId = await openInvoiceFor(late);
+      const tokenLate = instituteTokenFor(late);
+      const orderId = await initiate(invoiceId, tokenLate);
+      paidOrders.set(orderId, 'pay_closed_tab');
+
+      const res = await gqlRequest(result.httpServer, {
+        query: /* GraphQL */ `
+          mutation InitiatePayment($invoiceId: ID!) {
+            initiatePayment(invoiceId: $invoiceId) { gatewayOrderId }
+          }
+        `,
+        variables: { invoiceId },
+        token: tokenLate,
+      });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('INVOICE_ALREADY_PAID');
+      expect(await storedPayment(orderId)).toEqual({ payment: 'SUCCEEDED', invoice: 'PAID' });
+      expect(await invoiceAmounts(invoiceId)).toEqual({ status: 'PAID', paidEqualsTotal: true });
+    });
+
+    it('should settle a replaced order that was still paid, when its webhook arrives', async () => {
+      const invoiceId = await openInvoiceFor(replaced);
+      const orderId = await initiate(invoiceId, instituteTokenFor(replaced));
+      await withAdmin(result.db, mkAdminCtx('test:billing'), (tx) =>
+        tx
+          .update(payments)
+          .set({ status: 'FAILED', failureReason: 'Gateway order expired before payment' })
+          .where(eq(payments.gatewayOrderId, orderId)),
+      );
+      const event: WebhookEvent = {
+        eventType: 'payment.captured',
+        gatewayEventId: 'evt_late',
+        gatewayOrderId: orderId,
+        gatewayPaymentId: 'pay_old_tab',
+        amountPaise: 99900,
+        status: 'captured',
+        isCapture: true,
+        payload: {},
+      };
+
+      const res = await request(result.httpServer)
+        .post(`/api/webhooks/razorpay/${reseller.resellerId}`)
+        .set('content-type', 'application/json')
+        .send(JSON.stringify(event));
+
+      expect(res.status).toBe(200);
+      expect(await storedPayment(orderId)).toEqual({ payment: 'SUCCEEDED', invoice: 'PAID' });
     });
 
     it("should answer INVOICE_NOT_FOUND when paying another institute's invoice", async () => {

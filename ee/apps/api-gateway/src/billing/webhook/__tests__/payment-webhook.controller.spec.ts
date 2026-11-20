@@ -27,6 +27,8 @@ const BASE: WebhookEvent = {
   gatewayOrderId: 'order_123',
   gatewayPaymentId: 'pay_123',
   amountPaise: 118000,
+  isCapture: true,
+  owner: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
   payload: {},
 };
 
@@ -40,8 +42,7 @@ describe('RazorpayWebhookController', () => {
     expect(ctx.paymentService.handleWebhookPayment).toHaveBeenCalledWith('reseller-1', {
       gatewayPaymentId: 'pay_123',
       gatewayOrderId: 'order_123',
-      invoiceId: '',
-      tenantId: '',
+      owner: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
       method: PaymentMethod.RAZORPAY,
       amountPaise: 118000n,
       gatewayProvider: 'RAZORPAY',
@@ -49,8 +50,23 @@ describe('RazorpayWebhookController', () => {
     });
   });
 
+  it('should not pay the invoice for a refund, although its payment is still captured', async () => {
+    const ctx = setup({
+      ...BASE,
+      eventType: 'refund.processed',
+      status: 'captured',
+      isCapture: false,
+    });
+    const controller = new RazorpayWebhookController(ctx.gatewayFactory, ctx.paymentService);
+
+    await controller.handle('reseller-1', ctx.req, ctx.res);
+
+    expect(ctx.paymentService.handleWebhookPayment).not.toHaveBeenCalled();
+    expect(ctx.json).toHaveBeenCalledWith({ status: 'ok' });
+  });
+
   it('should not pay the invoice for a failed payment', async () => {
-    const ctx = setup({ ...BASE, eventType: 'payment.failed', status: 'failed' });
+    const ctx = setup({ ...BASE, eventType: 'payment.failed', status: 'failed', isCapture: false });
     const controller = new RazorpayWebhookController(ctx.gatewayFactory, ctx.paymentService);
 
     await controller.handle('reseller-1', ctx.req, ctx.res);
@@ -70,8 +86,7 @@ describe('CashfreeWebhookController', () => {
     expect(ctx.paymentService.handleWebhookPayment).toHaveBeenCalledWith('reseller-1', {
       gatewayPaymentId: 'pay_123',
       gatewayOrderId: 'order_123',
-      invoiceId: '',
-      tenantId: '',
+      owner: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
       method: PaymentMethod.CASHFREE,
       amountPaise: 118000n,
       gatewayProvider: 'CASHFREE',
@@ -80,7 +95,12 @@ describe('CashfreeWebhookController', () => {
   });
 
   it('should not pay the invoice for a failed payment', async () => {
-    const ctx = setup({ ...BASE, eventType: 'PAYMENT_FAILED_WEBHOOK', status: 'FAILED' });
+    const ctx = setup({
+      ...BASE,
+      eventType: 'PAYMENT_FAILED_WEBHOOK',
+      status: 'FAILED',
+      isCapture: false,
+    });
     const controller = new CashfreeWebhookController(ctx.gatewayFactory, ctx.paymentService);
 
     await controller.handle('reseller-1', ctx.req, ctx.res);

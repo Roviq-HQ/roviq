@@ -1,4 +1,4 @@
-import { ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { SYSTEM_USER_ID } from '@roviq/database';
 import { PaymentMethod } from '@roviq/ee-billing-types';
 import { requestContext } from '@roviq/request-context';
@@ -22,7 +22,7 @@ function createMockPaymentRepo() {
     findByInvoiceId: vi.fn(),
     findByTenantId: vi.fn(),
     findByGatewayOrderId: vi.fn(),
-    findOrCreateByGatewayId: vi.fn(),
+    recordGatewayPayment: vi.fn(),
     findOpenGatewayPayment: vi.fn(),
     settleGatewayOrder: vi.fn(),
     findPayer: vi.fn(),
@@ -285,9 +285,11 @@ describe('PaymentService', () => {
 
   describe('initiatePayment', () => {
     const CALLER = { resellerId: 'reseller-1', tenantId: 'tenant-1' };
+    const NOW = new Date('2026-11-20T10:00:00.000Z');
     const INVOICE = {
       id: 'inv-1',
       tenantId: 'tenant-1',
+      subscriptionId: 'sub-1',
       totalAmount: 118000n,
       paidAmount: 18000n,
       currency: 'INR',
@@ -325,20 +327,32 @@ describe('PaymentService', () => {
         phone: '9000000002',
       },
       returnUrl: 'https://app.roviq.com/billing/invoices/inv-1?order_id={order_id}',
+      owner: { invoiceId: 'inv-1', tenantId: 'tenant-1' },
     };
     const CHECKOUT = {
       gatewayOrderId: 'order_123',
       gatewayProvider: 'RAZORPAY',
       checkoutPayload: { key: 'rzp_test_123', order_id: 'order_123' },
     };
+    const OPEN_ROW = { id: 'pay-0', gatewayOrderId: 'order_old', gatewayProvider: 'CASHFREE' };
 
-    function setup(gateway: { createOrder?: unknown; resumeOrder?: unknown }) {
+    function setup(gateways: {
+      current: Record<string, unknown>;
+      old?: Record<string, unknown> | Error;
+    }) {
       const ctx = createService();
       ctx.invoiceRepo.findById.mockResolvedValue(INVOICE);
       ctx.config.getOrThrow.mockReturnValue('https://app.roviq.com/billing/subscriptions');
       ctx.paymentRepo.findPayer.mockResolvedValue(PAYER);
       ctx.paymentRepo.findOpenGatewayPayment.mockResolvedValue(null);
-      ctx.gatewayFactory.create.mockResolvedValue(gateway);
+      ctx.gatewayFactory.create.mockImplementation((_rid: string, provider?: string) => {
+        if (provider === 'CASHFREE') {
+          return gateways.old instanceof Error
+            ? Promise.reject(gateways.old)
+            : Promise.resolve(gateways.old);
+        }
+        return Promise.resolve(gateways.current);
+      });
       ctx.paymentRepo.create.mockImplementation((_rid: string, data: Record<string, unknown>) =>
         Promise.resolve({ id: 'pay-1', ...data }),
       );
@@ -348,7 +362,7 @@ describe('PaymentService', () => {
     it("should open a gateway order for the amount due with the institute's contact", () =>
       requestContext.run(TEST_CTX, async () => {
         const createOrder = vi.fn().mockResolvedValue(CHECKOUT);
-        const { service, paymentRepo } = setup({ createOrder });
+        const { service, paymentRepo } = setup({ current: { createOrder } });
 
         const result = await service.initiatePayment(CALLER, 'inv-1');
 
@@ -369,19 +383,20 @@ describe('PaymentService', () => {
         expect(result).toEqual({ paymentId: 'pay-1', ...CHECKOUT });
       }));
 
-    it('should reopen the open order of an earlier click instead of adding a payment', () =>
+    it('should reopen the open order on the gateway it was made on', () =>
       requestContext.run(TEST_CTX, async () => {
         const createOrder = vi.fn();
         const resumeOrder = vi.fn().mockResolvedValue({ state: 'OPEN', checkout: CHECKOUT });
-        const { service, paymentRepo } = setup({ createOrder, resumeOrder });
-        paymentRepo.findOpenGatewayPayment.mockResolvedValue({
-          id: 'pay-0',
-          gatewayOrderId: 'order_123',
+        const { service, paymentRepo, gatewayFactory } = setup({
+          current: { createOrder },
+          old: { resumeOrder },
         });
+        paymentRepo.findOpenGatewayPayment.mockResolvedValue(OPEN_ROW);
 
         const result = await service.initiatePayment(CALLER, 'inv-1');
 
-        expect(resumeOrder).toHaveBeenCalledWith('order_123', ORDER_INPUT);
+        expect(gatewayFactory.create).toHaveBeenCalledWith('reseller-1', 'CASHFREE');
+        expect(resumeOrder).toHaveBeenCalledWith('order_old', ORDER_INPUT);
         expect(createOrder).not.toHaveBeenCalled();
         expect(paymentRepo.create).not.toHaveBeenCalled();
         expect(result).toEqual({ paymentId: 'pay-0', ...CHECKOUT });
@@ -389,44 +404,110 @@ describe('PaymentService', () => {
 
     it('should close an expired order and open a new one', () =>
       requestContext.run(TEST_CTX, async () => {
-        const createOrder = vi.fn().mockResolvedValue(CHECKOUT);
-        const resumeOrder = vi.fn().mockResolvedValue({ state: 'CLOSED' });
-        const { service, paymentRepo } = setup({ createOrder, resumeOrder });
-        paymentRepo.findOpenGatewayPayment.mockResolvedValue({
-          id: 'pay-0',
-          gatewayOrderId: 'order_old',
-        });
+        vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+        try {
+          const createOrder = vi.fn().mockResolvedValue(CHECKOUT);
+          const resumeOrder = vi.fn().mockResolvedValue({ state: 'CLOSED' });
+          const { service, paymentRepo } = setup({
+            current: { createOrder },
+            old: { resumeOrder },
+          });
+          paymentRepo.findOpenGatewayPayment.mockResolvedValue(OPEN_ROW);
 
-        const result = await service.initiatePayment(CALLER, 'inv-1');
+          const result = await service.initiatePayment(CALLER, 'inv-1');
 
-        expect(paymentRepo.update).toHaveBeenCalledWith('reseller-1', 'pay-0', {
-          status: 'FAILED',
-          failedAt: expect.any(Date),
-          failureReason: 'Gateway order expired before payment',
-        });
-        expect(result.paymentId).toBe('pay-1');
+          expect(paymentRepo.update).toHaveBeenCalledWith('reseller-1', 'pay-0', {
+            status: 'FAILED',
+            failedAt: NOW,
+            failureReason: 'Gateway order expired before payment',
+          });
+          expect(result.paymentId).toBe('pay-1');
+        } finally {
+          vi.useRealTimers();
+        }
       }));
 
-    it('should refuse a new order while a captured payment is being confirmed', () =>
+    it('should replace an open order whose gateway the reseller no longer has', () =>
+      requestContext.run(TEST_CTX, async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+        try {
+          const createOrder = vi.fn().mockResolvedValue(CHECKOUT);
+          const { service, paymentRepo } = setup({
+            current: { createOrder },
+            old: new BusinessException(ErrorCode.PAYMENT_GATEWAY_NOT_CONFIGURED, 'gone'),
+          });
+          paymentRepo.findOpenGatewayPayment.mockResolvedValue(OPEN_ROW);
+
+          const result = await service.initiatePayment(CALLER, 'inv-1');
+
+          expect(paymentRepo.update).toHaveBeenCalledWith('reseller-1', 'pay-0', {
+            status: 'FAILED',
+            failedAt: NOW,
+            failureReason: 'Gateway order expired before payment',
+          });
+          expect(result).toEqual({ paymentId: 'pay-1', ...CHECKOUT });
+        } finally {
+          vi.useRealTimers();
+        }
+      }));
+
+    it('should record an earlier order the gateway reports as paid, then refuse a new one', () =>
       requestContext.run(TEST_CTX, async () => {
         const createOrder = vi.fn();
         const resumeOrder = vi.fn().mockResolvedValue({ state: 'PAID' });
-        const { service, paymentRepo } = setup({ createOrder, resumeOrder });
-        paymentRepo.findOpenGatewayPayment.mockResolvedValue({
-          id: 'pay-0',
-          gatewayOrderId: 'order_123',
+        const findPaidPayment = vi.fn().mockResolvedValue({ gatewayPaymentId: 'cf_pay_9' });
+        const { service, paymentRepo, invoiceRepo, eventBus } = setup({
+          current: { createOrder },
+          old: { resumeOrder, findPaidPayment },
         });
+        paymentRepo.findOpenGatewayPayment.mockResolvedValue(OPEN_ROW);
+        const paidInvoice = { ...INVOICE, paidAmount: 118000n, status: 'PAID' };
+        paymentRepo.settleGatewayOrder.mockResolvedValue({
+          payment: { id: 'pay-0', invoiceId: 'inv-1', tenantId: 'tenant-1' },
+          invoice: paidInvoice,
+          settled: true,
+        });
+        invoiceRepo.findById.mockResolvedValueOnce(INVOICE).mockResolvedValueOnce(paidInvoice);
 
         await expect(service.initiatePayment(CALLER, 'inv-1')).rejects.toMatchObject({
           code: ErrorCode.INVOICE_ALREADY_PAID,
         });
+
+        expect(paymentRepo.settleGatewayOrder).toHaveBeenCalledWith('reseller-1', {
+          gatewayOrderId: 'order_old',
+          gatewayPaymentId: 'cf_pay_9',
+          tenantId: 'tenant-1',
+          actorId: 'test-user-1',
+        });
+        expect(eventBus.emit).toHaveBeenCalledWith('BILLING.invoice.paid', {
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          subscriptionId: 'sub-1',
+          totalAmount: '118000',
+        });
         expect(createOrder).not.toHaveBeenCalled();
+      }));
+
+    it('should say the payment is being confirmed when the gateway has not exposed it yet', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const resumeOrder = vi.fn().mockResolvedValue({ state: 'PAID' });
+        const findPaidPayment = vi.fn().mockResolvedValue(null);
+        const { service, paymentRepo } = setup({
+          current: { createOrder: vi.fn() },
+          old: { resumeOrder, findPaidPayment },
+        });
+        paymentRepo.findOpenGatewayPayment.mockResolvedValue(OPEN_ROW);
+
+        await expect(service.initiatePayment(CALLER, 'inv-1')).rejects.toMatchObject({
+          code: ErrorCode.INVOICE_ALREADY_PAID,
+        });
+        expect(paymentRepo.settleGatewayOrder).not.toHaveBeenCalled();
       }));
 
     it("should treat another institute's invoice as not found", () =>
       requestContext.run(TEST_CTX, async () => {
         const createOrder = vi.fn();
-        const { service, invoiceRepo } = setup({ createOrder });
+        const { service, invoiceRepo } = setup({ current: { createOrder } });
         invoiceRepo.findById.mockResolvedValue({ ...INVOICE, tenantId: 'tenant-2' });
 
         await expect(service.initiatePayment(CALLER, 'inv-1')).rejects.toMatchObject({
@@ -435,14 +516,39 @@ describe('PaymentService', () => {
         expect(createOrder).not.toHaveBeenCalled();
       }));
 
-    it('should reject non-payable invoices', () =>
+    it('should refuse a draft invoice, which is not issued yet', () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, invoiceRepo } = setup({ createOrder: vi.fn() });
-        invoiceRepo.findById.mockResolvedValue({ ...INVOICE, status: 'PAID' });
+        const { service, invoiceRepo } = setup({ current: { createOrder: vi.fn() } });
+        invoiceRepo.findById.mockResolvedValue({ ...INVOICE, status: 'DRAFT' });
 
         await expect(service.initiatePayment(CALLER, 'inv-1')).rejects.toMatchObject({
           code: ErrorCode.INVOICE_NOT_PAYABLE,
         });
+      }));
+
+    it('should answer INVOICE_ALREADY_PAID for a paid invoice', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, invoiceRepo } = setup({ current: { createOrder: vi.fn() } });
+        invoiceRepo.findById.mockResolvedValue({ ...INVOICE, status: 'PAID' });
+
+        await expect(service.initiatePayment(CALLER, 'inv-1')).rejects.toMatchObject({
+          code: ErrorCode.INVOICE_ALREADY_PAID,
+        });
+      }));
+
+    it('should ask for the institute contact when it has no phone number', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const createOrder = vi.fn();
+        const { service, paymentRepo } = setup({ current: { createOrder } });
+        paymentRepo.findPayer.mockResolvedValue({
+          ...PAYER,
+          contact: { ...PAYER.contact, phones: [] },
+        });
+
+        await expect(service.initiatePayment(CALLER, 'inv-1')).rejects.toMatchObject({
+          code: ErrorCode.PAYER_CONTACT_MISSING,
+        });
+        expect(createOrder).not.toHaveBeenCalled();
       }));
   });
 
@@ -453,55 +559,68 @@ describe('PaymentService', () => {
       gatewayPaymentId: 'pay_gw_123',
       signature: 'sig_123',
     };
+    const ROW = { id: 'pay-1', tenantId: 'tenant-1', gatewayProvider: 'RAZORPAY' };
     const SETTLED = {
-      id: 'pay-1',
-      status: 'SUCCEEDED',
-      invoiceId: 'inv-1',
-      tenantId: 'tenant-1',
-      amountPaise: 118000n,
+      payment: { id: 'pay-1', status: 'SUCCEEDED', invoiceId: 'inv-1', tenantId: 'tenant-1' },
+      invoice: {
+        id: 'inv-1',
+        tenantId: 'tenant-1',
+        subscriptionId: 'sub-1',
+        status: 'PAID',
+        totalAmount: 118000n,
+      },
     };
 
-    it("should settle the institute's pending payment and mark the invoice paid", () =>
+    function setup(verifyPayment: ReturnType<typeof vi.fn>) {
+      const ctx = createService();
+      ctx.paymentRepo.findByGatewayOrderId.mockResolvedValue([ROW]);
+      ctx.gatewayFactory.create.mockResolvedValue({ verifyPayment });
+      return ctx;
+    }
+
+    it("should settle the institute's payment on the order's own gateway", () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, gatewayFactory, invoiceService } = createService();
-        gatewayFactory.create.mockResolvedValue({
-          verifyPayment: vi.fn().mockResolvedValue({ gatewayPaymentId: 'pay_gw_123' }),
-        });
-        paymentRepo.settleGatewayOrder.mockResolvedValue({ payment: SETTLED, settled: true });
+        const verify = vi.fn().mockResolvedValue({ gatewayPaymentId: 'pay_gw_123' });
+        const { service, paymentRepo, gatewayFactory, eventBus } = setup(verify);
+        paymentRepo.settleGatewayOrder.mockResolvedValue({ ...SETTLED, settled: true });
 
         const result = await service.verifyPayment(CALLER, INPUT);
 
+        expect(gatewayFactory.create).toHaveBeenCalledWith('reseller-1', 'RAZORPAY');
         expect(paymentRepo.settleGatewayOrder).toHaveBeenCalledWith('reseller-1', {
           gatewayOrderId: 'order_123',
           gatewayPaymentId: 'pay_gw_123',
           tenantId: 'tenant-1',
           actorId: 'test-user-1',
         });
-        expect(invoiceService.markPaid).toHaveBeenCalledWith('reseller-1', 'inv-1', 118000n);
-        expect(result).toBe(SETTLED);
+        expect(eventBus.emit).toHaveBeenCalledWith('BILLING.payment.succeeded', {
+          paymentId: 'pay-1',
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          resellerId: 'reseller-1',
+        });
+        expect(result).toBe(SETTLED.payment);
       }));
 
-    it('should not mark the invoice paid again when the webhook settled it first', () =>
+    it('should not announce the payment again when the webhook settled it first', () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, gatewayFactory, invoiceService, eventBus } = createService();
-        gatewayFactory.create.mockResolvedValue({
-          verifyPayment: vi.fn().mockResolvedValue({ gatewayPaymentId: 'pay_gw_123' }),
+        const verify = vi.fn().mockResolvedValue({ gatewayPaymentId: 'pay_gw_123' });
+        const { service, paymentRepo, eventBus } = setup(verify);
+        paymentRepo.settleGatewayOrder.mockResolvedValue({
+          payment: SETTLED.payment,
+          invoice: null,
+          settled: false,
         });
-        paymentRepo.settleGatewayOrder.mockResolvedValue({ payment: SETTLED, settled: false });
 
         const result = await service.verifyPayment(CALLER, INPUT);
 
-        expect(result).toBe(SETTLED);
-        expect(invoiceService.markPaid).not.toHaveBeenCalled();
+        expect(result).toBe(SETTLED.payment);
         expect(eventBus.emit).not.toHaveBeenCalled();
       }));
 
     it('should throw when the gateway does not confirm the payment', () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, gatewayFactory, paymentRepo } = createService();
-        gatewayFactory.create.mockResolvedValue({
-          verifyPayment: vi.fn().mockResolvedValue(null),
-        });
+        const { service, paymentRepo } = setup(vi.fn().mockResolvedValue(null));
 
         await expect(
           service.verifyPayment(CALLER, { ...INPUT, signature: 'bad_sig' }),
@@ -511,39 +630,35 @@ describe('PaymentService', () => {
 
     it("should refuse another institute's order of the same reseller as not found", () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, gatewayFactory, invoiceService } = createService();
-        gatewayFactory.create.mockResolvedValue({
-          verifyPayment: vi.fn().mockResolvedValue({ gatewayPaymentId: 'pay_gw_456' }),
-        });
-        paymentRepo.settleGatewayOrder.mockResolvedValue(null);
+        const verify = vi.fn();
+        const { service, paymentRepo } = setup(verify);
+        paymentRepo.findByGatewayOrderId.mockResolvedValue([{ ...ROW, tenantId: 'tenant-2' }]);
 
         await expect(
           service.verifyPayment(CALLER, { ...INPUT, gatewayOrderId: 'order_456' }),
         ).rejects.toMatchObject({ code: ErrorCode.PAYMENT_NOT_FOUND });
-        expect(invoiceService.markPaid).not.toHaveBeenCalled();
+        expect(verify).not.toHaveBeenCalled();
+        expect(paymentRepo.settleGatewayOrder).not.toHaveBeenCalled();
       }));
   });
 
   describe('handleWebhookPayment', () => {
     const WEBHOOK = {
       gatewayPaymentId: 'pay_gw_123',
-      invoiceId: 'inv-1',
-      tenantId: 'tenant-1',
       method: PaymentMethod.RAZORPAY,
       amountPaise: 118000n,
       gatewayProvider: 'RAZORPAY',
     };
-    const PAYMENT = {
-      id: 'pay-1',
-      invoiceId: 'inv-1',
-      tenantId: 'tenant-1',
-      amountPaise: 118000n,
+    const RESULT = {
+      payment: { id: 'pay-1', invoiceId: 'inv-1', tenantId: 'tenant-1' },
+      invoice: null,
     };
+    const OWNER = { invoiceId: 'inv-1', tenantId: 'tenant-1' };
 
-    it("should settle the order's pending payment instead of adding a second one", () =>
+    it("should settle the order's payment row instead of adding a second one", () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, invoiceService } = createService();
-        paymentRepo.settleGatewayOrder.mockResolvedValue({ payment: PAYMENT, settled: true });
+        const { service, paymentRepo, eventBus } = createService();
+        paymentRepo.settleGatewayOrder.mockResolvedValue({ ...RESULT, settled: true });
 
         await service.handleWebhookPayment('reseller-1', {
           ...WEBHOOK,
@@ -557,14 +672,19 @@ describe('PaymentService', () => {
           gatewayResponse: { event: 'payment.captured' },
           actorId: 'test-user-1',
         });
-        expect(paymentRepo.findOrCreateByGatewayId).not.toHaveBeenCalled();
-        expect(invoiceService.markPaid).toHaveBeenCalledWith('reseller-1', 'inv-1', 118000n);
+        expect(paymentRepo.recordGatewayPayment).not.toHaveBeenCalled();
+        expect(eventBus.emit).toHaveBeenCalledWith('BILLING.payment.succeeded', {
+          paymentId: 'pay-1',
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          resellerId: 'reseller-1',
+        });
       }));
 
     it('should record the system user as actor when the webhook has no user', () =>
       requestContext.run({ ...TEST_CTX, userId: '' }, async () => {
         const { service, paymentRepo } = createService();
-        paymentRepo.settleGatewayOrder.mockResolvedValue({ payment: PAYMENT, settled: true });
+        paymentRepo.settleGatewayOrder.mockResolvedValue({ ...RESULT, settled: true });
 
         await service.handleWebhookPayment('reseller-1', {
           ...WEBHOOK,
@@ -579,48 +699,87 @@ describe('PaymentService', () => {
         });
       }));
 
-    it('should not mark the invoice paid again after the browser verified it', () =>
+    it('should not announce the payment again after the browser verified it', () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, invoiceService } = createService();
-        paymentRepo.settleGatewayOrder.mockResolvedValue({ payment: PAYMENT, settled: false });
+        const { service, paymentRepo, eventBus } = createService();
+        paymentRepo.settleGatewayOrder.mockResolvedValue({ ...RESULT, settled: false });
 
         await service.handleWebhookPayment('reseller-1', {
           ...WEBHOOK,
           gatewayOrderId: 'order_123',
         });
 
-        expect(paymentRepo.findOrCreateByGatewayId).not.toHaveBeenCalled();
-        expect(invoiceService.markPaid).not.toHaveBeenCalled();
+        expect(paymentRepo.recordGatewayPayment).not.toHaveBeenCalled();
+        expect(eventBus.emit).not.toHaveBeenCalled();
       }));
 
-    it('should be idempotent — skip if payment already exists', () =>
+    it('should record a capture with no order row against the invoice the order named', () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, invoiceService } = createService();
-        paymentRepo.findOrCreateByGatewayId.mockResolvedValue({
-          payment: PAYMENT,
-          created: false,
-        });
-
-        await service.handleWebhookPayment('reseller-1', WEBHOOK);
-
-        expect(invoiceService.markPaid).not.toHaveBeenCalled();
-      }));
-
-    it('should create payment and update invoice when the order has no pending payment', () =>
-      requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, invoiceService } = createService();
+        const now = new Date('2026-11-20T10:00:00.000Z');
+        vi.useFakeTimers({ now, toFake: ['Date'] });
+        const { service, paymentRepo, invoiceRepo, eventBus } = createService();
         paymentRepo.settleGatewayOrder.mockResolvedValue(null);
-        paymentRepo.findOrCreateByGatewayId.mockResolvedValue({
-          payment: PAYMENT,
-          created: true,
+        invoiceRepo.findById.mockResolvedValue({
+          id: 'inv-1',
+          tenantId: 'tenant-1',
+          currency: 'INR',
         });
+        paymentRepo.recordGatewayPayment.mockResolvedValue({ ...RESULT, created: true });
 
         await service.handleWebhookPayment('reseller-1', {
           ...WEBHOOK,
           gatewayOrderId: 'order_unknown',
+          owner: OWNER,
         });
 
-        expect(invoiceService.markPaid).toHaveBeenCalledWith('reseller-1', 'inv-1', 118000n);
+        expect(paymentRepo.recordGatewayPayment).toHaveBeenCalledWith('reseller-1', {
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          resellerId: 'reseller-1',
+          status: 'SUCCEEDED',
+          method: PaymentMethod.RAZORPAY,
+          amountPaise: 118000n,
+          currency: 'INR',
+          gatewayProvider: 'RAZORPAY',
+          gatewayPaymentId: 'pay_gw_123',
+          gatewayOrderId: 'order_unknown',
+          gatewayResponse: null,
+          paidAt: now,
+          createdBy: 'test-user-1',
+          updatedBy: 'test-user-1',
+        });
+        expect(eventBus.emit).toHaveBeenCalledWith('BILLING.payment.succeeded', {
+          paymentId: 'pay-1',
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          resellerId: 'reseller-1',
+        });
+        vi.useRealTimers();
+      }));
+
+    it('should not record a capture that names no invoice of this reseller', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo } = createService();
+        paymentRepo.settleGatewayOrder.mockResolvedValue(null);
+        invoiceRepo.findById.mockResolvedValue({
+          id: 'inv-1',
+          tenantId: 'tenant-9',
+          currency: 'INR',
+        });
+
+        const withoutOwner = await service.handleWebhookPayment('reseller-1', {
+          ...WEBHOOK,
+          gatewayOrderId: 'order_unknown',
+        });
+        const wrongTenant = await service.handleWebhookPayment('reseller-1', {
+          ...WEBHOOK,
+          gatewayOrderId: 'order_unknown',
+          owner: OWNER,
+        });
+
+        expect(withoutOwner).toBeNull();
+        expect(wrongTenant).toBeNull();
+        expect(paymentRepo.recordGatewayPayment).not.toHaveBeenCalled();
       }));
   });
 

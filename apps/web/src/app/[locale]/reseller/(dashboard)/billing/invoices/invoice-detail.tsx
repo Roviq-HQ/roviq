@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@roviq/ui';
+import { keyedLineItems } from '@web/lib/keyed-line-items';
 import { Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -295,8 +296,8 @@ export function InvoiceDetail({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {lineItems.map((item) => (
-                          <TableRow key={`${item.description}-${item.unitAmountPaise}`}>
+                        {keyedLineItems(lineItems).map(({ key, item }) => (
+                          <TableRow key={key}>
                             <TableCell className="text-xs">{item.description}</TableCell>
                             <TableCell className="text-xs text-right">{item.quantity}</TableCell>
                             <TableCell className="text-xs text-right whitespace-nowrap">
