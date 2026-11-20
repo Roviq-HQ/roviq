@@ -344,6 +344,34 @@ export const ErrorCode = {
   PLAN_NOT_ACTIVE: 'PLAN_NOT_ACTIVE',
   /** Institute already has an active subscription */
   SUBSCRIPTION_ALREADY_ACTIVE: 'SUBSCRIPTION_ALREADY_ACTIVE',
+  /** Subscription plan not found or deleted */
+  PLAN_NOT_FOUND: 'PLAN_NOT_FOUND',
+  /** Invoice not found */
+  INVOICE_NOT_FOUND: 'INVOICE_NOT_FOUND',
+  /** Payment not found, or not the caller's to act on */
+  PAYMENT_NOT_FOUND: 'PAYMENT_NOT_FOUND',
+  /** Payment gateway configuration not found or deleted */
+  GATEWAY_CONFIG_NOT_FOUND: 'GATEWAY_CONFIG_NOT_FOUND',
+  /** Plan or gateway configuration is still used by active subscriptions */
+  PLAN_IN_USE: 'PLAN_IN_USE',
+  /** Plan code already exists for this reseller */
+  PLAN_CODE_DUPLICATE: 'PLAN_CODE_DUPLICATE',
+  /** Subscription is cancelled or expired and cannot change any more */
+  SUBSCRIPTION_TERMINAL: 'SUBSCRIPTION_TERMINAL',
+  /** Invoice is already fully paid */
+  INVOICE_ALREADY_PAID: 'INVOICE_ALREADY_PAID',
+  /** Invoice status does not allow payment (draft, cancelled, refunded) */
+  INVOICE_NOT_PAYABLE: 'INVOICE_NOT_PAYABLE',
+  /** Payment gateway signature or status check failed */
+  PAYMENT_VERIFICATION_FAILED: 'PAYMENT_VERIFICATION_FAILED',
+  /** Payment gateway returned an error */
+  GATEWAY_ERROR: 'GATEWAY_ERROR',
+  /** Refund amount is more than was paid */
+  REFUND_EXCEEDS_PAID: 'REFUND_EXCEEDS_PAID',
+  /** UPI transaction reference (UTR) has the wrong format */
+  UTR_INVALID: 'UTR_INVALID',
+  /** A payment with this UTR was already submitted */
+  UTR_ALREADY_SUBMITTED: 'UTR_ALREADY_SUBMITTED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -514,4 +542,18 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   PLAN_NOT_INACTIVE: HttpStatus.BAD_REQUEST,
   PLAN_NOT_ACTIVE: HttpStatus.BAD_REQUEST,
   SUBSCRIPTION_ALREADY_ACTIVE: HttpStatus.BAD_REQUEST,
+  PLAN_NOT_FOUND: HttpStatus.NOT_FOUND,
+  INVOICE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PAYMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  GATEWAY_CONFIG_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PLAN_IN_USE: HttpStatus.CONFLICT,
+  PLAN_CODE_DUPLICATE: HttpStatus.CONFLICT,
+  SUBSCRIPTION_TERMINAL: HttpStatus.UNPROCESSABLE_ENTITY,
+  INVOICE_ALREADY_PAID: HttpStatus.CONFLICT,
+  INVOICE_NOT_PAYABLE: HttpStatus.UNPROCESSABLE_ENTITY,
+  PAYMENT_VERIFICATION_FAILED: HttpStatus.UNPROCESSABLE_ENTITY,
+  GATEWAY_ERROR: HttpStatus.BAD_GATEWAY,
+  REFUND_EXCEEDS_PAID: HttpStatus.UNPROCESSABLE_ENTITY,
+  UTR_INVALID: HttpStatus.BAD_REQUEST,
+  UTR_ALREADY_SUBMITTED: HttpStatus.CONFLICT,
 };
