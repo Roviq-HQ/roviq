@@ -39,8 +39,8 @@ export class StaffQualificationModel {
   @Field(() => String, { nullable: true })
   gradePercentage?: string | null;
 
-  @Field(() => String, { nullable: true })
-  certificateUrl?: string | null;
+  /** Not a GraphQL field: resolved into `certificate`. */
+  certificateFileId?: string | null;
 
   @Field(() => DateTimeScalar)
   createdAt!: Date;

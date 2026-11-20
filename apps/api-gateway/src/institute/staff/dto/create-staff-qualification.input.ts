@@ -6,7 +6,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUrl,
   IsUUID,
   Max,
   MaxLength,
@@ -71,11 +70,12 @@ export class CreateStaffQualificationInput {
   @MaxLength(20)
   gradePercentage?: string;
 
-  @Field(() => String, {
+  @Field(() => ID, {
     nullable: true,
-    description: 'MinIO/S3 URL of the uploaded certificate scan.',
+    description:
+      'File id of the certificate scan, uploaded with `requestFileUpload` (purpose STAFF_CERTIFICATE).',
   })
   @IsOptional()
-  @IsUrl()
-  certificateUrl?: string;
+  @IsUUID()
+  certificateFileId?: string;
 }

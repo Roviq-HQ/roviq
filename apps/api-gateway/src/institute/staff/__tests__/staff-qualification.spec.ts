@@ -9,8 +9,10 @@
  */
 
 import { ErrorCode, QualificationType } from '@roviq/common-types';
-import { staffQualifications } from '@roviq/database';
+import { type DrizzleDB, staffQualifications } from '@roviq/database';
+import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FileService } from '../../../files/file.service';
 
 // ── Sequential result queue (shared between `withTenant` and `withAdmin`) ──
 
@@ -49,9 +51,11 @@ function createMockTx() {
   return chain;
 }
 
+const tx = createMockTx();
+
 async function mockWithContext(_db: unknown, ...args: unknown[]) {
   const fn = args[args.length - 1] as (tx: unknown) => Promise<unknown>;
-  return fn(createMockTx());
+  return fn(tx);
 }
 
 const softDeleteMock = vi.hoisted(() => vi.fn());
@@ -62,6 +66,7 @@ vi.mock('@roviq/database', () => ({
   withAdmin: vi.fn(mockWithContext),
   withTenant: vi.fn(mockWithContext),
   staffQualifications: {
+    deletedAt: 'deleted_at',
     id: 'id',
     staffProfileId: 'staff_profile_id',
     tenantId: 'tenant_id',
@@ -149,6 +154,12 @@ vi.mock('@roviq/database', () => ({
   groupChildrenLive: { __tableName: 'groupChildrenLive' },
 }));
 
+const markFilesReady = vi.hoisted(() => vi.fn());
+const markFilesDeleted = vi.hoisted(() => vi.fn());
+vi.mock('../../../files/file-attachment', () => ({ markFilesReady, markFilesDeleted }));
+// The service imports FileService for its type only; its module pulls in storage and sharp.
+vi.mock('../../../files/file.service', () => ({ FileService: class {} }));
+
 vi.mock('@roviq/request-context', () => ({
   getRequestContext: vi.fn(() => ({
     tenantId: 'tenant-1',
@@ -164,11 +175,21 @@ vi.mock('drizzle-orm', () => ({
   isNull: vi.fn((a: unknown) => ['isNull', a]),
 }));
 
+const verifyUploads = vi.fn();
+
 async function createService() {
   const mod = await import('../staff-qualification.service');
-  const svc = Object.create(mod.StaffQualificationService.prototype);
-  svc.db = {};
-  return svc as InstanceType<typeof mod.StaffQualificationService>;
+  return new mod.StaffQualificationService(
+    createMock<DrizzleDB>(),
+    createMock<FileService>({ verifyUploads }),
+  );
+}
+
+// The fake transaction is a Proxy, which deep equality cannot compare: check identity instead.
+function expectTxCall(mock: ReturnType<typeof vi.fn>, params: Record<string, unknown>) {
+  expect(mock).toHaveBeenCalledOnce();
+  expect(mock.mock.calls[0]?.[0]).toBe(tx);
+  expect(mock.mock.calls[0]?.[1]).toEqual(params);
 }
 
 describe('StaffQualificationService (unit)', () => {
@@ -192,63 +213,136 @@ describe('StaffQualificationService (unit)', () => {
     expect(result).toEqual(rows);
   });
 
-  it('create returns the inserted row from the returning chain', async () => {
-    const inserted = {
-      id: 'q3',
-      staffProfileId: 'staff-1',
-      tenantId: 'tenant-1',
-      type: QualificationType.ACADEMIC,
-      degreeName: 'B.Ed',
-    };
-    queueResult([inserted]);
-
-    const result = await service.create({
+  describe('create', () => {
+    const input = {
       staffProfileId: 'staff-1',
       type: QualificationType.ACADEMIC,
       degreeName: 'B.Ed',
-    });
-
-    expect(result).toEqual(inserted);
-  });
-
-  it('update returns the updated row', async () => {
-    const updated = {
-      id: 'q4',
-      staffProfileId: 'staff-1',
-      type: QualificationType.ACADEMIC,
-      degreeName: 'B.Ed (Revised)',
     };
-    queueResult([updated]);
+    const inserted = { id: 'q3', tenantId: 'tenant-1', ...input };
 
-    const result = await service.update('q4', { degreeName: 'B.Ed (Revised)' });
+    it('should return the inserted row and touch no file when there is no certificate', async () => {
+      queueResult([{ id: 'staff-1' }]);
+      queueResult([inserted]);
 
-    expect(result).toEqual(updated);
-  });
+      const result = await service.create(input);
 
-  it('update rejects when no row matches', async () => {
-    queueResult([]);
+      expect(result).toEqual(inserted);
+      expect(verifyUploads).not.toHaveBeenCalled();
+      expect(markFilesReady).not.toHaveBeenCalled();
+    });
 
-    await expect(service.update('missing', { degreeName: 'X' })).rejects.toMatchObject({
-      code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+    it('should verify the certificate upload and make it ready with the row', async () => {
+      queueResult([{ id: 'staff-1' }]);
+      queueResult([{ ...inserted, certificateFileId: 'file-1' }]);
+
+      await service.create({ ...input, certificateFileId: 'file-1' });
+
+      expect(verifyUploads).toHaveBeenCalledWith(['file-1'], 'STAFF_CERTIFICATE');
+      expectTxCall(markFilesReady, {
+        fileIds: ['file-1'],
+        purpose: 'STAFF_CERTIFICATE',
+        userId: 'user-1',
+      });
+    });
+
+    it('should refuse a staff member that is not in this institute before looking at the file', async () => {
+      queueResult([]);
+
+      await expect(service.create({ ...input, certificateFileId: 'file-1' })).rejects.toMatchObject(
+        { code: ErrorCode.STAFF_NOT_FOUND },
+      );
+      expect(verifyUploads).not.toHaveBeenCalled();
     });
   });
 
-  it('delete soft-deletes the row and returns true', async () => {
-    queueResult([{ id: 'q5' }]);
-    softDeleteMock.mockResolvedValueOnce(undefined);
+  describe('update', () => {
+    const updated = { id: 'q4', degreeName: 'B.Ed (Revised)' };
 
-    const result = await service.delete('q5');
+    it('should keep the certificate when the input does not mention it', async () => {
+      queueResult([{ id: 'q4', certificateFileId: 'old-file' }]);
+      queueResult([updated]);
 
-    expect(result).toBe(true);
-    expect(softDeleteMock).toHaveBeenCalledWith(expect.anything(), staffQualifications, 'q5');
+      const result = await service.update('q4', { degreeName: 'B.Ed (Revised)' });
+
+      expect(result).toEqual(updated);
+      expect(verifyUploads).not.toHaveBeenCalled();
+      expect(markFilesReady).not.toHaveBeenCalled();
+      expect(markFilesDeleted).not.toHaveBeenCalled();
+    });
+
+    it('should attach the new certificate and delete the one it replaces', async () => {
+      queueResult([{ id: 'q4', certificateFileId: 'old-file' }]);
+      queueResult([updated]);
+
+      await service.update('q4', { certificateFileId: 'new-file' });
+
+      expect(verifyUploads).toHaveBeenCalledWith(['new-file'], 'STAFF_CERTIFICATE');
+      expectTxCall(markFilesReady, {
+        fileIds: ['new-file'],
+        purpose: 'STAFF_CERTIFICATE',
+        userId: 'user-1',
+      });
+      expectTxCall(markFilesDeleted, {
+        fileIds: ['old-file'],
+        userId: 'user-1',
+      });
+    });
+
+    it('should delete the certificate when the input sets it to null', async () => {
+      queueResult([{ id: 'q4', certificateFileId: 'old-file' }]);
+      queueResult([updated]);
+
+      await service.update('q4', { certificateFileId: null });
+
+      expect(verifyUploads).not.toHaveBeenCalled();
+      expect(markFilesReady).not.toHaveBeenCalled();
+      expectTxCall(markFilesDeleted, {
+        fileIds: ['old-file'],
+        userId: 'user-1',
+      });
+    });
+
+    it('should do nothing to files when the same certificate is sent again', async () => {
+      queueResult([{ id: 'q4', certificateFileId: 'old-file' }]);
+      queueResult([updated]);
+
+      await service.update('q4', { certificateFileId: 'old-file' });
+
+      expect(verifyUploads).not.toHaveBeenCalled();
+      expect(markFilesDeleted).not.toHaveBeenCalled();
+    });
+
+    it('should reject when no live row matches', async () => {
+      queueResult([]);
+
+      await expect(service.update('missing', { degreeName: 'X' })).rejects.toMatchObject({
+        code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+      });
+    });
   });
 
-  it('delete rejects when no row matches', async () => {
-    queueResult([]);
+  describe('delete', () => {
+    it('should soft-delete the row together with its certificate', async () => {
+      queueResult([{ id: 'q5', certificateFileId: 'file-5' }]);
+      softDeleteMock.mockResolvedValueOnce(undefined);
 
-    await expect(service.delete('missing')).rejects.toMatchObject({
-      code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+      const result = await service.delete('q5');
+
+      expect(result).toBe(true);
+      expect(softDeleteMock).toHaveBeenCalledOnce();
+      expect(softDeleteMock.mock.calls[0]?.[0]).toBe(tx);
+      expect(softDeleteMock.mock.calls[0]?.slice(1)).toEqual([staffQualifications, 'q5']);
+      expectTxCall(markFilesDeleted, { fileIds: ['file-5'], userId: 'user-1' });
     });
-    expect(softDeleteMock).not.toHaveBeenCalled();
+
+    it('should reject when no live row matches', async () => {
+      queueResult([]);
+
+      await expect(service.delete('missing')).rejects.toMatchObject({
+        code: ErrorCode.STAFF_QUALIFICATION_NOT_FOUND,
+      });
+      expect(softDeleteMock).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, index, integer, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import { foreignKey, index, integer, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 import { tenantColumns } from '../common/columns';
 import { qualificationType } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
+import { files } from '../storage/files';
 import { institutes } from '../tenant/institutes';
 import { staffProfiles } from './staff-profiles';
 
@@ -35,8 +36,11 @@ export const staffQualifications = pgTable(
     yearOfPassing: integer('year_of_passing'),
     /** Grade or percentage — e.g., '85%', 'First Division', 'A+' */
     gradePercentage: varchar('grade_percentage', { length: 20 }),
-    /** S3/MinIO URL of the uploaded certificate scan */
-    certificateUrl: text('certificate_url'),
+    /** Scan of the certificate, if one was uploaded */
+    certificateFileId: uuid('certificate_file_id').references(() => files.id, {
+      onDelete: 'set null',
+      onUpdate: 'cascade',
+    }),
 
     ...tenantColumns,
   },
