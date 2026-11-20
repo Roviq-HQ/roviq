@@ -2,7 +2,7 @@
  * ROV-168 — Component test for the admission applications page.
  *
  * Verifies the 18-status pipeline rendering, RTE badge, status-change action
- * visibility, and the FEE_PAID → ENROLLED approve flow.
+ * visibility, the FEE_PAID → ENROLLED approve flow, and the documents dialog.
  */
 
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -10,6 +10,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../../messages/en/admission.json';
+import studentsEn from '../../../../../../../../messages/en/students.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 
 const { instituteAdmissionApplications } = testIds;
@@ -78,6 +79,17 @@ const rejectedApp = {
   rejectedAt: new Date('2026-04-16T10:00:00Z').toISOString(),
 };
 
+const birthCertificate = {
+  id: 'doc-1',
+  applicationId: 'app-1',
+  type: 'BIRTH_CERTIFICATE',
+  createdAt: new Date('2026-04-15T10:00:00Z').toISOString(),
+  files: [
+    { id: 'file-1', name: 'birth-certificate.pdf' },
+    { id: 'file-2', name: 'page-2.jpg' },
+  ],
+};
+
 const refetch = vi.fn();
 const listState = { failed: false };
 const approve = vi.fn(() => Promise.resolve({}));
@@ -112,13 +124,33 @@ vi.mock('../../use-admission', () => ({
     loading: false,
   }),
   useRejectApplication: () => [vi.fn(), { loading: false }],
+  useApplicationDocuments: (applicationId: string | null) => ({
+    data: applicationId ? { listApplicationDocuments: [birthCertificate] } : undefined,
+    loading: false,
+    error: undefined,
+    refetch: vi.fn(),
+  }),
+  useAddApplicationDocument: () => [vi.fn(), { loading: false }],
+  useRemoveApplicationDocument: () => [vi.fn(), { loading: false }],
+}));
+
+// Both talk to the API on their own; the dialog only places them.
+vi.mock('@web/components/file-upload/file-upload', () => ({
+  FileUpload: ({ label }: { label: string }) => <div>{label}</div>,
+}));
+vi.mock('@web/components/file-upload/file-download-button', () => ({
+  FileDownloadButton: ({ label, testId }: { label: string; testId: string }) => (
+    <button type="button" data-testid={testId}>
+      {label}
+    </button>
+  ),
 }));
 
 import ApplicationsPage from '../page';
 
 function renderPage() {
   return renderWithProviders(<ApplicationsPage />, {
-    messages: { admission: messagesEn },
+    messages: { admission: messagesEn, students: studentsEn },
   });
 }
 
@@ -168,6 +200,46 @@ describe('ApplicationsPage (component)', () => {
     renderPage();
     await userEvent.click(screen.getByTestId('application-status-btn-app-1'));
     expect(await screen.findByTestId('status-change-dialog')).toBeInTheDocument();
+  });
+
+  it('lists the documents of an open application with one button per page and lets them change', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId(instituteAdmissionApplications.documentsBtn('app-1')));
+
+    const dialog = await screen.findByTestId(instituteAdmissionApplications.documentsDialog);
+    const row = within(dialog).getByTestId(instituteAdmissionApplications.documentRow('doc-1'));
+    expect(row).toHaveTextContent(studentsEn.detail.documents.types.BIRTH_CERTIFICATE);
+    expect(
+      within(row).getByTestId(instituteAdmissionApplications.documentPageBtn('file-1')),
+    ).toHaveTextContent('Page 1');
+    expect(
+      within(row).getByTestId(instituteAdmissionApplications.documentPageBtn('file-2')),
+    ).toHaveTextContent('Page 2');
+    expect(
+      within(row).getByTestId(instituteAdmissionApplications.documentRemoveBtn('doc-1')),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByTestId(instituteAdmissionApplications.documentAddBtn),
+    ).toBeDisabled();
+  });
+
+  it('shows the documents of a closed application without add or remove', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId(instituteAdmissionApplications.documentsBtn('app-3')));
+
+    const dialog = await screen.findByTestId(instituteAdmissionApplications.documentsDialog);
+    expect(
+      within(dialog).getByTestId(instituteAdmissionApplications.documentsClosedNote),
+    ).toHaveTextContent(messagesEn.applications.documentsDialog.closed);
+    expect(
+      within(dialog).getByTestId(instituteAdmissionApplications.documentPageBtn('file-1')),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByTestId(instituteAdmissionApplications.documentAddBtn),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByTestId(instituteAdmissionApplications.documentRemoveBtn('doc-1')),
+    ).not.toBeInTheDocument();
   });
 
   it('shows the rejection reason only on applications that have one', () => {
