@@ -13,10 +13,9 @@
  *  - Subscription cancellation
  *  - Payment refund
  *  - Scope rejection: institute token cannot create a subscription plan
+ *  - Gateway payment: an institute verifies its own order (stub gateway), not another's
  *
  * Left as `it.todo()` with rationale:
- *  - Gateway payment flow (needs a real gateway adapter stub; `initiatePayment`
- *    requires `PaymentGatewayFactory.create()` to resolve a concrete adapter)
  *  - Webhook idempotency (needs a signed webhook payload specific to
  *    Razorpay/Cashfree adapters)
  *  - Reseller deletion cleanup (not yet implemented as a domain mutation)
@@ -26,6 +25,8 @@
  *  - Plan change proration (exercised at the service unit-test layer; the
  *    integration test here would just re-verify the same arithmetic)
  */
+import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
 import { mkAdminCtx, withAdmin } from '@roviq/database';
 import { BillingInterval, PaymentMethod } from '@roviq/ee-billing-types';
 import {
@@ -35,6 +36,7 @@ import {
   resellerInvoiceSequences,
   subscriptions,
 } from '@roviq/ee-database';
+import { type PaymentGateway, PaymentGatewayFactory } from '@roviq/ee-payments';
 import {
   cleanupTestInstitute,
   cleanupTestReseller,
@@ -82,6 +84,17 @@ async function cleanupBillingForReseller(
   });
 }
 
+const VALID_SIG = 'valid-signature';
+// Stands in for Razorpay/Cashfree: orders get fresh ids, and only VALID_SIG passes verification.
+const fakeGateway: Pick<PaymentGateway, 'createOrder' | 'verifyPayment'> = {
+  createOrder: async () => ({
+    gatewayOrderId: `order_${randomUUID()}`,
+    gatewayProvider: 'RAZORPAY',
+    checkoutUrl: 'https://checkout.example.test/pay',
+  }),
+  verifyPayment: async ({ signature }) => signature === VALID_SIG,
+};
+
 describe('Billing Integration', () => {
   let result: IntegrationAppResult;
   let reseller: TestReseller;
@@ -105,6 +118,7 @@ describe('Billing Integration', () => {
       // `this.natsClient.emit(pattern, data).subscribe(...)` fire-and-forget,
       // so `emit` must return something subscribable.
       overrides: [
+        { provide: PaymentGatewayFactory, useValue: { create: async () => fakeGateway } },
         {
           provide: 'JETSTREAM_CLIENT',
           useValue: {
@@ -445,13 +459,185 @@ describe('Billing Integration', () => {
   // Remaining todos — rationale documented in file-level comment.
   // ---------------------------------------------------------------------------
 
-  describe('Gateway payment flow', () => {
-    // Requires stubbing `PaymentGatewayFactory.create()` to return a fake
-    // adapter that records `initiatePayment` and `verifyPayment` calls.
-    // The factory resolves adapters by gateway config row, so tests must
-    // seed a gateway config encrypted with CryptoService first. Deferred to
-    // a follow-up focused on the `PaymentsModule` stub layer.
-    it.todo('initiatePayment → mock gateway → verifyPayment → invoice paid');
+  describe('Gateway payment flow (institute verifies its own payment)', () => {
+    const VERIFY = /* GraphQL */ `
+      mutation VerifyPayment($input: VerifyPaymentGqlInput!) {
+        verifyPayment(input: $input) { status gatewayPaymentId }
+      }
+    `;
+    let own: TestInstitute;
+    let other: TestInstitute;
+    let tokenA: string;
+    let tokenB: string;
+
+    function instituteTokenFor(inst: TestInstitute) {
+      return createInstituteToken({
+        sub: inst.userId,
+        tenantId: inst.tenantId,
+        resellerId: reseller.resellerId,
+        membershipId: inst.membershipId,
+        roleId: inst.roleId,
+      });
+    }
+
+    const openInvoices = new Map<string, string>();
+
+    // One subscription per institute, so the invoice is created once and reused for further orders.
+    async function openInvoiceFor(inst: TestInstitute): Promise<string> {
+      const known = openInvoices.get(inst.tenantId);
+      if (known) return known;
+      const plan = await gqlRequest<{ createSubscriptionPlan: { id: string } }>(result.httpServer, {
+        query: /* GraphQL */ `
+            mutation CreateSubscriptionPlan($input: CreatePlanInput!) {
+              createSubscriptionPlan(input: $input) { id }
+            }
+          `,
+        variables: {
+          input: {
+            name: { en: 'Gateway Plan' },
+            code: `gw-${randomUUID().slice(0, 8)}`,
+            interval: BillingInterval.MONTHLY,
+            amount: '99900',
+            currency: 'INR',
+            trialDays: 0,
+            entitlements: {
+              maxStudents: 500,
+              maxStaff: 50,
+              maxStorageMb: 1024,
+              auditLogRetentionDays: 30,
+              features: [],
+            },
+          },
+        },
+        token: resellerToken,
+      });
+      expect(plan.errors).toBeUndefined();
+      const assign = await gqlRequest(result.httpServer, {
+        query: /* GraphQL */ `
+          mutation AssignPlanToInstitute($input: AssignPlanInput!) {
+            assignPlanToInstitute(input: $input) { subscription { id } }
+          }
+        `,
+        variables: {
+          input: { tenantId: inst.tenantId, planId: plan.data?.createSubscriptionPlan.id },
+        },
+        token: resellerToken,
+      });
+      expect(assign.errors).toBeUndefined();
+      const mine = await gqlRequest<{ myInvoices: { id: string; status: string }[] }>(
+        result.httpServer,
+        {
+          query: /* GraphQL */ `query MyInvoices { myInvoices { id status } }`,
+          token: instituteTokenFor(inst),
+        },
+      );
+      expect(mine.errors).toBeUndefined();
+      const open = mine.data?.myInvoices.find((i) => i.status !== 'PAID');
+      assert(open);
+      openInvoices.set(inst.tenantId, open.id);
+      return open.id;
+    }
+
+    async function initiate(invoiceId: string, token: string): Promise<string> {
+      const res = await gqlRequest<{ initiatePayment: { gatewayOrderId: string } }>(
+        result.httpServer,
+        {
+          query: /* GraphQL */ `
+            mutation InitiatePayment($invoiceId: ID!) {
+              initiatePayment(invoiceId: $invoiceId) { gatewayOrderId }
+            }
+          `,
+          variables: { invoiceId },
+          token,
+        },
+      );
+      expect(res.errors).toBeUndefined();
+      const orderId = res.data?.initiatePayment.gatewayOrderId;
+      assert(orderId);
+      return orderId;
+    }
+
+    async function storedPayment(gatewayOrderId: string) {
+      return withAdmin(result.db, mkAdminCtx('test:billing'), async (tx) => {
+        const [row] = await tx
+          .select({ status: payments.status, invoiceId: payments.invoiceId })
+          .from(payments)
+          .where(eq(payments.gatewayOrderId, gatewayOrderId));
+        assert(row);
+        const [invoice] = await tx
+          .select({ status: invoices.status })
+          .from(invoices)
+          .where(eq(invoices.id, row.invoiceId));
+        return { payment: row.status, invoice: invoice?.status };
+      });
+    }
+
+    beforeAll(async () => {
+      own = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      other = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      tokenA = instituteTokenFor(own);
+      tokenB = instituteTokenFor(other);
+    });
+
+    afterAll(async () => {
+      for (const inst of [own, other]) {
+        if (!inst) continue;
+        await cleanupBillingForTenant(result.db, inst.tenantId);
+        await cleanupTestInstitute(result.db, inst);
+      }
+    });
+
+    it('should mark the payment succeeded and the invoice paid for a valid signature', async () => {
+      const orderId = await initiate(await openInvoiceFor(own), tokenA);
+
+      const res = await gqlRequest<{ verifyPayment: { status: string; gatewayPaymentId: string } }>(
+        result.httpServer,
+        {
+          query: VERIFY,
+          variables: {
+            input: { gatewayOrderId: orderId, gatewayPaymentId: 'pay_ok', signature: VALID_SIG },
+          },
+          token: tokenA,
+        },
+      );
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.verifyPayment).toEqual({
+        status: 'SUCCEEDED',
+        gatewayPaymentId: 'pay_ok',
+      });
+      expect(await storedPayment(orderId)).toEqual({ payment: 'SUCCEEDED', invoice: 'PAID' });
+    });
+
+    it("should answer PAYMENT_NOT_FOUND for another institute's order and leave it pending", async () => {
+      const orderB = await initiate(await openInvoiceFor(other), tokenB);
+
+      const res = await gqlRequest(result.httpServer, {
+        query: VERIFY,
+        variables: {
+          input: { gatewayOrderId: orderB, gatewayPaymentId: 'pay_steal', signature: VALID_SIG },
+        },
+        token: tokenA,
+      });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('PAYMENT_NOT_FOUND');
+      expect((await storedPayment(orderB)).payment).toBe('PENDING');
+    });
+
+    it('should answer PAYMENT_VERIFICATION_FAILED for a bad signature', async () => {
+      const orderId = await initiate(await openInvoiceFor(other), tokenB);
+
+      const res = await gqlRequest(result.httpServer, {
+        query: VERIFY,
+        variables: {
+          input: { gatewayOrderId: orderId, gatewayPaymentId: 'pay_bad', signature: 'forged' },
+        },
+        token: tokenB,
+      });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('PAYMENT_VERIFICATION_FAILED');
+      expect((await storedPayment(orderId)).payment).toBe('PENDING');
+    });
   });
 
   describe('Webhook idempotency', () => {

@@ -1,11 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import {
-  assertInstituteWithReseller,
-  assertResellerContext,
-  CurrentUser,
-  InstituteScope,
-} from '@roviq/auth-backend';
+import { assertInstituteWithReseller, CurrentUser, InstituteScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { BillingFilterInput } from '../dto/billing-filter.input';
@@ -108,8 +103,11 @@ export class InstituteBillingResolver {
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'create', subject: 'Payment' })
   async verifyPayment(@CurrentUser() user: AuthUser, @Args('input') input: VerifyPaymentGqlInput) {
-    assertResellerContext(user);
-    return this.paymentService.verifyPayment(user.resellerId, input);
+    assertInstituteWithReseller(user);
+    return this.paymentService.verifyPayment(
+      { resellerId: user.resellerId, tenantId: user.tenantId },
+      input,
+    );
   }
 
   @Query(() => [PaymentModel], { name: 'myPaymentHistory' })

@@ -92,9 +92,10 @@ export class PaymentService {
   }
 
   async verifyPayment(
-    resellerId: string,
+    caller: { resellerId: string; tenantId: string },
     input: { gatewayOrderId: string; gatewayPaymentId: string; signature: string },
   ) {
+    const { resellerId, tenantId } = caller;
     const gateway = await this.gatewayFactory.create(resellerId);
     const isValid = await gateway.verifyPayment(input);
 
@@ -102,9 +103,9 @@ export class PaymentService {
       billingError('PAYMENT_VERIFICATION_FAILED', 'Payment signature verification failed');
     }
 
-    // Find the pending payment by gateway order ID
+    // The lookup runs across the whole reseller, so another institute's order must look unknown.
     const payments = await this.paymentRepo.findByGatewayOrderId(resellerId, input.gatewayOrderId);
-    const pendingPayment = payments.find((p) => p.status === 'PENDING');
+    const pendingPayment = payments.find((p) => p.status === 'PENDING' && p.tenantId === tenantId);
     if (!pendingPayment) {
       billingError('PAYMENT_NOT_FOUND', 'No pending payment found for this order');
     }

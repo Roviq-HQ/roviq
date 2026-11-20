@@ -1,3 +1,4 @@
+import { ErrorCode } from '@roviq/common-types';
 import { PaymentMethod } from '@roviq/ee-billing-types';
 import { requestContext } from '@roviq/request-context';
 import { describe, expect, it, vi } from 'vitest';
@@ -333,6 +334,8 @@ describe('PaymentService', () => {
   });
 
   describe('verifyPayment', () => {
+    const CALLER = { resellerId: 'reseller-1', tenantId: 'tenant-1' };
+
     it('should verify signature and mark payment succeeded', () =>
       requestContext.run(TEST_CTX, async () => {
         const { service, paymentRepo, gatewayFactory, invoiceService } = createService();
@@ -340,11 +343,17 @@ describe('PaymentService', () => {
           verifyPayment: vi.fn().mockResolvedValue(true),
         });
         paymentRepo.findByGatewayOrderId.mockResolvedValue([
-          { id: 'pay-1', status: 'PENDING', invoiceId: 'inv-1', amountPaise: 118000n },
+          {
+            id: 'pay-1',
+            status: 'PENDING',
+            invoiceId: 'inv-1',
+            tenantId: 'tenant-1',
+            amountPaise: 118000n,
+          },
         ]);
         paymentRepo.update.mockResolvedValue({ id: 'pay-1', status: 'SUCCEEDED' });
 
-        await service.verifyPayment('reseller-1', {
+        await service.verifyPayment(CALLER, {
           gatewayOrderId: 'order_123',
           gatewayPaymentId: 'pay_gw_123',
           signature: 'sig_123',
@@ -366,12 +375,39 @@ describe('PaymentService', () => {
         });
 
         await expect(
-          service.verifyPayment('reseller-1', {
+          service.verifyPayment(CALLER, {
             gatewayOrderId: 'order_123',
             gatewayPaymentId: 'pay_gw_123',
             signature: 'bad_sig',
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: ErrorCode.PAYMENT_VERIFICATION_FAILED });
+      }));
+
+    it("should refuse another institute's order of the same reseller as not found", () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, gatewayFactory, invoiceService } = createService();
+        gatewayFactory.create.mockResolvedValue({
+          verifyPayment: vi.fn().mockResolvedValue(true),
+        });
+        paymentRepo.findByGatewayOrderId.mockResolvedValue([
+          {
+            id: 'pay-2',
+            status: 'PENDING',
+            invoiceId: 'inv-2',
+            tenantId: 'tenant-2',
+            amountPaise: 118000n,
+          },
+        ]);
+
+        await expect(
+          service.verifyPayment(CALLER, {
+            gatewayOrderId: 'order_456',
+            gatewayPaymentId: 'pay_gw_456',
+            signature: 'sig_456',
+          }),
+        ).rejects.toMatchObject({ code: ErrorCode.PAYMENT_NOT_FOUND });
+        expect(paymentRepo.update).not.toHaveBeenCalled();
+        expect(invoiceService.markPaid).not.toHaveBeenCalled();
       }));
   });
 
