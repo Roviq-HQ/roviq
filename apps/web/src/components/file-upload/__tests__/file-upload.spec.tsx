@@ -124,6 +124,20 @@ describe('FileUpload', () => {
     expect(screen.getByTestId('file-upload-item-error-tool.exe')).toBeInTheDocument();
   });
 
+  it('should let a valid file take the place of a refused one in a one-file field', async () => {
+    const { user } = renderUpload({ maxFiles: 1 });
+    requestUpload.mockReturnValue(new Promise(() => undefined));
+    const exe = new File(['MZ'], 'tool.exe', { type: 'application/x-msdownload' });
+    await user.upload(screen.getByTestId('file-upload-test-input'), exe);
+    expect(screen.getByTestId('file-upload-item-error-tool.exe')).toBeInTheDocument();
+
+    await user.upload(screen.getByTestId('file-upload-test-input'), pdf('degree.pdf'));
+
+    expect(screen.getByTestId('file-upload-item-degree.pdf')).toBeInTheDocument();
+    expect(screen.queryByTestId('file-upload-item-tool.exe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('file-upload-test-too-many')).not.toBeInTheDocument();
+  });
+
   it('should keep only as many files as allowed and say so', async () => {
     const { user } = renderUpload({ maxFiles: 2 });
     requestUpload.mockReturnValue(new Promise(() => undefined));

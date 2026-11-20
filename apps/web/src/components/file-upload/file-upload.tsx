@@ -106,11 +106,14 @@ export function FileUpload({
         })
       : format(Math.max(1, Math.round(bytes / 1024)), { style: 'unit', unit: 'kilobyte' });
 
-  const remaining = maxFiles - items.length;
+  // A refused file holds no slot: the next pick takes its place.
+  const failed = items.filter((item) => item.status === 'error');
+  const remaining = maxFiles - (items.length - failed.length);
   const accept = (files: File[]) => {
     if (files.length === 0) return;
     setTooMany(files.length > remaining);
     const accepted = files.slice(0, Math.max(remaining, 0));
+    if (accepted.length > 0) for (const item of failed) remove(item.key);
     const [first] = accepted;
     // Only a picture the purpose accepts is worth cropping; anything else goes on to be refused.
     const croppable =
