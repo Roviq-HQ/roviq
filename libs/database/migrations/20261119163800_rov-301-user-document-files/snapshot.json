@@ -1,8 +1,8 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "318185a8-5af0-4730-826c-57ce616575d2",
-  "prevIds": ["4f063fb7-37f9-4f45-b5a8-bd27b43e82a9"],
+  "id": "b0c98659-72f8-4db8-9b0e-8ef1da17ab47",
+  "prevIds": ["e69a2f89-2865-4092-bea9-2fa176373661"],
   "ddl": [
     {
       "values": [
@@ -285,9 +285,7 @@
         "BULK_IMPORT_CSV",
         "BULK_IMPORT_REPORT",
         "PROFILE_PHOTO",
-        "USER_DOCUMENT",
-        "STAFF_CERTIFICATE",
-        "APPLICATION_DOCUMENT"
+        "USER_DOCUMENT"
       ],
       "name": "FilePurpose",
       "entityType": "enums",
@@ -653,12 +651,6 @@
     {
       "isRlsEnabled": true,
       "name": "admission_applications",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "application_document_files",
       "entityType": "tables",
       "schema": "public"
     },
@@ -1497,162 +1489,6 @@
       "name": "id",
       "entityType": "columns",
       "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "document_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "file_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "smallint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "position",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "tenant_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_by",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_by",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "deleted_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "deleted_by",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "1",
-      "generated": null,
-      "identity": null,
-      "name": "version",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "uuidv7()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
       "table": "application_documents"
     },
     {
@@ -1677,6 +1513,19 @@
       "generated": null,
       "identity": null,
       "name": "type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "application_documents"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "file_urls",
       "entityType": "columns",
       "schema": "public",
       "table": "application_documents"
@@ -6336,7 +6185,7 @@
       "table": "tenant_sequences"
     },
     {
-      "type": "varchar(120)",
+      "type": "varchar(80)",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -16073,14 +15922,14 @@
       "table": "staff_qualifications"
     },
     {
-      "type": "uuid",
+      "type": "text",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "certificate_file_id",
+      "name": "certificate_url",
       "entityType": "columns",
       "schema": "public",
       "table": "staff_qualifications"
@@ -19874,69 +19723,6 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "admission_applications"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "tenant_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "application_document_files_tenant_id_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "document_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "application_document_files_document_id_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "file_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": "deleted_at IS NULL",
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "application_document_files_file_id_key",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "application_document_files"
     },
     {
       "nameExplicit": true,
@@ -25562,45 +25348,6 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["document_id"],
-      "schemaTo": "public",
-      "tableTo": "application_documents",
-      "columnsTo": ["id"],
-      "onUpdate": "CASCADE",
-      "onDelete": "CASCADE",
-      "name": "application_document_files_MzrAsHaJCjK8_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["file_id"],
-      "schemaTo": "public",
-      "tableTo": "files",
-      "columnsTo": ["id"],
-      "onUpdate": "CASCADE",
-      "onDelete": "RESTRICT",
-      "name": "application_document_files_file_id_files_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["tenant_id"],
-      "schemaTo": "public",
-      "tableTo": "institutes",
-      "columnsTo": ["id"],
-      "onUpdate": "CASCADE",
-      "onDelete": "RESTRICT",
-      "name": "application_document_files_tenant_id_institutes_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "nameExplicit": false,
       "columns": ["application_id"],
       "schemaTo": "public",
       "tableTo": "admission_applications",
@@ -27863,19 +27610,6 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["certificate_file_id"],
-      "schemaTo": "public",
-      "tableTo": "files",
-      "columnsTo": ["id"],
-      "onUpdate": "CASCADE",
-      "onDelete": "SET NULL",
-      "name": "staff_qualifications_certificate_file_id_files_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "staff_qualifications"
-    },
-    {
-      "nameExplicit": false,
       "columns": ["tenant_id"],
       "schemaTo": "public",
       "tableTo": "institutes",
@@ -28377,14 +28111,6 @@
       "name": "admission_applications_pkey",
       "schema": "public",
       "table": "admission_applications",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "application_document_files_pkey",
-      "schema": "public",
-      "table": "application_document_files",
       "entityType": "pks"
     },
     {
@@ -29334,72 +29060,6 @@
       "entityType": "policies",
       "schema": "public",
       "table": "admission_applications"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "SELECT",
-      "roles": ["roviq_app"],
-      "using": "tenant_id = current_setting('app.current_tenant_id', true)::uuid",
-      "withCheck": null,
-      "name": "application_document_files_app_select",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "INSERT",
-      "roles": ["roviq_app"],
-      "using": null,
-      "withCheck": "tenant_id = current_setting('app.current_tenant_id', true)::uuid",
-      "name": "application_document_files_app_insert",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "UPDATE",
-      "roles": ["roviq_app"],
-      "using": "tenant_id = current_setting('app.current_tenant_id', true)::uuid",
-      "withCheck": "tenant_id = current_setting('app.current_tenant_id', true)::uuid",
-      "name": "application_document_files_app_update",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "DELETE",
-      "roles": ["roviq_app"],
-      "using": "false",
-      "withCheck": null,
-      "name": "application_document_files_app_delete",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "SELECT",
-      "roles": ["roviq_reseller"],
-      "using": "tenant_id IN (\n      SELECT id FROM institutes\n      WHERE reseller_id = current_setting('app.current_reseller_id', true)::uuid\n    )",
-      "withCheck": null,
-      "name": "application_document_files_reseller_read",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "application_document_files"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": ["roviq_admin"],
-      "using": "true",
-      "withCheck": "true",
-      "name": "application_document_files_admin_all",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "application_document_files"
     },
     {
       "as": "PERMISSIVE",
@@ -33956,40 +33616,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"document_id\", \"file_id\", \"position\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"application_document_files\" where (\"application_document_files\".\"deleted_at\" is null)",
-      "with": {
-        "checkOption": null,
-        "securityBarrier": null,
-        "securityInvoker": true,
-        "autovacuumEnabled": null,
-        "autovacuumFreezeMaxAge": null,
-        "autovacuumFreezeMinAge": null,
-        "autovacuumFreezeTableAge": null,
-        "autovacuumMultixactFreezeMaxAge": null,
-        "autovacuumMultixactFreezeMinAge": null,
-        "autovacuumMultixactFreezeTableAge": null,
-        "autovacuumVacuumCostDelay": null,
-        "autovacuumVacuumCostLimit": null,
-        "autovacuumVacuumScaleFactor": null,
-        "autovacuumVacuumThreshold": null,
-        "fillfactor": null,
-        "logAutovacuumMinDuration": null,
-        "parallelWorkers": null,
-        "toastTupleTarget": null,
-        "userCatalogTable": null,
-        "vacuumIndexCleanup": null,
-        "vacuumTruncate": null
-      },
-      "withNoData": null,
-      "using": null,
-      "tablespace": null,
-      "materialized": false,
-      "name": "application_document_files_live",
-      "entityType": "views",
-      "schema": "public"
-    },
-    {
-      "definition": "select \"id\", \"application_id\", \"type\", \"is_verified\", \"verified_by\", \"verified_at\", \"rejection_reason\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"application_documents\" where (\"application_documents\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"application_id\", \"type\", \"file_urls\", \"is_verified\", \"verified_by\", \"verified_at\", \"rejection_reason\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"application_documents\" where (\"application_documents\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
@@ -35573,7 +35200,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"staff_profile_id\", \"type\", \"degree_name\", \"institution\", \"board_university\", \"year_of_passing\", \"grade_percentage\", \"certificate_file_id\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"staff_qualifications\" where (\"staff_qualifications\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"staff_profile_id\", \"type\", \"degree_name\", \"institution\", \"board_university\", \"year_of_passing\", \"grade_percentage\", \"certificate_url\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"staff_qualifications\" where (\"staff_qualifications\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
