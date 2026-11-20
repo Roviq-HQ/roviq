@@ -83,6 +83,7 @@ function createService(overrides: Record<string, unknown> = {}) {
   const config = createMockConfig();
   const eventBus = createMockEventBus();
 
+  const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const svc = Object.create(PaymentService.prototype) as PaymentService;
   Object.assign(svc, {
     paymentRepo,
@@ -92,7 +93,7 @@ function createService(overrides: Record<string, unknown> = {}) {
     gatewayFactory,
     config,
     eventBus,
-    logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    logger,
     ...overrides,
   });
 
@@ -105,6 +106,7 @@ function createService(overrides: Record<string, unknown> = {}) {
     gatewayFactory,
     config,
     eventBus,
+    logger,
   };
 }
 
@@ -464,7 +466,12 @@ describe('PaymentService', () => {
         const paidInvoice = { ...INVOICE, paidAmount: 118000n, status: 'PAID' };
         paymentRepo.settleGatewayOrder.mockResolvedValue({
           payment: { id: 'pay-0', invoiceId: 'inv-1', tenantId: 'tenant-1' },
-          invoice: paidInvoice,
+          credit: {
+            invoice: paidInvoice,
+            becamePaid: true,
+            statusBefore: 'SENT',
+            overpaidPaise: 0n,
+          },
           settled: true,
         });
         invoiceRepo.findById.mockResolvedValueOnce(INVOICE).mockResolvedValueOnce(paidInvoice);
@@ -562,12 +569,17 @@ describe('PaymentService', () => {
     const ROW = { id: 'pay-1', tenantId: 'tenant-1', gatewayProvider: 'RAZORPAY' };
     const SETTLED = {
       payment: { id: 'pay-1', status: 'SUCCEEDED', invoiceId: 'inv-1', tenantId: 'tenant-1' },
-      invoice: {
-        id: 'inv-1',
-        tenantId: 'tenant-1',
-        subscriptionId: 'sub-1',
-        status: 'PAID',
-        totalAmount: 118000n,
+      credit: {
+        invoice: {
+          id: 'inv-1',
+          tenantId: 'tenant-1',
+          subscriptionId: 'sub-1',
+          status: 'PAID',
+          totalAmount: 118000n,
+        },
+        becamePaid: true,
+        statusBefore: 'SENT',
+        overpaidPaise: 0n,
       },
     };
 
@@ -608,7 +620,7 @@ describe('PaymentService', () => {
         const { service, paymentRepo, eventBus } = setup(verify);
         paymentRepo.settleGatewayOrder.mockResolvedValue({
           payment: SETTLED.payment,
-          invoice: null,
+          credit: null,
           settled: false,
         });
 
@@ -651,7 +663,7 @@ describe('PaymentService', () => {
     };
     const RESULT = {
       payment: { id: 'pay-1', invoiceId: 'inv-1', tenantId: 'tenant-1' },
-      invoice: null,
+      credit: null,
     };
     const OWNER = { invoiceId: 'inv-1', tenantId: 'tenant-1' };
 
@@ -697,6 +709,67 @@ describe('PaymentService', () => {
           gatewayResponse: undefined,
           actorId: SYSTEM_USER_ID,
         });
+      }));
+
+    it('should flag a capture on a cancelled invoice for review and not announce the invoice paid', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, eventBus, logger } = createService();
+        paymentRepo.settleGatewayOrder.mockResolvedValue({
+          ...RESULT,
+          credit: {
+            invoice: {
+              id: 'inv-1',
+              tenantId: 'tenant-1',
+              subscriptionId: 'sub-1',
+              status: 'CANCELLED',
+              totalAmount: 118000n,
+            },
+            becamePaid: false,
+            statusBefore: 'CANCELLED',
+            overpaidPaise: 0n,
+          },
+          settled: true,
+        });
+
+        await service.handleWebhookPayment('reseller-1', {
+          ...WEBHOOK,
+          gatewayOrderId: 'order_123',
+        });
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          'Payment pay-1 needs review: invoice inv-1 was CANCELLED, overpaid by 0 paise',
+        );
+        expect(eventBus.emit).not.toHaveBeenCalledWith('BILLING.invoice.paid', expect.anything());
+      }));
+
+    it('should flag an overpayment for review', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, logger } = createService();
+        paymentRepo.settleGatewayOrder.mockResolvedValue({
+          ...RESULT,
+          credit: {
+            invoice: {
+              id: 'inv-1',
+              tenantId: 'tenant-1',
+              subscriptionId: 'sub-1',
+              status: 'PAID',
+              totalAmount: 118000n,
+            },
+            becamePaid: false,
+            statusBefore: 'PAID',
+            overpaidPaise: 118000n,
+          },
+          settled: true,
+        });
+
+        await service.handleWebhookPayment('reseller-1', {
+          ...WEBHOOK,
+          gatewayOrderId: 'order_123',
+        });
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          'Payment pay-1 needs review: invoice inv-1 was PAID, overpaid by 118000 paise',
+        );
       }));
 
     it('should not announce the payment again after the browser verified it', () =>

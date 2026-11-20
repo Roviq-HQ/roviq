@@ -15,16 +15,9 @@ import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { billingError } from '../billing.errors';
 import { InvoiceRepository } from '../repositories/invoice.repository';
-import { PaymentRepository } from '../repositories/payment.repository';
+import { PAYABLE_INVOICE_STATUSES, PaymentRepository } from '../repositories/payment.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { InvoiceService } from './invoice.service';
-
-/** Invoice statuses that can take a payment; DRAFT is not issued yet. */
-const PAYABLE_INVOICE_STATUSES: ReadonlySet<string> = new Set([
-  'SENT',
-  'PARTIALLY_PAID',
-  'OVERDUE',
-]);
 
 @Injectable()
 export class PaymentService {
@@ -206,29 +199,35 @@ export class PaymentService {
     resellerId: string,
     result: {
       payment: { id: string; invoiceId: string; tenantId: string };
-      invoice: {
-        id: string;
-        tenantId: string;
-        subscriptionId: string;
-        status: string;
-        totalAmount: bigint;
+      credit: {
+        invoice: { id: string; tenantId: string; subscriptionId: string; totalAmount: bigint };
+        becamePaid: boolean;
+        statusBefore: string;
+        overpaidPaise: bigint;
       } | null;
     },
   ) {
-    const { payment, invoice } = result;
+    const { payment, credit } = result;
     this.emitEvent(EVENT_PATTERNS.BILLING.payment.succeeded, {
       paymentId: payment.id,
       invoiceId: payment.invoiceId,
       tenantId: payment.tenantId,
       resellerId,
     });
+    if (!credit) return;
+    // Money taken that the invoice did not ask for: the reseller has to refund it.
+    if (credit.overpaidPaise > 0n || !PAYABLE_INVOICE_STATUSES.has(credit.statusBefore)) {
+      this.logger.warn(
+        `Payment ${payment.id} needs review: invoice ${credit.invoice.id} was ${credit.statusBefore}, overpaid by ${credit.overpaidPaise} paise`,
+      );
+    }
     // invoice.paid drives subscription reactivation (ROV-127)
-    if (invoice?.status === 'PAID') {
+    if (credit.becamePaid) {
       this.eventBus.emit(EVENT_PATTERNS.BILLING.invoice.paid, {
-        invoiceId: invoice.id,
-        tenantId: invoice.tenantId,
-        subscriptionId: invoice.subscriptionId,
-        totalAmount: String(invoice.totalAmount),
+        invoiceId: credit.invoice.id,
+        tenantId: credit.invoice.tenantId,
+        subscriptionId: credit.invoice.subscriptionId,
+        totalAmount: String(credit.invoice.totalAmount),
       });
     }
   }

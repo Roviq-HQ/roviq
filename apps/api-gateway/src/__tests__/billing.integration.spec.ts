@@ -487,6 +487,7 @@ describe('Billing Integration', () => {
     let other: TestInstitute;
     let late: TestInstitute;
     let replaced: TestInstitute;
+    let cancelled: TestInstitute;
     let tokenA: string;
     let tokenB: string;
 
@@ -625,6 +626,7 @@ describe('Billing Integration', () => {
       other = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
       late = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
       replaced = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
+      cancelled = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
       // The gateway needs the payer's phone and email on every order.
       await withAdmin(result.db, mkAdminCtx('test:billing'), (tx) =>
         tx
@@ -646,7 +648,7 @@ describe('Billing Integration', () => {
           .where(
             inArray(
               institutes.id,
-              [own, other, late, replaced].map((i) => i.tenantId),
+              [own, other, late, replaced, cancelled].map((i) => i.tenantId),
             ),
           ),
       );
@@ -655,7 +657,7 @@ describe('Billing Integration', () => {
     });
 
     afterAll(async () => {
-      for (const inst of [own, other, late, replaced]) {
+      for (const inst of [own, other, late, replaced, cancelled]) {
         if (!inst) continue;
         await cleanupBillingForTenant(result.db, inst.tenantId);
         await cleanupTestInstitute(result.db, inst);
@@ -792,6 +794,36 @@ describe('Billing Integration', () => {
 
       expect(res.status).toBe(200);
       expect(await storedPayment(orderId)).toEqual({ payment: 'SUCCEEDED', invoice: 'PAID' });
+    });
+
+    it('should keep a cancelled invoice cancelled when a late capture arrives, and still count the money', async () => {
+      const invoiceId = await openInvoiceFor(cancelled);
+      const orderId = await initiate(invoiceId, instituteTokenFor(cancelled));
+      await withAdmin(result.db, mkAdminCtx('test:billing'), (tx) =>
+        tx.update(invoices).set({ status: 'CANCELLED' }).where(eq(invoices.id, invoiceId)),
+      );
+      const event: WebhookEvent = {
+        eventType: 'payment.captured',
+        gatewayEventId: 'evt_cancelled',
+        gatewayOrderId: orderId,
+        gatewayPaymentId: 'pay_after_cancel',
+        amountPaise: 99900,
+        status: 'captured',
+        isCapture: true,
+        payload: {},
+      };
+
+      const res = await request(result.httpServer)
+        .post(`/api/webhooks/razorpay/${reseller.resellerId}`)
+        .set('content-type', 'application/json')
+        .send(JSON.stringify(event));
+
+      expect(res.status).toBe(200);
+      expect(await storedPayment(orderId)).toEqual({ payment: 'SUCCEEDED', invoice: 'CANCELLED' });
+      expect(await invoiceAmounts(invoiceId)).toEqual({
+        status: 'CANCELLED',
+        paidEqualsTotal: true,
+      });
     });
 
     it("should answer INVOICE_NOT_FOUND when paying another institute's invoice", async () => {

@@ -40,15 +40,15 @@ export class PaymentRepository {
         })
         .returning();
       if (created) {
-        const invoice = await applyToInvoice(tx, created, data.updatedBy);
-        return { payment: created, invoice, created: true };
+        const credit = await applyToInvoice(tx, created, data.updatedBy);
+        return { payment: created, credit, created: true };
       }
       const [existing] = await tx
         .select()
         .from(payments)
         .where(eq(payments.gatewayPaymentId, data.gatewayPaymentId ?? ''))
         .limit(1);
-      return { payment: existing, invoice: null, created: false };
+      return { payment: existing, credit: null, created: false };
     });
   }
 
@@ -132,8 +132,8 @@ export class PaymentRepository {
         )
         .returning();
       if (settled) {
-        const invoice = await applyToInvoice(tx, settled, input.actorId);
-        return { payment: settled, invoice, settled: true };
+        const credit = await applyToInvoice(tx, settled, input.actorId);
+        return { payment: settled, credit, settled: true };
       }
 
       const [existing] = await tx
@@ -141,7 +141,7 @@ export class PaymentRepository {
         .from(payments)
         .where(and(...scope, eq(payments.gatewayPaymentId, input.gatewayPaymentId)))
         .limit(1);
-      return existing ? { payment: existing, invoice: null, settled: false } : null;
+      return existing ? { payment: existing, credit: null, settled: false } : null;
     });
   }
 
@@ -261,23 +261,48 @@ export class PaymentRepository {
   }
 }
 
-/** Adds a captured payment to its invoice; PAID once the total is covered. */
+/** Invoice statuses that can take a payment; DRAFT is not issued yet. */
+export const PAYABLE_INVOICE_STATUSES: ReadonlySet<string> = new Set([
+  'SENT',
+  'PARTIALLY_PAID',
+  'OVERDUE',
+]);
+
+/**
+ * Adds a captured payment to its invoice. The money always counts towards `paidAmount`, but only
+ * a payable invoice changes status: a late capture must not reopen a cancelled or refunded one.
+ */
 async function applyToInvoice(
   tx: DrizzleDB,
   payment: { invoiceId: string; amountPaise: bigint },
   actorId: string,
 ) {
-  const covered = sql`${invoices.paidAmount} + ${payment.amountPaise} >= ${invoices.totalAmount}`;
+  // Row lock: two captures for one invoice must add up, not overwrite each other.
+  const [current] = await tx
+    .select()
+    .from(invoices)
+    .where(eq(invoices.id, payment.invoiceId))
+    .for('update');
+  if (!current) return null;
+
+  const paidAmount = current.paidAmount + payment.amountPaise;
+  const payable = PAYABLE_INVOICE_STATUSES.has(current.status);
+  const becamePaid = payable && paidAmount >= current.totalAmount;
   const [invoice] = await tx
     .update(invoices)
     .set({
-      paidAmount: sql`${invoices.paidAmount} + ${payment.amountPaise}`,
-      status: sql`CASE WHEN ${covered} THEN 'PAID' ELSE 'PARTIALLY_PAID' END::"InvoiceStatus"`,
-      paidAt: sql`CASE WHEN ${covered} THEN now() ELSE ${invoices.paidAt} END`,
+      paidAmount,
+      ...(payable && { status: becamePaid ? 'PAID' : 'PARTIALLY_PAID' }),
+      ...(becamePaid && { paidAt: new Date() }),
       updatedAt: new Date(),
       updatedBy: actorId,
     })
-    .where(eq(invoices.id, payment.invoiceId))
+    .where(eq(invoices.id, current.id))
     .returning();
-  return invoice ?? null;
+  return {
+    invoice,
+    becamePaid,
+    statusBefore: current.status,
+    overpaidPaise: paidAmount > current.totalAmount ? paidAmount - current.totalAmount : 0n,
+  };
 }
