@@ -1273,6 +1273,11 @@ export const testIds = {
     infoIdentifiersInfo: 'institute-info-identifiers-info',
     infoAffiliationsInfo: 'institute-info-affiliations-info',
     // Branding tab
+    brandingImageField: (name: string) => `branding-${name}-field`,
+    brandingImageCurrent: (name: string) => `branding-${name}-current`,
+    brandingImageRemoveBtn: (name: string) => `branding-${name}-remove-btn`,
+    brandingImageRemoveNote: (name: string) => `branding-${name}-remove-note`,
+    brandingImageUndoBtn: (name: string) => `branding-${name}-undo-btn`,
     brandingLogoInfo: 'branding-logo-info',
     brandingFaviconInfo: 'branding-favicon-info',
     brandingPrimaryColorInfo: 'branding-primary-color-info',

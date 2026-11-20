@@ -51,8 +51,11 @@ describe('CryptoService', () => {
     const service = createService();
     const encrypted = service.encrypt({ secret: 'data' });
     const parts = encrypted.split(':');
-    // Flip a byte in ciphertext
-    const tampered = `${parts[0]}:${parts[1]}:ff${parts[2].slice(2)}`;
+    // XOR, not a fixed value: the first byte is random and may already equal any constant.
+    const flipped = (Number.parseInt(parts[2].slice(0, 2), 16) ^ 0xff)
+      .toString(16)
+      .padStart(2, '0');
+    const tampered = `${parts[0]}:${parts[1]}:${flipped}${parts[2].slice(2)}`;
     expect(() => service.decrypt(tampered)).toThrow();
   });
 

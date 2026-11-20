@@ -4,13 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@rovi
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 
+interface BrandingImage {
+  url?: string | null;
+}
+
 export interface InstituteBranding {
-  logoUrl?: string | null;
-  faviconUrl?: string | null;
+  logo?: BrandingImage | null;
+  favicon?: BrandingImage | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   themeIdentifier?: string | null;
-  coverImageUrl?: string | null;
+  coverImage?: BrandingImage | null;
 }
 
 function ColourSwatch({ label, value }: { label: string; value: string | null | undefined }) {
@@ -56,9 +60,9 @@ export function BrandingDisplay({ branding }: { branding: InstituteBranding | nu
         <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">{t('logo')}</p>
-            {branding.logoUrl ? (
+            {branding.logo?.url ? (
               <Image
-                src={branding.logoUrl}
+                src={branding.logo?.url}
                 alt={t('logo')}
                 width={160}
                 height={80}
@@ -71,9 +75,9 @@ export function BrandingDisplay({ branding }: { branding: InstituteBranding | nu
           </div>
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">{t('favicon')}</p>
-            {branding.faviconUrl ? (
+            {branding.favicon?.url ? (
               <Image
-                src={branding.faviconUrl}
+                src={branding.favicon?.url}
                 alt={t('favicon')}
                 width={32}
                 height={32}
@@ -86,9 +90,9 @@ export function BrandingDisplay({ branding }: { branding: InstituteBranding | nu
           </div>
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">{t('cover')}</p>
-            {branding.coverImageUrl ? (
+            {branding.coverImage?.url ? (
               <Image
-                src={branding.coverImageUrl}
+                src={branding.coverImage?.url}
                 alt={t('cover')}
                 width={240}
                 height={120}

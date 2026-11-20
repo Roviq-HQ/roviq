@@ -81,6 +81,26 @@ const LOGO_IMAGE: ImageStoragePolicy = { square: false, fullPx: 1024, cacheableT
 /** Browser-tab icons are square; 512 px covers every size a browser or phone asks for. */
 const ICON_IMAGE: ImageStoragePolicy = { square: true, fullPx: 512, cacheableThumbnails: false };
 
+/** Wide banner behind the login form; kept at its own shape. */
+const COVER_IMAGE: ImageStoragePolicy = { square: false, fullPx: 1920, cacheableThumbnails: false };
+
+/**
+ * Institute branding: shown on the login page before anyone signs in, so it is stored in the
+ * public bucket under a link that never changes.
+ */
+function instituteBranding(image: ImageStoragePolicy): FilePurposePolicy {
+  return {
+    visibility: 'PUBLIC',
+    owner: 'INSTITUTE',
+    allowedContentTypes: IMAGE_CONTENT_TYPES,
+    maxSizeBytes: 10 * MB,
+    sensitive: false,
+    image,
+    uploadAbility: { action: 'update_branding', subject: 'Institute' },
+    readAbility: 'AUTHENTICATED',
+  };
+}
+
 export interface FilePurposePolicy {
   visibility: FileVisibility;
   /**
@@ -201,6 +221,9 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     // Checked against the very application the document belongs to, see FileService.canRead.
     readAbility: { action: 'read', subject: 'Application' },
   },
+  INSTITUTE_LOGO: instituteBranding(LOGO_IMAGE),
+  INSTITUTE_FAVICON: instituteBranding(ICON_IMAGE),
+  INSTITUTE_COVER: instituteBranding(COVER_IMAGE),
 };
 
 const EXTENSION: { readonly [T in FileContentType]: string } = {

@@ -24,7 +24,7 @@ import { ImageProcessor, InvalidImageError } from './image/image-processor';
 import type { FileUploadTicket } from './models/file-upload-ticket.model';
 import { FileRepository } from './repositories/file.repository';
 import type { FileRecord } from './repositories/types';
-import { storageKeyFor } from './storage-keys';
+import { storageKeyFor, variantKeyOf } from './storage-keys';
 
 export const UPLOAD_URL_TTL_SECONDS = 5 * 60;
 export const DOWNLOAD_URL_TTL_SECONDS = 10 * 60;
@@ -58,18 +58,13 @@ function pendingKeyOf(file: Pick<FileRecord, 'objectKey'>): string {
   return `pending/${file.objectKey}`;
 }
 
-/** Key of one stored size of an image: `…/{fileId}/sm.webp`. */
-function variantKeyOf(file: Pick<FileRecord, 'objectKey'>, variant: ImageVariant): string {
-  return `${file.objectKey.replace(/\.[a-z0-9]+$/, '')}/${variant.toLowerCase()}.webp`;
-}
-
 /** Every key a file may occupy in its own bucket, for cleanup. */
 function storedKeysOf(file: Pick<FileRecord, 'objectKey'>): string[] {
   return [
     file.objectKey,
-    variantKeyOf(file, 'SM'),
-    variantKeyOf(file, 'MD'),
-    variantKeyOf(file, 'FULL'),
+    variantKeyOf(file.objectKey, 'SM'),
+    variantKeyOf(file.objectKey, 'MD'),
+    variantKeyOf(file.objectKey, 'FULL'),
   ];
 }
 
@@ -268,7 +263,7 @@ export class FileService {
     expiresInSeconds: number,
   ): Promise<string> {
     const isImage = file.variants !== null;
-    const key = isImage ? variantKeyOf(file, variant) : file.objectKey;
+    const key = isImage ? variantKeyOf(file.objectKey, variant) : file.objectKey;
     if (file.visibility === 'PUBLIC') return Promise.resolve(this.storage.publicUrl(key));
 
     const disposition = {
@@ -333,7 +328,8 @@ export class FileService {
     if (!pending) {
       // A retry after processing already ran: the stored sizes decide.
       const done =
-        file.variants !== null && (await this.storage.head(bucket, variantKeyOf(file, 'FULL')));
+        file.variants !== null &&
+        (await this.storage.head(bucket, variantKeyOf(file.objectKey, 'FULL')));
       return done ? 'ACCEPTED' : 'CONTENT_MISMATCH';
     }
     if (pending.size !== file.sizeBytes) return 'CONTENT_MISMATCH';
@@ -349,7 +345,7 @@ export class FileService {
     }
 
     for (const variant of processed.variants) {
-      await this.storage.put(bucket, variantKeyOf(file, variant.name), variant.data, {
+      await this.storage.put(bucket, variantKeyOf(file.objectKey, variant.name), variant.data, {
         contentType: 'image/webp',
         cacheControl: bucket === 'public' ? PUBLIC_CACHE_CONTROL : PRIVATE_CACHE_CONTROL,
       });

@@ -136,7 +136,7 @@ export async function seedBrandingAndConfigs(tx: DrizzleDB, inst1Id: string, ins
         tenantId: inst1Id,
         primaryColor: '#1E40AF',
         secondaryColor: '#F59E0B',
-        themeIdentifier: 'royal-blue',
+        themeIdentifier: 'classic',
         ...BY,
       },
       {
@@ -144,7 +144,7 @@ export async function seedBrandingAndConfigs(tx: DrizzleDB, inst1Id: string, ins
         tenantId: inst2Id,
         primaryColor: '#059669',
         secondaryColor: '#DC2626',
-        themeIdentifier: 'emerald',
+        themeIdentifier: 'modern',
         ...BY,
       },
     ])

@@ -14,6 +14,8 @@ export async function markFilesReady(
     userId: string;
     /** For a person's file: the person it must be about, so one cannot be attached to another. */
     subjectUserId?: string;
+    /** In a transaction that is not bound to one institute: the institute that must own them. */
+    tenantId?: string;
   },
 ): Promise<void> {
   if (params.fileIds.length === 0) return;
@@ -28,6 +30,7 @@ export async function markFilesReady(
         eq(files.purpose, params.purpose),
         eq(files.uploadedBy, params.userId),
         params.subjectUserId ? eq(files.subjectUserId, params.subjectUserId) : undefined,
+        params.tenantId ? eq(files.tenantId, params.tenantId) : undefined,
         isNull(files.deletedAt),
       ),
     )

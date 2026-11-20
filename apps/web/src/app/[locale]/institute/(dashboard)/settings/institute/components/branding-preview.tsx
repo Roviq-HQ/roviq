@@ -10,15 +10,13 @@ type AnyForm = any;
 
 export interface BrandingPreviewProps {
   form: AnyForm;
+  /** Logo as it will look after saving: the newly picked one, the saved one, or none. */
+  logoUrl: string | null;
 }
 
-export function BrandingPreview({ form }: BrandingPreviewProps) {
+export function BrandingPreview({ form, logoUrl }: BrandingPreviewProps) {
   const t = useTranslations('instituteSettings.branding');
 
-  const logoUrl = useStore(form.store, (state) => {
-    const values = (state as { values: InstituteBrandingFormValues }).values;
-    return values.logoUrl;
-  });
   const primaryColor = useStore(form.store, (state) => {
     const values = (state as { values: InstituteBrandingFormValues }).values;
     return values.primaryColor || '#1e40af';

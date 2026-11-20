@@ -79,13 +79,16 @@ const hexColorSchema = z
 
 // ── Branding form schema ──
 
+// An image field: undefined keeps the saved image, null removes it, an id replaces it.
+const brandingImageSchema = z.string().uuid().nullable().optional();
+
 export const instituteBrandingSchema = z.object({
-  logoUrl: z.string().url().optional().or(z.literal('')),
-  faviconUrl: z.string().url().optional().or(z.literal('')),
+  logoFileId: brandingImageSchema,
+  faviconFileId: brandingImageSchema,
   primaryColor: hexColorSchema,
   secondaryColor: hexColorSchema,
   themeIdentifier: z.string().optional(),
-  coverImageUrl: z.string().url().optional().or(z.literal('')),
+  coverImageFileId: brandingImageSchema,
 });
 
 export type InstituteBrandingFormValues = z.infer<typeof instituteBrandingSchema>;

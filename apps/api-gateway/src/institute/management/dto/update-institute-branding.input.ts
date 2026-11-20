@@ -1,22 +1,28 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { IsHexColor, IsOptional, IsString, IsUrl } from 'class-validator';
+import { Field, ID, InputType } from '@nestjs/graphql';
+import { IsHexColor, IsOptional, IsString, IsUUID } from 'class-validator';
 
 @InputType({
-  description: 'Visual branding fields for the institute portal. All fields are optional.',
+  description:
+    'Visual branding fields for the institute portal. All fields are optional. Upload images first with `requestFileUpload`.',
 })
 export class UpdateInstituteBrandingInput {
-  @Field({
+  @Field(() => ID, {
     nullable: true,
-    description: 'MinIO/S3 URL of the institute logo shown in the portal header.',
+    description:
+      'Logo shown in the portal header: the id of an upload with purpose INSTITUTE_LOGO. Null removes the logo; leave out to keep it.',
   })
-  @IsUrl()
   @IsOptional()
-  logoUrl?: string;
+  @IsUUID()
+  logoFileId?: string | null;
 
-  @Field({ nullable: true, description: 'MinIO/S3 URL of the favicon (16×16 or 32×32 PNG/ICO).' })
-  @IsUrl()
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'Browser-tab icon: the id of an upload with purpose INSTITUTE_FAVICON. Null removes it; leave out to keep it.',
+  })
   @IsOptional()
-  faviconUrl?: string;
+  @IsUUID()
+  faviconFileId?: string | null;
 
   @Field({
     nullable: true,
@@ -46,11 +52,12 @@ export class UpdateInstituteBrandingInput {
   @IsOptional()
   themeIdentifier?: string;
 
-  @Field({
+  @Field(() => ID, {
     nullable: true,
-    description: 'MinIO/S3 URL of a cover/banner image shown on login and dashboard hero sections.',
+    description:
+      'Banner shown on the login page: the id of an upload with purpose INSTITUTE_COVER. Null removes it; leave out to keep it.',
   })
-  @IsUrl()
   @IsOptional()
-  coverImageUrl?: string;
+  @IsUUID()
+  coverImageFileId?: string | null;
 }

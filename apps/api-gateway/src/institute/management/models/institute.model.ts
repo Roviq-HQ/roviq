@@ -136,9 +136,6 @@ export class InstituteModel {
   @Field(() => InstituteAddressObject, { nullable: true })
   address?: DbInstituteAddress | null;
 
-  @Field(() => String, { nullable: true })
-  logoUrl?: string | null;
-
   @Field(() => String)
   timezone!: string;
 

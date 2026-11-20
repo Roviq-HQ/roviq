@@ -1,15 +1,16 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
 
-@ObjectType()
+@ObjectType({
+  description:
+    'Visual branding of an institute. `logo`, `favicon` and `coverImage` are public images.',
+})
 export class InstituteBrandingModel {
   @Field(() => ID)
   id!: string;
 
-  @Field(() => String, { nullable: true })
-  logoUrl?: string | null;
-
-  @Field(() => String, { nullable: true })
-  faviconUrl?: string | null;
+  logoFileId?: string | null;
+  faviconFileId?: string | null;
+  coverImageFileId?: string | null;
 
   @Field(() => String, { nullable: true })
   primaryColor?: string | null;
@@ -19,7 +20,4 @@ export class InstituteBrandingModel {
 
   @Field(() => String, { nullable: true })
   themeIdentifier?: string | null;
-
-  @Field(() => String, { nullable: true })
-  coverImageUrl?: string | null;
 }

@@ -9,6 +9,8 @@ import { instituteContactSchema } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
+import { FileService } from '../../files/file.service';
+import { BRANDING_IMAGES } from './branding-images';
 import type { CreateInstituteInput } from './dto/create-institute.input';
 import type { InstituteFilterInput } from './dto/institute-filter.input';
 import type { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
@@ -27,6 +29,7 @@ export class InstituteService {
     private readonly instituteRepo: InstituteRepository,
     private readonly setupService: InstituteSetupService,
     private readonly eventBus: EventBusService,
+    private readonly files: FileService,
   ) {}
 
   private emitEvent(pattern: EventPattern, data: Record<string, unknown>) {
@@ -131,6 +134,10 @@ export class InstituteService {
     instituteId: string,
     input: UpdateInstituteBrandingInput,
   ): Promise<InstituteRecord> {
+    for (const { column, purpose } of BRANDING_IMAGES) {
+      const fileId = input[column];
+      if (fileId) await this.files.verifyUploads([fileId], purpose);
+    }
     const record = await this.instituteRepo.updateBranding(instituteId, input);
     this.emitEvent(EVENT_PATTERNS.INSTITUTE.branding_updated, {
       instituteId,

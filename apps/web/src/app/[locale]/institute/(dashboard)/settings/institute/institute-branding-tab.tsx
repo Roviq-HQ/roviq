@@ -3,7 +3,6 @@
 import { extractGraphQLError } from '@roviq/graphql';
 import { zodValidator } from '@roviq/i18n';
 import {
-  Badge,
   Can,
   Card,
   CardContent,
@@ -23,6 +22,7 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { applyTenantTheme } from '../../tenant-theme-provider';
+import { BrandingImageField, type BrandingImageValue } from './components/branding-image-field';
 import { BrandingPreview } from './components/branding-preview';
 import { type InstituteBrandingFormValues, instituteBrandingSchema } from './schemas';
 import type { MyInstituteData } from './types';
@@ -36,19 +36,25 @@ interface InstituteBrandingTabProps {
   loading: boolean;
 }
 
+type ImageField = 'logoFileId' | 'faviconFileId' | 'coverImageFileId';
+
 const DEFAULT_VALUES: InstituteBrandingFormValues = {
-  logoUrl: '',
-  faviconUrl: '',
+  logoFileId: undefined,
+  faviconFileId: undefined,
   primaryColor: '#1e40af',
   secondaryColor: '#e2e8f0',
   themeIdentifier: 'default',
-  coverImageUrl: '',
+  coverImageFileId: undefined,
 };
 
 export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTabProps) {
   const t = useTranslations('instituteSettings');
   const tb = useTranslations('instituteSettings.branding');
   const [updateBranding] = useUpdateInstituteBranding();
+  const [uploading, setUploading] = React.useState<Record<string, boolean>>({});
+  // Local link to a newly picked logo, for the preview only.
+  const [pickedLogoUrl, setPickedLogoUrl] = React.useState<string | null>(null);
+  const [round, setRound] = React.useState(0);
 
   const branding = institute?.branding;
 
@@ -63,16 +69,17 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
         await updateBranding({
           variables: {
             input: {
-              logoUrl: value.logoUrl || undefined,
-              faviconUrl: value.faviconUrl || undefined,
+              logoFileId: value.logoFileId,
+              faviconFileId: value.faviconFileId,
               primaryColor: value.primaryColor || undefined,
               secondaryColor: value.secondaryColor || undefined,
               themeIdentifier: value.themeIdentifier || undefined,
-              coverImageUrl: value.coverImageUrl || undefined,
+              coverImageFileId: value.coverImageFileId,
             },
           },
         });
         toast.success(t('saved'));
+        setRound((current) => current + 1);
       } catch (err) {
         toast.error(t('saveFailed'), {
           description: extractGraphQLError(err, t('saveFailed')),
@@ -109,16 +116,51 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
     if (!branding) return;
     form.reset(
       {
-        logoUrl: branding.logoUrl ?? '',
-        faviconUrl: branding.faviconUrl ?? '',
+        logoFileId: undefined,
+        faviconFileId: undefined,
         primaryColor: branding.primaryColor ?? '#1e40af',
         secondaryColor: branding.secondaryColor ?? '#e2e8f0',
         themeIdentifier: branding.themeIdentifier ?? 'default',
-        coverImageUrl: branding.coverImageUrl ?? '',
+        coverImageFileId: undefined,
       },
       { keepDefaultValues: true },
     );
   }, [branding, form]);
+
+  const logoFileId = useStore(
+    form.store,
+    (state) => (state.values as InstituteBrandingFormValues).logoFileId,
+  );
+  const faviconFileId = useStore(
+    form.store,
+    (state) => (state.values as InstituteBrandingFormValues).faviconFileId,
+  );
+  const coverImageFileId = useStore(
+    form.store,
+    (state) => (state.values as InstituteBrandingFormValues).coverImageFileId,
+  );
+
+  React.useEffect(() => {
+    if (typeof logoFileId !== 'string') setPickedLogoUrl(null);
+  }, [logoFileId]);
+  React.useEffect(
+    () => () => {
+      if (pickedLogoUrl) URL.revokeObjectURL(pickedLogoUrl);
+    },
+    [pickedLogoUrl],
+  );
+
+  const setImage = (field: ImageField) => (value: BrandingImageValue, file?: File) => {
+    // An unchanged value must not mark the form as edited.
+    if (form.getFieldValue(field) === value) return;
+    form.setFieldValue(field, value);
+    if (field === 'logoFileId' && file) setPickedLogoUrl(URL.createObjectURL(file));
+  };
+  const setBusy = (field: ImageField) => (busy: boolean) =>
+    setUploading((current) => (current[field] === busy ? current : { ...current, [field]: busy }));
+  const isUploading = Object.values(uploading).some(Boolean);
+  const previewLogoUrl =
+    logoFileId === null ? null : (pickedLogoUrl ?? branding?.logo?.url ?? null);
 
   const themeOptions = THEME_OPTIONS.map((theme) => ({
     value: theme,
@@ -154,54 +196,30 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
               >
                 <fieldset disabled={!allowed}>
                   <FieldGroup>
-                    <form.AppField name="logoUrl">
-                      {(field) => (
-                        <field.TextField
-                          label={tb('logo')}
-                          description={tb('logoUrlDescription')}
-                          type="url"
-                          placeholder={tb('urlPlaceholder')}
-                          testId="branding-logo-url-input"
-                          info={
-                            <FieldInfoPopover
-                              title={tb('fieldHelp.logoTitle')}
-                              data-testid={instituteSettings.brandingLogoInfo}
-                            >
-                              <p>{tb('fieldHelp.logoBody')}</p>
-                              <p>
-                                <em>{tb('fieldHelp.logoExample')}</em>
-                              </p>
-                            </FieldInfoPopover>
-                          }
-                        />
-                      )}
-                    </form.AppField>
-                    <Badge variant="outline" className="text-xs text-muted-foreground">
-                      {t('uploadComingSoon')}
-                    </Badge>
-
-                    <form.AppField name="faviconUrl">
-                      {(field) => (
-                        <field.TextField
-                          label={tb('favicon')}
-                          description={tb('faviconUrlDescription')}
-                          type="url"
-                          placeholder={tb('urlPlaceholder')}
-                          testId="branding-favicon-url-input"
-                          info={
-                            <FieldInfoPopover
-                              title={tb('fieldHelp.faviconTitle')}
-                              data-testid={instituteSettings.brandingFaviconInfo}
-                            >
-                              <p>{tb('fieldHelp.faviconBody')}</p>
-                            </FieldInfoPopover>
-                          }
-                        />
-                      )}
-                    </form.AppField>
-                    <Badge variant="outline" className="text-xs text-muted-foreground">
-                      {t('uploadComingSoon')}
-                    </Badge>
+                    <BrandingImageField
+                      name="logo"
+                      purpose="INSTITUTE_LOGO"
+                      label={tb('logo')}
+                      description={tb('logoDescription')}
+                      current={branding?.logo}
+                      value={logoFileId}
+                      onChange={setImage('logoFileId')}
+                      onBusyChange={setBusy('logoFileId')}
+                      editable={allowed}
+                      round={round}
+                    />
+                    <BrandingImageField
+                      name="favicon"
+                      purpose="INSTITUTE_FAVICON"
+                      label={tb('favicon')}
+                      description={tb('faviconDescription')}
+                      current={branding?.favicon}
+                      value={faviconFileId}
+                      onChange={setImage('faviconFileId')}
+                      onBusyChange={setBusy('faviconFileId')}
+                      editable={allowed}
+                      round={round}
+                    />
 
                     <div className="grid grid-cols-2 gap-4">
                       <Field>
@@ -284,28 +302,18 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
                       )}
                     </form.AppField>
 
-                    <form.AppField name="coverImageUrl">
-                      {(field) => (
-                        <field.TextField
-                          label={tb('coverImage')}
-                          description={tb('coverImageUrlDescription')}
-                          type="url"
-                          placeholder={tb('urlPlaceholder')}
-                          testId="branding-cover-url-input"
-                          info={
-                            <FieldInfoPopover
-                              title={tb('fieldHelp.coverImageTitle')}
-                              data-testid={instituteSettings.brandingCoverInfo}
-                            >
-                              <p>{tb('fieldHelp.coverImageBody')}</p>
-                            </FieldInfoPopover>
-                          }
-                        />
-                      )}
-                    </form.AppField>
-                    <Badge variant="outline" className="text-xs text-muted-foreground">
-                      {t('uploadComingSoon')}
-                    </Badge>
+                    <BrandingImageField
+                      name="cover"
+                      purpose="INSTITUTE_COVER"
+                      label={tb('coverImage')}
+                      description={tb('coverImageDescription')}
+                      current={branding?.coverImage}
+                      value={coverImageFileId}
+                      onChange={setImage('coverImageFileId')}
+                      onBusyChange={setBusy('coverImageFileId')}
+                      editable={allowed}
+                      round={round}
+                    />
                   </FieldGroup>
 
                   {allowed && (
@@ -313,7 +321,7 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
                       <form.AppForm>
                         <form.SubmitButton
                           testId="branding-save-btn"
-                          disabled={!isDirty}
+                          disabled={!isDirty || isUploading}
                           submittingLabel={t('saving')}
                         >
                           {t('save')}
@@ -327,7 +335,7 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
           </Card>
 
           <div className="hidden lg:block">
-            <BrandingPreview form={form} />
+            <BrandingPreview form={form} logoUrl={previewLogoUrl} />
           </div>
 
           {!allowed && <p className="text-sm text-muted-foreground">{t('noPermission')}</p>}

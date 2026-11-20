@@ -73,8 +73,6 @@ export const institutes = pgTable(
     setupStatus: setupStatus('setup_status').default('PENDING').notNull(),
     contact: jsonb().$type<InstituteContact>().default({ phones: [], emails: [] }).notNull(),
     address: jsonb().$type<InstituteAddress>(),
-    // Deprecated: use institute_branding.logoUrl instead (kept for backward compatibility)
-    logoUrl: text('logo_url'),
     timezone: text().default('Asia/Kolkata').notNull(),
     currency: text().default('INR').notNull(),
     supportedLocales: jsonb('supported_locales').$type<string[]>().default(['en']).notNull(),

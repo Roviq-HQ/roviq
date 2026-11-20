@@ -17,7 +17,6 @@ export interface InstituteRecord {
   setupStatus: string;
   contact: InstituteContact;
   address: InstituteAddress | null;
-  logoUrl: string | null;
   timezone: string;
   currency: string;
   settings: Record<string, unknown>;
@@ -97,12 +96,13 @@ export interface UpdateInstituteInfoData {
 }
 
 export interface UpdateInstituteBrandingData {
-  logoUrl?: string;
-  faviconUrl?: string;
+  /** Undefined keeps the image, null removes it, an id replaces it. */
+  logoFileId?: string | null;
+  faviconFileId?: string | null;
+  coverImageFileId?: string | null;
   primaryColor?: string;
   secondaryColor?: string;
   themeIdentifier?: string;
-  coverImageUrl?: string;
 }
 
 export interface UpdateInstituteConfigData {

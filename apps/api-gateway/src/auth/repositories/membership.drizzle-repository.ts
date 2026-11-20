@@ -2,20 +2,37 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  filesLive,
+  instituteBrandingLive,
   institutesLive,
   membershipsLive,
   mkAdminCtx,
   rolesLive,
   withAdmin,
 } from '@roviq/database';
+import { StorageClient } from '@roviq/storage';
 import { and, asc, eq } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
+import { variantKeyOf } from '../../files/storage-keys';
 import { MembershipRepository } from './membership.repository';
 import type { MembershipWithInstituteAndRole } from './types';
 
+function readyLogoOf(logoFileId: PgColumn) {
+  return and(eq(filesLive.id, logoFileId), eq(filesLive.status, 'READY'));
+}
+
 @Injectable()
 export class MembershipDrizzleRepository extends MembershipRepository {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly storage: StorageClient,
+  ) {
     super();
+  }
+
+  /** Branding logos are public images, so their link never expires. */
+  private logoUrl(objectKey: string | null): string | null {
+    return objectKey ? this.storage.publicUrl(variantKeyOf(objectKey, 'MD')) : null;
   }
 
   async findActiveByUserId(userId: string): Promise<MembershipWithInstituteAndRole[]> {
@@ -30,7 +47,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
           instituteId: institutesLive.id,
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
-          instituteLogoUrl: institutesLive.logoUrl,
+          instituteLogoKey: filesLive.objectKey,
           instituteResellerId: institutesLive.resellerId,
           roleIdFk: rolesLive.id,
           roleName: rolesLive.name,
@@ -39,6 +56,8 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         .from(membershipsLive)
         .innerJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
         .innerJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
+        .leftJoin(instituteBrandingLive, eq(instituteBrandingLive.tenantId, institutesLive.id))
+        .leftJoin(filesLive, readyLogoOf(instituteBrandingLive.logoFileId))
         .where(and(eq(membershipsLive.userId, userId), eq(membershipsLive.status, 'ACTIVE')))
         // Deterministic order — multi-institute admins see memberships in
         // creation order across requests; selection-step UI / e2e tests
@@ -56,7 +75,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         id: row.instituteId,
         name: row.instituteName,
         slug: row.instituteSlug,
-        logoUrl: row.instituteLogoUrl,
+        logoUrl: this.logoUrl(row.instituteLogoKey),
         resellerId: row.instituteResellerId,
       },
       role: {
@@ -82,7 +101,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
           instituteId: institutesLive.id,
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
-          instituteLogoUrl: institutesLive.logoUrl,
+          instituteLogoKey: filesLive.objectKey,
           instituteResellerId: institutesLive.resellerId,
           roleIdFk: rolesLive.id,
           roleName: rolesLive.name,
@@ -91,6 +110,8 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         .from(membershipsLive)
         .innerJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
         .innerJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
+        .leftJoin(instituteBrandingLive, eq(instituteBrandingLive.tenantId, institutesLive.id))
+        .leftJoin(filesLive, readyLogoOf(instituteBrandingLive.logoFileId))
         .where(
           and(
             eq(membershipsLive.userId, userId),
@@ -110,7 +131,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         id: row.instituteId,
         name: row.instituteName,
         slug: row.instituteSlug,
-        logoUrl: row.instituteLogoUrl,
+        logoUrl: this.logoUrl(row.instituteLogoKey),
         resellerId: row.instituteResellerId,
       },
       role: {
@@ -136,7 +157,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
           instituteId: institutesLive.id,
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
-          instituteLogoUrl: institutesLive.logoUrl,
+          instituteLogoKey: filesLive.objectKey,
           instituteResellerId: institutesLive.resellerId,
           roleIdFk: rolesLive.id,
           roleName: rolesLive.name,
@@ -145,6 +166,8 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         .from(membershipsLive)
         .innerJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
         .innerJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
+        .leftJoin(instituteBrandingLive, eq(instituteBrandingLive.tenantId, institutesLive.id))
+        .leftJoin(filesLive, readyLogoOf(instituteBrandingLive.logoFileId))
         .where(
           and(
             eq(membershipsLive.id, membershipId),
@@ -166,7 +189,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         id: row.instituteId,
         name: row.instituteName,
         slug: row.instituteSlug,
-        logoUrl: row.instituteLogoUrl,
+        logoUrl: this.logoUrl(row.instituteLogoKey),
         resellerId: row.instituteResellerId,
       },
       role: {
