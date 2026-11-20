@@ -27,6 +27,7 @@ CREATE TABLE "export_reports" (
 );
 --> statement-breakpoint
 ALTER TABLE "export_reports" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE UNIQUE INDEX "academic_years_id_tenant_key" ON "academic_years" ("id","tenant_id");--> statement-breakpoint
 CREATE INDEX "export_reports_tenant_requested_idx" ON "export_reports" ("tenant_id","requested_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "export_reports_academic_year_id_idx" ON "export_reports" ("academic_year_id");--> statement-breakpoint
 CREATE INDEX "export_reports_file_id_idx" ON "export_reports" ("file_id") WHERE file_id IS NOT NULL;--> statement-breakpoint
@@ -35,6 +36,7 @@ ALTER TABLE "export_reports" ADD CONSTRAINT "export_reports_academic_year_id_aca
 ALTER TABLE "export_reports" ADD CONSTRAINT "export_reports_file_id_files_id_fkey" FOREIGN KEY ("file_id") REFERENCES "files"("id") ON DELETE RESTRICT ON UPDATE CASCADE;--> statement-breakpoint
 ALTER TABLE "export_reports" ADD CONSTRAINT "export_reports_requested_by_users_id_fkey" FOREIGN KEY ("requested_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;--> statement-breakpoint
 ALTER TABLE "export_reports" ADD CONSTRAINT "export_reports_tenant_id_institutes_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "institutes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;--> statement-breakpoint
+ALTER TABLE "export_reports" ADD CONSTRAINT "export_reports_academic_year_tenant_fkey" FOREIGN KEY ("academic_year_id","tenant_id") REFERENCES "academic_years"("id","tenant_id") ON DELETE RESTRICT ON UPDATE CASCADE;--> statement-breakpoint
 CREATE VIEW "export_reports_live" WITH (security_invoker = true) AS (select "id", "report_type", "academic_year_id", "status", "workflow_id", "file_id", "row_count", "error_code", "requested_by", "requested_at", "completed_at", "tenant_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at", "deleted_by", "version" from "export_reports" where ("export_reports"."deleted_at" is null));--> statement-breakpoint
 CREATE POLICY "export_reports_app_select" ON "export_reports" AS PERMISSIVE FOR SELECT TO "roviq_app" USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
 CREATE POLICY "export_reports_app_insert" ON "export_reports" AS PERMISSIVE FOR INSERT TO "roviq_app" WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint

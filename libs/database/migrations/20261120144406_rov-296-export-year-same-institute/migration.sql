@@ -1,2 +1,0 @@
-CREATE UNIQUE INDEX "academic_years_id_tenant_key" ON "academic_years" ("id","tenant_id");--> statement-breakpoint
-ALTER TABLE "export_reports" ADD CONSTRAINT "export_reports_academic_year_tenant_fkey" FOREIGN KEY ("academic_year_id","tenant_id") REFERENCES "academic_years"("id","tenant_id") ON DELETE RESTRICT ON UPDATE CASCADE;
