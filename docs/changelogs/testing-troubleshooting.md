@@ -831,3 +831,9 @@ Likely cause, not proven: load. The first run was cold after new commits, so the
 - **Cause:** the test tampered with the ciphertext by overwriting its first byte with `ff`. The IV is random, so the first ciphertext byte is random too. When it already was `ff`, nothing changed and decrypt succeeded.
 - **Fix:** the test XORs the first byte with `0xff`, which always changes it.
 - **Lesson:** to corrupt random data in a test, change the existing value (XOR, increment); never overwrite it with a constant.
+
+## 2026-11-20 — diagnosed: pre-push gate fails on timeouts only when the machine is overloaded
+
+- **Symptom:** two pushes of `parmody1/rov-195-institute-branding` in a row were refused: `unit` failed with 4 timed-out tests (`ee-module.spec.ts` 30 s, `student.service.spec.ts` hook 10 s, `designer-add-date.spec.tsx` 5 s) and `int` with a dozen `Hook timed out in 10000ms`. No assertion failed, and the failing tests differed between the two runs. The same commit's parent passed the gate an hour earlier (`unit` 50 s; this time 130 s).
+- **Cause:** load. `uptime` showed a load average of 38 during the first run and 75 after the second; several instances and browsers were running at the same time.
+- **Fix:** none in code. Push again when the load average is back to normal. Do not raise the timeouts for this.
