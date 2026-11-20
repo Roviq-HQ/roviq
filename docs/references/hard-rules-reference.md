@@ -39,7 +39,7 @@ Commit message format:
 
 Read the full Linear issue before coding — especially "Does NOT Change" and "Verification" sections. If it references a feature spec (Linear Document), read that too.
 
-Keep Linear in sync — update issues when scope changes.
+Keep Linear in sync — update issues/documents/prd/projects when scope changes.
 
 ---
 
