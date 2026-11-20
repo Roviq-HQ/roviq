@@ -22,6 +22,7 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { admissionReadPredicate } from '../../institute/admission/admission-read-predicate';
+import { leaveInScope } from '../../institute/leave/repositories/leave-scope';
 import { studentReadPredicate } from '../../institute/student/student-read-predicate';
 import { markFilesReady } from '../file-attachment';
 import { FileRepository } from './file.repository';
@@ -154,13 +155,15 @@ export class FileDrizzleRepository extends FileRepository {
     await this.run((tx, { userId }) => markFilesReady(tx, { fileIds: ids, purpose, userId }));
   }
 
-  async findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null> {
+  async findLeaveForFile(fileId: string, ability: AppAbility): Promise<FileLeaveOwner | null> {
     return this.run(async (tx) => {
       const rows = await tx
-        .select({ id: leavesLive.id, tenantId: leavesLive.tenantId, userId: leavesLive.userId })
+        .select({ id: leavesLive.id })
         .from(leaveFilesLive)
         .innerJoin(leavesLive, eq(leavesLive.id, leaveFilesLive.leaveId))
-        .where(eq(leaveFilesLive.fileId, fileId));
+        .where(
+          and(eq(leaveFilesLive.fileId, fileId), leaveInScope(ability, 'read', leavesLive.id)),
+        );
       return rows[0] ?? null;
     });
   }

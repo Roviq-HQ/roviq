@@ -232,3 +232,51 @@ export async function loginAsGuardian(): Promise<{
     membershipId: SEED.GUARDIAN_USER.membershipId,
   };
 }
+
+async function loginSingleInstitute(
+  credentials: { username: string; password: string },
+  label: string,
+): Promise<{ accessToken: string; refreshToken: string; userId: string }> {
+  const data = unwrap(
+    await gql<{
+      instituteLogin: { accessToken: string; refreshToken: string; user: { id: string } };
+    }>(
+      `mutation InstituteLogin($username: String!, $password: String!) {
+        instituteLogin(username: $username, password: $password) {
+          accessToken
+          refreshToken
+          user { id }
+        }
+      }`,
+      { username: credentials.username, password: credentials.password },
+    ),
+    `instituteLogin (${label})`,
+  );
+  return {
+    accessToken: data.instituteLogin.accessToken,
+    refreshToken: data.instituteLogin.refreshToken,
+    userId: data.instituteLogin.user.id,
+  };
+}
+
+/** subjectteacher1: a `subject_teacher` (not a class teacher) with timetable periods. */
+export async function loginAsSubjectTeacher(): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  userId: string;
+  membershipId: string;
+}> {
+  const tokens = await loginSingleInstitute(E2E_USERS.SUBJECT_TEACHER, 'subject teacher');
+  return { ...tokens, membershipId: SEED.SUBJECT_TEACHER_USER.membershipId };
+}
+
+/** guardian4: linked to two children (student6 + student7). */
+export async function loginAsMultiChildGuardian(): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  userId: string;
+  membershipId: string;
+}> {
+  const tokens = await loginSingleInstitute(E2E_USERS.MULTI_CHILD_GUARDIAN, 'multi-child guardian');
+  return { ...tokens, membershipId: SEED.MULTI_CHILD_GUARDIAN_USER.membershipId };
+}

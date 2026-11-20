@@ -1,21 +1,18 @@
 /**
- * Unit tests for LeaveService — covers read/list passthroughs, the apply-time
- * date-range + supporting-document rules, the PENDING-only edit gate, the
- * three status transitions (approve / reject / cancel) and their differing
- * NATS emission sets, soft-delete, and the attendance-side `approvedOnDate`
- * short-circuit.
+ * Unit tests for LeaveService — covers the ability-scoped reads, the apply-time
+ * applicant check, date-range and supporting-document rules, the read-then-allowed
+ * gate on every write, the PENDING-only edit gate, the three status transitions
+ * and their NATS emission sets, soft-delete, and the attendance-side
+ * `approvedOnDate` short-circuit.
  *
- * Mirrors `attendance.service.spec.ts`: the repository is a manually-typed
- * `vi.fn()` map against the abstract class contract, the NATS client is a
- * stub whose `emit()` returns an observable-like `{ subscribe }`, and the
- * service is constructed via `Object.assign(Object.create(Proto), {...})`
+ * The service is constructed via `Object.assign(Object.create(Proto), {...})`
  * so we skip the real constructor (decorator + parameter-property shorthand
  * does not reliably wire private fields under esbuild/Vitest).
  */
 
-import { createMongoAbility } from '@casl/ability';
 import {
   type AppAbility,
+  type AppAction,
   BusinessException,
   ErrorCode,
   LeaveStatus,
@@ -35,10 +32,7 @@ const USER_ID = '00000000-0000-7000-a000-000000000003';
 const FILE_ID = '00000000-0000-7000-a000-000000000005';
 const OTHER_FILE_ID = '00000000-0000-7000-a000-000000000006';
 
-// LeaveService now reads `tenantId` from request context (delete event includes
-// it for downstream routing — HL-009). `vi.mock` is hoisted to the top of the
-// file by Vitest, so the service's module-level `getRequestContext` reference
-// resolves to this mock even though it's declared after the import.
+// `vi.mock` is hoisted, so the service's `getRequestContext` resolves to this mock.
 vi.mock('@roviq/request-context', () => ({
   getRequestContext: vi.fn(() => ({
     tenantId: TENANT_ID,
@@ -67,10 +61,6 @@ function buildLeave(overrides: Partial<LeaveRecord> = {}): LeaveRecord {
   };
 }
 
-/**
- * Minimal EventBusService stand-in — exposes a synchronous `emit` so the
- * service can call `eventBus.emit(pattern, data)` without going through NATS.
- */
 function buildFile(overrides: Partial<FileRecord> = {}): FileRecord {
   return {
     id: FILE_ID,
@@ -99,23 +89,22 @@ function buildEventBusMock() {
   return { emit, eventBus: { emit } };
 }
 
-/**
- * Manual repository mock — typed against the abstract class contract so any
- * signature drift in production code surfaces as a type error here.
- */
+/** Typed against the abstract class so signature drift surfaces as a type error here. */
 type MockedRepo = {
-  [K in keyof LeaveRepository]: Mock;
+  [K in keyof LeaveRepository]: Mock<LeaveRepository[K]>;
 };
 
 function buildRepoMock(): MockedRepo {
   return {
-    findById: vi.fn(),
-    list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    setStatus: vi.fn(),
-    softDelete: vi.fn(),
-    approvedOnDate: vi.fn(),
+    findById: vi.fn<LeaveRepository['findById']>(),
+    list: vi.fn<LeaveRepository['list']>(),
+    isAllowed: vi.fn<LeaveRepository['isAllowed']>().mockResolvedValue(true),
+    canApplyFor: vi.fn<LeaveRepository['canApplyFor']>().mockResolvedValue(true),
+    create: vi.fn<LeaveRepository['create']>(),
+    update: vi.fn<LeaveRepository['update']>(),
+    setStatus: vi.fn<LeaveRepository['setStatus']>(),
+    softDelete: vi.fn<LeaveRepository['softDelete']>(),
+    approvedOnDate: vi.fn<LeaveRepository['approvedOnDate']>(),
   };
 }
 
@@ -124,14 +113,13 @@ describe('LeaveService (unit)', () => {
   let repo: MockedRepo;
   let eventBusMock: ReturnType<typeof buildEventBusMock>;
   let verifyUploads: Mock<FileService['verifyUploads']>;
+  let ability: AppAbility;
 
   beforeEach(() => {
     repo = buildRepoMock();
     eventBusMock = buildEventBusMock();
     verifyUploads = vi.fn<FileService['verifyUploads']>().mockResolvedValue(undefined);
-    // Build the instance via the prototype so we skip the real constructor.
-    // The constructor uses TS parameter-property shorthand which esbuild
-    // does not fully wire under Vitest — private fields end up undefined.
+    ability = createMock<AppAbility>();
     service = Object.assign(Object.create(LeaveService.prototype), {
       repo,
       eventBus: eventBusMock.eventBus,
@@ -140,27 +128,28 @@ describe('LeaveService (unit)', () => {
   });
 
   describe('findById', () => {
-    it('returns the record from the repo', async () => {
+    it('should return the record the repo reads under the ability', async () => {
       const existing = buildLeave();
       repo.findById.mockResolvedValue(existing);
 
-      const result = await service.findById(LEAVE_ID);
+      const result = await service.findById(LEAVE_ID, ability);
 
       expect(result).toBe(existing);
-      expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID);
+      expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID, ability);
     });
 
-    it('rejects when the repo returns null', async () => {
+    it('should throw LEAVE_NOT_FOUND when the repo returns null', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.findById(LEAVE_ID)).rejects.toMatchObject({
+      await expect(service.findById(LEAVE_ID, ability)).rejects.toMatchObject({
         code: ErrorCode.LEAVE_NOT_FOUND,
       });
+      expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID, ability);
     });
   });
 
   describe('list', () => {
-    it('forwards every filter field untouched to the repo', async () => {
+    it('should forward every filter field and the ability to the repo', async () => {
       const filter = {
         userId: USER_ID,
         status: LeaveStatus.APPROVED,
@@ -171,15 +160,46 @@ describe('LeaveService (unit)', () => {
       const rows = [buildLeave()];
       repo.list.mockResolvedValue(rows);
 
-      const result = await service.list(filter);
+      const result = await service.list(filter, ability);
 
       expect(result).toBe(rows);
-      expect(repo.list).toHaveBeenCalledWith(filter);
+      expect(repo.list).toHaveBeenCalledWith(
+        {
+          userId: USER_ID,
+          status: LeaveStatus.APPROVED,
+          type: LeaveType.MEDICAL,
+          startDate: '2026-05-01',
+          endDate: '2026-05-31',
+        },
+        ability,
+      );
     });
   });
 
   describe('apply', () => {
-    it('rejects when endDate precedes startDate', async () => {
+    it('should refuse with FORBIDDEN when the caller may not file for this person, and do nothing else', async () => {
+      repo.canApplyFor.mockResolvedValue(false);
+
+      await expect(
+        service.apply(
+          {
+            userId: USER_ID,
+            startDate: '2026-05-01',
+            endDate: '2026-05-05',
+            type: LeaveType.MEDICAL,
+            reason: 'flu',
+            fileIds: [FILE_ID],
+          },
+          ability,
+        ),
+      ).rejects.toMatchObject({ code: ErrorCode.FORBIDDEN });
+      expect(repo.canApplyFor).toHaveBeenCalledWith(USER_ID, ability);
+      expect(verifyUploads).not.toHaveBeenCalled();
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(eventBusMock.emit).not.toHaveBeenCalled();
+    });
+
+    it('should reject when endDate precedes startDate', async () => {
       const input = {
         userId: USER_ID,
         startDate: '2026-05-10',
@@ -188,18 +208,17 @@ describe('LeaveService (unit)', () => {
         reason: 'typo',
       };
 
-      // The service wraps `assertValidRange` — message matches production.
-      await expect(service.apply(input)).rejects.toThrow(
+      await expect(service.apply(input, ability)).rejects.toThrow(
         'Leave end date must not be before the start date.',
       );
-      await expect(service.apply(input)).rejects.toMatchObject({
+      await expect(service.apply(input, ability)).rejects.toMatchObject({
         code: ErrorCode.INVALID_DATE_RANGE,
       });
       expect(repo.create).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
 
-    it('rejects when the range spans 3+ calendar days and no files are attached', async () => {
+    it('should reject when the range spans 3+ calendar days and no files are attached', async () => {
       const input = {
         userId: USER_ID,
         startDate: '2026-05-01',
@@ -210,7 +229,7 @@ describe('LeaveService (unit)', () => {
         fileIds: [],
       };
 
-      await expect(service.apply(input)).rejects.toMatchObject({
+      await expect(service.apply(input, ability)).rejects.toMatchObject({
         code: ErrorCode.LEAVE_DOCUMENT_REQUIRED,
       });
       expect(repo.create).not.toHaveBeenCalled();
@@ -234,8 +253,9 @@ describe('LeaveService (unit)', () => {
         files: [buildFile()],
       });
       repo.create.mockResolvedValue(created);
+      repo.findById.mockResolvedValue(created);
 
-      const result = await service.apply(input);
+      const result = await service.apply(input, ability);
 
       expect(result).toBe(created);
       expect(repo.create).toHaveBeenCalledWith({
@@ -247,73 +267,83 @@ describe('LeaveService (unit)', () => {
         fileIds: [FILE_ID],
       });
       expect(verifyUploads).toHaveBeenCalledWith([FILE_ID], 'LEAVE_ATTACHMENT');
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'LEAVE.applied',
-        expect.objectContaining({
-          leaveId: created.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-          startDate: '2026-05-01',
-          endDate: '2026-05-05',
-          type: LeaveType.MEDICAL,
-        }),
-      );
+      expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID, ability);
+      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.applied', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+        startDate: '2026-05-01',
+        endDate: '2026-05-05',
+        type: LeaveType.MEDICAL,
+      });
     });
 
-    it('accepts a 2-calendar-day leave with no supporting files (under MIN_DOCUMENTED_DAYS = 3)', async () => {
+    it('should accept a 2-calendar-day leave with no supporting files (under MIN_DOCUMENTED_DAYS = 3)', async () => {
       const input = {
         userId: USER_ID,
         startDate: '2026-05-01',
-        // 2026-05-01 → 2026-05-02 = 2 calendar days (< MIN_DOCUMENTED_DAYS = 3)
         endDate: '2026-05-02',
         type: LeaveType.CASUAL,
         reason: 'short trip',
       };
-      const created = buildLeave({
-        startDate: input.startDate,
-        endDate: input.endDate,
-      });
+      const created = buildLeave({ startDate: input.startDate, endDate: input.endDate });
       repo.create.mockResolvedValue(created);
+      repo.findById.mockResolvedValue(created);
 
-      const result = await service.apply(input);
+      const result = await service.apply(input, ability);
 
       expect(result).toBe(created);
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(repo.create).toHaveBeenCalledWith({
+        userId: USER_ID,
+        startDate: '2026-05-01',
+        endDate: '2026-05-02',
+        type: LeaveType.CASUAL,
+        reason: 'short trip',
+        fileIds: [],
+      });
+      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.applied', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+        startDate: '2026-05-01',
+        endDate: '2026-05-02',
+        type: LeaveType.CASUAL,
+      });
+    });
+
+    it('should return the created leave without files when the caller cannot read it back', async () => {
+      const created = buildLeave({
+        startDate: '2026-05-01',
+        endDate: '2026-05-05',
+        type: LeaveType.MEDICAL,
+        reason: 'flu',
+        files: [buildFile()],
+      });
+      repo.create.mockResolvedValue(created);
+      repo.findById.mockResolvedValue(null);
+
+      const result = await service.apply(
+        {
           userId: USER_ID,
-          fileIds: [],
+          startDate: '2026-05-01',
+          endDate: '2026-05-05',
+          type: LeaveType.MEDICAL,
+          reason: 'flu',
+          fileIds: [FILE_ID],
+        },
+        ability,
+      );
+
+      expect(result).toEqual(
+        buildLeave({
+          startDate: '2026-05-01',
+          endDate: '2026-05-05',
+          type: LeaveType.MEDICAL,
+          reason: 'flu',
+          files: [],
         }),
       );
-      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.applied', expect.anything());
-    });
-  });
-
-  describe('filesVisibleTo', () => {
-    const ownLeavesOnly = createMongoAbility<AppAbility>([
-      { action: 'read', subject: 'Leave', conditions: { userId: USER_ID } },
-    ]);
-
-    it('should show the files of a leave the ability covers', () => {
-      const leave = buildLeave({ files: [buildFile()] });
-
-      expect(service.filesVisibleTo(ownLeavesOnly, leave)).toEqual([buildFile()]);
-    });
-
-    it("should hide the files of another person's leave from an own-leaves-only ability", () => {
-      const leave = buildLeave({ userId: APPROVER_ID, files: [buildFile()] });
-
-      expect(service.filesVisibleTo(ownLeavesOnly, leave)).toEqual([]);
-    });
-
-    it("should show every leave's files to an unconditional read ability", () => {
-      const readAll = createMongoAbility<AppAbility>([{ action: 'read', subject: 'Leave' }]);
-      const leave = buildLeave({ userId: APPROVER_ID, files: [buildFile()] });
-
-      expect(service.filesVisibleTo(readAll, leave)).toEqual([buildFile()]);
-    });
-
-    it('should hide files when no ability was resolved for the request', () => {
-      expect(service.filesVisibleTo(undefined, buildLeave({ files: [buildFile()] }))).toEqual([]);
+      expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID, ability);
     });
   });
 
@@ -324,44 +354,134 @@ describe('LeaveService (unit)', () => {
       );
 
       await expect(
-        service.apply({
-          userId: USER_ID,
-          startDate: '2026-05-01',
-          endDate: '2026-05-05',
-          type: LeaveType.MEDICAL,
-          reason: 'flu',
-          fileIds: [FILE_ID],
-        }),
+        service.apply(
+          {
+            userId: USER_ID,
+            startDate: '2026-05-01',
+            endDate: '2026-05-05',
+            type: LeaveType.MEDICAL,
+            reason: 'flu',
+            fileIds: [FILE_ID],
+          },
+          ability,
+        ),
       ).rejects.toMatchObject({ code: ErrorCode.FILE_CONTENT_MISMATCH });
       expect(repo.create).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
 
     it('should pass a file id given twice to the repo once', async () => {
-      repo.create.mockResolvedValue(buildLeave({ files: [buildFile()] }));
+      const created = buildLeave({ files: [buildFile()] });
+      repo.create.mockResolvedValue(created);
+      repo.findById.mockResolvedValue(created);
 
-      await service.apply({
+      await service.apply(
+        {
+          userId: USER_ID,
+          startDate: '2026-05-01',
+          endDate: '2026-05-01',
+          type: LeaveType.CASUAL,
+          reason: 'short',
+          fileIds: [FILE_ID, FILE_ID],
+        },
+        ability,
+      );
+
+      expect(verifyUploads).toHaveBeenCalledWith([FILE_ID], 'LEAVE_ATTACHMENT');
+      expect(repo.create).toHaveBeenCalledWith({
         userId: USER_ID,
         startDate: '2026-05-01',
         endDate: '2026-05-01',
         type: LeaveType.CASUAL,
         reason: 'short',
-        fileIds: [FILE_ID, FILE_ID],
+        fileIds: [FILE_ID],
+      });
+    });
+  });
+
+  describe('write gate', () => {
+    const cases: Array<{
+      name: string;
+      action: AppAction;
+      run: (svc: LeaveService, ab: AppAbility) => Promise<unknown>;
+      write: (r: MockedRepo) => Mock;
+    }> = [
+      {
+        name: 'update',
+        action: 'update',
+        run: (svc, ab) => svc.update(LEAVE_ID, { reason: 'changed' }, ab),
+        write: (r) => r.update,
+      },
+      {
+        name: 'approve',
+        action: 'update',
+        run: (svc, ab) => svc.approve(LEAVE_ID, ab, APPROVER_ID),
+        write: (r) => r.setStatus,
+      },
+      {
+        name: 'reject',
+        action: 'update',
+        run: (svc, ab) => svc.reject(LEAVE_ID, ab, APPROVER_ID),
+        write: (r) => r.setStatus,
+      },
+      {
+        name: 'cancel',
+        action: 'withdraw',
+        run: (svc, ab) => svc.cancel(LEAVE_ID, ab, USER_ID),
+        write: (r) => r.setStatus,
+      },
+      {
+        name: 'delete',
+        action: 'delete',
+        run: (svc, ab) => svc.delete(LEAVE_ID, ab),
+        write: (r) => r.softDelete,
+      },
+    ];
+
+    describe.each(cases)('$name', ({ action, run, write }) => {
+      it('should throw LEAVE_NOT_FOUND for a leave the caller cannot read, without writing', async () => {
+        repo.findById.mockResolvedValue(null);
+
+        await expect(run(service, ability)).rejects.toMatchObject({
+          code: ErrorCode.LEAVE_NOT_FOUND,
+        });
+        expect(repo.findById).toHaveBeenCalledWith(LEAVE_ID, ability);
+        expect(repo.isAllowed).not.toHaveBeenCalled();
+        expect(write(repo)).not.toHaveBeenCalled();
+        expect(eventBusMock.emit).not.toHaveBeenCalled();
       });
 
-      expect(verifyUploads).toHaveBeenCalledWith([FILE_ID], 'LEAVE_ATTACHMENT');
-      expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ fileIds: [FILE_ID] }));
+      it(`should throw FORBIDDEN when the leave is readable but '${action}' is not allowed`, async () => {
+        repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.PENDING }));
+        repo.isAllowed.mockResolvedValue(false);
+
+        await expect(run(service, ability)).rejects.toMatchObject({
+          code: ErrorCode.FORBIDDEN,
+        });
+        expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, action);
+        expect(write(repo)).not.toHaveBeenCalled();
+        expect(eventBusMock.emit).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe('update', () => {
+    it('should check the update rules before writing', async () => {
+      repo.findById.mockResolvedValue(buildLeave());
+      repo.update.mockResolvedValue(buildLeave({ reason: 'new' }));
+
+      await service.update(LEAVE_ID, { reason: 'new' }, ability);
+
+      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'update');
+    });
+
     it('should verify only the newly added files when the attachment set changes', async () => {
       repo.findById.mockResolvedValue(buildLeave({ files: [buildFile()] }));
       repo.update.mockResolvedValue(
         buildLeave({ files: [buildFile(), buildFile({ id: OTHER_FILE_ID })] }),
       );
 
-      await service.update(LEAVE_ID, { fileIds: [FILE_ID, OTHER_FILE_ID] });
+      await service.update(LEAVE_ID, { fileIds: [FILE_ID, OTHER_FILE_ID] }, ability);
 
       expect(verifyUploads).toHaveBeenCalledWith([OTHER_FILE_ID], 'LEAVE_ATTACHMENT');
       expect(repo.update).toHaveBeenCalledWith(LEAVE_ID, {
@@ -378,9 +498,9 @@ describe('LeaveService (unit)', () => {
         buildLeave({ startDate: '2026-05-01', endDate: '2026-05-02' }),
       );
 
-      await expect(service.update(LEAVE_ID, { endDate: '2026-05-03' })).rejects.toMatchObject({
-        code: ErrorCode.LEAVE_DOCUMENT_REQUIRED,
-      });
+      await expect(
+        service.update(LEAVE_ID, { endDate: '2026-05-03' }, ability),
+      ).rejects.toMatchObject({ code: ErrorCode.LEAVE_DOCUMENT_REQUIRED });
       expect(repo.update).not.toHaveBeenCalled();
     });
 
@@ -389,31 +509,29 @@ describe('LeaveService (unit)', () => {
         buildLeave({ startDate: '2026-05-01', endDate: '2026-05-05', files: [buildFile()] }),
       );
 
-      await expect(service.update(LEAVE_ID, { fileIds: [] })).rejects.toMatchObject({
+      await expect(service.update(LEAVE_ID, { fileIds: [] }, ability)).rejects.toMatchObject({
         code: ErrorCode.LEAVE_DOCUMENT_REQUIRED,
       });
       expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('should allow stretching a documented leave to 3 or more days', async () => {
-      const existing = buildLeave({
-        startDate: '2026-05-01',
-        endDate: '2026-05-02',
-        files: [buildFile()],
-      });
-      repo.findById.mockResolvedValue(existing);
-      repo.update.mockResolvedValue(buildLeave({ endDate: '2026-05-06', files: [buildFile()] }));
+      repo.findById.mockResolvedValue(
+        buildLeave({ startDate: '2026-05-01', endDate: '2026-05-02', files: [buildFile()] }),
+      );
+      const updated = buildLeave({ endDate: '2026-05-06', files: [buildFile()] });
+      repo.update.mockResolvedValue(updated);
 
-      await expect(service.update(LEAVE_ID, { endDate: '2026-05-06' })).resolves.toMatchObject({
-        endDate: '2026-05-06',
-      });
+      await expect(service.update(LEAVE_ID, { endDate: '2026-05-06' }, ability)).resolves.toBe(
+        updated,
+      );
     });
 
     it('should leave attachments alone when fileIds is omitted', async () => {
       repo.findById.mockResolvedValue(buildLeave({ files: [buildFile()] }));
       repo.update.mockResolvedValue(buildLeave({ reason: 'new', files: [buildFile()] }));
 
-      await service.update(LEAVE_ID, { reason: 'new' });
+      await service.update(LEAVE_ID, { reason: 'new' }, ability);
 
       expect(verifyUploads).not.toHaveBeenCalled();
       expect(repo.update).toHaveBeenCalledWith(LEAVE_ID, {
@@ -425,77 +543,68 @@ describe('LeaveService (unit)', () => {
       });
     });
 
-    it('rejects when the existing leave is already APPROVED', async () => {
-      const existing = buildLeave({ status: LeaveStatus.APPROVED });
-      repo.findById.mockResolvedValue(existing);
+    it('should reject when the existing leave is already APPROVED', async () => {
+      repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.APPROVED }));
 
-      await expect(service.update(LEAVE_ID, { reason: 'changed my mind' })).rejects.toMatchObject({
-        code: ErrorCode.LEAVE_NOT_EDITABLE,
-      });
+      await expect(
+        service.update(LEAVE_ID, { reason: 'changed my mind' }, ability),
+      ).rejects.toMatchObject({ code: ErrorCode.LEAVE_NOT_EDITABLE });
       expect(repo.update).not.toHaveBeenCalled();
       expect(eventBusMock.emit).not.toHaveBeenCalled();
     });
 
-    it('passes through to the repo when existing status is PENDING and emits LEAVE.updated', async () => {
-      const existing = buildLeave({ status: LeaveStatus.PENDING });
-      repo.findById.mockResolvedValue(existing);
+    it('should pass through to the repo when existing status is PENDING and emit LEAVE.updated', async () => {
+      repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.PENDING }));
       const updated = buildLeave({ reason: 'updated reason' });
       repo.update.mockResolvedValue(updated);
 
-      const patch = { reason: 'updated reason' };
-      const result = await service.update(LEAVE_ID, patch);
+      const result = await service.update(LEAVE_ID, { reason: 'updated reason' }, ability);
 
       expect(result).toBe(updated);
-      expect(repo.update).toHaveBeenCalledWith(LEAVE_ID, patch);
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'LEAVE.updated',
-        expect.objectContaining({
-          leaveId: updated.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-        }),
-      );
+      expect(repo.update).toHaveBeenCalledWith(LEAVE_ID, {
+        startDate: undefined,
+        endDate: undefined,
+        type: undefined,
+        reason: 'updated reason',
+        fileIds: undefined,
+      });
+      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.updated', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+      });
     });
   });
 
   describe('approve', () => {
-    it("delegates to repo.setStatus('APPROVED', ...) and emits LEAVE.approved + NOTIFICATION.leave.decided", async () => {
-      // HL-001: state machine reads existing status before transitioning, so
-      // the test must seed `findById` with a PENDING row.
+    it('should store the approver membership, emit LEAVE.approved and NOTIFICATION.leave.decided', async () => {
       repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.PENDING }));
       const approved = buildLeave({ status: LeaveStatus.APPROVED, decidedBy: APPROVER_ID });
       repo.setStatus.mockResolvedValue(approved);
 
-      const result = await service.approve(LEAVE_ID, APPROVER_ID);
+      const result = await service.approve(LEAVE_ID, ability, APPROVER_ID);
 
       expect(result).toBe(approved);
-      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'APPROVED', APPROVER_ID);
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'LEAVE.approved',
-        expect.objectContaining({
-          leaveId: approved.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-          approverMembershipId: APPROVER_ID,
-        }),
-      );
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'NOTIFICATION.leave.decided',
-        expect.objectContaining({
-          leaveId: approved.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-          status: 'APPROVED',
-        }),
-      );
+      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'update');
+      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'PENDING', 'APPROVED', APPROVER_ID);
+      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.approved', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+        approverMembershipId: APPROVER_ID,
+      });
+      expect(eventBusMock.emit).toHaveBeenCalledWith('NOTIFICATION.leave.decided', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+        status: 'APPROVED',
+      });
     });
 
-    it('rejects with BusinessException(INVALID_STATE_TRANSITION) when transitioning from a terminal status', async () => {
-      // HL-001: APPROVED → APPROVED, REJECTED → APPROVED, CANCELLED → APPROVED
-      // are all illegal under the new state machine. setStatus must NOT run.
+    it('should reject with a BusinessException when transitioning from a terminal status', async () => {
       repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.REJECTED }));
 
-      await expect(service.approve(LEAVE_ID, APPROVER_ID)).rejects.toBeInstanceOf(
+      await expect(service.approve(LEAVE_ID, ability, APPROVER_ID)).rejects.toBeInstanceOf(
         BusinessException,
       );
       expect(repo.setStatus).not.toHaveBeenCalled();
@@ -504,71 +613,61 @@ describe('LeaveService (unit)', () => {
   });
 
   describe('reject', () => {
-    it("delegates to repo.setStatus('REJECTED', ...) and emits LEAVE.rejected + NOTIFICATION.leave.decided", async () => {
+    it('should store the approver membership, emit LEAVE.rejected and NOTIFICATION.leave.decided', async () => {
       repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.PENDING }));
       const rejected = buildLeave({ status: LeaveStatus.REJECTED, decidedBy: APPROVER_ID });
       repo.setStatus.mockResolvedValue(rejected);
 
-      const result = await service.reject(LEAVE_ID, APPROVER_ID);
+      const result = await service.reject(LEAVE_ID, ability, APPROVER_ID);
 
       expect(result).toBe(rejected);
-      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'REJECTED', APPROVER_ID);
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'LEAVE.rejected',
-        expect.objectContaining({
-          leaveId: rejected.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-          approverMembershipId: APPROVER_ID,
-        }),
-      );
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'NOTIFICATION.leave.decided',
-        expect.objectContaining({
-          leaveId: rejected.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-          status: 'REJECTED',
-        }),
-      );
+      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'update');
+      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'PENDING', 'REJECTED', APPROVER_ID);
+      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.rejected', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+        approverMembershipId: APPROVER_ID,
+      });
+      expect(eventBusMock.emit).toHaveBeenCalledWith('NOTIFICATION.leave.decided', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+        status: 'REJECTED',
+      });
     });
   });
 
   describe('cancel', () => {
-    it("delegates to repo.setStatus('CANCELLED', ...), emits LEAVE.cancelled, and does NOT emit the notification event", async () => {
-      // PENDING → CANCELLED and APPROVED → CANCELLED are both legal; the
-      // applicant can withdraw a still-pending request OR an already-approved one.
+    it('should store the canceller membership, emit LEAVE.cancelled and no notification event', async () => {
       repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.PENDING }));
-      const cancelled = buildLeave({ status: LeaveStatus.CANCELLED, decidedBy: APPROVER_ID });
+      const cancelled = buildLeave({ status: LeaveStatus.CANCELLED, decidedBy: USER_ID });
       repo.setStatus.mockResolvedValue(cancelled);
 
-      const result = await service.cancel(LEAVE_ID, APPROVER_ID);
+      const result = await service.cancel(LEAVE_ID, ability, USER_ID);
 
       expect(result).toBe(cancelled);
-      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'CANCELLED', APPROVER_ID);
-      expect(eventBusMock.emit).toHaveBeenCalledWith(
-        'LEAVE.cancelled',
-        expect.objectContaining({
-          leaveId: cancelled.id,
-          tenantId: TENANT_ID,
-          userId: USER_ID,
-        }),
-      );
-      const patterns = eventBusMock.emit.mock.calls.map((c) => c[0]);
-      expect(patterns).not.toContain('NOTIFICATION.leave.decided');
+      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'withdraw');
+      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'PENDING', 'CANCELLED', USER_ID);
+      expect(eventBusMock.emit).toHaveBeenCalledTimes(1);
+      expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.cancelled', {
+        leaveId: LEAVE_ID,
+        tenantId: TENANT_ID,
+        userId: USER_ID,
+      });
     });
   });
 
   describe('delete', () => {
-    it('calls repo.softDelete and emits LEAVE.deleted with tenantId (HL-009)', async () => {
+    it('should check the delete rules, soft-delete and emit LEAVE.deleted with tenantId', async () => {
+      repo.findById.mockResolvedValue(buildLeave());
       repo.softDelete.mockResolvedValue(undefined);
 
-      const result = await service.delete(LEAVE_ID);
+      const result = await service.delete(LEAVE_ID, ability);
 
       expect(result).toBe(true);
+      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'delete');
       expect(repo.softDelete).toHaveBeenCalledWith(LEAVE_ID);
-      // HL-009: every lifecycle event must carry tenantId so consumers don't
-      // need to look up the row to route on multi-tenant DLQs.
       expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.deleted', {
         leaveId: LEAVE_ID,
         tenantId: TENANT_ID,
@@ -577,25 +676,21 @@ describe('LeaveService (unit)', () => {
   });
 
   describe('approvedOnDate', () => {
-    it('short-circuits to [] on empty userIds without hitting the repo', async () => {
+    it('should short-circuit to [] on empty userIds without hitting the repo', async () => {
       const result = await service.approvedOnDate('2026-05-01', []);
 
       expect(result).toEqual([]);
       expect(repo.approvedOnDate).not.toHaveBeenCalled();
     });
 
-    it('forwards non-empty userIds + date to the repo', async () => {
-      const userIds = [USER_ID];
+    it('should forward non-empty userIds and the date to the repo', async () => {
       const hits = [USER_ID];
       repo.approvedOnDate.mockResolvedValue(hits);
 
-      const result = await service.approvedOnDate('2026-05-01', userIds);
+      const result = await service.approvedOnDate('2026-05-01', [USER_ID]);
 
       expect(result).toBe(hits);
-      expect(repo.approvedOnDate).toHaveBeenCalledWith({
-        date: '2026-05-01',
-        userIds,
-      });
+      expect(repo.approvedOnDate).toHaveBeenCalledWith({ date: '2026-05-01', userIds: [USER_ID] });
     });
   });
 });

@@ -127,7 +127,7 @@
       "identifiersTypes": "Common types: UDISE+ — 11-digit Ministry of Education code. State Registration — society or trust registration number. CBSE/ICSE School Code — affiliation-issued institute code. GSTIN — 15-character tax ID. PAN — 10-character income tax ID. Shops & Establishment — local municipal licence.",
       "affiliationsTitle": "Board affiliations",
       "affiliationsBody": "Recognitions from education boards that govern the curriculum, exams, and certifications your institute can offer. An institute can hold multiple affiliations simultaneously — e.g. CBSE for classes 6-12 plus State Board for grades 1-5 — but only one can be marked primary.",
-      "affiliationStatusOptions": "Active — currently recognised and in good standing. Provisional — granted but subject to further inspection (common for new schools). Expired — past the validity date; students already enrolled continue under legacy rules. Withdrawn — the board revoked affiliation, usually for compliance breaches.",
+      "affiliationStatusOptions": "Active — currently recognised and in good standing. Provisional — granted but subject to further inspection (common for new institutes). Expired — past the validity date; students already enrolled continue under legacy rules. Withdrawn — the board revoked affiliation, usually for compliance breaches.",
       "affiliationGrantedLevelBody": "Highest class the board permits you to run. A 'Secondary' grant covers up to Class 10; 'Senior Secondary' extends to Class 12. Running classes beyond your granted level is a compliance breach — the board can withdraw affiliation."
     }
   },
@@ -220,7 +220,7 @@
     "fieldHelp": {
       "attendanceTypeTitle": "Attendance type",
       "attendanceTypeBody": "Whether attendance is captured once per day or per teaching period. Affects which timetables show attendance links, how fortnightly/monthly reports are computed, and whether students can be marked present but absent for specific lectures.",
-      "attendanceTypeDaily": "Daily — a single present/absent mark per student per day. Best for primary schools and boarding institutions where students stay on campus all day.",
+      "attendanceTypeDaily": "Daily — a single present/absent mark per student per day. Best for primary institutes and boarding institutions where students stay on campus all day.",
       "attendanceTypeLectureWise": "Lecture-wise — one mark per student per period. Needed for senior secondary, coaching institutes, and colleges where students attend discrete subjects with different teachers.",
       "gradingSystemTitle": "Grading system",
       "gradingSystemBody": "Controls the grade bands shown on report cards, marksheets, and TCs. Locked by board affiliation — CBSE uses CGPA 1–10, ICSE uses percentage + grade, state boards often use letter grades. Changing this mid-session breaks historical marksheets, so it is managed by support.",
@@ -231,7 +231,7 @@
       "exemptionAllowedTitle": "Allow exemptions",
       "exemptionAllowedBody": "When enabled, super-admins can temporarily exceed the hard maximum with a logged reason (RTE 25% admission, sibling joining mid-session, etc.). Each exemption is audited. Leave disabled for boards that do not permit over-capacity sections under any circumstances.",
       "shiftsTitle": "Shifts",
-      "shiftsBody": "If your institute runs morning and afternoon shifts (common in urban government and aided schools), define each shift separately so timetables, fees, and attendance are scoped to the correct shift. Each student is assigned to exactly one shift per academic year."
+      "shiftsBody": "If your institute runs morning and afternoon shifts (common in urban government and aided institutes), define each shift separately so timetables, fees, and attendance are scoped to the correct shift. Each student is assigned to exactly one shift per academic year."
     }
   },
   "languages": {

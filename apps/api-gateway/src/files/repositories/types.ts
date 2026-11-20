@@ -27,11 +27,9 @@ export interface FileRecord {
   createdAt: Date;
 }
 
-/** The leave a file is attached to, with the fields leave abilities are conditioned on. */
+/** The leave a file is attached to. */
 export interface FileLeaveOwner {
   id: string;
-  tenantId: string;
-  userId: string;
 }
 
 /** The user document a file is a page of. */

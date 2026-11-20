@@ -1,4 +1,3 @@
-import { subject } from '@casl/ability';
 import { Injectable, Logger } from '@nestjs/common';
 import { AbilityFactory } from '@roviq/casl';
 import {
@@ -220,12 +219,8 @@ export class FileService {
   private async canRead(ability: AppAbility, file: FileRecord): Promise<boolean> {
     const { readAbility } = FILE_PURPOSE_POLICY[file.purpose];
     if (file.purpose === 'LEAVE_ATTACHMENT') {
-      const leave = await this.repo.findLeaveForFile(file.id);
-      return (
-        leave !== null &&
-        readAbility !== 'AUTHENTICATED' &&
-        ability.can(readAbility.action, subject('Leave', leave))
-      );
+      // The query applies the caller's read rules to the very leave the file belongs to.
+      return (await this.repo.findLeaveForFile(file.id, ability)) !== null;
     }
     if (file.purpose === 'USER_DOCUMENT') {
       const document = await this.repo.findStudentDocumentForFile(file.id, ability);

@@ -1,7 +1,7 @@
-import { subject } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
 import {
   type AppAbility,
+  type AppAction,
   BusinessException,
   calendarDaysBetween,
   ErrorCode,
@@ -14,7 +14,6 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { FileService } from '../../files/file.service';
-import type { FileRecord } from '../../files/repositories/types';
 import type { CreateLeaveInput } from './dto/create-leave.input';
 import type { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveRepository } from './repositories/leave.repository';
@@ -37,36 +36,30 @@ export class LeaveService {
     return tenantId;
   }
 
-  async findById(id: string): Promise<LeaveRecord> {
-    const record = await this.repo.findById(id);
+  async findById(id: string, ability: AppAbility): Promise<LeaveRecord> {
+    const record = await this.repo.findById(id, ability);
+    // Also the answer for a leave the caller may not read, so ids cannot be probed.
     if (!record) throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
     return record;
   }
 
-  async list(filter: {
-    userId?: string;
-    status?: LeaveStatus;
-    type?: LeaveType;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<LeaveRecord[]> {
-    return this.repo.list(filter);
+  async list(
+    filter: {
+      userId?: string;
+      status?: LeaveStatus;
+      type?: LeaveType;
+      startDate?: string;
+      endDate?: string;
+    },
+    ability: AppAbility,
+  ): Promise<LeaveRecord[]> {
+    return this.repo.list(filter, ability);
   }
 
-  /**
-   * Attachments (often medical documents) are shown only to someone who may read this very
-   * leave, so a rule limited to "own leaves" never exposes another person's documents.
-   */
-  filesVisibleTo(ability: AppAbility | undefined, leave: LeaveRecord): FileRecord[] {
-    const record = subject('Leave', {
-      id: leave.id,
-      tenantId: leave.tenantId,
-      userId: leave.userId,
-    });
-    return ability?.can('read', record) ? leave.files : [];
-  }
-
-  async apply(input: CreateLeaveInput): Promise<LeaveRecord> {
+  async apply(input: CreateLeaveInput, ability: AppAbility): Promise<LeaveRecord> {
+    if (!(await this.repo.canApplyFor(input.userId, ability))) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'You may not file a leave for this person.');
+    }
     this.assertValidRange(input.startDate, input.endDate);
     const fileIds = [...new Set(input.fileIds ?? [])];
     this.assertDocumented(input.startDate, input.endDate, fileIds.length);
@@ -91,11 +84,12 @@ export class LeaveService {
       type: record.type,
     });
 
-    return record;
+    // A role may file a leave it cannot read back; then the documents stay hidden.
+    return (await this.repo.findById(record.id, ability)) ?? { ...record, files: [] };
   }
 
-  async update(id: string, input: UpdateLeaveInput): Promise<LeaveRecord> {
-    const existing = await this.findById(id);
+  async update(id: string, input: UpdateLeaveInput, ability: AppAbility): Promise<LeaveRecord> {
+    const existing = await this.loadFor(id, ability, 'update');
     if (existing.status !== LeaveStatus.PENDING) {
       // Deliberately strict: approvals are audited decisions. To amend an
       // already-decided leave the applicant must cancel and re-apply.
@@ -133,10 +127,20 @@ export class LeaveService {
     return record;
   }
 
-  async approve(id: string, approverMembershipId: string): Promise<LeaveRecord> {
-    const existing = await this.findById(id);
+  /** `approverMembershipId` is the caller's own membership, never a client value. */
+  async approve(
+    id: string,
+    ability: AppAbility,
+    approverMembershipId: string,
+  ): Promise<LeaveRecord> {
+    const existing = await this.loadFor(id, ability, 'update');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.APPROVED);
-    const record = await this.repo.setStatus(id, LeaveStatus.APPROVED, approverMembershipId);
+    const record = await this.repo.setStatus(
+      id,
+      existing.status,
+      LeaveStatus.APPROVED,
+      approverMembershipId,
+    );
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.approved, {
       leaveId: record.id,
       tenantId: record.tenantId,
@@ -153,10 +157,20 @@ export class LeaveService {
     return record;
   }
 
-  async reject(id: string, approverMembershipId: string): Promise<LeaveRecord> {
-    const existing = await this.findById(id);
+  /** `approverMembershipId` is the caller's own membership, never a client value. */
+  async reject(
+    id: string,
+    ability: AppAbility,
+    approverMembershipId: string,
+  ): Promise<LeaveRecord> {
+    const existing = await this.loadFor(id, ability, 'update');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.REJECTED);
-    const record = await this.repo.setStatus(id, LeaveStatus.REJECTED, approverMembershipId);
+    const record = await this.repo.setStatus(
+      id,
+      existing.status,
+      LeaveStatus.REJECTED,
+      approverMembershipId,
+    );
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.rejected, {
       leaveId: record.id,
       tenantId: record.tenantId,
@@ -172,10 +186,19 @@ export class LeaveService {
     return record;
   }
 
-  async cancel(id: string, cancellerMembershipId: string): Promise<LeaveRecord> {
-    const existing = await this.findById(id);
+  async cancel(
+    id: string,
+    ability: AppAbility,
+    cancellerMembershipId: string,
+  ): Promise<LeaveRecord> {
+    const existing = await this.loadFor(id, ability, 'withdraw');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.CANCELLED);
-    const record = await this.repo.setStatus(id, LeaveStatus.CANCELLED, cancellerMembershipId);
+    const record = await this.repo.setStatus(
+      id,
+      existing.status,
+      LeaveStatus.CANCELLED,
+      cancellerMembershipId,
+    );
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.cancelled, {
       leaveId: record.id,
       tenantId: record.tenantId,
@@ -184,7 +207,8 @@ export class LeaveService {
     return record;
   }
 
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, ability: AppAbility): Promise<boolean> {
+    await this.loadFor(id, ability, 'delete');
     await this.repo.softDelete(id);
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.deleted, { leaveId: id, tenantId: this.tenantId });
     return true;
@@ -198,6 +222,15 @@ export class LeaveService {
   async approvedOnDate(date: string, userIds: string[]): Promise<string[]> {
     if (userIds.length === 0) return [];
     return this.repo.approvedOnDate({ date, userIds });
+  }
+
+  /** `LEAVE_NOT_FOUND` for a leave the caller may not read, `FORBIDDEN` for one they may only read. */
+  private async loadFor(id: string, ability: AppAbility, action: AppAction): Promise<LeaveRecord> {
+    const record = await this.findById(id, ability);
+    if (!(await this.repo.isAllowed(id, ability, action))) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'You may not change this leave.');
+    }
+    return record;
   }
 
   private assertDocumented(start: string, end: string, fileCount: number) {

@@ -50,7 +50,7 @@
     },
     "fieldHelp": {
       "academicYearTitle": "Academic year",
-      "academicYearBody": "The Indian school session that runs April through March (e.g. 2025–26 covers April 2025 to March 2026). The student is admitted into this session, their class and section lists are filtered by it, and promotion to the next year will create a fresh record.",
+      "academicYearBody": "The Indian academic session that runs April through March (e.g. 2025–26 covers April 2025 to March 2026). The student is admitted into this session, their class and section lists are filtered by it, and promotion to the next year will create a fresh record.",
       "academicYearExample": "If you admit a student in June 2025, select 2025–26. For admissions happening in March 2026 for the upcoming term, select 2026–27.",
       "socialCategoryTitle": "Social category",
       "socialCategoryBody": "The government-defined classification used for reservation quotas, RTE reporting, and state scholarship eligibility. This is never shown to teachers or other students and is masked in exports unless you have audit-admin permissions.",

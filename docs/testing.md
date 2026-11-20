@@ -194,17 +194,21 @@ Known gaps accepted with these decisions:
 
 ### Deterministic Seed Data
 
-`scripts/seed.ts` uses deterministic UUIDs (`SEED_IDS`) so E2E tests can reference entities directly without querying:
+The seeders in `libs/database/src/seed/` use deterministic UUIDs (`SEED_IDS` in `libs/database/src/seed/ids.ts`) so E2E tests can reference entities directly without querying. Credentials come from `libs/database/src/seed/fixtures.ts`, exported to tests by `e2e/shared/seed-fixtures.ts`:
 
 | Entity | ID | Credentials |
 |---|---|---|
-| Saraswati Vidya Mandir (NEP + CBSE) | `00000000-0000-4000-a000-000000000101` | — |
-| Rajasthan Public School (Traditional + BSEH) | `00000000-0000-4000-a000-000000000102` | — |
-| Admin user | `00000000-0000-4000-a000-000000000201` | admin / admin123 |
-| Teacher user | `00000000-0000-4000-a000-000000000202` | teacher1 / teacher123 |
-| Student user | `00000000-0000-4000-a000-000000000203` | student1 / student123 |
-| Free plan | `00000000-0000-4000-a000-000000000001` | — |
-| Pro plan | `00000000-0000-4000-a000-000000000002` | — |
+| Saraswati Vidya Mandir (NEP + CBSE) | `00000000-0000-7000-a000-000000000101` | — |
+| Rajasthan Public School (Traditional + BSEH) | `00000000-0000-7000-a000-000000000102` | — |
+| Admin user | `00000000-0000-7000-a000-000000000201` | admin / admin123 |
+| Teacher user | `00000000-0000-7000-a000-000000000202` | teacher1 / teacher123 |
+| Student user | `00000000-0000-7000-a000-000000000203` | student1 / student123 |
+| Guardian user (student1; the e2e seed also links student2) | `00000000-0000-7000-a000-000000000205` | guardian1 / guardian123 |
+| Subject teacher user (`subject_teacher`, Hindi periods) | `00000000-0000-7000-a000-000000000206` | subjectteacher1 / teacher123 |
+| Guardian user (two children: student6, student7) | `00000000-0000-7000-a000-000000000724` | guardian4 / guardian123 |
+| Students of guardian4 | `00000000-0000-7000-a000-000000000707`, `…0708` | student6, student7 / student123 |
+| Free plan | `00000000-0000-7000-a000-000000000001` | — |
+| Pro plan | `00000000-0000-7000-a000-000000000002` | — |
 
 ### What Goes Where
 

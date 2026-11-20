@@ -89,7 +89,7 @@
     "labelExample": "For a session running 1 April 2025 to 31 March 2026, use 2025-26. For 1 April 2026 to 31 March 2027, use 2026-27.",
     "termStructureTitle": "Term structure",
     "termStructureBody": "How the session is sub-divided for exams, report cards, and internal assessments. Each term has its own date range and appears as a column on student report cards. Optional — skip this for institutes that run a single annual exam.",
-    "termStructureCommonChoices": "Common choices: 2 terms (semester system — common in CBSE/ICSE senior wing), 3 terms (trimester — common in state boards), 4 terms (quarterly — common in Cambridge and IB schools). Term dates must fall inside the session dates and cannot overlap each other.",
+    "termStructureCommonChoices": "Common choices: 2 terms (semester system — common in CBSE/ICSE senior wing), 3 terms (trimester — common in state boards), 4 terms (quarterly — common in Cambridge and IB institutes). Term dates must fall inside the session dates and cannot overlap each other.",
     "termLabelTitle": "Term name",
     "termLabelBody": "The label shown on report cards and marksheets for this term. Use the naming your board expects — 'Term 1' for CBSE/ICSE, 'Semester 1' for university-style, 'Quarter 1' for Cambridge/IB.",
     "boardExamDatesTitle": "Board exam dates",

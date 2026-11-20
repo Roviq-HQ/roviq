@@ -1,29 +1,21 @@
 'use client';
 
-import { useAuth } from '@roviq/auth';
-import { extractGraphQLError } from '@roviq/graphql';
-import { useFormatDate, useI18nField } from '@roviq/i18n';
+import { isCalendarDate } from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
+import { Link, useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   Badge,
   Button,
   Can,
   Card,
   CardContent,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
   DataTable,
   Empty,
+  EmptyContent,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -33,27 +25,27 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-  useDebounce,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
+  AlertTriangle,
   CalendarOff,
-  Check,
   CheckCircle2,
-  ChevronsUpDown,
   Eye,
   Plus,
-  User,
+  RefreshCw,
   XCircle,
 } from 'lucide-react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { useStudents } from '../people/students/use-students';
+import { ApplicantPicker } from './applicant-picker';
+import { applicantFactsByMembership, leaveSubject, useReadsOthersLeaves } from './leave-abilities';
+import { LeaveCancelAction } from './leave-cancel-action';
+import { leaveActionErrorKey } from './leave-errors';
 import {
   LEAVE_STATUS_VALUES,
   LEAVE_TYPE_VALUES,
@@ -61,7 +53,6 @@ import {
   type LeaveStatus,
   type LeaveType,
   useApproveLeave,
-  useCancelLeave,
   useLeaves,
   useRejectLeave,
 } from './use-leave';
@@ -87,8 +78,6 @@ function truncate(text: string, limit: number): string {
 
 export default function LeavesPage() {
   const t = useTranslations('leave');
-  const params = useParams();
-  const locale = params.locale as string;
 
   const [tab, setTab] = useQueryState('tab', parseAsString.withDefault('all'));
   const [userId, setUserId] = useQueryState('userId', parseAsString);
@@ -96,6 +85,29 @@ export default function LeavesPage() {
   const [type, setType] = useQueryState('type', parseAsString);
   const [startDate, setStartDate] = useQueryState('startDate', parseAsString);
   const [endDate, setEndDate] = useQueryState('endDate', parseAsString);
+
+  // A hand-edited or stale URL date would fail every request; drop it so the list loads.
+  const validStartDate = startDate && isCalendarDate(startDate) ? startDate : null;
+  const validEndDate = endDate && isCalendarDate(endDate) ? endDate : null;
+  React.useEffect(() => {
+    if (startDate && !validStartDate) void setStartDate(null);
+  }, [startDate, validStartDate, setStartDate]);
+  React.useEffect(() => {
+    if (endDate && !validEndDate) void setEndDate(null);
+  }, [endDate, validEndDate, setEndDate]);
+
+  const filters: LeaveFiltersProps = {
+    userId,
+    status: isLeaveStatus(status) ? status : null,
+    type: isLeaveType(type) ? type : null,
+    startDate: validStartDate,
+    endDate: validEndDate,
+    onUserIdChange: setUserId,
+    onStatusChange: setStatus,
+    onTypeChange: setType,
+    onStartDateChange: setStartDate,
+    onEndDateChange: setEndDate,
+  };
 
   return (
     <Can I="read" a="Leave" passThrough>
@@ -114,7 +126,7 @@ export default function LeavesPage() {
               </div>
               <Can I="create" a="Leave">
                 <Button asChild size="sm" className="gap-2" data-testid={instituteLeave.applyLink}>
-                  <Link href={`/${locale}/institute/leave/apply`}>
+                  <Link href="/leave/apply">
                     <Plus className="size-4" />
                     {t('applyCta')}
                   </Link>
@@ -122,35 +134,31 @@ export default function LeavesPage() {
               </Can>
             </header>
 
-            <Tabs value={tab} onValueChange={(v) => void setTab(v)}>
-              <TabsList data-testid={instituteLeave.tabs}>
-                <TabsTrigger value="all" data-testid={instituteLeave.tabAll}>
-                  {t('all')}
-                </TabsTrigger>
-                <TabsTrigger value="pending" data-testid={instituteLeave.tabPending}>
-                  {t('pending')}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="all" className="mt-4">
-                <AllLeavesTab
-                  userId={userId}
-                  status={isLeaveStatus(status) ? status : null}
-                  type={isLeaveType(type) ? type : null}
-                  startDate={startDate}
-                  endDate={endDate}
-                  onUserIdChange={setUserId}
-                  onStatusChange={setStatus}
-                  onTypeChange={setType}
-                  onStartDateChange={setStartDate}
-                  onEndDateChange={setEndDate}
-                />
-              </TabsContent>
-
-              <TabsContent value="pending" className="mt-4">
-                <PendingApprovalsTab />
-              </TabsContent>
-            </Tabs>
+            {/* The pending tab is a decision queue, so only for those who may decide leaves. */}
+            <Can I="update" a="Leave" passThrough>
+              {(canDecide: boolean) =>
+                canDecide ? (
+                  <Tabs value={tab} onValueChange={(v) => void setTab(v)}>
+                    <TabsList data-testid={instituteLeave.tabs}>
+                      <TabsTrigger value="all" data-testid={instituteLeave.tabAll}>
+                        {t('all')}
+                      </TabsTrigger>
+                      <TabsTrigger value="pending" data-testid={instituteLeave.tabPending}>
+                        {t('pending')}
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="all" className="mt-4">
+                      <LeavesTab filters={filters} />
+                    </TabsContent>
+                    <TabsContent value="pending" className="mt-4">
+                      <LeavesTab filters={filters} pendingOnly />
+                    </TabsContent>
+                  </Tabs>
+                ) : (
+                  <LeavesTab filters={filters} />
+                )
+              }
+            </Can>
           </div>
         ) : (
           <div className="flex items-center justify-center min-h-[400px]">
@@ -173,10 +181,10 @@ function isLeaveType(value: string | null): value is LeaveType {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// All-leaves tab — filters + DataTable
+// One tab: filters + DataTable. The pending tab fixes the status.
 // ─────────────────────────────────────────────────────────────────────
 
-interface AllLeavesTabProps {
+interface LeaveFiltersProps {
   userId: string | null;
   status: LeaveStatus | null;
   type: LeaveType | null;
@@ -189,7 +197,35 @@ interface AllLeavesTabProps {
   onEndDateChange: (next: string | null) => Promise<URLSearchParams>;
 }
 
-function AllLeavesTab({
+function LeavesTab({
+  filters,
+  pendingOnly = false,
+}: {
+  filters: LeaveFiltersProps;
+  pendingOnly?: boolean;
+}) {
+  const { leaves, loading, error, refetch } = useLeaves({
+    userId: filters.userId,
+    status: pendingOnly ? 'PENDING' : filters.status,
+    type: filters.type,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+  });
+
+  return (
+    <div className="space-y-4">
+      <LeaveFilters {...filters} showStatus={!pendingOnly} />
+      <LeavesTable
+        leaves={leaves}
+        loading={loading}
+        failed={Boolean(error)}
+        onRetry={() => void refetch()}
+      />
+    </div>
+  );
+}
+
+function LeaveFilters({
   userId,
   status,
   type,
@@ -200,50 +236,61 @@ function AllLeavesTab({
   onTypeChange,
   onStartDateChange,
   onEndDateChange,
-}: AllLeavesTabProps) {
+  showStatus,
+}: LeaveFiltersProps & { showStatus: boolean }) {
   const t = useTranslations('leave');
-  const { leaves, loading, refetch } = useLeaves({
-    userId,
-    status,
-    type,
-    startDate,
-    endDate,
-  });
+  const readsOthers = useReadsOthersLeaves();
+  const columns = 3 + (readsOthers ? 1 : 0) + (showStatus ? 1 : 0);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+    <Card>
+      <CardContent className="p-4">
+        <div className={`grid grid-cols-1 gap-3 ${GRID_COLUMNS[columns]}`}>
+          {/* Someone who reads only their own or their children's leaves has no one to filter by. */}
+          {readsOthers ? (
             <div>
               <span className="text-xs font-medium text-muted-foreground mb-1 block">
                 {t('fields.userId')}
               </span>
-              <UserIdPicker value={userId} onChange={(v) => void onUserIdChange(v)} />
+              <ApplicantPicker
+                value={userId}
+                onChange={(v) => void onUserIdChange(v)}
+                clearable
+                testIds={{
+                  trigger: instituteLeave.userPicker,
+                  input: instituteLeave.userPickerInput,
+                  clear: instituteLeave.userPickerClear,
+                  option: instituteLeave.userPickerOption,
+                }}
+              />
             </div>
+          ) : null}
+          <div>
+            <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              {t('fields.type')}
+            </span>
+            <Select
+              value={type ?? '__all__'}
+              onValueChange={(v) => void onTypeChange(v === '__all__' ? null : v)}
+            >
+              <SelectTrigger data-testid={instituteLeave.filterType}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{t('filters.any')}</SelectItem>
+                {LEAVE_TYPE_VALUES.map((v) => (
+                  <SelectItem key={v} value={v} data-testid={`leave-filter-type-${v}`}>
+                    {t(`type.${v}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {showStatus ? (
             <div>
               <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                {t('fields.type')}
+                {t('filters.status')}
               </span>
-              <Select
-                value={type ?? '__all__'}
-                onValueChange={(v) => void onTypeChange(v === '__all__' ? null : v)}
-              >
-                <SelectTrigger data-testid={instituteLeave.filterType}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">—</SelectItem>
-                  {LEAVE_TYPE_VALUES.map((v) => (
-                    <SelectItem key={v} value={v} data-testid={`leave-filter-type-${v}`}>
-                      {t(`type.${v}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">Status</span>
               <Select
                 value={status ?? '__all__'}
                 onValueChange={(v) => void onStatusChange(v === '__all__' ? null : v)}
@@ -252,7 +299,7 @@ function AllLeavesTab({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">—</SelectItem>
+                  <SelectItem value="__all__">{t('filters.any')}</SelectItem>
                   {LEAVE_STATUS_VALUES.map((v) => (
                     <SelectItem key={v} value={v} data-testid={`leave-filter-status-${v}`}>
                       {t(`status.${v}`)}
@@ -261,45 +308,41 @@ function AllLeavesTab({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                {t('fields.startDate')}
-              </span>
-              <Input
-                type="date"
-                value={startDate ?? ''}
-                onChange={(e) => void onStartDateChange(e.target.value || null)}
-                data-testid={instituteLeave.filterStartDate}
-              />
-            </div>
-            <div>
-              <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                {t('fields.endDate')}
-              </span>
-              <Input
-                type="date"
-                value={endDate ?? ''}
-                onChange={(e) => void onEndDateChange(e.target.value || null)}
-                data-testid={instituteLeave.filterEndDate}
-              />
-            </div>
+          ) : null}
+          <div>
+            <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              {t('fields.startDate')}
+            </span>
+            <Input
+              type="date"
+              value={startDate ?? ''}
+              onChange={(e) => void onStartDateChange(e.target.value || null)}
+              data-testid={instituteLeave.filterStartDate}
+            />
           </div>
-        </CardContent>
-      </Card>
-
-      <LeavesTable leaves={leaves} loading={loading} onChanged={refetch} />
-    </div>
+          <div>
+            <span className="text-xs font-medium text-muted-foreground mb-1 block">
+              {t('fields.endDate')}
+            </span>
+            <Input
+              type="date"
+              value={endDate ?? ''}
+              onChange={(e) => void onEndDateChange(e.target.value || null)}
+              data-testid={instituteLeave.filterEndDate}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Pending approvals tab — fixed status filter, same columns
-// ─────────────────────────────────────────────────────────────────────
-
-function PendingApprovalsTab() {
-  const { leaves, loading, refetch } = useLeaves({ status: 'PENDING' });
-  return <LeavesTable leaves={leaves} loading={loading} onChanged={refetch} />;
-}
+// Literal class names so Tailwind sees them.
+const GRID_COLUMNS: Record<number, string> = {
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+  5: 'md:grid-cols-5',
+};
 
 // ─────────────────────────────────────────────────────────────────────
 // Shared DataTable
@@ -308,19 +351,16 @@ function PendingApprovalsTab() {
 interface LeavesTableProps {
   leaves: LeaveRecord[];
   loading: boolean;
-  onChanged: () => void;
+  failed: boolean;
+  onRetry: () => void;
 }
 
-function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
+function LeavesTable({ leaves, loading, failed, onRetry }: LeavesTableProps) {
   const t = useTranslations('leave');
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
-  const params = useParams();
-  const locale = params.locale as string;
-  const { user } = useAuth();
   const { approve, loading: approving } = useApproveLeave();
   const { reject, loading: rejecting } = useRejectLeave();
-  const { cancel, loading: cancelling } = useCancelLeave();
 
   // Membership-id → display-name map built from the student list. Leaves
   // store `userId` as a *membership* id, so we key on `membershipId` (not
@@ -328,47 +368,28 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
   // back to a truncated chip below.
   const { students } = useStudents({ first: 200 });
   const nameByMembership = React.useMemo(() => {
-    const map = new Map<string, string>();
+    const names = new Map<string, string>();
     for (const s of students) {
       if (!s.membershipId) continue;
       const first = resolveI18n(s.firstName) ?? '';
       const last = s.lastName ? (resolveI18n(s.lastName) ?? '') : '';
       const fullName = [first, last].filter(Boolean).join(' ');
-      map.set(s.membershipId, `${fullName} · ${s.admissionNumber}`);
+      names.set(s.membershipId, `${fullName} · ${s.admissionNumber}`);
     }
-    return map;
+    return names;
   }, [students, resolveI18n]);
+  const factsByMembership = React.useMemo(() => applicantFactsByMembership(students), [students]);
 
-  async function handleApprove(id: string): Promise<void> {
-    if (!user?.membershipId) return;
+  async function runAction(
+    fn: (id: string) => Promise<unknown>,
+    id: string,
+    done: 'approved' | 'rejected',
+  ): Promise<void> {
     try {
-      await approve(id, user.membershipId);
-      toast.success(t('actions.approve'));
-      onChanged();
+      await fn(id);
+      toast.success(t(`toasts.${done}`));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('actions.approve')));
-    }
-  }
-
-  async function handleReject(id: string): Promise<void> {
-    if (!user?.membershipId) return;
-    try {
-      await reject(id, user.membershipId);
-      toast.success(t('actions.reject'));
-      onChanged();
-    } catch (err) {
-      toast.error(extractGraphQLError(err, t('actions.reject')));
-    }
-  }
-
-  async function handleCancel(id: string): Promise<void> {
-    if (!user?.membershipId) return;
-    try {
-      await cancel(id, user.membershipId);
-      toast.success(t('actions.cancel'));
-      onChanged();
-    } catch (err) {
-      toast.error(extractGraphQLError(err, t('actions.cancel')));
+      toast.error(t(`errors.action.${leaveActionErrorKey(extractGraphQLErrorCode(err))}`));
     }
   }
 
@@ -402,7 +423,7 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
     }) as ColumnDef<LeaveRecord, unknown>,
     columnHelper.display({
       id: 'dateRange',
-      header: `${t('fields.startDate')} – ${t('fields.endDate')}`,
+      header: t('columns.dates'),
       cell: ({ row }) => {
         const r = row.original;
         return (
@@ -414,7 +435,7 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
       },
     }) as ColumnDef<LeaveRecord, unknown>,
     columnHelper.accessor('status', {
-      header: 'Status',
+      header: t('columns.status'),
       cell: ({ getValue, row }) => {
         const status = getValue();
         return (
@@ -449,7 +470,7 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
       cell: ({ row }) => {
         const r = row.original;
         const isPending = r.status === 'PENDING';
-        const canCancel = isPending || r.status === 'APPROVED';
+        const facts = factsByMembership.get(r.userId) ?? null;
         return (
           <div className="flex items-center gap-1">
             <Button
@@ -458,20 +479,20 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
               size="sm"
               className="size-8 p-0"
               data-testid={`leave-row-${r.id}-view-btn`}
-              title="View"
+              title={t('actions.view')}
             >
-              <Link href={`/${locale}/institute/leave/${r.id}`}>
+              <Link href={`/leave/${r.id}`} aria-label={t('actions.view')}>
                 <Eye className="size-4" aria-hidden="true" />
               </Link>
             </Button>
             {isPending ? (
-              <Can I="update" a="Leave">
+              <Can I="update" this={leaveSubject(r, facts)}>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="size-8 p-0 text-emerald-600 hover:text-emerald-700"
-                  onClick={() => handleApprove(r.id)}
+                  onClick={() => runAction(approve, r.id, 'approved')}
                   disabled={approving}
                   title={t('actions.approve')}
                   data-testid={`leave-row-${r.id}-approve-btn`}
@@ -483,7 +504,7 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
                   variant="ghost"
                   size="sm"
                   className="size-8 p-0 text-rose-600 hover:text-rose-700"
-                  onClick={() => handleReject(r.id)}
+                  onClick={() => runAction(reject, r.id, 'rejected')}
                   disabled={rejecting}
                   title={t('actions.reject')}
                   data-testid={`leave-row-${r.id}-reject-btn`}
@@ -492,27 +513,38 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
                 </Button>
               </Can>
             ) : null}
-            {canCancel ? (
-              <Can I="update" a="Leave">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="size-8 p-0 text-slate-600 hover:text-slate-700"
-                  onClick={() => handleCancel(r.id)}
-                  disabled={cancelling}
-                  title={t('actions.cancel')}
-                  data-testid={`leave-row-${r.id}-cancel-btn`}
-                >
-                  <CalendarOff className="size-4" aria-hidden="true" />
-                </Button>
-              </Can>
-            ) : null}
+            <LeaveCancelAction leave={r} facts={facts} variant="icon" />
           </div>
         );
       },
     }) as ColumnDef<LeaveRecord, unknown>,
   ];
+
+  if (failed && leaves.length === 0) {
+    return (
+      <Empty data-testid={instituteLeave.listError}>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <AlertTriangle />
+          </EmptyMedia>
+          <EmptyTitle>{t('list.loadFailed')}</EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            title={t('detail.retry')}
+            data-testid={instituteLeave.listRetryBtn}
+          >
+            <RefreshCw className="size-4" aria-hidden="true" />
+            {t('detail.retry')}
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
 
   if (!loading && leaves.length === 0) {
     return (
@@ -535,107 +567,5 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
       skeletonRows={5}
       data-testid={instituteLeave.table}
     />
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// UserId (membership) picker — mirrors the attendance-history picker.
-// Backed by the student list because there's no shared membership
-// lookup yet. A TODO remains to switch to a generic membership picker
-// once that hook exists (staff members won't resolve today).
-// ─────────────────────────────────────────────────────────────────────
-
-function UserIdPicker({
-  value,
-  onChange,
-}: {
-  value: string | null;
-  onChange: (next: string | null) => void;
-}) {
-  const t = useTranslations('leave');
-  const resolveI18n = useI18nField();
-  const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebounce(search, 250);
-
-  const { students } = useStudents({ first: 50, search: debouncedSearch || undefined });
-
-  const selectedLabel = React.useMemo(() => {
-    if (!value) return null;
-    const stu = students.find((s) => s.id === value);
-    if (!stu) return value.slice(0, 8);
-    const first = resolveI18n(stu.firstName) ?? '';
-    const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
-    return `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`.trim();
-  }, [value, students, resolveI18n]);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-          data-testid={instituteLeave.userPicker}
-        >
-          <span className="truncate">{selectedLabel ?? t('fields.userId')}</span>
-          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[320px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={t('fields.userId')}
-            value={search}
-            onValueChange={setSearch}
-            data-testid={instituteLeave.userPickerInput}
-          />
-          <CommandList>
-            <CommandEmpty>
-              <span className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
-                <User className="size-4" aria-hidden="true" />
-                {t('fields.userId')}
-              </span>
-            </CommandEmpty>
-            <CommandGroup>
-              {value ? (
-                <CommandItem
-                  value="__clear__"
-                  onSelect={() => {
-                    onChange(null);
-                    setOpen(false);
-                  }}
-                  data-testid={instituteLeave.userPickerClear}
-                >
-                  <Check className="mr-2 size-4 opacity-0" />—
-                </CommandItem>
-              ) : null}
-              {students.map((stu) => {
-                const first = resolveI18n(stu.firstName) ?? '';
-                const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
-                const label = `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`;
-                return (
-                  <CommandItem
-                    key={stu.id}
-                    value={stu.id}
-                    onSelect={() => {
-                      onChange(stu.id);
-                      setOpen(false);
-                    }}
-                    data-testid={`leave-user-picker-option-${stu.id}`}
-                  >
-                    <Check
-                      className={`mr-2 size-4 ${value === stu.id ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                    {label}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }

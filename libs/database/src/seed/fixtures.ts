@@ -28,4 +28,27 @@ export const SEED_CREDENTIALS = {
   STAFF_3: { username: 'staff3', password: 'staff123' },
   GUARDIAN_2: { username: 'guardian2', password: 'guardian123' },
   GUARDIAN_3: { username: 'guardian3', password: 'guardian123' },
+  SUBJECT_TEACHER: { username: 'subjectteacher1', password: 'teacher123' },
+  GUARDIAN_4: { username: 'guardian4', password: 'guardian123' },
+  STUDENT_6: { username: 'student6', password: 'student123' },
+  STUDENT_7: { username: 'student7', password: 'student123' },
+} as const;
+
+export const SEED_PERSON_NAMES = {
+  SUBJECT_TEACHER: {
+    firstName: { en: 'Anjali', hi: 'अंजलि' },
+    lastName: { en: 'Mehta', hi: 'मेहता' },
+  },
+  GUARDIAN_4: {
+    firstName: { en: 'Kiran', hi: 'किरण' },
+    lastName: { en: 'Kapoor', hi: 'कपूर' },
+  },
+  STUDENT_6: {
+    firstName: { en: 'Ishaan', hi: 'ईशान' },
+    lastName: { en: 'Kapoor', hi: 'कपूर' },
+  },
+  STUDENT_7: {
+    firstName: { en: 'Meher', hi: 'मेहर' },
+    lastName: { en: 'Kapoor', hi: 'कपूर' },
+  },
 } as const;

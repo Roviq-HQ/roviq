@@ -1133,8 +1133,11 @@ export const testIds = {
     userPicker: 'leave-user-picker',
     userPickerInput: 'leave-user-picker-input',
     userPickerClear: 'leave-user-picker-clear',
+    userPickerOption: (membershipId: string) => `leave-user-picker-option-${membershipId}`,
     accessDenied: 'leave-access-denied',
     applyLink: 'leave-apply-link',
+    listError: 'leave-list-error',
+    listRetryBtn: 'leave-list-retry-btn',
     // Apply page
     applyTitle: 'leave-apply-title',
     applyBackBtn: 'leave-apply-back-btn',
@@ -1142,6 +1145,14 @@ export const testIds = {
     applyAccessDenied: 'leave-apply-access-denied',
     applyUserPicker: 'leave-apply-user-picker',
     applyUserPickerInput: 'leave-apply-user-picker-input',
+    applyUserPickerOption: (membershipId: string) => `leave-apply-user-option-${membershipId}`,
+    applyApplicantSelf: 'leave-apply-applicant-self',
+    // Row actions
+    rowCancelBtn: (leaveId: string) => `leave-row-${leaveId}-cancel-btn`,
+    rowWithdrawBtn: (leaveId: string) => `leave-row-${leaveId}-withdraw-btn`,
+    withdrawDialog: 'leave-withdraw-dialog',
+    withdrawConfirmBtn: 'leave-withdraw-confirm-btn',
+    withdrawDismissBtn: 'leave-withdraw-dismiss-btn',
     // Detail page
     detailTitle: 'leave-detail-title',
     detailCard: 'leave-detail-card',
@@ -1154,7 +1165,12 @@ export const testIds = {
     detailApproveBtn: 'leave-detail-approve-btn',
     detailRejectBtn: 'leave-detail-reject-btn',
     detailCancelBtn: 'leave-detail-cancel-btn',
+    detailWithdrawBtn: 'leave-detail-withdraw-btn',
     detailAccessDenied: 'leave-detail-access-denied',
+    detailNotFound: 'leave-detail-not-found',
+    detailNotFoundBackLink: 'leave-detail-not-found-back-link',
+    detailError: 'leave-detail-error',
+    detailRetryBtn: 'leave-detail-retry-btn',
   },
 
   // ── Institute: people → guardians ─────────────────────────────────────

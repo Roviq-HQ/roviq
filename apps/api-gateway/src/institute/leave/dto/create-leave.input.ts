@@ -1,9 +1,9 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { LeaveType } from '@roviq/common-types';
+import { DateOnlyScalar } from '@roviq/nestjs-graphql';
 import {
   ArrayMaxSize,
   IsArray,
-  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -18,12 +18,13 @@ export class CreateLeaveInput {
   @Field(() => ID, { description: 'Membership the leave is for (student or staff).' })
   userId!: string;
 
-  @IsDateString()
-  @Field(() => String, { description: 'Inclusive leave start date (ISO YYYY-MM-DD).' })
+  // DateOnly refuses impossible dates such as 2030-02-30 before they reach the database.
+  @IsString()
+  @Field(() => DateOnlyScalar, { description: 'Inclusive leave start date (ISO YYYY-MM-DD).' })
   startDate!: string;
 
-  @IsDateString()
-  @Field(() => String, { description: 'Inclusive leave end date (ISO YYYY-MM-DD).' })
+  @IsString()
+  @Field(() => DateOnlyScalar, { description: 'Inclusive leave end date (ISO YYYY-MM-DD).' })
   endDate!: string;
 
   @IsEnum(LeaveType)

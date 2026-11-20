@@ -21,6 +21,16 @@ function parseUtcMidnight(iso: string): number {
   return Date.parse(`${iso}T00:00:00Z`);
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True for a real calendar date in `YYYY-MM-DD` form; `2030-02-30` and `2030-13-01` are not. */
+export function isCalendarDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const ms = parseUtcMidnight(value);
+  // Date.parse rolls some impossible days over, so the date must read back unchanged.
+  return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === value;
+}
+
 /**
  * Inclusive calendar-day count between two `YYYY-MM-DD` strings.
  * Returns 0 when start > end (caller should validate range first).

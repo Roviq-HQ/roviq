@@ -26,8 +26,8 @@ export abstract class FileRepository {
   abstract isMemberOfCurrentTenant(userId: string): Promise<boolean>;
   /** Records the stored sizes of a pending image; it is WebP from then on. */
   abstract saveProcessedImage(id: string, image: ProcessedImageData): Promise<void>;
-  /** Null when the file is not attached to a live leave. */
-  abstract findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null>;
+  /** Null unless the file is attached to a live leave that `ability` may read. */
+  abstract findLeaveForFile(fileId: string, ability: AppAbility): Promise<FileLeaveOwner | null>;
   /**
    * The user document a file is a page of. Null unless the document belongs to a student of
    * this institute whom `ability` may read.

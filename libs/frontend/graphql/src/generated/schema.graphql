@@ -1752,7 +1752,7 @@ input CreateInstituteGroupInput {
 """Apply for a new leave. Submits in PENDING status awaiting approval."""
 input CreateLeaveInput {
   """Inclusive leave end date (ISO YYYY-MM-DD)."""
-  endDate: String!
+  endDate: DateOnly!
 
   """
   Ids of files uploaded through `requestFileUpload` with purpose LEAVE_ATTACHMENT. Leaves of 3 or more calendar days need at least one.
@@ -1763,7 +1763,7 @@ input CreateLeaveInput {
   reason: String!
 
   """Inclusive leave start date (ISO YYYY-MM-DD)."""
-  startDate: String!
+  startDate: DateOnly!
   type: LeaveType!
 
   """Membership the leave is for (student or staff)."""
@@ -3906,7 +3906,7 @@ type Mutation {
   ): ApplicationModel!
 
   """Approve a PENDING leave."""
-  approveLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
+  approveLeave(id: ID!): LeaveModel!
 
   """Approve a TC (principal only)"""
   approveTC(id: ID!): TCModel!
@@ -3948,8 +3948,10 @@ type Mutation {
   """
   bulkMarkAttendance(input: BulkMarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): [AttendanceEntryModel!]!
 
-  """Cancel an own / pending leave."""
-  cancelLeave(cancellerMembershipId: ID!, id: ID!): LeaveModel!
+  """
+  Cancel a leave. Applicants (and guardians, for their children) may withdraw a pending one; approvers may cancel any leave they manage.
+  """
+  cancelLeave(id: ID!): LeaveModel!
   cancelSubscription(input: CancelSubscriptionInput!): SubscriptionModel!
 
   """
@@ -4146,7 +4148,7 @@ type Mutation {
   rejectApplication(id: ID!, reason: String): ApplicationModel!
 
   """Reject a PENDING leave."""
-  rejectLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
+  rejectLeave(id: ID!): LeaveModel!
 
   """Reject a transfer certificate request"""
   rejectTC(id: ID!, reason: String!): TCModel!
@@ -4818,7 +4820,7 @@ type Query {
   """
   List leave applications, ordered by `startDate` DESC (most recent first — leave UIs are decision-driven, not calendar-driven). Optional filters narrow by user, status, type, and overlapping date range.
   """
-  leaves(endDate: String, startDate: String, status: LeaveStatus, type: LeaveType, userId: ID): [LeaveModel!]!
+  leaves(endDate: DateOnly, startDate: DateOnly, status: LeaveStatus, type: LeaveType, userId: ID): [LeaveModel!]!
 
   """Documents submitted with one admission application"""
   listApplicationDocuments(applicationId: ID!): [ApplicationDocumentModel!]!
@@ -7018,14 +7020,14 @@ input UpdateInstituteLocalesInput {
 
 """Edit a PENDING leave — dates, type, reason, or supporting files."""
 input UpdateLeaveInput {
-  endDate: String
+  endDate: DateOnly
 
   """
   Full new set of attachments: ids already attached stay, missing ones are removed, new ones (uploaded with purpose LEAVE_ATTACHMENT) are added. Omit to leave attachments unchanged.
   """
   fileIds: [ID!]
   reason: String
-  startDate: String
+  startDate: DateOnly
   type: LeaveType
 }
 

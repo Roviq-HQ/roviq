@@ -85,7 +85,7 @@
         "codeExample": "Good: PRO, STARTER-24, ENTERPRISE_V2. Avoid timestamps, UUIDs, or internal ticket numbers.",
         "intervalTitle": "Billing interval",
         "intervalBody": "How often the institute is charged. Longer intervals usually unlock a discount and reduce payment-failure risk, but tie the institute to a longer commitment. Once a subscription is active on an interval, switching mid-cycle creates a prorated invoice.",
-        "intervalOptions": "Monthly — charged every month. Highest flexibility; expect 2–4% payment-failure rate. Quarterly — every 3 months, mild commitment discount. Semi-annual — every 6 months, matches Indian school fee cycles. Annual — once per year, best for large contracts and GST simplification.",
+        "intervalOptions": "Monthly — charged every month. Highest flexibility; expect 2–4% payment-failure rate. Quarterly — every 3 months, mild commitment discount. Semi-annual — every 6 months, matches Indian institute fee cycles. Annual — once per year, best for large contracts and GST simplification.",
         "trialDaysTitle": "Trial days",
         "trialDaysBody": "Days the institute uses the plan for free before the first invoice is raised. Trial can only be offered once per institute per plan — re-assigning a plan after trial expiry starts paid billing immediately. Leave at 0 if the sale has already happened offline and the institute is paying day one.",
         "limitsTitle": "Capacity limits",

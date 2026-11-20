@@ -452,8 +452,7 @@ describe('File storage E2E', () => {
       );
       const download = await gql(DOWNLOAD_URL, { fileId }, studentToken);
 
-      // Whether the leave itself is readable is a leave rule; its documents must not be.
-      expect(read.data?.leave?.files ?? []).toEqual([]);
+      expect(codeOf(read)).toBe(ErrorCode.LEAVE_NOT_FOUND);
       expect(codeOf(download)).toBe(ErrorCode.FILE_NOT_FOUND);
     });
 

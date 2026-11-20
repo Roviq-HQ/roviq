@@ -22,11 +22,16 @@
  *     resolvability under Vitest. NEW_PASSWORD_MIN_LENGTH is duplicated
  *     as a literal constant below — kept honest by the runtime guard.
  */
-import { SEED_CREDENTIALS, SEED_NAMES, SEED_SLUGS } from '../../libs/database/src/seed/fixtures';
+import {
+  SEED_CREDENTIALS,
+  SEED_NAMES,
+  SEED_PERSON_NAMES,
+  SEED_SLUGS,
+} from '../../libs/database/src/seed/fixtures';
 import { SEED_IDS } from '../../libs/database/src/seed/ids';
 
 // Re-export so `import { SEED_IDS } from '.../seed-fixtures'` works.
-export { SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_SLUGS };
+export { SEED_CREDENTIALS, SEED_IDS, SEED_NAMES, SEED_PERSON_NAMES, SEED_SLUGS };
 
 // Mirrors `NEW_PASSWORD_MIN_LENGTH` from
 // `libs/shared/common-types/src/lib/policy/password-policy.ts`. Duplicated
@@ -75,6 +80,18 @@ export const SEED = {
     username: SEED_CREDENTIALS.GUARDIAN.username,
     membershipId: SEED_IDS.MEMBERSHIP_GUARDIAN_INST1,
   },
+  SUBJECT_TEACHER_USER: {
+    id: SEED_IDS.USER_SUBJECT_TEACHER,
+    username: SEED_CREDENTIALS.SUBJECT_TEACHER.username,
+    membershipId: SEED_IDS.MEMBERSHIP_SUBJECT_TEACHER_INST1,
+  },
+  /** guardian4 — linked to student6 and student7 only. */
+  MULTI_CHILD_GUARDIAN_USER: {
+    id: SEED_IDS.USER_GUARDIAN_4,
+    username: SEED_CREDENTIALS.GUARDIAN_4.username,
+    membershipId: SEED_IDS.MEMBERSHIP_GUARDIAN_4,
+    childMembershipIds: [SEED_IDS.MEMBERSHIP_STUDENT_6, SEED_IDS.MEMBERSHIP_STUDENT_7],
+  },
   STUDENT_PROFILE_1: {
     id: SEED_IDS.STUDENT_PROFILE_1,
   },
@@ -109,7 +126,13 @@ export const E2E_USERS = {
   TEACHER: SEED_CREDENTIALS.TEACHER,
   STUDENT: SEED_CREDENTIALS.STUDENT,
   GUARDIAN: SEED_CREDENTIALS.GUARDIAN,
+  SUBJECT_TEACHER: SEED_CREDENTIALS.SUBJECT_TEACHER,
+  MULTI_CHILD_GUARDIAN: SEED_CREDENTIALS.GUARDIAN_4,
 } as const;
+
+function fullName(person: { firstName: { en: string }; lastName: { en: string } }): string {
+  return `${person.firstName.en} ${person.lastName.en}`;
+}
 
 // People fixtures — used by Playwright + Vitest E2E tests that assert on
 // list/detail data. Mirrors the rows seedDemo() and seedE2e() create in
@@ -161,6 +184,24 @@ export const SEED_PEOPLE = {
       socialCategory: 'ST',
       rte: false,
     },
+    {
+      id: SEED_IDS.USER_STUDENT_6,
+      username: SEED_CREDENTIALS.STUDENT_6.username,
+      name: fullName(SEED_PERSON_NAMES.STUDENT_6),
+      admissionNumber: 'S-2026/0006',
+      academicStatus: 'ENROLLED',
+      socialCategory: 'GENERAL',
+      rte: false,
+    },
+    {
+      id: SEED_IDS.USER_STUDENT_7,
+      username: SEED_CREDENTIALS.STUDENT_7.username,
+      name: fullName(SEED_PERSON_NAMES.STUDENT_7),
+      admissionNumber: 'S-2026/0007',
+      academicStatus: 'ENROLLED',
+      socialCategory: 'GENERAL',
+      rte: false,
+    },
   ],
   STAFF: [
     {
@@ -187,10 +228,23 @@ export const SEED_PEOPLE = {
       designation: 'Admin Officer',
       employmentType: 'REGULAR',
     },
+    {
+      id: SEED_IDS.USER_SUBJECT_TEACHER,
+      username: SEED_CREDENTIALS.SUBJECT_TEACHER.username,
+      name: fullName(SEED_PERSON_NAMES.SUBJECT_TEACHER),
+      employeeId: 'SVM/STAFF/004',
+      designation: 'PRT Hindi',
+      employmentType: 'REGULAR',
+    },
   ],
   GUARDIANS: [
     { id: SEED_IDS.USER_GUARDIAN, username: 'guardian1', name: 'Suresh Kumar' },
     { id: SEED_IDS.USER_GUARDIAN_2, username: 'guardian2', name: 'Sunita Patel' },
     { id: SEED_IDS.USER_GUARDIAN_3, username: 'guardian3', name: 'Anil Verma' },
+    {
+      id: SEED_IDS.USER_GUARDIAN_4,
+      username: SEED_CREDENTIALS.GUARDIAN_4.username,
+      name: fullName(SEED_PERSON_NAMES.GUARDIAN_4),
+    },
   ],
 } as const;

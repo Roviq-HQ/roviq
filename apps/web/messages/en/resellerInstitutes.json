@@ -188,7 +188,7 @@
       "typeTitle": "Institute type",
       "typeBody": "Determines the feature set the institute will get after approval. Cannot be changed after creation — the wrong choice forces deleting and re-requesting. School covers K-12 with boards, report cards, and TCs. Coaching covers batch-based test prep. Library covers lending operations.",
       "structureFrameworkTitle": "Structure framework",
-      "structureFrameworkBody": "Applies to schools only. Pick NEP (Foundational → Preparatory → Middle → Secondary) for schools aligned to the National Education Policy 2020. Pick Traditional (10+2) for CBSE, ICSE, and most state boards that still use the older class-based model.",
+      "structureFrameworkBody": "Applies to School-type institutes only. Pick NEP (Foundational → Preparatory → Middle → Secondary) for institutes aligned to the National Education Policy 2020. Pick Traditional (10+2) for CBSE, ICSE, and most state boards that still use the older class-based model.",
       "boardTitle": "Board",
       "boardBody": "The institute's primary board of affiliation. Filters the state dropdown, locks the grading system, and determines whether UDISE+, APAAR, and TC templates apply. Additional boards can be added by the institute admin after approval.",
       "groupTitle": "Institute group",
