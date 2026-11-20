@@ -74,7 +74,7 @@
         "parentRelation": "Relationship",
         "source": "Source",
         "referredBy": "Referred by",
-        "previousSchool": "Previous school",
+        "previousSchool": "Previous institute",
         "followUpDate": "Follow-up date",
         "notes": "Notes"
       },
@@ -86,7 +86,7 @@
         "parentPhoneHint": "Indian mobile, 10 digits starting with 6–9.",
         "parentEmail": "parent@example.com",
         "referredBy": "Alumni, staff, current parent...",
-        "previousSchool": "Name of the previous school",
+        "previousSchool": "Name of the previous institute",
         "notes": "Anything the counsellor should know"
       },
       "errors": {
@@ -106,7 +106,7 @@
       "fieldHelp": {
         "sourceTitle": "Source",
         "sourceBody": "How this prospect first heard about your institute. Used for marketing attribution — the admissions dashboard reports which channels convert best so you can invest in what actually works. Always pick a specific option over 'Other' when possible.",
-        "sourceOptions": "Walk-in — visited the campus in person. Phone — called the admissions desk. Referral — referred by a current parent, staff member, or alumnus (fill the 'Referred by' field too). Digital ad — Google, Meta, or YouTube ad. Website — enquired via your institute's website. Social media — came through an organic Instagram, Facebook, or WhatsApp post. Event — admissions fair, school expo, or community event.",
+        "sourceOptions": "Walk-in — visited the campus in person. Phone — called the admissions desk. Referral — referred by a current parent, staff member, or alumnus (fill the 'Referred by' field too). Digital ad — Google, Meta, or YouTube ad. Website — enquired via your institute's website. Social media — came through an organic Instagram, Facebook, or WhatsApp post. Event — admissions fair, education expo, or community event.",
         "followUpDateTitle": "Follow-up date",
         "followUpDateBody": "When the admissions counsellor should contact this family next. The enquiry will appear on the counsellor's follow-up list on this date, and an SMS/WhatsApp reminder will be queued. Leave blank if the prospect asked you not to call back."
       }

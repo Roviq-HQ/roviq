@@ -25,7 +25,7 @@
         "academicYearBody": "The last academic session the student completed at your institute. This is printed on the TC and used to compute the 'Class studying in' field. Usually this is the current active year — pick a past year only if you are issuing a TC for a previously-withdrawn student whose record was reopened.",
         "reasonTitle": "Reason for leaving",
         "reasonBody": "Printed on the TC and visible to the receiving institute — be factual and neutral. Boards reject TCs with subjective or punitive wording ('ill-discipline', 'failed repeatedly') because they prejudice the student's next admission. Stick to objective facts: relocation, financial reasons, family circumstances, change of curriculum.",
-        "reasonExample": "Good: 'Parents have relocated to Pune due to job transfer.' 'Parents wish to shift child to a residential school.' Avoid: 'Poor academic performance', 'Disciplinary issues' — use the separate remarks field or suspension records instead."
+        "reasonExample": "Good: 'Parents have relocated to Pune due to job transfer.' 'Parents wish to shift child to a residential institute.' Avoid: 'Poor academic performance', 'Disciplinary issues' — use the separate remarks field or suspension records instead."
       }
     },
     "rejectDialog": {

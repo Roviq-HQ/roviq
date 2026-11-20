@@ -90,8 +90,8 @@
   "fieldHelp": {
     "typeTitle": "Group type",
     "typeBody": "The legal structure this group operates under. Drives what registration fields are expected, how invoices are taxed (trusts and societies are often exempt; chains and franchises are not), and whether this group can claim CSR and Section 80G benefits. If the group is legally registered as one type but behaves like another, prefer the legal registration.",
-    "typeTrust": "Trust — registered under the Indian Trusts Act 1882 or a state Public Trust Act. Common for schools founded by families or religious bodies.",
-    "typeSociety": "Society — registered under the Societies Registration Act 1860 (or state equivalent). The most common form for Indian school managements.",
+    "typeTrust": "Trust — registered under the Indian Trusts Act 1882 or a state Public Trust Act. Common for institutes founded by families or religious bodies.",
+    "typeSociety": "Society — registered under the Societies Registration Act 1860 (or state equivalent). The most common form for Indian institute managements.",
     "typeChain": "Chain — a branded operation running multiple institutes under the same management and brand, not necessarily registered as a trust or society.",
     "typeFranchise": "Franchise — a brand-owner (franchisor) licences the brand, curriculum, and standards to independent operators (franchisees). Each franchisee is billed separately.",
     "registrationNumberTitle": "Registration number",

@@ -293,7 +293,7 @@
       "identity": "Basic Information",
       "identityDescription": "Name, type and structure of the institute.",
       "schoolSpecific": "Board & Departments",
-      "schoolSpecificDescription": "Applies to schools only.",
+      "schoolSpecificDescription": "Applies to School-type institutes only.",
       "ownership": "Ownership",
       "ownershipDescription": "Who manages this institute on the platform.",
       "contact": "Contact Details",
@@ -427,7 +427,7 @@
       "boardOptions": "CBSE — Central Board of Secondary Education (nationwide). ICSE — Council for the Indian School Certificate Examinations. State Boards — HBSE (Haryana), RBSE (Rajasthan), BSEH (Bihar) and others. If your board is missing, pick the closest match and contact support to enable it.",
       "resellerTitle": "Reseller partner",
       "resellerBody": "The partner organisation responsible for onboarding, support, and invoicing this institute. Invoices are issued by the reseller, their support team receives tickets first, and their commission applies to every paid subscription. Leave blank for institutes sold and supported directly by Roviq.",
-      "resellerExample": "Example: a district-level EdTech consultant who resells Roviq to 30 local schools would be set as the reseller. Changing the reseller later is a contractual change and should route through finance.",
+      "resellerExample": "Example: a district-level EdTech consultant who resells Roviq to 30 local institutes would be set as the reseller. Changing the reseller later is a contractual change and should route through finance.",
       "groupTitle": "Institute group",
       "groupBody": "Use this to link multiple branches of the same chain (e.g. DPS Society, Amity Group). Grouped institutes can share branding, plan tiers, and cross-institute analytics while each branch still has its own tenant data. Leave blank for standalone institutes.",
       "groupExample": "Example: 'DPS Group' can contain DPS-GBN-01, DPS-GBN-02, DPS-DLI-03. A parent who has children in two branches can switch between them from the same login."
