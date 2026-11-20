@@ -40,9 +40,6 @@ export class BulkImportProgressModel {
   @Field(() => Int, { description: 'Number of validation/insert errors' })
   errors!: number;
 
-  @Field(() => String, {
-    nullable: true,
-    description: 'URL of the error report CSV (available when status = COMPLETED)',
-  })
-  reportUrl?: string | null;
+  /** Not a GraphQL field: resolved into `report`. */
+  reportFileId?: string | null;
 }

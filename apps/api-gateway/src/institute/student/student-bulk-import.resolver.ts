@@ -8,7 +8,7 @@
  * - bulkImportProgress: returns current status of an import workflow
  */
 import { UseGuards } from '@nestjs/common';
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   assertTenantContext,
   CurrentUser,
@@ -17,6 +17,9 @@ import {
 } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
+import { FileLoaders } from '../../files/file.loaders';
+import { FileRefModel } from '../../files/models/file-ref.model';
+import type { FileRecord } from '../../files/repositories/types';
 import { BulkCreateStudentsInput } from './dto/bulk-create-students.input';
 import { BulkImportProgressModel, BulkImportStatusEnum } from './models/bulk-import-progress.model';
 import { BulkImportStartResult } from './models/bulk-import-result.model';
@@ -38,14 +41,10 @@ export class StudentBulkImportResolver {
     @CurrentUser() user: AuthUser,
   ): Promise<BulkImportStartResult> {
     assertTenantContext(user);
-    assertTenantContext(user);
-    if (!user.tenantId) {
-      throw new Error('Missing tenantId — institute scope required');
-    }
 
     const workflowId = await this.importService.startBulkImport({
       tenantId: user.tenantId,
-      fileUrl: input.fileUrl,
+      fileId: input.fileId,
       academicYearId: input.academicYearId,
       standardId: input.standardId,
       sectionId: input.sectionId,
@@ -64,8 +63,10 @@ export class StudentBulkImportResolver {
   @CheckAbility({ action: 'read', subject: 'Student' })
   async bulkImportProgress(
     @Args('workflowId') workflowId: string,
+    @CurrentUser() user: AuthUser,
   ): Promise<BulkImportProgressModel> {
-    const progress = await this.importService.getProgress(workflowId);
+    assertTenantContext(user);
+    const progress = await this.importService.getProgress(user.tenantId, workflowId);
 
     return {
       status: progress.status as BulkImportStatusEnum,
@@ -74,7 +75,22 @@ export class StudentBulkImportResolver {
       created: progress.created,
       skipped: progress.skipped,
       errors: progress.errorCount,
-      reportUrl: progress.reportUrl,
+      reportFileId: progress.reportFileId,
     };
+  }
+}
+
+@Resolver(() => BulkImportProgressModel)
+export class BulkImportReportResolver {
+  constructor(private readonly loaders: FileLoaders) {}
+
+  @ResolveField(() => FileRefModel, {
+    nullable: true,
+    description: 'CSV listing the rows that failed, once the import has completed with errors.',
+  })
+  report(@Parent() progress: BulkImportProgressModel): Promise<FileRecord | null> {
+    return progress.reportFileId
+      ? this.loaders.readyById.load(progress.reportFileId)
+      : Promise.resolve(null);
   }
 }

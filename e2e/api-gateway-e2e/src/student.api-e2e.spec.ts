@@ -11,8 +11,7 @@
  *   07-soft-delete           — deletion + 404 on subsequent get
  *   08-concurrent-update     — second update with stale version → CONCURRENT_MODIFICATION
  *
- * Bulk import flows (09 and 10) are NOT migrated here — they require CSV
- * fixtures served from MinIO + a Temporal worker. Track separately.
+ * Bulk import: `student-bulk-import.api-e2e.spec.ts`.
  *
  * Tests share login state via beforeAll. Tests are sequential by design;
  * later cases reuse student/section IDs captured by earlier cases. The first

@@ -6,7 +6,9 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { Client, Connection } from '@temporalio/client';
+import { FileService } from '../../files/file.service';
 import type {
   BulkImportProgress,
   BulkStudentImportResult,
@@ -14,11 +16,18 @@ import type {
 
 const TASK_QUEUE = 'student-bulk-import';
 
+function workflowIdPrefix(tenantId: string): string {
+  return `bulk-student-import-${tenantId}-`;
+}
+
 @Injectable()
 export class StudentBulkImportService {
   private readonly logger = new Logger(StudentBulkImportService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly files: FileService,
+  ) {}
 
   /**
    * Start a BulkStudentImportWorkflow and return its workflow ID.
@@ -26,18 +35,21 @@ export class StudentBulkImportService {
    */
   async startBulkImport(input: {
     tenantId: string;
-    fileUrl: string;
+    fileId: string;
     academicYearId: string;
     standardId: string;
     sectionId: string;
     createdBy: string;
     fieldMapping: Record<string, string>;
   }): Promise<string> {
+    // The workflow is what owns the CSV, so the upload is made READY before it starts.
+    await this.files.claimUploads([input.fileId], 'BULK_IMPORT_CSV');
+
     const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
     const connection = await Connection.connect({ address });
     const client = new Client({ connection });
 
-    const workflowId = `bulk-student-import-${input.tenantId}-${Date.now()}`;
+    const workflowId = `${workflowIdPrefix(input.tenantId)}${Date.now()}`;
 
     await client.workflow.start('BulkStudentImportWorkflow', {
       taskQueue: TASK_QUEUE,
@@ -56,7 +68,11 @@ export class StudentBulkImportService {
    * Query the progress of a running or completed bulk import workflow.
    * Uses the Temporal query API to read the workflow's progress state.
    */
-  async getProgress(workflowId: string): Promise<BulkImportProgress> {
+  async getProgress(tenantId: string, workflowId: string): Promise<BulkImportProgress> {
+    // A workflow id names its institute; another institute's import does not exist for the caller.
+    if (!workflowId.startsWith(workflowIdPrefix(tenantId))) {
+      throw new BusinessException(ErrorCode.NOT_FOUND, 'Import not found');
+    }
     const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
     const connection = await Connection.connect({ address });
     const client = new Client({ connection });
@@ -81,7 +97,7 @@ export class StudentBulkImportService {
             created: result.created,
             skipped: result.skipped,
             errorCount: result.errorCount,
-            reportUrl: result.reportUrl,
+            reportFileId: result.reportFileId,
           };
         }
 
@@ -93,7 +109,7 @@ export class StudentBulkImportService {
             created: 0,
             skipped: 0,
             errorCount: 0,
-            reportUrl: null,
+            reportFileId: null,
           };
         }
 
@@ -105,7 +121,7 @@ export class StudentBulkImportService {
           created: 0,
           skipped: 0,
           errorCount: 0,
-          reportUrl: null,
+          reportFileId: null,
         };
       }
     } finally {
