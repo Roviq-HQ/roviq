@@ -250,6 +250,11 @@ export class FileService {
       // Same field rule as the document list: the scan shows the Aadhaar number itself.
       return document.type !== 'AADHAAR_CARD' || ability.can('read', 'Student', 'aadhaar');
     }
+    if (file.purpose === 'APPLICATION_DOCUMENT') {
+      const document = await this.repo.findApplicationDocumentForFile(file.id, ability);
+      if (!document) return false;
+      return document.type !== 'AADHAAR_CARD' || ability.can('read', 'Student', 'aadhaar');
+    }
     return this.allows(ability, readAbility);
   }
 

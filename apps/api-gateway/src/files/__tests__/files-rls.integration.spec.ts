@@ -1,12 +1,17 @@
 /**
  * Database-level rules for stored files, tried as each role: RLS on `files`, its owner CHECK,
- * the one-record-per-file index on `leave_files`, and the attach guard used inside domain
- * transactions.
+ * the one-record-per-file index on `leave_files`, the pages of user and application documents,
+ * and the attach guard used inside domain transactions.
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { ErrorCode } from '@roviq/common-types';
 import {
+  academicYears,
+  admissionApplications,
+  applicationDocumentFiles,
+  applicationDocumentFilesLive,
+  applicationDocuments,
   createDrizzleDb,
   type DrizzleDB,
   files,
@@ -16,6 +21,7 @@ import {
   mkInstituteCtx,
   mkResellerCtx,
   SYSTEM_USER_ID,
+  standards,
   userDocumentFiles,
   userDocumentFilesLive,
   userDocuments,
@@ -112,6 +118,12 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
     if (!db) return;
     const tenantIds = [tenantA.tenantId, tenantB.tenantId];
     await withAdmin(db, mkAdminCtx(ORIGIN), async (tx) => {
+      // Pages and documents go with their application (ON DELETE CASCADE).
+      await tx
+        .delete(admissionApplications)
+        .where(inArray(admissionApplications.tenantId, tenantIds));
+      await tx.delete(standards).where(inArray(standards.tenantId, tenantIds));
+      await tx.delete(academicYears).where(inArray(academicYears.tenantId, tenantIds));
       await tx.delete(leaveFiles).where(inArray(leaveFiles.tenantId, tenantIds));
       await tx.delete(leaves).where(inArray(leaves.tenantId, tenantIds));
       await tx.delete(files).where(inArray(files.tenantId, tenantIds));
@@ -615,6 +627,131 @@ describe.skipIf(!hasTestDb)('files — database rules', () => {
 
       await expect(link(secondLeave)).rejects.toMatchObject({
         cause: { code: '23505', constraint: 'leave_files_file_id_key' },
+      });
+    });
+  });
+
+  describe('application_document_files (pages of an admission application document)', () => {
+    let applicationId: string;
+    let documentId: string;
+    let fileId: string;
+
+    async function insertApplication(tenant: TestInstitute): Promise<string> {
+      return withAdmin(db, mkAdminCtx(ORIGIN), async (tx) => {
+        const audit = { createdBy: tenant.userId, updatedBy: tenant.userId };
+        const [year] = await tx
+          .insert(academicYears)
+          .values({
+            tenantId: tenant.tenantId,
+            label: '2026-27',
+            startDate: '2026-04-01',
+            endDate: '2027-03-31',
+            isActive: false,
+            ...audit,
+          })
+          .returning({ id: academicYears.id });
+        assert(year);
+        const [standard] = await tx
+          .insert(standards)
+          .values({
+            tenantId: tenant.tenantId,
+            academicYearId: year.id,
+            name: { en: `Class 1 ${randomUUID().slice(0, 8)}` },
+            numericOrder: 1,
+            level: 'PRIMARY',
+            ...audit,
+          })
+          .returning({ id: standards.id });
+        assert(standard);
+        const [application] = await tx
+          .insert(admissionApplications)
+          .values({
+            tenantId: tenant.tenantId,
+            academicYearId: year.id,
+            standardId: standard.id,
+            formData: { studentName: 'Aarav Verma' },
+            ...audit,
+          })
+          .returning({ id: admissionApplications.id });
+        assert(application);
+        return application.id;
+      });
+    }
+
+    async function insertDocument(tenant: TestInstitute): Promise<string> {
+      return withTenant(db, mkInstituteCtx(tenant.tenantId, ORIGIN), async (tx) => {
+        const [document] = await tx
+          .insert(applicationDocuments)
+          .values({
+            tenantId: tenant.tenantId,
+            applicationId,
+            type: 'BIRTH_CERTIFICATE',
+            createdBy: tenant.userId,
+            updatedBy: tenant.userId,
+          })
+          .returning({ id: applicationDocuments.id });
+        assert(document);
+        return document.id;
+      });
+    }
+
+    const pageValues = (owner: TestInstitute, document: string, file: string) => ({
+      tenantId: owner.tenantId,
+      documentId: document,
+      fileId: file,
+      position: 0,
+      createdBy: owner.userId,
+      updatedBy: owner.userId,
+    });
+
+    const pagesSeenBy = (tenant: TestInstitute) =>
+      withTenant(db, mkInstituteCtx(tenant.tenantId, ORIGIN), (tx) =>
+        tx
+          .select({ fileId: applicationDocumentFilesLive.fileId })
+          .from(applicationDocumentFilesLive)
+          .where(eq(applicationDocumentFilesLive.documentId, documentId)),
+      );
+
+    beforeAll(async () => {
+      applicationId = await insertApplication(tenantA);
+      documentId = await insertDocument(tenantA);
+      fileId = await insertFile(tenantA);
+      await withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
+        tx.insert(applicationDocumentFiles).values(pageValues(tenantA, documentId, fileId)),
+      );
+    });
+
+    it("should show a document's pages to the institute that owns the application", async () => {
+      const pages = await pagesSeenBy(tenantA);
+
+      expect(pages).toEqual([{ fileId }]);
+    });
+
+    it('should hide the pages from another institute', async () => {
+      const pages = await pagesSeenBy(tenantB);
+
+      expect(pages).toEqual([]);
+    });
+
+    it("should refuse an institute writing a page into another institute's document", async () => {
+      const foreignFile = await insertFile(tenantB);
+
+      const write = withTenant(db, mkInstituteCtx(tenantB.tenantId, ORIGIN), (tx) =>
+        tx.insert(applicationDocumentFiles).values(pageValues(tenantA, documentId, foreignFile)),
+      );
+
+      await expect(write).rejects.toMatchObject({ cause: { code: '42501' } });
+    });
+
+    it('should refuse one file being a page of two documents', async () => {
+      const second = await insertDocument(tenantA);
+
+      const write = withTenant(db, mkInstituteCtx(tenantA.tenantId, ORIGIN), (tx) =>
+        tx.insert(applicationDocumentFiles).values(pageValues(tenantA, second, fileId)),
+      );
+
+      await expect(write).rejects.toMatchObject({
+        cause: { code: '23505', constraint: 'application_document_files_file_id_key' },
       });
     });
   });

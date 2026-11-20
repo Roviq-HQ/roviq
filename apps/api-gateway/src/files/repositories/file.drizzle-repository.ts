@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AppAbility, FilePurpose } from '@roviq/common-types';
 import {
+  admissionApplicationsLive,
+  applicationDocumentFilesLive,
+  applicationDocumentsLive,
   DRIZZLE_DB,
   type DrizzleDB,
   files,
@@ -18,12 +21,14 @@ import {
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { admissionReadPredicate } from '../../institute/admission/admission-read-predicate';
 import { studentReadPredicate } from '../../institute/student/student-read-predicate';
 import { markFilesReady } from '../file-attachment';
 import { FileRepository } from './file.repository';
 import { fileLiveColumns } from './file-columns';
 import type {
   CreateFileData,
+  FileApplicationDocumentOwner,
   FileDocumentOwner,
   FileLeaveOwner,
   FileRecord,
@@ -171,6 +176,33 @@ export class FileDrizzleRepository extends FileRepository {
         .innerJoin(userDocumentsLive, eq(userDocumentsLive.id, userDocumentFilesLive.documentId))
         .innerJoin(studentProfilesLive, eq(studentProfilesLive.userId, userDocumentsLive.userId))
         .where(and(eq(userDocumentFilesLive.fileId, fileId), studentReadPredicate(ability, null)))
+        .limit(1);
+      return rows[0] ?? null;
+    });
+  }
+
+  async findApplicationDocumentForFile(
+    fileId: string,
+    ability: AppAbility,
+  ): Promise<FileApplicationDocumentOwner | null> {
+    return this.run(async (tx) => {
+      const rows = await tx
+        .select({ id: applicationDocumentsLive.id, type: applicationDocumentsLive.type })
+        .from(applicationDocumentFilesLive)
+        .innerJoin(
+          applicationDocumentsLive,
+          eq(applicationDocumentsLive.id, applicationDocumentFilesLive.documentId),
+        )
+        .innerJoin(
+          admissionApplicationsLive,
+          eq(admissionApplicationsLive.id, applicationDocumentsLive.applicationId),
+        )
+        .where(
+          and(
+            eq(applicationDocumentFilesLive.fileId, fileId),
+            admissionReadPredicate(ability, 'Application'),
+          ),
+        )
         .limit(1);
       return rows[0] ?? null;
     });

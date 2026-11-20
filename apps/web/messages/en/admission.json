@@ -83,7 +83,7 @@
         "classRequested": "Nursery, LKG, Class 5...",
         "parentName": "Full name of parent / guardian",
         "parentPhone": "98765 43210",
-        "parentPhoneHint": "Indian mobile, 10 digits starting with 6\u20139.",
+        "parentPhoneHint": "Indian mobile, 10 digits starting with 6–9.",
         "parentEmail": "parent@example.com",
         "referredBy": "Alumni, staff, current parent...",
         "previousSchool": "Name of the previous school",
@@ -170,7 +170,8 @@
       "approve": "Approve & enrol",
       "reject": "Reject",
       "changeStatus": "Change status",
-      "nextStatus": "Move to"
+      "nextStatus": "Move to",
+      "documents": "Documents"
     },
     "approveDialog": {
       "title": "Approve & enrol applicant",
@@ -207,7 +208,34 @@
     "rteBadge": "RTE",
     "rejectionReason": "Reason: {reason}",
     "workflowPending": "Enrolment in progress...",
-    "terminalNote": "Terminal status — no further transitions."
+    "terminalNote": "Terminal status — no further transitions.",
+    "documentsDialog": {
+      "title": "Documents of {name}",
+      "description": "Scans submitted with this application. Each one opens through a link that lasts one minute.",
+      "empty": "No documents yet",
+      "emptyDescription": "Add the birth certificate, transfer certificate and other scans the applicant has submitted.",
+      "loadError": "Could not load the documents.",
+      "retry": "Try again",
+      "page": "Page {n}",
+      "open": "Open",
+      "addedOn": "Added on {date}",
+      "remove": "Remove",
+      "removeConfirm": "Remove this document and its pages?",
+      "removeYes": "Yes, remove",
+      "removeNo": "Keep",
+      "removed": "Document removed.",
+      "removeError": "Could not remove the document.",
+      "addTitle": "Add a document",
+      "typeLabel": "Document type",
+      "filesLabel": "Pages of the document",
+      "filesHint": "Add up to {count} pages, in page order.",
+      "add": "Add document",
+      "adding": "Adding…",
+      "added": "Document added.",
+      "addError": "Could not add the document.",
+      "closed": "This application is closed. Its documents can no longer be changed.",
+      "close": "Close"
+    }
   },
   "statistics": {
     "title": "Admission Statistics",

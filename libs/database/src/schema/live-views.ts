@@ -5,6 +5,7 @@ import { isNull } from 'drizzle-orm';
 import { pgView } from 'drizzle-orm/pg-core';
 
 import { admissionApplications } from './admission/admission-applications';
+import { applicationDocumentFiles } from './admission/application-document-files';
 import { applicationDocuments } from './admission/application-documents';
 import { certificateTemplates } from './admission/certificate-templates';
 import { enquiries } from './admission/enquiries';
@@ -301,6 +302,9 @@ export const certificateTemplatesLive = liveView('certificate_templates_live').a
 );
 export const applicationDocumentsLive = liveView('application_documents_live').as((qb) =>
   qb.select().from(applicationDocuments).where(isNull(applicationDocuments.deletedAt)),
+);
+export const applicationDocumentFilesLive = liveView('application_document_files_live').as((qb) =>
+  qb.select().from(applicationDocumentFiles).where(isNull(applicationDocumentFiles.deletedAt)),
 );
 export const groupRulesLive = liveView('group_rules_live').as((qb) =>
   qb.select().from(groupRules).where(isNull(groupRules.deletedAt)),

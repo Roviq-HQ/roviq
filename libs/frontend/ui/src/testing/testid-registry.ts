@@ -910,6 +910,23 @@ export const testIds = {
     statusChangeSelect: 'status-change-select',
     statusChangeCancelBtn: 'status-change-cancel-btn',
     statusChangeSubmitBtn: 'status-change-submit-btn',
+    // Documents dialog
+    documentsBtn: (id: string) => `application-documents-btn-${id}`,
+    documentsDialog: 'application-documents-dialog',
+    documentsLoading: 'application-documents-loading',
+    documentsEmpty: 'application-documents-empty',
+    documentsLoadError: 'application-documents-load-error',
+    documentsRetryBtn: 'application-documents-retry-btn',
+    documentsClosedNote: 'application-documents-closed-note',
+    documentRow: (id: string) => `application-document-${id}`,
+    documentPageBtn: (fileId: string) => `application-document-page-${fileId}`,
+    documentRemoveBtn: (id: string) => `application-document-remove-btn-${id}`,
+    documentRemoveConfirmBtn: (id: string) => `application-document-remove-confirm-btn-${id}`,
+    documentRemoveCancelBtn: (id: string) => `application-document-remove-cancel-btn-${id}`,
+    documentTypeSelect: 'application-document-type-select',
+    documentTypeOption: (type: string) => `application-document-type-option-${type}`,
+    documentAddBtn: 'application-document-add-btn',
+    documentsCloseBtn: 'application-documents-close-btn',
   },
 
   // ── Institute: admission → enquiries ──────────────────────────────────

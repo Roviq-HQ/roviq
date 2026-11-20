@@ -189,6 +189,18 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     uploadAbility: { action: 'update', subject: 'Staff' },
     readAbility: { action: 'read', subject: 'Staff' },
   },
+  APPLICATION_DOCUMENT: {
+    visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
+    allowedContentTypes: DOCUMENT_TYPES,
+    maxSizeBytes: 10 * MB,
+    // Identity scans of an applicant: no link in lists, every download is audited.
+    sensitive: true,
+    image: DOCUMENT_IMAGE,
+    uploadAbility: { action: 'update', subject: 'Application' },
+    // Checked against the very application the document belongs to, see FileService.canRead.
+    readAbility: { action: 'read', subject: 'Application' },
+  },
 };
 
 const EXTENSION: { readonly [T in FileContentType]: string } = {

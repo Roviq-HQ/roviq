@@ -306,6 +306,8 @@ export const ErrorCode = {
   LEAVE_DOCUMENT_REQUIRED: 'LEAVE_DOCUMENT_REQUIRED',
   /** Only PENDING leaves can be edited */
   LEAVE_NOT_EDITABLE: 'LEAVE_NOT_EDITABLE',
+  /** The application reached an end state; its documents can no longer change */
+  APPLICATION_CLOSED: 'APPLICATION_CLOSED',
   /** The file type is not accepted for this upload purpose */
   FILE_TYPE_NOT_ALLOWED: 'FILE_TYPE_NOT_ALLOWED',
   /** The file is larger than this upload purpose allows */
@@ -495,6 +497,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   ATTENDANCE_ON_HOLIDAY: HttpStatus.CONFLICT,
   LEAVE_DOCUMENT_REQUIRED: HttpStatus.BAD_REQUEST,
   LEAVE_NOT_EDITABLE: HttpStatus.BAD_REQUEST,
+  APPLICATION_CLOSED: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_TYPE_NOT_ALLOWED: HttpStatus.BAD_REQUEST,
   FILE_TOO_LARGE: HttpStatus.BAD_REQUEST,
   FILE_CONTENT_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,

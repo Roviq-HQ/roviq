@@ -130,6 +130,19 @@ type ActiveAlert {
   since: DateTime!
 }
 
+"""
+A document submitted with an admission application. Upload each page first with `requestFileUpload` (purpose APPLICATION_DOCUMENT), then pass the file ids here.
+"""
+input AddApplicationDocumentInput {
+  applicationId: ID!
+
+  """Ids of the uploaded pages, in page order. 1 to 10 files."""
+  fileIds: [ID!]!
+
+  """Document category; the same list as student documents."""
+  type: UserDocumentType!
+}
+
 """Append a period, break, or extra slot to a timetable."""
 input AddTimetablePeriodInput {
   """Defaults to the timetable period duration."""
@@ -682,6 +695,19 @@ type ApplicationConnection {
   edges: [ApplicationEdge!]!
   pageInfo: PageInfo!
   totalCount: Int!
+}
+
+"""A document submitted with an admission application"""
+type ApplicationDocumentModel {
+  applicationId: ID!
+  createdAt: DateTime!
+
+  """
+  Pages of the document, in order. Their `url` is null: download each with `fileDownloadUrl`.
+  """
+  files: [FileRef!]!
+  id: ID!
+  type: UserDocumentType!
 }
 
 type ApplicationEdge {
@@ -2538,6 +2564,7 @@ input ExtraClassSlotInput {
 What a file is uploaded for. Decides allowed types, size limit and visibility.
 """
 enum FilePurpose {
+  APPLICATION_DOCUMENT
   BULK_IMPORT_CSV
   BULK_IMPORT_REPORT
   LEAVE_ATTACHMENT
@@ -3775,6 +3802,9 @@ type Mutation {
 
   """Publish a timetable (DRAFT/INACTIVE → ACTIVE)."""
   activateTimetable(id: ID!): TimetableModel!
+
+  """Attach uploaded pages to an application as one document"""
+  addApplicationDocument(input: AddApplicationDocumentInput!): ApplicationDocumentModel!
   addExamSchedule(input: CreateExamScheduleInput!): ExamScheduleModel!
   addTimetablePeriod(input: AddTimetablePeriodInput!): TimetablePeriodModel!
   addTimetableSection(sectionId: ID!, timetableId: ID!): TimetableSectionModel!
@@ -4106,6 +4136,9 @@ type Mutation {
   """Reject a transfer certificate request"""
   rejectTC(id: ID!, reason: String!): TCModel!
   rejectUpiPayment(input: RejectUpiInput!): PaymentModel!
+
+  """Remove a document and its files from an application"""
+  removeApplicationDocument(id: ID!): Boolean!
   removeExamSchedule(id: ID!): Boolean!
   removePasskey(passkeyId: String!): Boolean!
 
@@ -4771,6 +4804,9 @@ type Query {
   List leave applications, ordered by `startDate` DESC (most recent first — leave UIs are decision-driven, not calendar-driven). Optional filters narrow by user, status, type, and overlapping date range.
   """
   leaves(endDate: String, startDate: String, status: LeaveStatus, type: LeaveType, userId: ID): [LeaveModel!]!
+
+  """Documents submitted with one admission application"""
+  listApplicationDocuments(applicationId: ID!): [ApplicationDocumentModel!]!
 
   """List applications with filters"""
   listApplications(filter: ApplicationFilterInput): ApplicationConnection!
