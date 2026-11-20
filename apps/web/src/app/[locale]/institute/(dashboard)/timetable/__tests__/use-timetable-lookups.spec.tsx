@@ -62,9 +62,7 @@ const teacherMocks = [
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <NextIntlClientProvider locale="en" messages={{}}>
-      <MockedProvider mocks={teacherMocks} addTypename={false}>
-        {children}
-      </MockedProvider>
+      <MockedProvider mocks={teacherMocks}>{children}</MockedProvider>
     </NextIntlClientProvider>
   );
 }
@@ -137,7 +135,7 @@ describe('TimetableLookupsProvider maps', () => {
     ];
     render(
       <NextIntlClientProvider locale="en" messages={{}}>
-        <MockedProvider mocks={mocks} addTypename={false}>
+        <MockedProvider mocks={mocks}>
           <TimetableLookupsProvider>
             <Probe />
           </TimetableLookupsProvider>
@@ -179,7 +177,7 @@ describe('TimetableLookupsProvider maps', () => {
     ];
     render(
       <NextIntlClientProvider locale="en" messages={{}}>
-        <MockedProvider mocks={mocks} addTypename={false}>
+        <MockedProvider mocks={mocks}>
           <TimetableLookupsProvider>
             <Probe />
           </TimetableLookupsProvider>

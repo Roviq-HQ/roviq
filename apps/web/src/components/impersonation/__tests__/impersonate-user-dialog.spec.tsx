@@ -2,7 +2,7 @@ import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ImpersonateUserDialog, type ImpersonationStep } from '../impersonate-user-dialog';
 
 const toast = vi.hoisted(() => ({ success: vi.fn() }));
@@ -113,7 +113,7 @@ describe('ImpersonateUserDialog', () => {
       vi.useRealTimers();
     });
 
-    async function reachOtpStep(start: ReturnType<typeof vi.fn>) {
+    async function reachOtpStep(start: Mock<(reason: string) => Promise<ImpersonationStep>>) {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       renderDialog({ start, verifyOtp: vi.fn() });

@@ -46,6 +46,8 @@ const reseller: ResellerNode = {
   },
   address: null,
   branding: null,
+  logo: null,
+  favicon: null,
 };
 
 function renderDialog(onStale = vi.fn(), onClose = vi.fn()) {
