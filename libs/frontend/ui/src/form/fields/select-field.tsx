@@ -32,16 +32,14 @@ export interface SelectFieldProps<TValue extends string = string> {
   placeholder?: string;
   testId?: string;
   disabled?: boolean;
-  /** When true (default), choosing the placeholder emits `undefined`. */
+  /** Kept for callers that mark a field as required; the select itself cannot be cleared. */
   optional?: boolean;
   /** Called after the field's `handleChange` so callers can reset dependents. */
   onValueChange?: (value: TValue | undefined) => void;
 }
 
 /**
- * Single-select bound to a string-or-undefined field. Empty selection emits
- * `undefined` when `optional` (default), matching Zod schemas that wrap
- * `z.enum(...).optional()` with `emptyStringToUndefined`.
+ * Single-select bound to a string-or-undefined field. An unset field shows the placeholder.
  *
  * For cascading dropdowns, pass `onValueChange` to clear dependent fields:
  * ```tsx
@@ -56,7 +54,6 @@ export function SelectField<TValue extends string = string>({
   placeholder,
   testId,
   disabled,
-  optional = true,
   onValueChange,
 }: SelectFieldProps<TValue>) {
   const field = useFieldContext<TValue | undefined>();
@@ -71,7 +68,10 @@ export function SelectField<TValue extends string = string>({
       <Select
         value={value}
         onValueChange={(next) => {
-          const coerced = next === '' && optional ? undefined : (next as TValue);
+          // Radix on React 19 reports '' when the value is set from outside (a form reset),
+          // which marked untouched forms as edited. A user cannot pick '': no item has it.
+          if (next === '') return;
+          const coerced = next as TValue;
           field.handleChange(coerced);
           onValueChange?.(coerced);
         }}
