@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { type AppAbility, type AppAction, BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -8,6 +8,7 @@ import {
   leaveFilesLive,
   leaves,
   leavesLive,
+  membershipsLive,
   mkInstituteCtx,
   softDelete,
   withTenant,
@@ -18,6 +19,7 @@ import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment
 import { fileLiveColumns } from '../../../files/repositories/file-columns';
 import type { FileRecord } from '../../../files/repositories/types';
 import { LeaveRepository } from './leave.repository';
+import { leaveInScope, mayApplyFor } from './leave-scope';
 import type {
   CreateLeaveData,
   LeaveListQuery,
@@ -138,19 +140,22 @@ export class LeaveDrizzleRepository extends LeaveRepository {
     return tenantId;
   }
 
-  async findById(id: string): Promise<LeaveRecord | null> {
+  async findById(id: string, ability: AppAbility): Promise<LeaveRecord | null> {
     const tenantId = this.getTenantId();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
-      const rows = await tx.select(liveColumns).from(leavesLive).where(eq(leavesLive.id, id));
+      const rows = await tx
+        .select(liveColumns)
+        .from(leavesLive)
+        .where(and(eq(leavesLive.id, id), leaveInScope(ability, 'read', leavesLive.id)));
       const [record] = await withFiles(tx, rows);
       return record ?? null;
     });
   }
 
-  async list(query: LeaveListQuery): Promise<LeaveRecord[]> {
+  async list(query: LeaveListQuery, ability: AppAbility): Promise<LeaveRecord[]> {
     const tenantId = this.getTenantId();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
-      const conditions = [];
+      const conditions = [leaveInScope(ability, 'read', leavesLive.id)];
       if (query.userId) conditions.push(eq(leavesLive.userId, query.userId));
       if (query.status) conditions.push(eq(leavesLive.status, query.status));
       if (query.type) conditions.push(eq(leavesLive.type, query.type));
@@ -161,9 +166,31 @@ export class LeaveDrizzleRepository extends LeaveRepository {
       const rows = await tx
         .select(liveColumns)
         .from(leavesLive)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .where(and(...conditions))
         .orderBy(sql`${leavesLive.startDate} DESC`);
       return withFiles(tx, rows);
+    });
+  }
+
+  async isAllowed(id: string, ability: AppAbility, action: AppAction): Promise<boolean> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
+      const rows = await tx
+        .select({ id: leavesLive.id })
+        .from(leavesLive)
+        .where(and(eq(leavesLive.id, id), leaveInScope(ability, action, leavesLive.id)));
+      return rows.length > 0;
+    });
+  }
+
+  async canApplyFor(membershipId: string, ability: AppAbility): Promise<boolean> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
+      const rows = await tx
+        .select({ id: membershipsLive.id })
+        .from(membershipsLive)
+        .where(and(eq(membershipsLive.id, membershipId), mayApplyFor(ability, membershipId)));
+      return rows.length > 0;
     });
   }
 

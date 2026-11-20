@@ -1,10 +1,8 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
-import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
-import { type AppAbility, LeaveStatus, LeaveType } from '@roviq/common-types';
-import { FileRefModel } from '../../files/models/file-ref.model';
-import type { FileRecord } from '../../files/repositories/types';
+import { type AppAbility, type AuthUser, LeaveStatus, LeaveType } from '@roviq/common-types';
 import { CreateLeaveInput } from './dto/create-leave.input';
 import { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveService } from './leave.service';
@@ -15,14 +13,6 @@ import type { LeaveRecord } from './repositories/types';
 @Resolver(() => LeaveModel)
 export class LeaveResolver {
   constructor(private readonly service: LeaveService) {}
-
-  @ResolveField(() => [FileRefModel])
-  files(
-    @Parent() leave: LeaveRecord,
-    @CurrentAbility() ability: AppAbility | undefined,
-  ): FileRecord[] {
-    return this.service.filesVisibleTo(ability, leave);
-  }
 
   @Query(() => [LeaveModel], {
     description:
@@ -35,26 +25,36 @@ export class LeaveResolver {
     @Args('type', { type: () => LeaveType, nullable: true }) type: LeaveType | null,
     @Args('startDate', { type: () => String, nullable: true }) startDate: string | null,
     @Args('endDate', { type: () => String, nullable: true }) endDate: string | null,
+    @CurrentAbility() ability: AppAbility,
   ): Promise<LeaveRecord[]> {
-    return this.service.list({
-      userId: userId ?? undefined,
-      status: status ?? undefined,
-      type: type ?? undefined,
-      startDate: startDate ?? undefined,
-      endDate: endDate ?? undefined,
-    });
+    return this.service.list(
+      {
+        userId: userId ?? undefined,
+        status: status ?? undefined,
+        type: type ?? undefined,
+        startDate: startDate ?? undefined,
+        endDate: endDate ?? undefined,
+      },
+      ability,
+    );
   }
 
   @Query(() => LeaveModel)
   @CheckAbility({ action: 'read', subject: 'Leave' })
-  async leave(@Args('id', { type: () => ID }) id: string): Promise<LeaveRecord> {
-    return this.service.findById(id);
+  async leave(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentAbility() ability: AppAbility,
+  ): Promise<LeaveRecord> {
+    return this.service.findById(id, ability);
   }
 
   @Mutation(() => LeaveModel, { description: 'Submit a new leave application (PENDING).' })
   @CheckAbility({ action: 'create', subject: 'Leave' })
-  async applyLeave(@Args('input') input: CreateLeaveInput): Promise<LeaveRecord> {
-    return this.service.apply(input);
+  async applyLeave(
+    @Args('input') input: CreateLeaveInput,
+    @CurrentAbility() ability: AppAbility,
+  ): Promise<LeaveRecord> {
+    return this.service.apply(input, ability);
   }
 
   @Mutation(() => LeaveModel, { description: 'Edit a PENDING leave before it is decided.' })
@@ -62,35 +62,39 @@ export class LeaveResolver {
   async updateLeave(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateLeaveInput,
+    @CurrentAbility() ability: AppAbility,
   ): Promise<LeaveRecord> {
-    return this.service.update(id, input);
+    return this.service.update(id, input, ability);
   }
 
   @Mutation(() => LeaveModel, { description: 'Approve a PENDING leave.' })
   @CheckAbility({ action: 'update', subject: 'Leave' })
   async approveLeave(
     @Args('id', { type: () => ID }) id: string,
-    @Args('approverMembershipId', { type: () => ID }) approverMembershipId: string,
+    @CurrentAbility() ability: AppAbility,
+    @CurrentUser() user: AuthUser,
   ): Promise<LeaveRecord> {
-    return this.service.approve(id, approverMembershipId);
+    return this.service.approve(id, ability, user.membershipId);
   }
 
   @Mutation(() => LeaveModel, { description: 'Reject a PENDING leave.' })
   @CheckAbility({ action: 'update', subject: 'Leave' })
   async rejectLeave(
     @Args('id', { type: () => ID }) id: string,
-    @Args('approverMembershipId', { type: () => ID }) approverMembershipId: string,
+    @CurrentAbility() ability: AppAbility,
+    @CurrentUser() user: AuthUser,
   ): Promise<LeaveRecord> {
-    return this.service.reject(id, approverMembershipId);
+    return this.service.reject(id, ability, user.membershipId);
   }
 
-  @Mutation(() => LeaveModel, { description: 'Cancel an own / pending leave.' })
+  @Mutation(() => LeaveModel, { description: 'Cancel a leave.' })
   @CheckAbility({ action: 'update', subject: 'Leave' })
   async cancelLeave(
     @Args('id', { type: () => ID }) id: string,
-    @Args('cancellerMembershipId', { type: () => ID }) cancellerMembershipId: string,
+    @CurrentAbility() ability: AppAbility,
+    @CurrentUser() user: AuthUser,
   ): Promise<LeaveRecord> {
-    return this.service.cancel(id, cancellerMembershipId);
+    return this.service.cancel(id, ability, user.membershipId);
   }
 
   @Mutation(() => Boolean, {
@@ -98,7 +102,10 @@ export class LeaveResolver {
       'Soft-delete a leave application. Returns true on success. Mirrors `deleteHoliday`.',
   })
   @CheckAbility({ action: 'delete', subject: 'Leave' })
-  async deleteLeave(@Args('id', { type: () => ID }) id: string): Promise<boolean> {
-    return this.service.delete(id);
+  async deleteLeave(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentAbility() ability: AppAbility,
+  ): Promise<boolean> {
+    return this.service.delete(id, ability);
   }
 }

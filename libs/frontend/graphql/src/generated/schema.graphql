@@ -3906,7 +3906,7 @@ type Mutation {
   ): ApplicationModel!
 
   """Approve a PENDING leave."""
-  approveLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
+  approveLeave(id: ID!): LeaveModel!
 
   """Approve a TC (principal only)"""
   approveTC(id: ID!): TCModel!
@@ -3948,8 +3948,8 @@ type Mutation {
   """
   bulkMarkAttendance(input: BulkMarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): [AttendanceEntryModel!]!
 
-  """Cancel an own / pending leave."""
-  cancelLeave(cancellerMembershipId: ID!, id: ID!): LeaveModel!
+  """Cancel a leave."""
+  cancelLeave(id: ID!): LeaveModel!
   cancelSubscription(input: CancelSubscriptionInput!): SubscriptionModel!
 
   """
@@ -4141,7 +4141,7 @@ type Mutation {
   rejectApplication(id: ID!, reason: String): ApplicationModel!
 
   """Reject a PENDING leave."""
-  rejectLeave(approverMembershipId: ID!, id: ID!): LeaveModel!
+  rejectLeave(id: ID!): LeaveModel!
 
   """Reject a transfer certificate request"""
   rejectTC(id: ID!, reason: String!): TCModel!

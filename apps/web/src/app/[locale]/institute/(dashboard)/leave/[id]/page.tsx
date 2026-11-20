@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuth } from '@roviq/auth';
 import { extractGraphQLError } from '@roviq/graphql';
 import { useFormatDate } from '@roviq/i18n';
 import { Badge, Button, Can, Card, CardContent, CardHeader, CardTitle } from '@roviq/ui';
@@ -119,18 +118,16 @@ function DetailActions({
   onChanged: () => Promise<unknown>;
 }) {
   const t = useTranslations('leave');
-  const { user } = useAuth();
   const { approve, loading: approving } = useApproveLeave();
   const { reject, loading: rejecting } = useRejectLeave();
   const { cancel, loading: cancelling } = useCancelLeave();
 
   async function runAction(
-    fn: (id: string, membershipId: string) => Promise<unknown>,
+    fn: (id: string) => Promise<unknown>,
     key: 'approve' | 'reject' | 'cancel',
   ): Promise<void> {
-    if (!user?.membershipId) return;
     try {
-      await fn(leave.id, user.membershipId);
+      await fn(leave.id);
       toast.success(t(`actions.${key}`));
       await onChanged();
     } catch (err) {

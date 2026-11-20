@@ -107,24 +107,24 @@ const UPDATE_LEAVE = gql`
 `;
 
 const APPROVE_LEAVE = gql`
-  mutation ApproveLeave($id: ID!, $approverMembershipId: ID!) {
-    approveLeave(id: $id, approverMembershipId: $approverMembershipId) {
+  mutation ApproveLeave($id: ID!) {
+    approveLeave(id: $id) {
       ${LEAVE_FIELDS}
     }
   }
 `;
 
 const REJECT_LEAVE = gql`
-  mutation RejectLeave($id: ID!, $approverMembershipId: ID!) {
-    rejectLeave(id: $id, approverMembershipId: $approverMembershipId) {
+  mutation RejectLeave($id: ID!) {
+    rejectLeave(id: $id) {
       ${LEAVE_FIELDS}
     }
   }
 `;
 
 const CANCEL_LEAVE = gql`
-  mutation CancelLeave($id: ID!, $cancellerMembershipId: ID!) {
-    cancelLeave(id: $id, cancellerMembershipId: $cancellerMembershipId) {
+  mutation CancelLeave($id: ID!) {
+    cancelLeave(id: $id) {
       ${LEAVE_FIELDS}
     }
   }
@@ -196,37 +196,34 @@ export function useUpdateLeave() {
 }
 
 export function useApproveLeave() {
-  const [mutate, { loading }] = useMutation<
-    { approveLeave: LeaveRecord },
-    { id: string; approverMembershipId: string }
-  >(APPROVE_LEAVE, { refetchQueries: ['Leaves', 'Leave'] });
+  const [mutate, { loading }] = useMutation<{ approveLeave: LeaveRecord }, { id: string }>(
+    APPROVE_LEAVE,
+    { refetchQueries: ['Leaves', 'Leave'] },
+  );
   return {
-    approve: (id: string, approverMembershipId: string) =>
-      mutate({ variables: { id, approverMembershipId } }),
+    approve: (id: string) => mutate({ variables: { id } }),
     loading,
   };
 }
 
 export function useRejectLeave() {
-  const [mutate, { loading }] = useMutation<
-    { rejectLeave: LeaveRecord },
-    { id: string; approverMembershipId: string }
-  >(REJECT_LEAVE, { refetchQueries: ['Leaves', 'Leave'] });
+  const [mutate, { loading }] = useMutation<{ rejectLeave: LeaveRecord }, { id: string }>(
+    REJECT_LEAVE,
+    { refetchQueries: ['Leaves', 'Leave'] },
+  );
   return {
-    reject: (id: string, approverMembershipId: string) =>
-      mutate({ variables: { id, approverMembershipId } }),
+    reject: (id: string) => mutate({ variables: { id } }),
     loading,
   };
 }
 
 export function useCancelLeave() {
-  const [mutate, { loading }] = useMutation<
-    { cancelLeave: LeaveRecord },
-    { id: string; cancellerMembershipId: string }
-  >(CANCEL_LEAVE, { refetchQueries: ['Leaves', 'Leave'] });
+  const [mutate, { loading }] = useMutation<{ cancelLeave: LeaveRecord }, { id: string }>(
+    CANCEL_LEAVE,
+    { refetchQueries: ['Leaves', 'Leave'] },
+  );
   return {
-    cancel: (id: string, cancellerMembershipId: string) =>
-      mutate({ variables: { id, cancellerMembershipId } }),
+    cancel: (id: string) => mutate({ variables: { id } }),
     loading,
   };
 }

@@ -1,4 +1,4 @@
-import { createMongoAbility, subject } from '@casl/ability';
+import { createMongoAbility } from '@casl/ability';
 import type { AbilityFactory } from '@roviq/casl';
 import {
   type AppAbility,
@@ -158,7 +158,7 @@ describe('FileService', () => {
     markReady = vi.fn<FileRepository['markReady']>().mockResolvedValue(undefined);
     findLeaveForFile = vi
       .fn<FileRepository['findLeaveForFile']>()
-      .mockResolvedValue({ id: LEAVE_ID, tenantId: TENANT_ID, userId: USER_ID });
+      .mockResolvedValue({ id: LEAVE_ID });
     findStudentDocumentForFile = vi
       .fn<FileRepository['findStudentDocumentForFile']>()
       .mockResolvedValue({ id: DOCUMENT_ID, type: 'BIRTH_CERTIFICATE' });
@@ -681,47 +681,29 @@ describe('FileService', () => {
   });
 
   describe('downloadUrl', () => {
-    it('should return a short-lived URL for a ready file the user may read', async () => {
+    it('should return a short-lived URL for a leave attachment whose leave the read rules cover', async () => {
       findById.mockResolvedValue(buildFile({ status: 'READY' }));
+      const ability = createMock<AppAbility>({ can });
+      createForUser.mockResolvedValue(ability);
 
       const url = await service.downloadUrl(user, FILE_ID);
 
       expect(url).toBe(
         `fake://private/${KEY}?get&expires=${AUDITED_DOWNLOAD_URL_TTL_SECONDS}&at=now`,
       );
-      expect(can).toHaveBeenCalledWith(
-        'read',
-        subject('Leave', { id: LEAVE_ID, tenantId: TENANT_ID, userId: USER_ID }),
-      );
+      expect(findLeaveForFile).toHaveBeenCalledWith(FILE_ID, ability);
     });
 
-    it("should refuse another person's leave attachment to a user who may read only own leaves", async () => {
+    it("should answer not found for a leave attachment the caller's read rules do not cover", async () => {
       findById.mockResolvedValue(buildFile({ status: 'READY' }));
-      findLeaveForFile.mockResolvedValue({
-        id: LEAVE_ID,
-        tenantId: TENANT_ID,
-        userId: OTHER_USER_ID,
-      });
-      createForUser.mockResolvedValue(
-        createMongoAbility<AppAbility>([
-          { action: 'read', subject: 'Leave', conditions: { userId: USER_ID } },
-        ]),
-      );
+      const ability = createMock<AppAbility>({ can });
+      createForUser.mockResolvedValue(ability);
+      findLeaveForFile.mockResolvedValue(null);
 
       await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
         code: ErrorCode.FILE_NOT_FOUND,
       });
-    });
-
-    it('should allow the own leave attachment to a user who may read only own leaves', async () => {
-      findById.mockResolvedValue(buildFile({ status: 'READY' }));
-      createForUser.mockResolvedValue(
-        createMongoAbility<AppAbility>([
-          { action: 'read', subject: 'Leave', conditions: { userId: USER_ID } },
-        ]),
-      );
-
-      await expect(service.downloadUrl(user, FILE_ID)).resolves.toContain(KEY);
+      expect(findLeaveForFile).toHaveBeenCalledWith(FILE_ID, ability);
     });
 
     it('should answer not found for a leave file that is no longer attached to a leave', async () => {
@@ -746,12 +728,13 @@ describe('FileService', () => {
     });
 
     it('should answer not found, not forbidden, when the user lacks the ability', async () => {
-      findById.mockResolvedValue(buildFile({ status: 'READY' }));
+      findById.mockResolvedValue(buildFile({ status: 'READY', purpose: 'STAFF_CERTIFICATE' }));
       can.mockReturnValue(false);
 
       await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
         code: ErrorCode.FILE_NOT_FOUND,
       });
+      expect(can).toHaveBeenCalledWith('read', 'Staff');
     });
 
     it("should answer not found for a file outside the caller's institute", async () => {

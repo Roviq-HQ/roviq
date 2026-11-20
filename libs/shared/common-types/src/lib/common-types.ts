@@ -600,6 +600,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
       subject: 'Leave',
       conditions: { sectionId: { $in: '$user.assignedSections' } },
     },
+    { action: 'create', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
+    { action: 'read', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
     { action: 'read', subject: 'Holiday' },
   ],
 
@@ -619,8 +621,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Institute' },
     { action: 'read', subject: 'Timetable' },
     // Subject teachers file own leave + read the holiday calendar.
-    { action: 'create', subject: 'Leave', conditions: { userId: '$user.sub' } },
-    { action: 'read', subject: 'Leave', conditions: { userId: '$user.sub' } },
+    { action: 'create', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
+    { action: 'read', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
     { action: 'read', subject: 'Holiday' },
   ],
 
@@ -764,8 +766,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     // Attendance entries reference the student's membership, not their user id.
     { action: 'read', subject: 'Attendance', conditions: { studentId: '$user.membershipId' } },
     // Students can file own leaves + read the holiday calendar.
-    { action: 'create', subject: 'Leave', conditions: { userId: '$user.sub' } },
-    { action: 'read', subject: 'Leave', conditions: { userId: '$user.sub' } },
+    { action: 'create', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
+    { action: 'read', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
     { action: 'read', subject: 'Holiday' },
   ],
 
@@ -787,7 +789,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Timetable' },
     { action: 'read', subject: 'ReportCard' },
     // Guardians read their children's leave + the institute holiday list.
-    { action: 'read', subject: 'Leave' },
+    {
+      action: 'read',
+      subject: 'Leave',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
+    },
     { action: 'read', subject: 'Holiday' },
   ],
 };

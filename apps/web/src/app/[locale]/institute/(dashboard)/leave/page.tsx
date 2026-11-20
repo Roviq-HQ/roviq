@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuth } from '@roviq/auth';
 import { extractGraphQLError } from '@roviq/graphql';
 import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
@@ -317,7 +316,6 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
   const resolveI18n = useI18nField();
   const params = useParams();
   const locale = params.locale as string;
-  const { user } = useAuth();
   const { approve, loading: approving } = useApproveLeave();
   const { reject, loading: rejecting } = useRejectLeave();
   const { cancel, loading: cancelling } = useCancelLeave();
@@ -340,9 +338,8 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
   }, [students, resolveI18n]);
 
   async function handleApprove(id: string): Promise<void> {
-    if (!user?.membershipId) return;
     try {
-      await approve(id, user.membershipId);
+      await approve(id);
       toast.success(t('actions.approve'));
       onChanged();
     } catch (err) {
@@ -351,9 +348,8 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
   }
 
   async function handleReject(id: string): Promise<void> {
-    if (!user?.membershipId) return;
     try {
-      await reject(id, user.membershipId);
+      await reject(id);
       toast.success(t('actions.reject'));
       onChanged();
     } catch (err) {
@@ -362,9 +358,8 @@ function LeavesTable({ leaves, loading, onChanged }: LeavesTableProps) {
   }
 
   async function handleCancel(id: string): Promise<void> {
-    if (!user?.membershipId) return;
     try {
-      await cancel(id, user.membershipId);
+      await cancel(id);
       toast.success(t('actions.cancel'));
       onChanged();
     } catch (err) {

@@ -47,13 +47,6 @@ vi.mock('../../people/students/use-students', () => ({
   }),
 }));
 
-// useAuth is invoked by LeavesTable to pick up the approver membershipId —
-// not used in the three cases below, but must resolve so the render doesn't
-// throw "useAuth must be used within an AuthProvider".
-vi.mock('@roviq/auth', () => ({
-  useAuth: () => ({ user: { membershipId: 'me-1' } }),
-}));
-
 interface LeaveFixture {
   id: string;
   userId: string;

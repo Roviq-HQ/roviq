@@ -1,3 +1,4 @@
+import type { AppAbility, AppAction } from '@roviq/common-types';
 import type {
   CreateLeaveData,
   LeaveListQuery,
@@ -7,8 +8,14 @@ import type {
 } from './types';
 
 export abstract class LeaveRepository {
-  abstract findById(id: string): Promise<LeaveRecord | null>;
-  abstract list(query: LeaveListQuery): Promise<LeaveRecord[]>;
+  /** The leave, when the ability's read rules cover it. */
+  abstract findById(id: string, ability: AppAbility): Promise<LeaveRecord | null>;
+  /** Only the leaves the ability's read rules cover. */
+  abstract list(query: LeaveListQuery, ability: AppAbility): Promise<LeaveRecord[]>;
+  /** Whether the ability's rules for `action` cover this leave. */
+  abstract isAllowed(id: string, ability: AppAbility, action: AppAction): Promise<boolean>;
+  /** Whether the ability may file a leave for this membership of the caller's institute. */
+  abstract canApplyFor(membershipId: string, ability: AppAbility): Promise<boolean>;
   abstract create(data: CreateLeaveData): Promise<LeaveRecord>;
   abstract update(id: string, data: UpdateLeaveData): Promise<LeaveRecord>;
   abstract setStatus(

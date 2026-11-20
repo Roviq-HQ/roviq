@@ -101,6 +101,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/guardian/__tests__/guardian-linking.spec.ts',
   'apps/api-gateway/src/institute/guardian/guardian.service.ts',
   'apps/api-gateway/src/institute/holiday/repositories/holiday.drizzle-repository.ts',
+  // ROV-304: isolated fixtures for the leave read/write/decide authorization tests only.
+  'apps/api-gateway/src/institute/leave/__tests__/leave-authorization.integration.spec.ts',
   'apps/api-gateway/src/institute/leave/repositories/leave.drizzle-repository.ts',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts',
   'apps/api-gateway/src/institute/management/seed/institute-seeder.service.ts',
