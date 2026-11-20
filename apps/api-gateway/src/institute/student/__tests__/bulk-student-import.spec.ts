@@ -389,6 +389,38 @@ describe('BulkStudentImport — Report Generation', () => {
     vi.restoreAllMocks();
   });
 
+  it('should neutralise a cell that a spreadsheet would run as a formula', async () => {
+    const { createBulkStudentImportActivities } = await import(
+      '../workflows/bulk-student-import.activities'
+    );
+    const activities = createBulkStudentImportActivities(
+      createMockDb(),
+      createMockNats(),
+      null,
+      fileStore,
+    );
+
+    await activities.generateReport({
+      tenantId: TENANT_ID,
+      reportFileId: 'report-2',
+      createdBy: 'user-1',
+      errors: [
+        {
+          rowNumber: 1,
+          field: 'gender',
+          reason: 'Invalid gender',
+          originalValue: '=HYPERLINK("http://evil.test","x")',
+        },
+      ],
+      totalRows: 1,
+      created: 0,
+      skipped: 0,
+    });
+
+    const lastLine = fileStore.written[0]?.body.toString('utf8').split('\r\n').pop();
+    expect(lastLine).toBe(`1,gender,Invalid gender,"'=HYPERLINK(""http://evil.test"",""x"")"`);
+  });
+
   it('should store the report as a CSV file under the id the workflow chose', async () => {
     const { createBulkStudentImportActivities } = await import(
       '../workflows/bulk-student-import.activities'

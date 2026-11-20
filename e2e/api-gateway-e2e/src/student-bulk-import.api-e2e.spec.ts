@@ -13,6 +13,7 @@ import {
   loginAsInstituteAdmin,
   loginAsInstituteAdminSecondInstitute,
   loginAsStudent,
+  loginAsTeacher,
 } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
@@ -181,6 +182,14 @@ describe('Bulk student import E2E', () => {
       const res = await gql(PROGRESS, { id: workflowId }, tokenB);
 
       expect(codeOf(res)).toBe(ErrorCode.NOT_FOUND);
+    });
+
+    it('should refuse the progress, and so the report, to a teacher who may read students but not create them', async () => {
+      const { accessToken } = await loginAsTeacher();
+
+      const res = await gql(PROGRESS, { id: workflowId }, accessToken);
+
+      expect(codeOf(res)).toBe(ErrorCode.FORBIDDEN);
     });
 
     it('should refuse to start a second import from the same uploaded file', async () => {

@@ -4,6 +4,7 @@
  * Starts Temporal workflows and queries their progress.
  * Does NOT contain business logic — that lives in the Temporal activities.
  */
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
@@ -49,7 +50,8 @@ export class StudentBulkImportService {
     const connection = await Connection.connect({ address });
     const client = new Client({ connection });
 
-    const workflowId = `${workflowIdPrefix(input.tenantId)}${Date.now()}`;
+    // Random, so an import's id cannot be guessed from when it started.
+    const workflowId = `${workflowIdPrefix(input.tenantId)}${randomUUID()}`;
 
     await client.workflow.start('BulkStudentImportWorkflow', {
       taskQueue: TASK_QUEUE,
