@@ -250,13 +250,57 @@ reference `files.id`; no table stores a URL. Design and remaining work: Linear R
 | Files about a person | A purpose with `owner: 'USER'` (today `PROFILE_PHOTO`) belongs to the person, not to an institute: `tenant_id` is null, `subject_user_id` is set, the key is `users/{userId}/{purpose}/…`. `requestFileUpload` needs `subjectUserId` and refuses a user who is not a member of the caller's institute. RLS lets an institute read and write such a file only while the person is its member, and lets a reseller read it for people in its institutes or team. `user_profiles.profile_image_file_id` points to it, so one picture shows in every institute the person belongs to. It is set with `setStudentPhoto` / `setStaffPhoto` / `setGuardianPhoto` (ability `update` on that record) or `setMyProfilePhoto`; the replaced file is deleted in the same transaction. Models expose it as `profileImage: FileRef`, loaded in one query per request by `FileLoaders`. |
 | Files of a reseller | A purpose with `owner: 'RESELLER'` (`RESELLER_LOGO`, `RESELLER_FAVICON`) belongs to the reseller: `reseller_id` is set, the key is `resellers/{resellerId}/{purpose}/…`, and it is uploaded through `resellerRequestFileUpload` from the reseller portal only. Both are public, so their links are stable and need no signature. `FileRepository` runs as the caller's role in either scope. |
 | Institute branding | `institute_branding.logo_file_id`, `favicon_file_id` and `cover_image_file_id` point at `files` (purposes `INSTITUTE_LOGO`, `INSTITUTE_FAVICON`, `INSTITUTE_COVER`: public, owned by the institute, uploaded with the `update_branding` ability). `updateInstituteBranding` takes the file ids: leave one out to keep the image, send null to remove it, send an id to replace it. The new file becomes READY and the replaced one is deleted in the same transaction as the branding row. `InstituteBrandingModel` exposes them as `logo`, `favicon` and `coverImage` (`FileRef`). The institute picker at login shows the logo: `instituteLogoUrl` on a membership is the public link of the 512 px size. `institutes.logo_url` no longer exists. `institute_group_branding` has `logo_file_id` and `favicon_file_id` for the same purposes; nothing reads or writes them yet. |
-| Sensitive files | A purpose with `sensitive: true` (today `USER_DOCUMENT` and `APPLICATION_DOCUMENT`, scans of identity and academic documents) never carries a link in a list: `FileRef.url` is null. Each download asks for a 60-second link through a mutation, so it is audited with the file id: `fileDownloadUrl` in the institute portal, `adminUserDocumentDownloadUrl` in the platform portal. `fileDownloadUrl` checks the record behind the file: for a user document, a student of this institute whom the caller may read, plus the Aadhaar field rule for an Aadhaar scan. It is the one mutation besides `endImpersonation` that a view-only impersonation session may call, because it changes nothing. A document's pages are rows in `user_document_files` (ordered, one file per page, written only as `roviq_admin`). Documents of an admission application work the same way with institute-owned files: `addApplicationDocument` / `removeApplicationDocument` / `listApplicationDocuments`, pages in `application_document_files` (tenant RLS), download allowed only when the caller may read that application, and no changes once the application is ENROLLED, REJECTED, WITHDRAWN or EXPIRED (`APPLICATION_CLOSED`). |
+| Sensitive files | A purpose with `sensitive: true` (today `USER_DOCUMENT` and `APPLICATION_DOCUMENT`, scans of identity and academic documents) never carries a link in a list: `FileRef.url` is null. Each download asks for a 60-second link through a mutation, so it is audited with the file id: `fileDownloadUrl` in the institute portal, `adminUserDocumentDownloadUrl` in the platform portal. `fileDownloadUrl` checks the record behind the file: for a user document, a student of this institute whom the caller may read, plus the Aadhaar field rule for an Aadhaar scan. It is the one mutation besides `endImpersonation` that a view-only impersonation session may call, because it changes nothing. A document's pages are rows in `user_document_files` (ordered, one file per page, written only as `roviq_admin`). `deleteStudentDocument` removes a student document with the same checks as upload plus the read and Aadhaar rules of the list (any miss answers `STUDENT_NOT_FOUND`): in one transaction the document and its pages are soft-deleted and their files marked DELETED, so they enter the 30-day grace period and are then purged from storage by the sweeper. Documents of an admission application work the same way with institute-owned files: `addApplicationDocument` / `removeApplicationDocument` / `listApplicationDocuments`, pages in `application_document_files` (tenant RLS), download allowed only when the caller may read that application, and no changes once the application is ENROLLED, REJECTED, WITHDRAWN or EXPIRED (`APPLICATION_CLOSED`). |
 | Files in workflows | A Temporal activity has no request, so it uses `WorkflowFileStore` (`files/workflow-file-store.ts`): `read(tenantId, fileId, purpose)` and `put({ tenantId, fileId, … })`, both running as that institute under RLS. The workflow chooses the id of a file it writes (`uuid4()` from `@temporalio/workflow`), so a retried activity overwrites the same file instead of adding one. A file that is the input of a workflow, not part of a record, is made READY with `FileService.claimUploads` before the workflow starts (bulk student import: `BULK_IMPORT_CSV` in, `BULK_IMPORT_REPORT` out). |
-| Delete | `markFilesDeleted(tx, …)` in the same transaction that detaches the file. The object stays until a sweeper purges it (ROV-300). |
+| Delete | `markFilesDeleted(tx, …)` in the same transaction that detaches the file. The row and objects stay for a 30-day grace period, then the file sweeper removes them (see "File sweeper" below). |
 | Client library | `@roviq/storage` wraps `@aws-sdk/client-s3`. Application code never calls S3 directly and uses nothing provider-specific; `pnpm storage:check` tests a provider against what the app relies on. `FakeStorageClient` is the in-memory version for unit tests. |
 
 Status flow: `PENDING` → `READY` → `DELETED`, or `PENDING` → `REJECTED` when verification fails
 (`FILE_STATE_MACHINE`).
+
+### File sweeper
+
+An hourly Temporal job (ROV-300) removes files nobody needs any more, across every institute.
+Code: `files/file-sweeper.ts`, queries in `files/file-purge.repository.ts`, workflow in
+`files/workflows/`. Only `roviq_admin` may delete a `files` row, so every query runs as that role.
+
+What is removed, and when:
+
+| File | Removed after | Objects deleted |
+|---|---|---|
+| `PENDING` upload nobody attached | 24 hours from `created_at` | `pending/{key}` (private bucket), the key and its three image sizes |
+| `REJECTED` upload | 24 hours from `updated_at` | same as `PENDING` |
+| `DELETED` file | 30 days from `deleted_at` (the grace period; a file can be restored by hand until then) | the key and its three image sizes in its own bucket |
+
+Rules:
+
+- Objects first, the row last. A missing object counts as deleted. When storage fails, the row stays
+  and the next run tries again.
+- A stale `PENDING` upload is first set to `REJECTED`, so a form submitted during the sweep cannot
+  attach a file whose object is going. If it was attached first, it is left alone.
+- A file that any record still points at is never purged, whatever its status says. The records
+  are: a live link row (`leave_files`, `user_document_files`, `application_document_files`), a
+  branding column (`institute_branding`, `institute_group_branding`), a user profile's photo
+  (`user_profiles.profile_image_file_id`), a reseller's logo or favicon, and a live staff
+  qualification's certificate. Such a file is counted as skipped and its pointer is left as it is.
+  Already-deleted link rows are removed with the file; a soft-deleted qualification's pointer is
+  set to null when its certificate goes.
+- Each run first retires `READY` files that are no longer needed, which marks them `DELETED` and
+  starts their grace period. Every `FilePurpose` has a rule in `FILE_RETIREMENT`:
+  - `TIMED` (`BULK_IMPORT_CSV`, `BULK_IMPORT_REPORT`): 30 days after it was written.
+  - `REFERENCED` (all others): once no record has pointed at it for 24 hours. This is a safety net
+    for a code path that dropped a file without marking it deleted.
+- A run handles at most 100 files per kind per query and 20 batches per kind; the rest waits for
+  the next hour. One log line per run gives the counts. Metric: `file_sweeper_files_total`.
+
+Schedule: `file-sweeper-hourly` (every hour, overlap `SKIP`, catch-up window 1 hour), workflow
+`fileSweeper` on task queue `file-maintenance`, one activity `sweepFiles` (10-minute timeout,
+3 attempts). A gateway with `FILE_SWEEPER_WORKER_ENABLED=true` runs the worker and creates the
+schedule at start if Temporal does not have it.
+
+`FileService.purge(fileIds)` removes files at once, whatever their age, for server workflows such
+as a data erasure request. It refuses a file that any record still points at (`inUse`) and reports unknown ids
+(`missing`). It must never be reachable from a resolver with ids a user typed.
 
 Frontend: `<FileUpload>` and `useFileUpload()` in `apps/web/src/components/file-upload/`.
 

@@ -20,6 +20,7 @@ import {
   THUMBNAIL_URL_TTL_SECONDS,
   THUMBNAIL_URL_WINDOW_SECONDS,
 } from '../file.service';
+import type { FileSweeper } from '../file-sweeper';
 import { ImageProcessor, InvalidImageError, type ProcessedImage } from '../image/image-processor';
 import type { FileRepository } from '../repositories/file.repository';
 import type { CreateFileData, FileRecord } from '../repositories/types';
@@ -136,6 +137,7 @@ describe('FileService', () => {
   let saveProcessedImage: ReturnType<typeof vi.fn<FileRepository['saveProcessedImage']>>;
   let images: FakeImageProcessor;
   let isMember: ReturnType<typeof vi.fn<FileRepository['isMemberOfCurrentTenant']>>;
+  let purge: ReturnType<typeof vi.fn<FileSweeper['purge']>>;
   let service: FileService;
 
   beforeEach(() => {
@@ -171,6 +173,7 @@ describe('FileService', () => {
     saveProcessedImage = vi.fn<FileRepository['saveProcessedImage']>().mockResolvedValue(undefined);
     images = new FakeImageProcessor();
     isMember = vi.fn<FileRepository['isMemberOfCurrentTenant']>().mockResolvedValue(true);
+    purge = vi.fn<FileSweeper['purge']>();
     service = new FileService(
       createMock<FileRepository>({
         create,
@@ -188,6 +191,7 @@ describe('FileService', () => {
       storage,
       createMock<AbilityFactory>({ createForUser }),
       images,
+      createMock<FileSweeper>({ purge }),
     );
   });
 
@@ -875,6 +879,16 @@ describe('FileService', () => {
         `fake://private/${KEY}?get&expires=${AUDITED_DOWNLOAD_URL_TTL_SECONDS}&at=now`,
       );
       expect(createForUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('purge', () => {
+    it('should hand the ids to the sweeper and return its answer', async () => {
+      const answer = { removed: [FILE_ID], inUse: [], missing: [OTHER_USER_ID] };
+      purge.mockResolvedValue(answer);
+
+      await expect(service.purge([FILE_ID, OTHER_USER_ID])).resolves.toEqual(answer);
+      expect(purge).toHaveBeenCalledWith([FILE_ID, OTHER_USER_ID]);
     });
   });
 });

@@ -24,6 +24,8 @@ declare global {
       S3_PUBLIC_BASE_URL?: string;
       LOG_LEVEL?: string;
       TEMPORAL_ADDRESS?: string;
+      /** 'true' runs the hourly file sweeper worker in this gateway (ROV-300). */
+      FILE_SWEEPER_WORKER_ENABLED?: string;
       ROVIQ_EE?: string;
       BILLING_ENCRYPTION_KEY?: string;
       RAZORPAY_WEBHOOK_SECRET?: string;

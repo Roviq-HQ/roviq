@@ -1,6 +1,7 @@
 /**
  * Student documents through the real stack: pages are uploaded as files, a document is saved
- * from their ids, lists carry no link, and each download goes through the audited call.
+ * from their ids, lists carry no link, each download goes through the audited call, and a
+ * removed document stops being listed or downloadable.
  *
  * RLS on document pages as each database role: `files-rls.integration.spec.ts`. The Aadhaar
  * field rule on downloads: `file.service.spec.ts`.
@@ -15,6 +16,7 @@ import {
   loginAsInstituteAdminSecondInstitute,
   loginAsPlatformAdmin,
   loginAsStudent,
+  loginAsTeacher,
 } from './helpers/auth';
 import { gql } from './helpers/gql-client';
 
@@ -50,6 +52,7 @@ const LIST_DOCUMENTS = `query Documents($id: ID!) {
   }
 }`;
 const DOWNLOAD_URL = `mutation Download($fileId: ID!) { fileDownloadUrl(fileId: $fileId) }`;
+const DELETE_DOCUMENT = `mutation DeleteDocument($id: ID!) { deleteStudentDocument(id: $id) }`;
 const ADMIN_USER_DOCUMENTS = `query AdminUser($userId: ID!) {
   adminGetUser(userId: $userId) { documents { id files { id name url } } }
 }`;
@@ -283,6 +286,80 @@ describe('Student documents E2E', () => {
       const res = await saveDocument(undefined, [SEED_IDS.STUDENT_PROFILE_1]);
 
       expect(codeOf(res)).toBe(ErrorCode.UNAUTHENTICATED);
+    });
+  });
+
+  describe('removing a document', () => {
+    let documentId: string;
+    let pageId: string;
+
+    const listedIds = async (token: string) => {
+      const res = await gql<{ listStudentDocuments: StudentDocument[] }>(
+        LIST_DOCUMENTS,
+        { id: SEED_IDS.STUDENT_PROFILE_1 },
+        token,
+      );
+      expect(res.errors).toBeUndefined();
+      return res.data?.listStudentDocuments.map((d) => d.id) ?? [];
+    };
+
+    beforeAll(async () => {
+      pageId = await upload(tokenA, pdf());
+      const saved = await saveDocument(tokenA, [pageId], `RM-${Date.now()}`);
+      expect(saved.errors).toBeUndefined();
+      assert(saved.data);
+      documentId = saved.data.uploadStudentDocument.id;
+    });
+
+    it('should refuse a teacher, who may only read students', async () => {
+      const { accessToken } = await loginAsTeacher();
+
+      const res = await gql(DELETE_DOCUMENT, { id: documentId }, accessToken);
+
+      expect(codeOf(res)).toBe(ErrorCode.FORBIDDEN);
+      expect(await listedIds(tokenA)).toContain(documentId);
+    });
+
+    it('should answer not found to an institute the student does not belong to', async () => {
+      const res = await gql(DELETE_DOCUMENT, { id: documentId }, tokenB);
+
+      expect(codeOf(res)).toBe(ErrorCode.STUDENT_NOT_FOUND);
+      expect(await listedIds(tokenA)).toContain(documentId);
+    });
+
+    it('should remove the document so it is no longer listed or downloadable', async () => {
+      const res = await gql<{ deleteStudentDocument: boolean }>(
+        DELETE_DOCUMENT,
+        { id: documentId },
+        tokenA,
+      );
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.deleteStudentDocument).toBe(true);
+      expect(await listedIds(tokenA)).not.toContain(documentId);
+      const download = await gql(DOWNLOAD_URL, { fileId: pageId }, tokenA);
+      expect(codeOf(download)).toBe(ErrorCode.FILE_NOT_FOUND);
+    });
+
+    it('should hide the removed document from the platform admin too', async () => {
+      const { accessToken: platformToken } = await loginAsPlatformAdmin();
+
+      const user = await gql<{ adminGetUser: { documents: { id: string }[] } }>(
+        ADMIN_USER_DOCUMENTS,
+        { userId: SEED_IDS.USER_STUDENT },
+        platformToken,
+      );
+      const link = await gql(ADMIN_DOWNLOAD_URL, { fileId: pageId }, platformToken);
+
+      expect(user.errors).toBeUndefined();
+      expect(user.data?.adminGetUser.documents.map((d) => d.id)).not.toContain(documentId);
+      expect(codeOf(link)).toBe(ErrorCode.FILE_NOT_FOUND);
+    });
+
+    it('should answer not found when removing it again', async () => {
+      const res = await gql(DELETE_DOCUMENT, { id: documentId }, tokenA);
+
+      expect(codeOf(res)).toBe(ErrorCode.STUDENT_NOT_FOUND);
     });
   });
 });

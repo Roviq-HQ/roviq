@@ -429,6 +429,19 @@
         "error": "Failed to upload document",
         "filesLabel": "Document pages",
         "filesHint": "Upload one file per page, in page order."
+      },
+      "remove": {
+        "button": "Remove",
+        "buttonTitle": "Remove this document",
+        "dialogTitle": "Remove {type}?",
+        "dialogDescription": "The {type} and all its pages will be removed from this student's record. The files are deleted for good after 30 days.",
+        "confirm": "Remove document",
+        "removing": "Removing…",
+        "cancel": "Cancel",
+        "success": "Document removed.",
+        "notFound": "This document was already removed or you cannot access it.",
+        "forbidden": "You do not have permission to remove documents.",
+        "error": "Could not remove the document. Please try again."
       }
     },
     "tc": {

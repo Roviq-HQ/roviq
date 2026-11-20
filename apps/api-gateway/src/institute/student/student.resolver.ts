@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import {
@@ -118,8 +118,21 @@ export class StudentResolver {
   @CheckAbility({ action: 'update', subject: 'Student' })
   async uploadStudentDocument(
     @Args('input') input: UploadStudentDocumentInput,
+    @CurrentReadAccess() access: InstituteReadAccess,
   ): Promise<StudentDocumentModel> {
-    return this.studentService.uploadDocument(input);
+    return this.studentService.uploadDocument(input, access.ability);
+  }
+
+  @Mutation(() => Boolean, {
+    description:
+      'Removes a student document with its pages; the files are purged after the grace period. STUDENT_NOT_FOUND when the caller cannot see the document.',
+  })
+  @CheckAbility({ action: 'update', subject: 'Student' })
+  async deleteStudentDocument(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentReadAccess() access: InstituteReadAccess,
+  ): Promise<boolean> {
+    return this.studentService.deleteDocument(id, access.ability);
   }
 
   @Mutation(() => Boolean, { description: 'Soft delete a student profile' })

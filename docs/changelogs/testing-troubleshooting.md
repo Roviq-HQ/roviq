@@ -837,3 +837,10 @@ Likely cause, not proven: load. The first run was cold after new commits, so the
 - **Symptom:** two pushes of `parmody1/rov-195-institute-branding` in a row were refused: `unit` failed with 4 timed-out tests (`ee-module.spec.ts` 30 s, `student.service.spec.ts` hook 10 s, `designer-add-date.spec.tsx` 5 s) and `int` with a dozen `Hook timed out in 10000ms`. No assertion failed, and the failing tests differed between the two runs. The same commit's parent passed the gate an hour earlier (`unit` 50 s; this time 130 s).
 - **Cause:** load. `uptime` showed a load average of 38 during the first run and 75 after the second; several instances and browsers were running at the same time.
 - **Fix:** none in code. Push again when the load average is back to normal. Do not raise the timeouts for this.
+
+## 2026-11-20 — fixed: pre-push gate fails at "seed failed" in an instance whose e2e stack predates file storage
+
+- **Symptom:** `pnpm ci:check` in instance 1 stopped at `✗ seed failed`: `storage:init failed: Error: getaddrinfo ENOTFOUND object-storage` after 30 waits. The same gate passed in instance 4.
+- **Cause:** phase 1 of `scripts/ci-check.sh` starts a fixed list of e2e services, and `object-storage` was not on it. The seed step runs with `--no-deps`, so nothing else started it. Instances where `pnpm e2e:up` had run since file storage was added already had the container; instance 1's e2e stack was created on 2026-11-18 and did not.
+- **Fix:** `object-storage` is in the phase 1 service list.
+- **Lesson:** a service that a `--no-deps` step needs must be started by name; a gate that passes only where an older command left a container behind is not self-sufficient.

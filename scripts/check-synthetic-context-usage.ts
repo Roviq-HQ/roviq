@@ -38,6 +38,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/profile-photo/profile-photo-target.repository.ts',
   // ROV-210: isolated fixtures for the files RLS and attach-guard tests only.
   'apps/api-gateway/src/files/__tests__/files-rls.integration.spec.ts',
+  // ROV-300: hard deletes of files across institutes for the sweeper workflow and FileService.purge.
+  'apps/api-gateway/src/files/file-purge.repository.ts',
+  // ROV-300: isolated fixtures (institutes, files, link rows) for the sweeper tests only.
+  'apps/api-gateway/src/files/__tests__/file-sweeper.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts',
   'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.loaders.ts',
@@ -114,6 +118,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/__tests__/admission-number-series.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-academic.service.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-detail.integration.spec.ts',
+  // ROV-300: isolated fixtures for the student document removal tests only.
+  'apps/api-gateway/src/institute/student/__tests__/student-document-removal.integration.spec.ts',
+  // ROV-300: isolated fixtures for the student document upload tests only.
+  'apps/api-gateway/src/institute/student/__tests__/student-document-upload.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student.service.spec.ts',
   'apps/api-gateway/src/institute/student/student-academic.service.ts',
   'apps/api-gateway/src/institute/student/student-event.handler.ts',

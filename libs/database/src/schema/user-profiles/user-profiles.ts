@@ -100,6 +100,10 @@ export const userProfiles = pgTable(
       sql`${table.bloodGroup} IN ('A+','A-','B+','B-','AB+','AB-','O+','O-')`,
     ),
     index('idx_user_profiles_user_id').on(table.userId),
+    // The file sweeper asks whether any profile still uses a file.
+    index('idx_user_profiles_profile_image_file')
+      .on(table.profileImageFileId)
+      .where(sql`profile_image_file_id IS NOT NULL`),
     /** GIN index on the generated tsvector for fast full-text search */
     index('idx_user_profiles_search').using('gin', sql`search_vector`),
     ...userScopedPolicies('user_profiles'),

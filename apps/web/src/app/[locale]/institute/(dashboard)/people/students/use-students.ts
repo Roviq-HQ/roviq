@@ -346,7 +346,7 @@ export function useGuardiansForStudentPicker(search: string, options: { skip?: b
 
 // ─── Documents uploaded for a student ─────────────────────────────────────
 
-const STUDENT_DOCUMENTS_QUERY = gql`
+export const STUDENT_DOCUMENTS_QUERY = gql`
   query InstituteStudentDocuments($studentProfileId: ID!) {
     listStudentDocuments(studentProfileId: $studentProfileId) {
       id
@@ -408,6 +408,20 @@ export function useUploadStudentDocument() {
   >(UPLOAD_STUDENT_DOCUMENT_MUTATION, {
     refetchQueries: ['InstituteStudentDocuments'],
   });
+}
+
+export const DELETE_STUDENT_DOCUMENT_MUTATION = gql`
+  mutation DeleteStudentDocument($id: ID!) {
+    deleteStudentDocument(id: $id)
+  }
+`;
+
+/** Removes a document with its pages; the server purges the files after a grace period. */
+export function useDeleteStudentDocument() {
+  return useMutation<{ deleteStudentDocument: boolean }, { id: string }>(
+    DELETE_STUDENT_DOCUMENT_MUTATION,
+    { refetchQueries: [STUDENT_DOCUMENTS_QUERY] },
+  );
 }
 
 // ─── TC history for a student ─────────────────────────────────────────────

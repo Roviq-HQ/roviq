@@ -53,6 +53,10 @@ export const staffQualifications = pgTable(
       .onUpdate('cascade'),
 
     index('idx_staff_qualifications_profile').on(table.staffProfileId),
+    // The file sweeper asks whether any qualification still uses a file.
+    index('idx_staff_qualifications_certificate_file')
+      .on(table.certificateFileId)
+      .where(sql`certificate_file_id IS NOT NULL`),
 
     ...tenantPolicies('staff_qualifications'),
   ],

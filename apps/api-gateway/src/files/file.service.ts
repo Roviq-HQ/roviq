@@ -18,13 +18,14 @@ import {
   isImageContentType,
   type ResellerContext,
 } from '@roviq/common-types';
-import { type StorageBucket, StorageClient } from '@roviq/storage';
+import { StorageClient } from '@roviq/storage';
 import type { RequestFileUploadInput } from './dto/request-file-upload.input';
+import { FileSweeper, type PurgeResult } from './file-sweeper';
 import { ImageProcessor, InvalidImageError } from './image/image-processor';
 import type { FileUploadTicket } from './models/file-upload-ticket.model';
 import { FileRepository } from './repositories/file.repository';
 import type { FileRecord } from './repositories/types';
-import { storageKeyFor, variantKeyOf } from './storage-keys';
+import { bucketOf, pendingKeyOf, storageKeyFor, storedKeysOf, variantKeyOf } from './storage-keys';
 
 export const UPLOAD_URL_TTL_SECONDS = 5 * 60;
 export const DOWNLOAD_URL_TTL_SECONDS = 10 * 60;
@@ -44,29 +45,6 @@ const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const PRIVATE_CACHE_CONTROL = `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`;
 
 type UploadVerdict = 'ACCEPTED' | 'CONTENT_MISMATCH' | 'IMAGE_INVALID';
-
-function bucketOf(file: Pick<FileRecord, 'visibility'>): StorageBucket {
-  return file.visibility === 'PUBLIC' ? 'public' : 'private';
-}
-
-/**
- * Where the browser uploads to. Always in the private bucket, and never the key a file is
- * served from: the upload URL stays valid for minutes, so the object behind it can still
- * change after it was checked.
- */
-function pendingKeyOf(file: Pick<FileRecord, 'objectKey'>): string {
-  return `pending/${file.objectKey}`;
-}
-
-/** Every key a file may occupy in its own bucket, for cleanup. */
-function storedKeysOf(file: Pick<FileRecord, 'objectKey'>): string[] {
-  return [
-    file.objectKey,
-    variantKeyOf(file.objectKey, 'SM'),
-    variantKeyOf(file.objectKey, 'MD'),
-    variantKeyOf(file.objectKey, 'FULL'),
-  ];
-}
 
 /** First part of the storage key: who owns the file. Never taken from the request body. */
 function ownerPrefix(user: InstituteContext | ResellerContext, subjectUserId: string | null) {
@@ -89,6 +67,7 @@ export class FileService {
     private readonly storage: StorageClient,
     private readonly abilities: AbilityFactory,
     private readonly images: ImageProcessor,
+    private readonly sweeper: FileSweeper,
   ) {}
 
   async requestUpload(
@@ -192,6 +171,15 @@ export class FileService {
   async claimUploads(fileIds: string[], purpose: FilePurpose): Promise<void> {
     await this.verifyUploads(fileIds, purpose);
     await this.repo.markReady(fileIds, purpose);
+  }
+
+  /**
+   * Removes files and their objects at once, across every institute, whatever their age; a
+   * file that any record still points at is refused. For server workflows only (data erasure): never
+   * reachable from a resolver with ids a user typed.
+   */
+  purge(fileIds: string[]): Promise<PurgeResult> {
+    return this.sweeper.purge(fileIds);
   }
 
   /**
