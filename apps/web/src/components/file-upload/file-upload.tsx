@@ -34,6 +34,7 @@ const TYPE_LABEL: { readonly [T in FileContentType]: string } = {
   [FILE_CONTENT_TYPE.PNG]: 'PNG',
   [FILE_CONTENT_TYPE.WEBP]: 'WebP',
   [FILE_CONTENT_TYPE.CSV]: 'CSV',
+  [FILE_CONTENT_TYPE.XLSX]: 'XLSX',
 };
 
 const BYTES_PER_MB = 1024 * 1024;

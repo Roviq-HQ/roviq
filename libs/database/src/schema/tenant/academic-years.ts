@@ -51,6 +51,8 @@ export const academicYears = pgTable(
     check('academic_years_label_format_check', sql`${table.label} ~ '^[0-9]{4}-[0-9]{2}$'`),
     // One academic-year label per institute (matches canonical "YYYY-YY" contract)
     uniqueIndex('academic_years_tenant_label_key').on(table.tenantId, table.label),
+    // Lets other tables reference a year together with its institute, so a row cannot point at another institute's year.
+    uniqueIndex('academic_years_id_tenant_key').on(table.id, table.tenantId),
     index('academic_years_tenant_id_idx').on(table.tenantId),
     ...tenantPolicies('academic_years'),
   ],

@@ -59,6 +59,8 @@ export const FILE_PURPOSE_VALUES = [
   'INSTITUTE_FAVICON',
   // Institute banner shown on the login page; public
   'INSTITUTE_COVER',
+  // Compliance export (UDISE+, CBSE, RTE …) written by the export workflow
+  'COMPLIANCE_EXPORT',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];

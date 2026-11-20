@@ -9,6 +9,7 @@ export const FILE_CONTENT_TYPE = {
   PNG: 'image/png',
   WEBP: 'image/webp',
   CSV: 'text/csv',
+  XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 } as const;
 
 export type FileContentType = (typeof FILE_CONTENT_TYPE)[keyof typeof FILE_CONTENT_TYPE];
@@ -153,6 +154,17 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     uploadAbility: null,
     readAbility: { action: 'create', subject: 'Student' },
   },
+  COMPLIANCE_EXPORT: {
+    visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
+    allowedContentTypes: [FILE_CONTENT_TYPE.XLSX],
+    maxSizeBytes: 50 * MB,
+    // Holds every student's personal data: downloaded only through an explicit, checked request.
+    sensitive: true,
+    image: null,
+    uploadAbility: null,
+    readAbility: { action: 'read', subject: 'Export' },
+  },
   PROFILE_PHOTO: {
     visibility: 'PRIVATE',
     owner: 'USER',
@@ -232,6 +244,7 @@ const EXTENSION: { readonly [T in FileContentType]: string } = {
   'image/png': 'png',
   'image/webp': 'webp',
   'text/csv': 'csv',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
 };
 
 export function isFileContentType(value: string): value is FileContentType {
@@ -263,6 +276,9 @@ export function fileContentMatchesType(head: Uint8Array, contentType: FileConten
     case 'text/csv':
       // CSV has no signature; a NUL byte means the file is binary.
       return head.length > 0 && !head.includes(0x00);
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      // XLSX is a ZIP archive.
+      return starts(0x50, 0x4b, 0x03, 0x04);
   }
 }
 

@@ -45,6 +45,7 @@ export * from './tenant/examination/grading-schemes';
 export * from './tenant/examination/report-card-instances';
 export * from './tenant/examination/report-cards';
 export * from './tenant/examination/subject-topics';
+export * from './tenant/export-reports';
 export * from './tenant/group-memberships';
 export * from './tenant/holidays';
 export * from './tenant/institute-affiliations';

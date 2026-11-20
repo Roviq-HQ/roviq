@@ -17,6 +17,7 @@ import {
   CERTIFICATE_STATUS_VALUES,
   CERTIFICATE_TEMPLATE_TYPE_VALUES,
   COMPETENCY_LEVEL_VALUES,
+  COMPLIANCE_REPORT_TYPE_VALUES,
   DAY_SESSION_VALUES,
   DOMAIN_GROUP_TYPE_VALUES,
   DYNAMIC_GROUP_STATUS_VALUES,
@@ -26,6 +27,7 @@ import {
   ENQUIRY_STATUS_VALUES,
   EXAM_STATUS_VALUES,
   EXAM_TYPE_VALUES,
+  EXPORT_REPORT_STATUS_VALUES,
   FILE_PURPOSE_VALUES,
   FILE_STATUS_VALUES,
   FILE_VISIBILITY_VALUES,
@@ -97,6 +99,8 @@ export type LeaveStatus = (typeof leaveStatus.enumValues)[number];
 export const fileVisibility = pgEnum('FileVisibility', FILE_VISIBILITY_VALUES);
 export const fileStatus = pgEnum('FileStatus', FILE_STATUS_VALUES);
 export const filePurpose = pgEnum('FilePurpose', FILE_PURPOSE_VALUES);
+export const complianceReportType = pgEnum('ComplianceReportType', COMPLIANCE_REPORT_TYPE_VALUES);
+export const exportReportStatus = pgEnum('ExportReportStatus', EXPORT_REPORT_STATUS_VALUES);
 export const holidayType = pgEnum('HolidayType', HOLIDAY_TYPE_VALUES);
 export type HolidayType = (typeof holidayType.enumValues)[number];
 export const academicYearStatus = pgEnum('AcademicYearStatus', ACADEMIC_YEAR_STATUS_VALUES);
