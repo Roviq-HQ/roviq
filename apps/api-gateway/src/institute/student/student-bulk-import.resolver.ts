@@ -60,7 +60,8 @@ export class StudentBulkImportResolver {
    * Poll this query to track import status.
    */
   @Query(() => BulkImportProgressModel, { description: 'Get bulk import progress by workflow ID' })
-  @CheckAbility({ action: 'read', subject: 'Student' })
+  // Same ability as starting an import: the report repeats values from the uploaded rows.
+  @CheckAbility({ action: 'create', subject: 'Student' })
   async bulkImportProgress(
     @Args('workflowId') workflowId: string,
     @CurrentUser() user: AuthUser,

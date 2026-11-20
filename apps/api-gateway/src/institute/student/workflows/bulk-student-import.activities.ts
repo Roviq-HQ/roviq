@@ -829,7 +829,9 @@ export function createBulkStudentImportActivities(
         original_value: e.originalValue ?? '',
       }));
 
-      const csvContent = Papa.unparse(csvRows);
+      // Values come from the uploaded file: a cell starting with = + - @ must not run as a
+      // formula when the report is opened in a spreadsheet.
+      const csvContent = Papa.unparse(csvRows, { escapeFormulae: true });
 
       // Build full report content with summary header
       const reportContent = [
