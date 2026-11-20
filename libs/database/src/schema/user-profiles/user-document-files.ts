@@ -31,6 +31,8 @@ export const userDocumentFiles = pgTable(
   (table) => [
     index('user_document_files_document_id_idx').on(table.documentId),
     index('user_document_files_user_id_idx').on(table.userId),
+    // Unfiltered: the file sweeper and the foreign-key check on deleting a file look up rows of any state.
+    index('user_document_files_file_id_idx').on(table.fileId),
     // A file belongs to one record only.
     uniqueIndex('user_document_files_file_id_key').on(table.fileId).where(sql`deleted_at IS NULL`),
     ...userScopedPolicies('user_document_files'),

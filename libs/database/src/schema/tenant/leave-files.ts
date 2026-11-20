@@ -28,6 +28,8 @@ export const leaveFiles = pgTable(
       .onUpdate('cascade'),
     index('leave_files_tenant_id_idx').on(table.tenantId),
     index('leave_files_leave_id_idx').on(table.leaveId),
+    // Unfiltered: the file sweeper and the foreign-key check on deleting a file look up rows of any state.
+    index('leave_files_file_id_idx').on(table.fileId),
     // A file belongs to one record only.
     uniqueIndex('leave_files_file_id_key').on(table.fileId).where(sql`deleted_at IS NULL`),
     ...tenantPolicies('leave_files'),

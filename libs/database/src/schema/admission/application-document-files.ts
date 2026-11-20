@@ -30,6 +30,8 @@ export const applicationDocumentFiles = pgTable(
       .onUpdate('cascade'),
     index('application_document_files_tenant_id_idx').on(table.tenantId),
     index('application_document_files_document_id_idx').on(table.documentId),
+    // Unfiltered: the file sweeper and the foreign-key check on deleting a file look up rows of any state.
+    index('application_document_files_file_id_idx').on(table.fileId),
     // A file belongs to one record only.
     uniqueIndex('application_document_files_file_id_key')
       .on(table.fileId)
