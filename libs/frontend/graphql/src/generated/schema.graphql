@@ -1118,8 +1118,10 @@ input BulkCreateStudentsInput {
   """
   fieldMapping: JSON!
 
-  """MinIO/S3 URL of the uploaded CSV file"""
-  fileUrl: String!
+  """
+  File id of the CSV, uploaded with `requestFileUpload` (purpose BULK_IMPORT_CSV).
+  """
+  fileId: ID!
 
   """Default section for all rows unless overridden"""
   sectionId: ID!
@@ -1139,8 +1141,10 @@ type BulkImportProgressModel {
   """Number of rows processed so far"""
   processed: Int!
 
-  """URL of the error report CSV (available when status = COMPLETED)"""
-  reportUrl: String
+  """
+  CSV listing the rows that failed, once the import has completed with errors.
+  """
+  report: FileRef
 
   """Number of rows skipped (duplicates)"""
   skipped: Int!
