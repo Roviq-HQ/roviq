@@ -1,4 +1,5 @@
 import { ErrorCode } from '@roviq/common-types';
+import { SYSTEM_USER_ID } from '@roviq/database';
 import { PaymentMethod } from '@roviq/ee-billing-types';
 import { requestContext } from '@roviq/request-context';
 import { describe, expect, it, vi } from 'vitest';
@@ -474,6 +475,7 @@ describe('PaymentService', () => {
           gatewayOrderId: 'order_123',
           gatewayPaymentId: 'pay_gw_123',
           tenantId: 'tenant-1',
+          actorId: 'test-user-1',
         });
         expect(invoiceService.markPaid).toHaveBeenCalledWith('reseller-1', 'inv-1', 118000n);
         expect(result).toBe(SETTLED);
@@ -553,9 +555,28 @@ describe('PaymentService', () => {
           gatewayOrderId: 'order_123',
           gatewayPaymentId: 'pay_gw_123',
           gatewayResponse: { event: 'payment.captured' },
+          actorId: 'test-user-1',
         });
         expect(paymentRepo.findOrCreateByGatewayId).not.toHaveBeenCalled();
         expect(invoiceService.markPaid).toHaveBeenCalledWith('reseller-1', 'inv-1', 118000n);
+      }));
+
+    it('should record the system user as actor when the webhook has no user', () =>
+      requestContext.run({ ...TEST_CTX, userId: '' }, async () => {
+        const { service, paymentRepo } = createService();
+        paymentRepo.settleGatewayOrder.mockResolvedValue({ payment: PAYMENT, settled: true });
+
+        await service.handleWebhookPayment('reseller-1', {
+          ...WEBHOOK,
+          gatewayOrderId: 'order_123',
+        });
+
+        expect(paymentRepo.settleGatewayOrder).toHaveBeenCalledWith('reseller-1', {
+          gatewayOrderId: 'order_123',
+          gatewayPaymentId: 'pay_gw_123',
+          gatewayResponse: undefined,
+          actorId: SYSTEM_USER_ID,
+        });
       }));
 
     it('should not mark the invoice paid again after the browser verified it', () =>

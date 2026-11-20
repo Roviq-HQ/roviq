@@ -95,6 +95,8 @@ export class PaymentRepository {
       /** Only settle a payment of this institute */
       tenantId?: string;
       gatewayResponse?: unknown;
+      /** Webhooks run without a user and pass the system user */
+      actorId: string;
     },
   ) {
     return withReseller(this.db, mkResellerCtx(resellerId, 'repository:payment'), async (tx) => {
@@ -109,7 +111,7 @@ export class PaymentRepository {
           ...(input.gatewayResponse !== undefined && { gatewayResponse: input.gatewayResponse }),
           paidAt: new Date(),
           updatedAt: new Date(),
-          updatedBy: this.userId,
+          updatedBy: input.actorId,
         })
         .where(and(...scope, eq(payments.status, 'PENDING')))
         .returning();

@@ -127,6 +127,7 @@ export class PaymentService {
       gatewayOrderId: input.gatewayOrderId,
       gatewayPaymentId: verified.gatewayPaymentId,
       tenantId,
+      actorId: getRequestContext().userId,
     });
     if (!result) {
       billingError('PAYMENT_NOT_FOUND', 'No pending payment found for this order');
@@ -352,6 +353,7 @@ export class PaymentService {
         gatewayOrderId: input.gatewayOrderId,
         gatewayPaymentId: input.gatewayPaymentId,
         gatewayResponse: input.gatewayResponse,
+        actorId: userId,
       });
       if (result) {
         if (result.settled) await this.recordCapture(resellerId, result.payment);
