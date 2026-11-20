@@ -311,6 +311,8 @@ services:
       STUDENT_ADMISSION_WORKER_ENABLED: "true"
       # Embedded Temporal worker so a bulk student import runs to completion in e2e.
       STUDENT_IMPORT_WORKER_ENABLED: "true"
+      # Hourly file sweeper; it only touches rows a day or more old, so tests never race it.
+      FILE_SWEEPER_WORKER_ENABLED: "true"
       # E2E-specific overrides
       API_GATEWAY_PORT: "3004"
       ALLOWED_ORIGINS: "http://localhost:${E2E_API_PORT:-3004},http://localhost:${E2E_WEB_PORT:-4201},http://admin.localhost:${E2E_WEB_PORT:-4201},http://reseller.localhost:${E2E_WEB_PORT:-4201}"

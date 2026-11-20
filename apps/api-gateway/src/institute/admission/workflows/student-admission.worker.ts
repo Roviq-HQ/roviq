@@ -14,7 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '@roviq/event-bus';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { IdentityService } from '../../../auth/identity.service';
-import { createDrizzleForWorker } from '../../student/workflows/worker-db';
+import { createDrizzleForWorker } from '../../../common/temporal/worker-db';
 
 const TASK_QUEUE = 'student-admission';
 

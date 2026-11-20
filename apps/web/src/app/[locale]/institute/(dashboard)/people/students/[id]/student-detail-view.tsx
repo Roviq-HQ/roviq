@@ -141,6 +141,7 @@ import {
   useUpdateStudent,
   useUploadStudentDocument,
 } from '../use-students';
+import { RemoveDocumentButton } from './remove-document-button';
 
 const { instituteStudents } = testIds;
 /**
@@ -2080,23 +2081,22 @@ function DocumentsTab({
                     : ''}
                 </p>
               </div>
-              {doc.files.length > 0 && (
-                <div className="flex flex-col gap-1 print:hidden">
-                  {doc.files.map((file, idx) => (
-                    <FileDownloadButton
-                      key={file.id}
-                      fileId={file.id}
-                      scope="institute"
-                      testId={instituteStudents.detailDocumentFileBtn(file.id)}
-                      label={
-                        doc.files.length > 1
-                          ? t('detail.documents.page', { n: idx + 1 })
-                          : t('detail.documents.download')
-                      }
-                    />
-                  ))}
-                </div>
-              )}
+              <div className="flex flex-col items-end gap-1 print:hidden">
+                {doc.files.map((file, idx) => (
+                  <FileDownloadButton
+                    key={file.id}
+                    fileId={file.id}
+                    scope="institute"
+                    testId={instituteStudents.detailDocumentFileBtn(file.id)}
+                    label={
+                      doc.files.length > 1
+                        ? t('detail.documents.page', { n: idx + 1 })
+                        : t('detail.documents.download')
+                    }
+                  />
+                ))}
+                <RemoveDocumentButton documentId={doc.id} type={doc.type} />
+              </div>
             </div>
           </CardContent>
         </Card>

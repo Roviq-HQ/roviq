@@ -153,6 +153,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. KNOWN GAP (ROV-292): the profile row is shared across institutes.',
   'apps/api-gateway/src/institute/student/student.service.ts#StudentService.create':
     'KNOWN GAP (ROV-292): reuses an existing user matched by phone number without consent. Otherwise writes rows for the user it just created.',
+  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.deleteDocument':
+    'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/student.service.ts#StudentService.uploadDocument':
     'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS.',
   'apps/api-gateway/src/institute/user/profile.service.ts#ProfileService.getMyProfile':
@@ -196,6 +198,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
 export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/files/file.loaders.ts':
     'Reached through a dataloader that runs as the role of the request scope; the admin branch runs only for a platform-scope token.',
+  'apps/api-gateway/src/files/file-purge.repository.ts':
+    'Bound in FilesModule for FileSweeper; reached only by the sweeper workflow and FileService.purge (server workflows), which no resolver calls.',
   'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts':
     'Imported by InstituteService; runs only from institute activation, which no non-admin resolver method calls.',
   'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts':

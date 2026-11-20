@@ -116,6 +116,7 @@ App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
 - **Traces**: auto-instrumented via `@opentelemetry/auto-instrumentations-node`. Sampling: 100% in dev, 10% in production.
 - **Metrics**: exported every 10s in dev (60s in production). Metric names are prefixed `roviq_`.
 - **Per-tenant API usage** (ROV-184): the api-gateway counter `roviq.api.requests` (Apollo plugin `TenantApiRequestsPlugin`) adds 1 per GraphQL operation over HTTP from an institute-scope caller, labelled `tenant_id`. graphql-ws subscriptions are not counted. Prometheus series: `roviq_roviq_api_requests_total`. The platform-admin query `adminTenantAnalytics` (module `apps/api-gateway/src/admin/monitoring/tenant-analytics/`, ability `read SystemHealth`) reads it with `sum by (tenant_id)(increase(…[24h]))` for `apiCalls24h` and a 7-point 1-day-step range for `activityTrend7d`; `activeUsers24h` comes from `refresh_tokens` (distinct users with a token created or used in the last 24h). When Prometheus is unreachable the query still answers, with `metricsAvailable: false` and null API-call fields. A tenant's calls made before its series was first scraped are not counted, because `increase()` needs two samples.
+- **File sweeper** (ROV-300): the api-gateway counter `file_sweeper_files_total` (Prometheus: `roviq_file_sweeper_files_total`) counts files the hourly sweeper handled, labelled `action` (`pending`, `rejected`, `deleted`, `retired_timed`, `retired_unused`, `purge`) and `result` (`removed`, `failed`, `skipped`). For the two `retired_*` actions, `removed` means the file was marked DELETED, not yet erased. A steady `failed` count means storage refuses deletes. See `docs/architecture.md` → "File sweeper".
 - **Logs**: OTel Pino instrumentation injects `trace_id`/`span_id` into log records for correlation (log shipping to Loki requires a separate pipeline — not yet configured).
 - **Grafana dashboard**: provisioned at `docker/grafana/dashboards/overview.json`, accessible at http://localhost:3001/d/roviq-overview or via the admin-portal Observability page.
 
@@ -193,6 +194,7 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | S3_BUCKET_PUBLIC | Bucket for files readable without sign-in (branding) |
 | S3_PUBLIC_BASE_URL | Stable base URL of the public bucket (a CDN in production) |
 | TEMPORAL_ADDRESS | Temporal server (host:port) |
+| FILE_SWEEPER_WORKER_ENABLED | `true` runs the hourly file sweeper worker in this gateway and creates its Temporal schedule (ROV-300). Unset or anything else: off |
 | STRIPE_SECRET_KEY | Stripe API key (use sk_test_... for dev) |
 | STRIPE_WEBHOOK_SECRET | Validates incoming Stripe webhook signatures |
 | SENTRY_DSN | Sentry error tracking (leave empty to disable) |

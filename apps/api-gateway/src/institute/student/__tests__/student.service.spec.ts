@@ -205,6 +205,12 @@ vi.mock('drizzle-orm/pg-core', () => {
   };
 });
 
+vi.mock('../../../files/user-document-files', () => ({
+  attachUserDocumentFiles: vi.fn(),
+  loadUserDocumentFiles: vi.fn(),
+  removeUserDocument: vi.fn(),
+}));
+
 // Mock status-machine to isolate update() behavior from transition rules.
 vi.mock('../student.state-machine', () => ({
   STUDENT_ACADEMIC_STATE_MACHINE: {
@@ -357,6 +363,73 @@ describe('StudentService (unit)', () => {
         { gender: 'unknown', count: 2 },
       ]);
       expect(result.byCategory).toEqual([{ category: 'general', count: 40 }]);
+    });
+  });
+
+  describe('deleteDocument', () => {
+    const admin = createMongoAbility<AppAbility>([{ action: 'manage', subject: 'all' }]);
+    const noAadhaar = createMongoAbility<AppAbility>([
+      { action: 'manage', subject: 'Student' },
+      { action: 'read', subject: 'Student', fields: ['aadhaar'], inverted: true },
+    ]);
+
+    async function removeMock() {
+      const { removeUserDocument } = await import('../../../files/user-document-files');
+      return vi.mocked(removeUserDocument);
+    }
+
+    it('rejects with STUDENT_NOT_FOUND when the caller cannot reach the document', async () => {
+      queueResult([]);
+      const remove = await removeMock();
+
+      await expect(service.deleteDocument('doc-1', admin)).rejects.toMatchObject({
+        code: ErrorCode.STUDENT_NOT_FOUND,
+      });
+      expect(remove).not.toHaveBeenCalled();
+    });
+
+    it('rejects an Aadhaar document for a caller without the aadhaar field, with STUDENT_NOT_FOUND', async () => {
+      queueResult([{ type: 'AADHAAR_CARD' }]);
+      const remove = await removeMock();
+
+      await expect(service.deleteDocument('doc-1', noAadhaar)).rejects.toMatchObject({
+        code: ErrorCode.STUDENT_NOT_FOUND,
+      });
+      expect(remove).not.toHaveBeenCalled();
+    });
+
+    it('rejects with STUDENT_NOT_FOUND when the document was removed meanwhile', async () => {
+      queueResult([{ type: 'BIRTH_CERTIFICATE' }]);
+      const remove = await removeMock();
+      remove.mockResolvedValueOnce(false);
+
+      await expect(service.deleteDocument('doc-1', admin)).rejects.toMatchObject({
+        code: ErrorCode.STUDENT_NOT_FOUND,
+      });
+    });
+
+    it('removes another document type for a caller without the aadhaar field', async () => {
+      queueResult([{ type: 'BIRTH_CERTIFICATE' }]);
+      const remove = await removeMock();
+      remove.mockResolvedValueOnce(true);
+
+      await expect(service.deleteDocument('doc-1', noAadhaar)).resolves.toBe(true);
+      expect(remove).toHaveBeenCalledTimes(1);
+    });
+
+    it('removes the document as admin for the acting user, once', async () => {
+      queueResult([{ type: 'AADHAAR_CARD' }]);
+      const remove = await removeMock();
+      remove.mockResolvedValueOnce(true);
+      const { withAdmin } = await import('@roviq/database');
+
+      await expect(service.deleteDocument('doc-1', admin)).resolves.toBe(true);
+
+      expect(withAdmin).toHaveBeenCalledTimes(1);
+      expect(remove).toHaveBeenCalledTimes(1);
+      expect(remove.mock.calls[0][1]).toEqual({ documentId: 'doc-1', actorId: 'user-1' });
+      // No event: EVENT_PATTERNS has no student-document group; the mutation is audited instead.
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
   });
 });

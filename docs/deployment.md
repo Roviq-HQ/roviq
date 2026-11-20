@@ -93,6 +93,20 @@ The R2 column is from Cloudflare's documentation and has not been run against th
 `pnpm storage:check` decides: in particular it proves that a presigned upload is refused when the
 body's size or type differs from what was signed, which the upload design depends on.
 
+## Background workers
+
+Temporal workers run inside the api-gateway process, switched on per instance with a
+`*_WORKER_ENABLED=true` variable. Set each flag on exactly the gateway instances that should run
+that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
+
+- **`FILE_SWEEPER_WORKER_ENABLED`** (ROV-300): the hourly file sweeper (`docs/architecture.md` →
+  "File sweeper"). It creates the `file-sweeper-hourly` schedule at start if Temporal does not
+  have it, so it needs Temporal reachable at start; the schedule skips a run while the previous
+  one is still going, so more than one instance is safe but wasteful. Without any instance
+  running it, stale uploads and deleted files are never removed from storage. The storage
+  access key needs delete rights on both buckets (already in the list under "Object storage").
+  It connects with `DATABASE_URL` and runs its queries as `roviq_admin`.
+
 ## Redis
 
 Redis is on the request path for access control, not only for caching:

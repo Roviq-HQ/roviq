@@ -11,6 +11,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AcademicStatus,
   AdmissionType,
+  type AppAbility,
   BusinessException,
   ErrorCode,
   SocialCategory,
@@ -35,6 +36,7 @@ import {
   studentProfiles,
   studentProfilesLive,
   userDocuments,
+  userDocumentsLive,
   userProfiles,
   userProfilesLive,
   withAdmin,
@@ -46,7 +48,11 @@ import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import { FileService } from '../../files/file.service';
 import { markFilesReady } from '../../files/file-attachment';
-import { attachUserDocumentFiles, loadUserDocumentFiles } from '../../files/user-document-files';
+import {
+  attachUserDocumentFiles,
+  loadUserDocumentFiles,
+  removeUserDocument,
+} from '../../files/user-document-files';
 import { nextAdmissionNumber } from './admission-number.sequence';
 import type { CreateStudentInput } from './dto/create-student.input';
 import type { StudentFilterInput } from './dto/student-filter.input';
@@ -54,6 +60,7 @@ import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
 import { StudentReadRepository } from './student-read.repository';
+import { studentReadPredicate } from './student-read-predicate';
 
 const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
 
@@ -368,6 +375,44 @@ export class StudentService {
       createdAt: inserted.createdAt,
       updatedAt: inserted.updatedAt,
     };
+  }
+
+  /**
+   * Removes a document of a student of this institute together with its pages and files. Every
+   * way the caller cannot reach the document answers STUDENT_NOT_FOUND, so ids cannot be probed.
+   */
+  async deleteDocument(documentId: string, ability: AppAbility): Promise<boolean> {
+    const tenantId = this.getTenantId();
+    const actorId = this.getUserId();
+
+    const documents = await withTenant(
+      this.db,
+      mkInstituteCtx(tenantId, 'service:student'),
+      async (tx) => {
+        return tx
+          .select({ type: userDocumentsLive.type })
+          .from(userDocumentsLive)
+          .innerJoin(studentProfilesLive, eq(studentProfilesLive.userId, userDocumentsLive.userId))
+          .where(and(eq(userDocumentsLive.id, documentId), studentReadPredicate(ability, null)))
+          .limit(1);
+      },
+    );
+    const document = documents[0];
+    // Same field rule as the document list: a caller who cannot see Aadhaar cannot remove it.
+    const hidden = document?.type === 'AADHAAR_CARD' && !ability.can('read', 'Student', 'aadhaar');
+    if (!document || hidden) {
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Document not found');
+    }
+
+    const removed = await withAdmin(this.db, mkAdminCtx('service:student'), (tx) =>
+      removeUserDocument(tx, { documentId, actorId }),
+    );
+    if (!removed) {
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Document not found');
+    }
+
+    this.logger.log(`Student document removed: document=${documentId} actor=${actorId}`);
+    return true;
   }
 
   /**
