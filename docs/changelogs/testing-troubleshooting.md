@@ -812,3 +812,9 @@ In one full `pnpm test:e2e:ui` run in slot 4 (273 passed, 1 failed, 3 did not ru
 - **Cause:** ROV-186 and the storage work (ROV-210 onward) were written in parallel, so their migrations both have the ROV-185 snapshot as parent: two branches. The storage snapshots do not know the `reseller_own_update` policy from ROV-186. The next `drizzle-kit generate` (ROV-301 student documents) therefore put that policy into its migration and snapshot a second time, and drizzle-kit saw two branches creating the same policy.
 - **Fix:** removed the duplicate `CREATE POLICY` line from the new migration and gave its `snapshot.json` both branch tips as `prevIds`, which makes it the merge point. `drizzle-kit check` passes and `drizzle-kit generate` reports no changes.
 - **Lesson:** after merging branches that each added a migration, the first `drizzle-kit generate` re-emits whatever the other branch added. Read the generated SQL for statements that are not yours, delete them, and add the other branch's last snapshot id to `prevIds`.
+
+## 2026-11-20 — fixed: `reseller-system-roles.integration.spec.ts` foreign-key failure in full integration runs
+
+Resolves the entry of 2026-11-19 ("seen once, cause unconfirmed"). It happened a second time in a full `pnpm test:int` run in slot 4 (2 failed, 757 passed), again with `23503 … Key (reseller_id)=(…) is not present in table "resellers"`, and the file passed when run alone, which fits the suspected cause: the ROV-91 backfill statement inserts roles for every reseller in `roviq_test` while other test files create and delete resellers.
+
+Fix: the two backfill tests take `LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE` in their own (rolled back) transaction before running the migration statements, so concurrent reseller writes wait for the few milliseconds the test holds it. The migration itself is unchanged; in a real deployment it runs alone.
