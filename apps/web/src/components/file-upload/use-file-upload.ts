@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  FILE_CONTENT_TYPE,
   FILE_PURPOSE_POLICY,
   type FilePurpose,
   IMAGE_PICK_MAX_BYTES,
@@ -70,6 +71,8 @@ export interface UploadItem {
   /** Set once the upload has finished. */
   fileId: string | null;
   errorKey: FileUploadErrorKey | null;
+  /** The picked file, after `withAllowedCsvType`. */
+  file: File;
 }
 
 interface Tracked {
@@ -96,6 +99,25 @@ function putWithProgress(
     xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
     signal.addEventListener('abort', () => xhr.abort(), { once: true });
     xhr.send(file);
+  });
+}
+
+/**
+ * Windows reports a .csv as `application/vnd.ms-excel` (or nothing) when Excel is installed, so the
+ * name decides for a purpose that takes CSV.
+ */
+export function withAllowedCsvType(file: File, allowed: readonly string[]): File {
+  const isCsvName = file.name.toLowerCase().endsWith('.csv');
+  if (
+    !isCsvName ||
+    file.type === FILE_CONTENT_TYPE.CSV ||
+    !allowed.includes(FILE_CONTENT_TYPE.CSV)
+  ) {
+    return file;
+  }
+  return new File([file], file.name, {
+    type: FILE_CONTENT_TYPE.CSV,
+    lastModified: file.lastModified,
   });
 }
 
@@ -167,7 +189,8 @@ export function useFileUpload(purpose: FilePurpose, subjectUserId?: string) {
   const add = React.useCallback(
     (files: File[]) => {
       const allowed: readonly string[] = policy.allowedContentTypes;
-      const added = files.map((file) => {
+      const added = files.map((picked) => {
+        const file = withAllowedCsvType(picked, allowed);
         const errorKey: FileUploadErrorKey | null = !allowed.includes(file.type)
           ? 'FILE_TYPE_NOT_ALLOWED'
           : // A photo is shrunk before upload, so its limit applies to the result (see `start`).
@@ -182,6 +205,7 @@ export function useFileUpload(purpose: FilePurpose, subjectUserId?: string) {
           progress: 0,
           fileId: null,
           errorKey,
+          file,
         };
         return { item, file };
       });

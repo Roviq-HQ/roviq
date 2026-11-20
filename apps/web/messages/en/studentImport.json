@@ -1,0 +1,112 @@
+{
+  "title": "Import students",
+  "description": "Add many students at once from a CSV file.",
+  "accessDenied": "You do not have permission to import students.",
+  "steps": {
+    "file": "File",
+    "target": "Class",
+    "columns": "Columns",
+    "run": "Import"
+  },
+  "stepOf": "Step {current} of {total}",
+  "file": {
+    "heading": "Choose the CSV file",
+    "label": "Student list (CSV file)",
+    "description": "The first row must hold column names. One student per row.",
+    "sampleTitle": "Not sure about the format?",
+    "sampleBody": "Download the sample, fill in your students, save it as CSV and choose it here.",
+    "sampleButton": "Download sample CSV",
+    "headerErrors": {
+      "EMPTY": "This file has no column names in its first row.",
+      "DUPLICATE_HEADERS": "Two columns in this file have the same name. Rename one and choose the file again.",
+      "UNREADABLE": "This file could not be read. Save it again as CSV and retry."
+    }
+  },
+  "target": {
+    "heading": "Choose the class",
+    "description": "Every student in the file joins this class. The admission number is created for any row that leaves it empty.",
+    "academicYear": "Academic year",
+    "academicYearPlaceholder": "Select academic year",
+    "active": "active",
+    "standard": "Standard",
+    "standardPlaceholder": "Select standard",
+    "section": "Section",
+    "sectionPlaceholder": "Select section",
+    "noStandards": "This academic year has no standards yet.",
+    "noSections": "This standard has no sections yet."
+  },
+  "columns": {
+    "heading": "Match the columns",
+    "description": "Tell us what each column of your file holds. Columns already named like a field are matched for you.",
+    "column": "Column in your file",
+    "field": "Imports as",
+    "skip": "Do not import",
+    "required": "required",
+    "autoMatched": "Matched by its name. It can be changed to another field but not left out.",
+    "missing": "Match a column to: {fields}.",
+    "duplicate": "More than one column is matched to: {fields}. Choose one.",
+    "fields": {
+      "first_name": "First name",
+      "last_name": "Last name",
+      "date_of_birth": "Date of birth (DD/MM/YYYY)",
+      "gender": "Gender (male, female, other)",
+      "father_name": "Father's name",
+      "mother_name": "Mother's name",
+      "phone": "Mobile number (10 digits)",
+      "email": "Email",
+      "social_category": "Social category (GENERAL, SC, ST, OBC, EWS)",
+      "admission_type": "Admission type (NEW, LATERAL_ENTRY, RE_ADMISSION, TRANSFER)",
+      "admission_number": "Admission number",
+      "standard_id": "Standard ID (overrides the class)",
+      "section_id": "Section ID (overrides the class)",
+      "religion": "Religion",
+      "blood_group": "Blood group",
+      "previous_school_name": "Previous institute"
+    }
+  },
+  "back": "Back",
+  "next": "Next",
+  "start": "Start import",
+  "starting": "Starting…",
+  "startFailed": "The import could not be started. Please try again.",
+  "fileUsed": "This file has already been imported. Choose the file again to import it once more.",
+  "progress": {
+    "heading": "Importing students",
+    "leaveNote": "You can leave this page. The import keeps running, and this link shows its progress.",
+    "rows": "{processed} of {total} rows",
+    "stages": {
+      "PARSING": "Reading the file",
+      "VALIDATING": "Checking each row",
+      "INSERTING": "Adding students",
+      "GENERATING_REPORT": "Preparing the error report"
+    },
+    "stageDone": "done",
+    "stageCurrent": "in progress",
+    "stagePending": "waiting",
+    "created": "Added",
+    "skipped": "Skipped",
+    "skippedHint": "already in the institute",
+    "errors": "Errors",
+    "reconnecting": "Lost touch with the server. Retrying…"
+  },
+  "summary": {
+    "heading": "Import finished",
+    "body": "{created, plural, =0 {No students added} one {# student added} other {# students added}}, {skipped, plural, =0 {none skipped} other {# skipped}}, {errors, plural, =0 {no errors} one {# error} other {# errors}}.",
+    "reportTitle": "Some rows were not imported",
+    "reportBody": "The error report lists each row that failed and why. Fix those rows and import them again.",
+    "reportButton": "Download error report",
+    "nextSteps": "What next",
+    "viewStudents": "View students",
+    "viewStudentsBody": "See the students that were added.",
+    "importAnother": "Import another file",
+    "importAnotherBody": "Start again with a new CSV file."
+  },
+  "failed": {
+    "heading": "The import failed",
+    "body": "No more rows will be imported. Students added before the failure stay. Try again, or contact support if it keeps failing."
+  },
+  "notFound": {
+    "heading": "Import not found",
+    "body": "This link does not match an import of your institute."
+  }
+}
