@@ -1846,8 +1846,10 @@ input CreateStaffQualificationInput {
   """Examining board or university name."""
   boardUniversity: String
 
-  """MinIO/S3 URL of the uploaded certificate scan."""
-  certificateUrl: String
+  """
+  File id of the certificate scan, uploaded with `requestFileUpload` (purpose STAFF_CERTIFICATE).
+  """
+  certificateFileId: ID
 
   """
   Name of the degree or certification, e.g. "B.Ed", "CTET", "M.Sc Physics".
@@ -2533,6 +2535,7 @@ enum FilePurpose {
   BULK_IMPORT_REPORT
   LEAVE_ATTACHMENT
   PROFILE_PHOTO
+  STAFF_CERTIFICATE
   USER_DOCUMENT
 }
 
@@ -5823,7 +5826,11 @@ type StaffModel {
 """Structured staff qualification (academic degree or certification)"""
 type StaffQualificationModel {
   boardUniversity: String
-  certificateUrl: String
+
+  """
+  Scan of the certificate. For an image, ask for `url(variant: MD)` to preview.
+  """
+  certificate: FileRef
   createdAt: DateTime!
   degreeName: String!
   gradePercentage: String
@@ -7097,8 +7104,10 @@ input UpdateStaffQualificationInput {
   """Examining board or university name."""
   boardUniversity: String
 
-  """MinIO/S3 URL of the uploaded certificate scan."""
-  certificateUrl: String
+  """
+  File id of a new certificate scan (purpose STAFF_CERTIFICATE). Null removes the scan; leave out to keep it.
+  """
+  certificateFileId: ID
 
   """
   Name of the degree or certification, e.g. "B.Ed", "CTET", "M.Sc Physics".
