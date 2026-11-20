@@ -13,7 +13,6 @@ const INSTITUTE_LIST_FIELDS = gql`
     structureFramework
     setupStatus
     status
-    logoUrl
     timezone
     currency
     createdAt
@@ -42,7 +41,6 @@ const INSTITUTE_DETAIL_FIELDS = gql`
     setupStatus
     contact { phones { countryCode number isPrimary isWhatsappEnabled label } emails { address isPrimary label } }
     address { line1 line2 line3 city district state postalCode country coordinates { lat lng } }
-    logoUrl
     timezone
     currency
     settings
@@ -51,12 +49,12 @@ const INSTITUTE_DETAIL_FIELDS = gql`
     updatedAt
     branding {
       id
-      logoUrl
-      faviconUrl
+      logo { id url(variant: MD) }
+      favicon { id url(variant: SM) }
+      coverImage { id url(variant: MD) }
       primaryColor
       secondaryColor
       themeIdentifier
-      coverImageUrl
     }
     config {
       id

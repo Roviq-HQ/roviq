@@ -909,7 +909,6 @@ describe('AuthService', () => {
             id: 'tenant-1',
             name: { en: 'Test Institute' },
             slug: 'test-institute',
-            logoUrl: null,
             resellerId: '00000000-0000-7000-a000-000000000011',
           },
         },

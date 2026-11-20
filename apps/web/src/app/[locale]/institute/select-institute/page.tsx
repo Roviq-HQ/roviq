@@ -6,7 +6,6 @@ import { useI18nField } from '@roviq/i18n';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { useRoleName } from '@web/hooks/use-role-name';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -99,12 +98,14 @@ export default function SelectInstitutePage() {
                   data-institute-name={ti(membership.instituteName)}
                 >
                   {membership.instituteLogoUrl ? (
-                    <Image
+                    // Not next/image: the logo is already a small stored size on the storage host.
+                    // biome-ignore lint/performance/noImgElement: see above
+                    <img
                       src={membership.instituteLogoUrl}
                       alt={ti(membership.instituteName)}
                       width={40}
                       height={40}
-                      className="h-10 w-10 rounded-md object-cover"
+                      className="h-10 w-10 shrink-0 rounded-md object-contain"
                     />
                   ) : (
                     <div className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-sm font-bold">

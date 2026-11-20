@@ -146,7 +146,6 @@ function makeInstituteRecord(overrides: Partial<InstituteRecord> = {}): Institut
       emails: [{ address: 'admin@test.com', isPrimary: true, label: 'Primary' }],
     },
     address: null,
-    logoUrl: null,
     timezone: 'Asia/Kolkata',
     currency: 'INR',
     settings: {},

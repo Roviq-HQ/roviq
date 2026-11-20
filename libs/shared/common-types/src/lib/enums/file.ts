@@ -53,6 +53,12 @@ export const FILE_PURPOSE_VALUES = [
   'STAFF_CERTIFICATE',
   // Scan of a document submitted with an admission application (birth certificate, Aadhaar, TC)
   'APPLICATION_DOCUMENT',
+  // Institute logo shown in the portal header and on the login page; public
+  'INSTITUTE_LOGO',
+  // Institute browser-tab icon; public
+  'INSTITUTE_FAVICON',
+  // Institute banner shown on the login page; public
+  'INSTITUTE_COVER',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];

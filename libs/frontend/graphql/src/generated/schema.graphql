@@ -2567,6 +2567,9 @@ enum FilePurpose {
   APPLICATION_DOCUMENT
   BULK_IMPORT_CSV
   BULK_IMPORT_REPORT
+  INSTITUTE_COVER
+  INSTITUTE_FAVICON
+  INSTITUTE_LOGO
   LEAVE_ATTACHMENT
   PROFILE_PHOTO
   RESELLER_FAVICON
@@ -3227,11 +3230,19 @@ type InstituteAffiliationModel {
   validTo: String!
 }
 
+"""
+Visual branding of an institute. `logo`, `favicon` and `coverImage` are public images.
+"""
 type InstituteBrandingModel {
-  coverImageUrl: String
-  faviconUrl: String
+  """Banner shown on the login page."""
+  coverImage: FileRef
+
+  """Browser-tab icon."""
+  favicon: FileRef
   id: ID!
-  logoUrl: String
+
+  """Logo shown in the portal header. Ask for `url(variant: MD)`."""
+  logo: FileRef
   primaryColor: String
   secondaryColor: String
   themeIdentifier: String
@@ -3399,7 +3410,6 @@ type InstituteModel {
   id: ID!
   identifiers: [InstituteIdentifierModel!]
   isDemo: Boolean
-  logoUrl: String
   name: I18nText!
   resellerId: String
 
@@ -6886,19 +6896,23 @@ input UpdateHolidayInput {
 }
 
 """
-Visual branding fields for the institute portal. All fields are optional.
+Visual branding fields for the institute portal. All fields are optional. Upload images first with `requestFileUpload`.
 """
 input UpdateInstituteBrandingInput {
   """
-  MinIO/S3 URL of a cover/banner image shown on login and dashboard hero sections.
+  Banner shown on the login page: the id of an upload with purpose INSTITUTE_COVER. Null removes it; leave out to keep it.
   """
-  coverImageUrl: String
+  coverImageFileId: ID
 
-  """MinIO/S3 URL of the favicon (16×16 or 32×32 PNG/ICO)."""
-  faviconUrl: String
+  """
+  Browser-tab icon: the id of an upload with purpose INSTITUTE_FAVICON. Null removes it; leave out to keep it.
+  """
+  faviconFileId: ID
 
-  """MinIO/S3 URL of the institute logo shown in the portal header."""
-  logoUrl: String
+  """
+  Logo shown in the portal header: the id of an upload with purpose INSTITUTE_LOGO. Null removes the logo; leave out to keep it.
+  """
+  logoFileId: ID
 
   """
   Primary brand colour in hex format, e.g. "#1677FF". Used for buttons, links, and highlights.

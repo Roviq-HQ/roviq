@@ -35,6 +35,8 @@ import {
   sql,
 } from 'drizzle-orm';
 import { decodeCursor } from '../../../common/pagination/relay-pagination.model';
+import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
+import { BRANDING_IMAGES, type BrandingImageColumn } from '../branding-images';
 import { InstituteRepository } from './institute.repository';
 import type {
   CreateInstituteData,
@@ -96,7 +98,6 @@ const instituteLiveColumns = {
   setupStatus: institutesLive.setupStatus,
   contact: institutesLive.contact,
   address: institutesLive.address,
-  logoUrl: institutesLive.logoUrl,
   timezone: institutesLive.timezone,
   currency: institutesLive.currency,
   settings: institutesLive.settings,
@@ -123,7 +124,6 @@ const instituteColumns = {
   setupStatus: institutes.setupStatus,
   contact: institutes.contact,
   address: institutes.address,
-  logoUrl: institutes.logoUrl,
   timezone: institutes.timezone,
   currency: institutes.currency,
   settings: institutes.settings,
@@ -381,19 +381,39 @@ export class InstituteDrizzleRepository extends InstituteRepository {
     const { userId } = getRequestContext();
 
     await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
+      const [current] = await tx
+        .select({
+          logoFileId: instituteBrandingLive.logoFileId,
+          faviconFileId: instituteBrandingLive.faviconFileId,
+          coverImageFileId: instituteBrandingLive.coverImageFileId,
+        })
+        .from(instituteBrandingLive)
+        .where(eq(instituteBrandingLive.tenantId, id));
+
+      const images: Partial<Record<BrandingImageColumn, string | null>> = {};
+      const replaced: string[] = [];
+      for (const { column, purpose } of BRANDING_IMAGES) {
+        const next = data[column];
+        const previous = current?.[column] ?? null;
+        if (next === undefined || next === previous) continue;
+        images[column] = next;
+        if (next) {
+          // Admin transaction: the tenant filter is what keeps another institute's upload out.
+          await markFilesReady(tx, { fileIds: [next], purpose, userId, tenantId: id });
+        }
+        if (previous) replaced.push(previous);
+      }
+
+      const fields = {
+        ...images,
+        ...(data.primaryColor !== undefined && { primaryColor: data.primaryColor }),
+        ...(data.secondaryColor !== undefined && { secondaryColor: data.secondaryColor }),
+        ...(data.themeIdentifier !== undefined && { themeIdentifier: data.themeIdentifier }),
+        updatedBy: userId,
+      };
       await tx
         .insert(instituteBranding)
-        .values({
-          tenantId: id,
-          ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
-          ...(data.faviconUrl !== undefined && { faviconUrl: data.faviconUrl }),
-          ...(data.primaryColor !== undefined && { primaryColor: data.primaryColor }),
-          ...(data.secondaryColor !== undefined && { secondaryColor: data.secondaryColor }),
-          ...(data.themeIdentifier !== undefined && { themeIdentifier: data.themeIdentifier }),
-          ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
-          createdBy: userId,
-          updatedBy: userId,
-        })
+        .values({ tenantId: id, ...fields, createdBy: userId })
         .onConflictDoUpdate({
           target: instituteBranding.tenantId,
           // `institute_branding.tenant_id` uses a PARTIAL unique index
@@ -401,16 +421,9 @@ export class InstituteDrizzleRepository extends InstituteRepository {
           // partial unique indexes when the predicate matches exactly, so we
           // must repeat it here.
           targetWhere: sql`${instituteBranding.deletedAt} IS NULL`,
-          set: {
-            ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
-            ...(data.faviconUrl !== undefined && { faviconUrl: data.faviconUrl }),
-            ...(data.primaryColor !== undefined && { primaryColor: data.primaryColor }),
-            ...(data.secondaryColor !== undefined && { secondaryColor: data.secondaryColor }),
-            ...(data.themeIdentifier !== undefined && { themeIdentifier: data.themeIdentifier }),
-            ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
-            updatedBy: userId,
-          },
+          set: fields,
         });
+      await markFilesDeleted(tx, { fileIds: replaced, userId });
     });
 
     const record = await this.findById(id);

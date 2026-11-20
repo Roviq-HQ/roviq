@@ -123,6 +123,6 @@ export interface RefreshTokenWithRelations {
      * institute-scope JWT containing `resellerId` (ROV-261) without an
      * extra round-trip to `membershipRepo`.
      */
-    institute: InstituteInfo;
+    institute: Omit<InstituteInfo, 'logoUrl'>;
   } | null;
 }

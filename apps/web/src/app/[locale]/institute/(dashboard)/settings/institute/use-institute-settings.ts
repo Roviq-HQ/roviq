@@ -23,7 +23,6 @@ const INSTITUTE_FIELDS = gql`
     version
     contact { phones { countryCode number isPrimary isWhatsappEnabled label } emails { address isPrimary label } }
     address { line1 line2 line3 city district state postalCode country coordinates { lat lng } }
-    logoUrl
     timezone
     currency
     settings
@@ -34,12 +33,12 @@ const INSTITUTE_FIELDS = gql`
     updatedAt
     branding {
       id
-      logoUrl
-      faviconUrl
+      logo { id url(variant: MD) width height placeholder }
+      favicon { id url(variant: SM) width height placeholder }
+      coverImage { id url(variant: FULL) width height placeholder }
       primaryColor
       secondaryColor
       themeIdentifier
-      coverImageUrl
     }
     config {
       id

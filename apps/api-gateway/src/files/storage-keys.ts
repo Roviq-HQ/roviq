@@ -1,4 +1,9 @@
-import { type FileContentType, type FilePurpose, fileExtensionFor } from '@roviq/common-types';
+import {
+  type FileContentType,
+  type FilePurpose,
+  fileExtensionFor,
+  type ImageVariant,
+} from '@roviq/common-types';
 
 /** Storage key of a file: `{owner}/{purpose}/{fileId}.{ext}`, e.g. `institutes/{id}/…`. */
 export function storageKeyFor(
@@ -9,4 +14,9 @@ export function storageKeyFor(
 ): string {
   const folder = purpose.toLowerCase().replaceAll('_', '-');
   return `${ownerPrefix}/${folder}/${fileId}.${fileExtensionFor(contentType)}`;
+}
+
+/** Key of one stored size of an image: `…/{fileId}/sm.webp`. */
+export function variantKeyOf(objectKey: string, variant: ImageVariant): string {
+  return `${objectKey.replace(/\.[a-z0-9]+$/, '')}/${variant.toLowerCase()}.webp`;
 }

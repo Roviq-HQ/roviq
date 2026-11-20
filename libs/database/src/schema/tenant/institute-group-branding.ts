@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
 import { entityPolicies } from '../common/rls-policies';
+import { files } from '../storage/files';
 import { instituteGroups } from './institute-groups';
 
 export const instituteGroupBranding = pgTable(
@@ -11,8 +12,15 @@ export const instituteGroupBranding = pgTable(
     groupId: uuid('group_id')
       .notNull()
       .references(() => instituteGroups.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    logoUrl: text('logo_url'),
-    faviconUrl: text('favicon_url'),
+    /** Same purposes as an institute's own branding: INSTITUTE_LOGO and INSTITUTE_FAVICON. */
+    logoFileId: uuid('logo_file_id').references(() => files.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    faviconFileId: uuid('favicon_file_id').references(() => files.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
     primaryColor: text('primary_color'),
     secondaryColor: text('secondary_color'),
     theme: text(),

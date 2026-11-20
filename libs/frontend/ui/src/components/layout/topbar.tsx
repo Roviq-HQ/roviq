@@ -1,7 +1,6 @@
 'use client';
 
 import { Bell, Building2, Check, ChevronsUpDown, Monitor, Moon, Sun } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
@@ -51,12 +50,13 @@ function InstituteSwitcherInline({ config }: { config: InstituteSwitcherConfig }
           >
             <div className="flex w-full items-center gap-2">
               {m.instituteLogoUrl ? (
-                <Image
+                // Not next/image: the logo is already a small stored size on the storage host.
+                <img
                   src={m.instituteLogoUrl}
                   alt={m.instituteName}
                   width={24}
                   height={24}
-                  className="h-6 w-6 rounded object-cover"
+                  className="h-6 w-6 shrink-0 rounded object-contain"
                 />
               ) : (
                 <div className="bg-primary/10 text-primary flex h-6 w-6 items-center justify-center rounded text-xs font-bold">

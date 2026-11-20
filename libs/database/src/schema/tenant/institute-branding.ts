@@ -2,18 +2,29 @@ import { sql } from 'drizzle-orm';
 import { foreignKey, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenantColumns } from '../common/columns';
 import { tenantPolicies } from '../common/rls-policies';
+import { files } from '../storage/files';
 import { institutes } from './institutes';
 
 export const instituteBranding = pgTable(
   'institute_branding',
   {
     id: uuid().default(sql`uuidv7()`).primaryKey(),
-    logoUrl: text('logo_url'),
-    faviconUrl: text('favicon_url'),
+    /** Public images (purposes INSTITUTE_LOGO, INSTITUTE_FAVICON, INSTITUTE_COVER). */
+    logoFileId: uuid('logo_file_id').references(() => files.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    faviconFileId: uuid('favicon_file_id').references(() => files.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    coverImageFileId: uuid('cover_image_file_id').references(() => files.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
     primaryColor: text('primary_color'),
     secondaryColor: text('secondary_color'),
     themeIdentifier: text('theme_identifier'),
-    coverImageUrl: text('cover_image_url'),
     ...tenantColumns,
   },
   (table) => [

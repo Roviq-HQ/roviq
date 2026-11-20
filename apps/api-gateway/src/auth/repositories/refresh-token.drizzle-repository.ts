@@ -109,7 +109,6 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           instituteId: institutesLive.id,
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
-          instituteLogoUrl: institutesLive.logoUrl,
           instituteResellerId: institutesLive.resellerId,
         })
         .from(refreshTokensLive)
@@ -164,7 +163,6 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
                   id: row.instituteId,
                   name: row.instituteName,
                   slug: row.instituteSlug,
-                  logoUrl: row.instituteLogoUrl,
                   resellerId: row.instituteResellerId,
                 },
               }
@@ -217,7 +215,6 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           instituteId: institutesLive.id,
           instituteName: institutesLive.name,
           instituteSlug: institutesLive.slug,
-          instituteLogoUrl: institutesLive.logoUrl,
           instituteResellerId: institutesLive.resellerId,
         })
         .from(refreshTokensLive)
@@ -274,7 +271,6 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
                   id: row.instituteId,
                   name: row.instituteName,
                   slug: row.instituteSlug,
-                  logoUrl: row.instituteLogoUrl,
                   resellerId: row.instituteResellerId,
                 },
               }
