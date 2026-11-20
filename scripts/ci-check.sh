@@ -156,7 +156,7 @@ if (( run_e2e )); then
   # Isolated one-shots have no dependents in Compose's selected project, so
   # --wait treats a successful exit as a failed running/healthy check.
   ( "${COMPOSE[@]}" up -d --wait \
-        postgres redis nats temporal mongodb novu-api novu-worker \
+        postgres redis nats temporal mongodb object-storage novu-api novu-worker \
       && "${COMPOSE[@]}" up -d --no-deps novu-bootstrap \
       && wait_setup_service novu-bootstrap ) > "$tmpdir/infra.log" 2>&1 & infra_pid=$!
 
