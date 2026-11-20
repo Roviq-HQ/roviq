@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 @InputType()
 export class VerifyPaymentGqlInput {
@@ -7,11 +7,19 @@ export class VerifyPaymentGqlInput {
   @IsString()
   gatewayOrderId!: string;
 
-  @Field()
+  @Field({
+    nullable: true,
+    description: 'razorpay_payment_id from Razorpay Checkout. Not used for Cashfree.',
+  })
+  @IsOptional()
   @IsString()
-  gatewayPaymentId!: string;
+  gatewayPaymentId?: string;
 
-  @Field()
+  @Field({
+    nullable: true,
+    description: 'razorpay_signature from Razorpay Checkout. Not used for Cashfree.',
+  })
+  @IsOptional()
   @IsString()
-  signature!: string;
+  signature?: string;
 }

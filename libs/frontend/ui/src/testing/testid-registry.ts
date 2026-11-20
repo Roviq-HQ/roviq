@@ -1680,4 +1680,11 @@ export const testIds = {
     // Action dialog
     subscriptionReasonInfo: 'billing-subscription-reason-info',
   },
+
+  // ── Institute: billing → invoice detail ──────────────────────────────
+  instituteBillingInvoice: {
+    payOnlineBtn: 'institute-invoice-pay-online-btn',
+    paymentConfirming: 'institute-invoice-payment-confirming',
+    lineItemRow: (index: number) => `institute-invoice-line-item-${index}`,
+  },
 } as const;

@@ -6,6 +6,7 @@ export type {
   CreateOrderResult,
   CreatePlanInput,
   CreateSubscriptionInput,
+  ExistingOrder,
   PaymentGateway,
   ProviderPayment,
   ProviderPlan,
@@ -14,6 +15,7 @@ export type {
   ProviderWebhookEvent,
   RefundInput as GatewayRefundInput,
   RefundResult,
+  VerifiedPayment,
   VerifyPaymentInput,
   WebhookEvent,
 } from './ports/payment-gateway.port';

@@ -247,7 +247,7 @@ export class BillingService {
 
     if (input.provider !== 'RAZORPAY' && input.provider !== 'CASHFREE') {
       billingError(
-        'GATEWAY_NOT_CONFIGURED',
+        'BAD_REQUEST',
         `${input.provider} does not support gateway checkout — use manual payment`,
       );
     }

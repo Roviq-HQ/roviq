@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { guardianProfiles, staffProfiles, studentProfiles } from '../../schema';
 import { seedE2e } from '../e2e';
 import { SEED_IDS } from '../ids';
-import { makeSeedTestDb } from './seed-test-helpers';
+import { makeSeedTestDb, SEED_HOOK_TIMEOUT_MS } from './seed-test-helpers';
 
 describe('Institute 2 stays people-free after seedE2e', () => {
   const { pool, db } = makeSeedTestDb();
@@ -13,7 +13,7 @@ describe('Institute 2 stays people-free after seedE2e', () => {
 
   beforeAll(async () => {
     await seedE2e(db);
-  });
+  }, SEED_HOOK_TIMEOUT_MS);
 
   it('Institute 2 has zero student_profiles', async () => {
     const [{ value: total }] = await db

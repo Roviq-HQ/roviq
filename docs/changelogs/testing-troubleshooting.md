@@ -844,3 +844,27 @@ Likely cause, not proven: load. The first run was cold after new commits, so the
 - **Cause:** phase 1 of `scripts/ci-check.sh` starts a fixed list of e2e services, and `object-storage` was not on it. The seed step runs with `--no-deps`, so nothing else started it. Instances where `pnpm e2e:up` had run since file storage was added already had the container; instance 1's e2e stack was created on 2026-11-18 and did not.
 - **Fix:** `object-storage` is in the phase 1 service list.
 - **Lesson:** a service that a `--no-deps` step needs must be started by name; a gate that passes only where an older command left a container behind is not self-sufficient.
+
+## 2026-11-20 — Integration setup failed silently: `drizzle-kit migrate failed (exit 1)` after a migration was renamed on main (fixed)
+
+- **Symptom:** `pnpm vitest run --project integration …` stopped in global setup with `drizzle-kit migrate failed (exit 1) against localhost:5434/roviq_test` and no drizzle error text. Each pending migration applied cleanly when run by hand in a rolled-back transaction.
+- **Cause:** commit `9a1566d9` (ROV-301) renamed `20261119163713_rov-301-user-document-files` to `20261119163800_…` to reorder it. `roviq_test` had recorded the old name, so drizzle-kit saw an applied migration with no folder and refused to continue.
+- **Fix:** `pnpm db:reset --test`, then the run passed.
+- **Lesson:** after pulling a change that renames or reorders migration folders, reset `roviq_test`. Compare `select name from drizzle.__drizzle_migrations` with `ls libs/database/migrations` to confirm.
+
+
+## 2026-11-20 — fixed: integration deadlock between `seedEssential` and the ROV-91 backfill test
+
+- **Symptom:** the pre-push `int` step failed with `deadlock detected` (40P01) in `seed/__tests__/essential.integration.spec.ts` while inserting `roles`; the other process waited for `ShareRowExclusiveLock` on `resellers`. A reseller-team test failed in the same run. Neither touched the code under test (ROV-291).
+- **Cause:** `reseller-system-roles.integration.spec.ts` took `LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE` (added earlier the same day) after its transaction had already created a reseller and its roles. A concurrent `seedEssential` held a row lock on `resellers` and waited for one of those role rows, while the test waited for the table lock: a lock-order cycle.
+- **Fix:** the backfill tests run in `inBackfillTx`, which takes the table lock as the transaction's first statement, before any row is written.
+- **Lesson:** a `LOCK TABLE` in a test transaction must come first; taking it after the transaction holds row locks trades a foreign-key race for a deadlock.
+
+## 2026-11-20 — fixed: `seedE2e` hook timeout in the pre-push `int` step (second occurrence)
+
+Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `parmody1/rov-291-fix-verifypayment-for-institutes-it` the `int` step failed again with `seedE2e > Hook timed out in 10000ms` (67 of 68 files passed). The load average was 25 during the run; alone the spec passes with 2.2 s of test time.
+
+- **Correction:** the earlier entry said the e2e seed does not write to `resellers`. It does: `seedE2e` → `seedDemo` → `seedEssential` upserts the Roviq Direct reseller. So it waits, as intended, while `reseller-system-roles.integration.spec.ts` holds `LOCK TABLE resellers` for a backfill test (since the deadlock fix of the same day, for that test's whole transaction).
+- **Cause:** the full demo seed plus that legitimate wait, on a loaded machine, takes longer than the 10 s default hook timeout.
+- **Fix:** the four seed specs pass `SEED_HOOK_TIMEOUT_MS` (60 s, in `seed-test-helpers.ts`) to their seeding `beforeAll`. Test timeouts are unchanged.
+- **Lesson:** a test that takes a table lock makes every writer of that table wait; size the hook timeouts of those writers for it.

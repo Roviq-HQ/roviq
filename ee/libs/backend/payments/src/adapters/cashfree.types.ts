@@ -118,12 +118,19 @@ export interface CfWebhookBody<T = unknown> {
   data: T;
 }
 
-/** Cashfree order-based payment webhook data (non-subscription flow) */
+/** Cashfree order payment webhook data (`PAYMENT_*_WEBHOOK`, non-subscription flow) */
 export interface CfOrderPaymentData {
-  order_id?: string;
-  cf_payment_id?: string;
-  payment_amount?: number;
-  payment_status?: string;
+  order?: {
+    order_id?: string;
+    order_amount?: number;
+    order_tags?: Record<string, string> | null;
+  };
+  payment?: {
+    /** A string since webhook version 2023-08-01; older samples show a number */
+    cf_payment_id?: string | number;
+    payment_amount?: number;
+    payment_status?: string;
+  };
 }
 
 export type CfStatusChangedWebhook = CfWebhookBody<CfStatusChangedData>;

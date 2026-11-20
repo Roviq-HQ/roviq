@@ -46,7 +46,15 @@ const INVOICES_QUERY = gql`
       issuedAt
       dueAt
       paidAt
-      lineItems
+      lineItems {
+        description
+        quantity
+        unitAmountPaise
+        totalAmountPaise
+        taxRate
+        taxAmountPaise
+        sacCode
+      }
       taxBreakdown
       notes
       createdAt

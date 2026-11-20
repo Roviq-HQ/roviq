@@ -70,6 +70,8 @@ function makeReseller(overrides: Partial<ResellerNode> = {}): ResellerNode {
     teamSize: 5,
     version: 1,
     branding: null,
+    logo: null,
+    favicon: null,
     registrationNumber: null,
     registrationState: null,
     contact: { phones: [], emails: [] },

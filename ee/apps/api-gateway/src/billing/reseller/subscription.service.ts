@@ -46,7 +46,7 @@ export class SubscriptionService {
     // Check no active subscription exists
     const existing = await this.subscriptionRepo.findActiveByTenant(resellerId, input.tenantId);
     if (existing) {
-      billingError('SUBSCRIPTION_EXISTS', 'Institute already has an active subscription');
+      billingError('SUBSCRIPTION_ALREADY_ACTIVE', 'Institute already has an active subscription');
     }
 
     // Fetch and validate plan

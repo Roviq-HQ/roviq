@@ -68,6 +68,8 @@ function makeReseller(overrides: Partial<ResellerNode> = {}): ResellerNode {
     contact: { phones: [], emails: [] },
     address: null,
     branding: null,
+    logo: null,
+    favicon: null,
     ...overrides,
   };
 }

@@ -23,7 +23,7 @@ export class GatewayConfigService {
 
   async getConfig(resellerId: string, id: string) {
     const config = await this.repo.findById(resellerId, id);
-    if (!config) billingError('GATEWAY_NOT_CONFIGURED', 'Gateway config not found');
+    if (!config) billingError('GATEWAY_CONFIG_NOT_FOUND', 'Gateway config not found');
     return this.toPublicConfig(config, resellerId);
   }
 
@@ -44,10 +44,10 @@ export class GatewayConfigService {
     // UPI_DIRECT: reject testMode and webhookSecret (no gateway SDK)
     if (input.provider === 'UPI_DIRECT') {
       if (input.testMode) {
-        billingError('GATEWAY_NOT_CONFIGURED', 'UPI_DIRECT does not support testMode');
+        billingError('BAD_REQUEST', 'UPI_DIRECT does not support testMode');
       }
       if (input.webhookSecret) {
-        billingError('GATEWAY_NOT_CONFIGURED', 'UPI_DIRECT does not support webhookSecret');
+        billingError('BAD_REQUEST', 'UPI_DIRECT does not support webhookSecret');
       }
     }
 
@@ -102,7 +102,7 @@ export class GatewayConfigService {
     }
 
     const config = await this.repo.update(resellerId, id, data);
-    if (!config) billingError('GATEWAY_NOT_CONFIGURED', 'Gateway config not found');
+    if (!config) billingError('GATEWAY_CONFIG_NOT_FOUND', 'Gateway config not found');
     return this.toPublicConfig(config, resellerId);
   }
 

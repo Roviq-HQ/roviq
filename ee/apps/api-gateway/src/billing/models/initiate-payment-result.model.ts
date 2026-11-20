@@ -9,9 +9,12 @@ export class InitiatePaymentResult {
   @Field()
   gatewayOrderId!: string;
 
-  @Field(() => String, { nullable: true })
-  checkoutUrl!: string | null;
+  @Field({ description: 'Gateway that opens the checkout: RAZORPAY or CASHFREE' })
+  gatewayProvider!: string;
 
-  @Field(() => GraphQLJSON, { nullable: true })
-  checkoutPayload!: Record<string, unknown> | null;
+  @Field(() => GraphQLJSON, {
+    description:
+      'Options for the gateway browser checkout. RAZORPAY: Razorpay Checkout options (key, order_id, amount, currency). CASHFREE: { paymentSessionId, mode }.',
+  })
+  checkoutPayload!: Record<string, unknown>;
 }

@@ -364,13 +364,29 @@ There are two payment methods available:
 4. After making the payment in your UPI app, come back and enter the **UTR number** (transaction reference) in the form.
 5. Click **Submit**. Your payment will be verified.
 
-**Option B -- Online payment (Razorpay):**
+**Option B -- Pay online (Razorpay or Cashfree):**
 
-1. Open the invoice you want to pay.
+Your reseller decides which payment gateway your institute uses. The invoice page handles both.
+
+1. Open the invoice you want to pay. **Pay Online** appears while the invoice is Sent, Partially Paid or Overdue.
 2. Click **Pay Online**.
-3. You will be redirected to the Razorpay payment page.
-4. Complete the payment using UPI, card, net banking, or any supported method.
-5. After payment, you will be redirected back automatically.
+3. What happens next depends on the gateway:
+   - **Razorpay:** a payment window opens on top of the invoice. Pay by UPI, card, net banking or wallet. When the payment succeeds, the window closes and the page says **Payment received**. If you close the window without paying, the page says the payment was not completed, and nothing is charged.
+   - **Cashfree:** you are taken to Cashfree's payment page. After paying, Cashfree brings you back to the invoice. The page shows **Confirming your payment…** for a few seconds, then **Payment received**.
+4. The invoice now shows **Paid** and the balance due is ₹0.00. The payment is listed under **Payment History**.
+
+If you click **Pay Online** again before paying, the same payment is reopened, so no extra pending payments pile up. If the earlier payment window had already been paid (for example you closed the tab right after paying), the page records that payment and shows the invoice as paid.
+
+**Messages you may see:**
+
+| Message | What it means | What to do |
+|---|---|---|
+| Online payment is not set up for your institute yet | Your reseller has not connected a payment gateway | Pay by UPI (Option A) or contact your reseller |
+| Online payment needs your institute's phone number and email | The gateway needs a contact number and email for the payer | Add them in **Settings → Institute**, then try again |
+| The payment gateway could not be reached | The gateway did not respond | Wait a few minutes and try again |
+| The payment gateway has not confirmed this payment | The gateway has not reported the payment as successful yet | If money was deducted, it is confirmed automatically, usually within minutes. Open the invoice again later |
+| This invoice has already been paid | A payment for this invoice was already recorded | Nothing; the page shows the latest status |
+| This invoice can no longer be paid | The invoice is cancelled, refunded or not yet issued | Contact your reseller |
 
 #### Downloading Invoice PDF
 

@@ -83,25 +83,46 @@ export interface CreateOrderInput {
   currency: string;
   /** Customer details for the checkout page */
   customer: { name: string; email: string; phone: string };
-  /** Where to redirect after payment */
+  /**
+   * Where a redirect checkout returns the payer. `{order_id}` is replaced with
+   * the gateway order id (Cashfree). Razorpay's modal checkout does not redirect.
+   */
   returnUrl: string;
-  notes?: { description?: string } & Record<string, string>;
+  /** Invoice and institute the order pays; stored on the order and echoed in its webhooks. */
+  owner: { invoiceId: string; tenantId: string };
+  description?: string;
 }
 
 export interface CreateOrderResult {
   gatewayOrderId: string;
   gatewayProvider: string;
-  /** Direct checkout URL (Cashfree) */
-  checkoutUrl?: string;
-  /** Payload for client-side SDK checkout (Razorpay) */
-  checkoutPayload?: Record<string, unknown>;
+  /**
+   * Options for the gateway's browser checkout: Razorpay Checkout options
+   * (`key`, `order_id`, …) or Cashfree's `{ paymentSessionId, mode }`.
+   */
+  checkoutPayload: Record<string, unknown>;
 }
+
+/** State of an order created earlier, so an unpaid one can be reopened instead of replaced. */
+export type ExistingOrder =
+  /** Still payable: reopen checkout with this payload */
+  | { state: 'OPEN'; checkout: CreateOrderResult }
+  /** The gateway has captured a payment for it */
+  | { state: 'PAID' }
+  /** Expired, terminated, or unknown to these credentials: a new order is needed */
+  | { state: 'CLOSED' };
 
 export interface VerifyPaymentInput {
   gatewayOrderId: string;
+  /** Payment id from the browser checkout (Razorpay). Cashfree looks it up itself. */
+  gatewayPaymentId?: string;
+  /** Signature from the browser checkout (Razorpay) */
+  signature?: string;
+}
+
+/** A payment the gateway has confirmed for the order. */
+export interface VerifiedPayment {
   gatewayPaymentId: string;
-  /** Signature from the gateway callback */
-  signature: string;
 }
 
 export interface RefundInput {
@@ -123,6 +144,10 @@ export interface WebhookEvent {
   gatewayPaymentId?: string;
   amountPaise?: number;
   status?: string;
+  /** True only for a successful capture of an order payment */
+  isCapture: boolean;
+  /** The `owner` the order was created with, when the gateway echoes it back */
+  owner?: { invoiceId: string; tenantId: string };
   payload: Record<string, unknown>;
 }
 
@@ -145,7 +170,12 @@ export interface PaymentGateway {
 
   // Order-based (ROV-112)
   createOrder(input: CreateOrderInput): Promise<CreateOrderResult>;
-  verifyPayment(input: VerifyPaymentInput): Promise<boolean>;
+  /** Looks up an order this gateway created earlier. */
+  resumeOrder(gatewayOrderId: string, input: CreateOrderInput): Promise<ExistingOrder>;
+  /** Confirms the order was paid; null when it was not or the proof is invalid. */
+  verifyPayment(input: VerifyPaymentInput): Promise<VerifiedPayment | null>;
+  /** The captured payment of an order, read from the gateway; null when there is none yet. */
+  findPaidPayment(gatewayOrderId: string): Promise<VerifiedPayment | null>;
   refundOrder(input: RefundInput): Promise<RefundResult>;
   parseWebhook(body: Buffer, headers: Record<string, string>): WebhookEvent;
 }

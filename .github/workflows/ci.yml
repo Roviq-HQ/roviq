@@ -104,6 +104,8 @@ jobs:
       S3_BUCKET_PRIVATE: roviq-private
       S3_BUCKET_PUBLIC: roviq-public
       S3_PUBLIC_BASE_URL: http://localhost:9002/roviq-public
+      # Gateway invoice payment builds its return URL from this (billing integration tests).
+      BILLING_RETURN_URL: http://localhost:4200/billing/subscriptions
     services:
       postgres:
         image: postgres:18-alpine

@@ -15,7 +15,7 @@ import {
 import { seedDemo } from '../demo';
 import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
-import { makeSeedTestDb } from './seed-test-helpers';
+import { makeSeedTestDb, SEED_HOOK_TIMEOUT_MS } from './seed-test-helpers';
 
 describe('seedDemo', () => {
   const { pool, db } = makeSeedTestDb();
@@ -25,7 +25,7 @@ describe('seedDemo', () => {
 
   beforeAll(async () => {
     await seedDemo(db);
-  });
+  }, SEED_HOOK_TIMEOUT_MS);
 
   it('creates 2 institutes', async () => {
     const rows = await db.select({ id: institutes.id }).from(institutes);

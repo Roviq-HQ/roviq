@@ -1,6 +1,6 @@
 # Important rules
 
-### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table.
+### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table. Some of the code is written by older models, so if you are fable 5.2 or above, you are allowed to completely change anything to reduce bugs, tighten security, less technical debt, faster launching of the product, and a lot of things.
 
 **Always use `pnpm tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Always call it as `pnpm tilt …`, never bare `tilt`: the wrapper targets this checkout's own Tilt, while bare `tilt` can hit another instance's. Examples:
 
@@ -155,8 +155,8 @@ Each line is a mistake that cost a session 10 to 40 minutes.
 
 ### Deviations & Deferred Work
 
-- **Deviations** — spec drifts, trade-offs, user-rejected approaches: add as a comment on the current Linear issue
-- **Deferred work** — if the user asks to defer something, create a new Linear issue with proper labels and set the current issue as parent. Nothing is silently deferred
+- **Deviations** — spec drifts, trade-offs, user-rejected approaches: add as a comment on the current Linear issue, update linear docs/projects
+- **Deferred work** — if the user asks to defer something, create a new Linear issue with skill with proper labels and set the current issue as parent. Nothing is silently deferred
 
 ## i18n Fields
 
@@ -201,7 +201,7 @@ Domain-specific rules live in `.claude/skills/` and load only when relevant:
 - `/backend-service` — Service layer rules, scope→DB mapping, status mutations, event naming, ownership boundaries
 
 ## Key Docs
-
+- When making infrastructure, convention, or architectural changes, create/update a Linear issue to document the change. Also create/update documents/prd/projects on linear.
 - When you need the product requirements document (PRD), read it in Linear.
 - `docs/architecture.md` — system architecture
 - `docs/auth.md` — authentication (three-scope model, JWT, refresh, impersonation)

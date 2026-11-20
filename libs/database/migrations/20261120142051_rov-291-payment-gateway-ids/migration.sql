@@ -1,0 +1,2 @@
+CREATE INDEX "payments_gateway_order_id_idx" ON "payments" ("gateway_order_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "payments_gateway_payment_id_key" ON "payments" ("gateway_payment_id") WHERE gateway_payment_id IS NOT NULL;

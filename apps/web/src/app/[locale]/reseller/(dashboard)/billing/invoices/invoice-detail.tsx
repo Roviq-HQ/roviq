@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@roviq/ui';
+import { keyedLineItems } from '@web/lib/keyed-line-items';
 import { Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -46,17 +47,6 @@ const INVOICE_STATUS_VARIANT: Record<
   CANCELLED: 'secondary',
   REFUNDED: 'secondary',
 };
-
-/** Shape of a single line item coming from the GraphQL lineItems JSON field */
-interface LineItem {
-  description: string;
-  quantity: number;
-  unitAmountPaise: string;
-  totalAmountPaise: string;
-  taxRate: number;
-  taxAmountPaise: string;
-  sacCode?: string;
-}
 
 /** Shape of the GST sub-object within taxBreakdown */
 interface GstBreakdown {
@@ -194,7 +184,7 @@ export function InvoiceDetail({
   /** Parse the paise string from GraphQL into a display-ready rupee amount */
   const paiseToCurrency = (paise: string | number) => formatCurrency(Number(paise) / 100);
 
-  const lineItems: LineItem[] = (invoice?.lineItems ?? []) as LineItem[];
+  const lineItems = invoice?.lineItems ?? [];
   const taxBreakdown = (invoice?.taxBreakdown ?? null) as TaxBreakdown | null;
 
   const subtotal = Number(invoice?.subtotalAmount ?? 0) / 100;
@@ -306,8 +296,8 @@ export function InvoiceDetail({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {lineItems.map((item) => (
-                          <TableRow key={`${item.description}-${item.unitAmountPaise}`}>
+                        {keyedLineItems(lineItems).map(({ key, item }) => (
+                          <TableRow key={key}>
                             <TableCell className="text-xs">{item.description}</TableCell>
                             <TableCell className="text-xs text-right">{item.quantity}</TableCell>
                             <TableCell className="text-xs text-right whitespace-nowrap">
