@@ -247,7 +247,8 @@ export async function seedExaminations(
     .select({ membershipId: studentProfiles.membershipId })
     .from(studentAcademics)
     .innerJoin(studentProfiles, eq(studentProfiles.id, studentAcademics.studentProfileId))
-    .where(and(eq(studentAcademics.sectionId, section.id), isNull(studentProfiles.deletedAt)));
+    .where(and(eq(studentAcademics.sectionId, section.id), isNull(studentProfiles.deletedAt)))
+    .orderBy(asc(studentAcademics.id));
 
   // Marks — the last enrolled student is ABSENT in the final subject (so results
   // exercise the ABSENT / COMPARTMENT paths, not just clean passes).

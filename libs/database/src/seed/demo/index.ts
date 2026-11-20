@@ -19,7 +19,9 @@ import {
   seedInstitutes,
   seedNotificationConfigs,
 } from './institutes';
+import { seedDemoMultiChildGuardian } from './multi-child-guardian';
 import { seedDemoStaffProfiles } from './staff-profiles';
+import { seedDemoSubjectTeacher } from './subject-teacher';
 import { seedTimetable } from './timetable';
 import { seedInstituteRoles, seedUsersAndMemberships } from './users';
 
@@ -62,8 +64,10 @@ export async function seedDemo(db: DrizzleDB): Promise<void> {
     const { roleIds, roleIds2 } = await seedInstituteRoles(tx, inst1.id, inst2.id);
     await seedUsersAndMemberships(tx, inst1.id, inst2.id, roleIds, roleIds2);
     await seedDemoStaffProfiles(tx, inst1.id);
+    await seedDemoSubjectTeacher(tx, inst1.id, roleIds);
 
     await seedAttendanceAndLeaves(tx, inst1.id);
+    await seedDemoMultiChildGuardian(tx, inst1.id, roleIds);
     // Config (schemes/terms/co-scholastic) seeds for both institutes; the graded
     // exam chain only for inst1 (the institute with enrolled demo students).
     if (ay1) await seedExaminations(tx, inst1.id, ay1.id, true);

@@ -18,6 +18,8 @@ const SEEDED_STUDENT_PROFILE_IDS = [
   SEED_IDS.STUDENT_PROFILE_3,
   SEED_IDS.STUDENT_PROFILE_4,
   SEED_IDS.STUDENT_PROFILE_5,
+  SEED_IDS.STUDENT_PROFILE_6,
+  SEED_IDS.STUDENT_PROFILE_7,
 ] as const;
 
 describe('Seed tier idempotency + cumulative chaining', () => {

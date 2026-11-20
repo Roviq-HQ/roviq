@@ -1,8 +1,9 @@
 // libs/database/src/seed/demo/timetable.ts
 //
-// An ACTIVE weekly timetable for Institute 1's first section: a 6-period day
-// with a lunch break, and Mon–Fri entries assigning subjects + the demo
-// teacher to each period. Idempotent (fixed ids + onConflict).
+// An ACTIVE weekly timetable for Institute 1's populated section: a 6-period day
+// with a lunch break, and Mon–Fri entries assigning subjects to each period.
+// The subject teacher takes the Hindi periods, the class teacher the rest.
+// Idempotent (fixed ids + onConflict).
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import {
   SYSTEM_USER_ID,
@@ -91,10 +92,11 @@ export async function seedTimetable(tx: DrizzleDB, inst1Id: string): Promise<voi
   if (!section) return;
 
   const teacherId = SEED_IDS.MEMBERSHIP_TEACHER_INST1;
+  const subjectTeacherId = SEED_IDS.MEMBERSHIP_SUBJECT_TEACHER_INST1;
 
   // Subjects taught in the standard — rotated across the teaching periods.
   const subjectRows = await tx
-    .select({ id: subjects.id })
+    .select({ id: subjects.id, shortName: subjects.shortName })
     .from(standardSubjects)
     .innerJoin(subjects, eq(subjects.id, standardSubjects.subjectId))
     .where(
@@ -177,24 +179,26 @@ export async function seedTimetable(tx: DrizzleDB, inst1Id: string): Promise<voi
     .onConflictDoNothing();
 
   // One entry per (teaching period × working day); rotate subjects so the grid
-  // reads naturally. Same teacher throughout (single demo teacher) — no clash
-  // since each cell is a distinct (period, day).
+  // reads naturally. No teacher clash since each cell is a distinct (period, day).
   const teachingPeriods = PERIODS.filter((p) => p.kind === 'PERIOD');
   const entries = WORKING_DAYS.flatMap((day, dayIdx) =>
-    teachingPeriods.map((period, periodIdx) => ({
-      tenantId: inst1Id,
-      timetableId: SEED_IDS.TIMETABLE_INST1,
-      periodId: period.id,
-      sectionId: section.id,
-      dayOfWeek: day,
-      splitIndex: 0,
-      splitLabel: null,
-      subjectId: subjectRows[(dayIdx + periodIdx) % subjectRows.length].id,
-      teacherId,
-      room: `Room ${101 + periodIdx}`,
-      notes: null,
-      ...BY,
-    })),
+    teachingPeriods.map((period, periodIdx) => {
+      const subject = subjectRows[(dayIdx + periodIdx) % subjectRows.length];
+      return {
+        tenantId: inst1Id,
+        timetableId: SEED_IDS.TIMETABLE_INST1,
+        periodId: period.id,
+        sectionId: section.id,
+        dayOfWeek: day,
+        splitIndex: 0,
+        splitLabel: null,
+        subjectId: subject.id,
+        teacherId: subject.shortName === 'HIN' ? subjectTeacherId : teacherId,
+        room: `Room ${101 + periodIdx}`,
+        notes: null,
+        ...BY,
+      };
+    }),
   );
   await tx.insert(timetableEntries).values(entries).onConflictDoNothing();
 }

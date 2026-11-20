@@ -1,14 +1,19 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   academicYears,
   institutes,
+  memberships,
+  roles,
   staffProfiles,
+  studentAcademics,
   studentGuardianLinks,
   studentProfiles,
+  timetableEntries,
   users,
 } from '../../schema';
 import { seedDemo } from '../demo';
+import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 import { makeSeedTestDb } from './seed-test-helpers';
 
@@ -35,8 +40,18 @@ describe('seedDemo', () => {
     expect(rows[0]?.isActive).toBe(true);
   });
 
-  it('creates the 5 demo users', async () => {
-    const expectedUsernames = ['admin', 'teacher1', 'student1', 'guardian1', 'reseller1'];
+  it('creates the demo users', async () => {
+    const expectedUsernames = [
+      'admin',
+      'teacher1',
+      'student1',
+      'guardian1',
+      'reseller1',
+      SEED_CREDENTIALS.SUBJECT_TEACHER.username,
+      SEED_CREDENTIALS.GUARDIAN_4.username,
+      SEED_CREDENTIALS.STUDENT_6.username,
+      SEED_CREDENTIALS.STUDENT_7.username,
+    ];
     for (const username of expectedUsernames) {
       const rows = await db
         .select({ id: users.id })
@@ -79,6 +94,74 @@ describe('seedDemo', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.relationship).toBe('FATHER');
     expect(rows[0]?.isPrimary).toBe(true);
+  });
+
+  it('gives subjectteacher1 the subject_teacher role and a staff profile that is not a class teacher', async () => {
+    const [membership] = await db
+      .select({ tenantId: memberships.tenantId, roleName: roles.name })
+      .from(memberships)
+      .innerJoin(roles, eq(roles.id, memberships.roleId))
+      .where(eq(memberships.id, SEED_IDS.MEMBERSHIP_SUBJECT_TEACHER_INST1));
+    const [staff] = await db
+      .select({
+        membershipId: staffProfiles.membershipId,
+        isClassTeacher: staffProfiles.isClassTeacher,
+      })
+      .from(staffProfiles)
+      .where(eq(staffProfiles.id, SEED_IDS.STAFF_PROFILE_SUBJECT_TEACHER));
+
+    expect(membership).toEqual({
+      tenantId: SEED_IDS.INSTITUTE_1,
+      roleName: { en: 'subject_teacher' },
+    });
+    expect(staff).toEqual({
+      membershipId: SEED_IDS.MEMBERSHIP_SUBJECT_TEACHER_INST1,
+      isClassTeacher: false,
+    });
+  });
+
+  it('assigns subjectteacher1 periods in the demo timetable', async () => {
+    const rows = await db
+      .select({ id: timetableEntries.id })
+      .from(timetableEntries)
+      .where(
+        and(
+          eq(timetableEntries.timetableId, SEED_IDS.TIMETABLE_INST1),
+          eq(timetableEntries.teacherId, SEED_IDS.MEMBERSHIP_SUBJECT_TEACHER_INST1),
+        ),
+      );
+
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('links guardian4 to exactly student6 and student7, enrolled beside student1', async () => {
+    const links = await db
+      .select({ studentProfileId: studentGuardianLinks.studentProfileId })
+      .from(studentGuardianLinks)
+      .where(eq(studentGuardianLinks.guardianProfileId, SEED_IDS.GUARDIAN_PROFILE_4));
+    const enrolments = await db
+      .select({
+        studentProfileId: studentAcademics.studentProfileId,
+        sectionId: studentAcademics.sectionId,
+        academicYearId: studentAcademics.academicYearId,
+      })
+      .from(studentAcademics)
+      .where(
+        inArray(studentAcademics.studentProfileId, [
+          SEED_IDS.STUDENT_PROFILE_1,
+          SEED_IDS.STUDENT_PROFILE_6,
+          SEED_IDS.STUDENT_PROFILE_7,
+        ]),
+      );
+
+    expect(links.map((link) => link.studentProfileId).sort()).toEqual(
+      [SEED_IDS.STUDENT_PROFILE_6, SEED_IDS.STUDENT_PROFILE_7].sort(),
+    );
+    expect(enrolments).toHaveLength(3);
+    expect(new Set(enrolments.map((row) => row.sectionId)).size).toBe(1);
+    expect(new Set(enrolments.map((row) => row.academicYearId))).toEqual(
+      new Set([SEED_IDS.ACADEMIC_YEAR_INST1]),
+    );
   });
 
   it('is idempotent — running twice does not duplicate institutes', async () => {
