@@ -59,7 +59,7 @@ const LIST = 'query { leaves { id } }';
 const ONE = 'query($id: ID!) { leave(id: $id) { id userId } }';
 const APPROVE = 'mutation($id: ID!) { approveLeave(id: $id) { id status decidedBy } }';
 const REJECT = 'mutation($id: ID!) { rejectLeave(id: $id) { id status decidedBy } }';
-const CANCEL = 'mutation($id: ID!) { cancelLeave(id: $id) { id status } }';
+const CANCEL = 'mutation($id: ID!) { cancelLeave(id: $id) { id status decidedBy } }';
 const DELETE = 'mutation($id: ID!) { deleteLeave(id: $id) }';
 const UPDATE =
   'mutation($id: ID!) { updateLeave(id: $id, input: { reason: "ROV-304 edited" }) { id reason } }';
@@ -90,6 +90,16 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
     leaveA2ToUpdate: '',
     leaveBToReject: '',
     leaveA2ToDelete: '',
+    leaveA1ToWithdraw: '',
+    leaveA1ApprovedKept: '',
+    leaveA2KeptFromA1: '',
+    leaveSubjectToWithdraw: '',
+    leaveClassTeacherToWithdraw: '',
+    leaveA2ApprovedToCancel: '',
+    leaveA1ParentWithdraws: '',
+    leaveA1ApprovedParentKept: '',
+    leaveBClerkKept: '',
+    leaveBApprovedAdminCancels: '',
   };
 
   async function actor(role: DefaultRole, institute = tenant): Promise<Actor> {
@@ -166,7 +176,13 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
     return row.id;
   }
 
-  async function insertLeave(tx: DrizzleDB, tenantId: string, person: Actor, reason: string) {
+  async function insertLeave(
+    tx: DrizzleDB,
+    tenantId: string,
+    person: Actor,
+    reason: string,
+    status: 'PENDING' | 'APPROVED' = 'PENDING',
+  ) {
     const [row] = await tx
       .insert(leaves)
       .values({
@@ -176,7 +192,7 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
         endDate: DAY,
         type: 'CASUAL',
         reason,
-        status: 'PENDING',
+        status,
         ...by,
       })
       .returning({ id: leaves.id });
@@ -263,6 +279,22 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
       ids.leaveBToReject = await insertLeave(tx, t, studentB, 'B reject');
       ids.leaveA2ToDelete = await insertLeave(tx, t, studentA2, 'A2 delete');
       ids.leaveForeign = await insertLeave(tx, foreignTenant.tenantId, foreignStudent, 'foreign');
+      ids.leaveA1ToWithdraw = await insertLeave(tx, t, studentA1, 'A1 withdraw');
+      ids.leaveA1ApprovedKept = await insertLeave(tx, t, studentA1, 'A1 approved', 'APPROVED');
+      ids.leaveA2KeptFromA1 = await insertLeave(tx, t, studentA2, 'A2 kept from A1');
+      ids.leaveSubjectToWithdraw = await insertLeave(tx, t, subjectTeacher, 'subject withdraw');
+      ids.leaveClassTeacherToWithdraw = await insertLeave(tx, t, classTeacher, 'class withdraw');
+      ids.leaveA2ApprovedToCancel = await insertLeave(tx, t, studentA2, 'A2 approved', 'APPROVED');
+      ids.leaveA1ParentWithdraws = await insertLeave(tx, t, studentA1, 'A1 parent withdraws');
+      ids.leaveA1ApprovedParentKept = await insertLeave(
+        tx,
+        t,
+        studentA1,
+        'A1 approved parent',
+        'APPROVED',
+      );
+      ids.leaveBClerkKept = await insertLeave(tx, t, studentB, 'B clerk kept');
+      ids.leaveBApprovedAdminCancels = await insertLeave(tx, t, studentB, 'B approved', 'APPROVED');
     });
   }, 60_000);
 
@@ -406,10 +438,15 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
   });
 
   it('should keep a subject teacher to their own leaves without decision rights', async () => {
-    expect(await listedIds(subjectTeacher)).toEqual([ids.leaveSubject]);
+    expect(await listedIds(subjectTeacher)).toEqual(
+      [ids.leaveSubject, ids.leaveSubjectToWithdraw].sort(),
+    );
     // Subject teachers have no update rule at all, so the ability guard refuses before any lookup.
     expect(await errorCodes(subjectTeacher, APPROVE, { id: ids.leaveA1 })).toEqual(['FORBIDDEN']);
-    expect(await errorCodes(subjectTeacher, CANCEL, { id: ids.leaveA1 })).toEqual(['FORBIDDEN']);
+    // They may withdraw, so cancelling passes the guard and meets the read rules instead.
+    expect(await errorCodes(subjectTeacher, CANCEL, { id: ids.leaveA1 })).toEqual([
+      'LEAVE_NOT_FOUND',
+    ]);
     expect(await errorCodes(subjectTeacher, APPROVE, { id: ids.leaveSubject })).toEqual([
       'FORBIDDEN',
     ]);
@@ -467,8 +504,9 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
     });
   });
 
-  it('should answer FORBIDDEN to a class teacher changing a leave they may only read', async () => {
-    for (const source of [APPROVE, REJECT, CANCEL, DELETE, UPDATE]) {
+  it('should answer FORBIDDEN to a class teacher deciding a leave they may only read', async () => {
+    // Not CANCEL: a pending leave of their own is theirs to withdraw.
+    for (const source of [APPROVE, REJECT, DELETE, UPDATE]) {
       expect(await errorCodes(classTeacher, source, { id: ids.leaveClassTeacher })).toEqual([
         'FORBIDDEN',
       ]);
@@ -484,11 +522,6 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
   it('should show a parent only the leaves of their linked child', async () => {
     expect(await listedIds(parentOfA1)).toEqual(await liveLeaveIds(tenant.tenantId, [studentA1]));
     expect(await errorCodes(parentOfA1, ONE, { id: ids.leaveA2 })).toEqual(['LEAVE_NOT_FOUND']);
-    const before = await leaveCountFor(studentA1);
-    expect(await errorCodes(parentOfA1, APPLY, { u: studentA1.membershipId })).toEqual([
-      'FORBIDDEN',
-    ]);
-    expect(await leaveCountFor(studentA1)).toBe(before);
   });
 
   it('should let the clerk and the admin read every leave of their institute only', async () => {
@@ -508,6 +541,35 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
     }
     expect(await errorCodes(clerk, APPROVE, { id: ids.leaveB })).toEqual(['FORBIDDEN']);
     expect((await stored(ids.leaveB)).status).toBe('PENDING');
+  });
+
+  it('should refuse the clerk a cancel', async () => {
+    expect(await errorCodes(clerk, CANCEL, { id: ids.leaveBClerkKept })).toEqual(['FORBIDDEN']);
+    expect(await stored(ids.leaveBClerkKept)).toEqual({
+      userId: studentB.membershipId,
+      status: 'PENDING',
+      decidedBy: null,
+      deletedAt: null,
+    });
+  });
+
+  it('should let the admin cancel an approved leave', async () => {
+    const data = await query<{ cancelLeave: { id: string; status: string; decidedBy: string } }>(
+      admin,
+      CANCEL,
+      { id: ids.leaveBApprovedAdminCancels },
+    );
+    expect(data.cancelLeave).toEqual({
+      id: ids.leaveBApprovedAdminCancels,
+      status: 'CANCELLED',
+      decidedBy: admin.membershipId,
+    });
+    expect(await stored(ids.leaveBApprovedAdminCancels)).toEqual({
+      userId: studentB.membershipId,
+      status: 'CANCELLED',
+      decidedBy: admin.membershipId,
+      deletedAt: null,
+    });
   });
 
   it('should let the admin reject and delete a leave, recording the admin as decider', async () => {
@@ -535,6 +597,166 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
     const row = await stored(ids.leaveA2ToDelete);
     expect(row.deletedAt).toBeInstanceOf(Date);
     expect(await errorCodes(admin, ONE, { id: ids.leaveA2ToDelete })).toEqual(['LEAVE_NOT_FOUND']);
+  });
+
+  describe('withdraw', () => {
+    async function withdraw(person: Actor, id: string) {
+      const data = await query<{
+        cancelLeave: { id: string; status: string; decidedBy: string };
+      }>(person, CANCEL, { id });
+      return data.cancelLeave;
+    }
+
+    it('should let a student withdraw their own pending leave', async () => {
+      expect(await withdraw(studentA1, ids.leaveA1ToWithdraw)).toEqual({
+        id: ids.leaveA1ToWithdraw,
+        status: 'CANCELLED',
+        decidedBy: studentA1.membershipId,
+      });
+      expect(await stored(ids.leaveA1ToWithdraw)).toEqual({
+        userId: studentA1.membershipId,
+        status: 'CANCELLED',
+        decidedBy: studentA1.membershipId,
+        deletedAt: null,
+      });
+    });
+
+    it('should refuse a student withdrawing their own approved leave', async () => {
+      expect(await errorCodes(studentA1, CANCEL, { id: ids.leaveA1ApprovedKept })).toEqual([
+        'FORBIDDEN',
+      ]);
+      expect(await stored(ids.leaveA1ApprovedKept)).toEqual({
+        userId: studentA1.membershipId,
+        status: 'APPROVED',
+        decidedBy: null,
+        deletedAt: null,
+      });
+    });
+
+    it('should answer LEAVE_NOT_FOUND to a student withdrawing another student’s leave', async () => {
+      expect(await errorCodes(studentA1, CANCEL, { id: ids.leaveA2KeptFromA1 })).toEqual([
+        'LEAVE_NOT_FOUND',
+      ]);
+      expect(await stored(ids.leaveA2KeptFromA1)).toEqual({
+        userId: studentA2.membershipId,
+        status: 'PENDING',
+        decidedBy: null,
+        deletedAt: null,
+      });
+    });
+
+    it('should let a subject teacher withdraw, but not approve, their own pending leave', async () => {
+      expect(await errorCodes(subjectTeacher, APPROVE, { id: ids.leaveSubjectToWithdraw })).toEqual(
+        ['FORBIDDEN'],
+      );
+      expect((await stored(ids.leaveSubjectToWithdraw)).status).toBe('PENDING');
+
+      expect(await withdraw(subjectTeacher, ids.leaveSubjectToWithdraw)).toEqual({
+        id: ids.leaveSubjectToWithdraw,
+        status: 'CANCELLED',
+        decidedBy: subjectTeacher.membershipId,
+      });
+      expect(await stored(ids.leaveSubjectToWithdraw)).toEqual({
+        userId: subjectTeacher.membershipId,
+        status: 'CANCELLED',
+        decidedBy: subjectTeacher.membershipId,
+        deletedAt: null,
+      });
+    });
+
+    it('should let a class teacher withdraw their own pending leave', async () => {
+      expect(await withdraw(classTeacher, ids.leaveClassTeacherToWithdraw)).toEqual({
+        id: ids.leaveClassTeacherToWithdraw,
+        status: 'CANCELLED',
+        decidedBy: classTeacher.membershipId,
+      });
+      expect(await stored(ids.leaveClassTeacherToWithdraw)).toEqual({
+        userId: classTeacher.membershipId,
+        status: 'CANCELLED',
+        decidedBy: classTeacher.membershipId,
+        deletedAt: null,
+      });
+    });
+
+    it('should let a class teacher cancel an approved leave of a section student', async () => {
+      expect(await withdraw(classTeacher, ids.leaveA2ApprovedToCancel)).toEqual({
+        id: ids.leaveA2ApprovedToCancel,
+        status: 'CANCELLED',
+        decidedBy: classTeacher.membershipId,
+      });
+      expect(await stored(ids.leaveA2ApprovedToCancel)).toEqual({
+        userId: studentA2.membershipId,
+        status: 'CANCELLED',
+        decidedBy: classTeacher.membershipId,
+        deletedAt: null,
+      });
+    });
+  });
+
+  describe('guardian', () => {
+    it('should let a parent apply for their linked child', async () => {
+      const data = await query<{ applyLeave: { id: string; userId: string; status: string } }>(
+        parentOfA1,
+        APPLY,
+        { u: studentA1.membershipId },
+      );
+      expect(data.applyLeave.userId).toBe(studentA1.membershipId);
+      expect(data.applyLeave.status).toBe('PENDING');
+      expect(await stored(data.applyLeave.id)).toEqual({
+        userId: studentA1.membershipId,
+        status: 'PENDING',
+        decidedBy: null,
+        deletedAt: null,
+      });
+    });
+
+    it('should refuse a parent applying for a student who is not their child', async () => {
+      const before = await leaveCountFor(studentB);
+      expect(await errorCodes(parentOfA1, APPLY, { u: studentB.membershipId })).toEqual([
+        'FORBIDDEN',
+      ]);
+      expect(await errorCodes(parentOfA1, APPLY, { u: parentOfA1.membershipId })).toEqual([
+        'FORBIDDEN',
+      ]);
+      expect(await leaveCountFor(studentB)).toBe(before);
+      expect(await leaveCountFor(parentOfA1)).toBe(0);
+    });
+
+    it('should refuse a parent approving their child’s leave', async () => {
+      expect(await errorCodes(parentOfA1, APPROVE, { id: ids.leaveA1ParentWithdraws })).toEqual([
+        'FORBIDDEN',
+      ]);
+      expect((await stored(ids.leaveA1ParentWithdraws)).status).toBe('PENDING');
+    });
+
+    it('should let a parent withdraw their child’s pending leave', async () => {
+      const data = await query<{
+        cancelLeave: { id: string; status: string; decidedBy: string };
+      }>(parentOfA1, CANCEL, { id: ids.leaveA1ParentWithdraws });
+      expect(data.cancelLeave).toEqual({
+        id: ids.leaveA1ParentWithdraws,
+        status: 'CANCELLED',
+        decidedBy: parentOfA1.membershipId,
+      });
+      expect(await stored(ids.leaveA1ParentWithdraws)).toEqual({
+        userId: studentA1.membershipId,
+        status: 'CANCELLED',
+        decidedBy: parentOfA1.membershipId,
+        deletedAt: null,
+      });
+    });
+
+    it('should refuse a parent withdrawing their child’s approved leave', async () => {
+      expect(await errorCodes(parentOfA1, CANCEL, { id: ids.leaveA1ApprovedParentKept })).toEqual([
+        'FORBIDDEN',
+      ]);
+      expect(await stored(ids.leaveA1ApprovedParentKept)).toEqual({
+        userId: studentA1.membershipId,
+        status: 'APPROVED',
+        decidedBy: null,
+        deletedAt: null,
+      });
+    });
   });
 
   it('should keep another institute from reading these leaves', async () => {

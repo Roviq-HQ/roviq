@@ -1,8 +1,9 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
 import { type AppAbility, type AuthUser, LeaveStatus, LeaveType } from '@roviq/common-types';
+import { DateOnlyScalar } from '@roviq/nestjs-graphql';
 import { CreateLeaveInput } from './dto/create-leave.input';
 import { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveService } from './leave.service';
@@ -20,11 +21,12 @@ export class LeaveResolver {
   })
   @CheckAbility({ action: 'read', subject: 'Leave' })
   async leaves(
-    @Args('userId', { type: () => ID, nullable: true }) userId: string | null,
+    @Args('userId', { type: () => ID, nullable: true }, new ParseUUIDPipe({ optional: true }))
+    userId: string | null,
     @Args('status', { type: () => LeaveStatus, nullable: true }) status: LeaveStatus | null,
     @Args('type', { type: () => LeaveType, nullable: true }) type: LeaveType | null,
-    @Args('startDate', { type: () => String, nullable: true }) startDate: string | null,
-    @Args('endDate', { type: () => String, nullable: true }) endDate: string | null,
+    @Args('startDate', { type: () => DateOnlyScalar, nullable: true }) startDate: string | null,
+    @Args('endDate', { type: () => DateOnlyScalar, nullable: true }) endDate: string | null,
     @CurrentAbility() ability: AppAbility,
   ): Promise<LeaveRecord[]> {
     return this.service.list(
@@ -42,7 +44,7 @@ export class LeaveResolver {
   @Query(() => LeaveModel)
   @CheckAbility({ action: 'read', subject: 'Leave' })
   async leave(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
   ): Promise<LeaveRecord> {
     return this.service.findById(id, ability);
@@ -60,7 +62,7 @@ export class LeaveResolver {
   @Mutation(() => LeaveModel, { description: 'Edit a PENDING leave before it is decided.' })
   @CheckAbility({ action: 'update', subject: 'Leave' })
   async updateLeave(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @Args('input') input: UpdateLeaveInput,
     @CurrentAbility() ability: AppAbility,
   ): Promise<LeaveRecord> {
@@ -70,7 +72,7 @@ export class LeaveResolver {
   @Mutation(() => LeaveModel, { description: 'Approve a PENDING leave.' })
   @CheckAbility({ action: 'update', subject: 'Leave' })
   async approveLeave(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
     @CurrentUser() user: AuthUser,
   ): Promise<LeaveRecord> {
@@ -80,17 +82,20 @@ export class LeaveResolver {
   @Mutation(() => LeaveModel, { description: 'Reject a PENDING leave.' })
   @CheckAbility({ action: 'update', subject: 'Leave' })
   async rejectLeave(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
     @CurrentUser() user: AuthUser,
   ): Promise<LeaveRecord> {
     return this.service.reject(id, ability, user.membershipId);
   }
 
-  @Mutation(() => LeaveModel, { description: 'Cancel a leave.' })
-  @CheckAbility({ action: 'update', subject: 'Leave' })
+  @Mutation(() => LeaveModel, {
+    description:
+      'Cancel a leave. Applicants (and guardians, for their children) may withdraw a pending one; approvers may cancel any leave they manage.',
+  })
+  @CheckAbility({ action: 'withdraw', subject: 'Leave' })
   async cancelLeave(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
     @CurrentUser() user: AuthUser,
   ): Promise<LeaveRecord> {
@@ -103,7 +108,7 @@ export class LeaveResolver {
   })
   @CheckAbility({ action: 'delete', subject: 'Leave' })
   async deleteLeave(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentAbility() ability: AppAbility,
   ): Promise<boolean> {
     return this.service.delete(id, ability);

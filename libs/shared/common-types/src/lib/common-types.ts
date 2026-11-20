@@ -41,6 +41,8 @@ export const AppAction = {
   Impersonate: 'impersonate',
   /** Re-publish or discard a dead-lettered NATS message — platform admin DLQ reader (ROV-19) */
   Replay: 'replay',
+  /** Withdraw (cancel) an application, e.g. a leave. Applicants hold it for their own pending ones. */
+  Withdraw: 'withdraw',
 } as const;
 
 export type AppAction = (typeof AppAction)[keyof typeof AppAction];
@@ -602,6 +604,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     },
     { action: 'create', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
     { action: 'read', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
+    {
+      action: 'withdraw',
+      subject: 'Leave',
+      conditions: { userId: '$user.membershipId', status: 'PENDING' },
+    },
     { action: 'read', subject: 'Holiday' },
   ],
 
@@ -623,6 +630,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     // Subject teachers file own leave + read the holiday calendar.
     { action: 'create', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
     { action: 'read', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
+    {
+      action: 'withdraw',
+      subject: 'Leave',
+      conditions: { userId: '$user.membershipId', status: 'PENDING' },
+    },
     { action: 'read', subject: 'Holiday' },
   ],
 
@@ -768,6 +780,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     // Students can file own leaves + read the holiday calendar.
     { action: 'create', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
     { action: 'read', subject: 'Leave', conditions: { userId: '$user.membershipId' } },
+    {
+      action: 'withdraw',
+      subject: 'Leave',
+      conditions: { userId: '$user.membershipId', status: 'PENDING' },
+    },
     { action: 'read', subject: 'Holiday' },
   ],
 
@@ -788,11 +805,21 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Subject' },
     { action: 'read', subject: 'Timetable' },
     { action: 'read', subject: 'ReportCard' },
-    // Guardians read their children's leave + the institute holiday list.
+    // Guardians file, read and withdraw their children's leaves.
+    {
+      action: 'create',
+      subject: 'Leave',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
+    },
     {
       action: 'read',
       subject: 'Leave',
       conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
+    },
+    {
+      action: 'withdraw',
+      subject: 'Leave',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' }, status: 'PENDING' },
     },
     { action: 'read', subject: 'Holiday' },
   ],

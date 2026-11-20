@@ -1,5 +1,6 @@
 'use client';
 
+import type { ApolloCache } from '@apollo/client';
 import { LEAVE_STATUS_VALUES, LEAVE_TYPE_VALUES } from '@roviq/common-types';
 import { gql, useMutation, useQuery } from '@roviq/graphql';
 import type {
@@ -67,8 +68,8 @@ const LEAVES_QUERY = gql`
     $userId: ID
     $status: LeaveStatus
     $type: LeaveType
-    $startDate: String
-    $endDate: String
+    $startDate: DateOnly
+    $endDate: DateOnly
   ) {
     leaves(
       userId: $userId
@@ -173,11 +174,18 @@ export function useLeave(id: string | null) {
 
 // ─── Mutation hooks ───────────────────────────────────────────────────
 
+// Evict, not `refetchQueries: ['Leaves']`: that warns when the list is unmounted (apply and
+// detail pages). Lists refetch the evicted field when they next render.
+function evictLeaveLists(cache: ApolloCache) {
+  cache.evict({ id: 'ROOT_QUERY', fieldName: 'leaves' });
+  cache.gc();
+}
+
 export function useApplyLeave() {
   const [mutate, { loading }] = useMutation<
     { applyLeave: LeaveRecord },
     { input: ApplyLeaveInput }
-  >(APPLY_LEAVE, { refetchQueries: ['Leaves'] });
+  >(APPLY_LEAVE, { update: evictLeaveLists });
   return {
     apply: (input: ApplyLeaveInput) => mutate({ variables: { input } }),
     loading,
@@ -188,7 +196,7 @@ export function useUpdateLeave() {
   const [mutate, { loading }] = useMutation<
     { updateLeave: LeaveRecord },
     { id: string; input: UpdateLeavePayload }
-  >(UPDATE_LEAVE, { refetchQueries: ['Leaves', 'Leave'] });
+  >(UPDATE_LEAVE, { update: evictLeaveLists });
   return {
     update: (id: string, input: UpdateLeavePayload) => mutate({ variables: { id, input } }),
     loading,
@@ -198,7 +206,7 @@ export function useUpdateLeave() {
 export function useApproveLeave() {
   const [mutate, { loading }] = useMutation<{ approveLeave: LeaveRecord }, { id: string }>(
     APPROVE_LEAVE,
-    { refetchQueries: ['Leaves', 'Leave'] },
+    { update: evictLeaveLists },
   );
   return {
     approve: (id: string) => mutate({ variables: { id } }),
@@ -209,7 +217,7 @@ export function useApproveLeave() {
 export function useRejectLeave() {
   const [mutate, { loading }] = useMutation<{ rejectLeave: LeaveRecord }, { id: string }>(
     REJECT_LEAVE,
-    { refetchQueries: ['Leaves', 'Leave'] },
+    { update: evictLeaveLists },
   );
   return {
     reject: (id: string) => mutate({ variables: { id } }),
@@ -220,7 +228,7 @@ export function useRejectLeave() {
 export function useCancelLeave() {
   const [mutate, { loading }] = useMutation<{ cancelLeave: LeaveRecord }, { id: string }>(
     CANCEL_LEAVE,
-    { refetchQueries: ['Leaves', 'Leave'] },
+    { update: evictLeaveLists },
   );
   return {
     cancel: (id: string) => mutate({ variables: { id } }),
@@ -231,7 +239,7 @@ export function useCancelLeave() {
 export function useDeleteLeave() {
   const [mutate, { loading }] = useMutation<{ deleteLeave: boolean }, { id: string }>(
     DELETE_LEAVE,
-    { refetchQueries: ['Leaves'] },
+    { update: evictLeaveLists },
   );
   return {
     remove: (id: string) => mutate({ variables: { id } }),

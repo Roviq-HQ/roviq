@@ -6,8 +6,10 @@
  * by the page resolves to a spy — the rest of the i18n exports (zodValidator,
  * translators) keep their real implementations so form validation runs.
  */
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 
@@ -60,18 +62,47 @@ vi.mock('@roviq/i18n', async () => {
   };
 });
 
+// UUID v7-shaped so the form's z.string().uuid() default passes with the prefilled applicant.
+const OWN_MEMBERSHIP_ID = '018f3e2c-0000-7000-8000-000000000001';
 vi.mock('@roviq/auth', () => ({
-  useAuth: () => ({
-    // UUID v7-shaped string so the form's z.string().uuid() default passes
-    // with the prefilled applicant.
-    user: { membershipId: '018f3e2c-0000-7000-8000-000000000001' },
-  }),
+  useAuth: () => ({ user: { membershipId: OWN_MEMBERSHIP_ID } }),
 }));
 
+vi.mock('../../use-own-name', () => ({
+  useOwnName: (skip: boolean) => (skip ? null : 'Asha Verma'),
+}));
+
+// The student profile id and the membership id differ on purpose: a leave belongs to the
+// membership, so only the membership id may be sent.
+const STUDENT = {
+  id: '018f3e2c-0000-7000-8000-000000000701',
+  membershipId: '018f3e2c-0000-7000-8000-000000000404',
+  admissionNumber: 'S-2026/0001',
+  firstName: { en: 'Priya' },
+  lastName: { en: 'Singh' },
+};
+
+const SECOND_CHILD = {
+  id: '018f3e2c-0000-7000-8000-000000000702',
+  membershipId: '018f3e2c-0000-7000-8000-000000000406',
+  admissionNumber: 'S-2026/0002',
+  firstName: { en: 'Rohan' },
+  lastName: { en: 'Singh' },
+};
+// Readable but not linked: the picker must still leave this student out for a guardian.
+const UNLINKED_STUDENT = {
+  id: '018f3e2c-0000-7000-8000-000000000703',
+  membershipId: '018f3e2c-0000-7000-8000-000000000407',
+  admissionNumber: 'S-2026/0003',
+  firstName: { en: 'Kabir' },
+  lastName: { en: 'Rao' },
+};
+
+const studentsState: { list: (typeof STUDENT)[] } = { list: [STUDENT] };
 vi.mock('../../../people/students/use-students', () => ({
   useStudents: () => ({
-    students: [],
-    totalCount: 0,
+    students: studentsState.list,
+    totalCount: 1,
     hasNextPage: false,
     loading: false,
     loadMore: vi.fn(),
@@ -112,11 +143,26 @@ async function openAndSelectRadixOption(
   await user.click(option);
 }
 
+function graphQLError(code: string) {
+  return new CombinedGraphQLErrors({
+    errors: [{ message: 'raw server text', extensions: { code } }],
+  });
+}
+
+// A one-day leave needs no document, so the form is valid once these are set.
+async function fillValidLeave(user: ReturnType<typeof userEvent.setup>) {
+  await openAndSelectRadixOption(screen.getByTestId('leave-apply-type-select'), 'Medical', user);
+  await user.type(screen.getByTestId('leave-apply-start-date'), '2026-04-10');
+  await user.type(screen.getByTestId('leave-apply-end-date'), '2026-04-10');
+  await user.type(screen.getByTestId('leave-apply-reason'), 'Fever');
+}
+
 describe('ApplyLeavePage', () => {
   beforeEach(() => {
     applyMock.mockReset();
     applyMock.mockResolvedValue({});
     pushMock.mockReset();
+    studentsState.list = [STUDENT];
   });
 
   it('renders the form shell with all expected fields', () => {
@@ -199,5 +245,269 @@ describe('ApplyLeavePage', () => {
     expect(screen.getByTestId('leave-apply-access-denied')).toBeInTheDocument();
     expect(screen.queryByTestId('leave-apply-title')).not.toBeInTheDocument();
     expect(screen.queryByTestId('leave-apply-submit-btn')).not.toBeInTheDocument();
+  });
+
+  it('shows that a user who may not create leaves may not apply', () => {
+    renderWithProviders(<ApplyLeavePage />, {
+      abilityRules: [
+        { action: 'manage', subject: 'all' },
+        { action: 'create', subject: 'Leave', inverted: true },
+      ],
+    });
+    expect(screen.getByTestId('leave-apply-access-denied')).toHaveTextContent(
+      'You are not allowed to apply for leave.',
+    );
+  });
+
+  it('labels the prefilled applicant with the signed-in person name, not an id prefix', () => {
+    renderWithProviders(<ApplyLeavePage />);
+    expect(screen.getByTestId('leave-apply-user-picker')).toHaveTextContent('Asha Verma');
+  });
+
+  it('applies for the picked student membership, not the student profile id', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ApplyLeavePage />);
+
+    await user.click(screen.getByTestId('leave-apply-user-picker'));
+    await user.click(await screen.findByTestId(`leave-apply-user-option-${STUDENT.membershipId}`));
+    expect(screen.getByTestId('leave-apply-user-picker')).toHaveTextContent(
+      'Priya Singh · S-2026/0001',
+    );
+    await fillValidLeave(user);
+    await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+    await waitFor(() =>
+      expect(applyMock).toHaveBeenCalledWith({
+        userId: STUDENT.membershipId,
+        type: 'MEDICAL',
+        startDate: '2026-04-10',
+        endDate: '2026-04-10',
+        reason: 'Fever',
+        fileIds: [],
+      }),
+    );
+    expect(toast.success).toHaveBeenCalledWith('Leave application submitted.');
+    expect(pushMock).toHaveBeenCalledWith('/leave');
+  });
+
+  it('explains a refused application as a leave rule, not as a file-upload error', async () => {
+    applyMock.mockRejectedValue(graphQLError('FORBIDDEN'));
+    const user = userEvent.setup();
+    renderWithProviders(<ApplyLeavePage />);
+
+    await fillValidLeave(user);
+    await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'You are not allowed to apply for leave for this person.',
+      ),
+    );
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('still explains an attachment problem with the file-upload message', async () => {
+    applyMock.mockRejectedValue(graphQLError('FILE_NOT_FOUND'));
+    const user = userEvent.setup();
+    renderWithProviders(<ApplyLeavePage />);
+
+    await fillValidLeave(user);
+    await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'An uploaded file is no longer available. Remove it and upload it again.',
+      ),
+    );
+  });
+
+  describe('as a student or teacher', () => {
+    // As the server sends them: `$user.*` placeholders already substituted.
+    const SELF_RULES = [
+      { action: 'create', subject: 'Leave', conditions: { userId: OWN_MEMBERSHIP_ID } },
+    ] as const;
+
+    it('shows their own name instead of a picker', () => {
+      renderWithProviders(<ApplyLeavePage />, { abilityRules: [...SELF_RULES] });
+
+      expect(screen.getByTestId('leave-apply-applicant-self')).toHaveTextContent('Asha Verma');
+      expect(screen.queryByTestId('leave-apply-user-picker')).not.toBeInTheDocument();
+    });
+
+    it('applies for themself', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<ApplyLeavePage />, { abilityRules: [...SELF_RULES] });
+
+      await fillValidLeave(user);
+      await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+      await waitFor(() =>
+        expect(applyMock).toHaveBeenCalledWith({
+          userId: OWN_MEMBERSHIP_ID,
+          type: 'MEDICAL',
+          startDate: '2026-04-10',
+          endDate: '2026-04-10',
+          reason: 'Fever',
+          fileIds: [],
+        }),
+      );
+    });
+  });
+
+  describe('as a guardian', () => {
+    const guardianRules = (childProfileIds: string[]) => [
+      {
+        action: 'create' as const,
+        subject: 'Leave' as const,
+        conditions: { studentProfileId: { $in: childProfileIds } },
+      },
+    ];
+
+    it('lists only the linked children and does not start as the guardian', async () => {
+      studentsState.list = [STUDENT, SECOND_CHILD, UNLINKED_STUDENT];
+      const user = userEvent.setup();
+      renderWithProviders(<ApplyLeavePage />, {
+        abilityRules: guardianRules([STUDENT.id, SECOND_CHILD.id]),
+      });
+
+      const trigger = screen.getByTestId('leave-apply-user-picker');
+      expect(trigger).toHaveTextContent('Select a person');
+      expect(trigger).not.toHaveTextContent('Asha Verma');
+
+      await user.click(trigger);
+      expect(
+        await screen.findByTestId(`leave-apply-user-option-${STUDENT.membershipId}`),
+      ).toHaveTextContent('Priya Singh · S-2026/0001');
+      expect(
+        screen.getByTestId(`leave-apply-user-option-${SECOND_CHILD.membershipId}`),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId(`leave-apply-user-option-${UNLINKED_STUDENT.membershipId}`),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(`leave-apply-user-option-${OWN_MEMBERSHIP_ID}`),
+      ).not.toBeInTheDocument();
+    });
+
+    it('applies for the picked child’s membership', async () => {
+      studentsState.list = [STUDENT, SECOND_CHILD, UNLINKED_STUDENT];
+      const user = userEvent.setup();
+      renderWithProviders(<ApplyLeavePage />, {
+        abilityRules: guardianRules([STUDENT.id, SECOND_CHILD.id]),
+      });
+
+      await user.click(screen.getByTestId('leave-apply-user-picker'));
+      await user.click(
+        await screen.findByTestId(`leave-apply-user-option-${SECOND_CHILD.membershipId}`),
+      );
+      await fillValidLeave(user);
+      await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+      await waitFor(() =>
+        expect(applyMock).toHaveBeenCalledWith({
+          userId: SECOND_CHILD.membershipId,
+          type: 'MEDICAL',
+          startDate: '2026-04-10',
+          endDate: '2026-04-10',
+          reason: 'Fever',
+          fileIds: [],
+        }),
+      );
+    });
+
+    it('preselects the only linked child', async () => {
+      studentsState.list = [STUDENT, UNLINKED_STUDENT];
+      const user = userEvent.setup();
+      renderWithProviders(<ApplyLeavePage />, { abilityRules: guardianRules([STUDENT.id]) });
+
+      await waitFor(() =>
+        expect(screen.getByTestId('leave-apply-user-picker')).toHaveTextContent(
+          'Priya Singh · S-2026/0001',
+        ),
+      );
+      await fillValidLeave(user);
+      await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+      await waitFor(() =>
+        expect(applyMock).toHaveBeenCalledWith({
+          userId: STUDENT.membershipId,
+          type: 'MEDICAL',
+          startDate: '2026-04-10',
+          endDate: '2026-04-10',
+          reason: 'Fever',
+          fileIds: [],
+        }),
+      );
+    });
+  });
+
+  describe('required fields', () => {
+    it('asks for a reason in words, not with the field label', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<ApplyLeavePage />);
+
+      await openAndSelectRadixOption(
+        screen.getByTestId('leave-apply-type-select'),
+        'Medical',
+        user,
+      );
+      await user.type(screen.getByTestId('leave-apply-start-date'), '2026-04-10');
+      await user.type(screen.getByTestId('leave-apply-end-date'), '2026-04-10');
+      await user.type(screen.getByTestId('leave-apply-reason'), 'x');
+      await user.clear(screen.getByTestId('leave-apply-reason'));
+      await user.tab();
+
+      expect(await screen.findByText('Enter a reason.')).toBeInTheDocument();
+      expect(screen.getByTestId('leave-apply-submit-btn')).toBeDisabled();
+      expect(applyMock).not.toHaveBeenCalled();
+    });
+
+    it('asks a guardian to choose the child', async () => {
+      studentsState.list = [STUDENT, SECOND_CHILD];
+      const user = userEvent.setup();
+      renderWithProviders(<ApplyLeavePage />, {
+        abilityRules: [
+          {
+            action: 'create',
+            subject: 'Leave',
+            conditions: { studentProfileId: { $in: [STUDENT.id, SECOND_CHILD.id] } },
+          },
+        ],
+      });
+
+      await fillValidLeave(user);
+
+      expect(await screen.findByText('Choose who the leave is for.')).toBeInTheDocument();
+      expect(screen.getByTestId('leave-apply-submit-btn')).toBeDisabled();
+      expect(applyMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('lets someone who applies for anyone pick themself again after picking a student', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ApplyLeavePage />);
+
+    await user.click(screen.getByTestId('leave-apply-user-picker'));
+    await user.click(await screen.findByTestId(`leave-apply-user-option-${STUDENT.membershipId}`));
+    await user.click(screen.getByTestId('leave-apply-user-picker'));
+    const self = await screen.findByTestId(`leave-apply-user-option-${OWN_MEMBERSHIP_ID}`);
+    expect(self).toHaveTextContent('Asha Verma');
+    await user.click(self);
+    expect(screen.getByTestId('leave-apply-user-picker')).toHaveTextContent('Asha Verma');
+
+    await fillValidLeave(user);
+    await user.click(screen.getByTestId('leave-apply-submit-btn'));
+
+    await waitFor(() =>
+      expect(applyMock).toHaveBeenCalledWith({
+        userId: OWN_MEMBERSHIP_ID,
+        type: 'MEDICAL',
+        startDate: '2026-04-10',
+        endDate: '2026-04-10',
+        reason: 'Fever',
+        fileIds: [],
+      }),
+    );
   });
 });

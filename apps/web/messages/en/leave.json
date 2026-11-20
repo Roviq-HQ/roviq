@@ -6,7 +6,8 @@
   "apply": {
     "title": "Apply for leave",
     "cta": "Submit application",
-    "submitting": "Submitting…"
+    "submitting": "Submitting…",
+    "accessDenied": "You are not allowed to apply for leave."
   },
   "fields": {
     "userId": "Applicant",
@@ -36,17 +37,77 @@
     "cancel": "Cancel",
     "approving": "Approving…",
     "rejecting": "Rejecting…",
-    "cancelling": "Cancelling…"
+    "cancelling": "Cancelling…",
+    "view": "View",
+    "withdraw": "Withdraw",
+    "withdrawing": "Withdrawing…"
   },
   "noLeaves": "No leave applications found.",
   "accessDenied": "You do not have permission to view leaves.",
   "errors": {
     "END_BEFORE_START": "End date must be on or after the start date.",
-    "FILES_REQUIRED_GT2_DAYS": "Leaves longer than 2 days require at least one supporting document."
+    "FILES_REQUIRED_GT2_DAYS": "Leaves longer than 2 days require at least one supporting document.",
+    "apply": {
+      "FORBIDDEN": "You are not allowed to apply for leave for this person.",
+      "LEAVE_DOCUMENT_REQUIRED": "Leaves longer than 2 days need at least one supporting document.",
+      "INVALID_DATE_RANGE": "The end date must be on or after the start date.",
+      "GENERIC": "The leave application could not be submitted. Please try again."
+    },
+    "action": {
+      "FORBIDDEN": "You are not allowed to change this leave.",
+      "LEAVE_NOT_FOUND": "This leave no longer exists or you cannot see it.",
+      "INVALID_STATE_TRANSITION": "This leave has already been decided or cancelled. Refresh to see its current status.",
+      "LEAVE_NOT_EDITABLE": "This leave can no longer be changed.",
+      "GENERIC": "The leave could not be updated. Please try again."
+    },
+    "required": {
+      "userId": "Choose who the leave is for.",
+      "type": "Choose a leave type.",
+      "startDate": "Choose a start date.",
+      "endDate": "Choose an end date.",
+      "reason": "Enter a reason."
+    }
+  },
+  "withdraw": {
+    "title": "Withdraw this leave?",
+    "description": "The application will be cancelled and cannot be reopened. You can apply again if you still need the leave.",
+    "keep": "Keep the leave"
+  },
+  "list": {
+    "loadFailed": "Leaves could not be loaded."
   },
   "detail": {
     "back": "Back",
     "decidedBy": "Decided by",
-    "reason": "Reason"
+    "reason": "Reason",
+    "notFound": "Leave not found",
+    "notFoundDescription": "This leave does not exist, or you are not allowed to see it.",
+    "backToList": "Back to leaves",
+    "loadFailed": "The leave could not be loaded.",
+    "retry": "Try again"
+  },
+  "picker": {
+    "placeholder": "Select a person",
+    "search": "Search by name or admission number",
+    "noResults": "No matching person found.",
+    "clear": "Any applicant",
+    "selected": "Selected person",
+    "self": "You",
+    "noChildren": "No children are linked to your account."
+  },
+  "filters": {
+    "status": "Status",
+    "any": "All"
+  },
+  "columns": {
+    "status": "Status",
+    "dates": "Dates"
+  },
+  "toasts": {
+    "applied": "Leave application submitted.",
+    "approved": "Leave approved.",
+    "rejected": "Leave rejected.",
+    "cancelled": "Leave cancelled.",
+    "withdrawn": "Leave withdrawn."
   }
 }

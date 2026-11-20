@@ -426,7 +426,7 @@ describe('LeaveService (unit)', () => {
       },
       {
         name: 'cancel',
-        action: 'update',
+        action: 'withdraw',
         run: (svc, ab) => svc.cancel(LEAVE_ID, ab, USER_ID),
         write: (r) => r.setStatus,
       },
@@ -647,7 +647,7 @@ describe('LeaveService (unit)', () => {
       const result = await service.cancel(LEAVE_ID, ability, USER_ID);
 
       expect(result).toBe(cancelled);
-      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'update');
+      expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'withdraw');
       expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'CANCELLED', USER_ID);
       expect(eventBusMock.emit).toHaveBeenCalledTimes(1);
       expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.cancelled', {

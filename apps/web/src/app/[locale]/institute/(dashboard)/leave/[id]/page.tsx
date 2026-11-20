@@ -1,20 +1,43 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
-import { useFormatDate } from '@roviq/i18n';
-import { Badge, Button, Can, Card, CardContent, CardHeader, CardTitle } from '@roviq/ui';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
+import { Link, useFormatDate } from '@roviq/i18n';
+import {
+  Badge,
+  Button,
+  Can,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { StoredImage } from '@web/components/stored-image/stored-image';
-import { ArrowLeft, CalendarOff, CheckCircle2, XCircle } from 'lucide-react';
-import Link from 'next/link';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CalendarOff,
+  CheckCircle2,
+  RefreshCw,
+  SearchX,
+  XCircle,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import { type ApplicantFacts, leaveSubject } from '../leave-abilities';
+import { LeaveCancelAction, WithApplicantFacts } from '../leave-cancel-action';
+import { leaveActionErrorKey } from '../leave-errors';
 import {
   type LeaveRecord,
   type LeaveStatus,
   useApproveLeave,
-  useCancelLeave,
   useLeave,
   useRejectLeave,
 } from '../use-leave';
@@ -37,7 +60,7 @@ export default function LeaveDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const { leave, loading, refetch } = useLeave(id);
+  const { leave, loading, error, refetch } = useLeave(id);
 
   return (
     <Can I="read" a="Leave" passThrough>
@@ -53,6 +76,8 @@ export default function LeaveDetailPage() {
               </Card>
             ) : leave ? (
               <LeaveDetailCard leave={leave} />
+            ) : error ? (
+              <LeaveLoadError error={error} onRetry={() => void refetch()} />
             ) : null}
           </div>
         ) : (
@@ -79,8 +104,6 @@ function DetailHeader({
   onChanged: () => Promise<unknown>;
 }) {
   const t = useTranslations('leave');
-  const params = useParams();
-  const locale = params.locale as string;
 
   return (
     <header className="flex items-center justify-between gap-4">
@@ -92,7 +115,7 @@ function DetailHeader({
           className="gap-2"
           data-testid={instituteLeave.detailBackBtn}
         >
-          <Link href={`/${locale}/institute/leave`}>
+          <Link href="/leave">
             <ArrowLeft className="size-4" aria-hidden="true" />
             {t('detail.back')}
           </Link>
@@ -105,46 +128,51 @@ function DetailHeader({
           {t('title')}
         </h1>
       </div>
-      {leave ? <DetailActions leave={leave} onChanged={onChanged} /> : null}
+      {leave ? (
+        <WithApplicantFacts userId={leave.userId}>
+          {(facts) => <DetailActions leave={leave} facts={facts} onChanged={onChanged} />}
+        </WithApplicantFacts>
+      ) : null}
     </header>
   );
 }
 
 function DetailActions({
   leave,
+  facts,
   onChanged,
 }: {
   leave: LeaveRecord;
+  facts: ApplicantFacts | null;
   onChanged: () => Promise<unknown>;
 }) {
   const t = useTranslations('leave');
   const { approve, loading: approving } = useApproveLeave();
   const { reject, loading: rejecting } = useRejectLeave();
-  const { cancel, loading: cancelling } = useCancelLeave();
 
   async function runAction(
     fn: (id: string) => Promise<unknown>,
-    key: 'approve' | 'reject' | 'cancel',
+    done: 'approved' | 'rejected',
   ): Promise<void> {
     try {
       await fn(leave.id);
-      toast.success(t(`actions.${key}`));
+      toast.success(t(`toasts.${done}`));
       await onChanged();
     } catch (err) {
-      toast.error(extractGraphQLError(err, t(`actions.${key}`)));
+      toast.error(t(`errors.action.${leaveActionErrorKey(extractGraphQLErrorCode(err))}`));
     }
   }
 
-  if (leave.status === 'PENDING') {
-    return (
-      <div className="flex items-center gap-2">
-        <Can I="update" a="Leave">
+  return (
+    <div className="flex items-center gap-2">
+      {leave.status === 'PENDING' ? (
+        <Can I="update" this={leaveSubject(leave, facts)}>
           <Button
             type="button"
             variant="default"
             size="sm"
             className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => runAction(approve, 'approve')}
+            onClick={() => runAction(approve, 'approved')}
             disabled={approving}
             data-testid={instituteLeave.detailApproveBtn}
           >
@@ -156,50 +184,73 @@ function DetailActions({
             variant="outline"
             size="sm"
             className="gap-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-            onClick={() => runAction(reject, 'reject')}
+            onClick={() => runAction(reject, 'rejected')}
             disabled={rejecting}
             data-testid={instituteLeave.detailRejectBtn}
           >
             <XCircle className="size-4" aria-hidden="true" />
             {rejecting ? t('actions.rejecting') : t('actions.reject')}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2 text-slate-600"
-            onClick={() => runAction(cancel, 'cancel')}
-            disabled={cancelling}
-            data-testid={instituteLeave.detailCancelBtn}
-          >
-            <CalendarOff className="size-4" aria-hidden="true" />
-            {cancelling ? t('actions.cancelling') : t('actions.cancel')}
-          </Button>
         </Can>
-      </div>
+      ) : null}
+      <LeaveCancelAction leave={leave} facts={facts} variant="button" onDone={onChanged} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Load failure — LEAVE_NOT_FOUND also covers a leave the caller may not read
+// ─────────────────────────────────────────────────────────────────────
+
+function LeaveLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const t = useTranslations('leave');
+
+  const code = extractGraphQLErrorCode(error);
+  // BAD_REQUEST: the id is not a UUID, so no such leave can exist.
+  if (code === 'LEAVE_NOT_FOUND' || code === 'BAD_REQUEST') {
+    return (
+      <Empty className="py-16" data-testid={instituteLeave.detailNotFound}>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <SearchX />
+          </EmptyMedia>
+          <EmptyTitle>{t('detail.notFound')}</EmptyTitle>
+          <EmptyDescription>{t('detail.notFoundDescription')}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/leave" data-testid={instituteLeave.detailNotFoundBackLink}>
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              {t('detail.backToList')}
+            </Link>
+          </Button>
+        </EmptyContent>
+      </Empty>
     );
   }
 
-  if (leave.status === 'APPROVED') {
-    return (
-      <Can I="update" a="Leave">
+  return (
+    <Empty className="py-16" data-testid={instituteLeave.detailError}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <AlertTriangle />
+        </EmptyMedia>
+        <EmptyTitle>{t('detail.loadFailed')}</EmptyTitle>
+      </EmptyHeader>
+      <EmptyContent>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="gap-2 text-slate-600"
-          onClick={() => runAction(cancel, 'cancel')}
-          disabled={cancelling}
-          data-testid={instituteLeave.detailCancelBtn}
+          onClick={onRetry}
+          data-testid={instituteLeave.detailRetryBtn}
         >
-          <CalendarOff className="size-4" aria-hidden="true" />
-          {cancelling ? t('actions.cancelling') : t('actions.cancel')}
+          <RefreshCw className="size-4" aria-hidden="true" />
+          {t('detail.retry')}
         </Button>
-      </Can>
-    );
-  }
-
-  return null;
+      </EmptyContent>
+    </Empty>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────

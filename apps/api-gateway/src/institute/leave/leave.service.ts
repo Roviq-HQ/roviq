@@ -181,7 +181,7 @@ export class LeaveService {
     ability: AppAbility,
     cancellerMembershipId: string,
   ): Promise<LeaveRecord> {
-    const existing = await this.loadFor(id, ability, 'update');
+    const existing = await this.loadFor(id, ability, 'withdraw');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.CANCELLED);
     const record = await this.repo.setStatus(id, LeaveStatus.CANCELLED, cancellerMembershipId);
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.cancelled, {

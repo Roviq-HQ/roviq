@@ -1752,7 +1752,7 @@ input CreateInstituteGroupInput {
 """Apply for a new leave. Submits in PENDING status awaiting approval."""
 input CreateLeaveInput {
   """Inclusive leave end date (ISO YYYY-MM-DD)."""
-  endDate: String!
+  endDate: DateOnly!
 
   """
   Ids of files uploaded through `requestFileUpload` with purpose LEAVE_ATTACHMENT. Leaves of 3 or more calendar days need at least one.
@@ -1763,7 +1763,7 @@ input CreateLeaveInput {
   reason: String!
 
   """Inclusive leave start date (ISO YYYY-MM-DD)."""
-  startDate: String!
+  startDate: DateOnly!
   type: LeaveType!
 
   """Membership the leave is for (student or staff)."""
@@ -3948,7 +3948,9 @@ type Mutation {
   """
   bulkMarkAttendance(input: BulkMarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): [AttendanceEntryModel!]!
 
-  """Cancel a leave."""
+  """
+  Cancel a leave. Applicants (and guardians, for their children) may withdraw a pending one; approvers may cancel any leave they manage.
+  """
   cancelLeave(id: ID!): LeaveModel!
   cancelSubscription(input: CancelSubscriptionInput!): SubscriptionModel!
 
@@ -4813,7 +4815,7 @@ type Query {
   """
   List leave applications, ordered by `startDate` DESC (most recent first — leave UIs are decision-driven, not calendar-driven). Optional filters narrow by user, status, type, and overlapping date range.
   """
-  leaves(endDate: String, startDate: String, status: LeaveStatus, type: LeaveType, userId: ID): [LeaveModel!]!
+  leaves(endDate: DateOnly, startDate: DateOnly, status: LeaveStatus, type: LeaveType, userId: ID): [LeaveModel!]!
 
   """Documents submitted with one admission application"""
   listApplicationDocuments(applicationId: ID!): [ApplicationDocumentModel!]!
@@ -7013,14 +7015,14 @@ input UpdateInstituteLocalesInput {
 
 """Edit a PENDING leave — dates, type, reason, or supporting files."""
 input UpdateLeaveInput {
-  endDate: String
+  endDate: DateOnly
 
   """
   Full new set of attachments: ids already attached stay, missing ones are removed, new ones (uploaded with purpose LEAVE_ATTACHMENT) are added. Omit to leave attachments unchanged.
   """
   fileIds: [ID!]
   reason: String
-  startDate: String
+  startDate: DateOnly
   type: LeaveType
 }
 

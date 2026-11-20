@@ -1,36 +1,23 @@
 'use client';
 
 import { useAuth } from '@roviq/auth';
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
-import { useI18nField, useRouter, zodValidator } from '@roviq/i18n';
-import {
-  Button,
-  Can,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  useAppForm,
-  useDebounce,
-} from '@roviq/ui';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
+import { useRouter, zodValidator } from '@roviq/i18n';
+import { Button, Can, Field, FieldError, FieldGroup, FieldLabel, useAppForm } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { FileUpload } from '@web/components/file-upload/file-upload';
 import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload';
-import { ArrowLeft, Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useStudents } from '../../people/students/use-students';
+import { ApplicantPicker } from '../applicant-picker';
+import { useApplicantMode, useMayApplyFor } from '../leave-abilities';
+import { applyLeaveErrorKey } from '../leave-errors';
 import { LEAVE_TYPE_VALUES, type LeaveType, useApplyLeave } from '../use-leave';
+import { useOwnName } from '../use-own-name';
 
 const { instituteLeave } = testIds;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -68,11 +55,11 @@ function daysBetween(start: string, end: string): number {
 function buildSchema(t: ReturnType<typeof useTranslations>) {
   return z
     .object({
-      userId: z.string().uuid(t('fields.userId')),
-      type: z.enum(LEAVE_TYPE_VALUES),
-      startDate: z.string().regex(ISO_DATE_REGEX, t('fields.startDate')),
-      endDate: z.string().regex(ISO_DATE_REGEX, t('fields.endDate')),
-      reason: z.string().trim().min(1, t('fields.reason')).max(REASON_MAX),
+      userId: z.string().uuid(t('errors.required.userId')),
+      type: z.enum(LEAVE_TYPE_VALUES, { error: t('errors.required.type') }),
+      startDate: z.string().regex(ISO_DATE_REGEX, t('errors.required.startDate')),
+      endDate: z.string().regex(ISO_DATE_REGEX, t('errors.required.endDate')),
+      reason: z.string().trim().min(1, t('errors.required.reason')).max(REASON_MAX),
       fileIds: z.array(z.string()),
     })
     .refine((d) => d.startDate <= d.endDate, {
@@ -101,13 +88,13 @@ export default function ApplyLeavePage() {
   const { apply } = useApplyLeave();
 
   const schema = React.useMemo(() => buildSchema(t), [t]);
+  const applicantMode = useApplicantMode();
 
   const form = useAppForm({
     defaultValues: {
       ...EMPTY_FORM,
-      // Prefill the applicant as the logged-in user — admins picking
-      // on behalf of a student can still overwrite via the picker.
-      userId: user?.membershipId ?? '',
+      // A guardian is not an applicant, so only staff and students start as themself.
+      userId: applicantMode === 'children' ? '' : (user?.membershipId ?? ''),
     } satisfies ApplyLeaveFormValues,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
     onSubmit: async ({ value }) => {
@@ -121,20 +108,25 @@ export default function ApplyLeavePage() {
           reason: parsed.reason,
           fileIds: parsed.fileIds,
         });
-        toast.success(t('apply.cta'));
-        router.push('/institute/leave');
+        toast.success(t('toasts.applied'));
+        router.push('/leave');
       } catch (err) {
-        const fileError = fileUploadErrorKey(extractGraphQLErrorCode(err));
+        const code = extractGraphQLErrorCode(err);
+        // Leave codes first: FORBIDDEN is also an upload code, but here it means the applicant.
+        const leaveError = applyLeaveErrorKey(code);
+        const fileError = leaveError ? null : fileUploadErrorKey(code);
         toast.error(
-          fileError
-            ? tFiles(`errors.${fileError}`, { count: MAX_LEAVE_FILES })
-            : extractGraphQLError(err, t('apply.cta')),
+          leaveError
+            ? t(`errors.apply.${leaveError}`)
+            : fileError
+              ? tFiles(`errors.${fileError}`, { count: MAX_LEAVE_FILES })
+              : t('errors.apply.GENERIC'),
         );
       }
     },
   });
 
-  const handleCancel = () => router.push('/institute/leave');
+  const handleCancel = () => router.push('/leave');
 
   const typeOptions = LEAVE_TYPE_VALUES.map((v) => ({ value: v, label: t(`type.${v}`) }));
 
@@ -175,24 +167,49 @@ export default function ApplyLeavePage() {
             >
               <FieldGroup>
                 <form.Field name="userId">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="leave-apply-user-picker">
-                        {t('fields.userId')}
-                      </FieldLabel>
-                      <MembershipPicker
-                        value={typeof field.state.value === 'string' ? field.state.value : ''}
-                        onChange={(v) => field.handleChange(v)}
-                      />
-                      {field.state.meta.isTouched && field.state.meta.errors.length > 0 ? (
-                        <FieldError
-                          errors={collectMessages(field.state.meta.errors).map((m) => ({
-                            message: m,
-                          }))}
+                  {(field) =>
+                    applicantMode === 'self' ? (
+                      <Field>
+                        <FieldLabel>{t('fields.userId')}</FieldLabel>
+                        <OwnApplicant />
+                      </Field>
+                    ) : (
+                      <Field>
+                        <FieldLabel htmlFor="leave-apply-user-picker">
+                          {t('fields.userId')}
+                        </FieldLabel>
+                        <ApplicantPicker
+                          id="leave-apply-user-picker"
+                          value={field.state.value || null}
+                          onChange={(v) => field.handleChange(v ?? '')}
+                          onlyApplicable={applicantMode === 'children'}
+                          includeSelf={applicantMode === 'anyone'}
+                          testIds={{
+                            trigger: instituteLeave.applyUserPicker,
+                            input: instituteLeave.applyUserPickerInput,
+                            option: instituteLeave.applyUserPickerOption,
+                          }}
                         />
-                      ) : null}
-                    </Field>
-                  )}
+                        {applicantMode === 'children' && !field.state.value ? (
+                          <PreselectOnlyChild onPick={(v) => field.handleChange(v)} />
+                        ) : null}
+                        {/* The picker cannot be "touched" without choosing someone, so the message
+                            follows the form: otherwise the disabled Submit goes unexplained. */}
+                        <form.Subscribe selector={(state) => state.isTouched}>
+                          {(formTouched) =>
+                            (field.state.meta.isTouched || formTouched) &&
+                            field.state.meta.errors.length > 0 ? (
+                              <FieldError
+                                errors={collectMessages(field.state.meta.errors).map((m) => ({
+                                  message: m,
+                                }))}
+                              />
+                            ) : null
+                          }
+                        </form.Subscribe>
+                      </Field>
+                    )
+                  }
                 </form.Field>
 
                 <form.AppField name="type">
@@ -275,7 +292,7 @@ export default function ApplyLeavePage() {
         ) : (
           <div className="flex items-center justify-center min-h-[400px]">
             <p className="text-muted-foreground" data-testid={instituteLeave.applyAccessDenied}>
-              {t('accessDenied')}
+              {t('apply.accessDenied')}
             </p>
           </div>
         )
@@ -284,88 +301,30 @@ export default function ApplyLeavePage() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Membership picker — reuses the student list like the attendance
-// history picker. See note in `page.tsx` re: staff membership gap.
-// ─────────────────────────────────────────────────────────────────────
-
-function MembershipPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-}) {
+function OwnApplicant() {
   const t = useTranslations('leave');
-  const resolveI18n = useI18nField();
-  const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebounce(search, 250);
-
-  const { students } = useStudents({ first: 50, search: debouncedSearch || undefined });
-
-  const selectedLabel = React.useMemo(() => {
-    if (!value) return null;
-    const stu = students.find((s) => s.id === value);
-    if (!stu) return value.slice(0, 8);
-    const first = resolveI18n(stu.firstName) ?? '';
-    const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
-    return `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`.trim();
-  }, [value, students, resolveI18n]);
-
+  const ownName = useOwnName(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          id="leave-apply-user-picker"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-          data-testid={instituteLeave.applyUserPicker}
-        >
-          <span className="truncate">{selectedLabel ?? t('fields.userId')}</span>
-          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[320px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={t('fields.userId')}
-            value={search}
-            onValueChange={setSearch}
-            data-testid={instituteLeave.applyUserPickerInput}
-          />
-          <CommandList>
-            <CommandEmpty>{t('fields.userId')}</CommandEmpty>
-            <CommandGroup>
-              {students.map((stu) => {
-                const first = resolveI18n(stu.firstName) ?? '';
-                const last = stu.lastName ? (resolveI18n(stu.lastName) ?? '') : '';
-                const label = `${[first, last].filter(Boolean).join(' ')} · ${stu.admissionNumber}`;
-                return (
-                  <CommandItem
-                    key={stu.id}
-                    value={stu.id}
-                    onSelect={() => {
-                      onChange(stu.id);
-                      setOpen(false);
-                    }}
-                    data-testid={`leave-apply-user-option-${stu.id}`}
-                  >
-                    <Check
-                      className={`mr-2 size-4 ${value === stu.id ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                    {label}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <p className="text-sm font-medium" data-testid={instituteLeave.applyApplicantSelf}>
+      {ownName ?? t('picker.self')}
+    </p>
   );
+}
+
+/** With a single linked child there is nothing to choose. */
+function PreselectOnlyChild({ onPick }: { onPick: (membershipId: string) => void }) {
+  const { students } = useStudents({ first: 50 });
+  const mayApplyFor = useMayApplyFor();
+  const children = students.flatMap((stu) =>
+    stu.membershipId && mayApplyFor({ id: stu.id, membershipId: stu.membershipId })
+      ? [stu.membershipId]
+      : [],
+  );
+  const only = children.length === 1 ? children[0] : null;
+  React.useEffect(() => {
+    if (only) onPick(only);
+  }, [only, onPick]);
+  return null;
 }
 
 function collectMessages(errors: ReadonlyArray<unknown>): string[] {
@@ -383,5 +342,3 @@ function collectMessages(errors: ReadonlyArray<unknown>): string[] {
   }
   return out;
 }
-
-import { testIds } from '@roviq/ui/testing/testid-registry';

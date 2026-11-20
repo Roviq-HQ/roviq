@@ -1,9 +1,9 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { LeaveType } from '@roviq/common-types';
+import { DateOnlyScalar } from '@roviq/nestjs-graphql';
 import {
   ArrayMaxSize,
   IsArray,
-  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -14,13 +14,13 @@ import {
 @InputType({ description: 'Edit a PENDING leave — dates, type, reason, or supporting files.' })
 export class UpdateLeaveInput {
   @IsOptional()
-  @IsDateString()
-  @Field(() => String, { nullable: true })
+  @IsString()
+  @Field(() => DateOnlyScalar, { nullable: true })
   startDate?: string;
 
   @IsOptional()
-  @IsDateString()
-  @Field(() => String, { nullable: true })
+  @IsString()
+  @Field(() => DateOnlyScalar, { nullable: true })
   endDate?: string;
 
   @IsOptional()
