@@ -144,7 +144,8 @@ export function FileUpload({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: drop target only; the button inside is the keyboard path */}
       <div
         className={cn(
-          'flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors',
+          // `relative` anchors the visually hidden file input inside the drop zone.
+          'relative flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors',
           dragging ? 'border-primary bg-primary/5' : 'border-input',
           remaining <= 0 && 'opacity-60',
         )}
@@ -177,7 +178,8 @@ export function FileUpload({
           ref={inputRef}
           id={inputId}
           type="file"
-          className="sr-only"
+          // `size-px` overrides the Input's `w-full`/`h-8`, which otherwise beat `sr-only` and widen the page.
+          className="sr-only size-px"
           tabIndex={-1}
           accept={acceptAttribute(policy.allowedContentTypes)}
           multiple={maxFiles > 1}

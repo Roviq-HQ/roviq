@@ -61,6 +61,17 @@ afterEach(() => {
 });
 
 describe('FileUpload', () => {
+  // A full-width hidden input is positioned absolutely and made the apply page scroll sideways.
+  it('should keep the hidden file input one pixel wide inside its drop zone', () => {
+    renderUpload();
+
+    const input = screen.getByTestId('file-upload-test-input');
+    expect(input).toHaveClass('sr-only', 'size-px');
+    expect(input).not.toHaveClass('w-full');
+    expect(input).not.toHaveClass('h-8');
+    expect(screen.getByTestId('file-upload-test-dropzone')).toHaveClass('relative');
+  });
+
   it('should tell the user which formats and size are accepted', () => {
     renderUpload();
 
