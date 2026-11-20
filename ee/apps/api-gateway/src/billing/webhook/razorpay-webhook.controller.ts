@@ -47,6 +47,13 @@ export class RazorpayWebhookController {
         );
         return res.json({ status: 'ok' });
       }
+      // Failed and refund events carry a payment id and amount too; only a capture pays the invoice.
+      if (event.status !== 'captured') {
+        this.logger.log(
+          `Razorpay webhook ignored — payment status ${event.status} (type: ${event.eventType}, reseller: ${resellerId})`,
+        );
+        return res.json({ status: 'ok' });
+      }
 
       const payload = event.payload as WebhookPayload;
       await this.paymentService.handleWebhookPayment(resellerId, {
