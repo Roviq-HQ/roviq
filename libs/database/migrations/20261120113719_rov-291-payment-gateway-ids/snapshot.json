@@ -1,8 +1,8 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "ccebb47f-186b-4ead-ae6f-a95e22c46bd0",
-  "prevIds": ["ee0c9b89-724f-47c8-a194-237bf75b117b"],
+  "id": "4531ccda-d911-477d-a96a-98cc3a3b0765",
+  "prevIds": ["088e8714-c3f8-4def-98d6-85fa24d09895"],
   "ddl": [
     {
       "values": [
@@ -289,7 +289,10 @@
         "RESELLER_FAVICON",
         "USER_DOCUMENT",
         "STAFF_CERTIFICATE",
-        "APPLICATION_DOCUMENT"
+        "APPLICATION_DOCUMENT",
+        "INSTITUTE_LOGO",
+        "INSTITUTE_FAVICON",
+        "INSTITUTE_COVER"
       ],
       "name": "FilePurpose",
       "entityType": "enums",
@@ -10472,27 +10475,40 @@
       "table": "institute_branding"
     },
     {
-      "type": "text",
+      "type": "uuid",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "logo_url",
+      "name": "logo_file_id",
       "entityType": "columns",
       "schema": "public",
       "table": "institute_branding"
     },
     {
-      "type": "text",
+      "type": "uuid",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "favicon_url",
+      "name": "favicon_file_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "institute_branding"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cover_image_file_id",
       "entityType": "columns",
       "schema": "public",
       "table": "institute_branding"
@@ -10532,19 +10548,6 @@
       "generated": null,
       "identity": null,
       "name": "theme_identifier",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "institute_branding"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "cover_image_url",
       "entityType": "columns",
       "schema": "public",
       "table": "institute_branding"
@@ -10927,27 +10930,27 @@
       "table": "institute_group_branding"
     },
     {
-      "type": "text",
+      "type": "uuid",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "logo_url",
+      "name": "logo_file_id",
       "entityType": "columns",
       "schema": "public",
       "table": "institute_group_branding"
     },
     {
-      "type": "text",
+      "type": "uuid",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "favicon_url",
+      "name": "favicon_file_id",
       "entityType": "columns",
       "schema": "public",
       "table": "institute_group_branding"
@@ -11598,19 +11601,6 @@
       "generated": null,
       "identity": null,
       "name": "address",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "institutes"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "logo_url",
       "entityType": "columns",
       "schema": "public",
       "table": "institutes"
@@ -27101,6 +27091,45 @@
     },
     {
       "nameExplicit": false,
+      "columns": ["logo_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
+      "name": "institute_branding_logo_file_id_files_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institute_branding"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["favicon_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
+      "name": "institute_branding_favicon_file_id_files_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institute_branding"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["cover_image_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
+      "name": "institute_branding_cover_image_file_id_files_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institute_branding"
+    },
+    {
+      "nameExplicit": false,
       "columns": ["tenant_id"],
       "schemaTo": "public",
       "tableTo": "institutes",
@@ -27134,6 +27163,32 @@
       "onUpdate": "CASCADE",
       "onDelete": "CASCADE",
       "name": "institute_group_branding_group_id_institute_groups_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institute_group_branding"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["logo_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
+      "name": "institute_group_branding_logo_file_id_files_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institute_group_branding"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["favicon_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
+      "name": "institute_group_branding_favicon_file_id_files_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "institute_group_branding"
@@ -34932,7 +34987,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"logo_url\", \"favicon_url\", \"primary_color\", \"secondary_color\", \"theme_identifier\", \"cover_image_url\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institute_branding\" where (\"institute_branding\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"logo_file_id\", \"favicon_file_id\", \"cover_image_file_id\", \"primary_color\", \"secondary_color\", \"theme_identifier\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institute_branding\" where (\"institute_branding\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
@@ -34998,7 +35053,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"group_id\", \"logo_url\", \"favicon_url\", \"primary_color\", \"secondary_color\", \"theme\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institute_group_branding\" where (\"institute_group_branding\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"group_id\", \"logo_file_id\", \"favicon_file_id\", \"primary_color\", \"secondary_color\", \"theme\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institute_group_branding\" where (\"institute_group_branding\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
@@ -35130,7 +35185,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"name\", \"slug\", \"code\", \"type\", \"structure_framework\", \"setup_status\", \"contact\", \"address\", \"logo_url\", \"timezone\", \"currency\", \"supported_locales\", \"default_locale\", \"settings\", \"is_demo\", \"require_impersonation_consent\", \"departments\", \"status\", \"reseller_id\", \"group_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institutes\" where (\"institutes\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"name\", \"slug\", \"code\", \"type\", \"structure_framework\", \"setup_status\", \"contact\", \"address\", \"timezone\", \"currency\", \"supported_locales\", \"default_locale\", \"settings\", \"is_demo\", \"require_impersonation_consent\", \"departments\", \"status\", \"reseller_id\", \"group_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institutes\" where (\"institutes\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
