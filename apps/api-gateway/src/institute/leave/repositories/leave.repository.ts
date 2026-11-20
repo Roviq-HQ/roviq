@@ -1,4 +1,4 @@
-import type { AppAbility, AppAction } from '@roviq/common-types';
+import type { AppAbility, AppAction, LeaveStatus } from '@roviq/common-types';
 import type {
   CreateLeaveData,
   LeaveListQuery,
@@ -20,6 +20,7 @@ export abstract class LeaveRepository {
   abstract update(id: string, data: UpdateLeaveData): Promise<LeaveRecord>;
   abstract setStatus(
     id: string,
+    from: LeaveStatus,
     status: 'APPROVED' | 'REJECTED' | 'CANCELLED',
     decidedBy: string,
   ): Promise<LeaveRecord>;

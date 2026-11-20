@@ -586,7 +586,7 @@ describe('LeaveService (unit)', () => {
 
       expect(result).toBe(approved);
       expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'update');
-      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'APPROVED', APPROVER_ID);
+      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'PENDING', 'APPROVED', APPROVER_ID);
       expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.approved', {
         leaveId: LEAVE_ID,
         tenantId: TENANT_ID,
@@ -622,7 +622,7 @@ describe('LeaveService (unit)', () => {
 
       expect(result).toBe(rejected);
       expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'update');
-      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'REJECTED', APPROVER_ID);
+      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'PENDING', 'REJECTED', APPROVER_ID);
       expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.rejected', {
         leaveId: LEAVE_ID,
         tenantId: TENANT_ID,
@@ -648,7 +648,7 @@ describe('LeaveService (unit)', () => {
 
       expect(result).toBe(cancelled);
       expect(repo.isAllowed).toHaveBeenCalledWith(LEAVE_ID, ability, 'withdraw');
-      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'CANCELLED', USER_ID);
+      expect(repo.setStatus).toHaveBeenCalledWith(LEAVE_ID, 'PENDING', 'CANCELLED', USER_ID);
       expect(eventBusMock.emit).toHaveBeenCalledTimes(1);
       expect(eventBusMock.emit).toHaveBeenCalledWith('LEAVE.cancelled', {
         leaveId: LEAVE_ID,

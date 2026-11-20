@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { type AppAbility, type AppAction, BusinessException, ErrorCode } from '@roviq/common-types';
+import {
+  type AppAbility,
+  type AppAction,
+  BusinessException,
+  ErrorCode,
+  type LeaveStatus,
+} from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -233,10 +239,11 @@ export class LeaveDrizzleRepository extends LeaveRepository {
           ...(data.reason !== undefined && { reason: data.reason }),
           updatedBy: userId,
         })
-        .where(and(eq(leaves.id, id), isNull(leaves.deletedAt)))
+        // Only a pending leave is editable; a decision made since the check wins.
+        .where(and(eq(leaves.id, id), eq(leaves.status, 'PENDING'), isNull(leaves.deletedAt)))
         .returning(writeReturning);
       if (rows.length === 0)
-        throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
+        throw new BusinessException(ErrorCode.LEAVE_NOT_EDITABLE, `Leave ${id} is not pending`);
       if (data.fileIds !== undefined) {
         const wanted = new Set(data.fileIds);
         const current = (await loadFiles(tx, [id])).get(id) ?? [];
@@ -254,6 +261,7 @@ export class LeaveDrizzleRepository extends LeaveRepository {
 
   async setStatus(
     id: string,
+    from: LeaveStatus,
     status: 'APPROVED' | 'REJECTED' | 'CANCELLED',
     decidedBy: string,
   ): Promise<LeaveRecord> {
@@ -262,11 +270,17 @@ export class LeaveDrizzleRepository extends LeaveRepository {
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:leave'), async (tx) => {
       const rows = await tx
         .update(leaves)
-        .set({ status, decidedBy, updatedBy: userId })
-        .where(and(eq(leaves.id, id), isNull(leaves.deletedAt)))
+        .set({ status, decidedBy, updatedBy: userId, version: sql`${leaves.version} + 1` })
+        // The caller was authorised for the leave in status `from`; a decision made meanwhile wins.
+        .where(and(eq(leaves.id, id), eq(leaves.status, from), isNull(leaves.deletedAt)))
         .returning(writeReturning);
       const [record] = await withFiles(tx, rows);
-      if (!record) throw new BusinessException(ErrorCode.LEAVE_NOT_FOUND, `Leave ${id} not found`);
+      if (!record) {
+        throw new BusinessException(
+          ErrorCode.INVALID_STATE_TRANSITION,
+          `Leave ${id} is no longer ${from}`,
+        );
+      }
       return record;
     });
   }

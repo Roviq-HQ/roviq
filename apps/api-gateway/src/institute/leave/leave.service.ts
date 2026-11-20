@@ -135,7 +135,12 @@ export class LeaveService {
   ): Promise<LeaveRecord> {
     const existing = await this.loadFor(id, ability, 'update');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.APPROVED);
-    const record = await this.repo.setStatus(id, LeaveStatus.APPROVED, approverMembershipId);
+    const record = await this.repo.setStatus(
+      id,
+      existing.status,
+      LeaveStatus.APPROVED,
+      approverMembershipId,
+    );
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.approved, {
       leaveId: record.id,
       tenantId: record.tenantId,
@@ -160,7 +165,12 @@ export class LeaveService {
   ): Promise<LeaveRecord> {
     const existing = await this.loadFor(id, ability, 'update');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.REJECTED);
-    const record = await this.repo.setStatus(id, LeaveStatus.REJECTED, approverMembershipId);
+    const record = await this.repo.setStatus(
+      id,
+      existing.status,
+      LeaveStatus.REJECTED,
+      approverMembershipId,
+    );
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.rejected, {
       leaveId: record.id,
       tenantId: record.tenantId,
@@ -183,7 +193,12 @@ export class LeaveService {
   ): Promise<LeaveRecord> {
     const existing = await this.loadFor(id, ability, 'withdraw');
     LEAVE_STATE_MACHINE.assertTransition(existing.status, LeaveStatus.CANCELLED);
-    const record = await this.repo.setStatus(id, LeaveStatus.CANCELLED, cancellerMembershipId);
+    const record = await this.repo.setStatus(
+      id,
+      existing.status,
+      LeaveStatus.CANCELLED,
+      cancellerMembershipId,
+    );
     this.eventBus.emit(EVENT_PATTERNS.LEAVE.cancelled, {
       leaveId: record.id,
       tenantId: record.tenantId,
