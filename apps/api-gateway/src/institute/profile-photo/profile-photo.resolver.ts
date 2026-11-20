@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
 import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
@@ -30,8 +30,8 @@ export class ProfilePhotoResolver {
   @Mutation(() => Boolean, { description: 'Set or remove a student profile picture.' })
   @CheckAbility({ action: 'update', subject: 'Student' })
   setStudentPhoto(
-    @Args('studentProfileId', { type: () => ID }) id: string,
-    @Args('fileId', FILE_ID_ARG) fileId: string | null,
+    @Args('studentProfileId', { type: () => ID }, ParseUUIDPipe) id: string,
+    @Args('fileId', FILE_ID_ARG, new ParseUUIDPipe({ optional: true })) fileId: string | null,
   ): Promise<boolean> {
     return this.setFor('student', id, fileId);
   }
@@ -39,8 +39,8 @@ export class ProfilePhotoResolver {
   @Mutation(() => Boolean, { description: 'Set or remove a staff member profile picture.' })
   @CheckAbility({ action: 'update', subject: 'Staff' })
   setStaffPhoto(
-    @Args('staffProfileId', { type: () => ID }) id: string,
-    @Args('fileId', FILE_ID_ARG) fileId: string | null,
+    @Args('staffProfileId', { type: () => ID }, ParseUUIDPipe) id: string,
+    @Args('fileId', FILE_ID_ARG, new ParseUUIDPipe({ optional: true })) fileId: string | null,
   ): Promise<boolean> {
     return this.setFor('staff', id, fileId);
   }
@@ -48,8 +48,8 @@ export class ProfilePhotoResolver {
   @Mutation(() => Boolean, { description: 'Set or remove a guardian profile picture.' })
   @CheckAbility({ action: 'update', subject: 'Guardian' })
   setGuardianPhoto(
-    @Args('guardianProfileId', { type: () => ID }) id: string,
-    @Args('fileId', FILE_ID_ARG) fileId: string | null,
+    @Args('guardianProfileId', { type: () => ID }, ParseUUIDPipe) id: string,
+    @Args('fileId', FILE_ID_ARG, new ParseUUIDPipe({ optional: true })) fileId: string | null,
   ): Promise<boolean> {
     return this.setFor('guardian', id, fileId);
   }
@@ -58,7 +58,7 @@ export class ProfilePhotoResolver {
   @Mutation(() => Boolean, { description: 'Set or remove your own profile picture.' })
   async setMyProfilePhoto(
     @CurrentUser() user: AuthUser,
-    @Args('fileId', FILE_ID_ARG) fileId: string | null,
+    @Args('fileId', FILE_ID_ARG, new ParseUUIDPipe({ optional: true })) fileId: string | null,
   ): Promise<boolean> {
     await this.photos.set(user.userId, fileId);
     return true;

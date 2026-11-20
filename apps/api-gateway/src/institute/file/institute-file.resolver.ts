@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
 import {
   assertTenantContext,
@@ -35,7 +35,7 @@ export class InstituteFileResolver {
   })
   async fileDownloadUrl(
     @CurrentUser() user: AuthUser,
-    @Args('fileId', { type: () => ID }) fileId: string,
+    @Args('fileId', { type: () => ID }, ParseUUIDPipe) fileId: string,
   ): Promise<string> {
     assertTenantContext(user);
     return this.files.downloadUrl(user, fileId);
