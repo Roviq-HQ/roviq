@@ -230,9 +230,15 @@ Sonnet (`Agent` tool with `model: "sonnet"`) does work that is large in volume, 
 - reading logs and test output
 - mechanical edits after an API change
 - translation and message files
-- docs and write-ups from facts Fable supplies
+- docs and write-ups from facts Fable supplies, including Linear comments, decision records and status updates
 - test fixes that follow a signature change, with assertions left as strict as they were
 - lint fixes and type errors with one obvious fix
+
+Resume before you spawn:
+- Give a follow-up or a small task to an agent that already worked in that checkout (`SendMessage` to its id). A fresh agent first re-reads CLAUDE.md, the skills and the code, which costs more than the task itself when the task is small.
+- Spawn a new agent only when no existing agent has the context, the existing one is busy and the work can run beside it, or the task needs a different model.
+- Brief only what the user asked for, plus what keeps the checks green. Extra tests, sweeps or docs are proposed to the user, not added to the brief.
+- Origin: on 2026-11-20 a request for two seed accounts went to a fresh agent with e2e tests and doc updates added; the user pointed out the waste.
 
 For a one-line change, the brief costs more than the work. Give it to the model that is already working on that area.
 
