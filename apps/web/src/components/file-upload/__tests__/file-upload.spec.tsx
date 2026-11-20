@@ -1,7 +1,8 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import type { FilePurpose } from '@roviq/common-types';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../__test-utils__/render-with-providers';
 import { FileUpload } from '../file-upload';
 
@@ -21,14 +22,12 @@ function photo(name: string, sizeBytes: number): File {
   return new File([new Uint8Array(sizeBytes)], name, { type: 'image/jpeg' });
 }
 
-function renderUpload(
-  props: { maxFiles?: number; crop?: 'square'; onChange?: (ids: string[]) => void } = {},
-) {
-  const onChange = props.onChange ?? vi.fn();
+function renderUpload(props: { maxFiles?: number; crop?: 'square'; purpose?: FilePurpose } = {}) {
+  const onChange = vi.fn<(fileIds: string[], files: File[]) => void>();
   renderWithProviders(
     <FileUpload
       name="test"
-      purpose="LEAVE_ATTACHMENT"
+      purpose={props.purpose ?? 'LEAVE_ATTACHMENT'}
       label="Supporting documents"
       maxFiles={props.maxFiles ?? 3}
       crop={props.crop}
@@ -39,6 +38,27 @@ function renderUpload(
   // as they do when dropped.
   return { onChange, user: userEvent.setup({ applyAccept: false }) };
 }
+
+/** Stands in for the storage PUT: answers 200 as soon as the body is sent. */
+class AcceptingXhr {
+  status = 0;
+  upload: { onprogress: ((event: ProgressEvent) => void) | null } = { onprogress: null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  open() {}
+  setRequestHeader() {}
+  abort() {}
+  send() {
+    this.status = 200;
+    queueMicrotask(() => this.onload?.());
+  }
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  requestUpload.mockReset();
+});
 
 describe('FileUpload', () => {
   it('should tell the user which formats and size are accepted', () => {
@@ -59,7 +79,7 @@ describe('FileUpload', () => {
       'This file type is not accepted here.',
     );
     expect(requestUpload).not.toHaveBeenCalled();
-    expect(onChange).toHaveBeenLastCalledWith([]);
+    expect(onChange).toHaveBeenLastCalledWith([], []);
   });
 
   it('should refuse a file one byte over the limit without contacting the server', async () => {
@@ -186,5 +206,68 @@ describe('FileUpload', () => {
     await user.click(screen.getByRole('button', { name: 'Remove tool.exe' }));
 
     expect(screen.queryByTestId('file-upload-item-tool.exe')).not.toBeInTheDocument();
+  });
+
+  describe('CSV picked on Windows', () => {
+    // With Excel installed, Windows browsers report a .csv as Excel's type.
+    const windowsCsv = () =>
+      new File(['first_name,date_of_birth,gender\n'], 'students.csv', {
+        type: 'application/vnd.ms-excel',
+      });
+
+    it('should upload a .csv reported as application/vnd.ms-excel as text/csv', async () => {
+      vi.stubGlobal('XMLHttpRequest', AcceptingXhr);
+      requestUpload.mockResolvedValue({
+        data: {
+          requestFileUpload: {
+            fileId: 'file-1',
+            uploadUrl: 'https://storage.test/put',
+            headers: [],
+          },
+        },
+      });
+      const { user, onChange } = renderUpload({ purpose: 'BULK_IMPORT_CSV', maxFiles: 1 });
+
+      await user.upload(screen.getByTestId('file-upload-test-input'), windowsCsv());
+
+      await waitFor(() => expect(onChange.mock.lastCall?.[0]).toEqual(['file-1']));
+      expect(requestUpload).toHaveBeenCalledWith({
+        variables: {
+          input: {
+            purpose: 'BULK_IMPORT_CSV',
+            subjectUserId: undefined,
+            fileName: 'students.csv',
+            contentType: 'text/csv',
+            sizeBytes: 32,
+          },
+        },
+      });
+      const [file] = onChange.mock.lastCall?.[1] ?? [];
+      expect(file).toBeInstanceOf(File);
+      expect(file?.name).toBe('students.csv');
+      expect(file?.type).toBe('text/csv');
+      expect(screen.queryByTestId('file-upload-item-error-students.csv')).not.toBeInTheDocument();
+    });
+
+    it('should still refuse an Excel workbook with the same reported type', async () => {
+      const { user } = renderUpload({ purpose: 'BULK_IMPORT_CSV', maxFiles: 1 });
+      const workbook = new File(['PK'], 'students.xls', { type: 'application/vnd.ms-excel' });
+
+      await user.upload(screen.getByTestId('file-upload-test-input'), workbook);
+
+      expect(screen.getByTestId('file-upload-item-error-students.xls')).toHaveTextContent(
+        'This file type is not accepted here.',
+      );
+      expect(requestUpload).not.toHaveBeenCalled();
+    });
+
+    it('should let the file picker show .csv files by extension', () => {
+      renderUpload({ purpose: 'BULK_IMPORT_CSV', maxFiles: 1 });
+
+      expect(screen.getByTestId('file-upload-test-input')).toHaveAttribute(
+        'accept',
+        'text/csv,.csv',
+      );
+    });
   });
 });

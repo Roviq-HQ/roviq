@@ -2,6 +2,7 @@
   "title": "Students",
   "description": "Manage enrolled students, track academic status, and handle admissions.",
   "addStudent": "Add Student",
+  "importStudents": "Import Students",
   "accessDenied": "You don't have permission to view students.",
   "new": {
     "title": "Add Student",

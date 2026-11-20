@@ -5,7 +5,14 @@
  * DrizzleDB + NATS client injected via closure at worker startup.
  */
 import { Logger } from '@nestjs/common';
-import { AcademicStatus, AdmissionType, Gender, SocialCategory } from '@roviq/common-types';
+import {
+  AcademicStatus,
+  AdmissionType,
+  Gender,
+  isStudentImportField,
+  SocialCategory,
+  studentImportFieldForHeader,
+} from '@roviq/common-types';
 import {
   type DrizzleDB,
   memberships,
@@ -235,26 +242,6 @@ function validateBloodGroup(
   return { value: raw || undefined, error: null };
 }
 
-/** Known internal field names that CSV columns can map to */
-const KNOWN_FIELDS = new Set([
-  'first_name',
-  'last_name',
-  'date_of_birth',
-  'gender',
-  'father_name',
-  'mother_name',
-  'phone',
-  'email',
-  'social_category',
-  'admission_type',
-  'admission_number',
-  'standard_id',
-  'section_id',
-  'religion',
-  'blood_group',
-  'previous_school_name',
-]);
-
 // ── CSV parsing ───────────────────────────────────────────
 
 /**
@@ -268,18 +255,11 @@ function applyFieldMapping(
   const mapped: Record<string, string> = {};
   for (const [csvCol, value] of Object.entries(raw)) {
     const targetField = fieldMapping[csvCol];
-    if (targetField && KNOWN_FIELDS.has(targetField)) {
+    if (targetField && isStudentImportField(targetField)) {
       mapped[targetField] = value;
     } else {
-      // Try snake_case version of the original header
-      const snaked = csvCol
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '_')
-        .replace(/[^a-z0-9_]/g, '');
-      if (KNOWN_FIELDS.has(snaked)) {
-        mapped[snaked] = value;
-      }
+      const named = studentImportFieldForHeader(csvCol);
+      if (named) mapped[named] = value;
     }
   }
   return mapped;
