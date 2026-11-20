@@ -121,6 +121,7 @@ describe('FileService', () => {
   let findById: ReturnType<typeof vi.fn<FileRepository['findById']>>;
   let countPending: ReturnType<typeof vi.fn<FileRepository['countPendingByCurrentUser']>>;
   let markRejected: ReturnType<typeof vi.fn<FileRepository['markRejected']>>;
+  let markReady: ReturnType<typeof vi.fn<FileRepository['markReady']>>;
   let findLeaveForFile: ReturnType<typeof vi.fn<FileRepository['findLeaveForFile']>>;
   let findStudentDocumentForFile: ReturnType<
     typeof vi.fn<FileRepository['findStudentDocumentForFile']>
@@ -148,6 +149,7 @@ describe('FileService', () => {
     findById = vi.fn<FileRepository['findById']>().mockResolvedValue(null);
     countPending = vi.fn<FileRepository['countPendingByCurrentUser']>().mockResolvedValue(0);
     markRejected = vi.fn<FileRepository['markRejected']>().mockResolvedValue(undefined);
+    markReady = vi.fn<FileRepository['markReady']>().mockResolvedValue(undefined);
     findLeaveForFile = vi
       .fn<FileRepository['findLeaveForFile']>()
       .mockResolvedValue({ id: LEAVE_ID, tenantId: TENANT_ID, userId: USER_ID });
@@ -167,6 +169,7 @@ describe('FileService', () => {
         findById,
         countPendingByCurrentUser: countPending,
         markRejected,
+        markReady,
         findLeaveForFile,
         findStudentDocumentForFile,
         saveProcessedImage,
@@ -392,6 +395,33 @@ describe('FileService', () => {
       await service.verifyUploads([], 'LEAVE_ATTACHMENT');
 
       expect(findClaimable).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('claimUploads', () => {
+    it('should verify the upload and then make it ready', async () => {
+      findClaimable.mockResolvedValue([buildFile()]);
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
+
+      await service.claimUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      expect(storage.has('private', KEY)).toBe(true);
+      expect(markReady).toHaveBeenCalledWith([FILE_ID], 'LEAVE_ATTACHMENT');
+    });
+
+    it('should not make a file ready when its content fails verification', async () => {
+      findClaimable.mockResolvedValue([buildFile()]);
+      storage.simulateUpload(
+        'private',
+        PENDING_KEY,
+        Buffer.from('MZ not a pdf'),
+        'application/pdf',
+      );
+
+      await expect(service.claimUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
+        code: ErrorCode.FILE_CONTENT_MISMATCH,
+      });
+      expect(markReady).not.toHaveBeenCalled();
     });
   });
 

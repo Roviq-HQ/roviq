@@ -118,6 +118,9 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/student-academic.service.ts',
   'apps/api-gateway/src/institute/student/student-event.handler.ts',
   'apps/api-gateway/src/institute/student/student.service.ts',
+  // File access for Temporal activities; every query runs as the institute the workflow names.
+  'apps/api-gateway/src/files/workflow-file-store.ts',
+  'apps/api-gateway/src/files/__tests__/workflow-file-store.integration.spec.ts',
   'apps/api-gateway/src/institute/student/workflows/bulk-student-import.activities.ts',
   'apps/api-gateway/src/institute/subject/__tests__/subject-links.integration.spec.ts',
   'apps/api-gateway/src/institute/subject/repositories/subject.drizzle-repository.ts',

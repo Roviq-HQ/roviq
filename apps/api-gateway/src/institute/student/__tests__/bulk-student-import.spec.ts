@@ -13,6 +13,7 @@ import { Gender, SocialCategory } from '@roviq/common-types';
 import type { DrizzleDB } from '@roviq/database';
 import { createMock } from '@roviq/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ImportFileStore } from '../workflows/bulk-student-import.types';
 
 interface MockNatsEmitter {
   emit(
@@ -36,32 +37,38 @@ function buildCsv(headers: string[], rows: string[][]): string {
   return lines.join('\n');
 }
 
-/** Create a fetch mock that returns CSV content */
-function mockFetchCsv(csvContent: string): void {
-  const buffer = new TextEncoder().encode(csvContent).buffer;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(buffer),
-    }),
-  );
+const TENANT_ID = 'tenant-1';
+const CSV_FILE_ID = 'csv-file-1';
+
+/** In-memory stand-in for file storage: one uploaded CSV, and whatever the activities write. */
+class FakeFileStore implements ImportFileStore {
+  csv: Uint8Array | null = null;
+  readonly written: Parameters<ImportFileStore['put']>[0][] = [];
+
+  async read(tenantId: string, fileId: string, purpose: 'BULK_IMPORT_CSV'): Promise<Buffer> {
+    if (!this.csv || tenantId !== TENANT_ID || fileId !== CSV_FILE_ID) {
+      throw new Error(`File ${fileId} is not a ready ${purpose} file of this institute`);
+    }
+    return Buffer.from(this.csv);
+  }
+
+  async put(write: Parameters<ImportFileStore['put']>[0]): Promise<void> {
+    this.written.push(write);
+  }
 }
 
-/** Create a fetch mock for UTF-8 BOM content */
-function mockFetchBomCsv(csvContent: string): void {
-  const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+let fileStore: FakeFileStore;
+
+function storeCsv(csvContent: string): void {
+  fileStore.csv = new TextEncoder().encode(csvContent);
+}
+
+function storeBomCsv(csvContent: string): void {
   const content = new TextEncoder().encode(csvContent);
-  const combined = new Uint8Array(bom.length + content.length);
-  combined.set(bom);
-  combined.set(content, bom.length);
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(combined.buffer),
-    }),
-  );
+  const combined = new Uint8Array(3 + content.length);
+  combined.set([0xef, 0xbb, 0xbf]);
+  combined.set(content, 3);
+  fileStore.csv = combined;
 }
 
 // ── Mock DB + NATS ────────────────────────────────────────
@@ -126,6 +133,10 @@ vi.mock('@roviq/database', async () => {
   };
 });
 
+beforeEach(() => {
+  fileStore = new FakeFileStore();
+});
+
 describe('BulkStudentImport — CSV Parsing', () => {
   let activities: Awaited<
     ReturnType<
@@ -142,7 +153,7 @@ describe('BulkStudentImport — CSV Parsing', () => {
     );
     const db = createMockDb();
     const nats = createMockNats();
-    activities = createBulkStudentImportActivities(db, nats);
+    activities = createBulkStudentImportActivities(db, nats, null, fileStore);
   }, 30_000);
 
   afterEach(() => {
@@ -158,9 +169,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       ],
     );
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/test.csv', {
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {
       'Student Name': 'first_name',
       'Last Name': 'last_name',
       DOB: 'date_of_birth',
@@ -188,9 +199,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       [['Ravi', '01/01/2010', 'male']],
     );
 
-    mockFetchBomCsv(csv);
+    storeBomCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/bom.csv', {});
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
 
     expect(result.totalRows).toBe(1);
     expect(result.validRows).toHaveLength(1);
@@ -207,9 +218,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       ],
     );
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/missing.csv', {});
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
 
     expect(result.totalRows).toBe(3);
     expect(result.validRows).toHaveLength(0);
@@ -237,9 +248,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       ],
     );
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/enums.csv', {});
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
 
     expect(result.validRows).toHaveLength(1); // only Priya is valid
     expect(result.validRows[0].firstName).toBe('Priya');
@@ -267,9 +278,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       ],
     );
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/dates.csv', {});
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
 
     expect(result.validRows).toHaveLength(3); // A, B, C
     expect(result.validRows[0].dateOfBirth).toBe('2010-04-15');
@@ -286,9 +297,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       [['राज', '15/04/2010', 'male', 'sc']],
     );
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/hindi.csv', {
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {
       'विद्यार्थी का नाम': 'first_name',
       'जन्म तिथि': 'date_of_birth',
       लिंग: 'gender',
@@ -313,9 +324,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
       ],
     );
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
-    const result = await activities.parseCsv('http://minio/phones.csv', {});
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
 
     expect(result.validRows).toHaveLength(3); // A, B, C
     expect(result.validRows[0].phone).toBe('9876543210');
@@ -326,18 +337,11 @@ describe('BulkStudentImport — CSV Parsing', () => {
     expect(phoneErrors).toHaveLength(2); // D and E
   });
 
-  it('handles fetch failure gracefully', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-      }),
-    );
+  it('should fail when the file is not a ready CSV of this institute', async () => {
+    storeCsv('first_name\nArjun');
 
-    await expect(activities.parseCsv('http://minio/missing.csv', {})).rejects.toThrow(
-      'Failed to download CSV: 404 Not Found',
+    await expect(activities.parseCsv('another-tenant', CSV_FILE_ID, {})).rejects.toThrow(
+      'is not a ready BULK_IMPORT_CSV file of this institute',
     );
   });
 });
@@ -353,7 +357,7 @@ describe('BulkStudentImport — Performance', () => {
     );
     const db = createMockDb();
     const nats = createMockNats();
-    const activities = createBulkStudentImportActivities(db, nats);
+    const activities = createBulkStudentImportActivities(db, nats, null, fileStore);
 
     // Generate 500-row CSV
     const headers = ['first_name', 'date_of_birth', 'gender', 'phone'];
@@ -368,10 +372,10 @@ describe('BulkStudentImport — Performance', () => {
     }
     const csv = buildCsv(headers, rows);
 
-    mockFetchCsv(csv);
+    storeCsv(csv);
 
     const start = Date.now();
-    const result = await activities.parseCsv('http://minio/large.csv', {});
+    const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
     const elapsed = Date.now() - start;
 
     expect(result.totalRows).toBe(500);
@@ -385,14 +389,16 @@ describe('BulkStudentImport — Report Generation', () => {
     vi.restoreAllMocks();
   });
 
-  it('generates a report URL when there are errors', async () => {
+  it('should store the report as a CSV file under the id the workflow chose', async () => {
     const { createBulkStudentImportActivities } = await import(
       '../workflows/bulk-student-import.activities'
     );
-    const db = createMockDb();
-    const nats = createMockNats();
-    const activities = createBulkStudentImportActivities(db, nats);
-
+    const activities = createBulkStudentImportActivities(
+      createMockDb(),
+      createMockNats(),
+      null,
+      fileStore,
+    );
     const errors = [
       {
         rowNumber: 1,
@@ -403,9 +409,35 @@ describe('BulkStudentImport — Report Generation', () => {
       { rowNumber: 3, field: 'gender', reason: 'Invalid gender', originalValue: 'xyz' },
     ];
 
-    const result = await activities.generateReport('tenant-1', errors, 5, 3, 0);
+    const result = await activities.generateReport({
+      tenantId: TENANT_ID,
+      reportFileId: 'report-1',
+      createdBy: 'user-1',
+      errors,
+      totalRows: 5,
+      created: 3,
+      skipped: 0,
+    });
 
-    expect(result.reportUrl).toBeTruthy();
-    expect(result.reportUrl).toContain('imports/tenant-1/report-');
+    expect(result).toEqual({ reportFileId: 'report-1' });
+    expect(fileStore.written).toHaveLength(1);
+    const [write] = fileStore.written;
+    expect({ ...write, body: write?.body.toString('utf8') }).toEqual({
+      tenantId: TENANT_ID,
+      fileId: 'report-1',
+      purpose: 'BULK_IMPORT_REPORT',
+      fileName: 'import-errors.csv',
+      contentType: 'text/csv',
+      createdBy: 'user-1',
+      body: [
+        '# Bulk Import Report',
+        '# Total rows: 5',
+        '# Created: 3',
+        '# Skipped: 0',
+        '# Errors: 2',
+        '#',
+        'row_number,field,error,original_value\r\n1,date_of_birth,Invalid date format,bad-date\r\n3,gender,Invalid gender,xyz',
+      ].join('\n'),
+    });
   });
 });

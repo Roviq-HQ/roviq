@@ -17,6 +17,7 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { studentReadPredicate } from '../../institute/student/student-read-predicate';
+import { markFilesReady } from '../file-attachment';
 import { FileRepository } from './file.repository';
 import { fileLiveColumns } from './file-columns';
 import type {
@@ -126,6 +127,13 @@ export class FileDrizzleRepository extends FileRepository {
         .where(and(eq(filesLive.uploadedBy, userId), eq(filesLive.status, 'PENDING')));
       return rows[0]?.value ?? 0;
     });
+  }
+
+  async markReady(ids: string[], purpose: FilePurpose): Promise<void> {
+    const { tenantId, userId } = this.context();
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:file'), (tx) =>
+      markFilesReady(tx, { fileIds: ids, purpose, userId }),
+    );
   }
 
   async findLeaveForFile(fileId: string): Promise<FileLeaveOwner | null> {

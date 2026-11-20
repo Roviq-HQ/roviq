@@ -12,7 +12,6 @@ import {
   type FileContentType,
   type FilePurpose,
   fileContentMatchesType,
-  fileExtensionFor,
   type ImageVariant,
   type InstituteContext,
   isFileContentType,
@@ -24,6 +23,7 @@ import { ImageProcessor, InvalidImageError } from './image/image-processor';
 import type { FileUploadTicket } from './models/file-upload-ticket.model';
 import { FileRepository } from './repositories/file.repository';
 import type { FileRecord } from './repositories/types';
+import { storageKeyFor } from './storage-keys';
 
 export const UPLOAD_URL_TTL_SECONDS = 5 * 60;
 export const DOWNLOAD_URL_TTL_SECONDS = 10 * 60;
@@ -128,7 +128,7 @@ export class FileService {
       visibility: policy.visibility,
       purpose: input.purpose,
       objectKey: (id) =>
-        this.objectKey(
+        storageKeyFor(
           subjectUserId ? `users/${subjectUserId}` : `institutes/${user.tenantId}`,
           input.purpose,
           id,
@@ -183,6 +183,16 @@ export class FileService {
             `The uploaded file "${file.originalName}" is missing or does not match its type.`,
           );
     }
+  }
+
+  /**
+   * Verifies uploads and makes them READY at once, for a file whose owner is not a database
+   * record (the input of a workflow). Everything else attaches with `markFilesReady` inside the
+   * transaction that saves its record.
+   */
+  async claimUploads(fileIds: string[], purpose: FilePurpose): Promise<void> {
+    await this.verifyUploads(fileIds, purpose);
+    await this.repo.markReady(fileIds, purpose);
   }
 
   /**
@@ -362,15 +372,5 @@ export class FileService {
       );
     }
     return contentType;
-  }
-
-  private objectKey(
-    ownerPrefix: string,
-    purpose: FilePurpose,
-    fileId: string,
-    contentType: FileContentType,
-  ): string {
-    const folder = purpose.toLowerCase().replaceAll('_', '-');
-    return `${ownerPrefix}/${folder}/${fileId}.${fileExtensionFor(contentType)}`;
   }
 }

@@ -28,11 +28,15 @@ import type { IdentityService } from '../../../auth/identity.service';
 import { nextAdmissionNumber } from '../admission-number.sequence';
 import type {
   BulkStudentImportActivities,
+  ImportFileStore,
   RowError,
   ValidatedRow,
 } from './bulk-student-import.types';
 
 const logger = new Logger('BulkStudentImportActivities');
+
+export const ROW_INSERT_FAILED =
+  'This student could not be created because of a system error. Import the row again or add the student by hand.';
 
 // ── Validation helpers ────────────────────────────────────
 
@@ -287,9 +291,7 @@ function applyFieldMapping(
  * Detect encoding by checking for UTF-8 BOM and trying to decode.
  * Falls back to ISO-8859-1 if UTF-8 decoding produces replacement chars.
  */
-function decodeBuffer(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-
+function decodeBuffer(bytes: Uint8Array): string {
   // Check for UTF-8 BOM (EF BB BF)
   const hasBom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
   const start = hasBom ? 3 : 0;
@@ -681,7 +683,8 @@ async function insertSingleRow(
 export function createBulkStudentImportActivities(
   db: DrizzleDB,
   natsClient: NatsEmitter | null,
-  identityService: IdentityService | null = null,
+  identityService: IdentityService | null,
+  fileStore: ImportFileStore,
 ): BulkStudentImportActivities {
   /** Emit a NATS event if client is available. */
   function emitEvent(pattern: EventPattern, data: unknown): void {
@@ -692,15 +695,10 @@ export function createBulkStudentImportActivities(
   }
 
   return {
-    async parseCsv(fileUrl, fieldMapping) {
-      logger.log(`Parsing CSV from: ${fileUrl}`);
+    async parseCsv(tenantId, fileId, fieldMapping) {
+      logger.log(`Parsing CSV file ${fileId}`);
 
-      const response = await fetch(fileUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to download CSV: ${response.status} ${response.statusText}`);
-      }
-
-      const buffer = await response.arrayBuffer();
+      const buffer = await fileStore.read(tenantId, fileId, 'BULK_IMPORT_CSV');
       const csvText = decodeBuffer(buffer);
 
       const parsed = Papa.parse<Record<string, string>>(csvText, {
@@ -799,10 +797,11 @@ export function createBulkStudentImportActivities(
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.error(`Row ${row.rowNumber}: Insert failed — ${message}`);
+          // The report goes to the institute: a driver error would show SQL and other rows' values.
           errors.push({
             rowNumber: row.rowNumber,
             field: '_system',
-            reason: `Insert failed: ${message}`,
+            reason: ROW_INSERT_FAILED,
           });
         }
       }
@@ -811,7 +810,15 @@ export function createBulkStudentImportActivities(
       return { created, skipped, errors };
     },
 
-    async generateReport(tenantId, errors, totalRows, created, skippedCount) {
+    async generateReport({
+      tenantId,
+      reportFileId,
+      createdBy,
+      errors,
+      totalRows,
+      created,
+      skipped: skippedCount,
+    }) {
       logger.log(`Generating import report for tenant ${tenantId}`);
 
       // Build error CSV
@@ -835,19 +842,20 @@ export function createBulkStudentImportActivities(
         csvContent,
       ].join('\n');
 
-      // Upload to MinIO/S3
-      // TODO: Replace with actual MinIO client when storage service is built.
-      // The reportContent will be uploaded as the CSV file body.
-      const reportKey = `imports/${tenantId}/report-${Date.now()}.csv`;
-      logger.log(`[STUB] Would upload ${reportContent.length} bytes to MinIO: ${reportKey}`);
+      await fileStore.put({
+        tenantId,
+        fileId: reportFileId,
+        purpose: 'BULK_IMPORT_REPORT',
+        fileName: 'import-errors.csv',
+        contentType: 'text/csv',
+        body: Buffer.from(reportContent, 'utf8'),
+        createdBy,
+      });
       logger.log(
         `Report summary: ${totalRows} total, ${created} created, ${skippedCount} skipped, ${errors.length} errors`,
       );
 
-      // Return stub URL — actual MinIO upload will be wired when storage service is available
-      const reportUrl = `/api/storage/${reportKey}`;
-
-      return { reportUrl };
+      return { reportFileId };
     },
   };
 }

@@ -16,6 +16,8 @@ export abstract class FileRepository {
   abstract findClaimable(ids: string[], purpose: FilePurpose): Promise<FileRecord[]>;
   abstract countPendingByCurrentUser(): Promise<number>;
   abstract markRejected(id: string): Promise<void>;
+  /** PENDING → READY for verified uploads of the current user; throws FILE_NOT_FOUND otherwise. */
+  abstract markReady(ids: string[], purpose: FilePurpose): Promise<void>;
   /** Whether the user has a membership in the caller's institute. */
   abstract isMemberOfCurrentTenant(userId: string): Promise<boolean>;
   /** Records the stored sizes of a pending image; it is WebP from then on. */

@@ -9,8 +9,10 @@
  */
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { StorageClient } from '@roviq/storage';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { IdentityService } from '../../../auth/identity.service';
+import { WorkflowFileStore } from '../../../files/workflow-file-store';
 import { createDrizzleForWorker } from './worker-db';
 
 const TASK_QUEUE = 'student-bulk-import';
@@ -22,6 +24,7 @@ export class BulkStudentImportWorkerService implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     private readonly identityService: IdentityService,
+    private readonly storage: StorageClient,
   ) {}
 
   async onModuleInit() {
@@ -47,7 +50,12 @@ export class BulkStudentImportWorkerService implements OnModuleInit {
     );
     // NATS client passed as null — student.admitted events still pending wiring;
     // IdentityService owns user creation and emits NOTIFICATION.user.created internally.
-    const activities = createBulkStudentImportActivities(db, null, this.identityService);
+    const activities = createBulkStudentImportActivities(
+      db,
+      null,
+      this.identityService,
+      new WorkflowFileStore(db, this.storage),
+    );
 
     const worker = await Worker.create({
       connection,
