@@ -275,6 +275,9 @@ describe('BulkStudentImport — CSV Parsing', () => {
         ['C', '15-04-2010', 'male'], // DD-MM-YYYY — valid
         ['D', 'not-a-date', 'male'], // invalid
         ['E', '2010/04/15', 'male'], // wrong format (YYYY/MM/DD)
+        ['F', '31/02/2014', 'male'], // no such day; Date would roll it to 3 March
+        ['G', '2014-02-30', 'male'], // no such day
+        ['H', '29/02/2016', 'male'], // leap day — valid
       ],
     );
 
@@ -282,13 +285,15 @@ describe('BulkStudentImport — CSV Parsing', () => {
 
     const result = await activities.parseCsv(TENANT_ID, CSV_FILE_ID, {});
 
-    expect(result.validRows).toHaveLength(3); // A, B, C
-    expect(result.validRows[0].dateOfBirth).toBe('2010-04-15');
-    expect(result.validRows[1].dateOfBirth).toBe('2010-04-15');
-    expect(result.validRows[2].dateOfBirth).toBe('2010-04-15');
+    expect(result.validRows.map((row) => row.dateOfBirth)).toEqual([
+      '2010-04-15',
+      '2010-04-15',
+      '2010-04-15',
+      '2016-02-29',
+    ]);
 
     const dateErrors = result.errors.filter((e) => e.field === 'date_of_birth');
-    expect(dateErrors).toHaveLength(2); // rows D and E
+    expect(dateErrors.map((e) => e.rowNumber)).toEqual([4, 5, 6, 7]); // D, E, F, G
   });
 
   it('applies field mapping correctly — renamed columns', async () => {
