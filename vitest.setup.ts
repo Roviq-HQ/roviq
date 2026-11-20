@@ -7,3 +7,7 @@
  * connect to the dev database.
  */
 import 'dotenv/config';
+import { disableTemporalWorkers } from './libs/backend/testing/src/integration/test-env';
+
+// Before any spec imports AppModule, whose ConfigModule reads the environment at import time.
+disableTemporalWorkers();
