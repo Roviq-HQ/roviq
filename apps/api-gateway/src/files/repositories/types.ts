@@ -40,6 +40,12 @@ export interface FileDocumentOwner {
   type: UserDocumentType;
 }
 
+/** The admission application document a file is a page of. */
+export interface FileApplicationDocumentOwner {
+  id: string;
+  type: string;
+}
+
 /** What processing turned an uploaded image into. */
 export interface ProcessedImageData {
   width: number;

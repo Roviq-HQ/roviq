@@ -129,6 +129,9 @@ describe('FileService', () => {
   let findStudentDocumentForFile: ReturnType<
     typeof vi.fn<FileRepository['findStudentDocumentForFile']>
   >;
+  let findApplicationDocumentForFile: ReturnType<
+    typeof vi.fn<FileRepository['findApplicationDocumentForFile']>
+  >;
   let createForUser: ReturnType<typeof vi.fn<AbilityFactory['createForUser']>>;
   let saveProcessedImage: ReturnType<typeof vi.fn<FileRepository['saveProcessedImage']>>;
   let images: FakeImageProcessor;
@@ -159,6 +162,9 @@ describe('FileService', () => {
     findStudentDocumentForFile = vi
       .fn<FileRepository['findStudentDocumentForFile']>()
       .mockResolvedValue({ id: DOCUMENT_ID, type: 'BIRTH_CERTIFICATE' });
+    findApplicationDocumentForFile = vi
+      .fn<FileRepository['findApplicationDocumentForFile']>()
+      .mockResolvedValue({ id: DOCUMENT_ID, type: 'BIRTH_CERTIFICATE' });
     createForUser = vi
       .fn<AbilityFactory['createForUser']>()
       .mockResolvedValue(createMock<AppAbility>({ can }));
@@ -175,6 +181,7 @@ describe('FileService', () => {
         markReady,
         findLeaveForFile,
         findStudentDocumentForFile,
+        findApplicationDocumentForFile,
         saveProcessedImage,
         isMemberOfCurrentTenant: isMember,
       }),
@@ -810,6 +817,53 @@ describe('FileService', () => {
       );
 
       await expect(service.downloadUrl(user, FILE_ID)).resolves.toContain(DOCUMENT_KEY);
+    });
+  });
+
+  describe('downloadUrl for an application document', () => {
+    const APPLICATION_KEY = `institutes/${TENANT_ID}/application-document/${FILE_ID}.pdf`;
+    const pageFile = () =>
+      buildFile({ status: 'READY', purpose: 'APPLICATION_DOCUMENT', objectKey: APPLICATION_KEY });
+
+    it('should return a short-lived URL when the page belongs to an application the user may read', async () => {
+      findById.mockResolvedValue(pageFile());
+      const ability = createMock<AppAbility>({ can });
+      createForUser.mockResolvedValue(ability);
+
+      const url = await service.downloadUrl(user, FILE_ID);
+
+      expect(url).toBe(
+        `fake://private/${APPLICATION_KEY}?get&expires=${AUDITED_DOWNLOAD_URL_TTL_SECONDS}&at=now`,
+      );
+      expect(findApplicationDocumentForFile).toHaveBeenCalledWith(FILE_ID, ability);
+    });
+
+    it('should answer not found when no readable application owns the page', async () => {
+      findById.mockResolvedValue(pageFile());
+      findApplicationDocumentForFile.mockResolvedValue(null);
+
+      await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
+        code: ErrorCode.FILE_NOT_FOUND,
+      });
+    });
+
+    it('should refuse an Aadhaar scan to a user who may not read the Aadhaar field', async () => {
+      findById.mockResolvedValue(pageFile());
+      findApplicationDocumentForFile.mockResolvedValue({ id: DOCUMENT_ID, type: 'AADHAAR_CARD' });
+      createForUser.mockResolvedValue(
+        createMongoAbility<AppAbility>([
+          { action: 'read', subject: 'Application' },
+          { action: 'read', subject: 'Student', fields: ['id', 'admissionNumber'] },
+        ]),
+      );
+
+      await expect(service.downloadUrl(user, FILE_ID)).rejects.toMatchObject({
+        code: ErrorCode.FILE_NOT_FOUND,
+      });
+    });
+
+    it('should never put a link to a page in an ordinary response', async () => {
+      await expect(service.refUrl(pageFile(), 'FULL')).resolves.toBeNull();
     });
   });
 

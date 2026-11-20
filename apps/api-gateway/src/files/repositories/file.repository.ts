@@ -1,6 +1,7 @@
 import type { AppAbility, FilePurpose } from '@roviq/common-types';
 import type {
   CreateFileData,
+  FileApplicationDocumentOwner,
   FileDocumentOwner,
   FileLeaveOwner,
   FileRecord,
@@ -35,4 +36,12 @@ export abstract class FileRepository {
     fileId: string,
     ability: AppAbility,
   ): Promise<FileDocumentOwner | null>;
+  /**
+   * The application document a file is a page of. Null unless it belongs to an application
+   * `ability` may read.
+   */
+  abstract findApplicationDocumentForFile(
+    fileId: string,
+    ability: AppAbility,
+  ): Promise<FileApplicationDocumentOwner | null>;
 }

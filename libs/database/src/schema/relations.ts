@@ -568,6 +568,18 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.users.id,
       alias: 'appDocVerifier',
     }),
+    files: r.many.applicationDocumentFiles(),
+  },
+
+  applicationDocumentFiles: {
+    document: r.one.applicationDocuments({
+      from: r.applicationDocumentFiles.documentId,
+      to: r.applicationDocuments.id,
+    }),
+    file: r.one.files({
+      from: r.applicationDocumentFiles.fileId,
+      to: r.files.id,
+    }),
   },
 
   // ── Certificates ────────────────────────────────────

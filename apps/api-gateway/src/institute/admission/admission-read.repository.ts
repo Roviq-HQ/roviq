@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { caslToSqlWhere, type InstituteReadAccess } from '@roviq/casl';
+import type { InstituteReadAccess } from '@roviq/casl';
 import {
   AdmissionApplicationStatus,
-  type AppAbility,
   BusinessException,
   EnquiryStatus,
   ErrorCode,
@@ -18,35 +17,13 @@ import {
 } from '@roviq/database';
 import { and, count, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
+import { admissionReadPredicate } from './admission-read-predicate';
 import { toApplicationModel, toEnquiryModel } from './admission-records';
 import type { AdmissionStatisticsFilterInput } from './dto/admission-statistics-filter.input';
 import type { ApplicationFilterInput, EnquiryFilterInput } from './dto/enquiry-filter.input';
 import type { AdmissionStatisticsModel } from './models/admission-statistics.model';
 import type { ApplicationModel } from './models/application.model';
 import type { EnquiryModel } from './models/enquiry.model';
-
-function admissionReadPredicate(ability: AppAbility, subject: 'Enquiry' | 'Application') {
-  return subject === 'Enquiry'
-    ? caslToSqlWhere(ability, 'read', subject, {
-        id: enquiriesLive.id,
-        tenantId: enquiriesLive.tenantId,
-        assignedTo: enquiriesLive.assignedTo,
-        createdBy: enquiriesLive.createdBy,
-        academicYearId: enquiriesLive.academicYearId,
-        status: enquiriesLive.status,
-      })
-    : caslToSqlWhere(ability, 'read', subject, {
-        id: admissionApplicationsLive.id,
-        tenantId: admissionApplicationsLive.tenantId,
-        createdBy: admissionApplicationsLive.createdBy,
-        academicYearId: admissionApplicationsLive.academicYearId,
-        standardId: admissionApplicationsLive.standardId,
-        sectionId: admissionApplicationsLive.sectionId,
-        status: admissionApplicationsLive.status,
-        enquiryId: admissionApplicationsLive.enquiryId,
-        studentProfileId: admissionApplicationsLive.studentProfileId,
-      });
-}
 
 @Injectable()
 export class AdmissionReadRepository {

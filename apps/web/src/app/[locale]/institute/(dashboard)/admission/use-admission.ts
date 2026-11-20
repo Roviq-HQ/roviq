@@ -3,8 +3,10 @@
 import { gql, useMutation, useQuery, useSubscription } from '@roviq/graphql';
 import type {
   AcademicYearModel,
+  AddApplicationDocumentInput,
   AdmissionApplicationStatus,
   AdmissionStatisticsModel,
+  ApplicationDocumentModel,
   ApplicationFilterInput,
   ApplicationModel,
   ApplicationStatusUpdate,
@@ -412,6 +414,71 @@ export function useAdmissionStatistics(filter?: AdmissionStatisticsFilter) {
     variables: { filter },
     fetchPolicy: 'cache-and-network',
   });
+}
+
+// ─── Application documents ────────────────────────────────────────────────
+
+const APPLICATION_DOCUMENT_FIELDS = `
+  id
+  applicationId
+  type
+  createdAt
+  files {
+    id
+    name
+  }
+`;
+
+const APPLICATION_DOCUMENTS_QUERY = gql`
+  query InstituteApplicationDocuments($applicationId: ID!) {
+    listApplicationDocuments(applicationId: $applicationId) {
+      ${APPLICATION_DOCUMENT_FIELDS}
+    }
+  }
+`;
+
+export type ApplicationDocumentNode = Pick<
+  ApplicationDocumentModel,
+  'id' | 'applicationId' | 'type' | 'createdAt'
+> & { files: { id: string; name: string }[] };
+
+export function useApplicationDocuments(applicationId: string | null) {
+  return useQuery<
+    { listApplicationDocuments: ApplicationDocumentNode[] },
+    { applicationId: string }
+  >(APPLICATION_DOCUMENTS_QUERY, {
+    variables: { applicationId: applicationId ?? '' },
+    skip: !applicationId,
+    fetchPolicy: 'cache-and-network',
+  });
+}
+
+const ADD_APPLICATION_DOCUMENT = gql`
+  mutation InstituteAddApplicationDocument($input: AddApplicationDocumentInput!) {
+    addApplicationDocument(input: $input) {
+      ${APPLICATION_DOCUMENT_FIELDS}
+    }
+  }
+`;
+
+export function useAddApplicationDocument() {
+  return useMutation<
+    { addApplicationDocument: ApplicationDocumentNode },
+    { input: AddApplicationDocumentInput }
+  >(ADD_APPLICATION_DOCUMENT, { refetchQueries: [APPLICATION_DOCUMENTS_QUERY] });
+}
+
+const REMOVE_APPLICATION_DOCUMENT = gql`
+  mutation InstituteRemoveApplicationDocument($id: ID!) {
+    removeApplicationDocument(id: $id)
+  }
+`;
+
+export function useRemoveApplicationDocument() {
+  return useMutation<{ removeApplicationDocument: boolean }, { id: string }>(
+    REMOVE_APPLICATION_DOCUMENT,
+    { refetchQueries: [APPLICATION_DOCUMENTS_QUERY] },
+  );
 }
 
 // ─── Academic years + standards pickers ───────────────────────────────────

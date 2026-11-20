@@ -23,6 +23,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { parseISO } from 'date-fns';
 import {
   CheckCircle2,
+  FileText,
   GitBranch,
   Inbox,
   Loader2,
@@ -49,11 +50,21 @@ import {
   useApplicationStatusChanged,
   useApplications,
 } from '../use-admission';
+import { ApplicationDocumentsDialog } from './application-documents-dialog';
 import { ApproveApplicationDialog } from './approve-application-dialog';
 import { RejectApplicationDialog } from './reject-application-dialog';
 import { StatusChangeDialog } from './status-change-dialog';
 
 const { instituteAdmissionApplications } = testIds;
+function applicantNameOf(application: ApplicationNode): string {
+  const formData = (application.formData ?? {}) as Record<string, unknown>;
+  return (
+    (formData.studentName as string) ??
+    (formData.student_name as string) ??
+    application.id.slice(0, 8)
+  );
+}
+
 const filterParsers = {
   status: parseAsString,
   standardId: parseAsString,
@@ -68,6 +79,7 @@ export default function ApplicationsPage() {
   const [statusChange, setStatusChange] = React.useState<ApplicationNode | null>(null);
   const [approveTarget, setApproveTarget] = React.useState<ApplicationNode | null>(null);
   const [rejectTarget, setRejectTarget] = React.useState<ApplicationNode | null>(null);
+  const [documentsTarget, setDocumentsTarget] = React.useState<ApplicationNode | null>(null);
   // Track which applications were just approved so we can show the
   // "enrolment in progress" indicator until the backend confirms via the
   // applicationStatusChanged subscription.
@@ -125,10 +137,7 @@ export default function ApplicationsPage() {
         header: t('applications.columns.applicant'),
         cell: ({ row }) => {
           const formData = (row.original.formData ?? {}) as Record<string, unknown>;
-          const studentName =
-            (formData.studentName as string) ??
-            (formData.student_name as string) ??
-            row.original.id.slice(0, 8);
+          const studentName = applicantNameOf(row.original);
           const parentName =
             (formData.parentName as string) ?? (formData.parent_name as string) ?? '';
           return (
@@ -234,6 +243,18 @@ export default function ApplicationsPage() {
           const canChangeStatus = getSelectableApplicationStatuses(status).length > 0;
           return (
             <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                title={t('applications.actions.documents')}
+                data-testid={instituteAdmissionApplications.documentsBtn(row.original.id)}
+                onClick={() => setDocumentsTarget(row.original)}
+              >
+                <FileText aria-hidden="true" className="size-4" />
+                <span className="sr-only md:not-sr-only md:ms-1">
+                  {t('applications.actions.documents')}
+                </span>
+              </Button>
               <Can I="update" a="Application">
                 <Button
                   size="sm"
@@ -436,6 +457,12 @@ export default function ApplicationsPage() {
                 handleApprovalStarted(id);
                 toast.success(t('applications.approveDialog.success'));
               }}
+            />
+            <ApplicationDocumentsDialog
+              open={!!documentsTarget}
+              onOpenChange={(o) => !o && setDocumentsTarget(null)}
+              application={documentsTarget}
+              applicantName={documentsTarget ? applicantNameOf(documentsTarget) : ''}
             />
             <RejectApplicationDialog
               open={!!rejectTarget}

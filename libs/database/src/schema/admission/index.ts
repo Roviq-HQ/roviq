@@ -1,4 +1,5 @@
 export * from './admission-applications';
+export * from './application-document-files';
 export * from './application-documents';
 export * from './certificate-templates';
 export * from './enquiries';

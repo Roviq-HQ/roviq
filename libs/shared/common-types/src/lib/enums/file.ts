@@ -51,6 +51,8 @@ export const FILE_PURPOSE_VALUES = [
   'USER_DOCUMENT',
   // Scan of a staff member's degree or teaching certificate, attached to a qualification
   'STAFF_CERTIFICATE',
+  // Scan of a document submitted with an admission application (birth certificate, Aadhaar, TC)
+  'APPLICATION_DOCUMENT',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];
