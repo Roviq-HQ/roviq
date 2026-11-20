@@ -45,6 +45,7 @@ import enSelectInstitute from '../../messages/en/selectInstitute.json';
 import enSessions from '../../messages/en/sessions.json';
 import enSettings from '../../messages/en/settings.json';
 import enStaff from '../../messages/en/staff.json';
+import enStudentImport from '../../messages/en/studentImport.json';
 import enStudents from '../../messages/en/students.json';
 import enTimetable from '../../messages/en/timetable.json';
 import hiAcademics from '../../messages/hi/academics.json';
@@ -93,6 +94,7 @@ import hiSelectInstitute from '../../messages/hi/selectInstitute.json';
 import hiSessions from '../../messages/hi/sessions.json';
 import hiSettings from '../../messages/hi/settings.json';
 import hiStaff from '../../messages/hi/staff.json';
+import hiStudentImport from '../../messages/hi/studentImport.json';
 import hiStudents from '../../messages/hi/students.json';
 import hiTimetable from '../../messages/hi/timetable.json';
 
@@ -144,6 +146,7 @@ const en = {
   settings: enSettings,
   staff: enStaff,
   students: enStudents,
+  studentImport: enStudentImport,
   timetable: enTimetable,
 } as const;
 
@@ -195,6 +198,7 @@ const hi = {
   settings: hiSettings,
   staff: hiStaff,
   students: hiStudents,
+  studentImport: hiStudentImport,
   timetable: hiTimetable,
 } as const;
 

@@ -125,6 +125,19 @@ describe('StudentsPage (component)', () => {
     expect(screen.getByText(messagesEn.accessDenied)).toBeInTheDocument();
   });
 
+  it('offers Import students to a user who can create students', () => {
+    renderPage([{ action: ['read', 'create'], subject: 'Student' }]);
+    expect(screen.getByRole('button', { name: messagesEn.importStudents })).toBeInTheDocument();
+  });
+
+  it('hides Import students from a user who can only read students', () => {
+    renderPage([{ action: 'read', subject: 'Student' }]);
+    expect(screen.getByRole('heading', { name: /students/i, level: 1 })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: messagesEn.importStudents }),
+    ).not.toBeInTheDocument();
+  });
+
   it('reveals the bulk action bar when a row checkbox is clicked', async () => {
     renderPage();
     const checkboxes = screen.getAllByRole('checkbox');

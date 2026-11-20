@@ -59,6 +59,7 @@ import {
   Search,
   SearchX,
   ShieldCheck,
+  Upload,
   X,
   XCircle,
 } from 'lucide-react';
@@ -937,6 +938,17 @@ export default function StudentsPage() {
                         : t('export.buttonAll')}
                   </Button>
                   <DeletedRecordsButton kind="student" />
+                  <Can I="create" a="Student">
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/institute/people/students/import')}
+                      title={t('importStudents')}
+                      data-testid={testIds.instituteStudents.importBtn}
+                    >
+                      <Upload aria-hidden="true" className="size-4" />
+                      {t('importStudents')}
+                    </Button>
+                  </Can>
                   <Can I="create" a="Student">
                     <Button
                       onClick={() => router.push('/institute/people/students/new')}

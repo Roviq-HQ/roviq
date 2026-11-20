@@ -38,12 +38,19 @@ const TYPE_LABEL: { readonly [T in FileContentType]: string } = {
 
 const BYTES_PER_MB = 1024 * 1024;
 
+// A picker filtering on `text/csv` alone hides .csv files on Windows, where they are Excel's type.
+function acceptAttribute(types: readonly FileContentType[]): string {
+  return types
+    .flatMap((type) => (type === FILE_CONTENT_TYPE.CSV ? [type, '.csv'] : [type]))
+    .join(',');
+}
+
 export interface FileUploadProps {
   purpose: FilePurpose;
   /** Field label, naming what to upload, e.g. "Supporting documents". */
   label: string;
-  /** Called with the ids of finished uploads whenever the set changes. */
-  onChange: (fileIds: string[]) => void;
+  /** Called with the ids of finished uploads whenever the set changes; `files[i]` is what `fileIds[i]` holds. */
+  onChange: (fileIds: string[], files: File[]) => void;
   /** Called when uploads start or all finish, so the form can block submit meanwhile. */
   onBusyChange?: (busy: boolean) => void;
   /** Extra guidance shown under the format and size line. */
@@ -81,8 +88,9 @@ export function FileUpload({
   const [tooMany, setTooMany] = React.useState(false);
   const [toCrop, setToCrop] = React.useState<File | null>(null);
 
-  const doneIds = items.flatMap((item) => (item.fileId ? [item.fileId] : []));
-  const doneKey = doneIds.join(',');
+  const doneKey = items.flatMap((item) => (item.fileId ? [item.fileId] : [])).join(',');
+  const itemsRef = React.useRef(items);
+  itemsRef.current = items;
   const busy = items.some((item) => item.status === 'uploading');
 
   // Callbacks are read through refs so a parent re-render does not re-fire them.
@@ -91,7 +99,12 @@ export function FileUpload({
   onChangeRef.current = onChange;
   onBusyChangeRef.current = onBusyChange;
   React.useEffect(() => {
-    onChangeRef.current(doneKey ? doneKey.split(',') : []);
+    const fileIds = doneKey ? doneKey.split(',') : [];
+    const files = fileIds.flatMap((id) => {
+      const item = itemsRef.current.find((candidate) => candidate.fileId === id);
+      return item ? [item.file] : [];
+    });
+    onChangeRef.current(fileIds, files);
   }, [doneKey]);
   React.useEffect(() => {
     onBusyChangeRef.current?.(busy);
@@ -166,7 +179,7 @@ export function FileUpload({
           type="file"
           className="sr-only"
           tabIndex={-1}
-          accept={policy.allowedContentTypes.join(',')}
+          accept={acceptAttribute(policy.allowedContentTypes)}
           multiple={maxFiles > 1}
           onChange={(event) => {
             accept(Array.from(event.target.files ?? []));

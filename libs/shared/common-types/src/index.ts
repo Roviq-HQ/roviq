@@ -14,5 +14,6 @@ export * from './lib/reseller-roles';
 export * from './lib/schemas/address';
 export * from './lib/state-machine';
 export * from './lib/state-machines';
+export * from './lib/student-import';
 export * from './lib/tc-data';
 export * from './lib/validation-exception-factory';
