@@ -1,8 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SYSTEM_USER_ID } from '@roviq/database';
+import { i18nDisplay, SYSTEM_USER_ID } from '@roviq/database';
 import type { PaymentMethod } from '@roviq/ee-billing-types';
-import { PaymentGatewayError, PaymentGatewayFactory } from '@roviq/ee-payments';
+import {
+  type CreateOrderInput,
+  type CreateOrderResult,
+  PaymentGatewayError,
+  PaymentGatewayFactory,
+} from '@roviq/ee-payments';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
@@ -44,38 +49,58 @@ export class PaymentService {
   // Gateway payment flow (institute initiates)
   // ---------------------------------------------------------------------------
 
-  async initiatePayment(
-    resellerId: string,
-    invoiceId: string,
-    customer: { name: string; email: string; phone: string },
-  ) {
+  async initiatePayment(caller: { resellerId: string; tenantId: string }, invoiceId: string) {
+    const { resellerId, tenantId } = caller;
     const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
-    if (!invoice) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
+    // Another institute's invoice must look unknown.
+    if (!invoice || invoice.tenantId !== tenantId) {
+      billingError('INVOICE_NOT_FOUND', 'Invoice not found');
+    }
     if (['PAID', 'CANCELLED', 'REFUNDED'].includes(invoice.status)) {
       billingError('INVOICE_NOT_PAYABLE', 'Invoice is not payable');
     }
 
     const gateway = await this.gatewayFactory.create(resellerId);
-    const returnUrl = this.config.getOrThrow<string>('BILLING_RETURN_URL');
-
-    const order = await gateway.createOrder({
+    const amountPaise = invoice.totalAmount - invoice.paidAmount;
+    const orderInput: CreateOrderInput = {
       invoiceId,
-      amountPaise: invoice.totalAmount - invoice.paidAmount,
+      amountPaise,
       currency: invoice.currency,
-      customer,
-      returnUrl: `${returnUrl}?invoiceId=${invoiceId}`,
-    });
+      customer: await this.payerOf(resellerId, tenantId),
+      returnUrl: this.invoiceReturnUrl(invoiceId),
+    };
 
+    // Reopen the order of an earlier click instead of leaving another pending payment behind.
+    const open = await this.paymentRepo.findOpenGatewayPayment(resellerId, invoiceId);
+    if (open?.gatewayOrderId) {
+      const existing = await this.callGateway(() =>
+        gateway.resumeOrder(open.gatewayOrderId ?? '', orderInput),
+      );
+      if (existing.state === 'OPEN') {
+        return this.checkoutResult(open.id, existing.checkout);
+      }
+      if (existing.state === 'PAID') {
+        billingError(
+          'INVOICE_ALREADY_PAID',
+          'A payment for this invoice was received and is being confirmed',
+        );
+      }
+      await this.paymentRepo.update(resellerId, open.id, {
+        status: 'FAILED',
+        failedAt: new Date(),
+        failureReason: 'Gateway order expired before payment',
+      });
+    }
+
+    const order = await this.callGateway(() => gateway.createOrder(orderInput));
     const { userId } = getRequestContext();
-
-    // Create pending payment record
     const payment = await this.paymentRepo.create(resellerId, {
       invoiceId,
-      tenantId: invoice.tenantId,
+      tenantId,
       resellerId,
       status: 'PENDING',
       method: order.gatewayProvider === 'CASHFREE' ? 'CASHFREE' : 'RAZORPAY',
-      amountPaise: invoice.totalAmount - invoice.paidAmount,
+      amountPaise,
       currency: invoice.currency,
       gatewayProvider: order.gatewayProvider,
       gatewayOrderId: order.gatewayOrderId,
@@ -83,56 +108,87 @@ export class PaymentService {
       updatedBy: userId,
     });
 
-    return {
-      paymentId: payment.id,
-      gatewayOrderId: order.gatewayOrderId,
-      checkoutUrl: order.checkoutUrl,
-      checkoutPayload: order.checkoutPayload,
-    };
+    return this.checkoutResult(payment.id, order);
   }
 
   async verifyPayment(
     caller: { resellerId: string; tenantId: string },
-    input: { gatewayOrderId: string; gatewayPaymentId: string; signature: string },
+    input: { gatewayOrderId: string; gatewayPaymentId?: string; signature?: string },
   ) {
     const { resellerId, tenantId } = caller;
     const gateway = await this.gatewayFactory.create(resellerId);
-    const isValid = await gateway.verifyPayment(input);
-
-    if (!isValid) {
-      billingError('PAYMENT_VERIFICATION_FAILED', 'Payment signature verification failed');
+    const verified = await this.callGateway(() => gateway.verifyPayment(input));
+    if (!verified) {
+      billingError('PAYMENT_VERIFICATION_FAILED', 'The gateway has not confirmed this payment');
     }
 
-    // The lookup runs across the whole reseller, so another institute's order must look unknown.
-    const payments = await this.paymentRepo.findByGatewayOrderId(resellerId, input.gatewayOrderId);
-    const pendingPayment = payments.find((p) => p.status === 'PENDING' && p.tenantId === tenantId);
-    if (!pendingPayment) {
+    // Scoped to the caller's institute, so another institute's order looks unknown.
+    const result = await this.paymentRepo.settleGatewayOrder(resellerId, {
+      gatewayOrderId: input.gatewayOrderId,
+      gatewayPaymentId: verified.gatewayPaymentId,
+      tenantId,
+    });
+    if (!result) {
       billingError('PAYMENT_NOT_FOUND', 'No pending payment found for this order');
     }
+    if (result.settled) await this.recordCapture(resellerId, result.payment);
+    return result.payment;
+  }
 
-    // Mark payment as succeeded
-    const updated = await this.paymentRepo.update(resellerId, pendingPayment.id, {
-      status: 'SUCCEEDED',
-      gatewayPaymentId: input.gatewayPaymentId,
-      paidAt: new Date(),
-    });
-
-    // Update invoice
-    await this.invoiceService.markPaid(
-      resellerId,
-      pendingPayment.invoiceId,
-      pendingPayment.amountPaise,
-    );
-
+  private async recordCapture(
+    resellerId: string,
+    payment: { id: string; invoiceId: string; tenantId: string; amountPaise: bigint },
+  ) {
+    await this.invoiceService.markPaid(resellerId, payment.invoiceId, payment.amountPaise);
     this.emitEvent(EVENT_PATTERNS.BILLING.payment.succeeded, {
-      paymentId: pendingPayment.id,
-      invoiceId: pendingPayment.invoiceId,
-      gatewayPaymentId: input.gatewayPaymentId,
-      tenantId: pendingPayment.tenantId,
+      paymentId: payment.id,
+      invoiceId: payment.invoiceId,
+      tenantId: payment.tenantId,
       resellerId,
     });
+  }
 
-    return updated;
+  private checkoutResult(paymentId: string, order: CreateOrderResult) {
+    return {
+      paymentId,
+      gatewayOrderId: order.gatewayOrderId,
+      gatewayProvider: order.gatewayProvider,
+      checkoutPayload: order.checkoutPayload,
+    };
+  }
+
+  /** The institute invoice page; Cashfree fills in `{order_id}` when it sends the payer back. */
+  private invoiceReturnUrl(invoiceId: string) {
+    const url = new URL(
+      `/billing/invoices/${invoiceId}`,
+      this.config.getOrThrow<string>('BILLING_RETURN_URL'),
+    );
+    return `${url.toString()}?order_id={order_id}`;
+  }
+
+  private async payerOf(resellerId: string, tenantId: string) {
+    const institute = await this.paymentRepo.findPayer(resellerId, tenantId);
+    if (!institute) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
+    const { phones, emails } = institute.contact;
+    const phone = phones.find((p) => p.isPrimary) ?? phones[0];
+    const email = emails.find((e) => e.isPrimary) ?? emails[0];
+    return {
+      name: i18nDisplay(institute.name),
+      email: email?.address ?? '',
+      phone: phone?.number ?? '',
+    };
+  }
+
+  private async callGateway<T>(call: () => Promise<T>): Promise<T> {
+    try {
+      return await call();
+    } catch (error) {
+      if (error instanceof PaymentGatewayError) {
+        this.logger.error(`Payment gateway ${error.provider} failed: ${error.message}`);
+        billingError('GATEWAY_ERROR', 'The payment gateway could not be reached');
+      }
+      throw error;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -290,6 +346,19 @@ export class PaymentService {
     // Webhook endpoints are unauthenticated — use system user as the actor
     const userId = getRequestContext().userId || SYSTEM_USER_ID;
 
+    // Usually the browser has already opened a pending row for this order; settle that one.
+    if (input.gatewayOrderId) {
+      const result = await this.paymentRepo.settleGatewayOrder(resellerId, {
+        gatewayOrderId: input.gatewayOrderId,
+        gatewayPaymentId: input.gatewayPaymentId,
+        gatewayResponse: input.gatewayResponse,
+      });
+      if (result) {
+        if (result.settled) await this.recordCapture(resellerId, result.payment);
+        return result.payment;
+      }
+    }
+
     const { payment, created } = await this.paymentRepo.findOrCreateByGatewayId(
       resellerId,
       input.gatewayPaymentId,
@@ -311,15 +380,7 @@ export class PaymentService {
       },
     );
 
-    if (created) {
-      await this.invoiceService.markPaid(resellerId, input.invoiceId, input.amountPaise);
-      this.emitEvent(EVENT_PATTERNS.BILLING.payment.succeeded, {
-        paymentId: payment.id,
-        invoiceId: input.invoiceId,
-        gatewayPaymentId: input.gatewayPaymentId,
-      });
-    }
-
+    if (created) await this.recordCapture(resellerId, payment);
     return payment;
   }
 

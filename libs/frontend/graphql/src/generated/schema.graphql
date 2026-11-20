@@ -3170,9 +3170,14 @@ enum IndianState {
 }
 
 type InitiatePaymentResult {
-  checkoutPayload: JSON
-  checkoutUrl: String
+  """
+  Options for the gateway browser checkout. RAZORPAY: Razorpay Checkout options (key, order_id, amount, currency). CASHFREE: { paymentSessionId, mode }.
+  """
+  checkoutPayload: JSON!
   gatewayOrderId: String!
+
+  """Gateway that opens the checkout: RAZORPAY or CASHFREE"""
+  gatewayProvider: String!
   paymentId: ID!
 }
 
@@ -3497,6 +3502,27 @@ enum InstituteType {
   SCHOOL
 }
 
+"""One charge on an invoice. Money is in paise."""
+type InvoiceLineItemModel {
+  description: String!
+  quantity: Int!
+
+  """GST Services Accounting Code"""
+  sacCode: String
+
+  """Tax on this line, in paise"""
+  taxAmountPaise: BigInt!
+
+  """Tax percentage, e.g. 18 for 18% GST"""
+  taxRate: Float!
+
+  """Quantity × unit price before tax, in paise"""
+  totalAmountPaise: BigInt!
+
+  """Price of one unit, in paise"""
+  unitAmountPaise: BigInt!
+}
+
 type InvoiceModel {
   createdAt: DateTime!
   currency: String!
@@ -3504,7 +3530,7 @@ type InvoiceModel {
   id: ID!
   invoiceNumber: String!
   issuedAt: DateTime
-  lineItems: JSON
+  lineItems: [InvoiceLineItemModel!]!
   notes: String
   paidAmount: BigInt!
   paidAt: DateTime
@@ -7490,8 +7516,12 @@ input VerifyPasskeyRegistrationInput {
 
 input VerifyPaymentGqlInput {
   gatewayOrderId: String!
-  gatewayPaymentId: String!
-  signature: String!
+
+  """razorpay_payment_id from Razorpay Checkout. Not used for Cashfree."""
+  gatewayPaymentId: String
+
+  """razorpay_signature from Razorpay Checkout. Not used for Cashfree."""
+  signature: String
 }
 
 """Day of the week a period runs (Sunday supported via workingDays)."""

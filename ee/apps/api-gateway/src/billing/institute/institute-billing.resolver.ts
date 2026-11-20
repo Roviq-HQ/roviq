@@ -86,17 +86,10 @@ export class InstituteBillingResolver {
     @Args('invoiceId', { type: () => ID }) invoiceId: string,
   ) {
     assertInstituteWithReseller(user);
-    // Verify invoice belongs to this tenant
-    const invoice = await this.invoiceService.getInvoice(user.resellerId, invoiceId);
-    if (invoice.tenantId !== user.tenantId) {
-      throw new Error('Invoice does not belong to this institute');
-    }
-    // Customer details are minimal from JWT — gateway adapters enrich from order context
-    return this.paymentService.initiatePayment(user.resellerId, invoiceId, {
-      name: user.tenantId ?? '',
-      email: `billing+${user.tenantId}@roviq.com`,
-      phone: '',
-    });
+    return this.paymentService.initiatePayment(
+      { resellerId: user.resellerId, tenantId: user.tenantId },
+      invoiceId,
+    );
   }
 
   @Mutation(() => PaymentModel, { name: 'verifyPayment' })

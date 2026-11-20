@@ -16,6 +16,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -80,6 +81,11 @@ export const payments = pgTable(
     index('payments_tenant_id_idx').on(table.tenantId),
     index('payments_reseller_id_idx').on(table.resellerId),
     index('payments_status_idx').on(table.status),
+    index('payments_gateway_order_id_idx').on(table.gatewayOrderId),
+    // One row per captured gateway payment, so browser verify and webhook cannot both record it.
+    uniqueIndex('payments_gateway_payment_id_key')
+      .on(table.gatewayPaymentId)
+      .where(sql`gateway_payment_id IS NOT NULL`),
     // App: read own institute's payments
     pgPolicy('pay_app_read', {
       for: 'select',

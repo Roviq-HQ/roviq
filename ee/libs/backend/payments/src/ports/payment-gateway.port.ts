@@ -83,7 +83,10 @@ export interface CreateOrderInput {
   currency: string;
   /** Customer details for the checkout page */
   customer: { name: string; email: string; phone: string };
-  /** Where to redirect after payment */
+  /**
+   * Where a redirect checkout returns the payer. `{order_id}` is replaced with
+   * the gateway order id (Cashfree). Razorpay's modal checkout does not redirect.
+   */
   returnUrl: string;
   notes?: { description?: string } & Record<string, string>;
 }
@@ -91,17 +94,33 @@ export interface CreateOrderInput {
 export interface CreateOrderResult {
   gatewayOrderId: string;
   gatewayProvider: string;
-  /** Direct checkout URL (Cashfree) */
-  checkoutUrl?: string;
-  /** Payload for client-side SDK checkout (Razorpay) */
-  checkoutPayload?: Record<string, unknown>;
+  /**
+   * Options for the gateway's browser checkout: Razorpay Checkout options
+   * (`key`, `order_id`, …) or Cashfree's `{ paymentSessionId, mode }`.
+   */
+  checkoutPayload: Record<string, unknown>;
 }
+
+/** State of an order created earlier, so an unpaid one can be reopened instead of replaced. */
+export type ExistingOrder =
+  /** Still payable: reopen checkout with this payload */
+  | { state: 'OPEN'; checkout: CreateOrderResult }
+  /** The gateway has captured a payment; confirmation is on its way */
+  | { state: 'PAID' }
+  /** Expired or terminated: a new order is needed */
+  | { state: 'CLOSED' };
 
 export interface VerifyPaymentInput {
   gatewayOrderId: string;
+  /** Payment id from the browser checkout (Razorpay). Cashfree looks it up itself. */
+  gatewayPaymentId?: string;
+  /** Signature from the browser checkout (Razorpay) */
+  signature?: string;
+}
+
+/** A payment the gateway has confirmed for the order. */
+export interface VerifiedPayment {
   gatewayPaymentId: string;
-  /** Signature from the gateway callback */
-  signature: string;
 }
 
 export interface RefundInput {
@@ -145,7 +164,10 @@ export interface PaymentGateway {
 
   // Order-based (ROV-112)
   createOrder(input: CreateOrderInput): Promise<CreateOrderResult>;
-  verifyPayment(input: VerifyPaymentInput): Promise<boolean>;
+  /** Looks up an order this gateway created earlier. */
+  resumeOrder(gatewayOrderId: string, input: CreateOrderInput): Promise<ExistingOrder>;
+  /** Confirms the order was paid; null when it was not or the proof is invalid. */
+  verifyPayment(input: VerifyPaymentInput): Promise<VerifiedPayment | null>;
   refundOrder(input: RefundInput): Promise<RefundResult>;
   parseWebhook(body: Buffer, headers: Record<string, string>): WebhookEvent;
 }

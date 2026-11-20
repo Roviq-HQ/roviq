@@ -35,7 +35,8 @@ export class PaymentGatewayFactory {
     if (!gwConfig) {
       throw new BusinessException(
         ErrorCode.PAYMENT_GATEWAY_NOT_CONFIGURED,
-        `No active payment gateway configured for reseller ${resellerId}${provider ? ` (${provider})` : ''}`,
+        // Institutes see this message, so it names no reseller.
+        `No active payment gateway is configured${provider ? ` for ${provider}` : ''}`,
       );
     }
 

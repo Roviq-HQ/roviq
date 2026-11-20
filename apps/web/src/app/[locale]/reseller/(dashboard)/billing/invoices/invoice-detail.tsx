@@ -47,17 +47,6 @@ const INVOICE_STATUS_VARIANT: Record<
   REFUNDED: 'secondary',
 };
 
-/** Shape of a single line item coming from the GraphQL lineItems JSON field */
-interface LineItem {
-  description: string;
-  quantity: number;
-  unitAmountPaise: string;
-  totalAmountPaise: string;
-  taxRate: number;
-  taxAmountPaise: string;
-  sacCode?: string;
-}
-
 /** Shape of the GST sub-object within taxBreakdown */
 interface GstBreakdown {
   rate: number;
@@ -194,7 +183,7 @@ export function InvoiceDetail({
   /** Parse the paise string from GraphQL into a display-ready rupee amount */
   const paiseToCurrency = (paise: string | number) => formatCurrency(Number(paise) / 100);
 
-  const lineItems: LineItem[] = (invoice?.lineItems ?? []) as LineItem[];
+  const lineItems = invoice?.lineItems ?? [];
   const taxBreakdown = (invoice?.taxBreakdown ?? null) as TaxBreakdown | null;
 
   const subtotal = Number(invoice?.subtotalAmount ?? 0) / 100;

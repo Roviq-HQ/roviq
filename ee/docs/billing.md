@@ -83,6 +83,18 @@ All billing tables (except `subscription_plans`) have Row-Level Security:
 - Cancel at cycle end: records `canceledAt`, provider webhook sets CANCELED when period ends
 - Cancel immediately: calls gateway cancel, sets CANCELED; provider handles proration/refunds
 
+## Paying an invoice online
+
+The institute's invoice page (`/billing/invoices/:id`) pays the balance through the reseller's default gateway.
+
+1. **Pay online** calls `initiatePayment(invoiceId)`. It answers `INVOICE_NOT_FOUND` for another institute's invoice. If the invoice already has a `PENDING` gateway payment, the gateway is asked about that order (`resumeOrder`): an open order for the same amount is reopened, so repeated clicks leave one pending payment; an expired or re-priced order is marked `FAILED` and replaced; an order the gateway reports paid answers `INVOICE_ALREADY_PAID` until the payment is confirmed.
+2. The result carries `gatewayProvider` and `checkoutPayload`:
+   - **Razorpay**: the page loads `checkout.razorpay.com/v1/checkout.js` and opens the modal with the payload. Its handler calls `verifyPayment({ gatewayOrderId, gatewayPaymentId, signature })`; the server checks the HMAC of `order_id|payment_id`. No `callback_url` is set, because it would bypass the handler.
+   - **Cashfree**: the page loads the v3 JS SDK and redirects with `paymentSessionId`. Cashfree sends the payer back to `<institute portal>/billing/invoices/:id?order_id=<order>` (built from the origin of `BILLING_RETURN_URL`); the page calls `verifyPayment({ gatewayOrderId })` once and removes the query. The server reads the order and its successful payment from Cashfree; nothing from the browser is trusted.
+3. `verifyPayment` and the webhook both settle the order through `PaymentRepository.settleGatewayOrder`: one conditional `UPDATE … WHERE status = 'PENDING'`, so only the first marks the invoice paid. A unique index on `payments.gateway_payment_id` keeps one row per captured payment.
+
+Errors reach the page as codes (`ErrorCode`) and are shown with copy from `instituteBilling.errors`, never the server message.
+
 ## Webhook Processing
 
 1. `POST /webhooks/{razorpay|cashfree}` receives raw request
@@ -110,7 +122,7 @@ All state changes emit NATS events via `ClientProxy`:
 | `CASHFREE_CLIENT_SECRET` | For Cashfree | Client secret |
 | `CASHFREE_ENVIRONMENT` | For Cashfree | `SANDBOX` or `PRODUCTION` |
 | `CASHFREE_API_VERSION` | For Cashfree | API version (e.g., `2025-01-01`) |
-| `BILLING_RETURN_URL` | Yes (EE) | Redirect URL after checkout (e.g., `http://localhost:4200/billing/subscriptions`) |
+| `BILLING_RETURN_URL` | Yes (EE) | Institute portal URL that subscription checkout returns to (e.g., `http://localhost:4200/billing/subscriptions`). Its origin is also used for the Cashfree invoice return, `/billing/invoices/:id?order_id=…` |
 | `ROVIQ_EE` | Yes | Set to `true` to load BillingModule |
 
 ## Testing

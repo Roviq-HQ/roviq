@@ -50,7 +50,7 @@ import {
   type TestInstitute,
   type TestReseller,
 } from '@roviq/testing/integration';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
 
@@ -85,14 +85,18 @@ async function cleanupBillingForReseller(
 }
 
 const VALID_SIG = 'valid-signature';
-// Stands in for Razorpay/Cashfree: orders get fresh ids, and only VALID_SIG passes verification.
-const fakeGateway: Pick<PaymentGateway, 'createOrder' | 'verifyPayment'> = {
-  createOrder: async () => ({
-    gatewayOrderId: `order_${randomUUID()}`,
-    gatewayProvider: 'RAZORPAY',
-    checkoutUrl: 'https://checkout.example.test/pay',
-  }),
-  verifyPayment: async ({ signature }) => signature === VALID_SIG,
+const checkoutOf = (gatewayOrderId: string) => ({
+  gatewayOrderId,
+  gatewayProvider: 'RAZORPAY',
+  checkoutPayload: { key: 'rzp_test_fake', order_id: gatewayOrderId },
+});
+// Stands in for Razorpay/Cashfree: orders get fresh ids and stay open, and only VALID_SIG
+// passes verification.
+const fakeGateway: Pick<PaymentGateway, 'createOrder' | 'resumeOrder' | 'verifyPayment'> = {
+  createOrder: async () => checkoutOf(`order_${randomUUID()}`),
+  resumeOrder: async (gatewayOrderId) => ({ state: 'OPEN', checkout: checkoutOf(gatewayOrderId) }),
+  verifyPayment: async ({ gatewayPaymentId, signature }) =>
+    gatewayPaymentId && signature === VALID_SIG ? { gatewayPaymentId } : null,
 };
 
 describe('Billing Integration', () => {
@@ -572,6 +576,34 @@ describe('Billing Integration', () => {
       });
     }
 
+    async function pendingPaymentCount(invoiceId: string) {
+      return withAdmin(result.db, mkAdminCtx('test:billing'), async (tx) => {
+        const rows = await tx
+          .select({ id: payments.id })
+          .from(payments)
+          .where(and(eq(payments.invoiceId, invoiceId), eq(payments.status, 'PENDING')));
+        return rows.length;
+      });
+    }
+
+    async function invoiceAmounts(invoiceId: string) {
+      return withAdmin(result.db, mkAdminCtx('test:billing'), async (tx) => {
+        const [invoice] = await tx
+          .select({
+            status: invoices.status,
+            paidAmount: invoices.paidAmount,
+            totalAmount: invoices.totalAmount,
+          })
+          .from(invoices)
+          .where(eq(invoices.id, invoiceId));
+        assert(invoice);
+        return {
+          status: invoice.status,
+          paidEqualsTotal: invoice.paidAmount === invoice.totalAmount,
+        };
+      });
+    }
+
     beforeAll(async () => {
       own = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
       other = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
@@ -637,6 +669,52 @@ describe('Billing Integration', () => {
 
       expect(res.errors?.[0]?.extensions?.code).toBe('PAYMENT_VERIFICATION_FAILED');
       expect((await storedPayment(orderId)).payment).toBe('PENDING');
+    });
+
+    it('should reopen the same order on another Pay online click instead of adding a payment', async () => {
+      const invoiceId = await openInvoiceFor(other);
+
+      const first = await initiate(invoiceId, tokenB);
+      const second = await initiate(invoiceId, tokenB);
+
+      expect(second).toBe(first);
+      expect(await pendingPaymentCount(invoiceId)).toBe(1);
+    });
+
+    it('should record a payment once when it is verified twice', async () => {
+      const invoiceId = await openInvoiceFor(other);
+      const orderId = await initiate(invoiceId, tokenB);
+      const verify = () =>
+        gqlRequest<{ verifyPayment: { status: string } }>(result.httpServer, {
+          query: VERIFY,
+          variables: {
+            input: { gatewayOrderId: orderId, gatewayPaymentId: 'pay_twice', signature: VALID_SIG },
+          },
+          token: tokenB,
+        });
+
+      const [a, b] = [await verify(), await verify()];
+
+      expect(a.errors).toBeUndefined();
+      expect(b.errors).toBeUndefined();
+      expect(b.data?.verifyPayment.status).toBe('SUCCEEDED');
+      expect(await invoiceAmounts(invoiceId)).toEqual({ status: 'PAID', paidEqualsTotal: true });
+    });
+
+    it("should answer INVOICE_NOT_FOUND when paying another institute's invoice", async () => {
+      const invoiceB = await openInvoiceFor(other);
+
+      const res = await gqlRequest(result.httpServer, {
+        query: /* GraphQL */ `
+          mutation InitiatePayment($invoiceId: ID!) {
+            initiatePayment(invoiceId: $invoiceId) { gatewayOrderId }
+          }
+        `,
+        variables: { invoiceId: invoiceB },
+        token: tokenA,
+      });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('INVOICE_NOT_FOUND');
     });
   });
 

@@ -1,8 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE_DB, type DrizzleDB, mkResellerCtx, withReseller } from '@roviq/database';
+import {
+  DRIZZLE_DB,
+  type DrizzleDB,
+  institutesLive,
+  mkResellerCtx,
+  withReseller,
+} from '@roviq/database';
 import { payments } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, desc, eq, type SQL, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNotNull, type SQL, sql } from 'drizzle-orm';
 
 @Injectable()
 export class PaymentRepository {
@@ -54,6 +60,79 @@ export class PaymentRepository {
         .where(eq(payments.id, id))
         .returning();
       return payment;
+    });
+  }
+
+  /** Latest gateway order still waiting for payment on this invoice. */
+  async findOpenGatewayPayment(resellerId: string, invoiceId: string) {
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:payment'), async (tx) => {
+      const [payment] = await tx
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.invoiceId, invoiceId),
+            eq(payments.status, 'PENDING'),
+            isNotNull(payments.gatewayOrderId),
+          ),
+        )
+        .orderBy(desc(payments.createdAt))
+        .limit(1);
+      return payment ?? null;
+    });
+  }
+
+  /**
+   * Marks the pending payment of a gateway order as captured. Browser verify and the
+   * gateway webhook can race: only one settles the row; the other gets `settled: false`
+   * with the row the first one wrote. Returns null when the order has no payment row.
+   */
+  async settleGatewayOrder(
+    resellerId: string,
+    input: {
+      gatewayOrderId: string;
+      gatewayPaymentId: string;
+      /** Only settle a payment of this institute */
+      tenantId?: string;
+      gatewayResponse?: unknown;
+    },
+  ) {
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:payment'), async (tx) => {
+      const scope: SQL[] = [eq(payments.gatewayOrderId, input.gatewayOrderId)];
+      if (input.tenantId) scope.push(eq(payments.tenantId, input.tenantId));
+
+      const [settled] = await tx
+        .update(payments)
+        .set({
+          status: 'SUCCEEDED',
+          gatewayPaymentId: input.gatewayPaymentId,
+          ...(input.gatewayResponse !== undefined && { gatewayResponse: input.gatewayResponse }),
+          paidAt: new Date(),
+          updatedAt: new Date(),
+          updatedBy: this.userId,
+        })
+        .where(and(...scope, eq(payments.status, 'PENDING')))
+        .returning();
+      if (settled) return { payment: settled, settled: true };
+
+      const [existing] = await tx
+        .select()
+        .from(payments)
+        .where(and(...scope, eq(payments.gatewayPaymentId, input.gatewayPaymentId)))
+        .limit(1);
+      return existing ? { payment: existing, settled: false } : null;
+    });
+  }
+
+  /** Name and primary contact of an institute, for the gateway checkout form. */
+  async findPayer(resellerId: string, tenantId: string) {
+    return withReseller(this.db, mkResellerCtx(resellerId, 'repository:payment'), async (tx) => {
+      const [institute] = await tx
+        .select({ name: institutesLive.name, contact: institutesLive.contact })
+        .from(institutesLive)
+        .where(eq(institutesLive.id, tenantId))
+        .limit(1);
+      return institute ?? null;
     });
   }
 

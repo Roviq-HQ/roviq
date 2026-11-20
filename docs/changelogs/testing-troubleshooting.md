@@ -844,3 +844,11 @@ Likely cause, not proven: load. The first run was cold after new commits, so the
 - **Cause:** phase 1 of `scripts/ci-check.sh` starts a fixed list of e2e services, and `object-storage` was not on it. The seed step runs with `--no-deps`, so nothing else started it. Instances where `pnpm e2e:up` had run since file storage was added already had the container; instance 1's e2e stack was created on 2026-11-18 and did not.
 - **Fix:** `object-storage` is in the phase 1 service list.
 - **Lesson:** a service that a `--no-deps` step needs must be started by name; a gate that passes only where an older command left a container behind is not self-sufficient.
+
+## 2026-11-20 — Integration setup failed silently: `drizzle-kit migrate failed (exit 1)` after a migration was renamed on main (fixed)
+
+- **Symptom:** `pnpm vitest run --project integration …` stopped in global setup with `drizzle-kit migrate failed (exit 1) against localhost:5434/roviq_test` and no drizzle error text. Each pending migration applied cleanly when run by hand in a rolled-back transaction.
+- **Cause:** commit `9a1566d9` (ROV-301) renamed `20261119163713_rov-301-user-document-files` to `20261119163800_…` to reorder it. `roviq_test` had recorded the old name, so drizzle-kit saw an applied migration with no folder and refused to continue.
+- **Fix:** `pnpm db:reset --test`, then the run passed.
+- **Lesson:** after pulling a change that renames or reorders migration folders, reset `roviq_test`. Compare `select name from drizzle.__drizzle_migrations` with `ls libs/database/migrations` to confirm.
+

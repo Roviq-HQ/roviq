@@ -10,6 +10,7 @@ import type {
   CreateOrderResult,
   CreatePlanInput,
   CreateSubscriptionInput,
+  ExistingOrder,
   PaymentGateway,
   ProviderPayment,
   ProviderPlan,
@@ -18,6 +19,7 @@ import type {
   ProviderWebhookEvent,
   RefundInput,
   RefundResult,
+  VerifiedPayment,
   VerifyPaymentInput,
   WebhookEvent,
 } from '../ports/payment-gateway.port';
@@ -272,19 +274,7 @@ export class RazorpayAdapter implements PaymentGateway {
         receipt: input.invoiceId,
         notes: input.notes ?? {},
       });
-      return {
-        gatewayOrderId: result.id,
-        gatewayProvider: 'RAZORPAY',
-        checkoutPayload: {
-          key: this.keyId,
-          order_id: result.id,
-          amount: result.amount,
-          currency: result.currency,
-          name: input.customer.name,
-          prefill: { email: input.customer.email, contact: input.customer.phone },
-          callback_url: input.returnUrl,
-        },
-      };
+      return this.checkoutFor(result, input);
     } catch (error) {
       throw new PaymentGatewayError(
         `Failed to create order: ${razorpayErrorDetail(error)}`,
@@ -295,13 +285,52 @@ export class RazorpayAdapter implements PaymentGateway {
     }
   }
 
-  async verifyPayment(input: VerifyPaymentInput): Promise<boolean> {
+  async resumeOrder(gatewayOrderId: string, input: CreateOrderInput): Promise<ExistingOrder> {
     try {
-      const body = `${input.gatewayOrderId}|${input.gatewayPaymentId}`;
-      return validateWebhookSignature(body, input.signature, this.keySecret ?? '');
-    } catch {
-      return false;
+      const order: Orders.RazorpayOrder = await this.instance.orders.fetch(gatewayOrderId);
+      if (order.status === 'paid') return { state: 'PAID' };
+      // A changed balance (for example a partial payment since) needs an order for the new amount.
+      if (Number(order.amount_due) !== Number(input.amountPaise)) return { state: 'CLOSED' };
+      return { state: 'OPEN', checkout: this.checkoutFor(order, input) };
+    } catch (error) {
+      throw new PaymentGatewayError(
+        `Failed to fetch order: ${razorpayErrorDetail(error)}`,
+        'RAZORPAY',
+        undefined,
+        error,
+      );
     }
+  }
+
+  async verifyPayment(input: VerifyPaymentInput): Promise<VerifiedPayment | null> {
+    const { gatewayOrderId, gatewayPaymentId, signature } = input;
+    if (!gatewayPaymentId || !signature) return null;
+    try {
+      const valid = validateWebhookSignature(
+        `${gatewayOrderId}|${gatewayPaymentId}`,
+        signature,
+        this.keySecret ?? '',
+      );
+      return valid ? { gatewayPaymentId } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Options for Razorpay Checkout in the browser. No callback_url: it would bypass the
+  // handler that sends the signed result back for verification.
+  private checkoutFor(order: Orders.RazorpayOrder, input: CreateOrderInput): CreateOrderResult {
+    return {
+      gatewayOrderId: order.id,
+      gatewayProvider: 'RAZORPAY',
+      checkoutPayload: {
+        key: this.keyId,
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        ...(input.notes?.description && { description: input.notes.description }),
+      },
+    };
   }
 
   async refundOrder(input: RefundInput): Promise<RefundResult> {

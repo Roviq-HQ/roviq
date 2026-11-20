@@ -41,13 +41,21 @@ interface InitiatePaymentData {
   initiatePayment: {
     paymentId: string;
     gatewayOrderId: string;
-    checkoutUrl: string | null;
-    checkoutPayload: Record<string, unknown> | null;
+    gatewayProvider: string;
+    checkoutPayload: Record<string, unknown>;
   };
 }
 
 interface InitiatePaymentVariables {
   invoiceId: string;
+}
+
+interface VerifyPaymentData {
+  verifyPayment: { id: string; status: string };
+}
+
+interface VerifyPaymentVariables {
+  input: { gatewayOrderId: string; gatewayPaymentId?: string; signature?: string };
 }
 
 interface MyPaymentHistoryQuery {
@@ -70,7 +78,8 @@ const MY_INVOICE_QUERY = gql`
     myInvoice(id: $id) {
       id invoiceNumber status subtotalAmount taxAmount totalAmount paidAmount
       currency periodStart periodEnd dueAt paidAt issuedAt
-      lineItems notes upiPaymentUri
+      lineItems { description quantity unitAmountPaise totalAmountPaise taxRate taxAmountPaise sacCode }
+      notes upiPaymentUri
     }
   }
 `;
@@ -115,8 +124,17 @@ const INITIATE_PAYMENT_MUTATION = gql`
     initiatePayment(invoiceId: $invoiceId) {
       paymentId
       gatewayOrderId
-      checkoutUrl
+      gatewayProvider
       checkoutPayload
+    }
+  }
+`;
+
+const VERIFY_PAYMENT_MUTATION = gql`
+  mutation VerifyPayment($input: VerifyPaymentGqlInput!) {
+    verifyPayment(input: $input) {
+      id
+      status
     }
   }
 `;
@@ -164,5 +182,12 @@ export function useGenerateInvoicePdf() {
 export function useInitiatePayment() {
   return useMutation<InitiatePaymentData, InitiatePaymentVariables>(INITIATE_PAYMENT_MUTATION, {
     refetchQueries: ['MyInvoice', 'MyPaymentHistory'],
+  });
+}
+
+export function useVerifyPayment() {
+  return useMutation<VerifyPaymentData, VerifyPaymentVariables>(VERIFY_PAYMENT_MUTATION, {
+    refetchQueries: ['MyInvoice', 'MyPaymentHistory'],
+    awaitRefetchQueries: true,
   });
 }

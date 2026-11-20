@@ -1,6 +1,6 @@
-import { Field, ID, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
 import { InvoiceStatus } from '@roviq/ee-billing-types';
-import type { invoices } from '@roviq/ee-database';
+import type { InvoiceLineItem, invoices } from '@roviq/ee-database';
 import { DateTimeScalar, Paginated } from '@roviq/nestjs-graphql';
 import { GraphQLBigInt } from 'graphql-scalars';
 import { GraphQLJSON } from 'graphql-type-json';
@@ -15,6 +15,30 @@ export class SubscriptionRef {
 
   @Field(() => InstituteRef, { nullable: true })
   institute?: InstituteRef;
+}
+
+@ObjectType({ description: 'One charge on an invoice. Money is in paise.' })
+export class InvoiceLineItemModel {
+  @Field()
+  description!: string;
+
+  @Field(() => Int)
+  quantity!: number;
+
+  @Field(() => GraphQLBigInt, { description: 'Price of one unit, in paise' })
+  unitAmountPaise!: string;
+
+  @Field(() => GraphQLBigInt, { description: 'Quantity × unit price before tax, in paise' })
+  totalAmountPaise!: string;
+
+  @Field(() => Float, { description: 'Tax percentage, e.g. 18 for 18% GST' })
+  taxRate!: number;
+
+  @Field(() => GraphQLBigInt, { description: 'Tax on this line, in paise' })
+  taxAmountPaise!: string;
+
+  @Field(() => String, { nullable: true, description: 'GST Services Accounting Code' })
+  sacCode?: string | null;
 }
 
 @ObjectType()
@@ -70,8 +94,8 @@ export class InvoiceModel {
   @Field(() => DateTimeScalar, { nullable: true })
   paidAt!: Date | null;
 
-  @Field(() => GraphQLJSON, { nullable: true })
-  lineItems!: unknown[] | null;
+  @Field(() => [InvoiceLineItemModel])
+  lineItems!: InvoiceLineItem[];
 
   @Field(() => GraphQLJSON, { nullable: true })
   taxBreakdown!: Record<string, unknown> | null;

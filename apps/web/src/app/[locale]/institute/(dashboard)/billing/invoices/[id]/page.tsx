@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import type { InvoiceStatus } from '@roviq/graphql/generated';
 import { useFormatDate, useFormatNumber } from '@roviq/i18n';
 import {
@@ -20,21 +19,27 @@ import {
   TableHeader,
   TableRow,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { parseISO } from 'date-fns';
 import { ArrowLeft, CreditCard, Download, FileText, Loader2, QrCode } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { openRazorpayCheckout, redirectToCashfreeCheckout } from '../../gateway-checkout';
 import {
   useGenerateInvoicePdf,
   useInitiatePayment,
   useMyInvoice,
   useMyPaymentHistory,
   useSubmitUpiProof,
+  useVerifyPayment,
 } from '../../use-billing';
+import { useBillingErrorMessage } from '../../use-billing-error-message';
+
+const { instituteBillingInvoice: ids } = testIds;
 
 /** Invoice status to badge variant mapping */
 const INVOICE_STATUS_VARIANT: Record<
@@ -94,7 +99,13 @@ export default function InvoiceDetailPage() {
 
   const [submitUpiProof, { loading: submittingProof }] = useSubmitUpiProof();
   const [fetchPdf, { loading: pdfLoading }] = useGenerateInvoicePdf();
-  const [initiatePayment, { loading: paymentLoading }] = useInitiatePayment();
+  const [initiatePayment, { loading: initiating }] = useInitiatePayment();
+  const [verifyPayment, { loading: verifying }] = useVerifyPayment();
+  const errorMessage = useBillingErrorMessage();
+  const returnedOrderId = useSearchParams().get('order_id');
+  const handledReturn = useRef<string | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const paymentLoading = initiating || verifying || checkoutOpen;
 
   const [showUtrForm, setShowUtrForm] = useState(false);
   const [utrNumber, setUtrNumber] = useState('');
@@ -121,9 +132,9 @@ export default function InvoiceDetailPage() {
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed to download PDF'));
+      toast.error(errorMessage(err, 'pdfFailed'));
     }
-  }, [fetchPdf, invoiceId, invoice?.invoiceNumber]);
+  }, [fetchPdf, invoiceId, invoice?.invoiceNumber, errorMessage]);
 
   /** Submit UTR proof for UPI P2P payment */
   const handleSubmitUtr = useCallback(async () => {
@@ -140,24 +151,59 @@ export default function InvoiceDetailPage() {
       setShowUtrForm(false);
       setUtrNumber('');
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed to submit payment proof'));
+      toast.error(errorMessage(err));
     }
-  }, [utrNumber, invoiceId, submitUpiProof, t]);
+  }, [utrNumber, invoiceId, submitUpiProof, t, errorMessage]);
 
-  /** Initiate gateway payment (Razorpay / redirect) */
+  const confirmPayment = useCallback(
+    async (input: { gatewayOrderId: string; gatewayPaymentId?: string; signature?: string }) => {
+      try {
+        await verifyPayment({ variables: { input } });
+        toast.success(t('invoiceDetail.paymentReceived'));
+      } catch (err) {
+        toast.error(errorMessage(err));
+      }
+    },
+    [verifyPayment, t, errorMessage],
+  );
+
+  // Cashfree sends the payer back here with `?order_id=`; confirm that order once.
+  useEffect(() => {
+    if (!returnedOrderId || handledReturn.current === returnedOrderId) return;
+    handledReturn.current = returnedOrderId;
+    window.history.replaceState(null, '', window.location.pathname);
+    void confirmPayment({ gatewayOrderId: returnedOrderId });
+  }, [returnedOrderId, confirmPayment]);
+
   const handlePayOnline = useCallback(async () => {
     try {
       const { data } = await initiatePayment({ variables: { invoiceId } });
-      if (!data?.initiatePayment) return;
+      const order = data?.initiatePayment;
+      if (!order) return;
 
-      const { checkoutUrl } = data.initiatePayment;
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+      setCheckoutOpen(true);
+      if (order.gatewayProvider === 'CASHFREE') {
+        await redirectToCashfreeCheckout(order.checkoutPayload);
+        return;
       }
+      const result = await openRazorpayCheckout(order.checkoutPayload, {
+        name: t('invoiceDetail.checkoutName', { number: invoice?.invoiceNumber ?? '' }),
+      });
+      setCheckoutOpen(false);
+      if (!result) {
+        toast.info(t('invoiceDetail.paymentCancelled'));
+        return;
+      }
+      await confirmPayment({
+        gatewayOrderId: order.gatewayOrderId,
+        gatewayPaymentId: result.razorpay_payment_id,
+        signature: result.razorpay_signature,
+      });
     } catch (err) {
-      toast.error(extractGraphQLError(err, 'Failed to initiate payment'));
+      setCheckoutOpen(false);
+      toast.error(errorMessage(err));
     }
-  }, [initiatePayment, invoiceId]);
+  }, [initiatePayment, invoiceId, invoice?.invoiceNumber, confirmPayment, t, errorMessage]);
 
   if (loading) {
     return (
@@ -196,13 +242,7 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  const lineItems = (invoice.lineItems ?? []) as Array<{
-    description: string;
-    quantity: number;
-    unitPricePaise: string;
-    taxPaise: string;
-    totalPaise: string;
-  }>;
+  const lineItems = invoice.lineItems;
 
   const balanceDue = Number(invoice.totalAmount) - Number(invoice.paidAmount);
   const showPayButton = PAYABLE_STATUSES.has(invoice.status);
@@ -284,18 +324,21 @@ export default function InvoiceDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lineItems.map((item) => (
-                  <TableRow key={`${item.description}-${item.unitPricePaise}`}>
+                {lineItems.map((item, index) => (
+                  <TableRow
+                    key={`${item.description}-${item.unitAmountPaise}`}
+                    data-testid={ids.lineItemRow(index)}
+                  >
                     <TableCell>{item.description}</TableCell>
                     <TableCell className="text-end">{item.quantity}</TableCell>
                     <TableCell className="text-end">
-                      {currency(Number(item.unitPricePaise) / 100)}
+                      {currency(Number(item.unitAmountPaise) / 100)}
                     </TableCell>
                     <TableCell className="text-end">
-                      {currency(Number(item.taxPaise) / 100)}
+                      {currency(Number(item.taxAmountPaise) / 100)}
                     </TableCell>
                     <TableCell className="text-end">
-                      {currency(Number(item.totalPaise) / 100)}
+                      {currency(Number(item.totalAmountPaise) / 100)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -384,8 +427,24 @@ export default function InvoiceDetailPage() {
 
       {/* Pay Online / Pay Now buttons */}
       {showPayButton && (
-        <div className="flex justify-end gap-2">
-          <Button size="lg" variant="outline" onClick={handlePayOnline} disabled={paymentLoading}>
+        <div className="flex items-center justify-end gap-3">
+          {verifying && (
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              data-testid={ids.paymentConfirming}
+            >
+              {t('invoiceDetail.paymentConfirming')}
+            </p>
+          )}
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={handlePayOnline}
+            disabled={paymentLoading}
+            title={t('invoiceDetail.payOnline')}
+            data-testid={ids.payOnlineBtn}
+          >
             {paymentLoading ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (

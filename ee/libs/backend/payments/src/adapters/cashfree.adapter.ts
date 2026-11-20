@@ -8,6 +8,7 @@ import type {
   CreateOrderResult,
   CreatePlanInput,
   CreateSubscriptionInput,
+  ExistingOrder,
   PaymentGateway,
   ProviderPayment,
   ProviderPlan,
@@ -16,6 +17,7 @@ import type {
   ProviderWebhookEvent,
   RefundInput,
   RefundResult,
+  VerifiedPayment,
   VerifyPaymentInput,
   WebhookEvent,
 } from '../ports/payment-gateway.port';
@@ -53,12 +55,13 @@ function cashfreeErrorDetail(error: unknown): string {
 
 export class CashfreeAdapter implements PaymentGateway {
   private readonly client: InstanceType<typeof Cashfree>;
+  /** Mode for Cashfree.js in the browser; must match the API environment. */
+  private readonly mode: 'production' | 'sandbox';
 
   constructor(config: ConfigService) {
-    const env =
-      config.getOrThrow('CASHFREE_ENVIRONMENT') === 'PRODUCTION'
-        ? CFEnvironment.PRODUCTION
-        : CFEnvironment.SANDBOX;
+    const production = config.getOrThrow('CASHFREE_ENVIRONMENT') === 'PRODUCTION';
+    this.mode = production ? 'production' : 'sandbox';
+    const env = production ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
     this.client = new Cashfree(
       env,
       config.getOrThrow('CASHFREE_CLIENT_ID'),
@@ -274,6 +277,7 @@ export class CashfreeAdapter implements PaymentGateway {
 
   async createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
     try {
+      // Our own order_id, not cf_order_id: fetch, payments and webhooks all key on it.
       const orderId = `ord_${randomUUID()}`;
       const response = await this.client.PGCreateOrder({
         order_id: orderId,
@@ -288,15 +292,9 @@ export class CashfreeAdapter implements PaymentGateway {
         order_meta: { return_url: input.returnUrl },
         order_note: input.notes?.description ?? undefined,
       });
-      const data = response?.data;
-      return {
-        gatewayOrderId: data?.cf_order_id?.toString() ?? orderId,
-        gatewayProvider: 'CASHFREE',
-        checkoutUrl: data?.payment_session_id
-          ? `https://payments.cashfree.com/order/#${data.payment_session_id}`
-          : undefined,
-        checkoutPayload: { paymentSessionId: data?.payment_session_id },
-      };
+      const sessionId = response?.data?.payment_session_id;
+      if (!sessionId) throw new Error('Cashfree returned no payment_session_id');
+      return this.checkoutFor(orderId, sessionId);
     } catch (error) {
       throw new PaymentGatewayError(
         `Failed to create order: ${cashfreeErrorDetail(error)}`,
@@ -307,14 +305,51 @@ export class CashfreeAdapter implements PaymentGateway {
     }
   }
 
-  async verifyPayment(input: VerifyPaymentInput): Promise<boolean> {
+  async resumeOrder(gatewayOrderId: string, input: CreateOrderInput): Promise<ExistingOrder> {
     try {
-      const response = await this.client.PGFetchOrder(input.gatewayOrderId);
-      const status = response?.data?.order_status;
-      return status === 'PAID';
-    } catch {
-      return false;
+      const order = (await this.client.PGFetchOrder(gatewayOrderId))?.data;
+      if (order?.order_status === 'PAID') return { state: 'PAID' };
+      if (
+        order?.order_status !== 'ACTIVE' ||
+        !order.payment_session_id ||
+        Math.round((order.order_amount ?? 0) * 100) !== Number(input.amountPaise)
+      ) {
+        return { state: 'CLOSED' };
+      }
+      return {
+        state: 'OPEN',
+        checkout: this.checkoutFor(gatewayOrderId, order.payment_session_id),
+      };
+    } catch (error) {
+      throw new PaymentGatewayError(
+        `Failed to fetch order: ${cashfreeErrorDetail(error)}`,
+        'CASHFREE',
+        undefined,
+        error,
+      );
     }
+  }
+
+  // Cashfree's return carries only the order id, so the paid order and its payment id
+  // are read from Cashfree rather than taken from the browser.
+  async verifyPayment(input: VerifyPaymentInput): Promise<VerifiedPayment | null> {
+    try {
+      const order = (await this.client.PGFetchOrder(input.gatewayOrderId))?.data;
+      if (order?.order_status !== 'PAID') return null;
+      const payments = (await this.client.PGOrderFetchPayments(input.gatewayOrderId))?.data ?? [];
+      const paid = payments.find((p) => p.payment_status === 'SUCCESS' && p.cf_payment_id);
+      return paid?.cf_payment_id ? { gatewayPaymentId: String(paid.cf_payment_id) } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private checkoutFor(orderId: string, paymentSessionId: string): CreateOrderResult {
+    return {
+      gatewayOrderId: orderId,
+      gatewayProvider: 'CASHFREE',
+      checkoutPayload: { paymentSessionId, mode: this.mode },
+    };
   }
 
   async refundOrder(input: RefundInput): Promise<RefundResult> {

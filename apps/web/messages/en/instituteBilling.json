@@ -69,7 +69,11 @@
     "proofSubmitted": "Payment recorded! Your administrator will verify within 24 hours.",
     "payOnline": "Pay Online",
     "downloadPdf": "Download PDF",
-    "paymentHistory": "Payment History"
+    "paymentHistory": "Payment History",
+    "paymentReceived": "Payment received. This invoice is now paid.",
+    "paymentConfirming": "Confirming your payment…",
+    "paymentCancelled": "Payment was not completed. You can try again.",
+    "checkoutName": "Invoice {number}"
   },
   "invoiceStatuses": {
     "DRAFT": "Draft",
@@ -108,5 +112,20 @@
     "BANK_TRANSFER": "Bank Transfer",
     "CASH": "Cash",
     "CHEQUE": "Cheque"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "INVOICE_NOT_FOUND": "This invoice could not be found.",
+    "INVOICE_NOT_PAYABLE": "This invoice can no longer be paid.",
+    "INVOICE_ALREADY_PAID": "A payment for this invoice was received and is being confirmed. Refresh in a minute.",
+    "PAYMENT_NOT_FOUND": "We could not find this payment. If money was deducted, contact your administrator.",
+    "PAYMENT_VERIFICATION_FAILED": "The payment gateway has not confirmed this payment. If money was deducted, it will be confirmed shortly.",
+    "PAYMENT_GATEWAY_NOT_CONFIGURED": "Online payment is not set up for your institute yet. Please pay by UPI or contact your administrator.",
+    "GATEWAY_CONFIG_NOT_FOUND": "Online payment is not set up for your institute yet. Please pay by UPI or contact your administrator.",
+    "GATEWAY_ERROR": "The payment gateway could not be reached. Please try again in a few minutes.",
+    "UTR_INVALID": "UTR must be 12–22 digits.",
+    "UTR_ALREADY_SUBMITTED": "This UTR number has already been submitted.",
+    "checkoutUnavailable": "The payment window could not be opened. Check your internet connection and try again.",
+    "pdfFailed": "The invoice PDF could not be downloaded. Please try again."
   }
 }

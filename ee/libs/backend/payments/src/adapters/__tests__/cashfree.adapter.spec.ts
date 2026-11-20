@@ -12,6 +12,9 @@ const mockSubsManageSubscription = vi.fn();
 const mockSubsFetchSubscriptionPayments = vi.fn();
 const mockSubsCreateRefund = vi.fn();
 const mockPGVerifyWebhookSignature = vi.fn();
+const mockPGCreateOrder = vi.fn();
+const mockPGFetchOrder = vi.fn();
+const mockPGOrderFetchPayments = vi.fn();
 
 vi.mock('cashfree-pg', () => ({
   Cashfree: vi.fn(
@@ -25,6 +28,9 @@ vi.mock('cashfree-pg', () => ({
       SubsFetchSubscriptionPayments = mockSubsFetchSubscriptionPayments;
       SubsCreateRefund = mockSubsCreateRefund;
       PGVerifyWebhookSignature = mockPGVerifyWebhookSignature;
+      PGCreateOrder = mockPGCreateOrder;
+      PGFetchOrder = mockPGFetchOrder;
+      PGOrderFetchPayments = mockPGOrderFetchPayments;
     },
   ),
   CFEnvironment: { SANDBOX: 1, PRODUCTION: 2 },
@@ -69,6 +75,102 @@ describe('CashfreeAdapter', () => {
       });
 
       expect(result.providerPlanId).toBe('plan_cf_123');
+    });
+  });
+
+  describe('invoice orders', () => {
+    const ORDER_INPUT = {
+      invoiceId: 'inv-1',
+      amountPaise: 118000n,
+      currency: 'INR',
+      customer: { name: 'Saraswati Vidya Mandir', email: 'a@svm.example', phone: '9000000002' },
+      returnUrl: 'https://app.roviq.com/billing/invoices/inv-1?order_id={order_id}',
+    };
+    const ACTIVE = {
+      order_status: 'ACTIVE',
+      order_amount: 1180,
+      payment_session_id: 'session_1',
+    };
+
+    it('should create an order under our own order id and return the payment session', async () => {
+      mockPGCreateOrder.mockResolvedValue({ data: { payment_session_id: 'session_1' } });
+
+      const result = await adapter.createOrder(ORDER_INPUT);
+
+      const [request] = mockPGCreateOrder.mock.calls[0];
+      expect(request).toEqual({
+        order_id: result.gatewayOrderId,
+        order_amount: 1180,
+        order_currency: 'INR',
+        customer_details: {
+          customer_id: 'inv-1',
+          customer_name: 'Saraswati Vidya Mandir',
+          customer_email: 'a@svm.example',
+          customer_phone: '9000000002',
+        },
+        order_meta: { return_url: ORDER_INPUT.returnUrl },
+        order_note: undefined,
+      });
+      expect(result.gatewayOrderId).toMatch(/^ord_[0-9a-f-]{36}$/);
+      expect(result).toEqual({
+        gatewayOrderId: result.gatewayOrderId,
+        gatewayProvider: 'CASHFREE',
+        checkoutPayload: { paymentSessionId: 'session_1', mode: 'sandbox' },
+      });
+    });
+
+    it('should fail when Cashfree returns no payment session', async () => {
+      mockPGCreateOrder.mockResolvedValue({ data: {} });
+
+      await expect(adapter.createOrder(ORDER_INPUT)).rejects.toThrow(/payment_session_id/);
+    });
+
+    it('should reopen an active order for the same amount', async () => {
+      mockPGFetchOrder.mockResolvedValue({ data: ACTIVE });
+
+      expect(await adapter.resumeOrder('ord_1', ORDER_INPUT)).toEqual({
+        state: 'OPEN',
+        checkout: {
+          gatewayOrderId: 'ord_1',
+          gatewayProvider: 'CASHFREE',
+          checkoutPayload: { paymentSessionId: 'session_1', mode: 'sandbox' },
+        },
+      });
+    });
+
+    it('should report a paid order as PAID', async () => {
+      mockPGFetchOrder.mockResolvedValue({ data: { ...ACTIVE, order_status: 'PAID' } });
+
+      expect(await adapter.resumeOrder('ord_1', ORDER_INPUT)).toEqual({ state: 'PAID' });
+    });
+
+    it('should close an expired order or one for another amount', async () => {
+      mockPGFetchOrder.mockResolvedValueOnce({ data: { ...ACTIVE, order_status: 'EXPIRED' } });
+      mockPGFetchOrder.mockResolvedValueOnce({ data: { ...ACTIVE, order_amount: 500 } });
+
+      expect(await adapter.resumeOrder('ord_1', ORDER_INPUT)).toEqual({ state: 'CLOSED' });
+      expect(await adapter.resumeOrder('ord_1', ORDER_INPUT)).toEqual({ state: 'CLOSED' });
+    });
+
+    it('should confirm a paid order with its successful payment id', async () => {
+      mockPGFetchOrder.mockResolvedValue({ data: { ...ACTIVE, order_status: 'PAID' } });
+      mockPGOrderFetchPayments.mockResolvedValue({
+        data: [
+          { payment_status: 'FAILED', cf_payment_id: 11 },
+          { payment_status: 'SUCCESS', cf_payment_id: 12 },
+        ],
+      });
+
+      expect(await adapter.verifyPayment({ gatewayOrderId: 'ord_1' })).toEqual({
+        gatewayPaymentId: '12',
+      });
+    });
+
+    it('should not confirm an order that is not paid', async () => {
+      mockPGFetchOrder.mockResolvedValue({ data: ACTIVE });
+
+      expect(await adapter.verifyPayment({ gatewayOrderId: 'ord_1' })).toBeNull();
+      expect(mockPGOrderFetchPayments).not.toHaveBeenCalled();
     });
   });
 
