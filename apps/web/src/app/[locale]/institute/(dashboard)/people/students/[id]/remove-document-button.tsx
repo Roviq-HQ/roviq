@@ -17,7 +17,7 @@ import { Loader2, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useDeleteStudentDocument } from '../use-students';
+import { STUDENT_DOCUMENTS_QUERY, useDeleteStudentDocument } from '../use-students';
 
 const { instituteStudents } = testIds;
 
@@ -30,7 +30,7 @@ const ERROR_KEYS: Record<string, 'notFound' | 'forbidden'> = {
 export function RemoveDocumentButton({ documentId, type }: { documentId: string; type: string }) {
   const t = useTranslations('students.detail.documents');
   const [open, setOpen] = useState(false);
-  const [removeDocument, { loading }] = useDeleteStudentDocument();
+  const [removeDocument, { loading, client }] = useDeleteStudentDocument();
   const typeLabel = t(`types.${type}`, { default: type });
 
   const confirm = async () => {
@@ -40,6 +40,11 @@ export function RemoveDocumentButton({ documentId, type }: { documentId: string;
       setOpen(false);
     } catch (err) {
       const code = extractGraphQLErrorCode(err);
+      // Removed elsewhere: refetchQueries runs only on success, so drop the stale card here.
+      if (code === 'STUDENT_NOT_FOUND') {
+        // A failed refetch shows in the documents list itself.
+        client.refetchQueries({ include: [STUDENT_DOCUMENTS_QUERY] }).catch(() => undefined);
+      }
       toast.error(t(`remove.${(code && ERROR_KEYS[code]) ?? 'error'}`));
       setOpen(false);
     }

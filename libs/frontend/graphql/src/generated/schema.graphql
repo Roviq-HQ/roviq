@@ -4056,6 +4056,11 @@ type Mutation {
   """Soft delete a student profile"""
   deleteStudent(id: ID!): Boolean!
 
+  """
+  Removes a student document with its pages; the files are purged after the grace period. STUDENT_NOT_FOUND when the caller cannot see the document.
+  """
+  deleteStudentDocument(id: ID!): Boolean!
+
   """Soft-delete a subject. Returns true on success."""
   deleteSubject(id: ID!): Boolean!
   deleteSubjectTopic(id: ID!): Boolean!

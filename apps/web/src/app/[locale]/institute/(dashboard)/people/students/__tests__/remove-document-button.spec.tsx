@@ -153,4 +153,64 @@ describe('RemoveDocumentButton', () => {
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(message));
     expect(toastSuccess).not.toHaveBeenCalled();
   });
+
+  it('drops the card when the document was already removed elsewhere', async () => {
+    const user = userEvent.setup();
+    const refetched = vi.fn(() => ({ data: { listStudentDocuments: [] } }));
+    renderWithProviders(<DocumentsHarness />, {
+      apolloMocks: [
+        listMock([documentNode('doc-1', 'BIRTH_CERTIFICATE')]),
+        deleteMock({
+          errors: [new GraphQLError('gone', { extensions: { code: 'STUDENT_NOT_FOUND' } })],
+        }),
+        {
+          request: { query: STUDENT_DOCUMENTS_QUERY, variables: { studentProfileId: STUDENT } },
+          result: refetched,
+          delay: 0,
+        },
+      ],
+    });
+
+    await user.click(await screen.findByTestId(ids.detailDocumentRemoveBtn('doc-1')));
+    await user.click(await screen.findByTestId(ids.detailDocumentRemoveConfirmBtn));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(copy.notFound));
+    await waitFor(() =>
+      expect(screen.queryByTestId(ids.detailDocumentRemoveBtn('doc-1'))).not.toBeInTheDocument(),
+    );
+    expect(refetched).toHaveBeenCalledTimes(1);
+  });
+
+  // The document still exists after these, so the card stays for a retry.
+  it.each([
+    ['FORBIDDEN', copy.forbidden],
+    ['INTERNAL_SERVER_ERROR', copy.error],
+  ])('keeps the card without refetching after %s', async (code, message) => {
+    const user = userEvent.setup();
+    const refetched = vi.fn(() => ({ data: { listStudentDocuments: [] } }));
+    renderWithProviders(<DocumentsHarness />, {
+      apolloMocks: [
+        listMock([documentNode('doc-1', 'BIRTH_CERTIFICATE')]),
+        deleteMock({ errors: [new GraphQLError('raw server text', { extensions: { code } })] }),
+        {
+          request: { query: STUDENT_DOCUMENTS_QUERY, variables: { studentProfileId: STUDENT } },
+          result: refetched,
+          delay: 0,
+        },
+      ],
+    });
+
+    await user.click(await screen.findByTestId(ids.detailDocumentRemoveBtn('doc-1')));
+    await user.click(await screen.findByTestId(ids.detailDocumentRemoveConfirmBtn));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(message));
+
+    // A further round trip through the dialog gives a stray refetch time to land.
+    await user.click(screen.getByTestId(ids.detailDocumentRemoveBtn('doc-1')));
+    await user.click(await screen.findByTestId(ids.detailDocumentRemoveCancelBtn));
+    await waitFor(() =>
+      expect(screen.queryByTestId(ids.detailDocumentRemoveDialog)).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId(ids.detailDocumentRemoveBtn('doc-1'))).toBeInTheDocument();
+    expect(refetched).not.toHaveBeenCalled();
+  });
 });
