@@ -13,8 +13,8 @@ import { AdmissionType, Gender, SocialCategory } from '@roviq/common-types';
 export interface BulkStudentImportInput {
   /** Tenant (institute) this import targets */
   tenantId: string;
-  /** MinIO/S3 URL of the uploaded CSV file */
-  fileUrl: string;
+  /** READY file of purpose BULK_IMPORT_CSV holding the uploaded CSV */
+  fileId: string;
   /** Academic year for enrollment */
   academicYearId: string;
   /** Default standard (grade level) for all rows unless overridden per row */
@@ -99,8 +99,8 @@ export interface BatchInsertResult {
 
 /** Result from the generateReport activity */
 export interface ImportReportResult {
-  /** MinIO/S3 URL of the error CSV report */
-  reportUrl: string;
+  /** Stored error report (purpose BULK_IMPORT_REPORT) */
+  reportFileId: string;
 }
 
 // ── Workflow result / progress ─────────────────────────────
@@ -130,8 +130,8 @@ export interface BulkStudentImportResult {
   skipped: number;
   errorCount: number;
   errors: RowError[];
-  /** URL of the error report CSV (null if no errors) */
-  reportUrl: string | null;
+  /** File id of the error report CSV (null if no errors) */
+  reportFileId: string | null;
 }
 
 /** Progress update queryable via bulkImportProgress */
@@ -142,8 +142,8 @@ export interface BulkImportProgress {
   created: number;
   skipped: number;
   errorCount: number;
-  /** URL of the error report CSV — only populated when status = completed */
-  reportUrl: string | null;
+  /** File id of the error report CSV — only populated when status = completed */
+  reportFileId: string | null;
 }
 
 // ── Activities interface ──────────────────────────────────
@@ -151,10 +151,14 @@ export interface BulkImportProgress {
 /** Activities interface for proxyActivities in the workflow */
 export interface BulkStudentImportActivities {
   /**
-   * Download CSV from MinIO/S3, detect encoding, parse with Papaparse,
+   * Read the CSV from file storage, detect encoding, parse with Papaparse,
    * validate each row, apply field mapping, and return validated rows + errors.
    */
-  parseCsv(fileUrl: string, fieldMapping: Record<string, string>): Promise<ParseCsvResult>;
+  parseCsv(
+    tenantId: string,
+    fileId: string,
+    fieldMapping: Record<string, string>,
+  ): Promise<ParseCsvResult>;
 
   /**
    * Insert a batch of validated rows. For each row:
@@ -175,15 +179,32 @@ export interface BulkStudentImportActivities {
     rows: ValidatedRow[],
   ): Promise<BatchInsertResult>;
 
-  /**
-   * Generate an error CSV report and upload to MinIO/S3.
-   * Returns the URL of the uploaded report.
-   */
-  generateReport(
-    tenantId: string,
-    errors: RowError[],
-    totalRows: number,
-    created: number,
-    skipped: number,
-  ): Promise<ImportReportResult>;
+  /** Store the error report as a file. A retry writes the same `reportFileId` again. */
+  generateReport(params: GenerateReportParams): Promise<ImportReportResult>;
+}
+
+export interface GenerateReportParams {
+  tenantId: string;
+  /** Chosen by the workflow so that a retried activity does not create a second file. */
+  reportFileId: string;
+  /** The user who started the import; recorded as the report's uploader. */
+  createdBy: string;
+  errors: RowError[];
+  totalRows: number;
+  created: number;
+  skipped: number;
+}
+
+/** What the import activities need from file storage. */
+export interface ImportFileStore {
+  read(tenantId: string, fileId: string, purpose: 'BULK_IMPORT_CSV'): Promise<Buffer>;
+  put(write: {
+    tenantId: string;
+    fileId: string;
+    purpose: 'BULK_IMPORT_REPORT';
+    fileName: string;
+    contentType: 'text/csv';
+    body: Buffer;
+    createdBy: string;
+  }): Promise<void>;
 }

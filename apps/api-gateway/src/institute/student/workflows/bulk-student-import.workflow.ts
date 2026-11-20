@@ -2,14 +2,14 @@
  * BulkStudentImportWorkflow — Temporal workflow (ROV-155, PRD §7.1).
  *
  * Orchestrates CSV-based bulk student import:
- *   Step 1: Parse CSV (download from MinIO, detect encoding, validate rows)
+ *   Step 1: Parse CSV (read from file storage, detect encoding, validate rows)
  *   Step 2: Batch insert (50 rows per activity, with retry)
- *   Step 3: Generate report (error CSV uploaded to MinIO)
+ *   Step 3: Generate report (error CSV stored as a file)
  *
  * Task queue: student-bulk-import
  * Workflow timeout: 10 minutes
  */
-import { defineQuery, proxyActivities, setHandler } from '@temporalio/workflow';
+import { defineQuery, proxyActivities, setHandler, uuid4 } from '@temporalio/workflow';
 import type {
   BulkImportProgress,
   BulkStudentImportActivities,
@@ -36,7 +36,7 @@ export const bulkImportProgressQuery = defineQuery<BulkImportProgress>('bulkImpo
 export async function BulkStudentImportWorkflow(
   input: BulkStudentImportInput,
 ): Promise<BulkStudentImportResult> {
-  const { tenantId, fileUrl, academicYearId, standardId, sectionId, createdBy, fieldMapping } =
+  const { tenantId, fileId, academicYearId, standardId, sectionId, createdBy, fieldMapping } =
     input;
 
   // ── Mutable progress state (queryable) ─────────────────
@@ -47,7 +47,7 @@ export async function BulkStudentImportWorkflow(
     created: 0,
     skipped: 0,
     errorCount: 0,
-    reportUrl: null,
+    reportFileId: null,
   };
 
   setHandler(bulkImportProgressQuery, () => progress);
@@ -55,7 +55,7 @@ export async function BulkStudentImportWorkflow(
   // ── Step 1: Parse CSV ──────────────────────────────────
   progress = { ...progress, status: 'parsing' };
 
-  const parseResult = await activities.parseCsv(fileUrl, fieldMapping);
+  const parseResult = await activities.parseCsv(tenantId, fileId, fieldMapping);
   const allErrors: RowError[] = [...parseResult.errors];
 
   progress = {
@@ -99,19 +99,22 @@ export async function BulkStudentImportWorkflow(
   }
 
   // ── Step 3: Generate report ────────────────────────────
-  let reportUrl: string | null = null;
+  let reportFileId: string | null = null;
 
   if (allErrors.length > 0) {
     progress = { ...progress, status: 'generating_report' };
 
-    const reportResult = await activities.generateReport(
+    const reportResult = await activities.generateReport({
       tenantId,
-      allErrors,
-      parseResult.totalRows,
-      totalCreated,
-      totalSkipped,
-    );
-    reportUrl = reportResult.reportUrl;
+      // Deterministic in the workflow, so a retried activity overwrites the same file.
+      reportFileId: uuid4(),
+      createdBy,
+      errors: allErrors,
+      totalRows: parseResult.totalRows,
+      created: totalCreated,
+      skipped: totalSkipped,
+    });
+    reportFileId = reportResult.reportFileId;
   }
 
   // ── Complete ───────────────────────────────────────────
@@ -122,7 +125,7 @@ export async function BulkStudentImportWorkflow(
     created: totalCreated,
     skipped: totalSkipped,
     errorCount: allErrors.length,
-    reportUrl,
+    reportFileId,
   };
 
   return {
@@ -132,6 +135,6 @@ export async function BulkStudentImportWorkflow(
     skipped: totalSkipped,
     errorCount: allErrors.length,
     errors: allErrors,
-    reportUrl,
+    reportFileId,
   };
 }

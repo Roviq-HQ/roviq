@@ -309,6 +309,8 @@ services:
       S3_PUBLIC_BASE_URL: http://localhost:${E2E_STORAGE_PORT:-9004}/roviq-public
       # Embedded Temporal worker so approveApplication can reach ENROLLED in e2e.
       STUDENT_ADMISSION_WORKER_ENABLED: "true"
+      # Embedded Temporal worker so a bulk student import runs to completion in e2e.
+      STUDENT_IMPORT_WORKER_ENABLED: "true"
       # E2E-specific overrides
       API_GATEWAY_PORT: "3004"
       ALLOWED_ORIGINS: "http://localhost:${E2E_API_PORT:-3004},http://localhost:${E2E_WEB_PORT:-4201},http://admin.localhost:${E2E_WEB_PORT:-4201},http://reseller.localhost:${E2E_WEB_PORT:-4201}"

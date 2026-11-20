@@ -5,7 +5,10 @@ import { StudentResolver } from './student.resolver';
 import { StudentService } from './student.service';
 import { StudentAcademicResolver } from './student-academic.resolver';
 import { StudentAcademicService } from './student-academic.service';
-import { StudentBulkImportResolver } from './student-bulk-import.resolver';
+import {
+  BulkImportReportResolver,
+  StudentBulkImportResolver,
+} from './student-bulk-import.resolver';
 import { StudentBulkImportService } from './student-bulk-import.service';
 import { StudentEventHandler } from './student-event.handler';
 import { StudentQueryService } from './student-query.service';
@@ -24,6 +27,7 @@ import { BulkStudentImportWorkerService } from './workflows/bulk-student-import.
     StudentEventHandler,
     StudentBulkImportService,
     StudentBulkImportResolver,
+    BulkImportReportResolver,
     BulkStudentImportWorkerService,
   ],
   exports: [StudentService],
