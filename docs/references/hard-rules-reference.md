@@ -208,3 +208,56 @@ Invoke the matching project skill BEFORE the first Edit/Write to a file in its d
 When a single change spans multiple skill domains (e.g. a new service that ships a migration and an integration test), invoke each relevant skill. Don't batch a multi-domain change without consulting each skill's rules.
 
 ---
+
+## MODEL SPLIT
+
+### [MDLSP] Fable Plans, Reviews and Owns Security and Migrations; Opus Builds and Tests; Sonnet Does the Volume Work
+
+This rule applies when the session runs on a Fable model. The work is split across three models.
+
+Fable:
+- plans the work, splits it into tasks and reviews the results
+- writes, by its own hand, everything security-sensitive: authentication, permissions, RLS, anything that decides who can see or change data, and security findings
+- writes every database migration
+
+Opus 5.5 or newer (`Agent` tool with `model: "opus"`):
+- feature code and new tests
+- debugging when the cause is not known yet
+- the browser pass
+
+Sonnet (`Agent` tool with `model: "sonnet"`) does work that is large in volume, simple in shape, and has a clear "done":
+- searches and inventories ("find every caller of X")
+- reading logs and test output
+- mechanical edits after an API change
+- translation and message files
+- docs and write-ups from facts Fable supplies
+- test fixes that follow a signature change, with assertions left as strict as they were
+- lint fixes and type errors with one obvious fix
+
+For a one-line change, the brief costs more than the work. Give it to the model that is already working on that area.
+
+Why: Fable quota is limited. It is worth most on planning, review, and the work where a mistake is expensive: security and migrations. A second model that checks the work also catches mistakes the author misses. Sonnet saves quota on work that is easy to check.
+
+How to brief a subagent. Each brief is self-contained. It names:
+- the files the subagent may touch
+- the project rules that apply
+- how to verify the change
+- what to report
+
+A browser brief also names the instance URLs, the logins and every workflow the change can reach. It tells the subagent to drive each workflow to its end: the normal flow, boundary and forbidden cases, a refresh and an account switch. It tells the subagent to check the console, the network responses and the stored data. It asks the subagent to report every other anomaly it notices, related or not.
+
+How Fable reviews. Fable checks each result against the diff, the test output and the browser evidence. Fable re-runs the tests itself. If the subagent skipped a workflow, Fable sends it back to drive that workflow. Fable never reports a claim it has not checked. Sonnet's results get a closer review than Opus's.
+
+Limits:
+- Subagents do not commit, push, or run Tilt or database commands. The main session does.
+- A fork runs on the parent's model, so forks are not used for development.
+
+Anti-patterns to avoid:
+- Fable writes feature code or runs the browser pass itself
+- A subagent writes a migration, an RLS policy or a permission check
+- Sonnet gets a task that needs judgment: a new permission test, a bug with an unknown cause, the browser pass
+- A brief that says "fix the bug" with no files, rules or verification steps
+- A browser brief that names one happy-path click instead of every reachable workflow
+- Passing a subagent's report on to the user without checking it against the diff and the test output
+
+---
