@@ -818,3 +818,9 @@ In one full `pnpm test:e2e:ui` run in slot 4 (273 passed, 1 failed, 3 did not ru
 Resolves the entry of 2026-11-19 ("seen once, cause unconfirmed"). It happened a second time in a full `pnpm test:int` run in slot 4 (2 failed, 757 passed), again with `23503 … Key (reseller_id)=(…) is not present in table "resellers"`, and the file passed when run alone, which fits the suspected cause: the ROV-91 backfill statement inserts roles for every reseller in `roviq_test` while other test files create and delete resellers.
 
 Fix: the two backfill tests take `LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE` in their own (rolled back) transaction before running the migration statements, so concurrent reseller writes wait for the few milliseconds the test holds it. The migration itself is unchanged; in a real deployment it runs alone.
+
+## 2026-11-20 — seen once, cause unconfirmed: `seed/__tests__/e2e.integration.spec.ts` hook timed out during a cold pre-push gate
+
+On the first push of `parmody1/rov-301-student-documents` the gate's `int` step failed with `seedE2e > Hook timed out in 10000ms` (1 file failed, 67 passed); every other step passed. The spec passes alone with 2.7 s of test time, and the second push, run minutes later with no code change, passed `int` in 70 s.
+
+Likely cause, not proven: load. The first run was cold after new commits, so the integration step ran while the gate was still building the e2e images and starting the stack, and `seedE2e` in `beforeAll` has only the default 10 s. Not ruled out: waiting behind the `LOCK TABLE resellers` added to `reseller-system-roles.integration.spec.ts` the same day, although the e2e seed does not write to `resellers`. If it happens again, record how long `seedE2e` took and what else was running before raising the hook timeout.
