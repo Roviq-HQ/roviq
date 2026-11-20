@@ -23,7 +23,7 @@ export const tenantSequences = pgTable(
   {
     tenantId: uuid('tenant_id').notNull(),
     /** Identifies the counter, e.g. `adm_no`, `roll_no:{section}:{year}` */
-    sequenceName: varchar('sequence_name', { length: 80 }).notNull(),
+    sequenceName: varchar('sequence_name', { length: 120 }).notNull(),
     /** Last issued value — incremented atomically by `next_sequence_value()` */
     currentValue: bigint('current_value', { mode: 'bigint' }).default(0n).notNull(),
     /** Optional prefix prepended in the formatted output, e.g. `N-` */
