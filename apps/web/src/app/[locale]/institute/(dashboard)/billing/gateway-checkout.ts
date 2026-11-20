@@ -20,7 +20,11 @@ interface RazorpayOptions extends Record<string, unknown> {
 }
 
 interface CashfreeInstance {
-  checkout(options: { paymentSessionId: string; redirectTarget: '_self' }): Promise<unknown>;
+  // Resolves instead of rejecting when it cannot start the checkout.
+  checkout(options: {
+    paymentSessionId: string;
+    redirectTarget: '_self';
+  }): Promise<{ error?: { message?: string } } | undefined>;
 }
 
 declare global {
@@ -94,5 +98,8 @@ export async function redirectToCashfreeCheckout(payload: Record<string, unknown
   await loadScript(CASHFREE_SCRIPT);
   const Cashfree = window.Cashfree;
   if (!Cashfree) throw new CheckoutUnavailableError('Cashfree SDK did not load');
-  await Cashfree({ mode }).checkout({ paymentSessionId, redirectTarget: '_self' });
+  const result = await Cashfree({ mode }).checkout({ paymentSessionId, redirectTarget: '_self' });
+  if (result?.error) {
+    throw new CheckoutUnavailableError(result.error.message ?? 'Cashfree checkout did not open');
+  }
 }

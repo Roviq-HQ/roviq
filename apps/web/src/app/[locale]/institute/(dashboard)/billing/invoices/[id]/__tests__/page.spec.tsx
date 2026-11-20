@@ -70,6 +70,7 @@ vi.mock('../../../use-billing', () => ({
   useVerifyPayment: () => [state.verify, { loading: false }],
 }));
 
+import { CheckoutUnavailableError } from '../../../gateway-checkout';
 import InvoiceDetailPage from '../page';
 
 const RAZORPAY_ORDER = {
@@ -176,6 +177,30 @@ describe('InvoiceDetailPage', () => {
       }),
     );
     expect(state.openRazorpay).not.toHaveBeenCalled();
+  });
+
+  it('should let the payer try again when Cashfree checkout does not open', async () => {
+    state.initiate.mockResolvedValue({
+      data: {
+        initiatePayment: {
+          paymentId: 'pay-2',
+          gatewayOrderId: 'ord_1',
+          gatewayProvider: 'CASHFREE',
+          checkoutPayload: { paymentSessionId: 'session_1', mode: 'sandbox' },
+        },
+      },
+    });
+    state.redirectCashfree.mockRejectedValue(new CheckoutUnavailableError('session expired'));
+    renderWithProviders(<InvoiceDetailPage />);
+
+    await userEvent.click(screen.getByTestId(ids.payOnlineBtn));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'The payment window could not be opened. Check your internet connection and try again.',
+      ),
+    );
+    expect(screen.getByTestId(ids.payOnlineBtn)).toBeEnabled();
   });
 
   it('should confirm the order Cashfree returns the payer with', async () => {
