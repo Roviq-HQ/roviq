@@ -859,3 +859,12 @@ Likely cause, not proven: load. The first run was cold after new commits, so the
 - **Cause:** `reseller-system-roles.integration.spec.ts` took `LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE` (added earlier the same day) after its transaction had already created a reseller and its roles. A concurrent `seedEssential` held a row lock on `resellers` and waited for one of those role rows, while the test waited for the table lock: a lock-order cycle.
 - **Fix:** the backfill tests run in `inBackfillTx`, which takes the table lock as the transaction's first statement, before any row is written.
 - **Lesson:** a `LOCK TABLE` in a test transaction must come first; taking it after the transaction holds row locks trades a foreign-key race for a deadlock.
+
+## 2026-11-20 — fixed: `seedE2e` hook timeout in the pre-push `int` step (second occurrence)
+
+Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `parmody1/rov-291-fix-verifypayment-for-institutes-it` the `int` step failed again with `seedE2e > Hook timed out in 10000ms` (67 of 68 files passed). The load average was 25 during the run; alone the spec passes with 2.2 s of test time.
+
+- **Correction:** the earlier entry said the e2e seed does not write to `resellers`. It does: `seedE2e` → `seedDemo` → `seedEssential` upserts the Roviq Direct reseller. So it waits, as intended, while `reseller-system-roles.integration.spec.ts` holds `LOCK TABLE resellers` for a backfill test (since the deadlock fix of the same day, for that test's whole transaction).
+- **Cause:** the full demo seed plus that legitimate wait, on a loaded machine, takes longer than the 10 s default hook timeout.
+- **Fix:** the four seed specs pass `SEED_HOOK_TIMEOUT_MS` (60 s, in `seed-test-helpers.ts`) to their seeding `beforeAll`. Test timeouts are unchanged.
+- **Lesson:** a test that takes a table lock makes every writer of that table wait; size the hook timeouts of those writers for it.

@@ -8,7 +8,7 @@ import {
 } from '../../schema';
 import { seedE2e } from '../e2e';
 import { SEED_IDS } from '../ids';
-import { makeSeedTestDb } from './seed-test-helpers';
+import { makeSeedTestDb, SEED_HOOK_TIMEOUT_MS } from './seed-test-helpers';
 
 const SEEDED_STUDENT_PROFILE_IDS = [
   SEED_IDS.STUDENT_PROFILE_1,
@@ -45,7 +45,7 @@ describe('seedE2e', () => {
 
   beforeAll(async () => {
     await seedE2e(db);
-  });
+  }, SEED_HOOK_TIMEOUT_MS);
 
   it('creates the seed-owned student_profiles in Institute 1', async () => {
     const rows = await db

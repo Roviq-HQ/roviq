@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resellers, roles, users } from '../../schema';
 import { seedEssential } from '../essential';
 import { SEED_IDS } from '../ids';
-import { makeSeedTestDb } from './seed-test-helpers';
+import { makeSeedTestDb, SEED_HOOK_TIMEOUT_MS } from './seed-test-helpers';
 
 describe('seedEssential', () => {
   const { pool, db } = makeSeedTestDb();
@@ -13,7 +13,7 @@ describe('seedEssential', () => {
 
   beforeAll(async () => {
     await seedEssential(db);
-  });
+  }, SEED_HOOK_TIMEOUT_MS);
 
   it('creates the system user', async () => {
     const rows = await db
