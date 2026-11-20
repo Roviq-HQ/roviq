@@ -179,6 +179,16 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     // Checked against the very student the document belongs to, see FileService.canRead.
     readAbility: { action: 'read', subject: 'Student' },
   },
+  STAFF_CERTIFICATE: {
+    visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
+    allowedContentTypes: DOCUMENT_TYPES,
+    maxSizeBytes: 10 * MB,
+    sensitive: false,
+    image: DOCUMENT_IMAGE,
+    uploadAbility: { action: 'update', subject: 'Staff' },
+    readAbility: { action: 'read', subject: 'Staff' },
+  },
 };
 
 const EXTENSION: { readonly [T in FileContentType]: string } = {

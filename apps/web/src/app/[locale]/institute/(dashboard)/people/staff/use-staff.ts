@@ -135,7 +135,12 @@ const STAFF_QUALIFICATIONS_QUERY = gql`
       boardUniversity
       yearOfPassing
       gradePercentage
-      certificateUrl
+      certificate {
+        id
+        name
+        contentType
+        url
+      }
       createdAt
     }
   }
@@ -162,7 +167,12 @@ const CREATE_STAFF_QUALIFICATION = gql`
       boardUniversity
       yearOfPassing
       gradePercentage
-      certificateUrl
+      certificate {
+        id
+        name
+        contentType
+        url
+      }
       createdAt
     }
   }
@@ -188,7 +198,12 @@ const UPDATE_STAFF_QUALIFICATION = gql`
       boardUniversity
       yearOfPassing
       gradePercentage
-      certificateUrl
+      certificate {
+        id
+        name
+        contentType
+        url
+      }
       createdAt
     }
   }

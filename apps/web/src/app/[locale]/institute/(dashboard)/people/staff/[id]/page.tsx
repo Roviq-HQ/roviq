@@ -1,5 +1,6 @@
 'use client';
 
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import type { EmploymentType, SocialCategory as GqlSocialCategory } from '@roviq/graphql/generated';
 import {
   buildI18nTextOptionalSchema,
@@ -59,6 +60,8 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
+import { FileUpload } from '@web/components/file-upload/file-upload';
+import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload';
 import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
 import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
@@ -69,6 +72,7 @@ import {
   Briefcase,
   CalendarClock,
   CalendarDays,
+  FileText,
   GraduationCap,
   History,
   LayersIcon,
@@ -785,6 +789,19 @@ function QualificationsTab({ staffProfileId }: { staffProfileId: string }) {
                     ) : null}
                     {q.gradePercentage ? <span>{q.gradePercentage}</span> : null}
                   </div>
+                  {q.certificate?.url ? (
+                    <Button variant="outline" size="sm" asChild className="mt-1 print:hidden">
+                      <a
+                        href={q.certificate.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={instituteStaff.qualificationCertificateLink(q.id)}
+                      >
+                        <FileText aria-hidden="true" className="size-3" />
+                        {t('detail.qualifications.certificate.view')}
+                      </a>
+                    </Button>
+                  ) : null}
                 </div>
                 <Can I="update" a="Staff">
                   <div className="flex items-center gap-1">
@@ -905,9 +922,14 @@ function QualificationDialog({
   editing: StaffQualificationNode | null;
 }) {
   const t = useTranslations('staff');
+  const tFiles = useTranslations('fileUpload');
   const [createQual, { loading: creating }] = useCreateStaffQualification();
   const [updateQual, { loading: updating }] = useUpdateStaffQualification();
   const loading = creating || updating;
+  // Undefined keeps the stored scan, null removes it, an id replaces it.
+  const [certificateFileId, setCertificateFileId] = React.useState<string | null | undefined>();
+  const [uploading, setUploading] = React.useState(false);
+  const keptCertificate = certificateFileId === undefined ? (editing?.certificate ?? null) : null;
 
   const buildDefaults = React.useCallback(
     (): QualificationFormValues =>
@@ -944,6 +966,7 @@ function QualificationDialog({
                 boardUniversity: parsed.boardUniversity || undefined,
                 yearOfPassing: parsed.yearOfPassing,
                 gradePercentage: parsed.gradePercentage || undefined,
+                certificateFileId,
               },
             },
           });
@@ -959,6 +982,7 @@ function QualificationDialog({
                 boardUniversity: parsed.boardUniversity || undefined,
                 yearOfPassing: parsed.yearOfPassing,
                 gradePercentage: parsed.gradePercentage || undefined,
+                certificateFileId: certificateFileId ?? undefined,
               },
             },
           });
@@ -966,7 +990,12 @@ function QualificationDialog({
         }
         onOpenChange(false);
       } catch (err) {
-        toast.error((err as Error).message);
+        const fileError = fileUploadErrorKey(extractGraphQLErrorCode(err));
+        toast.error(
+          fileError
+            ? tFiles(`errors.${fileError}`, { count: 1 })
+            : t('detail.qualifications.saveError'),
+        );
       }
     },
   });
@@ -978,6 +1007,7 @@ function QualificationDialog({
   React.useEffect(() => {
     if (open) {
       form.reset(buildDefaults(), { keepDefaultValues: true });
+      setCertificateFileId(undefined);
     }
   }, [open, buildDefaults, form]);
 
@@ -1063,6 +1093,40 @@ function QualificationDialog({
                 )}
               </form.AppField>
             </div>
+            {keptCertificate ? (
+              <div
+                className="flex items-center justify-between gap-3 rounded-md border p-3"
+                data-testid={instituteStaff.qualificationCurrentCertificate}
+              >
+                <span className="flex min-w-0 items-center gap-2 text-sm">
+                  <FileText aria-hidden="true" className="size-4 shrink-0" />
+                  <span className="truncate">{keptCertificate.name}</span>
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCertificateFileId(null)}
+                  title={t('detail.qualifications.certificate.remove')}
+                  data-testid={instituteStaff.qualificationRemoveCertificateBtn}
+                >
+                  {t('detail.qualifications.certificate.remove')}
+                </Button>
+              </div>
+            ) : (
+              <FileUpload
+                // Remounted with the dialog so a closed dialog forgets its upload.
+                key={`${String(open)}-${editing?.id ?? 'new'}`}
+                name="staff-certificate"
+                purpose="STAFF_CERTIFICATE"
+                label={t('detail.qualifications.certificate.label')}
+                description={t('detail.qualifications.certificate.hint')}
+                onChange={(fileIds) =>
+                  setCertificateFileId(fileIds[0] ?? (editing?.certificate ? null : undefined))
+                }
+                onBusyChange={setUploading}
+              />
+            )}
           </FieldGroup>
           <DialogFooter>
             <Button
@@ -1077,7 +1141,7 @@ function QualificationDialog({
             </Button>
             <form.AppForm>
               <form.SubmitButton
-                disabled={loading}
+                disabled={loading || uploading}
                 submittingLabel={t('detail.qualifications.saving')}
                 className="min-h-11"
                 testId="staff-qualification-save-btn"

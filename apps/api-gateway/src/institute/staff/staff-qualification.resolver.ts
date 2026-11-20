@@ -1,7 +1,10 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import { FileLoaders } from '../../files/file.loaders';
+import { FileRefModel } from '../../files/models/file-ref.model';
+import type { FileRecord } from '../../files/repositories/types';
 import { CreateStaffQualificationInput } from './dto/create-staff-qualification.input';
 import { UpdateStaffQualificationInput } from './dto/update-staff-qualification.input';
 import { StaffQualificationModel } from './models/staff-qualification.model';
@@ -16,7 +19,20 @@ import { StaffQualificationService } from './staff-qualification.service';
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
 @Resolver(() => StaffQualificationModel)
 export class StaffQualificationResolver {
-  constructor(private readonly service: StaffQualificationService) {}
+  constructor(
+    private readonly service: StaffQualificationService,
+    private readonly loaders: FileLoaders,
+  ) {}
+
+  @ResolveField(() => FileRefModel, {
+    nullable: true,
+    description: 'Scan of the certificate. For an image, ask for `url(variant: MD)` to preview.',
+  })
+  certificate(@Parent() qualification: StaffQualificationModel): Promise<FileRecord | null> {
+    return qualification.certificateFileId
+      ? this.loaders.readyById.load(qualification.certificateFileId)
+      : Promise.resolve(null);
+  }
 
   @Query(() => [StaffQualificationModel], {
     description: 'List qualifications for a given staff profile',

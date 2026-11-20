@@ -1,6 +1,6 @@
-import { Field, InputType, Int } from '@nestjs/graphql';
+import { Field, ID, InputType, Int } from '@nestjs/graphql';
 import { QualificationType } from '@roviq/common-types';
-import { IsEnum, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * Input for editing an existing staff qualification record. Every field is
@@ -61,11 +61,12 @@ export class UpdateStaffQualificationInput {
   @MaxLength(20)
   gradePercentage?: string;
 
-  @Field(() => String, {
+  @Field(() => ID, {
     nullable: true,
-    description: 'MinIO/S3 URL of the uploaded certificate scan.',
+    description:
+      'File id of a new certificate scan (purpose STAFF_CERTIFICATE). Null removes the scan; leave out to keep it.',
   })
   @IsOptional()
-  @IsUrl()
-  certificateUrl?: string;
+  @IsUUID()
+  certificateFileId?: string | null;
 }

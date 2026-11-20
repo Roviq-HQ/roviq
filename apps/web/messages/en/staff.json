@@ -254,6 +254,13 @@
       "validation": {
         "degreeNameRequired": "Degree name is required",
         "yearInvalid": "Enter a valid year"
+      },
+      "saveError": "Could not save the qualification. Try again.",
+      "certificate": {
+        "label": "Certificate scan",
+        "hint": "Optional. A scan or photo of the degree or certificate.",
+        "view": "View certificate",
+        "remove": "Remove"
       }
     },
     "assignedSections": {
