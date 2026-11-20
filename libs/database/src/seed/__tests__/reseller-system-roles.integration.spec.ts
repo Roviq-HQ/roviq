@@ -111,6 +111,14 @@ describe('ROV-91 reseller role backfill migration', () => {
     .split('--> statement-breakpoint')
     .map((statement) => statement.trim());
 
+  // The backfill touches every reseller in the database, and other test files create and delete
+  // theirs meanwhile; one deleted mid-statement fails the roles foreign key. The lock makes
+  // those writes wait until this transaction rolls back.
+  async function runBackfill(tx: DrizzleDB): Promise<void> {
+    await tx.execute(sql`LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE`);
+    for (const statement of statements) await tx.execute(sql.raw(statement));
+  }
+
   it('should move a membership off the shared Roviq Direct role onto the reseller own copy', async () => {
     await inRolledBackTx(async (tx) => {
       const resellerId = await createReseller(tx, 'rov-91-backfill');
@@ -133,7 +141,7 @@ describe('ROV-91 reseller role backfill migration', () => {
         updatedBy: SYSTEM_USER_ID,
       });
 
-      for (const statement of statements) await tx.execute(sql.raw(statement));
+      await runBackfill(tx);
 
       const ownRoles = await resellerRoles(tx, resellerId);
       expect(ownRoles.map((r) => r.name.en)).toEqual([
@@ -156,7 +164,7 @@ describe('ROV-91 reseller role backfill migration', () => {
       const resellerId = await createReseller(tx, 'rov-91-backfill-noop');
       const ids = await provisionResellerSystemRoles(tx, resellerId, SYSTEM_USER_ID);
 
-      for (const statement of statements) await tx.execute(sql.raw(statement));
+      await runBackfill(tx);
 
       const ownRoles = await resellerRoles(tx, resellerId);
       expect(ownRoles.map((r) => r.id)).toEqual([
