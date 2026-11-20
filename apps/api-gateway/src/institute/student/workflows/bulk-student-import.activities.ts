@@ -46,23 +46,21 @@ const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
 /** Accepted date formats: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY */
 function parseDate(value: string): string | null {
   const trimmed = value.trim();
-
-  // YYYY-MM-DD (ISO)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    const d = new Date(trimmed);
-    if (!Number.isNaN(d.getTime())) return trimmed;
-  }
-
-  // DD/MM/YYYY or DD-MM-YYYY
-  const match = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (match) {
-    const [, day, month, year] = match;
-    const iso = `${year}-${month}-${day}`;
-    const d = new Date(iso);
-    if (!Number.isNaN(d.getTime())) return iso;
-  }
-
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return calendarDate(iso[1], iso[2], iso[3]);
+  const dmy = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+  if (dmy) return calendarDate(dmy[3], dmy[2], dmy[1]);
   return null;
+}
+
+// `new Date('2014-02-31')` rolls over to 3 March instead of failing, so the parts must survive the round trip.
+function calendarDate(year: string, month: string, day: string): string | null {
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  const valid =
+    date.getUTCFullYear() === Number(year) &&
+    date.getUTCMonth() === Number(month) - 1 &&
+    date.getUTCDate() === Number(day);
+  return valid ? `${year}-${month}-${day}` : null;
 }
 
 const VALID_GENDERS = new Set(['MALE', 'FEMALE', 'OTHER']);
