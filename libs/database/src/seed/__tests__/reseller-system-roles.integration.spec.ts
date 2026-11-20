@@ -113,14 +113,21 @@ describe('ROV-91 reseller role backfill migration', () => {
 
   // The backfill touches every reseller in the database, and other test files create and delete
   // theirs meanwhile; one deleted mid-statement fails the roles foreign key. The lock makes
-  // those writes wait until this transaction rolls back.
+  // those writes wait until this transaction rolls back. It is taken before the test writes
+  // anything: locking after this transaction holds row locks deadlocks with a concurrent seed.
+  async function inBackfillTx(fn: (tx: DrizzleDB) => Promise<void>): Promise<void> {
+    await inRolledBackTx(async (tx) => {
+      await tx.execute(sql`LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE`);
+      await fn(tx);
+    });
+  }
+
   async function runBackfill(tx: DrizzleDB): Promise<void> {
-    await tx.execute(sql`LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE`);
     for (const statement of statements) await tx.execute(sql.raw(statement));
   }
 
   it('should move a membership off the shared Roviq Direct role onto the reseller own copy', async () => {
-    await inRolledBackTx(async (tx) => {
+    await inBackfillTx(async (tx) => {
       const resellerId = await createReseller(tx, 'rov-91-backfill');
       const [user] = await tx
         .insert(users)
@@ -160,7 +167,7 @@ describe('ROV-91 reseller role backfill migration', () => {
   });
 
   it('should not add roles to a reseller that already has its own copies', async () => {
-    await inRolledBackTx(async (tx) => {
+    await inBackfillTx(async (tx) => {
       const resellerId = await createReseller(tx, 'rov-91-backfill-noop');
       const ids = await provisionResellerSystemRoles(tx, resellerId, SYSTEM_USER_ID);
 

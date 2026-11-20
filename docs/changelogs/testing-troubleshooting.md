@@ -852,3 +852,10 @@ Likely cause, not proven: load. The first run was cold after new commits, so the
 - **Fix:** `pnpm db:reset --test`, then the run passed.
 - **Lesson:** after pulling a change that renames or reorders migration folders, reset `roviq_test`. Compare `select name from drizzle.__drizzle_migrations` with `ls libs/database/migrations` to confirm.
 
+
+## 2026-11-20 — fixed: integration deadlock between `seedEssential` and the ROV-91 backfill test
+
+- **Symptom:** the pre-push `int` step failed with `deadlock detected` (40P01) in `seed/__tests__/essential.integration.spec.ts` while inserting `roles`; the other process waited for `ShareRowExclusiveLock` on `resellers`. A reseller-team test failed in the same run. Neither touched the code under test (ROV-291).
+- **Cause:** `reseller-system-roles.integration.spec.ts` took `LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE` (added earlier the same day) after its transaction had already created a reseller and its roles. A concurrent `seedEssential` held a row lock on `resellers` and waited for one of those role rows, while the test waited for the table lock: a lock-order cycle.
+- **Fix:** the backfill tests run in `inBackfillTx`, which takes the table lock as the transaction's first statement, before any row is written.
+- **Lesson:** a `LOCK TABLE` in a test transaction must come first; taking it after the transaction holds row locks trades a foreign-key race for a deadlock.
