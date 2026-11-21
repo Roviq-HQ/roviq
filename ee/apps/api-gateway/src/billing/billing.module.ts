@@ -3,6 +3,8 @@ import { SUBSCRIPTION_READER } from '@roviq/common-types';
 import { PaymentsModule } from '@roviq/ee-payments';
 import './billing.enums';
 import { AdminBillingResolver } from './admin/admin-billing.resolver';
+import { BillingRepository } from './billing.repository';
+import { BillingService } from './billing.service';
 import { BillingEventConsumer } from './billing-event.consumer';
 import {
   InstituteBillingSubscriptions,
@@ -35,11 +37,13 @@ import { BillingWorkerService } from './workflows/billing.worker';
   imports: [PaymentsModule],
   controllers: [RazorpayWebhookController, CashfreeWebhookController],
   providers: [
+    BillingRepository,
     PlanRepository,
     SubscriptionRepository,
     InvoiceRepository,
     PaymentRepository,
     GatewayConfigRepository,
+    BillingService,
     PlanService,
     SubscriptionService,
     InvoiceService,
