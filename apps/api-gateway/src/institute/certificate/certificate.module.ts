@@ -14,9 +14,7 @@ import { CertificateDrizzleRepository } from './repositories/certificate.drizzle
 import { CertificateRepository } from './repositories/certificate.repository';
 import { TcDrizzleRepository } from './repositories/tc.drizzle-repository';
 import { TcRepository } from './repositories/tc.repository';
-import { TcVerificationRepository } from './repositories/tc-verification.repository';
 import { TCResolver } from './tc.resolver';
-import { TcVerificationResolver } from './tc-verification.resolver';
 import { TCIssuanceWorkerService } from './workflows/tc-issuance.worker';
 
 @Module({
@@ -33,8 +31,6 @@ import { TCIssuanceWorkerService } from './workflows/tc-issuance.worker';
     CertificateService,
     TcPdfResolver,
     CertificatePdfResolver,
-    TcVerificationRepository,
-    TcVerificationResolver,
     TCResolver,
     CertificateResolver,
     ComplianceExportResolver,

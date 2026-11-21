@@ -82,13 +82,3 @@ export interface InstituteLetterheadRow {
   affiliationNumber: string | null;
   logoFileId: string | null;
 }
-
-/** What the public verification page may show for a token. */
-export interface TcVerificationRow {
-  serialNumber: string;
-  status: TcStatus;
-  studentName: string | null;
-  instituteName: I18nContent;
-  issuedOn: string | null;
-  isDuplicate: boolean;
-}

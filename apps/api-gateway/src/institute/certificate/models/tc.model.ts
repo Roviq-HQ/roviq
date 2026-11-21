@@ -137,24 +137,3 @@ export class CertificateModel {
   @Field(() => DateTimeScalar)
   createdAt!: Date;
 }
-
-@ObjectType({ description: 'What the public verification page shows for a TC' })
-export class TcVerificationModel {
-  @Field()
-  serialNumber!: string;
-
-  @Field(() => Boolean, { description: 'False when the TC was cancelled or is not issued' })
-  isValid!: boolean;
-
-  @Field(() => String, { nullable: true })
-  studentName!: string | null;
-
-  @Field(() => I18nTextScalar, { description: 'Institute name by locale' })
-  instituteName!: Record<string, string>;
-
-  @Field(() => String, { nullable: true, description: 'Issue date, YYYY-MM-DD' })
-  issuedOn!: string | null;
-
-  @Field(() => Boolean)
-  isDuplicate!: boolean;
-}
