@@ -42,6 +42,7 @@ function createMocks() {
   const invoiceService = {
     markPaid: vi.fn(),
     markRefunded: vi.fn(),
+    markPaymentReversed: vi.fn(),
     generateInvoice: vi.fn(),
   };
   const subscriptionRepo = {
@@ -140,7 +141,11 @@ describe('UPI P2P Integration — Full Lifecycle', () => {
             status: 'OVERDUE',
           })
           // After reject, invoice status reverted
-          .mockResolvedValueOnce({ id: INVOICE_ID, status: 'OVERDUE' });
+          .mockResolvedValueOnce({
+            id: INVOICE_ID,
+            status: 'OVERDUE',
+            dueAt: new Date('2020-01-01T00:00:00.000Z'),
+          });
 
         paymentRepo.findByUtrNumber.mockResolvedValue(null);
         paymentRepo.create.mockResolvedValue({
@@ -180,7 +185,12 @@ describe('UPI P2P Integration — Full Lifecycle', () => {
         await service.rejectUpiPayment(RESELLER_ID, 'pay-1', 'UTR not found in bank statement');
 
         // Invoice reversed
-        expect(invoiceService.markRefunded).toHaveBeenCalledWith(RESELLER_ID, INVOICE_ID, 118000n);
+        expect(invoiceService.markPaymentReversed).toHaveBeenCalledWith(
+          RESELLER_ID,
+          INVOICE_ID,
+          118000n,
+        );
+        expect(invoiceService.markRefunded).not.toHaveBeenCalled();
         // Subscription reverted to PAST_DUE
         expect(subscriptionRepo.update).toHaveBeenCalledWith(RESELLER_ID, 'sub-1', {
           status: 'PAST_DUE',
@@ -278,7 +288,7 @@ describe('UPI P2P Integration — Full Lifecycle', () => {
 
     it('should not revert subscription if invoice is still PAID after reject', () =>
       requestContext.run(TEST_CTX, async () => {
-        const { service, paymentRepo, invoiceRepo, subscriptionRepo } = ctx;
+        const { service, paymentRepo, invoiceRepo, invoiceService, subscriptionRepo } = ctx;
         paymentRepo.findById.mockResolvedValue({
           id: 'pay-1',
           invoiceId: INVOICE_ID,
@@ -292,6 +302,11 @@ describe('UPI P2P Integration — Full Lifecycle', () => {
 
         await service.rejectUpiPayment(RESELLER_ID, 'pay-1', 'Not found');
 
+        expect(invoiceService.markPaymentReversed).toHaveBeenCalledWith(
+          RESELLER_ID,
+          INVOICE_ID,
+          50000n,
+        );
         // Subscription should NOT be reverted since invoice is still paid
         expect(subscriptionRepo.update).not.toHaveBeenCalled();
       }));

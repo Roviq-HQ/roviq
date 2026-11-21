@@ -1083,6 +1083,37 @@ enum BillingInterval {
   SEMI_ANNUAL
 }
 
+"""
+An invoice was generated. Carries ids only: refetch the invoice to read it.
+"""
+type BillingInvoiceEvent {
+  invoiceId: ID!
+
+  """Institute the invoice was raised for"""
+  tenantId: ID!
+}
+
+"""
+A payment was received or changed state (UPI proof submitted, verified, rejected, refunded). Carries ids only: refetch the payment or its invoice.
+"""
+type BillingPaymentEvent {
+  invoiceId: ID!
+  paymentId: ID!
+
+  """Institute that owes the invoice"""
+  tenantId: ID!
+}
+
+"""
+A subscription changed (created, paused, resumed, cancelled, expired or moved to another plan). Carries ids only: refetch the subscription to read its new state.
+"""
+type BillingSubscriptionEvent {
+  subscriptionId: ID!
+
+  """Institute the subscription belongs to"""
+  tenantId: ID!
+}
+
 enum BoardType {
   BSEH
   CBSE
@@ -6415,14 +6446,33 @@ type Subscription {
   instituteConfigUpdated: InstituteModel!
   instituteSetupProgress: JSON!
   instituteUpdated: InstituteModel!
-  myInvoiceGenerated: InvoiceModel!
-  myPaymentStatusChanged: PaymentModel!
-  mySubscriptionStatusChanged: SubscriptionModel!
+
+  """Fires when an invoice is raised for this institute"""
+  myInvoiceGenerated: BillingInvoiceEvent!
+
+  """
+  Fires when one of this institute's payments is received or changes state
+  """
+  myPaymentStatusChanged: BillingPaymentEvent!
+
+  """Fires when this institute's subscription changes"""
+  mySubscriptionStatusChanged: BillingSubscriptionEvent!
   resellerInstituteCreated: InstituteModel!
   resellerInstituteStatusChanged: InstituteModel!
-  resellerInvoiceGenerated: InvoiceModel!
-  resellerPaymentReceived: PaymentModel!
-  resellerSubscriptionChanged: SubscriptionModel!
+
+  """Fires when an invoice is raised for one of this reseller's institutes"""
+  resellerInvoiceGenerated: BillingInvoiceEvent!
+
+  """Fires when money is captured or recorded against an invoice"""
+  resellerPaymentReceived: BillingPaymentEvent!
+
+  """
+  Fires on every payment change, including a UPI proof waiting for verification, a rejection and a refund
+  """
+  resellerPaymentStatusChanged: BillingPaymentEvent!
+
+  """Fires when a subscription of one of this reseller's institutes changes"""
+  resellerSubscriptionChanged: BillingSubscriptionEvent!
   studentUpdated(studentId: ID!): StudentModel!
   studentsInTenantUpdated: StudentModel!
 }

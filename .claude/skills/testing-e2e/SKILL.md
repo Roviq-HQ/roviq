@@ -128,7 +128,7 @@ Real subscription names (spot-checked against `@Subscription(` in `apps/` and `e
 - Reseller scope: `resellerInstituteCreated`, `resellerInstituteStatusChanged`
 - Platform scope: `adminInstituteApprovalRequested`, `adminInstituteCreated`
 - Billing (institute): `mySubscriptionStatusChanged`, `myInvoiceGenerated`, `myPaymentStatusChanged`
-- Billing (reseller): `resellerInvoiceGenerated`, `resellerPaymentReceived`, `resellerSubscriptionChanged`
+- Billing (reseller): `resellerInvoiceGenerated`, `resellerPaymentReceived`, `resellerPaymentStatusChanged`, `resellerSubscriptionChanged` (payload is ids only, e.g. `{ invoiceId tenantId }`; see `billing-realtime.api-e2e.spec.ts`)
 
 ```typescript
 import { subscribeOnce } from './helpers/ws-client';

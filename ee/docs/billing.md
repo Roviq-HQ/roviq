@@ -13,11 +13,12 @@ ee/libs/backend/payments/            # @roviq/ee-payments — provider-agnostic 
 
 | File | Purpose |
 |------|---------|
-| `billing.module.ts` | Wires BillingRepository, BillingService, BillingResolver, WebhookController; imports PaymentsModule + NATS client |
-| `billing.service.ts` | All business logic — plan CRUD, subscription lifecycle, invoice creation, webhook processing |
-| `billing.repository.ts` | Drizzle queries via `withAdmin()`; all operations run through RLS |
-| `billing.resolver.ts` | Code-first GraphQL resolver — thin, delegates to service |
-| `webhook.controller.ts` | REST `POST /webhooks/razorpay` and `POST /webhooks/cashfree` — verifies signatures, delegates to service |
+| `billing.module.ts` | Wires the repositories, services, resolvers and webhook controllers; imports PaymentsModule |
+| `reseller/*.service.ts` | Business logic per area: plans, subscriptions, invoices, payments, gateway configs, dashboard |
+| `repositories/` | Drizzle queries through `withReseller()` / `withTenant()`; every read and write runs under RLS |
+| `reseller/`, `institute/`, `admin/` resolvers | Code-first GraphQL resolvers per scope — thin, delegate to the services |
+| `billing-subscriptions.resolver.ts` | GraphQL subscriptions (realtime), see "Realtime" below |
+| `webhook/` | REST `POST /webhooks/razorpay/:resellerId` and `POST /webhooks/cashfree/:resellerId` — verify signatures, delegate to `PaymentService` |
 | `dto/` | GraphQL input types with `class-validator` decorators |
 | `models/` | GraphQL object types (code-first) |
 
@@ -116,6 +117,22 @@ All state changes emit NATS events via `ClientProxy`:
 - `billing.plan.created`, `billing.plan.updated`
 - `billing.subscription.created`, `.canceled`, `.paused`, `.resumed`
 - `billing.webhook.{provider}`
+
+## Realtime
+
+GraphQL subscriptions in `billing-subscriptions.resolver.ts`. Each event carries ids only; the client refetches what it shows.
+
+| Scope | Subscription | Fires on | Payload |
+|-------|--------------|----------|---------|
+| institute | `mySubscriptionStatusChanged` | any change to the institute's subscription | `subscriptionId`, `tenantId` |
+| institute | `myInvoiceGenerated` | an invoice raised for the institute | `invoiceId`, `tenantId` |
+| institute | `myPaymentStatusChanged` | any change to one of its payments | `paymentId`, `invoiceId`, `tenantId` |
+| reseller | `resellerInvoiceGenerated` | an invoice raised for one of its institutes | `invoiceId`, `tenantId` |
+| reseller | `resellerPaymentReceived` | money captured or recorded | `paymentId`, `invoiceId`, `tenantId` |
+| reseller | `resellerPaymentStatusChanged` | every payment change, including a UPI proof waiting for verification | `paymentId`, `invoiceId`, `tenantId` |
+| reseller | `resellerSubscriptionChanged` | any change to a subscription of one of its institutes | `subscriptionId`, `tenantId` |
+
+Delivery is filtered on the `tenantId` / `resellerId` inside the event, so the event schemas in `event-schemas.ts` require both ids on `BILLING.subscription.status_changed`, `BILLING.payment.status_changed`, `BILLING.payment.succeeded` and `BILLING.invoice.generated`. An event without them is delivered to nobody.
 
 ## Environment Variables
 
