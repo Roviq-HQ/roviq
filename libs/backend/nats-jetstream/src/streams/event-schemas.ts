@@ -361,6 +361,7 @@ const NOTIFICATION_SCHEMAS = {
       .object({
         otp: z.string().optional(),
         recipientPhone: z.string().optional(),
+        recipientEmail: z.string().optional(),
         purpose: z.string().optional(),
       })
       .catchall(z.unknown()),

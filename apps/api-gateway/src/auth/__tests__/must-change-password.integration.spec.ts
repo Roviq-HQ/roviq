@@ -214,6 +214,46 @@ describe('First-login password change (integration)', () => {
     expect(await mustChange()).toBe(false);
   });
 
+  it('ends the access tokens issued before a password change, on their next request', async () => {
+    // Its own account: the tests above leave the shared ones in different states.
+    const account = await createTestInstitute(result.db);
+    await flag(account.userId);
+    const signIn = async (password: string) => {
+      const res = await gqlRequest<{ instituteLogin: { accessToken: string } }>(result.httpServer, {
+        query:
+          'mutation ($u: String!, $p: String!) { instituteLogin(username: $u, password: $p) { accessToken } }',
+        variables: { u: account.username, p: password },
+      });
+      expect(res.errors).toBeUndefined();
+      const token = res.data?.instituteLogin.accessToken;
+      if (!token) throw new Error('institute login failed');
+      return token;
+    };
+    const before = await signIn(TEMP_PASSWORD);
+    const other = await signIn(TEMP_PASSWORD);
+    const stillValid = await gqlRequest(result.httpServer, { query: ME, token: other });
+    expect(stillValid.errors).toBeUndefined();
+
+    const next = 'Changed-Password-2026';
+    const changed = await gqlRequest(result.httpServer, {
+      query: CHANGE_PASSWORD,
+      variables: { c: TEMP_PASSWORD, n: next },
+      token: before,
+    });
+    expect(changed.errors).toBeUndefined();
+
+    // Both tokens were signed before the change and have minutes of lifetime left.
+    for (const stale of [before, other]) {
+      const res = await gqlRequest(result.httpServer, { query: ME, token: stale });
+      expect(res.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
+      expect(res.data).toBeNull();
+    }
+
+    const me = await gqlRequest(result.httpServer, { query: ME, token: await signIn(next) });
+    expect(me.errors).toBeUndefined();
+    // Left in place like this spec's other accounts: its auth events reference the user.
+  });
+
   it('does not expose public sign-up', async () => {
     const res = await request(result.httpServer)
       .post('/api/graphql')

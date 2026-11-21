@@ -9,6 +9,10 @@ export const REDIS_KEYS = {
   INSTITUTE_ACCESS: 'auth:institute-access:',
   /** Role a reseller membership's access tokens must carry, or `blocked`; written when a member is changed. */
   RESELLER_MEMBER_ACCESS: 'auth:reseller-member-access:',
+  /** Current `users.token_version` of a user; access tokens issued with a lower one are refused. */
+  TOKEN_VERSION: 'auth:token-version:',
+  /** SHA-256 of a user's pending email verification code; `:attempts` counts the guesses. EX = code lifetime. */
+  EMAIL_VERIFICATION: 'auth:email-verify:',
   /** Sliding-window counter for failed login attempts, keyed by lowercased username. EX = FAILURE_WINDOW_SECONDS. */
   LOGIN_FAILURES: 'auth:failed-login:',
   /** Active lockout marker for a username. Presence ⇒ login is blocked for LOCKOUT_DURATION_SECONDS. */

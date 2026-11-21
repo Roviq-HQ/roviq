@@ -27,6 +27,7 @@ import { InstituteAccessGuard } from '../auth/middleware/institute-access.guard'
 import { MustChangePasswordGuard } from '../auth/middleware/must-change-password.guard';
 import { ResellerAccessGuard } from '../auth/middleware/reseller-access.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
+import { TokenVersionGuard } from '../auth/middleware/token-version.guard';
 import { consumeWsTicket } from '../auth/ws-ticket.store';
 import { CaslModule } from '../casl/casl.module';
 import { readFieldMiddleware } from '../casl/read-field.middleware';
@@ -142,6 +143,11 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     DateOnlyScalar,
     DateTimeScalar,
     I18nTextScalar,
+    // First: a token whose sessions were ended must not reach any other check.
+    {
+      provide: APP_GUARD,
+      useClass: TokenVersionGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: ImpersonationSessionGuard,

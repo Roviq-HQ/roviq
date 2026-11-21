@@ -14,6 +14,8 @@ interface JwtPayload {
   type: 'access';
   /** ROV-96 — first-login enforcement claim, mirrored onto AuthUser. */
   mustChangePassword?: boolean;
+  /** `users.token_version` at issue; checked by TokenVersionGuard. */
+  tv?: number;
   // Impersonation
   isImpersonated?: boolean;
   impersonatorId?: string;
@@ -39,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roleId: payload.roleId,
       type: 'access' as const,
       mustChangePassword: payload.mustChangePassword ?? false,
+      tokenVersion: payload.tv ?? 0,
       isImpersonated: payload.isImpersonated,
       impersonatorId: payload.impersonatorId,
       impersonationSessionId: payload.impersonationSessionId,

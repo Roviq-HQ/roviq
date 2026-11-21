@@ -20,6 +20,7 @@ import {
   approvalRequestWorkflow,
   attendanceAbsentWorkflow,
   billingEventWorkflow,
+  emailVerificationWorkflow,
   feeOverdueWorkflow,
   feeReminderWorkflow,
   leaveDecidedWorkflow,
@@ -38,6 +39,7 @@ import { AppController } from './app.controller';
       workflows: [
         systemAuthWorkflow,
         userWelcomeWorkflow,
+        emailVerificationWorkflow,
         attendanceAbsentWorkflow,
         feeOverdueWorkflow,
         feeReminderWorkflow,
