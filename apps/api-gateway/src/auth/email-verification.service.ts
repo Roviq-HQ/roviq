@@ -12,12 +12,15 @@ import { UserRepository } from './repositories/user.repository';
 export const EMAIL_VERIFICATION_CODE_TTL_SECONDS = 10 * 60;
 export const EMAIL_VERIFICATION_RESEND_AFTER_SECONDS = 60;
 export const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
+/** Codes one user may be sent in a day. With 5 guesses each, that bounds guessing to 25 a day. */
+export const EMAIL_VERIFICATION_MAX_CODES_PER_DAY = 5;
+const DAY_SECONDS = 24 * 60 * 60;
 
 const hashCode = (code: string) => createHash('sha256').update(code).digest();
 
-function keysOf(userId: string): { code: string; attempts: string } {
+function keysOf(userId: string): { code: string; attempts: string; sent: string } {
   const code = `${REDIS_KEYS.EMAIL_VERIFICATION}${userId}`;
-  return { code, attempts: `${code}:attempts` };
+  return { code, attempts: `${code}:attempts`, sent: `${code}:sent` };
 }
 
 export interface EmailVerificationState {
@@ -54,6 +57,17 @@ export class EmailVerificationService {
       throw new BusinessException(
         ErrorCode.EMAIL_VERIFICATION_TOO_SOON,
         'A code was sent a moment ago',
+      );
+    }
+
+    // A fresh code resets the guess counter, so the number of codes is capped too: otherwise
+    // whoever holds the account without the mailbox could guess without limit.
+    const sentToday = await this.redis.incr(keys.sent);
+    if (sentToday === 1) await this.redis.expire(keys.sent, DAY_SECONDS);
+    if (sentToday > EMAIL_VERIFICATION_MAX_CODES_PER_DAY) {
+      throw new BusinessException(
+        ErrorCode.EMAIL_VERIFICATION_LIMIT_REACHED,
+        'No more codes can be sent today',
       );
     }
 
@@ -100,7 +114,7 @@ export class EmailVerificationService {
     await this.redis.del(keys.code, keys.attempts);
   }
 
-  /** Drops a pending code, so a new one can be requested at once. */
+  /** Drops a pending code, so a new one can be requested at once. The daily count stays. */
   async clearPending(userId: string): Promise<void> {
     const keys = keysOf(userId);
     await this.redis.del(keys.code, keys.attempts);

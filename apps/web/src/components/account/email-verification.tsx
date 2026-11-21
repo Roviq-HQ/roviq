@@ -55,9 +55,10 @@ const VERIFY_EMAIL = gql`
 
 const CODE_SHAPE = /^\d{6}$/;
 
-function errorKey(code: string | null): 'codeInvalid' | 'tooSoon' | 'generic' {
+function errorKey(code: string | null): 'codeInvalid' | 'tooSoon' | 'limitReached' | 'generic' {
   if (code === ErrorCode.EMAIL_VERIFICATION_CODE_INVALID) return 'codeInvalid';
   if (code === ErrorCode.EMAIL_VERIFICATION_TOO_SOON) return 'tooSoon';
+  if (code === ErrorCode.EMAIL_VERIFICATION_LIMIT_REACHED) return 'limitReached';
   return 'generic';
 }
 

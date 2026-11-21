@@ -20,6 +20,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../app/app.module';
+import { IdentityService } from '../identity.service';
 
 const TEMP_PASSWORD = 'Temp-Password-1';
 const NEW_PASSWORD = 'New-Password-2';
@@ -252,6 +253,43 @@ describe('First-login password change (integration)', () => {
     const me = await gqlRequest(result.httpServer, { query: ME, token: await signIn(next) });
     expect(me.errors).toBeUndefined();
     // Left in place like this spec's other accounts: its auth events reference the user.
+  });
+
+  it('ends the sessions of a never-signed-in account when its temporary password is reissued', async () => {
+    const account = await createTestInstitute(result.db);
+    await flag(account.userId);
+    const signIn = (password: string) =>
+      gqlRequest<{ instituteLogin: { accessToken: string; refreshToken: string } }>(
+        result.httpServer,
+        {
+          query:
+            'mutation ($u: String!, $p: String!) { instituteLogin(username: $u, password: $p) { accessToken refreshToken } }',
+          variables: { u: account.username, p: password },
+        },
+      );
+    const before = (await signIn(TEMP_PASSWORD)).data?.instituteLogin;
+    if (!before) throw new Error('institute login failed');
+
+    const reissued = await result.app
+      .get(IdentityService)
+      .reissueTempPassword(account.userId, SYSTEM_USER_ID);
+    if (!reissued) throw new Error('temporary password was not reissued');
+
+    // Whoever held the old temporary password loses the session it opened, not only the password.
+    const stale = await gqlRequest(result.httpServer, { query: ME, token: before.accessToken });
+    expect(stale.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
+    const refreshed = await gqlRequest(result.httpServer, {
+      query: 'mutation ($t: String!) { refreshToken(token: $t) { accessToken } }',
+      variables: { t: before.refreshToken },
+    });
+    expect(refreshed.errors).toBeDefined();
+    expect(refreshed.data).toBeNull();
+    expect((await signIn(TEMP_PASSWORD)).errors?.[0]?.extensions?.code).toBe('INVALID_CREDENTIALS');
+
+    const fresh = (await signIn(reissued)).data?.instituteLogin;
+    if (!fresh) throw new Error('login with the reissued password failed');
+    const me = await gqlRequest(result.httpServer, { query: ME, token: fresh.accessToken });
+    expect(me.errors).toBeUndefined();
   });
 
   it('does not expose public sign-up', async () => {

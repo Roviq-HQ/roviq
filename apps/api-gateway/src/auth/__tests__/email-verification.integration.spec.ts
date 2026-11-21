@@ -19,11 +19,13 @@ import {
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
+import type Redis from 'ioredis';
 import { EMPTY } from 'rxjs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../app/app.module';
 import {
   EMAIL_VERIFICATION_MAX_ATTEMPTS,
+  EMAIL_VERIFICATION_MAX_CODES_PER_DAY,
   EmailVerificationService,
 } from '../email-verification.service';
 
@@ -90,6 +92,10 @@ describe('Email verification (integration)', () => {
   beforeEach(async () => {
     emitted = [];
     await setVerified(null);
+    // The daily count of codes is per user and would otherwise carry over between tests.
+    await result.app
+      .get<Redis>(REDIS_CLIENT, { strict: false })
+      .del(`auth:email-verify:${institute.userId}:sent`);
   });
 
   it('sends the code to the account email only and verifies the address with it', async () => {
@@ -144,6 +150,17 @@ describe('Email verification (integration)', () => {
     const verified = await call<{ requestEmailVerification: boolean }>(REQUEST);
     expect(verified.errors).toBeUndefined();
     expect(emitted).toHaveLength(1);
+  });
+
+  it('stops sending codes after the daily limit, so guessing cannot be restarted forever', async () => {
+    for (let sent = 0; sent < EMAIL_VERIFICATION_MAX_CODES_PER_DAY; sent++) await requestCode();
+    expect(emitted).toHaveLength(EMAIL_VERIFICATION_MAX_CODES_PER_DAY);
+
+    await result.app.get(EmailVerificationService).clearPending(institute.userId);
+    const refused = await call(REQUEST);
+
+    expect(refused.errors?.[0]?.extensions?.code).toBe('EMAIL_VERIFICATION_LIMIT_REACHED');
+    expect(emitted).toHaveLength(EMAIL_VERIFICATION_MAX_CODES_PER_DAY);
   });
 
   it('refuses a code without a pending request, and an anonymous caller', async () => {
