@@ -812,7 +812,7 @@ export default function StudentsPage() {
         header: () => <SortableHeader column="admissionDate" label={t('columns.admittedOn')} />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {formatDate(row.original.admissionDate)}
+            {row.original.admissionDate ? formatDate(row.original.admissionDate) : '—'}
           </span>
         ),
       },

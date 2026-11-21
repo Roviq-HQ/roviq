@@ -888,3 +888,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** same shape as the 2026-11-20 entry. The cleanup deleted `roles` rows first and only then needed a lock on `resellers`, while `reseller-system-roles.integration.spec.ts` held `LOCK TABLE resellers` and waited for those role rows.
 - **Fix:** `cleanupTestReseller` takes `LOCK TABLE resellers IN ROW EXCLUSIVE MODE` as its first statement, so it waits for the table before holding any row lock.
 - **Lesson:** the 2026-11-20 lesson applies to every transaction that meets a table-locking test, not only to the test that takes the lock.
+
+## 2026-11-21 — fixed: password-change e2e left guardian1 with a rotated password (ROV-232)
+
+- **Symptom:** pre-push `e2e` failed in `consent.api-e2e.spec.ts` with `instituteLogin (guardian) failed: Invalid credentials`.
+- **Cause:** `changePassword` now enforces the shared password rules on the server. `password-change.api-e2e.spec.ts` restores guardian1's seed password in `afterAll`; `guardian123` has no upper-case letter, so the restore was refused and only logged a warning. Every later suite that logs in as guardian1 failed.
+- **Fix:** guardian1's seed password is `Guardian123` (`libs/database/src/seed/fixtures.ts`).
+- **Lesson:** a seed password that a test restores through `changePassword` must meet `failedPasswordRules`. A dev database keeps the old password until it is re-seeded.

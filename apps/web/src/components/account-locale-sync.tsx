@@ -8,8 +8,6 @@ import { useEffect } from 'react';
 
 // Locale navigation remounts providers; remember the account for this document.
 let appliedAccount: string | null = null;
-// Whether this document has seen nobody signed in: only then is a new account a sign-in.
-let sawSignedOut = false;
 
 export function AccountLocaleSync() {
   const { user, isLoading, preferredLocale, isLocaleLoading, localePreferenceError } = useAuth();
@@ -19,21 +17,11 @@ export function AccountLocaleSync() {
 
   useEffect(() => {
     if (!user) {
-      if (!isLoading) {
-        appliedAccount = null;
-        sawSignedOut = true;
-      }
+      if (!isLoading) appliedAccount = null;
       return;
     }
     const account = `${user.scope}:${user.id}`;
-    if (appliedAccount === account) return;
-    // A session restored on page load keeps the locale the URL names (a deep link, a
-    // shared link); the saved language applies on sign-in and on switching accounts.
-    if (!sawSignedOut && appliedAccount === null) {
-      appliedAccount = account;
-      return;
-    }
-    if (isLocaleLoading || localePreferenceError) return;
+    if (isLocaleLoading || localePreferenceError || appliedAccount === account) return;
     appliedAccount = account;
     const targetLocale = resolveAccountLocale(preferredLocale, navigator.languages);
     if (targetLocale !== locale) {

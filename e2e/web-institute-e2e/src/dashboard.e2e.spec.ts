@@ -8,16 +8,11 @@ test.describe('Dashboard', () => {
     });
   });
 
-  test('shows welcome card with setup instructions', async ({ page }) => {
-    await expect(page.getByTestId('dashboard-get-started')).toBeVisible();
-  });
-
-  test('Get Started section shows 3 CTAs', async ({ page }) => {
-    const getStarted = page.getByTestId('dashboard-get-started');
-    await expect(getStarted).toBeVisible();
-    await expect(getStarted.getByText(/students/i).first()).toBeVisible();
-    await expect(getStarted.getByText(/teachers/i).first()).toBeVisible();
-    await expect(getStarted.getByText(/standards/i).first()).toBeVisible();
+  test('hides Get Started for an institute that already has students, staff and standards', async ({
+    page,
+  }) => {
+    await expect(page.getByTestId('dashboard-quick-links')).toBeVisible();
+    await expect(page.getByTestId('dashboard-get-started')).toHaveCount(0);
   });
 
   test('Quick Links section shows 4 links', async ({ page }) => {
