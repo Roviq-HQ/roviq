@@ -173,6 +173,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts',
   // ROV-101 fixture: reads the teacher role's stored name to compare with the API.
   'apps/api-gateway/src/reseller/user/__tests__/user-listing-roles.integration.spec.ts',
+  // ROV-302 integration fixture: inserts files of each status and owner to measure usage
+  'apps/api-gateway/src/files/__tests__/storage-quota.integration.spec.ts',
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',
