@@ -140,6 +140,8 @@ describe('PasskeyService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
       const mockOptions = {
         challenge: 'test-challenge',
@@ -168,6 +170,8 @@ describe('PasskeyService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
       mockAuthProviderRepo.findPasskeysByUserId.mockResolvedValue([
         {
@@ -478,6 +482,8 @@ describe('PasskeyService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
 
@@ -497,6 +503,8 @@ describe('PasskeyService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(1);
@@ -515,6 +523,8 @@ describe('PasskeyService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(1);
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(1);
@@ -533,6 +543,8 @@ describe('PasskeyService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
       mockAuthProviderRepo.countOtherPasskeys.mockResolvedValue(0);
       mockAuthProviderRepo.deletePasskey.mockResolvedValue(0);

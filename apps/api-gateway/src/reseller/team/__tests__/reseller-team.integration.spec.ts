@@ -252,11 +252,21 @@ describe('Reseller team management (integration)', () => {
           .where(eq(users.id, institute.userId)),
       );
 
-      const response = await gql(
-        INVITE,
-        { input: { email: existing.email.toUpperCase(), roleId: team.roleIds.reseller_viewer } },
-        team.adminTokens.accessToken,
+      const invite = () =>
+        gql(
+          INVITE,
+          { input: { email: existing.email.toUpperCase(), roleId: team.roleIds.reseller_viewer } },
+          team.adminTokens.accessToken,
+        );
+
+      // SF-045: someone else created the account and its owner has not proved the mailbox.
+      const unverified = await invite();
+      expect(codeOf(unverified)).toBe(ErrorCode.TEAM_MEMBER_EMAIL_UNAVAILABLE);
+
+      await admin((tx) =>
+        tx.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, institute.userId)),
       );
+      const response = await invite();
       expect(response.errors).toBeUndefined();
       expect((response.data?.resellerInviteTeamMember as Member).userId).toBe(institute.userId);
     });

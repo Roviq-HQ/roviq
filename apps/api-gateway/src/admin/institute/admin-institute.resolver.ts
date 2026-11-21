@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
@@ -10,6 +10,7 @@ import { AdminInstituteService } from './admin-institute.service';
 import { AdminCreateInstituteInput } from './dto/admin-create-institute.input';
 import { AdminListInstitutesFilterInput } from './dto/admin-list-institutes-filter.input';
 import { AcademicTreeModel } from './models/academic-tree.model';
+import { DeletedInstituteModel } from './models/deleted-institute.model';
 
 @UseGuards(GqlAuthGuard, PlatformScopeGuard, AbilityGuard)
 @Resolver(() => InstituteModel)
@@ -84,9 +85,19 @@ export class AdminInstituteResolver {
     return this.instituteService.delete(id);
   }
 
-  @Mutation(() => InstituteModel)
+  @Query(() => [DeletedInstituteModel], {
+    description: 'Deleted institutes, most recently deleted first (at most 200).',
+  })
   @CheckAbility({ action: 'restore', subject: 'Institute' })
-  async adminRestoreInstitute(@Args('id', { type: () => ID }) id: string) {
+  async adminListDeletedInstitutes(): Promise<DeletedInstituteModel[]> {
+    return this.instituteService.listDeleted();
+  }
+
+  @Mutation(() => InstituteModel, {
+    description: 'Bring a deleted institute back with the status it had when it was deleted.',
+  })
+  @CheckAbility({ action: 'restore', subject: 'Institute' })
+  async adminRestoreInstitute(@Args('id', { type: () => ID }, ParseUUIDPipe) id: string) {
     return this.instituteService.restore(id);
   }
 
