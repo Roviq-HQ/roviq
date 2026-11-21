@@ -98,8 +98,16 @@ export class AuditInterceptor implements NestInterceptor {
       this.reflector.get(AuditInstitute, context.getHandler()),
     );
     // Read when the event is built: a resolver may name the institute only after it ran.
-    const subjectOf = () =>
-      user.scope === 'institute' ? null : (fromArgs ?? markedAuditInstitute(req));
+    // A refused attempt proves nothing about the caller's right over the institute in its
+    // arguments, so then only the platform (which has that right over every institute) or
+    // an id the server itself confirmed is used. Otherwise a reseller could write rows,
+    // with text of its choosing, into the audit log of an institute it does not own.
+    const subjectOf = (succeeded: boolean) => {
+      if (user.scope === 'institute') return null;
+      const confirmed = markedAuditInstitute(req);
+      if (succeeded || user.scope === 'platform') return fromArgs ?? confirmed;
+      return confirmed;
+    };
     const actionType = extractActionType(info.fieldName);
     const entityType = extractEntityType(info.fieldName);
     const correlationId: string = req.correlationId ?? crypto.randomUUID();
@@ -115,7 +123,7 @@ export class AuditInterceptor implements NestInterceptor {
             changes: null,
             metadata: { input: safeSerializeArgs(gqlContext.getArgs()) },
             correlationId,
-            subjectTenantId: subjectOf(),
+            subjectTenantId: subjectOf(true),
           });
 
           // Non-blocking — fire and forget
@@ -155,7 +163,7 @@ export class AuditInterceptor implements NestInterceptor {
             },
           },
           correlationId,
-          subjectTenantId: subjectOf(),
+          subjectTenantId: subjectOf(false),
         });
 
         // Non-blocking error audit — don't let audit failure mask the real error

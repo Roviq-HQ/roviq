@@ -5,15 +5,24 @@
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { auditLogs, mkAdminCtx, mkInstituteCtx, withAdmin, withTenant } from '@roviq/database';
+import {
+  auditLogs,
+  institutes,
+  mkAdminCtx,
+  mkInstituteCtx,
+  withAdmin,
+  withTenant,
+} from '@roviq/database';
 import type { JetStreamClient } from '@roviq/nats-jetstream';
 import {
   cleanupTestInstitute,
+  cleanupTestReseller,
   createInstituteToken,
   createIntegrationApp,
   createMock,
   createPlatformToken,
   createTestInstitute,
+  createTestReseller,
   gqlRequest,
   type IntegrationAppResult,
   type TestInstitute,
@@ -35,6 +44,8 @@ const AUDIT_LOGS = /* GraphQL */ `
           scope
           tenantId
           action
+          metadata
+          impersonatorId
           actorName
           ipAddress
           userAgent
@@ -49,6 +60,8 @@ interface Row {
   scope: string;
   tenantId: string | null;
   action: string;
+  metadata: Record<string, unknown> | null;
+  impersonatorId: string | null;
   actorName: string | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -115,6 +128,11 @@ describe('platform actions in an institute audit log (integration)', () => {
           subjectTenantId: instA.tenantId,
           action: 'adminSuspendInstitute',
           entityId: instA.tenantId,
+          impersonatorId: SEED_IDS.USER_ADMIN,
+          metadata: {
+            input: { id: instA.tenantId, reason: 'Fees unpaid', internalNote: 'ticket 4412' },
+            error: { code: 'Error', message: 'stack trace of an internal service' },
+          },
         },
         {
           ...base,
@@ -167,6 +185,13 @@ describe('platform actions in an institute audit log (integration)', () => {
     });
   });
 
+  it('gives the institute the stated reason and nothing else from the platform request', async () => {
+    const platformRow = (await listFor(instA)).find((row) => row.id === platformRowId);
+
+    expect(platformRow?.metadata).toEqual({ reason: 'Fees unpaid' });
+    expect(platformRow?.impersonatorId).toBeNull();
+  });
+
   it('shows another institute neither row', async () => {
     const ids = (await listFor(instB)).map((row) => row.id);
 
@@ -198,6 +223,49 @@ describe('platform actions in an institute audit log (integration)', () => {
     );
 
     await expect(insert).rejects.toThrow();
+  });
+
+  it("clears a reseller row's subject when the institute is not that reseller's", async () => {
+    const ownId = randomUUID();
+    const foreignId = randomUUID();
+    const otherReseller = await createTestReseller(app.db);
+    const [owner] = await withAdmin(app.db, mkAdminCtx(ORIGIN), (tx) =>
+      tx
+        .select({ resellerId: institutes.resellerId })
+        .from(institutes)
+        .where(eq(institutes.id, instA.tenantId)),
+    );
+    assert(owner);
+    try {
+      const resellerRow = {
+        ...base,
+        scope: 'reseller',
+        tenantId: null,
+        subjectTenantId: instA.tenantId,
+        action: 'resellerSuspendInstitute',
+        entityId: instA.tenantId,
+      };
+      const stored = await withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
+        await tx.insert(auditLogs).values([
+          { ...resellerRow, id: ownId, resellerId: owner.resellerId },
+          { ...resellerRow, id: foreignId, resellerId: otherReseller.resellerId },
+        ]);
+        return tx
+          .select({ id: auditLogs.id, subjectTenantId: auditLogs.subjectTenantId })
+          .from(auditLogs)
+          .where(inArray(auditLogs.id, [ownId, foreignId]));
+      });
+
+      expect(stored.find((row) => row.id === ownId)?.subjectTenantId).toBe(instA.tenantId);
+      expect(stored.find((row) => row.id === foreignId)?.subjectTenantId).toBeNull();
+      // So institute A never reads what the other reseller wrote.
+      expect((await listFor(instA)).map((row) => row.id)).not.toContain(foreignId);
+    } finally {
+      await withAdmin(app.db, mkAdminCtx(ORIGIN), (tx) =>
+        tx.delete(auditLogs).where(inArray(auditLogs.id, [ownId, foreignId])),
+      );
+      await cleanupTestReseller(app.db, otherReseller);
+    }
   });
 
   it('names the institute on the audit event of a platform mutation that acts on it', async () => {

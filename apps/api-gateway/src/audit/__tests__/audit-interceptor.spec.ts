@@ -404,6 +404,43 @@ describe('AuditInterceptor', () => {
     });
   });
 
+  it('does not name an institute from the arguments of a refused reseller action', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: { ...platformUser, scope: 'reseller', resellerId: 'reseller-1' },
+      fieldName: 'resellerSuspendInstitute',
+      args: { id: INSTITUTE_ID, reason: 'text written into a stranger log' },
+    });
+    mockGqlCreate(gqlContext);
+    decoratedWith('id');
+
+    await new Promise<void>((resolve) => {
+      interceptor.intercept(context, createErrorCallHandler(new Error('not yours'))).subscribe({
+        error: () => {
+          expect(mockEmit.mock.calls[0][0].subjectTenantId).toBeNull();
+          resolve();
+        },
+      });
+    });
+  });
+
+  it('keeps an institute the server confirmed even when the reseller action then fails', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: { ...platformUser, scope: 'reseller', resellerId: 'reseller-1' },
+      args: { id: 'ignored' },
+    });
+    mockGqlCreate(gqlContext);
+    mockMarked.mockReturnValue(INSTITUTE_ID);
+
+    await new Promise<void>((resolve) => {
+      interceptor.intercept(context, createErrorCallHandler(new Error('later step'))).subscribe({
+        error: () => {
+          expect(mockEmit.mock.calls[0][0].subjectTenantId).toBe(INSTITUTE_ID);
+          resolve();
+        },
+      });
+    });
+  });
+
   it('leaves the subject empty when the argument is not a UUID', async () => {
     const { context, gqlContext } = createMockGqlContext({
       user: platformUser,

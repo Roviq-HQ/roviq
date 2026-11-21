@@ -285,16 +285,19 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
       resellerId: row.resellerId,
       userId: row.userId,
       actorId: row.actorId,
-      impersonatorId: row.impersonatorId,
-      impersonationSessionId: row.impersonationSessionId,
+      impersonatorId: outsider ? null : row.impersonatorId,
+      impersonationSessionId: outsider ? null : row.impersonationSessionId,
       action: row.action,
       actionType: row.actionType,
       entityType: row.entityType,
       entityId: row.entityId,
       changes: row.changes as Record<string, unknown> | null,
-      metadata: row.metadata as Record<string, unknown> | null,
+      metadata: outsider
+        ? outsiderMetadata(row.metadata)
+        : (row.metadata as Record<string, unknown> | null),
       correlationId: row.correlationId,
-      // The institute sees who acted and what was done, not where the staff member sat.
+      // The institute sees who acted, what was done and the stated reason; not where the
+      // staff member sat, nor the raw arguments and error text of a platform request.
       ipAddress: outsider ? null : row.ipAddress,
       userAgent: outsider ? null : row.userAgent,
       source: row.source,
@@ -307,4 +310,13 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
       resellerTier: row.resellerTier ?? null,
     };
   }
+}
+
+/** Of a platform or reseller row's metadata, an institute gets the stated reason and no more. */
+function outsiderMetadata(metadata: unknown): Record<string, unknown> | null {
+  if (typeof metadata !== 'object' || metadata === null) return null;
+  const input = (metadata as { input?: unknown }).input;
+  if (typeof input !== 'object' || input === null) return null;
+  const reason = (input as { reason?: unknown }).reason;
+  return typeof reason === 'string' ? { reason } : null;
 }
