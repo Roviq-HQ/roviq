@@ -165,6 +165,27 @@ export const FILE_PURPOSE_POLICY: { readonly [P in FilePurpose]: FilePurposePoli
     uploadAbility: null,
     readAbility: { action: 'read', subject: 'Export' },
   },
+  TC_PDF: {
+    visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
+    allowedContentTypes: [FILE_CONTENT_TYPE.PDF],
+    maxSizeBytes: 10 * MB,
+    // A legal document with the student's personal data: explicit, checked download only.
+    sensitive: true,
+    image: null,
+    uploadAbility: null,
+    readAbility: { action: 'read', subject: 'TC' },
+  },
+  CERTIFICATE_PDF: {
+    visibility: 'PRIVATE',
+    owner: 'INSTITUTE',
+    allowedContentTypes: [FILE_CONTENT_TYPE.PDF],
+    maxSizeBytes: 10 * MB,
+    sensitive: true,
+    image: null,
+    uploadAbility: null,
+    readAbility: { action: 'read', subject: 'Certificate' },
+  },
   PROFILE_PHOTO: {
     visibility: 'PRIVATE',
     owner: 'USER',

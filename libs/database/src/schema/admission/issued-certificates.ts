@@ -6,7 +6,6 @@ import {
   index,
   jsonb,
   pgTable,
-  text,
   uniqueIndex,
   uuid,
   varchar,
@@ -15,6 +14,7 @@ import { users } from '../auth/users';
 import { tenantColumns } from '../common/columns';
 import { certificateStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
+import { files } from '../storage/files';
 import { institutes } from '../tenant/institutes';
 import { staffProfiles } from '../user-profiles/staff-profiles';
 import { studentProfiles } from '../user-profiles/student-profiles';
@@ -56,7 +56,8 @@ export const issuedCertificates = pgTable(
 
     /** Populated template fields frozen at issuance time */
     certificateData: jsonb('certificate_data').notNull(),
-    pdfUrl: text('pdf_url'),
+    /** The rendered PDF (purpose CERTIFICATE_PDF); NULL until issue has rendered it. */
+    pdfFileId: uuid('pdf_file_id').references(() => files.id, { onDelete: 'restrict' }),
     issuedDate: date('issued_date'),
     issuedBy: uuid('issued_by').references(() => users.id),
     /** Purpose for which the certificate was requested */

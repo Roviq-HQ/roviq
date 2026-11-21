@@ -259,6 +259,10 @@ export const ErrorCode = {
   TC_NOT_FOUND: 'TC_NOT_FOUND',
   /** The student already has a Transfer Certificate request in progress */
   TC_ALREADY_REQUESTED: 'TC_ALREADY_REQUESTED',
+  /** A PDF could not be rendered because its text uses a script no bundled font covers */
+  PDF_UNSUPPORTED_SCRIPT: 'PDF_UNSUPPORTED_SCRIPT',
+  /** The PDF of this record has not been rendered yet; issue it or generate it first */
+  PDF_NOT_READY: 'PDF_NOT_READY',
   /** Reseller team member not found */
   TEAM_MEMBER_NOT_FOUND: 'TEAM_MEMBER_NOT_FOUND',
   /** The invited person already has a membership (active or inactive) in this reseller */
@@ -526,6 +530,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SUBSCRIPTION_PLAN_NOT_FOUND: HttpStatus.NOT_FOUND,
   TC_NOT_FOUND: HttpStatus.NOT_FOUND,
   TC_ALREADY_REQUESTED: HttpStatus.CONFLICT,
+  PDF_UNSUPPORTED_SCRIPT: HttpStatus.UNPROCESSABLE_ENTITY,
+  PDF_NOT_READY: HttpStatus.CONFLICT,
   TEAM_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
   TEAM_MEMBER_ALREADY_EXISTS: HttpStatus.CONFLICT,
   TEAM_MEMBER_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
