@@ -7,7 +7,7 @@
  */
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '@roviq/common-types';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../../messages/en/admission.json';
@@ -62,6 +62,8 @@ const sampleEnquiry = {
 };
 
 const refetch = vi.fn();
+const createEnquiry = vi.hoisted(() => vi.fn());
+
 vi.mock('../../use-admission', () => ({
   useEnquiries: () => ({
     enquiries: [sampleEnquiry],
@@ -73,7 +75,7 @@ vi.mock('../../use-admission', () => ({
     fetchMore: vi.fn(),
   }),
   useEnquiryCreated: vi.fn(),
-  useCreateEnquiry: () => [vi.fn(), { loading: false }],
+  useCreateEnquiry: () => [createEnquiry, { loading: false }],
   useUpdateEnquiry: () => [vi.fn(), { loading: false }],
   useConvertEnquiry: () => [vi.fn(), { loading: false }],
   useAcademicYearsForAdmission: () => ({ data: { academicYears: [] }, loading: false }),
@@ -129,6 +131,45 @@ describe('EnquiriesPage (component)', () => {
     expect(await screen.findByTestId('enquiry-form-title')).toHaveTextContent(
       messagesEn.enquiries.newForm.title,
     );
+  });
+
+  it('requires the parent’s relationship before creating an enquiry', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId('enquiries-new-btn'));
+    await userEvent.type(await screen.findByTestId('enquiry-student-name-input'), 'Diya Patel');
+    await userEvent.type(screen.getByTestId('enquiry-class-input'), 'Class 1');
+    await userEvent.type(screen.getByTestId('enquiry-parent-name-input'), 'Meera Patel');
+    await userEvent.type(screen.getByTestId('enquiry-parent-phone-input'), '9876543210');
+
+    const submit = screen.getByTestId('enquiry-form-submit-btn');
+    expect(submit).toBeDisabled();
+    await userEvent.click(submit);
+    expect(createEnquiry).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByTestId('enquiry-relation-select'));
+    await userEvent.click(
+      await screen.findByRole('option', { name: messagesEn.relationships.FATHER }),
+    );
+    await waitFor(() => expect(screen.getByTestId('enquiry-form-submit-btn')).toBeEnabled());
+  });
+
+  it('marks the relationship as required and says so once it is left empty', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId('enquiries-new-btn'));
+    const relation = await screen.findByTestId('enquiry-relation-select');
+
+    expect(relation).toHaveAttribute('aria-required', 'true');
+    const label = screen.getByText(messagesEn.enquiries.newForm.fields.parentRelation, {
+      selector: 'label',
+    });
+    expect(within(label).getByText('*')).toHaveAttribute('aria-hidden', 'true');
+
+    await userEvent.type(screen.getByTestId('enquiry-student-name-input'), 'Diya Patel');
+    fireEvent.blur(relation);
+
+    expect(
+      await screen.findByText(messagesEn.enquiries.newForm.errors.parentRelationRequired),
+    ).toBeInTheDocument();
   });
 
   it('blocks rendering when the user lacks Enquiry:read', () => {

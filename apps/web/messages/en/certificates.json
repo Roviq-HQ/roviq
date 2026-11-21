@@ -69,7 +69,7 @@
     "reasonLabel": "Reason",
     "requestedOn": "Requested on {date}",
     "clearanceTitle": "Department Clearances",
-    "tcDataTitle": "TC Data (CBSE 20-field)",
+    "tcDataTitle": "Certificate details",
     "noClearances": "No clearance data recorded yet.",
     "noTcData": "No TC data snapshot available.",
     "clearanceStatus": {
@@ -89,17 +89,80 @@
     "issue": "Issue TC",
     "issuing": "Issuing…",
     "requestDuplicate": "Request Duplicate",
-    "approveSuccess": "TC approved successfully",
-    "approveError": "Failed to approve TC",
-    "issueSuccess": "TC issued successfully",
-    "issueError": "Failed to issue TC",
     "rejectSuccess": "TC rejected",
     "rejectError": "Failed to reject TC",
     "duplicateSuccess": "Duplicate TC request submitted",
     "duplicateError": "Failed to request duplicate",
     "requestSuccess": "TC request submitted",
     "requestError": "Failed to request TC",
-    "notFound": "Transfer certificate not found."
+    "notFound": "Transfer certificate not found.",
+    "issueDuplicate": "Issue Duplicate",
+    "duplicateOf": "Duplicate of {serial}",
+    "viewOriginal": "View original TC",
+    "duplicatesTitle": "Duplicates",
+    "noDuplicates": "No duplicates requested for this TC.",
+    "accessDenied": {
+      "title": "You can't view transfer certificates",
+      "description": "Your role does not include access to transfer certificates. Ask your institute admin if you need it."
+    },
+    "confirm": {
+      "approve": {
+        "title": "Approve this TC?",
+        "description": "Once approved, the TC can be issued to the student.",
+        "confirm": "Approve",
+        "success": "TC approved",
+        "error": "Could not approve the TC"
+      },
+      "issue": {
+        "title": "Issue this TC?",
+        "description": "The TC gets its serial number and the student is marked as transferred out. This can't be undone.",
+        "confirm": "Issue TC",
+        "success": "TC issued",
+        "error": "Could not issue the TC"
+      },
+      "issueDuplicate": {
+        "title": "Issue this duplicate TC?",
+        "description": "The duplicate gets the original's serial number with a -D suffix. The student's record is not changed. This can't be undone.",
+        "confirm": "Issue Duplicate",
+        "success": "Duplicate TC issued",
+        "error": "Could not issue the duplicate TC"
+      }
+    },
+    "errors": {
+      "alreadyRequested": "A request for this TC is already in progress.",
+      "invalidState": "This TC has moved on since you opened it. Refresh the page to see its current status.",
+      "notFound": "This TC no longer exists.",
+      "studentNotEnrolled": "Only an enrolled student can be given a TC.",
+      "studentNotFound": "The student could not be found.",
+      "validation": "Some details are not valid. Check them and try again.",
+      "forbidden": "Your role is not allowed to do this.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "fields": {
+      "studentName": "Name of the pupil",
+      "motherName": "Mother's name",
+      "fatherOrGuardianName": "Father's or guardian's name",
+      "nationality": "Nationality",
+      "socialCategory": "Category (SC/ST/OBC)",
+      "dateOfBirthFigures": "Date of birth (in figures)",
+      "dateOfBirthWords": "Date of birth (in words)",
+      "whetherFailed": "Whether failed, if so once or twice in the same class",
+      "subjectsStudied": "Subjects studied",
+      "classLastStudied": "Class in which the pupil last studied",
+      "lastExamResult": "Last examination taken, with result",
+      "qualifiedForPromotion": "Whether qualified for promotion to the higher class",
+      "feesPaidUpTo": "Whether all dues are paid",
+      "feeConcession": "Fee concession availed, if any",
+      "nccScoutGuide": "NCC cadet / Scout / Guide details",
+      "dateOfLeaving": "Date the name was struck off the rolls",
+      "reasonForLeaving": "Reason for leaving",
+      "totalWorkingDays": "Total working days",
+      "totalPresentDays": "Total days present",
+      "generalConduct": "General conduct",
+      "remarks": "Other remarks",
+      "dateOfIssue": "Date of issue",
+      "rejectionReason": "Reason for rejection"
+    }
   },
   "other": {
     "title": "Certificates",
@@ -153,6 +216,15 @@
         "purposeBody": "Why the student or parent is asking for this certificate. Printed on the certificate body (e.g. 'issued for the purpose of applying to …'). Being specific protects the institute — a certificate issued 'for all official purposes' is sometimes rejected by government offices, while 'for railway concession pass renewal' is accepted immediately.",
         "purposeExamples": "Good: 'Scholarship application — National Means-cum-Merit', 'Railway concession pass renewal', 'Passport application', 'Change of surname after court decree #DEL/2025/4412'. Avoid 'official purpose' or 'personal use'."
       }
+    },
+    "errors": {
+      "templateNotFound": "That certificate template no longer exists. Pick another template.",
+      "certificateNotFound": "This certificate could not be found. It may have been removed.",
+      "studentNotFound": "This student could not be found. They may have been removed.",
+      "invalidState": "This certificate cannot be issued in its current status.",
+      "invalidInput": "Some details are invalid. Check them and try again.",
+      "forbidden": "You do not have permission to do this.",
+      "generic": "Something went wrong. Try again in a moment."
     }
   },
   "tcStatuses": {

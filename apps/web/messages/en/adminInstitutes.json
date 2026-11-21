@@ -244,7 +244,16 @@
     "auditPlaceholder": "Audit logs for this institute will be displayed here.",
     "notFound": "Institute not found.",
     "configReadOnly": "Configuration is managed by institute administrators.",
-    "brandingReadOnly": "Branding is managed by institute administrators."
+    "brandingReadOnly": "Branding is managed by institute administrators.",
+    "firstAdmin": {
+      "title": "First admin",
+      "description": "Receives the login details when setup runs.",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Mobile",
+      "none": "Not recorded",
+      "withheld": "This is an existing Roviq account, so its name and mobile number are not shown here."
+    }
   },
   "actions": {
     "approve": "Approve",
@@ -433,7 +442,24 @@
       "groupBody": "Use this to link multiple branches of the same chain (e.g. DPS Society, Amity Group). Grouped institutes can share branding, plan tiers, and cross-institute analytics while each branch still has its own tenant data. Leave blank for standalone institutes.",
       "groupExample": "Example: 'DPS Group' can contain DPS-GBN-01, DPS-GBN-02, DPS-DLI-03. A parent who has children in two branches can switch between them from the same login."
     },
-    "invalidInput": "Some details are invalid. Check the highlighted fields and try again."
+    "invalidInput": "Some details are invalid. Check the highlighted fields and try again.",
+    "firstAdmin": {
+      "title": "First admin",
+      "description": "This person becomes the institute admin. If a Roviq account already uses this email, that account is added as admin; otherwise a new account is created. An account that has never signed in receives a new temporary password by email and SMS.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "emailPlaceholder": "principal@example.com",
+      "phone": "Mobile number",
+      "phonePlaceholder": "9876543210",
+      "infoTitle": "Who receives the login details",
+      "infoBody": "When setup runs, this person becomes the institute admin. If no Roviq account uses this email, a new account is created. An account that has never signed in, including a new one, receives a new temporary password at its email and mobile number. An account that has already signed in keeps its password and simply gets access to this institute.",
+      "firstNameRequired": "First name is required.",
+      "emailInvalid": "Enter a valid email address.",
+      "emailUnavailable": "This email cannot be used for the first admin because it belongs to a deleted account or matches more than one account. Enter a different email.",
+      "phoneInUse": "This mobile number already belongs to another Roviq account. Enter a different number, or leave it empty.",
+      "phoneInvalid": "Mobile number must be exactly 10 digits."
+    }
   },
   "exports": {
     "title": "Compliance exports",

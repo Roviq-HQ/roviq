@@ -14,6 +14,8 @@ interface GraphQLProviderProps {
   onImpersonationEnded?: () => void;
   /** Called when a view-only impersonation session tried to change something. */
   onImpersonationReadOnly?: () => void;
+  /** Called when the server refuses a request until the account changes its password. */
+  onPasswordChangeRequired?: () => void;
   /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
   apiUrl?: string;
   /** Called to refresh the access token on auth error. Returns the new token or null. */
@@ -28,6 +30,7 @@ export function GraphQLProvider({
   onAuthError,
   onImpersonationEnded,
   onImpersonationReadOnly,
+  onPasswordChangeRequired,
   onTokenRefresh,
   apiUrl,
   children,
@@ -42,6 +45,7 @@ export function GraphQLProvider({
       onAuthError,
       onImpersonationEnded,
       onImpersonationReadOnly,
+      onPasswordChangeRequired,
       onTokenRefresh,
       apiUrl,
       onNetworkError: (message) => {

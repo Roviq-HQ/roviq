@@ -41,6 +41,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DeletedRecordsButton } from '@web/components/people/deleted-records';
+import { parseISO } from 'date-fns';
 import {
   AlertCircle,
   ArrowRightCircle,
@@ -452,7 +453,7 @@ const filterParsers = {
 
 export default function StudentsPage() {
   const t = useTranslations('students');
-  const { formatDistance } = useFormatDate();
+  const { format } = useFormatDate();
   const resolveI18n = useI18nField();
   const router = useRouter();
   const [filters, setFilters] = useQueryStates(filterParsers);
@@ -616,9 +617,11 @@ export default function StudentsPage() {
 
   const allOnPageSelected = students.length > 0 && students.every((s) => selectedIds.has(s.id));
 
+  // A calendar date: `new Date('YYYY-MM-DD')` is UTC midnight (05:30 IST), so it is
+  // parsed as a local date and shown as a date, never as time elapsed.
   const formatDate = React.useCallback(
-    (date: Date) => formatDistance(date, new Date()),
-    [formatDistance],
+    (isoDate: string) => format(parseISO(isoDate), 'dd/MM/yyyy'),
+    [format],
   );
 
   const fullName = React.useCallback(
@@ -809,7 +812,7 @@ export default function StudentsPage() {
         header: () => <SortableHeader column="admissionDate" label={t('columns.admittedOn')} />,
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {formatDate(new Date(row.original.admissionDate))}
+            {formatDate(row.original.admissionDate)}
           </span>
         ),
       },

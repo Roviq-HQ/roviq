@@ -82,6 +82,7 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
   );
   const t = useTranslations('instituteSettings');
   const ti = useTranslations('instituteSettings.info');
+  const tCommon = useTranslations('common');
   const [concurrentError, setConcurrentError] = React.useState(false);
   const [updateInfo] = useUpdateInstituteInfo();
 
@@ -378,7 +379,9 @@ export function InstituteInfoTab({ institute, loading, refetch }: InstituteInfoT
                       <TableRow key={`${aff.board}-${aff.affiliationNumber}`}>
                         <TableCell className="font-medium">{aff.board.toUpperCase()}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{aff.affiliationStatus}</Badge>
+                          <Badge variant="secondary">
+                            {tCommon(`affiliationStatuses.${aff.affiliationStatus}`)}
+                          </Badge>
                         </TableCell>
                         <TableCell>{aff.affiliationNumber ?? '—'}</TableCell>
                         <TableCell>{aff.grantedLevel ?? '—'}</TableCell>

@@ -22,6 +22,7 @@ import { useTranslations } from 'next-intl';
 import { type AttendanceStatus, useDateSummary } from '../attendance/use-attendance';
 import { ExamsSummaryCard } from './exams-summary-card';
 import { TodayScheduleCard } from './today-schedule-card';
+import { useSetupCounts } from './use-setup-counts';
 
 // Same palette as the attendance page's STATUS_COLORS — kept intentionally
 // consistent so the dashboard KPI reads as a preview of that screen.
@@ -158,8 +159,12 @@ export default function DashboardPage() {
     },
   ];
 
+  const counts = useSetupCounts();
+  // A card shows only once its count is known to be zero.
   const emptyStates = [
     {
+      id: 'students',
+      count: counts.students,
       title: t('emptyStudentsTitle'),
       description: t('emptyStudentsDescription'),
       cta: t('emptyStudentsCta'),
@@ -167,6 +172,8 @@ export default function DashboardPage() {
       icon: Users,
     },
     {
+      id: 'staff',
+      count: counts.staff,
       title: t('emptyTeachersTitle'),
       description: t('emptyTeachersDescription'),
       cta: t('emptyTeachersCta'),
@@ -174,13 +181,15 @@ export default function DashboardPage() {
       icon: UserCheck,
     },
     {
+      id: 'standards',
+      count: counts.standards,
       title: t('emptyStandardsTitle'),
       description: t('emptyStandardsDescription'),
       cta: t('emptyStandardsCta'),
       href: '/academics',
       icon: GraduationCap,
     },
-  ];
+  ].filter((state) => state.count === 0);
 
   // Newly-shipped feature shortcuts — Students, Guardians, Groups, TC,
   // Certificates, Data Consent, My Profile. These are the pages built in
@@ -261,23 +270,28 @@ export default function DashboardPage() {
           <ExamsSummaryCard />
         </Can>
       </div>
-      <div data-testid={testIds.instituteDashboard.getStarted}>
-        <CardTitle className="mb-4 text-lg">{t('getStarted')}</CardTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {emptyStates.map((state) => (
-            <Card key={state.href}>
-              <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
-                <state.icon className="size-8 text-muted-foreground" />
-                <CardTitle className="text-base">{state.title}</CardTitle>
-                <CardDescription>{state.description}</CardDescription>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={state.href}>{state.cta}</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+      {emptyStates.length > 0 && (
+        <div data-testid={testIds.instituteDashboard.getStarted}>
+          <CardTitle className="mb-4 text-lg">{t('getStarted')}</CardTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {emptyStates.map((state) => (
+              <Card
+                key={state.id}
+                data-testid={testIds.instituteDashboard.getStartedCard(state.id)}
+              >
+                <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
+                  <state.icon className="size-8 text-muted-foreground" />
+                  <CardTitle className="text-base">{state.title}</CardTitle>
+                  <CardDescription>{state.description}</CardDescription>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={state.href}>{state.cta}</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <div>
         <CardTitle className="mb-4 text-lg">{t('features')}</CardTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

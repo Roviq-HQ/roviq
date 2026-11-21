@@ -78,4 +78,23 @@ describe('AccountLocaleSync', () => {
     second.rerender(<AccountLocaleSync />);
     expect(replace).toHaveBeenCalledTimes(1);
   });
+
+  it('should keep the URL locale when a stored session is restored on page load', async () => {
+    // A fresh document: the module has never seen a signed-out state.
+    vi.resetModules();
+    const { AccountLocaleSync: FreshSync } = await import('../account-locale-sync');
+    vi.mocked(useAuth).mockReturnValue(makeAuth({ user: null, isLoading: true }));
+    const { rerender } = render(<FreshSync />);
+    vi.mocked(useAuth).mockReturnValue(makeAuth());
+    rerender(<FreshSync />);
+
+    expect(replace).not.toHaveBeenCalled();
+
+    // Signing out and back in within the same document is a sign-in: the saved language applies.
+    vi.mocked(useAuth).mockReturnValue(makeAuth({ user: null, isLoading: false }));
+    rerender(<FreshSync />);
+    vi.mocked(useAuth).mockReturnValue(makeAuth());
+    rerender(<FreshSync />);
+    expect(replace).toHaveBeenCalledWith('/institute/account', { locale: 'hi' });
+  });
 });

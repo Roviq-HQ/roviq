@@ -40,7 +40,8 @@ import {
   useBreadcrumbOverride,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { CheckCircle2, Pause, Play, ShieldOff, Trash2, Undo, Users, XCircle } from 'lucide-react';
+import { FirstAdminCard } from '@web/components/institute/first-admin-card';
+import { CheckCircle2, Pause, Play, ShieldOff, Trash2, Users, XCircle } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
@@ -66,7 +67,6 @@ import {
   useReassignReseller,
   useRejectInstitute,
   useRemoveGroup,
-  useRestoreInstitute,
   useSuspendInstitute,
 } from '../use-institutes';
 
@@ -86,7 +86,6 @@ type ActionType =
   | 'suspend'
   | 'reject'
   | 'delete'
-  | 'restore'
   | 'reassignReseller'
   | 'assignGroup'
   | 'removeGroup';
@@ -132,7 +131,7 @@ function ActionButtons({
           {ta('approve')}
         </Button>
       )}
-      {(institute.status === 'PENDING' || institute.status === 'PENDING_APPROVAL') && (
+      {INSTITUTE_STATE_MACHINE.canTransition(institute.status, 'REJECTED') && (
         <Button
           variant="destructive"
           size="sm"
@@ -171,18 +170,6 @@ function ActionButtons({
       >
         {institute.groupId ? ta('removeGroup') : ta('assignGroup')}
       </Button>
-      {institute.status === 'REJECTED' || institute.status === 'INACTIVE' ? (
-        <Button
-          variant="outline"
-          size="sm"
-          title={ta('restoreDescription')}
-          onClick={() => setActionDialog({ type: 'restore' })}
-          data-testid={testIds.adminInstituteDetail.actionRestore}
-        >
-          <Undo className="size-4" />
-          {ta('restore')}
-        </Button>
-      ) : null}
       <Button
         variant="ghost"
         size="sm"
@@ -327,6 +314,7 @@ function OverviewTab({
   td: ReturnType<typeof useTranslations<'adminInstitutes.detail'>>;
   resolveI18n: ReturnType<typeof useI18nField>;
 }) {
+  const tCommon = useTranslations('common');
   return (
     <TabsContent value="overview" className="mt-6 space-y-6">
       {/* Identity */}
@@ -352,7 +340,7 @@ function OverviewTab({
             </div>
             <div>
               <dt className="text-muted-foreground">{td('fieldFramework')}</dt>
-              <dd>{institute.structureFramework}</dd>
+              <dd>{t(`create.frameworks.${institute.structureFramework}`)}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">{td('fieldTimezone')}</dt>
@@ -365,6 +353,20 @@ function OverviewTab({
           </dl>
         </CardContent>
       </Card>
+
+      <FirstAdminCard
+        firstAdmin={institute.firstAdmin}
+        testId={testIds.adminInstituteDetail.firstAdminCard}
+        labels={{
+          title: td('firstAdmin.title'),
+          description: td('firstAdmin.description'),
+          name: td('firstAdmin.name'),
+          email: td('firstAdmin.email'),
+          phone: td('firstAdmin.phone'),
+          none: td('firstAdmin.none'),
+          withheld: td('firstAdmin.withheld'),
+        }}
+      />
 
       {institute.contact && <ContactCard contact={institute.contact} td={td} />}
 
@@ -443,7 +445,9 @@ function OverviewTab({
                   <TableRow key={`${aff.board}-${aff.affiliationNumber}`}>
                     <TableCell className="font-medium">{aff.board.toUpperCase()}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{aff.affiliationStatus}</Badge>
+                      <Badge variant="secondary">
+                        {tCommon(`affiliationStatuses.${aff.affiliationStatus}`)}
+                      </Badge>
                     </TableCell>
                     <TableCell>{aff.affiliationNumber ?? '—'}</TableCell>
                     <TableCell>{aff.grantedLevel ?? '—'}</TableCell>
@@ -560,7 +564,6 @@ export default function InstituteDetailPage() {
   const [suspend] = useSuspendInstitute();
   const [reject] = useRejectInstitute();
   const [deleteInst] = useDeleteInstitute();
-  const [restore] = useRestoreInstitute();
   const [reassignReseller] = useReassignReseller();
   const [assignGroup] = useAssignGroup();
   const [removeGroup] = useRemoveGroup();
@@ -582,7 +585,6 @@ export default function InstituteDetailPage() {
     suspend: (id, reason) => suspend({ variables: { id, reason } }),
     reject: (id, reason) => reject({ variables: { id, reason: reason || 'Rejected' } }),
     delete: (id) => deleteInst({ variables: { id } }),
-    restore: (id) => restore({ variables: { id } }),
     reassignReseller: (id) => {
       if (!pickedResellerId) return Promise.reject(new Error('No reseller selected'));
       return reassignReseller({ variables: { id, newResellerId: pickedResellerId } });

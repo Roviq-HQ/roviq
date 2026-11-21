@@ -1,6 +1,6 @@
 'use client';
 
-import { useFormatDate } from '@roviq/i18n';
+import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -12,7 +12,6 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -36,6 +35,7 @@ import { useTranslations } from 'next-intl';
 import { parseAsBoolean, parseAsString, useQueryStates } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useStandards } from '../../academics/use-academics';
 import {
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_ICON,
@@ -74,8 +74,11 @@ const filterParsers = {
 export default function ApplicationsPage() {
   const t = useTranslations('admission');
   const { format } = useFormatDate();
+  const resolveI18n = useI18nField();
 
   const [filters, setFilters] = useQueryStates(filterParsers);
+  // Standards of the active academic year, which is where applications are made.
+  const { standards } = useStandards();
   const [statusChange, setStatusChange] = React.useState<ApplicationNode | null>(null);
   const [approveTarget, setApproveTarget] = React.useState<ApplicationNode | null>(null);
   const [rejectTarget, setRejectTarget] = React.useState<ApplicationNode | null>(null);
@@ -151,12 +154,10 @@ export default function ApplicationsPage() {
         },
       },
       {
-        accessorKey: 'standardId',
+        id: 'standard',
         header: t('applications.columns.standard'),
         cell: ({ row }) => (
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-            {row.original.standardId.slice(0, 8)}
-          </code>
+          <span className="text-sm">{resolveI18n(row.original.standardName) || '—'}</span>
         ),
       },
       {
@@ -240,6 +241,8 @@ export default function ApplicationsPage() {
           const status = row.original.status as ApplicationStatusKey;
           const terminal = isTerminalApplicationStatus(status);
           const canApprove = status === 'FEE_PAID';
+          // Only where a status can be picked by hand: none after a terminal one, and FEE_PAID's
+          // only step (ENROLLED) belongs to Approve & enrol.
           const canChangeStatus = getSelectableApplicationStatuses(status).length > 0;
           return (
             <div className="flex items-center gap-1">
@@ -255,21 +258,22 @@ export default function ApplicationsPage() {
                   {t('applications.actions.documents')}
                 </span>
               </Button>
-              <Can I="update" a="Application">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!canChangeStatus}
-                  title={t('applications.actions.changeStatus')}
-                  data-testid={`application-status-btn-${row.original.id}`}
-                  onClick={() => setStatusChange(row.original)}
-                >
-                  <GitBranch aria-hidden="true" className="size-4" />
-                  <span className="sr-only md:not-sr-only md:ms-1">
-                    {t('applications.actions.changeStatus')}
-                  </span>
-                </Button>
-              </Can>
+              {canChangeStatus && (
+                <Can I="update" a="Application">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title={t('applications.actions.changeStatus')}
+                    data-testid={`application-status-btn-${row.original.id}`}
+                    onClick={() => setStatusChange(row.original)}
+                  >
+                    <GitBranch aria-hidden="true" className="size-4" />
+                    <span className="sr-only md:not-sr-only md:ms-1">
+                      {t('applications.actions.changeStatus')}
+                    </span>
+                  </Button>
+                </Can>
+              )}
               {canApprove && (
                 <Can I="update" a="Application">
                   <Button
@@ -304,7 +308,7 @@ export default function ApplicationsPage() {
         },
       },
     ],
-    [t, format, pendingApprovals],
+    [t, format, pendingApprovals, resolveI18n],
   );
 
   return (
@@ -346,14 +350,26 @@ export default function ApplicationsPage() {
                 </SelectContent>
               </Select>
 
-              <Input
-                className="w-[200px]"
-                placeholder={t('applications.filters.allStandards')}
-                value={filters.standardId ?? ''}
-                onChange={(e) => setFilters({ standardId: e.target.value || null })}
-                data-testid={instituteAdmissionApplications.standardFilter}
-                aria-label={t('applications.filters.allStandards')}
-              />
+              <Select
+                value={filters.standardId ?? '__all__'}
+                onValueChange={(v) => setFilters({ standardId: v === '__all__' ? null : v })}
+              >
+                <SelectTrigger
+                  className="w-[200px]"
+                  aria-label={t('applications.filters.allStandards')}
+                  data-testid={instituteAdmissionApplications.standardFilter}
+                >
+                  <SelectValue placeholder={t('applications.filters.allStandards')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{t('applications.filters.allStandards')}</SelectItem>
+                  {standards.map((standard) => (
+                    <SelectItem key={standard.id} value={standard.id}>
+                      {resolveI18n(standard.name)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               <label className="inline-flex items-center gap-2 text-sm">
                 <input

@@ -93,10 +93,10 @@
         "studentNameRequired": "Student name is required",
         "classRequiredRequired": "Class is required",
         "parentNameRequired": "Parent name is required",
+        "parentRelationRequired": "Choose how this person is related to the student",
         "parentPhoneInvalid": "Enter a 10-digit Indian mobile starting with 6-9",
         "emailInvalid": "Enter a valid email",
-        "generic": "Could not create enquiry. Please try again.",
-        "duplicate": "An enquiry with this phone and class already exists."
+        "generic": "Could not create enquiry. Please try again."
       },
       "submit": "Create enquiry",
       "submitting": "Creating...",
@@ -328,5 +328,21 @@
     "rowsPerPage": "Rows per page",
     "prev": "Previous page",
     "next": "Next page"
+  },
+  "errors": {
+    "invalidState": "This record has moved on since you opened it. Refresh to see its current status.",
+    "concurrentModification": "Someone else changed this application just now. Refresh and try again.",
+    "applicationNotFound": "This application no longer exists.",
+    "enquiryNotFound": "This enquiry no longer exists.",
+    "enquiryAlreadyConverted": "This enquiry already has an application.",
+    "academicYearNotFound": "The academic year could not be found.",
+    "academicYearNotActive": "Choose an academic year that is open for admission.",
+    "standardNotFound": "The class could not be found.",
+    "sectionRequired": "Choose a section before enrolling the student.",
+    "sectionStandardMismatch": "The section belongs to a different class.",
+    "validation": "Some details are not valid. Check them and try again.",
+    "forbidden": "Your role is not allowed to do this.",
+    "generic": "Something went wrong. Please try again.",
+    "moveEnquiry": "Could not move the enquiry"
   }
 }

@@ -7,6 +7,7 @@ import { ThemeProvider } from '@roviq/ui/components/theme-provider';
 import { Toaster } from '@roviq/ui/components/ui/sonner';
 import { TooltipProvider } from '@roviq/ui/components/ui/tooltip';
 import { AccountLocaleSync } from '@web/components/account-locale-sync';
+import { RefetchAfterReLogin } from '@web/components/auth/refetch-after-re-login';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { useTranslations } from 'next-intl';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
@@ -48,7 +49,7 @@ function GraphQLBridge({
   scopedStorage: ReturnType<typeof createScopedTokenStorage>;
   children: React.ReactNode;
 }) {
-  const { notifyImpersonationEnded, refreshSession } = useAuth();
+  const { notifyImpersonationEnded, refreshSession, markPasswordChangeRequired } = useAuth();
   const t = useTranslations('auth');
 
   const handleImpersonationEnded = React.useCallback(() => {
@@ -81,6 +82,7 @@ function GraphQLBridge({
       }}
       onTokenRefresh={handleTokenRefresh}
       onImpersonationEnded={handleImpersonationEnded}
+      onPasswordChangeRequired={markPasswordChangeRequired}
       // One id, so a page that fires several refused writes shows one message.
       onImpersonationReadOnly={() =>
         toast.error(t('impersonationViewOnlyRefused'), { id: 'impersonation-view-only' })
@@ -138,6 +140,7 @@ export function Providers({ scope = 'institute', children }: ProvidersProps) {
       sessionExpiredLabels={sessionExpiredLabels}
     >
       <GraphQLBridge scopedStorage={scopedStorage}>
+        <RefetchAfterReLogin />
         <AccountLocaleSync />
         <NuqsAdapter>
           <ThemeProvider>

@@ -1,4 +1,4 @@
-import type { TcStatus } from '@roviq/common-types';
+import type { CbseTcData, TcStatus } from '@roviq/common-types';
 import {
   AlertCircle,
   Award,
@@ -46,4 +46,41 @@ export type TcClearanceDepartment = (typeof TC_CLEARANCE_DEPARTMENTS)[number];
 
 export function isKnownDepartment(value: string): value is TcClearanceDepartment {
   return (TC_CLEARANCE_DEPARTMENTS as readonly string[]).includes(value);
+}
+
+/** CBSE TC fields in the order they are printed on the certificate (see `CbseTcData`). */
+export const TC_DATA_FIELDS = [
+  'studentName',
+  'motherName',
+  'fatherOrGuardianName',
+  'nationality',
+  'socialCategory',
+  'dateOfBirthFigures',
+  'dateOfBirthWords',
+  'whetherFailed',
+  'subjectsStudied',
+  'classLastStudied',
+  'lastExamResult',
+  'qualifiedForPromotion',
+  'feesPaidUpTo',
+  'feeConcession',
+  'nccScoutGuide',
+  'dateOfLeaving',
+  'reasonForLeaving',
+  'totalWorkingDays',
+  'totalPresentDays',
+  'generalConduct',
+  'remarks',
+  'dateOfIssue',
+] as const satisfies ReadonlyArray<keyof CbseTcData>;
+
+/** Snapshot fields holding a calendar date (`YYYY-MM-DD`), shown in the viewer's date format. */
+export const TC_DATE_FIELDS: ReadonlySet<(typeof TC_DATA_FIELDS)[number]> = new Set([
+  'dateOfBirthFigures',
+  'dateOfLeaving',
+  'dateOfIssue',
+]);
+
+export function isIsoCalendarDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }

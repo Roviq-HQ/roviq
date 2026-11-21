@@ -36,6 +36,8 @@ import {
   Textarea,
   useBreadcrumbOverride,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { FirstAdminCard } from '@web/components/institute/first-admin-card';
 import { AlertTriangle, Loader2, Pause, Play } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -69,6 +71,7 @@ export default function ResellerInstituteDetailPage() {
   const t = useTranslations('resellerInstitutes');
   const td = useTranslations('resellerInstitutes.detail');
   const ta = useTranslations('resellerInstitutes.actions');
+  const tCommon = useTranslations('common');
   const resolveI18n = useI18nField();
   const [activeTab, setActiveTab] = useQueryState('tab', parseAsString.withDefault('overview'));
 
@@ -199,7 +202,7 @@ export default function ResellerInstituteDetailPage() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">{td('fieldFramework')}</dt>
-                  <dd>{institute.structureFramework}</dd>
+                  <dd>{t(`create.frameworks.${institute.structureFramework}`)}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">{td('fieldTimezone')}</dt>
@@ -216,6 +219,20 @@ export default function ResellerInstituteDetailPage() {
               </dl>
             </CardContent>
           </Card>
+
+          <FirstAdminCard
+            firstAdmin={institute.firstAdmin}
+            testId={testIds.resellerInstituteDetail.firstAdminCard}
+            labels={{
+              title: td('firstAdmin.title'),
+              description: td('firstAdmin.description'),
+              name: td('firstAdmin.name'),
+              email: td('firstAdmin.email'),
+              phone: td('firstAdmin.phone'),
+              none: td('firstAdmin.none'),
+              withheld: td('firstAdmin.withheld'),
+            }}
+          />
 
           {institute.contact && (
             <Card>
@@ -337,7 +354,9 @@ export default function ResellerInstituteDetailPage() {
                       <TableRow key={`${aff.board}-${aff.affiliationNumber}`}>
                         <TableCell className="font-medium">{aff.board.toUpperCase()}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{aff.affiliationStatus}</Badge>
+                          <Badge variant="secondary">
+                            {tCommon(`affiliationStatuses.${aff.affiliationStatus}`)}
+                          </Badge>
                         </TableCell>
                         <TableCell>{aff.affiliationNumber ?? '\u2014'}</TableCell>
                         <TableCell>{aff.grantedLevel ?? '\u2014'}</TableCell>

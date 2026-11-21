@@ -92,7 +92,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Slug → render-info map. Resolved by <BottomTabBar/> for the phone bottom
   // nav, and by future "more" surfaces. Labels come from the same `nav`
   // namespace already used by the desktop sidebar.
-  const NAV_REGISTRY: Record<string, NavRegistryEntry> = {
+  const NAV_REGISTRY = {
     [NAV_SLUGS.dashboard]: {
       href: '/dashboard',
       icon: LayoutDashboard,
@@ -182,6 +182,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       label: t('myReportCards'),
       ability: { action: 'read', subject: 'ReportCard' },
     },
+    [NAV_SLUGS.attendance]: {
+      href: '/attendance',
+      icon: ClipboardCheck,
+      label: t('attendance'),
+      ability: { action: 'read', subject: 'Attendance' },
+    },
     [NAV_SLUGS.tc]: {
       href: '/certificates/tc',
       icon: FileText,
@@ -244,7 +250,15 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       icon: UserCog,
       label: t('account'),
     },
-  };
+  } satisfies Record<string, NavRegistryEntry>;
+
+  // Sidebar items reuse the registry's ability, so a role never sees a link to a page it cannot open.
+  const navItem = ({ label, href, icon, ability }: NavRegistryEntry) => ({
+    title: label,
+    href,
+    icon,
+    ability,
+  });
 
   const INSTITUTE_DEFAULT_SLUGS: string[] = [
     NAV_SLUGS.dashboard,
@@ -273,38 +287,34 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     navGroups: [
       {
         title: t('overview'),
-        items: [{ title: t('dashboard'), href: '/dashboard', icon: LayoutDashboard }],
+        items: [navItem(NAV_REGISTRY.dashboard)],
       },
       {
         // People group bundles every human-record management page so the
         // sidebar mirrors the spec wording from ROV-167/169 ("People").
         title: t('people'),
         items: [
-          { title: t('students'), href: '/people/students', icon: GraduationCap },
-          { title: t('staff'), href: '/people/staff', icon: UserCog },
-          { title: t('guardians'), href: '/people/guardians', icon: UserCheck },
-          { title: tGroups('title'), href: '/groups', icon: Users2 },
+          navItem(NAV_REGISTRY.students),
+          navItem(NAV_REGISTRY.staff),
+          navItem(NAV_REGISTRY.guardians),
+          navItem(NAV_REGISTRY.groups),
         ],
       },
       {
         // Admission group — ROV-168. Enquiries, applications, and funnel stats.
         title: t('admission'),
         items: [
-          { title: t('admissionEnquiries'), href: '/admission/enquiries', icon: UserPlus },
-          {
-            title: t('admissionApplications'),
-            href: '/admission/applications',
-            icon: ClipboardList,
-          },
-          { title: t('admissionStatistics'), href: '/admission/statistics', icon: BarChart3 },
+          navItem(NAV_REGISTRY.enquiries),
+          navItem(NAV_REGISTRY.applications),
+          navItem(NAV_REGISTRY.statistics),
         ],
       },
       {
         title: t('academic'),
         items: [
-          { title: t('academicYears'), href: '/academic-years', icon: CalendarRange },
-          { title: t('standards'), href: '/academics', icon: GraduationCap },
-          { title: t('timetable'), href: '/timetable', icon: Calendar },
+          navItem(NAV_REGISTRY.academicYears),
+          navItem(NAV_REGISTRY.academics),
+          navItem(NAV_REGISTRY.timetable),
           {
             title: t('sectionTimetable'),
             href: '/timetable/section-timetable',
@@ -312,16 +322,22 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           },
           { title: t('staffTimetable'), href: '/timetable/staff-timetable', icon: CalendarRange },
           { title: t('dayTimetable'), href: '/timetable/day', icon: CalendarDays },
-          { title: t('examinations'), href: '/examinations', icon: GraduationCap },
-          { title: t('reportCards'), href: '/examinations/report-cards', icon: FileText },
-          { title: t('gradingSchemes'), href: '/examinations/grading-schemes', icon: Award },
-          { title: t('myReportCards'), href: '/examinations/report-cards/my', icon: FileText },
-          { title: t('attendance'), href: '/attendance', icon: ClipboardCheck },
-          { title: t('attendanceHistory'), href: '/attendance/history', icon: History },
+          navItem(NAV_REGISTRY.examinations),
+          navItem(NAV_REGISTRY.reportCards),
+          navItem(NAV_REGISTRY.gradingSchemes),
+          navItem(NAV_REGISTRY.myReportCards),
+          navItem(NAV_REGISTRY.attendance),
+          {
+            title: t('attendanceHistory'),
+            href: '/attendance/history',
+            icon: History,
+            // Same check as the page, so a role without it is not offered a dead end.
+            ability: { action: 'read', subject: 'Attendance' },
+          },
           { title: t('leave'), href: '/leave', icon: CalendarOff },
           { title: t('holidays'), href: '/holiday', icon: CalendarDays },
-          { title: t('tc'), href: '/certificates/tc', icon: FileText },
-          { title: t('certificates'), href: '/certificates/other', icon: Award },
+          navItem(NAV_REGISTRY.tc),
+          navItem(NAV_REGISTRY.certificates),
         ],
       },
       ...(eeEnabled
@@ -329,9 +345,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             {
               title: t('billing'),
               items: [
-                { title: t('subscriptions'), href: '/billing', icon: CreditCard },
-                { title: t('invoices'), href: '/billing/invoices', icon: Receipt },
-                { title: t('payments'), href: '/billing/payments', icon: Wallet },
+                navItem(NAV_REGISTRY.subscriptions),
+                navItem(NAV_REGISTRY.invoices),
+                navItem(NAV_REGISTRY.payments),
               ],
             },
           ]
@@ -339,17 +355,13 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       {
         title: t('system'),
         items: [
-          { title: t('auditLogs'), href: '/audit', icon: FileText },
-          { title: t('settings'), href: '/settings', icon: Settings },
-          {
-            title: t('notificationPreferences'),
-            href: '/settings/notifications',
-            icon: Bell,
-          },
-          { title: t('consent'), href: '/settings/consent', icon: ShieldCheck },
+          navItem(NAV_REGISTRY.audit),
+          navItem(NAV_REGISTRY.settings),
+          navItem(NAV_REGISTRY.notifications),
+          navItem(NAV_REGISTRY.consent),
           { title: t('roleNav'), href: '/settings/roles', icon: ListTree },
-          { title: t('myProfile'), href: '/profile', icon: UserRound },
-          { title: t('account'), href: '/account', icon: UserCog },
+          navItem(NAV_REGISTRY.profile),
+          navItem(NAV_REGISTRY.account),
         ],
       },
     ],

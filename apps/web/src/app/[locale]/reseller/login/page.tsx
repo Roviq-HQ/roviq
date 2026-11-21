@@ -1,8 +1,9 @@
 'use client';
 
-import { LoginForm, useAuth } from '@roviq/auth';
+import { LoginForm } from '@roviq/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
+import { useLiveSession } from '@web/hooks/use-live-session';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
@@ -11,14 +12,14 @@ const { auth } = testIds;
 export default function ResellerLoginPage() {
   const t = useTranslations('auth');
   const errorLabels = useAuthErrorLabels();
-  const { isAuthenticated } = useAuth();
+  const liveSession = useLiveSession();
   const router = useRouter();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (liveSession) {
       router.replace('/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [liveSession, router]);
 
   const labels = {
     username: t('username'),

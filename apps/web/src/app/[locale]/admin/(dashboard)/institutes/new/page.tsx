@@ -117,6 +117,20 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
     resellerId: z.string().uuid().optional().nullable(),
     groupId: z.string().uuid().optional().nullable(),
     isDemo: z.boolean().default(false),
+    firstAdmin: z.object({
+      firstName: z.string().trim().min(1, t('firstAdmin.firstNameRequired')),
+      lastName: z
+        .string()
+        .trim()
+        .transform((value) => value || undefined),
+      email: z.string().trim().email(t('firstAdmin.emailInvalid')),
+      // Same display as the contact phones ("98765 43210" after blur); empty means none.
+      phone: z
+        .string()
+        .transform((value) => value.replace(/\D/g, ''))
+        .pipe(z.union([z.literal(''), z.string().regex(/^\d{10}$/, t('firstAdmin.phoneInvalid'))]))
+        .transform((value) => value || undefined),
+    }),
   });
 }
 
@@ -124,6 +138,24 @@ type CreateInstituteSchema = ReturnType<typeof buildSchema>;
 type CreateInstituteFormValues = z.input<CreateInstituteSchema>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Server errors that belong to one form field. */
+function fieldErrorFor(code: string | null) {
+  switch (code) {
+    // The slug is derived from the code, so a taken slug is a taken code too.
+    case ErrorCode.INSTITUTE_CODE_DUPLICATE:
+    case ErrorCode.SLUG_DUPLICATE:
+      return { field: 'code', messageKey: 'codeDuplicate' } as const;
+    case ErrorCode.RESELLER_INVALID:
+      return { field: 'resellerId', messageKey: 'resellerInvalid' } as const;
+    case ErrorCode.INSTITUTE_ADMIN_EMAIL_UNAVAILABLE:
+      return { field: 'firstAdmin.email', messageKey: 'firstAdmin.emailUnavailable' } as const;
+    case ErrorCode.PHONE_ALREADY_IN_USE:
+      return { field: 'firstAdmin.phone', messageKey: 'firstAdmin.phoneInUse' } as const;
+    default:
+      return null;
+  }
+}
 
 /** Formats a 10-digit Indian mobile as "98765 43210". */
 function formatIndianMobile(raw: string): string {
@@ -202,6 +234,7 @@ const DEFAULT_VALUES: CreateInstituteFormValues = {
   resellerId: null,
   groupId: null,
   isDemo: false,
+  firstAdmin: { firstName: '', lastName: '', email: '', phone: '' },
 };
 
 // ─── Page Component ──────────────────────────────────────────────────────────
@@ -247,6 +280,7 @@ export default function CreateInstitutePage() {
               resellerId: parsed.resellerId ?? undefined,
               groupId: parsed.groupId ?? undefined,
               isDemo: parsed.isDemo,
+              firstAdmin: parsed.firstAdmin,
             },
           },
         });
@@ -256,21 +290,15 @@ export default function CreateInstitutePage() {
         if (id) router.push(`/admin/institutes/${id}`);
       } catch (err) {
         const code = extractGraphQLErrorCode(err);
-        // The slug is derived from the code, so a taken slug is a taken code too.
-        if (code === ErrorCode.INSTITUTE_CODE_DUPLICATE || code === ErrorCode.SLUG_DUPLICATE) {
-          form.setFieldMeta('code', (prev) => ({
+        const fieldError = fieldErrorFor(code);
+        if (fieldError) {
+          const message = t(fieldError.messageKey);
+          form.setFieldMeta(fieldError.field, (prev) => ({
             ...prev,
             isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: t('codeDuplicate') },
+            errorMap: { ...prev.errorMap, onChange: message },
           }));
-          toast.error(t('codeDuplicate'));
-        } else if (code === ErrorCode.RESELLER_INVALID) {
-          form.setFieldMeta('resellerId', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: t('resellerInvalid') },
-          }));
-          toast.error(t('resellerInvalid'));
+          toast.error(message);
         } else {
           toast.error(t('error'), {
             description: code === ErrorCode.BAD_REQUEST ? t('invalidInput') : undefined,
@@ -655,6 +683,82 @@ export default function CreateInstitutePage() {
                           onChange={(next) => field.handleChange(next)}
                           data-testid={adminInstitutes.newGroupCombobox}
                         />
+                      </Field>
+                    );
+                  }}
+                </form.AppField>
+              </FieldSet>
+
+              {/* ─── Section: First admin ────────────────────────────── */}
+
+              <FieldSet data-testid={adminInstitutes.formSectionFirstAdmin}>
+                <div className="flex items-center gap-1">
+                  <FieldLegend>{t('firstAdmin.title')}</FieldLegend>
+                  <FieldInfoPopover
+                    title={t('firstAdmin.infoTitle')}
+                    data-testid={adminInstitutes.newFirstAdminInfo}
+                  >
+                    <p>{t('firstAdmin.infoBody')}</p>
+                  </FieldInfoPopover>
+                </div>
+                <FieldDescription>{t('firstAdmin.description')}</FieldDescription>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <form.AppField name="firstAdmin.firstName">
+                    {(field) => (
+                      <field.TextField
+                        label={t('firstAdmin.firstName')}
+                        testId={adminInstitutes.newFirstAdminFirstName}
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="firstAdmin.lastName">
+                    {(field) => (
+                      <field.TextField
+                        label={t('firstAdmin.lastName')}
+                        testId={adminInstitutes.newFirstAdminLastName}
+                      />
+                    )}
+                  </form.AppField>
+                </div>
+                <form.AppField name="firstAdmin.email">
+                  {(field) => (
+                    <field.TextField
+                      label={t('firstAdmin.email')}
+                      placeholder={t('firstAdmin.emailPlaceholder')}
+                      type="email"
+                      testId={adminInstitutes.newFirstAdminEmail}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="firstAdmin.phone">
+                  {(field) => {
+                    const errors = fieldErrorMessages(field);
+                    const invalid = errors.length > 0;
+                    const value = typeof field.state.value === 'string' ? field.state.value : '';
+                    return (
+                      <Field data-invalid={invalid || undefined}>
+                        <FieldLabel htmlFor={field.name}>{t('firstAdmin.phone')}</FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          data-testid={adminInstitutes.newFirstAdminPhone}
+                          inputMode="numeric"
+                          placeholder={t('firstAdmin.phonePlaceholder')}
+                          aria-invalid={invalid || undefined}
+                          value={value}
+                          // Extra digits stay visible so the length error explains them.
+                          onChange={(e) =>
+                            field.handleChange(e.target.value.replace(/[^\d ]/g, ''))
+                          }
+                          onBlur={() => {
+                            if (value.replace(/\D/g, '').length === 10) {
+                              field.handleChange(formatIndianMobile(value));
+                            }
+                            field.handleBlur();
+                          }}
+                        />
+                        <FieldDescription>{t('phoneConstraint')}</FieldDescription>
+                        {invalid && <FieldError errors={errors} />}
                       </Field>
                     );
                   }}

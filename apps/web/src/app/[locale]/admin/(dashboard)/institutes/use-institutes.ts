@@ -39,6 +39,7 @@ const INSTITUTE_DETAIL_FIELDS = gql`
     type
     structureFramework
     setupStatus
+    firstAdmin { firstName lastName email phone detailsWithheld }
     contact { phones { countryCode number isPrimary isWhatsappEnabled label } emails { address isPrimary label } }
     address { line1 line2 line3 city district state postalCode country coordinates { lat lng } }
     timezone
@@ -236,12 +237,6 @@ const DELETE_INSTITUTE = gql`
   }
 `;
 
-const RESTORE_INSTITUTE = gql`
-  mutation AdminRestoreInstitute($id: ID!) {
-    adminRestoreInstitute(id: $id) { id status }
-  }
-`;
-
 export function useCreateInstitute() {
   return useMutation<CreateInstituteData, { input: Record<string, unknown> }>(CREATE_INSTITUTE);
 }
@@ -292,12 +287,6 @@ export function useRejectInstitute() {
 
 export function useDeleteInstitute() {
   return useMutation<{ adminDeleteInstitute: boolean }, { id: string }>(DELETE_INSTITUTE);
-}
-
-export function useRestoreInstitute() {
-  return useMutation<{ adminRestoreInstitute: { id: string; status: string } }, { id: string }>(
-    RESTORE_INSTITUTE,
-  );
 }
 
 // ─── Subscriptions ───────────────────────────────────────────────────────────

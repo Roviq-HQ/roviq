@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { emptyStringToUndefined, phoneSchema, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -21,6 +21,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { ENQUIRY_SOURCE_VALUES } from '../admission-constants';
+import { admissionErrorKey } from '../admission-errors';
 import { useCreateEnquiry } from '../use-admission';
 
 const { instituteAdmissionEnquiries } = testIds;
@@ -50,7 +51,21 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
     parentEmail: emptyStringToUndefined(
       z.email({ error: t('enquiries.newForm.errors.emailInvalid') }).optional(),
     ),
-    parentRelation: emptyStringToUndefined(z.enum(RELATIONSHIPS).optional()),
+    // The admission links this person as a guardian, so the relationship is never guessed.
+    parentRelation: z
+      .enum(RELATIONSHIPS)
+      .optional()
+      .transform((value, ctx) => {
+        if (value === undefined) {
+          ctx.issues.push({
+            code: 'custom',
+            message: t('enquiries.newForm.errors.parentRelationRequired'),
+            input: value,
+          });
+          return z.NEVER;
+        }
+        return value;
+      }),
     source: emptyStringToUndefined(z.enum(ENQUIRY_SOURCE_VALUES).optional()),
     referredBy: emptyStringToUndefined(z.string().max(200).optional()),
     previousSchool: emptyStringToUndefined(z.string().max(200).optional()),
@@ -125,22 +140,9 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
         onOpenChange(false);
         if (id) onCreated?.(id);
       } catch (err) {
-        const message = extractGraphQLError(err, t('enquiries.newForm.errors.generic'));
-        if (message.includes('DUPLICATE') || message.includes('duplicate')) {
-          // Surface the duplicate-phone error both as a toast and as an inline
-          // field error so the user immediately sees which field is at fault.
-          // TanStack Form exposes per-source error slots via `setFieldMeta`;
-          // populating `onSubmit` mirrors what the validator path would do.
-          const duplicateMsg = t('enquiries.newForm.errors.duplicate');
-          toast.error(duplicateMsg);
-          form.setFieldMeta('parentPhone', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onSubmit: duplicateMsg },
-          }));
-        } else {
-          toast.error(t('enquiries.newForm.errors.generic'), { description: message });
-        }
+        toast.error(t('enquiries.newForm.errors.generic'), {
+          description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+        });
       }
     },
   });
@@ -267,6 +269,7 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
                     label={t('enquiries.newForm.fields.parentRelation')}
                     options={relationshipOptions}
                     placeholder={t('enquiries.newForm.fields.parentRelation')}
+                    optional={false}
                     testId="enquiry-relation-select"
                   />
                 )}

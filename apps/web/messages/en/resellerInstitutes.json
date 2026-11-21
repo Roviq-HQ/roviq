@@ -95,7 +95,16 @@
     "noComplianceData": "No compliance data available.",
     "auditPlaceholder": "Audit logs for this institute will be displayed here.",
     "notFound": "Institute not found.",
-    "setupProgress": "Setup in progress…"
+    "setupProgress": "Setup in progress…",
+    "firstAdmin": {
+      "title": "First admin",
+      "description": "Receives the login details when setup runs.",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Mobile",
+      "none": "Not recorded",
+      "withheld": "This is an existing Roviq account, so its name and mobile number are not shown here."
+    }
   },
   "actions": {
     "suspend": "Suspend",
@@ -200,11 +209,28 @@
       "invalidInput": "Some details are invalid. Check the highlighted fields and try again.",
       "groupNotFound": "The selected institute group was not found.",
       "forbidden": "You do not have permission to request an institute."
+    },
+    "firstAdmin": {
+      "title": "First admin",
+      "description": "This person becomes the institute admin. If a Roviq account already uses this email, that account is added as admin; otherwise a new account is created. An account that has never signed in receives a new temporary password by email and SMS.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "emailPlaceholder": "principal@example.com",
+      "phone": "Mobile number",
+      "phonePlaceholder": "9876543210",
+      "infoTitle": "Who receives the login details",
+      "infoBody": "When setup runs, this person becomes the institute admin. If no Roviq account uses this email, a new account is created. An account that has never signed in, including a new one, receives a new temporary password at its email and mobile number. An account that has already signed in keeps its password and simply gets access to this institute.",
+      "firstNameRequired": "First name is required.",
+      "emailInvalid": "Enter a valid email address.",
+      "emailUnavailable": "This email cannot be used for the first admin because it belongs to a deleted account or matches more than one account. Enter a different email.",
+      "phoneInUse": "This mobile number already belongs to another Roviq account. Enter a different number, or leave it empty.",
+      "phoneInvalid": "Mobile number must be exactly 10 digits."
     }
   },
   "groups": {
     "title": "Institute Groups",
-    "description": "Organise institutes into groups (trusts, chains).",
+    "description": "Keep institutes that belong together, such as a trust or a chain, in one group.",
     "createGroup": "Create Group",
     "registrationNumber": "Registration No.",
     "registrationNumberPlaceholder": "e.g. REG-12345",
@@ -218,7 +244,7 @@
     },
     "empty": {
       "title": "No groups yet",
-      "description": "Create a group to organise your institutes."
+      "description": "Create a group to keep related institutes together."
     },
     "create": {
       "title": "Create Institute Group",

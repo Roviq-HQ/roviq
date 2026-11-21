@@ -1,5 +1,6 @@
 'use client';
 
+import type { ApolloCache } from '@apollo/client';
 import { gql, useMutation, useQuery, useSubscription } from '@roviq/graphql';
 import type {
   AcademicYearModel,
@@ -107,6 +108,20 @@ export function useEnquiries(filter?: EnquiryFilterInput) {
 
 // ─── Enquiry mutations ────────────────────────────────────────────────────
 
+// Evicting root fields refetches every mounted list that reads them; naming the
+// queries in `refetchQueries` warns whenever that list is not mounted.
+function evictRootFields(cache: ApolloCache, fieldNames: readonly string[]) {
+  for (const fieldName of fieldNames) cache.evict({ id: 'ROOT_QUERY', fieldName });
+  cache.gc();
+}
+
+const evictEnquiries = (cache: ApolloCache) =>
+  evictRootFields(cache, ['listEnquiries', 'admissionStatistics']);
+const evictApplications = (cache: ApolloCache) =>
+  evictRootFields(cache, ['listApplications', 'admissionStatistics']);
+const evictEnquiriesAndApplications = (cache: ApolloCache) =>
+  evictRootFields(cache, ['listEnquiries', 'listApplications', 'admissionStatistics']);
+
 const CREATE_ENQUIRY = gql`
   mutation InstituteCreateEnquiry($input: CreateEnquiryInput!) {
     createEnquiry(input: $input) {
@@ -118,7 +133,7 @@ const CREATE_ENQUIRY = gql`
 export function useCreateEnquiry() {
   return useMutation<{ createEnquiry: EnquiryNode }, { input: CreateEnquiryInput }>(
     CREATE_ENQUIRY,
-    { refetchQueries: ['InstituteListEnquiries'] },
+    { update: evictEnquiries },
   );
 }
 
@@ -133,7 +148,7 @@ const UPDATE_ENQUIRY = gql`
 export function useUpdateEnquiry() {
   return useMutation<{ updateEnquiry: EnquiryNode }, { id: string; input: UpdateEnquiryInput }>(
     UPDATE_ENQUIRY,
-    { refetchQueries: ['InstituteListEnquiries'] },
+    { update: evictEnquiries },
   );
 }
 
@@ -167,7 +182,7 @@ export function useConvertEnquiry() {
     },
     { enquiryId: string; standardId: string; academicYearId: string }
   >(CONVERT_ENQUIRY, {
-    refetchQueries: ['InstituteListEnquiries', 'InstituteListApplications'],
+    update: evictEnquiriesAndApplications,
   });
 }
 
@@ -202,6 +217,7 @@ const APPLICATION_FIELDS = `
   enquiryId
   academicYearId
   standardId
+  standardName
   sectionId
   formData
   status
@@ -291,7 +307,7 @@ const CREATE_APPLICATION = gql`
 export function useCreateApplication() {
   return useMutation<{ createApplication: ApplicationNode }, { input: CreateApplicationInput }>(
     CREATE_APPLICATION,
-    { refetchQueries: ['InstituteListApplications'] },
+    { update: evictApplications },
   );
 }
 
@@ -323,7 +339,7 @@ export function useUpdateApplication() {
         meritRank?: number;
       };
     }
-  >(UPDATE_APPLICATION, { refetchQueries: ['InstituteListApplications'] });
+  >(UPDATE_APPLICATION, { update: evictApplications });
 }
 
 const APPROVE_APPLICATION = gql`
@@ -337,7 +353,7 @@ const APPROVE_APPLICATION = gql`
 export function useApproveApplication() {
   return useMutation<{ approveApplication: ApplicationNode }, { id: string; sectionId: string }>(
     APPROVE_APPLICATION,
-    { refetchQueries: ['InstituteListApplications'] },
+    { update: evictApplications },
   );
 }
 
@@ -352,7 +368,7 @@ const REJECT_APPLICATION = gql`
 export function useRejectApplication() {
   return useMutation<{ rejectApplication: ApplicationNode }, { id: string; reason?: string }>(
     REJECT_APPLICATION,
-    { refetchQueries: ['InstituteListApplications'] },
+    { update: evictApplications },
   );
 }
 

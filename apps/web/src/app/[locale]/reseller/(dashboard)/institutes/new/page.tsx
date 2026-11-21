@@ -30,6 +30,7 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useResellerCreateInstituteRequest } from '../use-reseller-institutes';
@@ -54,24 +55,38 @@ const phoneEntrySchema = z.object({
   label: z.string().max(50).default(''),
 });
 
-const schema = z.object({
-  name: i18nTextSchema,
-  code: z.string().min(1, 'Code is required.').max(50),
-  type: z.enum(TYPES),
-  structureFramework: z.enum(FRAMEWORKS).optional(),
-  board: emptyStringToUndefined(z.enum(BOARD_TYPE_VALUES).optional()),
-  departments: z.array(z.enum(EDUCATION_LEVEL_VALUES)).default([]),
-  group: emptyStringToUndefined(z.string().optional()),
-  phones: z.array(phoneEntrySchema),
-  addressLine1: emptyStringToUndefined(z.string().optional()),
-  city: emptyStringToUndefined(z.string().optional()),
-  district: emptyStringToUndefined(z.string().optional()),
-  state: emptyStringToUndefined(z.string().optional()),
-  postalCode: emptyStringToUndefined(z.string().optional()),
-});
+type CreateT = ReturnType<typeof useTranslations<'resellerInstitutes.create'>>;
 
-type FormSchema = typeof schema;
-type FormValues = z.input<FormSchema>;
+function buildSchema(t: CreateT) {
+  return z.object({
+    name: i18nTextSchema,
+    code: z.string().min(1, 'Code is required.').max(50),
+    type: z.enum(TYPES),
+    structureFramework: z.enum(FRAMEWORKS).optional(),
+    board: emptyStringToUndefined(z.enum(BOARD_TYPE_VALUES).optional()),
+    departments: z.array(z.enum(EDUCATION_LEVEL_VALUES)).default([]),
+    group: emptyStringToUndefined(z.string().optional()),
+    phones: z.array(phoneEntrySchema),
+    addressLine1: emptyStringToUndefined(z.string().optional()),
+    city: emptyStringToUndefined(z.string().optional()),
+    district: emptyStringToUndefined(z.string().optional()),
+    state: emptyStringToUndefined(z.string().optional()),
+    postalCode: emptyStringToUndefined(z.string().optional()),
+    firstAdmin: z.object({
+      firstName: z.string().trim().min(1, t('firstAdmin.firstNameRequired')),
+      lastName: emptyStringToUndefined(z.string().trim().optional()),
+      email: z.string().trim().email(t('firstAdmin.emailInvalid')),
+      phone: emptyStringToUndefined(
+        z
+          .string()
+          .regex(/^\d{10}$/, t('firstAdmin.phoneInvalid'))
+          .optional(),
+      ),
+    }),
+  });
+}
+
+type FormValues = z.input<ReturnType<typeof buildSchema>>;
 
 const DEFAULT_PHONE: z.input<typeof phoneEntrySchema> = {
   countryCode: '+91',
@@ -83,11 +98,28 @@ const DEFAULT_PHONE: z.input<typeof phoneEntrySchema> = {
 
 // ─── Page Component ──────────────────────────────────────────────────────────
 
+/** Server errors that belong to one form field. */
+function fieldErrorFor(code: string | null) {
+  switch (code) {
+    // The slug is derived from the code, so a taken slug is a taken code too.
+    case ErrorCode.INSTITUTE_CODE_DUPLICATE:
+    case ErrorCode.SLUG_DUPLICATE:
+      return { field: 'code', messageKey: 'codeDuplicate' } as const;
+    case ErrorCode.INSTITUTE_ADMIN_EMAIL_UNAVAILABLE:
+      return { field: 'firstAdmin.email', messageKey: 'firstAdmin.emailUnavailable' } as const;
+    case ErrorCode.PHONE_ALREADY_IN_USE:
+      return { field: 'firstAdmin.phone', messageKey: 'firstAdmin.phoneInUse' } as const;
+    default:
+      return null;
+  }
+}
+
 export default function ResellerCreateInstitutePage() {
   const t = useTranslations('resellerInstitutes.create');
   const tGeo = useTranslations('geography');
   const router = useRouter();
   const [createRequest] = useResellerCreateInstituteRequest();
+  const schema = useMemo(() => buildSchema(t), [t]);
 
   const form = useAppForm({
     defaultValues: {
@@ -104,6 +136,7 @@ export default function ResellerCreateInstitutePage() {
       district: '',
       state: '',
       postalCode: '',
+      firstAdmin: { firstName: '', lastName: '', email: '', phone: '' },
     } satisfies FormValues,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
     onSubmit: async ({ value }) => {
@@ -145,6 +178,7 @@ export default function ResellerCreateInstitutePage() {
               departments: isSchoolType ? parsed.departments : undefined,
               contact,
               address,
+              firstAdmin: parsed.firstAdmin,
             },
           },
         });
@@ -152,14 +186,15 @@ export default function ResellerCreateInstitutePage() {
         router.push('/reseller/institutes');
       } catch (err) {
         const code = extractGraphQLErrorCode(err);
-        // The slug is derived from the code, so a taken slug is a taken code too.
-        if (code === ErrorCode.INSTITUTE_CODE_DUPLICATE || code === ErrorCode.SLUG_DUPLICATE) {
-          form.setFieldMeta('code', (prev) => ({
+        const fieldError = fieldErrorFor(code);
+        if (fieldError) {
+          const message = t(fieldError.messageKey);
+          form.setFieldMeta(fieldError.field, (prev) => ({
             ...prev,
             isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: t('codeDuplicate') },
+            errorMap: { ...prev.errorMap, onChange: message },
           }));
-          toast.error(t('codeDuplicate'));
+          toast.error(message);
         } else {
           toast.error(t('error'), { description: errorDescription(code) });
         }
@@ -361,6 +396,57 @@ export default function ResellerCreateInstitutePage() {
               </form.AppField>
 
               {/* ─── Contact ───────────────────────────────────────────── */}
+
+              {/* ─── First admin ───────────────────────────────────────── */}
+
+              <FieldSeparator>{t('firstAdmin.title')}</FieldSeparator>
+              <p className="text-sm text-muted-foreground">
+                {t('firstAdmin.description')}
+                <FieldInfoPopover
+                  title={t('firstAdmin.infoTitle')}
+                  data-testid={resellerInstitutes.newFirstAdminInfo}
+                >
+                  <p>{t('firstAdmin.infoBody')}</p>
+                </FieldInfoPopover>
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <form.AppField name="firstAdmin.firstName">
+                  {(field) => (
+                    <field.TextField
+                      label={t('firstAdmin.firstName')}
+                      testId={resellerInstitutes.newFirstAdminFirstName}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="firstAdmin.lastName">
+                  {(field) => (
+                    <field.TextField
+                      label={t('firstAdmin.lastName')}
+                      testId={resellerInstitutes.newFirstAdminLastName}
+                    />
+                  )}
+                </form.AppField>
+              </div>
+              <form.AppField name="firstAdmin.email">
+                {(field) => (
+                  <field.TextField
+                    label={t('firstAdmin.email')}
+                    placeholder={t('firstAdmin.emailPlaceholder')}
+                    type="email"
+                    testId={resellerInstitutes.newFirstAdminEmail}
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="firstAdmin.phone">
+                {(field) => (
+                  <field.TextField
+                    label={t('firstAdmin.phone')}
+                    placeholder={t('firstAdmin.phonePlaceholder')}
+                    inputMode="numeric"
+                    testId={resellerInstitutes.newFirstAdminPhone}
+                  />
+                )}
+              </form.AppField>
 
               <FieldSeparator>{t('contact')}</FieldSeparator>
 

@@ -1,3 +1,4 @@
+import type { ApolloCache } from '@apollo/client';
 import { gql, useMutation, useQuery } from '@roviq/graphql';
 import type {
   InstituteAffiliationModel,
@@ -76,6 +77,9 @@ const RESELLER_INSTITUTE_QUERY = gql`
       type
       structureFramework
       setupStatus
+      firstAdmin { firstName lastName email phone detailsWithheld }
+      identifiers { id type value issuingAuthority validFrom validTo }
+      affiliations { id board affiliationStatus affiliationNumber grantedLevel validFrom validTo }
       contact { phones { countryCode number isPrimary isWhatsappEnabled label } emails { address isPrimary label } }
       address { line1 line2 line3 city district state postalCode country coordinates { lat lng } }
       timezone
@@ -130,7 +134,14 @@ export function useResellerCreateInstituteRequest() {
       };
     },
     { input: Record<string, unknown> }
-  >(CREATE_INSTITUTE_REQUEST, { refetchQueries: ['ResellerInstitutes'] });
+  >(CREATE_INSTITUTE_REQUEST, { update: evictInstituteLists });
+}
+
+// Evicting the root field refetches every mounted institute list; naming `ResellerInstitutes`
+// in `refetchQueries` warns when the list is not mounted (the request form).
+function evictInstituteLists(cache: ApolloCache) {
+  cache.evict({ id: 'ROOT_QUERY', fieldName: 'resellerListInstitutes' });
+  cache.gc();
 }
 
 export function useResellerSuspendInstitute() {
@@ -203,7 +214,8 @@ export function useResellerAddInstituteToGroup() {
     { resellerAddInstituteToGroup: boolean },
     { instituteId: string; groupId: string }
   >(ADD_INSTITUTE_TO_GROUP, {
-    refetchQueries: ['ResellerInstituteGroups', 'ResellerInstitutes'],
+    refetchQueries: ['ResellerInstituteGroups'],
+    update: evictInstituteLists,
   });
 }
 
@@ -216,7 +228,7 @@ const REMOVE_INSTITUTE_FROM_GROUP = gql`
 export function useResellerRemoveInstituteFromGroup() {
   return useMutation<{ resellerRemoveInstituteFromGroup: boolean }, { instituteId: string }>(
     REMOVE_INSTITUTE_FROM_GROUP,
-    { refetchQueries: ['ResellerInstituteGroups', 'ResellerInstitutes'] },
+    { refetchQueries: ['ResellerInstituteGroups'], update: evictInstituteLists },
   );
 }
 

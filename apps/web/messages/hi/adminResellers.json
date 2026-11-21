@@ -141,7 +141,7 @@
     },
     "name": "रीसेलर नाम",
     "namePlaceholder": "जैसे Acme Education Partners",
-    "nameDescription": "रीसेलर संगठन का पूरा नाम।",
+    "nameDescription": "रीसेलर का पूरा नाम।",
     "slug": "स्लग",
     "slugPlaceholder": "जैसे acme-partners",
     "slugDescription": "URL-सुरक्षित पहचानकर्ता (लोअरकेस, हाइफ़न)। नाम से स्वतः उत्पन्न होता है। बनाने के बाद नहीं बदला जा सकता।",

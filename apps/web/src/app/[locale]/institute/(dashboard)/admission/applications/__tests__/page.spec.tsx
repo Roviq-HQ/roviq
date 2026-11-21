@@ -5,9 +5,12 @@
  * visibility, the FEE_PAID → ENROLLED approve flow, and the documents dialog.
  */
 
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { ErrorCode } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../../messages/en/admission.json';
 import studentsEn from '../../../../../../../../messages/en/students.json';
@@ -26,6 +29,18 @@ vi.mock('next/navigation', () => ({
   RedirectType: { push: 'push', replace: 'replace' },
 }));
 
+const setFilters = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../academics/use-academics', () => ({
+  useStandards: () => ({
+    standards: [
+      { id: 'std-1', name: { en: 'Class 1' } },
+      { id: 'std-2', name: { en: 'Class 2' } },
+    ],
+    loading: false,
+  }),
+}));
+
 vi.mock('nuqs', () => {
   const cache = new WeakMap<object, [Record<string, unknown>, ReturnType<typeof vi.fn>]>();
   return {
@@ -36,7 +51,7 @@ vi.mock('nuqs', () => {
         for (const key of Object.keys(parsers)) {
           if (!(key in defaults)) defaults[key] = null;
         }
-        entry = [defaults, vi.fn()];
+        entry = [defaults, setFilters];
         cache.set(parsers, entry);
       }
       return entry;
@@ -51,6 +66,7 @@ const baseApp = {
   enquiryId: null,
   academicYearId: 'ay-1',
   standardId: 'std-classroom-id-1234',
+  standardName: { en: 'Class 1', hi: 'कक्षा 1' },
   sectionId: null,
   formData: { studentName: 'Diya Patel', parentName: 'Meera Patel' },
   isRteApplication: true,
@@ -92,7 +108,11 @@ const birthCertificate = {
 
 const refetch = vi.fn();
 const listState = { failed: false };
-const approve = vi.fn(() => Promise.resolve({}));
+const approve = vi.fn((_options: unknown) => Promise.resolve({}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 vi.mock('../../use-admission', () => ({
   useApplications: () =>
     listState.failed
@@ -161,6 +181,39 @@ describe('ApplicationsPage (component)', () => {
       messagesEn.applications.title,
     );
     expect(screen.getByTestId('application-applicant-app-1')).toHaveTextContent('Diya Patel');
+  });
+
+  it('names the class applied for instead of showing its id', () => {
+    renderPage();
+    // All three fixture applications are for the same class.
+    expect(screen.getAllByText('Class 1')).toHaveLength(3);
+    expect(screen.queryByText(/std-clas/)).not.toBeInTheDocument();
+  });
+
+  it('explains a refused approval in translated copy, not the server message', async () => {
+    approve.mockRejectedValueOnce(
+      new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'raw server text',
+            extensions: { code: ErrorCode.SECTION_STANDARD_MISMATCH },
+          },
+        ],
+      }),
+    );
+    renderPage();
+    await userEvent.click(screen.getByTestId('application-approve-btn-app-2'));
+    await userEvent.click(screen.getByTestId(instituteAdmissionApplications.approveSectionSelect));
+    await userEvent.click(
+      await screen.findByTestId(instituteAdmissionApplications.approveSectionOption('sec-1')),
+    );
+    await userEvent.click(screen.getByTestId(instituteAdmissionApplications.approveConfirmBtn));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messagesEn.applications.approveDialog.error, {
+        description: messagesEn.errors.sectionStandardMismatch,
+      }),
+    );
   });
 
   it('renders the RTE badge only on RTE applications', () => {
@@ -252,10 +305,20 @@ describe('ApplicationsPage (component)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('disables manual status change on FEE_PAID, where enrolment is the only next step', () => {
+  it('offers Change status only where a status can still be picked by hand', () => {
     renderPage();
-    expect(screen.getByTestId('application-status-btn-app-2')).toBeDisabled();
+    // FEE_PAID's only next step is enrolment, through Approve; REJECTED is terminal.
+    expect(screen.queryByTestId('application-status-btn-app-2')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('application-status-btn-app-3')).not.toBeInTheDocument();
     expect(screen.getByTestId('application-status-btn-app-1')).toBeEnabled();
+  });
+
+  it('filters by a standard picked from the institute’s standards', async () => {
+    renderPage();
+    await userEvent.click(screen.getByTestId(instituteAdmissionApplications.standardFilter));
+    await userEvent.click(await screen.findByRole('option', { name: 'Class 2' }));
+
+    expect(setFilters).toHaveBeenCalledWith({ standardId: 'std-2' });
   });
 
   it('requires a section before the approve dialog can be confirmed', async () => {

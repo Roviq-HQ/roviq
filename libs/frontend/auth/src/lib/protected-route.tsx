@@ -6,15 +6,18 @@ import { useAuth } from './auth-context';
 interface ProtectedRouteProps {
   loginPath?: string;
   selectInstitutePath?: string;
+  /** Where an account that must change its password is sent; every other page is withheld. */
+  changePasswordPath?: string;
   children: React.ReactNode;
 }
 
 export function ProtectedRoute({
   loginPath = '/login',
   selectInstitutePath = '/select-institute',
+  changePasswordPath = '/change-password',
   children,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, needsInstituteSelection } = useAuth();
+  const { isAuthenticated, isLoading, needsInstituteSelection, mustChangePassword } = useAuth();
 
   React.useEffect(() => {
     if (isLoading) return;
@@ -30,8 +33,21 @@ export function ProtectedRoute({
 
     if (!isAuthenticated) {
       window.location.href = `${loginPath}?returnUrl=${returnUrl}`;
+      return;
     }
-  }, [isAuthenticated, isLoading, needsInstituteSelection, loginPath, selectInstitutePath]);
+
+    if (mustChangePassword) {
+      window.location.href = changePasswordPath;
+    }
+  }, [
+    isAuthenticated,
+    isLoading,
+    needsInstituteSelection,
+    mustChangePassword,
+    loginPath,
+    selectInstitutePath,
+    changePasswordPath,
+  ]);
 
   if (isLoading) {
     return (
@@ -41,7 +57,8 @@ export function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated || needsInstituteSelection) {
+  // Nothing under the route renders, so no page query fires for these sessions.
+  if (!isAuthenticated || needsInstituteSelection || mustChangePassword) {
     return null;
   }
 

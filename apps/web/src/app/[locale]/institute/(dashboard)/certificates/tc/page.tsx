@@ -1,9 +1,9 @@
 'use client';
 
-import { ErrorCode, TC_STATUS_VALUES } from '@roviq/common-types';
+import { AcademicStatus, ErrorCode, TC_STATUS_VALUES } from '@roviq/common-types';
 import { extractGraphQLErrorCode } from '@roviq/graphql';
 import type { TcStatus } from '@roviq/graphql/generated';
-import { useI18nField, zodValidator } from '@roviq/i18n';
+import { useFormatDate, useI18nField, zodValidator } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -34,6 +34,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  useAbility,
   useAppForm,
   useDebounce,
 } from '@roviq/ui';
@@ -55,6 +56,7 @@ import { parseAsArrayOf, parseAsInteger, parseAsString, useQueryStates } from 'n
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { TcAccessDenied } from '../tc-access-denied';
 import { TC_STATUS_CLASS, TC_STATUS_ICON } from '../tc-status';
 import {
   type TCListFilter,
@@ -75,18 +77,12 @@ const filterParsers = {
   size: parseAsInteger.withDefault(DEFAULT_PAGE_SIZE),
 };
 
-/** Pad a Date to DD/MM/YYYY — locale-independent per frontend-ux [GYATP]. */
-function formatDdMmYyyy(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
 export default function TCListPage() {
   const t = useTranslations('certificates');
   const resolveI18n = useI18nField();
+  const { format } = useFormatDate();
+  const ability = useAbility();
+  const canRead = ability.can('read', 'TC');
   const router = useRouter();
   const [filters, setFilters] = useQueryStates(filterParsers);
   const [searchInput, setSearchInput] = React.useState(filters.search ?? '');
@@ -106,7 +102,7 @@ export default function TCListPage() {
     return f;
   }, [filters.status]);
 
-  const { tcs, loading, refetch } = useTCs(queryFilter);
+  const { tcs, loading, refetch } = useTCs(queryFilter, { skip: !canRead });
 
   // Client-side search over serial number + reason (backend doesn't support search).
   const filteredTcs = React.useMemo(() => {
@@ -150,11 +146,11 @@ export default function TCListPage() {
       },
       {
         id: 'class',
-        accessorKey: 'currentStandardName',
+        accessorKey: 'standardName',
         header: t('columns.class'),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {resolveI18n(row.original.currentStandardName) ?? '—'}
+            {resolveI18n(row.original.standardName) || '—'}
           </span>
         ),
       },
@@ -204,12 +200,12 @@ export default function TCListPage() {
         header: t('columns.createdAt'),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
-            {formatDdMmYyyy(row.original.createdAt)}
+            {format(new Date(row.original.createdAt), 'dd/MM/yyyy')}
           </span>
         ),
       },
     ],
-    [t, resolveI18n],
+    [t, resolveI18n, format],
   );
 
   const hasFilters = Boolean(filters.search || (filters.status && filters.status.length > 0));
@@ -361,7 +357,9 @@ export default function TCListPage() {
               onSuccess={() => refetch()}
             />
           </div>
-        ) : null
+        ) : (
+          <TcAccessDenied />
+        )
       }
     </Can>
   );
@@ -426,7 +424,10 @@ function RequestTCDialog({
   const resolveI18n = useI18nField();
   const [studentSearch, setStudentSearch] = React.useState('');
   const debouncedSearch = useDebounce(studentSearch, 250);
-  const { data: studentsData } = useStudentPicker(debouncedSearch);
+  // Only an enrolled student can be given a TC.
+  const { data: studentsData } = useStudentPicker(debouncedSearch, {
+    academicStatus: [AcademicStatus.ENROLLED],
+  });
   const { data: yearsData } = useAcademicYearsForCertificates();
   const [requestTC] = useRequestTC();
   const requestTCSchema = React.useMemo(() => buildRequestTCSchema(t), [t]);

@@ -1,6 +1,12 @@
 'use client';
 
-import { NEW_PASSWORD_MIN_LENGTH } from '@roviq/common-types';
+import {
+  failedPasswordRules,
+  meetsPasswordRule,
+  NEW_PASSWORD_MIN_LENGTH,
+  PASSWORD_RULE_IDS,
+  type PasswordRuleId,
+} from '@roviq/common-types';
 import {
   Button,
   Card,
@@ -16,7 +22,7 @@ import {
   Input,
   useAppForm,
 } from '@roviq/ui';
-import { Eye, EyeOff, KeyRound, ShieldAlert } from 'lucide-react';
+import { Check, Circle, Eye, EyeOff, KeyRound, ShieldAlert } from 'lucide-react';
 import * as React from 'react';
 import { z } from 'zod';
 import { useAuth } from './auth-context';
@@ -44,6 +50,8 @@ export interface PasswordChangeFormLabels {
   reqDifferent?: string;
   mustDifferError?: string;
   minLengthError?: string;
+  mixedCaseError?: string;
+  numberError?: string;
   mismatchError?: string;
   requiredError?: string;
   successMessage?: string;
@@ -58,7 +66,7 @@ export interface PasswordChangeFormProps {
   onSuccess?: () => void;
 }
 
-function resolveLabels(labels?: PasswordChangeFormLabels) {
+function resolveFieldLabels(labels?: PasswordChangeFormLabels) {
   return {
     title: labels?.title ?? 'Change password',
     description:
@@ -75,6 +83,11 @@ function resolveLabels(labels?: PasswordChangeFormLabels) {
     submit: labels?.submit ?? 'Change password',
     submitting: labels?.submitting ?? 'Changing…',
     showPassword: labels?.showPassword ?? 'Show password',
+  };
+}
+
+function resolveMessageLabels(labels?: PasswordChangeFormLabels) {
+  return {
     hidePassword: labels?.hidePassword ?? 'Hide password',
     requirementsTitle: labels?.requirementsTitle ?? 'Password requirements',
     reqMinLength: labels?.reqMinLength ?? `At least ${NEW_PASSWORD_MIN_LENGTH} characters`,
@@ -85,6 +98,8 @@ function resolveLabels(labels?: PasswordChangeFormLabels) {
       labels?.mustDifferError ?? 'New password must differ from the current password',
     minLengthError:
       labels?.minLengthError ?? `Password must be at least ${NEW_PASSWORD_MIN_LENGTH} characters`,
+    mixedCaseError: labels?.mixedCaseError ?? 'Password must contain upper and lower case letters',
+    numberError: labels?.numberError ?? 'Password must contain at least one number',
     mismatchError: labels?.mismatchError ?? 'Passwords do not match',
     requiredError: labels?.requiredError ?? 'Required',
     successMessage:
@@ -92,6 +107,18 @@ function resolveLabels(labels?: PasswordChangeFormLabels) {
       'Password changed. You have been signed out — please sign in again with your new password.',
     genericError: labels?.genericError ?? 'Failed to change password',
   };
+}
+
+function resolveLabels(labels?: PasswordChangeFormLabels) {
+  return { ...resolveFieldLabels(labels), ...resolveMessageLabels(labels) };
+}
+
+function ruleLabels(l: ReturnType<typeof resolveLabels>): Record<PasswordRuleId, string> {
+  return { MIN_LENGTH: l.reqMinLength, MIXED_CASE: l.reqMixedCase, NUMBER: l.reqNumber };
+}
+
+function ruleErrors(l: ReturnType<typeof resolveLabels>): Record<PasswordRuleId, string> {
+  return { MIN_LENGTH: l.minLengthError, MIXED_CASE: l.mixedCaseError, NUMBER: l.numberError };
 }
 
 type PasswordStrength = 'weak' | 'fair' | 'good' | 'strong';
@@ -128,7 +155,7 @@ type FormValues = {
 };
 
 export function PasswordChangeForm({ labels, onSuccess }: PasswordChangeFormProps) {
-  const l = resolveLabels(labels);
+  const l = React.useMemo(() => resolveLabels(labels), [labels]);
   const { changePassword } = useAuth();
 
   const schema = React.useMemo(
@@ -136,7 +163,10 @@ export function PasswordChangeForm({ labels, onSuccess }: PasswordChangeFormProp
       z
         .object({
           currentPassword: z.string().min(1, l.requiredError),
-          newPassword: z.string().min(NEW_PASSWORD_MIN_LENGTH, l.minLengthError),
+          newPassword: z.string().superRefine((value, ctx) => {
+            const [failed] = failedPasswordRules(value);
+            if (failed) ctx.addIssue({ code: 'custom', message: ruleErrors(l)[failed] });
+          }),
           confirmPassword: z.string().min(1, l.requiredError),
         })
         .refine((data) => data.newPassword === data.confirmPassword, {
@@ -147,7 +177,7 @@ export function PasswordChangeForm({ labels, onSuccess }: PasswordChangeFormProp
           path: ['newPassword'],
           message: l.mustDifferError,
         }),
-    [l.requiredError, l.minLengthError, l.mismatchError, l.mustDifferError],
+    [l],
   );
 
   const [showCurrent, setShowCurrent] = React.useState(false);
@@ -377,12 +407,34 @@ export function PasswordChangeForm({ labels, onSuccess }: PasswordChangeFormProp
 
             <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
               <p className="mb-1.5 font-medium text-foreground">{l.requirementsTitle}</p>
-              <ul className="space-y-0.5 pl-3">
-                <li className="list-disc">{l.reqMinLength}</li>
-                <li className="list-disc">{l.reqMixedCase}</li>
-                <li className="list-disc">{l.reqNumber}</li>
-                <li className="list-disc">{l.reqDifferent}</li>
-              </ul>
+              <form.Subscribe selector={(state) => state.values.newPassword}>
+                {(newPassword) => (
+                  <ul className="space-y-0.5" data-testid="password-requirements">
+                    {PASSWORD_RULE_IDS.map((rule) => {
+                      const met = meetsPasswordRule(newPassword, rule);
+                      return (
+                        <li
+                          key={rule}
+                          className={`flex items-center gap-1.5 ${met ? 'text-emerald-700 dark:text-emerald-400' : ''}`}
+                          data-rule={rule}
+                          data-met={met}
+                        >
+                          {met ? (
+                            <Check className="size-3.5 shrink-0" aria-hidden="true" />
+                          ) : (
+                            <Circle className="size-3.5 shrink-0" aria-hidden="true" />
+                          )}
+                          {ruleLabels(l)[rule]}
+                        </li>
+                      );
+                    })}
+                    <li className="flex items-center gap-1.5">
+                      <Circle className="size-3.5 shrink-0" aria-hidden="true" />
+                      {l.reqDifferent}
+                    </li>
+                  </ul>
+                )}
+              </form.Subscribe>
             </div>
 
             <form.AppForm>

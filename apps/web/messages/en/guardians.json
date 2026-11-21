@@ -22,7 +22,7 @@
       "email": "Email",
       "phone": "Phone",
       "occupation": "Occupation",
-      "organization": "Organization",
+      "organization": "Employer",
       "educationLevel": "Education level"
     },
     "placeholders": {
@@ -73,7 +73,7 @@
     "phone": "Phone",
     "linkedStudents": "Linked students",
     "occupation": "Occupation",
-    "organization": "Organization",
+    "organization": "Employer",
     "designation": "Designation",
     "educationLevel": "Education level",
     "actions": "Actions"
@@ -134,7 +134,7 @@
       "firstName": "First name",
       "lastName": "Last name",
       "occupation": "Occupation",
-      "organization": "Organization",
+      "organization": "Employer",
       "designation": "Designation",
       "educationLevel": "Education level",
       "save": "Save changes",
@@ -153,7 +153,7 @@
     "email": "Email",
     "phone": "Phone",
     "occupation": "Occupation",
-    "organization": "Organization",
+    "organization": "Employer",
     "educationLevel": "Education level",
     "designation": "Designation"
   },

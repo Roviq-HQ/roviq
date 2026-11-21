@@ -1,6 +1,6 @@
 {
   "title": "Team",
-  "description": "People from your organisation who can sign in to this portal.",
+  "description": "People on your reseller team who can sign in to this portal.",
   "invite": "Invite member",
   "you": "You",
   "never": "Never",
@@ -106,7 +106,7 @@
     "TEAM_MEMBER_ALREADY_EXISTS": "This person is already on your team. If they are inactive, reactivate them from the list.",
     "TEAM_MEMBER_EMAIL_UNAVAILABLE": "This email cannot be used for a team member. Use another address.",
     "TEAM_MEMBER_SELF_CHANGE": "You cannot change your own role or status. Ask another admin.",
-    "TEAM_ROLE_NOT_ASSIGNABLE": "This role is above what you, or your organisation's plan, can assign.",
+    "TEAM_ROLE_NOT_ASSIGNABLE": "This role is above what you, or your reseller plan, can assign.",
     "TEAM_MEMBER_STATUS_UNCHANGED": "This member's status has already changed. Refresh the page."
   }
 }

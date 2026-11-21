@@ -20,5 +20,11 @@
     "foundDescription": "Your earlier edits are saved locally. Restore to pick them up, or discard to start fresh.",
     "restore": "Restore",
     "discard": "Discard"
+  },
+  "affiliationStatuses": {
+    "PROVISIONAL": "Provisional",
+    "REGULAR": "Regular",
+    "EXTENSION_PENDING": "Extension pending",
+    "REVOKED": "Revoked"
   }
 }

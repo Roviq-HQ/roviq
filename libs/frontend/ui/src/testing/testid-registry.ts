@@ -129,6 +129,12 @@ export const testIds = {
     formSectionContact: 'institute-form-section-contact',
     formSectionAddress: 'institute-form-section-address',
     formSectionAdvanced: 'institute-form-section-advanced',
+    formSectionFirstAdmin: 'institute-form-section-first-admin',
+    newFirstAdminInfo: 'admin-institute-new-first-admin-info',
+    newFirstAdminFirstName: 'admin-institute-new-first-admin-first-name',
+    newFirstAdminLastName: 'admin-institute-new-first-admin-last-name',
+    newFirstAdminEmail: 'admin-institute-new-first-admin-email',
+    newFirstAdminPhone: 'admin-institute-new-first-admin-phone',
     newCodeInfo: 'admin-institute-new-code-info',
     newCodeInput: 'admin-institute-new-code-input',
     newTypeInfo: 'admin-institute-new-type-info',
@@ -162,6 +168,7 @@ export const testIds = {
     contactCard: 'institute-detail-contact-card',
     contactTitle: 'institute-detail-contact-title',
     addressCard: 'institute-detail-address-card',
+    firstAdminCard: 'institute-detail-first-admin-card',
     addressTitle: 'institute-detail-address-title',
     tab: (
       name:
@@ -179,7 +186,6 @@ export const testIds = {
     actionReassignReseller: 'action-reassign-reseller',
     actionAssignGroup: 'action-assign-group',
     actionRemoveGroup: 'action-remove-group',
-    actionRestore: 'action-restore',
     reassignResellerCombobox: 'reassign-reseller-combobox',
     assignGroupCombobox: 'assign-group-combobox',
 
@@ -409,6 +415,7 @@ export const testIds = {
 
   // ── Reseller: institute detail ─────────────────────────────────────────
   resellerInstituteDetail: {
+    firstAdminCard: 'reseller-institute-detail-first-admin-card',
     usersTab: 'reseller-institute-users-tab',
     usersLoading: 'reseller-institute-users-loading',
     usersEmpty: 'reseller-institute-users-empty',
@@ -714,6 +721,15 @@ export const testIds = {
     devQuickLogin: (username: string) => `dev-quick-login-${username}`,
   },
 
+  // ── Auth: forced password change (temporary password) ──────────────────
+  forcedPasswordChange: {
+    page: 'forced-password-change-page',
+    title: 'forced-password-change-title',
+    signOutBtn: 'forced-password-change-sign-out-btn',
+    success: 'forced-password-change-success',
+    signInBtn: 'forced-password-change-sign-in-btn',
+  },
+
   // ── Admin: account page ────────────────────────────────────────────────
   adminAccount: {
     page: 'account-page',
@@ -729,6 +745,7 @@ export const testIds = {
   instituteDashboard: {
     welcomeCard: 'dashboard-welcome-card',
     getStarted: 'dashboard-get-started',
+    getStartedCard: (id: string) => `dashboard-get-started-${id}`,
     quickLinks: 'dashboard-quick-links',
     quickLink: (id: string) => `dashboard-quick-link-${id}`,
     attendanceKpiCard: 'dashboard-attendance-kpi-card',
@@ -1074,6 +1091,17 @@ export const testIds = {
     requestReasonInfo: 'tc-request-reason-info',
     rejectReasonInfo: 'tc-reject-reason-info',
     duplicateReasonInfo: 'tc-duplicate-reason-info',
+    accessDenied: 'tc-access-denied',
+    // Detail page
+    approveBtn: 'tc-approve-btn',
+    rejectBtn: 'tc-reject-btn',
+    issueBtn: 'tc-issue-btn',
+    requestDuplicateBtn: 'tc-request-duplicate-btn',
+    confirmDialog: 'tc-confirm-dialog',
+    confirmBtn: 'tc-confirm-btn',
+    originalLink: 'tc-original-link',
+    duplicatesCard: 'tc-duplicates-card',
+    duplicateLink: (id: string) => `tc-duplicate-link-${id}`,
   },
 
   // ── Institute: certificates → other ───────────────────────────────────
@@ -1655,6 +1683,11 @@ export const testIds = {
     newFrameworkInfo: 'reseller-institute-new-framework-info',
     newBoardInfo: 'reseller-institute-new-board-info',
     newGroupInfo: 'reseller-institute-new-group-info',
+    newFirstAdminInfo: 'reseller-institute-new-first-admin-info',
+    newFirstAdminFirstName: 'reseller-institute-new-first-admin-first-name',
+    newFirstAdminLastName: 'reseller-institute-new-first-admin-last-name',
+    newFirstAdminEmail: 'reseller-institute-new-first-admin-email',
+    newFirstAdminPhone: 'reseller-institute-new-first-admin-phone',
   },
 
   // ── Reseller: billing → plans ──────────────────────────────────────────

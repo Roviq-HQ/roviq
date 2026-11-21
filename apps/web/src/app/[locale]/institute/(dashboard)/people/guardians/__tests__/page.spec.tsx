@@ -66,7 +66,6 @@ const guardianMessages: Record<string, unknown> = {
   columns: {
     ...(baseMessages.columns as Record<string, string>),
     photo: 'Photo',
-    organization: 'Organization',
     designation: 'Designation',
     educationLevel: 'Education level',
   },
@@ -87,6 +86,13 @@ describe('GuardiansPage (component)', () => {
   it('renders the page title', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /^guardians$/i, level: 1 })).toBeInTheDocument();
+  });
+
+  it('labels the employer column in domain language', () => {
+    renderPage();
+    expect(baseMessages.columns.organization).toBe('Employer');
+    expect(screen.getAllByText('Employer').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/organi[sz]ation/i)).not.toBeInTheDocument();
   });
 
   it('renders the search input', () => {

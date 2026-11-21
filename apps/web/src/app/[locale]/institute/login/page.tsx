@@ -3,6 +3,7 @@
 import { LoginForm, resolveAuthErrorMessage, sanitizeReturnUrl, useAuth } from '@roviq/auth';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
+import { useLiveSession } from '@web/hooks/use-live-session';
 import { LogIn } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -13,7 +14,8 @@ const { auth } = testIds;
 export default function LoginPage() {
   const t = useTranslations('auth');
   const errorLabels = useAuthErrorLabels();
-  const { isAuthenticated, needsInstituteSelection, login } = useAuth();
+  const { needsInstituteSelection, login } = useAuth();
+  const liveSession = useLiveSession();
   const router = useRouter();
   const [quickLoading, setQuickLoading] = React.useState<string | null>(null);
 
@@ -57,10 +59,10 @@ export default function LoginPage() {
       );
       return;
     }
-    if (isAuthenticated) {
+    if (liveSession) {
       router.replace(returnUrl ?? '/dashboard');
     }
-  }, [isAuthenticated, needsInstituteSelection, router]);
+  }, [liveSession, needsInstituteSelection, router]);
 
   const labels = {
     username: t('username'),

@@ -15,7 +15,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useFormatDate } from '@roviq/i18n';
 import { Badge, Card, CardContent, ScrollArea } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -28,6 +28,7 @@ import {
   ENQUIRY_STATUS_ICON,
   type EnquiryStatusKey,
 } from '../admission-constants';
+import { admissionErrorKey } from '../admission-errors';
 import { type EnquiryNode, useUpdateEnquiry } from '../use-admission';
 
 /**
@@ -47,6 +48,7 @@ export interface EnquiriesKanbanProps {
 }
 
 export function EnquiriesKanban({ enquiries, onCardClick }: EnquiriesKanbanProps) {
+  const t = useTranslations('admission');
   const [updateEnquiry] = useUpdateEnquiry();
   const [activeId, setActiveId] = React.useState<string | null>(null);
 
@@ -94,8 +96,9 @@ export function EnquiriesKanban({ enquiries, onCardClick }: EnquiriesKanbanProps
         },
       });
     } catch (err) {
-      const message = extractGraphQLError(err, '');
-      toast.error(message || 'Could not move enquiry.');
+      toast.error(t('errors.moveEnquiry'), {
+        description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+      });
     }
   };
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { AcademicStatus } from '@roviq/common-types';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -38,6 +39,7 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { certificateErrorCopy } from '../certificate-errors';
 import {
   type CertificateNode,
   useCertificates,
@@ -152,7 +154,7 @@ function CertificateTypeTable({ type }: { type: CertificateType }) {
         await issueCertificate({ variables: { id } });
         toast.success(t('other.issueSuccess'));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('other.issueError'));
+        toast.error(t('other.issueError'), { description: certificateErrorCopy(t, err) });
       }
     },
     [issueCertificate, t],
@@ -293,7 +295,10 @@ function IssueCertificateDialog({
   const resolveI18n = useI18nField();
   const [studentSearch, setStudentSearch] = React.useState('');
   const debouncedSearch = useDebounce(studentSearch, 250);
-  const { data: studentsData } = useStudentPicker(debouncedSearch);
+  // A student who has left (TC issued, passed out) is no longer offered, as in the TC dialog.
+  const { data: studentsData } = useStudentPicker(debouncedSearch, {
+    academicStatus: [AcademicStatus.ENROLLED],
+  });
   const [requestCertificate] = useRequestCertificate();
   const [previewHtml, setPreviewHtml] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -312,7 +317,7 @@ function IssueCertificateDialog({
         toast.success(t('other.requestSuccess'));
         onOpenChange(false);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('other.requestError'));
+        toast.error(t('other.requestError'), { description: certificateErrorCopy(t, err) });
       }
     },
   });
@@ -391,7 +396,7 @@ function IssueCertificateDialog({
       setPreviewHtml(html);
       setPreviewOpen(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('other.dialog.previewError'));
+      toast.error(t('other.dialog.previewError'), { description: certificateErrorCopy(t, err) });
     }
   };
 
