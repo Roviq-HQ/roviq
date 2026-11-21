@@ -23,6 +23,7 @@ describe('EntitlementCacheConsumer', () => {
     eventBus.emit(EVENT_PATTERNS.BILLING.subscription.status_changed, {
       subscriptionId: '00000000-0000-7000-a000-000000000002',
       tenantId: TENANT_ID,
+      resellerId: '00000000-0000-7000-a000-000000000004',
       planId: '00000000-0000-7000-a000-000000000003',
       status: 'ACTIVE',
     });
