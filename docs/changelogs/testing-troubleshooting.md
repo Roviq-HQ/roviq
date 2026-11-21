@@ -895,3 +895,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** `changePassword` now enforces the shared password rules on the server. `password-change.api-e2e.spec.ts` restores guardian1's seed password in `afterAll`; `guardian123` has no upper-case letter, so the restore was refused and only logged a warning. Every later suite that logs in as guardian1 failed.
 - **Fix:** guardian1's seed password is `Guardian123` (`libs/database/src/seed/fixtures.ts`).
 - **Lesson:** a seed password that a test restores through `changePassword` must meet `failedPasswordRules`. A dev database keeps the old password until it is re-seeded.
+
+## 2026-11-21 — fixed: "switching back to English" Playwright test depended on its neighbour
+
+- **Symptom:** pre-push `e2e` failed once in `switchers.e2e.spec.ts` › "switching back to English restores /en/ URL": timeout waiting for `locale-option-en`; the snapshot showed the English dashboard.
+- **Cause:** the test opened `/hi/dashboard` and assumed the account's saved language was Hindi, which only held when the "switching to Hindi" test had already run for that user. Otherwise `AccountLocaleSync` redirected to `/en` and the navigation closed the language menu between the two clicks.
+- **Fix:** one test switches to Hindi and back, so it sets the state it needs and leaves the account on English.
+- **Lesson:** since ROV-52 the URL locale follows the saved account language. A test that needs another locale must save it itself, not only open the `/hi/` URL.
