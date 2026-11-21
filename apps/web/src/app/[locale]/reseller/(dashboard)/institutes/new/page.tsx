@@ -24,6 +24,7 @@ import {
   FieldLabel,
   FieldSeparator,
   I18nField,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -188,11 +189,7 @@ export default function ResellerCreateInstitutePage() {
         const fieldError = fieldErrorFor(code);
         if (fieldError) {
           const message = t(fieldError.messageKey);
-          form.setFieldMeta(fieldError.field, (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: message },
-          }));
+          setServerFieldError(form, fieldError.field, message);
           toast.error(message);
         } else {
           toast.error(t('error'), { description: errorDescription(code) });

@@ -24,6 +24,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { parseISO } from 'date-fns';
@@ -125,11 +126,9 @@ export function CreateYearDialog() {
         if (/overlap/i.test(message)) {
           toast.error(t('errors.ACADEMIC_YEAR_OVERLAP'));
         } else if (/date/i.test(message)) {
-          form.setFieldMeta('endDate', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onSubmit: t('errors.INVALID_DATE_RANGE') },
-          }));
+          setServerFieldError(form, 'endDate', t('errors.INVALID_DATE_RANGE'), {
+            alsoClearOnChangeOf: ['startDate'],
+          });
         } else {
           toast.error(message);
         }

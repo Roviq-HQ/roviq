@@ -15,6 +15,7 @@ import {
   FieldInfoPopover,
   FieldLegend,
   FieldSet,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
@@ -142,10 +143,7 @@ export default function NewInstituteGroupPage() {
       } catch (err) {
         const message = extractGraphQLError(err, t('createFailed'));
         if (message.includes('CODE_DUPLICATE') || message.includes('already exists')) {
-          formApi.setFieldMeta('code', (prev) => ({
-            ...prev,
-            errorMap: { ...prev.errorMap, onSubmit: t('codeDuplicate') },
-          }));
+          setServerFieldError(formApi, 'code', t('codeDuplicate'));
         } else {
           toast.error(t('createFailed'), { description: message });
         }

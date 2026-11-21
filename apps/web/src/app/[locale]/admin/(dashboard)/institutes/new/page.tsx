@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
@@ -292,11 +293,7 @@ export default function CreateInstitutePage() {
         const fieldError = fieldErrorFor(code);
         if (fieldError) {
           const message = t(fieldError.messageKey);
-          form.setFieldMeta(fieldError.field, (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: message },
-          }));
+          setServerFieldError(form, fieldError.field, message);
           toast.error(message);
         } else {
           toast.error(t('error'), {

@@ -19,6 +19,7 @@ import {
   FieldLegend,
   FieldSet,
   I18nField,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useTranslations } from 'next-intl';
@@ -239,13 +240,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
         onOpenChange(false);
       } catch (err) {
         if (extractGraphQLErrorCode(err) === 'PLAN_CODE_DUPLICATE') {
-          form.setFieldMeta('code', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: errorMessage(err) },
-            // Marked as form-sourced so the next edit clears it; field-sourced errors persist.
-            errorSourceMap: { ...prev.errorSourceMap, onChange: 'form' },
-          }));
+          setServerFieldError(form, 'code', errorMessage(err));
           codeInputRef.current?.focus();
           return;
         }
