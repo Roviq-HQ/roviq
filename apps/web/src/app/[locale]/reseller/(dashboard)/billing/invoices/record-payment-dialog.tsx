@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError, gql, useMutation } from '@roviq/graphql';
+import { gql, useMutation } from '@roviq/graphql';
 import {
   Button,
   Dialog,
@@ -23,6 +23,7 @@ import {
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 
 const { resellerBillingInvoices } = testIds;
 const RECORD_PAYMENT = gql`
@@ -47,12 +48,12 @@ export function RecordPaymentDialog({
   remainingPaise,
 }: RecordPaymentDialogProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const [recordPayment] = useMutation(RECORD_PAYMENT, { refetchQueries: ['Invoices'] });
   const [method, setMethod] = React.useState<string>('CASH');
   const [amount, setAmount] = React.useState('');
   const [receiptNumber, setReceiptNumber] = React.useState('');
   const [notes, setNotes] = React.useState('');
-  const [collectedById, setCollectedById] = React.useState('');
   const [collectionDate, setCollectionDate] = React.useState(
     () => new Date().toISOString().split('T')[0],
   );
@@ -64,7 +65,6 @@ export function RecordPaymentDialog({
       setAmount(String(remainingPaise / 100));
       setReceiptNumber('');
       setNotes('');
-      setCollectedById('');
       setCollectionDate(new Date().toISOString().split('T')[0]);
     }
   }, [open, remainingPaise]);
@@ -82,19 +82,14 @@ export function RecordPaymentDialog({
             amountPaise,
             receiptNumber: receiptNumber || undefined,
             notes: notes || undefined,
-            ...(method === 'CASH'
-              ? {
-                  collectedById: collectedById || undefined,
-                  collectionDate: collectionDate || undefined,
-                }
-              : {}),
+            ...(method === 'CASH' ? { collectionDate: collectionDate || undefined } : {}),
           },
         },
       });
       toast.success(t('invoices.recordPayment.success'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('invoices.recordPayment.error')));
+      toast.error(errorMessage(err, t('invoices.recordPayment.error')));
     } finally {
       setIsSubmitting(false);
     }
@@ -175,23 +170,12 @@ export function RecordPaymentDialog({
 
             {method === 'CASH' && (
               <>
-                <Field>
-                  <FieldLabel htmlFor="collectedById">
-                    {t('invoices.recordPayment.collectedById')}
-                    <FieldInfoPopover
-                      title={t('invoices.recordPayment.fieldHelp.collectedByIdTitle')}
-                      data-testid={resellerBillingInvoices.recordPaymentCollectedByInfo}
-                    >
-                      <p>{t('invoices.recordPayment.fieldHelp.collectedByIdBody')}</p>
-                    </FieldInfoPopover>
-                  </FieldLabel>
-                  <Input
-                    id="collectedById"
-                    value={collectedById}
-                    onChange={(e) => setCollectedById(e.target.value)}
-                    placeholder={t('invoices.recordPayment.collectedByIdPlaceholder')}
-                  />
-                </Field>
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid={resellerBillingInvoices.recordPaymentCollectedBySelf}
+                >
+                  {t('invoices.recordPayment.collectedBySelf')}
+                </p>
                 <Field>
                   <FieldLabel htmlFor="collectionDate">
                     {t('invoices.recordPayment.collectionDate')}

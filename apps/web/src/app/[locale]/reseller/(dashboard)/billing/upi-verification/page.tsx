@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { useFormatDate, useFormatNumber } from '@roviq/i18n';
 import {
   Badge,
@@ -31,6 +30,7 @@ import { CheckCircle, Clock, ShieldAlert, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import {
   type UnverifiedPaymentNode,
   useRejectUpiPayment,
@@ -102,6 +102,7 @@ const { resellerBillingUpi: ids } = testIds;
 
 export default function UpiVerificationPage() {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
   const { payments, loading } = useUnverifiedPayments({ first: 20 });
@@ -121,7 +122,7 @@ export default function UpiVerificationPage() {
       await verifyUpi({ variables: { paymentId } });
       toast.success(t('upiVerification.verifySuccess'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('upiVerification.verifyError')));
+      toast.error(errorMessage(err, t('upiVerification.verifyError')));
     } finally {
       setVerifyingId(null);
     }
@@ -143,7 +144,7 @@ export default function UpiVerificationPage() {
       setRejectDialogPayment(null);
       setRejectReason('');
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('upiVerification.rejectError')));
+      toast.error(errorMessage(err, t('upiVerification.rejectError')));
     } finally {
       setIsRejecting(false);
     }

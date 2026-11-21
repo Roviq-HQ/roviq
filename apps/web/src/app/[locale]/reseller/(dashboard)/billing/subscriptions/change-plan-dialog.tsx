@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError, gql, useMutation } from '@roviq/graphql';
+import { gql, useMutation } from '@roviq/graphql';
 import { useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
   Button,
@@ -21,6 +21,7 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { useSubscriptionPlans } from '../plans/use-plans';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 
 const CHANGE_PLAN_MUTATION = gql`
   mutation ChangePlan($input: ChangePlanInput!) {
@@ -48,6 +49,7 @@ export function ChangePlanDialog({
   periodEnd,
 }: ChangePlanDialogProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const { currency } = useFormatNumber();
   const ti = useI18nField();
   const { plans } = useSubscriptionPlans();
@@ -80,7 +82,7 @@ export function ChangePlanDialog({
       toast.success(t('subscriptions.actions.changePlanSuccess'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('subscriptions.actions.changePlanError')));
+      toast.error(errorMessage(err, t('subscriptions.actions.changePlanError')));
     } finally {
       setIsSubmitting(false);
     }

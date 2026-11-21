@@ -1751,6 +1751,7 @@ export const testIds = {
   // ── Reseller: billing → gateway configs ───────────────────────────────
   resellerBillingGateway: {
     vpaInfo: 'billing-gateway-vpa-info',
+    defaultSwitch: 'billing-gateway-default-switch',
     keyIdInfo: 'billing-gateway-key-id-info',
     keySecretInfo: 'billing-gateway-key-secret-info',
     webhookSecretInfo: 'billing-gateway-webhook-secret-info',
@@ -1776,16 +1777,23 @@ export const testIds = {
     // Record payment dialog
     recordPaymentMethodInfo: 'billing-record-payment-method-info',
     recordPaymentReceiptInfo: 'billing-record-payment-receipt-info',
-    recordPaymentCollectedByInfo: 'billing-record-payment-collected-by-info',
+    recordPaymentCollectedBySelf: 'billing-record-payment-collected-by-self',
     recordPaymentCollectionDateInfo: 'billing-record-payment-collection-date-info',
     // Refund dialog
     refundAmountInfo: 'billing-refund-amount-info',
     refundReasonInfo: 'billing-refund-reason-info',
+    refundPaymentSelect: 'billing-refund-payment-select',
+    refundPaymentOption: (id: string) => `billing-refund-payment-option-${id}`,
+    refundNoPayment: 'billing-refund-no-payment',
+    refundAmountError: 'billing-refund-amount-error',
+    refundSubmit: 'billing-refund-submit',
   },
 
   // ── Reseller: billing → subscriptions ─────────────────────────────────
   resellerBillingSubscriptions: {
     table: 'reseller-billing-subscriptions-table',
+    pauseBtn: 'billing-subscription-pause-btn',
+    resumeBtn: 'billing-subscription-resume-btn',
     assignPlanBtn: 'billing-assign-plan-btn',
     // Assign plan dialog
     assignPlanDialog: 'billing-assign-plan-dialog',

@@ -65,12 +65,12 @@ export function useUnverifiedPayments(variables: UnverifiedPaymentsQueryVariable
 
 export function useVerifyUpiPayment() {
   return useMutation(VERIFY_UPI_MUTATION, {
-    refetchQueries: ['UnverifiedPayments', 'Invoices', 'ResellerBillingDashboard'],
+    refetchQueries: ['UnverifiedPayments', 'UnverifiedPaymentsCount'],
   });
 }
 
 export function useRejectUpiPayment() {
   return useMutation(REJECT_UPI_MUTATION, {
-    refetchQueries: ['UnverifiedPayments', 'Invoices', 'ResellerBillingDashboard'],
+    refetchQueries: ['UnverifiedPayments', 'UnverifiedPaymentsCount'],
   });
 }

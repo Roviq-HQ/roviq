@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { useFormatDate, useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -20,6 +19,7 @@ import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import { createPlanColumns, type PlanAction } from './plan-columns';
 import { PlanFormDialog } from './plan-form-dialog';
 import {
@@ -32,6 +32,7 @@ import {
 
 export default function PlansPage() {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
   const ti = useI18nField();
@@ -91,7 +92,7 @@ export default function PlansPage() {
     } catch (err) {
       const key = `plans.actions.${confirmAction.type}Error` as const;
       const fallback = t(key);
-      toast.error(fallback, { description: extractGraphQLError(err, fallback) });
+      toast.error(fallback, { description: errorMessage(err) });
     } finally {
       setIsExecuting(false);
       setConfirmAction(null);
