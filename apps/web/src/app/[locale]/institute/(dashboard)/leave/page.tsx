@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import { useStudents } from '../people/students/use-students';
 import { ApplicantPicker } from './applicant-picker';
 import { applicantFactsByMembership, leaveSubject, useReadsOthersLeaves } from './leave-abilities';
+import { leaveApplicantLabel } from './leave-applicant';
 import { LeaveCancelAction } from './leave-cancel-action';
 import { leaveActionErrorKey } from './leave-errors';
 import {
@@ -362,22 +363,8 @@ function LeavesTable({ leaves, loading, failed, onRetry }: LeavesTableProps) {
   const { approve, loading: approving } = useApproveLeave();
   const { reject, loading: rejecting } = useRejectLeave();
 
-  // Membership-id → display-name map built from the student list. Leaves
-  // store `userId` as a *membership* id, so we key on `membershipId` (not
-  // the student profile id). 200 rows covers most institutes; outliers fall
-  // back to a truncated chip below.
+  // Students are loaded for the approval rules below; names come with each leave.
   const { students } = useStudents({ first: 200 });
-  const nameByMembership = React.useMemo(() => {
-    const names = new Map<string, string>();
-    for (const s of students) {
-      if (!s.membershipId) continue;
-      const first = resolveI18n(s.firstName) ?? '';
-      const last = s.lastName ? (resolveI18n(s.lastName) ?? '') : '';
-      const fullName = [first, last].filter(Boolean).join(' ');
-      names.set(s.membershipId, `${fullName} · ${s.admissionNumber}`);
-    }
-    return names;
-  }, [students, resolveI18n]);
   const factsByMembership = React.useMemo(() => applicantFactsByMembership(students), [students]);
 
   async function runAction(
@@ -397,9 +384,9 @@ function LeavesTable({ leaves, loading, failed, onRetry }: LeavesTableProps) {
   const columns: ColumnDef<LeaveRecord, unknown>[] = [
     columnHelper.accessor('userId', {
       header: t('fields.userId'),
-      cell: ({ getValue, row }) => {
-        const id = String(getValue());
-        const label = nameByMembership.get(id) ?? id.slice(0, 8);
+      cell: ({ row }) => {
+        const label =
+          leaveApplicantLabel(row.original.applicant, resolveI18n) ?? t('applicantUnknown');
         return (
           <span
             className="font-medium truncate"

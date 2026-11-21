@@ -42,6 +42,11 @@ export interface LeaveListFilter {
 const LEAVE_FIELDS = `
   id
   userId
+  applicant {
+    firstName
+    lastName
+    admissionNumber
+  }
   startDate
   endDate
   type

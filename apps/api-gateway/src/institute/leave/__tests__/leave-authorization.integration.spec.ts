@@ -268,6 +268,15 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
         relationship: GuardianRelationship.FATHER,
       });
 
+      // The class teacher is left without a profile on purpose (ROV-312).
+      await tx.insert(userProfiles).values({
+        ...by,
+        userId: subjectTeacher.userId,
+        firstName: { en: 'Meera', hi: 'मीरा' },
+        lastName: { en: 'Iyer' },
+        gender: Gender.FEMALE,
+      });
+
       const t = tenant.tenantId;
       ids.leaveA1 = await insertLeave(tx, t, studentA1, 'A1 read');
       ids.leaveA2 = await insertLeave(tx, t, studentA2, 'A2 read');
@@ -541,6 +550,33 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
     }
     expect(await errorCodes(clerk, APPROVE, { id: ids.leaveB })).toEqual(['FORBIDDEN']);
     expect((await stored(ids.leaveB)).status).toBe('PENDING');
+  });
+
+  it('should name the applicant of each leave: a student with admission number, staff without', async () => {
+    const data = await query<{
+      leaves: {
+        id: string;
+        applicant: {
+          firstName: Record<string, string>;
+          lastName: Record<string, string> | null;
+          admissionNumber: string | null;
+        } | null;
+      }[];
+    }>(admin, 'query { leaves { id applicant { firstName lastName admissionNumber } } }');
+    const applicantOf = (id: string) => data.leaves.find((row) => row.id === id)?.applicant;
+
+    expect(applicantOf(ids.leaveA1)).toEqual({
+      firstName: { en: 'Student A' },
+      lastName: null,
+      admissionNumber: `ROV304-A-${studentA1.membershipId.slice(-4)}`,
+    });
+    expect(applicantOf(ids.leaveSubject)).toEqual({
+      firstName: { en: 'Meera', hi: 'मीरा' },
+      lastName: { en: 'Iyer' },
+      admissionNumber: null,
+    });
+    // No profile row: null, never another person's name.
+    expect(applicantOf(ids.leaveClassTeacher)).toBeNull();
   });
 
   it('should refuse the clerk a cancel', async () => {

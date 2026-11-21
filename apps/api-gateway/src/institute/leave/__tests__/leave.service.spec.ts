@@ -53,6 +53,7 @@ function buildLeave(overrides: Partial<LeaveRecord> = {}): LeaveRecord {
     type: LeaveType.CASUAL,
     reason: 'family function',
     status: LeaveStatus.PENDING,
+    applicant: null,
     files: [],
     decidedBy: null,
     createdAt: FIXED_TS,
