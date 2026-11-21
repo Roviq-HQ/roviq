@@ -17,6 +17,7 @@ import { users } from '../auth/users';
 import { tenantColumns } from '../common/columns';
 import { tcStatus } from '../common/enums';
 import { tenantPolicies } from '../common/rls-policies';
+import { files } from '../storage/files';
 import { academicYears } from '../tenant/academic-years';
 import { institutes } from '../tenant/institutes';
 import { studentProfiles } from '../user-profiles/student-profiles';
@@ -104,9 +105,10 @@ export const tcRegister = pgTable(
     issuedTo: varchar('issued_to', { length: 200 }),
 
     // ── Digital ─────────────────────────────────────────
-    pdfUrl: text('pdf_url'),
-    /** QR code URL for online TC verification — e.g., '{domain}/tc/verify/{serial}' */
-    qrVerificationUrl: text('qr_verification_url'),
+    /** The rendered PDF (purpose TC_PDF); NULL until issue has rendered it. */
+    pdfFileId: uuid('pdf_file_id').references(() => files.id, { onDelete: 'restrict' }),
+    /** Opaque token in the QR code; the public page looks the TC up by it. Set on issue. */
+    verificationToken: text('verification_token'),
     /** Whether the TC has been counter-signed by DEO (required for inter-district transfers in Haryana) */
     isCounterSigned: boolean('is_counter_signed').default(false),
     counterSignedBy: varchar('counter_signed_by', { length: 200 }),
@@ -145,6 +147,7 @@ export const tcRegister = pgTable(
 
     /** TC serial number unique per tenant */
     uniqueIndex('uq_tc_serial').on(table.tenantId, table.tcSerialNumber),
+    uniqueIndex('uq_tc_verification_token').on(table.verificationToken),
     index('idx_tc_register_tenant_status')
       .on(table.tenantId, table.status)
       .where(sql`${table.deletedAt} IS NULL`),

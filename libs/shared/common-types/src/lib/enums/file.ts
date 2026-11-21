@@ -61,6 +61,10 @@ export const FILE_PURPOSE_VALUES = [
   'INSTITUTE_COVER',
   // Compliance export (UDISE+, CBSE, RTE …) written by the export workflow
   'COMPLIANCE_EXPORT',
+  // Transfer certificate PDF rendered by the server when the TC is issued
+  'TC_PDF',
+  // PDF of an issued certificate (bonafide, character …) rendered by the server
+  'CERTIFICATE_PDF',
 ] as const;
 
 export type FilePurpose = (typeof FILE_PURPOSE_VALUES)[number];
