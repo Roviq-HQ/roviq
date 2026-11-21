@@ -13,6 +13,9 @@ import {
 const toastMock = vi.hoisted(() => ({ info: vi.fn(), success: vi.fn() }));
 vi.mock('sonner', () => ({ toast: toastMock }));
 
+// The event must land after the first load: Apollo drops a refetch of a query still in flight.
+const EVENT_DELAY_MS = 400;
+
 function payment(id: string, utr: string) {
   return {
     __typename: 'PaymentModel' as const,
@@ -64,7 +67,7 @@ describe('useResellerBillingRealtime', () => {
         unverifiedQuery([payment('pay-1', 'UTR-ONE'), payment('pay-2', 'UTR-TWO')]),
         {
           request: { query: ResellerPaymentStatusChangedDocument },
-          delay: 50,
+          delay: EVENT_DELAY_MS,
           result: { data: { resellerPaymentStatusChanged: event } },
         },
       ],
@@ -81,7 +84,7 @@ describe('useResellerBillingRealtime', () => {
         unverifiedQuery([]),
         {
           request: { query: ResellerInvoiceGeneratedDocument },
-          delay: 50,
+          delay: EVENT_DELAY_MS,
           result: {
             data: {
               resellerInvoiceGenerated: {
@@ -104,7 +107,7 @@ describe('useResellerBillingRealtime', () => {
         unverifiedQuery([]),
         {
           request: { query: ResellerPaymentReceivedDocument },
-          delay: 50,
+          delay: EVENT_DELAY_MS,
           result: { data: { resellerPaymentReceived: event } },
         },
       ],
@@ -120,7 +123,7 @@ describe('useResellerBillingRealtime', () => {
         unverifiedQuery([payment('pay-1', 'UTR-ONE')]),
         {
           request: { query: ResellerPaymentReceivedDocument },
-          delay: 50,
+          delay: EVENT_DELAY_MS,
           result: { data: { resellerPaymentReceived: event } },
         },
       ],
