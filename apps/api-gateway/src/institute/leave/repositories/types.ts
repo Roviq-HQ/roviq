@@ -1,6 +1,14 @@
 import type { LeaveStatus, LeaveType } from '@roviq/common-types';
 import type { FileRecord } from '../../../files/repositories/types';
 
+/** Who the leave is for, as shown next to it. */
+export interface LeaveApplicantRecord {
+  firstName: Record<string, string>;
+  lastName: Record<string, string> | null;
+  /** Set when the applicant is a student. */
+  admissionNumber: string | null;
+}
+
 export interface LeaveRecord {
   id: string;
   tenantId: string;
@@ -10,6 +18,8 @@ export interface LeaveRecord {
   type: LeaveType;
   reason: string;
   status: LeaveStatus;
+  /** Null when the membership has no profile row. */
+  applicant: LeaveApplicantRecord | null;
   /** Supporting documents, oldest first. */
   files: FileRecord[];
   decidedBy: string | null;
