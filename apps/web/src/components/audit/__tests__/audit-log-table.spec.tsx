@@ -125,6 +125,32 @@ describe('AuditLogTable', () => {
     );
   });
 
+  it("marks a platform action in an institute's own log", () => {
+    const log = makeLog({ scope: 'platform' });
+    renderTable({ logs: [log] });
+
+    expect(screen.getByTestId(testIds.auditLogs.outsideActorBadge(log.id))).toHaveTextContent(
+      'Roviq platform',
+    );
+  });
+
+  it('marks a reseller action in Hindi too', () => {
+    const log = makeLog({ scope: 'reseller' });
+    renderTable({ logs: [log] }, 'hi');
+
+    expect(screen.getByTestId(testIds.auditLogs.outsideActorBadge(log.id))).toHaveTextContent(
+      'रीसेलर',
+    );
+  });
+
+  it("puts no marker on the institute's own actions, nor on the platform's own log", () => {
+    const own = makeLog({ scope: 'institute' });
+    renderTable({ logs: [own] });
+    expect(
+      screen.queryByTestId(testIds.auditLogs.outsideActorBadge(own.id)),
+    ).not.toBeInTheDocument();
+  });
+
   it('translates the impersonation badge', () => {
     renderTable({ logs: [makeLog({ impersonatorId: 'imp-1' })] }, 'hi');
 

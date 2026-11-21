@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { AuditInstitute } from '@roviq/audit';
 import { assertResellerContext, CurrentUser, ResellerScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
@@ -146,6 +147,7 @@ export class ResellerBillingResolver {
   // Subscriptions (ROV-116)
   // ---------------------------------------------------------------------------
 
+  @AuditInstitute('input.tenantId')
   @Mutation(() => AssignPlanResult, { name: 'assignPlanToInstitute' })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'create', subject: 'Subscription' })
@@ -244,6 +246,7 @@ export class ResellerBillingResolver {
     return items;
   }
 
+  @AuditInstitute('input.tenantId')
   @Mutation(() => InvoiceModel, { name: 'generateInvoice' })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'create', subject: 'Invoice' })

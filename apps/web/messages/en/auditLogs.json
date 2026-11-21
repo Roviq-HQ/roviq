@@ -168,5 +168,9 @@
       "reseller": "reseller admin",
       "institute": "institute admin"
     }
+  },
+  "actorScope": {
+    "platform": "Roviq platform",
+    "reseller": "Reseller"
   }
 }

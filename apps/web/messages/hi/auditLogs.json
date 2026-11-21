@@ -168,5 +168,9 @@
       "reseller": "रीसेलर एडमिन",
       "institute": "संस्थान एडमिन"
     }
+  },
+  "actorScope": {
+    "platform": "Roviq प्लेटफ़ॉर्म",
+    "reseller": "रीसेलर"
   }
 }

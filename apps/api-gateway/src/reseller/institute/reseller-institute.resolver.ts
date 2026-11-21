@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { AuditInstitute } from '@roviq/audit';
 import { GqlAuthGuard, ResellerScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { InstituteFilterInput } from '../../institute/management/dto/institute-filter.input';
@@ -33,6 +34,7 @@ export class ResellerInstituteResolver {
     return this.resellerInstituteService.findById(id);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel)
   @CheckAbility({ action: 'suspend', subject: 'Institute' })
   async resellerSuspendInstitute(
@@ -42,6 +44,7 @@ export class ResellerInstituteResolver {
     return this.resellerInstituteService.suspend(id, reason);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel)
   @CheckAbility({ action: 'activate', subject: 'Institute' })
   async resellerReactivateInstitute(@Args('id', { type: () => ID }) id: string) {

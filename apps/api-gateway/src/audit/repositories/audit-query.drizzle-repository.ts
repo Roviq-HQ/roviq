@@ -50,8 +50,10 @@ function buildAuditConditions(
   const conditions: SQL[] = [];
 
   // Defense-in-depth: explicit tenant filter alongside RLS (skip for platform admins)
+  // Its own rows, plus platform and reseller actions that were about this institute.
   if (tenantId) {
-    conditions.push(eq(auditLogs.tenantId, tenantId));
+    const visible = or(eq(auditLogs.tenantId, tenantId), eq(auditLogs.subjectTenantId, tenantId));
+    if (visible) conditions.push(visible);
   }
 
   // Cursor: base64url("timestamp:uuid") → WHERE (created_at, id) < ($N, $N)
@@ -191,7 +193,7 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
 
       const edges = rows.map((row) => ({
         cursor: Buffer.from(`${row.createdAt.toISOString()}:${row.id}`).toString('base64url'),
-        node: this.mapRow(row),
+        node: this.mapRow(row, tenantId !== undefined && row.scope !== 'institute'),
       }));
 
       return {
@@ -245,33 +247,37 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
     });
   }
 
-  private mapRow(row: {
-    id: string;
-    scope: string;
-    tenantId: string | null;
-    resellerId: string | null;
-    userId: string;
-    actorId: string;
-    impersonatorId: string | null;
-    impersonationSessionId: string | null;
-    action: string;
-    actionType: string;
-    entityType: string;
-    entityId: string | null;
-    changes: unknown;
-    metadata: unknown;
-    correlationId: string;
-    ipAddress: string | null;
-    userAgent: string | null;
-    source: string;
-    syntheticOrigin: string | null;
-    createdAt: Date;
-    actorName: string | null;
-    userName: string | null;
-    tenantName: Record<string, string> | null;
-    resellerName: string | null;
-    resellerTier: string | null;
-  }): AuditLogRow {
+  /** `outsider`: a platform or reseller row shown to the institute it was about. */
+  private mapRow(
+    row: {
+      id: string;
+      scope: string;
+      tenantId: string | null;
+      resellerId: string | null;
+      userId: string;
+      actorId: string;
+      impersonatorId: string | null;
+      impersonationSessionId: string | null;
+      action: string;
+      actionType: string;
+      entityType: string;
+      entityId: string | null;
+      changes: unknown;
+      metadata: unknown;
+      correlationId: string;
+      ipAddress: string | null;
+      userAgent: string | null;
+      source: string;
+      syntheticOrigin: string | null;
+      createdAt: Date;
+      actorName: string | null;
+      userName: string | null;
+      tenantName: Record<string, string> | null;
+      resellerName: string | null;
+      resellerTier: string | null;
+    },
+    outsider: boolean,
+  ): AuditLogRow {
     return {
       id: row.id,
       scope: row.scope,
@@ -288,8 +294,9 @@ export class AuditQueryDrizzleRepository extends AuditQueryRepository {
       changes: row.changes as Record<string, unknown> | null,
       metadata: row.metadata as Record<string, unknown> | null,
       correlationId: row.correlationId,
-      ipAddress: row.ipAddress,
-      userAgent: row.userAgent,
+      // The institute sees who acted and what was done, not where the staff member sat.
+      ipAddress: outsider ? null : row.ipAddress,
+      userAgent: outsider ? null : row.userAgent,
       source: row.source,
       syntheticOrigin: row.syntheticOrigin,
       createdAt: row.createdAt,

@@ -82,9 +82,23 @@ export function createAuditLogColumns({
       cell: ({ row }) => {
         const log = row.original;
         const actor = log.actorName ?? log.actorId.slice(0, 8);
+        // On an institute's own log, mark what the platform or its reseller did to it.
+        const outside =
+          scope === 'institute' && (log.scope === 'platform' || log.scope === 'reseller')
+            ? log.scope
+            : null;
         return (
           <div className="flex items-center gap-1.5">
             <span className="max-w-[120px] truncate text-xs">{actor}</span>
+            {outside && (
+              <Badge
+                variant="outline"
+                className="text-[10px]"
+                data-testid={testIds.auditLogs.outsideActorBadge(log.id)}
+              >
+                {t(`actorScope.${outside}`)}
+              </Badge>
+            )}
             {log.impersonatorId && (
               <ImpersonationBadge
                 impersonatorName={actor}

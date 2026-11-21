@@ -32,6 +32,8 @@ export interface AuditEvent {
   tenantId: string | null;
   /** Set only for reseller-scoped actions */
   resellerId: string | null;
+  /** Institute a platform or reseller action was about */
+  subjectTenantId?: string | null;
   /** The user whose data was affected */
   userId: string;
   /** Real person (same as userId unless impersonating) */
@@ -247,6 +249,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
       'scope',
       'tenant_id',
       'reseller_id',
+      'subject_tenant_id',
       'user_id',
       'actor_id',
       'impersonator_id',
@@ -282,6 +285,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
         e.scope,
         e.tenantId,
         e.resellerId,
+        e.subjectTenantId ?? null,
         e.userId,
         e.actorId,
         e.impersonatorId,
