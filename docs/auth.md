@@ -187,6 +187,26 @@ Every newly-provisioned user is born with `users.must_change_password = true` an
 - **Whitelist** — handlers decorated with `@AllowWhenPasswordChangeRequired()` are reachable while the bit is set. Currently: `changePassword`, `logout`, `me`. Add the decorator on any future handler the change-password screen needs to call.
 - **Frontend contract** — on receiving `code: 'PASSWORD_CHANGE_REQUIRED'` the web app redirects to `/auth/change-password`. The screen calls `changePassword(currentPassword, newPassword)`; the next access token will not carry the bit.
 
+## Ending access tokens on a password change (ROV-232)
+
+A password change revokes every refresh token, and also ends the access tokens already issued:
+
+- `users.token_version` is raised by the same statement that stores the new password.
+- Every access token carries the version it was issued with (claim `tv`).
+- `TokenVersionGuard` (global, runs first) refuses a token whose `tv` is lower than the user's current version with `UNAUTHENTICATED`. It reads the version from Redis (`auth:token-version:<userId>`, 60 s cache, plus a `:floor` key that outlives the cache so a racing request cannot write a stale lower value) and falls back to the database.
+- Impersonation tokens are not checked; they end with their impersonation session.
+
+The user is signed out on every device, including the one that changed the password, and signs in again.
+
+## Email verification (SF-045, ROV-232)
+
+An email address typed by someone else does not prove who owns an account: the welcome message with the temporary password also goes by SMS to the phone the creator typed.
+
+- `users.email_verified_at` is set when the user enters a 6-digit code on their Account page (`requestEmailVerification`, `verifyEmail`). The code is sent by the `email-verification` Novu workflow to the email address only: no SMS, no in-app message. It lives 10 minutes, allows 5 guesses, and a new one can be requested after 60 seconds.
+- `IdentityService.findOrCreateUserByEmail` (first institute admin, reseller team invite, reseller creation) reuses an existing account only when its email is verified, or when the same actor created it. Otherwise it answers `unavailable` and the caller shows one generic error.
+- The reason an email or phone is refused is never sent to the client (`INSTITUTE_ADMIN_UNAVAILABLE`, `TEAM_MEMBER_EMAIL_UNAVAILABLE`, `RESELLER_ADMIN_EMAIL_UNAVAILABLE`).
+- Seeded users are verified. Only `roviq_admin` can update `users`, so no institute or reseller role can set the column.
+
 ## Brute-Force Lockout (ROV-209)
 
 `LoginLockoutService` tracks failed login attempts in Redis using a sliding window and locks the account after a threshold.

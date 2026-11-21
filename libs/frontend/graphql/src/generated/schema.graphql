@@ -2198,6 +2198,18 @@ enum DaySession {
   MORNING
 }
 
+"""A deleted institute, as listed for restoring"""
+type DeletedInstituteModel {
+  code: String
+  deletedAt: DateTime!
+  id: ID!
+  name: I18nText!
+  slug: String!
+
+  """The status it returns to when restored"""
+  status: InstituteStatus!
+}
+
 """
 A soft-deleted student, staff member or guardian, as shown in the Deleted list. Restore it with the matching restore mutation.
 """
@@ -2327,6 +2339,16 @@ enum EducationLevel {
   SECONDARY
   SENIOR_SECONDARY
   UPPER_PRIMARY
+}
+
+"""Whether the signed-in user has proved they read their account's email"""
+type EmailVerificationModel {
+  email: String!
+
+  """
+  An account with an unverified email cannot be given a role by email (first admin, reseller team) by anyone but the person who created it.
+  """
+  isVerified: Boolean!
 }
 
 """Emergency contact within medical info"""
@@ -3409,7 +3431,7 @@ input InstituteFilterInput {
 }
 
 """
-The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_EMAIL_UNAVAILABLE when the email cannot identify one live account.
+The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_UNAVAILABLE when the email cannot identify one live account.
 """
 input InstituteFirstAdminInput {
   """
@@ -4025,6 +4047,10 @@ type Mutation {
 
   """Re-publish a dead-lettered message to its original subject"""
   adminReplayDlqMessage(id: ID!): DlqMessageModel!
+
+  """
+  Bring a deleted institute back with the status it had when it was deleted.
+  """
   adminRestoreInstitute(id: ID!): InstituteModel!
 
   """
@@ -4345,6 +4371,11 @@ type Mutation {
   requestDuplicateTC(input: RequestDuplicateTCInput!): TCModel!
 
   """
+  Send a 6-digit code to the account email. Valid for 10 minutes; a new one can be requested after 60 seconds.
+  """
+  requestEmailVerification: Boolean!
+
+  """
   Start a file upload. Returns a URL that accepts one PUT of the declared size and type. The file is unusable until a mutation attaches it by `fileId`.
   """
   requestFileUpload(input: RequestFileUploadInput!): FileUploadTicket!
@@ -4552,6 +4583,9 @@ type Mutation {
   Saves a document for a student from files uploaded beforehand with `requestFileUpload`.
   """
   uploadStudentDocument(input: UploadStudentDocumentInput!): StudentDocumentModel!
+
+  """Confirm the code sent by `requestEmailVerification`."""
+  verifyEmail(code: String!): Boolean!
   verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): InstituteLoginResult!
   verifyPasskeyRegistration(input: VerifyPasskeyRegistrationInput!): PasskeyInfo!
   verifyPayment(input: VerifyPaymentGqlInput!): PaymentModel!
@@ -4805,6 +4839,9 @@ type Query {
   adminGetUser(userId: ID!): AdminUserDetailModel!
   adminImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   adminInstituteStatistics: InstituteStatisticsModel!
+
+  """Deleted institutes, most recently deleted first (at most 200)."""
+  adminListDeletedInstitutes: [DeletedInstituteModel!]!
 
   """Platform admin: list dead-lettered NATS messages (ROV-19)"""
   adminListDlqMessages(filter: DlqMessageFilterInput): DlqMessageConnection!
@@ -5074,6 +5111,9 @@ type Query {
 
   """Get current consent status for all linked children and purposes"""
   myConsentStatus: [ConsentStatus!]!
+
+  """The signed-in user's email address and whether it is verified."""
+  myEmailVerification: EmailVerificationModel!
   myGroups: [GroupMembershipModel!]!
   myInstitute: InstituteModel!
 

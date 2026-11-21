@@ -3,6 +3,7 @@
 import type { PasskeyManagerLabels } from '@roviq/auth';
 import { createAuthMutations, PasskeyManager, PasswordChangeForm } from '@roviq/auth';
 import { useFormatDate } from '@roviq/i18n';
+import { EmailVerification } from '@web/components/account/email-verification';
 import { LanguagePreference } from '@web/components/account/language-preference';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { usePasswordChangeLabels } from '@web/hooks/use-password-change-labels';
@@ -68,6 +69,7 @@ export default function AccountPage() {
 
       <div className="grid max-w-2xl gap-6">
         <LanguagePreference />
+        <EmailVerification />
         <PasskeyManager
           mutations={passkeyMutations}
           labels={passkeyLabels}

@@ -223,8 +223,7 @@
       "infoBody": "When setup runs, this person becomes the institute admin. If no Roviq account uses this email, a new account is created. An account that has never signed in, including a new one, receives a new temporary password at its email and mobile number. An account that has already signed in keeps its password and simply gets access to this institute.",
       "firstNameRequired": "First name is required.",
       "emailInvalid": "Enter a valid email address.",
-      "emailUnavailable": "This email cannot be used for the first admin because it belongs to a deleted account or matches more than one account. Enter a different email.",
-      "phoneInUse": "This mobile number already belongs to another Roviq account. Enter a different number, or leave it empty.",
+      "unavailable": "These first admin details cannot be used. Enter a different email or mobile number. If this person already has a Roviq account, ask them to verify their email on their Account page first.",
       "phoneInvalid": "Mobile number must be exactly 10 digits."
     }
   },

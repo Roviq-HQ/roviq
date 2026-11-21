@@ -158,9 +158,11 @@ Redis is on the request path for access control, not only for caching:
 - `ResellerAccessGuard` (ROV-97) reads `auth:reseller-access:<id>` on every reseller-scope request, and suspension writes a block marker there. If Redis is unreachable these requests fail rather than skip the check.
 - The same guard reads `auth:reseller-member-access:<membershipId>` (ROV-185). A role change, a deactivation and a tier change write the role the member's tokens must carry (or `blocked`) there for 11 minutes, one minute longer than a reseller access token lives. If the key is lost early, a token issued before the change keeps its old role until it expires (at most 10 minutes); refresh tokens are unaffected because the database checks the membership.
 - `ImpersonationSessionGuard` reads `impersonation-session:<id>` and its tombstone on every impersonated request.
-- One-time impersonation codes, impersonation OTP requests and ws-tickets live only in Redis.
+- `InstituteAccessGuard` reads `auth:institute-access:<id>` on every institute-scope request; a status change or delete writes a block marker there.
+- `TokenVersionGuard` reads `auth:token-version:<userId>` on every authenticated request. A password change writes the new version there, which ends the access tokens issued before it at once. If the key is lost the guard reads `users.token_version` from the database, so nothing is let through wrongly.
+- One-time impersonation codes, impersonation OTP requests, pending email verification codes and ws-tickets live only in Redis.
 
-Plan Redis availability with that in mind; a Redis outage blocks reseller users and impersonation.
+Plan Redis availability with that in mind; a Redis outage blocks every signed-in request.
 
 ## Impersonation OTP delivery
 

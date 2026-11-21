@@ -40,5 +40,29 @@
     "loadFailed": "Could not load your saved language.",
     "retry": "Try again",
     "impersonating": "Language preferences cannot be changed while impersonating another account."
+  },
+  "emailVerification": {
+    "title": "Email",
+    "description": "The email address of your Roviq account.",
+    "statusVerified": "Verified",
+    "statusUnverified": "Not verified",
+    "whyVerify": "Verify this address to show that it is yours. Until you do, an institute or reseller cannot give your account a new role by typing your email.",
+    "sendCode": "Send verification code",
+    "sending": "Sending…",
+    "sendAgain": "Send a new code",
+    "codeSent": "We sent a 6-digit code to your email.",
+    "codeLabel": "Verification code",
+    "codeHelp": "Enter the 6-digit code sent to {email}. It is valid for 10 minutes.",
+    "verify": "Verify email",
+    "verifying": "Verifying…",
+    "verified": "Your email is verified.",
+    "retry": "Try again",
+    "errors": {
+      "codeShape": "Enter the 6 digits of the code.",
+      "codeInvalid": "That code is wrong or has expired. Check it, or send a new code.",
+      "tooSoon": "A code was sent a moment ago. Check your email, or wait a minute before asking for another.",
+      "loadFailed": "Your email status could not be loaded.",
+      "generic": "Something went wrong. Try again in a moment."
+    }
   }
 }
