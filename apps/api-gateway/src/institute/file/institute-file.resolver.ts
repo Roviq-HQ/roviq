@@ -1,5 +1,5 @@
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   assertTenantContext,
   CurrentUser,
@@ -10,12 +10,22 @@ import type { AuthUser } from '@roviq/common-types';
 import { RequestFileUploadInput } from '../../files/dto/request-file-upload.input';
 import { FileService } from '../../files/file.service';
 import { FileUploadTicket } from '../../files/models/file-upload-ticket.model';
+import { StorageUsageModel } from '../../files/models/storage-usage.model';
 
 // No @CheckAbility: the ability depends on the file purpose, so FileService checks it.
 @UseGuards(GqlAuthGuard, InstituteScopeGuard)
 @Resolver()
 export class InstituteFileResolver {
   constructor(private readonly files: FileService) {}
+
+  // Any member may see it: the number explains why their own upload was refused.
+  @Query(() => StorageUsageModel, {
+    description: "Storage used by the institute's files and the limit of its plan",
+  })
+  async storageUsage(@CurrentUser() user: AuthUser): Promise<StorageUsageModel> {
+    assertTenantContext(user);
+    return this.files.storageUsage(user);
+  }
 
   @Mutation(() => FileUploadTicket, {
     description:

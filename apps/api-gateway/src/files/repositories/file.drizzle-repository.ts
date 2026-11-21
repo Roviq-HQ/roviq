@@ -34,6 +34,7 @@ import type {
   FileLeaveOwner,
   FileRecord,
   ProcessedImageData,
+  StorageUsageRecord,
 } from './types';
 
 const writeReturning = {
@@ -148,6 +149,24 @@ export class FileDrizzleRepository extends FileRepository {
         .from(filesLive)
         .where(and(eq(filesLive.uploadedBy, userId), eq(filesLive.status, 'PENDING')));
       return rows[0]?.value ?? 0;
+    });
+  }
+
+  async storageUsage(): Promise<StorageUsageRecord> {
+    return this.run(async (tx, { tenantId }) => {
+      if (!tenantId) throw new Error('Storage usage is per institute');
+      const rows = await tx
+        .select({
+          readyBytes: sql<string>`coalesce(sum(${filesLive.sizeBytes}) filter (where ${filesLive.status} = 'READY'), 0)`,
+          pendingBytes: sql<string>`coalesce(sum(${filesLive.sizeBytes}) filter (where ${filesLive.status} = 'PENDING'), 0)`,
+        })
+        .from(filesLive)
+        // Files about a person (tenant_id null) and reseller files are not the institute's.
+        .where(eq(filesLive.tenantId, tenantId));
+      return {
+        readyBytes: Number(rows[0]?.readyBytes ?? 0),
+        pendingBytes: Number(rows[0]?.pendingBytes ?? 0),
+      };
     });
   }
 

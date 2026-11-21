@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  DEFAULT_ENTITLEMENTS,
   type FeatureLimits,
   SUBSCRIPTION_READER,
   type SubscriptionReader,
@@ -29,6 +30,7 @@ export class EntitlementService {
    * Get entitlements for a tenant.
    * - EE disabled → UNLIMITED_ENTITLEMENTS
    * - EE enabled → Redis cache (5min TTL) → SubscriptionReader fallback
+   * - EE enabled, no active subscription → DEFAULT_ENTITLEMENTS
    */
   async getEntitlements(tenantId: string): Promise<FeatureLimits> {
     if (!this.eeEnabled || !this.reader) {
@@ -44,7 +46,7 @@ export class EntitlementService {
 
     // Fetch from subscription reader
     const sub = await this.reader.findActiveByTenant(tenantId);
-    const entitlements = sub?.plan.entitlements ?? UNLIMITED_ENTITLEMENTS;
+    const entitlements = sub?.plan.entitlements ?? DEFAULT_ENTITLEMENTS;
 
     // Cache for 5 minutes
     await this.redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(entitlements));
@@ -66,6 +68,12 @@ export class EntitlementService {
     // null = unlimited
     if (limit === null) return true;
     return currentCount < limit;
+  }
+
+  /** Bytes of file storage the institute's plan allows; null means no limit. */
+  async storageLimitBytes(tenantId: string): Promise<number | null> {
+    const { maxStorageMb } = await this.getEntitlements(tenantId);
+    return maxStorageMb === null ? null : maxStorageMb * 1024 * 1024;
   }
 
   /** Invalidate cached entitlements for a tenant (called on subscription changes) */

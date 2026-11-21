@@ -4,6 +4,7 @@ export const TENANT_SORT_FIELDS = [
   'INSTITUTE_NAME',
   'ACTIVE_USERS_24H',
   'API_CALLS_24H',
+  'STORAGE_USED',
 ] as const satisfies readonly TenantAnalyticsSortField[];
 
 export const SORT_ORDERS = ['ASC', 'DESC'] as const satisfies readonly SortOrder[];

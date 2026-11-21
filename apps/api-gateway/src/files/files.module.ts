@@ -1,6 +1,7 @@
 import { Logger, Module } from '@nestjs/common';
 import { AuditModule } from '@roviq/audit';
 import { DRIZZLE_DB, type DrizzleDB } from '@roviq/database';
+import { EntitlementModule } from '@roviq/entitlements';
 import { StorageClient } from '@roviq/storage';
 import { FileLoaders } from './file.loaders';
 import { FileService } from './file.service';
@@ -15,7 +16,7 @@ import { fileScannerProvider } from './scan/file-scanner.provider';
 import { FileSweeperWorkerService } from './workflows/file-sweeper.worker';
 
 @Module({
-  imports: [FileRepositoryModule, AuditModule],
+  imports: [FileRepositoryModule, AuditModule, EntitlementModule],
   providers: [
     FileService,
     FileLoaders,

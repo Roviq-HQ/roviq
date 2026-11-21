@@ -3,16 +3,18 @@ import type { PlatformContext } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
+  filesLive,
   institutesLive,
   refreshTokensLive,
   resellersLive,
   withAdmin,
 } from '@roviq/database';
-import { and, countDistinct, eq, gte, isNotNull, or } from 'drizzle-orm';
+import { and, countDistinct, eq, gte, isNotNull, or, sql } from 'drizzle-orm';
 import {
   type TenantActiveUsersRecord,
   TenantAnalyticsRepository,
   type TenantInstituteRecord,
+  type TenantStorageRecord,
 } from './tenant-analytics.repository';
 
 @Injectable()
@@ -61,6 +63,22 @@ export class TenantAnalyticsDrizzleRepository extends TenantAnalyticsRepository 
     );
     return rows.flatMap((r) =>
       r.tenantId ? [{ tenantId: r.tenantId, activeUsers: r.activeUsers }] : [],
+    );
+  }
+
+  async sumStorageByTenant(ctx: PlatformContext): Promise<TenantStorageRecord[]> {
+    const rows = await withAdmin(this.db, ctx, (tx) =>
+      tx
+        .select({
+          tenantId: filesLive.tenantId,
+          bytes: sql<string>`sum(${filesLive.sizeBytes})`,
+        })
+        .from(filesLive)
+        .where(and(eq(filesLive.status, 'READY'), isNotNull(filesLive.tenantId)))
+        .groupBy(filesLive.tenantId),
+    );
+    return rows.flatMap((r) =>
+      r.tenantId ? [{ tenantId: r.tenantId, storageUsedBytes: Number(r.bytes) }] : [],
     );
   }
 }

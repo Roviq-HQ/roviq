@@ -31,6 +31,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { Sparkline } from '@web/components/metrics/sparkline';
+import { formatBytes } from '@web/lib/format-bytes';
 import {
   ArrowDown,
   ArrowUp,
@@ -189,6 +190,14 @@ export function TenantAnalyticsTable() {
                     onSort={onSort}
                     numeric
                   />
+                  <SortableHead
+                    field="STORAGE_USED"
+                    label={t('columns.storage')}
+                    sort={filters.sort}
+                    order={filters.order}
+                    onSort={onSort}
+                    numeric
+                  />
                   <TableHead className="hidden sm:table-cell">{t('columns.trend')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -197,7 +206,7 @@ export function TenantAnalyticsTable() {
                   ? Array.from({ length: 5 }, (_, i) => (
                       // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders with no identity
                       <TableRow key={i}>
-                        {Array.from({ length: 5 }, (__, j) => (
+                        {Array.from({ length: 6 }, (__, j) => (
                           // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders with no identity
                           <TableCell key={j}>
                             <Skeleton className="h-4 w-full" />
@@ -227,6 +236,14 @@ export function TenantAnalyticsTable() {
                           </TableCell>
                           <TableCell className="text-end tabular-nums">
                             {formatMetric(row.apiCalls24h)}
+                          </TableCell>
+                          <TableCell
+                            className="text-end tabular-nums"
+                            data-testid={ids.tenantStorage(row.instituteId)}
+                          >
+                            {row.storageUsedBytes > 0
+                              ? formatBytes(row.storageUsedBytes, formatNumber)
+                              : '—'}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
                             <Sparkline

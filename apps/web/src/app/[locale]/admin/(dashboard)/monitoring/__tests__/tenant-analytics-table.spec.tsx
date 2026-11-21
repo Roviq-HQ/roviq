@@ -26,6 +26,7 @@ const ALPHA: Node = {
   resellerId: 'res-1',
   resellerName: 'Roviq Direct',
   activeUsers24h: 12,
+  storageUsedBytes: 1288490189,
   apiCalls24h: 3400,
   activityTrend7d: [100, 200, 300, 250, 400, 500, 3400],
 };
@@ -37,6 +38,7 @@ const BETA: Node = {
   resellerId: 'res-2',
   resellerName: 'Partner Edu',
   activeUsers24h: 0,
+  storageUsedBytes: 0,
   apiCalls24h: null,
   activityTrend7d: null,
 };
@@ -128,6 +130,13 @@ describe('TenantAnalyticsTable', () => {
       '100,200,300,250,400,500,3400',
     );
     expect(screen.getByTestId(ids.tenantPageInfo)).toHaveTextContent('1–2 of 2');
+  });
+
+  it('should show storage in a readable unit, and — for an institute with no files', async () => {
+    renderTable([analytics({}, [ALPHA, BETA])]);
+
+    expect(await screen.findByTestId(ids.tenantStorage('inst-alpha'))).toHaveTextContent('1.2 GB');
+    expect(screen.getByTestId(ids.tenantStorage('inst-beta'))).toHaveTextContent('—');
   });
 
   it('should render — for null API calls and a missing trend', async () => {

@@ -49,14 +49,18 @@ export class TenantAnalyticsService {
     const sortOrder = args.sortOrder ?? SortOrder.DESC;
     const nowSec = Math.floor(Date.now() / 1000);
 
-    const [institutes, activeUsers, apiMetrics] = await Promise.all([
+    const [institutes, activeUsers, storage, apiMetrics] = await Promise.all([
       this.repo.listInstitutes(ctx, args.resellerId ?? null),
       this.repo.countActiveUsersSince(ctx, new Date((nowSec - DAY_SEC) * 1000)),
+      this.repo.sumStorageByTenant(ctx),
       this.fetchApiMetrics(nowSec),
     ]);
 
     const activeByTenant = new Map(activeUsers.map((r) => [r.tenantId, r.activeUsers]));
-    const rows = institutes.map((inst) => toModel(inst, activeByTenant, apiMetrics));
+    const storageByTenant = new Map(storage.map((r) => [r.tenantId, r.storageUsedBytes]));
+    const rows = institutes.map((inst) =>
+      toModel(inst, activeByTenant, storageByTenant, apiMetrics),
+    );
     rows.sort(comparator(sortBy, sortOrder));
 
     const page = rows.slice(offset, offset + first);
@@ -117,11 +121,13 @@ export function zeroFillTrend(
 function toModel(
   inst: TenantInstituteRecord,
   activeByTenant: Map<string, number>,
+  storageByTenant: Map<string, number>,
   apiMetrics: TenantApiMetrics | null,
 ): TenantAnalyticsModel {
   return {
     ...inst,
     activeUsers24h: activeByTenant.get(inst.instituteId) ?? 0,
+    storageUsedBytes: storageByTenant.get(inst.instituteId) ?? 0,
     apiCalls24h: apiMetrics ? (apiMetrics.calls24h.get(inst.instituteId) ?? 0) : null,
     activityTrend7d: apiMetrics
       ? (apiMetrics.trend7d.get(inst.instituteId) ?? new Array<number>(TREND_DAYS).fill(0))
@@ -148,6 +154,8 @@ function comparator(
         return a.activeUsers24h - b.activeUsers24h;
       case 'API_CALLS_24H':
         return (a.apiCalls24h ?? 0) - (b.apiCalls24h ?? 0);
+      case 'STORAGE_USED':
+        return a.storageUsedBytes - b.storageUsedBytes;
     }
   };
   // Id tie-break keeps page boundaries stable between requests.

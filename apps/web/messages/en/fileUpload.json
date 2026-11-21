@@ -24,7 +24,8 @@
     "FILE_NOT_FOUND": "An uploaded file is no longer available. Remove it and upload it again.",
     "FORBIDDEN": "You are not allowed to upload files here.",
     "TOO_MANY_FILES": "{count, plural, one {Only one file can be added here.} other {Only # files can be added here.}}",
-    "UPLOAD_FAILED": "The upload did not finish. Check your connection and try again."
+    "UPLOAD_FAILED": "The upload did not finish. Check your connection and try again.",
+    "STORAGE_QUOTA_EXCEEDED": "Your institute has used all the storage its plan allows. Ask your institute admin to delete files or upgrade the plan."
   },
   "crop": {
     "title": "Position your picture",

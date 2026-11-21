@@ -244,5 +244,15 @@
     "saveFailed": "Could not save content languages",
     "loadFailed": "Could not load institute languages",
     "retry": "Retry"
+  },
+  "storage": {
+    "title": "Storage",
+    "usedOfLimit": "{used} of {limit} used",
+    "usedUnlimited": "{used} used. Your plan sets no storage limit.",
+    "barLabel": "Storage used: {percent}",
+    "hint": "Counts files your institute has attached to its records. Documents and photos of people are not counted.",
+    "nearLimit": "Your institute has used most of its storage. Delete files you no longer need, or ask about a larger plan.",
+    "atLimit": "Your institute has used all its storage. New uploads are refused until files are deleted or the plan is upgraded.",
+    "failed": "Storage usage could not be loaded."
   }
 }
