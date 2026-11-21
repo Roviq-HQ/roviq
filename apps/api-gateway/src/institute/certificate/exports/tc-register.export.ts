@@ -1,57 +1,95 @@
 /**
- * TC Register Export — PDF of all TCs issued in academic year (ROV-171, PRD §8).
+ * TC Register Export (ROV-171, ROV-296).
  *
- * Generates XLSX (PDF generation deferred to Puppeteer integration).
+ * Every transfer certificate ISSUED in the chosen academic year, by TC serial number. No
+ * official layout was found: the student is shown by name and admission number, dates as
+ * DD/MM/YYYY (India time).
  */
 import { TcStatus } from '@roviq/common-types';
-import { type DrizzleDB, mkInstituteCtx, tcRegisterLive, withTenant } from '@roviq/database';
-import { and, eq } from 'drizzle-orm';
+import {
+  type DrizzleDB,
+  mkInstituteCtx,
+  studentProfilesLive,
+  tcRegisterLive,
+  userProfilesLive,
+  withTenant,
+} from '@roviq/database';
+import { and, asc, eq } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
+import { formatDateDmyOf, fullName, yesNo } from './export-helpers';
+import type { ComplianceExportOutput } from './types';
 
-const TC_REGISTER_HEADERS = [
+export const TC_REGISTER_HEADERS = [
   'TC Serial Number',
-  'Student Profile ID',
+  'Student Name',
   'Status',
   'Reason',
   'Requested At',
   'Issued At',
   'Is Duplicate',
+  'Admission Number',
 ];
+
+const ORIGIN = 'workflow:compliance-export-tc-register';
+
+function issuedTcs(tx: DrizzleDB, academicYearId: string) {
+  return tx
+    .select({
+      tcSerialNumber: tcRegisterLive.tcSerialNumber,
+      status: tcRegisterLive.status,
+      reason: tcRegisterLive.reason,
+      requestedAt: tcRegisterLive.requestedAt,
+      issuedAt: tcRegisterLive.issuedAt,
+      isDuplicate: tcRegisterLive.isDuplicate,
+      admissionNumber: studentProfilesLive.admissionNumber,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+    })
+    .from(tcRegisterLive)
+    .leftJoin(studentProfilesLive, eq(studentProfilesLive.id, tcRegisterLive.studentProfileId))
+    .leftJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+    .where(
+      and(
+        eq(tcRegisterLive.academicYearId, academicYearId),
+        eq(tcRegisterLive.status, TcStatus.ISSUED),
+      ),
+    )
+    .orderBy(asc(tcRegisterLive.tcSerialNumber));
+}
+
+export type TcRegisterRow = Awaited<ReturnType<typeof issuedTcs>>[number];
 
 export async function generateTcRegisterExport(
   db: DrizzleDB,
   tenantId: string,
   academicYearId: string,
-): Promise<Buffer> {
-  const tcs = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-tc-register-export'),
-    async (tx) => {
-      return tx
-        .select()
-        .from(tcRegisterLive)
-        .where(
-          and(
-            eq(tcRegisterLive.academicYearId, academicYearId),
-            eq(tcRegisterLive.status, TcStatus.ISSUED),
-          ),
-        );
-    },
+): Promise<ComplianceExportOutput> {
+  const tcs = await withTenant(db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+    issuedTcs(tx, academicYearId),
   );
+  return buildTcRegister(tcs);
+}
 
+export function buildTcRegister(tcs: readonly TcRegisterRow[]): ComplianceExportOutput {
   const rows = tcs.map((tc) => ({
     'TC Serial Number': tc.tcSerialNumber,
-    'Student Profile ID': tc.studentProfileId,
+    'Student Name': fullName(tc),
     Status: tc.status,
     Reason: tc.reason,
-    'Requested At': tc.requestedAt?.toISOString() ?? '',
-    'Issued At': tc.issuedAt?.toISOString() ?? '',
-    'Is Duplicate': tc.isDuplicate ? 'Yes' : 'No',
+    'Requested At': formatDateDmyOf(tc.requestedAt),
+    'Issued At': formatDateDmyOf(tc.issuedAt),
+    'Is Duplicate': yesNo(tc.isDuplicate),
+    'Admission Number': tc.admissionNumber ?? '',
   }));
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows, { header: TC_REGISTER_HEADERS });
-  XLSX.utils.book_append_sheet(wb, ws, 'TC Register');
-
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.json_to_sheet(rows, { header: TC_REGISTER_HEADERS }),
+    'TC Register',
+  );
+  return {
+    buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+    rowCount: rows.length,
+  };
 }

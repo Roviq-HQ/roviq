@@ -195,6 +195,7 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | S3_PUBLIC_BASE_URL | Stable base URL of the public bucket (a CDN in production) |
 | TEMPORAL_ADDRESS | Temporal server (host:port) |
 | FILE_SWEEPER_WORKER_ENABLED | `true` runs the hourly file sweeper worker in this gateway and creates its Temporal schedule (ROV-300). Unset or anything else: off |
+| COMPLIANCE_EXPORT_WORKER_ENABLED | `true` runs the compliance export worker (task queue `compliance-export`) in this gateway (ROV-296). Unset or anything else: off, and requested exports stay PENDING |
 | STRIPE_SECRET_KEY | Stripe API key (use sk_test_... for dev) |
 | STRIPE_WEBHOOK_SECRET | Validates incoming Stripe webhook signatures |
 | SENTRY_DSN | Sentry error tracking (leave empty to disable) |

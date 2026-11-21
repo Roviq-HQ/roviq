@@ -1,29 +1,33 @@
 /**
- * Admission Register (AWR) Export (ROV-171, PRD §8).
+ * Admission Register (AWR) Export (ROV-171, ROV-296).
  *
- * All admissions in academic year sorted by admission_number.
- * Batch-fetches all data (no N+1).
+ * Students admitted during the chosen academic year (admission date between its start and
+ * end), by admission number, with the class and section they hold in that year. No official
+ * definition of the register was found, so "in that academic year" means by admission date.
  */
 import {
   type DrizzleDB,
-  mkAdminCtx,
   mkInstituteCtx,
+  sectionsLive,
+  standardsLive,
   studentAcademicsLive,
   studentProfilesLive,
   userProfilesLive,
-  withAdmin,
   withTenant,
 } from '@roviq/database';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
+import {
+  formatDateDmy,
+  fullName,
+  genderLabel,
+  resolveI18n,
+  socialCategoryLabel,
+} from './export-helpers';
+import { academicYearOf } from './staff-for-year';
+import type { ComplianceExportOutput } from './types';
 
-/** Resolve an i18nText jsonb value to a single display string (en → first → ''). */
-function resolveI18n(value: Record<string, string> | null | undefined): string {
-  if (!value) return '';
-  return value.en ?? Object.values(value)[0] ?? '';
-}
-
-const AWR_HEADERS = [
+export const AWR_HEADERS = [
   'S.No.',
   'Admission Number',
   'Student Name',
@@ -38,62 +42,73 @@ const AWR_HEADERS = [
   'Section',
 ];
 
+const ORIGIN = 'workflow:compliance-export-awr';
+
+function admittedDuring(tx: DrizzleDB, year: { id: string; startDate: string; endDate: string }) {
+  return tx
+    .select({
+      admissionNumber: studentProfilesLive.admissionNumber,
+      admissionDate: studentProfilesLive.admissionDate,
+      admissionClass: studentProfilesLive.admissionClass,
+      admissionType: studentProfilesLive.admissionType,
+      academicStatus: studentProfilesLive.academicStatus,
+      socialCategory: studentProfilesLive.socialCategory,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+      gender: userProfilesLive.gender,
+      dateOfBirth: userProfilesLive.dateOfBirth,
+      standardName: standardsLive.name,
+      sectionName: sectionsLive.name,
+    })
+    .from(studentProfilesLive)
+    .leftJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+    .leftJoin(
+      studentAcademicsLive,
+      and(
+        eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
+        eq(studentAcademicsLive.academicYearId, year.id),
+      ),
+    )
+    .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
+    .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
+    .where(
+      and(
+        gte(studentProfilesLive.admissionDate, year.startDate),
+        lte(studentProfilesLive.admissionDate, year.endDate),
+      ),
+    )
+    .orderBy(asc(studentProfilesLive.admissionNumber));
+}
+
+export type AwrRow = Awaited<ReturnType<typeof admittedDuring>>[number];
+
 export async function generateAwrExport(
   db: DrizzleDB,
   tenantId: string,
   academicYearId: string,
-): Promise<Buffer> {
-  // Batch fetch all data
-  const students = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-awr-export'),
-    async (tx) => {
-      return tx
-        .select()
-        .from(studentProfilesLive)
-        .orderBy(asc(studentProfilesLive.admissionNumber));
-    },
-  );
-
-  const academics = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-awr-export'),
-    async (tx) => {
-      return tx
-        .select()
-        .from(studentAcademicsLive)
-        .where(eq(studentAcademicsLive.academicYearId, academicYearId));
-    },
-  );
-
-  const allProfiles = await withAdmin(
-    db,
-    mkAdminCtx('service:certificate-awr-export'),
-    async (tx) => tx.select().from(userProfilesLive),
-  );
-  const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
-  const academicMap = new Map(academics.map((a) => [a.studentProfileId, a]));
-
-  let sno = 1;
-  const rows = students.map((student) => {
-    const profile = profileMap.get(student.userId);
-    const acad = academicMap.get(student.id);
-
-    return {
-      'S.No.': sno++,
-      'Admission Number': student.admissionNumber,
-      'Student Name': `${resolveI18n(profile?.firstName)} ${resolveI18n(profile?.lastName)}`.trim(),
-      'Date of Birth': profile?.dateOfBirth ?? '',
-      Gender: profile?.gender ?? '',
-      'Admission Date': student.admissionDate,
-      'Admission Class': student.admissionClass ?? '',
-      'Admission Type': student.admissionType,
-      'Academic Status': student.academicStatus,
-      'Social Category': student.socialCategory,
-      Class: acad?.standardId ?? '',
-      Section: acad?.sectionId ?? '',
-    };
+): Promise<ComplianceExportOutput> {
+  const students = await withTenant(db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+    const year = await academicYearOf(tx, academicYearId);
+    return admittedDuring(tx, { id: academicYearId, ...year });
   });
+  return buildAwr(students);
+}
+
+export function buildAwr(students: readonly AwrRow[]): ComplianceExportOutput {
+  const rows = students.map((student, index) => ({
+    'S.No.': index + 1,
+    'Admission Number': student.admissionNumber,
+    'Student Name': fullName(student),
+    'Date of Birth': formatDateDmy(student.dateOfBirth),
+    Gender: genderLabel(student.gender),
+    'Admission Date': formatDateDmy(student.admissionDate),
+    'Admission Class': student.admissionClass ?? '',
+    'Admission Type': student.admissionType,
+    'Academic Status': student.academicStatus,
+    'Social Category': socialCategoryLabel(student.socialCategory),
+    Class: resolveI18n(student.standardName),
+    Section: resolveI18n(student.sectionName),
+  }));
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
@@ -101,5 +116,8 @@ export async function generateAwrExport(
     XLSX.utils.json_to_sheet(rows, { header: AWR_HEADERS }),
     'Admission Register',
   );
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  return {
+    buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+    rowCount: rows.length,
+  };
 }

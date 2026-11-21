@@ -1,129 +1,54 @@
 /**
- * CBSE Class 9/11 Registration Export (ROV-171, PRD §3.1).
+ * CBSE Class 9/11 Registration Export (ROV-171, ROV-296).
  *
- * Generates XLSX matching CBSE Pariksha Sangam template.
- * Batch-fetches all data (no N+1 per-row queries).
+ * Only students of Class IX and Class XI (UDISE+ class codes 9 and 11) in the chosen year,
+ * one sheet per class: CBSE registers the two classes separately ("Checklist of students
+ * registered for Class…", CBSE circular "Submission of Registration Data of Class IX/XI
+ * 2025-26", 15.09.2025). Columns are the Pariksha Sangam set held in @roviq/compliance.
+ * Subject codes, e-mail and annual income are not held, so those cells stay empty.
  */
-
-import { GuardianRelationship } from '@roviq/common-types';
 import { CBSE_REGISTRATION_HEADERS } from '@roviq/compliance';
-import {
-  type DrizzleDB,
-  guardianProfilesLive,
-  mkAdminCtx,
-  mkInstituteCtx,
-  studentAcademicsLive,
-  studentGuardianLinksLive,
-  studentProfilesLive,
-  userProfilesLive,
-  withAdmin,
-  withTenant,
-} from '@roviq/database';
-import { eq } from 'drizzle-orm';
+import type { DrizzleDB } from '@roviq/database';
 import * as XLSX from 'xlsx';
+import { type CbseCandidateData, cbseCandidates, fetchCbseCandidates } from './cbse-candidates';
+import type { ComplianceExportOutput } from './types';
 
-/** Resolve an i18nText jsonb value to a single display string (en → first → ''). */
-function resolveI18n(value: Record<string, string> | null | undefined): string {
-  if (!value) return '';
-  return value.en ?? Object.values(value)[0] ?? '';
-}
-
-/** Format YYYY-MM-DD → DD/MM/YYYY (CBSE format) */
-function formatDobCbse(dob: string | null): string {
-  if (!dob) return '';
-  const match = String(dob).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
-}
+/** UDISE+ class code → sheet name. */
+export const CBSE_REGISTRATION_CLASSES = [
+  { code: 9, sheet: 'Class IX' },
+  { code: 11, sheet: 'Class XI' },
+] as const;
 
 export async function generateCbseRegistrationExport(
   db: DrizzleDB,
   tenantId: string,
   academicYearId: string,
-): Promise<Buffer> {
-  // Batch fetch
-  const academics = await withTenant(
+): Promise<ComplianceExportOutput> {
+  const data = await fetchCbseCandidates(
     db,
-    mkInstituteCtx(tenantId, 'service:certificate-cbse-registration-export'),
-    async (tx) => {
-      return tx
-        .select()
-        .from(studentAcademicsLive)
-        .where(eq(studentAcademicsLive.academicYearId, academicYearId));
-    },
+    tenantId,
+    academicYearId,
+    CBSE_REGISTRATION_CLASSES.map((c) => c.code),
+    'workflow:compliance-export-cbse-registration',
   );
+  return buildCbseRegistration(data);
+}
 
-  const allStudents = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-cbse-registration-export'),
-    async (tx) => {
-      return tx.select().from(studentProfilesLive);
-    },
-  );
-  const studentMap = new Map(allStudents.map((s) => [s.id, s]));
+export function buildCbseRegistration(data: CbseCandidateData): ComplianceExportOutput {
+  const candidates = cbseCandidates(data);
+  const wb = XLSX.utils.book_new();
+  let rowCount = 0;
 
-  const allProfiles = await withAdmin(
-    db,
-    mkAdminCtx('service:certificate-cbse-registration-export'),
-    async (tx) => tx.select().from(userProfilesLive),
-  );
-  const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
-
-  const allGuardianLinks = await withAdmin(
-    db,
-    mkAdminCtx('service:certificate-cbse-registration-export'),
-    async (tx) => {
-      return tx
-        .select({
-          studentProfileId: studentGuardianLinksLive.studentProfileId,
-          relationship: studentGuardianLinksLive.relationship,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
-        })
-        .from(studentGuardianLinksLive)
-        .innerJoin(
-          guardianProfilesLive,
-          eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
-        )
-        .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId));
-    },
-  );
-
-  const guardianMap = new Map<string, typeof allGuardianLinks>();
-  for (const link of allGuardianLinks) {
-    const existing = guardianMap.get(link.studentProfileId) ?? [];
-    existing.push(link);
-    guardianMap.set(link.studentProfileId, existing);
-  }
-
-  // Build rows
-  const rows = academics
-    .map((acad) => {
-      const student = studentMap.get(acad.studentProfileId);
-      if (!student) return null;
-
-      const profile = profileMap.get(student.userId);
-      const guardians = guardianMap.get(student.id) ?? [];
-      const father = guardians.find(
-        (g) =>
-          g.relationship === GuardianRelationship.FATHER ||
-          g.relationship === GuardianRelationship.LEGAL_GUARDIAN,
-      );
-      const mother = guardians.find((g) => g.relationship === GuardianRelationship.MOTHER);
-
-      return {
-        'Student Name (CAPITALS)':
-          `${resolveI18n(profile?.firstName)} ${resolveI18n(profile?.lastName)}`
-            .trim()
-            .toUpperCase(),
-        "Mother's Name": mother
-          ? `${resolveI18n(mother.firstName)} ${resolveI18n(mother.lastName)}`.trim()
-          : '',
-        "Father's/Guardian's Name": father
-          ? `${resolveI18n(father.firstName)} ${resolveI18n(father.lastName)}`.trim()
-          : '',
-        'Date of Birth': formatDobCbse(profile?.dateOfBirth ?? null),
-        Gender: profile?.gender ?? '',
-        'APAAR ID': '',
+  for (const { code, sheet } of CBSE_REGISTRATION_CLASSES) {
+    const rows = candidates
+      .filter((c) => c.udiseClassCode === code)
+      .map((c) => ({
+        'Student Name (CAPITALS)': c.nameCapitals,
+        "Mother's Name": c.motherName,
+        "Father's/Guardian's Name": c.fatherOrGuardianName,
+        'Date of Birth': c.dateOfBirth,
+        Gender: c.gender,
+        'APAAR ID': c.apaarId,
         'Subject Code 1': '',
         'Subject Code 2': '',
         'Subject Code 3': '',
@@ -131,20 +56,21 @@ export async function generateCbseRegistrationExport(
         'Subject Code 5': '',
         'Subject Code 6': '',
         'Subject Code 7': '',
-        'CWSN Status': student.cwsnType ?? '',
-        'Mobile Number': '',
+        'CWSN Status': c.cwsnStatus,
+        'Mobile Number': c.mobile,
         Email: '',
         'Annual Income': '',
-      };
-    })
-    .filter(Boolean) as Record<string, unknown>[];
+      }));
+    rowCount += rows.length;
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(rows, { header: CBSE_REGISTRATION_HEADERS }),
+      sheet,
+    );
+  }
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet(rows, { header: CBSE_REGISTRATION_HEADERS }),
-    'CBSE Registration',
-  );
-
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  return {
+    buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+    rowCount,
+  };
 }

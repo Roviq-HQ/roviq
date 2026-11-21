@@ -1,193 +1,137 @@
 /**
- * UDISE+ DCF Export (ROV-171, PRD §2.1-2.3).
+ * UDISE+ DCF Export (ROV-171, ROV-296).
  *
- * Generates XLSX with:
- * - Sheet 1: Student data (21 UDISE+ student fields)
- * - Sheet 2: Teacher data (12 UDISE+ teacher fields)
+ * - Sheet "Students": students enrolled in the chosen academic year (DCF 4.2 "Enrolment
+ *   details of student in present school for current year")
+ * - Sheet "Teachers": staff employed at any time in that year (DCF Section 3)
  *
- * All data fetched in batch (no N+1 per-row queries).
+ * Formats follow the UDISE+ Data Capture Format for Academic Year 2025-26 (Ministry of
+ * Education): names in capital letters (4.1.1, 3.3.1), dates DD/MM/YYYY (4.1.3, 3.3.3),
+ * minority "Not Applicable" when none (4.1.14). Aadhaar is never exported.
+ * Every query runs as the institute (`withTenant`); no other institute's rows are read.
  */
-
-import { GuardianRelationship, QualificationType } from '@roviq/common-types';
+import { QualificationType, UserIdentifierType } from '@roviq/common-types';
 import { UDISE_STUDENT_HEADERS, UDISE_TEACHER_HEADERS } from '@roviq/compliance';
-import {
-  type DrizzleDB,
-  guardianProfilesLive,
-  mkAdminCtx,
-  mkInstituteCtx,
-  staffProfilesLive,
-  staffQualificationsLive,
-  studentAcademicsLive,
-  studentGuardianLinksLive,
-  studentProfilesLive,
-  userProfilesLive,
-  withAdmin,
-  withTenant,
-} from '@roviq/database';
-import { eq } from 'drizzle-orm';
+import { type DrizzleDB, mkInstituteCtx, withTenant } from '@roviq/database';
 import * as XLSX from 'xlsx';
+import {
+  formatDateDmy,
+  fullName,
+  genderLabel,
+  groupBy,
+  identifierMap,
+  minorityLabel,
+  natureOfAppointment,
+  resolveI18n,
+  socialCategoryLabel,
+  yesNo,
+} from './export-helpers';
+import {
+  academicYearOf,
+  latestQualification,
+  type StaffQualificationRow,
+  type StaffYearRow,
+  staffEmployedDuring,
+  staffQualifications,
+} from './staff-for-year';
+import {
+  type GuardianNameRow,
+  guardianNames,
+  type PersonIdentifierRow,
+  parentsOf,
+  personIdentifiers,
+  type StudentYearRow,
+  studentsInYear,
+} from './students-for-year';
+import type { ComplianceExportOutput } from './types';
 
-/** Resolve an i18nText jsonb value to a single display string (en → first → ''). */
-function resolveI18n(value: Record<string, string> | null | undefined): string {
-  if (!value) return '';
-  return value.en ?? Object.values(value)[0] ?? '';
+const ORIGIN = 'workflow:compliance-export-udise-dcf';
+
+export interface UdiseDcfData {
+  students: readonly StudentYearRow[];
+  guardians: readonly GuardianNameRow[];
+  identifiers: readonly PersonIdentifierRow[];
+  staff: readonly StaffYearRow[];
+  qualifications: readonly StaffQualificationRow[];
 }
 
 export async function generateUdiseDcfExport(
   db: DrizzleDB,
   tenantId: string,
   academicYearId: string,
-): Promise<Buffer> {
-  // ── Batch fetch all data upfront ───────────────────────
-
-  const students = await withTenant(
+): Promise<ComplianceExportOutput> {
+  const data = await withTenant(
     db,
-    mkInstituteCtx(tenantId, 'service:certificate-udise-dcf-export'),
-    async (tx) => {
-      return tx.select().from(studentProfilesLive);
+    mkInstituteCtx(tenantId, ORIGIN),
+    async (tx): Promise<UdiseDcfData> => {
+      const year = await academicYearOf(tx, academicYearId);
+      return {
+        students: await studentsInYear(tx, academicYearId),
+        guardians: await guardianNames(tx),
+        identifiers: await personIdentifiers(tx, [
+          UserIdentifierType.APAAR,
+          UserIdentifierType.PEN,
+        ]),
+        staff: await staffEmployedDuring(tx, year),
+        qualifications: await staffQualifications(tx),
+      };
     },
   );
+  return buildUdiseDcf(data);
+}
 
-  const academics = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-udise-dcf-export'),
-    async (tx) => {
-      return tx
-        .select()
-        .from(studentAcademicsLive)
-        .where(eq(studentAcademicsLive.academicYearId, academicYearId));
-    },
-  );
+export function buildUdiseDcf(data: UdiseDcfData): ComplianceExportOutput {
+  const guardianMap = groupBy(data.guardians, (g) => g.studentProfileId);
+  const apaarIds = identifierMap(data.identifiers, UserIdentifierType.APAAR);
+  const pens = identifierMap(data.identifiers, UserIdentifierType.PEN);
 
-  // All user profiles (platform-level, no RLS)
-  const allProfiles = await withAdmin(
-    db,
-    mkAdminCtx('service:certificate-udise-dcf-export'),
-    async (tx) => tx.select().from(userProfilesLive),
-  );
-  const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
-
-  // All guardian links with names (single batch query)
-  const allGuardianLinks = await withAdmin(
-    db,
-    mkAdminCtx('service:certificate-udise-dcf-export'),
-    async (tx) => {
-      return tx
-        .select({
-          studentProfileId: studentGuardianLinksLive.studentProfileId,
-          relationship: studentGuardianLinksLive.relationship,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
-        })
-        .from(studentGuardianLinksLive)
-        .innerJoin(
-          guardianProfilesLive,
-          eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
-        )
-        .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId));
-    },
-  );
-
-  // Group guardian links by student
-  const guardianMap = new Map<string, typeof allGuardianLinks>();
-  for (const link of allGuardianLinks) {
-    const existing = guardianMap.get(link.studentProfileId) ?? [];
-    existing.push(link);
-    guardianMap.set(link.studentProfileId, existing);
-  }
-
-  const academicMap = new Map(academics.map((a) => [a.studentProfileId, a]));
-
-  // ── Build student rows (in-memory, no queries) ─────────
-
-  const studentRows = students.map((student) => {
-    const profile = profileMap.get(student.userId);
-    const acad = academicMap.get(student.id);
-    const guardians = guardianMap.get(student.id) ?? [];
-    const father = guardians.find(
-      (g) =>
-        g.relationship === GuardianRelationship.FATHER ||
-        g.relationship === GuardianRelationship.LEGAL_GUARDIAN,
-    );
-    const mother = guardians.find((g) => g.relationship === GuardianRelationship.MOTHER);
-
+  const studentRows = data.students.map((student) => {
+    const { father, mother } = parentsOf(guardianMap.get(student.id) ?? []);
     return {
-      'Student Name': `${resolveI18n(profile?.firstName)} ${resolveI18n(profile?.lastName)}`.trim(),
-      "Father's Name": father
-        ? `${resolveI18n(father.firstName)} ${resolveI18n(father.lastName)}`.trim()
-        : '',
-      "Mother's Name": mother
-        ? `${resolveI18n(mother.firstName)} ${resolveI18n(mother.lastName)}`.trim()
-        : '',
-      'Date of Birth': profile?.dateOfBirth ?? '',
-      Gender: profile?.gender ?? '',
+      'Student Name': fullName(student).toUpperCase(),
+      "Father's Name": father ? fullName(father) : '',
+      "Mother's Name": mother ? fullName(mother) : '',
+      'Date of Birth': formatDateDmy(student.dateOfBirth),
+      Gender: genderLabel(student.gender),
       'Aadhaar Number': '',
-      'Mother Tongue': profile?.motherTongue ?? '',
-      'Social Category': student.socialCategory ?? 'general',
-      'Minority Status': student.minorityType ?? '',
-      'Is BPL': student.isBpl ? 'Yes' : 'No',
-      'Is CWSN': student.isCwsn ? 'Yes' : 'No',
+      'Mother Tongue': student.motherTongue ?? '',
+      'Social Category': socialCategoryLabel(student.socialCategory),
+      'Minority Status': minorityLabel(student.minorityType),
+      'Is BPL': yesNo(student.isBpl),
+      'Is CWSN': yesNo(student.isCwsn),
       'CWSN Type': student.cwsnType ?? '',
-      'RTE Admitted': student.isRteAdmitted ? 'Yes' : 'No',
-      Class: acad?.standardId ?? '',
-      Section: acad?.sectionId ?? '',
+      'RTE Admitted': yesNo(student.isRteAdmitted),
+      Class: resolveI18n(student.standardName),
+      Section: resolveI18n(student.sectionName),
       'Admission Number': student.admissionNumber,
       Stream: student.stream ?? '',
-      'Medium of Instruction': '',
+      'Medium of Instruction': student.mediumOfInstruction ?? '',
       'Previous Year Status': '',
-      'APAAR ID': '',
-      PEN: '',
+      'APAAR ID': apaarIds.get(student.userId) ?? '',
+      PEN: pens.get(student.userId) ?? '',
     };
   });
 
-  // ── Batch fetch teacher data ───────────────────────────
-
-  const staffList = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-udise-dcf-export'),
-    async (tx) => {
-      return tx.select().from(staffProfilesLive);
-    },
-  );
-
-  const allQuals = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'service:certificate-udise-dcf-export'),
-    async (tx) => {
-      return tx.select().from(staffQualificationsLive);
-    },
-  );
-
-  const qualMap = new Map<string, typeof allQuals>();
-  for (const q of allQuals) {
-    const existing = qualMap.get(q.staffProfileId) ?? [];
-    existing.push(q);
-    qualMap.set(q.staffProfileId, existing);
-  }
-
-  const teacherRows = staffList.map((staff) => {
-    const profile = profileMap.get(staff.userId);
+  const qualMap = groupBy(data.qualifications, (q) => q.staffProfileId);
+  const teacherRows = data.staff.map((staff) => {
     const quals = qualMap.get(staff.id) ?? [];
-    const academicQual = quals.find((q) => q.type === QualificationType.ACADEMIC);
-    const professionalQual = quals.find((q) => q.type === QualificationType.PROFESSIONAL);
-
     return {
-      'Teacher Name': `${resolveI18n(profile?.firstName)} ${resolveI18n(profile?.lastName)}`.trim(),
+      'Teacher Name': fullName(staff).toUpperCase(),
       'Aadhaar Number': '',
-      'Date of Birth': profile?.dateOfBirth ?? '',
-      Gender: profile?.gender ?? '',
-      'Social Category': staff.socialCategory ?? '',
-      'Nature of Appointment': staff.natureOfAppointment ?? '',
-      'Date of Joining': staff.dateOfJoining ?? '',
-      'Academic Qualification': academicQual?.degreeName ?? '',
-      'Professional Qualification': professionalQual?.degreeName ?? '',
-      'Trained for CWSN': staff.trainedForCwsn ? 'Yes' : 'No',
-      'Is Disabled': staff.isDisabled ? 'Yes' : 'No',
+      'Date of Birth': formatDateDmy(staff.dateOfBirth),
+      Gender: genderLabel(staff.gender),
+      'Social Category': socialCategoryLabel(staff.socialCategory),
+      'Nature of Appointment': natureOfAppointment(staff),
+      'Date of Joining': formatDateDmy(staff.dateOfJoining),
+      'Academic Qualification':
+        latestQualification(quals, QualificationType.ACADEMIC)?.degreeName ?? '',
+      'Professional Qualification':
+        latestQualification(quals, QualificationType.PROFESSIONAL)?.degreeName ?? '',
+      'Trained for CWSN': yesNo(staff.trainedForCwsn),
+      'Is Disabled': yesNo(staff.isDisabled),
       'Current Post Held': staff.designation ?? '',
     };
   });
-
-  // ── Generate XLSX ──────────────────────────────────────
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
@@ -201,5 +145,8 @@ export async function generateUdiseDcfExport(
     'Teachers',
   );
 
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  return {
+    buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+    rowCount: studentRows.length + teacherRows.length,
+  };
 }

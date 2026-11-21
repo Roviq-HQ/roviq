@@ -75,4 +75,42 @@ export class WorkflowFileStore {
         .onConflictDoNothing({ target: files.id }),
     );
   }
+
+  /**
+   * Stores a file the server produced as PENDING: the caller makes it READY with
+   * `markFilesReady` in the transaction that saves the record pointing at it. A retry with
+   * the same `fileId` replaces the bytes and the recorded size while the file is still PENDING.
+   */
+  async putPending(write: WorkflowFileWrite): Promise<void> {
+    const objectKey = storageKeyFor(
+      `institutes/${write.tenantId}`,
+      write.purpose,
+      write.fileId,
+      write.contentType,
+    );
+    await this.storage.put('private', objectKey, write.body, { contentType: write.contentType });
+    await withTenant(this.db, mkInstituteCtx(write.tenantId, ORIGIN), (tx) =>
+      tx
+        .insert(files)
+        .values({
+          id: write.fileId,
+          tenantId: write.tenantId,
+          visibility: 'PRIVATE',
+          purpose: write.purpose,
+          objectKey,
+          originalName: write.fileName,
+          contentType: write.contentType,
+          sizeBytes: write.body.length,
+          status: 'PENDING',
+          uploadedBy: write.createdBy,
+          createdBy: write.createdBy,
+          updatedBy: write.createdBy,
+        })
+        .onConflictDoUpdate({
+          target: files.id,
+          set: { sizeBytes: write.body.length, updatedBy: write.createdBy },
+          setWhere: and(eq(files.status, 'PENDING'), eq(files.objectKey, objectKey)),
+        }),
+    );
+  }
 }

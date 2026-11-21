@@ -18,11 +18,26 @@ const ADMIN_DOCUMENT_DOWNLOAD = gql`
   }
 `;
 
+const ADMIN_EXPORT_DOWNLOAD = gql`
+  mutation AdminExportReportDownloadUrl($fileId: ID!) {
+    url: adminExportReportDownloadUrl(fileId: $fileId)
+  }
+`;
+
+const DOWNLOAD = {
+  institute: INSTITUTE_DOWNLOAD,
+  admin: ADMIN_DOCUMENT_DOWNLOAD,
+  adminExport: ADMIN_EXPORT_DOWNLOAD,
+} as const;
+
 export interface FileDownloadButtonProps {
   fileId: string;
   label: string;
-  /** Which portal asks: the institute call checks the record's ability, the admin one `read User`. */
-  scope: 'institute' | 'admin';
+  /**
+   * Which link to ask for: `institute` checks the record's ability, `admin` a user document
+   * (`read User`), `adminExport` a finished compliance export (`read Export`).
+   */
+  scope: keyof typeof DOWNLOAD;
   testId: string;
 }
 
@@ -32,9 +47,7 @@ export interface FileDownloadButtonProps {
  */
 export function FileDownloadButton({ fileId, label, scope, testId }: FileDownloadButtonProps) {
   const t = useTranslations('fileUpload');
-  const [request, { loading }] = useMutation<{ url: string }, { fileId: string }>(
-    scope === 'admin' ? ADMIN_DOCUMENT_DOWNLOAD : INSTITUTE_DOWNLOAD,
-  );
+  const [request, { loading }] = useMutation<{ url: string }, { fileId: string }>(DOWNLOAD[scope]);
 
   const open = async () => {
     // Opened before the request so the browser ties the tab to the click and does not block it.

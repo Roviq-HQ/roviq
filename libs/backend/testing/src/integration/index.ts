@@ -49,4 +49,9 @@ export {
 export { type AuditLogQuery, waitForAuditLog, waitForCondition } from './polling.js';
 // Test-env defaults — callers rarely need this directly; createIntegrationApp
 // invokes it automatically before Test.createTestingModule is built.
-export { setupTestEnv } from './test-env.js';
+export {
+  disableTemporalWorkers,
+  setupTestEnv,
+  TEMPORAL_WORKER_FLAGS,
+  type TemporalWorkerFlag,
+} from './test-env.js';

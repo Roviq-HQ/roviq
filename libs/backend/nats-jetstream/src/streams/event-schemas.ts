@@ -1,4 +1,8 @@
-import { AUTH_SCOPE_VALUES, AUTH_SECURITY_EVENT_TYPE_VALUES } from '@roviq/common-types';
+import {
+  AUTH_SCOPE_VALUES,
+  AUTH_SECURITY_EVENT_TYPE_VALUES,
+  COMPLIANCE_REPORT_TYPE_VALUES,
+} from '@roviq/common-types';
 import { z } from 'zod';
 import type { EventPattern } from './event-patterns';
 
@@ -402,8 +406,21 @@ const TC_SCHEMAS = {
   'TC.issued': tenantBase.catchall(z.unknown()),
 } as const;
 
+const exportReportBase = z.object({
+  tenantId: uuid,
+  exportReportId: uuid,
+  reportType: z.enum(COMPLIANCE_REPORT_TYPE_VALUES),
+  academicYearId: uuid,
+  requestedBy: uuid,
+});
+
 const EXPORT_SCHEMAS = {
-  'EXPORT.completed': tenantBase.catchall(z.unknown()),
+  'EXPORT.requested': exportReportBase,
+  'EXPORT.completed': exportReportBase.extend({
+    fileId: uuid,
+    rowCount: z.number().int().nonnegative(),
+  }),
+  'EXPORT.failed': exportReportBase.extend({ errorCode: str }),
 } as const;
 
 const USER_SCHEMAS = {

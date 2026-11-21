@@ -39,6 +39,7 @@ import { gradingSchemes } from './tenant/examination/grading-schemes';
 import { reportCardInstances } from './tenant/examination/report-card-instances';
 import { reportCards } from './tenant/examination/report-cards';
 import { subjectTopics } from './tenant/examination/subject-topics';
+import { exportReports } from './tenant/export-reports';
 import { groupMemberships } from './tenant/group-memberships';
 import { holidays } from './tenant/holidays';
 import { instituteAffiliations } from './tenant/institute-affiliations';
@@ -130,6 +131,9 @@ export const instituteIdentifiersLive = liveView('institute_identifiers_live').a
 );
 export const filesLive = liveView('files_live').as((qb) =>
   qb.select().from(files).where(isNull(files.deletedAt)),
+);
+export const exportReportsLive = liveView('export_reports_live').as((qb) =>
+  qb.select().from(exportReports).where(isNull(exportReports.deletedAt)),
 );
 export const leaveFilesLive = liveView('leave_files_live').as((qb) =>
   qb.select().from(leaveFiles).where(isNull(leaveFiles.deletedAt)),

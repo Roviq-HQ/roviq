@@ -319,6 +319,18 @@ export const ErrorCode = {
   /** Too many uploads started and not yet attached to anything */
   FILE_UPLOAD_LIMIT_REACHED: 'FILE_UPLOAD_LIMIT_REACHED',
 
+  // ── Compliance exports ─────────────────────────────────
+  /** No compliance export (or no finished one) with this id or file for the caller */
+  EXPORT_REPORT_NOT_FOUND: 'EXPORT_REPORT_NOT_FOUND',
+  /** The export workflow could not be started; the export is marked FAILED */
+  EXPORT_START_FAILED: 'EXPORT_START_FAILED',
+  /** Building or storing the export file failed after every retry */
+  EXPORT_GENERATION_FAILED: 'EXPORT_GENERATION_FAILED',
+  /** The institute does not qualify for this report type (board affiliation or state) */
+  EXPORT_TYPE_NOT_AVAILABLE: 'EXPORT_TYPE_NOT_AVAILABLE',
+  /** The export was still queued or running long after its workflow must have ended */
+  EXPORT_TIMED_OUT: 'EXPORT_TIMED_OUT',
+
   // ── Impersonation ──────────────────────────────────────
   /** Target user cannot be impersonated (self, inactive, or no membership in the institute) */
   IMPERSONATION_TARGET_INVALID: 'IMPERSONATION_TARGET_INVALID',
@@ -533,6 +545,11 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   FILE_CONTENT_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_IMAGE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_UPLOAD_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
+  EXPORT_REPORT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  EXPORT_START_FAILED: HttpStatus.SERVICE_UNAVAILABLE,
+  EXPORT_GENERATION_FAILED: HttpStatus.INTERNAL_SERVER_ERROR,
+  EXPORT_TYPE_NOT_AVAILABLE: HttpStatus.UNPROCESSABLE_ENTITY,
+  EXPORT_TIMED_OUT: HttpStatus.GATEWAY_TIMEOUT,
   IMPERSONATION_TARGET_INVALID: HttpStatus.BAD_REQUEST,
   IMPERSONATION_SESSION_INVALID: HttpStatus.BAD_REQUEST,
   IMPERSONATION_CONSENT_UNAVAILABLE: HttpStatus.BAD_REQUEST,

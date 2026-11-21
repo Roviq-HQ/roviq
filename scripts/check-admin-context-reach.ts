@@ -113,6 +113,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Reads user_profiles for a user id taken from a student row fetched under tenant RLS.',
   'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate':
     'Reads user_profiles for a user id taken from a student row fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts#ExportReportDrizzleRepository.run':
+    'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts).',
   'apps/api-gateway/src/institute/group/group.service.ts#GroupService.listMembers':
     'Reads usernames for user ids taken from membership rows fetched under tenant RLS.',
   'apps/api-gateway/src/institute/guardian/guardian.service.ts#GuardianService.create':

@@ -1,14 +1,23 @@
+import assert from 'node:assert';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type DocumentNode, getOperationAST, print } from 'graphql';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../__test-utils__/render-with-providers';
 import { FileDownloadButton } from '../file-download-button';
 
 const request = vi.fn();
+const mutationDocs: DocumentNode[] = [];
 vi.mock('@roviq/graphql', async () => {
   const actual = await vi.importActual<typeof import('@roviq/graphql')>('@roviq/graphql');
-  return { ...actual, useMutation: () => [request, { loading: false }] };
+  return {
+    ...actual,
+    useMutation: (doc: DocumentNode) => {
+      mutationDocs.push(doc);
+      return [request, { loading: false }];
+    },
+  };
 });
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -26,6 +35,7 @@ describe('FileDownloadButton', () => {
 
   beforeEach(() => {
     request.mockReset();
+    mutationDocs.length = 0;
     tab = { opener: {}, location: { replace: vi.fn() }, close: vi.fn() };
     open = vi.fn().mockReturnValue(tab);
     vi.stubGlobal('open', open);
@@ -63,5 +73,32 @@ describe('FileDownloadButton', () => {
     await waitFor(() => expect(tab.close).toHaveBeenCalledOnce());
     expect(tab.location.replace).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith('Could not open the file. Try again.');
+  });
+
+  it.each([
+    [
+      'institute',
+      'FileDownloadUrl',
+      'mutation FileDownloadUrl($fileId: ID!) {\n  url: fileDownloadUrl(fileId: $fileId)\n}',
+    ],
+    [
+      'admin',
+      'AdminUserDocumentDownloadUrl',
+      'mutation AdminUserDocumentDownloadUrl($fileId: ID!) {\n  url: adminUserDocumentDownloadUrl(fileId: $fileId)\n}',
+    ],
+    [
+      'adminExport',
+      'AdminExportReportDownloadUrl',
+      'mutation AdminExportReportDownloadUrl($fileId: ID!) {\n  url: adminExportReportDownloadUrl(fileId: $fileId)\n}',
+    ],
+  ] as const)('should ask for the %s link with %s', (scope, operationName, document) => {
+    renderWithProviders(
+      <FileDownloadButton fileId="file-1" label="Download" scope={scope} testId="download-1" />,
+    );
+
+    const [doc] = mutationDocs;
+    assert(doc);
+    expect(getOperationAST(doc)?.name?.value).toBe(operationName);
+    expect(print(doc).trim()).toBe(document);
   });
 });

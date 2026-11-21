@@ -19,6 +19,28 @@ function setIfMissing(key: string, value: string): void {
   }
 }
 
+/** Every `*_WORKER_ENABLED` flag that starts an embedded Temporal worker in the gateway. */
+export const TEMPORAL_WORKER_FLAGS = [
+  'STUDENT_ADMISSION_WORKER_ENABLED',
+  'STUDENT_IMPORT_WORKER_ENABLED',
+  'BILLING_WORKER_ENABLED',
+  'FILE_SWEEPER_WORKER_ENABLED',
+  'COMPLIANCE_EXPORT_WORKER_ENABLED',
+] as const;
+
+export type TemporalWorkerFlag = (typeof TEMPORAL_WORKER_FLAGS)[number];
+
+/**
+ * Switches every embedded Temporal worker off. A flag left on in `.env` would make a test
+ * process poll the dev Temporal and run dev tasks against the test DB. It must run before
+ * `AppModule` is imported: `ConfigModule.forRoot` reads the environment at import time, so
+ * the integration project calls it from `vitest.setup.ts`. A spec that needs a worker sets
+ * its flag to 'true' in a `vi.hoisted` block, which runs after this and before its imports.
+ */
+export function disableTemporalWorkers(): void {
+  for (const flag of TEMPORAL_WORKER_FLAGS) process.env[flag] = 'false';
+}
+
 export function setupTestEnv(): void {
   // Database — integration tests must ALWAYS run against the test DB, never
   // the dev DB. Force-override DATABASE_URL so a stray .env entry can't leak

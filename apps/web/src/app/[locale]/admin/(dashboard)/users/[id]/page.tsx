@@ -89,7 +89,8 @@ export default function UserDetailPage() {
         <ProfileCard user={user} />
       </aside>
       <Tabs value={tab} onValueChange={(v) => setTab(TABS.find((x) => x === v) ?? null)}>
-        <div className="overflow-x-auto">
+        {/* The hidden y-axis clips the triggers' invisible underline (::after, 5px below). */}
+        <div className="overflow-x-auto overflow-y-hidden">
           <TabsList>
             {TABS.map((name) => (
               <TabsTrigger key={name} value={name} data-testid={adminUserDetail.tab(name)}>

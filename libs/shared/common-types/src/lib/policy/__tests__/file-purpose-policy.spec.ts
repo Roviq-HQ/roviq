@@ -70,6 +70,14 @@ describe('fileContentMatchesType', () => {
     );
   });
 
+  it('should accept a ZIP archive as XLSX and refuse anything else', () => {
+    const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    expect(fileContentMatchesType(bytes(0x50, 0x4b, 0x03, 0x04, 0x14), xlsx)).toBe(true);
+    expect(fileContentMatchesType(text('name,class\nAsha,5'), xlsx)).toBe(false);
+    expect(fileContentMatchesType(bytes(), xlsx)).toBe(false);
+    expect(fileExtensionFor(xlsx)).toBe('xlsx');
+  });
+
   it('should accept text as CSV and refuse binary or empty content', () => {
     expect(fileContentMatchesType(text('name,class\nAsha,5'), 'text/csv')).toBe(true);
     expect(fileContentMatchesType(bytes(0x50, 0x4b, 0x03, 0x04, 0x00), 'text/csv')).toBe(false);

@@ -2,6 +2,7 @@ export * from './academic-year';
 export * from './admission-application';
 export * from './dlq-status';
 export * from './examination';
+export * from './export-report';
 export * from './file';
 export * from './institute';
 export * from './invoice';

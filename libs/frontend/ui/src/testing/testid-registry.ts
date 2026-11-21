@@ -163,8 +163,17 @@ export const testIds = {
     contactTitle: 'institute-detail-contact-title',
     addressCard: 'institute-detail-address-card',
     addressTitle: 'institute-detail-address-title',
-    tab: (name: 'overview' | 'setup' | 'academic' | 'users' | 'config' | 'branding' | 'audit') =>
-      `institute-detail-tab-${name}`,
+    tab: (
+      name:
+        | 'overview'
+        | 'setup'
+        | 'academic'
+        | 'users'
+        | 'config'
+        | 'branding'
+        | 'audit'
+        | 'exports',
+    ) => `institute-detail-tab-${name}`,
     actionApprove: 'action-approve',
     actionReassignReseller: 'action-reassign-reseller',
     actionAssignGroup: 'action-assign-group',
@@ -181,6 +190,25 @@ export const testIds = {
     configDisplay: 'config-display',
     setupProgressPanel: 'setup-progress-panel',
     setupRetryButton: 'setup-retry-button',
+
+    // Exports tab (ROV-296)
+    exportsTab: 'institute-exports-tab',
+    exportsYearSelect: 'institute-exports-year-select',
+    exportsNoYears: 'institute-exports-no-years',
+    exportCard: (reportType: string) => `institute-export-card-${reportType}`,
+    exportCardLoading: (reportType: string) => `institute-export-card-loading-${reportType}`,
+    exportGenerateBtn: (reportType: string) => `institute-export-generate-${reportType}`,
+    exportProgress: (reportType: string) => `institute-export-progress-${reportType}`,
+    exportDownloadBtn: (reportType: string) => `institute-export-download-${reportType}`,
+    exportError: (reportType: string) => `institute-export-error-${reportType}`,
+    exportsHistoryTable: 'institute-exports-history-table',
+    exportsHistoryRow: (id: string) => `institute-exports-history-row-${id}`,
+    exportsHistoryDownloadBtn: (id: string) => `institute-exports-history-download-${id}`,
+    exportsHistoryRowError: (id: string) => `institute-exports-history-row-error-${id}`,
+    exportsHistoryEmpty: 'institute-exports-history-empty',
+    exportsHistoryLoading: 'institute-exports-history-loading',
+    exportsHistoryError: 'institute-exports-history-error',
+    exportsHistoryRetry: 'institute-exports-history-retry',
   },
 
   // ── Admin: dashboard ───────────────────────────────────────────────────

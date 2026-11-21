@@ -868,3 +868,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the full demo seed plus that legitimate wait, on a loaded machine, takes longer than the 10 s default hook timeout.
 - **Fix:** the four seed specs pass `SEED_HOOK_TIMEOUT_MS` (60 s, in `seed-test-helpers.ts`) to their seeding `beforeAll`. Test timeouts are unchanged.
 - **Lesson:** a test that takes a table lock makes every writer of that table wait; size the hook timeouts of those writers for it.
+
+## 2026-11-20 — fixed: integration specs booting `AppModule` started every embedded Temporal worker from `.env`
+
+- **Symptom:** with `FILE_SWEEPER_WORKER_ENABLED=true` / `COMPLIANCE_EXPORT_WORKER_ENABLED=true` in a dev `.env`, every integration spec that boots `AppModule` started those workers. They polled the dev Temporal of the instance with `DATABASE_URL` pointing at `roviq_test`, so a test run could take dev tasks and run them against the wrong database.
+- **Cause:** `ConfigModule.forRoot` reads the environment when `app.module.ts` is imported, before `createIntegrationApp()` runs `setupTestEnv()`, so nothing set in `setupTestEnv()` reaches `ConfigService`.
+- **Fix:** `disableTemporalWorkers()` (`libs/backend/testing/src/integration/test-env.ts`) sets every `*_WORKER_ENABLED` flag to `false`; the integration project's `vitest.setup.ts` calls it before any spec is imported, and `setupTestEnv()` no longer pretends to control them. A spec that needs a worker sets its flag to `'true'` in a `vi.hoisted` block. `compliance-export.integration.spec.ts` asserts the flags are off.
+- **Lesson:** environment a Nest module reads at import time must be set in a vitest `setupFiles` entry, not in a helper called from `beforeAll`.

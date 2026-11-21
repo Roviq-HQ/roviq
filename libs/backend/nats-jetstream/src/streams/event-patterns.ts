@@ -108,6 +108,8 @@ export const EVENT_PATTERNS = {
   },
   EXPORT: {
     completed: 'EXPORT.completed',
+    failed: 'EXPORT.failed',
+    requested: 'EXPORT.requested',
   },
   GROUP: {
     membership_resolved: 'GROUP.membership_resolved',
