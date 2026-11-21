@@ -294,9 +294,9 @@ export class PaymentService {
       amountPaise: bigint;
       receiptNumber?: string;
       notes?: string;
-      collectedById?: string;
       collectionDate?: string;
     },
+    membershipId: string,
   ) {
     const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
     if (!invoice) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
@@ -316,7 +316,8 @@ export class PaymentService {
       currency: invoice.currency,
       receiptNumber: input.receiptNumber ?? null,
       notes: input.notes ?? null,
-      collectedById: input.collectedById ?? null,
+      // Cash is attributed to the reseller staff member who records it.
+      collectedById: input.method === 'CASH' ? membershipId : null,
       collectionDate: input.collectionDate ?? null,
       paidAt: new Date(),
       createdBy: userId,
@@ -646,6 +647,12 @@ export class PaymentService {
   /**
    * List payments pending UPI verification for a reseller.
    */
+  async listInvoicePayments(resellerId: string, invoiceId: string) {
+    const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
+    if (!invoice) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
+    return this.paymentRepo.findByInvoiceId(resellerId, invoiceId);
+  }
+
   async findUnverifiedPayments(resellerId: string, first: number, after?: string) {
     return this.paymentRepo.findUnverified(resellerId, { first, after });
   }

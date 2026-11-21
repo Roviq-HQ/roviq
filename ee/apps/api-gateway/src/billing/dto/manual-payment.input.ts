@@ -1,6 +1,6 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { PaymentMethod } from '@roviq/ee-billing-types';
-import { Allow, IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Allow, IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { GraphQLBigInt } from 'graphql-scalars';
 
 @InputType()
@@ -22,12 +22,6 @@ export class ManualPaymentInput {
   @IsString()
   @IsOptional()
   notes?: string;
-
-  /** Which reseller field agent collected the cash (method=CASH only) */
-  @Field({ nullable: true })
-  @IsUUID('all')
-  @IsOptional()
-  collectedById?: string;
 
   /** When cash was physically collected — may differ from recording date (method=CASH only) */
   @Field({ nullable: true })

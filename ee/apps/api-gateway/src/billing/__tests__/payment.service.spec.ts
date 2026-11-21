@@ -137,12 +137,16 @@ describe('PaymentService', () => {
           status: 'PAID',
         });
 
-        const result = await service.recordManualPayment('reseller-1', 'inv-1', {
-          method: PaymentMethod.CASH,
-          amountPaise: 118000n,
-          collectedById: 'member-1',
-          collectionDate: '2026-03-24',
-        });
+        const result = await service.recordManualPayment(
+          'reseller-1',
+          'inv-1',
+          {
+            method: PaymentMethod.CASH,
+            amountPaise: 118000n,
+            collectionDate: '2026-03-24',
+          },
+          'member-1',
+        );
 
         expect(paymentRepo.create).toHaveBeenCalledWith(
           'reseller-1',
@@ -167,11 +171,69 @@ describe('PaymentService', () => {
         invoiceRepo.findById.mockResolvedValue({ status: 'PAID' });
 
         await expect(
-          service.recordManualPayment('reseller-1', 'inv-1', {
-            method: PaymentMethod.CASH,
-            amountPaise: 50000n,
-          }),
+          service.recordManualPayment(
+            'reseller-1',
+            'inv-1',
+            { method: PaymentMethod.CASH, amountPaise: 50000n },
+            'member-1',
+          ),
         ).rejects.toThrow();
+      }));
+
+    it.each([
+      [PaymentMethod.CASH, 'member-1'],
+      [PaymentMethod.BANK_TRANSFER, null],
+      [PaymentMethod.UPI, null],
+    ])('should store %s collector as %s', (method, collector) =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo, invoiceService } = createService();
+        invoiceRepo.findById.mockResolvedValue({
+          id: 'inv-1',
+          tenantId: 'tenant-1',
+          currency: 'INR',
+          status: 'SENT',
+        });
+        paymentRepo.create.mockResolvedValue({ id: 'pay-1' });
+        invoiceService.markPaid.mockResolvedValue({ id: 'inv-1' });
+
+        await service.recordManualPayment(
+          'reseller-1',
+          'inv-1',
+          { method, amountPaise: 1000n },
+          'member-1',
+        );
+
+        const created = paymentRepo.create.mock.calls[0]?.[1];
+        expect(created?.collectedById).toBe(collector);
+      }));
+  });
+
+  describe('listInvoicePayments', () => {
+    it('should return the payments of an invoice the reseller owns', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo } = createService();
+        const rows = [{ id: 'pay-1' }, { id: 'pay-2' }];
+        invoiceRepo.findById.mockResolvedValue({ id: 'inv-1' });
+        paymentRepo.findByInvoiceId.mockResolvedValue(rows);
+
+        const result = await service.listInvoicePayments('reseller-1', 'inv-1');
+
+        expect(result).toEqual(rows);
+        expect(paymentRepo.findByInvoiceId).toHaveBeenCalledWith('reseller-1', 'inv-1');
+      }));
+
+    it('should throw INVOICE_NOT_FOUND when the reseller has no such invoice', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo } = createService();
+        invoiceRepo.findById.mockResolvedValue(null);
+
+        const error = await service
+          .listInvoicePayments('reseller-1', 'inv-x')
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BusinessException);
+        expect((error as BusinessException).code).toBe(ErrorCode.INVOICE_NOT_FOUND);
+        expect(paymentRepo.findByInvoiceId).not.toHaveBeenCalled();
       }));
   });
 
