@@ -881,3 +881,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Symptom:** four `describe.skip` blocks in `certificate.api-e2e.spec.ts` (clearance, approve, issue, duplicate) and no check that institute approval finishes setup: `TCIssuanceWorkflow` and `InstituteSetupWorkflow` were started but nothing polled their task queues.
 - **Fix:** the gateway now runs those workers behind `TC_ISSUANCE_WORKER_ENABLED` and `INSTITUTE_SETUP_WORKER_ENABLED` (plus `AUDIT_PARTITION_WORKER_ENABLED`); all three are set in `docker/compose.e2e.yaml` and listed in `TEMPORAL_WORKER_FLAGS`, so integration specs keep them off. The skipped blocks are real tests again and poll with `vi.waitFor`.
 - **Note:** `tc_register` now allows one TC in progress per student (`uq_tc_register_open_request`). A test that leaves a request open on a seeded student blocks the next `requestTC` for that student: close it (reject) or use a fresh student.
+
+## 2026-11-21 — fixed: `cleanupTestReseller` deadlocked against the ROV-91 backfill test
+
+- **Symptom:** pre-push `int` failed once with `deadlock detected` (40P01) on `delete from "resellers"` in `cleanupTestReseller`, called from `reseller-team.integration.spec.ts`. 77 of 78 files passed; the branch (ROV-232) does not touch resellers.
+- **Cause:** same shape as the 2026-11-20 entry. The cleanup deleted `roles` rows first and only then needed a lock on `resellers`, while `reseller-system-roles.integration.spec.ts` held `LOCK TABLE resellers` and waited for those role rows.
+- **Fix:** `cleanupTestReseller` takes `LOCK TABLE resellers IN ROW EXCLUSIVE MODE` as its first statement, so it waits for the table before holding any row lock.
+- **Lesson:** the 2026-11-20 lesson applies to every transaction that meets a table-locking test, not only to the test that takes the lock.
