@@ -1,5 +1,6 @@
 import type { BoardType } from '@roviq/common-types';
 import type {
+  I18nContent,
   InstituteAddress,
   InstituteContact,
   InstituteStatus,
@@ -130,4 +131,14 @@ export interface UpdateInstituteOwnershipData {
   resellerId?: string;
   /** New institute-group id — pass `null` to explicitly remove the group assignment. */
   groupId?: string | null;
+}
+
+/** A soft-deleted institute as the platform recycle bin lists it. */
+export interface DeletedInstituteRecord {
+  id: string;
+  name: I18nContent;
+  code: string | null;
+  slug: string;
+  status: InstituteStatus;
+  deletedAt: Date;
 }

@@ -672,9 +672,38 @@ describe('AdminResellerService', () => {
       expect(result).toEqual({ ...insertedReseller, instituteCount: 0, teamSize: 1 });
     });
 
+    it('refuses an existing account whose email is not verified and that someone else created', async () => {
+      vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
+        {
+          userId: 'squatted-user-id',
+          isDeleted: false,
+          isEmailVerified: false,
+          createdBy: 'other-actor',
+        },
+      ]);
+      const { tx } = createTxMock({ resellerRows: [] });
+      setTx(tx);
+
+      await expect(
+        service.create(
+          { name: 'Acme', tier: ResellerTier.READ_ONLY, initialAdminEmail: 'taken@acme.test' },
+          ACTOR_ID,
+        ),
+      ).rejects.toMatchObject({
+        code: ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
+        message: 'Initial admin email cannot be used',
+      });
+      expect(identityService.createMembership).not.toHaveBeenCalled();
+    });
+
     it('links an existing user with that email and sends no welcome message', async () => {
       vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
-        { userId: 'existing-user-id', isDeleted: false },
+        {
+          userId: 'existing-user-id',
+          isDeleted: false,
+          isEmailVerified: true,
+          createdBy: 'other-actor',
+        },
       ]);
       const { tx } = createTxMock({ resellerRows: [] });
       setTx(tx);
@@ -697,7 +726,12 @@ describe('AdminResellerService', () => {
 
     it('throws RESELLER_ADMIN_EMAIL_UNAVAILABLE for a deleted user and creates nothing', async () => {
       vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
-        { userId: 'deleted-user-id', isDeleted: true },
+        {
+          userId: 'deleted-user-id',
+          isDeleted: true,
+          isEmailVerified: true,
+          createdBy: 'other-actor',
+        },
       ]);
       const { tx, calls } = createTxMock({ resellerRows: [] });
       setTx(tx);
@@ -730,8 +764,8 @@ describe('AdminResellerService', () => {
 
     it('refuses when several accounts share the email in different case', async () => {
       vi.mocked(identityService.findUsersByEmail).mockResolvedValue([
-        { userId: 'user-a', isDeleted: false },
-        { userId: 'user-b', isDeleted: false },
+        { userId: 'user-a', isDeleted: false, isEmailVerified: true, createdBy: 'other-actor' },
+        { userId: 'user-b', isDeleted: false, isEmailVerified: true, createdBy: 'other-actor' },
       ]);
       const { tx, calls } = createTxMock({ resellerRows: [] });
       setTx(tx);

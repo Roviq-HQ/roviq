@@ -94,10 +94,12 @@ export const ErrorCode = {
   TIER_CHANGE_REQUIRES_ACTIVE: 'TIER_CHANGE_REQUIRES_ACTIVE',
   /** Initial reseller admin email is held by a deleted user, by several users, or is another user's Roviq ID */
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: 'RESELLER_ADMIN_EMAIL_UNAVAILABLE',
-  /** First institute admin email is held by a deleted user, by several users, or is another user's Roviq ID */
-  INSTITUTE_ADMIN_EMAIL_UNAVAILABLE: 'INSTITUTE_ADMIN_EMAIL_UNAVAILABLE',
-  /** A new account was asked for with a mobile number another account already owns */
-  PHONE_ALREADY_IN_USE: 'PHONE_ALREADY_IN_USE',
+  /** The first institute admin's email or mobile cannot be used; the reason is never disclosed */
+  INSTITUTE_ADMIN_UNAVAILABLE: 'INSTITUTE_ADMIN_UNAVAILABLE',
+  /** The email verification code is wrong, expired, or was tried too many times */
+  EMAIL_VERIFICATION_CODE_INVALID: 'EMAIL_VERIFICATION_CODE_INVALID',
+  /** A verification code was sent moments ago; wait before asking for another */
+  EMAIL_VERIFICATION_TOO_SOON: 'EMAIL_VERIFICATION_TOO_SOON',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',
   /** Suspend attempted on a reseller that is already suspended */
@@ -454,8 +456,9 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INVALID_TIER: HttpStatus.BAD_REQUEST,
   TIER_CHANGE_REQUIRES_ACTIVE: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
-  INSTITUTE_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
-  PHONE_ALREADY_IN_USE: HttpStatus.CONFLICT,
+  INSTITUTE_ADMIN_UNAVAILABLE: HttpStatus.CONFLICT,
+  EMAIL_VERIFICATION_CODE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
+  EMAIL_VERIFICATION_TOO_SOON: HttpStatus.TOO_MANY_REQUESTS,
   INVALID_SLUG: HttpStatus.BAD_REQUEST,
   RESELLER_ALREADY_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,

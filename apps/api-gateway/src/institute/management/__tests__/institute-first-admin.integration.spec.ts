@@ -120,12 +120,14 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       actorId: SYSTEM_USER_ID,
     });
     await identity.ensureUserProfile(userId, FIRST_ADMIN, SYSTEM_USER_ID);
-    await withAdmin(result.db, mkAdminCtx('test:first-admin'), (tx) =>
-      tx
+    await withAdmin(result.db, mkAdminCtx('test:first-admin'), async (tx) => {
+      // The owner of this account has proved the mailbox, so its email may identify it.
+      await tx.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, userId));
+      await tx
         .update(institutes)
         .set({ firstAdminUserId: userId })
-        .where(eq(institutes.id, institute.tenantId)),
-    );
+        .where(eq(institutes.id, institute.tenantId));
+    });
   });
 
   afterAll(async () => {
@@ -350,7 +352,9 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       token: resellerToken(owner),
     });
 
-    expect(res.errors?.[0]?.extensions?.code).toBe('PHONE_ALREADY_IN_USE');
+    // Same answer as an unusable email: the form must not reveal which numbers are registered.
+    expect(res.errors?.[0]?.extensions?.code).toBe('INSTITUTE_ADMIN_UNAVAILABLE');
+    expect(res.errors?.[0]?.message).toBe('These first admin details cannot be used');
     const state = await withAdmin(result.db, mkAdminCtx('test:first-admin'), async (tx) => ({
       institutes: await tx
         .select({ id: institutes.id })
@@ -384,6 +388,53 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
     });
   });
 
+  it('refuses an account whose email is not verified, unless the same person created it', async () => {
+    // Someone else created this account and may hold its password (SF-045).
+    const squatted = `squatted-${randomUUID().slice(0, 8)}@institute.test`;
+    await identity.createUser({ email: squatted, username: squatted, actorId: SYSTEM_USER_ID });
+    const request = (email: string, slug: string) =>
+      gqlRequest<{ resellerCreateInstituteRequest: { id: string } }>(result.httpServer, {
+        query: CREATE_REQUEST,
+        variables: {
+          input: {
+            name: { en: 'Unverified Email' },
+            slug,
+            firstAdmin: { firstName: 'Asha', email },
+          },
+        },
+        token: resellerToken(owner),
+      });
+
+    const refusedSlug = `first-admin-unverified-${randomUUID().slice(0, 8)}`;
+    const refused = await request(squatted, refusedSlug);
+    expect(refused.errors?.[0]?.extensions?.code).toBe('INSTITUTE_ADMIN_UNAVAILABLE');
+    expect(refused.errors?.[0]?.message).toBe('These first admin details cannot be used');
+    const rows = await withAdmin(result.db, mkAdminCtx('test:first-admin'), (tx) =>
+      tx.select({ id: institutes.id }).from(institutes).where(eq(institutes.slug, refusedSlug)),
+    );
+    expect(rows).toEqual([]);
+
+    // Once the owner verifies the address it identifies them to anyone.
+    await withAdmin(result.db, mkAdminCtx('test:first-admin'), (tx) =>
+      tx.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.email, squatted)),
+    );
+    const accepted = await request(squatted, `first-admin-verified-${randomUUID().slice(0, 8)}`);
+    expect(accepted.errors).toBeUndefined();
+    const acceptedId = accepted.data?.resellerCreateInstituteRequest.id;
+    assert(acceptedId);
+    createdInstituteIds.push(acceptedId);
+
+    // An account this reseller user created in an earlier request is reused without verification.
+    const own = `own-${randomUUID().slice(0, 8)}@institute.test`;
+    for (const slug of ['own-first', 'own-second']) {
+      const res = await request(own, `${slug}-${randomUUID().slice(0, 8)}`);
+      expect(res.errors).toBeUndefined();
+      const id = res.data?.resellerCreateInstituteRequest.id;
+      assert(id);
+      createdInstituteIds.push(id);
+    }
+  });
+
   it('refuses a request whose first admin email cannot be used and stores no institute', async () => {
     const email = `taken-${randomUUID().slice(0, 8)}@institute.test`;
     // Another account uses the address as its Roviq ID, so it cannot identify one person.
@@ -402,7 +453,7 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       token: resellerToken(owner),
     });
 
-    expect(res.errors?.[0]?.extensions?.code).toBe('INSTITUTE_ADMIN_EMAIL_UNAVAILABLE');
+    expect(res.errors?.[0]?.extensions?.code).toBe('INSTITUTE_ADMIN_UNAVAILABLE');
     const rows = await withAdmin(result.db, mkAdminCtx('test:first-admin'), (tx) =>
       tx.select({ id: institutes.id }).from(institutes).where(eq(institutes.slug, slug)),
     );

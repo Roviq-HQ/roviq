@@ -28,6 +28,7 @@ import {
   and,
   asc,
   count,
+  desc,
   eq,
   ilike,
   inArray,
@@ -45,6 +46,7 @@ import { BRANDING_IMAGES, type BrandingImageColumn } from '../branding-images';
 import { InstituteRepository } from './institute.repository';
 import type {
   CreateInstituteData,
+  DeletedInstituteRecord,
   InstituteRecord,
   InstituteSearchParams,
   InstituteStatistics,
@@ -562,7 +564,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
   async restore(id: string): Promise<InstituteRecord> {
     const { userId } = getRequestContext();
 
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
+    const restored = await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
       const rows = await tx
         .update(institutes)
         .set({ deletedAt: null, deletedBy: null, updatedBy: userId })
@@ -577,6 +579,29 @@ export class InstituteDrizzleRepository extends InstituteRepository {
       }
       return rows[0] as InstituteRecord;
     });
+    // The delete marked the institute blocked; its members get in again per its own status.
+    await recordInstituteAccess(this.redis, id, restored.status);
+    return restored;
+  }
+
+  listDeleted(): Promise<DeletedInstituteRecord[]> {
+    return withAdmin(this.db, mkAdminCtx('repository:institute'), (tx) =>
+      tx
+        .select({
+          id: institutes.id,
+          name: institutes.name,
+          code: institutes.code,
+          slug: institutes.slug,
+          status: institutes.status,
+          deletedAt: institutes.deletedAt,
+        })
+        .from(institutes) // allow-base-read: the recycle bin lists soft-deleted institutes
+        .where(isNotNull(institutes.deletedAt))
+        .orderBy(desc(institutes.deletedAt))
+        .limit(200),
+    ).then((rows) =>
+      rows.flatMap((row) => (row.deletedAt ? [{ ...row, deletedAt: row.deletedAt }] : [])),
+    );
   }
 
   async findBranding(instituteId: string): Promise<Record<string, unknown> | null> {

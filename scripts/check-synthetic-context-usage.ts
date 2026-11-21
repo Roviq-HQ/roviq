@@ -49,6 +49,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
   'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
+  'apps/api-gateway/src/auth/__tests__/email-verification.integration.spec.ts',
   'apps/api-gateway/src/auth/__tests__/institute-status-access.integration.spec.ts',
   'apps/api-gateway/src/institute/section/__tests__/section-strength.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
@@ -66,6 +67,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-97: global guard reads the reseller's status before any resolver runs.
   // Reads an institute's status for any institute-scope token, before a tenant context exists.
   'apps/api-gateway/src/auth/middleware/institute-access.guard.ts',
+  // Reads one user's token_version before any resolver runs; the id comes from the verified token.
+  'apps/api-gateway/src/auth/middleware/token-version.guard.ts',
   'apps/api-gateway/src/auth/middleware/reseller-access.guard.ts',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts',
   'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts',

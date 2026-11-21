@@ -2,6 +2,7 @@ import type { InstituteLocaleSettings } from '@roviq/common-types';
 import type { InstituteStatus } from '@roviq/database';
 import type {
   CreateInstituteData,
+  DeletedInstituteRecord,
   InstituteRecord,
   InstituteSearchParams,
   InstituteStatistics,
@@ -35,6 +36,8 @@ export abstract class InstituteRepository {
   ): Promise<InstituteRecord>;
   abstract softDelete(id: string): Promise<void>;
   abstract restore(id: string): Promise<InstituteRecord>;
+  /** Soft-deleted institutes, most recently deleted first (at most 200). */
+  abstract listDeleted(): Promise<DeletedInstituteRecord[]>;
   abstract searchByReseller(
     resellerId: string,
     params: InstituteSearchParams,

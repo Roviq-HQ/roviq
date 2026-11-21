@@ -776,7 +776,8 @@ export class AdminResellerService {
     if (resolved.kind === 'unavailable') {
       throw new BusinessException(
         ErrorCode.RESELLER_ADMIN_EMAIL_UNAVAILABLE,
-        `Initial admin email cannot be used (${resolved.reason})`,
+        // The reason stays on the server: it describes an account that is not the caller's.
+        'Initial admin email cannot be used',
       );
     }
     return {
