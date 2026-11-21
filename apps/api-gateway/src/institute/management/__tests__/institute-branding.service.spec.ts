@@ -2,6 +2,7 @@ import type { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { IdentityService } from '../../../auth/identity.service';
 import type { FileService } from '../../../files/file.service';
 import { InstituteService } from '../institute.service';
 import type { InstituteRepository } from '../repositories/institute.repository';
@@ -35,6 +36,7 @@ describe('InstituteService.updateBranding', () => {
       createMock<InstituteSetupService>(),
       createMock<EventBusService>({ emit }),
       createMock<FileService>({ verifyUploads }),
+      createMock<IdentityService>(),
     );
   });
 

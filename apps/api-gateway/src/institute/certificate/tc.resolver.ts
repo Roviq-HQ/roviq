@@ -1,6 +1,11 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
+import {
+  assertTenantContext,
+  CurrentUser,
+  GqlAuthGuard,
+  InstituteScopeGuard,
+} from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
 import { CertificateService } from './certificate.service';
@@ -16,57 +21,80 @@ export class TCResolver {
     description: 'Request a Transfer Certificate — starts TCIssuanceWorkflow',
   })
   @CheckAbility({ action: 'create', subject: 'TC' })
-  async requestTC(@Args('input') input: RequestTCInput): Promise<TCModel> {
-    return this.certService.requestTC(input) as Promise<TCModel>;
+  async requestTC(
+    @Args('input') input: RequestTCInput,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TCModel> {
+    assertTenantContext(user);
+    return this.certService.requestTC(user, input);
   }
 
   @Mutation(() => TCModel, { description: 'Approve a TC (principal only)' })
   @CheckAbility({ action: 'manage', subject: 'TC' })
-  async approveTC(@Args('id', { type: () => ID }) id: string): Promise<TCModel> {
-    return this.certService.approveTC(id) as Promise<TCModel>;
+  async approveTC(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TCModel> {
+    assertTenantContext(user);
+    return this.certService.approveTC(user, id);
   }
 
   @Mutation(() => TCModel, { description: 'Reject a transfer certificate request' })
   @CheckAbility({ action: 'manage', subject: 'TC' })
   async rejectTC(
-    @Args('id', { type: () => ID }) id: string,
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @Args('reason') reason: string,
     @CurrentUser() user: AuthUser,
   ): Promise<TCModel> {
-    return this.certService.rejectTC(id, reason, user.userId) as Promise<TCModel>;
+    assertTenantContext(user);
+    return this.certService.rejectTC(user, id, reason);
   }
 
   @Mutation(() => TCModel, {
     description: 'Issue TC — generates serial, PDF, marks student transferred_out',
   })
   @CheckAbility({ action: 'manage', subject: 'TC' })
-  async issueTC(@Args('id', { type: () => ID }) id: string): Promise<TCModel> {
-    return this.certService.issueTC(id) as Promise<TCModel>;
+  async issueTC(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TCModel> {
+    assertTenantContext(user);
+    return this.certService.issueTC(user, id);
   }
 
   @Query(() => TCModel, { description: 'Get TC details including 20-field CBSE data snapshot' })
   @CheckAbility({ action: 'read', subject: 'TC' })
-  async getTCDetails(@Args('id', { type: () => ID }) id: string): Promise<TCModel> {
-    return this.certService.getTCDetails(id) as Promise<TCModel>;
+  async getTCDetails(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TCModel> {
+    assertTenantContext(user);
+    return this.certService.getTCDetails(user, id);
   }
 
   @Query(() => [TCModel], { description: 'List TCs with optional filters' })
   @CheckAbility({ action: 'read', subject: 'TC' })
   async listTCs(
+    @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: ListTCFilterInput,
   ): Promise<TCModel[]> {
-    return this.certService.listTCs(filter) as Promise<TCModel[]>;
+    assertTenantContext(user);
+    return this.certService.listTCs(user, filter);
   }
 
   @Mutation(() => TCModel, {
     description: 'Request duplicate TC (PRD §5.3) — is_duplicate=true, references original',
   })
   @CheckAbility({ action: 'create', subject: 'TC' })
-  async requestDuplicateTC(@Args('input') input: RequestDuplicateTCInput): Promise<TCModel> {
-    return this.certService.requestDuplicateTC({
+  async requestDuplicateTC(
+    @Args('input') input: RequestDuplicateTCInput,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TCModel> {
+    assertTenantContext(user);
+    return this.certService.requestDuplicateTC(user, {
       originalTcId: input.originalTcId,
       reason: input.reason,
       duplicateFee: input.duplicateFee ? BigInt(input.duplicateFee) : undefined,
-    }) as Promise<TCModel>;
+    });
   }
 }

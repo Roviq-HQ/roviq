@@ -22,11 +22,17 @@ export class InstituteAffiliationModel {
   @Field(() => String, { nullable: true })
   grantedLevel?: string | null;
 
-  @Field(() => String)
-  validFrom!: string;
+  @Field(() => String, {
+    nullable: true,
+    description: 'Start of the affiliation; null until the institute enters its details.',
+  })
+  validFrom?: string | null;
 
-  @Field(() => String)
-  validTo!: string;
+  @Field(() => String, {
+    nullable: true,
+    description: 'End of the affiliation; null until the institute enters its details.',
+  })
+  validTo?: string | null;
 
   @Field(() => String, { nullable: true })
   nocNumber?: string | null;

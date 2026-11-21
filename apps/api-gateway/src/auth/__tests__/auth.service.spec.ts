@@ -26,7 +26,6 @@ import { UserRepository } from '../repositories/user.repository';
 
 function createMockUserRepo() {
   return createMock<UserRepository>({
-    create: vi.fn(),
     findById: vi.fn(),
     findByUsername: vi.fn(),
     updatePasswordHash: vi.fn(),
@@ -45,6 +44,7 @@ function createMockLockoutService() {
 function createMockMembershipRepo() {
   return createMock<MembershipRepository>({
     findActiveByUserId: vi.fn(),
+    hasMembershipInUnusableInstitute: vi.fn(),
     findManyByUserAndTenant: vi.fn(),
     findByIdAndUser: vi.fn(),
   });
@@ -69,6 +69,7 @@ function createMockRefreshTokenRepo() {
     findByIdWithRelations: vi.fn(),
     findByHash: vi.fn(),
     findActiveByUserId: vi.fn(),
+    hasMembershipInUnusableInstitute: vi.fn(),
     revoke: vi.fn(),
     revokeAllForUser: vi.fn(),
     revokeAllOtherForUser: vi.fn(),
@@ -382,9 +383,35 @@ describe('AuthService', () => {
       );
     });
 
+    it('should say the institute is not active when every institute of the user is unusable', async () => {
+      mockUserRepo.findByUsername.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
+      mockMembershipRepo.hasMembershipInUnusableInstitute.mockResolvedValue(true);
+
+      const failure = await expectBusinessError(
+        authService.instituteLogin('admin', 'correct-password', { ip: '10.0.0.1' }),
+        ErrorCode.INSTITUTE_NOT_ACTIVE,
+      );
+      expect(failure.message).toBe('Your institute is not active');
+      expect(mockMembershipRepo.hasMembershipInUnusableInstitute).toHaveBeenCalledWith('user-1');
+      expect(mockRefreshTokenRepo.create).not.toHaveBeenCalled();
+      expect(mockAuthEventService.emit).toHaveBeenCalledWith({
+        userId: 'user-1',
+        type: 'login_failed',
+        portal: 'institute',
+        authMethod: 'password',
+        failureReason: 'NO_PORTAL_ACCESS',
+        ip: '10.0.0.1',
+        userAgent: undefined,
+        deviceInfo: undefined,
+        metadata: undefined,
+      });
+    });
+
     it('should answer a correct password with no institute membership like a wrong password', async () => {
       mockUserRepo.findByUsername.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
+      mockMembershipRepo.hasMembershipInUnusableInstitute.mockResolvedValue(false);
 
       const failure = await expectBusinessError(
         authService.instituteLogin('admin', 'correct-password', { ip: '10.0.0.1' }),
@@ -654,9 +681,21 @@ describe('AuthService', () => {
       });
     });
 
+    it('should say the institute is not active on a passkey login into an unusable institute', async () => {
+      mockUserRepo.findById.mockResolvedValue(mockUser);
+      mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
+      mockMembershipRepo.hasMembershipInUnusableInstitute.mockResolvedValue(true);
+
+      await expectBusinessError(
+        authService.instituteLoginByUserId('user-1'),
+        ErrorCode.INSTITUTE_NOT_ACTIVE,
+      );
+    });
+
     it('should throw when user has no active memberships', async () => {
       mockUserRepo.findById.mockResolvedValue(mockUser);
       mockMembershipRepo.findActiveByUserId.mockResolvedValue([]);
+      mockMembershipRepo.hasMembershipInUnusableInstitute.mockResolvedValue(false);
 
       const failure = await expectBusinessError(
         authService.instituteLoginByUserId('user-1'),
@@ -822,46 +861,6 @@ describe('AuthService', () => {
         ErrorCode.SESSION_EXPIRED,
       );
       expect(failure.message).toBe('Invalid or expired selection token');
-    });
-  });
-
-  describe('register', () => {
-    it('should hash password with argon2id and create user (platform-level)', async () => {
-      const createdUser = {
-        id: 'new-user',
-        username: 'newuser',
-        email: 'new@test.com',
-        passwordHash: '$argon2id$...',
-        status: 'ACTIVE' as const,
-        passwordChangedAt: null,
-        mustChangePassword: false,
-      };
-      mockUserRepo.create.mockResolvedValue(createdUser);
-
-      const result = await authService.register({
-        username: 'newuser',
-        email: 'new@test.com',
-        password: 'SecurePass123!',
-      });
-
-      expect(result.user?.username).toBe('newuser');
-
-      const createCall = mockUserRepo.create.mock.calls[0][0];
-      expect(createCall.passwordHash).not.toBe('SecurePass123!');
-      expect(createCall.passwordHash.startsWith('$argon2id$')).toBe(true);
-    });
-
-    it('should propagate unique constraint error on duplicate username', async () => {
-      const dbError = new Error('Unique constraint failed on the fields: (`username`)');
-      mockUserRepo.create.mockRejectedValue(dbError);
-
-      await expect(
-        authService.register({
-          username: 'existing',
-          email: 'new@test.com',
-          password: 'SecurePass123!',
-        }),
-      ).rejects.toThrow('Unique constraint failed');
     });
   });
 
@@ -1657,7 +1656,7 @@ describe('AuthService', () => {
   describe('changePassword', () => {
     // ROV-96 — new contract:
     //   changePassword(userId, currentPassword, newPassword, meta?) → Promise<void>
-    //   Min length is 12. Server revokes ALL refresh tokens; caller must re-login.
+    //   Rules come from failedPasswordRules. Server revokes ALL refresh tokens; caller must re-login.
     const CURRENT = 'current-password-123';
     const NEW = 'NewPassword12!';
     const userId = 'user-1';
@@ -1738,12 +1737,13 @@ describe('AuthService', () => {
       expect(mockRefreshTokenRepo.revokeAllForUser).not.toHaveBeenCalled();
     });
 
-    it('rejects new password shorter than NEW_PASSWORD_MIN_LENGTH with VALIDATION_FAILED', async () => {
-      // One character shy of the floor, padded from 'a' so the content is
-      // deterministic regardless of what NEW_PASSWORD_MIN_LENGTH is.
-      const tooShort = 'a'.repeat(NEW_PASSWORD_MIN_LENGTH - 1);
+    it.each([
+      ['shorter than NEW_PASSWORD_MIN_LENGTH', `Aa1${'x'.repeat(NEW_PASSWORD_MIN_LENGTH - 4)}`],
+      ['lower case only', 'lowercase-only-1'],
+      ['without a digit', 'abcdefghIJ'],
+    ])('rejects a new password %s with VALIDATION_FAILED', async (_case, rejected) => {
       await expectBusinessError(
-        authService.changePassword(userId, CURRENT, tooShort),
+        authService.changePassword(userId, CURRENT, rejected),
         ErrorCode.VALIDATION_FAILED,
       );
       expect(mockUserRepo.updatePassword).not.toHaveBeenCalled();

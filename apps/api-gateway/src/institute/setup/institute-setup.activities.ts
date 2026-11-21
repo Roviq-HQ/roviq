@@ -2,8 +2,6 @@
  * Activities for InstituteSetupWorkflow (ROV-126, PRD §10.4).
  *
  * Each activity is idempotent — checks "exists?" before creating.
- * Activities that call Identity Service use NATS stubs (Identity Service
- * handlers are in the Auth & Identity project, not implemented here).
  *
  * Temporal activities must accept only serializable arguments.
  * The DrizzleDB, EventBusService and InstituteSetupService are injected at worker startup via
@@ -35,6 +33,7 @@ export function createInstituteSetupActivities(
   setup: Pick<
     InstituteSetupService,
     | 'createDefaultRoles'
+    | 'createFirstAdmin'
     | 'createDefaultNotificationConfig'
     | 'createInstituteConfig'
     | 'createFirstAcademicYear'
@@ -42,62 +41,14 @@ export function createInstituteSetupActivities(
   >,
 ): InstituteSetupActivities {
   return {
-    // ── Phase 1: Identity (via NATS stubs) ─────────────────
+    // ── Phase 1: Identity ──────────────────────────────────
 
-    /**
-     * Request Identity Service to create "Admin" role for this institute.
-     * TODO: Replace stub with actual NATS call when Identity Service implements
-     * the IDENTITY.createRole handler (Auth & Identity project).
-     */
-    async createAdminRole(instituteId: string, _creatingUserId: string): Promise<string> {
-      logger.log(`[STUB] NATS → IDENTITY.createRole: Admin role for institute ${instituteId}`);
-      // TODO: Actual NATS call:
-      // const result = await firstValueFrom(
-      //   natsClient.send('IDENTITY.createRole', {
-      //     tenantId: instituteId,
-      //     name: 'Admin',
-      //     scope: 'institute',
-      //     abilities: [{ action: 'manage', subject: 'all' }],
-      //     isSystem: true,
-      //     isDefault: true,
-      //     headers: { 'x-actor-id': creatingUserId },
-      //   })
-      // );
-      // return result.roleId;
-      return `stub-admin-role-${instituteId}`;
+    async createDefaultRoles(instituteId: string, _creatingUserId: string): Promise<void> {
+      await setup.createDefaultRoles(instituteId);
     },
 
-    /**
-     * Request Identity Service to create admin membership.
-     * TODO: Replace stub with actual NATS call to IDENTITY.createMembership.
-     */
-    async createAdminMembership(
-      instituteId: string,
-      creatingUserId: string,
-      roleId: string,
-    ): Promise<string> {
-      logger.log(
-        `[STUB] NATS → IDENTITY.createMembership: user=${creatingUserId}, role=${roleId}, institute=${instituteId}`,
-      );
-      // TODO: Actual NATS call to Identity Service.
-      // Identity Service creates membership + generates secure random password if new user.
-      // Enforces password change on first login.
-      return `stub-membership-${instituteId}`;
-    },
-
-    /**
-     * Request Identity Service to create "System" role for automated operations.
-     * TODO: Replace stub with actual NATS call to IDENTITY.createRole.
-     */
-    async createSystemRole(instituteId: string, _creatingUserId: string): Promise<string> {
-      logger.log(`[STUB] NATS → IDENTITY.createRole: System role for institute ${instituteId}`);
-      return `stub-system-role-${instituteId}`;
-    },
-
-    /** Set admin as institute representative (updates institute record) */
-    async setInstituteRepresentative(instituteId: string, _creatingUserId: string): Promise<void> {
-      logger.log(`Setting representative for institute ${instituteId}`);
-      // Representative field not yet on institutes table — logging only for now
+    async createFirstAdmin(instituteId: string, creatingUserId: string): Promise<void> {
+      await setup.createFirstAdmin(instituteId, creatingUserId);
     },
 
     // ── Phase 2: Infrastructure ────────────────────────────
@@ -111,10 +62,6 @@ export function createInstituteSetupActivities(
         `[STUB] NATS → FINANCE.createWallets: fund, virtual, cash, expense for ${instituteId}`,
       );
       // TODO: Actual NATS call to Finance Service
-    },
-
-    async createDefaultRoles(instituteId: string, _creatingUserId: string): Promise<void> {
-      await setup.createDefaultRoles(instituteId);
     },
 
     // ── Phase 3: Academic Structure ────────────────────────

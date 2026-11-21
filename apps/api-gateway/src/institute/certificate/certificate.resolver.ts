@@ -1,7 +1,13 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
+import {
+  assertTenantContext,
+  CurrentUser,
+  GqlAuthGuard,
+  InstituteScopeGuard,
+} from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
+import type { AuthUser } from '@roviq/common-types';
 import { CertificateService } from './certificate.service';
 import { PreviewCertificateInput } from './dto/preview-certificate.input';
 import { ListCertificateFilterInput, RequestCertificateInput } from './dto/request-tc.input';
@@ -18,30 +24,42 @@ export class CertificateResolver {
   @CheckAbility({ action: 'create', subject: 'Certificate' })
   async requestCertificate(
     @Args('input') input: RequestCertificateInput,
+    @CurrentUser() user: AuthUser,
   ): Promise<CertificateModel> {
-    return this.certService.requestCertificate(input);
+    assertTenantContext(user);
+    return this.certService.requestCertificate(user, input);
   }
 
   @Mutation(() => CertificateModel, {
     description: 'Issue certificate — generates serial, renders PDF',
   })
   @CheckAbility({ action: 'manage', subject: 'Certificate' })
-  async issueCertificate(@Args('id', { type: () => ID }) id: string): Promise<CertificateModel> {
-    return this.certService.issueCertificate(id);
+  async issueCertificate(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CertificateModel> {
+    assertTenantContext(user);
+    return this.certService.issueCertificate(user, id);
   }
 
   @Query(() => [CertificateModel], { description: 'List certificates with optional filters' })
   @CheckAbility({ action: 'read', subject: 'Certificate' })
   async listCertificates(
+    @CurrentUser() user: AuthUser,
     @Args('filter', { nullable: true }) filter?: ListCertificateFilterInput,
   ): Promise<CertificateModel[]> {
-    return this.certService.listCertificates(filter);
+    assertTenantContext(user);
+    return this.certService.listCertificates(user, filter);
   }
 
   @Query(() => CertificateModel, { description: 'Get a certificate by id' })
   @CheckAbility({ action: 'read', subject: 'Certificate' })
-  async getCertificate(@Args('id', { type: () => ID }) id: string): Promise<CertificateModel> {
-    return this.certService.findCertificateById(id);
+  async getCertificate(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CertificateModel> {
+    assertTenantContext(user);
+    return this.certService.findCertificateById(user, id);
   }
 
   @Query(() => [String], {
@@ -50,9 +68,11 @@ export class CertificateResolver {
   })
   @CheckAbility({ action: 'read', subject: 'Certificate' })
   async getCertificateTemplateFields(
-    @Args('templateId', { type: () => ID }) templateId: string,
+    @Args('templateId', { type: () => ID }, ParseUUIDPipe) templateId: string,
+    @CurrentUser() user: AuthUser,
   ): Promise<string[]> {
-    return this.certService.getCertificateTemplateFields(templateId);
+    assertTenantContext(user);
+    return this.certService.getCertificateTemplateFields(user, templateId);
   }
 
   @Query(() => String, {
@@ -60,7 +80,11 @@ export class CertificateResolver {
       'Renders a preview HTML for a certificate by substituting student data into the template. No row is persisted.',
   })
   @CheckAbility({ action: 'read', subject: 'Certificate' })
-  async previewCertificate(@Args('input') input: PreviewCertificateInput): Promise<string> {
-    return this.certService.previewCertificate(input);
+  async previewCertificate(
+    @Args('input') input: PreviewCertificateInput,
+    @CurrentUser() user: AuthUser,
+  ): Promise<string> {
+    assertTenantContext(user);
+    return this.certService.previewCertificate(user, input);
   }
 }

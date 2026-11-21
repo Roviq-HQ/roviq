@@ -5,6 +5,8 @@ export const REDIS_KEYS = {
   WS_TICKET: 'ws-ticket:',
   /** Cached "may this reseller's staff use the API" answer, keyed by reseller id. */
   RESELLER_ACCESS: 'auth:reseller-access:',
+  /** Cached "may this institute's members use the API" answer, keyed by institute id. */
+  INSTITUTE_ACCESS: 'auth:institute-access:',
   /** Role a reseller membership's access tokens must carry, or `blocked`; written when a member is changed. */
   RESELLER_MEMBER_ACCESS: 'auth:reseller-member-access:',
   /** Sliding-window counter for failed login attempts, keyed by lowercased username. EX = FAILURE_WINDOW_SECONDS. */

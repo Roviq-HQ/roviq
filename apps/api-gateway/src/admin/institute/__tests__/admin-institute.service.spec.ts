@@ -156,6 +156,7 @@ function makeInstituteRecord(overrides: Partial<InstituteRecord> = {}): Institut
     groupId: null,
     departments: ['PRIMARY'],
     isDemo: false,
+    firstAdminUserId: 'aaaaaaaa-0000-7000-a000-000000000001',
     version: 1,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),

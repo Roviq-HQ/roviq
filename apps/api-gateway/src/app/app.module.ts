@@ -23,6 +23,7 @@ import { AuditInterceptor } from '../audit/audit.interceptor';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { ImpersonationSessionGuard } from '../auth/middleware/impersonation-session.guard';
+import { InstituteAccessGuard } from '../auth/middleware/institute-access.guard';
 import { MustChangePasswordGuard } from '../auth/middleware/must-change-password.guard';
 import { ResellerAccessGuard } from '../auth/middleware/reseller-access.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
@@ -146,6 +147,10 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     {
       provide: APP_GUARD,
       useClass: ResellerAccessGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: InstituteAccessGuard,
     },
     // ROV-96 — first-login enforcement. Runs after JWT auth has populated
     // req.user (or short-circuits when there is no user). Allows handlers

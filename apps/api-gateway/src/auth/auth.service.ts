@@ -14,7 +14,7 @@ import type {
 import {
   BusinessException,
   ErrorCode,
-  NEW_PASSWORD_MIN_LENGTH,
+  failedPasswordRules,
   ResellerStatus,
 } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
@@ -22,7 +22,6 @@ import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { AuthEventService } from './auth-event.service';
 import type { AuthPayload, InstituteLoginResult } from './dto/auth-payload';
-import type { RegisterInput } from './dto/register.input';
 import { LoginLockoutService } from './login-lockout.service';
 import { MembershipRepository } from './repositories/membership.repository';
 import { PlatformMembershipRepository } from './repositories/platform-membership.repository';
@@ -107,20 +106,6 @@ export class AuthService {
   async updatePreferredLocale(userId: string, locale: string | null): Promise<string | null> {
     await this.userRepo.updatePreferredLocale(userId, locale);
     return locale;
-  }
-
-  // ── Registration ───────────────────────────────────────
-
-  async register(input: RegisterInput): Promise<AuthPayload> {
-    const passwordHash = await hash(input.password);
-    const user = await this.userRepo.create({
-      username: input.username,
-      email: input.email,
-      passwordHash,
-    });
-    return {
-      user: { id: user.id, username: user.username, email: user.email },
-    };
   }
 
   // ── Three login mutations ──────────────────────────────
@@ -233,6 +218,7 @@ export class AuthService {
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
+      await this.rejectUnusableInstitute(user.id, 'password', meta);
       this.rejectWrongPortal(user.id, 'institute', meta);
     }
 
@@ -312,6 +298,7 @@ export class AuthService {
 
     const memberships = await this.membershipRepo.findActiveByUserId(user.id);
     if (memberships.length === 0) {
+      await this.rejectUnusableInstitute(user.id, 'passkey', meta);
       this.emitPasskeyLoginFailed(user.id, 'NO_PORTAL_ACCESS', meta);
       throw new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND, 'No account found');
     }
@@ -695,10 +682,11 @@ export class AuthService {
         'New password must differ from current password',
       );
     }
-    if (newPassword.length < NEW_PASSWORD_MIN_LENGTH) {
+    const failedRules = failedPasswordRules(newPassword);
+    if (failedRules.length > 0) {
       throw new BusinessException(
         ErrorCode.VALIDATION_FAILED,
-        `New password must be at least ${NEW_PASSWORD_MIN_LENGTH} characters`,
+        `New password does not meet: ${failedRules.join(', ')}`,
       );
     }
 
@@ -898,6 +886,20 @@ export class AuthService {
    * Correct password, no usable account in this portal. Same error as a wrong
    * password so the response does not confirm the credentials.
    */
+  /**
+   * The caller proved who they are, so they may be told why they cannot enter: every
+   * institute they belong to is waiting for activation, inactive, suspended or rejected.
+   */
+  private async rejectUnusableInstitute(
+    userId: string,
+    authMethod: LoginAuthMethod,
+    meta?: RequestMeta,
+  ): Promise<void> {
+    if (!(await this.membershipRepo.hasMembershipInUnusableInstitute(userId))) return;
+    this.emitLoginFailed({ userId, portal: 'institute', authMethod }, 'NO_PORTAL_ACCESS', meta);
+    throw new BusinessException(ErrorCode.INSTITUTE_NOT_ACTIVE, 'Your institute is not active');
+  }
+
   private rejectWrongPortal(userId: string, portal: AuthScope, meta?: RequestMeta): never {
     this.emitLoginFailed({ userId, portal, authMethod: 'password' }, 'NO_PORTAL_ACCESS', meta);
     throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials');

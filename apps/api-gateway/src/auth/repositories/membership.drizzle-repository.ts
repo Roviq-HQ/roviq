@@ -11,11 +11,14 @@ import {
   withAdmin,
 } from '@roviq/database';
 import { StorageClient } from '@roviq/storage';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { variantKeyOf } from '../../files/storage-keys';
 import { MembershipRepository } from './membership.repository';
 import type { MembershipWithInstituteAndRole } from './types';
+
+// A membership counts for login only while its institute is ACTIVE (SF-042).
+const USABLE_INSTITUTE = eq(institutesLive.status, 'ACTIVE');
 
 function readyLogoOf(logoFileId: PgColumn) {
   return and(eq(filesLive.id, logoFileId), eq(filesLive.status, 'READY'));
@@ -33,6 +36,24 @@ export class MembershipDrizzleRepository extends MembershipRepository {
   /** Branding logos are public images, so their link never expires. */
   private logoUrl(objectKey: string | null): string | null {
     return objectKey ? this.storage.publicUrl(variantKeyOf(objectKey, 'MD')) : null;
+  }
+
+  async hasMembershipInUnusableInstitute(userId: string): Promise<boolean> {
+    const rows = await withAdmin(this.db, mkAdminCtx('repository:membership'), (tx) =>
+      tx
+        .select({ id: membershipsLive.id })
+        .from(membershipsLive)
+        .innerJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
+        .where(
+          and(
+            eq(membershipsLive.userId, userId),
+            eq(membershipsLive.status, 'ACTIVE'),
+            ne(institutesLive.status, 'ACTIVE'),
+          ),
+        )
+        .limit(1),
+    );
+    return rows.length > 0;
   }
 
   async findActiveByUserId(userId: string): Promise<MembershipWithInstituteAndRole[]> {
@@ -58,7 +79,13 @@ export class MembershipDrizzleRepository extends MembershipRepository {
         .innerJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
         .leftJoin(instituteBrandingLive, eq(instituteBrandingLive.tenantId, institutesLive.id))
         .leftJoin(filesLive, readyLogoOf(instituteBrandingLive.logoFileId))
-        .where(and(eq(membershipsLive.userId, userId), eq(membershipsLive.status, 'ACTIVE')))
+        .where(
+          and(
+            eq(membershipsLive.userId, userId),
+            eq(membershipsLive.status, 'ACTIVE'),
+            USABLE_INSTITUTE,
+          ),
+        )
         // Deterministic order — multi-institute admins see memberships in
         // creation order across requests; selection-step UI / e2e tests
         // can rely on a stable index.
@@ -117,6 +144,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
             eq(membershipsLive.userId, userId),
             eq(membershipsLive.tenantId, tenantId),
             eq(membershipsLive.status, 'ACTIVE'),
+            USABLE_INSTITUTE,
           ),
         ),
     );
@@ -173,6 +201,7 @@ export class MembershipDrizzleRepository extends MembershipRepository {
             eq(membershipsLive.id, membershipId),
             eq(membershipsLive.userId, userId),
             eq(membershipsLive.status, 'ACTIVE'),
+            USABLE_INSTITUTE,
           ),
         )
         .limit(1),

@@ -8,7 +8,9 @@ import { ApplicationResolver } from './application.resolver';
 import { ApplicationDocumentRepository } from './application-document.repository';
 import { ApplicationDocumentResolver } from './application-document.resolver';
 import { ApplicationDocumentService } from './application-document.service';
+import { ApplicationFieldResolver } from './application-field.resolver';
 import { EnquiryResolver } from './enquiry.resolver';
+import { StandardNameLoaders } from './standard-name.loaders';
 import { StudentAdmissionWorkerService } from './workflows/student-admission.worker';
 
 @Module({
@@ -19,6 +21,8 @@ import { StudentAdmissionWorkerService } from './workflows/student-admission.wor
     AdmissionReadRepository,
     EnquiryResolver,
     ApplicationResolver,
+    ApplicationFieldResolver,
+    StandardNameLoaders,
     ApplicationDocumentRepository,
     ApplicationDocumentService,
     ApplicationDocumentResolver,

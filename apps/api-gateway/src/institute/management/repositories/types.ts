@@ -1,3 +1,4 @@
+import type { BoardType } from '@roviq/common-types';
 import type {
   InstituteAddress,
   InstituteContact,
@@ -29,6 +30,8 @@ export interface InstituteRecord {
   departments: string[];
   /** True for demo/sandbox institutes — disables notifications, seeds sample data. */
   isDemo: boolean;
+  /** The user setup makes the institute admin; null means setup creates no admin. */
+  firstAdminUserId: string | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -46,6 +49,10 @@ export interface CreateInstituteData {
   resellerId?: string;
   groupId?: string;
   isDemo?: boolean;
+  /** Resolved from the request's first admin before the insert. */
+  firstAdminUserId: string;
+  /** Recorded as a PROVISIONAL affiliation so setup can seed the board's subjects. */
+  board?: BoardType;
 }
 
 export interface InstituteSearchParams {

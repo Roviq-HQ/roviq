@@ -2,8 +2,8 @@
  * InstituteSetupWorkflow — 5-phase Temporal workflow (ROV-126, PRD §10.4).
  *
  * Orchestrates institute provisioning after creation/approval:
- *   Phase 1: Identity (sequential) — admin role, membership, system role
- *   Phase 2: Infrastructure (parallel) — wallets, default roles
+ *   Phase 1: Identity (sequential) — default roles, then the first admin's membership
+ *   Phase 2: Infrastructure — wallets
  *   Phase 3: Academic Structure (parallel per department) — standards, sections, subjects
  *   Phase 4: Configuration (parallel) — notifications, strength norms, first academic year
  *   Phase 5: Demo Data (conditional) — only if isDemo=true
@@ -42,8 +42,6 @@ export async function InstituteSetupWorkflow(
   await activities.updateSetupStatus(instituteId, 'IN_PROGRESS', creatingUserId);
 
   // ── Phase 1: Identity (Sequential) ─────────────────────
-  // CRITICAL: Never write directly to memberships/users/roles tables.
-  // Always via NATS to Identity Service. Actor context propagated via headers.
   await activities.publishProgress({
     instituteId,
     step: 'identity',
@@ -53,10 +51,9 @@ export async function InstituteSetupWorkflow(
     totalSteps: TOTAL_STEPS,
   });
 
-  const adminRoleId = await activities.createAdminRole(instituteId, creatingUserId);
-  await activities.createAdminMembership(instituteId, creatingUserId, adminRoleId);
-  await activities.createSystemRole(instituteId, creatingUserId);
-  await activities.setInstituteRepresentative(instituteId, creatingUserId);
+  // The first admin's membership needs the institute admin role to exist.
+  await activities.createDefaultRoles(instituteId, creatingUserId);
+  await activities.createFirstAdmin(instituteId, creatingUserId);
 
   await activities.publishProgress({
     instituteId,
@@ -77,10 +74,7 @@ export async function InstituteSetupWorkflow(
     totalSteps: TOTAL_STEPS,
   });
 
-  await Promise.all([
-    activities.createWallets(instituteId),
-    activities.createDefaultRoles(instituteId, creatingUserId),
-  ]);
+  await activities.createWallets(instituteId);
 
   await activities.publishProgress({
     instituteId,

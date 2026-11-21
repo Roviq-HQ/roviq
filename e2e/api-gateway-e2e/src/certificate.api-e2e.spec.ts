@@ -8,7 +8,7 @@
  *   02-tc-clearance           — the worker clears every department and snapshots tc_data
  *   03-tc-approve             — approveTC: GENERATED → APPROVED
  *   04-tc-issue               — issueTC: APPROVED → ISSUED, student → TRANSFERRED_OUT
- *   05-duplicate-tc           — requestDuplicateTC on the ISSUED TC
+ *   05-duplicate-tc           — requestDuplicateTC on the ISSUED TC, then issue it as <serial>-D1
  *   07-tc-blocks-non-admin    — teacher token on requestTC → FORBIDDEN
  *
  * Plus: rejectTC (→ CANCELLED) and listTCs with a `status` filter.
@@ -363,6 +363,9 @@ describe('Certificate E2E', () => {
       expect(generated.tcData.studentName).toBe('Tc Lifecycle');
       expect(generated.tcData.reasonForLeaving).toBe('Family relocated to another city');
       expect(generated.tcData.feesPaidUpTo).toBe('Yes');
+      // The class by name, not the standard's id.
+      expect(generated.tcData.classLastStudied).toBeTruthy();
+      expect(generated.tcData.classLastStudied).not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
 
       // 03 — principal approval.
       const approved = await gql<{ approveTC: TCNode }>(APPROVE_TC, { id: tcId }, adminToken);
@@ -413,6 +416,20 @@ describe('Certificate E2E', () => {
       expect(dup.isDuplicate).toBe(true);
       expect(dup.originalTcId).toBe(tcId);
       expect(dup.studentProfileId).toBe(lifecycleStudentId);
+
+      // 06 — issuing the duplicate numbers it after the original and leaves the student alone.
+      const dupIssued = await gql<{ issueTC: TCNode }>(ISSUE_TC, { id: dup.id }, adminToken);
+      expect(dupIssued.errors).toBeUndefined();
+      expect(dupIssued.data?.issueTC.status).toBe(TcStatus.DUPLICATE_ISSUED);
+      expect(dupIssued.data?.issueTC.tcSerialNumber).toBe(`${issuedTc.tcSerialNumber}-D1`);
+
+      const duplicates = await gql<{ listTCs: Array<{ id: string; status: TcStatus }> }>(
+        LIST_TCS,
+        { filter: { originalTcId: tcId } },
+        adminToken,
+      );
+      expect(duplicates.errors).toBeUndefined();
+      expect(duplicates.data?.listTCs.map((tc) => tc.id)).toEqual([dup.id]);
     });
 
     it('refuses issueTC for a TC that has not been approved', async () => {

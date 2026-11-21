@@ -15,12 +15,6 @@ export interface UserRecord {
   mustChangePassword: boolean;
 }
 
-export interface CreateUserData {
-  username: string;
-  email: string;
-  passwordHash: string;
-}
-
 export interface InstituteInfo {
   id: string;
   name: I18nContent;

@@ -62,12 +62,10 @@ export class CreateEnquiryInput {
   parentEmail?: string;
 
   @Field(() => GuardianRelationship, {
-    nullable: true,
     description: 'Relationship of the contact person to the student.',
   })
-  @IsOptional()
   @IsEnum(GuardianRelationship)
-  parentRelation?: GuardianRelationship;
+  parentRelation!: GuardianRelationship;
 
   @Field(() => EnquirySource, {
     nullable: true,

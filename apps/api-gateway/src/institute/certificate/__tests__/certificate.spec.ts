@@ -1,176 +1,58 @@
 /**
  * ROV-170 — Unit tests for CertificateService "other certificates" methods.
  *
- * Pure unit: mocks `@roviq/database` (withTenant/withAdmin + tables) and the
- * request context so no DB is touched. Covers findCertificateById,
- * listCertificates type-filter branch, and requestCertificate insert shape.
+ * Pure unit: the repositories are mocked, so no DB is touched. Covers findCertificateById,
+ * listCertificates with a type filter, and the shape of the certificate requestCertificate creates.
  */
 import type { ConfigService } from '@nestjs/config';
-import { CertificateStatus, CertificateTemplateType } from '@roviq/common-types';
-import type { DrizzleDB } from '@roviq/database';
+import {
+  CertificateStatus,
+  CertificateTemplateType,
+  type InstituteContext,
+} from '@roviq/common-types';
 import type { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CertificateService } from '../certificate.service';
+import { CertificateRepository } from '../repositories/certificate.repository';
+import type { IssuedCertificateRow } from '../repositories/certificate.types';
+import { TcRepository } from '../repositories/tc.repository';
 
-// ── Sequential result queue powering the mock Drizzle tx chain ──
-const resultQueue: unknown[] = [];
-let queueIndex = 0;
+const ctx: InstituteContext = {
+  _scope: 'institute',
+  scope: 'institute',
+  tenantId: 'tenant-1',
+  userId: 'user-1',
+  membershipId: 'membership-1',
+  roleId: 'role-1',
+  type: 'access',
+};
 
-function queueResult(result: unknown) {
-  resultQueue.push(result);
+function certificateRow(overrides: Partial<IssuedCertificateRow> = {}): IssuedCertificateRow {
+  return {
+    id: 'cert-1',
+    tenantId: 'tenant-1',
+    templateId: 'tpl-1',
+    studentProfileId: null,
+    staffProfileId: null,
+    serialNumber: 'CERT/TRA/0001',
+    status: CertificateStatus.ISSUED,
+    certificateData: {},
+    pdfUrl: null,
+    issuedDate: null,
+    issuedBy: null,
+    purpose: null,
+    validUntil: null,
+    createdAt: new Date('2026-04-01T00:00:00Z'),
+    updatedAt: new Date('2026-04-01T00:00:00Z'),
+    createdBy: 'user-1',
+    updatedBy: 'user-1',
+    deletedAt: null,
+    deletedBy: null,
+    version: 1,
+    ...overrides,
+  };
 }
-
-function resetQueue() {
-  resultQueue.length = 0;
-  queueIndex = 0;
-}
-
-function nextResult(): unknown {
-  const result = resultQueue[queueIndex] ?? [];
-  queueIndex++;
-  return result;
-}
-
-interface CapturedInsert {
-  table: string;
-  values: Record<string, unknown> | null;
-}
-const capturedInserts: CapturedInsert[] = [];
-let currentTable: string | null = null;
-
-function createMockTx() {
-  const terminal = vi.fn(() => Promise.resolve(nextResult()));
-  return new Proxy(
-    {},
-    {
-      get(_target, prop) {
-        if (prop === 'insert') {
-          return (table: { __tableName?: string }) => {
-            currentTable = table.__tableName ?? 'unknown';
-            return createMockTx();
-          };
-        }
-        if (prop === 'values') {
-          return (vals: Record<string, unknown>) => {
-            capturedInserts.push({ table: currentTable ?? 'unknown', values: vals });
-            return createMockTx();
-          };
-        }
-        if (prop === 'onConflictDoNothing') return () => Promise.resolve();
-        if (prop === 'limit' || prop === 'returning') return terminal;
-        if (prop === 'then') {
-          return (resolve: (v: unknown) => void) => resolve(nextResult());
-        }
-        if (prop === 'execute') {
-          return vi.fn(() =>
-            Promise.resolve({ rows: [{ next_val: '1', formatted: 'CERT/TRA/0001' }] }),
-          );
-        }
-        return vi.fn(() => createMockTx());
-      },
-    },
-  );
-}
-
-async function mockWithContext(_db: unknown, ...args: unknown[]) {
-  const fn = args[args.length - 1] as (tx: unknown) => Promise<unknown>;
-  return fn(createMockTx());
-}
-
-vi.mock('@roviq/database', () => ({
-  DRIZZLE_DB: Symbol('DRIZZLE_DB'),
-  withAdmin: vi.fn(mockWithContext),
-  withTenant: vi.fn(mockWithContext),
-  issuedCertificates: { __tableName: 'issuedCertificates', id: 'id', status: 'status' },
-  certificateTemplates: { __tableName: 'certificateTemplates', id: 'id', type: 'type' },
-  studentProfiles: {
-    __tableName: 'studentProfiles',
-    id: 'id',
-    userId: 'user_id',
-    admissionNumber: 'admission_number',
-    admissionClass: 'admission_class',
-  },
-  userProfiles: { __tableName: 'userProfiles', userId: 'user_id' },
-  tcRegister: { __tableName: 'tcRegister', id: 'id', status: 'status' },
-  tenantSequences: { __tableName: 'tenantSequences' },
-  academicYearsLive: { __tableName: 'academicYearsLive' },
-  admissionApplicationsLive: { __tableName: 'admissionApplicationsLive' },
-  attendanceEntriesLive: { __tableName: 'attendanceEntriesLive' },
-  attendanceSessionsLive: { __tableName: 'attendanceSessionsLive' },
-  botProfilesLive: { __tableName: 'botProfilesLive' },
-  enquiriesLive: { __tableName: 'enquiriesLive' },
-  groupsLive: { __tableName: 'groupsLive' },
-  guardianProfilesLive: { __tableName: 'guardianProfilesLive' },
-  holidaysLive: { __tableName: 'holidaysLive' },
-  instituteAffiliationsLive: { __tableName: 'instituteAffiliationsLive' },
-  instituteBrandingLive: { __tableName: 'instituteBrandingLive' },
-  instituteConfigsLive: { __tableName: 'instituteConfigsLive' },
-  instituteGroupBrandingLive: { __tableName: 'instituteGroupBrandingLive' },
-  instituteIdentifiersLive: { __tableName: 'instituteIdentifiersLive' },
-  institutesLive: { __tableName: 'institutesLive' },
-  issuedCertificatesLive: { __tableName: 'issuedCertificatesLive' },
-  leavesLive: { __tableName: 'leavesLive' },
-  membershipsLive: { __tableName: 'membershipsLive' },
-  rolesLive: { __tableName: 'rolesLive' },
-  sectionSubjectsLive: { __tableName: 'sectionSubjectsLive' },
-  sectionsLive: { __tableName: 'sectionsLive' },
-  staffProfilesLive: { __tableName: 'staffProfilesLive' },
-  standardSubjectsLive: { __tableName: 'standardSubjectsLive' },
-  standardsLive: { __tableName: 'standardsLive' },
-  studentAcademicsLive: { __tableName: 'studentAcademicsLive' },
-  studentProfilesLive: { __tableName: 'studentProfilesLive' },
-  subjectsLive: { __tableName: 'subjectsLive' },
-  tcRegisterLive: { __tableName: 'tcRegisterLive' },
-  mkInstituteCtx: (tenantId: string) => ({
-    _scope: 'institute',
-    scope: 'institute',
-    tenantId,
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  mkResellerCtx: (resellerId: string) => ({
-    _scope: 'reseller',
-    scope: 'reseller',
-    resellerId,
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  mkAdminCtx: () => ({
-    _scope: 'platform',
-    scope: 'platform',
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  usersLive: { __tableName: 'usersLive' },
-  refreshTokensLive: { __tableName: 'refreshTokensLive' },
-  phoneNumbersLive: { __tableName: 'phoneNumbersLive' },
-  authProvidersLive: { __tableName: 'authProvidersLive' },
-  platformMembershipsLive: { __tableName: 'platformMembershipsLive' },
-  resellerMembershipsLive: { __tableName: 'resellerMembershipsLive' },
-  groupMembershipsLive: { __tableName: 'groupMembershipsLive' },
-  userProfilesLive: { __tableName: 'userProfilesLive', userId: 'user_id' },
-  userAddressesLive: { __tableName: 'userAddressesLive' },
-  userDocumentsLive: { __tableName: 'userDocumentsLive' },
-  userIdentifiersLive: { __tableName: 'userIdentifiersLive' },
-  studentGuardianLinksLive: { __tableName: 'studentGuardianLinksLive' },
-  staffQualificationsLive: { __tableName: 'staffQualificationsLive' },
-  privacyNoticesLive: { __tableName: 'privacyNoticesLive' },
-  certificateTemplatesLive: { __tableName: 'certificateTemplatesLive', id: 'id', type: 'type' },
-  applicationDocumentsLive: { __tableName: 'applicationDocumentsLive' },
-  groupRulesLive: { __tableName: 'groupRulesLive' },
-  groupMembersLive: { __tableName: 'groupMembersLive' },
-  groupChildrenLive: { __tableName: 'groupChildrenLive' },
-}));
-
-vi.mock('@roviq/request-context', () => ({
-  getRequestContext: () => ({ tenantId: 'tenant-1', userId: 'user-1' }),
-}));
 
 vi.mock('@temporalio/client', () => {
   class FakeTemporalClient {
@@ -182,92 +64,86 @@ vi.mock('@temporalio/client', () => {
   };
 });
 
-// Import AFTER mocks.
-import { CertificateService } from '../certificate.service';
-
 describe('CertificateService (unit)', () => {
   let service: CertificateService;
+  let certificates: CertificateRepository;
 
   beforeEach(() => {
-    resetQueue();
-    capturedInserts.length = 0;
-    currentTable = null;
-    const db = createMock<DrizzleDB>();
-    const eventBus = createMock<EventBusService>({
-      emit: vi.fn(),
-    });
-    const config = createMock<ConfigService>({
-      get: vi.fn(() => 'localhost:7233'),
-    });
-    service = new CertificateService(db, eventBus, config);
+    certificates = createMock<CertificateRepository>();
+    const eventBus = createMock<EventBusService>({ emit: vi.fn() });
+    const config = createMock<ConfigService>({ get: vi.fn(() => 'localhost:7233') });
+    service = new CertificateService(createMock<TcRepository>(), certificates, eventBus, config);
   });
 
   describe('findCertificateById', () => {
-    it('returns the row produced by the mocked select chain', async () => {
-      const certRow = { id: 'cert-1', status: 'issued', serialNumber: 'CERT/TRA/0001' };
-      queueResult([certRow]);
-      const result = await service.findCertificateById('cert-1');
+    it('returns the row the repository finds', async () => {
+      const certRow = certificateRow();
+      vi.mocked(certificates.findById).mockResolvedValue(certRow);
+
+      const result = await service.findCertificateById(ctx, 'cert-1');
+
       expect(result).toEqual(certRow);
+      expect(certificates.findById).toHaveBeenCalledWith(ctx, 'cert-1');
     });
 
     it('rejects when no row is returned', async () => {
-      queueResult([]);
-      await expect(service.findCertificateById('missing')).rejects.toThrow(/not found/i);
+      vi.mocked(certificates.findById).mockResolvedValue(null);
+
+      await expect(service.findCertificateById(ctx, 'missing')).rejects.toThrow(/not found/i);
     });
   });
 
   describe('listCertificates', () => {
-    it('returns rows for a type filter via the two-step template lookup', async () => {
-      // Service now does two reads under a type filter:
-      //   1. SELECT id FROM certificate_templates WHERE type = ?
-      //   2. SELECT * FROM issued_certificates_live WHERE template_id IN (...)
-      // (rewritten from a JOIN to a two-step query because Drizzle pgView
-      // types don't satisfy the `select({ cert: view })` shorthand — the
-      // returned rows and filter semantics are identical.)
-      queueResult([{ id: 'tpl-1' }]);
-      queueResult([{ id: 'cert-1', status: 'issued' }]);
-      const result = await service.listCertificates({
+    it('returns rows for a type filter', async () => {
+      const rows = [certificateRow()];
+      vi.mocked(certificates.list).mockResolvedValue(rows);
+
+      const result = await service.listCertificates(ctx, {
         type: CertificateTemplateType.TRANSFER_CERTIFICATE,
       });
-      expect(result).toEqual([{ id: 'cert-1', status: 'issued' }]);
+
+      expect(result).toEqual(rows);
+      expect(certificates.list).toHaveBeenCalledWith(ctx, {
+        type: CertificateTemplateType.TRANSFER_CERTIFICATE,
+      });
     });
   });
 
   describe('requestCertificate', () => {
-    it('inserts an issued_certificate row with template data and actor tenant', async () => {
-      // 1. Template lookup.
-      queueResult([
-        {
-          id: 'tpl-1',
-          type: CertificateTemplateType.CHARACTER_CERTIFICATE,
-          approvalChain: [],
-        },
-      ]);
-      // 2. Insert .returning() for the issued certificate.
-      queueResult([
-        {
-          id: 'cert-new',
-          tenantId: 'tenant-1',
-          templateId: 'tpl-1',
-          serialNumber: 'CERT/CHA/0001',
-          status: CertificateStatus.DRAFT,
-        },
-      ]);
+    it('creates an issued certificate with the template, purpose and the caller as actor', async () => {
+      vi.mocked(certificates.findTemplate).mockResolvedValue({
+        id: 'tpl-1',
+        type: CertificateTemplateType.CHARACTER_CERTIFICATE,
+        name: 'Character',
+        templateContent: null,
+        approvalChain: [],
+      });
+      vi.mocked(certificates.nextSerial).mockResolvedValue('CERT/CHA/0001');
+      const created = certificateRow({
+        id: 'cert-new',
+        serialNumber: 'CERT/CHA/0001',
+        status: CertificateStatus.DRAFT,
+      });
+      vi.mocked(certificates.create).mockResolvedValue(created);
 
-      const result = await service.requestCertificate({
+      const result = await service.requestCertificate(ctx, {
         templateId: 'tpl-1',
         purpose: 'Bonafide for passport',
       });
 
       expect(result.id).toBe('cert-new');
-      const certInsert = capturedInserts.find((c) => c.table === 'issuedCertificates');
-      expect(certInsert).toBeDefined();
-      expect(certInsert?.values?.tenantId).toBe('tenant-1');
-      expect(certInsert?.values?.templateId).toBe('tpl-1');
-      expect(certInsert?.values?.purpose).toBe('Bonafide for passport');
-      expect(certInsert?.values?.createdBy).toBe('user-1');
-      // No approval chain → status starts as draft.
-      expect(certInsert?.values?.status).toBe(CertificateStatus.DRAFT);
+      expect(certificates.nextSerial).toHaveBeenCalledWith(ctx, 'CHA');
+      // No approval chain → status starts as draft. The tenant comes from ctx.
+      expect(certificates.create).toHaveBeenCalledWith(ctx, {
+        templateId: 'tpl-1',
+        studentProfileId: null,
+        staffProfileId: null,
+        serialNumber: 'CERT/CHA/0001',
+        status: CertificateStatus.DRAFT,
+        certificateData: {},
+        purpose: 'Bonafide for passport',
+        actorId: 'user-1',
+      });
     });
   });
 });

@@ -27,7 +27,6 @@ import {
   mkInstituteCtx,
   phoneNumbersLive,
   rolesLive,
-  sections,
   sectionsLive,
   studentAcademics,
   studentGuardianLinks,
@@ -357,16 +356,12 @@ export function createStudentAdmissionActivities(
       sectionId,
       createdBy,
     ) {
-      // Temporal retries activities, so this must be idempotent. The seat
-      // count on `sections.current_strength` is only bumped when the
-      // student_academics row is *actually inserted* — guarding the bump on
-      // `RETURNING { id }` length means a retry whose insert is skipped by
-      // `onConflictDoNothing` skips the bump too, preventing double-counts.
+      // Idempotent for Temporal retries; a database trigger keeps sections.current_strength.
       await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
         async (tx) => {
-          const inserted = await tx
+          await tx
             .insert(studentAcademics)
             .values({
               studentProfileId,
@@ -377,15 +372,7 @@ export function createStudentAdmissionActivities(
               createdBy,
               updatedBy: createdBy,
             })
-            .onConflictDoNothing()
-            .returning({ id: studentAcademics.id });
-
-          if (inserted.length > 0) {
-            await tx
-              .update(sections)
-              .set({ currentStrength: sql`${sections.currentStrength} + 1` })
-              .where(eq(sections.id, sectionId));
-          }
+            .onConflictDoNothing();
         },
       );
     },
@@ -600,7 +587,8 @@ export function createStudentAdmissionActivities(
         (relationshipRaw ?? '').toUpperCase(),
       )
         ? ((relationshipRaw as string).toUpperCase() as GuardianRelationship)
-        : GuardianRelationship.FATHER;
+        : // Unknown or missing: record OTHER rather than guess a parent.
+          GuardianRelationship.OTHER;
 
       // Create the student↔guardian link (idempotent — uq_student_guardian
       // prevents duplicates). Promote to primary contact when the student has

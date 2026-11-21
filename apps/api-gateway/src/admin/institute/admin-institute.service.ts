@@ -19,7 +19,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { Client, Connection } from '@temporalio/client';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { InstituteService } from '../../institute/management/institute.service';
 import { InstituteRepository } from '../../institute/management/repositories/institute.repository';
@@ -383,7 +383,11 @@ export class AdminInstituteService {
         .select({ board: instituteAffiliationsLive.board })
         .from(instituteAffiliationsLive)
         .where(eq(instituteAffiliationsLive.tenantId, instituteId))
-        .orderBy(asc(instituteAffiliationsLive.validFrom))
+        // Undated rows (recorded at request time) rank after dated ones; oldest row breaks ties.
+        .orderBy(
+          sql`${instituteAffiliationsLive.validFrom} ASC NULLS LAST`,
+          asc(instituteAffiliationsLive.createdAt),
+        )
         .limit(1);
       return rows[0]?.board ?? undefined;
     });

@@ -73,6 +73,7 @@ const CREATE_ENQUIRY = /* GraphQL */ `
       classRequested
       status
       parentPhone
+      parentRelation
     }
   }
 `;
@@ -125,6 +126,7 @@ interface CreateEnquiryResponse {
     classRequested: string;
     status: string;
     parentPhone: string;
+    parentRelation: string | null;
   };
 }
 
@@ -195,6 +197,7 @@ describe('Admission enquiries (integration)', () => {
           classRequested: 'Class 1',
           parentName: 'Suresh Kumar',
           parentPhone: '9876543210',
+          parentRelation: 'MOTHER',
           source: EnquirySource.WALK_IN,
         },
       },
@@ -205,6 +208,24 @@ describe('Admission enquiries (integration)', () => {
     expect(response.data?.createEnquiry.classRequested).toBe('Class 1');
     expect(response.data?.createEnquiry.status).toBe(EnquiryStatus.NEW);
     expect(response.data?.createEnquiry.parentPhone).toBe('9876543210');
+    expect(response.data?.createEnquiry.parentRelation).toBe('MOTHER');
+  });
+
+  it('createEnquiry: refuses an enquiry without the contact person’s relationship', async () => {
+    const request = gqlRequest<CreateEnquiryResponse>(result.httpServer, {
+      query: CREATE_ENQUIRY,
+      token: instituteToken,
+      variables: {
+        input: {
+          studentName: 'No Relation',
+          classRequested: 'Class 1',
+          parentName: 'Unknown',
+          parentPhone: '9876500001',
+        },
+      },
+    });
+
+    await expect(request).rejects.toThrow(/parentRelation.*was not provided/);
   });
 
   it('listEnquiries: returns the tenant-scoped enquiries', async () => {
@@ -218,6 +239,7 @@ describe('Admission enquiries (integration)', () => {
           classRequested: 'Class 2',
           parentName: 'Ravi Sharma',
           parentPhone: '9123456780',
+          parentRelation: 'MOTHER',
         },
       },
     });
@@ -244,6 +266,7 @@ describe('Admission enquiries (integration)', () => {
           classRequested: 'Class 3',
           parentName: 'Vijay Mehta',
           parentPhone: '9988776655',
+          parentRelation: 'MOTHER',
         },
       },
     });
@@ -281,6 +304,7 @@ describe('Admission enquiries (integration)', () => {
           classRequested: 'Class 1',
           parentName: 'Manish Patel',
           parentPhone: '9012345678',
+          parentRelation: 'MOTHER',
         },
       },
     });

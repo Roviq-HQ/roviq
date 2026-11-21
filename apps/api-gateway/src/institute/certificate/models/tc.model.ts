@@ -44,11 +44,12 @@ export class TCModel {
   })
   studentLastName?: I18nContent | null;
 
-  @Field(() => String, {
+  @Field(() => I18nTextScalar, {
     nullable: true,
-    description: "Class/standard studied snapshot from tcData->>'class_studied'",
+    description:
+      "Student's standard in the TC's academic year (i18n); null without an academic record",
   })
-  currentStandardName?: string | null;
+  standardName?: I18nContent | null;
 
   @Field()
   tcSerialNumber!: string;
@@ -63,7 +64,10 @@ export class TCModel {
   reason!: string;
 
   /** 20+ CBSE fields snapshotted at generation — dynamic per board, kept as JSON */
-  @Field(() => GraphQLJSON, { nullable: true, description: 'CBSE 20-field TC data snapshot' })
+  @Field(() => GraphQLJSON, {
+    nullable: true,
+    description: 'CBSE TC fields frozen at generation (see CbseTcData)',
+  })
   tcData?: Record<string, unknown>;
 
   @Field(() => [ClearanceEntryObject], {
@@ -81,11 +85,14 @@ export class TCModel {
   @Field(() => Boolean)
   isDuplicate!: boolean;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => String, {
+    nullable: true,
+    description: 'For a duplicate, the issued TC it copies; null on an original',
+  })
   originalTcId?: string | null;
 
   @Field(() => Boolean, { nullable: true })
-  isCounterSigned?: boolean;
+  isCounterSigned?: boolean | null;
 
   @Field(() => DateTimeScalar)
   createdAt!: Date;
