@@ -11,6 +11,9 @@ import {
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  instituteAffiliationsLive,
+  instituteBrandingLive,
+  institutesLive,
   standardsLive,
   studentAcademicsLive,
   studentProfiles,
@@ -20,12 +23,14 @@ import {
   userProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, count, desc, eq, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNull, type SQL, sql } from 'drizzle-orm';
+import { markFilesReady } from '../../../files/file-attachment';
 import { nextTcSerialNumber } from '../tc-serial';
 import { TcRepository } from './tc.repository';
 import type {
   CreateDuplicateTcData,
   CreateTcRequestData,
+  InstituteLetterheadRow,
   IssueTcData,
   StudentStatusRow,
   TcDetailsRow,
@@ -42,6 +47,7 @@ const rowColumns = {
   isDuplicate: tcRegisterLive.isDuplicate,
   originalTcId: tcRegisterLive.originalTcId,
   tcData: tcRegisterLive.tcData,
+  pdfFileId: tcRegisterLive.pdfFileId,
 } as const;
 
 const detailsColumns = {
@@ -53,8 +59,10 @@ const detailsColumns = {
   reason: tcRegisterLive.reason,
   tcData: tcRegisterLive.tcData,
   clearances: tcRegisterLive.clearances,
-  pdfUrl: tcRegisterLive.pdfUrl,
-  qrVerificationUrl: tcRegisterLive.qrVerificationUrl,
+  pdfFileId: tcRegisterLive.pdfFileId,
+  verificationToken: tcRegisterLive.verificationToken,
+  issuedAt: tcRegisterLive.issuedAt,
+  admissionNumber: studentProfilesLive.admissionNumber,
   isDuplicate: tcRegisterLive.isDuplicate,
   originalTcId: tcRegisterLive.originalTcId,
   isCounterSigned: tcRegisterLive.isCounterSigned,
@@ -219,7 +227,7 @@ export class TcDrizzleRepository extends TcRepository {
   }
 
   async issueOriginal(ctx: InstituteContext, data: IssueTcData): Promise<string> {
-    const { tc, today, pdfUrl, actorId } = data;
+    const { tc, today, verificationToken, actorId } = data;
     // Serial + status in one transaction so a failed issue doesn't burn a number
     return withTenant(this.db, ctx, async (tx) => {
       const serial = await nextTcSerialNumber(tx, ctx.tenantId, tc.academicYearId);
@@ -230,8 +238,7 @@ export class TcDrizzleRepository extends TcRepository {
           status: TcStatus.ISSUED,
           tcSerialNumber: serial,
           issuedAt: new Date(),
-          pdfUrl,
-          qrVerificationUrl: `/tc/verify/${serial}`,
+          verificationToken,
           tcData: withDateOfIssue(today),
           updatedBy: actorId,
         })
@@ -261,7 +268,7 @@ export class TcDrizzleRepository extends TcRepository {
   }
 
   async issueDuplicate(ctx: InstituteContext, data: IssueTcData): Promise<string> {
-    const { tc, today, pdfUrl, actorId } = data;
+    const { tc, today, verificationToken, actorId } = data;
     const originalTcId = tc.originalTcId;
     if (!originalTcId) {
       throw new BusinessException(ErrorCode.TC_NOT_FOUND, 'Original TC of the duplicate not found');
@@ -295,8 +302,7 @@ export class TcDrizzleRepository extends TcRepository {
           status: TcStatus.DUPLICATE_ISSUED,
           tcSerialNumber: serial,
           issuedAt: new Date(),
-          pdfUrl,
-          qrVerificationUrl: `/tc/verify/${serial}`,
+          verificationToken,
           tcData: withDateOfIssue(today),
           updatedBy: actorId,
         })
@@ -309,6 +315,49 @@ export class TcDrizzleRepository extends TcRepository {
         );
       }
       return serial;
+    });
+  }
+
+  async findLetterhead(ctx: InstituteContext): Promise<InstituteLetterheadRow | null> {
+    const [row] = await withTenant(this.db, ctx, (tx) =>
+      tx
+        .select({
+          name: institutesLive.name,
+          address: institutesLive.address,
+          board: instituteAffiliationsLive.board,
+          affiliationNumber: instituteAffiliationsLive.affiliationNumber,
+          logoFileId: instituteBrandingLive.logoFileId,
+        })
+        .from(institutesLive)
+        .leftJoin(instituteBrandingLive, eq(instituteBrandingLive.tenantId, institutesLive.id))
+        .leftJoin(
+          instituteAffiliationsLive,
+          eq(instituteAffiliationsLive.tenantId, institutesLive.id),
+        )
+        .where(eq(institutesLive.id, ctx.tenantId))
+        // Same primary-affiliation order as institute setup: dated rows first, oldest first.
+        .orderBy(
+          sql`${instituteAffiliationsLive.validFrom} ASC NULLS LAST`,
+          asc(instituteAffiliationsLive.createdAt),
+        )
+        .limit(1),
+    );
+    return row ?? null;
+  }
+
+  attachPdf(
+    ctx: InstituteContext,
+    data: { tcId: string; fileId: string; actorId: string },
+  ): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .update(tcRegister)
+        .set({ pdfFileId: data.fileId, updatedBy: data.actorId })
+        .where(and(eq(tcRegister.id, data.tcId), isNull(tcRegister.pdfFileId)))
+        .returning({ id: tcRegister.id });
+      if (rows.length === 0) return false;
+      await markFilesReady(tx, { fileIds: [data.fileId], purpose: 'TC_PDF', userId: data.actorId });
+      return true;
     });
   }
 

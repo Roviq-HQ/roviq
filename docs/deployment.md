@@ -135,6 +135,22 @@ that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
   It connects with `DATABASE_URL` and runs as `roviq_admin`, reaching partition DDL through the
   `SECURITY DEFINER` functions `ensure_monthly_partition` and `detach_monthly_partition`.
 
+## PDF generation
+
+Transfer certificates and other certificates are rendered inside the api-gateway with Typst
+(`@myriaddreamin/typst-ts-node-compiler`). No browser or system binary is needed.
+
+- The package ships one native binary per platform as an optional dependency. The image must
+  be installed on the platform it runs on (`pnpm install` inside the image), not copied from a
+  different one.
+- Fonts are in the build output at `dist/apps/api-gateway/src/assets/fonts` (Noto Sans and Noto
+  Sans Devanagari). Text in a script without a font is refused with `PDF_UNSUPPORTED_SCRIPT`
+  instead of being printed as boxes; to add a script see `apps/api-gateway/src/assets/fonts/README.md`.
+- `INSTITUTE_PORTAL_URL` must be the public address of the institute portal
+  (`https://app.roviq.com`). It is printed in the QR code of every transfer certificate as
+  `<url>/verify/tc/<token>`. A certificate printed with the wrong address cannot be fixed later.
+- The page `/verify/tc/<token>` and the `verifyTC` query are public on purpose.
+
 ## Redis
 
 Redis is on the request path for access control, not only for caching:

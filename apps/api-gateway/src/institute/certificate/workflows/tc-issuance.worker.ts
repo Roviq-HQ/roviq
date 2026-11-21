@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
-import { EventBusService } from '@roviq/event-bus';
 import { EmbeddedTemporalWorker } from '../../../common/temporal/embedded-temporal-worker';
 import { createTCIssuanceActivities } from './tc-issuance.activities';
 import { DEFAULT_TC_TASK_QUEUE } from './tc-issuance.types';
@@ -13,10 +12,7 @@ import { tcIssuanceWorkflowsPath } from './tc-issuance.workflows-path';
  */
 @Injectable()
 export class TCIssuanceWorkerService extends EmbeddedTemporalWorker {
-  constructor(
-    config: ConfigService,
-    private readonly eventBus: EventBusService,
-  ) {
+  constructor(config: ConfigService) {
     super(config, {
       flag: 'TC_ISSUANCE_WORKER_ENABLED',
       label: 'TC issuance worker',
@@ -27,7 +23,7 @@ export class TCIssuanceWorkerService extends EmbeddedTemporalWorker {
   }
 
   protected createActivities(db: DrizzleDB) {
-    return createTCIssuanceActivities(db, this.eventBus);
+    return createTCIssuanceActivities(db);
   }
 
   protected workflowsPath(): string {

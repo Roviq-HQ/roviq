@@ -46,12 +46,6 @@ export interface TCPopulateResult {
   tcData: CbseTcData;
 }
 
-export interface TCIssueResult {
-  pdfUrl: string;
-  qrVerificationUrl: string;
-  tcSerialNumber: string;
-}
-
 // ── Workflow result ───────────────────────────────────────
 
 export type TCWorkflowStatus =
@@ -68,7 +62,6 @@ export interface TCIssuanceResult {
   status: TCWorkflowStatus;
   tcRegisterId: string;
   tcSerialNumber: string | null;
-  pdfUrl: string | null;
 }
 
 // ── Activities interface ──────────────────────────────────
@@ -97,15 +90,4 @@ export interface TCIssuanceActivities {
     tcRegisterId: string,
     studentProfileId: string,
   ): Promise<TCPopulateResult | null>;
-
-  /** Step 4: Record approval by principal */
-  recordApproval(tenantId: string, tcRegisterId: string, approvedBy: string): Promise<void>;
-
-  /** Step 5: Generate PDF, upload S3, update student status, emit event */
-  issueTC(
-    tenantId: string,
-    tcRegisterId: string,
-    studentProfileId: string,
-    academicYearId: string,
-  ): Promise<TCIssueResult>;
 }

@@ -1,11 +1,10 @@
 /**
- * TCIssuanceWorkflow — 5-step Temporal workflow (ROV-161, PRD §5.1).
+ * TCIssuanceWorkflow — the first three steps of TC issuance (ROV-161, PRD §5.1).
  *
  * Step 1: Request validation → status='clearance_pending'
  * Step 2: Department clearances (parallel) → accounts, library, lab, transport
  * Step 3: Data population → snapshot 20 CBSE TC fields into tc_data JSONB
- * Step 4: Approval → principal signs off
- * Step 5: Issuance → PDF + QR, upload S3, student → transferred_out
+ * Steps 4 (approval) and 5 (issue, PDF) are the approveTC and issueTC mutations.
  *
  * Task queue: tc-issuance
  * Workflow timeout: 7 days
@@ -32,7 +31,6 @@ export async function TCIssuanceWorkflow(input: TCIssuanceInput): Promise<TCIssu
     status: 'CANCELLED',
     tcRegisterId,
     tcSerialNumber: null,
-    pdfUrl: null,
   };
   if (!(await activities.validateRequest(tenantId, tcRegisterId, studentProfileId))) {
     return stopped;
@@ -50,7 +48,6 @@ export async function TCIssuanceWorkflow(input: TCIssuanceInput): Promise<TCIssu
         status: 'FAILED',
         tcRegisterId,
         tcSerialNumber: null,
-        pdfUrl: null,
       };
     }
   }
@@ -69,6 +66,5 @@ export async function TCIssuanceWorkflow(input: TCIssuanceInput): Promise<TCIssu
     status: 'GENERATED',
     tcRegisterId,
     tcSerialNumber: null,
-    pdfUrl: null,
   };
 }

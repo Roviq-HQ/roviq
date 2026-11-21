@@ -5,19 +5,24 @@
  * for requestTC, approveTC, rejectTC, and listTCs. Uses a fresh test institute
  * with a hand-rolled student fixture per suite (no seed mutation).
  */
+import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import {
   AcademicStatus,
   AdmissionType,
+  type CbseTcData,
   Gender,
   SocialCategory,
   TcStatus,
 } from '@roviq/common-types';
 import {
   academicYears,
+  certificateTemplates,
   type DrizzleDB,
+  files,
   memberships,
   mkAdminCtx,
+  mkInstituteCtx,
   roles,
   SYSTEM_USER_ID,
   sections,
@@ -28,20 +33,48 @@ import {
   userProfiles,
   users,
   withAdmin,
+  withTenant,
 } from '@roviq/database';
+import { FakeStorageClient, StorageClient } from '@roviq/storage';
 import {
   createInstituteToken,
   createIntegrationApp,
   createResellerToken,
   createTestInstitute,
+  createTestTeacher,
   gqlRequest,
   type IntegrationAppResult,
   RESELLER_DIRECT_ID,
 } from '@roviq/testing/integration';
-import { and, eq, notInArray } from 'drizzle-orm';
+import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 import { createTCIssuanceActivities } from '../workflows/tc-issuance.activities';
+
+const EMPTY_TC_DATA: CbseTcData = {
+  studentName: '',
+  motherName: null,
+  fatherOrGuardianName: null,
+  nationality: 'Indian',
+  socialCategory: 'GENERAL',
+  dateOfBirthFigures: '2015-04-02',
+  dateOfBirthWords: null,
+  whetherFailed: 'No',
+  subjectsStudied: 'As per curriculum',
+  classLastStudied: 'Class 5',
+  lastExamResult: 'Passed',
+  qualifiedForPromotion: 'Yes',
+  feesPaidUpTo: 'Yes',
+  feeConcession: 'None',
+  nccScoutGuide: 'None',
+  dateOfLeaving: null,
+  reasonForLeaving: 'Family is moving',
+  totalWorkingDays: '220',
+  totalPresentDays: '200',
+  generalConduct: 'Good',
+  remarks: '',
+  dateOfIssue: null,
+};
 
 interface StudentFixture {
   studentProfileId: string;
@@ -285,9 +318,13 @@ describe('TCResolver (integration)', () => {
   let instituteToken: string;
   let tenantId: string;
   let fixture: StudentFixture;
+  const storage = new FakeStorageClient();
 
   beforeAll(async () => {
-    result = await createIntegrationApp({ modules: [AppModule] });
+    result = await createIntegrationApp({
+      modules: [AppModule],
+      overrides: [{ provide: StorageClient, useValue: storage }],
+    });
     const institute = await createTestInstitute(result.db);
     tenantId = institute.tenantId;
     instituteToken = createInstituteToken({
@@ -419,7 +456,7 @@ describe('TCResolver (integration)', () => {
         })
         .returning({ id: tcRegister.id }),
     );
-    const activities = createTCIssuanceActivities(result.db, null);
+    const activities = createTCIssuanceActivities(result.db);
 
     const validated = await activities.validateRequest(tenantId, tc.id, fixture.studentProfileId);
     const clearance = await activities.checkDepartmentClearance(tenantId, tc.id, 'accounts');
@@ -462,7 +499,7 @@ describe('TCResolver (integration)', () => {
         })
         .returning({ id: tcRegister.id }),
     );
-    const activities = createTCIssuanceActivities(result.db, null);
+    const activities = createTCIssuanceActivities(result.db);
 
     expect(await activities.validateRequest(tenantId, tc.id, fixture.studentProfileId)).toBe(true);
     for (const department of ['accounts', 'library', 'lab', 'transport']) {
@@ -772,6 +809,269 @@ describe('TCResolver (integration)', () => {
       // The original is free for a new duplicate request once the open one is cancelled.
       const next = await requestDuplicate(originalId);
       expect(next.errors).toBeUndefined();
+    });
+  });
+
+  describe('TC PDF', () => {
+    const TC_FIELDS = 'id status tcSerialNumber verificationUrl pdf { id url }';
+    interface TcPdfFields {
+      id: string;
+      status: string;
+      tcSerialNumber: string;
+      verificationUrl: string | null;
+      pdf: { id: string; url: string | null } | null;
+    }
+    const DOWNLOAD = 'mutation ($id: ID!) { fileDownloadUrl(fileId: $id) }';
+    const VERIFY =
+      'query ($token: String!) { verifyTC(token: $token) { serialNumber isValid studentName isDuplicate issuedOn } }';
+
+    const insertTc = async (values: {
+      status: TcStatus;
+      studentName?: string;
+      verificationToken?: string;
+    }) => {
+      const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .insert(tcRegister)
+          .values({
+            tenantId,
+            studentProfileId: fixture.studentProfileId,
+            academicYearId: fixture.academicYearId,
+            tcSerialNumber: `TC-TMP-${randomUUID()}`,
+            status: values.status,
+            reason: 'Family is moving to another city',
+            tcData: { ...EMPTY_TC_DATA, studentName: values.studentName ?? 'Asha Verma' },
+            verificationToken: values.verificationToken,
+            issuedAt: values.status === TcStatus.ISSUED ? new Date() : null,
+            requestedBy: SYSTEM_USER_ID,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: tcRegister.id }),
+      );
+      return tc.id;
+    };
+    const issue = (id: string) =>
+      gqlRequest<{ issueTC: TcPdfFields }>(result.httpServer, {
+        query: `mutation ($id: ID!) { issueTC(id: $id) { ${TC_FIELDS} } }`,
+        token: instituteToken,
+        variables: { id },
+      });
+    const tokenOf = (url: string | null) => url?.split('/').pop() ?? '';
+
+    it('issueTC stores the PDF as a READY TC_PDF file that only an explicit request downloads', async () => {
+      const response = await issue(await insertTc({ status: TcStatus.APPROVED }));
+      expect(response.errors).toBeUndefined();
+      const tc = response.data?.issueTC;
+      assert(tc?.pdf);
+      expect(tc.status).toBe(TcStatus.ISSUED);
+      // Sensitive purpose: the file reference never carries a URL.
+      expect(tc.pdf.url).toBeNull();
+      expect(tokenOf(tc.verificationUrl)).toMatch(/^[A-Za-z0-9_-]{32}$/);
+
+      const [file] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .select()
+          .from(files)
+          .where(eq(files.id, tc.pdf?.id ?? '')),
+      );
+      expect(file.purpose).toBe('TC_PDF');
+      expect(file.status).toBe('READY');
+      expect(file.visibility).toBe('PRIVATE');
+      expect(file.tenantId).toBe(tenantId);
+      const body = await storage.get('private', file.objectKey);
+      expect(body.subarray(0, 5).toString()).toBe('%PDF-');
+      expect(body.length).toBe(Number(file.sizeBytes));
+
+      const download = await gqlRequest<{ fileDownloadUrl: string }>(result.httpServer, {
+        query: DOWNLOAD,
+        token: instituteToken,
+        variables: { id: tc.pdf.id },
+      });
+      expect(download.errors).toBeUndefined();
+      expect(download.data?.fileDownloadUrl).toContain(file.objectKey);
+    });
+
+    it('a teacher, another institute and a reseller cannot download the PDF', async () => {
+      const response = await issue(await insertTc({ status: TcStatus.APPROVED }));
+      const fileId = response.data?.issueTC.pdf?.id;
+      assert(fileId);
+
+      const teacher = await createTestTeacher(result.db, tenantId);
+      const other = await createTestInstitute(result.db);
+      const tokens = {
+        teacher: createInstituteToken({
+          sub: teacher.userId,
+          tenantId,
+          membershipId: teacher.membershipId,
+          roleId: teacher.roleId,
+        }),
+        otherInstitute: createInstituteToken({
+          sub: other.userId,
+          tenantId: other.tenantId,
+          membershipId: other.membershipId,
+          roleId: other.roleId,
+        }),
+        reseller: createResellerToken({
+          sub: randomUUID(),
+          resellerId: RESELLER_DIRECT_ID,
+          membershipId: randomUUID(),
+          roleId: randomUUID(),
+        }),
+      };
+      const codeFor = async (token: string) => {
+        const download = await gqlRequest(result.httpServer, {
+          query: DOWNLOAD,
+          token,
+          variables: { id: fileId },
+        });
+        expect(download.data?.fileDownloadUrl).toBeUndefined();
+        return download.errors?.[0]?.extensions?.code;
+      };
+
+      expect(await codeFor(tokens.teacher)).toBe('FILE_NOT_FOUND');
+      expect(await codeFor(tokens.otherInstitute)).toBe('FILE_NOT_FOUND');
+      expect(await codeFor(tokens.reseller)).toBe('FORBIDDEN');
+    });
+
+    it('verifyTC answers anyone holding the token, and only with the verification fields', async () => {
+      const response = await issue(await insertTc({ status: TcStatus.APPROVED }));
+      const tc = response.data?.issueTC;
+      assert(tc);
+      const verify = (token: string) =>
+        gqlRequest<{
+          verifyTC: {
+            serialNumber: string;
+            isValid: boolean;
+            studentName: string;
+            isDuplicate: boolean;
+            issuedOn: string;
+          } | null;
+        }>(result.httpServer, { query: VERIFY, variables: { token } });
+
+      const valid = await verify(tokenOf(tc.verificationUrl));
+      expect(valid.errors).toBeUndefined();
+      expect(valid.data?.verifyTC).toEqual({
+        serialNumber: tc.tcSerialNumber,
+        isValid: true,
+        studentName: 'Asha Verma',
+        isDuplicate: false,
+        issuedOn: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()),
+      });
+
+      expect((await verify('x'.repeat(32))).data?.verifyTC).toBeNull();
+      expect((await verify("' OR 1=1 --")).data?.verifyTC).toBeNull();
+
+      await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx.update(tcRegister).set({ status: TcStatus.CANCELLED }).where(eq(tcRegister.id, tc.id)),
+      );
+      expect((await verify(tokenOf(tc.verificationUrl))).data?.verifyTC?.isValid).toBe(false);
+    });
+
+    it('verify_tc cannot be called by the institute role', async () => {
+      await expect(
+        withTenant(result.db, mkInstituteCtx(tenantId, 'test:tc'), (tx) =>
+          tx.execute(sql`SELECT * FROM verify_tc(${'x'.repeat(32)})`),
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('issueTC refuses a TC whose text no bundled font can print, and leaves it approved', async () => {
+      const id = await insertTc({ status: TcStatus.APPROVED, studentName: 'தமிழ் செல்வன்' });
+
+      const response = await issue(id);
+
+      expect(response.errors?.[0]?.extensions?.code).toBe('PDF_UNSUPPORTED_SCRIPT');
+      const [row] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx.select({ status: tcRegister.status }).from(tcRegister).where(eq(tcRegister.id, id)),
+      );
+      expect(row.status).toBe(TcStatus.APPROVED);
+    });
+
+    it('generateTCPdf renders the PDF of an issued TC that has none, once', async () => {
+      const id = await insertTc({
+        status: TcStatus.ISSUED,
+        verificationToken: randomUUID().replace(/-/g, ''),
+      });
+      const generate = () =>
+        gqlRequest<{ generateTCPdf: TcPdfFields }>(result.httpServer, {
+          query: `mutation ($id: ID!) { generateTCPdf(id: $id) { ${TC_FIELDS} } }`,
+          token: instituteToken,
+          variables: { id },
+        });
+
+      const first = await generate();
+      expect(first.errors).toBeUndefined();
+      const fileId = first.data?.generateTCPdf.pdf?.id;
+      assert(fileId);
+      expect((await generate()).data?.generateTCPdf.pdf?.id).toBe(fileId);
+
+      const notIssued = await gqlRequest(result.httpServer, {
+        query: 'mutation ($id: ID!) { generateTCPdf(id: $id) { id } }',
+        token: instituteToken,
+        variables: { id: await insertTc({ status: TcStatus.APPROVED }) },
+      });
+      expect(notIssued.errors?.[0]?.extensions?.code).toBe('PDF_NOT_READY');
+    });
+  });
+
+  describe('certificate PDF', () => {
+    it('issueCertificate stores a CERTIFICATE_PDF built from the template text as plain text', async () => {
+      const [template] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .insert(certificateTemplates)
+          .values({
+            tenantId,
+            type: 'BONAFIDE_CERTIFICATE',
+            name: 'Bonafide',
+            // Markup and Typst code in institute-authored text must print as text.
+            templateContent:
+              '<p>Certified that <b>{{studentName}}</b> is a student here.</p><p>#panic("x") {{purpose}}</p>',
+            fieldsSchema: {},
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: certificateTemplates.id }),
+      );
+      const requested = await gqlRequest<{ requestCertificate: { id: string } }>(
+        result.httpServer,
+        {
+          query:
+            'mutation ($input: RequestCertificateInput!) { requestCertificate(input: $input) { id } }',
+          token: instituteToken,
+          variables: {
+            input: {
+              templateId: template.id,
+              studentProfileId: fixture.studentProfileId,
+              purpose: 'Passport application',
+            },
+          },
+        },
+      );
+      expect(requested.errors).toBeUndefined();
+      const id = requested.data?.requestCertificate.id;
+      assert(id);
+
+      const issued = await gqlRequest<{
+        issueCertificate: { status: string; pdf: { id: string; url: string | null } | null };
+      }>(result.httpServer, {
+        query: 'mutation ($id: ID!) { issueCertificate(id: $id) { status pdf { id url } } }',
+        token: instituteToken,
+        variables: { id },
+      });
+
+      expect(issued.errors).toBeUndefined();
+      const pdf = issued.data?.issueCertificate.pdf;
+      assert(pdf);
+      expect(issued.data?.issueCertificate.status).toBe('ISSUED');
+      expect(pdf.url).toBeNull();
+      const [file] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx.select().from(files).where(eq(files.id, pdf.id)),
+      );
+      expect(file.purpose).toBe('CERTIFICATE_PDF');
+      expect(file.status).toBe('READY');
+      const body = await storage.get('private', file.objectKey);
+      expect(body.subarray(0, 5).toString()).toBe('%PDF-');
     });
   });
 
