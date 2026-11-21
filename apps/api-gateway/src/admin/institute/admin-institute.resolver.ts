@@ -1,5 +1,6 @@
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { AuditInstitute } from '@roviq/audit';
 import { GqlAuthGuard, PlatformScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { InstituteService } from '../../institute/management/institute.service';
@@ -40,12 +41,14 @@ export class AdminInstituteResolver {
     return this.instituteService.create(input);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel)
   @CheckAbility({ action: 'approve', subject: 'Institute' })
   async adminApproveInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.adminService.approve(id);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel, {
     description:
       'Activate institute (PENDING/INACTIVE/SUSPENDED → ACTIVE). Requires setup_status COMPLETED.',
@@ -55,6 +58,7 @@ export class AdminInstituteResolver {
     return this.instituteService.activate(id);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel)
   @CheckAbility({ action: 'reject', subject: 'Institute' })
   async adminRejectInstitute(
@@ -64,12 +68,14 @@ export class AdminInstituteResolver {
     return this.adminService.reject(id, reason);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel)
   @CheckAbility({ action: 'deactivate', subject: 'Institute' })
   async adminDeactivateInstitute(@Args('id', { type: () => ID }) id: string) {
     return this.instituteService.deactivate(id);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel)
   @CheckAbility({ action: 'suspend', subject: 'Institute' })
   async adminSuspendInstitute(
@@ -79,6 +85,7 @@ export class AdminInstituteResolver {
     return this.instituteService.suspend(id, reason);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => Boolean)
   @CheckAbility({ action: 'delete', subject: 'Institute' })
   async adminDeleteInstitute(@Args('id', { type: () => ID }) id: string) {
@@ -93,6 +100,7 @@ export class AdminInstituteResolver {
     return this.instituteService.listDeleted();
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel, {
     description: 'Bring a deleted institute back with the status it had when it was deleted.',
   })
@@ -101,6 +109,7 @@ export class AdminInstituteResolver {
     return this.instituteService.restore(id);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel, {
     description: 'Reassign an institute to a different active reseller',
   })
@@ -112,6 +121,7 @@ export class AdminInstituteResolver {
     return this.adminService.reassignReseller(id, newResellerId);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel, {
     description: 'Assign an institute to a group (franchise/trust)',
   })
@@ -123,6 +133,7 @@ export class AdminInstituteResolver {
     return this.adminService.assignGroup(id, groupId);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel, {
     description: 'Remove an institute from its group (clears the group assignment)',
   })
@@ -131,6 +142,7 @@ export class AdminInstituteResolver {
     return this.adminService.removeGroup(id);
   }
 
+  @AuditInstitute('id')
   @Mutation(() => InstituteModel, {
     description:
       'Retry the institute setup workflow for an institute whose setup failed or is stuck. Idempotent.',

@@ -198,7 +198,7 @@ describe('AuditConsumer', () => {
     expect(sql).toContain('$1');
     expect(sql).not.toContain("'tenant-1'"); // no string interpolation
     expect(values).toBeInstanceOf(Array);
-    expect(values.length).toBe(20); // 20 columns
+    expect(values.length).toBe(21); // 21 columns
     expect(msg.ack).toHaveBeenCalledOnce();
   });
 
@@ -221,7 +221,7 @@ describe('AuditConsumer', () => {
     expect(values).toContain("Robert'; DROP TABLE audit_logs;--");
   });
 
-  it('includes all 20 columns matching audit_logs schema', async () => {
+  it('includes all 21 columns matching audit_logs schema', async () => {
     const event = createAuditEvent({
       scope: 'reseller',
       resellerId: 'reseller-1',
@@ -244,6 +244,7 @@ describe('AuditConsumer', () => {
       'scope',
       'tenant_id',
       'reseller_id',
+      'subject_tenant_id',
       'impersonator_id',
       'impersonation_session_id',
       'correlation_id',
@@ -399,9 +400,9 @@ describe('AuditConsumer', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     expect(mockPool.query).toHaveBeenCalledOnce();
-    // 3 events × 20 columns = 57 values
+    // 3 events × 21 columns
     const [, values] = mockPool.query.mock.calls[0];
-    expect(values.length).toBe(60);
+    expect(values.length).toBe(63);
     for (const msg of messages) {
       expect(msg.ack).toHaveBeenCalledOnce();
     }
@@ -492,8 +493,8 @@ describe('AuditConsumer', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     const [, values] = mockPool.query.mock.calls[0];
-    // columns[12] = changes, columns[13] = metadata → both null
-    expect(values[12]).toBeNull();
+    // columns[13] = changes, columns[14] = metadata → both null
     expect(values[13]).toBeNull();
+    expect(values[14]).toBeNull();
   });
 });

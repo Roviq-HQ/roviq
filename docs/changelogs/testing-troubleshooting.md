@@ -902,3 +902,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the test opened `/hi/dashboard` and assumed the account's saved language was Hindi, which only held when the "switching to Hindi" test had already run for that user. Otherwise `AccountLocaleSync` redirected to `/en` and the navigation closed the language menu between the two clicks.
 - **Fix:** one test switches to Hindi and back, so it sets the state it needs and leaves the account on English.
 - **Lesson:** since ROV-52 the URL locale follows the saved account language. A test that needs another locale must save it itself, not only open the `/hi/` URL.
+
+## 2026-11-21 — diagnosed and fixed: an `ALTER POLICY` on `audit_logs` vanished after `db:reset` (ROV-311)
+
+- **Symptom:** a generated migration changed the `audit_app_read` policy. `__drizzle_migrations` listed it as applied, but the test and dev databases still had the old policy, so the new integration spec failed.
+- **Cause:** `scripts/db-reset.ts` builds the schema with `drizzle-kit push` (which does not diff policies) and then replays only the custom migrations, the ones whose first line is a `--` comment. The replayed `audit-logs-infra` migration re-creates `audit_logs` and its policies with their original text. A generated migration is not replayed, so its policy change is lost.
+- **Fix:** the migration starts with a comment, which makes it custom and replayed after `audit-logs-infra`. Its other statements find their objects already there; the replay tolerates that.
+- **Lesson:** a policy change on a table that a custom migration re-creates (today only `audit_logs`) must itself be a custom migration. Check the policy with `pg_policy` after a reset, not only the migration list.

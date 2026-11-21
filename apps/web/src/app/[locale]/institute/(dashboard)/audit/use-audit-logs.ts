@@ -31,6 +31,7 @@ const AUDIT_LOGS_QUERY = gql`
         cursor
         node {
           id
+          scope
           userId
           actorId
           impersonatorId

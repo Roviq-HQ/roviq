@@ -1,5 +1,6 @@
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Context, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { AuditInstitute, markAuditInstitute } from '@roviq/audit';
 import { assertPlatformContext, CurrentUser, PlatformScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
@@ -23,6 +24,7 @@ export class AdminComplianceExportResolver {
     description:
       'Start a compliance export of any institute (platform admin). Returns the PENDING export; poll `adminListExportReports` until it is COMPLETED or FAILED.',
   })
+  @AuditInstitute('input.instituteId')
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'manage', subject: 'Export' })
   async adminExportComplianceReport(
@@ -68,8 +70,11 @@ export class AdminComplianceExportResolver {
   async adminExportReportDownloadUrl(
     @Args('fileId', { type: () => ID }, ParseUUIDPipe) fileId: string,
     @CurrentUser() user: AuthUser,
+    @Context() ctx: { req: object },
   ): Promise<string> {
     assertPlatformContext(user);
-    return this.exports.adminDownloadUrl(user, fileId);
+    const { url, tenantId } = await this.exports.adminDownloadUrl(user, fileId);
+    if (tenantId) markAuditInstitute(ctx.req, tenantId);
+    return url;
   }
 }

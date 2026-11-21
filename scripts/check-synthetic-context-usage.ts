@@ -175,6 +175,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/reseller/user/__tests__/user-listing-roles.integration.spec.ts',
   // ROV-302 integration fixture: inserts files of each status and owner to measure usage
   'apps/api-gateway/src/files/__tests__/storage-quota.integration.spec.ts',
+  // ROV-311 integration fixture: inserts audit rows and reads them as each institute's role
+  'apps/api-gateway/src/audit/__tests__/audit-subject-institute.integration.spec.ts',
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',

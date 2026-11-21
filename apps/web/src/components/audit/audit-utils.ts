@@ -25,7 +25,12 @@ export type AuditLogRow = Pick<
   Partial<
     Pick<
       AuditLog,
-      'tenantId' | 'tenantName' | 'resellerName' | 'resellerTier' | 'impersonationSessionId'
+      | 'scope'
+      | 'tenantId'
+      | 'tenantName'
+      | 'resellerName'
+      | 'resellerTier'
+      | 'impersonationSessionId'
     >
   >;
 

@@ -8,7 +8,13 @@ import {
 import { Reflector } from '@nestjs/core';
 import { GqlContextType, GqlExecutionContext } from '@nestjs/graphql';
 import { metrics } from '@opentelemetry/api';
-import { AuditEmitter, type AuditEventPayload, NoAudit } from '@roviq/audit';
+import {
+  AuditEmitter,
+  type AuditEventPayload,
+  AuditInstitute,
+  markedAuditInstitute,
+  NoAudit,
+} from '@roviq/audit';
 import { type AuthUser, isSyntheticContext } from '@roviq/common-types';
 import { catchError, type Observable, tap } from 'rxjs';
 import { extractActionType, extractEntityType } from './audit.helpers';
@@ -87,6 +93,13 @@ export class AuditInterceptor implements NestInterceptor {
       return next.handle();
     }
 
+    const fromArgs = readInstituteId(
+      gqlContext.getArgs(),
+      this.reflector.get(AuditInstitute, context.getHandler()),
+    );
+    // Read when the event is built: a resolver may name the institute only after it ran.
+    const subjectOf = () =>
+      user.scope === 'institute' ? null : (fromArgs ?? markedAuditInstitute(req));
     const actionType = extractActionType(info.fieldName);
     const entityType = extractEntityType(info.fieldName);
     const correlationId: string = req.correlationId ?? crypto.randomUUID();
@@ -102,6 +115,7 @@ export class AuditInterceptor implements NestInterceptor {
             changes: null,
             metadata: { input: safeSerializeArgs(gqlContext.getArgs()) },
             correlationId,
+            subjectTenantId: subjectOf(),
           });
 
           // Non-blocking — fire and forget
@@ -141,6 +155,7 @@ export class AuditInterceptor implements NestInterceptor {
             },
           },
           correlationId,
+          subjectTenantId: subjectOf(),
         });
 
         // Non-blocking error audit — don't let audit failure mask the real error
@@ -181,6 +196,7 @@ export class AuditInterceptor implements NestInterceptor {
       changes: AuditEventPayload['changes'];
       metadata: AuditEventPayload['metadata'];
       correlationId: string;
+      subjectTenantId: string | null;
     },
   ): AuditEventPayload {
     const base = {
@@ -204,11 +220,36 @@ export class AuditInterceptor implements NestInterceptor {
 
     switch (user.scope) {
       case 'platform':
-        return { ...base, scope: 'platform', tenantId: null, resellerId: null };
+        return {
+          ...base,
+          scope: 'platform',
+          tenantId: null,
+          resellerId: null,
+          subjectTenantId: event.subjectTenantId,
+        };
       case 'reseller':
-        return { ...base, scope: 'reseller', tenantId: null, resellerId: user.resellerId };
+        return {
+          ...base,
+          scope: 'reseller',
+          tenantId: null,
+          resellerId: user.resellerId,
+          subjectTenantId: event.subjectTenantId,
+        };
       case 'institute':
         return { ...base, scope: 'institute', tenantId: user.tenantId, resellerId: null };
     }
   }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The institute id at `path` in the mutation arguments; null unless it is a UUID. */
+export function readInstituteId(args: unknown, path: string | undefined): string | null {
+  if (!path) return null;
+  let value: unknown = args;
+  for (const key of path.split('.')) {
+    if (typeof value !== 'object' || value === null) return null;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return typeof value === 'string' && UUID.test(value) ? value : null;
 }

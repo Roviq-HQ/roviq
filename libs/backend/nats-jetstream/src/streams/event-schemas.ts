@@ -329,6 +329,7 @@ const AUDIT_SCHEMAS = {
       scope: z.enum(AUTH_SCOPE_VALUES),
       tenantId: uuid.nullable(),
       resellerId: uuid.nullable().optional(),
+      subjectTenantId: uuid.nullable().optional(),
       userId: uuid,
       actorId: uuid,
       action: str,
