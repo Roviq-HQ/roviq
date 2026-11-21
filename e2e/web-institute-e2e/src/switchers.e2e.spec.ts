@@ -1,37 +1,14 @@
 /**
- * Language switcher, theme toggler, and institute switcher.
+ * Theme toggler and institute switcher.
  *
- * These controls live in the topbar across all dashboard pages.
+ * These controls live in the topbar across all dashboard pages. The language switcher saves
+ * the account language, so it is covered by language-preference.e2e.spec.ts on its own account.
  */
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { expect, test } from '../../shared/console-guardian';
 import { SEED } from '../../shared/seed-fixtures';
 
 const dashboardCard = testIds.instituteDashboard.welcomeCard;
-
-// ── Language switcher ─────────────────────────────────────────────────
-
-test.describe('Language switcher', () => {
-  // One test: the saved account language decides the URL, so the way back needs the way there.
-  test('switching to Hindi and back to English follows the URL', async ({ page }) => {
-    await page.goto('/en/dashboard');
-    await expect(page.getByTestId(dashboardCard)).toBeVisible({
-      timeout: 10_000,
-    });
-
-    await page.getByTestId(testIds.layout.localeSwitcher).click();
-    await page.getByTestId(testIds.layout.localeOption('hi')).click();
-
-    await expect(page).toHaveURL(/\/hi\/dashboard/, { timeout: 10_000 });
-    await expect(page.getByTestId(dashboardCard)).toBeVisible();
-
-    await page.getByTestId(testIds.layout.localeSwitcher).click();
-    await page.getByTestId(testIds.layout.localeOption('en')).click();
-
-    await expect(page).toHaveURL(/\/en\/dashboard/, { timeout: 10_000 });
-    await expect(page.getByTestId(dashboardCard)).toBeVisible();
-  });
-});
 
 // ── Theme toggler ─────────────────────────────────────────────────────
 

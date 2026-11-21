@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
 const UNVERIFIED_COUNT_QUERY = gql`
@@ -44,6 +45,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { logout, user } = useAuth();
 
   usePushNotifications();
+  const changeLocale = useLocaleChange();
 
   const subscriberId = user?.id ?? '';
   const [subscriberHash, setSubscriberHash] = useState<string>();
@@ -132,6 +134,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   ];
 
   const config: LayoutConfig = {
+    onLocaleChange: changeLocale,
     appName: tCommon('appNameReseller'),
     user: user ? { username: user.username, email: user.email } : undefined,
     onLogout: logout,
