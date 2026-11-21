@@ -346,6 +346,9 @@ platform or reseller scope with `tenant_id` NULL. So that the institute can see 
 resolver says which argument holds the institute id with `@AuditInstitute('id')` (or
 `'input.tenantId'`); a mutation whose arguments do not hold it (a download by file id) calls
 `markAuditInstitute(req, id)`. The institute's audit screen marks these rows "Roviq platform" or
-"Reseller" and does not get the staff member's IP address or browser. A new platform or
+"Reseller"; of such a row it gets the actor, the action and the stated reason, not the IP
+address, browser, raw arguments or error text. The institute is named from the arguments only
+when the action succeeded (a platform admin excepted, who may act on any institute), and a
+trigger clears the subject of a reseller row that names an institute of another reseller. A new platform or
 reseller mutation that acts on one institute needs the decorator, or the institute will not see
 it.
