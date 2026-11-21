@@ -68,14 +68,14 @@ export const billingRelations: AnyRelations = defineRelationsPart(schema, (r) =>
       to: r.resellers.id,
     }),
     /** Cash: which reseller field agent collected the payment */
-    collectedBy: r.one.memberships({
+    collectedBy: r.one.resellerMemberships({
       from: r.payments.collectedById,
-      to: r.memberships.id,
+      to: r.resellerMemberships.id,
     }),
     /** UPI P2P: which reseller staff verified the UTR */
-    verifiedBy: r.one.memberships({
+    verifiedBy: r.one.resellerMemberships({
       from: r.payments.verifiedById,
-      to: r.memberships.id,
+      to: r.resellerMemberships.id,
     }),
   },
 

@@ -264,19 +264,26 @@ const BILLING_SCHEMAS = {
   }),
   'BILLING.subscription.plan_changed': z.object({
     subscriptionId: uuid,
+    tenantId: uuid,
+    resellerId: uuid,
     oldPlanId: uuid,
     newPlanId: uuid,
     prorationDelta: z.unknown().optional(),
   }),
+  // The three ids are what the GraphQL subscription filters match on.
   'BILLING.subscription.status_changed': z
     .object({
-      subscriptionId: uuid.optional(),
+      subscriptionId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.payment.succeeded': z
     .object({
       paymentId: uuid,
       invoiceId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.payment.refunded': z
@@ -286,7 +293,10 @@ const BILLING_SCHEMAS = {
     .catchall(z.unknown()),
   'BILLING.payment.status_changed': z
     .object({
-      paymentId: uuid.optional(),
+      paymentId: uuid,
+      invoiceId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.payment.upi_p2p_submitted': z
@@ -299,9 +309,16 @@ const BILLING_SCHEMAS = {
       paymentId: uuid.optional(),
     })
     .catchall(z.unknown()),
+  'BILLING.payment.upi_p2p_verified': z
+    .object({
+      paymentId: uuid.optional(),
+    })
+    .catchall(z.unknown()),
   'BILLING.invoice.generated': z
     .object({
-      invoiceId: uuid.optional(),
+      invoiceId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.invoice.paid': z

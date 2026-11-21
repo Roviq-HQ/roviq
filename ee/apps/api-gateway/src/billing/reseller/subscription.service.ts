@@ -13,7 +13,13 @@ import { InvoiceService } from './invoice.service';
 
 // Subscription transitions are validated via SUBSCRIPTION_STATE_MACHINE
 // (`@roviq/common-types/state-machines/subscription.ts`) — single source of
-// truth shared with `billing.service.ts` and the frontend dropdown.
+// truth shared with the frontend dropdown.
+
+type SubscriptionEvent = Record<string, unknown> & {
+  subscriptionId: string;
+  tenantId: string;
+  resellerId: string;
+};
 
 @Injectable()
 export class SubscriptionService {
@@ -28,7 +34,7 @@ export class SubscriptionService {
   // subject for any subscription lifecycle change. Every specific subject (created /
   // paused / activated / cancelled / expired / plan_changed) fans out to it so
   // subscribers don't need to listen to N specific subjects.
-  private emitEvent(pattern: EventPattern, data: Record<string, unknown>) {
+  private emitEvent(pattern: EventPattern, data: SubscriptionEvent) {
     this.eventBus.emit(pattern, data);
     if (
       (pattern as string).startsWith('BILLING.subscription.') &&
@@ -91,6 +97,7 @@ export class SubscriptionService {
     this.emitEvent(EVENT_PATTERNS.BILLING.subscription.created, {
       subscriptionId: subscription.id,
       tenantId: input.tenantId,
+      resellerId,
       planId: input.planId,
       status: subscription.status,
     });
@@ -148,6 +155,8 @@ export class SubscriptionService {
 
     this.emitEvent(EVENT_PATTERNS.BILLING.subscription.plan_changed, {
       subscriptionId,
+      tenantId: sub.tenantId,
+      resellerId,
       oldPlanId: sub.planId,
       newPlanId,
       prorationDelta,
@@ -175,6 +184,7 @@ export class SubscriptionService {
     this.emitEvent(EVENT_PATTERNS.BILLING.subscription.paused, {
       subscriptionId,
       tenantId: sub.tenantId,
+      resellerId,
     });
     return updated;
   }
