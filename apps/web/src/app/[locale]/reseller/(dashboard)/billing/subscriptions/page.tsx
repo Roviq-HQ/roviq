@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryStates } from 'nuqs';
@@ -21,6 +22,8 @@ import { AssignPlanDialog } from './assign-plan-dialog';
 import { createSubscriptionColumns } from './subscription-columns';
 import { SubscriptionDetail } from './subscription-detail';
 import { type SubscriptionNode, useSubscriptions } from './use-subscriptions';
+
+const { resellerBillingSubscriptions: ids } = testIds;
 
 const filterParsers = {
   status: parseAsString,
@@ -60,10 +63,7 @@ export default function SubscriptionsPage() {
           <p className="text-muted-foreground">{t('subscriptions.description')}</p>
         </div>
         <Can I="create" a="Subscription">
-          <Button
-            data-testid={testIds.resellerBillingSubscriptions.assignPlanBtn}
-            onClick={() => setAssignOpen(true)}
-          >
+          <Button data-testid={ids.assignPlanBtn} onClick={() => setAssignOpen(true)}>
             <Plus className="me-1 size-4" />
             {t('subscriptions.assignPlan')}
           </Button>
@@ -80,7 +80,10 @@ export default function SubscriptionsPage() {
                     value={filters.status ?? ''}
                     onValueChange={(v) => setFilters({ status: v || null })}
                   >
-                    <SelectTrigger className="w-[160px]">
+                    <SelectTrigger
+                      className="w-[160px]"
+                      aria-label={t('subscriptions.filters.status')}
+                    >
                       <SelectValue placeholder={t('subscriptions.filters.status')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -97,6 +100,7 @@ export default function SubscriptionsPage() {
                       size="icon"
                       className="absolute right-7 top-1/2 size-5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onClick={() => setFilters({ status: null })}
+                      aria-label={t('subscriptions.filters.clearStatus')}
                     >
                       <X className="size-3" />
                     </Button>
@@ -112,6 +116,7 @@ export default function SubscriptionsPage() {
               </DataTableToolbar>
 
               <DataTable
+                data-testid={ids.table}
                 columns={columns}
                 data={subscriptions}
                 isLoading={loading && subscriptions.length === 0}
@@ -139,5 +144,3 @@ export default function SubscriptionsPage() {
     </div>
   );
 }
-
-import { testIds } from '@roviq/ui/testing/testid-registry';

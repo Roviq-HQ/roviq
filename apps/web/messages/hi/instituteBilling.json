@@ -41,7 +41,21 @@
     "title": "चालान",
     "description": "अपने बिलिंग चालान देखें।",
     "empty": "अभी तक कोई चालान नहीं।",
-    "due": "देय"
+    "due": "देय",
+    "emptyFiltered": "इस स्थिति का कोई चालान नहीं मिला। दूसरी स्थिति चुनें या फ़िल्टर हटाएँ।",
+    "accessDenied": "आपको चालान देखने की अनुमति नहीं है।",
+    "loadMore": "और दिखाएँ",
+    "filters": {
+      "status": "स्थिति",
+      "clearFilters": "फ़िल्टर हटाएँ"
+    },
+    "columns": {
+      "invoiceNumber": "चालान",
+      "billingPeriod": "बिलिंग अवधि",
+      "total": "कुल",
+      "status": "स्थिति",
+      "dueDate": "देय तिथि"
+    }
   },
   "invoiceDetail": {
     "title": "चालान विवरण",
@@ -109,6 +123,7 @@
     "RAZORPAY": "Razorpay",
     "CASHFREE": "Cashfree",
     "UPI": "UPI",
+    "UPI_P2P": "UPI ट्रांसफर (UTR)",
     "BANK_TRANSFER": "बैंक ट्रांसफर",
     "CASH": "नकद",
     "CHEQUE": "चेक"
@@ -128,5 +143,10 @@
     "checkoutUnavailable": "भुगतान विंडो नहीं खुल सकी। अपना इंटरनेट कनेक्शन जाँचें और फिर से कोशिश करें।",
     "pdfFailed": "इनवॉइस PDF डाउनलोड नहीं हो सका। कृपया फिर से कोशिश करें।",
     "PAYER_CONTACT_MISSING": "ऑनलाइन भुगतान के लिए आपके संस्थान का फ़ोन नंबर और ईमेल आवश्यक है। इन्हें संस्थान सेटिंग में जोड़ें, फिर से कोशिश करें।"
+  },
+  "realtime": {
+    "newInvoice": "नया इनवॉइस",
+    "newInvoiceDescription": "आपके संस्थान के लिए नया इनवॉइस बनाया गया है।",
+    "openInvoice": "खोलें"
   }
 }

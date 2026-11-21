@@ -202,7 +202,7 @@ export function InvoiceDetail({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[600px] sm:max-w-[600px]">
+      <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-[700px]">
         <SheetHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -226,8 +226,8 @@ export function InvoiceDetail({
         </SheetHeader>
 
         {invoice && (
-          <div className="flex-1 px-4">
-            <ScrollArea className="h-[calc(100vh-120px)]">
+          <div className="min-h-0 flex-1 px-4">
+            <ScrollArea className="h-full [&_[data-slot=scroll-area-viewport]>div]:!block">
               <div className="space-y-1 pb-6 pt-4">
                 {/* ---------- Invoice summary ---------- */}
                 <DetailRow label={t('invoices.detail.id')}>

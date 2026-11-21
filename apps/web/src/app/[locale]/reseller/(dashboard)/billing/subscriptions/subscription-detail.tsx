@@ -142,7 +142,7 @@ function SubscriptionFields({
   onAction: (action: ConfirmAction) => void;
 }) {
   return (
-    <ScrollArea className="h-[calc(100vh-120px)]">
+    <ScrollArea className="h-full">
       <div className="space-y-1 pb-6 pt-4">
         <DetailRow label={t('subscriptions.detail.id')}>
           <span className="font-mono text-xs">{subscription.id}</span>
@@ -252,13 +252,13 @@ export function SubscriptionDetail({ subscription, open, onOpenChange }: Subscri
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-[600px] sm:max-w-[600px]">
+        <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-[600px]">
           <SheetHeader>
             <SheetTitle>{t('subscriptions.detail.title')}</SheetTitle>
             <SheetDescription>{t('subscriptions.detail.description')}</SheetDescription>
           </SheetHeader>
 
-          <div className="flex-1 px-4">
+          <div className="min-h-0 flex-1 px-4">
             <SubscriptionFields
               subscription={subscription}
               t={t}

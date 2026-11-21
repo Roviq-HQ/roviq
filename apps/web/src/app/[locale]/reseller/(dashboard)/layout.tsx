@@ -23,7 +23,7 @@ import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
 const UNVERIFIED_COUNT_QUERY = gql`
   query UnverifiedPaymentsCount {
-    unverifiedPayments(first: 0) {
+    unverifiedPayments(first: 100) {
       id
     }
   }

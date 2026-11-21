@@ -14,7 +14,6 @@ import {
   FolderTree,
   LayoutDashboard,
   Settings,
-  Shield,
   Store,
   UserCog,
   Users,
@@ -71,7 +70,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
       ability: { action: 'read', subject: 'AuditLog' },
     },
     [NAV_SLUGS.settings]: {
-      href: '/settings',
+      href: '/settings/sessions',
       icon: Settings,
       label: t('settings'),
     },
@@ -118,7 +117,6 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
       {
         title: t('system'),
         items: [
-          { title: t('roles'), href: '/roles', icon: Shield },
           { title: t('auditLogs'), href: '/audit-logs', icon: FileText },
           {
             title: t('impersonationSessions'),
@@ -134,7 +132,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
             icon: Activity,
             ability: { action: 'read', subject: 'SystemHealth' },
           },
-          { title: t('settings'), href: '/settings', icon: Settings },
+          { title: t('settings'), href: '/settings/sessions', icon: Settings },
           { title: t('account'), href: '/account', icon: UserCog },
         ],
       },

@@ -95,7 +95,10 @@
         "isActiveBody": "Controls whether this plan is visible on the pricing page and selectable for new subscriptions. Archiving a plan (active=false) does NOT cancel existing subscribers — they keep billing on the plan's frozen price until they switch or cancel."
       }
     },
-    "statuses": { "ACTIVE": "Active", "INACTIVE": "Inactive" },
+    "statuses": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive"
+    },
     "actions": {
       "edit": "Edit Plan",
       "archive": "Archive",
@@ -245,7 +248,8 @@
     },
     "filters": {
       "status": "Status",
-      "clearFilters": "Clear filters"
+      "clearFilters": "Clear filters",
+      "clearStatus": "Clear status filter"
     },
     "empty": "No subscriptions found.",
     "emptyTitle": "No subscriptions yet",
@@ -313,7 +317,8 @@
     },
     "filters": {
       "status": "Status",
-      "clearFilters": "Clear filters"
+      "clearFilters": "Clear filters",
+      "clearStatus": "Clear status filter"
     },
     "empty": "No invoices found.",
     "emptyTitle": "No invoices yet",
@@ -481,5 +486,9 @@
     "loadMore": "Load more",
     "showing": "Showing",
     "of": "of"
+  },
+  "realtime": {
+    "invoiceGenerated": "New invoice generated",
+    "paymentReceived": "Payment received"
   }
 }
