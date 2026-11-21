@@ -196,6 +196,9 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | TEMPORAL_ADDRESS | Temporal server (host:port) |
 | FILE_SWEEPER_WORKER_ENABLED | `true` runs the hourly file sweeper worker in this gateway and creates its Temporal schedule (ROV-300). Unset or anything else: off |
 | COMPLIANCE_EXPORT_WORKER_ENABLED | `true` runs the compliance export worker (task queue `compliance-export`) in this gateway (ROV-296). Unset or anything else: off, and requested exports stay PENDING |
+| TC_ISSUANCE_WORKER_ENABLED | `true` runs the TC issuance worker (task queue `tc-issuance`, or `TEMPORAL_TC_TASK_QUEUE`) in this gateway (ROV-232). Unset or anything else: off, and a requested TC stays REQUESTED |
+| INSTITUTE_SETUP_WORKER_ENABLED | `true` runs the institute setup worker (task queue `institute-setup`) in this gateway (ROV-232). Unset or anything else: off, and an approved institute request never finishes setup |
+| AUDIT_PARTITION_WORKER_ENABLED | `true` runs the audit partition worker (task queue `audit-maintenance`) in this gateway and creates or updates its `audit-partition-cron` schedule (ROV-232). Unset or anything else: off, and audit partitions past retention are never detached |
 | STRIPE_SECRET_KEY | Stripe API key (use sk_test_... for dev) |
 | STRIPE_WEBHOOK_SECRET | Validates incoming Stripe webhook signatures |
 | SENTRY_DSN | Sentry error tracking (leave empty to disable) |

@@ -6,6 +6,7 @@
 //   - Operation names are prefixed `E2e*` to avoid collisions with apps/web ops
 //     (codegen merges all documents to detect duplicate operation names).
 import assert from 'node:assert';
+import { SetupStatus } from '@roviq/common-types';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { SEED_IDS } from '../../shared/seed-fixtures';
@@ -26,6 +27,10 @@ import {
 } from './__generated__/graphql';
 import { loginAsPlatformAdmin, loginAsReseller } from './helpers/auth';
 import { gql } from './helpers/gql-client';
+import { waitForSetupComplete } from './helpers/wait-for-setup-complete';
+
+/** The setup workflow runs about a dozen short activities; leave room for a cold worker. */
+const SETUP_TIMEOUT_MS = 30_000;
 
 describe('Institute Reseller (reseller scope) E2E', () => {
   let resellerToken: string;
@@ -85,6 +90,15 @@ describe('Institute Reseller (reseller scope) E2E', () => {
       expect(statsRes.errors).toBeUndefined();
       expect(statsRes.data?.resellerInstituteStatistics).not.toBeNull();
 
+      // A request does not run setup; only the workflow that approval starts does.
+      const beforeApproval = await gql<{ adminGetInstitute: { setupStatus: SetupStatus } }>(
+        `query BeforeApproval($id: ID!) { adminGetInstitute(id: $id) { setupStatus } }`,
+        { id },
+        adminToken,
+      );
+      expect(beforeApproval.errors).toBeUndefined();
+      expect(beforeApproval.data?.adminGetInstitute.setupStatus).toBe(SetupStatus.PENDING);
+
       // 5. Admin approves — PENDING_APPROVAL → PENDING
       const approveRes = await gql(E2eAdminApproveInstituteDocument, { id }, adminToken);
       expect(approveRes.errors).toBeUndefined();
@@ -97,7 +111,23 @@ describe('Institute Reseller (reseller scope) E2E', () => {
       expect(verifyRes.errors).toBeUndefined();
       expect(verifyRes.data?.resellerGetInstitute.status).toBe('PENDING');
 
-      // 7. Cleanup via admin
+      // 7. The InstituteSetupWorkflow worker (INSTITUTE_SETUP_WORKER_ENABLED) finishes setup
+      //    and creates the first academic year.
+      await waitForSetupComplete(id, adminToken, SETUP_TIMEOUT_MS);
+      const treeRes = await gql<{
+        adminGetInstituteAcademicTree: { instituteId: string; academicYearId: string | null };
+      }>(
+        `query ApprovedTree($id: ID!) {
+          adminGetInstituteAcademicTree(instituteId: $id) { instituteId academicYearId }
+        }`,
+        { id },
+        adminToken,
+      );
+      expect(treeRes.errors).toBeUndefined();
+      expect(treeRes.data?.adminGetInstituteAcademicTree.instituteId).toBe(id);
+      expect(treeRes.data?.adminGetInstituteAcademicTree.academicYearId).not.toBeNull();
+
+      // 8. Cleanup via admin
       const delRes = await gql(E2eAdminDeleteInstituteDocument, { id }, adminToken);
       expect(delRes.errors).toBeUndefined();
       expect(delRes.data?.adminDeleteInstitute).toBe(true);

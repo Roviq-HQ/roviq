@@ -24,7 +24,7 @@
  * passing test across all three scopes is also a ws-ticket ack test.
  *
  * Scope exclusions (tracked elsewhere, not covered here):
- *   - instituteSetupProgress — blocked on ROV-232 Temporal workers
+ *   - instituteSetupProgress — not covered yet (its worker runs in e2e since ROV-232)
  *   - Scope-filter isolation (reseller A vs B, institute A vs B) — ROV-229
  *   - Factory isolation (drop SEED-mutation pattern) — ROV-230
  */

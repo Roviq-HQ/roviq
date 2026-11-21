@@ -12,7 +12,6 @@ import {
   subjectsLive,
   withTenant,
 } from '@roviq/database';
-import { getRequestContext } from '@roviq/request-context';
 import { and, eq, sql } from 'drizzle-orm';
 import {
   BOARD_EXAM_CLASSES,
@@ -37,10 +36,10 @@ export class InstituteSeederService {
   async seedStandards(
     tenantId: string,
     academicYearId: string,
-    departments: string[],
-    board?: string,
+    departments: readonly string[],
+    board: string | undefined,
+    userId: string,
   ): Promise<string[]> {
-    const { userId } = getRequestContext();
     const createdIds: string[] = [];
 
     await withTenant(
@@ -112,10 +111,10 @@ export class InstituteSeederService {
     tenantId: string,
     standardId: string,
     academicYearId: string,
+    userId: string,
     count = DEFAULT_SECTIONS_PER_STANDARD,
     names = DEFAULT_SECTION_NAMES,
   ): Promise<string[]> {
-    const { userId } = getRequestContext();
     const createdIds: string[] = [];
 
     await withTenant(
@@ -168,8 +167,12 @@ export class InstituteSeederService {
    * Seed subjects for a board and link them to standards.
    * Idempotent: checks existence before creating.
    */
-  async seedSubjects(tenantId: string, academicYearId: string, board: string): Promise<string[]> {
-    const { userId } = getRequestContext();
+  async seedSubjects(
+    tenantId: string,
+    academicYearId: string,
+    board: string,
+    userId: string,
+  ): Promise<string[]> {
     const templates = BOARD_SUBJECTS[board];
     if (!templates) {
       this.logger.warn(`No subject templates for board: ${board}`);
@@ -260,11 +263,7 @@ export class InstituteSeederService {
   /**
    * Seed library structure: single standard + 2 sections.
    */
-  async seedLibrary(tenantId: string, academicYearId: string): Promise<void> {
-    const _standardIds = await this.seedStandards(tenantId, academicYearId, [], undefined);
-
-    // Create the Library standard manually since it's not in departments
-    const { userId } = getRequestContext();
+  async seedLibrary(tenantId: string, academicYearId: string, userId: string): Promise<void> {
     let libraryStandardId = '';
 
     await withTenant(
@@ -300,7 +299,14 @@ export class InstituteSeederService {
       },
     );
 
-    await this.seedSections(tenantId, libraryStandardId, academicYearId, 2, LIBRARY_SECTIONS);
+    await this.seedSections(
+      tenantId,
+      libraryStandardId,
+      academicYearId,
+      userId,
+      2,
+      LIBRARY_SECTIONS,
+    );
     this.logger.log('Seeded library structure');
   }
 }

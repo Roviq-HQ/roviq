@@ -33,8 +33,6 @@ export const NATS_EMIT_ALLOWLIST: ReadonlySet<string> = new Set([
   'libs/backend/nats-jetstream/src/streams/stream.config.ts',
   // Temporal workflow activities — closure-scoped `function emitEvent(...)`
   // wrappers that take EventPattern.
-  'apps/api-gateway/src/institute/certificate/workflows/tc-issuance.activities.ts',
-  'apps/api-gateway/src/institute/setup/institute-setup.activities.ts',
   'apps/api-gateway/src/institute/student/workflows/bulk-student-import.activities.ts',
   // Audit emitter — different contract from EventBusService:
   //   1. Uses `firstValueFrom(client.emit(...))` to await JetStream ack so

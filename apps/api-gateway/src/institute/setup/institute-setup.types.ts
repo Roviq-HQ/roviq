@@ -5,6 +5,9 @@
  * after creation/approval. All activities are idempotent.
  */
 
+/** Task queue of InstituteSetupWorkflow; the admin service starts it here and the worker polls it. */
+export const INSTITUTE_SETUP_TASK_QUEUE = 'institute-setup';
+
 /** Input to the InstituteSetupWorkflow */
 export interface InstituteSetupInput {
   /** The institute being provisioned */
