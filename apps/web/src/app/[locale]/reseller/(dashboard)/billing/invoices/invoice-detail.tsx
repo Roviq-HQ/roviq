@@ -197,12 +197,14 @@ export function InvoiceDetail({
   const payableStatuses: Set<string> = new Set(['DRAFT', 'SENT', 'OVERDUE', 'PARTIALLY_PAID']);
   /** Whether this invoice can accept a manual payment */
   const canRecordPayment = payableStatuses.has(invoice?.status ?? '');
-  /** Whether this invoice is eligible for a refund */
-  const canIssueRefund = invoice?.status === 'PAID';
+  // A partly refunded invoice reads PARTIALLY_PAID and may still hold refundable money.
+  const canIssueRefund =
+    (invoice?.status === 'PAID' || invoice?.status === 'PARTIALLY_PAID') &&
+    Number(invoice.paidAmount) > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[600px] sm:max-w-[600px]">
+      <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-[700px]">
         <SheetHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -226,8 +228,8 @@ export function InvoiceDetail({
         </SheetHeader>
 
         {invoice && (
-          <div className="flex-1 px-4">
-            <ScrollArea className="h-[calc(100vh-120px)]">
+          <div className="min-h-0 flex-1 px-4">
+            <ScrollArea className="h-full [&_[data-slot=scroll-area-viewport]>div]:!block">
               <div className="space-y-1 pb-6 pt-4">
                 {/* ---------- Invoice summary ---------- */}
                 <DetailRow label={t('invoices.detail.id')}>

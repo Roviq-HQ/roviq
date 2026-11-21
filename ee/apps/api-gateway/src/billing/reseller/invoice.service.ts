@@ -104,6 +104,7 @@ export class InvoiceService {
     this.eventBus.emit(EVENT_PATTERNS.BILLING.invoice.generated, {
       invoiceId: invoice.id,
       tenantId: input.tenantId,
+      resellerId,
       totalAmount: total,
     });
 
@@ -161,15 +162,32 @@ export class InvoiceService {
     return updated;
   }
 
+  /** Take back a payment that never arrived (rejected UPI proof): the invoice is owed again. */
+  async markPaymentReversed(resellerId: string, invoiceId: string, amountPaise: bigint) {
+    const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
+    if (!invoice) return;
+
+    const paid = Number(invoice.paidAmount) - Number(amountPaise);
+    const newPaidAmount = Math.max(0, paid);
+    const isPaid = newPaidAmount >= Number(invoice.totalAmount);
+    const unpaidStatus = invoice.dueAt.getTime() < Date.now() ? 'OVERDUE' : 'SENT';
+
+    await this.invoiceRepo.updateStatus(resellerId, invoiceId, {
+      paidAmount: BigInt(newPaidAmount),
+      status: isPaid ? 'PAID' : newPaidAmount > 0 ? 'PARTIALLY_PAID' : unpaidStatus,
+      paidAt: isPaid ? invoice.paidAt : null,
+    });
+  }
+
   /** Update invoice for refund */
   async markRefunded(resellerId: string, invoiceId: string, refundAmountPaise: bigint) {
     const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
-    if (!invoice) return;
+    if (!invoice) return null;
 
     const newPaidAmount = Math.max(0, Number(invoice.paidAmount) - Number(refundAmountPaise));
     const isFullRefund = newPaidAmount === 0;
 
-    await this.invoiceRepo.updateStatus(resellerId, invoiceId, {
+    return this.invoiceRepo.updateStatus(resellerId, invoiceId, {
       paidAmount: BigInt(newPaidAmount),
       status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_PAID',
     });

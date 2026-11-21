@@ -1680,6 +1680,7 @@ export const testIds = {
   // ── Reseller: billing → gateway configs ───────────────────────────────
   resellerBillingGateway: {
     vpaInfo: 'billing-gateway-vpa-info',
+    defaultSwitch: 'billing-gateway-default-switch',
     keyIdInfo: 'billing-gateway-key-id-info',
     keySecretInfo: 'billing-gateway-key-secret-info',
     webhookSecretInfo: 'billing-gateway-webhook-secret-info',
@@ -1687,20 +1688,41 @@ export const testIds = {
     defaultInfo: 'billing-gateway-default-info',
   },
 
+  // ── Reseller: billing → dashboard ─────────────────────────────────────
+  resellerBillingDashboard: {
+    metric: (name: 'mrr' | 'active' | 'churn' | 'overdue') => `reseller-billing-dashboard-${name}`,
+  },
+
+  // ── Reseller: billing → UPI verification ──────────────────────────────
+  resellerBillingUpi: {
+    table: 'reseller-billing-upi-table',
+    empty: 'reseller-billing-upi-empty',
+  },
+
   // ── Reseller: billing → invoices ──────────────────────────────────────
   resellerBillingInvoices: {
+    table: 'reseller-billing-invoices-table',
+    statusFilter: 'reseller-billing-invoices-status-filter',
     // Record payment dialog
     recordPaymentMethodInfo: 'billing-record-payment-method-info',
     recordPaymentReceiptInfo: 'billing-record-payment-receipt-info',
-    recordPaymentCollectedByInfo: 'billing-record-payment-collected-by-info',
+    recordPaymentCollectedBySelf: 'billing-record-payment-collected-by-self',
     recordPaymentCollectionDateInfo: 'billing-record-payment-collection-date-info',
     // Refund dialog
     refundAmountInfo: 'billing-refund-amount-info',
     refundReasonInfo: 'billing-refund-reason-info',
+    refundPaymentSelect: 'billing-refund-payment-select',
+    refundPaymentOption: (id: string) => `billing-refund-payment-option-${id}`,
+    refundNoPayment: 'billing-refund-no-payment',
+    refundAmountError: 'billing-refund-amount-error',
+    refundSubmit: 'billing-refund-submit',
   },
 
   // ── Reseller: billing → subscriptions ─────────────────────────────────
   resellerBillingSubscriptions: {
+    table: 'reseller-billing-subscriptions-table',
+    pauseBtn: 'billing-subscription-pause-btn',
+    resumeBtn: 'billing-subscription-resume-btn',
     assignPlanBtn: 'billing-assign-plan-btn',
     // Assign plan dialog
     assignPlanDialog: 'billing-assign-plan-dialog',
@@ -1710,10 +1732,33 @@ export const testIds = {
     subscriptionReasonInfo: 'billing-subscription-reason-info',
   },
 
+  // ── Institute: billing → overview and payments ──────────────────────
+  instituteBillingOverview: {
+    subscriptionCard: 'institute-billing-subscription-card',
+    statusBadge: 'institute-billing-status-badge',
+    noSubscription: 'institute-billing-no-subscription',
+  },
+  instituteBillingPayments: {
+    list: 'institute-payments-list',
+    empty: 'institute-payments-empty',
+    row: (id: string) => `institute-payment-row-${id}`,
+  },
+
   // ── Institute: billing → invoice detail ──────────────────────────────
   instituteBillingInvoice: {
     payOnlineBtn: 'institute-invoice-pay-online-btn',
     paymentConfirming: 'institute-invoice-payment-confirming',
     lineItemRow: (index: number) => `institute-invoice-line-item-${index}`,
+  },
+
+  // ── Institute: billing → invoice list ────────────────────────────────
+  instituteBillingInvoices: {
+    table: 'institute-invoices-table',
+    statusFilter: 'institute-invoices-status-filter',
+    clearFilters: 'institute-invoices-clear-filters',
+    loadMore: 'institute-invoices-load-more',
+    empty: 'institute-invoices-empty',
+    accessDenied: 'institute-invoices-access-denied',
+    invoiceLink: (id: string) => `institute-invoice-link-${id}`,
   },
 } as const;

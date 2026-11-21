@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE_DB, type DrizzleDB, mkResellerCtx, withReseller } from '@roviq/database';
 import { gatewayConfigs, gatewayConfigsLive, payments } from '@roviq/ee-database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import { billingError } from '../billing.errors';
 
 @Injectable()
@@ -43,6 +43,7 @@ export class GatewayConfigRepository {
       this.db,
       mkResellerCtx(resellerId, 'repository:gateway-config'),
       async (tx) => {
+        if (data.isDefault) await this.clearDefault(tx, resellerId);
         const [config] = await tx.insert(gatewayConfigs).values(data).returning();
         return config;
       },
@@ -63,6 +64,7 @@ export class GatewayConfigRepository {
           .limit(1);
         if (!existing) return undefined;
 
+        if (data.isDefault) await this.clearDefault(tx, resellerId);
         const [config] = await tx
           .update(gatewayConfigs)
           .set({ ...data, updatedAt: new Date(), updatedBy: this.userId })
@@ -71,6 +73,20 @@ export class GatewayConfigRepository {
         return config;
       },
     );
+  }
+
+  /** Only one live config per reseller may be the default (`gwc_reseller_default_key`). */
+  private async clearDefault(tx: DrizzleDB, resellerId: string) {
+    await tx
+      .update(gatewayConfigs)
+      .set({ isDefault: false, updatedAt: new Date(), updatedBy: this.userId })
+      .where(
+        and(
+          eq(gatewayConfigs.resellerId, resellerId),
+          eq(gatewayConfigs.isDefault, true),
+          isNull(gatewayConfigs.deletedAt),
+        ),
+      );
   }
 
   async softDelete(resellerId: string, id: string) {

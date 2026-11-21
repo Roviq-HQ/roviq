@@ -2,11 +2,14 @@
 
 import { useFormatDate, useFormatNumber } from '@roviq/i18n';
 import { Badge, Card, CardContent, Skeleton } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { parseISO } from 'date-fns';
 import { CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMyPaymentHistory } from '../use-billing';
+
+const { instituteBillingPayments: ids } = testIds;
 
 const METHOD_ICONS: Record<string, string> = {
   RAZORPAY: '💳',
@@ -63,16 +66,16 @@ export default function PaymentHistoryPage() {
       <p className="text-muted-foreground">{t('payments.description')}</p>
 
       {payments.length === 0 ? (
-        <Card>
+        <Card data-testid={ids.empty}>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <CreditCard className="mb-4 size-12 text-muted-foreground" />
             <p className="text-muted-foreground">{t('payments.empty')}</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" data-testid={ids.list}>
           {payments.map((payment) => (
-            <Card key={payment.id}>
+            <Card key={payment.id} data-testid={ids.row(payment.id)}>
               <CardContent className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xl">{METHOD_ICONS[payment.method] ?? '💳'}</span>

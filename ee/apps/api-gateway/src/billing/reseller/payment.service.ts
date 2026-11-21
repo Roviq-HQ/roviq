@@ -19,6 +19,13 @@ import { PAYABLE_INVOICE_STATUSES, PaymentRepository } from '../repositories/pay
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { InvoiceService } from './invoice.service';
 
+type PaymentEvent = Record<string, unknown> & {
+  paymentId: string;
+  invoiceId: string;
+  tenantId: string;
+  resellerId: string;
+};
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -37,7 +44,7 @@ export class PaymentService {
   // subject for any payment lifecycle change. Every specific subject (succeeded
   // / refunded / upi_p2p_*) fans out to it so subscribers don't need to listen
   // to N specific subjects.
-  private emitEvent(pattern: EventPattern, data: Record<string, unknown>) {
+  private emitEvent(pattern: EventPattern, data: PaymentEvent) {
     this.eventBus.emit(pattern, data);
     if (
       (pattern as string).startsWith('BILLING.payment.') &&
@@ -287,9 +294,9 @@ export class PaymentService {
       amountPaise: bigint;
       receiptNumber?: string;
       notes?: string;
-      collectedById?: string;
       collectionDate?: string;
     },
+    membershipId: string,
   ) {
     const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
     if (!invoice) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
@@ -309,7 +316,8 @@ export class PaymentService {
       currency: invoice.currency,
       receiptNumber: input.receiptNumber ?? null,
       notes: input.notes ?? null,
-      collectedById: input.collectedById ?? null,
+      // Cash is attributed to the reseller staff member who records it.
+      collectedById: input.method === 'CASH' ? membershipId : null,
       collectionDate: input.collectionDate ?? null,
       paidAt: new Date(),
       createdBy: userId,
@@ -350,7 +358,7 @@ export class PaymentService {
   ) {
     const payment = await this.paymentRepo.findById(resellerId, paymentId);
     if (!payment) billingError('PAYMENT_NOT_FOUND', 'Payment not found');
-    if (payment.status !== 'SUCCEEDED') {
+    if (payment.status !== 'SUCCEEDED' && payment.status !== 'PARTIALLY_REFUNDED') {
       billingError('INVOICE_NOT_PAYABLE', 'Can only refund succeeded payments');
     }
 
@@ -388,7 +396,7 @@ export class PaymentService {
     const newRefundedTotal = BigInt(alreadyRefunded + requestedRefund);
     const isFullRefund = Number(newRefundedTotal) >= paidAmount;
 
-    const updated = await this.paymentRepo.update(resellerId, paymentId, {
+    await this.paymentRepo.update(resellerId, paymentId, {
       status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
       refundedAmountPaise: newRefundedTotal,
       refundedAt: new Date(),
@@ -396,8 +404,11 @@ export class PaymentService {
       refundGatewayId,
     });
 
-    // Update invoice
-    await this.invoiceService.markRefunded(resellerId, payment.invoiceId, input.amountPaise);
+    const invoice = await this.invoiceService.markRefunded(
+      resellerId,
+      payment.invoiceId,
+      input.amountPaise,
+    );
 
     this.emitEvent(EVENT_PATTERNS.BILLING.payment.refunded, {
       paymentId,
@@ -407,7 +418,7 @@ export class PaymentService {
       resellerId,
     });
 
-    return updated;
+    return invoice ?? (await this.invoiceRepo.findById(resellerId, payment.invoiceId));
   }
 
   // ---------------------------------------------------------------------------
@@ -582,6 +593,13 @@ export class PaymentService {
       verifiedById: membershipId,
     });
 
+    this.emitEvent(EVENT_PATTERNS.BILLING.payment.upi_p2p_verified, {
+      paymentId,
+      invoiceId: payment.invoiceId,
+      tenantId: payment.tenantId,
+      resellerId,
+    });
+
     return updated;
   }
 
@@ -597,7 +615,11 @@ export class PaymentService {
     }
 
     // 1. Revert invoice — decrement paidAmount by payment amount
-    await this.invoiceService.markRefunded(resellerId, payment.invoiceId, payment.amountPaise);
+    await this.invoiceService.markPaymentReversed(
+      resellerId,
+      payment.invoiceId,
+      payment.amountPaise,
+    );
 
     // 2. Check if subscription needs to revert to PAST_DUE
     await this.revertToPastDueIfNeeded(resellerId, payment.tenantId, payment.invoiceId);
@@ -625,6 +647,12 @@ export class PaymentService {
   /**
    * List payments pending UPI verification for a reseller.
    */
+  async listInvoicePayments(resellerId: string, invoiceId: string) {
+    const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
+    if (!invoice) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
+    return this.paymentRepo.findByInvoiceId(resellerId, invoiceId);
+  }
+
   async findUnverifiedPayments(resellerId: string, first: number, after?: string) {
     return this.paymentRepo.findUnverified(resellerId, { first, after });
   }
@@ -653,8 +681,8 @@ export class PaymentService {
     const invoice = await this.invoiceRepo.findById(resellerId, invoiceId);
     if (!invoice) return;
 
-    // If invoice is no longer fully paid, check subscription status
-    if (invoice.status !== 'PAID') {
+    // An unpaid invoice only makes the subscription past due once its due date has passed.
+    if (invoice.status !== 'PAID' && invoice.dueAt.getTime() < Date.now()) {
       const sub = await this.subscriptionRepo.findActiveByTenant(resellerId, tenantId);
       if (sub && sub.status === 'ACTIVE') {
         await this.subscriptionRepo.update(resellerId, sub.id, { status: 'PAST_DUE' });

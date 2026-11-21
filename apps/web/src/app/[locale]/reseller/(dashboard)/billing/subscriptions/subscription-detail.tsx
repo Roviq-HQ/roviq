@@ -1,7 +1,6 @@
 'use client';
 
 import { SUBSCRIPTION_STATE_MACHINE, type SubscriptionStatus } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import type { SubscriptionStatus as SubscriptionStatusType } from '@roviq/graphql/generated';
 import { useFormatDate, useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
@@ -23,15 +22,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import {
   type SubscriptionNode,
   useCancelSubscription,
   usePauseSubscription,
   useResumeSubscription,
 } from './use-subscriptions';
+
+const { resellerBillingSubscriptions: ids } = testIds;
 
 /** Status → badge variant mapping matching subscription-columns.tsx */
 const STATUS_VARIANT: Record<
@@ -83,11 +86,10 @@ function ActionButtons({
   t: (key: string) => string;
 }) {
   const { status } = subscription;
-  const hasProvider = !!subscription.gatewaySubscriptionId;
   const machine = SUBSCRIPTION_STATE_MACHINE;
   const canCancel = machine.canTransition(status as SubscriptionStatus, 'CANCELLED');
-  const canPause = hasProvider && machine.canTransition(status as SubscriptionStatus, 'PAUSED');
-  const canResume = hasProvider && machine.canTransition(status as SubscriptionStatus, 'ACTIVE');
+  const canPause = machine.canTransition(status as SubscriptionStatus, 'PAUSED');
+  const canResume = machine.canTransition(status as SubscriptionStatus, 'ACTIVE');
 
   if (!canCancel && !canPause && !canResume) return null;
 
@@ -96,12 +98,21 @@ function ActionButtons({
       <Separator className="my-4" />
       <div className="flex flex-wrap gap-2">
         {canResume && (
-          <Button size="sm" onClick={() => onAction({ type: 'resume' })}>
+          <Button
+            size="sm"
+            data-testid={ids.resumeBtn}
+            onClick={() => onAction({ type: 'resume' })}
+          >
             {t('subscriptions.actions.resume')}
           </Button>
         )}
         {canPause && (
-          <Button variant="outline" size="sm" onClick={() => onAction({ type: 'pause' })}>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid={ids.pauseBtn}
+            onClick={() => onAction({ type: 'pause' })}
+          >
             {t('subscriptions.actions.pause')}
           </Button>
         )}
@@ -142,7 +153,7 @@ function SubscriptionFields({
   onAction: (action: ConfirmAction) => void;
 }) {
   return (
-    <ScrollArea className="h-[calc(100vh-120px)]">
+    <ScrollArea className="h-full">
       <div className="space-y-1 pb-6 pt-4">
         <DetailRow label={t('subscriptions.detail.id')}>
           <span className="font-mono text-xs">{subscription.id}</span>
@@ -215,6 +226,7 @@ async function executeAction(
 
 export function SubscriptionDetail({ subscription, open, onOpenChange }: SubscriptionDetailProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
   const ti = useI18nField();
@@ -243,7 +255,7 @@ export function SubscriptionDetail({ subscription, open, onOpenChange }: Subscri
       onOpenChange(false);
     } catch (err) {
       const key = `subscriptions.actions.${confirmAction.type}Error`;
-      toast.error(t(key), { description: extractGraphQLError(err, t(key)) });
+      toast.error(t(key), { description: errorMessage(err) });
     } finally {
       setConfirmAction(null);
     }
@@ -252,13 +264,13 @@ export function SubscriptionDetail({ subscription, open, onOpenChange }: Subscri
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-[600px] sm:max-w-[600px]">
+        <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-[600px]">
           <SheetHeader>
             <SheetTitle>{t('subscriptions.detail.title')}</SheetTitle>
             <SheetDescription>{t('subscriptions.detail.description')}</SheetDescription>
           </SheetHeader>
 
-          <div className="flex-1 px-4">
+          <div className="min-h-0 flex-1 px-4">
             <SubscriptionFields
               subscription={subscription}
               t={t}

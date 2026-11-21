@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryStates } from 'nuqs';
@@ -22,6 +23,8 @@ import { InvoiceDetail } from './invoice-detail';
 import { RecordPaymentDialog } from './record-payment-dialog';
 import { RefundDialog } from './refund-dialog';
 import { type InvoiceNode, useInvoices } from './use-invoices';
+
+const { resellerBillingInvoices: ids } = testIds;
 
 const filterParsers = {
   status: parseAsString,
@@ -76,7 +79,11 @@ export default function InvoicesPage() {
                     value={filters.status ?? ''}
                     onValueChange={(v) => setFilters({ status: v || null })}
                   >
-                    <SelectTrigger className="w-[160px]">
+                    <SelectTrigger
+                      className="w-[160px]"
+                      data-testid={ids.statusFilter}
+                      aria-label={t('invoices.filters.status')}
+                    >
                       <SelectValue placeholder={t('invoices.filters.status')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -93,6 +100,7 @@ export default function InvoicesPage() {
                       size="icon"
                       className="absolute right-7 top-1/2 size-5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onClick={() => setFilters({ status: null })}
+                      aria-label={t('invoices.filters.clearStatus')}
                     >
                       <X className="size-3" />
                     </Button>
@@ -108,6 +116,7 @@ export default function InvoicesPage() {
               </DataTableToolbar>
 
               <DataTable
+                data-testid={ids.table}
                 columns={columns}
                 data={invoices}
                 isLoading={loading && invoices.length === 0}
@@ -157,8 +166,7 @@ export default function InvoicesPage() {
                   onOpenChange={(open) => {
                     if (!open) setRefundInvoice(null);
                   }}
-                  paymentId={refundInvoice.id}
-                  maxRefundPaise={Number(refundInvoice.paidAmount)}
+                  invoiceId={refundInvoice.id}
                 />
               )}
             </>

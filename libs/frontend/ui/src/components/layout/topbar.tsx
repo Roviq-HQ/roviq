@@ -184,7 +184,7 @@ export function Topbar({ config }: { config: LayoutConfig }) {
         )}
         <ThemeToggle />
         <div className="hidden xl:block">
-          <LocaleSwitcher />
+          <LocaleSwitcher onLocaleChange={config.onLocaleChange} />
         </div>
         <UserMenu
           onLogout={config.onLogout}

@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import {
   Button,
   Dialog,
@@ -18,6 +17,7 @@ import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import {
   useCancelSubscription,
   usePauseSubscription,
@@ -40,6 +40,7 @@ export function SubscriptionActionDialog({
   subscriptionId,
 }: SubscriptionActionDialogProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const [reason, setReason] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -69,7 +70,7 @@ export function SubscriptionActionDialog({
       onOpenChange(false);
     } catch (err) {
       const fallback = t(`subscriptions.actions.${action}Error`);
-      toast.error(extractGraphQLError(err, fallback));
+      toast.error(errorMessage(err, fallback));
     } finally {
       setIsSubmitting(false);
     }

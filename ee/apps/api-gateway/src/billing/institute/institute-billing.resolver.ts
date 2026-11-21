@@ -3,6 +3,7 @@ import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { assertInstituteWithReseller, CurrentUser, InstituteScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
+import { billingError } from '../billing.errors';
 import { BillingFilterInput } from '../dto/billing-filter.input';
 import { SubmitUpiProofInput } from '../dto/submit-upi-proof.input';
 import { VerifyPaymentGqlInput } from '../dto/verify-payment.input';
@@ -133,9 +134,7 @@ export class InstituteBillingResolver {
     assertInstituteWithReseller(user);
     // Verify invoice belongs to this tenant
     const invoice = await this.invoiceService.getInvoice(user.resellerId, input.invoiceId);
-    if (invoice.tenantId !== user.tenantId) {
-      throw new Error('Invoice does not belong to this institute');
-    }
+    if (invoice.tenantId !== user.tenantId) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
     return this.paymentService.submitUpiProof(
       user.resellerId,
       input.invoiceId,
@@ -157,9 +156,7 @@ export class InstituteBillingResolver {
   ) {
     assertInstituteWithReseller(user);
     const invoice = await this.invoiceService.getInvoice(user.resellerId, invoiceId);
-    if (invoice.tenantId !== user.tenantId) {
-      throw new Error('Invoice does not belong to this institute');
-    }
+    if (invoice.tenantId !== user.tenantId) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
     const pdfBuffer = await this.pdfService.generate(user.resellerId, invoiceId);
     return pdfBuffer.toString('base64');
   }

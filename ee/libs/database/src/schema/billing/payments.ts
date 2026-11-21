@@ -1,6 +1,6 @@
 import {
   institutes,
-  memberships,
+  resellerMemberships,
   resellers,
   roviqAdmin,
   roviqApp,
@@ -58,7 +58,7 @@ export const payments = pgTable(
 
     // --- Cash payment tracking ---
     /** Which reseller field agent collected the cash */
-    collectedById: uuid('collected_by_id').references(() => memberships.id),
+    collectedById: uuid('collected_by_id').references(() => resellerMemberships.id),
     /** When cash was physically collected (may differ from recording date) */
     collectionDate: date('collection_date'),
 
@@ -72,7 +72,7 @@ export const payments = pgTable(
     /** When reseller confirmed the UTR */
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     /** Which reseller staff verified the UTR */
-    verifiedById: uuid('verified_by_id').references(() => memberships.id),
+    verifiedById: uuid('verified_by_id').references(() => resellerMemberships.id),
 
     ...trackingColumns,
   },

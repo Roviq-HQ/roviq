@@ -1,8 +1,9 @@
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { SYSTEM_USER_ID } from '@roviq/database';
 import { PaymentMethod } from '@roviq/ee-billing-types';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { requestContext } from '@roviq/request-context';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PaymentService } from '../reseller/payment.service';
 
@@ -46,6 +47,7 @@ function createMockInvoiceService() {
   return {
     markPaid: vi.fn(),
     markRefunded: vi.fn(),
+    markPaymentReversed: vi.fn(),
     generateInvoice: vi.fn(),
   };
 }
@@ -135,12 +137,16 @@ describe('PaymentService', () => {
           status: 'PAID',
         });
 
-        const result = await service.recordManualPayment('reseller-1', 'inv-1', {
-          method: PaymentMethod.CASH,
-          amountPaise: 118000n,
-          collectedById: 'member-1',
-          collectionDate: '2026-03-24',
-        });
+        const result = await service.recordManualPayment(
+          'reseller-1',
+          'inv-1',
+          {
+            method: PaymentMethod.CASH,
+            amountPaise: 118000n,
+            collectionDate: '2026-03-24',
+          },
+          'member-1',
+        );
 
         expect(paymentRepo.create).toHaveBeenCalledWith(
           'reseller-1',
@@ -165,11 +171,69 @@ describe('PaymentService', () => {
         invoiceRepo.findById.mockResolvedValue({ status: 'PAID' });
 
         await expect(
-          service.recordManualPayment('reseller-1', 'inv-1', {
-            method: PaymentMethod.CASH,
-            amountPaise: 50000n,
-          }),
+          service.recordManualPayment(
+            'reseller-1',
+            'inv-1',
+            { method: PaymentMethod.CASH, amountPaise: 50000n },
+            'member-1',
+          ),
         ).rejects.toThrow();
+      }));
+
+    it.each([
+      [PaymentMethod.CASH, 'member-1'],
+      [PaymentMethod.BANK_TRANSFER, null],
+      [PaymentMethod.UPI, null],
+    ])('should store %s collector as %s', (method, collector) =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo, invoiceService } = createService();
+        invoiceRepo.findById.mockResolvedValue({
+          id: 'inv-1',
+          tenantId: 'tenant-1',
+          currency: 'INR',
+          status: 'SENT',
+        });
+        paymentRepo.create.mockResolvedValue({ id: 'pay-1' });
+        invoiceService.markPaid.mockResolvedValue({ id: 'inv-1' });
+
+        await service.recordManualPayment(
+          'reseller-1',
+          'inv-1',
+          { method, amountPaise: 1000n },
+          'member-1',
+        );
+
+        const created = paymentRepo.create.mock.calls[0]?.[1];
+        expect(created?.collectedById).toBe(collector);
+      }));
+  });
+
+  describe('listInvoicePayments', () => {
+    it('should return the payments of an invoice the reseller owns', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo } = createService();
+        const rows = [{ id: 'pay-1' }, { id: 'pay-2' }];
+        invoiceRepo.findById.mockResolvedValue({ id: 'inv-1' });
+        paymentRepo.findByInvoiceId.mockResolvedValue(rows);
+
+        const result = await service.listInvoicePayments('reseller-1', 'inv-1');
+
+        expect(result).toEqual(rows);
+        expect(paymentRepo.findByInvoiceId).toHaveBeenCalledWith('reseller-1', 'inv-1');
+      }));
+
+    it('should throw INVOICE_NOT_FOUND when the reseller has no such invoice', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, invoiceRepo } = createService();
+        invoiceRepo.findById.mockResolvedValue(null);
+
+        const error = await service
+          .listInvoicePayments('reseller-1', 'inv-x')
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BusinessException);
+        expect((error as BusinessException).code).toBe(ErrorCode.INVOICE_NOT_FOUND);
+        expect(paymentRepo.findByInvoiceId).not.toHaveBeenCalled();
       }));
   });
 
@@ -283,6 +347,120 @@ describe('PaymentService', () => {
           expect.objectContaining({ refundGatewayId: 'rfnd_123' }),
         );
       }));
+
+    describe('after a first refund', () => {
+      const REFUND_TIME = new Date('2026-06-15T10:00:00.000Z');
+      beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(REFUND_TIME);
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+      const invoiceRow = { id: 'inv-1', status: 'PARTIALLY_PAID', paidAmount: 70000n };
+      const payment = (status: string, refunded: bigint) => ({
+        id: 'pay-1',
+        invoiceId: 'inv-1',
+        tenantId: 'tenant-1',
+        status,
+        amountPaise: 100000n,
+        refundedAmountPaise: refunded,
+        gatewayPaymentId: null,
+        gatewayProvider: null,
+      });
+
+      it('should return the invoice row from markRefunded, not the payment', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, paymentRepo, invoiceService, invoiceRepo } = createService();
+          paymentRepo.findById.mockResolvedValue(payment('SUCCEEDED', 0n));
+          paymentRepo.update.mockResolvedValue({ id: 'pay-1', status: 'PARTIALLY_REFUNDED' });
+          invoiceService.markRefunded.mockResolvedValue(invoiceRow);
+
+          const result = await service.issueRefund('reseller-1', 'pay-1', { amountPaise: 30000n });
+
+          expect(result).toEqual(invoiceRow);
+          expect(invoiceRepo.findById).not.toHaveBeenCalled();
+        }));
+
+      it('should fall back to reading the invoice when markRefunded finds none', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, paymentRepo, invoiceService, invoiceRepo } = createService();
+          paymentRepo.findById.mockResolvedValue(payment('SUCCEEDED', 0n));
+          paymentRepo.update.mockResolvedValue({});
+          invoiceService.markRefunded.mockResolvedValue(null);
+          invoiceRepo.findById.mockResolvedValue(invoiceRow);
+
+          const result = await service.issueRefund('reseller-1', 'pay-1', { amountPaise: 30000n });
+
+          expect(result).toEqual(invoiceRow);
+          expect(invoiceRepo.findById).toHaveBeenCalledWith('reseller-1', 'inv-1');
+        }));
+
+      it('should accept a second refund on a PARTIALLY_REFUNDED payment and total the refunds', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, paymentRepo, invoiceService } = createService();
+          paymentRepo.findById.mockResolvedValue(payment('PARTIALLY_REFUNDED', 30000n));
+          paymentRepo.update.mockResolvedValue({});
+          invoiceService.markRefunded.mockResolvedValue(invoiceRow);
+
+          await service.issueRefund('reseller-1', 'pay-1', { amountPaise: 20000n });
+
+          expect(paymentRepo.update).toHaveBeenCalledWith('reseller-1', 'pay-1', {
+            status: 'PARTIALLY_REFUNDED',
+            refundedAmountPaise: 50000n,
+            refundedAt: REFUND_TIME,
+            refundReason: null,
+            refundGatewayId: null,
+          });
+        }));
+
+      it('should mark REFUNDED when the second refund takes the rest', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, paymentRepo, invoiceService } = createService();
+          paymentRepo.findById.mockResolvedValue(payment('PARTIALLY_REFUNDED', 30000n));
+          paymentRepo.update.mockResolvedValue({});
+          invoiceService.markRefunded.mockResolvedValue(invoiceRow);
+
+          await service.issueRefund('reseller-1', 'pay-1', { amountPaise: 70000n });
+
+          expect(paymentRepo.update).toHaveBeenCalledWith('reseller-1', 'pay-1', {
+            status: 'REFUNDED',
+            refundedAmountPaise: 100000n,
+            refundedAt: REFUND_TIME,
+            refundReason: null,
+            refundGatewayId: null,
+          });
+        }));
+
+      it('should throw REFUND_EXCEEDS_PAID when a second refund is above the remaining amount', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, paymentRepo, invoiceService } = createService();
+          paymentRepo.findById.mockResolvedValue(payment('PARTIALLY_REFUNDED', 30000n));
+
+          const error = await service
+            .issueRefund('reseller-1', 'pay-1', { amountPaise: 70001n })
+            .catch((e: unknown) => e);
+
+          expect(error).toBeInstanceOf(BusinessException);
+          expect((error as BusinessException).code).toBe(ErrorCode.REFUND_EXCEEDS_PAID);
+          expect(paymentRepo.update).not.toHaveBeenCalled();
+          expect(invoiceService.markRefunded).not.toHaveBeenCalled();
+        }));
+
+      it.each(['REFUNDED', 'FAILED'])('should still refuse a %s payment', (status) =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, paymentRepo } = createService();
+          paymentRepo.findById.mockResolvedValue(payment(status, 0n));
+
+          const error = await service
+            .issueRefund('reseller-1', 'pay-1', { amountPaise: 1n })
+            .catch((e: unknown) => e);
+
+          expect(error).toBeInstanceOf(BusinessException);
+          expect((error as BusinessException).code).toBe(ErrorCode.INVOICE_NOT_PAYABLE);
+          expect(paymentRepo.update).not.toHaveBeenCalled();
+        }));
+    });
   });
 
   describe('initiatePayment', () => {
@@ -985,6 +1163,49 @@ describe('PaymentService', () => {
 
         await expect(service.verifyUpiPayment('reseller-1', 'pay-1', 'member-1')).rejects.toThrow();
       }));
+
+    it('should emit upi_p2p_verified and status_changed with the same payload', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, eventBus } = createService();
+        paymentRepo.findById.mockResolvedValue({
+          id: 'pay-1',
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          verificationStatus: 'PENDING_VERIFICATION',
+        });
+        paymentRepo.update.mockResolvedValue({ id: 'pay-1', verificationStatus: 'VERIFIED' });
+
+        await service.verifyUpiPayment('reseller-1', 'pay-1', 'member-1');
+
+        const payload = {
+          paymentId: 'pay-1',
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          resellerId: 'reseller-1',
+        };
+        expect(eventBus.emit).toHaveBeenCalledTimes(2);
+        expect(eventBus.emit).toHaveBeenCalledWith(
+          EVENT_PATTERNS.BILLING.payment.upi_p2p_verified,
+          payload,
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(
+          EVENT_PATTERNS.BILLING.payment.status_changed,
+          payload,
+        );
+      }));
+
+    it('should not emit when the payment is not pending verification', () =>
+      requestContext.run(TEST_CTX, async () => {
+        const { service, paymentRepo, eventBus } = createService();
+        paymentRepo.findById.mockResolvedValue({
+          id: 'pay-1',
+          verificationStatus: 'VERIFIED',
+        });
+
+        await expect(service.verifyUpiPayment('reseller-1', 'pay-1', 'member-1')).rejects.toThrow();
+
+        expect(eventBus.emit).not.toHaveBeenCalled();
+      }));
   });
 
   describe('rejectUpiPayment', () => {
@@ -1000,14 +1221,23 @@ describe('PaymentService', () => {
           verificationStatus: 'PENDING_VERIFICATION',
         });
         // After reversal, invoice is no longer PAID
-        invoiceRepo.findById.mockResolvedValue({ id: 'inv-1', status: 'SENT' });
+        invoiceRepo.findById.mockResolvedValue({
+          id: 'inv-1',
+          status: 'OVERDUE',
+          dueAt: new Date('2020-01-01T00:00:00.000Z'),
+        });
         subscriptionRepo.findActiveByTenant.mockResolvedValue({ id: 'sub-1', status: 'ACTIVE' });
         paymentRepo.update.mockResolvedValue({});
 
         await service.rejectUpiPayment('reseller-1', 'pay-1', 'UTR not found in bank');
 
-        // 1. Invoice refunded
-        expect(invoiceService.markRefunded).toHaveBeenCalledWith('reseller-1', 'inv-1', 118000n);
+        // 1. Invoice owed again
+        expect(invoiceService.markPaymentReversed).toHaveBeenCalledWith(
+          'reseller-1',
+          'inv-1',
+          118000n,
+        );
+        expect(invoiceService.markRefunded).not.toHaveBeenCalled();
         // 2. Subscription reverted to PAST_DUE
         expect(subscriptionRepo.update).toHaveBeenCalledWith('reseller-1', 'sub-1', {
           status: 'PAST_DUE',
@@ -1023,6 +1253,58 @@ describe('PaymentService', () => {
           }),
         );
       }));
+
+    describe('subscription after a rejection', () => {
+      const PAST = new Date('2020-01-01T00:00:00.000Z');
+      const FUTURE = new Date('2999-01-01T00:00:00.000Z');
+
+      function arrange(invoice: { status: string; dueAt: Date }) {
+        const ctx = createService();
+        ctx.paymentRepo.findById.mockResolvedValue({
+          id: 'pay-1',
+          invoiceId: 'inv-1',
+          tenantId: 'tenant-1',
+          amountPaise: 118000n,
+          verificationStatus: 'PENDING_VERIFICATION',
+        });
+        ctx.invoiceRepo.findById.mockResolvedValue({ id: 'inv-1', ...invoice });
+        ctx.subscriptionRepo.findActiveByTenant.mockResolvedValue({
+          id: 'sub-1',
+          status: 'ACTIVE',
+        });
+        ctx.paymentRepo.update.mockResolvedValue({});
+        return ctx;
+      }
+
+      it('should set PAST_DUE when the unpaid invoice is overdue', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, subscriptionRepo } = arrange({ status: 'OVERDUE', dueAt: PAST });
+
+          await service.rejectUpiPayment('reseller-1', 'pay-1', 'no match');
+
+          expect(subscriptionRepo.update).toHaveBeenCalledWith('reseller-1', 'sub-1', {
+            status: 'PAST_DUE',
+          });
+        }));
+
+      it('should leave the subscription alone when the invoice is not yet due', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, subscriptionRepo } = arrange({ status: 'SENT', dueAt: FUTURE });
+
+          await service.rejectUpiPayment('reseller-1', 'pay-1', 'no match');
+
+          expect(subscriptionRepo.update).not.toHaveBeenCalled();
+        }));
+
+      it('should leave the subscription alone when the invoice is still PAID', () =>
+        requestContext.run(TEST_CTX, async () => {
+          const { service, subscriptionRepo } = arrange({ status: 'PAID', dueAt: PAST });
+
+          await service.rejectUpiPayment('reseller-1', 'pay-1', 'no match');
+
+          expect(subscriptionRepo.update).not.toHaveBeenCalled();
+        }));
+    });
   });
 
   describe('findUnverifiedPayments', () => {
