@@ -21,7 +21,6 @@ import {
   standardsLive,
   studentAcademicsLive,
   studentGuardianLinksLive,
-  studentProfiles,
   studentProfilesLive,
   tcRegister,
   tcRegisterLive,
@@ -29,10 +28,7 @@ import {
   withAdmin,
   withTenant,
 } from '@roviq/database';
-import type { EventBusService } from '@roviq/event-bus';
-import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import { nextTcSerialNumber } from '../tc-serial';
 import type { CbseTcData, TCIssuanceActivities } from './tc-issuance.types';
 
 const logger = new Logger('TCIssuanceActivities');
@@ -219,10 +215,7 @@ function buildCbseTcData(params: {
 
 // ── Activity factory ──────────────────────────────────────
 
-export function createTCIssuanceActivities(
-  db: DrizzleDB,
-  eventBus: Pick<EventBusService, 'emit'> | null,
-): TCIssuanceActivities {
+export function createTCIssuanceActivities(db: DrizzleDB): TCIssuanceActivities {
   return {
     async validateRequest(tenantId, tcRegisterId, studentProfileId) {
       logger.log(`Validating TC request: ${tcRegisterId} for student ${studentProfileId}`);
@@ -482,89 +475,6 @@ export function createTCIssuanceActivities(
 
       logger.log(`TC ${tcRegisterId}: 20 CBSE fields populated → status=generated`);
       return { tcData };
-    },
-
-    async recordApproval(tenantId, tcRegisterId, approvedBy) {
-      logger.log(`Recording approval for TC ${tcRegisterId} by ${approvedBy}`);
-
-      await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
-        async (tx) => {
-          await tx
-            .update(tcRegister)
-            .set({
-              status: TcStatus.APPROVED,
-              approvedBy,
-              approvedAt: new Date(),
-            })
-            .where(eq(tcRegister.id, tcRegisterId));
-        },
-      );
-
-      logger.log(`TC ${tcRegisterId}: status → approved`);
-    },
-
-    async issueTC(tenantId, tcRegisterId, studentProfileId, academicYearId) {
-      logger.log(`Issuing TC ${tcRegisterId}`);
-
-      const today = new Date().toISOString().split('T')[0];
-
-      // TODO: Generate PDF with Handlebars template + QR code
-      // Stub: use placeholder PDF URL
-      const pdfUrl = `/api/storage/tc/${tenantId}/${tcRegisterId}.pdf`;
-
-      // Serial + status in one transaction so a failed attempt doesn't burn a number
-      const tcSerialNumber = await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
-        async (tx) => {
-          const serial = await nextTcSerialNumber(tx, tenantId, academicYearId);
-          await tx
-            .update(tcRegister)
-            .set({
-              status: TcStatus.ISSUED,
-              tcSerialNumber: serial,
-              issuedAt: new Date(),
-              pdfUrl,
-              qrVerificationUrl: `/tc/verify/${serial}`,
-              tcData: sql`jsonb_set(COALESCE(tc_data, '{}'), '{dateOfIssue}', to_jsonb(${today}::text))`,
-            })
-            .where(eq(tcRegister.id, tcRegisterId));
-          return serial;
-        },
-      );
-      const qrVerificationUrl = `/tc/verify/${tcSerialNumber}`;
-
-      // Update student_profile: mark transferred_out (PRD §5.1 Step 5)
-      await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
-        async (tx) => {
-          await tx
-            .update(studentProfiles)
-            .set({
-              tcIssued: true,
-              tcNumber: tcSerialNumber,
-              tcIssuedDate: today,
-              dateOfLeaving: today,
-              academicStatus: AcademicStatus.TRANSFERRED_OUT,
-            })
-            .where(eq(studentProfiles.id, studentProfileId));
-        },
-      );
-
-      // Emit tc.issued event
-      eventBus?.emit(EVENT_PATTERNS.TC.issued, {
-        tcId: tcRegisterId,
-        studentProfileId,
-        tcSerialNumber,
-        tenantId,
-      });
-
-      logger.log(`TC ${tcRegisterId}: issued as ${tcSerialNumber}, student → transferred_out`);
-
-      return { pdfUrl, qrVerificationUrl, tcSerialNumber };
     },
   };
 }

@@ -34,7 +34,6 @@ export interface MarkCertificateIssuedData {
   id: string;
   /** YYYY-MM-DD */
   issuedDate: string;
-  pdfUrl: string;
   actorId: string;
 }
 

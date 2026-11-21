@@ -1,5 +1,5 @@
 import type { AcademicStatus, CbseTcData, TcStatus } from '@roviq/common-types';
-import type { I18nContent, TcClearances } from '@roviq/database';
+import type { I18nContent, InstituteAddress, TcClearances } from '@roviq/database';
 
 /** A `tc_register` row as read from `tc_register_live`. */
 export interface TcRow {
@@ -11,6 +11,7 @@ export interface TcRow {
   isDuplicate: boolean;
   originalTcId: string | null;
   tcData: CbseTcData;
+  pdfFileId: string | null;
 }
 
 /** A TC with the student's name and the standard of the TC's year, for list and detail. */
@@ -23,8 +24,11 @@ export interface TcDetailsRow {
   reason: string;
   tcData: CbseTcData;
   clearances: TcClearances | null;
-  pdfUrl: string | null;
-  qrVerificationUrl: string | null;
+  pdfFileId: string | null;
+  /** Opaque token of the public verification page; null until issued. */
+  verificationToken: string | null;
+  issuedAt: Date | null;
+  admissionNumber: string;
   isDuplicate: boolean;
   originalTcId: string | null;
   isCounterSigned: boolean | null;
@@ -61,10 +65,30 @@ export interface IssueTcData {
   tc: TcRow;
   /** YYYY-MM-DD, written as the issue and leaving date. */
   today: string;
-  pdfUrl: string;
+  /** Opaque, unguessable; printed in the QR code. */
+  verificationToken: string;
   actorId: string;
 }
 
 export interface StudentStatusRow {
   academicStatus: AcademicStatus;
+}
+
+/** What a certificate prints at its top. */
+export interface InstituteLetterheadRow {
+  name: I18nContent;
+  address: InstituteAddress | null;
+  board: string | null;
+  affiliationNumber: string | null;
+  logoFileId: string | null;
+}
+
+/** What the public verification page may show for a token. */
+export interface TcVerificationRow {
+  serialNumber: string;
+  status: TcStatus;
+  studentName: string | null;
+  instituteName: I18nContent;
+  issuedOn: string | null;
+  isDuplicate: boolean;
 }

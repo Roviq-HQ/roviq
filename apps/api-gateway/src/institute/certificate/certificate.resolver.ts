@@ -31,6 +31,18 @@ export class CertificateResolver {
   }
 
   @Mutation(() => CertificateModel, {
+    description: 'Render the PDF of an issued certificate that has none',
+  })
+  @CheckAbility({ action: 'manage', subject: 'Certificate' })
+  async generateCertificatePdf(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CertificateModel> {
+    assertTenantContext(user);
+    return this.certService.generateCertificatePdf(user, id);
+  }
+
+  @Mutation(() => CertificateModel, {
     description: 'Issue certificate — generates serial, renders PDF',
   })
   @CheckAbility({ action: 'manage', subject: 'Certificate' })

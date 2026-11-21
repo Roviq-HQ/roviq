@@ -14,6 +14,7 @@ import type { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CertificateService } from '../certificate.service';
+import { CertificatePdfService } from '../certificate-pdf.service';
 import { CertificateRepository } from '../repositories/certificate.repository';
 import type { IssuedCertificateRow } from '../repositories/certificate.types';
 import { TcRepository } from '../repositories/tc.repository';
@@ -38,7 +39,7 @@ function certificateRow(overrides: Partial<IssuedCertificateRow> = {}): IssuedCe
     serialNumber: 'CERT/TRA/0001',
     status: CertificateStatus.ISSUED,
     certificateData: {},
-    pdfUrl: null,
+    pdfFileId: null,
     issuedDate: null,
     issuedBy: null,
     purpose: null,
@@ -72,7 +73,13 @@ describe('CertificateService (unit)', () => {
     certificates = createMock<CertificateRepository>();
     const eventBus = createMock<EventBusService>({ emit: vi.fn() });
     const config = createMock<ConfigService>({ get: vi.fn(() => 'localhost:7233') });
-    service = new CertificateService(createMock<TcRepository>(), certificates, eventBus, config);
+    service = new CertificateService(
+      createMock<TcRepository>(),
+      certificates,
+      eventBus,
+      config,
+      createMock<CertificatePdfService>(),
+    );
   });
 
   describe('findCertificateById', () => {

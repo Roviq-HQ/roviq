@@ -200,7 +200,7 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
     resetQueue();
 
     const { createTCIssuanceActivities } = await import('../workflows/tc-issuance.activities');
-    activities = createTCIssuanceActivities(createMock<DrizzleDB>(), null);
+    activities = createTCIssuanceActivities(createMock<DrizzleDB>());
   });
 
   it('populateTcData returns all 20 CBSE fields', async () => {
@@ -398,7 +398,7 @@ describe('TC Status Transitions', () => {
   it('validateRequest throws if student not enrolled', async () => {
     resetQueue();
     const { createTCIssuanceActivities } = await import('../workflows/tc-issuance.activities');
-    const activities = createTCIssuanceActivities(createMock<DrizzleDB>(), null);
+    const activities = createTCIssuanceActivities(createMock<DrizzleDB>());
 
     queueResult([{ academicStatus: 'transferred_out' }]); // student not enrolled
 
@@ -410,7 +410,7 @@ describe('TC Status Transitions', () => {
   it('validateRequest throws if student not found', async () => {
     resetQueue();
     const { createTCIssuanceActivities } = await import('../workflows/tc-issuance.activities');
-    const activities = createTCIssuanceActivities(createMock<DrizzleDB>(), null);
+    const activities = createTCIssuanceActivities(createMock<DrizzleDB>());
 
     queueResult([]); // student not found
 

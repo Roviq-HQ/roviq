@@ -30,6 +30,14 @@ export abstract class CertificateRepository {
     data: MarkCertificateIssuedData,
   ): Promise<IssuedCertificateRow | null>;
   abstract findById(ctx: InstituteContext, id: string): Promise<IssuedCertificateRow | null>;
+  /**
+   * Makes the rendered PENDING file READY and points the certificate at it, in one
+   * transaction. False when the certificate already has a PDF.
+   */
+  abstract attachPdf(
+    ctx: InstituteContext,
+    data: { certificateId: string; fileId: string; actorId: string },
+  ): Promise<boolean>;
   /** At most 50. */
   abstract list(
     ctx: InstituteContext,

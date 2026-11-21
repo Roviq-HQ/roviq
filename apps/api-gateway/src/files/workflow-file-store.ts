@@ -2,7 +2,7 @@ import type { FileContentType, FilePurpose } from '@roviq/common-types';
 import { type DrizzleDB, files, filesLive, mkInstituteCtx, withTenant } from '@roviq/database';
 import type { StorageClient } from '@roviq/storage';
 import { and, eq } from 'drizzle-orm';
-import { storageKeyFor } from './storage-keys';
+import { bucketOf, storageKeyFor, variantKeyOf } from './storage-keys';
 
 const ORIGIN = 'workflow:file-store';
 
@@ -44,6 +44,24 @@ export class WorkflowFileStore {
     );
     if (!file) throw new Error(`File ${fileId} is not a ready ${purpose} file of this institute`);
     return this.storage.get(file.visibility === 'PUBLIC' ? 'public' : 'private', file.objectKey);
+  }
+
+  /** The medium WebP rendition of a READY image of this institute and purpose; null when absent. */
+  async readImage(tenantId: string, fileId: string, purpose: FilePurpose): Promise<Buffer | null> {
+    const [file] = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+      tx
+        .select({ objectKey: filesLive.objectKey, visibility: filesLive.visibility })
+        .from(filesLive)
+        .where(
+          and(
+            eq(filesLive.id, fileId),
+            eq(filesLive.status, 'READY'),
+            eq(filesLive.purpose, purpose),
+          ),
+        ),
+    );
+    if (!file) return null;
+    return this.storage.get(bucketOf(file), variantKeyOf(file.objectKey, 'MD'));
   }
 
   /** Stores a file the server produced. Writing the same `fileId` again replaces its bytes. */

@@ -113,6 +113,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/tc-register.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/udise-dcf.export.ts',
+  // Public TC verification: an anonymous caller, served only through the verify_tc() function.
+  'apps/api-gateway/src/institute/certificate/repositories/tc-verification.repository.ts',
   'apps/api-gateway/src/institute/certificate/workflows/compliance-export.activities.ts',
   'apps/api-gateway/src/institute/certificate/workflows/tc-issuance.activities.ts',
   'apps/api-gateway/src/institute/consent/consent.service.ts',
