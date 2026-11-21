@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   const { logout, user } = useAuth();
 
   usePushNotifications();
+  const changeLocale = useLocaleChange();
 
   const subscriberId = user?.id ?? '';
   const [subscriberHash, setSubscriberHash] = useState<string>();
@@ -89,6 +91,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   ];
 
   const config: LayoutConfig = {
+    onLocaleChange: changeLocale,
     appName: tCommon('appNameAdmin'),
     user: user ? { username: user.username, email: user.email } : undefined,
     onLogout: logout,

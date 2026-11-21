@@ -94,6 +94,8 @@ export interface LayoutConfig {
   navGroups: NavGroup[];
   user?: UserInfo;
   onLogout?: () => void;
+  /** Topbar language switcher; the app decides whether to persist the choice before navigating. */
+  onLocaleChange: (locale: string) => void;
   /** Replaces "Log out" in the user menu, e.g. while the tab is an impersonation session. */
   logoutLabel?: string;
   instituteSwitcher?: InstituteSwitcherConfig;

@@ -49,10 +49,18 @@ export class LanguagePreferencePage {
     await expect(this.page.getByTestId(testIds.accountLocale.select)).toBeEnabled();
   }
 
-  async temporarilyUseEnglish() {
+  async switchInTopbar(locale: 'en' | 'hi') {
     await this.page.getByTestId(testIds.layout.localeSwitcher).click();
-    await this.page.getByTestId(testIds.layout.localeOption('en')).click();
-    await expect(this.page).toHaveURL(new RegExp(`/en/${this.portal}/account`));
+    await this.page.getByTestId(testIds.layout.localeOption(locale)).click();
+    await expect(this.page).toHaveURL(new RegExp(`/${locale}/${this.portal}/account`));
+  }
+
+  async expectEnglish() {
+    await expect(this.page).toHaveURL(
+      new RegExp(`/en/${this.portal}/account\\?tab=profile#language$`),
+    );
+    await expect(this.page.getByTestId(testIds.accountLocale.select)).toHaveText('English');
+    await expect(this.page.getByTestId(testIds.accountLocale.select)).toBeEnabled();
   }
 
   async refresh() {

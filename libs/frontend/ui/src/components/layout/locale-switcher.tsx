@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname, useRouter } from '@roviq/i18n';
 import { Check, Languages } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { testIds } from '../../testing/testid-registry';
@@ -21,17 +20,9 @@ const locales = [
   { value: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
 ];
 
-export function LocaleSwitcher() {
+export function LocaleSwitcher({ onLocaleChange }: { onLocaleChange: (locale: string) => void }) {
   const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
   const t = useTranslations('locale');
-
-  function handleLocaleChange(newLocale: string) {
-    router.replace(`${pathname}${window.location.search}${window.location.hash}`, {
-      locale: newLocale,
-    });
-  }
 
   const current = locales.find((l) => l.value === locale);
 
@@ -60,7 +51,7 @@ export function LocaleSwitcher() {
         {locales.map((l) => (
           <DropdownMenuItem
             key={l.value}
-            onClick={() => handleLocaleChange(l.value)}
+            onClick={() => onLocaleChange(l.value)}
             className="flex items-center justify-between"
             data-testid={layout.localeOption(l.value)}
           >

@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
+import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 import { BillingRealtime } from './billing/billing-realtime';
 import { useUnpaidInvoiceCount } from './billing/use-billing-realtime';
@@ -54,6 +55,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const roleName = useRoleName();
 
   usePushNotifications();
+  const changeLocale = useLocaleChange();
 
   const subscriberId = user?.id ?? '';
   const [subscriberHash, setSubscriberHash] = useState<string>();
@@ -263,6 +265,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   ];
 
   const config: LayoutConfig = {
+    onLocaleChange: changeLocale,
     appName: tCommon('appNameInstitute'),
     user: user ? { username: user.username, email: user.email } : undefined,
     // Log out would sign the impersonator out of their own account; this tab only exits.
