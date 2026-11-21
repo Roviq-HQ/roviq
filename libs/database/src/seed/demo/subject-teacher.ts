@@ -18,6 +18,9 @@ import type { DrizzleDB } from '../../providers';
 import { SEED_CREDENTIALS, SEED_PERSON_NAMES } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
+// Seeded people own their addresses: their email can identify them when a role is granted.
+const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
+
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 
 export async function seedDemoSubjectTeacher(
@@ -35,6 +38,7 @@ export async function seedDemoSubjectTeacher(
       username: SEED_CREDENTIALS.SUBJECT_TEACHER.username,
       email: 'subjectteacher1@svm-ggn.edu.in',
       passwordHash: await hash(SEED_CREDENTIALS.SUBJECT_TEACHER.password),
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
       ...BY,
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
