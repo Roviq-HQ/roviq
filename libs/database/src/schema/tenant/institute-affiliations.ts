@@ -13,8 +13,9 @@ export const instituteAffiliations = pgTable(
     affiliationStatus: affiliationStatus('affiliation_status').default('PROVISIONAL').notNull(),
     affiliationNumber: text('affiliation_number'),
     grantedLevel: text('granted_level'),
-    validFrom: date('valid_from').notNull(),
-    validTo: date('valid_to').notNull(),
+    // Null until the institute enters its affiliation details: the board alone is known at creation.
+    validFrom: date('valid_from'),
+    validTo: date('valid_to'),
     nocNumber: text('noc_number'),
     nocDate: date('noc_date'),
     ...tenantColumns,

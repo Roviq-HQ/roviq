@@ -11,6 +11,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { users } from '../auth/users';
 import { entityColumns, i18nText } from '../common/columns';
 import {
   educationLevel,
@@ -73,6 +74,15 @@ export const institutes = pgTable(
     setupStatus: setupStatus('setup_status').default('PENDING').notNull(),
     contact: jsonb().$type<InstituteContact>().default({ phones: [], emails: [] }).notNull(),
     address: jsonb().$type<InstituteAddress>(),
+    /**
+     * The user named as first admin when the institute was requested or created. Setup gives
+     * this user the institute admin membership. Only the id lives here: the person's details
+     * are in the platform-level user tables, which institute roles cannot read.
+     */
+    firstAdminUserId: uuid('first_admin_user_id').references(() => users.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
     timezone: text().default('Asia/Kolkata').notNull(),
     currency: text().default('INR').notNull(),
     supportedLocales: jsonb('supported_locales').$type<string[]>().default(['en']).notNull(),
