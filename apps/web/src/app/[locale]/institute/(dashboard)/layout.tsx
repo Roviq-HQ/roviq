@@ -1,9 +1,10 @@
 'use client';
 
+import { createMongoAbility } from '@casl/ability';
 import { ProtectedRoute, useAuth } from '@roviq/auth';
-import { NAV_SLUGS } from '@roviq/common-types';
+import { type AppAbility, NAV_SLUGS } from '@roviq/common-types';
 import { useI18nField } from '@roviq/i18n';
-import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
+import type { LayoutConfig, NavGroup, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
 import { ImpersonationBannerView } from '@web/components/impersonation/impersonation-banner';
 import { useImpersonationSession } from '@web/components/impersonation/use-impersonation-session';
@@ -35,8 +36,10 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
+import { BillingRealtime } from './billing/billing-realtime';
+import { useUnpaidInvoiceCount } from './billing/use-billing-realtime';
 import { CurrentInstituteLocalesProvider } from './institute-locales-provider';
 import { TenantThemeProvider } from './tenant-theme-provider';
 
@@ -88,6 +91,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       : undefined;
 
   const eeEnabled = process.env.NEXT_PUBLIC_ROVIQ_EE === 'true';
+  const abilityRules = user?.abilityRules;
+  const canReadInvoices = useMemo(
+    () => createMongoAbility<AppAbility>(abilityRules ?? []).can('read', 'Invoice'),
+    [abilityRules],
+  );
+  const unpaidInvoices = useUnpaidInvoiceCount(eeEnabled && canReadInvoices);
 
   // Slug → render-info map. Resolved by <BottomTabBar/> for the phone bottom
   // nav, and by future "more" surfaces. Labels come from the same `nav`
@@ -341,16 +350,19 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         ],
       },
       ...(eeEnabled
-        ? [
+        ? ([
             {
               title: t('billing'),
               items: [
                 navItem(NAV_REGISTRY.subscriptions),
-                navItem(NAV_REGISTRY.invoices),
+                {
+                  ...navItem(NAV_REGISTRY.invoices),
+                  badge: unpaidInvoices > 0 ? String(unpaidInvoices) : undefined,
+                },
                 navItem(NAV_REGISTRY.payments),
               ],
             },
-          ]
+          ] satisfies NavGroup[])
         : []),
       {
         title: t('system'),
@@ -378,6 +390,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     <ProtectedRoute>
       <AbilityProvider rules={user?.abilityRules ?? []}>
         <TenantThemeProvider>
+          {eeEnabled && <BillingRealtime />}
           <AdminLayout
             config={config}
             banner={

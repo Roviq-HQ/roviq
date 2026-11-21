@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { CheckCircle, Clock, ShieldAlert, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -97,6 +98,8 @@ function DeadlineCell({ deadline }: { deadline: string | null }) {
   );
 }
 
+const { resellerBillingUpi: ids } = testIds;
+
 export default function UpiVerificationPage() {
   const t = useTranslations('billing');
   const { format } = useFormatDate();
@@ -166,14 +169,14 @@ export default function UpiVerificationPage() {
         {(allowed: boolean) =>
           allowed ? (
             payments.length === 0 ? (
-              <Card>
+              <Card data-testid={ids.empty}>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <ShieldAlert className="mb-4 size-12 text-muted-foreground" />
                   <p className="text-muted-foreground">{t('upiVerification.empty')}</p>
                 </CardContent>
               </Card>
             ) : (
-              <Card>
+              <Card data-testid={ids.table}>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>

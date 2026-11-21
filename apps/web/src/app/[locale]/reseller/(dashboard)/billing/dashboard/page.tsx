@@ -2,6 +2,7 @@
 
 import { gql, useQuery } from '@roviq/graphql';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import {
   AlertTriangle,
   BarChart3,
@@ -27,6 +28,8 @@ const Pie = dynamic(() => import('recharts').then((m) => m.Pie), { ssr: false })
 const Cell = dynamic(() => import('recharts').then((m) => m.Cell), { ssr: false });
 const Legend = dynamic(() => import('recharts').then((m) => m.Legend), { ssr: false });
 const Tooltip = dynamic(() => import('recharts').then((m) => m.Tooltip), { ssr: false });
+
+const { resellerBillingDashboard: ids } = testIds;
 
 /** Color mapping for subscription statuses used in the pie chart. */
 const STATUS_COLORS: Record<string, string> = {
@@ -61,13 +64,12 @@ interface DashboardData {
   churnedLast30Days: number;
   churnRate: number;
   overdueInvoiceCount: number;
-  // TODO: verify why unverifiedUpiCount is missing from BillingDashboardModel resolver
-  // unverifiedUpiCount: number;
   subscriptionsByStatus: Record<string, number>;
 }
 
 interface DashboardQueryData {
   resellerBillingDashboard: DashboardData;
+  unverifiedPayments: { id: string }[];
 }
 
 const DASHBOARD_QUERY = gql`
@@ -78,9 +80,10 @@ const DASHBOARD_QUERY = gql`
       churnedLast30Days
       churnRate
       overdueInvoiceCount
-      # TODO: unverifiedUpiCount missing from resolver
-      # unverifiedUpiCount
       subscriptionsByStatus
+    }
+    unverifiedPayments(first: 100) {
+      id
     }
   }
 `;
@@ -142,8 +145,7 @@ export default function BillingDashboardPage() {
   const activeSubscriptions = Number(dashboard?.activeSubscriptions ?? 0);
   const churnRate = Number(dashboard?.churnRate ?? 0);
   const overdueCount = Number(dashboard?.overdueInvoiceCount ?? 0);
-  // TODO: unverifiedUpiCount missing from BillingDashboardModel resolver
-  const unverifiedUpiCount = 0;
+  const unverifiedUpiCount = data?.unverifiedPayments.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -153,7 +155,7 @@ export default function BillingDashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card data-testid={ids.metric('mrr')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('dashboard.mrr')}</CardTitle>
             <IndianRupee className="size-4 text-muted-foreground" />
@@ -164,7 +166,7 @@ export default function BillingDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-testid={ids.metric('active')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               {t('dashboard.activeSubscriptions')}
@@ -176,7 +178,7 @@ export default function BillingDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-testid={ids.metric('churn')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('dashboard.churnRate')}</CardTitle>
             <TrendingUp className="size-4 text-muted-foreground" />
@@ -187,7 +189,7 @@ export default function BillingDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-testid={ids.metric('overdue')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('dashboard.overdueInvoices')}</CardTitle>
             <AlertTriangle className="size-4 text-muted-foreground" />
