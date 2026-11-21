@@ -262,8 +262,10 @@ Storage quota (ROV-302): `requestFileUpload` refuses an institute-owned upload w
 `STORAGE_QUOTA_EXCEEDED` when the institute's `READY` bytes, plus the declared size of its
 uploads still `PENDING`, plus the new file would pass `maxStorageMb` of its plan
 (`EntitlementService.storageLimitBytes`: no limit when EE is off or the plan says `null`,
-`DEFAULT_ENTITLEMENTS` when EE is on and the institute has no subscription). Files about a
-person, reseller files and files the server writes are not counted or refused. Usage is one
+`DEFAULT_ENTITLEMENTS` when EE is on and the institute has no subscription). Files about
+a person (documents, photos; `tenant_id` null) count for every institute that person is a
+member of, in full for each, and their upload is refused the same way. Reseller files are not
+counted; files the server writes are counted but never refused. Usage is one
 indexed `SUM` per upload request, not a cache. `storageUsage` (institute) and
 `adminTenantAnalytics.storageUsedBytes` (platform) show the same `READY` sum.
 
@@ -274,7 +276,8 @@ sweeper never removes it), and a `FILE.quarantined` event plus a `quarantineFile
 name the uploader. Without a verdict the request fails with `FILE_SCAN_UNAVAILABLE` and the
 file stays `PENDING`. Images are not scanned because only their re-encoded sizes are stored;
 files the server writes itself are not scanned. Scanners: `ClamavFileScanner` (clamd `INSTREAM`
-over TCP) in production, `EicarFileScanner` elsewhere (`docs/deployment.md` → "Malware scanning
+over TCP), `EicarFileScanner` outside production, and `DisabledFileScanner`, which is what
+production uses until ClamAV is turned on (`docs/deployment.md` → "Malware scanning
 of uploads").
 
 ### File sweeper
@@ -333,3 +336,16 @@ Frontend: `<FileUpload>` and `useFileUpload()` in `apps/web/src/components/file-
 | Institute-timezone calendar | `getInstituteToday(institute)` from `apps/api-gateway/src/common/timezone` (API-gateway-internal) | Falls back to `Asia/Kolkata` |
 
 **The DD/MM footgun**: India displays DD/MM/YYYY. ISO stores YYYY-MM-DD. These must never be confused — store ISO, parse ISO, display via hook. A display string must never be re-parsed as a date.
+
+## Audit log
+
+**Platform and reseller actions on an institute (ROV-311).** Such an action is audited in the
+platform or reseller scope with `tenant_id` NULL. So that the institute can see it,
+`audit_logs.subject_tenant_id` names the institute the action was about, and the
+`audit_app_read` policy lets an institute read its own rows and the rows that name it. The
+resolver says which argument holds the institute id with `@AuditInstitute('id')` (or
+`'input.tenantId'`); a mutation whose arguments do not hold it (a download by file id) calls
+`markAuditInstitute(req, id)`. The institute's audit screen marks these rows "Roviq platform" or
+"Reseller" and does not get the staff member's IP address or browser. A new platform or
+reseller mutation that acts on one institute needs the decorator, or the institute will not see
+it.

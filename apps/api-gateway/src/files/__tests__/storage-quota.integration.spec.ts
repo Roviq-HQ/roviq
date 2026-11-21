@@ -1,12 +1,12 @@
 /**
- * ROV-302 / ROV-297 — an institute's own files count against the storage its plan allows, an
- * upload over the limit is refused for that institute only, and the platform sees usage per
- * institute.
+ * ROV-302 / ROV-297 — an institute's own files and the files about its members count against
+ * the storage its plan allows, an upload over the limit is refused for that institute only, and
+ * the platform sees usage per institute. A person in two institutes counts in full for both.
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { ErrorCode, type FileStatus } from '@roviq/common-types';
-import { files, mkAdminCtx, withAdmin } from '@roviq/database';
+import { files, memberships, mkAdminCtx, SYSTEM_USER_ID, withAdmin } from '@roviq/database';
 import { EntitlementService } from '@roviq/entitlements';
 import { FakeStorageClient, StorageClient } from '@roviq/storage';
 import {
@@ -24,7 +24,7 @@ import {
   type TestInstitute,
   type TestReseller,
 } from '@roviq/testing/integration';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { PrometheusClient } from '../../admin/monitoring/prometheus.client';
@@ -70,6 +70,7 @@ describe('storage quota and usage (integration)', () => {
   let tokenA: string;
   let tokenB: string;
   const fileIds: string[] = [];
+  let sharedMembershipId: string;
 
   // Institute A has a 10 MB plan; B's plan sets no limit.
   const entitlements = createMock<EntitlementService>({
@@ -167,12 +168,31 @@ describe('storage quota and usage (integration)', () => {
     tokenA = tokenFor(instA);
     tokenB = tokenFor(instB);
 
-    await insertFile({ tenantId: instA.tenantId }, instA.userId, 6 * MB, 'READY');
-    // Not the institute's own storage: a document about a person.
+    // A's admin is also a member of B: that person's files count for both institutes.
+    sharedMembershipId = await withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const [row] = await tx
+        .insert(memberships)
+        .values({
+          userId: instA.userId,
+          roleId: instB.roleId,
+          tenantId: instB.tenantId,
+          abilities: [],
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: memberships.id });
+      assert(row);
+      return row.id;
+    });
+
+    await insertFile({ tenantId: instA.tenantId }, instA.userId, 5 * MB, 'READY');
+    // A document about a person, owned by no institute.
+    await insertFile({ tenantId: null, subjectUserId: instA.userId }, instA.userId, MB, 'READY');
+    // About a member of B only: never counted for A.
     await insertFile(
-      { tenantId: null, subjectUserId: instA.userId },
-      instA.userId,
-      50 * MB,
+      { tenantId: null, subjectUserId: instB.userId },
+      instB.userId,
+      4 * MB,
       'READY',
     );
     // No longer attached to anything.
@@ -191,19 +211,24 @@ describe('storage quota and usage (integration)', () => {
       const ids = [...new Set([...fileIds, ...pending.map((row) => row.id)])];
       if (ids.length > 0) await tx.delete(files).where(inArray(files.id, ids));
     });
+    await withAdmin(app.db, mkAdminCtx(ORIGIN), (tx) =>
+      tx.delete(memberships).where(eq(memberships.id, sharedMembershipId)),
+    );
     await cleanupTestInstitute(app.db, instA);
     await cleanupTestInstitute(app.db, instB);
     await cleanupTestReseller(app.db, reseller);
     await app.close();
   });
 
-  it("reports only the institute's own attached files, with the limit of its plan", async () => {
+  it("reports the institute's attached files plus its members' files, with the limit of its plan", async () => {
     const a = await usage(tokenA);
     const b = await usage(tokenB);
 
     expect(a.errors).toBeUndefined();
+    // A: 5 MB own + 1 MB about its admin. B: 2 MB own + 4 MB about its admin + the same 1 MB,
+    // because A's admin is a member of B too.
     expect(a.data?.storageUsage).toEqual({ usedBytes: 6 * MB, limitBytes: LIMIT_A });
-    expect(b.data?.storageUsage).toEqual({ usedBytes: 2 * MB, limitBytes: null });
+    expect(b.data?.storageUsage).toEqual({ usedBytes: 7 * MB, limitBytes: null });
   });
 
   it('refuses an upload that would cross the limit, and only for that institute', async () => {
@@ -215,6 +240,24 @@ describe('storage quota and usage (integration)', () => {
     expect(sameForB.errors).toBeUndefined();
   });
 
+  it("refuses a file about a person too once the institute's storage is used up", async () => {
+    const res = await gqlRequest<{ requestFileUpload: { fileId: string } }>(app.httpServer, {
+      query: REQUEST_UPLOAD,
+      variables: {
+        input: {
+          purpose: 'USER_DOCUMENT',
+          fileName: 'birth-certificate.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 4 * MB + 1,
+          subjectUserId: instA.userId,
+        },
+      },
+      token: tokenA,
+    });
+
+    expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.STORAGE_QUOTA_EXCEEDED);
+  });
+
   it('holds a pending upload against the limit, then frees the space when a file is deleted', async () => {
     const first = await requestUpload(tokenA, 3 * MB);
     expect(first.errors).toBeUndefined();
@@ -222,7 +265,7 @@ describe('storage quota and usage (integration)', () => {
     assert(pendingId);
     fileIds.push(pendingId);
 
-    // 6 MB attached + 3 MB pending: 2 MB more does not fit in 10 MB.
+    // 6 MB counted + 3 MB pending: 2 MB more does not fit in 10 MB.
     const second = await requestUpload(tokenA, 2 * MB);
     expect(second.errors?.[0]?.extensions?.code).toBe(ErrorCode.STORAGE_QUOTA_EXCEEDED);
 
@@ -250,8 +293,8 @@ describe('storage quota and usage (integration)', () => {
 
     expect(res.errors).toBeUndefined();
     expect(res.data?.adminTenantAnalytics.edges.map((edge) => edge.node)).toEqual([
+      { instituteId: instB.tenantId, storageUsedBytes: 7 * MB },
       { instituteId: instA.tenantId, storageUsedBytes: 6 * MB },
-      { instituteId: instB.tenantId, storageUsedBytes: 2 * MB },
     ]);
   });
 

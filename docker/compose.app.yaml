@@ -52,19 +52,21 @@ services:
       timeout: 3s
       retries: 5
 
+  # Malware scanning is off for now. To turn it on: uncomment this service and the clamav-db
+  # volume, and set FILE_SCANNER=clamav and CLAMAV_HOST=clamav on api-gateway (docs/deployment.md).
   # Malware scanner for uploaded documents (ROV-303). Needs about 1.5 GB of memory; the first
   # start downloads the signature database, so allow it a few minutes to become healthy.
-  clamav:
-    image: clamav/clamav:1.4
-    networks: [roviq-net]
-    volumes:
-      - clamav-db:/var/lib/clamav
-    healthcheck:
-      test: ["CMD", "clamdcheck.sh"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 300s
+  # clamav:
+  #   image: clamav/clamav:1.4
+  #   networks: [roviq-net]
+  #   volumes:
+  #     - clamav-db:/var/lib/clamav
+  #   healthcheck:
+  #     test: ["CMD", "clamdcheck.sh"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 300s
 
   temporal:
     image: temporalio/auto-setup:latest
@@ -124,8 +126,7 @@ services:
       S3_BUCKET_PRIVATE: roviq-private
       S3_BUCKET_PUBLIC: roviq-public
       S3_PUBLIC_BASE_URL: http://localhost:9002/roviq-public
-      FILE_SCANNER: clamav
-      CLAMAV_HOST: clamav
+      FILE_SCANNER: "off"
       TEMPORAL_ADDRESS: temporal:7233
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
@@ -141,8 +142,6 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_healthy
-      clamav:
         condition: service_healthy
 
   web:
@@ -178,5 +177,5 @@ networks:
   roviq-net:
 
 volumes:
-  clamav-db:
+  # clamav-db:
   roviq-pgdata:

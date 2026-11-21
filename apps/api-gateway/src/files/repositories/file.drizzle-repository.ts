@@ -20,7 +20,7 @@ import {
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { admissionReadPredicate } from '../../institute/admission/admission-read-predicate';
 import { leaveInScope } from '../../institute/leave/repositories/leave-scope';
 import { studentReadPredicate } from '../../institute/student/student-read-predicate';
@@ -161,8 +161,24 @@ export class FileDrizzleRepository extends FileRepository {
           pendingBytes: sql<string>`coalesce(sum(${filesLive.sizeBytes}) filter (where ${filesLive.status} = 'PENDING'), 0)`,
         })
         .from(filesLive)
-        // Files about a person (tenant_id null) and reseller files are not the institute's.
-        .where(eq(filesLive.tenantId, tenantId));
+        // Its own files, plus the files about each of its members. A person in two institutes
+        // counts in full for both: each of them can upload to and read that person's files.
+        .where(
+          or(
+            eq(filesLive.tenantId, tenantId),
+            and(
+              isNull(filesLive.tenantId),
+              isNull(filesLive.resellerId),
+              inArray(
+                filesLive.subjectUserId,
+                tx
+                  .select({ userId: membershipsLive.userId })
+                  .from(membershipsLive)
+                  .where(eq(membershipsLive.tenantId, tenantId)),
+              ),
+            ),
+          ),
+        );
       return {
         readyBytes: Number(rows[0]?.readyBytes ?? 0),
         pendingBytes: Number(rows[0]?.pendingBytes ?? 0),

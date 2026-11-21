@@ -948,6 +948,11 @@ type AuditLog {
   metadata: JSON
   resellerName: String
   resellerTier: String
+
+  """
+  Who acted: 'institute', 'reseller' or 'platform'. An institute also sees reseller and platform actions that were about it.
+  """
+  scope: String!
   source: String!
   syntheticOrigin: String
   tenantId: String
@@ -3727,10 +3732,20 @@ type KeyCountEntry {
   key: String!
 }
 
+"""The person a leave application is for"""
+type LeaveApplicant {
+  """Set when the applicant is a student."""
+  admissionNumber: String
+  firstName: I18nText!
+  lastName: I18nText
+}
+
 """
 A leave application for a student or staff member. When status=APPROVED and the date is in range, attendance seeds LEAVE for the student.
 """
 type LeaveModel {
+  """Name of the person the leave is for; null when they have no profile."""
+  applicant: LeaveApplicant
   createdAt: DateTime!
 
   """Membership id that approved or rejected."""
@@ -6179,14 +6194,14 @@ type StatusCount {
 }
 
 """
-Storage taken by the institute's own files, against what its plan allows
+Storage taken by the institute's files and its members' files, against what its plan allows
 """
 type StorageUsage {
   """Bytes the plan allows; null when the plan sets no limit"""
   limitBytes: Float
 
   """
-  Bytes of files attached to records of the institute. Files about a person (documents, photos) are not counted.
+  Bytes of files attached to records of the institute, plus documents and photos of its members. A person who belongs to several institutes counts in full for each.
   """
   usedBytes: Float!
 }
@@ -6727,7 +6742,7 @@ type TenantAnalytics {
   resellerName: String!
 
   """
-  Bytes of the institute's own stored files. Files about a person (documents, photos) are not counted.
+  Bytes of the institute's stored files plus documents and photos of its members. A person in several institutes counts for each, so the column does not add up to total storage.
   """
   storageUsedBytes: Float!
 }

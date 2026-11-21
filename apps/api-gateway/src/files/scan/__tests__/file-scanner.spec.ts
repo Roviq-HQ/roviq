@@ -2,6 +2,7 @@ import { type AddressInfo, createServer, type Server } from 'node:net';
 import { ConfigService } from '@nestjs/config';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ClamavFileScanner, parseClamdReply } from '../clamav-file-scanner';
+import { DisabledFileScanner } from '../disabled-file-scanner';
 import { EICAR_TEST_STRING, EicarFileScanner } from '../eicar-file-scanner';
 import { ScannerUnavailableError } from '../file-scanner';
 import { createFileScanner } from '../file-scanner.provider';
@@ -122,21 +123,34 @@ describe('createFileScanner', () => {
     );
   });
 
-  it('should use ClamAV in production when nothing is configured', () => {
-    const config = new ConfigService({ NODE_ENV: 'production', CLAMAV_HOST: 'clamav' });
+  it('should scan nothing in production when nothing is configured', async () => {
+    const scanner = createFileScanner(new ConfigService({ NODE_ENV: 'production' }));
+
+    expect(scanner).toBeInstanceOf(DisabledFileScanner);
+    await expect(scanner.scan(Buffer.from(EICAR_TEST_STRING))).resolves.toEqual({
+      verdict: 'CLEAN',
+    });
+  });
+
+  it('should use ClamAV when asked to', () => {
+    const config = new ConfigService({
+      NODE_ENV: 'production',
+      FILE_SCANNER: 'clamav',
+      CLAMAV_HOST: 'clamav',
+    });
 
     expect(createFileScanner(config)).toBeInstanceOf(ClamavFileScanner);
   });
 
-  it('should refuse to start in production without a ClamAV host', () => {
-    expect(() => createFileScanner(new ConfigService({ NODE_ENV: 'production' }))).toThrow(
-      /CLAMAV_HOST/,
-    );
+  it('should refuse to start with ClamAV chosen and no host', () => {
+    const config = new ConfigService({ NODE_ENV: 'production', FILE_SCANNER: 'clamav' });
+
+    expect(() => createFileScanner(config)).toThrow(/CLAMAV_HOST/);
   });
 
   it('should refuse the EICAR stand-in in production', () => {
     const config = new ConfigService({ NODE_ENV: 'production', FILE_SCANNER: 'eicar' });
 
-    expect(() => createFileScanner(config)).toThrow(/production needs clamav/);
+    expect(() => createFileScanner(config)).toThrow(/use clamav or off in production/);
   });
 });

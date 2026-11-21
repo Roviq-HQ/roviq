@@ -29,6 +29,9 @@ export abstract class TenantAnalyticsRepository {
     since: Date,
   ): Promise<TenantActiveUsersRecord[]>;
 
-  /** Bytes of READY institute-owned files per institute; institutes with none are absent. */
+  /**
+   * Bytes of READY files per institute: its own plus those about its members. Institutes
+   * with none are absent.
+   */
   abstract sumStorageByTenant(ctx: PlatformContext): Promise<TenantStorageRecord[]>;
 }

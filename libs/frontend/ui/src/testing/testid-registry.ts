@@ -299,6 +299,7 @@ export const testIds = {
     instituteFilterClear: 'audit-log-institute-filter-clear',
     clearFilters: 'audit-log-clear-filters',
     entityLink: (logId: string) => `audit-log-entity-link-${logId}`,
+    outsideActorBadge: (id: string) => `audit-log-outside-actor-${id}`,
     detailEntityLink: 'audit-log-detail-entity-link',
   },
 

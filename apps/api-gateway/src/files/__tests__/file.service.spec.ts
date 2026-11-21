@@ -434,7 +434,7 @@ describe('FileService', () => {
       expect(storageUsage).not.toHaveBeenCalled();
     });
 
-    it("should not hold a person's file against the institute's quota", async () => {
+    it("should refuse a person's file too once the institute is over its limit", async () => {
       storageLimitBytes.mockResolvedValue(1);
       storageUsage.mockResolvedValue({ readyBytes: 1, pendingBytes: 0 });
 
@@ -448,7 +448,17 @@ describe('FileService', () => {
             subjectUserId: OTHER_USER_ID,
           }),
         ),
-      ).resolves.toBeDefined();
+      ).rejects.toMatchObject({ code: ErrorCode.STORAGE_QUOTA_EXCEEDED });
+    });
+
+    it("should not check an institute's quota for a reseller's upload", async () => {
+      storageLimitBytes.mockResolvedValue(1);
+
+      await service.requestUpload(
+        resellerUser,
+        buildInput({ purpose: 'RESELLER_LOGO', contentType: 'image/png', fileName: 'logo.png' }),
+      );
+
       expect(storageLimitBytes).not.toHaveBeenCalled();
     });
 
