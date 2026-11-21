@@ -1,6 +1,8 @@
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import '@testing-library/jest-dom/vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createPlanMock = vi.fn();
@@ -151,5 +153,67 @@ describe('PlanFormDialog', () => {
       expect(anyInvalid).toBe(true);
     });
     expect(createPlanMock).not.toHaveBeenCalled();
+  });
+
+  describe('server rejection on create', () => {
+    function rejection(code: string) {
+      return new CombinedGraphQLErrors({
+        data: null,
+        errors: [{ message: 'rejected', extensions: { code } }],
+      });
+    }
+
+    async function submitFilledForm() {
+      const [nameEn] = screen.getAllByPlaceholderText(/e\.g\. pro plan/i);
+      if (!nameEn) throw new Error('name input missing');
+      await userEvent.type(nameEn, 'Pro');
+      await userEvent.type(screen.getByTestId('billing-plan-code-input'), 'PRO');
+      const submit = screen
+        .getAllByRole('button', { name: /create plan/i })
+        .find((b) => (b as HTMLButtonElement).type === 'submit');
+      if (!submit) throw new Error('submit button missing');
+      await userEvent.click(submit);
+    }
+
+    beforeEach(() => vi.mocked(toast.error).mockClear());
+
+    it('shows a duplicate plan code under the code field, focuses it and keeps the dialog open', async () => {
+      createPlanMock.mockRejectedValue(rejection('PLAN_CODE_DUPLICATE'));
+      const onOpenChange = vi.fn();
+      renderWithProviders(<PlanFormDialog open={true} onOpenChange={onOpenChange} plan={null} />, {
+        messages,
+      });
+
+      await submitFilledForm();
+
+      const codeInput = screen.getByTestId('billing-plan-code-input');
+      const error = await screen.findByTestId('billing-plan-code-error');
+      expect(error).toHaveTextContent(billingMessages.errors.PLAN_CODE_DUPLICATE);
+      expect(codeInput).toHaveAttribute('aria-invalid', 'true');
+      expect(codeInput).toHaveFocus();
+      expect(codeInput).toHaveValue('PRO');
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(onOpenChange).not.toHaveBeenCalled();
+
+      await userEvent.type(codeInput, '2');
+      await waitFor(() =>
+        expect(screen.queryByTestId('billing-plan-code-error')).not.toBeInTheDocument(),
+      );
+      createPlanMock.mockResolvedValue({ data: { createPlan: { id: 'p1' } } });
+      await userEvent.click(screen.getByTestId('billing-plan-submit-btn'));
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    });
+
+    it('keeps the error toast for any other failure', async () => {
+      createPlanMock.mockRejectedValue(rejection('INTERNAL_SERVER_ERROR'));
+      renderWithProviders(<PlanFormDialog open={true} onOpenChange={() => {}} plan={null} />, {
+        messages,
+      });
+
+      await submitFilledForm();
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId('billing-plan-code-error')).not.toBeInTheDocument();
+    });
   });
 });
