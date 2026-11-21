@@ -5,7 +5,7 @@ import { Input } from '@roviq/ui/components/ui/input';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
 import { FieldLabelWithInfo } from '@roviq/ui/form/fields/field-label-with-info';
 import { useFieldContext } from '@roviq/ui/form/use-app-form';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 export interface TextFieldProps {
   label: ReactNode;
@@ -26,6 +26,8 @@ export interface TextFieldProps {
   required?: boolean;
   /** Maximum character length forwarded to the underlying input. */
   maxLength?: number;
+  /** Lets the form move focus here, e.g. when the server rejects this field's value. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 export function TextField({
@@ -41,6 +43,7 @@ export function TextField({
   disabled,
   required,
   maxLength,
+  inputRef,
 }: TextFieldProps) {
   const field = useFieldContext<string | undefined>();
   const errors = fieldErrorMessages(field);
@@ -52,6 +55,7 @@ export function TextField({
         {label}
       </FieldLabelWithInfo>
       <Input
+        ref={inputRef}
         id={field.name}
         name={field.name}
         type={type}
