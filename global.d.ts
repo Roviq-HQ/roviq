@@ -26,7 +26,7 @@ declare global {
       TEMPORAL_ADDRESS?: string;
       /** 'true' runs the hourly file sweeper worker in this gateway (ROV-300). */
       FILE_SWEEPER_WORKER_ENABLED?: string;
-      /** Malware scanner for uploads: 'clamav' or 'eicar' (ROV-303). */
+      /** Malware scanner for uploads: 'clamav', 'eicar' or 'off' (ROV-303). */
       FILE_SCANNER?: string;
       CLAMAV_HOST?: string;
       CLAMAV_PORT?: string;

@@ -250,7 +250,7 @@
     "usedOfLimit": "{used} of {limit} used",
     "usedUnlimited": "{used} used. Your plan sets no storage limit.",
     "barLabel": "Storage used: {percent}",
-    "hint": "Counts files your institute has attached to its records. Documents and photos of people are not counted.",
+    "hint": "Counts the files your institute has attached to its records, and the documents and photos of its students, staff and guardians.",
     "nearLimit": "Your institute has used most of its storage. Delete files you no longer need, or ask about a larger plan.",
     "atLimit": "Your institute has used all its storage. New uploads are refused until files are deleted or the plan is upgraded.",
     "failed": "Storage usage could not be loaded."

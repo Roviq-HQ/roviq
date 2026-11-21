@@ -20,7 +20,10 @@ export abstract class FileRepository {
   /** PENDING rows the current user uploaded for `purpose`. */
   abstract findClaimable(ids: string[], purpose: FilePurpose): Promise<FileRecord[]>;
   abstract countPendingByCurrentUser(): Promise<number>;
-  /** Bytes of the caller's institute's own files: attached ones, and uploads still pending. */
+  /**
+   * Bytes of the caller's institute: its own files and the files about its members, split
+   * into attached ones and uploads still pending.
+   */
   abstract storageUsage(): Promise<StorageUsageRecord>;
   abstract markRejected(id: string): Promise<void>;
   /** PENDING → QUARANTINED. The row stays as the record of the infected upload. */

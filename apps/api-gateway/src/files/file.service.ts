@@ -122,7 +122,7 @@ export class FileService {
     if (input.sizeBytes > policy.maxSizeBytes) {
       throw new BusinessException(ErrorCode.FILE_TOO_LARGE, 'The file is too large.');
     }
-    if (policy.owner === 'INSTITUTE' && user.scope === 'institute') {
+    if (user.scope === 'institute') {
       await this.assertWithinQuota(user, input.sizeBytes);
     }
     if ((await this.repo.countPendingByCurrentUser()) >= MAX_PENDING_UPLOADS_PER_USER) {
@@ -157,7 +157,7 @@ export class FileService {
     };
   }
 
-  /** What the institute's own files take up, against what its plan allows. */
+  /** What the institute's files and its members' files take up, against what its plan allows. */
   async storageUsage(user: InstituteContext): Promise<StorageUsage> {
     const [usage, limitBytes] = await Promise.all([
       this.repo.storageUsage(),

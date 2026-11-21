@@ -26,7 +26,7 @@ export class TenantAnalyticsModel {
 
   @Field(() => Float, {
     description:
-      "Bytes of the institute's own stored files. Files about a person (documents, photos) are not counted.",
+      "Bytes of the institute's stored files plus documents and photos of its members. A person in several institutes counts for each, so the column does not add up to total storage.",
   })
   storageUsedBytes!: number;
 
