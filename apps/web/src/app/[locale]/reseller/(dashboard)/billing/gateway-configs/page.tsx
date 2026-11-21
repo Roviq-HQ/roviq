@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import {
   Badge,
   Button,
@@ -34,6 +33,7 @@ import { CreditCard, Plus, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import {
   useCreateGatewayConfig,
   useDeleteGatewayConfig,
@@ -143,7 +143,12 @@ export default function GatewayConfigsPage() {
         </div>
       )}
 
-      <GatewayConfigDialog open={dialogOpen} onOpenChange={setDialogOpen} config={editingConfig} />
+      <GatewayConfigDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        config={editingConfig}
+        hasDefault={(configs as GatewayConfig[]).some((c) => c.isDefault)}
+      />
     </div>
   );
 }
@@ -152,12 +157,15 @@ function GatewayConfigDialog({
   open,
   onOpenChange,
   config,
+  hasDefault,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   config: GatewayConfig | null;
+  hasDefault: boolean;
 }) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const isEditing = !!config;
   const [createConfig] = useCreateGatewayConfig();
   const [updateConfig] = useUpdateGatewayConfig();
@@ -169,7 +177,7 @@ function GatewayConfigDialog({
   const [keySecret, setKeySecret] = React.useState('');
   const [webhookSecret, setWebhookSecret] = React.useState('');
   const [testMode, setTestMode] = React.useState(config?.testMode ?? false);
-  const [isDefault, setIsDefault] = React.useState(config?.isDefault ?? true);
+  const [isDefault, setIsDefault] = React.useState(config?.isDefault ?? !hasDefault);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
@@ -181,11 +189,14 @@ function GatewayConfigDialog({
       setWebhookSecret('');
       setVpa(config?.upiVpa ?? '');
       setTestMode(config?.testMode ?? false);
-      setIsDefault(config?.isDefault ?? true);
+      setIsDefault(config?.isDefault ?? !hasDefault);
     }
-  }, [open, config]);
+  }, [open, config, hasDefault]);
 
   const [vpa, setVpa] = React.useState('');
+
+  // UPI_DIRECT cannot be the default gateway; the server rejects it.
+  const sendDefault = provider === 'UPI_DIRECT' ? false : isDefault;
 
   const buildCredentials = (): Record<string, string> => {
     const creds: Record<string, string> = {};
@@ -217,7 +228,7 @@ function GatewayConfigDialog({
               ...(hasCredentials ? { credentials } : {}),
               ...(webhookSecret ? { webhookSecret } : {}),
               testMode,
-              isDefault,
+              isDefault: sendDefault,
             },
           },
         });
@@ -231,7 +242,7 @@ function GatewayConfigDialog({
               credentials,
               webhookSecret: webhookSecret || undefined,
               testMode,
-              isDefault,
+              isDefault: sendDefault,
             },
           },
         });
@@ -239,7 +250,7 @@ function GatewayConfigDialog({
       }
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('gateway.error')));
+      toast.error(errorMessage(err, t('gateway.error')));
     } finally {
       setIsSubmitting(false);
     }
@@ -252,7 +263,7 @@ function GatewayConfigDialog({
       toast.success(t('gateway.deleteSuccess'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('gateway.deleteError')));
+      toast.error(errorMessage(err, t('gateway.deleteError')));
     }
   };
 
@@ -389,18 +400,25 @@ function GatewayConfigDialog({
               </>
             )}
 
-            <Field className="flex items-center justify-between">
-              <FieldLabel htmlFor="isDefault">
-                {t('gateway.defaultGateway')}
-                <FieldInfoPopover
-                  title={t('gateway.fieldHelp.defaultGatewayTitle')}
-                  data-testid={resellerBillingGateway.defaultInfo}
-                >
-                  <p>{t('gateway.fieldHelp.defaultGatewayBody')}</p>
-                </FieldInfoPopover>
-              </FieldLabel>
-              <Switch id="isDefault" checked={isDefault} onCheckedChange={setIsDefault} />
-            </Field>
+            {provider !== 'UPI_DIRECT' && (
+              <Field className="flex items-center justify-between">
+                <FieldLabel htmlFor="isDefault">
+                  {t('gateway.defaultGateway')}
+                  <FieldInfoPopover
+                    title={t('gateway.fieldHelp.defaultGatewayTitle')}
+                    data-testid={resellerBillingGateway.defaultInfo}
+                  >
+                    <p>{t('gateway.fieldHelp.defaultGatewayBody')}</p>
+                  </FieldInfoPopover>
+                </FieldLabel>
+                <Switch
+                  id="isDefault"
+                  data-testid={resellerBillingGateway.defaultSwitch}
+                  checked={isDefault}
+                  onCheckedChange={setIsDefault}
+                />
+              </Field>
+            )}
           </FieldGroup>
 
           <DialogFooter className="mt-6">

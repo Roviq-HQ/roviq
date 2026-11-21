@@ -197,8 +197,10 @@ export function InvoiceDetail({
   const payableStatuses: Set<string> = new Set(['DRAFT', 'SENT', 'OVERDUE', 'PARTIALLY_PAID']);
   /** Whether this invoice can accept a manual payment */
   const canRecordPayment = payableStatuses.has(invoice?.status ?? '');
-  /** Whether this invoice is eligible for a refund */
-  const canIssueRefund = invoice?.status === 'PAID';
+  // A partly refunded invoice reads PARTIALLY_PAID and may still hold refundable money.
+  const canIssueRefund =
+    (invoice?.status === 'PAID' || invoice?.status === 'PARTIALLY_PAID') &&
+    Number(invoice.paidAmount) > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

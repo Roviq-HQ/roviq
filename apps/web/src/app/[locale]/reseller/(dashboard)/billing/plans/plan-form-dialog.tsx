@@ -1,7 +1,6 @@
 'use client';
 
 import type { FeatureLimits } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import { i18nTextSchema, useFormatDate, useFormatNumber, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -26,6 +25,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useFormDraft } from '../../../../../../hooks/use-form-draft';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import { type SubscriptionPlanNode, useCreatePlan, useUpdatePlan } from './use-plans';
 
 const { resellerBillingPlans } = testIds;
@@ -104,6 +104,7 @@ interface PlanFormValues {
 
 export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const tCommon = useTranslations('common');
   const isEditing = !!plan;
   const [createPlan] = useCreatePlan();
@@ -235,7 +236,7 @@ export function PlanFormDialog({ open, onOpenChange, plan }: PlanFormDialogProps
         onOpenChange(false);
       } catch (err) {
         const fallback = isEditing ? t('plans.form.updateError') : t('plans.form.createError');
-        toast.error(fallback, { description: extractGraphQLError(err, fallback) });
+        toast.error(fallback, { description: errorMessage(err) });
       }
     },
   });

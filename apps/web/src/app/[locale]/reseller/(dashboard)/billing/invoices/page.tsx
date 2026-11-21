@@ -166,8 +166,7 @@ export default function InvoicesPage() {
                   onOpenChange={(open) => {
                     if (!open) setRefundInvoice(null);
                   }}
-                  paymentId={refundInvoice.id}
-                  maxRefundPaise={Number(refundInvoice.paidAmount)}
+                  invoiceId={refundInvoice.id}
                 />
               )}
             </>

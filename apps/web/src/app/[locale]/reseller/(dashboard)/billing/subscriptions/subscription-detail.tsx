@@ -1,7 +1,6 @@
 'use client';
 
 import { SUBSCRIPTION_STATE_MACHINE, type SubscriptionStatus } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import type { SubscriptionStatus as SubscriptionStatusType } from '@roviq/graphql/generated';
 import { useFormatDate, useFormatNumber, useI18nField } from '@roviq/i18n';
 import {
@@ -23,15 +22,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 import {
   type SubscriptionNode,
   useCancelSubscription,
   usePauseSubscription,
   useResumeSubscription,
 } from './use-subscriptions';
+
+const { resellerBillingSubscriptions: ids } = testIds;
 
 /** Status → badge variant mapping matching subscription-columns.tsx */
 const STATUS_VARIANT: Record<
@@ -83,11 +86,10 @@ function ActionButtons({
   t: (key: string) => string;
 }) {
   const { status } = subscription;
-  const hasProvider = !!subscription.gatewaySubscriptionId;
   const machine = SUBSCRIPTION_STATE_MACHINE;
   const canCancel = machine.canTransition(status as SubscriptionStatus, 'CANCELLED');
-  const canPause = hasProvider && machine.canTransition(status as SubscriptionStatus, 'PAUSED');
-  const canResume = hasProvider && machine.canTransition(status as SubscriptionStatus, 'ACTIVE');
+  const canPause = machine.canTransition(status as SubscriptionStatus, 'PAUSED');
+  const canResume = machine.canTransition(status as SubscriptionStatus, 'ACTIVE');
 
   if (!canCancel && !canPause && !canResume) return null;
 
@@ -96,12 +98,21 @@ function ActionButtons({
       <Separator className="my-4" />
       <div className="flex flex-wrap gap-2">
         {canResume && (
-          <Button size="sm" onClick={() => onAction({ type: 'resume' })}>
+          <Button
+            size="sm"
+            data-testid={ids.resumeBtn}
+            onClick={() => onAction({ type: 'resume' })}
+          >
             {t('subscriptions.actions.resume')}
           </Button>
         )}
         {canPause && (
-          <Button variant="outline" size="sm" onClick={() => onAction({ type: 'pause' })}>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid={ids.pauseBtn}
+            onClick={() => onAction({ type: 'pause' })}
+          >
             {t('subscriptions.actions.pause')}
           </Button>
         )}
@@ -215,6 +226,7 @@ async function executeAction(
 
 export function SubscriptionDetail({ subscription, open, onOpenChange }: SubscriptionDetailProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();
   const { currency } = useFormatNumber();
   const ti = useI18nField();
@@ -243,7 +255,7 @@ export function SubscriptionDetail({ subscription, open, onOpenChange }: Subscri
       onOpenChange(false);
     } catch (err) {
       const key = `subscriptions.actions.${confirmAction.type}Error`;
-      toast.error(t(key), { description: extractGraphQLError(err, t(key)) });
+      toast.error(t(key), { description: errorMessage(err) });
     } finally {
       setConfirmAction(null);
     }

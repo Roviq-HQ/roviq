@@ -110,3 +110,56 @@ export async function ensureBillingFixture(request: APIRequestContext): Promise<
     invoiceNumber: created.generateInvoice.invoiceNumber,
   };
 }
+
+/** A fresh invoice for the first institute, fully paid in cash, so a refund can be issued on it. */
+export async function createPaidInvoice(
+  request: APIRequestContext,
+  fixture: BillingFixture,
+): Promise<{ invoiceId: string; invoiceNumber: string }> {
+  const call = async <TData>(
+    query: string,
+    variables: Record<string, unknown>,
+    token?: string,
+  ): Promise<TData> => {
+    const res = await request.post(API_URL, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      data: { query, variables },
+    });
+    const body: GraphqlBody<TData> = await res.json();
+    if (body.errors?.length || !body.data) {
+      throw new Error(`Billing fixture call failed: ${JSON.stringify(body.errors ?? body)}`);
+    }
+    return body.data;
+  };
+
+  const login = await call<{ resellerLogin: { accessToken: string } }>(
+    `mutation($username: String!, $password: String!) {
+      resellerLogin(username: $username, password: $password) { accessToken }
+    }`,
+    { username: E2E_USERS.RESELLER.username, password: E2E_USERS.RESELLER.password },
+  );
+  const token = login.resellerLogin.accessToken;
+
+  const created = await call<{
+    generateInvoice: { id: string; invoiceNumber: string; totalAmount: string | number };
+  }>(
+    'mutation($input: GenerateInvoiceInput!) { generateInvoice(input: $input) { id invoiceNumber totalAmount } }',
+    { input: { tenantId: SEED.INSTITUTE_1.id, subscriptionId: fixture.subscriptionId } },
+    token,
+  );
+  await call(
+    'mutation($invoiceId: ID!, $input: ManualPaymentInput!) { recordManualPayment(invoiceId: $invoiceId, input: $input) { id } }',
+    {
+      invoiceId: created.generateInvoice.id,
+      input: { method: 'CASH', amountPaise: String(created.generateInvoice.totalAmount) },
+    },
+    token,
+  );
+  return {
+    invoiceId: created.generateInvoice.id,
+    invoiceNumber: created.generateInvoice.invoiceNumber,
+  };
+}

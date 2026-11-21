@@ -339,8 +339,6 @@
       "recording": "Recording...",
       "success": "Payment recorded successfully.",
       "error": "Failed to record payment.",
-      "collectedById": "Collected By (Membership ID)",
-      "collectedByIdPlaceholder": "e.g. mem_abc123",
       "collectionDate": "Collection Date",
       "methods": {
         "CASH": "Cash",
@@ -354,15 +352,14 @@
         "methodOptions": "Cash — counter receipt. Cheque — requires clearance before the invoice marks paid. Bank Transfer — NEFT/RTGS/IMPS direct to your account. UPI — any VPA payment (PhonePe, GPay, Paytm UPI); still needs manual UTR verification until our UPI auto-reconciliation ships.",
         "receiptNumberTitle": "Receipt number",
         "receiptNumberBody": "Your institute's own sequential receipt number — the one printed on the carbon-copy receipt handed to the payer. Needed because tax audits match this number against the invoice for GST input-credit validation. For UPI and bank transfers, use your UTR/transaction reference here.",
-        "collectedByIdTitle": "Collected by",
-        "collectedByIdBody": "The staff membership ID of the person who physically received and counted the payment. Used for cashier reconciliation reports and to investigate short-counts. For digital payments where no staff was involved, set this to the admin who verified the UTR.",
         "collectionDateTitle": "Collection date",
         "collectionDateBody": "The actual calendar date the money was received — not the date you are recording it. For cheques, use the date the cheque CLEARED (not the date it was handed over), otherwise the finance ledger will show fake income on the deposit date."
-      }
+      },
+      "collectedBySelf": "This cash payment is recorded as collected by you."
     },
     "refund": {
       "title": "Issue Refund",
-      "description": "Refund up to {max} for this payment.",
+      "description": "Choose the payment to refund. You can refund up to what remains on it.",
       "amount": "Refund Amount (₹)",
       "reason": "Reason",
       "reasonPlaceholder": "Why is this refund being issued?",
@@ -376,7 +373,16 @@
         "amountBody": "How much to return to the payer, in rupees. Can be less than the original payment if you are keeping a cancellation fee or adjustment. Must not exceed the unrefunded balance shown at the top of this dialog. Stored as paise — the Indian-format preview shows the readable number.",
         "reasonTitle": "Reason",
         "reasonBody": "Required for audit and GST credit-note generation. Be specific — 'Duplicate payment', 'Admission withdrawn — within 7-day cooling-off', 'Service not delivered', 'Goodwill gesture'. Generic answers like 'Refund' will fail finance review, delaying the payer."
-      }
+      },
+      "payment": "Payment to refund",
+      "paymentPlaceholder": "Select a payment",
+      "paymentOption": "{method} · {date} · paid {paid} · refunded {refunded} · remaining {remaining}",
+      "remaining": "Refundable: {max}",
+      "noRefundable": "This invoice has no payment that can still be refunded.",
+      "loadingPayments": "Loading payments...",
+      "loadError": "Could not load the payments for this invoice.",
+      "amountExceeds": "Enter at most {max}, the amount left on this payment.",
+      "amountInvalid": "Enter an amount greater than zero."
     }
   },
   "dashboard": {
@@ -490,5 +496,34 @@
   "realtime": {
     "invoiceGenerated": "New invoice generated",
     "paymentReceived": "Payment received"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "BAD_REQUEST": "This request is not allowed. Check the details and try again.",
+    "VALIDATION_FAILED": "Some details are invalid. Check the form and try again.",
+    "FORBIDDEN": "You do not have permission to do this.",
+    "UNAUTHENTICATED": "Your session has expired. Please sign in again.",
+    "NOT_FOUND": "We could not find what you were looking for.",
+    "CONFLICT": "This conflicts with an existing record.",
+    "INTERNAL_ERROR": "Something went wrong on our side. Please try again.",
+    "PLAN_NOT_FOUND": "This plan no longer exists.",
+    "SUBSCRIPTION_NOT_FOUND": "This subscription no longer exists.",
+    "INVOICE_NOT_FOUND": "This invoice no longer exists.",
+    "PAYMENT_NOT_FOUND": "This payment no longer exists.",
+    "GATEWAY_CONFIG_NOT_FOUND": "This gateway configuration no longer exists.",
+    "PLAN_IN_USE": "This plan is used by active subscriptions and cannot be changed this way.",
+    "PLAN_CODE_DUPLICATE": "A plan with this code already exists. Use a different code.",
+    "SUBSCRIPTION_ALREADY_ACTIVE": "This institute already has an active subscription.",
+    "SUBSCRIPTION_TERMINAL": "This subscription has ended and cannot be changed.",
+    "INVOICE_ALREADY_PAID": "This invoice is already paid.",
+    "INVOICE_NOT_PAYABLE": "This action is not possible for the current state of the invoice or payment.",
+    "PAYMENT_VERIFICATION_FAILED": "The payment could not be verified.",
+    "PAYMENT_GATEWAY_NOT_CONFIGURED": "No payment gateway is set up for this action. Add one under Gateway configs.",
+    "GATEWAY_ERROR": "The payment gateway returned an error. Please try again later.",
+    "REFUND_EXCEEDS_PAID": "The refund is more than what remains to be refunded for this payment.",
+    "CONCURRENT_MODIFICATION": "Someone else changed this at the same time. Reload and try again.",
+    "UTR_INVALID": "The UTR number is not valid.",
+    "UTR_ALREADY_SUBMITTED": "This UTR number has already been submitted.",
+    "PAYER_CONTACT_MISSING": "The institute needs a phone number and email before this action."
   }
 }
