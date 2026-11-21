@@ -332,6 +332,10 @@ export const ErrorCode = {
   FILE_CONTENT_MISMATCH: 'FILE_CONTENT_MISMATCH',
   /** The image could not be read, or has more pixels than is accepted */
   FILE_IMAGE_INVALID: 'FILE_IMAGE_INVALID',
+  /** The malware scanner found a threat in the uploaded file; the file was removed */
+  FILE_INFECTED: 'FILE_INFECTED',
+  /** The malware scanner could not be reached; the upload is kept and the request can be retried */
+  FILE_SCAN_UNAVAILABLE: 'FILE_SCAN_UNAVAILABLE',
   /** Too many uploads started and not yet attached to anything */
   FILE_UPLOAD_LIMIT_REACHED: 'FILE_UPLOAD_LIMIT_REACHED',
 
@@ -568,6 +572,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   FILE_TOO_LARGE: HttpStatus.BAD_REQUEST,
   FILE_CONTENT_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_IMAGE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_INFECTED: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_SCAN_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   FILE_UPLOAD_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   EXPORT_REPORT_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXPORT_START_FAILED: HttpStatus.SERVICE_UNAVAILABLE,

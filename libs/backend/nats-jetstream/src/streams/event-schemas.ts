@@ -2,6 +2,7 @@ import {
   AUTH_SCOPE_VALUES,
   AUTH_SECURITY_EVENT_TYPE_VALUES,
   COMPLIANCE_REPORT_TYPE_VALUES,
+  FILE_PURPOSE_VALUES,
 } from '@roviq/common-types';
 import { z } from 'zod';
 import type { EventPattern } from './event-patterns';
@@ -424,6 +425,19 @@ const EXPORT_SCHEMAS = {
   'EXPORT.failed': exportReportBase.extend({ errorCode: str }),
 } as const;
 
+const FILE_SCHEMAS = {
+  'FILE.quarantined': z.object({
+    // Null for a reseller's file and for a file about a person
+    tenantId: uuid.nullable(),
+    resellerId: uuid.nullable(),
+    fileId: uuid,
+    purpose: z.enum(FILE_PURPOSE_VALUES),
+    uploadedBy: uuid,
+    // Name the scanner gave the threat, e.g. "Win.Test.EICAR_HDB-1"
+    signature: str,
+  }),
+} as const;
+
 const USER_SCHEMAS = {
   'USER.admission_created': z.object({}).catchall(z.unknown()),
 } as const;
@@ -647,6 +661,7 @@ export const _DOMAIN_SCHEMA_MAPS = [
   CERTIFICATE_SCHEMAS,
   TC_SCHEMAS,
   EXPORT_SCHEMAS,
+  FILE_SCHEMAS,
   USER_SCHEMAS,
   GUARDIAN_SCHEMAS,
   STAFF_SCHEMAS,

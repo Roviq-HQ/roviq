@@ -31,6 +31,7 @@ describe('STREAMS config', () => {
     'TC',
     'TIMETABLE',
     'EXPORT',
+    'FILE',
     'USER',
     'GUARDIAN',
     'STAFF',

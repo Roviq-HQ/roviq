@@ -70,6 +70,10 @@ const envSchema = z.looseObject({
   NOVU_MODE: z.enum(['local', 'cloud']).optional(),
   NOVU_API_URL: z.string().url().optional(),
   BILLING_RETURN_URL: z.string().url().optional(),
+  // Malware scanner for uploads; unset means clamav in production, eicar elsewhere (ROV-303)
+  FILE_SCANNER: z.enum(['clamav', 'eicar']).optional(),
+  CLAMAV_HOST: z.string().optional(),
+  CLAMAV_PORT: z.coerce.number().optional(),
 
   // Temporal — used by certificate (TC issuance) and admission workflows.
   // Address defaults to localhost:7233 inside services; CE-002 made the

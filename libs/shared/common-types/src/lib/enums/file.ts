@@ -22,6 +22,8 @@ export const FILE_STATUS_VALUES = [
   'READY',
   // Failed verification (wrong size or content); the object has been removed
   'REJECTED',
+  // The malware scanner found a threat; the object has been removed and the row is kept as a record
+  'QUARANTINED',
   // Detached from its record; the object is purged after the grace period
   'DELETED',
 ] as const;

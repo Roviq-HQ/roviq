@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { AuditEmitter, type AuditEventPayload } from '@roviq/audit';
 import { AbilityFactory } from '@roviq/casl';
 import {
   type AppAbility,
@@ -17,6 +18,9 @@ import {
   isImageContentType,
   type ResellerContext,
 } from '@roviq/common-types';
+import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { getRequestContext } from '@roviq/request-context';
 import { StorageClient } from '@roviq/storage';
 import type { RequestFileUploadInput } from './dto/request-file-upload.input';
 import { FileSweeper, type PurgeResult } from './file-sweeper';
@@ -24,6 +28,7 @@ import { ImageProcessor, InvalidImageError } from './image/image-processor';
 import type { FileUploadTicket } from './models/file-upload-ticket.model';
 import { FileRepository } from './repositories/file.repository';
 import type { FileRecord } from './repositories/types';
+import { FileScanner, ScannerUnavailableError } from './scan/file-scanner';
 import { bucketOf, pendingKeyOf, storageKeyFor, storedKeysOf, variantKeyOf } from './storage-keys';
 
 export const UPLOAD_URL_TTL_SECONDS = 5 * 60;
@@ -43,7 +48,15 @@ const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 /** Private objects: the user's own browser only, and no longer than a link to them can live. */
 const PRIVATE_CACHE_CONTROL = `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`;
 
-type UploadVerdict = 'ACCEPTED' | 'CONTENT_MISMATCH' | 'IMAGE_INVALID';
+type UploadVerdict =
+  | { kind: 'ACCEPTED' }
+  | { kind: 'CONTENT_MISMATCH' }
+  | { kind: 'IMAGE_INVALID' }
+  | { kind: 'INFECTED'; signature: string };
+
+const ACCEPTED: UploadVerdict = { kind: 'ACCEPTED' };
+const CONTENT_MISMATCH: UploadVerdict = { kind: 'CONTENT_MISMATCH' };
+const IMAGE_INVALID: UploadVerdict = { kind: 'IMAGE_INVALID' };
 
 /** First part of the storage key: who owns the file. Never taken from the request body. */
 function ownerPrefix(user: InstituteContext | ResellerContext, subjectUserId: string | null) {
@@ -67,6 +80,9 @@ export class FileService {
     private readonly abilities: AbilityFactory,
     private readonly images: ImageProcessor,
     private readonly sweeper: FileSweeper,
+    private readonly scanner: FileScanner,
+    private readonly eventBus: EventBusService,
+    private readonly audit: AuditEmitter,
   ) {}
 
   async requestUpload(
@@ -146,11 +162,17 @@ export class FileService {
     }
     for (const file of claimable) {
       const verdict = await this.acceptUpload(file);
-      if (verdict === 'ACCEPTED') continue;
+      if (verdict.kind === 'ACCEPTED') continue;
+      if (verdict.kind === 'INFECTED') {
+        await this.quarantine(file, verdict.signature);
+        throw new BusinessException(
+          ErrorCode.FILE_INFECTED,
+          `The file "${file.originalName}" was refused by the malware scan and has been removed.`,
+        );
+      }
       await this.repo.markRejected(file.id);
-      await this.storage.delete('private', [pendingKeyOf(file)]);
-      await this.storage.delete(bucketOf(file), storedKeysOf(file));
-      throw verdict === 'IMAGE_INVALID'
+      await this.removeObjects(file);
+      throw verdict.kind === 'IMAGE_INVALID'
         ? new BusinessException(
             ErrorCode.FILE_IMAGE_INVALID,
             `The image "${file.originalName}" could not be read or has too many pixels.`,
@@ -160,6 +182,56 @@ export class FileService {
             `The uploaded file "${file.originalName}" is missing or does not match its type.`,
           );
     }
+  }
+
+  private async removeObjects(file: FileRecord): Promise<void> {
+    await this.storage.delete('private', [pendingKeyOf(file)]);
+    await this.storage.delete(bucketOf(file), storedKeysOf(file));
+  }
+
+  /** The row is kept as the record of who uploaded what; only the bytes go. */
+  private async quarantine(file: FileRecord, signature: string): Promise<void> {
+    await this.repo.markQuarantined(file.id);
+    await this.removeObjects(file);
+    this.logger.warn(`File ${file.id} quarantined: ${signature}`);
+    const ctx = getRequestContext();
+    // The uploader's institute or reseller: a file about a person has no owner of its own.
+    const tenantId = ctx.scope === 'reseller' ? null : ctx.tenantId;
+    const resellerId = ctx.scope === 'reseller' ? ctx.resellerId : null;
+    this.eventBus.emit(EVENT_PATTERNS.FILE.quarantined, {
+      tenantId,
+      resellerId,
+      fileId: file.id,
+      purpose: file.purpose,
+      uploadedBy: file.uploadedBy,
+      signature,
+    });
+    const entry: AuditEventPayload = {
+      scope: ctx.scope === 'reseller' ? 'reseller' : 'institute',
+      tenantId,
+      resellerId,
+      userId: ctx.userId,
+      actorId: ctx.impersonatorId ?? ctx.userId,
+      impersonatorId: ctx.impersonatorId,
+      impersonationSessionId: null,
+      action: 'quarantineFile',
+      actionType: 'UPDATE',
+      entityType: 'File',
+      entityId: file.id,
+      changes: { status: { old: 'PENDING', new: 'QUARANTINED' } },
+      metadata: {
+        signature,
+        purpose: file.purpose,
+        originalName: file.originalName,
+        uploadedBy: file.uploadedBy,
+      },
+      correlationId: ctx.correlationId,
+      source: 'api-gateway',
+    };
+    // A failed audit publish must not turn the refusal into a server error.
+    await this.audit.emit(entry).catch((err: unknown) => {
+      this.logger.error(`Audit entry for quarantined file ${file.id} was not published`, err);
+    });
   }
 
   /**
@@ -274,36 +346,59 @@ export class FileService {
   }
 
   private async acceptFile(file: FileRecord): Promise<UploadVerdict> {
+    if (!isFileContentType(file.contentType)) return CONTENT_MISMATCH;
     const bucket = bucketOf(file);
     const pendingKey = pendingKeyOf(file);
     // No pending object means a retry after the copy already happened; the final key decides.
-    if (await this.storage.head('private', pendingKey)) {
+    const pending = await this.storage.head('private', pendingKey);
+    const source = pending
+      ? { bucket: 'private' as const, key: pendingKey, size: pending.size }
+      : await this.storedObject(file);
+    if (!source || source.size !== file.sizeBytes) return CONTENT_MISMATCH;
+
+    // Checked before the copy, so nothing unscanned ever sits at the key files are served from.
+    const bytes = await this.storage.get(source.bucket, source.key);
+    if (!fileContentMatchesType(bytes.subarray(0, FILE_SIGNATURE_BYTES), file.contentType)) {
+      this.logger.warn(`File ${file.id} content does not match ${file.contentType}`);
+      return CONTENT_MISMATCH;
+    }
+    const scan = await this.scan(file, bytes);
+    if (scan.verdict === 'INFECTED') return { kind: 'INFECTED', signature: scan.signature };
+
+    if (pending) {
       await this.storage.copy(
         { bucket: 'private', key: pendingKey },
         { bucket, key: file.objectKey },
       );
       await this.storage.delete('private', [pendingKey]);
     }
+    return ACCEPTED;
+  }
+
+  private async storedObject(file: FileRecord) {
+    const bucket = bucketOf(file);
     const stored = await this.storage.head(bucket, file.objectKey);
-    if (!stored || stored.size !== file.sizeBytes) return 'CONTENT_MISMATCH';
-    if (!isFileContentType(file.contentType)) return 'CONTENT_MISMATCH';
-    const head = await this.storage.getRange(
-      bucket,
-      file.objectKey,
-      0,
-      Math.min(stored.size, FILE_SIGNATURE_BYTES) - 1,
-    );
-    if (!fileContentMatchesType(head, file.contentType)) {
-      this.logger.warn(`File ${file.id} content does not match ${file.contentType}`);
-      return 'CONTENT_MISMATCH';
+    return stored ? { bucket, key: file.objectKey, size: stored.size } : null;
+  }
+
+  /** Fails closed: without a verdict the upload stays PENDING and the request can be retried. */
+  private async scan(file: FileRecord, bytes: Buffer) {
+    try {
+      return await this.scanner.scan(bytes);
+    } catch (err) {
+      if (!(err instanceof ScannerUnavailableError)) throw err;
+      this.logger.error(`File ${file.id} could not be scanned: ${err.message}`);
+      throw new BusinessException(
+        ErrorCode.FILE_SCAN_UNAVAILABLE,
+        'The file could not be checked for malware right now. Try again in a moment.',
+      );
     }
-    return 'ACCEPTED';
   }
 
   /** An image is never stored as uploaded: only the sizes produced here are kept. */
   private async acceptImage(file: FileRecord): Promise<UploadVerdict> {
     const policy = FILE_PURPOSE_POLICY[file.purpose].image;
-    if (!policy) return 'CONTENT_MISMATCH';
+    if (!policy) return CONTENT_MISMATCH;
     const bucket = bucketOf(file);
     const pendingKey = pendingKeyOf(file);
 
@@ -313,9 +408,9 @@ export class FileService {
       const done =
         file.variants !== null &&
         (await this.storage.head(bucket, variantKeyOf(file.objectKey, 'FULL')));
-      return done ? 'ACCEPTED' : 'CONTENT_MISMATCH';
+      return done ? ACCEPTED : CONTENT_MISMATCH;
     }
-    if (pending.size !== file.sizeBytes) return 'CONTENT_MISMATCH';
+    if (pending.size !== file.sizeBytes) return CONTENT_MISMATCH;
 
     const original = await this.storage.get('private', pendingKey);
     let processed: Awaited<ReturnType<ImageProcessor['process']>>;
@@ -324,7 +419,7 @@ export class FileService {
     } catch (err) {
       if (!(err instanceof InvalidImageError)) throw err;
       this.logger.warn(`Image ${file.id} was refused: ${err.message}`);
-      return 'IMAGE_INVALID';
+      return IMAGE_INVALID;
     }
 
     for (const variant of processed.variants) {
@@ -348,7 +443,7 @@ export class FileService {
       sizeBytes: processed.variants.reduce((sum, variant) => sum + variant.data.length, 0),
     });
     await this.storage.delete('private', [pendingKey]);
-    return 'ACCEPTED';
+    return ACCEPTED;
   }
 
   private assertAllowedType(purpose: FilePurpose, contentType: string): FileContentType {

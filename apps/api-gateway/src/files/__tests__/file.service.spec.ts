@@ -1,4 +1,5 @@
 import { createMongoAbility } from '@casl/ability';
+import type { AuditEmitter } from '@roviq/audit';
 import type { AbilityFactory } from '@roviq/casl';
 import {
   type AppAbility,
@@ -8,6 +9,8 @@ import {
   type InstituteContext,
   type ResellerContext,
 } from '@roviq/common-types';
+import type { EventBusService } from '@roviq/event-bus';
+import { requestContext } from '@roviq/request-context';
 import { FakeStorageClient } from '@roviq/storage';
 import { createMock } from '@roviq/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +27,8 @@ import type { FileSweeper } from '../file-sweeper';
 import { ImageProcessor, InvalidImageError, type ProcessedImage } from '../image/image-processor';
 import type { FileRepository } from '../repositories/file.repository';
 import type { CreateFileData, FileRecord } from '../repositories/types';
+import { EICAR_TEST_STRING, EicarFileScanner } from '../scan/eicar-file-scanner';
+import { FileScanner, ScannerUnavailableError, type ScanResult } from '../scan/file-scanner';
 
 const TENANT_ID = '00000000-0000-7000-a000-000000000001';
 const USER_ID = '00000000-0000-7000-a000-000000000002';
@@ -117,6 +122,34 @@ class FakeImageProcessor extends ImageProcessor {
   process = vi.fn<ImageProcessor['process']>().mockResolvedValue(PROCESSED);
 }
 
+/** The EICAR stand-in, which can also be switched off to play a scanner outage. */
+class SwitchableScanner extends FileScanner {
+  down = false;
+  private readonly eicar = new EicarFileScanner();
+
+  async scan(bytes: Buffer): Promise<ScanResult> {
+    if (this.down) throw new ScannerUnavailableError('connect ECONNREFUSED');
+    return this.eicar.scan(bytes);
+  }
+}
+
+const INFECTED_PDF = Buffer.from(`%PDF-1.7\n${EICAR_TEST_STRING}`);
+const CORRELATION_ID = '00000000-0000-7000-a000-00000000000c';
+
+function asUploader<T>(fn: () => Promise<T>): Promise<T> {
+  return requestContext.run(
+    {
+      tenantId: TENANT_ID,
+      resellerId: null,
+      userId: USER_ID,
+      scope: 'institute',
+      impersonatorId: null,
+      correlationId: CORRELATION_ID,
+    },
+    fn,
+  );
+}
+
 describe('FileService', () => {
   let storage: FakeStorageClient;
   let can: ReturnType<typeof vi.fn<AppAbility['can']>>;
@@ -138,6 +171,10 @@ describe('FileService', () => {
   let images: FakeImageProcessor;
   let isMember: ReturnType<typeof vi.fn<FileRepository['isMemberOfCurrentTenant']>>;
   let purge: ReturnType<typeof vi.fn<FileSweeper['purge']>>;
+  let markQuarantined: ReturnType<typeof vi.fn<FileRepository['markQuarantined']>>;
+  let scanner: SwitchableScanner;
+  let emitEvent: ReturnType<typeof vi.fn<EventBusService['emit']>>;
+  let emitAudit: ReturnType<typeof vi.fn<AuditEmitter['emit']>>;
   let service: FileService;
 
   beforeEach(() => {
@@ -174,6 +211,10 @@ describe('FileService', () => {
     images = new FakeImageProcessor();
     isMember = vi.fn<FileRepository['isMemberOfCurrentTenant']>().mockResolvedValue(true);
     purge = vi.fn<FileSweeper['purge']>();
+    markQuarantined = vi.fn<FileRepository['markQuarantined']>().mockResolvedValue(undefined);
+    scanner = new SwitchableScanner();
+    emitEvent = vi.fn<EventBusService['emit']>();
+    emitAudit = vi.fn<AuditEmitter['emit']>().mockResolvedValue(undefined);
     service = new FileService(
       createMock<FileRepository>({
         create,
@@ -181,6 +222,7 @@ describe('FileService', () => {
         findById,
         countPendingByCurrentUser: countPending,
         markRejected,
+        markQuarantined,
         markReady,
         findLeaveForFile,
         findStudentDocumentForFile,
@@ -192,6 +234,9 @@ describe('FileService', () => {
       createMock<AbilityFactory>({ createForUser }),
       images,
       createMock<FileSweeper>({ purge }),
+      scanner,
+      createMock<EventBusService>({ emit: emitEvent }),
+      createMock<AuditEmitter>({ emit: emitAudit }),
     );
   });
 
@@ -435,6 +480,105 @@ describe('FileService', () => {
       await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
         code: ErrorCode.FILE_CONTENT_MISMATCH,
       });
+    });
+
+    it('should quarantine an infected file, remove its bytes and record who uploaded it', async () => {
+      findClaimable.mockResolvedValue([buildFile({ sizeBytes: INFECTED_PDF.length })]);
+      storage.simulateUpload('private', PENDING_KEY, INFECTED_PDF, 'application/pdf');
+
+      await expect(
+        asUploader(() => service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')),
+      ).rejects.toMatchObject({ code: ErrorCode.FILE_INFECTED });
+
+      expect(markQuarantined).toHaveBeenCalledWith(FILE_ID);
+      expect(markRejected).not.toHaveBeenCalled();
+      expect(storage.has('private', PENDING_KEY)).toBe(false);
+      expect(storage.has('private', KEY)).toBe(false);
+      expect(emitEvent).toHaveBeenCalledWith('FILE.quarantined', {
+        tenantId: TENANT_ID,
+        resellerId: null,
+        fileId: FILE_ID,
+        purpose: 'LEAVE_ATTACHMENT',
+        uploadedBy: USER_ID,
+        signature: 'Eicar-Test-Signature',
+      });
+      expect(emitAudit).toHaveBeenCalledWith({
+        scope: 'institute',
+        tenantId: TENANT_ID,
+        resellerId: null,
+        userId: USER_ID,
+        actorId: USER_ID,
+        impersonatorId: null,
+        impersonationSessionId: null,
+        action: 'quarantineFile',
+        actionType: 'UPDATE',
+        entityType: 'File',
+        entityId: FILE_ID,
+        changes: { status: { old: 'PENDING', new: 'QUARANTINED' } },
+        metadata: {
+          signature: 'Eicar-Test-Signature',
+          purpose: 'LEAVE_ATTACHMENT',
+          originalName: 'certificate.pdf',
+          uploadedBy: USER_ID,
+        },
+        correlationId: CORRELATION_ID,
+        source: 'api-gateway',
+      });
+    });
+
+    it('should still answer FILE_INFECTED when the audit entry cannot be published', async () => {
+      emitAudit.mockRejectedValue(new Error('nats down'));
+      findClaimable.mockResolvedValue([buildFile({ sizeBytes: INFECTED_PDF.length })]);
+      storage.simulateUpload('private', PENDING_KEY, INFECTED_PDF, 'application/pdf');
+
+      await expect(
+        asUploader(() => service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')),
+      ).rejects.toMatchObject({ code: ErrorCode.FILE_INFECTED });
+    });
+
+    it('should never copy an infected file to the key files are served from', async () => {
+      findClaimable.mockResolvedValue([buildFile({ sizeBytes: INFECTED_PDF.length })]);
+      storage.simulateUpload('private', PENDING_KEY, INFECTED_PDF, 'application/pdf');
+      const copy = vi.spyOn(storage, 'copy');
+
+      await expect(
+        asUploader(() => service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')),
+      ).rejects.toMatchObject({ code: ErrorCode.FILE_INFECTED });
+
+      expect(copy).not.toHaveBeenCalled();
+    });
+
+    it('should fail and keep the upload pending when the scanner gives no verdict', async () => {
+      scanner.down = true;
+      findClaimable.mockResolvedValue([buildFile()]);
+      storage.simulateUpload('private', PENDING_KEY, PDF, 'application/pdf');
+
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).rejects.toMatchObject({
+        code: ErrorCode.FILE_SCAN_UNAVAILABLE,
+      });
+
+      expect(markRejected).not.toHaveBeenCalled();
+      expect(markQuarantined).not.toHaveBeenCalled();
+      expect(storage.has('private', PENDING_KEY)).toBe(true);
+      expect(storage.has('private', KEY)).toBe(false);
+
+      scanner.down = false;
+      await expect(service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT')).resolves.toBeUndefined();
+      expect(storage.has('private', KEY)).toBe(true);
+    });
+
+    it('should not send an image to the scanner: it is re-encoded instead', async () => {
+      const scan = vi.spyOn(scanner, 'scan');
+      const key = `institutes/${TENANT_ID}/leave-attachment/${FILE_ID}.png`;
+      const png = Buffer.from('fake png bytes');
+      findClaimable.mockResolvedValue([
+        buildFile({ contentType: 'image/png', objectKey: key, sizeBytes: png.length }),
+      ]);
+      storage.simulateUpload('private', `pending/${key}`, png, 'image/png');
+
+      await service.verifyUploads([FILE_ID], 'LEAVE_ATTACHMENT');
+
+      expect(scan).not.toHaveBeenCalled();
     });
 
     it('should do nothing for an empty list', async () => {

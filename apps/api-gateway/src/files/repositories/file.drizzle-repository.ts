@@ -239,4 +239,13 @@ export class FileDrizzleRepository extends FileRepository {
         .where(and(eq(files.id, id), eq(files.status, 'PENDING'), isNull(files.deletedAt)));
     });
   }
+
+  async markQuarantined(id: string): Promise<void> {
+    await this.run(async (tx, { userId }) => {
+      await tx
+        .update(files)
+        .set({ status: 'QUARANTINED', updatedBy: userId })
+        .where(and(eq(files.id, id), eq(files.status, 'PENDING'), isNull(files.deletedAt)));
+    });
+  }
 }

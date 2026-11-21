@@ -97,6 +97,33 @@ The R2 column is from Cloudflare's documentation and has not been run against th
 `pnpm storage:check` decides: in particular it proves that a presigned upload is refused when the
 body's size or type differs from what was signed, which the upload design depends on.
 
+## Malware scanning of uploads
+
+Every uploaded file that is not an image (PDF, CSV, XLSX) is scanned before it can be attached
+to a record (ROV-303). Images are not scanned: they are re-encoded, and only the re-encoded
+sizes are stored.
+
+- **Production needs a ClamAV daemon.** Run the `clamav/clamav` image (see `clamav` in
+  `docker/compose.app.yaml`) and set `CLAMAV_HOST` (and `CLAMAV_PORT` if not 3310) on every
+  api-gateway. The gateway does not start in production without `CLAMAV_HOST`.
+- **Memory and start-up:** `clamd` keeps its signatures in memory, about 1.5 GB. The first start
+  downloads the signature database; keep `/var/lib/clamav` on a volume. The image runs
+  `freshclam` itself, so it needs outbound HTTPS to `database.clamav.net`.
+- **Not reachable from outside:** `clamd` has no authentication. Keep port 3310 on the private
+  network only.
+- **Size limit:** the largest upload is 50 MB. `clamd` refuses a stream above its
+  `StreamMaxLength` (100 MB in the official image); do not lower it below 50 MB.
+- **When the scanner is down** uploads of documents fail with `FILE_SCAN_UNAVAILABLE` and can be
+  retried; nothing unscanned is attached. Alert on the health check of the container.
+- **An infected file** is refused with `FILE_INFECTED`, its bytes are deleted and its `files`
+  row stays with status `QUARANTINED`. A `FILE.quarantined` event and an audit entry
+  (`quarantineFile`) name the uploader and the institute.
+- **To test a deployment** upload the EICAR test file as a `.csv` where a CSV is accepted (bulk
+  student import). ClamAV recognises EICAR only at the start of a file, so an EICAR string
+  placed after a PDF header is reported clean.
+- `FILE_SCANNER=eicar` (the default outside production) detects only the EICAR test file. It is
+  for development and automated tests and is refused when `NODE_ENV=production`.
+
 ## Background workers
 
 Temporal workers run inside the api-gateway process, switched on per instance with a

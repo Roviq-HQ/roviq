@@ -2,6 +2,9 @@
  * ROV-300 — `uploadStudentDocument` follows the removal rules: a student outside the caller's
  * read scope answers STUDENT_NOT_FOUND, an Aadhaar card needs the `aadhaar` field, and a refused
  * upload writes no document and leaves its files PENDING.
+ *
+ * ROV-303 — a page is scanned for malware before it is attached: an infected one is
+ * QUARANTINED and its bytes removed, and without a verdict nothing is attached.
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -25,12 +28,14 @@ import {
   users,
   withAdmin,
 } from '@roviq/database';
+import type { JetStreamClient } from '@roviq/nats-jetstream';
 import { FakeStorageClient, StorageClient } from '@roviq/storage';
 import {
   cleanupTestInstitute,
   cleanupTestTeacher,
   createInstituteToken,
   createIntegrationApp,
+  createMock,
   createTestInstitute,
   createTestTeacher,
   gqlRequest,
@@ -39,11 +44,35 @@ import {
   type TestTeacher,
 } from '@roviq/testing/integration';
 import { eq, inArray } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { of } from 'rxjs';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
+import { EICAR_TEST_STRING, EicarFileScanner } from '../../../files/scan/eicar-file-scanner';
+import {
+  FileScanner,
+  ScannerUnavailableError,
+  type ScanResult,
+} from '../../../files/scan/file-scanner';
 
 const ORIGIN = 'test:student-document-upload';
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj\n<<>>\nendobj\n');
+const INFECTED_PDF = Buffer.from(`%PDF-1.7\n${EICAR_TEST_STRING}\n`);
+
+/** The EICAR stand-in, which can be stopped to play a scanner outage. */
+class StoppableScanner extends FileScanner {
+  stopped = false;
+  private readonly eicar = new EicarFileScanner();
+
+  async scan(bytes: Buffer): Promise<ScanResult> {
+    if (this.stopped) throw new ScannerUnavailableError('connect ECONNREFUSED');
+    return this.eicar.scan(bytes);
+  }
+}
+
+interface Published {
+  pattern: string;
+  payload: Record<string, unknown>;
+}
 
 const UPLOAD = /* GraphQL */ `
   mutation UploadStudentDocument($input: UploadStudentDocumentInput!) {
@@ -61,6 +90,8 @@ const UPLOAD = /* GraphQL */ `
 describe('uploadStudentDocument (integration)', () => {
   let app: IntegrationAppResult;
   let storage: FakeStorageClient;
+  const scanner = new StoppableScanner();
+  const published: Published[] = [];
   let tenant: TestInstitute;
   let sectionTeacher: TestTeacher;
   let vicePrincipal: TestTeacher;
@@ -130,9 +161,9 @@ describe('uploadStudentDocument (integration)', () => {
   }
 
   /** A page the uploader has put in storage but not attached yet, as `requestFileUpload` leaves it. */
-  async function createPendingFile(uploaderId: string): Promise<string> {
+  async function createPendingFile(uploaderId: string, bytes = PDF): Promise<string> {
     const objectKey = `users/${studentUserId}/user-document/${randomUUID()}.pdf`;
-    await storage.put('private', `pending/${objectKey}`, PDF, { contentType: 'application/pdf' });
+    await storage.put('private', `pending/${objectKey}`, bytes, { contentType: 'application/pdf' });
     const id = await withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
       const [file] = await tx
         .insert(files)
@@ -143,7 +174,7 @@ describe('uploadStudentDocument (integration)', () => {
           objectKey,
           originalName: 'page.pdf',
           contentType: 'application/pdf',
-          sizeBytes: PDF.length,
+          sizeBytes: bytes.length,
           status: 'PENDING',
           uploadedBy: uploaderId,
           createdBy: uploaderId,
@@ -163,6 +194,17 @@ describe('uploadStudentDocument (integration)', () => {
         .from(files)
         .where(inArray(files.id, ids));
       return ids.map((id) => rows.find((row) => row.id === id)?.status ?? 'MISSING');
+    });
+  }
+
+  async function objectKeyOf(id: string): Promise<string> {
+    return withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const [row] = await tx
+        .select({ objectKey: files.objectKey })
+        .from(files)
+        .where(eq(files.id, id));
+      assert(row);
+      return row.objectKey;
     });
   }
 
@@ -188,9 +230,20 @@ describe('uploadStudentDocument (integration)', () => {
   beforeAll(async () => {
     assert.equal(new URL(process.env.DATABASE_URL_TEST ?? '').pathname, '/roviq_test');
     storage = new FakeStorageClient();
+    // What the gateway publishes is read from the NATS client it publishes through.
+    const nats = createMock<JetStreamClient>({
+      emit: vi.fn((pattern: string, payload: Record<string, unknown>) => {
+        published.push({ pattern, payload });
+        return of(undefined);
+      }),
+    });
     app = await createIntegrationApp({
       modules: [AppModule],
-      overrides: [{ provide: StorageClient, useValue: storage }],
+      overrides: [
+        { provide: StorageClient, useValue: storage },
+        { provide: FileScanner, useValue: scanner },
+        { provide: 'JETSTREAM_CLIENT', useValue: nats },
+      ],
     });
     tenant = await createTestInstitute(app.db);
     sectionTeacher = await createTestTeacher(app.db, tenant.tenantId);
@@ -286,5 +339,81 @@ describe('uploadStudentDocument (integration)', () => {
     expect(document?.files.map((file) => file.id)).toEqual(pages);
     expect(await fileStatuses(pages)).toEqual(['READY', 'READY']);
     expect(await documentTypes()).toEqual(['AADHAAR_CARD', 'REPORT_CARD']);
+  });
+
+  it('quarantines an infected page, removes its bytes and records it; nothing is attached', async () => {
+    const page = await createPendingFile(tenant.userId, INFECTED_PDF);
+    const objectKey = await objectKeyOf(page);
+    const before = await documentTypes();
+    published.length = 0;
+
+    const response = await upload('MEDICAL_CERTIFICATE', [page], adminToken);
+
+    expect(response.errors?.[0]?.extensions?.code).toBe(ErrorCode.FILE_INFECTED);
+    expect(await fileStatuses([page])).toEqual(['QUARANTINED']);
+    expect(storage.has('private', `pending/${objectKey}`)).toBe(false);
+    expect(storage.has('private', objectKey)).toBe(false);
+    expect(await documentTypes()).toEqual(before);
+
+    const event = published.find((entry) => entry.pattern === 'FILE.quarantined');
+    expect(event?.payload).toEqual({
+      tenantId: tenant.tenantId,
+      resellerId: null,
+      fileId: page,
+      purpose: 'USER_DOCUMENT',
+      uploadedBy: tenant.userId,
+      signature: 'Eicar-Test-Signature',
+    });
+    const audit = published.find(
+      (entry) => entry.pattern === 'AUDIT.log' && entry.payload.action === 'quarantineFile',
+    );
+    expect(audit?.payload).toMatchObject({
+      scope: 'institute',
+      tenantId: tenant.tenantId,
+      userId: tenant.userId,
+      actorId: tenant.userId,
+      entityType: 'File',
+      entityId: page,
+      changes: { status: { old: 'PENDING', new: 'QUARANTINED' } },
+    });
+  });
+
+  it('cannot attach or download a quarantined file afterwards', async () => {
+    const page = await createPendingFile(tenant.userId, INFECTED_PDF);
+    await upload('MEDICAL_CERTIFICATE', [page], adminToken);
+
+    const again = await upload('MEDICAL_CERTIFICATE', [page], adminToken);
+    expect(again.errors?.[0]?.extensions?.code).toBe(ErrorCode.FILE_NOT_FOUND);
+
+    const download = await gqlRequest<{ fileDownloadUrl: string }>(app.httpServer, {
+      query: /* GraphQL */ `
+        mutation Download($fileId: ID!) {
+          fileDownloadUrl(fileId: $fileId)
+        }
+      `,
+      variables: { fileId: page },
+      token: adminToken,
+    });
+    expect(download.errors?.[0]?.extensions?.code).toBe(ErrorCode.FILE_NOT_FOUND);
+    expect(await fileStatuses([page])).toEqual(['QUARANTINED']);
+  });
+
+  it('fails with a retryable error and keeps the page PENDING while the scanner is stopped', async () => {
+    const page = await createPendingFile(tenant.userId);
+    const before = await documentTypes();
+    scanner.stopped = true;
+    try {
+      const response = await upload('MEDICAL_CERTIFICATE', [page], adminToken);
+
+      expect(response.errors?.[0]?.extensions?.code).toBe(ErrorCode.FILE_SCAN_UNAVAILABLE);
+      expect(await fileStatuses([page])).toEqual(['PENDING']);
+      expect(await documentTypes()).toEqual(before);
+    } finally {
+      scanner.stopped = false;
+    }
+
+    const retried = await upload('MEDICAL_CERTIFICATE', [page], adminToken);
+    expect(retried.errors).toBeUndefined();
+    expect(await fileStatuses([page])).toEqual(['READY']);
   });
 });

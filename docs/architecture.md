@@ -255,8 +255,18 @@ reference `files.id`; no table stores a URL. Design and remaining work: Linear R
 | Delete | `markFilesDeleted(tx, …)` in the same transaction that detaches the file. The row and objects stay for a 30-day grace period, then the file sweeper removes them (see "File sweeper" below). |
 | Client library | `@roviq/storage` wraps `@aws-sdk/client-s3`. Application code never calls S3 directly and uses nothing provider-specific; `pnpm storage:check` tests a provider against what the app relies on. `FakeStorageClient` is the in-memory version for unit tests. |
 
-Status flow: `PENDING` → `READY` → `DELETED`, or `PENDING` → `REJECTED` when verification fails
-(`FILE_STATE_MACHINE`).
+Status flow: `PENDING` → `READY` → `DELETED`, `PENDING` → `REJECTED` when verification fails, or
+`PENDING` → `QUARANTINED` when the malware scan finds a threat (`FILE_STATE_MACHINE`).
+
+Malware scan (ROV-303): a file that is not an image is read from its pending key and sent to the
+`FileScanner` before it is copied to the key it is served from, so nothing unscanned ever sits
+there. An infected file becomes `QUARANTINED`: its bytes are deleted, the row is kept (the
+sweeper never removes it), and a `FILE.quarantined` event plus a `quarantineFile` audit entry
+name the uploader. Without a verdict the request fails with `FILE_SCAN_UNAVAILABLE` and the
+file stays `PENDING`. Images are not scanned because only their re-encoded sizes are stored;
+files the server writes itself are not scanned. Scanners: `ClamavFileScanner` (clamd `INSTREAM`
+over TCP) in production, `EicarFileScanner` elsewhere (`docs/deployment.md` → "Malware scanning
+of uploads").
 
 ### File sweeper
 
