@@ -1,4 +1,5 @@
 import { Logger, Module } from '@nestjs/common';
+import { AuditModule } from '@roviq/audit';
 import { DRIZZLE_DB, type DrizzleDB } from '@roviq/database';
 import { StorageClient } from '@roviq/storage';
 import { FileLoaders } from './file.loaders';
@@ -10,16 +11,18 @@ import { ImageProcessor } from './image/image-processor';
 import { SharpImageProcessor } from './image/sharp-image-processor';
 import { ProfilePhotoService } from './profile-photo.service';
 import { FileRepositoryModule } from './repositories/file-repository.module';
+import { fileScannerProvider } from './scan/file-scanner.provider';
 import { FileSweeperWorkerService } from './workflows/file-sweeper.worker';
 
 @Module({
-  imports: [FileRepositoryModule],
+  imports: [FileRepositoryModule, AuditModule],
   providers: [
     FileService,
     FileLoaders,
     ProfilePhotoService,
     FileRefResolver,
     { provide: ImageProcessor, useClass: SharpImageProcessor },
+    fileScannerProvider,
     {
       provide: FilePurgeRepository,
       inject: [DRIZZLE_DB],

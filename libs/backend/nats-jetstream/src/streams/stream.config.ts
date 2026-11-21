@@ -194,6 +194,13 @@ export const STREAMS: Record<string, StreamConfig> = {
     storage: 'file',
     maxDeliver: 3,
   },
+  FILE: {
+    name: 'FILE',
+    subjects: ['FILE.>'],
+    retention: 'workqueue',
+    storage: 'file',
+    maxDeliver: 3,
+  },
   USER: {
     name: 'USER',
     subjects: ['USER.>'],

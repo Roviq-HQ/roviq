@@ -19,6 +19,8 @@
     "FILE_UPLOAD_LIMIT_REACHED": "You have too many unfinished uploads. Wait a little, then try again.",
     "FILE_CONTENT_MISMATCH": "A file did not upload correctly or is not the type it claims to be. Remove it and upload it again.",
     "FILE_IMAGE_INVALID": "This image could not be read, or it has too many pixels. Try another picture.",
+    "FILE_INFECTED": "This file was refused by the malware scan and has been removed. Do not open it on your computer. Upload a clean copy.",
+    "FILE_SCAN_UNAVAILABLE": "Files cannot be checked for malware right now. Nothing was saved. Try again in a few minutes.",
     "FILE_NOT_FOUND": "An uploaded file is no longer available. Remove it and upload it again.",
     "FORBIDDEN": "You are not allowed to upload files here.",
     "TOO_MANY_FILES": "{count, plural, one {Only one file can be added here.} other {Only # files can be added here.}}",

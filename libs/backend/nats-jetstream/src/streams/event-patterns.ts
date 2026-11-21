@@ -111,6 +111,9 @@ export const EVENT_PATTERNS = {
     failed: 'EXPORT.failed',
     requested: 'EXPORT.requested',
   },
+  FILE: {
+    quarantined: 'FILE.quarantined',
+  },
   GROUP: {
     membership_resolved: 'GROUP.membership_resolved',
     rules_updated: 'GROUP.rules_updated',
