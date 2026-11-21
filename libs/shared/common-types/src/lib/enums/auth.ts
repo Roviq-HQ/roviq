@@ -91,6 +91,8 @@ export const AUTH_SECURITY_EVENT_TYPE_VALUES = [
   'SESSION_REVOKED',
   // OTP delivered to the impersonation target for consent confirmation
   'IMPERSONATION_OTP',
+  // One-time code sent only to the account's email address, to prove its owner reads it
+  'EMAIL_VERIFICATION',
 ] as const;
 
 export type AuthSecurityEventType = (typeof AUTH_SECURITY_EVENT_TYPE_VALUES)[number];

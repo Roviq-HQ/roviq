@@ -5,6 +5,10 @@ import type { AuthScope, AuthUser } from '@roviq/common-types';
 
 /** The access-token claims the global (APP_GUARD) guards act on. */
 export interface RequestTokenClaims {
+  /** The user the token was issued to. */
+  sub?: string;
+  /** `users.token_version` when the token was issued; absent on tokens that predate it. */
+  tv?: number;
   scope?: AuthScope;
   tenantId?: string;
   resellerId?: string;
@@ -37,6 +41,8 @@ export function readRequestTokenClaims(
   const user = req?.user;
   if (user) {
     return {
+      sub: user.userId,
+      tv: user.tokenVersion,
       scope: user.scope,
       tenantId: user.scope === 'institute' ? user.tenantId : undefined,
       resellerId: user.scope === 'platform' ? undefined : user.resellerId,

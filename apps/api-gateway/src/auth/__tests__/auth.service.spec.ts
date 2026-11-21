@@ -7,6 +7,7 @@ import type { AuthScope, InstituteContext } from '@roviq/common-types';
 import { ErrorCode, NEW_PASSWORD_MIN_LENGTH, ResellerStatus } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
+import type Redis from 'ioredis';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectBusinessError } from '../../__tests__/expect-business-error';
 import { AuthService } from '../auth.service';
@@ -116,6 +117,8 @@ function activeUser(): UserRecord {
     status: 'ACTIVE',
     passwordChangedAt: null,
     mustChangePassword: false,
+    emailVerifiedAt: null,
+    tokenVersion: 0,
   };
 }
 
@@ -161,6 +164,8 @@ function storedRefreshToken(membershipScope: AuthScope): RefreshTokenWithRelatio
       status: 'ACTIVE',
       passwordChangedAt: null,
       mustChangePassword: false,
+      emailVerifiedAt: null,
+      tokenVersion: 0,
     },
     membership: null,
   };
@@ -205,6 +210,7 @@ describe('AuthService', () => {
   let mockAuthEventService: ReturnType<typeof createMockAuthEventService>;
   let mockLockout: ReturnType<typeof createMockLockoutService>;
   let mockEventBus: EventBusService;
+  let mockRedis: Redis;
 
   beforeEach(() => {
     mockUserRepo = createMockUserRepo();
@@ -221,6 +227,7 @@ describe('AuthService', () => {
       createForUser: vi.fn().mockResolvedValue({ rules: [] }),
     });
     mockEventBus = createMock<EventBusService>({ emit: vi.fn() });
+    mockRedis = createMock<Redis>({ set: vi.fn(() => Promise.resolve('OK')) });
 
     authService = new AuthService(
       mockConfig,
@@ -234,6 +241,7 @@ describe('AuthService', () => {
       mockAbilityFactory,
       mockLockout,
       mockEventBus,
+      mockRedis,
     );
   });
 
@@ -263,6 +271,8 @@ describe('AuthService', () => {
       status: 'ACTIVE' as const,
       passwordChangedAt: null,
       mustChangePassword: false,
+      emailVerifiedAt: null,
+      tokenVersion: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -477,6 +487,8 @@ describe('AuthService', () => {
       status: 'ACTIVE' as const,
       passwordChangedAt: null,
       mustChangePassword: false,
+      emailVerifiedAt: null,
+      tokenVersion: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -580,6 +592,8 @@ describe('AuthService', () => {
       status: 'ACTIVE' as const,
       passwordChangedAt: null,
       mustChangePassword: false,
+      emailVerifiedAt: null,
+      tokenVersion: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -716,6 +730,8 @@ describe('AuthService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
 
       const result = await authService.verifyPassword('user-1', 'correct-password');
@@ -732,6 +748,8 @@ describe('AuthService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
 
       const result = await authService.verifyPassword('user-1', 'wrong-password');
@@ -780,6 +798,8 @@ describe('AuthService', () => {
         status: 'ACTIVE' as const,
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       };
 
       mockMembershipRepo.findByIdAndUser.mockResolvedValue(membership);
@@ -897,6 +917,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: {
           id: 'membership-1',
@@ -925,6 +947,8 @@ describe('AuthService', () => {
         status: 'ACTIVE',
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       });
 
       const result = await authService.refreshToken(fakeToken, {
@@ -1002,6 +1026,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1058,6 +1084,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1106,6 +1134,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1152,6 +1182,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1200,6 +1232,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1256,6 +1290,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1299,6 +1335,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       });
@@ -1638,6 +1676,8 @@ describe('AuthService', () => {
         status: 'ACTIVE' as const,
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       };
       mockUserRepo.findById.mockResolvedValue(user);
 
@@ -1658,6 +1698,7 @@ describe('AuthService', () => {
     //   changePassword(userId, currentPassword, newPassword, meta?) → Promise<void>
     //   Rules come from failedPasswordRules. Server revokes ALL refresh tokens; caller must re-login.
     const CURRENT = 'current-password-123';
+    const NEW_TOKEN_VERSION = 4;
     const NEW = 'NewPassword12!';
     const userId = 'user-1';
 
@@ -1672,9 +1713,11 @@ describe('AuthService', () => {
         status: 'ACTIVE' as const,
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       };
       mockUserRepo.findById.mockResolvedValue(storedUser);
-      mockUserRepo.updatePassword.mockResolvedValue(undefined);
+      mockUserRepo.updatePassword.mockResolvedValue(NEW_TOKEN_VERSION);
       mockRefreshTokenRepo.revokeAllForUser.mockResolvedValue(undefined);
     });
 
@@ -1692,6 +1735,19 @@ describe('AuthService', () => {
       expect(updatedHash.startsWith('$argon2id$')).toBe(true);
 
       expect(mockRefreshTokenRepo.revokeAllForUser).toHaveBeenCalledWith(userId, 'password_change');
+    });
+
+    it('publishes the new token version so older access tokens are refused at once', async () => {
+      await authService.changePassword(userId, CURRENT, NEW);
+
+      const key = `auth:token-version:${userId}`;
+      expect(mockRedis.set).toHaveBeenCalledWith(key, String(NEW_TOKEN_VERSION), 'EX', 60);
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        `${key}:floor`,
+        String(NEW_TOKEN_VERSION),
+        'EX',
+        70,
+      );
     });
 
     it('revokes refresh tokens AFTER persisting the new password hash', async () => {
@@ -1780,6 +1836,8 @@ describe('AuthService', () => {
         status: 'ACTIVE' as const,
         passwordChangedAt: null,
         mustChangePassword: false,
+        emailVerifiedAt: null,
+        tokenVersion: 0,
       };
     });
 
@@ -1903,6 +1961,8 @@ describe('AuthService', () => {
           status: 'ACTIVE',
           passwordChangedAt: null,
           mustChangePassword: false,
+          emailVerifiedAt: null,
+          tokenVersion: 0,
         },
         membership: null,
       };

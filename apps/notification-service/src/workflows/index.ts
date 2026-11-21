@@ -1,6 +1,7 @@
 export { approvalRequestWorkflow } from './approval-request.workflow';
 export { attendanceAbsentWorkflow } from './attendance-absent.workflow';
 export { billingEventWorkflow } from './billing-event.workflow';
+export { emailVerificationWorkflow } from './email-verification.workflow';
 export { feeOverdueWorkflow } from './fee-overdue.workflow';
 export { feeReminderWorkflow } from './fee-reminder.workflow';
 export { leaveDecidedWorkflow } from './leave-decided.workflow';

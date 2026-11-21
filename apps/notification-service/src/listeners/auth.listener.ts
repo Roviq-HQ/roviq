@@ -22,6 +22,11 @@ export class AuthListener {
       `Processing auth security event "${event.eventType}" for user "${event.userId}"`,
     );
 
+    if (event.eventType === 'EMAIL_VERIFICATION') {
+      await this.sendEmailVerification(event);
+      return;
+    }
+
     const { subject, body } = this.composeMessage(event);
 
     await this.triggerService.trigger({
@@ -33,6 +38,21 @@ export class AuthListener {
         eventType: event.eventType.toLowerCase().replace(/_/g, '-'),
       },
       tenantId: event.tenantId ?? undefined,
+    });
+  }
+
+  // Email only, to the address in the event: the code must not reach the account's phone or
+  // its in-app feed, which whoever created the account may read.
+  private async sendEmailVerification(event: AuthSecurityEvent): Promise<void> {
+    const { otp, recipientEmail } = event.metadata;
+    if (!otp || !recipientEmail) {
+      this.logger.error(`EMAIL_VERIFICATION for user "${event.userId}" lacks a code or an address`);
+      return;
+    }
+    await this.triggerService.trigger({
+      workflowId: 'email-verification',
+      to: { subscriberId: event.userId, email: recipientEmail },
+      payload: { code: otp },
     });
   }
 
@@ -71,6 +91,9 @@ export class AuthListener {
           subject: 'Approve impersonation request',
           body: `Roviq: an admin requested impersonation access to your institute. Approve by entering OTP ${event.metadata.otp} in the admin portal. Code expires in 5 minutes. If you didn't expect this, ignore — the request will time out.`,
         };
+      case 'EMAIL_VERIFICATION':
+        // Sent by `sendEmailVerification`; never through the multi-channel workflow.
+        return { subject: 'Verify your email', body: 'Use the code sent to your email address.' };
       default: {
         const _exhaustive: never = event.eventType;
         return {
