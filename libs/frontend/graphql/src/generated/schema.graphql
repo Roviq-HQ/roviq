@@ -1249,7 +1249,11 @@ type CertificateModel {
   certificateData: JSON!
   createdAt: DateTime!
   id: ID!
-  pdfUrl: String
+
+  """
+  The rendered PDF once issued. Sensitive: `url` is null; download through `fileDownloadUrl`.
+  """
+  pdf: FileRef
   purpose: String
   serialNumber: String!
   staffProfileId: String
@@ -2636,6 +2640,7 @@ enum FilePurpose {
   APPLICATION_DOCUMENT
   BULK_IMPORT_CSV
   BULK_IMPORT_REPORT
+  CERTIFICATE_PDF
   COMPLIANCE_EXPORT
   INSTITUTE_COVER
   INSTITUTE_FAVICON
@@ -2645,6 +2650,7 @@ enum FilePurpose {
   RESELLER_FAVICON
   RESELLER_LOGO
   STAFF_CERTIFICATE
+  TC_PDF
   USER_DOCUMENT
 }
 
@@ -4246,12 +4252,20 @@ type Mutation {
   Get a download URL for one file, valid for 60 seconds. A mutation, so every call is audited.
   """
   fileDownloadUrl(fileId: ID!): String!
+
+  """Render the PDF of an issued certificate that has none"""
+  generateCertificatePdf(id: ID!): CertificateModel!
   generateInvoice(input: GenerateInvoiceInput!): InvoiceModel!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
   generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
 
   """Generate per-student instances for a section."""
   generateReportCards(reportCardId: ID!, sectionId: ID!): Int!
+
+  """
+  Render the PDF of an issued TC that has none (the render at issue failed)
+  """
+  generateTCPdf(id: ID!): TCModel!
 
   """Grant parental consent for a data processing purpose (DPDP Act 2023)"""
   grantConsent(input: GrantConsentInput!): ConsentRecordModel!
@@ -5221,6 +5235,11 @@ type Query {
     status: TimetableStatus
   ): PaginatedTimetablesModel!
   unverifiedPayments(after: String, first: Int = 20): [PaymentModel!]!
+
+  """
+  Public check of a transfer certificate by the token in its QR code. Null when no TC has the token.
+  """
+  verifyTC(token: String!): TcVerificationModel
 }
 
 input RefundInput {
@@ -6565,8 +6584,11 @@ type TCModel {
 
   """For a duplicate, the issued TC it copies; null on an original"""
   originalTcId: String
-  pdfUrl: String
-  qrVerificationUrl: String
+
+  """
+  The rendered PDF once issued. Sensitive: `url` is null; download through `fileDownloadUrl`.
+  """
+  pdf: FileRef
   reason: String!
 
   """
@@ -6585,6 +6607,9 @@ type TCModel {
   """CBSE TC fields frozen at generation (see CbseTcData)"""
   tcData: JSON
   tcSerialNumber: String!
+
+  """Public page the QR code on the TC opens; null until the TC is issued"""
+  verificationUrl: String
 }
 
 enum TcStatus {
@@ -6598,6 +6623,21 @@ enum TcStatus {
   ISSUED
   REQUESTED
   REVIEW_PENDING
+}
+
+"""What the public verification page shows for a TC"""
+type TcVerificationModel {
+  """Institute name by locale"""
+  instituteName: I18nText!
+  isDuplicate: Boolean!
+
+  """False when the TC was cancelled or is not issued"""
+  isValid: Boolean!
+
+  """Issue date, YYYY-MM-DD"""
+  issuedOn: String
+  serialNumber: String!
+  studentName: String
 }
 
 """

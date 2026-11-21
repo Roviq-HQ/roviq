@@ -1297,12 +1297,15 @@ function TCHistoryTab({ studentProfileId }: { studentProfileId: string }) {
                   {format(parseISO(tc.createdAt), 'dd/MM/yyyy')}
                 </p>
               </div>
-              {tc.pdfUrl && (
-                <Button variant="outline" size="sm" asChild className="print:hidden">
-                  <a href={tc.pdfUrl} target="_blank" rel="noopener noreferrer">
-                    {t('detail.tc.downloadPdf')}
-                  </a>
-                </Button>
+              {tc.pdf && (
+                <span className="print:hidden">
+                  <FileDownloadButton
+                    fileId={tc.pdf.id}
+                    scope="institute"
+                    label={t('detail.tc.downloadPdf')}
+                    testId={instituteStudents.detailTcDownloadBtn(tc.id)}
+                  />
+                </span>
               )}
             </div>
           </CardContent>

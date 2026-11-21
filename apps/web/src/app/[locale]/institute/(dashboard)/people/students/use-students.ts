@@ -435,8 +435,10 @@ const STUDENT_TCS_QUERY = gql`
       reason
       isDuplicate
       originalTcId
-      pdfUrl
-      qrVerificationUrl
+      pdf {
+        id
+      }
+      verificationUrl
       academicYearId
       createdAt
     }
@@ -641,8 +643,8 @@ export type StudentTCNode = Pick<
   | 'reason'
   | 'isDuplicate'
   | 'originalTcId'
-  | 'pdfUrl'
-  | 'qrVerificationUrl'
+  | 'pdf'
+  | 'verificationUrl'
   | 'academicYearId'
   | 'createdAt'
 >;
