@@ -62,7 +62,8 @@
       "codeInvalid": "That code is wrong or has expired. Check it, or send a new code.",
       "tooSoon": "A code was sent a moment ago. Check your email, or wait a minute before asking for another.",
       "loadFailed": "Your email status could not be loaded.",
-      "generic": "Something went wrong. Try again in a moment."
+      "generic": "Something went wrong. Try again in a moment.",
+      "limitReached": "No more codes can be sent to this account today. Try again tomorrow."
     }
   }
 }

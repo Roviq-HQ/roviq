@@ -100,6 +100,8 @@ export const ErrorCode = {
   EMAIL_VERIFICATION_CODE_INVALID: 'EMAIL_VERIFICATION_CODE_INVALID',
   /** A verification code was sent moments ago; wait before asking for another */
   EMAIL_VERIFICATION_TOO_SOON: 'EMAIL_VERIFICATION_TOO_SOON',
+  /** The daily number of verification codes for this account is used up */
+  EMAIL_VERIFICATION_LIMIT_REACHED: 'EMAIL_VERIFICATION_LIMIT_REACHED',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',
   /** Suspend attempted on a reseller that is already suspended */
@@ -459,6 +461,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INSTITUTE_ADMIN_UNAVAILABLE: HttpStatus.CONFLICT,
   EMAIL_VERIFICATION_CODE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   EMAIL_VERIFICATION_TOO_SOON: HttpStatus.TOO_MANY_REQUESTS,
+  EMAIL_VERIFICATION_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   INVALID_SLUG: HttpStatus.BAD_REQUEST,
   RESELLER_ALREADY_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,

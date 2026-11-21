@@ -13,6 +13,7 @@ import {
   phoneNumbers,
   phoneNumbersLive,
   platformMemberships,
+  refreshTokens,
   resellerMemberships,
   resellerMembershipsLive,
   userProfiles,
@@ -25,7 +26,10 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
+import { REDIS_CLIENT } from '@roviq/redis';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import type Redis from 'ioredis';
+import { recordTokenVersion } from './token-version-cache';
 
 export interface CreateUserInput {
   /** Email address (placeholder allowed for system-created users without one). */
@@ -127,6 +131,7 @@ export class IdentityService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     // private readonly authEventService: AuthEventService, // TODO: Add this back in when we have a way to emit the event
   ) {}
 
@@ -305,16 +310,31 @@ export class IdentityService {
   async reissueTempPassword(userId: string, actorId: string): Promise<string | null> {
     const tempPassword = randomBytes(16).toString('base64url');
     const passwordHash = await hash(tempPassword);
-    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
+    // Same three steps as a password change: whoever holds the old temporary password must
+    // lose the sessions it opened, not only the password.
+    const tokenVersion = await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
+      const [row] = await tx
         .update(users)
-        .set({ passwordHash, mustChangePassword: true, updatedBy: actorId })
+        .set({
+          passwordHash,
+          mustChangePassword: true,
+          tokenVersion: sql`${users.tokenVersion} + 1`,
+          updatedBy: actorId,
+        })
         .where(
           and(eq(users.id, userId), eq(users.mustChangePassword, true), isNull(users.deletedAt)),
         )
-        .returning({ id: users.id }),
-    );
-    return rows.length > 0 ? tempPassword : null;
+        .returning({ tokenVersion: users.tokenVersion });
+      if (!row) return null;
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), revokedReason: 'password_change' })
+        .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+      return row.tokenVersion;
+    });
+    if (tokenVersion === null) return null;
+    await recordTokenVersion(this.redis, userId, tokenVersion);
+    return tempPassword;
   }
 
   /** The live membership of this user in the institute with this role, if any. */
