@@ -5227,6 +5227,9 @@ type Query {
     academicYearId: ID
   ): [StandardModel!]!
 
+  """Storage used by the institute's files and the limit of its plan"""
+  storageUsage: StorageUsage!
+
   """Aggregate student statistics"""
   studentStatistics: StudentStatisticsModel!
 
@@ -6175,6 +6178,19 @@ type StatusCount {
   status: String!
 }
 
+"""
+Storage taken by the institute's own files, against what its plan allows
+"""
+type StorageUsage {
+  """Bytes the plan allows; null when the plan sets no limit"""
+  limitBytes: Float
+
+  """
+  Bytes of files attached to records of the institute. Files about a person (documents, photos) are not counted.
+  """
+  usedBytes: Float!
+}
+
 """Stream (specialisation) for a section — name and short code."""
 input StreamInput {
   """Short code used in reports, e.g. "SC", "CO", "AR"."""
@@ -6709,6 +6725,11 @@ type TenantAnalytics {
   instituteName: I18nText!
   resellerId: ID!
   resellerName: String!
+
+  """
+  Bytes of the institute's own stored files. Files about a person (documents, photos) are not counted.
+  """
+  storageUsedBytes: Float!
 }
 
 type TenantAnalyticsConnection {
@@ -6732,6 +6753,7 @@ enum TenantAnalyticsSortField {
   ACTIVE_USERS_24H
   API_CALLS_24H
   INSTITUTE_NAME
+  STORAGE_USED
 }
 
 """Term/semester period within an academic year"""

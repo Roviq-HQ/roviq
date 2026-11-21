@@ -409,6 +409,7 @@ export const testIds = {
     tenantTable: 'admin-monitoring-tenant-table',
     tenantRow: (id: string) => `admin-monitoring-tenant-row-${id}`,
     tenantSort: (field: string) => `admin-monitoring-tenant-sort-${field}`,
+    tenantStorage: (id: string) => `admin-monitoring-tenant-storage-${id}`,
     tenantResellerFilter: 'admin-monitoring-tenant-reseller-filter',
     tenantEmpty: 'admin-monitoring-tenant-empty',
     tenantError: 'admin-monitoring-tenant-error',
@@ -1376,6 +1377,10 @@ export const testIds = {
 
   // ── Institute: settings → institute info/branding/config ──────────────
   instituteSettings: {
+    storageCard: 'settings-storage-card',
+    storageUsed: 'settings-storage-used',
+    storageBar: 'settings-storage-bar',
+    storageWarning: 'settings-storage-warning',
     // Info tab
     infoRefreshBtn: 'settings-info-refresh-btn',
     infoCodeInput: 'settings-info-code-input',

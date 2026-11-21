@@ -12,6 +12,7 @@ import {
   type TenantActiveUsersRecord,
   TenantAnalyticsRepository,
   type TenantInstituteRecord,
+  type TenantStorageRecord,
 } from '../repositories/tenant-analytics.repository';
 import {
   decodeOffsetCursor,
@@ -63,6 +64,10 @@ const activeUsers: TenantActiveUsersRecord[] = [
   { tenantId: INST_A, activeUsers: 2 },
   { tenantId: INST_C, activeUsers: 9 },
 ];
+const storage: TenantStorageRecord[] = [
+  { tenantId: INST_A, storageUsedBytes: 5_000 },
+  { tenantId: INST_C, storageUsedBytes: 2_000_000 },
+];
 const calls: PromSample[] = [
   { metric: { tenant_id: INST_A }, value: 40.4 },
   { metric: { tenant_id: INST_B }, value: 120 },
@@ -92,6 +97,7 @@ describe('TenantAnalyticsService', () => {
     repo = createMock<TenantAnalyticsRepository>({
       listInstitutes: vi.fn().mockResolvedValue(institutes),
       countActiveUsersSince: vi.fn().mockResolvedValue(activeUsers),
+      sumStorageByTenant: vi.fn().mockResolvedValue(storage),
     });
     prometheus = createMock<PrometheusClient>({
       query: vi.fn().mockResolvedValue(calls),
@@ -113,22 +119,31 @@ describe('TenantAnalyticsService', () => {
       {
         ...institutes[1],
         activeUsers24h: 0,
+        storageUsedBytes: 0,
         apiCalls24h: 120,
         activityTrend7d: [0, 0, 0, 0, 0, 30, 120],
       },
       {
         ...institutes[0],
         activeUsers24h: 2,
+        storageUsedBytes: 5_000,
         apiCalls24h: 40,
         activityTrend7d: [0, 0, 0, 0, 0, 0, 0],
       },
       {
         ...institutes[2],
         activeUsers24h: 9,
+        storageUsedBytes: 2_000_000,
         apiCalls24h: 0,
         activityTrend7d: [0, 0, 0, 0, 0, 0, 0],
       },
     ]);
+  });
+
+  it('should sort by storage used, largest first, with unused institutes last', async () => {
+    const result = await service.list(CTX, args({ sortBy: 'STORAGE_USED', sortOrder: 'DESC' }));
+
+    expect(result.edges.map((e) => e.node.instituteId)).toEqual([INST_C, INST_A, INST_B]);
   });
 
   it('should query Prometheus once for 24h totals and once for a 7-point daily range', async () => {
@@ -237,9 +252,27 @@ describe('TenantAnalyticsService', () => {
 
       expect(result.metricsAvailable).toBe(false);
       expect(result.edges.map((e) => e.node)).toEqual([
-        { ...institutes[2], activeUsers24h: 9, apiCalls24h: null, activityTrend7d: null },
-        { ...institutes[0], activeUsers24h: 2, apiCalls24h: null, activityTrend7d: null },
-        { ...institutes[1], activeUsers24h: 0, apiCalls24h: null, activityTrend7d: null },
+        {
+          ...institutes[2],
+          activeUsers24h: 9,
+          storageUsedBytes: 2_000_000,
+          apiCalls24h: null,
+          activityTrend7d: null,
+        },
+        {
+          ...institutes[0],
+          activeUsers24h: 2,
+          storageUsedBytes: 5_000,
+          apiCalls24h: null,
+          activityTrend7d: null,
+        },
+        {
+          ...institutes[1],
+          activeUsers24h: 0,
+          storageUsedBytes: 0,
+          apiCalls24h: null,
+          activityTrend7d: null,
+        },
       ]);
     });
 

@@ -258,6 +258,15 @@ reference `files.id`; no table stores a URL. Design and remaining work: Linear R
 Status flow: `PENDING` → `READY` → `DELETED`, `PENDING` → `REJECTED` when verification fails, or
 `PENDING` → `QUARANTINED` when the malware scan finds a threat (`FILE_STATE_MACHINE`).
 
+Storage quota (ROV-302): `requestFileUpload` refuses an institute-owned upload with
+`STORAGE_QUOTA_EXCEEDED` when the institute's `READY` bytes, plus the declared size of its
+uploads still `PENDING`, plus the new file would pass `maxStorageMb` of its plan
+(`EntitlementService.storageLimitBytes`: no limit when EE is off or the plan says `null`,
+`DEFAULT_ENTITLEMENTS` when EE is on and the institute has no subscription). Files about a
+person, reseller files and files the server writes are not counted or refused. Usage is one
+indexed `SUM` per upload request, not a cache. `storageUsage` (institute) and
+`adminTenantAnalytics.storageUsedBytes` (platform) show the same `READY` sum.
+
 Malware scan (ROV-303): a file that is not an image is read from its pending key and sent to the
 `FileScanner` before it is copied to the key it is served from, so nothing unscanned ever sits
 there. An infected file becomes `QUARANTINED`: its bytes are deleted, the row is kept (the

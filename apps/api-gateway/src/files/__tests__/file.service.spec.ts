@@ -9,6 +9,7 @@ import {
   type InstituteContext,
   type ResellerContext,
 } from '@roviq/common-types';
+import type { EntitlementService } from '@roviq/entitlements';
 import type { EventBusService } from '@roviq/event-bus';
 import { requestContext } from '@roviq/request-context';
 import { FakeStorageClient } from '@roviq/storage';
@@ -175,6 +176,8 @@ describe('FileService', () => {
   let scanner: SwitchableScanner;
   let emitEvent: ReturnType<typeof vi.fn<EventBusService['emit']>>;
   let emitAudit: ReturnType<typeof vi.fn<AuditEmitter['emit']>>;
+  let storageUsage: ReturnType<typeof vi.fn<FileRepository['storageUsage']>>;
+  let storageLimitBytes: ReturnType<typeof vi.fn<EntitlementService['storageLimitBytes']>>;
   let service: FileService;
 
   beforeEach(() => {
@@ -215,6 +218,10 @@ describe('FileService', () => {
     scanner = new SwitchableScanner();
     emitEvent = vi.fn<EventBusService['emit']>();
     emitAudit = vi.fn<AuditEmitter['emit']>().mockResolvedValue(undefined);
+    storageUsage = vi
+      .fn<FileRepository['storageUsage']>()
+      .mockResolvedValue({ readyBytes: 0, pendingBytes: 0 });
+    storageLimitBytes = vi.fn<EntitlementService['storageLimitBytes']>().mockResolvedValue(null);
     service = new FileService(
       createMock<FileRepository>({
         create,
@@ -223,6 +230,7 @@ describe('FileService', () => {
         countPendingByCurrentUser: countPending,
         markRejected,
         markQuarantined,
+        storageUsage,
         markReady,
         findLeaveForFile,
         findStudentDocumentForFile,
@@ -237,6 +245,7 @@ describe('FileService', () => {
       scanner,
       createMock<EventBusService>({ emit: emitEvent }),
       createMock<AuditEmitter>({ emit: emitAudit }),
+      createMock<EntitlementService>({ storageLimitBytes }),
     );
   });
 
@@ -390,6 +399,67 @@ describe('FileService', () => {
         code: ErrorCode.FILE_UPLOAD_LIMIT_REACHED,
       });
       expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('storage quota', () => {
+    const MB = 1024 * 1024;
+
+    it('should accept an upload that exactly fills the limit and refuse one byte more', async () => {
+      storageLimitBytes.mockResolvedValue(10 * MB);
+      storageUsage.mockResolvedValue({ readyBytes: 6 * MB, pendingBytes: 0 });
+
+      await expect(
+        service.requestUpload(user, buildInput({ sizeBytes: 4 * MB })),
+      ).resolves.toBeDefined();
+      await expect(
+        service.requestUpload(user, buildInput({ sizeBytes: 4 * MB + 1 })),
+      ).rejects.toMatchObject({ code: ErrorCode.STORAGE_QUOTA_EXCEEDED });
+      expect(storageLimitBytes).toHaveBeenCalledWith(TENANT_ID);
+    });
+
+    it('should count uploads that are still pending, so many at once cannot pass together', async () => {
+      storageLimitBytes.mockResolvedValue(10 * MB);
+      storageUsage.mockResolvedValue({ readyBytes: 2 * MB, pendingBytes: 7 * MB });
+
+      await expect(
+        service.requestUpload(user, buildInput({ sizeBytes: 2 * MB })),
+      ).rejects.toMatchObject({ code: ErrorCode.STORAGE_QUOTA_EXCEEDED });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('should not measure usage when the plan sets no limit', async () => {
+      await service.requestUpload(user, buildInput());
+
+      expect(storageUsage).not.toHaveBeenCalled();
+    });
+
+    it("should not hold a person's file against the institute's quota", async () => {
+      storageLimitBytes.mockResolvedValue(1);
+      storageUsage.mockResolvedValue({ readyBytes: 1, pendingBytes: 0 });
+
+      await expect(
+        service.requestUpload(
+          user,
+          buildInput({
+            purpose: 'PROFILE_PHOTO',
+            contentType: 'image/jpeg',
+            fileName: 'me.jpg',
+            subjectUserId: OTHER_USER_ID,
+          }),
+        ),
+      ).resolves.toBeDefined();
+      expect(storageLimitBytes).not.toHaveBeenCalled();
+    });
+
+    it('should report attached bytes only, with the limit of the plan', async () => {
+      storageLimitBytes.mockResolvedValue(10 * MB);
+      storageUsage.mockResolvedValue({ readyBytes: 3 * MB, pendingBytes: 5 * MB });
+
+      await expect(service.storageUsage(user)).resolves.toEqual({
+        usedBytes: 3 * MB,
+        limitBytes: 10 * MB,
+      });
     });
   });
 

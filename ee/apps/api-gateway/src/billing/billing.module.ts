@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { SUBSCRIPTION_READER } from '@roviq/common-types';
 import { PaymentsModule } from '@roviq/ee-payments';
 import './billing.enums';
@@ -33,6 +33,8 @@ import { RazorpayWebhookController } from './webhook/razorpay-webhook.controller
 import { BillingScheduleService } from './workflows/billing.schedule';
 import { BillingWorkerService } from './workflows/billing.worker';
 
+// Global so the OSS EntitlementService can inject SUBSCRIPTION_READER without importing EE.
+@Global()
 @Module({
   imports: [PaymentsModule],
   controllers: [RazorpayWebhookController, CashfreeWebhookController],

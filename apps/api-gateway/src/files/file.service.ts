@@ -18,6 +18,7 @@ import {
   isImageContentType,
   type ResellerContext,
 } from '@roviq/common-types';
+import { EntitlementService } from '@roviq/entitlements';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
@@ -47,6 +48,12 @@ export const THUMBNAIL_URL_TTL_SECONDS = 12 * 60 * 60;
 const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 /** Private objects: the user's own browser only, and no longer than a link to them can live. */
 const PRIVATE_CACHE_CONTROL = `private, max-age=${THUMBNAIL_URL_TTL_SECONDS}, immutable`;
+
+export interface StorageUsage {
+  usedBytes: number;
+  /** Null when the plan sets no limit. */
+  limitBytes: number | null;
+}
 
 type UploadVerdict =
   | { kind: 'ACCEPTED' }
@@ -83,6 +90,7 @@ export class FileService {
     private readonly scanner: FileScanner,
     private readonly eventBus: EventBusService,
     private readonly audit: AuditEmitter,
+    private readonly entitlements: EntitlementService,
   ) {}
 
   async requestUpload(
@@ -114,6 +122,9 @@ export class FileService {
     if (input.sizeBytes > policy.maxSizeBytes) {
       throw new BusinessException(ErrorCode.FILE_TOO_LARGE, 'The file is too large.');
     }
+    if (policy.owner === 'INSTITUTE' && user.scope === 'institute') {
+      await this.assertWithinQuota(user, input.sizeBytes);
+    }
     if ((await this.repo.countPendingByCurrentUser()) >= MAX_PENDING_UPLOADS_PER_USER) {
       throw new BusinessException(
         ErrorCode.FILE_UPLOAD_LIMIT_REACHED,
@@ -144,6 +155,31 @@ export class FileService {
       headers: Object.entries(presigned.headers).map(([name, value]) => ({ name, value })),
       expiresAt: new Date(Date.now() + UPLOAD_URL_TTL_SECONDS * 1000),
     };
+  }
+
+  /** What the institute's own files take up, against what its plan allows. */
+  async storageUsage(user: InstituteContext): Promise<StorageUsage> {
+    const [usage, limitBytes] = await Promise.all([
+      this.repo.storageUsage(),
+      this.entitlements.storageLimitBytes(user.tenantId),
+    ]);
+    return { usedBytes: usage.readyBytes, limitBytes };
+  }
+
+  /**
+   * Uploads still pending count too, or many started at once would all pass the check.
+   * Files the server writes itself (exports, certificates) are never refused.
+   */
+  private async assertWithinQuota(user: InstituteContext, sizeBytes: number): Promise<void> {
+    const limitBytes = await this.entitlements.storageLimitBytes(user.tenantId);
+    if (limitBytes === null) return;
+    const usage = await this.repo.storageUsage();
+    if (usage.readyBytes + usage.pendingBytes + sizeBytes > limitBytes) {
+      throw new BusinessException(
+        ErrorCode.STORAGE_QUOTA_EXCEEDED,
+        'Your institute has used the storage its plan allows.',
+      );
+    }
   }
 
   /**

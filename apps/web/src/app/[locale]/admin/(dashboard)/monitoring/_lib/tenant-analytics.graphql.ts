@@ -25,6 +25,7 @@ export const ADMIN_TENANT_ANALYTICS = gql`
           resellerId
           resellerName
           activeUsers24h
+          storageUsedBytes
           apiCalls24h
           activityTrend7d
         }

@@ -3,5 +3,17 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/backend/entitlements/src",
   "projectType": "library",
-  "tags": ["scope:backend"]
+  "tags": ["scope:backend"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/entitlements",
+        "main": "libs/backend/entitlements/src/index.ts",
+        "tsConfig": "libs/backend/entitlements/tsconfig.lib.json",
+        "assets": ["libs/backend/entitlements/*.md"]
+      }
+    }
+  }
 }

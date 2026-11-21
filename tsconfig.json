@@ -18,6 +18,7 @@
     { "path": "libs/frontend/auth" },
     { "path": "libs/frontend/i18n" },
     { "path": "libs/backend/audit" },
+    { "path": "libs/backend/entitlements" },
     { "path": "ee/libs/backend/payments" },
     { "path": "ee/apps/api-gateway" },
     { "path": "libs/shared/domain" },

@@ -8,6 +8,8 @@ export const TENANT_ANALYTICS_SORT_FIELD_VALUES = [
   'ACTIVE_USERS_24H',
   // API operations in the last 24h (Prometheus); null values sort as zero
   'API_CALLS_24H',
+  // Bytes of the institute's own stored files
+  'STORAGE_USED',
 ] as const;
 export type TenantAnalyticsSortField = (typeof TENANT_ANALYTICS_SORT_FIELD_VALUES)[number];
 export const TenantAnalyticsSortField = Object.fromEntries(
