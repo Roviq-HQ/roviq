@@ -21,6 +21,9 @@ import type { DrizzleDB } from '../../providers';
 import { SEED_CREDENTIALS, SEED_PERSON_NAMES } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
+// Seeded people own their addresses: their email can identify them when a role is granted.
+const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
+
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 
 const CHILDREN = [
@@ -89,6 +92,7 @@ export async function seedDemoMultiChildGuardian(
       username: c.credentials.username,
       email: `${c.credentials.username}@svm-ggn.edu.in`,
       passwordHash: studentPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
       names: c.names,
       gender: c.gender,
     })),
@@ -97,6 +101,7 @@ export async function seedDemoMultiChildGuardian(
       username: SEED_CREDENTIALS.GUARDIAN_4.username,
       email: 'guardian4@example.com',
       passwordHash: guardianPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
       names: SEED_PERSON_NAMES.GUARDIAN_4,
       gender: 'FEMALE',
     },
@@ -110,6 +115,7 @@ export async function seedDemoMultiChildGuardian(
         username: p.username,
         email: p.email,
         passwordHash: p.passwordHash,
+        emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
         ...BY,
       })
       .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } });
