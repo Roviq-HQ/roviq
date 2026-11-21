@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
   FieldGroup,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
@@ -106,25 +107,16 @@ export default function NewResellerPage() {
         router.push(id ? `/admin/resellers/${id}` : '/admin/resellers');
       } catch (err) {
         if (extractGraphQLErrorCode(err) === 'SLUG_DUPLICATE') {
-          form.setFieldMeta('slug', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onServer: t('errors.SLUG_DUPLICATE') },
-          }));
+          // The server derives the slug from the name when it is blank.
+          setServerFieldError(form, 'slug', t('errors.SLUG_DUPLICATE'), {
+            alsoClearOnChangeOf: ['name'],
+          });
           return;
         }
         toast.error(errorMessage(err));
       }
     },
   });
-
-  // Validators never clear the onServer slot, so drop it once the user edits what the slug comes from.
-  const clearSlugServerError = () =>
-    form.setFieldMeta('slug', (prev) =>
-      prev.errorMap.onServer
-        ? { ...prev, errorMap: { ...prev.errorMap, onServer: undefined } }
-        : prev,
-    );
 
   const tierOptions = RESELLER_TIER_VALUES.map((tier) => ({
     value: tier,
@@ -191,7 +183,7 @@ export default function NewResellerPage() {
           </CardHeader>
           <CardContent>
             <FieldGroup>
-              <form.AppField name="name" listeners={{ onChange: clearSlugServerError }}>
+              <form.AppField name="name">
                 {(field) => (
                   <field.TextField
                     label={t('create.name')}
@@ -202,7 +194,7 @@ export default function NewResellerPage() {
                 )}
               </form.AppField>
 
-              <form.AppField name="slug" listeners={{ onChange: clearSlugServerError }}>
+              <form.AppField name="slug">
                 {(field) => (
                   <field.TextField
                     label={t('create.slug')}

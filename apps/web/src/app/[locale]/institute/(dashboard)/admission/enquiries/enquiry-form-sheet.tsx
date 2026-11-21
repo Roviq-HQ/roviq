@@ -14,6 +14,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useTranslations } from 'next-intl';
@@ -127,17 +128,10 @@ export function EnquiryFormSheet({ open, onOpenChange, onCreated }: EnquiryFormS
       } catch (err) {
         const message = extractGraphQLError(err, t('enquiries.newForm.errors.generic'));
         if (message.includes('DUPLICATE') || message.includes('duplicate')) {
-          // Surface the duplicate-phone error both as a toast and as an inline
-          // field error so the user immediately sees which field is at fault.
-          // TanStack Form exposes per-source error slots via `setFieldMeta`;
-          // populating `onSubmit` mirrors what the validator path would do.
+          // Toast plus inline field error so the user sees which field is at fault.
           const duplicateMsg = t('enquiries.newForm.errors.duplicate');
           toast.error(duplicateMsg);
-          form.setFieldMeta('parentPhone', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onSubmit: duplicateMsg },
-          }));
+          setServerFieldError(form, 'parentPhone', duplicateMsg);
         } else {
           toast.error(t('enquiries.newForm.errors.generic'), { description: message });
         }

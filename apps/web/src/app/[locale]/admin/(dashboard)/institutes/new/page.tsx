@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
@@ -258,18 +259,10 @@ export default function CreateInstitutePage() {
         const code = extractGraphQLErrorCode(err);
         // The slug is derived from the code, so a taken slug is a taken code too.
         if (code === ErrorCode.INSTITUTE_CODE_DUPLICATE || code === ErrorCode.SLUG_DUPLICATE) {
-          form.setFieldMeta('code', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: t('codeDuplicate') },
-          }));
+          setServerFieldError(form, 'code', t('codeDuplicate'));
           toast.error(t('codeDuplicate'));
         } else if (code === ErrorCode.RESELLER_INVALID) {
-          form.setFieldMeta('resellerId', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: t('resellerInvalid') },
-          }));
+          setServerFieldError(form, 'resellerId', t('resellerInvalid'));
           toast.error(t('resellerInvalid'));
         } else {
           toast.error(t('error'), {

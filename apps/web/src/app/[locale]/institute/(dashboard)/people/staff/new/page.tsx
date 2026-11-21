@@ -20,6 +20,7 @@ import {
   FieldLegend,
   FieldSet,
   I18nField,
+  setServerFieldError,
   useAppForm,
   useBreadcrumbOverride,
 } from '@roviq/ui';
@@ -113,10 +114,7 @@ export default function CreateStaffPage() {
       } catch (err) {
         const message = extractGraphQLError(err, t('new.errors.generic'));
         if (message.includes('DUPLICATE') || message.includes('already exists')) {
-          form.setFieldMeta('email', (prev) => ({
-            ...prev,
-            errorMap: { ...prev.errorMap, onChange: t('new.errors.duplicate') },
-          }));
+          setServerFieldError(form, 'email', t('new.errors.duplicate'));
           toast.error(t('new.errors.duplicate'));
         } else {
           toast.error(t('new.errors.generic'), { description: message });

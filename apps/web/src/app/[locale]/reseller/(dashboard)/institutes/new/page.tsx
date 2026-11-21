@@ -24,6 +24,7 @@ import {
   FieldLabel,
   FieldSeparator,
   I18nField,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -154,11 +155,7 @@ export default function ResellerCreateInstitutePage() {
         const code = extractGraphQLErrorCode(err);
         // The slug is derived from the code, so a taken slug is a taken code too.
         if (code === ErrorCode.INSTITUTE_CODE_DUPLICATE || code === ErrorCode.SLUG_DUPLICATE) {
-          form.setFieldMeta('code', (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: t('codeDuplicate') },
-          }));
+          setServerFieldError(form, 'code', t('codeDuplicate'));
           toast.error(t('codeDuplicate'));
         } else {
           toast.error(t('error'), { description: errorDescription(code) });
