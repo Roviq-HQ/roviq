@@ -1,7 +1,7 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { TcStatus } from '@roviq/common-types';
-import { TcVerificationModel } from './models/tc.model';
-import { TcVerificationRepository } from './repositories/tc-verification.repository';
+import { TcVerificationModel } from './tc-verification.model';
+import { TcVerificationRepository } from './tc-verification.repository';
 
 const VALID_STATUSES: readonly TcStatus[] = [TcStatus.ISSUED, TcStatus.DUPLICATE_ISSUED];
 // 24 random bytes in base64url; anything else cannot be a token and is not looked up.

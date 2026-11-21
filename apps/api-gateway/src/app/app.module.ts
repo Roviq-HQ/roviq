@@ -41,6 +41,7 @@ import { InstituteScopeModule } from '../institute/institute-scope.module';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
 import { NovuProxyModule } from '../novu-proxy/novu-proxy.module';
 import { PasskeyModule } from '../passkey/passkey.module';
+import { PublicVerificationModule } from '../public-verification/public-verification.module';
 import { ResellerModule } from '../reseller/reseller.module';
 import { AppController } from './app.controller';
 import { AppResolver } from './app.resolver';
@@ -125,6 +126,7 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     AdminModule,
     ResellerModule,
     InstituteScopeModule,
+    PublicVerificationModule,
     NovuProxyModule,
     EeModule.register(),
   ],

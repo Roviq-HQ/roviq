@@ -8,7 +8,7 @@ import {
   withAdmin,
 } from '@roviq/database';
 import { sql } from 'drizzle-orm';
-import type { TcVerificationRow } from './tc.types';
+import type { TcVerificationRow } from './tc-verification.model';
 
 interface VerifyTcRow extends Record<string, unknown> {
   serial_number: string;
