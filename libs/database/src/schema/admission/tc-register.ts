@@ -129,6 +129,14 @@ export const tcRegister = pgTable(
     })
       .onDelete('restrict')
       .onUpdate('cascade'),
+    // On top of the plain reference: the year must belong to the same institute as the TC.
+    foreignKey({
+      columns: [table.academicYearId, table.tenantId],
+      foreignColumns: [academicYears.id, academicYears.tenantId],
+      name: 'tc_register_academic_year_tenant_fkey',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
     /** Self-referencing FK for duplicate TCs */
     foreignKey({
       columns: [table.originalTcId],
@@ -141,6 +149,12 @@ export const tcRegister = pgTable(
       .on(table.tenantId, table.status)
       .where(sql`${table.deletedAt} IS NULL`),
     index('idx_tc_register_student').on(table.studentProfileId),
+    // One TC in progress per student; a cancelled or issued one frees the slot.
+    uniqueIndex('uq_tc_register_open_request')
+      .on(table.tenantId, table.studentProfileId)
+      .where(
+        sql`${table.isDuplicate} = false AND ${table.status} NOT IN ('CANCELLED', 'ISSUED') AND ${table.deletedAt} IS NULL`,
+      ),
 
     ...tenantPolicies('tc_register'),
   ],

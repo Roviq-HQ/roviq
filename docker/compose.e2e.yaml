@@ -315,6 +315,12 @@ services:
       FILE_SWEEPER_WORKER_ENABLED: "true"
       # Embedded Temporal worker so a compliance export reaches COMPLETED in e2e.
       COMPLIANCE_EXPORT_WORKER_ENABLED: "true"
+      # Embedded Temporal worker so a requested TC reaches GENERATED and can be approved and issued.
+      TC_ISSUANCE_WORKER_ENABLED: "true"
+      # Embedded Temporal worker so an approved institute request reaches setup COMPLETED.
+      INSTITUTE_SETUP_WORKER_ENABLED: "true"
+      # Monthly audit partition worker; its schedule fires on the 25th, so tests never race it.
+      AUDIT_PARTITION_WORKER_ENABLED: "true"
       # E2E-specific overrides
       API_GATEWAY_PORT: "3004"
       ALLOWED_ORIGINS: "http://localhost:${E2E_API_PORT:-3004},http://localhost:${E2E_WEB_PORT:-4201},http://admin.localhost:${E2E_WEB_PORT:-4201},http://reseller.localhost:${E2E_WEB_PORT:-4201}"

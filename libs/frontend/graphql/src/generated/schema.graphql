@@ -5314,7 +5314,7 @@ input RequestDuplicateTCInput {
   originalTcId: ID!
 
   """
-  Reason for the duplicate request, e.g. FIR reference number or affidavit details.
+  Reason for the duplicate request, e.g. FIR reference number or affidavit details. At most 200 characters.
   """
   reason: String!
 }
@@ -5345,7 +5345,7 @@ input RequestTCInput {
   academicYearId: ID!
 
   """
-  Reason for leaving — printed verbatim on the TC, e.g. "Family relocated to another city".
+  Reason for leaving — printed verbatim on the TC, e.g. "Family relocated to another city". 10 to 200 characters.
   """
   reason: String!
 
@@ -5384,8 +5384,8 @@ input ResellerCreateInstituteRequestInput {
   """Physical address of the institute."""
   address: InstituteAddressInput
 
-  """Affiliated board name, e.g. "CBSE", "RBSE"."""
-  board: String
+  """Affiliated board, e.g. CBSE or RBSE."""
+  board: BoardType
 
   """Short internal code for the institute, e.g. "SA-JDH"."""
   code: String
@@ -5393,8 +5393,8 @@ input ResellerCreateInstituteRequestInput {
   """Primary contact details for the institute."""
   contact: InstituteContactInput
 
-  """Education departments offered, e.g. ["primary", "secondary"]."""
-  departments: [String!]
+  """Education departments offered, e.g. [PRIMARY, SECONDARY]."""
+  departments: [EducationLevel!]
 
   """
   ID of the institute group (trust/chain/society) this institute belongs to.
@@ -5414,7 +5414,7 @@ input ResellerCreateInstituteRequestInput {
   """Curriculum structure framework. Defaults to TRADITIONAL."""
   structureFramework: StructureFramework = TRADITIONAL
 
-  """Legal/organisational type of the institute. Defaults to SCHOOL."""
+  """Kind of institute (school, coaching or library). Defaults to SCHOOL."""
   type: InstituteType = SCHOOL
 }
 

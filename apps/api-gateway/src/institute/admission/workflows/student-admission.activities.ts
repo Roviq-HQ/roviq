@@ -154,31 +154,10 @@ export function createStudentAdmissionActivities(
       }
     },
 
-    async createUserAndMembership(tenantId, formData, createdBy, seed) {
-      const phone = (formData.parentPhone ?? formData.parent_phone) as string | undefined;
-
-      // Find or create user — guaranteed string by end of block
+    async createUserAndMembership(tenantId, createdBy, seed) {
+      // The parent phone in the form belongs to the guardian (linkGuardians); the student user
+      // never carries it, or the guardian lookup by phone would find the student.
       const userId = await (async (): Promise<string> => {
-        if (phone) {
-          const existing = await withAdmin(
-            db,
-            mkAdminCtx('workflow:student-admission.activities'),
-            async (tx) => {
-              return tx
-                .select({ userId: phoneNumbersLive.userId })
-                .from(phoneNumbersLive)
-                .where(
-                  and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)),
-                )
-                .limit(1);
-            },
-          );
-          if (existing.length > 0) {
-            logger.log(`Found existing user by phone: ${existing[0].userId}`);
-            return existing[0].userId;
-          }
-        }
-
         // Deterministic placeholder email derived from the stable applicationId
         // seed so every Temporal retry resolves the same user. Check for an
         // existing row by email *before* calling IdentityService — without this
@@ -206,7 +185,6 @@ export function createStudentAdmissionActivities(
         const { userId: newUserId } = await identityService.createUser({
           email,
           username,
-          phone: phone ? { countryCode: '+91', number: phone } : undefined,
           actorId: createdBy,
         });
         eventBus.emit(EVENT_PATTERNS.USER.admission_created, {
@@ -214,7 +192,6 @@ export function createStudentAdmissionActivities(
           userId: newUserId,
           email,
           username,
-          phone: phone ?? null,
         });
 
         return newUserId;
@@ -414,38 +391,62 @@ export function createStudentAdmissionActivities(
     },
 
     async linkGuardians(tenantId, studentProfileId, formData, createdBy, seed) {
+      const findPhoneOwner = async (number: string): Promise<string | undefined> => {
+        const rows = await withAdmin(
+          db,
+          mkAdminCtx('workflow:student-admission.activities'),
+          async (tx) =>
+            tx
+              .select({ userId: phoneNumbersLive.userId })
+              .from(phoneNumbersLive)
+              .where(
+                and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, number)),
+              )
+              .limit(1),
+        );
+        return rows.at(0)?.userId;
+      };
+      const isParentIn = async (tenant: string, userId: string): Promise<boolean> => {
+        const rows = await withTenant(
+          db,
+          mkInstituteCtx(tenant, 'workflow:student-admission.activities'),
+          async (tx) =>
+            tx
+              .select({ id: membershipsLive.id })
+              .from(membershipsLive)
+              .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
+              .where(
+                and(
+                  eq(membershipsLive.userId, userId),
+                  eq(membershipsLive.tenantId, tenant),
+                  eq(membershipsLive.status, 'ACTIVE'),
+                  sql`${rolesLive.name}->>'en' = ${DefaultRoles.Parent}`,
+                ),
+              )
+              .limit(1),
+        );
+        return rows.length > 0;
+      };
+
       const parentPhone = (formData.parentPhone ?? formData.parent_phone) as string | undefined;
       const parentName = (formData.parentName ?? formData.parent_name) as string | undefined;
       const relationshipRaw = (formData.parentRelation ?? formData.parent_relation) as
         | string
         | undefined;
 
-      if (!parentPhone) {
+      if (!parentPhone && !parentName) {
         logger.warn(
-          `No parent phone in formData for student ${studentProfileId} — cannot link guardian`,
+          `No parent details in formData for student ${studentProfileId} — cannot link guardian`,
         );
         return;
       }
 
-      // Find the guardian user by phone; create a placeholder if absent.
+      // A typed phone number proves nothing about who typed it. The account that owns it is
+      // reused only when it is already a parent in this institute (a sibling's admission);
+      // any other owner would gain a membership and a child without consenting (SF-040).
       const guardianUserId = await (async (): Promise<string> => {
-        const existing = await withAdmin(
-          db,
-          mkAdminCtx('workflow:student-admission.activities'),
-          async (tx) => {
-            return tx
-              .select({ userId: phoneNumbersLive.userId })
-              .from(phoneNumbersLive)
-              .where(
-                and(
-                  eq(phoneNumbersLive.countryCode, '+91'),
-                  eq(phoneNumbersLive.number, parentPhone),
-                ),
-              )
-              .limit(1);
-          },
-        );
-        if (existing.length > 0) return existing[0].userId;
+        const phoneOwner = parentPhone ? await findPhoneOwner(parentPhone) : undefined;
+        if (phoneOwner && (await isParentIn(tenantId, phoneOwner))) return phoneOwner;
 
         // Check by deterministic placeholder email before creating — a Temporal
         // retry would otherwise fail with a unique-constraint violation on
@@ -472,7 +473,9 @@ export function createStudentAdmissionActivities(
         const { userId: newId } = await identityService.createUser({
           email,
           username,
-          phone: { countryCode: '+91', number: parentPhone },
+          // The number stays with its owner; this guardian has none until a verified claim.
+          phone:
+            parentPhone && !phoneOwner ? { countryCode: '+91', number: parentPhone } : undefined,
           actorId: createdBy,
         });
         return newId;

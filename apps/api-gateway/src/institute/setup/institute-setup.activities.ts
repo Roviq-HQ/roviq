@@ -6,33 +6,40 @@
  * handlers are in the Auth & Identity project, not implemented here).
  *
  * Temporal activities must accept only serializable arguments.
- * The DrizzleDB + ClientProxy are injected at worker startup via closure.
+ * The DrizzleDB, EventBusService and InstituteSetupService are injected at worker startup via
+ * closure; the setup steps themselves live in InstituteSetupService, shared with direct creation.
  */
 import { Logger } from '@nestjs/common';
-import type { ClientProxy } from '@nestjs/microservices';
 import {
-  academicYears,
-  academicYearsLive,
   type DrizzleDB,
-  instituteConfigs,
   instituteNotificationConfigs,
   institutes,
   mkAdminCtx,
   withAdmin,
 } from '@roviq/database';
+import type { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { eq } from 'drizzle-orm';
+import type { InstituteSetupService } from '../management/seed/institute-setup.service';
 import type { InstituteSetupActivities, InstituteSetupProgress } from './institute-setup.types';
 
 const logger = new Logger('InstituteSetupActivities');
 
 /**
- * Create activity implementations bound to a DrizzleDB instance and NATS client.
+ * Create activity implementations bound to a DrizzleDB instance and the event bus.
  * Called at Temporal worker startup — activities close over the connections.
  */
 export function createInstituteSetupActivities(
   db: DrizzleDB,
-  natsClient: ClientProxy,
+  eventBus: Pick<EventBusService, 'emit'>,
+  setup: Pick<
+    InstituteSetupService,
+    | 'createDefaultRoles'
+    | 'createDefaultNotificationConfig'
+    | 'createInstituteConfig'
+    | 'createFirstAcademicYear'
+    | 'seedAcademicStructure'
+  >,
 ): InstituteSetupActivities {
   return {
     // ── Phase 1: Identity (via NATS stubs) ─────────────────
@@ -106,121 +113,45 @@ export function createInstituteSetupActivities(
       // TODO: Actual NATS call to Finance Service
     },
 
-    /**
-     * Request Identity Service to create default roles (teacher, student, parent, etc.).
-     * TODO: Replace stub with actual NATS call to IDENTITY.createDefaultRoles.
-     */
     async createDefaultRoles(instituteId: string, _creatingUserId: string): Promise<void> {
-      logger.log(
-        `[STUB] NATS → IDENTITY.createDefaultRoles: teacher, student, parent for ${instituteId}`,
-      );
-      // TODO: Actual NATS call — Identity Service creates roles from DEFAULT_ROLE_ABILITIES
+      await setup.createDefaultRoles(instituteId);
     },
 
     // ── Phase 3: Academic Structure ────────────────────────
 
-    /**
-     * Seed standards, sections, and subjects for the institute.
-     * Delegates to InstituteSeederService (injected via closure).
-     * Idempotent — seeder checks existence before creating.
-     *
-     * NOTE: Temporal activities can't access NestJS DI directly.
-     * The seeder is passed via closure at worker startup, or this activity
-     * uses direct DB operations mirroring the seeder logic.
-     */
     async seedAcademicStructure(
       instituteId: string,
-      _academicYearId: string,
+      academicYearId: string,
       departments: string[],
-      _board: string | undefined,
+      board: string | undefined,
       type: string,
-      _creatingUserId: string,
-    ): Promise<{ standardsCreated: number; sectionsCreated: number; subjectsSeeded: number }> {
-      logger.log(
-        `Seeding academic structure: institute=${instituteId}, type=${type}, departments=${departments.join(',')}`,
-      );
-
-      // Academic structure seeding is handled by InstituteSetupService (NestJS service)
-      // which calls InstituteSeederService with proper DI context.
-      // This Temporal activity logs the intent — the actual seeding runs in the
-      // NestJS process via the existing InstituteSetupService.runSetup() method.
-      // When migrating fully to Temporal, the seeder will be injected via closure
-      // at worker startup (same pattern as createPartitionActivities in audit).
-      logger.log(
-        `Academic structure seeding for ${instituteId}: type=${type}, ` +
-          `departments=[${departments.join(',')}] — delegated to InstituteSeederService`,
-      );
-
-      // Return zeroes — actual counts come from the NestJS seeder
-      return { standardsCreated: 0, sectionsCreated: 0, subjectsSeeded: 0 };
+      creatingUserId: string,
+    ) {
+      return setup.seedAcademicStructure({
+        instituteId,
+        academicYearId,
+        type,
+        departments,
+        board,
+        actorId: creatingUserId,
+      });
     },
 
     // ── Phase 4: Configuration ─────────────────────────────
 
-    /** Generate default notification config for the institute */
     async createDefaultNotificationConfig(
       instituteId: string,
       creatingUserId: string,
     ): Promise<void> {
-      logger.log(`Creating default notification config for ${instituteId}`);
-
-      const notificationTypes = ['FEE', 'ATTENDANCE', 'APPROVAL'];
-
-      await withAdmin(db, mkAdminCtx('seeder:institute-setup.activities'), async (tx) => {
-        for (const notificationType of notificationTypes) {
-          // Idempotency: ON CONFLICT DO NOTHING
-          await tx
-            .insert(instituteNotificationConfigs)
-            .values({
-              tenantId: instituteId,
-              notificationType,
-              inAppEnabled: true,
-              whatsappEnabled: false,
-              emailEnabled: true,
-              pushEnabled: false,
-              digestEnabled: false,
-              createdBy: creatingUserId,
-              updatedBy: creatingUserId,
-            })
-            .onConflictDoNothing();
-        }
-      });
+      await setup.createDefaultNotificationConfig(instituteId, creatingUserId);
     },
 
-    /** Create institute config with board-specific section_strength_norms */
     async createInstituteConfig(
       instituteId: string,
       board: string | undefined,
       creatingUserId: string,
     ): Promise<void> {
-      logger.log(`Creating institute config for ${instituteId} (board=${board ?? 'none'})`);
-
-      // Board-specific section strength norms (PRD §7.3)
-      const normsByBoard: Record<
-        string,
-        { optimal: number; hardMax: number; exemptionAllowed: boolean }
-      > = {
-        CBSE: { optimal: 40, hardMax: 45, exemptionAllowed: true },
-        BSEH: { optimal: 40, hardMax: 45, exemptionAllowed: true },
-        RBSE: { optimal: 40, hardMax: 45, exemptionAllowed: true },
-        ICSE: { optimal: 35, hardMax: 40, exemptionAllowed: false },
-      };
-
-      const sectionStrengthNorms = board
-        ? (normsByBoard[board] ?? normsByBoard.CBSE)
-        : normsByBoard.CBSE;
-
-      await withAdmin(db, mkAdminCtx('seeder:institute-setup.activities'), async (tx) => {
-        await tx
-          .insert(instituteConfigs)
-          .values({
-            tenantId: instituteId,
-            sectionStrengthNorms,
-            createdBy: creatingUserId,
-            updatedBy: creatingUserId,
-          })
-          .onConflictDoNothing();
-      });
+      await setup.createInstituteConfig(instituteId, board, creatingUserId);
     },
 
     // TODO (ROV-152): Seed default tenant_sequences for this institute:
@@ -229,44 +160,8 @@ export function createInstituteSetupActivities(
     //   - `tc_no:{year}` → format `TC/{year}/{value:03d}`
     // See: libs/database/src/schema/sequences/tenant-sequences.ts
 
-    /** Create first academic year in active state (Indian: April–March) */
     async createFirstAcademicYear(instituteId: string, creatingUserId: string): Promise<string> {
-      const now = new Date();
-      // Indian academic year: April to March
-      const startYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-      const label = `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
-      const startDate = `${startYear}-04-01`;
-      const endDate = `${startYear + 1}-03-31`;
-
-      return withAdmin(db, mkAdminCtx('seeder:institute-setup.activities'), async (tx) => {
-        // Idempotency: check if academic year already exists
-        const existing = await tx
-          .select({ id: academicYearsLive.id })
-          .from(academicYearsLive)
-          .where(eq(academicYearsLive.tenantId, instituteId));
-
-        if (existing.length > 0) {
-          logger.log(`Academic year already exists for ${instituteId}, skipping`);
-          return existing[0].id;
-        }
-
-        const rows = await tx
-          .insert(academicYears)
-          .values({
-            tenantId: instituteId,
-            label,
-            startDate,
-            endDate,
-            isActive: true,
-            status: 'ACTIVE',
-            createdBy: creatingUserId,
-            updatedBy: creatingUserId,
-          })
-          .returning({ id: academicYears.id });
-
-        logger.log(`Created academic year "${label}" for ${instituteId}`);
-        return rows[0].id;
-      });
+      return setup.createFirstAcademicYear(instituteId, creatingUserId);
     },
 
     // ── Phase 5: Demo Data ─────────────────────────────────
@@ -312,27 +207,21 @@ export function createInstituteSetupActivities(
       });
 
       if (status === 'COMPLETED') {
-        natsClient
-          .emit(EVENT_PATTERNS.INSTITUTE.setup_completed, { instituteId, tenantId: instituteId })
-          .subscribe({
-            error: (err: unknown) =>
-              logger.warn(`Failed to emit INSTITUTE.setup_completed: ${err}`),
-          });
+        eventBus.emit(EVENT_PATTERNS.INSTITUTE.setup_completed, {
+          instituteId,
+          tenantId: instituteId,
+        });
       }
 
       logger.log(`Setup status → ${status} for institute ${instituteId}`);
     },
 
-    /** Publish progress update via NATS for instituteSetupProgress subscription */
+    /** Publish progress for the instituteSetupProgress subscriptions (NATS and GraphQL pubsub). */
     async publishProgress(progress: InstituteSetupProgress): Promise<void> {
-      natsClient
-        .emit(EVENT_PATTERNS.INSTITUTE.setup_progress, {
-          ...progress,
-          tenantId: progress.instituteId,
-        })
-        .subscribe({
-          error: (err: unknown) => logger.warn(`Failed to publish setup progress: ${err}`),
-        });
+      eventBus.emit(EVENT_PATTERNS.INSTITUTE.setup_progress, {
+        ...progress,
+        tenantId: progress.instituteId,
+      });
     },
   };
 }

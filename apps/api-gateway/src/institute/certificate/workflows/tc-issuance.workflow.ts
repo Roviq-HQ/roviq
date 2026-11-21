@@ -28,7 +28,15 @@ export async function TCIssuanceWorkflow(input: TCIssuanceInput): Promise<TCIssu
   const { tenantId, tcRegisterId, studentProfileId, skipClearance } = input;
 
   // ── Step 1: Request validation ─────────────────────────
-  await activities.validateRequest(tenantId, tcRegisterId, studentProfileId);
+  const stopped: TCIssuanceResult = {
+    status: 'CANCELLED',
+    tcRegisterId,
+    tcSerialNumber: null,
+    pdfUrl: null,
+  };
+  if (!(await activities.validateRequest(tenantId, tcRegisterId, studentProfileId))) {
+    return stopped;
+  }
 
   // ── Step 2: Department clearances (parallel) ───────────
   if (!skipClearance) {
@@ -48,7 +56,8 @@ export async function TCIssuanceWorkflow(input: TCIssuanceInput): Promise<TCIssu
   }
 
   // ── Step 3: Data population (20 CBSE fields) ──────────
-  await activities.populateTcData(tenantId, tcRegisterId, studentProfileId);
+  const populated = await activities.populateTcData(tenantId, tcRegisterId, studentProfileId);
+  if (!populated) return stopped;
 
   // Steps 4 (approval) and 5 (issuance) are resolver-driven:
   // - Principal calls approveTC mutation → status='approved'

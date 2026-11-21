@@ -17,6 +17,7 @@ import {
   TcStatus,
 } from '@roviq/common-types';
 import {
+  academicYearsLive,
   certificateTemplatesLive,
   DRIZZLE_DB,
   type DrizzleDB,
@@ -40,14 +41,7 @@ import { getRequestContext } from '@roviq/request-context';
 import { Client, Connection } from '@temporalio/client';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { nextTcSerialNumber } from './tc-serial';
-
-/**
- * Default Temporal task queue name for the TC-issuance workflow. Overridable
- * via `TEMPORAL_TC_TASK_QUEUE` env var (CE-002) so a deployment can rename
- * the queue in concert with the worker without a code change. Worker side
- * must read the same env var to register the same name.
- */
-const DEFAULT_TC_TASK_QUEUE = 'tc-issuance';
+import { DEFAULT_TC_TASK_QUEUE } from './workflows/tc-issuance.types';
 
 @Injectable()
 export class CertificateService {
@@ -104,6 +98,21 @@ export class CertificateService {
       );
     }
 
+    // Read under the caller's tenant: another institute's year is invisible here.
+    const year = await withTenant(
+      this.db,
+      mkInstituteCtx(tenantId, 'service:certificate'),
+      async (tx) =>
+        tx
+          .select({ id: academicYearsLive.id })
+          .from(academicYearsLive)
+          .where(eq(academicYearsLive.id, input.academicYearId))
+          .limit(1),
+    );
+    if (year.length === 0) {
+      throw new BusinessException(ErrorCode.ACADEMIC_YEAR_NOT_FOUND, 'Academic year not found');
+    }
+
     // Generate TC serial number placeholder (final serial assigned at issuance)
     const tempSerial = `TC-REQ-${Date.now()}`;
 
@@ -125,10 +134,21 @@ export class CertificateService {
             createdBy: actorId,
             updatedBy: actorId,
           })
+          // uq_tc_register_open_request: a second request in progress inserts nothing.
+          .onConflictDoNothing({
+            target: [tcRegister.tenantId, tcRegister.studentProfileId],
+            where: sql`${tcRegister.isDuplicate} = false AND ${tcRegister.status} NOT IN ('CANCELLED', 'ISSUED') AND ${tcRegister.deletedAt} IS NULL`,
+          })
           .returning();
-        return rows[0];
+        return rows.at(0);
       },
     );
+    if (!tc) {
+      throw new BusinessException(
+        ErrorCode.TC_ALREADY_REQUESTED,
+        'This student already has a transfer certificate request in progress',
+      );
+    }
 
     // Start Temporal workflow
     try {

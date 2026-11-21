@@ -5,6 +5,7 @@ import { DlqModule } from '../dlq/dlq.module';
 import { FilesModule } from '../files/files.module';
 import { InstituteGroupModule } from '../institute/institute-group/institute-group.module';
 import { InstituteModule } from '../institute/management/institute.module';
+import { InstituteSetupModule } from '../institute/setup/institute-setup.module';
 import { AdminAttendanceModule } from './attendance/admin-attendance.module';
 import { AdminAuditResolver } from './audit/admin-audit.resolver';
 import { AdminComplianceExportModule } from './compliance-export/admin-compliance-export.module';
@@ -32,6 +33,7 @@ import { AdminUserModule } from './user/admin-user.module';
     DlqModule, // provides DlqService
     InstituteGroupModule, // provides InstituteGroupService for admin group operations
     InstituteModule, // provides InstituteService for admin institute operations
+    InstituteSetupModule, // runs the setup workflow that approval starts (ROV-232)
     AdminUserModule,
     AdminAttendanceModule, // cross-tenant attendance summary (ROV admin attendance view)
     AdminMonitoringModule, // system health + tenant analytics (ROV-184)

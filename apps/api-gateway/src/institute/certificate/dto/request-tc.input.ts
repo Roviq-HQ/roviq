@@ -1,6 +1,14 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { CertificateStatus, CertificateTemplateType, TcStatus } from '@roviq/common-types';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 @InputType({
   description:
@@ -17,10 +25,11 @@ export class RequestTCInput {
 
   @Field({
     description:
-      'Reason for leaving — printed verbatim on the TC, e.g. "Family relocated to another city".',
+      'Reason for leaving — printed verbatim on the TC, e.g. "Family relocated to another city". 10 to 200 characters.',
   })
   @IsString()
-  @IsNotEmpty()
+  @MinLength(10)
+  @MaxLength(200)
   reason!: string;
 }
 
@@ -34,10 +43,11 @@ export class RequestDuplicateTCInput {
 
   @Field({
     description:
-      'Reason for the duplicate request, e.g. FIR reference number or affidavit details.',
+      'Reason for the duplicate request, e.g. FIR reference number or affidavit details. At most 200 characters.',
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
   reason!: string;
 
   @Field(() => String, {

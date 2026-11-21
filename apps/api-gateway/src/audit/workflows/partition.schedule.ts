@@ -1,61 +1,59 @@
+import type { LoggerService } from '@nestjs/common';
+import {
+  ScheduleAlreadyRunning,
+  type ScheduleClient,
+  ScheduleNotFoundError,
+  type ScheduleOptions,
+} from '@temporalio/client';
+
+export const AUDIT_MAINTENANCE_TASK_QUEUE = 'audit-maintenance';
+export const AUDIT_PARTITION_SCHEDULE_ID = 'audit-partition-cron';
+
 /**
- * Register the audit partition management cron schedule with Temporal.
- *
- * Run once: npx ts-node apps/api-gateway/src/audit/workflows/partition.schedule.ts
- *
- * Schedule: 25th of each month at 2 AM UTC
- * Creates next month's partition 5 days early as safety margin.
+ * 2 AM UTC on the 25th of each month: next month's partition five days early, then retention
+ * (detach partitions past one year) and a health check. AuditPartitionMaintainer creates
+ * partitions at boot and daily too; only this workflow enforces retention.
  */
-import 'dotenv/config';
-import { createLogger } from '@roviq/telemetry';
-import { Client, Connection } from '@temporalio/client';
+const AUDIT_PARTITION_SCHEDULE = {
+  spec: { calendars: [{ hour: 2, minute: 0, dayOfMonth: 25 }] },
+  action: {
+    type: 'startWorkflow',
+    workflowType: 'auditPartitionManagement',
+    taskQueue: AUDIT_MAINTENANCE_TASK_QUEUE,
+  },
+  policies: { overlap: 'SKIP', catchupWindow: '24 hours' },
+} satisfies Omit<ScheduleOptions, 'scheduleId'>;
 
-const logger = createLogger('partition-schedule');
-
-const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-const TASK_QUEUE = 'audit-maintenance';
-const SCHEDULE_ID = 'audit-partition-cron';
-
-async function register() {
-  const connection = await Connection.connect({ address: TEMPORAL_ADDRESS });
-  const client = new Client({ connection });
-
+/**
+ * Brings the partition schedule to the spec above, creating it when it does not exist. Only a
+ * not-found answer leads to a create; any other error is thrown.
+ */
+export async function ensureAuditPartitionSchedule(
+  schedules: ScheduleClient,
+  logger: Pick<LoggerService, 'log'>,
+): Promise<'created' | 'updated' | 'exists'> {
   try {
-    // Check if schedule already exists
-    const handle = client.schedule.getHandle(SCHEDULE_ID);
-    const desc = await handle.describe();
-    logger.info(
-      `Schedule ${SCHEDULE_ID} already exists (next run: ${desc.info.nextActionTimes[0]})`,
-    );
-    return;
-  } catch {
-    // Schedule doesn't exist — create it
+    await schedules.getHandle(AUDIT_PARTITION_SCHEDULE_ID).update((previous) => ({
+      ...AUDIT_PARTITION_SCHEDULE,
+      // An operator's pause and its note survive a deploy.
+      state: previous.state,
+    }));
+    logger.log(`Updated Temporal schedule ${AUDIT_PARTITION_SCHEDULE_ID}`);
+    return 'updated';
+  } catch (err) {
+    if (!(err instanceof ScheduleNotFoundError)) throw err;
   }
 
-  await client.schedule.create({
-    scheduleId: SCHEDULE_ID,
-    spec: {
-      /** 2 AM UTC on the 25th of each month */
-      calendars: [{ hour: 2, minute: 0, dayOfMonth: 25 }],
-    },
-    action: {
-      type: 'startWorkflow',
-      workflowType: 'auditPartitionManagement',
-      taskQueue: TASK_QUEUE,
-    },
-    policies: {
-      /** Skip if previous run hasn't finished */
-      overlap: 'SKIP',
-      /** Catch up missed runs within 24 hours */
-      catchupWindow: '24 hours',
-    },
-  });
-
-  logger.info(`Schedule ${SCHEDULE_ID} created: 2 AM UTC on 25th of each month`);
-  await connection.close();
+  try {
+    await schedules.create({
+      scheduleId: AUDIT_PARTITION_SCHEDULE_ID,
+      ...AUDIT_PARTITION_SCHEDULE,
+    });
+  } catch (err) {
+    // Another gateway created it between our update and create, from the same spec.
+    if (err instanceof ScheduleAlreadyRunning) return 'exists';
+    throw err;
+  }
+  logger.log(`Created Temporal schedule ${AUDIT_PARTITION_SCHEDULE_ID}`);
+  return 'created';
 }
-
-register().catch((err) => {
-  logger.error('Failed to register schedule:', err);
-  process.exit(1);
-});

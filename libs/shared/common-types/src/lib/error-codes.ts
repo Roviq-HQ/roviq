@@ -251,6 +251,8 @@ export const ErrorCode = {
   SUBSCRIPTION_PLAN_NOT_FOUND: 'SUBSCRIPTION_PLAN_NOT_FOUND',
   /** Transfer Certificate not found or not in the state the action needs */
   TC_NOT_FOUND: 'TC_NOT_FOUND',
+  /** The student already has a Transfer Certificate request in progress */
+  TC_ALREADY_REQUESTED: 'TC_ALREADY_REQUESTED',
   /** Reseller team member not found */
   TEAM_MEMBER_NOT_FOUND: 'TEAM_MEMBER_NOT_FOUND',
   /** The invited person already has a membership (active or inactive) in this reseller */
@@ -514,6 +516,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SUBSCRIPTION_NOT_FOUND: HttpStatus.NOT_FOUND,
   SUBSCRIPTION_PLAN_NOT_FOUND: HttpStatus.NOT_FOUND,
   TC_NOT_FOUND: HttpStatus.NOT_FOUND,
+  TC_ALREADY_REQUESTED: HttpStatus.CONFLICT,
   TEAM_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
   TEAM_MEMBER_ALREADY_EXISTS: HttpStatus.CONFLICT,
   TEAM_MEMBER_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,

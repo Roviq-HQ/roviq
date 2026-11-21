@@ -24,6 +24,7 @@ import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { InstituteService } from '../../institute/management/institute.service';
 import { InstituteRepository } from '../../institute/management/repositories/institute.repository';
 import type { InstituteRecord } from '../../institute/management/repositories/types';
+import { INSTITUTE_SETUP_TASK_QUEUE } from '../../institute/setup/institute-setup.types';
 import type { AdminListInstitutesFilterInput } from './dto/admin-list-institutes-filter.input';
 import type { AcademicTreeModel } from './models/academic-tree.model';
 
@@ -405,7 +406,7 @@ export class AdminInstituteService {
         const { userId } = getRequestContext();
 
         await client.workflow.start('InstituteSetupWorkflow', {
-          taskQueue: 'institute-setup',
+          taskQueue: INSTITUTE_SETUP_TASK_QUEUE,
           // WorkflowIdReusePolicy default (AllowDuplicateFailedOnly) lets retry()
           // start a fresh run when the prior run failed or timed out.
           workflowId: `institute-setup-${instituteId}`,

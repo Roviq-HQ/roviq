@@ -26,20 +26,16 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import {
-  AlertCircle,
   ArrowLeft,
   Award,
   CheckCircle2,
   CheckCircle as CheckCircleFilled,
   Clock,
-  Eraser,
   ExternalLink,
   FileDown,
   Printer,
   QrCode,
   Send,
-  ShieldCheck,
-  Sparkles,
   XCircle,
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -47,6 +43,7 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { isKnownDepartment, TC_STATUS_CLASS, TC_STATUS_ICON } from '../../tc-status';
 import {
   useApproveTC,
   useIssueTC,
@@ -56,61 +53,6 @@ import {
 } from '../../use-certificates';
 
 const { instituteCertificatesTc } = testIds;
-const TC_STATUS_CLASS: Record<string, string> = {
-  REQUESTED: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  CLEARANCE_PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
-  CLEARED: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
-  APPROVED: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300',
-  COUNTERSIGNED: 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
-  ISSUED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-  DUPLICATE_ISSUED: 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300',
-  REJECTED: 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300',
-  RETURNED: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  CANCELLED: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-};
-
-const TC_STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  REQUESTED: Clock,
-  CLEARANCE_PENDING: AlertCircle,
-  CLEARED: ShieldCheck,
-  APPROVED: Sparkles,
-  COUNTERSIGNED: Award,
-  ISSUED: CheckCircle2,
-  DUPLICATE_ISSUED: Award,
-  REJECTED: XCircle,
-  RETURNED: Send,
-  CANCELLED: Eraser,
-};
-
-/** Normalise a clearance entry into a status keyword for rendering. */
-type ClearanceStatus = 'cleared' | 'pending' | 'blocked';
-
-function normaliseClearance(value: unknown): { status: ClearanceStatus; note: string | null } {
-  if (typeof value === 'string') {
-    const v = value.toLowerCase();
-    if (v === 'cleared' || v === 'approved' || v === 'done' || v === 'ok') {
-      return { status: 'cleared', note: null };
-    }
-    if (v === 'blocked' || v === 'rejected' || v === 'denied') {
-      return { status: 'blocked', note: null };
-    }
-    return { status: 'pending', note: null };
-  }
-  if (value && typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    const raw = typeof obj.status === 'string' ? (obj.status as string).toLowerCase() : '';
-    const note = typeof obj.note === 'string' ? (obj.note as string) : null;
-    if (raw === 'cleared' || raw === 'approved' || raw === 'done') {
-      return { status: 'cleared', note };
-    }
-    if (raw === 'blocked' || raw === 'rejected' || raw === 'denied') {
-      return { status: 'blocked', note };
-    }
-    return { status: 'pending', note };
-  }
-  return { status: 'pending', note: null };
-}
-
 function formatDdMmYyyy(dateStr: string): string {
   const d = new Date(dateStr);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
@@ -190,11 +132,9 @@ export default function TCDetailPage() {
     );
   }
 
-  const status = tc.status.toUpperCase();
-  const StatusIcon = TC_STATUS_ICON[status] ?? Clock;
-
-  const clearances = tc.clearances && typeof tc.clearances === 'object' ? tc.clearances : null;
-  const clearanceEntries = clearances ? Object.entries(clearances) : [];
+  const status: TcStatus = tc.status;
+  const StatusIcon = TC_STATUS_ICON[status];
+  const clearances = tc.clearances ?? [];
   const tcDataEntries = tc.tcData && typeof tc.tcData === 'object' ? Object.entries(tc.tcData) : [];
 
   return (
@@ -241,10 +181,10 @@ export default function TCDetailPage() {
                   <div className="mt-2 flex items-center gap-2">
                     <Badge
                       variant="secondary"
-                      className={`inline-flex items-center gap-1 ${TC_STATUS_CLASS[status] ?? ''}`}
+                      className={`inline-flex items-center gap-1 ${TC_STATUS_CLASS[status]}`}
                     >
                       <StatusIcon className="size-3.5" />
-                      {t(`tcStatuses.${status}`, { default: status })}
+                      {t(`tcStatuses.${status}`)}
                     </Badge>
                     {tc.isDuplicate && <Badge variant="outline">{t('duplicate')}</Badge>}
                     <span className="text-sm text-muted-foreground">
@@ -254,25 +194,25 @@ export default function TCDetailPage() {
                 </div>
                 <Can I="manage" a="TC">
                   <div className="flex flex-wrap items-center gap-2 print:hidden">
-                    {TC_STATE_MACHINE.canTransition(status as TcStatus, 'APPROVED') && (
+                    {TC_STATE_MACHINE.canTransition(status, 'APPROVED') && (
                       <Button onClick={handleApprove} disabled={approving}>
                         <CheckCircleFilled className="size-4" />
                         {approving ? t('tc.approving') : t('tc.approve')}
                       </Button>
                     )}
-                    {TC_STATE_MACHINE.canTransition(status as TcStatus, 'CANCELLED') && (
+                    {TC_STATE_MACHINE.canTransition(status, 'CANCELLED') && (
                       <Button variant="destructive" onClick={() => setRejectOpen(true)}>
                         <XCircle className="size-4" />
                         {t('tc.reject')}
                       </Button>
                     )}
-                    {TC_STATE_MACHINE.canTransition(status as TcStatus, 'ISSUED') && (
+                    {TC_STATE_MACHINE.canTransition(status, 'ISSUED') && (
                       <Button onClick={handleIssue} disabled={issuing}>
                         <Send className="size-4" />
                         {issuing ? t('tc.issuing') : t('tc.issue')}
                       </Button>
                     )}
-                    {TC_STATE_MACHINE.canTransition(status as TcStatus, 'DUPLICATE_REQUESTED') &&
+                    {TC_STATE_MACHINE.canTransition(status, 'DUPLICATE_REQUESTED') &&
                       !tc.isDuplicate && (
                         <Button variant="outline" onClick={() => setDuplicateOpen(true)}>
                           <Award className="size-4" />
@@ -294,34 +234,37 @@ export default function TCDetailPage() {
                     <CardTitle>{t('tc.clearanceTitle')}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {clearanceEntries.length === 0 ? (
+                    {clearances.length === 0 ? (
                       <p className="text-sm text-muted-foreground">{t('tc.noClearances')}</p>
                     ) : (
                       <ul className="space-y-2">
-                        {clearanceEntries.map(([dept, value]) => {
-                          const { status: cs, note } = normaliseClearance(value);
-                          const Icon =
-                            cs === 'cleared' ? CheckCircle2 : cs === 'blocked' ? XCircle : Clock;
-                          const color =
-                            cs === 'cleared'
-                              ? 'text-emerald-600'
-                              : cs === 'blocked'
-                                ? 'text-rose-600'
-                                : 'text-amber-600';
+                        {clearances.map(({ department, cleared, notes }) => {
+                          const Icon = cleared ? CheckCircle2 : Clock;
+                          const color = cleared ? 'text-emerald-600' : 'text-amber-600';
                           return (
                             <li
-                              key={dept}
+                              key={department}
                               className="flex items-start justify-between gap-3 rounded border p-2"
                             >
                               <div className="flex items-start gap-2">
                                 <Icon className={`mt-0.5 size-4 ${color}`} />
                                 <div>
-                                  <p className="text-sm font-medium">{dept}</p>
-                                  {note && <p className="text-xs text-muted-foreground">{note}</p>}
+                                  <p className="text-sm font-medium">
+                                    {isKnownDepartment(department)
+                                      ? t(`tc.departments.${department}`)
+                                      : department}
+                                  </p>
+                                  {notes && (
+                                    <p className="text-xs text-muted-foreground">{notes}</p>
+                                  )}
                                 </div>
                               </div>
                               <span className={`text-xs font-medium ${color}`}>
-                                {t(`tc.clearanceStatus.${cs}`)}
+                                {t(
+                                  cleared
+                                    ? 'tc.clearanceStatus.cleared'
+                                    : 'tc.clearanceStatus.pending',
+                                )}
                               </span>
                             </li>
                           );

@@ -49,6 +49,7 @@ import type { CreateEnquiryInput } from './dto/create-enquiry.input';
 import type { UpdateEnquiryInput } from './dto/update-enquiry.input';
 import type { ApplicationModel } from './models/application.model';
 import type { EnquiryModel } from './models/enquiry.model';
+import { STUDENT_ADMISSION_TASK_QUEUE } from './workflows/student-admission.types';
 
 /**
  * Drizzle row types — single source of truth for the shape returned by
@@ -556,7 +557,7 @@ export class AdmissionService {
     try {
       const client = new TemporalClient({ connection });
       await client.workflow.start('StudentAdmissionWorkflow', {
-        taskQueue: 'student-admission',
+        taskQueue: STUDENT_ADMISSION_TASK_QUEUE,
         workflowId,
         workflowExecutionTimeout: '5 minutes',
         args: [{ applicationId: id, tenantId, actorId }],

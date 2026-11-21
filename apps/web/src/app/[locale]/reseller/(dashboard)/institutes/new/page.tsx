@@ -1,7 +1,14 @@
 'use client';
 
-import { INDIAN_STATE_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import {
+  BOARD_TYPE_VALUES,
+  type BoardType,
+  EDUCATION_LEVEL_VALUES,
+  type EducationLevel,
+  ErrorCode,
+  INDIAN_STATE_VALUES,
+} from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { emptyStringToUndefined, i18nTextSchema, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -19,6 +26,7 @@ import {
   I18nField,
   useAppForm,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -35,25 +43,14 @@ const TYPES = ['SCHOOL', 'COACHING', 'LIBRARY'] as const;
 /** Academic structure frameworks (school-only). */
 const FRAMEWORKS = ['NEP', 'TRADITIONAL'] as const;
 
-/** Education boards (school-only). */
-const BOARDS = ['cbse', 'bseh', 'rbse', 'icse'] as const;
-
-/** Academic departments (school-only) — must match EducationLevel pgEnum values (UPPER_CASE). */
-const DEPARTMENTS = [
-  'PRE_PRIMARY',
-  'PRIMARY',
-  'UPPER_PRIMARY',
-  'SECONDARY',
-  'SENIOR_SECONDARY',
-] as const;
-
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
+// Field names are the GraphQL InstitutePhoneInput's, so a parsed entry is sent as is.
 const phoneEntrySchema = z.object({
-  country_code: z.string().default('+91'),
+  countryCode: z.string().default('+91'),
   number: z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits.'),
-  is_primary: z.boolean().default(false),
-  is_whatsapp_enabled: z.boolean().default(false),
+  isPrimary: z.boolean().default(false),
+  isWhatsappEnabled: z.boolean().default(false),
   label: z.string().max(50).default(''),
 });
 
@@ -62,8 +59,8 @@ const schema = z.object({
   code: z.string().min(1, 'Code is required.').max(50),
   type: z.enum(TYPES),
   structureFramework: z.enum(FRAMEWORKS).optional(),
-  board: emptyStringToUndefined(z.string().optional()),
-  departments: z.array(z.string()).default([]),
+  board: emptyStringToUndefined(z.enum(BOARD_TYPE_VALUES).optional()),
+  departments: z.array(z.enum(EDUCATION_LEVEL_VALUES)).default([]),
   group: emptyStringToUndefined(z.string().optional()),
   phones: z.array(phoneEntrySchema),
   addressLine1: emptyStringToUndefined(z.string().optional()),
@@ -77,10 +74,10 @@ type FormSchema = typeof schema;
 type FormValues = z.input<FormSchema>;
 
 const DEFAULT_PHONE: z.input<typeof phoneEntrySchema> = {
-  country_code: '+91',
+  countryCode: '+91',
   number: '',
-  is_primary: true,
-  is_whatsapp_enabled: true,
+  isPrimary: true,
+  isWhatsappEnabled: true,
   label: '',
 };
 
@@ -98,7 +95,7 @@ export default function ResellerCreateInstitutePage() {
       code: '',
       type: 'SCHOOL',
       structureFramework: 'TRADITIONAL',
-      board: 'cbse',
+      board: 'CBSE',
       departments: [],
       group: '',
       phones: [{ ...DEFAULT_PHONE }],
@@ -154,14 +151,17 @@ export default function ResellerCreateInstitutePage() {
         toast.success(t('success'));
         router.push('/reseller/institutes');
       } catch (err) {
-        const message = extractGraphQLError(err, t('error'));
-        if (message.includes('INSTITUTE_CODE_DUPLICATE') || message.includes('already exists')) {
+        const code = extractGraphQLErrorCode(err);
+        // The slug is derived from the code, so a taken slug is a taken code too.
+        if (code === ErrorCode.INSTITUTE_CODE_DUPLICATE || code === ErrorCode.SLUG_DUPLICATE) {
           form.setFieldMeta('code', (prev) => ({
             ...prev,
-            errorMap: { onChange: t('codeDuplicate') },
+            isTouched: true,
+            errorMap: { ...prev.errorMap, onChange: t('codeDuplicate') },
           }));
+          toast.error(t('codeDuplicate'));
         } else {
-          toast.error(t('error'), { description: message });
+          toast.error(t('error'), { description: errorDescription(code) });
         }
       }
     },
@@ -175,7 +175,14 @@ export default function ResellerCreateInstitutePage() {
     (s) => (s.values as FormValues).departments ?? [],
   );
 
-  function toggleDepartment(dept: string) {
+  function errorDescription(code: string | null): string | undefined {
+    if (code === ErrorCode.BAD_REQUEST) return t('errors.invalidInput');
+    if (code === ErrorCode.INSTITUTE_GROUP_NOT_FOUND) return t('errors.groupNotFound');
+    if (code === ErrorCode.FORBIDDEN) return t('errors.forbidden');
+    return undefined;
+  }
+
+  function toggleDepartment(dept: EducationLevel) {
     const current = (form.state.values as FormValues).departments ?? [];
     const updated = current.includes(dept) ? current.filter((d) => d !== dept) : [...current, dept];
     // TanStack's `setFieldValue` typed name union elides `string[]`-typed
@@ -189,7 +196,10 @@ export default function ResellerCreateInstitutePage() {
 
   const typeOptions = TYPES.map((tp) => ({ value: tp, label: tp }));
   const frameworkOptions = FRAMEWORKS.map((fw) => ({ value: fw, label: t(`frameworks.${fw}`) }));
-  const boardOptions = BOARDS.map((b) => ({ value: b, label: t(`boards.${b}`) }));
+  const boardOptions = BOARD_TYPE_VALUES.map((b: BoardType) => ({
+    value: b,
+    label: t(`boards.${b}`),
+  }));
   const stateOptions = INDIAN_STATE_VALUES.map((s) => ({
     value: s,
     label: tGeo(`states.${s}`),
@@ -310,7 +320,7 @@ export default function ResellerCreateInstitutePage() {
                   <Field>
                     <FieldLabel>{t('departments')}</FieldLabel>
                     <div className="flex flex-wrap gap-3">
-                      {DEPARTMENTS.map((dept) => (
+                      {EDUCATION_LEVEL_VALUES.map((dept) => (
                         <div key={dept} className="flex items-center gap-2 text-sm">
                           <Checkbox
                             id={`dept-${dept}`}
@@ -363,7 +373,7 @@ export default function ResellerCreateInstitutePage() {
                         key={index}
                         className="grid grid-cols-[70px_1fr_auto] items-end gap-2 rounded-lg border p-3"
                       >
-                        <form.AppField name={`phones[${index}].country_code` as const}>
+                        <form.AppField name={`phones[${index}].countryCode` as const}>
                           {(field) => <field.TextField label={t('countryCode')} disabled />}
                         </form.AppField>
                         <form.AppField name={`phones[${index}].number` as const}>
@@ -394,8 +404,8 @@ export default function ResellerCreateInstitutePage() {
                       onClick={() =>
                         phonesField.pushValue({
                           ...DEFAULT_PHONE,
-                          is_primary: false,
-                          is_whatsapp_enabled: false,
+                          isPrimary: false,
+                          isWhatsappEnabled: false,
                         })
                       }
                     >
@@ -464,5 +474,3 @@ export default function ResellerCreateInstitutePage() {
     </div>
   );
 }
-
-import { testIds } from '@roviq/ui/testing/testid-registry';

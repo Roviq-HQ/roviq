@@ -13,6 +13,8 @@ import {
   AcademicStatus,
   AdmissionApplicationStatus,
   AdmissionType,
+  DefaultRoles,
+  GuardianRelationship,
   REJECTION_REASON_MAX_LENGTH,
   SocialCategory,
 } from '@roviq/common-types';
@@ -20,10 +22,15 @@ import {
   academicYears,
   admissionApplications,
   type DrizzleDB,
+  guardianProfiles,
+  memberships,
   mkAdminCtx,
+  phoneNumbers,
+  roles,
   SYSTEM_USER_ID,
   sections,
   standards,
+  studentGuardianLinks,
   studentProfiles,
   withAdmin,
 } from '@roviq/database';
@@ -39,10 +46,10 @@ import {
   type IntegrationAppResult,
 } from '@roviq/testing/integration';
 import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
-import type { IdentityService } from '../../../auth/identity.service';
+import { IdentityService } from '../../../auth/identity.service';
 import { createStudentAdmissionActivities } from '../workflows/student-admission.activities';
 
 const temporal = vi.hoisted(() => ({ start: vi.fn() }));
@@ -554,6 +561,217 @@ describe('Admission applications (integration)', () => {
     const row = await loadApplication(fixture.offerAcceptedApplicationId);
     expect(row.status).toBe(AdmissionApplicationStatus.OFFER_ACCEPTED);
     expect(row.studentProfileId).toBeNull();
+  });
+
+  it('admission activities: the parent phone makes a separate guardian user, never the student', async () => {
+    const parentRoleId = await withAdmin(result.db, mkAdminCtx('test:application'), async (tx) => {
+      const insertRole = async (name: string) => {
+        const [row] = await tx
+          .insert(roles)
+          .values({
+            name: { en: name },
+            scope: 'institute',
+            tenantId,
+            abilities: [],
+            isDefault: false,
+            isSystem: false,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: roles.id });
+        return row.id;
+      };
+      await insertRole(DefaultRoles.Student);
+      return insertRole(DefaultRoles.Parent);
+    });
+    const activities = createStudentAdmissionActivities(
+      result.db,
+      createMock<EventBusService>(),
+      result.app.get(IdentityService),
+    );
+    const seed = randomUUID();
+    const parentPhone = `9${String(Date.now()).slice(-9)}`;
+    const formData = {
+      studentName: 'Admitted Child',
+      parentName: 'Ramesh Verma',
+      parentPhone,
+      parentRelation: 'FATHER',
+    };
+
+    const { userId: studentUserId, membershipId } = await activities.createUserAndMembership(
+      tenantId,
+      actorId,
+      seed,
+    );
+    const { studentProfileId } = await activities.createStudentProfile(
+      tenantId,
+      studentUserId,
+      membershipId,
+      fixture.standardId,
+      formData,
+      false,
+      actorId,
+    );
+    await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
+    // Temporal retries must not create a second guardian.
+    await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
+
+    const stored = await withAdmin(result.db, mkAdminCtx('test:application'), async (tx) => {
+      const phoneOwners = await tx
+        .select({ userId: phoneNumbers.userId })
+        .from(phoneNumbers)
+        .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, parentPhone)));
+      const studentPhones = await tx
+        .select({ id: phoneNumbers.id })
+        .from(phoneNumbers)
+        .where(eq(phoneNumbers.userId, studentUserId));
+      const links = await tx
+        .select({
+          guardianUserId: guardianProfiles.userId,
+          relationship: studentGuardianLinks.relationship,
+          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
+        })
+        .from(studentGuardianLinks)
+        .innerJoin(
+          guardianProfiles,
+          eq(studentGuardianLinks.guardianProfileId, guardianProfiles.id),
+        )
+        .where(eq(studentGuardianLinks.studentProfileId, studentProfileId));
+      const studentParentMemberships = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(eq(memberships.userId, studentUserId), eq(memberships.roleId, parentRoleId)));
+      return { phoneOwners, studentPhones, links, studentParentMemberships };
+    });
+
+    expect(stored.studentPhones).toEqual([]);
+    expect(stored.studentParentMemberships).toEqual([]);
+    expect(stored.phoneOwners).toHaveLength(1);
+    const guardianUserId = stored.phoneOwners[0]?.userId;
+    assert(guardianUserId);
+    expect(guardianUserId).not.toBe(studentUserId);
+    expect(stored.links).toEqual([
+      { guardianUserId, relationship: GuardianRelationship.FATHER, isPrimaryContact: true },
+    ]);
+  });
+
+  // SF-040. Runs after the test above, which creates the Student and Parent roles.
+  it('admission activities: a phone owned by an account outside the institute links nobody to it', async () => {
+    const identity = result.app.get(IdentityService);
+    const activities = createStudentAdmissionActivities(
+      result.db,
+      createMock<EventBusService>(),
+      identity,
+    );
+    const outsiderPhone = `8${String(Date.now()).slice(-9)}`;
+    const outsiderSeed = randomUUID();
+    const { userId: outsiderId } = await identity.createUser({
+      email: `outsider-${outsiderSeed}@roviq.placeholder`,
+      username: `outsider-${outsiderSeed}`,
+      phone: { countryCode: '+91', number: outsiderPhone },
+      actorId,
+    });
+    const admit = async (seed: string) => {
+      const formData = {
+        studentName: 'Admitted Child',
+        parentName: 'Typed Parent',
+        parentPhone: outsiderPhone,
+        parentRelation: 'MOTHER',
+      };
+      const student = await activities.createUserAndMembership(tenantId, actorId, seed);
+      const { studentProfileId } = await activities.createStudentProfile(
+        tenantId,
+        student.userId,
+        student.membershipId,
+        fixture.standardId,
+        formData,
+        false,
+        actorId,
+      );
+      await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
+      return studentProfileId;
+    };
+
+    const studentProfileId = await admit(randomUUID());
+
+    const stored = await withAdmin(result.db, mkAdminCtx('test:application'), async (tx) => {
+      const outsiderMemberships = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(eq(memberships.userId, outsiderId), eq(memberships.tenantId, tenantId)));
+      const outsiderProfiles = await tx
+        .select({ id: guardianProfiles.id })
+        .from(guardianProfiles)
+        .where(eq(guardianProfiles.userId, outsiderId));
+      const links = await tx
+        .select({ guardianUserId: guardianProfiles.userId })
+        .from(studentGuardianLinks)
+        .innerJoin(
+          guardianProfiles,
+          eq(studentGuardianLinks.guardianProfileId, guardianProfiles.id),
+        )
+        .where(eq(studentGuardianLinks.studentProfileId, studentProfileId));
+      const phoneOwners = await tx
+        .select({ userId: phoneNumbers.userId })
+        .from(phoneNumbers)
+        .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, outsiderPhone)));
+      return { outsiderMemberships, outsiderProfiles, links, phoneOwners };
+    });
+
+    expect(stored.outsiderMemberships).toEqual([]);
+    expect(stored.outsiderProfiles).toEqual([]);
+    expect(stored.phoneOwners).toEqual([{ userId: outsiderId }]);
+    expect(stored.links).toHaveLength(1);
+    expect(stored.links[0]?.guardianUserId).not.toBe(outsiderId);
+  });
+
+  it('admission activities: a sibling is linked to the parent already in the institute', async () => {
+    const activities = createStudentAdmissionActivities(
+      result.db,
+      createMock<EventBusService>(),
+      result.app.get(IdentityService),
+    );
+    const parentPhone = `7${String(Date.now()).slice(-9)}`;
+    const formData = {
+      studentName: 'Admitted Child',
+      parentName: 'Shared Parent',
+      parentPhone,
+      parentRelation: 'FATHER',
+    };
+    const admit = async () => {
+      const seed = randomUUID();
+      const student = await activities.createUserAndMembership(tenantId, actorId, seed);
+      const { studentProfileId } = await activities.createStudentProfile(
+        tenantId,
+        student.userId,
+        student.membershipId,
+        fixture.standardId,
+        formData,
+        false,
+        actorId,
+      );
+      await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
+      return studentProfileId;
+    };
+
+    const first = await admit();
+    const second = await admit();
+
+    const guardians = await withAdmin(result.db, mkAdminCtx('test:application'), (tx) =>
+      tx
+        .select({
+          studentProfileId: studentGuardianLinks.studentProfileId,
+          guardianUserId: guardianProfiles.userId,
+        })
+        .from(studentGuardianLinks)
+        .innerJoin(
+          guardianProfiles,
+          eq(studentGuardianLinks.guardianProfileId, guardianProfiles.id),
+        )
+        .where(inArray(studentGuardianLinks.studentProfileId, [first, second])),
+    );
+    expect(guardians).toHaveLength(2);
+    expect(guardians[0]?.guardianUserId).toBe(guardians[1]?.guardianUserId);
   });
 
   it('rejectApplication: stores the reason and timestamp in dedicated columns', async () => {

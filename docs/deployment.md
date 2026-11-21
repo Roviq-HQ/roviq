@@ -117,6 +117,23 @@ that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
   It connects with `DATABASE_URL` and runs every query as the institute being exported
   (`roviq_app` with RLS). Needs `TEMPORAL_ADDRESS` and the object storage write access the
   gateway already has.
+- **`TC_ISSUANCE_WORKER_ENABLED`** (ROV-232): runs `TCIssuanceWorkflow` on task queue
+  `tc-issuance` (or `TEMPORAL_TC_TASK_QUEUE`, which the gateway that starts the workflow must
+  share). It moves a requested TC through clearance to `GENERATED`; without any instance running
+  it, a TC stays `REQUESTED` and can never be approved or issued. More than one instance is safe.
+  It connects with `DATABASE_URL` and runs its queries as `roviq_app` (the TC's institute) and
+  `roviq_admin`.
+- **`INSTITUTE_SETUP_WORKER_ENABLED`** (ROV-232): runs `InstituteSetupWorkflow` on task queue
+  `institute-setup`, which approving an institute request starts. Without any instance running it,
+  an approved institute's setup never reaches `COMPLETED`. More than one instance is safe.
+  It connects with `DATABASE_URL` and runs its queries as `roviq_admin`.
+- **`AUDIT_PARTITION_WORKER_ENABLED`** (ROV-232): runs `auditPartitionManagement` on task queue
+  `audit-maintenance` and creates or updates the `audit-partition-cron` schedule (2 AM UTC on the
+  25th) at start, keeping an operator's pause. Each run creates next month's `audit_logs`
+  partition, detaches partitions older than a year and checks the new one is attached. The
+  gateway already creates partitions at boot and daily; only this worker enforces retention.
+  It connects with `DATABASE_URL` and runs as `roviq_admin`, reaching partition DDL through the
+  `SECURITY DEFINER` functions `ensure_monthly_partition` and `detach_monthly_partition`.
 
 ## Redis
 

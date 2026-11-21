@@ -9,7 +9,7 @@
     },
     "requestDialog": {
       "title": "Request Transfer Certificate",
-      "description": "Start a new TC request for a student. Reason must be at least 10 characters.",
+      "description": "Start a new TC request for a student. The reason must be 10 to 200 characters.",
       "studentLabel": "Student",
       "studentSearchPlaceholder": "Search by name or admission number…",
       "studentSelectPlaceholder": "Select a student",
@@ -18,6 +18,7 @@
       "academicYearPlaceholder": "Select academic year",
       "reasonLabel": "Reason for leaving",
       "reasonPlaceholder": "Explain why the student is leaving (shown on TC)",
+      "reasonCounter": "{count} of {max} characters",
       "submit": "Request TC",
       "submitting": "Requesting…",
       "fieldHelp": {
@@ -26,6 +27,18 @@
         "reasonTitle": "Reason for leaving",
         "reasonBody": "Printed on the TC and visible to the receiving institute — be factual and neutral. Boards reject TCs with subjective or punitive wording ('ill-discipline', 'failed repeatedly') because they prejudice the student's next admission. Stick to objective facts: relocation, financial reasons, family circumstances, change of curriculum.",
         "reasonExample": "Good: 'Parents have relocated to Pune due to job transfer.' 'Parents wish to shift child to a residential institute.' Avoid: 'Poor academic performance', 'Disciplinary issues' — use the separate remarks field or suspension records instead."
+      },
+      "errors": {
+        "studentRequired": "Select a student.",
+        "academicYearRequired": "Select an academic year.",
+        "reasonTooShort": "Reason must be at least {min} characters.",
+        "reasonTooLong": "Reason must be at most {max} characters.",
+        "alreadyRequested": "This student already has a TC in progress. Open it from the list instead of requesting another.",
+        "academicYearNotFound": "The selected academic year does not belong to this institute. Pick another year.",
+        "invalidReason": "The reason must be 10 to 200 characters.",
+        "studentNotEnrolled": "A TC can only be requested for an enrolled student.",
+        "studentNotFound": "This student could not be found. They may have been removed.",
+        "generic": "Something went wrong. Try again in a moment."
       }
     },
     "rejectDialog": {
@@ -63,6 +76,12 @@
       "cleared": "Cleared",
       "pending": "Pending",
       "blocked": "Blocked"
+    },
+    "departments": {
+      "accounts": "Accounts",
+      "library": "Library",
+      "lab": "Laboratory",
+      "transport": "Transport"
     },
     "approve": "Approve",
     "approving": "Approving…",
@@ -139,14 +158,14 @@
   "tcStatuses": {
     "REQUESTED": "Requested",
     "CLEARANCE_PENDING": "Clearance Pending",
-    "CLEARED": "Cleared",
+    "CLEARANCE_COMPLETE": "Clearance Complete",
+    "GENERATED": "Generated",
+    "REVIEW_PENDING": "Review Pending",
     "APPROVED": "Approved",
-    "COUNTERSIGNED": "Countersigned",
     "ISSUED": "Issued",
-    "DUPLICATE_ISSUED": "Duplicate Issued",
-    "REJECTED": "Rejected",
-    "RETURNED": "Returned",
-    "CANCELLED": "Cancelled"
+    "CANCELLED": "Cancelled",
+    "DUPLICATE_REQUESTED": "Duplicate Requested",
+    "DUPLICATE_ISSUED": "Duplicate Issued"
   },
   "certificateStatuses": {
     "REQUESTED": "Requested",

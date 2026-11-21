@@ -1,5 +1,6 @@
 'use client';
 
+import { INSTITUTE_STATE_MACHINE } from '@roviq/common-types';
 import { extractGraphQLError } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
@@ -114,22 +115,11 @@ function ActionButtons({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {institute.status === 'INACTIVE' && (
+      {INSTITUTE_STATE_MACHINE.canTransition(institute.status, 'ACTIVE') && (
         <ActivateWithTooltip canActivate={canActivate} ta={ta} setActionDialog={setActionDialog} />
       )}
       {institute.status === 'ACTIVE' && (
         <ActiveStatusActions ta={ta} setActionDialog={setActionDialog} />
-      )}
-      {institute.status === 'SUSPENDED' && (
-        <Button
-          variant="outline"
-          size="sm"
-          title={ta('activateDescription')}
-          onClick={() => setActionDialog({ type: 'activate' })}
-        >
-          <Play className="size-4" />
-          {ta('activate')}
-        </Button>
       )}
       {institute.status === 'PENDING_APPROVAL' && (
         <Button
@@ -224,7 +214,9 @@ function ActivateWithTooltip({
               variant="outline"
               size="sm"
               disabled={!canActivate}
+              title={ta('activateDescription')}
               onClick={() => setActionDialog({ type: 'activate' })}
+              data-testid={testIds.adminInstituteDetail.actionActivate}
             >
               <Play className="size-4" />
               {ta('activate')}

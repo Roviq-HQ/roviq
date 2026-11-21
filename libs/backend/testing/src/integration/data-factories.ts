@@ -12,7 +12,7 @@ import {
   users,
   withAdmin,
 } from '@roviq/database';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 /**
  * Default reseller ID seeded in every environment as "Roviq Direct".
@@ -359,6 +359,9 @@ export async function cleanupTestInstitute(db: DrizzleDB, tenant: TestInstitute)
  */
 export async function cleanupTestReseller(db: DrizzleDB, reseller: TestReseller): Promise<void> {
   await withAdmin(db, mkAdminCtx('test:data-factories'), async (tx) => {
+    // Before any row lock: a test holding LOCK TABLE resellers would otherwise wait on our
+    // role rows while we wait on its table lock (deadlock, 40P01).
+    await tx.execute(sql`LOCK TABLE resellers IN ROW EXCLUSIVE MODE`);
     await tx
       .delete(resellerMemberships)
       .where(eq(resellerMemberships.resellerId, reseller.resellerId));

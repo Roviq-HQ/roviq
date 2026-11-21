@@ -9,6 +9,12 @@
  *   5. Issuance (PDF generation, S3 upload, student status update)
  */
 
+/**
+ * Default task queue of TCIssuanceWorkflow. `TEMPORAL_TC_TASK_QUEUE` overrides it (CE-002);
+ * the service that starts the workflow and the worker read the same variable.
+ */
+export const DEFAULT_TC_TASK_QUEUE = 'tc-issuance';
+
 // ── Workflow input ────────────────────────────────────────
 
 export interface TCIssuanceInput {
@@ -54,6 +60,8 @@ export type TCWorkflowStatus =
   | 'GENERATED'
   | 'APPROVED'
   | 'ISSUED'
+  // The TC was cancelled while the workflow ran
+  | 'CANCELLED'
   | 'FAILED';
 
 export interface TCIssuanceResult {
@@ -66,8 +74,15 @@ export interface TCIssuanceResult {
 // ── Activities interface ──────────────────────────────────
 
 export interface TCIssuanceActivities {
-  /** Step 1: Validate student status and update tc_register to clearance_pending */
-  validateRequest(tenantId: string, tcRegisterId: string, studentProfileId: string): Promise<void>;
+  /**
+   * Step 1: Validate student status and move tc_register to clearance_pending.
+   * False when the TC left REQUESTED meanwhile (cancelled): the workflow must stop.
+   */
+  validateRequest(
+    tenantId: string,
+    tcRegisterId: string,
+    studentProfileId: string,
+  ): Promise<boolean>;
 
   /** Step 2: Check clearance for a single department */
   checkDepartmentClearance(
@@ -76,12 +91,12 @@ export interface TCIssuanceActivities {
     department: string,
   ): Promise<ClearanceResult>;
 
-  /** Step 3: Populate tc_data with all 20 CBSE fields from student record */
+  /** Step 3: Populate tc_data with all 20 CBSE fields. Null when the TC was cancelled meanwhile. */
   populateTcData(
     tenantId: string,
     tcRegisterId: string,
     studentProfileId: string,
-  ): Promise<TCPopulateResult>;
+  ): Promise<TCPopulateResult | null>;
 
   /** Step 4: Record approval by principal */
   recordApproval(tenantId: string, tcRegisterId: string, approvedBy: string): Promise<void>;

@@ -8,6 +8,7 @@ import {
 import { instituteContactSchema } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
+import { getRequestContext } from '@roviq/request-context';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { FileService } from '../../files/file.service';
 import { BRANDING_IMAGES } from './branding-images';
@@ -90,6 +91,7 @@ export class InstituteService {
         ],
         board: input.board,
         isDemo: input.isDemo,
+        actorId: getRequestContext().userId,
       })
       .catch((err) => {
         this.logger.error(`Setup failed for institute ${record.id}`, err);

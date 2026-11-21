@@ -7,6 +7,7 @@ import { auditDbProvider } from './audit-db.provider';
 import { AuditPartitionMaintainer } from './audit-partition-maintainer';
 import { natsProvider } from './nats.provider';
 import { AuditRepositoryModule } from './repositories/audit-repository.module';
+import { AuditPartitionWorkerService } from './workflows/partition.worker';
 
 @Module({
   imports: [AuditRepositoryModule, AuditLibModule],
@@ -14,6 +15,7 @@ import { AuditRepositoryModule } from './repositories/audit-repository.module';
     natsProvider,
     auditDbProvider,
     AuditPartitionMaintainer,
+    AuditPartitionWorkerService,
     AuditConsumer,
     AuditService,
     AuditInterceptor,

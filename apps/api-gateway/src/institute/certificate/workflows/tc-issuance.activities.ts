@@ -1,7 +1,7 @@
 /**
  * Activities for TCIssuanceWorkflow (ROV-161, PRD §5.1-5.2).
  *
- * Each activity is idempotent. DrizzleDB + NATS injected via closure.
+ * Each activity is idempotent. DrizzleDB + EventBusService injected via closure.
  * The populateTcData activity snapshots all 20 CBSE TC fields.
  */
 import { Logger } from '@nestjs/common';
@@ -27,8 +27,9 @@ import {
   withAdmin,
   withTenant,
 } from '@roviq/database';
-import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
-import { eq, sql } from 'drizzle-orm';
+import type { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { nextTcSerialNumber } from '../tc-serial';
 import type { CbseTcData, TCIssuanceActivities } from './tc-issuance.types';
 
@@ -90,15 +91,6 @@ function dateToWords(dateStr: string): string {
   const month = MONTHS[Number.parseInt(monthStr, 10) - 1];
   const year = numberToWords(Number.parseInt(yearStr, 10));
   return `${day} ${month} ${year}`;
-}
-
-// ── NATS emitter type ─────────────────────────────────────
-
-interface NatsEmitter {
-  emit(
-    pattern: string,
-    data: unknown,
-  ): { subscribe: (opts: { error?: (err: unknown) => void }) => void };
 }
 
 // ── TC data helpers (extracted for readability) ───────────
@@ -199,7 +191,7 @@ function buildCbseTcData(params: {
     whetherFailed,
     subjectsStudied: 'As per curriculum',
     classLastStudied: latestAcademic?.standardId ?? null,
-    lastExamResult: 'As per school records',
+    lastExamResult: 'As per institute records',
     qualifiedForPromotion:
       promotionStatus === PromotionStatus.PROMOTED
         ? 'Yes'
@@ -223,15 +215,8 @@ function buildCbseTcData(params: {
 
 export function createTCIssuanceActivities(
   db: DrizzleDB,
-  natsClient: NatsEmitter | null,
+  eventBus: Pick<EventBusService, 'emit'> | null,
 ): TCIssuanceActivities {
-  function emitEvent(pattern: EventPattern, data: unknown): void {
-    if (!natsClient) return;
-    natsClient.emit(pattern, data).subscribe({
-      error: (err) => logger.warn(`Failed to emit ${pattern}: ${err}`),
-    });
-  }
-
   return {
     async validateRequest(tenantId, tcRegisterId, studentProfileId) {
       logger.log(`Validating TC request: ${tcRegisterId} for student ${studentProfileId}`);
@@ -254,12 +239,12 @@ export function createTCIssuanceActivities(
         throw new Error(`Student is not enrolled (status: ${student[0].academicStatus})`);
       }
 
-      // Update status to clearance_pending
-      await withTenant(
+      // Conditional on the status: a TC cancelled meanwhile must stay cancelled.
+      const moved = await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
-          await tx
+          return tx
             .update(tcRegister)
             .set({
               status: TcStatus.CLEARANCE_PENDING,
@@ -270,11 +255,23 @@ export function createTCIssuanceActivities(
                 transport: { cleared: false },
               },
             })
-            .where(eq(tcRegister.id, tcRegisterId));
+            .where(
+              and(
+                eq(tcRegister.id, tcRegisterId),
+                // CLEARANCE_PENDING too, so a retried activity is not read as a cancellation.
+                inArray(tcRegister.status, [TcStatus.REQUESTED, TcStatus.CLEARANCE_PENDING]),
+              ),
+            )
+            .returning({ id: tcRegister.id });
         },
       );
+      if (moved.length === 0) {
+        logger.warn(`TC ${tcRegisterId} is no longer awaiting validation; stopping`);
+        return false;
+      }
 
       logger.log(`TC ${tcRegisterId}: status → clearance_pending`);
+      return true;
     },
 
     async checkDepartmentClearance(tenantId, tcRegisterId, department) {
@@ -288,19 +285,25 @@ export function createTCIssuanceActivities(
       // Update the specific department in clearances JSONB using parameterized values
       const clearanceValue = JSON.stringify({ cleared, at: now });
       const jsonPath = `{${department}}`;
-      await withTenant(
+      const recorded = await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
-          await tx.execute(
+          return tx.execute<{ id: string }>(
             sql`UPDATE tc_register SET clearances = jsonb_set(
             COALESCE(clearances, '{}'),
             ${jsonPath}::text[],
             ${clearanceValue}::jsonb
-          ) WHERE id = ${tcRegisterId}`,
+          ) WHERE id = ${tcRegisterId}
+            AND status IN (${TcStatus.CLEARANCE_PENDING}, ${TcStatus.CLEARANCE_COMPLETE})
+          RETURNING id`,
           );
         },
       );
+      if (recorded.rows.length === 0) {
+        logger.warn(`TC ${tcRegisterId} is no longer in clearance; ${department} not recorded`);
+        return { department, cleared: false, notes: 'TC is no longer in clearance' };
+      }
 
       // Check if all departments are now cleared
       const tc = await withTenant(
@@ -326,7 +329,12 @@ export function createTCIssuanceActivities(
             await tx
               .update(tcRegister)
               .set({ status: TcStatus.CLEARANCE_COMPLETE })
-              .where(eq(tcRegister.id, tcRegisterId));
+              .where(
+                and(
+                  eq(tcRegister.id, tcRegisterId),
+                  eq(tcRegister.status, TcStatus.CLEARANCE_PENDING),
+                ),
+              );
           },
         );
         logger.log(`TC ${tcRegisterId}: all departments cleared → clearance_complete`);
@@ -425,21 +433,36 @@ export function createTCIssuanceActivities(
         reason: tcRow[0]?.reason ?? 'Transfer',
       });
 
-      // Persist snapshot
-      await withTenant(
+      // Persist snapshot, only while the TC is still on its way to GENERATED
+      const generated = await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
-          await tx
+          return tx
             .update(tcRegister)
             .set({
               tcData,
               status: TcStatus.GENERATED,
               generatedAt: new Date(),
             })
-            .where(eq(tcRegister.id, tcRegisterId));
+            .where(
+              and(
+                eq(tcRegister.id, tcRegisterId),
+                // CLEARANCE_PENDING: clearance is skipped for some requests. GENERATED: a retry.
+                inArray(tcRegister.status, [
+                  TcStatus.CLEARANCE_PENDING,
+                  TcStatus.CLEARANCE_COMPLETE,
+                  TcStatus.GENERATED,
+                ]),
+              ),
+            )
+            .returning({ id: tcRegister.id });
         },
       );
+      if (generated.length === 0) {
+        logger.warn(`TC ${tcRegisterId} is no longer awaiting its data; nothing written`);
+        return null;
+      }
 
       logger.log(`TC ${tcRegisterId}: 20 CBSE fields populated → status=generated`);
       return { tcData };
@@ -516,7 +539,7 @@ export function createTCIssuanceActivities(
       );
 
       // Emit tc.issued event
-      emitEvent(EVENT_PATTERNS.TC.issued, {
+      eventBus?.emit(EVENT_PATTERNS.TC.issued, {
         tcId: tcRegisterId,
         studentProfileId,
         tcSerialNumber,

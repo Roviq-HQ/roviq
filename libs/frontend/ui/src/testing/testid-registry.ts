@@ -175,6 +175,7 @@ export const testIds = {
         | 'exports',
     ) => `institute-detail-tab-${name}`,
     actionApprove: 'action-approve',
+    actionActivate: 'action-activate',
     actionReassignReseller: 'action-reassign-reseller',
     actionAssignGroup: 'action-assign-group',
     actionRemoveGroup: 'action-remove-group',
