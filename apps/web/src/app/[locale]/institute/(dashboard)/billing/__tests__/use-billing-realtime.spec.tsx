@@ -11,6 +11,9 @@ import {
 const toastMock = vi.hoisted(() => ({ info: vi.fn() }));
 const nav = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('sonner', () => ({ toast: toastMock }));
+
+// The event must land after the first load: Apollo drops a refetch of a query still in flight.
+const EVENT_DELAY_MS = 400;
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: nav.push, replace: vi.fn(), prefetch: vi.fn() }),
 }));
@@ -45,7 +48,7 @@ describe('useInstituteBillingRealtime', () => {
         unpaidQuery([invoice('inv-1', 'SENT'), invoice('inv-2', 'OVERDUE')]),
         {
           request: { query: MyInvoiceGeneratedDocument },
-          delay: 50,
+          delay: EVENT_DELAY_MS,
           result: {
             data: {
               myInvoiceGenerated: {
@@ -74,7 +77,7 @@ describe('useInstituteBillingRealtime', () => {
         unpaidQuery([invoice('inv-1', 'PAID')]),
         {
           request: { query: MyPaymentStatusChangedDocument },
-          delay: 50,
+          delay: EVENT_DELAY_MS,
           result: {
             data: {
               myPaymentStatusChanged: {

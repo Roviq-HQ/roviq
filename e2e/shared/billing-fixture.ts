@@ -51,12 +51,15 @@ export async function ensureBillingFixture(request: APIRequestContext): Promise<
   );
   const token = login.resellerLogin.accessToken;
 
-  const subs = await call<{
-    subscriptions: Array<{ id: string; status: string; tenantId: string }>;
-  }>('query { subscriptions(first: 100) { id status tenantId } }', {}, token);
-  let subscriptionId = subs.subscriptions.find(
-    (s) => s.tenantId === tenantId && s.status !== 'CANCELLED' && s.status !== 'EXPIRED',
-  )?.id;
+  const findLiveSubscription = async () => {
+    const subs = await call<{
+      subscriptions: Array<{ id: string; status: string; tenantId: string }>;
+    }>('query { subscriptions(first: 100) { id status tenantId } }', {}, token);
+    return subs.subscriptions.find(
+      (s) => s.tenantId === tenantId && s.status !== 'CANCELLED' && s.status !== 'EXPIRED',
+    )?.id;
+  };
+  let subscriptionId = await findLiveSubscription();
 
   if (!subscriptionId) {
     const suffix = randomUUID().slice(0, 8);
@@ -81,14 +84,20 @@ export async function ensureBillingFixture(request: APIRequestContext): Promise<
       },
       token,
     );
-    const assigned = await call<{
-      assignPlanToInstitute: { subscription: { id: string } };
-    }>(
-      'mutation($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id } } }',
-      { input: { tenantId, planId: plan.createSubscriptionPlan.id } },
-      token,
-    );
-    subscriptionId = assigned.assignPlanToInstitute.subscription.id;
+    try {
+      const assigned = await call<{
+        assignPlanToInstitute: { subscription: { id: string } };
+      }>(
+        'mutation($input: AssignPlanInput!) { assignPlanToInstitute(input: $input) { subscription { id } } }',
+        { input: { tenantId, planId: plan.createSubscriptionPlan.id } },
+        token,
+      );
+      subscriptionId = assigned.assignPlanToInstitute.subscription.id;
+    } catch (err) {
+      // Spec files set up in parallel workers: another one may have assigned a plan first.
+      subscriptionId = await findLiveSubscription();
+      if (!subscriptionId) throw err;
+    }
   }
 
   const invoices = await call<{
