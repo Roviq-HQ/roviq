@@ -1,5 +1,7 @@
 'use client';
 
+import { ErrorCode, TC_STATUS_VALUES } from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import type { TcStatus } from '@roviq/graphql/generated';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
@@ -36,25 +38,16 @@ import {
   useDebounce,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useStore } from '@tanstack/react-form';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
-  AlertCircle,
-  Award,
-  Award as AwardIcon,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Eraser,
   FileText,
   Plus,
   Search,
   SearchX,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  XCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -62,6 +55,7 @@ import { parseAsArrayOf, parseAsInteger, parseAsString, useQueryStates } from 'n
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { TC_STATUS_CLASS, TC_STATUS_ICON } from '../tc-status';
 import {
   type TCListFilter,
   type TCNode,
@@ -72,49 +66,6 @@ import {
 } from '../use-certificates';
 
 const { instituteCertificatesTc } = testIds;
-/**
- * 10-status TC lifecycle — mirrors the tc_register.status state machine
- * defined in the backend domain layer.
- */
-const TC_STATUSES = [
-  'REQUESTED',
-  'CLEARANCE_PENDING',
-  'CLEARED',
-  'APPROVED',
-  'COUNTERSIGNED',
-  'ISSUED',
-  'DUPLICATE_ISSUED',
-  'REJECTED',
-  'RETURNED',
-  'CANCELLED',
-] as const;
-
-const STATUS_CLASS: Record<string, string> = {
-  REQUESTED: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  CLEARANCE_PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
-  CLEARED: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
-  APPROVED: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300',
-  COUNTERSIGNED: 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300',
-  ISSUED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-  DUPLICATE_ISSUED: 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300',
-  REJECTED: 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300',
-  RETURNED: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  CANCELLED: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-};
-
-const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  REQUESTED: Clock,
-  CLEARANCE_PENDING: AlertCircle,
-  CLEARED: ShieldCheck,
-  APPROVED: Sparkles,
-  COUNTERSIGNED: Award,
-  ISSUED: CheckCircle2,
-  DUPLICATE_ISSUED: AwardIcon,
-  REJECTED: XCircle,
-  RETURNED: Send,
-  CANCELLED: Eraser,
-};
-
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -211,15 +162,15 @@ export default function TCListPage() {
         accessorKey: 'status',
         header: t('columns.status'),
         cell: ({ row }) => {
-          const status = row.original.status.toUpperCase();
-          const Icon = STATUS_ICON[status] ?? Clock;
+          const status = row.original.status;
+          const Icon = TC_STATUS_ICON[status];
           return (
             <Badge
               variant="secondary"
-              className={`inline-flex items-center gap-1 ${STATUS_CLASS[status] ?? ''}`}
+              className={`inline-flex items-center gap-1 ${TC_STATUS_CLASS[status]}`}
             >
               <Icon className="size-3.5" />
-              {t(`tcStatuses.${status}`, { default: status })}
+              {t(`tcStatuses.${status}`)}
             </Badge>
           );
         },
@@ -309,7 +260,7 @@ export default function TCListPage() {
                 </PopoverTrigger>
                 <PopoverContent className="w-60 p-2" align="start">
                   <div className="space-y-1">
-                    {TC_STATUSES.map((s) => {
+                    {TC_STATUS_VALUES.map((s) => {
                       const selected = filters.status?.includes(s) ?? false;
                       const toggle = () => {
                         const current = filters.status ?? [];
@@ -317,7 +268,7 @@ export default function TCListPage() {
                         setFilters({ status: next.length > 0 ? next : null });
                         setPageIndex(0);
                       };
-                      const Icon = STATUS_ICON[s] ?? Clock;
+                      const Icon = TC_STATUS_ICON[s];
                       return (
                         <button
                           type="button"
@@ -334,7 +285,7 @@ export default function TCListPage() {
                             aria-hidden
                           />
                           <Icon className="size-3.5 text-muted-foreground" />
-                          <span>{t(`tcStatuses.${s}`, { default: s })}</span>
+                          <span>{t(`tcStatuses.${s}`)}</span>
                         </button>
                       );
                     })}
@@ -418,13 +369,43 @@ export default function TCListPage() {
 
 // ─── Request TC Dialog ───────────────────────────────────────────────────────
 
-const requestTCSchema = z.object({
-  studentProfileId: z.string().min(1, 'Student is required'),
-  academicYearId: z.string().min(1, 'Academic year is required'),
-  reason: z.string().min(10, 'Reason must be at least 10 characters'),
-});
+/** The limits RequestTCInput.reason enforces on the API. */
+const TC_REASON_MIN_LENGTH = 10;
+const TC_REASON_MAX_LENGTH = 200;
 
-type RequestTCFormValues = z.input<typeof requestTCSchema>;
+function buildRequestTCSchema(t: ReturnType<typeof useTranslations<'certificates'>>) {
+  return z.object({
+    studentProfileId: z.string().min(1, t('tc.requestDialog.errors.studentRequired')),
+    academicYearId: z.string().min(1, t('tc.requestDialog.errors.academicYearRequired')),
+    reason: z
+      .string()
+      .trim()
+      .min(
+        TC_REASON_MIN_LENGTH,
+        t('tc.requestDialog.errors.reasonTooShort', { min: TC_REASON_MIN_LENGTH }),
+      )
+      .max(
+        TC_REASON_MAX_LENGTH,
+        t('tc.requestDialog.errors.reasonTooLong', { max: TC_REASON_MAX_LENGTH }),
+      ),
+  });
+}
+
+type RequestTCFormValues = z.input<ReturnType<typeof buildRequestTCSchema>>;
+
+/** Copy for the requestTC error codes a user can fix; anything else gets the generic message. */
+const REQUEST_TC_ERROR_KEYS = {
+  [ErrorCode.TC_ALREADY_REQUESTED]: 'alreadyRequested',
+  [ErrorCode.ACADEMIC_YEAR_NOT_FOUND]: 'academicYearNotFound',
+  [ErrorCode.VALIDATION_FAILED]: 'invalidReason',
+  [ErrorCode.STUDENT_NOT_ENROLLED]: 'studentNotEnrolled',
+  [ErrorCode.STUDENT_NOT_FOUND]: 'studentNotFound',
+} as const;
+
+function requestTCErrorKey(code: string | null) {
+  const match = Object.entries(REQUEST_TC_ERROR_KEYS).find(([known]) => known === code);
+  return match ? match[1] : 'generic';
+}
 
 const REQUEST_TC_DEFAULTS: RequestTCFormValues = {
   studentProfileId: '',
@@ -448,6 +429,7 @@ function RequestTCDialog({
   const { data: studentsData } = useStudentPicker(debouncedSearch);
   const { data: yearsData } = useAcademicYearsForCertificates();
   const [requestTC] = useRequestTC();
+  const requestTCSchema = React.useMemo(() => buildRequestTCSchema(t), [t]);
 
   const form = useAppForm({
     defaultValues: REQUEST_TC_DEFAULTS,
@@ -463,10 +445,14 @@ function RequestTCDialog({
         onSuccess();
         onOpenChange(false);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('tc.requestError'));
+        const key = requestTCErrorKey(extractGraphQLErrorCode(err));
+        toast.error(t('tc.requestError'), {
+          description: t(`tc.requestDialog.errors.${key}`),
+        });
       }
     },
   });
+  const reasonLength = useStore(form.store, (s) => s.values.reason.length);
 
   React.useEffect(() => {
     if (open) {
@@ -569,6 +555,11 @@ function RequestTCDialog({
                   label={t('tc.requestDialog.reasonLabel')}
                   placeholder={t('tc.requestDialog.reasonPlaceholder')}
                   rows={4}
+                  maxLength={TC_REASON_MAX_LENGTH}
+                  description={t('tc.requestDialog.reasonCounter', {
+                    count: reasonLength,
+                    max: TC_REASON_MAX_LENGTH,
+                  })}
                   info={
                     <FieldInfoPopover
                       title={t('tc.requestDialog.fieldHelp.reasonTitle')}

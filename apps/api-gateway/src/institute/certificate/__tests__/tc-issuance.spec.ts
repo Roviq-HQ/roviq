@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 /**
  * Unit tests for TC issuance (ROV-161).
  *
@@ -184,6 +185,7 @@ vi.mock('@roviq/database', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
+  inArray: vi.fn((a: unknown, b: unknown) => [a, b]),
   sql: Object.assign(vi.fn(), { raw: vi.fn() }),
 }));
 
@@ -254,9 +256,10 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
       },
     ]);
     // 6. tc_register update (persist snapshot) — returns void-like
-    queueResult(undefined);
+    queueResult([{ id: 'tc-1' }]);
 
     const result = await activities.populateTcData('tenant-1', 'tc-1', 'sp1');
+    assert(result);
     const tc = result.tcData;
 
     // ── Verify all 20 CBSE fields ─────────────────────
@@ -356,9 +359,10 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
       { promotionStatus: 'PROMOTED', standardId: 'std-6', classRoles: [] },
     ]);
     queueResult([{ reason: 'Transfer', clearances: {} }]);
-    queueResult(undefined);
+    queueResult([{ id: 'tc-1' }]);
 
     const result = await activities.populateTcData('tenant-1', 'tc-1', 'sp1');
+    assert(result);
     expect(result.tcData.whetherFailed).toBe('Yes, twice');
   });
 
@@ -375,9 +379,10 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
     queueResult([]);
     queueResult([]);
     queueResult([{ reason: 'Transfer', clearances: {} }]);
-    queueResult(undefined);
+    queueResult([{ id: 'tc-1' }]);
 
     const result = await activities.populateTcData('tenant-1', 'tc-1', 'sp1');
+    assert(result);
     expect(result.tcData.feeConcession).toContain('RTE');
   });
 });

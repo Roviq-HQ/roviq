@@ -5,9 +5,12 @@
  * on rendering, CASL gating, and the empty state. Real Apollo wiring is
  * covered by the integration + e2e layers.
  */
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import type { RawRuleOf } from '@casl/ability';
-import type { AppAbility } from '@roviq/common-types';
-import { screen } from '@testing-library/react';
+import { type AppAbility, ErrorCode } from '@roviq/common-types';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../messages/en/certificates.json';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
@@ -58,14 +61,51 @@ const requestTCResult: [ReturnType<typeof vi.fn>, { loading: boolean }] = [
   vi.fn(),
   { loading: false },
 ];
-const studentPickerResult = { data: { listStudents: { edges: [] } } };
-const yearsResult = { data: { academicYears: [] } };
+const studentPickerResult = {
+  data: {
+    listStudents: {
+      edges: [
+        {
+          node: {
+            id: 'student-1',
+            admissionNumber: 'ADM-1',
+            firstName: { en: 'Asha' },
+            lastName: null,
+            currentStandardName: null,
+            currentSectionName: null,
+          },
+        },
+      ],
+    },
+  },
+};
+const yearsResult = {
+  data: { academicYears: [{ id: 'year-1', label: '2026-27', isActive: true }] },
+};
 vi.mock('../use-certificates', () => ({
   useTCs: () => tcsResult,
   useRequestTC: () => requestTCResult,
   useStudentPicker: () => studentPickerResult,
   useAcademicYearsForCertificates: () => yearsResult,
 }));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
+// Radix Select uses pointer-capture APIs happy-dom doesn't ship.
+if (typeof Element.prototype.hasPointerCapture === 'undefined') {
+  Element.prototype.hasPointerCapture = () => false;
+}
+if (typeof Element.prototype.setPointerCapture === 'undefined') {
+  Element.prototype.setPointerCapture = () => {};
+}
+if (typeof Element.prototype.releasePointerCapture === 'undefined') {
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (typeof Element.prototype.scrollIntoView === 'undefined') {
+  Element.prototype.scrollIntoView = () => {};
+}
 
 // Import AFTER mocks.
 import TCListPage from '../tc/page';
@@ -92,5 +132,51 @@ describe('TCListPage (component)', () => {
   it('hides the whole page when the user lacks TC read permission', () => {
     renderPage([{ action: 'read', subject: 'Student' }]);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+  });
+
+  it('explains a duplicate TC request in translated copy instead of the server message', async () => {
+    const user = userEvent.setup();
+    requestTCResult[0].mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [
+          { message: 'raw server text', extensions: { code: ErrorCode.TC_ALREADY_REQUESTED } },
+        ],
+      }),
+    );
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: messagesEn.tc.requestButton }));
+    const dialog = await screen.findByRole('dialog');
+    const studentTrigger = within(dialog).getAllByRole('combobox')[0];
+    if (!studentTrigger) throw new Error('student select not found');
+    fireEvent.pointerDown(studentTrigger, { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    fireEvent.pointerUp(studentTrigger, { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    const option = await screen.findByRole('option', { name: 'ADM-1 · Asha' });
+    fireEvent.pointerDown(option, { button: 0, pointerType: 'mouse' });
+    fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+    await user.click(option);
+    await user.type(
+      within(dialog).getByLabelText(messagesEn.tc.requestDialog.reasonLabel),
+      'Family relocated to another city',
+    );
+    expect(within(dialog).getByText('32 of 200 characters')).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole('button', { name: messagesEn.tc.requestDialog.submit }),
+    );
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(messagesEn.tc.requestError, {
+        description: messagesEn.tc.requestDialog.errors.alreadyRequested,
+      }),
+    );
+    expect(requestTCResult[0]).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          studentProfileId: 'student-1',
+          academicYearId: 'year-1',
+          reason: 'Family relocated to another city',
+        },
+      },
+    });
   });
 });

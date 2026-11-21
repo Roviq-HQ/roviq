@@ -37,9 +37,10 @@ import {
   type IntegrationAppResult,
   RESELLER_DIRECT_ID,
 } from '@roviq/testing/integration';
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, eq, notInArray } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
+import { createTCIssuanceActivities } from '../workflows/tc-issuance.activities';
 
 interface StudentFixture {
   studentProfileId: string;
@@ -251,6 +252,21 @@ describe('TCResolver (integration)', () => {
     await result?.close();
   });
 
+  // uq_tc_register_open_request allows one TC in progress per student; each test starts with none.
+  beforeEach(async () => {
+    await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx
+        .update(tcRegister)
+        .set({ status: TcStatus.CANCELLED })
+        .where(
+          and(
+            eq(tcRegister.tenantId, tenantId),
+            notInArray(tcRegister.status, [TcStatus.CANCELLED, TcStatus.ISSUED]),
+          ),
+        ),
+    );
+  });
+
   it('requestTC creates a tc_register row in requested status for an enrolled student', async () => {
     const response = await gqlRequest<RequestTCResponse>(result.httpServer, {
       query: REQUEST_TC,
@@ -339,6 +355,82 @@ describe('TCResolver (integration)', () => {
     expect(tcData?.rejection_reason).toBe('Insufficient documentation submitted');
   });
 
+  it('the workflow activities leave a cancelled TC cancelled', async () => {
+    const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx
+        .insert(tcRegister)
+        .values({
+          tenantId,
+          studentProfileId: fixture.studentProfileId,
+          academicYearId: fixture.academicYearId,
+          tcSerialNumber: `TC-REQ-${Date.now()}-c`,
+          status: TcStatus.CANCELLED,
+          reason: 'Cancelled before the worker picked it up',
+          requestedBy: SYSTEM_USER_ID,
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: tcRegister.id }),
+    );
+    const activities = createTCIssuanceActivities(result.db, null);
+
+    const validated = await activities.validateRequest(tenantId, tc.id, fixture.studentProfileId);
+    const clearance = await activities.checkDepartmentClearance(tenantId, tc.id, 'accounts');
+    const populated = await activities.populateTcData(tenantId, tc.id, fixture.studentProfileId);
+
+    expect(validated).toBe(false);
+    expect(clearance.cleared).toBe(false);
+    expect(populated).toBeNull();
+    const rows = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx
+        .select({
+          status: tcRegister.status,
+          clearances: tcRegister.clearances,
+          tcData: tcRegister.tcData,
+        })
+        .from(tcRegister)
+        .where(eq(tcRegister.id, tc.id))
+        .limit(1),
+    );
+    expect(rows[0]?.status).toBe(TcStatus.CANCELLED);
+    expect(rows[0]?.tcData).toEqual({});
+    const clearances = rows[0]?.clearances as Record<string, unknown> | null;
+    expect(clearances?.accounts).toBeUndefined();
+  });
+
+  it('the workflow activities take a requested TC to generated', async () => {
+    const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx
+        .insert(tcRegister)
+        .values({
+          tenantId,
+          studentProfileId: fixture.studentProfileId,
+          academicYearId: fixture.academicYearId,
+          tcSerialNumber: `TC-REQ-${Date.now()}-g`,
+          status: TcStatus.REQUESTED,
+          reason: 'Transfer',
+          requestedBy: SYSTEM_USER_ID,
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: tcRegister.id }),
+    );
+    const activities = createTCIssuanceActivities(result.db, null);
+
+    expect(await activities.validateRequest(tenantId, tc.id, fixture.studentProfileId)).toBe(true);
+    for (const department of ['accounts', 'library', 'lab', 'transport']) {
+      const clearance = await activities.checkDepartmentClearance(tenantId, tc.id, department);
+      expect(clearance.cleared).toBe(true);
+    }
+    const populated = await activities.populateTcData(tenantId, tc.id, fixture.studentProfileId);
+
+    expect(populated).not.toBeNull();
+    const rows = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx.select({ status: tcRegister.status }).from(tcRegister).where(eq(tcRegister.id, tc.id)),
+    );
+    expect(rows[0]?.status).toBe(TcStatus.GENERATED);
+  });
+
   it('listTCs returns only the current tenant’s TCs', async () => {
     const response = await gqlRequest<ListTCsResponse>(result.httpServer, {
       query: LIST_TCS,
@@ -348,6 +440,79 @@ describe('TCResolver (integration)', () => {
     expect(Array.isArray(response.data?.listTCs)).toBe(true);
     // Must contain at least the requested TC from the first test.
     expect(response.data?.listTCs.length).toBeGreaterThan(0);
+  });
+
+  it('requestTC refuses a second request while one is in progress', async () => {
+    const request = () =>
+      gqlRequest<RequestTCResponse>(result.httpServer, {
+        query: REQUEST_TC,
+        token: instituteToken,
+        variables: {
+          input: {
+            studentProfileId: fixture.studentProfileId,
+            academicYearId: fixture.academicYearId,
+            reason: 'Family relocating to another city',
+          },
+        },
+      });
+
+    const first = await request();
+    const second = await request();
+
+    expect(first.errors).toBeUndefined();
+    expect(second.errors?.[0]?.extensions?.code).toBe('TC_ALREADY_REQUESTED');
+  });
+
+  it('requestTC refuses an academic year of another institute, and so does the table', async () => {
+    const other = await createTestInstitute(result.db);
+    const otherYear = await createEnrolledStudent(result.db, other.tenantId);
+
+    const response = await gqlRequest<RequestTCResponse>(result.httpServer, {
+      query: REQUEST_TC,
+      token: instituteToken,
+      variables: {
+        input: {
+          studentProfileId: fixture.studentProfileId,
+          academicYearId: otherYear.academicYearId,
+          reason: 'Family relocating to another city',
+        },
+      },
+    });
+    expect(response.errors?.[0]?.extensions?.code).toBe('ACADEMIC_YEAR_NOT_FOUND');
+
+    const insert = withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+      tx.insert(tcRegister).values({
+        tenantId,
+        studentProfileId: fixture.studentProfileId,
+        academicYearId: otherYear.academicYearId,
+        tcSerialNumber: `TC-REQ-${randomUUID()}`,
+        status: TcStatus.REQUESTED,
+        reason: 'Year of another institute',
+        requestedBy: SYSTEM_USER_ID,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+      }),
+    );
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: 'tc_register_academic_year_tenant_fkey' },
+    });
+  });
+
+  it('requestTC answers a reason outside 10 to 200 characters with a validation error', async () => {
+    for (const reason of ['Too short', 'x'.repeat(201)]) {
+      const response = await gqlRequest<RequestTCResponse>(result.httpServer, {
+        query: REQUEST_TC,
+        token: instituteToken,
+        variables: {
+          input: {
+            studentProfileId: fixture.studentProfileId,
+            academicYearId: fixture.academicYearId,
+            reason,
+          },
+        },
+      });
+      expect(response.errors?.[0]?.extensions?.code).toBe('VALIDATION_FAILED');
+    }
   });
 
   it('reseller token is rejected with FORBIDDEN on requestTC', async () => {
@@ -403,12 +568,9 @@ describe('TCResolver (integration)', () => {
       return response.data?.issueTC.tcSerialNumber;
     };
 
-    const first = await approvedTc(fixture);
-    const second = await approvedTc(fixture);
-    const nextYearFirst = await approvedTc(nextYear);
-
-    expect(await issue(first)).toBe('TC/2025-26/0001');
-    expect(await issue(second)).toBe('TC/2025-26/0002');
-    expect(await issue(nextYearFirst)).toBe('TC/2026-27/0001');
+    // Issued one at a time: a student holds one TC in progress.
+    expect(await issue(await approvedTc(fixture))).toBe('TC/2025-26/0001');
+    expect(await issue(await approvedTc(fixture))).toBe('TC/2025-26/0002');
+    expect(await issue(await approvedTc(nextYear))).toBe('TC/2026-27/0001');
   });
 });
