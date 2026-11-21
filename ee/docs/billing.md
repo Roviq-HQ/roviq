@@ -118,6 +118,12 @@ All state changes emit NATS events via `ClientProxy`:
 - `billing.subscription.created`, `.canceled`, `.paused`, `.resumed`
 - `billing.webhook.{provider}`
 
+## Rules enforced by the backend
+
+- **One default gateway per reseller.** Online orders go to the default config. Saving a config as default clears the previous one in the same transaction, and the partial unique index `gwc_reseller_default_key` enforces it. `UPI_DIRECT` cannot be the default: a bare UPI address cannot take an online order.
+- **Cash collector.** `recordManualPayment` stores the reseller staff member who records a cash payment as `collected_by_id`. `collected_by_id` and `verified_by_id` reference `reseller_memberships`.
+- **Refunds are per payment.** `issueRefund` takes a payment id; `invoicePayments(invoiceId)` lists an invoice's payments for the reseller. A partly refunded payment can be refunded again up to what is left.
+
 ## Realtime
 
 GraphQL subscriptions in `billing-subscriptions.resolver.ts`. Each event carries ids only; the client refetches what it shows.

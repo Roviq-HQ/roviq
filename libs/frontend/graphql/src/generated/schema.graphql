@@ -3925,7 +3925,6 @@ input LunchSlotInput {
 
 input ManualPaymentInput {
   amountPaise: BigInt!
-  collectedById: String
   collectionDate: String
   method: PaymentMethod!
   notes: String
@@ -5073,6 +5072,9 @@ type Query {
 
   """List institute roles available for primary-nav customization."""
   instituteRoles: [Role!]!
+
+  """Every payment recorded against one invoice, newest first"""
+  invoicePayments(invoiceId: ID!): [PaymentModel!]!
   invoices(after: String, filter: BillingFilterInput, first: Int = 20, instituteId: ID): [InvoiceModel!]!
   leave(id: ID!): LeaveModel!
 

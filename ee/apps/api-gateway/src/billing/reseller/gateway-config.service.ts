@@ -49,6 +49,10 @@ export class GatewayConfigService {
       if (input.webhookSecret) {
         billingError('BAD_REQUEST', 'UPI_DIRECT does not support webhookSecret');
       }
+      // The default config receives online orders, which a bare UPI address cannot take.
+      if (input.isDefault) {
+        billingError('BAD_REQUEST', 'UPI_DIRECT cannot be the default gateway');
+      }
     }
 
     // Encrypt credentials before storage
@@ -86,6 +90,13 @@ export class GatewayConfigService {
       status?: string;
     },
   ) {
+    if (input.isDefault) {
+      const existing = await this.repo.findById(resellerId, id);
+      if (existing?.provider === 'UPI_DIRECT') {
+        billingError('BAD_REQUEST', 'UPI_DIRECT cannot be the default gateway');
+      }
+    }
+
     const data: Partial<GatewayConfigRow> = {};
     if (input.displayName !== undefined) data.displayName = input.displayName;
     if (input.isDefault !== undefined) data.isDefault = input.isDefault;

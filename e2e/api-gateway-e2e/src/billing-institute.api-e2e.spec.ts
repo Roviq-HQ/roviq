@@ -46,6 +46,16 @@ interface PaymentNode {
   refundedAmountPaise: number | string | null;
 }
 
+interface InvoicePaymentNode extends PaymentNode {
+  collectedById: string | null;
+}
+
+interface GatewayConfigNode {
+  id: string;
+  provider: string;
+  isDefault: boolean;
+}
+
 const INVOICE_FIELDS = `id invoiceNumber tenantId resellerId status totalAmount paidAmount upiPaymentUri`;
 const PAYMENT_FIELDS = `id invoiceId tenantId status method amountPaise utrNumber verificationStatus verifiedAt verifiedById failureReason refundedAmountPaise`;
 
@@ -63,6 +73,9 @@ const UNVERIFIED = `query { unverifiedPayments(first: 100) { ${PAYMENT_FIELDS} }
 const VERIFY_UPI = `mutation($paymentId: ID!) { verifyUpiPayment(paymentId: $paymentId) { ${PAYMENT_FIELDS} } }`;
 const REJECT_UPI = `mutation($input: RejectUpiInput!) { rejectUpiPayment(input: $input) { ${PAYMENT_FIELDS} } }`;
 const CREATE_GATEWAY = `mutation($input: CreateGatewayConfigInput!) { createGatewayConfig(input: $input) { id provider upiVpa } }`;
+const INVOICE_PAYMENTS = `query($invoiceId: ID!) { invoicePayments(invoiceId: $invoiceId) { ${PAYMENT_FIELDS} collectedById } }`;
+const LIST_GATEWAYS = `query { gatewayConfigs { id provider isDefault } }`;
+const UPDATE_GATEWAY = `mutation($id: ID!, $input: UpdateGatewayConfigInput!) { updateGatewayConfig(id: $id, input: $input) { id isDefault } }`;
 const DELETE_GATEWAY = `mutation($id: ID!) { deleteGatewayConfig(id: $id) }`;
 
 const MY_INVOICES = `query($first: Int) { myInvoices(first: $first) { ${INVOICE_FIELDS} } }`;
@@ -89,6 +102,7 @@ describe('Billing institute flows E2E', () => {
   const tenant2 = SEED_IDS.INSTITUTE_2;
   const planAmountPaise = 100_000;
   const gatewayConfigIds: string[] = [];
+  let defaultGatewayBefore: string | null = null;
 
   async function createPlan(amount: number) {
     const suffix = randomUUID().slice(0, 8);
@@ -204,6 +218,14 @@ describe('Billing institute flows E2E', () => {
   afterAll(async () => {
     for (const id of gatewayConfigIds) {
       await gql(DELETE_GATEWAY, { id }, resellerToken);
+    }
+    // Creating a default config clears the previous default; put it back.
+    if (defaultGatewayBefore) {
+      await gql(
+        UPDATE_GATEWAY,
+        { id: defaultGatewayBefore, input: { isDefault: true } },
+        resellerToken,
+      );
     }
     const { accessToken: adminToken } = await loginAsPlatformAdmin();
     for (const id of [tenant1, tenant2]) {
@@ -725,6 +747,137 @@ describe('Billing institute flows E2E', () => {
       await submitProofOk(invoice.id);
       const paid = await gql(INITIATE_PAYMENT, { invoiceId: invoice.id }, instituteToken);
       expect(codeOf(paid)).toBe('INVOICE_ALREADY_PAID');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // invoicePayments
+  // -------------------------------------------------------------------------
+
+  describe('invoicePayments', () => {
+    it('lists the payments of an invoice for the reseller with the cash collector recorded', async () => {
+      const { subscriptionId } = await freshSubscription(tenant1);
+      const cashInvoice = await newInvoice(tenant1, subscriptionId);
+      const cash = await gql(
+        RECORD_MANUAL,
+        {
+          invoiceId: cashInvoice.id,
+          input: { method: 'CASH', amountPaise: String(Number(cashInvoice.totalAmount)) },
+        },
+        resellerToken,
+      );
+      expect(cash.errors).toBeUndefined();
+      const upiInvoice = await newInvoice(tenant1, subscriptionId);
+      const proof = await submitProofOk(upiInvoice.id);
+
+      const cashRes = await gql<{ invoicePayments: InvoicePaymentNode[] }>(
+        INVOICE_PAYMENTS,
+        { invoiceId: cashInvoice.id },
+        resellerToken,
+      );
+      expect(cashRes.errors).toBeUndefined();
+      assert(cashRes.data);
+      expect(cashRes.data.invoicePayments).toHaveLength(1);
+      const [cashPayment] = cashRes.data.invoicePayments;
+      expect(cashPayment.invoiceId).toBe(cashInvoice.id);
+      expect(cashPayment.method).toBe('CASH');
+      expect(cashPayment.status).toBe('SUCCEEDED');
+      assert(cashPayment.collectedById);
+
+      const upiRes = await gql<{ invoicePayments: InvoicePaymentNode[] }>(
+        INVOICE_PAYMENTS,
+        { invoiceId: upiInvoice.id },
+        resellerToken,
+      );
+      expect(upiRes.errors).toBeUndefined();
+      assert(upiRes.data);
+      expect(upiRes.data.invoicePayments.map((p) => p.id)).toEqual([proof.id]);
+      expect(upiRes.data.invoicePayments[0].method).toBe('UPI_P2P');
+      expect(upiRes.data.invoicePayments[0].collectedById).toBeNull();
+    });
+
+    it('answers INVOICE_NOT_FOUND for an unknown invoice id', async () => {
+      const res = await gql(INVOICE_PAYMENTS, { invoiceId: randomUUID() }, resellerToken);
+      expect(codeOf(res)).toBe('INVOICE_NOT_FOUND');
+    });
+
+    it('is refused for an institute token with FORBIDDEN', async () => {
+      const { subscriptionId } = await freshSubscription(tenant1);
+      const invoice = await newInvoice(tenant1, subscriptionId);
+      const res = await gql(INVOICE_PAYMENTS, { invoiceId: invoice.id }, instituteToken);
+      expect(codeOf(res)).toBe('FORBIDDEN');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Default gateway
+  // -------------------------------------------------------------------------
+
+  describe('gateway default', () => {
+    async function listGateways() {
+      const res = await gql<{ gatewayConfigs: GatewayConfigNode[] }>(
+        LIST_GATEWAYS,
+        undefined,
+        resellerToken,
+      );
+      expect(res.errors).toBeUndefined();
+      assert(res.data);
+      return res.data.gatewayConfigs;
+    }
+
+    async function createGateway(provider: string, credentials: Record<string, string>) {
+      const res = await gql<{ createGatewayConfig: { id: string } }>(
+        CREATE_GATEWAY,
+        {
+          input: {
+            provider,
+            displayName: `Vitest ${provider}`,
+            credentials,
+            isDefault: true,
+            testMode: provider !== 'UPI_DIRECT',
+          },
+        },
+        resellerToken,
+      );
+      return res;
+    }
+
+    it('keeps exactly one default, moves it on create and update, and refuses UPI_DIRECT as default', async () => {
+      defaultGatewayBefore = (await listGateways()).find((g) => g.isDefault)?.id ?? null;
+
+      const a = await createGateway('RAZORPAY', {
+        RAZORPAY_KEY_ID: 'rzp_test_a',
+        RAZORPAY_KEY_SECRET: 'secret-a',
+      });
+      expect(a.errors).toBeUndefined();
+      assert(a.data);
+      const aId = a.data.createGatewayConfig.id;
+      gatewayConfigIds.push(aId);
+
+      const b = await createGateway('CASHFREE', {
+        CASHFREE_APP_ID: 'cf_app_b',
+        CASHFREE_SECRET_KEY: 'secret-b',
+      });
+      expect(b.errors).toBeUndefined();
+      assert(b.data);
+      const bId = b.data.createGatewayConfig.id;
+      gatewayConfigIds.push(bId);
+
+      const defaultsAfterB = (await listGateways()).filter((g) => g.isDefault);
+      expect(defaultsAfterB.map((g) => g.id)).toEqual([bId]);
+
+      const flip = await gql(
+        UPDATE_GATEWAY,
+        { id: aId, input: { isDefault: true } },
+        resellerToken,
+      );
+      expect(flip.errors).toBeUndefined();
+      const defaultsAfterA = (await listGateways()).filter((g) => g.isDefault);
+      expect(defaultsAfterA.map((g) => g.id)).toEqual([aId]);
+
+      const upi = await createGateway('UPI_DIRECT', { VPA: 'vitest@upi' });
+      expect(codeOf(upi)).toBe('BAD_REQUEST');
+      expect((await listGateways()).filter((g) => g.isDefault).map((g) => g.id)).toEqual([aId]);
     });
   });
 

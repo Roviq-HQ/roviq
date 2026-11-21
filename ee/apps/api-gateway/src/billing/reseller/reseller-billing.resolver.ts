@@ -274,7 +274,7 @@ export class ResellerBillingResolver {
     @Args('invoiceId', { type: () => ID }) invoiceId: string,
     @Args('input') input: ManualPaymentInput,
   ) {
-    return this.paymentService.recordManualPayment(rid(user), invoiceId, input);
+    return this.paymentService.recordManualPayment(rid(user), invoiceId, input, user.membershipId);
   }
 
   @Mutation(() => InvoiceModel, { name: 'issueRefund' })
@@ -345,6 +345,19 @@ export class ResellerBillingResolver {
   // ---------------------------------------------------------------------------
   // UPI P2P verification (ROV-119 — reseller verifies/rejects UPI proofs)
   // ---------------------------------------------------------------------------
+
+  @Query(() => [PaymentModel], {
+    name: 'invoicePayments',
+    description: 'Every payment recorded against one invoice, newest first',
+  })
+  @UseGuards(AbilityGuard)
+  @CheckAbility({ action: 'read', subject: 'Payment' })
+  async resellerInvoicePayments(
+    @CurrentUser() user: AuthUser,
+    @Args('invoiceId', { type: () => ID }) invoiceId: string,
+  ) {
+    return this.paymentService.listInvoicePayments(rid(user), invoiceId);
+  }
 
   @Query(() => [PaymentModel], { name: 'unverifiedPayments' })
   @UseGuards(AbilityGuard)
