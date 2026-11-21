@@ -115,25 +115,14 @@ describe('ResellerCreateInstitutePage', () => {
   });
 
   it('marks the first admin email when no account can be resolved from it', async () => {
-    createRequestMock.mockRejectedValue(graphQLError('INSTITUTE_ADMIN_EMAIL_UNAVAILABLE'));
+    createRequestMock.mockRejectedValue(graphQLError('INSTITUTE_ADMIN_UNAVAILABLE'));
 
     await fillAndSubmit();
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(copy.firstAdmin.emailUnavailable));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(copy.firstAdmin.unavailable));
     const email = screen.getByLabelText(copy.firstAdmin.email);
     expect(email).toHaveAttribute('aria-invalid', 'true');
-    expect(await screen.findAllByText(copy.firstAdmin.emailUnavailable)).not.toHaveLength(0);
-    expect(pushMock).not.toHaveBeenCalled();
-  });
-
-  it('marks the first admin mobile when another account already owns it', async () => {
-    createRequestMock.mockRejectedValue(graphQLError('PHONE_ALREADY_IN_USE'));
-
-    await fillAndSubmit();
-
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(copy.firstAdmin.phoneInUse));
-    expect(screen.getByLabelText(copy.firstAdmin.phone)).toHaveAttribute('aria-invalid', 'true');
-    expect(await screen.findAllByText(copy.firstAdmin.phoneInUse)).not.toHaveLength(0);
+    expect(await screen.findAllByText(copy.firstAdmin.unavailable)).not.toHaveLength(0);
     expect(pushMock).not.toHaveBeenCalled();
   });
 

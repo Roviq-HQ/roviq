@@ -105,10 +105,9 @@ function fieldErrorFor(code: string | null) {
     case ErrorCode.INSTITUTE_CODE_DUPLICATE:
     case ErrorCode.SLUG_DUPLICATE:
       return { field: 'code', messageKey: 'codeDuplicate' } as const;
-    case ErrorCode.INSTITUTE_ADMIN_EMAIL_UNAVAILABLE:
-      return { field: 'firstAdmin.email', messageKey: 'firstAdmin.emailUnavailable' } as const;
-    case ErrorCode.PHONE_ALREADY_IN_USE:
-      return { field: 'firstAdmin.phone', messageKey: 'firstAdmin.phoneInUse' } as const;
+    case ErrorCode.INSTITUTE_ADMIN_UNAVAILABLE:
+      // One message for every reason; the server never says which detail is the problem.
+      return { field: 'firstAdmin.email', messageKey: 'firstAdmin.unavailable' } as const;
     default:
       return null;
   }

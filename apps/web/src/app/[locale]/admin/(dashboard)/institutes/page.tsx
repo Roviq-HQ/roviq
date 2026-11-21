@@ -36,6 +36,7 @@ import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { DeletedInstitutesDialog } from './deleted-institutes-dialog';
 import { createApprovalColumns, createInstituteColumns } from './institute-columns';
 import { InstituteFilters, useInstituteFilters } from './institute-filters';
 import type { InstituteNode } from './types';
@@ -186,12 +187,15 @@ export default function InstitutesPage() {
             {t('description')}
           </p>
         </div>
-        <Can I="create" a="Institute">
-          <Button onClick={() => router.push('/admin/institutes/new')}>
-            <Plus className="size-4" />
-            {t('createInstitute')}
-          </Button>
-        </Can>
+        <div className="flex flex-wrap items-center gap-2">
+          <DeletedInstitutesDialog onRestored={() => refetch()} />
+          <Can I="create" a="Institute">
+            <Button onClick={() => router.push('/admin/institutes/new')}>
+              <Plus className="size-4" />
+              {t('createInstitute')}
+            </Button>
+          </Can>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

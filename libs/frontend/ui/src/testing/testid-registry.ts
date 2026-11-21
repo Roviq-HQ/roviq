@@ -47,6 +47,19 @@ export const testIds = {
     save: 'institute-locales-save',
   },
 
+  accountEmail: {
+    card: 'account-email-card',
+    loading: 'account-email-loading',
+    retryBtn: 'account-email-retry-btn',
+    address: 'account-email-address',
+    verifiedBadge: 'account-email-verified-badge',
+    unverifiedBadge: 'account-email-unverified-badge',
+    sendBtn: 'account-email-send-btn',
+    codeInput: 'account-email-code-input',
+    codeError: 'account-email-code-error',
+    verifyBtn: 'account-email-verify-btn',
+    resendBtn: 'account-email-resend-btn',
+  },
   accountLocale: {
     card: 'account-language-card',
     select: 'account-language-select',
@@ -105,6 +118,11 @@ export const testIds = {
   // ── Admin: institutes list + filters + columns ─────────────────────────
   adminInstitutes: {
     page: 'institutes-page',
+    deletedOpenBtn: 'institutes-deleted-open-btn',
+    deletedDialog: 'institutes-deleted-dialog',
+    deletedEmpty: 'institutes-deleted-empty',
+    deletedRow: (id: string) => `institutes-deleted-row-${id}`,
+    deletedRestoreBtn: (id: string) => `institutes-deleted-restore-btn-${id}`,
     title: 'institutes-title',
     description: 'institutes-description',
     table: 'institutes-table',
