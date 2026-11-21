@@ -92,7 +92,7 @@ describe('Password Change E2E (ROV-187)', () => {
     expect(res.errors[0].message).toMatch(/Current password is incorrect/i);
   });
 
-  it(`rejects new password shorter than ${NEW_PASSWORD_MIN_LENGTH} characters with min-length error`, async () => {
+  it(`rejects new password shorter than ${NEW_PASSWORD_MIN_LENGTH} characters with the MIN_LENGTH rule`, async () => {
     // `a` repeated `MIN - 1` times — one character short of the minimum.
     const tooShort = 'a'.repeat(NEW_PASSWORD_MIN_LENGTH - 1);
     const res = await gql(
@@ -104,7 +104,8 @@ describe('Password Change E2E (ROV-187)', () => {
     );
     expect(res.errors).toBeDefined();
     assert(res.errors);
-    expect(res.errors[0].message).toMatch(new RegExp(`${NEW_PASSWORD_MIN_LENGTH} characters`, 'i'));
+    expect(res.errors[0].extensions?.code).toBe('VALIDATION_FAILED');
+    expect(res.errors[0].message).toContain('MIN_LENGTH');
   });
 
   it('rejects when new password equals current with "differ" error', async () => {

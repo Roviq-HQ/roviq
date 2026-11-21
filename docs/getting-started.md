@@ -30,7 +30,7 @@ Open the Tilt UI at http://localhost:10350 to monitor all resources.
 | admin | admin123 | institute_admin | 2 institutes (shows institute picker) |
 | teacher1 | teacher123 | teacher | 1 institute (direct login) |
 | student1 | student123 | student | 1 institute (direct login) |
-| guardian1 | guardian123 | parent of student1 (the e2e seed also links student2) | 1 institute (direct login) |
+| guardian1 | Guardian123 | parent of student1 (the e2e seed also links student2) | 1 institute (direct login) |
 | subjectteacher1 | teacher123 | subject_teacher, Hindi periods in the demo timetable | 1 institute (direct login) |
 | guardian4 | guardian123 | parent, two children (student6, student7) | 1 institute (direct login) |
 | student6, student7 | student123 | student | 1 institute (direct login) |
