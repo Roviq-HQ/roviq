@@ -827,6 +827,7 @@ export const testIds = {
     detailDocumentRemoveConfirmBtn: 'students-detail-document-remove-confirm-btn',
     detailDocumentRemoveCancelBtn: 'students-detail-document-remove-cancel-btn',
     detailTcEmpty: 'students-detail-tc-empty',
+    detailTcDownloadBtn: (id: string) => `students-detail-tc-download-btn-${id}`,
     detailAuditEmpty: 'students-detail-audit-empty',
     detailAcademicsEmpty: 'students-detail-academics-empty',
     detailTitle: 'students-detail-title',
@@ -1083,8 +1084,21 @@ export const testIds = {
   },
 
   // ── Institute: certificates → TC ──────────────────────────────────────
+  // Public TC verification page (opened from the QR code)
+  tcVerify: {
+    card: 'tc-verify-card',
+    loading: 'tc-verify-loading',
+    error: 'tc-verify-error',
+    retryBtn: 'tc-verify-retry-btn',
+    notFound: 'tc-verify-not-found',
+    valid: 'tc-verify-valid',
+    invalid: 'tc-verify-invalid',
+    serial: 'tc-verify-serial',
+  },
   instituteCertificatesTc: {
     title: 'tc-title',
+    downloadPdfBtn: 'tc-download-pdf-btn',
+    generatePdfBtn: 'tc-generate-pdf-btn',
     table: 'tc-table',
     // Request dialog
     requestAcademicYearInfo: 'tc-request-academic-year-info',

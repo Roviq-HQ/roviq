@@ -9,6 +9,8 @@ const TC_ERROR_KEYS = {
   [ErrorCode.STUDENT_NOT_FOUND]: 'studentNotFound',
   [ErrorCode.VALIDATION_FAILED]: 'validation',
   [ErrorCode.FORBIDDEN]: 'forbidden',
+  [ErrorCode.PDF_UNSUPPORTED_SCRIPT]: 'unsupportedScript',
+  [ErrorCode.PDF_NOT_READY]: 'pdfNotReady',
 } as const;
 
 export type TcErrorKey = (typeof TC_ERROR_KEYS)[keyof typeof TC_ERROR_KEYS] | 'generic';

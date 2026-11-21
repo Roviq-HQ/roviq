@@ -40,6 +40,7 @@ import {
   useBreadcrumbOverride,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { FileDownloadButton } from '@web/components/file-upload/file-download-button';
 import { parseISO } from 'date-fns';
 import {
   ArrowLeft,
@@ -73,6 +74,7 @@ import {
 import {
   type TCNode,
   useApproveTC,
+  useGenerateTCPdf,
   useIssueTC,
   useRejectTC,
   useRequestDuplicateTC,
@@ -115,6 +117,19 @@ export default function TCDetailPage() {
   const [confirmAction, setConfirmAction] = React.useState<ConfirmAction | null>(null);
   const [approveTC, { loading: approving }] = useApproveTC();
   const [issueTC, { loading: issuing }] = useIssueTC();
+  const [generatePdf, { loading: generatingPdf }] = useGenerateTCPdf();
+
+  const runGeneratePdf = async () => {
+    if (!tc) return;
+    try {
+      await generatePdf({ variables: { id: tc.id } });
+      toast.success(t('tc.generatePdf.success'));
+    } catch (err) {
+      toast.error(t('tc.generatePdf.error'), {
+        description: t(`tc.errors.${tcErrorKey(extractGraphQLErrorCode(err))}`),
+      });
+    }
+  };
 
   const runConfirmed = async () => {
     if (!tc || !confirmAction) return;
@@ -190,17 +205,31 @@ export default function TCDetailPage() {
             <Printer className="size-4" />
             {t('actions.print')}
           </Button>
-          {tc.pdfUrl && (
-            <Button asChild variant="outline">
-              <a href={tc.pdfUrl} target="_blank" rel="noopener noreferrer">
-                <FileDown className="size-4" />
-                {t('actions.downloadPdf')}
-              </a>
-            </Button>
+          {tc.pdf && (
+            <FileDownloadButton
+              fileId={tc.pdf.id}
+              scope="institute"
+              label={t('actions.downloadPdf')}
+              testId={instituteCertificatesTc.downloadPdfBtn}
+            />
           )}
-          {tc.qrVerificationUrl && (
+          {!tc.pdf && (tc.status === 'ISSUED' || tc.status === 'DUPLICATE_ISSUED') && (
+            <Can I="manage" a="TC">
+              <Button
+                variant="outline"
+                onClick={runGeneratePdf}
+                disabled={generatingPdf}
+                title={t('actions.generatePdf')}
+                data-testid={instituteCertificatesTc.generatePdfBtn}
+              >
+                <FileDown className="size-4" />
+                {t('actions.generatePdf')}
+              </Button>
+            </Can>
+          )}
+          {tc.verificationUrl && (
             <Button asChild variant="outline">
-              <a href={tc.qrVerificationUrl} target="_blank" rel="noopener noreferrer">
+              <a href={tc.verificationUrl} target="_blank" rel="noopener noreferrer">
                 <QrCode className="size-4" />
                 {t('actions.verifyQr')}
                 <ExternalLink className="size-3" />
