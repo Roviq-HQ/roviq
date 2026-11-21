@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { screen, waitFor } from '@testing-library/react';
+import assert from 'node:assert';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -89,5 +91,79 @@ describe('CreateInstitutePage (admin)', () => {
       expect(screen.queryByText(/expected number/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/received NaN/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('submits a school with a phone formatted on blur and enum board and departments', async () => {
+    // Everything but the phone and the departments comes from a restored draft.
+    window.localStorage.setItem(
+      'roviq:draft:adminCreateInstitute:new',
+      JSON.stringify({
+        savedAt: Date.now(),
+        values: {
+          name: { en: 'Sunrise Academy' },
+          code: 'SUN-01',
+          type: 'SCHOOL',
+          structureFramework: 'TRADITIONAL',
+          board: 'CBSE',
+          departments: [],
+          contact: {
+            phones: [
+              {
+                countryCode: '+91',
+                number: '',
+                isPrimary: true,
+                isWhatsappEnabled: true,
+                label: '',
+              },
+            ],
+            emails: [{ address: 'office@sunrise.example', isPrimary: true, label: '' }],
+          },
+          address: {
+            line1: '12 Main Road',
+            line2: '',
+            line3: '',
+            city: 'Gurugram',
+            district: 'Gurugram',
+            state: 'HARYANA',
+            postalCode: '122001',
+            country: 'IN',
+          },
+          resellerId: null,
+          groupId: null,
+          isDemo: false,
+        },
+      }),
+    );
+    createInstituteMock.mockResolvedValue({ data: { adminCreateInstitute: { id: 'inst-1' } } });
+    renderWithProviders(<CreateInstitutePage />);
+
+    await userEvent.click(await screen.findByTestId(testIds.adminInstitutes.newDraftRestoreBtn));
+    const phone = screen.getByTestId('admin-institute-new-phone-0-input');
+    await userEvent.type(phone, '9876512399');
+    fireEvent.blur(phone);
+    await waitFor(() => expect(phone).toHaveValue('98765 12399'));
+    expect(phone).not.toHaveAttribute('aria-invalid');
+    await userEvent.click(screen.getByTestId('admin-institute-new-department-PRIMARY'));
+
+    const submit = screen
+      .getAllByRole('button', { name: /create institute/i })
+      .find((b) => (b as HTMLButtonElement).type === 'submit');
+    assert(submit);
+    await userEvent.click(submit);
+
+    await waitFor(() => expect(createInstituteMock).toHaveBeenCalledTimes(1));
+    const input = createInstituteMock.mock.calls[0]?.[0]?.variables?.input;
+    assert(input);
+    expect(input.board).toBe('CBSE');
+    expect(input.departments).toEqual(['PRIMARY']);
+    expect(input.contact.phones).toEqual([
+      {
+        countryCode: '+91',
+        number: '9876512399',
+        isPrimary: true,
+        isWhatsappEnabled: true,
+        label: '',
+      },
+    ]);
   });
 });

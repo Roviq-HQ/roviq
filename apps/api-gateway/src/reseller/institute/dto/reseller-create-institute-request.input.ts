@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { InstituteType, StructureFramework } from '@roviq/common-types';
+import { BoardType, EducationLevel, InstituteType, StructureFramework } from '@roviq/common-types';
 import type { InstituteAddress, InstituteContact } from '@roviq/database';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import {
@@ -48,7 +48,7 @@ export class ResellerCreateInstituteRequestInput {
   @Field(() => InstituteType, {
     nullable: true,
     defaultValue: 'SCHOOL',
-    description: 'Legal/organisational type of the institute. Defaults to SCHOOL.',
+    description: 'Kind of institute (school, coaching or library). Defaults to SCHOOL.',
   })
   @IsEnum(InstituteType)
   @IsOptional()
@@ -79,22 +79,22 @@ export class ResellerCreateInstituteRequestInput {
   @IsOptional()
   address?: InstituteAddress;
 
-  @Field(() => [String], {
+  @Field(() => [EducationLevel], {
     nullable: true,
-    description: 'Education departments offered, e.g. ["primary", "secondary"].',
+    description: 'Education departments offered, e.g. [PRIMARY, SECONDARY].',
   })
   @IsArray()
-  @IsString({ each: true })
+  @IsEnum(EducationLevel, { each: true })
   @IsOptional()
-  departments?: string[];
+  departments?: EducationLevel[];
 
-  @Field(() => String, {
+  @Field(() => BoardType, {
     nullable: true,
-    description: 'Affiliated board name, e.g. "CBSE", "RBSE".',
+    description: 'Affiliated board, e.g. CBSE or RBSE.',
   })
-  @IsString()
+  @IsEnum(BoardType)
   @IsOptional()
-  board?: string;
+  board?: BoardType;
 
   @Field(() => String, {
     nullable: true,

@@ -1,7 +1,15 @@
 'use client';
 
-import { createAddressSchema, INDIAN_STATE_VALUES } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import {
+  BOARD_TYPE_VALUES,
+  type BoardType,
+  createAddressSchema,
+  EDUCATION_LEVEL_VALUES,
+  type EducationLevel,
+  ErrorCode,
+  INDIAN_STATE_VALUES,
+} from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { i18nTextSchema, useFormatDate, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -62,24 +70,16 @@ const INSTITUTE_TYPES = ['SCHOOL', 'COACHING', 'LIBRARY'] as const;
 /** Academic structure frameworks (school-only). */
 const FRAMEWORKS = ['NEP', 'TRADITIONAL'] as const;
 
-/** Education boards (school-only). */
-const BOARDS = ['cbse', 'bseh', 'rbse', 'icse'] as const;
-
-/** Academic departments (school-only). */
-const DEPARTMENTS = [
-  'pre_primary',
-  'primary',
-  'upper_primary',
-  'secondary',
-  'senior_secondary',
-] as const;
-
 // ─── Schema factory (uses next-intl for error messages) ──────────────────────
 
 function buildSchema(t: ReturnType<typeof useTranslations>) {
   const phoneSchema = z.object({
     countryCode: z.string().default('+91'),
-    number: z.string().regex(/^\d{10}$/, t('phoneInvalid')),
+    // The field shows "98765 43210" after blur; validate and send the digits.
+    number: z
+      .string()
+      .transform((value) => value.replace(/\D/g, ''))
+      .pipe(z.string().regex(/^\d{10}$/, t('phoneInvalid'))),
     isPrimary: z.boolean().default(false),
     isWhatsappEnabled: z.boolean().default(false),
     label: z.string().max(50).default(''),
@@ -110,8 +110,8 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
     slug: z.string().optional(),
     type: z.enum(INSTITUTE_TYPES),
     structureFramework: z.enum(FRAMEWORKS).optional(),
-    board: z.string().optional(),
-    departments: z.array(z.string()).optional(),
+    board: z.enum(BOARD_TYPE_VALUES).optional(),
+    departments: z.array(z.enum(EDUCATION_LEVEL_VALUES)).optional(),
     contact: contactSchema.optional(),
     address: addressSchema.optional(),
     resellerId: z.string().uuid().optional().nullable(),
@@ -175,7 +175,7 @@ const DEFAULT_VALUES: CreateInstituteFormValues = {
   code: '',
   type: 'SCHOOL',
   structureFramework: 'TRADITIONAL',
-  board: 'cbse',
+  board: 'CBSE',
   departments: [],
   contact: {
     phones: [
@@ -231,17 +231,6 @@ export default function CreateInstitutePage() {
 
       const isSchoolType = parsed.type === 'SCHOOL';
 
-      // Normalize phone numbers to E.164 on submit (display keeps the formatted version).
-      const contact = parsed.contact
-        ? {
-            ...parsed.contact,
-            phones: parsed.contact.phones.map((p) => ({
-              ...p,
-              number: p.number.replace(/\D/g, ''),
-            })),
-          }
-        : undefined;
-
       try {
         const result = await createInstitute({
           variables: {
@@ -253,7 +242,7 @@ export default function CreateInstitutePage() {
               structureFramework: isSchoolType ? parsed.structureFramework : undefined,
               board: isSchoolType ? parsed.board : undefined,
               departments: isSchoolType ? parsed.departments : undefined,
-              contact,
+              contact: parsed.contact,
               address: parsed.address,
               resellerId: parsed.resellerId ?? undefined,
               groupId: parsed.groupId ?? undefined,
@@ -266,15 +255,16 @@ export default function CreateInstitutePage() {
         const id = result.data?.adminCreateInstitute.id;
         if (id) router.push(`/admin/institutes/${id}`);
       } catch (err) {
-        const message = extractGraphQLError(err, t('error'));
-        if (message.includes('INSTITUTE_CODE_DUPLICATE') || message.includes('already exists')) {
+        const code = extractGraphQLErrorCode(err);
+        // The slug is derived from the code, so a taken slug is a taken code too.
+        if (code === ErrorCode.INSTITUTE_CODE_DUPLICATE || code === ErrorCode.SLUG_DUPLICATE) {
           form.setFieldMeta('code', (prev) => ({
             ...prev,
             isTouched: true,
             errorMap: { ...prev.errorMap, onChange: t('codeDuplicate') },
           }));
           toast.error(t('codeDuplicate'));
-        } else if (message.includes('RESELLER_INVALID')) {
+        } else if (code === ErrorCode.RESELLER_INVALID) {
           form.setFieldMeta('resellerId', (prev) => ({
             ...prev,
             isTouched: true,
@@ -282,7 +272,9 @@ export default function CreateInstitutePage() {
           }));
           toast.error(t('resellerInvalid'));
         } else {
-          toast.error(t('error'), { description: message });
+          toast.error(t('error'), {
+            description: code === ErrorCode.BAD_REQUEST ? t('invalidInput') : undefined,
+          });
         }
       }
     },
@@ -317,7 +309,7 @@ export default function CreateInstitutePage() {
     return parts.join(', ');
   }, [addressWatch]);
 
-  function toggleDepartment(dept: string) {
+  function toggleDepartment(dept: EducationLevel) {
     const current = selectedDepartments;
     const updated = current.includes(dept) ? current.filter((d) => d !== dept) : [...current, dept];
     form.setFieldValue('departments', updated);
@@ -543,7 +535,7 @@ export default function CreateInstitutePage() {
                   <form.AppField name="board">
                     {(field) => {
                       const value = typeof field.state.value === 'string' ? field.state.value : '';
-                      const selected = BOARDS.find((b) => b === value);
+                      const selected = BOARD_TYPE_VALUES.find((b) => b === value);
                       return (
                         <Field>
                           <FieldLabel>
@@ -572,7 +564,7 @@ export default function CreateInstitutePage() {
                     <FieldLabel>{t('departments')}</FieldLabel>
                     <FieldDescription>{t('departmentsDescription')}</FieldDescription>
                     <div className="flex flex-wrap gap-3">
-                      {DEPARTMENTS.map((dept) => (
+                      {EDUCATION_LEVEL_VALUES.map((dept) => (
                         <FieldLabel
                           key={dept}
                           htmlFor={`dept-${dept}`}
@@ -1206,7 +1198,7 @@ function StateCombobox({ value, onChange, t, tGeo }: StateComboboxProps) {
 
 interface BoardComboboxProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: BoardType) => void;
   selectedLabel?: string;
   t: ReturnType<typeof useTranslations>;
 }
@@ -1237,7 +1229,7 @@ function BoardCombobox({ value, onChange, selectedLabel, t }: BoardComboboxProps
           <CommandList>
             <CommandEmpty>{t('boardNoResults')}</CommandEmpty>
             <CommandGroup>
-              {BOARDS.map((board) => (
+              {BOARD_TYPE_VALUES.map((board) => (
                 <CommandItem
                   key={board}
                   value={board}

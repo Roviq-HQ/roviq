@@ -25,6 +25,7 @@ import {
   and,
   asc,
   count,
+  DrizzleQueryError,
   eq,
   ilike,
   inArray,
@@ -34,6 +35,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
+import { DatabaseError } from 'pg';
 import { decodeCursor } from '../../../common/pagination/relay-pagination.model';
 import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
 import { BRANDING_IMAGES, type BrandingImageColumn } from '../branding-images';
@@ -266,38 +268,56 @@ export class InstituteDrizzleRepository extends InstituteRepository {
   async create(data: CreateInstituteData): Promise<InstituteRecord> {
     const { userId } = getRequestContext();
 
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
-      const rows = await tx
-        .insert(institutes)
-        .values({
-          name: data.name,
-          slug: data.slug,
-          code: data.code,
-          type: data.type as 'SCHOOL' | 'COACHING' | 'LIBRARY' | undefined,
-          structureFramework: data.structureFramework as 'NEP' | 'TRADITIONAL' | undefined,
-          contact: data.contact ?? { phones: [], emails: [] },
-          address: data.address,
-          ...(data.departments && {
-            departments: data.departments as (
-              | 'PRE_PRIMARY'
-              | 'PRIMARY'
-              | 'UPPER_PRIMARY'
-              | 'SECONDARY'
-              | 'SENIOR_SECONDARY'
-            )[],
-          }),
-          ...(data.resellerId && { resellerId: data.resellerId }),
-          ...(data.groupId && { groupId: data.groupId }),
-          ...(data.isDemo !== undefined && { isDemo: data.isDemo }),
-          status: 'PENDING',
-          setupStatus: 'PENDING',
-          createdBy: userId,
-          updatedBy: userId,
-        })
-        .returning(instituteColumns);
+    try {
+      return await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
+        const rows = await tx
+          .insert(institutes)
+          .values({
+            name: data.name,
+            slug: data.slug,
+            code: data.code,
+            type: data.type as 'SCHOOL' | 'COACHING' | 'LIBRARY' | undefined,
+            structureFramework: data.structureFramework as 'NEP' | 'TRADITIONAL' | undefined,
+            contact: data.contact ?? { phones: [], emails: [] },
+            address: data.address,
+            ...(data.departments && {
+              departments: data.departments as (
+                | 'PRE_PRIMARY'
+                | 'PRIMARY'
+                | 'UPPER_PRIMARY'
+                | 'SECONDARY'
+                | 'SENIOR_SECONDARY'
+              )[],
+            }),
+            ...(data.resellerId && { resellerId: data.resellerId }),
+            ...(data.groupId && { groupId: data.groupId }),
+            ...(data.isDemo !== undefined && { isDemo: data.isDemo }),
+            status: 'PENDING',
+            setupStatus: 'PENDING',
+            createdBy: userId,
+            updatedBy: userId,
+          })
+          .returning(instituteColumns);
 
-      return rows[0] as InstituteRecord;
-    });
+        return rows[0] as InstituteRecord;
+      });
+    } catch (err) {
+      // The unique indexes are the only race-free duplicate check; name the field for the caller.
+      const constraint = uniqueViolationConstraint(err);
+      if (constraint === 'institutes_slug_key') {
+        throw new BusinessException(
+          ErrorCode.SLUG_DUPLICATE,
+          `Slug "${data.slug}" is already taken`,
+        );
+      }
+      if (constraint === 'institutes_code_key') {
+        throw new BusinessException(
+          ErrorCode.INSTITUTE_CODE_DUPLICATE,
+          `Institute code "${data.code}" is already taken`,
+        );
+      }
+      throw err;
+    }
   }
 
   async updateInfo(id: string, data: UpdateInstituteInfoData): Promise<InstituteRecord> {
@@ -680,4 +700,10 @@ export class InstituteDrizzleRepository extends InstituteRepository {
       };
     });
   }
+}
+
+/** Drizzle wraps the driver's error in DrizzleQueryError; node-postgres puts the constraint on it. */
+function uniqueViolationConstraint(err: unknown): string | null {
+  if (!(err instanceof DrizzleQueryError) || !(err.cause instanceof DatabaseError)) return null;
+  return err.cause.code === '23505' ? (err.cause.constraint ?? null) : null;
 }
