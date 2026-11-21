@@ -71,6 +71,14 @@ export class ListTCFilterInput {
   @IsOptional()
   @IsUUID()
   studentProfileId?: string;
+
+  @Field(() => ID, {
+    nullable: true,
+    description: 'Filter to the duplicates of one original TC.',
+  })
+  @IsOptional()
+  @IsUUID()
+  originalTcId?: string;
 }
 
 @InputType({

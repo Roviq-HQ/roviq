@@ -3,7 +3,7 @@
   "description": "Manage trusts, societies, and chains that operate institutes.",
   "newGroup": "New Group",
   "noGroups": "No institute groups found",
-  "noGroupsDescription": "Create your first institute group to organize institutes.",
+  "noGroupsDescription": "Create your first institute group to keep related institutes together.",
   "name": "Group Name",
   "namePlaceholder": "e.g. Delhi Public Schools Society",
   "nameDescription": "The legal or common name this group is known by.",

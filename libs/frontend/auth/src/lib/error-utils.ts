@@ -72,6 +72,7 @@ export const AUTH_ERROR_CODES = [
   'CURRENT_PASSWORD_INCORRECT',
   'PASSWORD_UNCHANGED',
   'NO_ACTIVE_MEMBERSHIP',
+  'INSTITUTE_NOT_ACTIVE',
   'PASSKEY_CHALLENGE_EXPIRED',
   'PASSKEY_VERIFICATION_FAILED',
   'PASSKEY_AUTHENTICATION_FAILED',
@@ -107,6 +108,8 @@ export const DEFAULT_AUTH_ERROR_LABELS: Record<AuthErrorKey, string> = {
   CURRENT_PASSWORD_INCORRECT: 'Current password is incorrect.',
   PASSWORD_UNCHANGED: 'New password must differ from the current password.',
   NO_ACTIVE_MEMBERSHIP: 'You no longer have access to this institute.',
+  INSTITUTE_NOT_ACTIVE:
+    'Your institute is not active right now. Please contact your institute or Roviq support.',
   PASSKEY_CHALLENGE_EXPIRED: 'Passkey verification timed out. Please try again.',
   PASSKEY_VERIFICATION_FAILED: 'Passkey could not be verified. Please try again.',
   PASSKEY_AUTHENTICATION_FAILED: 'Passkey sign-in failed. Try again or use your password.',

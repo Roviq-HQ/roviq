@@ -22,7 +22,7 @@
       "email": "ईमेल",
       "phone": "फ़ोन",
       "occupation": "व्यवसाय",
-      "organization": "संस्था",
+      "organization": "नियोक्ता",
       "educationLevel": "शिक्षा स्तर"
     },
     "placeholders": {
@@ -73,7 +73,7 @@
     "phone": "फ़ोन",
     "linkedStudents": "जुड़े छात्र",
     "occupation": "व्यवसाय",
-    "organization": "संगठन",
+    "organization": "नियोक्ता",
     "designation": "पदनाम",
     "educationLevel": "शिक्षा स्तर",
     "actions": "कार्रवाइयाँ"
@@ -134,7 +134,7 @@
       "firstName": "प्रथम नाम",
       "lastName": "अंतिम नाम",
       "occupation": "व्यवसाय",
-      "organization": "संस्था",
+      "organization": "नियोक्ता",
       "designation": "पद",
       "educationLevel": "शिक्षा स्तर",
       "save": "परिवर्तन सहेजें",
@@ -153,7 +153,7 @@
     "email": "ईमेल",
     "phone": "फ़ोन",
     "occupation": "व्यवसाय",
-    "organization": "संगठन",
+    "organization": "नियोक्ता",
     "educationLevel": "शिक्षा स्तर",
     "designation": "पदनाम"
   },

@@ -47,11 +47,12 @@ test.describe('Admin · new institute form', () => {
     await page.goto('/en/admin/institutes/new');
   });
 
-  test('renders all six logical sections', async ({ page }) => {
+  test('renders all seven logical sections', async ({ page }) => {
     // FXPFP — sectioned with FieldSet/FieldLegend
     await expect(page.getByTestId('institute-form-section-basic')).toBeVisible();
     await expect(page.getByTestId('institute-form-section-board')).toBeVisible();
     await expect(page.getByTestId('institute-form-section-ownership')).toBeVisible();
+    await expect(page.getByTestId('institute-form-section-first-admin')).toBeVisible();
     await expect(page.getByTestId('institute-form-section-contact')).toBeVisible();
     await expect(page.getByTestId('institute-form-section-address')).toBeVisible();
     await expect(page.getByTestId('institute-form-section-advanced')).toBeVisible();

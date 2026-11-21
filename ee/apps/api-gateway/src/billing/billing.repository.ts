@@ -385,42 +385,6 @@ export class BillingRepository {
     });
   }
 
-  async claimPaymentEvent(
-    gatewayPaymentId: string,
-    data: {
-      invoiceId: string;
-      tenantId: string;
-      resellerId: string;
-      method: (typeof payments.$inferSelect)['method'];
-      amountPaise: bigint;
-      currency?: string;
-      gatewayProvider?: string;
-    },
-  ): Promise<boolean> {
-    try {
-      await withAdmin(this.db, mkAdminCtx('repository:billing'), async (tx) => {
-        await tx.insert(payments).values({
-          ...data,
-          gatewayPaymentId,
-          status: 'PENDING',
-          createdBy: this.userId,
-          updatedBy: this.userId,
-        });
-      });
-      return true;
-    } catch (error) {
-      // 23505 = unique_violation in PostgreSQL
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as { code: string }).code === '23505'
-      ) {
-        return false;
-      }
-      throw error;
-    }
-  }
-
   async markPaymentSucceeded(
     gatewayPaymentId: string,
     data: {

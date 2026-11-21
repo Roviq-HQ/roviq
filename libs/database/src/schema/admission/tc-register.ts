@@ -156,6 +156,11 @@ export const tcRegister = pgTable(
         sql`${table.isDuplicate} = false AND ${table.status} NOT IN ('CANCELLED', 'ISSUED') AND ${table.deletedAt} IS NULL`,
       ),
 
+    // One duplicate request in progress per original TC.
+    uniqueIndex('uq_tc_register_open_duplicate')
+      .on(table.originalTcId)
+      .where(sql`${table.status} = 'DUPLICATE_REQUESTED' AND ${table.deletedAt} IS NULL`),
+
     ...tenantPolicies('tc_register'),
   ],
 ).enableRLS();

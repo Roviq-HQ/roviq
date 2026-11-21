@@ -210,6 +210,11 @@ input AdminCreateInstituteInput {
   departments: [EducationLevel!]
 
   """
+  The person setup makes the institute admin; they receive the login details.
+  """
+  firstAdmin: InstituteFirstAdminInput!
+
+  """
   Institute group (trust, chain, or society) to assign this institute to.
   """
   groupId: String
@@ -760,6 +765,9 @@ type ApplicationModel {
   rteLotteryRank: Int
   sectionId: String
   standardId: String!
+
+  """Name (i18n) of the standard applied for"""
+  standardName: I18nText
   status: String!
   studentProfileId: String
   tenantId: String!
@@ -1516,7 +1524,7 @@ input CreateEnquiryInput {
   parentPhone: String!
 
   """Relationship of the contact person to the student."""
-  parentRelation: GuardianRelationship
+  parentRelation: GuardianRelationship!
 
   """Board of the student's previous institute, e.g. "CBSE"."""
   previousBoard: String
@@ -3293,8 +3301,12 @@ type InstituteAffiliationModel {
   id: ID!
   nocDate: DateOnly
   nocNumber: String
-  validFrom: String!
-  validTo: String!
+
+  """Start of the affiliation; null until the institute enters its details."""
+  validFrom: String
+
+  """End of the affiliation; null until the institute enters its details."""
+  validTo: String
 }
 
 """
@@ -3390,6 +3402,43 @@ input InstituteFilterInput {
   type: InstituteType
 }
 
+"""
+The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_EMAIL_UNAVAILABLE when the email cannot identify one live account.
+"""
+input InstituteFirstAdminInput {
+  """
+  Email address, trimmed and lower-cased; matches an existing Roviq account case-insensitively.
+  """
+  email: String!
+
+  """First name, shown on the account and in the welcome message."""
+  firstName: String!
+
+  """Last name."""
+  lastName: String
+
+  """
+  10-digit Indian mobile number without +91; set only on a newly created account.
+  """
+  phone: String
+}
+
+"""The person named to become the institute admin when setup runs."""
+type InstituteFirstAdminObject {
+  """
+  True when the email belongs to an account the calling reseller did not create: only the email it typed is returned, never that account’s name or phone.
+  """
+  detailsWithheld: Boolean!
+  email: String!
+
+  """Null together with lastName and phone when detailsWithheld is true."""
+  firstName: String
+  lastName: String
+
+  """10-digit mobile number without +91."""
+  phone: String
+}
+
 type InstituteGroupConnection {
   edges: [InstituteGroupEdge!]!
   pageInfo: PageInfo!
@@ -3468,6 +3517,11 @@ type InstituteModel {
   """Fallback language for institute-authored text; must be enabled."""
   defaultLocale: String!
   departments: [String!]
+
+  """
+  The user named to become the institute admin when setup runs, as their account shows them now. Platform and the owning reseller only; null when none was named.
+  """
+  firstAdmin: InstituteFirstAdminObject
   groupId: String
 
   """
@@ -3773,6 +3827,9 @@ input ListStaffFilterInput {
 
 """Filter for listing Transfer Certificates."""
 input ListTCFilterInput {
+  """Filter to the duplicates of one original TC."""
+  originalTcId: ID
+
   """Filter by TC lifecycle status."""
   status: TcStatus
 
@@ -4239,7 +4296,6 @@ type Mutation {
   publishReportCards(reportCardId: ID!): Int!
   recordManualPayment(input: ManualPaymentInput!, invoiceId: ID!): InvoiceModel!
   refreshToken(token: String!): AuthPayload!
-  register(input: RegisterInput!): AuthPayload!
   registerDeviceToken(token: String!): Boolean!
 
   """Reject an application"""
@@ -5172,22 +5228,6 @@ input RefundInput {
   reason: String
 }
 
-"""Credentials for creating a new Roviq account."""
-input RegisterInput {
-  """
-  Email address used for account recovery and transactional notifications.
-  """
-  email: String!
-
-  """Account password — minimum 8 characters, maximum 128."""
-  password: String!
-
-  """
-  Roviq ID (username) — 3–50 characters, alphanumeric, dashes, and underscores only.
-  """
-  username: String!
-}
-
 input RejectUpiInput {
   paymentId: ID!
   reason: String!
@@ -5395,6 +5435,11 @@ input ResellerCreateInstituteRequestInput {
 
   """Education departments offered, e.g. [PRIMARY, SECONDARY]."""
   departments: [EducationLevel!]
+
+  """
+  The person setup makes the institute admin; they receive the login details.
+  """
+  firstAdmin: InstituteFirstAdminInput!
 
   """
   ID of the institute group (trust/chain/society) this institute belongs to.
@@ -6514,16 +6559,20 @@ type TCModel {
   """Department clearance records"""
   clearances: [ClearanceEntryObject!]
   createdAt: DateTime!
-
-  """Class/standard studied snapshot from tcData->>'class_studied'"""
-  currentStandardName: String
   id: ID!
   isCounterSigned: Boolean
   isDuplicate: Boolean!
+
+  """For a duplicate, the issued TC it copies; null on an original"""
   originalTcId: String
   pdfUrl: String
   qrVerificationUrl: String
   reason: String!
+
+  """
+  Student's standard in the TC's academic year (i18n); null without an academic record
+  """
+  standardName: I18nText
   status: TcStatus!
 
   """Student first name (i18n) joined from user_profiles"""
@@ -6533,7 +6582,7 @@ type TCModel {
   studentLastName: I18nText
   studentProfileId: String!
 
-  """CBSE 20-field TC data snapshot"""
+  """CBSE TC fields frozen at generation (see CbseTcData)"""
   tcData: JSON
   tcSerialNumber: String!
 }

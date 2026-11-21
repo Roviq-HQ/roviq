@@ -62,18 +62,12 @@ export interface InstituteSetupResult {
 /** Activities interface for proxyActivities in the workflow */
 export interface InstituteSetupActivities {
   // Phase 1: Identity
-  createAdminRole(instituteId: string, creatingUserId: string): Promise<string>;
-  createAdminMembership(
-    instituteId: string,
-    creatingUserId: string,
-    roleId: string,
-  ): Promise<string>;
-  createSystemRole(instituteId: string, creatingUserId: string): Promise<string>;
-  setInstituteRepresentative(instituteId: string, creatingUserId: string): Promise<void>;
+  createDefaultRoles(instituteId: string, creatingUserId: string): Promise<void>;
+  /** Makes `institutes.first_admin_user_id` the institute admin; runs after createDefaultRoles. */
+  createFirstAdmin(instituteId: string, creatingUserId: string): Promise<void>;
 
   // Phase 2: Infrastructure
   createWallets(instituteId: string): Promise<void>;
-  createDefaultRoles(instituteId: string, creatingUserId: string): Promise<void>;
 
   // Phase 3: Academic Structure
   seedAcademicStructure(

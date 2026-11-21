@@ -49,6 +49,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
   'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
+  'apps/api-gateway/src/auth/__tests__/institute-status-access.integration.spec.ts',
+  'apps/api-gateway/src/institute/section/__tests__/section-strength.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
   'apps/api-gateway/src/admin/user/__tests__/admin-user.integration.spec.ts',
   'apps/api-gateway/src/admin/reseller/admin-reseller.service.ts',
@@ -62,6 +64,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/auth/impersonation.service.ts',
   'apps/api-gateway/src/auth/middleware/impersonation-session.guard.ts',
   // ROV-97: global guard reads the reseller's status before any resolver runs.
+  // Reads an institute's status for any institute-scope token, before a tenant context exists.
+  'apps/api-gateway/src/auth/middleware/institute-access.guard.ts',
   'apps/api-gateway/src/auth/middleware/reseller-access.guard.ts',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts',
   'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts',
@@ -79,6 +83,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/admission/__tests__/enquiry.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/admission.service.ts',
   'apps/api-gateway/src/institute/admission/workflows/student-admission.activities.ts',
+  // ROV-232: flags test accounts as needing a password change and grants a platform role.
+  'apps/api-gateway/src/auth/__tests__/must-change-password.integration.spec.ts',
+  // ROV-232: records a first admin on a test institute to check who may read it.
+  'apps/api-gateway/src/institute/management/__tests__/institute-first-admin.integration.spec.ts',
   // ROV-232: reads what the setup workflow wrote, to compare it with direct creation.
   'apps/api-gateway/src/institute/setup/__tests__/institute-setup.integration.spec.ts',
   'apps/api-gateway/src/institute/attendance/__tests__/attendance-authorization.integration.spec.ts',
@@ -94,7 +102,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/certificate/__tests__/compliance-generators.integration.spec.ts',
   'apps/api-gateway/src/institute/certificate/__tests__/tc-issuance.spec.ts',
   'apps/api-gateway/src/institute/certificate/__tests__/tc.integration.spec.ts',
-  'apps/api-gateway/src/institute/certificate/certificate.service.ts',
   'apps/api-gateway/src/institute/certificate/exports/awr.export.ts',
   // ROV-296: compliance export generators and activities, run by the export workflow as the institute it names.
   'apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts',

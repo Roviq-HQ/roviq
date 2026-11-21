@@ -120,6 +120,12 @@ describe('StudentsPage (component)', () => {
     expect(screen.getAllByText(/name/i).length).toBeGreaterThan(0);
   });
 
+  it('shows the admission date as a calendar date, not as time elapsed', () => {
+    renderPage();
+    expect(screen.getAllByText('01/04/2025').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/ ago$/)).not.toBeInTheDocument();
+  });
+
   it('shows access denied when the ability does not include Student:read', () => {
     renderPage([{ action: 'read', subject: 'Institute' }]);
     expect(screen.getByText(messagesEn.accessDenied)).toBeInTheDocument();

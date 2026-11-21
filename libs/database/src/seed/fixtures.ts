@@ -19,7 +19,7 @@ export const SEED_CREDENTIALS = {
   RESELLER: { username: 'reseller1', password: 'reseller123' },
   TEACHER: { username: 'teacher1', password: 'teacher123' },
   STUDENT: { username: 'student1', password: 'student123' },
-  GUARDIAN: { username: 'guardian1', password: 'guardian123' },
+  GUARDIAN: { username: 'guardian1', password: 'Guardian123' },
   STUDENT_2: { username: 'student2', password: 'student123' },
   STUDENT_3: { username: 'student3', password: 'student123' },
   STUDENT_4: { username: 'student4', password: 'student123' },

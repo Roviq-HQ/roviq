@@ -1,6 +1,6 @@
 {
   "title": "Settings",
-  "description": "Your organisation's profile, branding and sign-in sessions.",
+  "description": "Your reseller profile, branding and sign-in sessions.",
   "tabs": {
     "label": "Settings sections",
     "profile": "Profile",
@@ -23,8 +23,8 @@
     "generic": "Could not save. Try again."
   },
   "profile": {
-    "identity": "Organisation",
-    "identityDescription": "How your organisation appears to institutes and to Roviq.",
+    "identity": "Business details",
+    "identityDescription": "How your reseller business appears to institutes and to Roviq.",
     "name": "Name",
     "nameSystemHint": "The name of the Roviq Direct reseller is fixed.",
     "slug": "Slug",

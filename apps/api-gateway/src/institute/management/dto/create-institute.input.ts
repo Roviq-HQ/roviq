@@ -2,16 +2,55 @@ import { Field, Float, InputType } from '@nestjs/graphql';
 import { BoardType, EducationLevel, InstituteType, StructureFramework } from '@roviq/common-types';
 import type { InstituteAddress, InstituteContact } from '@roviq/database';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
   Matches,
+  MaxLength,
+  ValidateNested,
 } from 'class-validator';
+
+@InputType({
+  description:
+    'The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_EMAIL_UNAVAILABLE when the email cannot identify one live account.',
+})
+export class InstituteFirstAdminInput {
+  @Field({ description: 'First name, shown on the account and in the welcome message.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  firstName!: string;
+
+  @Field(() => String, { nullable: true, description: 'Last name.' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  lastName?: string;
+
+  @Field({
+    description:
+      'Email address, trimmed and lower-cased; matches an existing Roviq account case-insensitively.',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail()
+  @MaxLength(320)
+  email!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: '10-digit Indian mobile number without +91; set only on a newly created account.',
+  })
+  @IsOptional()
+  @Matches(/^\d{10}$/, { message: 'phone must be exactly 10 digits' })
+  phone?: string;
+}
 
 // ── Contact / Address input types ──
 
@@ -187,4 +226,11 @@ export class CreateInstituteInput {
   @IsBoolean()
   @IsOptional()
   isDemo?: boolean;
+
+  @Field(() => InstituteFirstAdminInput, {
+    description: 'The person setup makes the institute admin.',
+  })
+  @ValidateNested()
+  @Type(() => InstituteFirstAdminInput)
+  firstAdmin!: InstituteFirstAdminInput;
 }

@@ -66,6 +66,8 @@ export const ErrorCode = {
   // ── Institute ──────────────────────────────────────────
   /** Institute not found or soft-deleted */
   INSTITUTE_NOT_FOUND: 'INSTITUTE_NOT_FOUND',
+  /** Login refused: every institute the user belongs to is not ACTIVE (pending, inactive, suspended, rejected) */
+  INSTITUTE_NOT_ACTIVE: 'INSTITUTE_NOT_ACTIVE',
   /** Another non-deleted institute already uses this code */
   INSTITUTE_CODE_DUPLICATE: 'INSTITUTE_CODE_DUPLICATE',
   /** Another non-deleted institute already uses this primary email */
@@ -92,6 +94,10 @@ export const ErrorCode = {
   TIER_CHANGE_REQUIRES_ACTIVE: 'TIER_CHANGE_REQUIRES_ACTIVE',
   /** Initial reseller admin email is held by a deleted user, by several users, or is another user's Roviq ID */
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: 'RESELLER_ADMIN_EMAIL_UNAVAILABLE',
+  /** First institute admin email is held by a deleted user, by several users, or is another user's Roviq ID */
+  INSTITUTE_ADMIN_EMAIL_UNAVAILABLE: 'INSTITUTE_ADMIN_EMAIL_UNAVAILABLE',
+  /** A new account was asked for with a mobile number another account already owns */
+  PHONE_ALREADY_IN_USE: 'PHONE_ALREADY_IN_USE',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',
   /** Suspend attempted on a reseller that is already suspended */
@@ -430,6 +436,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   PASSKEY_NOT_FOUND: HttpStatus.NOT_FOUND,
   PASSKEY_LAST_AUTH_METHOD: HttpStatus.BAD_REQUEST,
   INSTITUTE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  INSTITUTE_NOT_ACTIVE: HttpStatus.FORBIDDEN,
   INSTITUTE_CODE_DUPLICATE: HttpStatus.CONFLICT,
   INSTITUTE_EMAIL_DUPLICATE: HttpStatus.CONFLICT,
   SETUP_NOT_COMPLETE: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -443,6 +450,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INVALID_TIER: HttpStatus.BAD_REQUEST,
   TIER_CHANGE_REQUIRES_ACTIVE: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
+  INSTITUTE_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
+  PHONE_ALREADY_IN_USE: HttpStatus.CONFLICT,
   INVALID_SLUG: HttpStatus.BAD_REQUEST,
   RESELLER_ALREADY_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -23,6 +23,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { admissionErrorKey } from '../admission-errors';
 import {
   type ApplicationNode,
   useApproveApplication,
@@ -71,8 +72,9 @@ export function ApproveApplicationDialog({
       onApproved?.(application.id);
       onOpenChange(false);
     } catch (err) {
-      const message = extractGraphQLError(err, t('applications.approveDialog.error'));
-      toast.error(t('applications.approveDialog.error'), { description: message });
+      toast.error(t('applications.approveDialog.error'), {
+        description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+      });
     }
   };
 

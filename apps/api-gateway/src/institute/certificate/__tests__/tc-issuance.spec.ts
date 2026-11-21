@@ -184,6 +184,7 @@ vi.mock('@roviq/database', () => ({
 
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
+  asc: vi.fn((a: unknown) => a),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
   inArray: vi.fn((a: unknown, b: unknown) => [a, b]),
   sql: Object.assign(vi.fn(), { raw: vi.fn() }),
@@ -243,10 +244,14 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
         lastName: { en: 'Devi' },
       },
     ]);
-    // 4. student_academics
+    // 4. student_academics joined to standards, oldest academic year first
     queueResult([
-      { promotionStatus: 'PROMOTED', standardId: 'std-5', classRoles: [] },
-      { promotionStatus: 'PROMOTED', standardId: 'std-6', classRoles: ['class_monitor'] },
+      { promotionStatus: 'PROMOTED', standardName: { en: 'Class 5' }, classRoles: [] },
+      {
+        promotionStatus: 'PROMOTED',
+        standardName: { en: 'Class 6', hi: 'कक्षा 6' },
+        classRoles: ['class_monitor'],
+      },
     ]);
     // 5. tc_register select (reason + clearances)
     queueResult([
@@ -282,8 +287,8 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
     expect(tc.whetherFailed).toBe('No');
     // 8. Subjects studied
     expect(tc.subjectsStudied).toBeTruthy();
-    // 9. Class last studied
-    expect(tc.classLastStudied).toBeTruthy();
+    // 9. Class last studied: the latest year's standard, by its English name
+    expect(tc.classLastStudied).toBe('Class 6');
     // 10. Last exam result
     expect(tc.lastExamResult).toBeTruthy();
     // 11. Qualified for promotion
@@ -354,9 +359,9 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
     queueResult([]); // no guardians
     // 2 detentions
     queueResult([
-      { promotionStatus: 'DETAINED', standardId: 'std-5', classRoles: [] },
-      { promotionStatus: 'DETAINED', standardId: 'std-5', classRoles: [] },
-      { promotionStatus: 'PROMOTED', standardId: 'std-6', classRoles: [] },
+      { promotionStatus: 'DETAINED', standardName: { en: 'Class 5' }, classRoles: [] },
+      { promotionStatus: 'DETAINED', standardName: { en: 'Class 5' }, classRoles: [] },
+      { promotionStatus: 'PROMOTED', standardName: { en: 'Class 6' }, classRoles: [] },
     ]);
     queueResult([{ reason: 'Transfer', clearances: {} }]);
     queueResult([{ id: 'tc-1' }]);
@@ -384,6 +389,8 @@ describe('TC Data Snapshot — All 20 CBSE Fields', () => {
     const result = await activities.populateTcData('tenant-1', 'tc-1', 'sp1');
     assert(result);
     expect(result.tcData.feeConcession).toContain('RTE');
+    // No academic record: no class to print
+    expect(result.tcData.classLastStudied).toBeNull();
   });
 });
 

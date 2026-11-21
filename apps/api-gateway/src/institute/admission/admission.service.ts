@@ -13,7 +13,6 @@ import {
   EnquirySource,
   EnquiryStatus,
   ErrorCode,
-  GuardianRelationship,
   REJECTION_REASON_MAX_LENGTH,
 } from '@roviq/common-types';
 import {
@@ -151,7 +150,7 @@ export class AdmissionService {
             parentName: input.parentName,
             parentPhone: input.parentPhone,
             parentEmail: input.parentEmail ?? null,
-            parentRelation: input.parentRelation ?? GuardianRelationship.FATHER,
+            parentRelation: input.parentRelation,
             source: input.source ?? EnquirySource.WALK_IN,
             referredBy: input.referredBy ?? null,
             assignedTo: input.assignedTo ?? null,

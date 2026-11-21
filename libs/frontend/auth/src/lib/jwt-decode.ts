@@ -9,6 +9,8 @@ interface JwtPayload {
   impersonationSessionId?: string;
   /** The session may read but not change anything. */
   impersonationReadOnly?: boolean;
+  /** The account must change its password before using anything else. */
+  mustChangePassword?: boolean;
 }
 
 export function decodeJwt(token: string): JwtPayload | null {
@@ -37,4 +39,10 @@ export function checkIsImpersonated(token: string | null): boolean {
   if (!token) return false;
   const payload = decodeJwt(token);
   return payload?.isImpersonated === true;
+}
+
+/** Whether the access token's account must change its password before anything else. */
+export function tokenRequiresPasswordChange(token: string | null | undefined): boolean {
+  if (!token) return false;
+  return decodeJwt(token)?.mustChangePassword === true;
 }

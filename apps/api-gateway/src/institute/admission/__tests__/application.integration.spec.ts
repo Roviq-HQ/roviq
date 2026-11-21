@@ -242,6 +242,7 @@ const LIST_APPLICATIONS = /* GraphQL */ `
           status
           academicYearId
           standardId
+          standardName
         }
       }
     }
@@ -304,6 +305,7 @@ interface ListApplicationsResponse {
         status: string;
         academicYearId: string;
         standardId: string;
+        standardName: Record<string, string> | null;
       };
     }>;
   };
@@ -397,6 +399,19 @@ describe('Admission applications (integration)', () => {
     const ids = response.data?.listApplications.edges.map((e) => e.node.id) ?? [];
     expect(ids).toContain(fixture.submittedApplicationId);
     expect(ids).toContain(fixture.offerAcceptedApplicationId);
+
+    // The list shows the class applied for by name, not by id.
+    const [standard] = await withAdmin(result.db, mkAdminCtx('test:application'), (tx) =>
+      tx
+        .select({ name: standards.name })
+        .from(standards)
+        .where(eq(standards.id, fixture.standardId)),
+    );
+    const submitted = response.data?.listApplications.edges.find(
+      (e) => e.node.id === fixture.submittedApplicationId,
+    );
+    expect(submitted?.node.standardName).toEqual(standard?.name);
+    expect(standard?.name.en).toMatch(/^Class 1 /);
   });
 
   it('updateApplication: valid status transition submitted → documents_pending', async () => {
@@ -656,6 +671,45 @@ describe('Admission applications (integration)', () => {
   });
 
   // SF-040. Runs after the test above, which creates the Student and Parent roles.
+  // Relies on the Student and Parent roles the first admission-activities test created.
+  it('admission activities: a parent given without a relationship is linked as OTHER, not FATHER', async () => {
+    const activities = createStudentAdmissionActivities(
+      result.db,
+      createMock<EventBusService>(),
+      result.app.get(IdentityService),
+    );
+    const seed = randomUUID();
+    const formData = {
+      studentName: 'Unstated Relation Child',
+      parentName: 'Kavita Rao',
+      parentPhone: `8${String(Date.now()).slice(-9)}`,
+    };
+    const { userId, membershipId } = await activities.createUserAndMembership(
+      tenantId,
+      actorId,
+      seed,
+    );
+    const { studentProfileId } = await activities.createStudentProfile(
+      tenantId,
+      userId,
+      membershipId,
+      fixture.standardId,
+      formData,
+      false,
+      actorId,
+    );
+
+    await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
+
+    const links = await withAdmin(result.db, mkAdminCtx('test:application'), (tx) =>
+      tx
+        .select({ relationship: studentGuardianLinks.relationship })
+        .from(studentGuardianLinks)
+        .where(eq(studentGuardianLinks.studentProfileId, studentProfileId)),
+    );
+    expect(links).toEqual([{ relationship: GuardianRelationship.OTHER }]);
+  });
+
   it('admission activities: a phone owned by an account outside the institute links nobody to it', async () => {
     const identity = result.app.get(IdentityService);
     const activities = createStudentAdmissionActivities(

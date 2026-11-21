@@ -37,8 +37,16 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first.',
   'apps/api-gateway/src/auth/identity.service.ts#IdentityService.createUser':
     'Creates a new platform-level user; no existing row is read or changed.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.ensureUserProfile':
+    'Called only for a user the same request just created; never with a caller-supplied id.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.findUserContact':
+    'The user id is the institute row’s first_admin_user_id, read only after the platform or owning-reseller check; a reseller gets the name and phone only when wasCreatedByReseller is true.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.wasCreatedByReseller':
+    'Boolean only; the user id is the institute row’s first_admin_user_id and the reseller id comes from the caller token, both after the owning-reseller check.',
   'apps/api-gateway/src/auth/identity.service.ts#IdentityService.findUsersByEmail':
     'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.isPhoneTaken':
+    'Boolean existence check for a number the caller typed for a new account; refusing a taken number is what keeps the welcome from going to another person’s phone.',
   'apps/api-gateway/src/auth/identity.service.ts#IdentityService.isUsernameTaken':
     'Boolean existence check; the reseller invite answers every unusable address with one error code.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertActiveResellerMembership':
@@ -69,6 +77,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Code exchange (ROV-183): user and reseller come from the session row and its institute, never from the caller; decides only whether the token is view-only.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findActiveByUserId':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
+  'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.hasMembershipInUnusableInstitute':
+    'Login runs before any tenant is chosen; the user id comes from the verified credentials, never from input.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findByIdAndUser':
     'A membership id from the client is matched against the authenticated user id in the same query.',
   'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts#PlatformMembershipDrizzleRepository.findByUserId':
@@ -89,8 +99,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/auth/repositories/reseller-membership.drizzle-repository.ts#ResellerMembershipDrizzleRepository.findByUserId':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
-  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.create':
-    'Self-registration creates a new user. KNOWN GAP (ROV-286): the public register mutation itself.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findById':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findByUsername':
@@ -109,10 +117,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Revokes the membership id read from a bot profile fetched under tenant RLS.',
   'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.findOrCreateBotRole':
     'Keyed by the tenant id in the verified token.',
-  'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.previewCertificate':
-    'Reads user_profiles for a user id taken from a student row fetched under tenant RLS.',
-  'apps/api-gateway/src/institute/certificate/certificate.service.ts#CertificateService.requestCertificate':
-    'Reads user_profiles for a user id taken from a student row fetched under tenant RLS.',
   'apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts#ExportReportDrizzleRepository.run':
     'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts).',
   'apps/api-gateway/src/institute/group/group.service.ts#GroupService.listMembers':

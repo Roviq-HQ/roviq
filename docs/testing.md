@@ -203,7 +203,7 @@ The seeders in `libs/database/src/seed/` use deterministic UUIDs (`SEED_IDS` in 
 | Admin user | `00000000-0000-7000-a000-000000000201` | admin / admin123 |
 | Teacher user | `00000000-0000-7000-a000-000000000202` | teacher1 / teacher123 |
 | Student user | `00000000-0000-7000-a000-000000000203` | student1 / student123 |
-| Guardian user (student1; the e2e seed also links student2) | `00000000-0000-7000-a000-000000000205` | guardian1 / guardian123 |
+| Guardian user (student1; the e2e seed also links student2) | `00000000-0000-7000-a000-000000000205` | guardian1 / Guardian123 |
 | Subject teacher user (`subject_teacher`, Hindi periods) | `00000000-0000-7000-a000-000000000206` | subjectteacher1 / teacher123 |
 | Guardian user (two children: student6, student7) | `00000000-0000-7000-a000-000000000724` | guardian4 / guardian123 |
 | Students of guardian4 | `00000000-0000-7000-a000-000000000707`, `…0708` | student6, student7 / student123 |

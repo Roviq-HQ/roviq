@@ -78,7 +78,8 @@ test.describe('Admission application decisions', () => {
     await applications.advanceToFeePaid(id);
     await page.reload();
 
-    await expect(applications.changeStatusButton(id)).toBeDisabled();
+    // Fee paid leaves only approval, so no status change is offered.
+    await expect(applications.changeStatusButton(id)).toHaveCount(0);
     await applications.openApproveDialog(id);
     await expect(applications.approveConfirmButton()).toBeDisabled();
     await applications.chooseFirstSection();

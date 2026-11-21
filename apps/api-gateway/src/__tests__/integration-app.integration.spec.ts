@@ -75,7 +75,6 @@ const ADMIN_LIST_USERS_QUERY = /* GraphQL */ `
 const FAKE_USER_ID = '00000000-0000-7000-a000-000000000999';
 const FAKE_MEMBERSHIP_ID = '00000000-0000-7000-a000-000000000998';
 const FAKE_ROLE_ID = '00000000-0000-7000-a000-000000000997';
-const FAKE_TENANT_ID = '00000000-0000-7000-a000-000000000996';
 const FAKE_RESELLER_ID = RESELLER_DIRECT_ID;
 
 describe('@roviq/testing/integration — proof-of-concept', () => {
@@ -109,7 +108,7 @@ describe('@roviq/testing/integration — proof-of-concept', () => {
   it('rejects an institute-scoped token on a @PlatformScope query', async () => {
     const token = createInstituteToken({
       sub: FAKE_USER_ID,
-      tenantId: FAKE_TENANT_ID,
+      tenantId: SEED_IDS.INSTITUTE_1,
       membershipId: FAKE_MEMBERSHIP_ID,
       roleId: FAKE_ROLE_ID,
     });

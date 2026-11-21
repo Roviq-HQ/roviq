@@ -11,6 +11,8 @@ import {
   institutes,
   mkAdminCtx,
   SYSTEM_USER_ID,
+  userProfiles,
+  users,
   withAdmin,
 } from '@roviq/database';
 import {
@@ -184,6 +186,10 @@ describe('Reseller institute groups (integration)', () => {
     const resellerIds = [r1, r2, r3].filter(Boolean).map((r) => r.resellerId);
     await withAdmin(result.db, mkAdminCtx(CTX), async (tx) => {
       await tx.delete(institutes).where(inArray(institutes.resellerId, resellerIds));
+      // First admins resolved by those requests name the reseller's user as creator.
+      const creators = [r1, r2, r3].filter(Boolean).map((r) => r.userId);
+      await tx.delete(userProfiles).where(inArray(userProfiles.createdBy, creators));
+      await tx.delete(users).where(inArray(users.createdBy, creators));
     });
     const groupIds = [platformGroupId, g1, g2].filter((id): id is string => Boolean(id));
     if (groupIds.length > 0) {
@@ -311,7 +317,12 @@ describe('Reseller institute groups (integration)', () => {
   describe('institute request with a group', () => {
     const requestInput = (groupId: string) => {
       const suffix = `${Date.now().toString(36)}${Math.floor(performance.now())}`;
-      return { name: { en: `Requested ${suffix}` }, slug: `req-${suffix}`, groupId };
+      return {
+        name: { en: `Requested ${suffix}` },
+        slug: `req-${suffix}`,
+        groupId,
+        firstAdmin: { firstName: 'Asha', email: `admin-${suffix}@group-request.test` },
+      };
     };
 
     async function instituteCount(resellerId: string): Promise<number> {

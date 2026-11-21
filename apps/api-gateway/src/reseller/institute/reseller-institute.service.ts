@@ -5,6 +5,7 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { InstituteGroupService } from '../../institute/institute-group/institute-group.service';
+import { InstituteService } from '../../institute/management/institute.service';
 import { InstituteRepository } from '../../institute/management/repositories/institute.repository';
 import type { ResellerCreateInstituteRequestInput } from './dto/reseller-create-institute-request.input';
 
@@ -12,6 +13,7 @@ import type { ResellerCreateInstituteRequestInput } from './dto/reseller-create-
 export class ResellerInstituteService {
   constructor(
     private readonly instituteRepo: InstituteRepository,
+    private readonly instituteService: InstituteService,
     private readonly groupService: InstituteGroupService,
     private readonly eventBus: EventBusService,
   ) {}
@@ -29,8 +31,7 @@ export class ResellerInstituteService {
     // SECURITY: create() runs as admin; an unchecked groupId would join another reseller's group.
     if (input.groupId) await this.groupService.assertOwnedByReseller(resellerId, input.groupId);
 
-    // Create via repository with reseller auto-assigned
-    const record = await this.instituteRepo.create({
+    const record = await this.instituteService.insertWithFirstAdmin({
       ...input,
       resellerId,
       isDemo: false,

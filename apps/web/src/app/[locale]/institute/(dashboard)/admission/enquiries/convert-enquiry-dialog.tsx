@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Button,
@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { admissionErrorKey } from '../admission-errors';
 import {
   useAcademicYearsForAdmission,
   useConvertEnquiry,
@@ -96,8 +97,9 @@ export function ConvertEnquiryDialog({
         router.push(`/institute/admission/applications?application=${appId}`);
       }
     } catch (err) {
-      const message = extractGraphQLError(err, t('enquiries.convertDialog.error'));
-      toast.error(t('enquiries.convertDialog.error'), { description: message });
+      toast.error(t('enquiries.convertDialog.error'), {
+        description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+      });
     }
   };
 

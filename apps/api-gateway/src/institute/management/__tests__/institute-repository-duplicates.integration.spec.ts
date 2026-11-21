@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { createDrizzleDb, SYSTEM_USER_ID } from '@roviq/database';
 import { withTestContext } from '@roviq/request-context';
+import { createMock } from '@roviq/testing/integration';
+import type Redis from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TEST_POOLER_URL } from '../../../../../../libs/database/src/__tests__/test-helpers';
@@ -17,14 +19,21 @@ afterAll(async () => {
 
 function create(repo: InstituteDrizzleRepository, data: { slug: string; code: string }) {
   return withTestContext(
-    () => repo.create({ name: { en: 'Duplicate Check' }, type: 'SCHOOL', ...data }),
+    () =>
+      repo.create({
+        name: { en: 'Duplicate Check' },
+        type: 'SCHOOL',
+        // Any existing user satisfies the reference; the duplicate checks do not look at it.
+        firstAdminUserId: SYSTEM_USER_ID,
+        ...data,
+      }),
     { userId: SYSTEM_USER_ID },
   );
 }
 
 describe('InstituteDrizzleRepository.create duplicates', () => {
   it('reports a taken slug or code by its error code, not as an internal error', async () => {
-    const repo = new InstituteDrizzleRepository(createDrizzleDb(runtime));
+    const repo = new InstituteDrizzleRepository(createDrizzleDb(runtime), createMock<Redis>());
     const suffix = randomUUID().slice(0, 8);
     const first = { slug: `dup-${suffix}`, code: `DUP-${suffix}` };
 

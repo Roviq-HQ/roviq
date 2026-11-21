@@ -6,20 +6,26 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   memberships,
+  membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
   mkResellerCtx,
   phoneNumbers,
+  phoneNumbersLive,
   platformMemberships,
   resellerMemberships,
+  resellerMembershipsLive,
+  userProfiles,
+  userProfilesLive,
   users,
+  usersLive,
   withAdmin,
   withReseller,
   withTenant,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
 export interface CreateUserInput {
   /** Email address (placeholder allowed for system-created users without one). */
@@ -89,10 +95,28 @@ export interface CreateUserWithMembershipResult extends CreateUserResult, Create
  *  - Returns the plaintext password for callers that need to surface it
  *    inline (e.g. admin "reset password and show once" flows).
  */
+export interface UserContact {
+  userId: string;
+  email: string;
+  username: string;
+  mustChangePassword: boolean;
+  firstName: string | null;
+  lastName: string | null;
+  phone: { countryCode: string; number: string } | null;
+}
+
+function pickName(name: Record<string, string>): string | null {
+  return name.en ?? Object.values(name)[0] ?? null;
+}
+
 export type EmailUserResolution =
   | { kind: 'existing'; userId: string; email: string }
   | { kind: 'created'; userId: string; email: string; tempPassword: string }
-  | { kind: 'unavailable'; reason: 'ambiguous' | 'deleted' | 'username_taken' };
+  | {
+      kind: 'unavailable';
+      /** `phone_taken` only when a new user was asked for with a phone another account owns. */
+      reason: 'ambiguous' | 'deleted' | 'username_taken' | 'phone_taken';
+    };
 
 @Injectable()
 export class IdentityService {
@@ -129,12 +153,34 @@ export class IdentityService {
     return row !== undefined;
   }
 
+  /** Whether a live phone row already holds this number; the unique index allows one owner. */
+  async isPhoneTaken(phone: { countryCode: string; number: string }): Promise<boolean> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .select({ id: phoneNumbersLive.id })
+        .from(phoneNumbersLive)
+        .where(
+          and(
+            eq(phoneNumbersLive.countryCode, phone.countryCode),
+            eq(phoneNumbersLive.number, phone.number),
+          ),
+        )
+        .limit(1),
+    );
+    return row !== undefined;
+  }
+
   /**
    * The account a new membership should attach to, matched by email only: the existing
    * owner of the address, or a new user whose Roviq ID is the address. `unavailable` when
    * the address cannot safely identify one live account.
    */
-  async findOrCreateUserByEmail(rawEmail: string, actorId: string): Promise<EmailUserResolution> {
+  async findOrCreateUserByEmail(
+    rawEmail: string,
+    actorId: string,
+    /** Used only when a new user is created; an existing account is never changed. */
+    newUser: { phone?: { countryCode: string; number: string } } = {},
+  ): Promise<EmailUserResolution> {
     const email = rawEmail.trim().toLowerCase();
     const matches = await this.findUsersByEmail(email);
     if (matches.length > 1) return { kind: 'unavailable', reason: 'ambiguous' };
@@ -143,8 +189,128 @@ export class IdentityService {
     if (existing) return { kind: 'existing', userId: existing.userId, email };
     // Never link by Roviq ID: an unrelated account may use this address as its username.
     if (await this.isUsernameTaken(email)) return { kind: 'unavailable', reason: 'username_taken' };
-    const created = await this.createUser({ email, username: email, actorId });
+    if (newUser.phone && (await this.isPhoneTaken(newUser.phone))) {
+      return { kind: 'unavailable', reason: 'phone_taken' };
+    }
+    const created = await this.createUser({
+      email,
+      username: email,
+      phone: newUser.phone,
+      actorId,
+    });
     return { kind: 'created', userId: created.userId, email, tempPassword: created.tempPassword };
+  }
+
+  /** A profile carrying the user's name; an existing profile is left as it is. */
+  async ensureUserProfile(
+    userId: string,
+    name: { firstName: string; lastName?: string },
+    actorId: string,
+  ): Promise<void> {
+    await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .insert(userProfiles)
+        .values({
+          userId,
+          firstName: { en: name.firstName },
+          lastName: name.lastName ? { en: name.lastName } : null,
+          createdBy: actorId,
+          updatedBy: actorId,
+        })
+        .onConflictDoNothing(),
+    );
+  }
+
+  /** Email, name and primary phone of a live user; null when the user is gone. */
+  async findUserContact(userId: string): Promise<UserContact | null> {
+    return withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
+      const [user] = await tx
+        .select({
+          email: usersLive.email,
+          username: usersLive.username,
+          mustChangePassword: usersLive.mustChangePassword,
+          firstName: userProfilesLive.firstName,
+          lastName: userProfilesLive.lastName,
+        })
+        .from(usersLive)
+        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
+        .where(eq(usersLive.id, userId))
+        .limit(1);
+      if (!user) return null;
+      const [phone] = await tx
+        .select({ countryCode: phoneNumbersLive.countryCode, number: phoneNumbersLive.number })
+        .from(phoneNumbersLive)
+        .where(eq(phoneNumbersLive.userId, userId))
+        .orderBy(desc(phoneNumbersLive.isPrimary), asc(phoneNumbersLive.createdAt))
+        .limit(1);
+      return {
+        userId,
+        email: user.email,
+        username: user.username,
+        mustChangePassword: user.mustChangePassword,
+        firstName: user.firstName ? pickName(user.firstName) : null,
+        lastName: user.lastName ? pickName(user.lastName) : null,
+        phone: phone ?? null,
+      };
+    });
+  }
+
+  /**
+   * True when the account was created by a member of this reseller. Such an account's name
+   * and phone were typed by the reseller's own staff; any other account's are not theirs to see.
+   */
+  async wasCreatedByReseller(userId: string, resellerId: string): Promise<boolean> {
+    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .select({ id: usersLive.id })
+        .from(usersLive)
+        .innerJoin(resellerMembershipsLive, eq(resellerMembershipsLive.userId, usersLive.createdBy))
+        .where(and(eq(usersLive.id, userId), eq(resellerMembershipsLive.resellerId, resellerId)))
+        .limit(1),
+    );
+    return rows.length > 0;
+  }
+
+  /**
+   * Replaces the password of a user who has never completed a first login with a fresh
+   * temporary one and returns it, once. Null when the user has a real password: the check
+   * and the write are one statement, so a password set meanwhile is never overwritten.
+   */
+  async reissueTempPassword(userId: string, actorId: string): Promise<string | null> {
+    const tempPassword = randomBytes(16).toString('base64url');
+    const passwordHash = await hash(tempPassword);
+    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
+      tx
+        .update(users)
+        .set({ passwordHash, mustChangePassword: true, updatedBy: actorId })
+        .where(
+          and(eq(users.id, userId), eq(users.mustChangePassword, true), isNull(users.deletedAt)),
+        )
+        .returning({ id: users.id }),
+    );
+    return rows.length > 0 ? tempPassword : null;
+  }
+
+  /** The live membership of this user in the institute with this role, if any. */
+  async findInstituteMembership(
+    userId: string,
+    tenantId: string,
+    roleId: string,
+  ): Promise<{ membershipId: string } | null> {
+    const [row] = await withTenant(this.db, mkInstituteCtx(tenantId, 'service:identity'), (tx) =>
+      tx
+        .select({ id: membershipsLive.id })
+        .from(membershipsLive)
+        .where(
+          and(
+            eq(membershipsLive.userId, userId),
+            eq(membershipsLive.tenantId, tenantId),
+            eq(membershipsLive.roleId, roleId),
+          ),
+        )
+        .limit(1),
+    );
+    return row ? { membershipId: row.id } : null;
   }
 
   async createUser(input: CreateUserInput): Promise<CreateUserResult> {

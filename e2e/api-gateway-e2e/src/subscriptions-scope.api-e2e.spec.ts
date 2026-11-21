@@ -35,6 +35,7 @@ import type { Mutation } from '@roviq/graphql/generated';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SEED } from '../../shared/seed-fixtures';
 import { loginAsInstituteAdmin, loginAsPlatformAdmin, loginAsReseller } from './helpers/auth';
+import { firstAdminInput } from './helpers/first-admin';
 import { gql } from './helpers/gql-client';
 import { subscribeOnce } from './helpers/ws-client';
 
@@ -246,6 +247,7 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'Phase E — Admin → Reseller' },
             slug,
             resellerId: SEED.RESELLER.id,
@@ -276,7 +278,13 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
         `mutation ($input: ResellerCreateInstituteRequestInput!) {
           resellerCreateInstituteRequest(input: $input) { id }
         }`,
-        { input: { name: { en: 'Phase E — Reseller Status Change' }, slug } },
+        {
+          input: {
+            firstAdmin: firstAdminInput(),
+            name: { en: 'Phase E — Reseller Status Change' },
+            slug,
+          },
+        },
         resellerToken,
       );
       if (createRes.errors) throw new Error(`seed failed: ${JSON.stringify(createRes.errors)}`);
@@ -335,6 +343,7 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'Phase E — Admin Create' },
             slug,
             resellerId: SEED.RESELLER.id,
@@ -371,7 +380,13 @@ describe('Subscriptions — Phase E (all 3 scopes)', () => {
         `mutation ($input: ResellerCreateInstituteRequestInput!) {
           resellerCreateInstituteRequest(input: $input) { id }
         }`,
-        { input: { name: { en: 'Phase E — Approval Requested' }, slug } },
+        {
+          input: {
+            firstAdmin: firstAdminInput(),
+            name: { en: 'Phase E — Approval Requested' },
+            slug,
+          },
+        },
         resellerToken,
       );
       if (res.errors) {

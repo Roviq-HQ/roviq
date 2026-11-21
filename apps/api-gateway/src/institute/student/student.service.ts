@@ -29,7 +29,6 @@ import {
   mkInstituteCtx,
   phoneNumbersLive,
   rolesLive,
-  sections,
   softDelete,
   studentAcademics,
   studentAcademicsLive,
@@ -257,12 +256,6 @@ export class StudentService {
         createdBy: actorId,
         updatedBy: actorId,
       });
-
-      // Increment section strength
-      await tx
-        .update(sections)
-        .set({ currentStrength: sql`${sections.currentStrength} + 1` })
-        .where(eq(sections.id, input.sectionId));
     });
 
     // 7. Emit event

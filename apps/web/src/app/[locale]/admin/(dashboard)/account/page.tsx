@@ -1,6 +1,6 @@
 'use client';
 
-import type { PasskeyManagerLabels, PasswordChangeFormLabels } from '@roviq/auth';
+import type { PasskeyManagerLabels } from '@roviq/auth';
 import { createAuthMutations, PasskeyManager, PasswordChangeForm, useAuth } from '@roviq/auth';
 import type { AuthScope } from '@roviq/common-types';
 import { useFormatDate } from '@roviq/i18n';
@@ -22,6 +22,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { LanguagePreference } from '@web/components/account/language-preference';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
+import { usePasswordChangeLabels } from '@web/hooks/use-password-change-labels';
 import { parseISO } from 'date-fns';
 import { Check, Copy, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -119,37 +120,7 @@ export default function AccountPage() {
     [tAuth, errorLabels],
   );
 
-  const passwordChangeLabels = React.useMemo<PasswordChangeFormLabels>(
-    () => ({
-      title: tAuth('passwordChange.title'),
-      description: tAuth('passwordChange.description'),
-      currentPassword: tAuth('passwordChange.currentPassword'),
-      newPassword: tAuth('passwordChange.newPassword'),
-      confirmPassword: tAuth('passwordChange.confirmPassword'),
-      strengthLabel: tAuth('passwordChange.strengthLabel'),
-      strengthWeak: tAuth('passwordChange.strengthWeak'),
-      strengthFair: tAuth('passwordChange.strengthFair'),
-      strengthGood: tAuth('passwordChange.strengthGood'),
-      strengthStrong: tAuth('passwordChange.strengthStrong'),
-      submit: tAuth('passwordChange.submit'),
-      submitting: tAuth('passwordChange.submitting'),
-      showPassword: tAuth('passwordChange.showPassword'),
-      hidePassword: tAuth('passwordChange.hidePassword'),
-      requirementsTitle: tAuth('passwordChange.requirementsTitle'),
-      reqMinLength: tAuth('passwordChange.reqMinLength'),
-      reqMixedCase: tAuth('passwordChange.reqMixedCase'),
-      reqNumber: tAuth('passwordChange.reqNumber'),
-      reqDifferent: tAuth('passwordChange.reqDifferent'),
-      mustDifferError: tAuth('passwordChange.mustDifferError'),
-      minLengthError: tAuth('passwordChange.minLengthError'),
-      mismatchError: tAuth('passwordChange.mismatchError'),
-      requiredError: tAuth('passwordChange.requiredError'),
-      successMessage: tAuth('passwordChange.successMessage'),
-      genericError: tAuth('passwordChange.genericError'),
-      errors: errorLabels,
-    }),
-    [tAuth, errorLabels],
-  );
+  const passwordChangeLabels = usePasswordChangeLabels();
 
   return (
     <div className="space-y-6" data-testid={adminAccount.page}>

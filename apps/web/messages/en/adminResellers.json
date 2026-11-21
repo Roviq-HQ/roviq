@@ -141,7 +141,7 @@
     },
     "name": "Reseller Name",
     "namePlaceholder": "e.g. Acme Education Partners",
-    "nameDescription": "Full name of the reseller organisation.",
+    "nameDescription": "Full name of the reseller.",
     "slug": "Slug",
     "slugPlaceholder": "e.g. acme-partners",
     "slugDescription": "URL-safe identifier (lowercase, hyphens). Auto-generated from name if left blank. Cannot be changed after creation.",

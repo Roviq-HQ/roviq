@@ -26,6 +26,7 @@ import {
   E2eResellerSuspendInstituteDocument,
 } from './__generated__/graphql';
 import { loginAsPlatformAdmin, loginAsReseller } from './helpers/auth';
+import { firstAdminInput } from './helpers/first-admin';
 import { gql } from './helpers/gql-client';
 import { waitForSetupComplete } from './helpers/wait-for-setup-complete';
 
@@ -54,6 +55,7 @@ describe('Institute Reseller (reseller scope) E2E', () => {
     it('creates a PENDING_APPROVAL request, lists/gets it, then admin approves it', async () => {
       // 1. Reseller creates the request
       const slug = `e2e-reseller-req-${Date.now()}`;
+      const firstAdmin = firstAdminInput();
       const createRes = await gql(
         E2eResellerCreateInstituteRequestDocument,
         {
@@ -62,6 +64,8 @@ describe('Institute Reseller (reseller scope) E2E', () => {
             slug,
             type: 'SCHOOL',
             departments: ['PRIMARY', 'SECONDARY'],
+            board: 'CBSE',
+            firstAdmin,
           },
         },
         resellerToken,
@@ -126,6 +130,39 @@ describe('Institute Reseller (reseller scope) E2E', () => {
       expect(treeRes.errors).toBeUndefined();
       expect(treeRes.data?.adminGetInstituteAcademicTree.instituteId).toBe(id);
       expect(treeRes.data?.adminGetInstituteAcademicTree.academicYearId).not.toBeNull();
+
+      //    Setup also made the named first admin the institute admin.
+      const usersRes = await gql<{
+        adminListUsers: {
+          edges: Array<{
+            node: {
+              email: string;
+              profile: { firstName: Record<string, string> } | null;
+              memberships: Array<{
+                tenantId: string;
+                status: string;
+                roleName: Record<string, string> | null;
+              }>;
+            };
+          }>;
+        };
+      }>(
+        `query ApprovedInstituteUsers($tenantId: String!) {
+          adminListUsers(filter: { tenantId: $tenantId, first: 50 }) {
+            edges { node { email profile { firstName } memberships { tenantId status roleName } } }
+          }
+        }`,
+        { tenantId: id },
+        adminToken,
+      );
+      expect(usersRes.errors).toBeUndefined();
+      const admins = (usersRes.data?.adminListUsers.edges ?? []).filter((edge) =>
+        edge.node.memberships.some(
+          (m) => m.tenantId === id && m.roleName?.en === 'institute_admin' && m.status === 'ACTIVE',
+        ),
+      );
+      expect(admins.map((edge) => edge.node.email)).toEqual([firstAdmin.email]);
+      expect(admins[0]?.node.profile?.firstName.en).toBe(firstAdmin.firstName);
 
       // 8. Cleanup via admin
       const delRes = await gql(E2eAdminDeleteInstituteDocument, { id }, adminToken);

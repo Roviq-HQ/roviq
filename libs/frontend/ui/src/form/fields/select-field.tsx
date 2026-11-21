@@ -32,7 +32,7 @@ export interface SelectFieldProps<TValue extends string = string> {
   placeholder?: string;
   testId?: string;
   disabled?: boolean;
-  /** Kept for callers that mark a field as required; the select itself cannot be cleared. */
+  /** `false` marks the field required: a marker after the label and `aria-required`. */
   optional?: boolean;
   /** Called after the field's `handleChange` so callers can reset dependents. */
   onValueChange?: (value: TValue | undefined) => void;
@@ -54,15 +54,17 @@ export function SelectField<TValue extends string = string>({
   placeholder,
   testId,
   disabled,
+  optional,
   onValueChange,
 }: SelectFieldProps<TValue>) {
+  const required = optional === false;
   const field = useFieldContext<TValue | undefined>();
   const errors = fieldErrorMessages(field);
   const invalid = errors.length > 0;
   const value = typeof field.state.value === 'string' ? field.state.value : '';
   return (
     <Field data-invalid={invalid || undefined}>
-      <FieldLabelWithInfo htmlFor={field.name} info={info}>
+      <FieldLabelWithInfo htmlFor={field.name} info={info} required={required}>
         {label}
       </FieldLabelWithInfo>
       <Select
@@ -81,6 +83,7 @@ export function SelectField<TValue extends string = string>({
           id={field.name}
           onBlur={field.handleBlur}
           aria-invalid={invalid || undefined}
+          aria-required={required || undefined}
           data-testid={testId}
         >
           <SelectValue placeholder={placeholder} />

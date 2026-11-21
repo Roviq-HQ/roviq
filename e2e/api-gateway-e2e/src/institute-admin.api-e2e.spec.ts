@@ -14,6 +14,7 @@ import {
   E2ePingDocument,
 } from './__generated__/graphql';
 import { loginAsPlatformAdmin } from './helpers/auth';
+import { firstAdminInput } from './helpers/first-admin';
 import { gql } from './helpers/gql-client';
 import { waitForSetupComplete } from './helpers/wait-for-setup-complete';
 
@@ -210,6 +211,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Create Institute' },
             slug,
             type: 'SCHOOL',
@@ -236,6 +238,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Coaching Institute' },
             slug: fullSlug,
             type: 'COACHING',
@@ -273,6 +276,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'Dup Slug' },
             slug,
             type: 'SCHOOL',
@@ -313,6 +317,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Update Test' },
             slug,
             type: 'SCHOOL',
@@ -377,6 +382,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Status Pending' },
             slug: `e2e-status-pending-${Date.now()}`,
             type: 'SCHOOL',
@@ -548,6 +554,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Delete Test' },
             slug: `e2e-delete-${Date.now()}`,
             type: 'SCHOOL',
@@ -613,6 +620,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Approval Flow' },
             slug: `e2e-approval-flow-${Date.now()}`,
             type: 'SCHOOL',
@@ -682,6 +690,7 @@ describe('Institute Admin (platform scope) E2E', () => {
         }`,
         {
           input: {
+            firstAdmin: firstAdminInput(),
             name: { en: 'E2E Reject Flow' },
             slug: `e2e-reject-${Date.now()}`,
             type: 'SCHOOL',
@@ -939,7 +948,14 @@ describe('Institute Admin (platform scope) E2E', () => {
         `mutation AdminCreate($input: AdminCreateInstituteInput!) {
           adminCreateInstitute(input: $input) { id slug }
         }`,
-        { input: { name: { en: 'E2E Academic Tree Test' }, slug, type: 'COACHING' } },
+        {
+          input: {
+            firstAdmin: firstAdminInput(),
+            name: { en: 'E2E Academic Tree Test' },
+            slug,
+            type: 'COACHING',
+          },
+        },
         adminToken,
       );
       expect(createRes.errors).toBeUndefined();
@@ -1018,7 +1034,14 @@ describe('Institute Admin (platform scope) E2E', () => {
         `mutation AdminCreate($input: AdminCreateInstituteInput!) {
           adminCreateInstitute(input: $input) { id slug resellerId }
         }`,
-        { input: { name: { en: 'E2E Reassign Test' }, slug, type: 'SCHOOL' } },
+        {
+          input: {
+            firstAdmin: firstAdminInput(),
+            name: { en: 'E2E Reassign Test' },
+            slug,
+            type: 'SCHOOL',
+          },
+        },
         adminToken,
       );
       expect(createRes.errors).toBeUndefined();
@@ -1071,7 +1094,14 @@ describe('Institute Admin (platform scope) E2E', () => {
         `mutation AdminCreate($input: AdminCreateInstituteInput!) {
           adminCreateInstitute(input: $input) { id groupId }
         }`,
-        { input: { name: { en: 'E2E Assign Inst' }, slug, type: 'SCHOOL' } },
+        {
+          input: {
+            firstAdmin: firstAdminInput(),
+            name: { en: 'E2E Assign Inst' },
+            slug,
+            type: 'SCHOOL',
+          },
+        },
         adminToken,
       );
       expect(instRes.errors).toBeUndefined();
@@ -1140,7 +1170,14 @@ describe('Institute Admin (platform scope) E2E', () => {
         `mutation AdminCreate($input: AdminCreateInstituteInput!) {
           adminCreateInstitute(input: $input) { id setupStatus }
         }`,
-        { input: { name: { en: 'E2E Retry Setup' }, slug, type: 'SCHOOL' } },
+        {
+          input: {
+            firstAdmin: firstAdminInput(),
+            name: { en: 'E2E Retry Setup' },
+            slug,
+            type: 'SCHOOL',
+          },
+        },
         adminToken,
       );
       expect(createRes.errors).toBeUndefined();

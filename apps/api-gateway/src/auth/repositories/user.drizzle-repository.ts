@@ -3,13 +3,12 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   mkAdminCtx,
-  SYSTEM_USER_ID,
   users,
   usersLive,
   withAdmin,
 } from '@roviq/database';
 import { eq, sql } from 'drizzle-orm';
-import type { CreateUserData, UserRecord } from './types';
+import type { UserRecord } from './types';
 import { UserRepository } from './user.repository';
 
 const userSelect = {
@@ -20,16 +19,6 @@ const userSelect = {
   status: usersLive.status,
   passwordChangedAt: usersLive.passwordChangedAt,
   mustChangePassword: usersLive.mustChangePassword,
-} as const;
-
-const userWriteReturning = {
-  id: users.id,
-  username: users.username,
-  email: users.email,
-  passwordHash: users.passwordHash,
-  status: users.status,
-  passwordChangedAt: users.passwordChangedAt,
-  mustChangePassword: users.mustChangePassword,
 } as const;
 
 @Injectable()
@@ -56,23 +45,6 @@ export class UserDrizzleRepository extends UserRepository {
         .set({ preferredLocale: locale, updatedBy: userId })
         .where(eq(users.id, userId)),
     );
-  }
-
-  async create(data: CreateUserData): Promise<UserRecord> {
-    const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
-      tx
-        .insert(users)
-        .values({
-          // Self-registration: no acting user exists before this row does.
-          createdBy: SYSTEM_USER_ID,
-          updatedBy: SYSTEM_USER_ID,
-          username: data.username,
-          email: data.email,
-          passwordHash: data.passwordHash,
-        })
-        .returning(userWriteReturning),
-    );
-    return user;
   }
 
   async findById(id: string): Promise<UserRecord | null> {

@@ -1,7 +1,7 @@
 'use client';
 
 import { REJECTION_REASON_MAX_LENGTH } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import {
   Button,
   Dialog,
@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { admissionErrorKey } from '../admission-errors';
 import { type ApplicationNode, useRejectApplication } from '../use-admission';
 
 const { instituteAdmissionApplications } = testIds;
@@ -51,8 +52,9 @@ export function RejectApplicationDialog({
       onRejected?.(application.id);
       onOpenChange(false);
     } catch (err) {
-      const message = extractGraphQLError(err, t('applications.rejectDialog.error'));
-      toast.error(t('applications.rejectDialog.error'), { description: message });
+      toast.error(t('applications.rejectDialog.error'), {
+        description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+      });
     }
   };
 

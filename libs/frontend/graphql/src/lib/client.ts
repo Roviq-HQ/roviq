@@ -20,6 +20,8 @@ export interface ApolloClientConfig {
   onImpersonationEnded?: () => void;
   /** Called when a view-only impersonation session tried to change something. */
   onImpersonationReadOnly?: () => void;
+  /** Called when the server refuses a request until the account changes its password. */
+  onPasswordChangeRequired?: () => void;
   /** Base API URL for ws-ticket endpoint. If provided, uses ticket-based WS auth. */
   apiUrl?: string;
   /** Called to refresh the access token. If provided, auth errors retry once after refresh. */
@@ -77,6 +79,10 @@ function processGraphQLError(
   }
   if (err.extensions?.code === 'IMPERSONATION_READ_ONLY') {
     config.onImpersonationReadOnly?.();
+    return false;
+  }
+  if (err.extensions?.code === 'PASSWORD_CHANGE_REQUIRED') {
+    config.onPasswordChangeRequired?.();
     return false;
   }
   // SESSION_EXPIRED: the refresh token sent with a session operation was rejected.

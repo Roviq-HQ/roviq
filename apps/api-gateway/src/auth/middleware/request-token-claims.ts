@@ -6,12 +6,14 @@ import type { AuthScope, AuthUser } from '@roviq/common-types';
 /** The access-token claims the global (APP_GUARD) guards act on. */
 export interface RequestTokenClaims {
   scope?: AuthScope;
+  tenantId?: string;
   resellerId?: string;
   membershipId?: string;
   roleId?: string;
   isImpersonated?: boolean;
   impersonationSessionId?: string;
   impersonationReadOnly?: boolean;
+  mustChangePassword?: boolean;
 }
 
 /**
@@ -36,12 +38,14 @@ export function readRequestTokenClaims(
   if (user) {
     return {
       scope: user.scope,
+      tenantId: user.scope === 'institute' ? user.tenantId : undefined,
       resellerId: user.scope === 'platform' ? undefined : user.resellerId,
       membershipId: user.membershipId,
       roleId: user.roleId,
       isImpersonated: user.isImpersonated,
       impersonationSessionId: user.impersonationSessionId,
       impersonationReadOnly: user.impersonationReadOnly,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 

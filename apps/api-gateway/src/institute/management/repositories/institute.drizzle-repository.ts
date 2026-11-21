@@ -6,6 +6,7 @@ import {
   escapeLikePattern,
   type InstituteStatus,
   i18nNameSearch,
+  instituteAffiliations,
   instituteAffiliationsLive,
   instituteBranding,
   instituteBrandingLive,
@@ -17,15 +18,16 @@ import {
   mkAdminCtx,
   mkResellerCtx,
   softDelete,
+  uniqueViolationConstraint,
   withAdmin,
   withReseller,
 } from '@roviq/database';
+import { REDIS_CLIENT } from '@roviq/redis';
 import { getRequestContext } from '@roviq/request-context';
 import {
   and,
   asc,
   count,
-  DrizzleQueryError,
   eq,
   ilike,
   inArray,
@@ -35,7 +37,8 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { DatabaseError } from 'pg';
+import type Redis from 'ioredis';
+import { recordInstituteAccess } from '../../../auth/institute-access-cache';
 import { decodeCursor } from '../../../common/pagination/relay-pagination.model';
 import { markFilesDeleted, markFilesReady } from '../../../files/file-attachment';
 import { BRANDING_IMAGES, type BrandingImageColumn } from '../branding-images';
@@ -110,6 +113,7 @@ const instituteLiveColumns = {
   groupId: institutesLive.groupId,
   departments: institutesLive.departments,
   isDemo: institutesLive.isDemo,
+  firstAdminUserId: institutesLive.firstAdminUserId,
   version: institutesLive.version,
   createdAt: institutesLive.createdAt,
   updatedAt: institutesLive.updatedAt,
@@ -136,6 +140,7 @@ const instituteColumns = {
   groupId: institutes.groupId,
   departments: institutes.departments,
   isDemo: institutes.isDemo,
+  firstAdminUserId: institutes.firstAdminUserId,
   version: institutes.version,
   createdAt: institutes.createdAt,
   updatedAt: institutes.updatedAt,
@@ -145,7 +150,10 @@ const instituteColumns = {
 // reseller scope must use the *ByReseller methods or prove ownership first (ROV-290).
 @Injectable()
 export class InstituteDrizzleRepository extends InstituteRepository {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {
     super();
   }
 
@@ -292,14 +300,32 @@ export class InstituteDrizzleRepository extends InstituteRepository {
             ...(data.resellerId && { resellerId: data.resellerId }),
             ...(data.groupId && { groupId: data.groupId }),
             ...(data.isDemo !== undefined && { isDemo: data.isDemo }),
+            firstAdminUserId: data.firstAdminUserId,
             status: 'PENDING',
             setupStatus: 'PENDING',
             createdBy: userId,
             updatedBy: userId,
           })
           .returning(instituteColumns);
+        const record = rows[0] as InstituteRecord;
 
-        return rows[0] as InstituteRecord;
+        if (data.board) {
+          // Status, number and dates stay unset until the institute enters its affiliation details.
+          await tx
+            .insert(instituteAffiliations)
+            .values({
+              tenantId: record.id,
+              board: data.board,
+              createdBy: userId,
+              updatedBy: userId,
+            })
+            .onConflictDoNothing({
+              target: [instituteAffiliations.tenantId, instituteAffiliations.board],
+              where: sql`${instituteAffiliations.deletedAt} IS NULL`,
+            });
+        }
+
+        return record;
       });
     } catch (err) {
       // The unique indexes are the only race-free duplicate check; name the field for the caller.
@@ -352,7 +378,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
   async updateStatus(id: string, status: InstituteStatus): Promise<InstituteRecord> {
     const { userId } = getRequestContext();
 
-    return withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
+    const record = await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
       const rows = await tx
         .update(institutes)
         .set({
@@ -367,6 +393,9 @@ export class InstituteDrizzleRepository extends InstituteRepository {
       }
       return rows[0] as InstituteRecord;
     });
+    // After the commit: members' open sessions follow the new status on their next request.
+    await recordInstituteAccess(this.redis, id, status);
+    return record;
   }
 
   async updateOwnership(id: string, data: UpdateInstituteOwnershipData): Promise<InstituteRecord> {
@@ -527,6 +556,7 @@ export class InstituteDrizzleRepository extends InstituteRepository {
     await withAdmin(this.db, mkAdminCtx('repository:institute'), async (tx) => {
       await softDelete(tx, institutes, id);
     });
+    await recordInstituteAccess(this.redis, id, 'INACTIVE');
   }
 
   async restore(id: string): Promise<InstituteRecord> {
@@ -700,10 +730,4 @@ export class InstituteDrizzleRepository extends InstituteRepository {
       };
     });
   }
-}
-
-/** Drizzle wraps the driver's error in DrizzleQueryError; node-postgres puts the constraint on it. */
-function uniqueViolationConstraint(err: unknown): string | null {
-  if (!(err instanceof DrizzleQueryError) || !(err.cause instanceof DatabaseError)) return null;
-  return err.cause.code === '23505' ? (err.cause.constraint ?? null) : null;
 }

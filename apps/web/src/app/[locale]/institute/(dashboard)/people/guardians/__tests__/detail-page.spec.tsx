@@ -198,7 +198,7 @@ const detailMessages = {
       firstName: 'First name',
       lastName: 'Last name',
       occupation: 'Occupation',
-      organization: 'Organization',
+      organization: 'Employer',
       designation: 'Designation',
       educationLevel: 'Education level',
       save: 'Save changes',

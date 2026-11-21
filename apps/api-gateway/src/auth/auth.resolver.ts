@@ -7,21 +7,12 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
-import { RegisterInput } from './dto/register.input';
 import { UpdateLocaleInput } from './dto/update-locale.input';
 import { extractMeta, type GqlContext } from './gql-context';
 
 @Resolver()
 export class AuthResolver {
   constructor(private readonly authService: AuthService) {}
-
-  // ── Registration ───────────────────────────────────────
-
-  @NoAudit()
-  @Mutation(() => AuthPayload)
-  async register(@Args('input') input: RegisterInput): Promise<AuthPayload> {
-    return this.authService.register(input);
-  }
 
   // ── Three login mutations ──────────────────────────────
 

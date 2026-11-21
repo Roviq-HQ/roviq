@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { seedDefaultRoles } from '@roviq/casl';
+import { BusinessException, DefaultRoles, ErrorCode } from '@roviq/common-types';
 import {
   academicYears,
   academicYearsLive,
@@ -8,10 +9,13 @@ import {
   instituteConfigs,
   instituteNotificationConfigs,
   institutes,
+  institutesLive,
   mkAdminCtx,
+  rolesLive,
   withAdmin,
 } from '@roviq/database';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { IdentityService } from '../../../auth/identity.service';
 import { InstituteSeederService } from './institute-seeder.service';
 
 export interface SetupInput {
@@ -55,6 +59,7 @@ export class InstituteSetupService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly seeder: InstituteSeederService,
+    private readonly identity: IdentityService,
   ) {}
 
   async runSetup(input: SetupInput): Promise<void> {
@@ -64,6 +69,7 @@ export class InstituteSetupService {
     try {
       await this.updateSetupStatus(instituteId, 'IN_PROGRESS', actorId);
       await this.createDefaultRoles(instituteId);
+      await this.createFirstAdmin(instituteId, actorId);
       await this.createDefaultNotificationConfig(instituteId, actorId);
       await this.createInstituteConfig(instituteId, board, actorId);
       const academicYearId = await this.createFirstAcademicYear(instituteId, actorId);
@@ -87,6 +93,86 @@ export class InstituteSetupService {
   /** The default institute roles (admin, principal, teacher, student, parent …). */
   async createDefaultRoles(instituteId: string): Promise<void> {
     await seedDefaultRoles(this.db, instituteId);
+  }
+
+  /**
+   * Makes the user in `institutes.first_admin_user_id` the institute admin. A user who has
+   * never completed a first login gets a fresh temporary password and the welcome on every
+   * run, so a run that crashed before the welcome still delivers one; a user with a real
+   * password only gains the membership. The membership is found before it is created.
+   */
+  async createFirstAdmin(instituteId: string, actorId: string): Promise<void> {
+    const [institute] = await withAdmin(
+      this.db,
+      mkAdminCtx('seeder:institute-setup.service'),
+      (tx) =>
+        tx
+          .select({ firstAdminUserId: institutesLive.firstAdminUserId })
+          .from(institutesLive)
+          .where(eq(institutesLive.id, instituteId)),
+    );
+    const userId = institute?.firstAdminUserId;
+    if (!userId) {
+      this.logger.warn(`Institute ${instituteId} has no first admin; setup creates no admin`);
+      return;
+    }
+
+    const contact = await this.identity.findUserContact(userId);
+    if (!contact) {
+      this.logger.warn(`First admin ${userId} of institute ${instituteId} was deleted; no admin`);
+      return;
+    }
+
+    const roleId = await this.instituteAdminRoleId(instituteId);
+    if (!(await this.identity.findInstituteMembership(userId, instituteId, roleId))) {
+      await this.identity.createMembership({
+        userId,
+        scope: 'institute',
+        tenantId: instituteId,
+        roleId,
+        actorId,
+      });
+    }
+
+    const tempPassword = await this.identity.reissueTempPassword(userId, actorId);
+    if (tempPassword === null) {
+      // No notification exists for "you were added to an institute" yet.
+      this.logger.log(`Existing user ${userId} is now admin of institute ${instituteId}`);
+      return;
+    }
+    this.identity.sendWelcomeNotification({
+      userId,
+      username: contact.username,
+      email: contact.email,
+      phone: contact.phone ?? undefined,
+      firstName: contact.firstName ?? undefined,
+      lastName: contact.lastName ?? undefined,
+      tempPassword,
+      scope: 'institute',
+      tenantId: instituteId,
+    });
+  }
+
+  private async instituteAdminRoleId(instituteId: string): Promise<string> {
+    const [role] = await withAdmin(this.db, mkAdminCtx('seeder:institute-setup.service'), (tx) =>
+      tx
+        .select({ id: rolesLive.id })
+        .from(rolesLive)
+        .where(
+          and(
+            eq(rolesLive.tenantId, instituteId),
+            sql`${rolesLive.name}->>'en' = ${DefaultRoles.InstituteAdmin}`,
+          ),
+        )
+        .limit(1),
+    );
+    if (!role) {
+      throw new BusinessException(
+        ErrorCode.ROLE_NOT_FOUND,
+        `Institute ${instituteId} has no ${DefaultRoles.InstituteAdmin} role`,
+      );
+    }
+    return role.id;
   }
 
   async createDefaultNotificationConfig(instituteId: string, actorId: string): Promise<void> {

@@ -23,7 +23,16 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
+// Hooks below (push registration, Novu) call the API, so they run only once the route allows it.
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <DashboardShell>{children}</DashboardShell>
+    </ProtectedRoute>
+  );
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
   const { logout, user } = useAuth();
@@ -149,10 +158,8 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   };
 
   return (
-    <ProtectedRoute>
-      <AbilityProvider rules={user?.abilityRules ?? []}>
-        <AdminLayout config={config}>{children}</AdminLayout>
-      </AbilityProvider>
-    </ProtectedRoute>
+    <AbilityProvider rules={user?.abilityRules ?? []}>
+      <AdminLayout config={config}>{children}</AdminLayout>
+    </AbilityProvider>
   );
 }

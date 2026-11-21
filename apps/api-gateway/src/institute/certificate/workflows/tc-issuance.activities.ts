@@ -13,10 +13,12 @@ import {
   TcStatus,
 } from '@roviq/common-types';
 import {
+  academicYearsLive,
   type DrizzleDB,
   guardianProfilesLive,
   mkAdminCtx,
   mkInstituteCtx,
+  standardsLive,
   studentAcademicsLive,
   studentGuardianLinksLive,
   studentProfiles,
@@ -29,7 +31,7 @@ import {
 } from '@roviq/database';
 import type { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { nextTcSerialNumber } from '../tc-serial';
 import type { CbseTcData, TCIssuanceActivities } from './tc-issuance.types';
 
@@ -160,7 +162,10 @@ function buildCbseTcData(params: {
   fatherName: string | null;
   motherName: string | null;
   whetherFailed: string;
-  latestAcademic: { promotionStatus: PromotionStatus | null; standardId: string } | null;
+  latestAcademic: {
+    promotionStatus: PromotionStatus | null;
+    standardName: Record<string, string> | null;
+  } | null;
   nccScoutGuide: string;
   allDuesPaid: string;
   reason: string;
@@ -190,7 +195,8 @@ function buildCbseTcData(params: {
     dateOfBirthWords: userProfile?.dateOfBirth ? dateToWords(userProfile.dateOfBirth) : null,
     whetherFailed,
     subjectsStudied: 'As per curriculum',
-    classLastStudied: latestAcademic?.standardId ?? null,
+    // The snapshot is a fixed English document, so the standard's `en` name is stored.
+    classLastStudied: latestAcademic ? resolveI18n(latestAcademic.standardName) || null : null,
     lastExamResult: 'As per institute records',
     qualifiedForPromotion:
       promotionStatus === PromotionStatus.PROMOTED
@@ -391,15 +397,25 @@ export function createTCIssuanceActivities(
         },
       );
 
-      // Fetch academics
+      // Oldest year first, so the last row is the class the student last studied
       const academics = await withTenant(
         db,
         mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
           return tx
-            .select()
+            .select({
+              promotionStatus: studentAcademicsLive.promotionStatus,
+              classRoles: studentAcademicsLive.classRoles,
+              standardName: standardsLive.name,
+            })
             .from(studentAcademicsLive)
-            .where(eq(studentAcademicsLive.studentProfileId, studentProfileId));
+            .innerJoin(
+              academicYearsLive,
+              eq(academicYearsLive.id, studentAcademicsLive.academicYearId),
+            )
+            .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
+            .where(eq(studentAcademicsLive.studentProfileId, studentProfileId))
+            .orderBy(asc(academicYearsLive.startDate));
         },
       );
 

@@ -29,7 +29,16 @@ const UNVERIFIED_COUNT_QUERY = gql`
   }
 `;
 
+// Hooks below (push registration, Novu) call the API, so they run only once the route allows it.
 export default function ResellerDashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <DashboardShell>{children}</DashboardShell>
+    </ProtectedRoute>
+  );
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
   const { logout, user } = useAuth();
@@ -186,10 +195,8 @@ export default function ResellerDashboardLayout({ children }: { children: React.
   };
 
   return (
-    <ProtectedRoute>
-      <AbilityProvider rules={user?.abilityRules ?? []}>
-        <AdminLayout config={config}>{children}</AdminLayout>
-      </AbilityProvider>
-    </ProtectedRoute>
+    <AbilityProvider rules={user?.abilityRules ?? []}>
+      <AdminLayout config={config}>{children}</AdminLayout>
+    </AbilityProvider>
   );
 }

@@ -1,52 +1,49 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
+import { JwtService } from '@nestjs/jwt';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
+import type { GraphQLResolveInfo } from 'graphql';
 import { ALLOW_WHEN_PASSWORD_CHANGE_REQUIRED } from '../decorators/allow-when-password-change-required.decorator';
+import { readRequestTokenClaims } from './request-token-claims';
 
 /**
- * ROV-96 — first-login enforcement.
+ * First-login enforcement (ROV-96). A caller whose access token carries
+ * `mustChangePassword` may call only handlers marked `@AllowWhenPasswordChangeRequired()`.
  *
- * Runs after GqlAuthGuard has populated `req.user`. If the authenticated user
- * was flagged with `mustChangePassword = true` at access-token mint time, we
- * block every operation except those explicitly marked
- * `@AllowWhenPasswordChangeRequired()` (changePassword, logout, me).
- *
- * Anonymous requests (no user on req) and users without the flag pass through
- * untouched — auth/scope guards handle their own concerns.
+ * This is an APP_GUARD, so on HTTP it runs before the per-resolver `GqlAuthGuard` has set
+ * `req.user`. It therefore reads the token itself; relying on `req.user` let every flagged
+ * caller through (SF-041). Requests without a valid token pass: authentication is not this
+ * guard's job.
  */
 @Injectable()
 export class MustChangePasswordGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const ctx = GqlExecutionContext.create(context);
-    // Both HTTP and WebSocket requests reach this guard via the wrapped
-    // context shape `{ req: { user } }`. For WS subscriptions the wrap is
-    // performed inside `apps/api-gateway/src/app/app.module.ts` `context()`,
-    // which copies `extra.user` (set by `onConnect`) onto `req.user`. Reading
-    // strictly from `req?.user` here means a future refactor that bypasses
-    // the wrapper for WS would surface as `undefined` (anonymous, fail-CLOSE
-    // for everyone except handlers tagged @AllowWhenPasswordChangeRequired)
-    // rather than silently fail-OPEN by reading directly from `extra`.
-    const user = ctx.getContext().req?.user as AuthUser | undefined | null;
+    const claims = readRequestTokenClaims(
+      context,
+      this.jwtService,
+      this.config.getOrThrow<string>('JWT_SECRET'),
+    );
+    if (claims?.mustChangePassword !== true) return true;
 
-    if (!user) {
-      return true;
-    }
-
-    if (user.mustChangePassword !== true) {
-      return true;
+    // Fields below the root were let in with their root field; they carry no marker of their own.
+    if (context.getType<'graphql' | 'http'>() === 'graphql') {
+      const info = GqlExecutionContext.create(context).getInfo<GraphQLResolveInfo>();
+      if (info.path.prev) return true;
     }
 
     const isAllowed = this.reflector.getAllAndOverride<boolean>(
       ALLOW_WHEN_PASSWORD_CHANGE_REQUIRED,
       [context.getHandler(), context.getClass()],
     );
-
-    if (isAllowed) {
-      return true;
-    }
+    if (isAllowed) return true;
 
     throw new BusinessException(
       ErrorCode.PASSWORD_CHANGE_REQUIRED,

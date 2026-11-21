@@ -360,7 +360,7 @@ describe('ResellerTeamPage', () => {
 
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
-          "This role is above what you, or your organisation's plan, can assign.",
+          'This role is above what you, or your reseller plan, can assign.',
         ),
       );
       expect(screen.getByTestId('reseller-team-confirm-dialog')).toBeInTheDocument();

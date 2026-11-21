@@ -9,6 +9,8 @@ export interface FieldLabelWithInfoProps {
   children: ReactNode;
   /** Inline slot after the label — typically `<FieldInfoPopover>`. */
   info?: ReactNode;
+  /** Shows a required marker after the label text. */
+  required?: boolean;
 }
 
 /**
@@ -17,16 +19,24 @@ export interface FieldLabelWithInfoProps {
  * prop is uniformly available without repeating the render-next-to-label
  * markup at each call site.
  */
-export function FieldLabelWithInfo({ htmlFor, children, info }: FieldLabelWithInfoProps) {
-  if (!info) {
-    return <FieldLabel htmlFor={htmlFor}>{children}</FieldLabel>;
-  }
+export function FieldLabelWithInfo({ htmlFor, children, info, required }: FieldLabelWithInfoProps) {
+  const label = (
+    <FieldLabel htmlFor={htmlFor}>
+      {children}
+      {required && (
+        <span className="text-destructive" aria-hidden="true">
+          *
+        </span>
+      )}
+    </FieldLabel>
+  );
+  if (!info) return label;
   // Render info as a sibling of the label (not nested inside) so queries like
   // `getByLabelText(...)` / the platform accessible-name algorithm treat the
   // label as belonging solely to the input it points at.
   return (
     <span className="flex items-center gap-2">
-      <FieldLabel htmlFor={htmlFor}>{children}</FieldLabel>
+      {label}
       {info}
     </span>
   );

@@ -1,146 +1,186 @@
+/**
+ * MustChangePasswordGuard unit tests. The guard is an APP_GUARD, so on HTTP it runs before
+ * GqlAuthGuard sets `req.user` and reads the Bearer token itself; on a subscription the
+ * context wrapper has already put the user on `req.user`. The full pipeline (real login,
+ * real token) is covered by must-change-password.integration.spec.ts.
+ */
 import type { ExecutionContext } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { JwtService } from '@nestjs/jwt';
 import { type AuthUser, ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
+import type { GraphQLResolveInfo } from 'graphql';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectBusinessError } from '../../__tests__/expect-business-error';
 import { ALLOW_WHEN_PASSWORD_CHANGE_REQUIRED } from '../decorators/allow-when-password-change-required.decorator';
 import { MustChangePasswordGuard } from '../middleware/must-change-password.guard';
 
 vi.mock('@nestjs/graphql', () => ({
-  GqlExecutionContext: {
-    create: vi.fn(),
-  },
+  GqlExecutionContext: { create: vi.fn() },
 }));
 
-const mockedGqlCreate = vi.mocked(GqlExecutionContext.create);
+const SECRET = 'must-change-password-guard-test-secret';
+// A real JwtService signs and verifies, so the Bearer path checks a genuine token.
+const jwt = new JwtService();
 
-function makeUser(overrides: Partial<AuthUser> = {}): AuthUser {
-  return {
-    _scope: 'institute',
-    userId: 'user-1',
-    scope: 'institute',
-    tenantId: 'tenant-1',
-    membershipId: 'mem-1',
-    roleId: 'role-1',
-    type: 'access',
-    ...overrides,
-  } as AuthUser;
+function accessToken(claims: { mustChangePassword?: boolean }, secret = SECRET): string {
+  return jwt.sign(
+    {
+      sub: 'user-1',
+      scope: 'institute',
+      tenantId: 'tenant-1',
+      membershipId: 'membership-1',
+      roleId: 'role-1',
+      type: 'access',
+      ...claims,
+    },
+    { secret, expiresIn: 300 },
+  );
 }
 
-function makeExecutionContext(): ExecutionContext {
-  return createMock<ExecutionContext>({
-    getType: vi.fn().mockReturnValue('graphql'),
-    getHandler: vi.fn().mockReturnValue(() => {}),
-    getClass: vi.fn().mockReturnValue(class {}),
+function instituteUser(mustChangePassword: boolean): AuthUser {
+  return {
+    _scope: 'institute',
+    scope: 'institute',
+    userId: 'user-1',
+    tenantId: 'tenant-1',
+    membershipId: 'membership-1',
+    roleId: 'role-1',
+    type: 'access',
+    mustChangePassword,
+  };
+}
+
+/** A root field when `nested` is false: its path has no `prev`. */
+function resolveInfo(nested: boolean): GraphQLResolveInfo {
+  const root = { prev: undefined, key: 'students', typename: 'Query' };
+  return createMock<GraphQLResolveInfo>({
+    path: nested ? { prev: root, key: 'firstName', typename: 'StudentModel' } : root,
   });
 }
 
-/**
- * Stub the result of `GqlExecutionContext.create(...)` so the guard sees the
- * supplied raw context shape. The guard reads `ctx.getContext().req?.user` —
- * pass `req: undefined` to simulate a WebSocket subscription that has NOT
- * been merged through the app.module.ts context wrapper.
- */
-function stubGqlContext(rawContext: { req?: { user?: AuthUser } | null; extra?: unknown }): void {
-  mockedGqlCreate.mockReturnValue(
+interface RequestStub {
+  user?: AuthUser;
+  headers?: Record<string, string | string[] | undefined>;
+}
+
+function stubGraphql(req: RequestStub | undefined, nested = false): void {
+  vi.mocked(GqlExecutionContext.create).mockReturnValue(
     createMock<GqlExecutionContext>({
-      getContext: () => rawContext as Record<string, unknown>,
+      getContext: () => (req === undefined ? {} : { req }),
+      getInfo: () => resolveInfo(nested),
     }),
   );
 }
 
-function makeReflector(returnValue: boolean | undefined): Reflector {
-  return createMock<Reflector>({
-    getAllAndOverride: vi.fn().mockReturnValue(returnValue),
+const handler = () => undefined;
+class SomeResolver {}
+
+function executionContext(): ExecutionContext {
+  return createMock<ExecutionContext>({
+    getType: vi.fn().mockReturnValue('graphql'),
+    getHandler: vi.fn().mockReturnValue(handler),
+    getClass: vi.fn().mockReturnValue(SomeResolver),
+    switchToHttp: vi.fn().mockReturnValue({ getRequest: () => undefined }),
   });
 }
 
-describe('MustChangePasswordGuard', () => {
-  let guard: MustChangePasswordGuard;
+function createGuard(allowed: boolean | undefined) {
+  const reflector = createMock<Reflector>({
+    getAllAndOverride: vi.fn().mockReturnValue(allowed),
+  });
+  const config = createMock<ConfigService>({ getOrThrow: vi.fn(() => SECRET) });
+  return { guard: new MustChangePasswordGuard(reflector, jwt, config), reflector };
+}
 
+const bearer = (token: string): RequestStub => ({
+  headers: { authorization: `Bearer ${token}` },
+});
+
+describe('MustChangePasswordGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('HTTP requests (req.user populated)', () => {
-    it('blocks with PASSWORD_CHANGE_REQUIRED when user.mustChangePassword=true and handler is not allow-decorated', async () => {
-      guard = new MustChangePasswordGuard(makeReflector(undefined));
-      stubGqlContext({ req: { user: makeUser({ mustChangePassword: true }) } });
+  describe('Bearer token (HTTP, before GqlAuthGuard runs)', () => {
+    it('should refuse a flagged token on a root field without the marker', async () => {
+      stubGraphql(bearer(accessToken({ mustChangePassword: true })));
+      const { guard, reflector } = createGuard(undefined);
 
-      const ctx = makeExecutionContext();
-
-      await expectBusinessError(() => guard.canActivate(ctx), ErrorCode.PASSWORD_CHANGE_REQUIRED);
-    });
-
-    it('returns true when user has no mustChangePassword flag', () => {
-      guard = new MustChangePasswordGuard(makeReflector(undefined));
-      stubGqlContext({ req: { user: makeUser({ mustChangePassword: false }) } });
-
-      expect(guard.canActivate(makeExecutionContext())).toBe(true);
-    });
-
-    it('returns true when handler is decorated @AllowWhenPasswordChangeRequired even if flag is set', () => {
-      const reflector = makeReflector(true);
-      guard = new MustChangePasswordGuard(reflector);
-      stubGqlContext({ req: { user: makeUser({ mustChangePassword: true }) } });
-
-      const ctx = makeExecutionContext();
-      expect(guard.canActivate(ctx)).toBe(true);
+      await expectBusinessError(
+        () => guard.canActivate(executionContext()),
+        ErrorCode.PASSWORD_CHANGE_REQUIRED,
+      );
       expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
         ALLOW_WHEN_PASSWORD_CHANGE_REQUIRED,
-        [ctx.getHandler(), ctx.getClass()],
+        [handler, SomeResolver],
       );
     });
 
-    it('returns true for anonymous requests (no user on req)', () => {
-      guard = new MustChangePasswordGuard(makeReflector(undefined));
-      stubGqlContext({ req: {} });
+    it('should let a flagged token through to a marked handler', () => {
+      stubGraphql(bearer(accessToken({ mustChangePassword: true })));
+      const { guard } = createGuard(true);
 
-      expect(guard.canActivate(makeExecutionContext())).toBe(true);
+      expect(guard.canActivate(executionContext())).toBe(true);
+    });
+
+    it('should let a flagged token through on a nested field without reading the marker', () => {
+      stubGraphql(bearer(accessToken({ mustChangePassword: true })), true);
+      const { guard, reflector } = createGuard(undefined);
+
+      expect(guard.canActivate(executionContext())).toBe(true);
+      expect(reflector.getAllAndOverride).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a token without the flag', () => accessToken({})],
+      ['a token with the flag false', () => accessToken({ mustChangePassword: false })],
+    ])('should let %s through without reading the marker', (_name, token) => {
+      stubGraphql(bearer(token()));
+      const { guard, reflector } = createGuard(undefined);
+
+      expect(guard.canActivate(executionContext())).toBe(true);
+      expect(reflector.getAllAndOverride).not.toHaveBeenCalled();
     });
   });
 
-  describe('WebSocket requests', () => {
-    // The app.module.ts context() wrapper merges `extra.user` (set by
-    // graphql-ws onConnect) onto `req.user` for every subscription. The
-    // assertions below exercise BOTH shapes:
-    //   1. The wrapped shape — what subscriptions see in production. Behaves
-    //      identically to HTTP because the guard reads from `req.user`.
-    //   2. The unwrapped shape — what `extra` would look like if a future
-    //      refactor bypassed the wrapper. The guard MUST NOT fail-open by
-    //      peeking at `extra.user`; it must treat the request as anonymous
-    //      (req?.user === undefined → returns true and lets downstream
-    //      auth/scope guards reject), which is the safe behaviour for a
-    //      first-login check that runs after authentication.
-
-    it('blocks WS with mustChangePassword=true when context has been wrapped (req.user populated)', async () => {
-      guard = new MustChangePasswordGuard(makeReflector(undefined));
-      stubGqlContext({ req: { user: makeUser({ mustChangePassword: true }) } });
+  describe('req.user (WebSocket, set by the context wrapper)', () => {
+    it('should refuse a flagged user on a root field without the marker', async () => {
+      stubGraphql({ user: instituteUser(true) });
+      const { guard } = createGuard(undefined);
 
       await expectBusinessError(
-        () => guard.canActivate(makeExecutionContext()),
+        () => guard.canActivate(executionContext()),
         ErrorCode.PASSWORD_CHANGE_REQUIRED,
       );
     });
 
-    it('does NOT fail-open when WS context has not been wrapped — reads only from req?.user, never extra.user', () => {
-      // Simulate the raw onConnect shape: user lives on extra, not req.
-      // If the guard ever started reading from extra it would let this
-      // user through with mustChangePassword=true — that would be a fail-OPEN.
-      // Instead, with `req` undefined the guard must treat this as anonymous
-      // (no user) and return true so downstream auth guards can reject.
-      guard = new MustChangePasswordGuard(makeReflector(undefined));
-      stubGqlContext({
-        req: undefined,
-        extra: { user: makeUser({ mustChangePassword: true }) },
-      });
+    it('should let an unflagged user through', () => {
+      stubGraphql({ user: instituteUser(false) });
+      const { guard } = createGuard(undefined);
 
-      // Returns true because req?.user is undefined — the guard does NOT
-      // peek at extra.user. Downstream auth/scope guards are responsible
-      // for rejecting the unauthenticated request.
-      expect(guard.canActivate(makeExecutionContext())).toBe(true);
+      expect(guard.canActivate(executionContext())).toBe(true);
+    });
+  });
+
+  describe('no usable token (authentication is not this guard’s job)', () => {
+    it.each<[string, RequestStub | undefined]>([
+      ['no request', undefined],
+      ['no Authorization header', { headers: {} }],
+      ['a non-Bearer header', { headers: { authorization: 'Basic abc' } }],
+      ['an empty Bearer token', { headers: { authorization: 'Bearer   ' } }],
+      [
+        'a flagged token signed with another secret',
+        bearer(accessToken({ mustChangePassword: true }, 'another-secret')),
+      ],
+      ['a malformed token', bearer('not.a.jwt')],
+    ])('should let %s through', (_name, req) => {
+      stubGraphql(req);
+      const { guard } = createGuard(undefined);
+
+      expect(guard.canActivate(executionContext())).toBe(true);
     });
   });
 });

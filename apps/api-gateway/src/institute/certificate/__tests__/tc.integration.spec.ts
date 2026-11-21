@@ -22,6 +22,7 @@ import {
   SYSTEM_USER_ID,
   sections,
   standards,
+  studentAcademics,
   studentProfiles,
   tcRegister,
   userProfiles,
@@ -81,7 +82,7 @@ async function createEnrolledStudent(
       })
       .returning({ id: standards.id });
 
-    await tx
+    const [section] = await tx
       .insert(sections)
       .values({
         tenantId,
@@ -157,6 +158,16 @@ async function createEnrolledStudent(
       })
       .returning({ id: studentProfiles.id });
 
+    await tx.insert(studentAcademics).values({
+      tenantId,
+      studentProfileId: profile.id,
+      academicYearId: year.id,
+      standardId: std.id,
+      sectionId: section.id,
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+    });
+
     return { studentProfileId: profile.id, academicYearId: year.id };
   });
 }
@@ -204,11 +215,35 @@ const ISSUE_TC = /* GraphQL */ `
   }
 `;
 
+const REQUEST_DUPLICATE_TC = /* GraphQL */ `
+  mutation RequestDuplicateTC($input: RequestDuplicateTCInput!) {
+    requestDuplicateTC(input: $input) {
+      id
+      status
+      isDuplicate
+      originalTcId
+    }
+  }
+`;
+
+const ISSUE_DUPLICATE_TC = /* GraphQL */ `
+  mutation IssueTC($id: ID!) {
+    issueTC(id: $id) {
+      id
+      status
+      tcSerialNumber
+      isDuplicate
+      tcData
+    }
+  }
+`;
+
 const LIST_TCS = /* GraphQL */ `
   query ListTCs($filter: ListTCFilterInput) {
     listTCs(filter: $filter) {
       id
       status
+      standardName
     }
   }
 `;
@@ -225,8 +260,24 @@ interface RejectTCResponse {
 interface IssueTCResponse {
   issueTC: { tcSerialNumber: string };
 }
+interface RequestDuplicateTCResponse {
+  requestDuplicateTC: { id: string; status: string; isDuplicate: boolean; originalTcId: string };
+}
+interface IssueDuplicateTCResponse {
+  issueTC: {
+    id: string;
+    status: string;
+    tcSerialNumber: string;
+    isDuplicate: boolean;
+    tcData: Record<string, string | null>;
+  };
+}
 interface ListTCsResponse {
-  listTCs: ReadonlyArray<{ id: string; status: string }>;
+  listTCs: ReadonlyArray<{
+    id: string;
+    status: string;
+    standardName: Record<string, string> | null;
+  }>;
 }
 
 describe('TCResolver (integration)', () => {
@@ -285,10 +336,7 @@ describe('TCResolver (integration)', () => {
     expect(response.data?.requestTC.reason).toBe('Family relocating to another city');
   });
 
-  it('approveTC returns NOT_FOUND when the TC is not in `generated` status (requested)', async () => {
-    // Create a TC directly in `requested` status so we can assert approveTC's
-    // guard — it only accepts status=generated, so this verifies the full pipeline
-    // (scope guard → CASL → service → withTenant) routes the NotFoundException.
+  it('approveTC refuses a TC that is not in `generated` status (requested)', async () => {
     const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
       tx
         .insert(tcRegister)
@@ -311,8 +359,7 @@ describe('TCResolver (integration)', () => {
       token: instituteToken,
       variables: { id: tc.id },
     });
-    expect(response.errors).toBeDefined();
-    expect(response.errors?.[0]?.message).toMatch(/not found|not in generated/i);
+    expect(response.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
   });
 
   it('rejectTC transitions a requested TC to cancelled and persists the rejection reason', async () => {
@@ -424,7 +471,7 @@ describe('TCResolver (integration)', () => {
     }
     const populated = await activities.populateTcData(tenantId, tc.id, fixture.studentProfileId);
 
-    expect(populated).not.toBeNull();
+    expect(populated?.tcData.classLastStudied).toBe('Class 5');
     const rows = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
       tx.select({ status: tcRegister.status }).from(tcRegister).where(eq(tcRegister.id, tc.id)),
     );
@@ -440,6 +487,8 @@ describe('TCResolver (integration)', () => {
     expect(Array.isArray(response.data?.listTCs)).toBe(true);
     // Must contain at least the requested TC from the first test.
     expect(response.data?.listTCs.length).toBeGreaterThan(0);
+    // The class comes from the student's academic record for the TC's year.
+    expect(response.data?.listTCs[0]?.standardName).toEqual({ en: 'Class 5' });
   });
 
   it('requestTC refuses a second request while one is in progress', async () => {
@@ -572,5 +621,175 @@ describe('TCResolver (integration)', () => {
     expect(await issue(await approvedTc(fixture))).toBe('TC/2025-26/0001');
     expect(await issue(await approvedTc(fixture))).toBe('TC/2025-26/0002');
     expect(await issue(await approvedTc(nextYear))).toBe('TC/2026-27/0001');
+  });
+
+  describe('duplicate TC', () => {
+    async function issuedOriginal(serial: string) {
+      const [tc] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .insert(tcRegister)
+          .values({
+            tenantId,
+            studentProfileId: fixture.studentProfileId,
+            academicYearId: fixture.academicYearId,
+            tcSerialNumber: serial,
+            status: TcStatus.ISSUED,
+            reason: 'Family relocated to another city',
+            requestedBy: SYSTEM_USER_ID,
+            issuedAt: new Date(),
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: tcRegister.id }),
+      );
+      return tc.id;
+    }
+
+    const requestDuplicate = (originalTcId: string) =>
+      gqlRequest<RequestDuplicateTCResponse>(result.httpServer, {
+        query: REQUEST_DUPLICATE_TC,
+        token: instituteToken,
+        variables: { input: { originalTcId, reason: 'Original lost, FIR 123/2026' } },
+      });
+
+    const issue = (id: string) =>
+      gqlRequest<IssueDuplicateTCResponse>(result.httpServer, {
+        query: ISSUE_DUPLICATE_TC,
+        token: instituteToken,
+        variables: { id },
+      });
+
+    const studentRow = () =>
+      withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .select({
+            academicStatus: studentProfiles.academicStatus,
+            tcIssued: studentProfiles.tcIssued,
+            tcNumber: studentProfiles.tcNumber,
+            dateOfLeaving: studentProfiles.dateOfLeaving,
+          })
+          .from(studentProfiles)
+          .where(eq(studentProfiles.id, fixture.studentProfileId))
+          .limit(1),
+      );
+
+    it('issues duplicates as <original>-D1, -D2 and leaves the student untouched', async () => {
+      const serial = `TC/DUP/${randomUUID().slice(0, 8)}`;
+      const originalId = await issuedOriginal(serial);
+      const studentBefore = await studentRow();
+
+      const first = await requestDuplicate(originalId);
+      expect(first.errors).toBeUndefined();
+      const { id: firstId = '', ...requested } = first.data?.requestDuplicateTC ?? {};
+      expect(requested).toEqual({
+        status: TcStatus.DUPLICATE_REQUESTED,
+        isDuplicate: true,
+        originalTcId: originalId,
+      });
+      const issuedFirst = await issue(firstId);
+      expect(issuedFirst.errors).toBeUndefined();
+      expect(issuedFirst.data?.issueTC.status).toBe(TcStatus.DUPLICATE_ISSUED);
+      expect(issuedFirst.data?.issueTC.tcSerialNumber).toBe(`${serial}-D1`);
+      expect(issuedFirst.data?.issueTC.tcData.dateOfIssue).toBe(
+        new Date().toISOString().split('T')[0],
+      );
+
+      const second = await requestDuplicate(originalId);
+      expect(second.errors).toBeUndefined();
+      const issuedSecond = await issue(second.data?.requestDuplicateTC.id ?? '');
+      expect(issuedSecond.errors).toBeUndefined();
+      expect(issuedSecond.data?.issueTC.tcSerialNumber).toBe(`${serial}-D2`);
+
+      expect(await studentRow()).toEqual(studentBefore);
+
+      // An issued duplicate is terminal: issuing it again is refused.
+      const again = await issue(firstId);
+      expect(again.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
+    });
+
+    it('refuses a second duplicate request while one is open', async () => {
+      const originalId = await issuedOriginal(`TC/DUP/${randomUUID().slice(0, 8)}`);
+
+      const first = await requestDuplicate(originalId);
+      const second = await requestDuplicate(originalId);
+
+      expect(first.errors).toBeUndefined();
+      expect(second.errors?.[0]?.extensions?.code).toBe('TC_ALREADY_REQUESTED');
+    });
+
+    it('refuses a duplicate of a TC that is not issued', async () => {
+      const [approved] = await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
+        tx
+          .insert(tcRegister)
+          .values({
+            tenantId,
+            studentProfileId: fixture.studentProfileId,
+            academicYearId: fixture.academicYearId,
+            tcSerialNumber: `TC-TMP-${randomUUID()}`,
+            status: TcStatus.APPROVED,
+            reason: 'Not issued yet',
+            requestedBy: SYSTEM_USER_ID,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: tcRegister.id }),
+      );
+
+      const response = await requestDuplicate(approved.id);
+
+      expect(response.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
+    });
+
+    it('approveTC refuses a duplicate request', async () => {
+      const originalId = await issuedOriginal(`TC/DUP/${randomUUID().slice(0, 8)}`);
+      const dup = await requestDuplicate(originalId);
+
+      const response = await gqlRequest<ApproveTCResponse>(result.httpServer, {
+        query: APPROVE_TC,
+        token: instituteToken,
+        variables: { id: dup.data?.requestDuplicateTC.id },
+      });
+
+      expect(response.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
+    });
+
+    it('rejectTC cancels a duplicate request, which then cannot be issued', async () => {
+      const originalId = await issuedOriginal(`TC/DUP/${randomUUID().slice(0, 8)}`);
+      const dup = await requestDuplicate(originalId);
+      const dupId = dup.data?.requestDuplicateTC.id ?? '';
+
+      const rejected = await gqlRequest<RejectTCResponse>(result.httpServer, {
+        query: REJECT_TC,
+        token: instituteToken,
+        variables: { id: dupId, reason: 'Original TC was found by the guardian' },
+      });
+      expect(rejected.errors).toBeUndefined();
+      expect(rejected.data?.rejectTC.status).toBe(TcStatus.CANCELLED);
+
+      const issued = await issue(dupId);
+      expect(issued.errors?.[0]?.extensions?.code).toBe('INVALID_STATE_TRANSITION');
+
+      // The original is free for a new duplicate request once the open one is cancelled.
+      const next = await requestDuplicate(originalId);
+      expect(next.errors).toBeUndefined();
+    });
+  });
+
+  it.each([
+    [
+      'getCertificateTemplateFields',
+      'query ($id: ID!) { getCertificateTemplateFields(templateId: $id) }',
+    ],
+    ['getCertificate', 'query ($id: ID!) { getCertificate(id: $id) { id } }'],
+    ['getTCDetails', 'query ($id: ID!) { getTCDetails(id: $id) { id } }'],
+    ['approveTC', 'mutation ($id: ID!) { approveTC(id: $id) { id } }'],
+  ])('%s refuses an id that is not a UUID as bad input, not an internal error', async (_op, query) => {
+    const response = await gqlRequest(result.httpServer, {
+      query,
+      token: instituteToken,
+      variables: { id: 'not-a-uuid' },
+    });
+
+    expect(response.errors?.[0]?.extensions?.code).toBe('BAD_REQUEST');
   });
 });

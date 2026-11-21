@@ -9,18 +9,27 @@ import { instituteContactSchema } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
+import { IdentityService } from '../../auth/identity.service';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { FileService } from '../../files/file.service';
 import { BRANDING_IMAGES } from './branding-images';
-import type { CreateInstituteInput } from './dto/create-institute.input';
+import type { CreateInstituteInput, InstituteFirstAdminInput } from './dto/create-institute.input';
 import type { InstituteFilterInput } from './dto/institute-filter.input';
 import type { UpdateInstituteBrandingInput } from './dto/update-institute-branding.input';
 import type { UpdateInstituteConfigInput } from './dto/update-institute-config.input';
 import type { UpdateInstituteInfoInput } from './dto/update-institute-info.input';
 import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.input';
 import { InstituteRepository } from './repositories/institute.repository';
-import type { InstituteRecord, UpdateInstituteConfigData } from './repositories/types';
+import type {
+  CreateInstituteData,
+  InstituteRecord,
+  UpdateInstituteConfigData,
+} from './repositories/types';
 import { InstituteSetupService } from './seed/institute-setup.service';
+
+export type NewInstituteData = Omit<CreateInstituteData, 'firstAdminUserId'> & {
+  firstAdmin: InstituteFirstAdminInput;
+};
 
 @Injectable()
 export class InstituteService {
@@ -31,6 +40,7 @@ export class InstituteService {
     private readonly setupService: InstituteSetupService,
     private readonly eventBus: EventBusService,
     private readonly files: FileService,
+    private readonly identity: IdentityService,
   ) {}
 
   private emitEvent(pattern: EventPattern, data: Record<string, unknown>) {
@@ -75,8 +85,41 @@ export class InstituteService {
     return record;
   }
 
+  /**
+   * Inserts the institute with its first admin resolved to a user. A new user stays dormant
+   * (no membership, no welcome) until setup; if the insert then fails, the next request with
+   * the same email reuses that user.
+   */
+  async insertWithFirstAdmin(data: NewInstituteData): Promise<InstituteRecord> {
+    const { firstAdmin, ...rest } = data;
+    const actorId = getRequestContext().userId;
+    const resolved = await this.identity.findOrCreateUserByEmail(firstAdmin.email, actorId, {
+      phone: firstAdmin.phone ? { countryCode: '+91', number: firstAdmin.phone } : undefined,
+    });
+    if (resolved.kind === 'unavailable' && resolved.reason === 'phone_taken') {
+      throw new BusinessException(
+        ErrorCode.PHONE_ALREADY_IN_USE,
+        'The first admin mobile number already belongs to another account',
+      );
+    }
+    if (resolved.kind === 'unavailable') {
+      throw new BusinessException(
+        ErrorCode.INSTITUTE_ADMIN_EMAIL_UNAVAILABLE,
+        `The first admin email cannot be used (${resolved.reason})`,
+      );
+    }
+    if (resolved.kind === 'created') {
+      await this.identity.ensureUserProfile(
+        resolved.userId,
+        { firstName: firstAdmin.firstName, lastName: firstAdmin.lastName },
+        actorId,
+      );
+    }
+    return this.instituteRepo.create({ ...rest, firstAdminUserId: resolved.userId });
+  }
+
   async create(input: CreateInstituteInput): Promise<InstituteRecord> {
-    const record = await this.instituteRepo.create(input);
+    const record = await this.insertWithFirstAdmin(input);
 
     // Trigger async setup — runs synchronously for now, will be Temporal workflow later
     this.setupService

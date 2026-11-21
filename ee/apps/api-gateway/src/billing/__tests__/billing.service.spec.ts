@@ -1187,7 +1187,6 @@ describe('BillingService', () => {
 
     it('should handle normalized subscription.card_expiry_reminder — log only', () =>
       requestContext.run(TEST_CTX, async () => {
-        repo.claimPaymentEvent.mockResolvedValue(true);
         repo.markPaymentSucceeded.mockResolvedValue(undefined);
         repo.findSubscriptionByProviderId.mockResolvedValue(
           mockReturn<'findSubscriptionByProviderId'>({
@@ -1212,7 +1211,6 @@ describe('BillingService', () => {
 
     describe('normalized Cashfree status change events', () => {
       function setupNormalizedEvent(normalizedEventType: string) {
-        repo.claimPaymentEvent.mockResolvedValue(true);
         repo.markPaymentSucceeded.mockResolvedValue(undefined);
         repo.findSubscriptionByProviderId.mockResolvedValue(
           mockReturn<'findSubscriptionByProviderId'>({

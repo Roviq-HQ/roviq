@@ -99,6 +99,30 @@ registerEnumType(StructureFramework, { name: 'StructureFramework' });
 registerEnumType(SetupStatus, { name: 'SetupStatus' });
 registerEnumType(InstituteStatus, { name: 'InstituteStatus' });
 
+@ObjectType({ description: 'The person named to become the institute admin when setup runs.' })
+export class InstituteFirstAdminObject {
+  @Field(() => String, {
+    nullable: true,
+    description: 'Null together with lastName and phone when detailsWithheld is true.',
+  })
+  firstName?: string | null;
+
+  @Field(() => String, { nullable: true })
+  lastName?: string | null;
+
+  @Field()
+  email!: string;
+
+  @Field(() => String, { nullable: true, description: '10-digit mobile number without +91.' })
+  phone?: string | null;
+
+  @Field({
+    description:
+      'True when the email belongs to an account the calling reseller did not create: only the email it typed is returned, never that account’s name or phone.',
+  })
+  detailsWithheld!: boolean;
+}
+
 @ObjectType()
 export class InstituteModel {
   @Field(() => [String], {
@@ -176,4 +200,7 @@ export class InstituteModel {
   /** True if this institute was created as a demo (sample data, notifications disabled). */
   @Field(() => Boolean, { nullable: true })
   isDemo?: boolean | null;
+
+  /** Not a schema field: `InstituteFirstAdminFieldResolver` resolves `firstAdmin` from it. */
+  firstAdminUserId?: string | null;
 }

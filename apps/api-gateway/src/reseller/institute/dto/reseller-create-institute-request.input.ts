@@ -2,6 +2,7 @@ import { Field, InputType } from '@nestjs/graphql';
 import { BoardType, EducationLevel, InstituteType, StructureFramework } from '@roviq/common-types';
 import type { InstituteAddress, InstituteContact } from '@roviq/database';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -11,10 +12,12 @@ import {
   IsString,
   IsUUID,
   Matches,
+  ValidateNested,
 } from 'class-validator';
 import {
   InstituteAddressInput,
   InstituteContactInput,
+  InstituteFirstAdminInput,
 } from '../../../institute/management/dto/create-institute.input';
 
 @InputType({
@@ -103,4 +106,11 @@ export class ResellerCreateInstituteRequestInput {
   @IsUUID()
   @IsOptional()
   groupId?: string;
+
+  @Field(() => InstituteFirstAdminInput, {
+    description: 'The person setup makes the institute admin; they receive the login details.',
+  })
+  @ValidateNested()
+  @Type(() => InstituteFirstAdminInput)
+  firstAdmin!: InstituteFirstAdminInput;
 }

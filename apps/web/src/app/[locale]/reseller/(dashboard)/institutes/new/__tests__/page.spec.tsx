@@ -41,6 +41,9 @@ async function fillAndSubmit() {
   await userEvent.type(screen.getByLabelText(copy.code), 'SUN-01');
   await userEvent.type(screen.getByLabelText(copy.phoneNumber), '9876512399');
   await userEvent.click(screen.getByLabelText(copy.departmentOptions.PRIMARY));
+  await userEvent.type(screen.getByLabelText(copy.firstAdmin.firstName), 'Meera');
+  await userEvent.type(screen.getByLabelText(copy.firstAdmin.email), 'meera@sunrise.example');
+  await userEvent.type(screen.getByLabelText(copy.firstAdmin.phone), '9812345678');
   await userEvent.click(screen.getByRole('button', { name: copy.submit }));
 }
 
@@ -69,6 +72,12 @@ describe('ResellerCreateInstitutePage', () => {
     assert(input);
     expect(input.board).toBe('CBSE');
     expect(input.departments).toEqual(['PRIMARY']);
+    expect(input.firstAdmin).toEqual({
+      firstName: 'Meera',
+      lastName: undefined,
+      email: 'meera@sunrise.example',
+      phone: '9812345678',
+    });
     expect(input.contact).toEqual({
       phones: [
         {
@@ -103,5 +112,56 @@ describe('ResellerCreateInstitutePage', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(copy.codeDuplicate));
     expect(await screen.findAllByText(copy.codeDuplicate)).not.toHaveLength(0);
+  });
+
+  it('marks the first admin email when no account can be resolved from it', async () => {
+    createRequestMock.mockRejectedValue(graphQLError('INSTITUTE_ADMIN_EMAIL_UNAVAILABLE'));
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(copy.firstAdmin.emailUnavailable));
+    const email = screen.getByLabelText(copy.firstAdmin.email);
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(await screen.findAllByText(copy.firstAdmin.emailUnavailable)).not.toHaveLength(0);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('marks the first admin mobile when another account already owns it', async () => {
+    createRequestMock.mockRejectedValue(graphQLError('PHONE_ALREADY_IN_USE'));
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(copy.firstAdmin.phoneInUse));
+    expect(screen.getByLabelText(copy.firstAdmin.phone)).toHaveAttribute('aria-invalid', 'true');
+    expect(await screen.findAllByText(copy.firstAdmin.phoneInUse)).not.toHaveLength(0);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('does not submit with an invalid first admin email', async () => {
+    renderWithProviders(<ResellerCreateInstitutePage />);
+    const name = screen
+      .getAllByRole('textbox')
+      .find((el) => (el as HTMLInputElement).name === 'name.en');
+    assert(name);
+    await userEvent.type(name, 'Sunrise Academy');
+    await userEvent.type(screen.getByLabelText(copy.code), 'SUN-02');
+    await userEvent.type(screen.getByLabelText(copy.phoneNumber), '9876512399');
+    await userEvent.type(screen.getByLabelText(copy.firstAdmin.firstName), 'Meera');
+    await userEvent.type(screen.getByLabelText(copy.firstAdmin.email), 'not-an-email');
+    await userEvent.tab();
+    await userEvent.click(screen.getByRole('button', { name: copy.submit }));
+
+    expect(await screen.findByText(copy.firstAdmin.emailInvalid)).toBeInTheDocument();
+    expect(createRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the length error for an 11-digit first admin mobile instead of cutting it', async () => {
+    renderWithProviders(<ResellerCreateInstitutePage />);
+    const phone = screen.getByLabelText(copy.firstAdmin.phone);
+    await userEvent.type(phone, '98765432101');
+    await userEvent.tab();
+
+    expect(phone).toHaveValue('98765432101');
+    expect(await screen.findByText(copy.firstAdmin.phoneInvalid)).toBeInTheDocument();
   });
 });

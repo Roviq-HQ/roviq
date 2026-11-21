@@ -56,7 +56,6 @@ function createMockUserRepo() {
   return createMock<UserRepository>({
     findById: vi.fn(),
     findByUsername: vi.fn(),
-    create: vi.fn(),
   });
 }
 

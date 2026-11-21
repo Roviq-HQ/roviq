@@ -15,7 +15,6 @@ import {
   instituteConfigsLive,
   mkInstituteCtx,
   type SectionStrengthNorms,
-  sections,
   sectionsLive,
   standardsLive,
   studentAcademics,
@@ -24,7 +23,7 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { EnrollStudentInput, UpdateStudentSectionInput } from './dto/enroll-student.input';
 
 @Injectable()
@@ -120,12 +119,6 @@ export class StudentAcademicService {
           })
           .returning({ id: studentAcademics.id });
 
-        // Increment section strength
-        await tx
-          .update(sections)
-          .set({ currentStrength: sql`${sections.currentStrength} + 1` })
-          .where(eq(sections.id, input.sectionId));
-
         return rows[0];
       },
     );
@@ -196,18 +189,6 @@ export class StudentAcademicService {
         .update(studentAcademics)
         .set({ sectionId: input.newSectionId, updatedBy: actorId })
         .where(eq(studentAcademics.id, input.studentAcademicId));
-
-      // Decrement old section
-      await tx
-        .update(sections)
-        .set({ currentStrength: sql`GREATEST(${sections.currentStrength} - 1, 0)` })
-        .where(eq(sections.id, oldSectionId));
-
-      // Increment new section
-      await tx
-        .update(sections)
-        .set({ currentStrength: sql`${sections.currentStrength} + 1` })
-        .where(eq(sections.id, input.newSectionId));
     });
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.section_changed, {

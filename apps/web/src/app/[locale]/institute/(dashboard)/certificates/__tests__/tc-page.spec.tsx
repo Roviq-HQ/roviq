@@ -55,8 +55,13 @@ vi.mock('nuqs', () => {
 // ── use-certificates hook module ─────────────────────────
 // Stable references — see nuqs mock note above. New objects each render
 // would re-fire the dialog's `[open, yearsData, ...]` effect → reset() loop.
-const emptyTCs: Array<Record<string, unknown>> = [];
-const tcsResult = { tcs: emptyTCs, loading: false, refetch: vi.fn() };
+const tcsResult: { tcs: Array<Record<string, unknown>>; loading: boolean; refetch: () => void } = {
+  tcs: [],
+  loading: false,
+  refetch: vi.fn(),
+};
+const useTCsMock = vi.fn((_filter?: unknown, _options?: { skip?: boolean }) => tcsResult);
+const useStudentPickerMock = vi.fn((_search: string, _filter?: unknown) => studentPickerResult);
 const requestTCResult: [ReturnType<typeof vi.fn>, { loading: boolean }] = [
   vi.fn(),
   { loading: false },
@@ -83,9 +88,9 @@ const yearsResult = {
   data: { academicYears: [{ id: 'year-1', label: '2026-27', isActive: true }] },
 };
 vi.mock('../use-certificates', () => ({
-  useTCs: () => tcsResult,
+  useTCs: (filter?: unknown, options?: { skip?: boolean }) => useTCsMock(filter, options),
   useRequestTC: () => requestTCResult,
-  useStudentPicker: () => studentPickerResult,
+  useStudentPicker: (search: string, filter?: unknown) => useStudentPickerMock(search, filter),
   useAcademicYearsForCertificates: () => yearsResult,
 }));
 
@@ -129,9 +134,34 @@ describe('TCListPage (component)', () => {
     expect(screen.getAllByText(/no .*transfer certificate/i).length).toBeGreaterThan(0);
   });
 
-  it('hides the whole page when the user lacks TC read permission', () => {
+  it('shows the no-permission state, without querying, when the user lacks TC read permission', () => {
     renderPage([{ action: 'read', subject: 'Student' }]);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByText(messagesEn.tc.accessDenied.title)).toBeInTheDocument();
+    expect(useTCsMock).toHaveBeenLastCalledWith({}, { skip: true });
+  });
+
+  it('shows the class name of each TC', () => {
+    tcsResult.tcs = [
+      {
+        id: 'tc-1',
+        tcSerialNumber: 'TC/2026-27/0001',
+        status: 'GENERATED',
+        reason: 'Family relocated to another city',
+        isDuplicate: false,
+        studentFirstName: { en: 'Asha' },
+        studentLastName: null,
+        standardName: { en: 'Class 5', hi: 'कक्षा 5' },
+        createdAt: '2026-11-20T09:00:00Z',
+      },
+    ];
+    try {
+      renderPage();
+      const row = screen.getByRole('row', { name: /TC\/2026-27\/0001/ });
+      expect(within(row).getByText('Class 5')).toBeInTheDocument();
+    } finally {
+      tcsResult.tcs = [];
+    }
   });
 
   it('explains a duplicate TC request in translated copy instead of the server message', async () => {
@@ -147,6 +177,8 @@ describe('TCListPage (component)', () => {
 
     await user.click(screen.getByRole('button', { name: messagesEn.tc.requestButton }));
     const dialog = await screen.findByRole('dialog');
+    // A TC is only for an enrolled student, so the picker never offers anyone else.
+    expect(useStudentPickerMock).toHaveBeenCalledWith('', { academicStatus: ['ENROLLED'] });
     const studentTrigger = within(dialog).getAllByRole('combobox')[0];
     if (!studentTrigger) throw new Error('student select not found');
     fireEvent.pointerDown(studentTrigger, { button: 0, ctrlKey: false, pointerType: 'mouse' });

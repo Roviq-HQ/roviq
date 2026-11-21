@@ -304,9 +304,10 @@ describe('Cross-scope guard rejection', () => {
     membershipId: FAKE.MEMBERSHIP,
     roleId: SEED_IDS.ROLE_RESELLER_FULL_ADMIN,
   });
+  // A token for an institute that is not ACTIVE is refused before the scope guard runs.
   const instituteToken = createInstituteToken({
     sub: FAKE.USER,
-    tenantId: FAKE.TENANT,
+    tenantId: SEED_IDS.INSTITUTE_1,
     membershipId: FAKE.MEMBERSHIP,
     roleId: FAKE.ROLE,
   });

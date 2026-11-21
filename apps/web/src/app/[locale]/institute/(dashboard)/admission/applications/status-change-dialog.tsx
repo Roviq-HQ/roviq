@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import {
   Button,
   Dialog,
@@ -26,6 +26,7 @@ import {
   getSelectableApplicationStatuses,
   isTerminalApplicationStatus,
 } from '../admission-constants';
+import { admissionErrorKey } from '../admission-errors';
 import { type ApplicationNode, useUpdateApplication } from '../use-admission';
 
 const { instituteAdmissionApplications } = testIds;
@@ -64,8 +65,9 @@ export function StatusChangeDialog({ open, onOpenChange, application }: StatusCh
       toast.success(t('applications.statusDialog.success'));
       onOpenChange(false);
     } catch (err) {
-      const message = extractGraphQLError(err, t('applications.statusDialog.error'));
-      toast.error(t('applications.statusDialog.error'), { description: message });
+      toast.error(t('applications.statusDialog.error'), {
+        description: t(`errors.${admissionErrorKey(extractGraphQLErrorCode(err))}`),
+      });
     }
   };
 

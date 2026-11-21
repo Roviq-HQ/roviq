@@ -3,7 +3,7 @@
 import type { AuthScope } from '@roviq/common-types';
 import * as React from 'react';
 import { AuthRequestError, isAppError } from './error-utils';
-import { checkIsImpersonated, isTokenExpired } from './jwt-decode';
+import { checkIsImpersonated, isTokenExpired, tokenRequiresPasswordChange } from './jwt-decode';
 import type { SessionExpiredDialogProps } from './session-expired-dialog';
 import { SessionExpiredDialog } from './session-expired-dialog';
 import { createScopedTokenStorage } from './token-storage';
@@ -17,14 +17,25 @@ interface AuthContextValue extends AuthState {
   savePreferredLocale: (locale: string | null) => Promise<void>;
   scope: AuthScope;
   sessionExpired: boolean;
+  /** Increments each time the session-expired dialog signs the user back in; data loaded before must be fetched again. */
+  sessionRestores: number;
   needsInstituteSelection: boolean;
   memberships: MembershipInfo[] | null;
   isImpersonated: boolean;
   impersonationEnded: boolean;
+  /** The signed-in account must change its password; nothing else of the app may be used. */
+  mustChangePassword: boolean;
+  /** Record that the server refused a request with PASSWORD_CHANGE_REQUIRED. */
+  markPasswordChangeRequired: () => void;
   login: (input: LoginInput) => Promise<void>;
   loginWithPasskey: () => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  /**
+   * Asks the server whether the stored session still works. A dead one is cleared without the
+   * session-expired dialog, so a sign-in page can show its form instead of redirecting.
+   */
+  verifySession: () => Promise<boolean>;
   getAccessToken: () => string | null;
   getRefreshToken: () => string | null;
   selectInstitute: (membershipId: string) => Promise<void>;
@@ -100,10 +111,13 @@ export function AuthProvider({
   const tokenStorage = React.useMemo(() => createScopedTokenStorage(scope), [scope]);
 
   const [sessionExpired, setSessionExpired] = React.useState(false);
+  const [sessionRestores, setSessionRestores] = React.useState(0);
   const [needsInstituteSelection, setNeedsInstituteSelection] = React.useState(false);
   const [pendingSelectionToken, setPendingSelectionToken] = React.useState<string | null>(null);
   const [memberships, setMemberships] = React.useState<MembershipInfo[] | null>(null);
   const [impersonationEnded, setImpersonationEnded] = React.useState(false);
+  // Set when the server refuses a request although the token did not carry the flag yet.
+  const [passwordChangeRefused, setPasswordChangeRefused] = React.useState(false);
 
   // Check for impersonation session first (sessionStorage, dies with tab)
   const impersonationToken =
@@ -117,6 +131,8 @@ export function AuthProvider({
   });
 
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the session comes only from storage: the server may have revoked it since.
+  const unverifiedSessionRef = React.useRef(false);
   const prevTenantIdRef = React.useRef<string | undefined>(undefined);
 
   // Derive isImpersonated from impersonation token or current access token
@@ -126,6 +142,15 @@ export function AuthProvider({
       checkIsImpersonated(state.tokens?.accessToken ?? null),
     [impersonationToken, state.tokens?.accessToken],
   );
+
+  const mustChangePassword =
+    state.isAuthenticated &&
+    !isImpersonated &&
+    (passwordChangeRefused || tokenRequiresPasswordChange(state.tokens?.accessToken));
+
+  const markPasswordChangeRequired = React.useCallback(() => {
+    setPasswordChangeRefused(true);
+  }, []);
 
   // Capture tenantId when session expires so re-login can auto-select the same institute
   React.useEffect(() => {
@@ -229,6 +254,7 @@ export function AuthProvider({
 
     // If valid tokens exist, restore authenticated state and memberships
     if (accessToken && user && !isTokenExpired(accessToken)) {
+      unverifiedSessionRef.current = true;
       setState({
         user,
         tokens: { accessToken, refreshToken: refreshToken ?? '' },
@@ -284,6 +310,8 @@ export function AuthProvider({
 
   const handleLoginResult = React.useCallback(
     async (result: LoginResult) => {
+      setPasswordChangeRefused(false);
+      unverifiedSessionRef.current = false;
       if (result.accessToken && result.refreshToken && result.user) {
         tokenStorage.setTokens({
           accessToken: result.accessToken,
@@ -329,6 +357,7 @@ export function AuthProvider({
 
   const clearAllState = React.useCallback(() => {
     tokenStorage.clear();
+    setPasswordChangeRefused(false);
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
@@ -422,6 +451,7 @@ export function AuthProvider({
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
+    setPasswordChangeRefused(false);
     setNeedsInstituteSelection(false);
     setMemberships(null);
     setState({
@@ -476,6 +506,38 @@ export function AuthProvider({
     scheduleRefresh(result.accessToken);
   }, [refreshMutation, scheduleRefresh, tokenStorage]);
 
+  const verifySession = React.useCallback(async () => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('roviq-impersonation-token')) {
+      return true;
+    }
+    if (!unverifiedSessionRef.current) return true;
+    const refreshToken = tokenStorage.getRefreshToken();
+    if (!refreshToken) {
+      clearAllState();
+      return false;
+    }
+    try {
+      const result = await refreshMutation(refreshToken);
+      tokenStorage.setTokens({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+      tokenStorage.setUser(result.user);
+      setState({
+        user: result.user,
+        tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      scheduleRefresh(result.accessToken);
+      unverifiedSessionRef.current = false;
+      return true;
+    } catch {
+      clearAllState();
+      return false;
+    }
+  }, [clearAllState, refreshMutation, scheduleRefresh, tokenStorage]);
+
   const getAccessToken = React.useCallback(() => {
     // Prefer impersonation token if present (sessionStorage, dies with tab)
     if (typeof window !== 'undefined') {
@@ -498,7 +560,8 @@ export function AuthProvider({
   React.useEffect(() => {
     const request = ++localeRequest.current;
     const accessToken = getAccessToken();
-    if (!localeUserId || !accessToken) {
+    // The server refuses every other request until the password is changed.
+    if (!localeUserId || !accessToken || mustChangePassword) {
       setLocalePreference(null);
       return;
     }
@@ -518,7 +581,7 @@ export function AuthProvider({
     return () => {
       ++localeRequest.current;
     };
-  }, [localeUserId, getAccessToken, getPreferredLocale, localeReload]);
+  }, [localeUserId, getAccessToken, getPreferredLocale, localeReload, mustChangePassword]);
 
   const savePreferredLocale = React.useCallback(
     async (locale: string | null) => {
@@ -565,7 +628,10 @@ export function AuthProvider({
 
   const handleReLoginSuccess = React.useCallback(() => {
     setSessionExpired(false);
-  }, []);
+    setSessionRestores((n) => n + 1);
+    // The same user signs back in, so the effect keyed on the user id would keep a failed load.
+    reloadPreferredLocale();
+  }, [reloadPreferredLocale]);
 
   const handleSwitchAccount = React.useCallback(async () => {
     setSessionExpired(false);
@@ -582,14 +648,18 @@ export function AuthProvider({
       savePreferredLocale,
       scope,
       sessionExpired,
+      sessionRestores,
       needsInstituteSelection,
       memberships,
       isImpersonated,
       impersonationEnded,
+      mustChangePassword,
+      markPasswordChangeRequired,
       login,
       loginWithPasskey,
       logout,
       refreshSession,
+      verifySession,
       getAccessToken,
       getRefreshToken,
       selectInstitute,
@@ -606,14 +676,18 @@ export function AuthProvider({
       savePreferredLocale,
       scope,
       sessionExpired,
+      sessionRestores,
       needsInstituteSelection,
       memberships,
       isImpersonated,
       impersonationEnded,
+      mustChangePassword,
+      markPasswordChangeRequired,
       login,
       loginWithPasskey,
       logout,
       refreshSession,
+      verifySession,
       getAccessToken,
       getRefreshToken,
       selectInstitute,

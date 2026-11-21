@@ -9,7 +9,6 @@ import {
   E2eEntityAuditTimelineDocument,
   type E2eEntityAuditTimelineQuery,
   E2ePingDocument,
-  E2eRegisterDocument,
   E2eStandardsDocument,
 } from './__generated__/graphql';
 import { loginAsInstituteAdmin } from './helpers/auth';
@@ -634,20 +633,18 @@ describe('Audit E2E', () => {
   describe('@NoAudit opt-out', () => {
     it('unauthenticated mutations produce no audit log', async () => {
       const uniqueUsername = `audit_test_${Date.now()}`;
-      await gql(E2eRegisterDocument, {
-        input: {
-          username: uniqueUsername,
-          password: 'test1234',
-          email: `${uniqueUsername}@test.com`,
-        },
-      });
+      // A failed login carries a password and is @NoAudit: neither must reach the audit log.
+      await gql(
+        `mutation ($u: String!, $p: String!) { instituteLogin(username: $u, password: $p) { __typename } }`,
+        { u: uniqueUsername, p: 'not-a-real-password-1A' },
+      );
 
       // Brief wait for any potential async pipeline
       await new Promise((r) => setTimeout(r, 1500));
 
       const result = await queryAsPlatformAdmin(
         pool,
-        `SELECT id FROM audit_logs WHERE action = 'register' AND metadata->>'input' LIKE $1`,
+        `SELECT id FROM audit_logs WHERE action = 'instituteLogin' AND metadata::text LIKE $1`,
         [`%${uniqueUsername}%`],
       );
 
