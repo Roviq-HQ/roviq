@@ -1,61 +1,38 @@
-/**
- * NestJS-based Temporal worker for StudentAdmissionWorkflow (ROV-159).
- *
- * Registers the workflow + its activities on the `student-admission`
- * task queue. Without this worker the `approveApplication` mutation starts
- * a workflow that never runs, leaving applications stuck in `fee_paid`.
- *
- * Follows the same pattern as BulkStudentImportWorkerService. Enabled via
- * STUDENT_ADMISSION_WORKER_ENABLED=true so that only one API instance runs
- * the worker when the service is scaled horizontally.
- */
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { DrizzleDB } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
-import { NativeConnection, Worker } from '@temporalio/worker';
 import { IdentityService } from '../../../auth/identity.service';
-import { createDrizzleForWorker } from '../../../common/temporal/worker-db';
+import { EmbeddedTemporalWorker } from '../../../common/temporal/embedded-temporal-worker';
+import { createStudentAdmissionActivities } from './student-admission.activities';
+import { STUDENT_ADMISSION_TASK_QUEUE } from './student-admission.types';
+import { studentAdmissionWorkflowsPath } from './student-admission.workflows-path';
 
-const TASK_QUEUE = 'student-admission';
-
+/**
+ * Runs StudentAdmissionWorkflow (ROV-159) in this gateway when STUDENT_ADMISSION_WORKER_ENABLED
+ * is 'true'. Without it `approveApplication` starts a workflow that never runs and the
+ * application never reaches ENROLLED.
+ */
 @Injectable()
-export class StudentAdmissionWorkerService implements OnModuleInit {
-  private readonly logger = new Logger(StudentAdmissionWorkerService.name);
-
+export class StudentAdmissionWorkerService extends EmbeddedTemporalWorker {
   constructor(
-    private readonly config: ConfigService,
+    config: ConfigService,
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
-  ) {}
-
-  async onModuleInit() {
-    if (this.config.get<string>('STUDENT_ADMISSION_WORKER_ENABLED') !== 'true') return;
-
-    this.startWorker().catch((err) => {
-      this.logger.error('Student admission worker failed to start', (err as Error).message);
+  ) {
+    super(config, {
+      flag: 'STUDENT_ADMISSION_WORKER_ENABLED',
+      label: 'Student admission worker',
+      taskQueue: STUDENT_ADMISSION_TASK_QUEUE,
+      loggerName: StudentAdmissionWorkerService.name,
     });
   }
 
-  private async startWorker(): Promise<void> {
-    const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
-    const dbUrl = this.config.get<string>(
-      'DATABASE_URL_MIGRATE',
-      'postgresql://roviq:roviq_dev@localhost:5434/roviq',
-    );
-    const connection = await NativeConnection.connect({ address });
-    const db = await createDrizzleForWorker(dbUrl);
+  protected createActivities(db: DrizzleDB) {
+    return createStudentAdmissionActivities(db, this.eventBus, this.identityService);
+  }
 
-    const { createStudentAdmissionActivities } = await import('./student-admission.activities.js');
-    const activities = createStudentAdmissionActivities(db, this.eventBus, this.identityService);
-
-    const worker = await Worker.create({
-      connection,
-      taskQueue: TASK_QUEUE,
-      workflowsPath: require.resolve('./student-admission.workflow'),
-      activities,
-    });
-
-    this.logger.log(`Student admission worker started on queue: ${TASK_QUEUE}`);
-    await worker.run();
+  protected workflowsPath(): string {
+    return studentAdmissionWorkflowsPath();
   }
 }

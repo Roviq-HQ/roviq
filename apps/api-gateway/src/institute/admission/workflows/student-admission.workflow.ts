@@ -33,14 +33,10 @@ export async function StudentAdmissionWorkflow(
     await activities.validateSectionCapacity(tenantId, sectionId);
   }
 
-  // 3. Auth NATS → create user + membership (student role).
-  // `applicationId` doubles as the deterministic placeholder seed so retries
-  // of this activity (when no parent phone matches an existing user) reuse
-  // the same `admission-<id>@roviq.placeholder` username instead of minting
-  // a fresh one each retry.
+  // 3. Create the student user + membership (student role). `applicationId` seeds the
+  // placeholder `admission-<id>@roviq.placeholder` so retries reuse the same user.
   const { userId, membershipId } = await activities.createUserAndMembership(
     tenantId,
-    formData,
     actorId,
     applicationId,
   );

@@ -6,6 +6,9 @@
  * academics, and linking guardians.
  */
 
+/** Task queue of StudentAdmissionWorkflow; AdmissionService starts it here and the worker polls it. */
+export const STUDENT_ADMISSION_TASK_QUEUE = 'student-admission';
+
 export interface StudentAdmissionInput {
   applicationId: string;
   tenantId: string;
@@ -67,12 +70,9 @@ export interface StudentAdmissionActivities {
 
   createUserAndMembership(
     tenantId: string,
-    formData: Record<string, unknown>,
     createdBy: string,
-    /** Stable per-application seed used for deterministic placeholder
-     *  email/username when no parent phone is supplied. Required so a
-     *  Temporal retry of `createUserAndMembership` reuses the previously
-     *  created placeholder user instead of orphaning a duplicate. */
+    /** Stable per-application seed for the student's placeholder email/username, so a
+     *  Temporal retry reuses the user it already created instead of orphaning a duplicate. */
     seed: string,
   ): Promise<{ userId: string; membershipId: string }>;
 
