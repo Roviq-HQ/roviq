@@ -4,6 +4,7 @@ declare global {
       NODE_ENV?: 'development' | 'production' | 'test';
       DATABASE_URL?: string;
       DATABASE_URL_TEST?: string;
+      INTEGRATION_EXCLUDE?: string;
       DATABASE_URL_MIGRATE?: string;
       DATABASE_URL_TEST_MIGRATE?: string;
       DATABASE_URL_ADMIN?: string;

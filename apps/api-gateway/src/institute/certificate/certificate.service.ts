@@ -20,7 +20,7 @@ import {
 } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { Client, Connection } from '@temporalio/client';
+import { TemporalClientService } from '@roviq/temporal';
 import { CertificatePdfService } from './certificate-pdf.service';
 import type { ClearanceEntryObject } from './models/tc.model';
 import { CertificateRepository } from './repositories/certificate.repository';
@@ -53,6 +53,7 @@ export class CertificateService {
     private readonly eventBus: EventBusService,
     private readonly config: ConfigService,
     private readonly pdfs: CertificatePdfService,
+    private readonly temporal: TemporalClientService,
   ) {}
 
   // ── TC Operations ──────────────────────────────────────
@@ -95,12 +96,8 @@ export class CertificateService {
     }
 
     try {
-      const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
       const taskQueue = this.config.get<string>('TEMPORAL_TC_TASK_QUEUE', DEFAULT_TC_TASK_QUEUE);
-      const connection = await Connection.connect({ address });
-      const client = new Client({ connection });
-
-      await client.workflow.start('TCIssuanceWorkflow', {
+      await this.temporal.startWorkflow('TCIssuanceWorkflow', {
         taskQueue,
         workflowId: `tc-issuance-${tc.id}`,
         workflowExecutionTimeout: '7 days',
@@ -115,8 +112,6 @@ export class CertificateService {
           },
         ],
       });
-
-      await connection.close();
       this.logger.log(`TC workflow started: ${tc.id}`);
     } catch (err) {
       this.logger.warn(`Temporal workflow failed to start for TC ${tc.id}: ${err}`);

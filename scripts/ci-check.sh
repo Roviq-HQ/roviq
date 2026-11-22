@@ -154,7 +154,7 @@ if (( run_e2e )); then
   }
 
   ( "${COMPOSE[@]}" up -d --wait \
-        postgres redis nats temporal object-storage ) > "$tmpdir/infra.log" 2>&1 & infra_pid=$!
+        postgres redis nats temporal object-storage mailpit ) > "$tmpdir/infra.log" 2>&1 & infra_pid=$!
 
   # Stream B: build the shared toolchain image (one image for every backend
   # service, defined on migrate-and-seed; source and node_modules come from

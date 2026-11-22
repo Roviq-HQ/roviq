@@ -36,9 +36,11 @@ import {
   withTenant,
 } from '@roviq/database';
 import { FakeStorageClient, StorageClient } from '@roviq/storage';
+import { TemporalClientService } from '@roviq/temporal';
 import {
   createInstituteToken,
   createIntegrationApp,
+  createMock,
   createResellerToken,
   createTestInstitute,
   createTestTeacher,
@@ -47,9 +49,10 @@ import {
   RESELLER_DIRECT_ID,
 } from '@roviq/testing/integration';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 import { createTCIssuanceActivities } from '../workflows/tc-issuance.activities';
+import { DEFAULT_TC_TASK_QUEUE } from '../workflows/tc-issuance.types';
 
 const EMPTY_TC_DATA: CbseTcData = {
   studentName: '',
@@ -317,16 +320,25 @@ describe('TCResolver (integration)', () => {
   let result: IntegrationAppResult;
   let instituteToken: string;
   let tenantId: string;
+  let userId: string;
   let fixture: StudentFixture;
   const storage = new FakeStorageClient();
+  const startWorkflow = vi.fn<TemporalClientService['startWorkflow']>();
 
   beforeAll(async () => {
     result = await createIntegrationApp({
       modules: [AppModule],
-      overrides: [{ provide: StorageClient, useValue: storage }],
+      overrides: [
+        { provide: StorageClient, useValue: storage },
+        {
+          provide: TemporalClientService,
+          useValue: createMock<TemporalClientService>({ startWorkflow }),
+        },
+      ],
     });
     const institute = await createTestInstitute(result.db);
     tenantId = institute.tenantId;
+    userId = institute.userId;
     instituteToken = createInstituteToken({
       sub: institute.userId,
       tenantId: institute.tenantId,
@@ -342,6 +354,8 @@ describe('TCResolver (integration)', () => {
 
   // uq_tc_register_open_request allows one TC in progress per student; each test starts with none.
   beforeEach(async () => {
+    startWorkflow.mockReset();
+    startWorkflow.mockResolvedValue('run-id');
     await withAdmin(result.db, mkAdminCtx('test:tc'), (tx) =>
       tx
         .update(tcRegister)
@@ -371,6 +385,23 @@ describe('TCResolver (integration)', () => {
     expect(response.data?.requestTC.id).toBeDefined();
     expect(response.data?.requestTC.status).toBe(TcStatus.REQUESTED);
     expect(response.data?.requestTC.reason).toBe('Family relocating to another city');
+    const tcId = response.data?.requestTC.id;
+    expect(startWorkflow).toHaveBeenCalledTimes(1);
+    expect(startWorkflow).toHaveBeenCalledWith('TCIssuanceWorkflow', {
+      taskQueue: DEFAULT_TC_TASK_QUEUE,
+      workflowId: `tc-issuance-${tcId}`,
+      workflowExecutionTimeout: '7 days',
+      args: [
+        {
+          tenantId,
+          tcRegisterId: tcId,
+          studentProfileId: fixture.studentProfileId,
+          academicYearId: fixture.academicYearId,
+          reason: 'Family relocating to another city',
+          requestedBy: userId,
+        },
+      ],
+    });
   });
 
   it('approveTC refuses a TC that is not in `generated` status (requested)', async () => {

@@ -6,11 +6,14 @@
  */
 import type { ConfigService } from '@nestjs/config';
 import {
+  AcademicStatus,
   CertificateStatus,
   CertificateTemplateType,
   type InstituteContext,
+  TcStatus,
 } from '@roviq/common-types';
 import type { EventBusService } from '@roviq/event-bus';
+import type { TemporalClientService } from '@roviq/temporal';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CertificateService } from '../certificate.service';
@@ -18,6 +21,7 @@ import { CertificatePdfService } from '../certificate-pdf.service';
 import { CertificateRepository } from '../repositories/certificate.repository';
 import type { IssuedCertificateRow } from '../repositories/certificate.types';
 import { TcRepository } from '../repositories/tc.repository';
+import type { TcDetailsRow } from '../repositories/tc.types';
 
 const ctx: InstituteContext = {
   _scope: 'institute',
@@ -55,31 +59,121 @@ function certificateRow(overrides: Partial<IssuedCertificateRow> = {}): IssuedCe
   };
 }
 
-vi.mock('@temporalio/client', () => {
-  class FakeTemporalClient {
-    workflow = { start: vi.fn(() => Promise.resolve()) };
-  }
+function tcDetailsRow(overrides: Partial<TcDetailsRow> = {}): TcDetailsRow {
   return {
-    Client: FakeTemporalClient,
-    Connection: { connect: vi.fn(() => Promise.resolve({ close: vi.fn() })) },
+    id: 'tc-1',
+    studentProfileId: 'student-1',
+    tcSerialNumber: 'TC-REQ-1',
+    academicYearId: 'year-1',
+    status: TcStatus.REQUESTED,
+    reason: 'Family relocation',
+    tcData: {
+      studentName: 'Rajesh Kumar',
+      motherName: null,
+      fatherOrGuardianName: null,
+      nationality: null,
+      socialCategory: 'General',
+      dateOfBirthFigures: null,
+      dateOfBirthWords: null,
+      whetherFailed: 'No',
+      subjectsStudied: '',
+      classLastStudied: null,
+      lastExamResult: '',
+      qualifiedForPromotion: '',
+      feesPaidUpTo: '',
+      feeConcession: '',
+      nccScoutGuide: '',
+      dateOfLeaving: null,
+      reasonForLeaving: 'Family relocation',
+      totalWorkingDays: '',
+      totalPresentDays: '',
+      generalConduct: '',
+      remarks: '',
+      dateOfIssue: null,
+    },
+    clearances: null,
+    pdfFileId: null,
+    verificationToken: null,
+    issuedAt: null,
+    admissionNumber: 'ADM-1',
+    isDuplicate: false,
+    originalTcId: null,
+    isCounterSigned: null,
+    createdAt: new Date('2026-04-01T00:00:00Z'),
+    studentFirstName: { en: 'Rajesh' },
+    studentLastName: { en: 'Kumar' },
+    standardName: { en: 'Class 5' },
+    ...overrides,
   };
-});
+}
 
 describe('CertificateService (unit)', () => {
   let service: CertificateService;
   let certificates: CertificateRepository;
+  let tcs: TcRepository;
+  let pdfs: CertificatePdfService;
+  let temporal: TemporalClientService;
 
   beforeEach(() => {
     certificates = createMock<CertificateRepository>();
+    tcs = createMock<TcRepository>();
+    pdfs = createMock<CertificatePdfService>();
+    temporal = createMock<TemporalClientService>();
     const eventBus = createMock<EventBusService>({ emit: vi.fn() });
-    const config = createMock<ConfigService>({ get: vi.fn(() => 'localhost:7233') });
-    service = new CertificateService(
-      createMock<TcRepository>(),
-      certificates,
-      eventBus,
-      config,
-      createMock<CertificatePdfService>(),
-    );
+    const configValues: Record<string, string> = { TEMPORAL_TC_TASK_QUEUE: 'tc-issuance-test' };
+    const config = createMock<ConfigService>({ get: vi.fn((key: string) => configValues[key]) });
+    service = new CertificateService(tcs, certificates, eventBus, config, pdfs, temporal);
+  });
+
+  describe('requestTC', () => {
+    const input = {
+      studentProfileId: 'student-1',
+      reason: 'Family relocation',
+      academicYearId: 'year-1',
+    };
+
+    beforeEach(() => {
+      vi.mocked(tcs.findStudentStatus).mockResolvedValue({
+        academicStatus: AcademicStatus.ENROLLED,
+      });
+      vi.mocked(tcs.academicYearExists).mockResolvedValue(true);
+      vi.mocked(tcs.createRequest).mockResolvedValue({ id: 'tc-1' });
+      vi.mocked(tcs.findDetails).mockResolvedValue(tcDetailsRow());
+      vi.mocked(pdfs.verificationUrl).mockReturnValue(null);
+    });
+
+    it('starts TCIssuanceWorkflow on the shared client with the TC id and the request', async () => {
+      vi.mocked(temporal.startWorkflow).mockResolvedValue('run-1');
+
+      await service.requestTC(ctx, input);
+
+      expect(temporal.startWorkflow).toHaveBeenCalledTimes(1);
+      expect(temporal.startWorkflow).toHaveBeenCalledWith('TCIssuanceWorkflow', {
+        taskQueue: 'tc-issuance-test',
+        workflowId: 'tc-issuance-tc-1',
+        workflowExecutionTimeout: '7 days',
+        args: [
+          {
+            tenantId: 'tenant-1',
+            tcRegisterId: 'tc-1',
+            studentProfileId: 'student-1',
+            academicYearId: 'year-1',
+            reason: 'Family relocation',
+            requestedBy: 'user-1',
+          },
+        ],
+      });
+    });
+
+    it('still returns the requested TC when the workflow cannot be started', async () => {
+      vi.mocked(temporal.startWorkflow).mockRejectedValue(new Error('temporal unavailable'));
+
+      const result = await service.requestTC(ctx, input);
+
+      const { verificationToken: _token, ...rest } = tcDetailsRow();
+      expect(result).toEqual({ ...rest, verificationUrl: null, clearances: undefined });
+      expect(tcs.findDetails).toHaveBeenCalledWith(ctx, 'tc-1');
+    });
   });
 
   describe('findCertificateById', () => {

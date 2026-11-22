@@ -124,7 +124,13 @@ export default defineConfig({
             'ee/apps/**/src/**/*.integration.spec.ts',
             'ee/libs/**/src/**/*.integration.spec.ts',
           ],
-          exclude: ['**/node_modules/**', '**/dist/**'],
+          // CI runs some specs as named gates first and lists them here so they run once;
+          // a CLI --exclude does not reach a project that sets its own exclude.
+          exclude: [
+            '**/node_modules/**',
+            '**/dist/**',
+            ...(process.env.INTEGRATION_EXCLUDE ?? '').split(/\s+/).filter(Boolean),
+          ],
           testTimeout: 30000,
         },
       },

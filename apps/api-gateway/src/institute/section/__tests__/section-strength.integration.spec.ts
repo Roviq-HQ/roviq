@@ -25,7 +25,7 @@ import {
   createTestInstitute,
   type IntegrationAppResult,
 } from '@roviq/testing/integration';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 
@@ -187,6 +187,94 @@ describe('section strength triggers (integration)', () => {
     await Promise.all(students.map((student) => enrol(student, section)));
 
     expect(await strength(section)).toBe(3);
+  });
+
+  it('counts every section of one multi-row insert, update and delete', async () => {
+    const first = await createSection('F');
+    const second = await createSection('G');
+    const third = await createSection('H');
+    const students = await Promise.all(Array.from({ length: 5 }, () => createStudent()));
+    const targets = [first, first, first, second, second];
+
+    const rows = await withTenant(db, mkInstituteCtx(tenantId, 'test:section-strength'), (tx) =>
+      tx
+        .insert(studentAcademics)
+        .values(
+          students.map((studentProfileId, index) => ({
+            tenantId,
+            studentProfileId,
+            academicYearId: yearId,
+            standardId,
+            sectionId: targets[index],
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })),
+        )
+        .returning({ id: studentAcademics.id, sectionId: studentAcademics.sectionId }),
+    );
+    expect(await strength(first)).toBe(3);
+    expect(await strength(second)).toBe(2);
+
+    await withTenant(db, mkInstituteCtx(tenantId, 'test:section-strength'), (tx) =>
+      tx
+        .update(studentAcademics)
+        .set({ sectionId: third })
+        .where(
+          inArray(
+            studentAcademics.id,
+            rows.map((row) => row.id),
+          ),
+        ),
+    );
+    expect(await strength(first)).toBe(0);
+    expect(await strength(second)).toBe(0);
+    expect(await strength(third)).toBe(5);
+
+    await withAdmin(db, mkAdminCtx('test:section-strength'), (tx) =>
+      tx.delete(studentAcademics).where(
+        inArray(
+          studentAcademics.id,
+          rows.slice(0, 2).map((row) => row.id),
+        ),
+      ),
+    );
+    expect(await strength(third)).toBe(3);
+  });
+
+  it('recounts once for a status change of many students in one statement', async () => {
+    const section = await createSection('I');
+    const other = await createSection('J');
+    const students = await Promise.all(Array.from({ length: 4 }, () => createStudent()));
+    await Promise.all(students.slice(0, 3).map((student) => enrol(student, section)));
+    await enrol(students[3], other);
+
+    await withTenant(db, mkInstituteCtx(tenantId, 'test:section-strength'), (tx) =>
+      tx
+        .update(studentProfiles)
+        .set({ academicStatus: AcademicStatus.TRANSFERRED_OUT })
+        .where(inArray(studentProfiles.id, [students[0], students[1], students[3]])),
+    );
+
+    expect(await strength(section)).toBe(1);
+    expect(await strength(other)).toBe(0);
+  });
+
+  it('leaves the count alone when an update changes nothing that is counted', async () => {
+    const section = await createSection('K');
+    const academicId = await enrol(await createStudent(), section);
+    // A wrong counter would be overwritten by a recount; it must survive this update.
+    await withAdmin(db, mkAdminCtx('test:section-strength'), (tx) =>
+      tx.update(sections).set({ currentStrength: 7 }).where(eq(sections.id, section)),
+    );
+
+    await withTenant(db, mkInstituteCtx(tenantId, 'test:section-strength'), (tx) =>
+      tx
+        .update(studentAcademics)
+        .set({ rollNumber: '12' })
+        .where(eq(studentAcademics.id, academicId)),
+    );
+
+    expect(await strength(section)).toBe(7);
   });
 
   it('moves the count when a student changes section', async () => {

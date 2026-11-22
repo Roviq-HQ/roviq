@@ -96,6 +96,14 @@ jobs:
       S3_PUBLIC_BASE_URL: http://localhost:9002/roviq-public
       # Gateway invoice payment builds its return URL from this (billing integration tests).
       BILLING_RETURN_URL: http://localhost:4200/billing/subscriptions
+      # The named security gates below run these files; "Integration tests" then skips
+      # them, so each runs once. Keep a file in exactly one of the two lists.
+      USER_GROUPS_GATE_SPECS: apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts
+      AUTH_GATE_SPECS: >-
+        libs/database/src/__tests__/security-invariants.integration.spec.ts
+        libs/database/src/__tests__/auth-invariants-db.integration.spec.ts
+        apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts
+        apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts
     services:
       postgres:
         image: postgres:18-alpine
@@ -198,17 +206,16 @@ jobs:
         run: pnpx nx affected -t test
       # Named gate so a CASL-to-SQL / RLS regression is visible before the full suite runs.
       - name: User & Groups Security Invariants
-        run: pnpm vitest run --project integration apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts
+        run: pnpm vitest run --project integration $USER_GROUPS_GATE_SPECS
       # Named gate (ROV-102): roles/RLS at the database, then session revocation through the app.
       - name: Auth Security Invariants
-        run: >-
-          pnpm vitest run --project integration
-          libs/database/src/__tests__/security-invariants.integration.spec.ts
-          libs/database/src/__tests__/auth-invariants-db.integration.spec.ts
-          apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts
-          apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts
+        run: pnpm vitest run --project integration $AUTH_GATE_SPECS
       - name: Integration tests
-        run: pnpm test:int
+        run: |
+          for spec in $USER_GROUPS_GATE_SPECS $AUTH_GATE_SPECS; do
+            test -f "$spec" || { echo "::error::gate spec $spec does not exist"; exit 1; }
+          done
+          INTEGRATION_EXCLUDE="$USER_GROUPS_GATE_SPECS $AUTH_GATE_SPECS" pnpm test:int
 
   build:
     name: Build
