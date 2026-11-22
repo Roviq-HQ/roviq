@@ -40,6 +40,7 @@ async function loginGuardian(password: string) {
 describe('Password Change E2E (ROV-187)', () => {
   let accessToken: string;
   let originalRefreshToken: string;
+  let secondRefreshToken: string;
   let passwordWasChanged = false;
   const suiteStartedAt = new Date();
 
@@ -54,6 +55,13 @@ describe('Password Change E2E (ROV-187)', () => {
     assert(login.refreshToken);
     accessToken = login.accessToken;
     originalRefreshToken = login.refreshToken;
+
+    const secondLogin = await loginGuardian(ORIGINAL_PASSWORD);
+    expect(secondLogin.errors).toBeUndefined();
+    const token = secondLogin.data?.instituteLogin.refreshToken;
+    assert(token);
+    expect(token).not.toBe(originalRefreshToken);
+    secondRefreshToken = token;
   });
 
   afterAll(async () => {
@@ -182,24 +190,16 @@ describe('Password Change E2E (ROV-187)', () => {
     expect(revoked?.metadata).toEqual({ reason: 'password_change' });
   });
 
-  it('rejects the original refresh token after password change (all sessions revoked)', async () => {
-    const res = await gql<{ refreshToken: { accessToken: string } }>(
-      `mutation($token: String!) {
-        refreshToken(token: $token) { accessToken }
-      }`,
-      { token: originalRefreshToken },
-    );
-
-    expect(res.errors).toBeDefined();
-    assert(res.errors);
-    // Service revokes all refresh tokens AND password_changed_at fence kicks
-    // in. Three surfaces are acceptable — all mean the token was refused:
-    //   - "Invalid refresh token" / "expired" — plain revocation
-    //   - "password" — password_changed_at fence
-    //   - "reuse" — refresh-token-reuse detector (the service now revokes the
-    //     whole family on second use, which is exactly what we want post
-    //     password change)
-    expect(res.errors[0].message).toMatch(/Invalid refresh token|expired|password|reuse|revoked/i);
+  it('requires both the calling browser and another browser to sign in again', async () => {
+    for (const token of [originalRefreshToken, secondRefreshToken]) {
+      const res = await gql<{ refreshToken: { accessToken: string } }>(
+        `mutation($token: String!) { refreshToken(token: $token) { accessToken } }`,
+        { token },
+      );
+      expect(res.data).toBeNull();
+      expect(res.errors?.[0].extensions?.code).toBe('SESSION_EXPIRED');
+      expect(res.errors?.[0].message).toBe('Refresh token revoked');
+    }
   });
 
   it('allows login with the new password', async () => {

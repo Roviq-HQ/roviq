@@ -917,6 +917,13 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Fix:** the index is no longer declared in the schema. It is created by the ROV-311 custom migration with `IF NOT EXISTS`, like `audit_logs_synthetic_origin_idx`.
 - **Lesson:** an index on a partitioned table belongs in a custom migration only. After a schema change, run `pnpm db:push` a second time on a reset database; it must succeed.
 
+## 2026-11-22 — diagnosed and fixed: `forced-password-change.spec.tsx` timed out in the pre-push unit run
+
+- **Symptom:** "changes the password, confirms, and then sends the user to sign in" failed at 5050 ms in a full `ci:check` unit run, and passed alone and in the run before.
+- **Cause:** the screen redirects 4 s after success and the test waited for that in real time. Typing three fields plus 4 s leaves under 1 s of the 5 s test budget, so a loaded machine goes over. The `waitFor` timeout of 6 s was longer than the test's own.
+- **Fix:** the test uses fake timers (`shouldAdvanceTime: true`) and advances 4 s itself. It also asserts that the redirect has not happened before the delay.
+- **Lesson:** never wait out a product delay in real time in a component test. Advance fake timers past it.
+
 ## 2026-11-22 — diagnosed and fixed: CI `Test` failed on `notifications:test` with no test output (ROV-314)
 
 - **Symptom:** on the pull request, the `Test` job failed with `Failed tasks: notifications:test`. The task printed nothing but the executor's deprecation line. The pre-push gate had passed on the same commit.
