@@ -26,10 +26,6 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ theme: 'light', setTheme: vi.fn(), resolvedTheme: 'light' }),
 }));
 
-vi.mock('@novu/nextjs', () => ({
-  Inbox: () => <div data-testid="novu-inbox-stub" />,
-}));
-
 vi.mock('next/image', () => ({
   default: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
 }));

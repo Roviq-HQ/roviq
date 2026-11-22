@@ -237,6 +237,8 @@ export const ErrorCode = {
   FILE_NOT_FOUND: 'FILE_NOT_FOUND',
   /** Membership row not found */
   MEMBERSHIP_NOT_FOUND: 'MEMBERSHIP_NOT_FOUND',
+  /** Notification does not exist or is not the caller's; both answer the same */
+  NOTIFICATION_NOT_FOUND: 'NOTIFICATION_NOT_FOUND',
   /** No active payment gateway is configured for the reseller or institute */
   PAYMENT_GATEWAY_NOT_CONFIGURED: 'PAYMENT_GATEWAY_NOT_CONFIGURED',
   /** Role not found (including a missing default role for the institute) */
@@ -529,6 +531,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   LEAVE_NOT_FOUND: HttpStatus.NOT_FOUND,
   FILE_NOT_FOUND: HttpStatus.NOT_FOUND,
   MEMBERSHIP_NOT_FOUND: HttpStatus.NOT_FOUND,
+  NOTIFICATION_NOT_FOUND: HttpStatus.NOT_FOUND,
   PAYMENT_GATEWAY_NOT_CONFIGURED: HttpStatus.NOT_FOUND,
   ROLE_NOT_FOUND: HttpStatus.NOT_FOUND,
   SECTION_NOT_FOUND: HttpStatus.NOT_FOUND,

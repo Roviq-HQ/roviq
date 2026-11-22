@@ -135,11 +135,23 @@ To turn scanning on:
   student import). ClamAV recognises EICAR only at the start of a file, so an EICAR string
   placed after a PDF header is reported clean.
 
+## Telemetry and shutdown
+
+- Set `OTEL_EXPORTER_OTLP_ENDPOINT` only where an OpenTelemetry collector runs. Unset, the
+  gateway starts no SDK and exports nothing; set to an unreachable address, every export fails
+  and the data is lost.
+- On SIGTERM the gateway and the notification service stop accepting connections, finish
+  in-flight requests, stop their consumers and Temporal workers, close NATS, Temporal, database
+  pools and Redis, flush telemetry (at most 2 s) and exit 0. Past 10 s they exit 1 and log what
+  had not closed. Give the container a stop grace period above 10 s (Docker's default of 10 s
+  cuts it short; Kubernetes' 30 s is enough).
+
 ## Background workers
 
 Temporal workers run inside the api-gateway process, switched on per instance with a
 `*_WORKER_ENABLED=true` variable. Set each flag on exactly the gateway instances that should run
-that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
+that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal. A worker that fails to
+start or stops (Temporal restarted, connection lost) tries to start again every 30 seconds.
 
 - **`FILE_SWEEPER_WORKER_ENABLED`** (ROV-300): the hourly file sweeper (`docs/architecture.md` →
   "File sweeper"). It creates the `file-sweeper-hourly` schedule at start if Temporal does not
@@ -172,6 +184,25 @@ that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
   gateway already creates partitions at boot and daily; only this worker enforces retention.
   It connects with `DATABASE_URL` and runs as `roviq_admin`, reaching partition DDL through the
   `SECURITY DEFINER` functions `ensure_monthly_partition` and `detach_monthly_partition`.
+
+## Notification delivery
+
+The notification service writes in-app notifications to Postgres and delivers email, push, SMS
+and WhatsApp itself (ROV-314). It needs `TEMPORAL_ADDRESS`, and
+`NOTIFICATION_WORKER_ENABLED=true` on at least one notification-service instance: that worker
+runs the delivery and digest workflows on task queue `notifications`. Without it, in-app rows are
+still written but no email, push or WhatsApp message is sent. Codes and temporary passwords
+(email verification, impersonation OTP, welcome) do not use Temporal; they are sent at once.
+
+Each channel needs a provider; a channel with none records every send as skipped (`no_provider`).
+
+- **Email**: `NOTIFICATION_EMAIL_PROVIDER=smtp`, `SMTP_URL` (`smtps://user:pass@host:465`) and
+  `EMAIL_FROM` (`Roviq <no-reply@your-domain>`). The sending domain needs SPF and DKIM.
+- **Push**: `NOTIFICATION_PUSH_PROVIDER=fcm` and `FCM_SERVICE_ACCOUNT_JSON`, the whole service
+  account key JSON of the Firebase project. Tokens FCM reports as unregistered are retired.
+- **SMS and WhatsApp**: no production provider yet. The `log` provider sends nothing and is
+  refused at start when `NODE_ENV=production`, so leave these unset until a provider exists;
+  impersonation codes then cannot reach a phone.
 
 ## PDF generation
 

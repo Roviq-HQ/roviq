@@ -24,10 +24,11 @@ roviq/
 │   │       │   ├── academic-year/    # Academic year lifecycle
 │   │       │   ├── institute-group/  # Institute group service, models (shared with admin/reseller)
 │   │       │   ├── role/             # Institute roles and primary nav
-│   │       │   ├── notification-config/  # Tenant notification channels, device tokens
+│   │       │   ├── notification-config/  # Tenant notification channels
 │   │       │   ├── audit/        # auditLogs, entityAuditTimeline
 │   │       │   └── setup/        # Temporal InstituteSetupWorkflow
 │   │       ├── auth/             # JWT, login, impersonation, auth events, repositories, ws-ticket
+│   │       ├── notification-inbox/  # Every scope's own in-app inbox, live feed, push device tokens
 │   │       ├── audit/            # Audit interceptor, consumer, service, partition workflow (no resolvers)
 │   │       ├── dlq/              # DLQ consumer and service (resolver lives in admin/dlq)
 │   │       ├── casl/             # CASL ability guard + module
@@ -149,7 +150,7 @@ reads the same value. Tenant context and audit consumers use this request value.
 - **EventBusService**: publishes to both NATS JetStream (for cross-service) and GraphQL PubSub (for subscriptions) in a single `emit()` call
 - **GraphQL Subscriptions**: 8 subscriptions across 3 scopes with tenant/reseller filtering via `graphql-ws`
 - **Temporal**: used for long-running workflows (institute setup pipeline, audit partition management)
-- **JetStream retention**: every business stream uses `workqueue` retention so each message is dispatched to exactly one durable handler. The `NOTIFICATION` stream is the single exception — it uses `interest` retention because two consumers need the same `NOTIFICATION.user.created` event (welcome-email listener on the exact subject + Novu-subscriber-sync listener on the `NOTIFICATION.user.*` wildcard), which workqueue retention rejects as overlapping filters. `interest` fans out to every bound consumer and retains each message until all have acked. Stream config lives in `libs/backend/nats-jetstream/src/streams/stream.config.ts`.
+- **JetStream retention**: every business stream uses `workqueue` retention so each message is dispatched to exactly one durable handler. The `NOTIFICATION` stream is the single exception — it uses `interest` retention because workqueue retention rejects overlapping consumer filters. `interest` fans out to every bound consumer and retains each message until all have acked. Stream config lives in `libs/backend/nats-jetstream/src/streams/stream.config.ts`.
 
 ### Service Layer Rules
 
@@ -230,6 +231,15 @@ See `docs/features/timetable.md` for the timetable feature — the 5-table norma
 ### Examinations & Report Cards
 
 See `docs/features/examinations.md` for the offline-examination feature — the 12-table model (grade schemes + bands, exam terms, exams, datesheet, marks, NEP subject topics + topic assessments, co-scholastic areas + assessments, report-card templates + per-student instances), the `EXAM` / `REPORT_CARD` state machines, pure grading/aggregation math (weighted term percentage, GPA, dense ranking), the GraphQL surface with granular CASL, and the server-rendered report-card PDF.
+
+## Notifications
+
+- Domain events on the `NOTIFICATION` stream are consumed by `apps/notification-service`, which writes the in-app row to PostgreSQL and sends through the channel adapters (`smtp` for email, `fcm` for push; SMS and WhatsApp have only the `log` adapter).
+- Regular notification types run through Temporal workflows (delivery and digest, queue `notifications`).
+- Codes and passwords are sent inline by `dispatchSecret` and stored nowhere.
+- The gateway serves the inbox API and the live feed from `apps/api-gateway/src/notification-inbox/`.
+- The web app shows them in the bell, `apps/web/src/components/notifications/`.
+- Per-institute channel choices live in `institute_notification_configs`.
 
 ## File storage
 

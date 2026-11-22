@@ -11,6 +11,7 @@ import type { EventPattern } from './event-patterns';
 
 const uuid = z.string().uuid();
 const str = z.string();
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 // Permissive base: all tenant-scoped events carry at least tenantId.
 const tenantBase = z.object({ tenantId: uuid });
 // Institute-record events identify the institute by `id` (the InstituteRecord
@@ -365,6 +366,9 @@ const NOTIFICATION_SCHEMAS = {
     tenantId: uuid,
     userId: uuid,
     status: str,
+    applicantName: str.nullable().optional(),
+    startDate: calendarDate.optional(),
+    endDate: calendarDate.optional(),
   }),
   'NOTIFICATION.approval.requested': tenantBase.catchall(z.unknown()),
   'NOTIFICATION.approval.resolved': tenantBase.catchall(z.unknown()),
@@ -384,9 +388,19 @@ const NOTIFICATION_SCHEMAS = {
         purpose: z.string().optional(),
       })
       .catchall(z.unknown()),
+    scope: z.enum(['platform', 'reseller', 'institute']).optional(),
+    resellerId: uuid.nullable().optional(),
   }),
   'NOTIFICATION.fee.overdue': tenantBase.catchall(z.unknown()),
   'NOTIFICATION.fee.reminder': tenantBase.catchall(z.unknown()),
+  // Pointer only: the consumer reads the row as the recipient, so no text travels on NATS.
+  'NOTIFICATION.inapp.created': z.object({
+    notificationId: uuid,
+    scope: z.enum(['platform', 'reseller', 'institute']),
+    tenantId: uuid.nullable(),
+    resellerId: uuid.nullable(),
+    recipientUserId: uuid,
+  }),
   'NOTIFICATION.user.created': z.object({}).catchall(z.unknown()),
   'NOTIFICATION.user.updated': z.object({}).catchall(z.unknown()),
 } as const;

@@ -40,7 +40,7 @@ import { ProfileImageResolversModule } from '../files/profile-image-resolvers.mo
 import { HealthModule } from '../health/health.module';
 import { InstituteScopeModule } from '../institute/institute-scope.module';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
-import { NovuProxyModule } from '../novu-proxy/novu-proxy.module';
+import { NotificationInboxModule } from '../notification-inbox/notification-inbox.module';
 import { PasskeyModule } from '../passkey/passkey.module';
 import { PublicVerificationModule } from '../public-verification/public-verification.module';
 import { ResellerModule } from '../reseller/reseller.module';
@@ -118,6 +118,7 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
       }),
     }),
     AuthModule,
+    NotificationInboxModule,
     CaslModule,
     HealthModule,
     ProfileImageResolversModule,
@@ -128,7 +129,6 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     ResellerModule,
     InstituteScopeModule,
     PublicVerificationModule,
-    NovuProxyModule,
     EeModule.register(),
   ],
   controllers: [AppController],

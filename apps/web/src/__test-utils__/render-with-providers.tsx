@@ -33,6 +33,8 @@ export interface RenderWithProvidersOptions {
   abilityRules?: RawRuleOf<AppAbility>[];
   /** Apollo MockedProvider mocks. Defaults to empty array. */
   apolloMocks?: MockedProviderProps['mocks'];
+  /** Replaces the mocks with a link of the test's own, e.g. to push subscription events. */
+  apolloLink?: MockedProviderProps['link'];
 }
 
 const PERMISSIVE_RULES: RawRuleOf<AppAbility>[] = [{ action: 'manage', subject: 'all' }];
@@ -46,6 +48,7 @@ export function renderWithProviders(
     locale = 'en',
     abilityRules = PERMISSIVE_RULES,
     apolloMocks = [],
+    apolloLink,
   } = options;
 
   const messages = { ...getLocaleMessages(locale), ...(overrideMessages ?? {}) };
@@ -54,7 +57,7 @@ export function renderWithProviders(
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <MockedProvider mocks={apolloMocks}>
+      <MockedProvider mocks={apolloMocks} link={apolloLink}>
         <NextIntlClientProvider
           locale={locale}
           messages={messages}

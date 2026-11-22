@@ -17,7 +17,7 @@ CI=true pnpm install
 
 # Create .env from .env.example if it doesn't exist, with Docker service hostnames.
 # Patched services (available in devcontainer): PostgreSQL, Redis, NATS.
-# NOT patched (not in devcontainer compose): Temporal, object storage, MongoDB, OTEL.
+# NOT patched (not in devcontainer compose): Temporal, object storage, OTEL.
 # To add those, extend .devcontainer/docker-compose.yml and patch here.
 if [ ! -f .env ]; then
   echo "Creating .env from .env.example with Docker hostnames..."

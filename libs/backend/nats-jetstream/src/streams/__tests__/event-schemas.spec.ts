@@ -162,6 +162,32 @@ describe('flatEventSchemas', () => {
         }),
       ).not.toThrow();
     });
+
+    it('NOTIFICATION.leave.decided keeps the applicant name and leave dates', () => {
+      const payload = {
+        leaveId: U1,
+        tenantId: U2,
+        userId: U3,
+        status: 'REJECTED',
+        applicantName: 'Ishaan Kapoor',
+        startDate: '2026-11-24',
+        endDate: '2026-11-26',
+      };
+
+      expect(flatEventSchemas['NOTIFICATION.leave.decided'].parse(payload)).toEqual(payload);
+    });
+
+    it('NOTIFICATION.leave.decided rejects a leave date that is not YYYY-MM-DD', () => {
+      expect(() =>
+        flatEventSchemas['NOTIFICATION.leave.decided'].parse({
+          leaveId: U1,
+          tenantId: U2,
+          userId: U3,
+          status: 'APPROVED',
+          startDate: '2026-11-24T00:00:00.000Z',
+        }),
+      ).toThrow(ZodError);
+    });
   });
 
   describe('permissive baseline (tenantId enforcement)', () => {

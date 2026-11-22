@@ -1224,7 +1224,7 @@ Same filters as platform admin. RLS automatically limits to `reseller_id = curre
 | InstituteGroup | Minimal v1 — entity + FK, no memberships | Defer operational powers |
 | Institute creation by reseller | With platform admin approval | Prevents unauthorized creation |
 | Auth | CASL with role abilities + membership overrides | Flexible ABAC |
-| Notifications | Novu via NotificationPort | Cloud now, self-hosted later |
+| Notifications | In-house pipeline (`apps/notification-service`) | See `docs/architecture.md` → Notifications |
 | Workflows | Temporal.io | Idempotent setup, year rollover |
 | Lint/Format | Biome | Single config, AI-agent-friendly |
 | Real-time | graphql-ws with ws-ticket auth per auth PRD | Secure WebSocket |

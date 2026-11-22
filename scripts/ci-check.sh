@@ -153,12 +153,8 @@ if (( run_e2e )); then
     fi
   }
 
-  # Isolated one-shots have no dependents in Compose's selected project, so
-  # --wait treats a successful exit as a failed running/healthy check.
   ( "${COMPOSE[@]}" up -d --wait \
-        postgres redis nats temporal mongodb object-storage novu-api novu-worker \
-      && "${COMPOSE[@]}" up -d --no-deps novu-bootstrap \
-      && wait_setup_service novu-bootstrap ) > "$tmpdir/infra.log" 2>&1 & infra_pid=$!
+        postgres redis nats temporal object-storage ) > "$tmpdir/infra.log" 2>&1 & infra_pid=$!
 
   # Stream B: build the shared toolchain image (one image for every backend
   # service, defined on migrate-and-seed; source and node_modules come from
@@ -172,7 +168,6 @@ if (( run_e2e )); then
   ( { CI=true pnpm -s codegen \
       && cd apps/web \
       && NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
-         NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='' \
          pnpm exec next build; } > "$tmpdir/web-build.log" 2>&1 ) & web_pid=$!
 
   infra_rc=0; build_rc=0; web_rc=0
@@ -198,12 +193,11 @@ if (( run_e2e )); then
   # seed completed in phase 2 (depends_on satisfied). api-gateway builds both
   # apps; notification-service starts once it is healthy. Both are recreated
   # unconditionally: the gate must test the pushed source even if the
-  # fingerprint in scripts/e2e-compose.sh misses an input. --no-deps on the
-  # bridge sync keeps Compose from re-running migrate-and-seed under them.
+  # fingerprint in scripts/e2e-compose.sh misses an input. --no-deps keeps
+  # Compose from re-running migrate-and-seed under them.
   log "phase 3: build and start backend apps on the current source"
   if ! { "${COMPOSE[@]}" up -d --wait --no-deps --force-recreate api-gateway \
-         && "${COMPOSE[@]}" up -d --wait --no-deps --force-recreate notification-service \
-         && "${COMPOSE[@]}" run --rm --no-deps novu-bridge-sync; } > "$tmpdir/apps.log" 2>&1; then
+         && "${COMPOSE[@]}" up -d --wait --no-deps --force-recreate notification-service; } > "$tmpdir/apps.log" 2>&1; then
     log "✗ app startup failed"; cat "$tmpdir/apps.log"; exit 1
   fi
 
@@ -273,7 +267,6 @@ launch lint pnpm -s lint
   NATS_URL="nats://localhost:$E2E_NATS_PORT" pnpm -s check:jetstream-drift
   pnpm -s nx run api-gateway-e2e:test-e2e
   NEXT_PUBLIC_API_URL="http://localhost:$E2E_API_PORT" \
-  NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER='\'''\'' \
   pnpm -s nx run web-e2e-suite:e2e'
 
 # Static gates — fast, always run regardless of affected set since they catch

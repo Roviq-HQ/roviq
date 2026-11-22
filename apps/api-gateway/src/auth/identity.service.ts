@@ -47,7 +47,7 @@ export interface CreateUserInput {
 
 export interface CreateUserResult {
   userId: string;
-  /** Plaintext temporary password — NEVER stored. Caller may hand this to a delivery channel; default flow ships it via Novu. */
+  /** Plaintext temporary password — NEVER stored. Caller may hand this to a delivery channel; default flow ships it inline. */
   tempPassword: string;
 }
 
@@ -95,7 +95,7 @@ export interface CreateUserWithMembershipResult extends CreateUserResult, Create
  *  - Sets users.must_change_password = true so the first login is forced
  *    through `changePassword` before any other action.
  *  - Emits NOTIFICATION.user.created with the plaintext temp password so the
- *    notification-service can deliver the welcome SMS/email via Novu.
+ *    notification-service can deliver the welcome SMS/email by email and SMS.
  *  - Returns the plaintext password for callers that need to surface it
  *    inline (e.g. admin "reset password and show once" flows).
  */

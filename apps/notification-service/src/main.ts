@@ -2,13 +2,18 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { MicroserviceOptions } from '@nestjs/microservices';
 import { JetStreamServer, STREAMS } from '@roviq/nats-jetstream';
-import { registerCircuitBreakerGauge } from '@roviq/resilience';
+import { enableGracefulShutdown } from '@roviq/telemetry';
+import { Runtime } from '@temporalio/worker';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app/app.module';
 
 async function bootstrap() {
+  // enableGracefulShutdown owns SIGTERM/SIGINT and stops the worker in onModuleDestroy; Temporal's
+  // own handlers would stop it first, and the worker would schedule a restart.
+  Runtime.install({ shutdownSignals: [] });
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  enableGracefulShutdown(app);
   const config = app.get(ConfigService);
 
   app.connectMicroservice<MicroserviceOptions>({
@@ -19,10 +24,6 @@ async function bootstrap() {
     }),
   });
   await app.startAllMicroservices();
-
-  // Telemetry is up (TelemetryModule loaded with AppModule); register the
-  // circuit-breaker state gauge so the novu-trigger breaker is observable.
-  registerCircuitBreakerGauge();
 
   const port = config.get<number>('NOTIFICATION_SERVICE_PORT', 3002);
   await app.listen(port);

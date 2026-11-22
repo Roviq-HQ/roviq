@@ -580,7 +580,15 @@ describe('LeaveService (unit)', () => {
   describe('approve', () => {
     it('should store the approver membership, emit LEAVE.approved and NOTIFICATION.leave.decided', async () => {
       repo.findById.mockResolvedValue(buildLeave({ status: LeaveStatus.PENDING }));
-      const approved = buildLeave({ status: LeaveStatus.APPROVED, decidedBy: APPROVER_ID });
+      const approved = buildLeave({
+        status: LeaveStatus.APPROVED,
+        decidedBy: APPROVER_ID,
+        applicant: {
+          firstName: { en: 'Ishaan', hi: 'ईशान' },
+          lastName: { en: 'Kapoor' },
+          admissionNumber: 'ADM-0042',
+        },
+      });
       repo.setStatus.mockResolvedValue(approved);
 
       const result = await service.approve(LEAVE_ID, ability, APPROVER_ID);
@@ -599,6 +607,9 @@ describe('LeaveService (unit)', () => {
         tenantId: TENANT_ID,
         userId: USER_ID,
         status: 'APPROVED',
+        applicantName: 'Ishaan Kapoor',
+        startDate: '2026-05-01',
+        endDate: '2026-05-02',
       });
     });
 
@@ -635,6 +646,9 @@ describe('LeaveService (unit)', () => {
         tenantId: TENANT_ID,
         userId: USER_ID,
         status: 'REJECTED',
+        applicantName: null,
+        startDate: '2026-05-01',
+        endDate: '2026-05-02',
       });
     });
   });

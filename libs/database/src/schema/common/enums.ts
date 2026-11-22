@@ -19,6 +19,7 @@ import {
   COMPETENCY_LEVEL_VALUES,
   COMPLIANCE_REPORT_TYPE_VALUES,
   DAY_SESSION_VALUES,
+  DEVICE_PLATFORM_VALUES,
   DOMAIN_GROUP_TYPE_VALUES,
   DYNAMIC_GROUP_STATUS_VALUES,
   EDUCATION_LEVEL_VALUES,
@@ -49,6 +50,8 @@ import {
   MEMBERSHIP_STATUS_VALUES,
   MINORITY_TYPE_VALUES,
   NEP_STAGE_VALUES,
+  NOTIFICATION_CHANNEL_VALUES,
+  NOTIFICATION_DELIVERY_STATUS_VALUES,
   PERIOD_KIND_VALUES,
   PROMOTION_STATUS_VALUES,
   QUALIFICATION_TYPE_VALUES,
@@ -229,3 +232,11 @@ export const qualificationType = pgEnum('QualificationType', QUALIFICATION_TYPE_
 
 // ── Bot type enums ───────────────────────────────────
 export const botType = pgEnum('BotType', BOT_TYPE_VALUES);
+
+// ── Notification domain enums ────────────────────────
+export const notificationChannel = pgEnum('NotificationChannel', NOTIFICATION_CHANNEL_VALUES);
+export const notificationDeliveryStatus = pgEnum(
+  'NotificationDeliveryStatus',
+  NOTIFICATION_DELIVERY_STATUS_VALUES,
+);
+export const devicePlatform = pgEnum('DevicePlatform', DEVICE_PLATFORM_VALUES);

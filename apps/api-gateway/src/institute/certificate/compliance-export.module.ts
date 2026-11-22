@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TemporalClientModule } from '../../common/temporal/temporal-client.module';
+import { TemporalClientModule } from '@roviq/temporal';
 import { FilesModule } from '../../files/files.module';
 import { ComplianceExportService } from './compliance-export.service';
 import { ExportReportFileResolver } from './export-report-file.resolver';

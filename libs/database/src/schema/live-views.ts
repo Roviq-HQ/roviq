@@ -20,7 +20,9 @@ import { groupChildren } from './groups/group-children';
 import { groupMembers } from './groups/group-members';
 import { groupRules } from './groups/group-rules';
 import { groups } from './groups/groups';
+import { deviceTokens } from './notification/device-tokens';
 import { instituteNotificationConfigs } from './notification/notification-configs';
+import { notifications } from './notification/notifications';
 import { resellerMemberships } from './reseller/reseller-memberships';
 import { resellers } from './reseller/resellers';
 import { files } from './storage/files';
@@ -102,6 +104,12 @@ export const instituteNotificationConfigsLive = liveView('institute_notification
       .select()
       .from(instituteNotificationConfigs)
       .where(isNull(instituteNotificationConfigs.deletedAt)),
+);
+export const notificationsLive = liveView('notifications_live').as((qb) =>
+  qb.select().from(notifications).where(isNull(notifications.deletedAt)),
+);
+export const deviceTokensLive = liveView('device_tokens_live').as((qb) =>
+  qb.select().from(deviceTokens).where(isNull(deviceTokens.deletedAt)),
 );
 
 // Tenant business tables.

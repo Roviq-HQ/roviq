@@ -7,8 +7,7 @@ export class UpdateNotificationConfigInput {
   @IsNotEmpty()
   @IsDefined()
   @Field({
-    description:
-      'Notification type key, e.g. "FEE_REMINDER", "ATTENDANCE_ALERT". Must match a registered Novu event slug.',
+    description: 'Notification type key, e.g. "FEE_REMINDER", "ATTENDANCE_ALERT".',
   })
   notificationType!: string;
 

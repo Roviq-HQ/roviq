@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
+import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
 import { IdentityService } from '../../../auth/identity.service';
-import { EmbeddedTemporalWorker } from '../../../common/temporal/embedded-temporal-worker';
 import { createStudentAdmissionActivities } from './student-admission.activities';
 import { STUDENT_ADMISSION_TASK_QUEUE } from './student-admission.types';
 import { studentAdmissionWorkflowsPath } from './student-admission.workflows-path';
@@ -25,6 +25,7 @@ export class StudentAdmissionWorkerService extends EmbeddedTemporalWorker {
       label: 'Student admission worker',
       taskQueue: STUDENT_ADMISSION_TASK_QUEUE,
       loggerName: StudentAdmissionWorkerService.name,
+      restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });
   }
 

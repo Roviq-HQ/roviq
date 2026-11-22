@@ -79,14 +79,14 @@ describe('TemporalHealthIndicator', () => {
     expect(Connection.lazy).not.toHaveBeenCalled();
   });
 
-  it('should close the connection on module destroy', async () => {
+  it('should close the connection on application shutdown', async () => {
     const { connection } = lazyConnectionReturning(1);
     const indicator = new TemporalHealthIndicator(
       healthIndicatorService,
       configWith({ TEMPORAL_ADDRESS: 'temporal.test:7233' }),
     );
 
-    await indicator.onModuleDestroy();
+    await indicator.onApplicationShutdown();
 
     expect(connection.close).toHaveBeenCalledTimes(1);
   });

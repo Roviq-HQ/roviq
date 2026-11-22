@@ -88,6 +88,11 @@ interface RequestMeta {
 
 type LoginAuthMethod = 'password' | 'passkey';
 
+type LoginPortal =
+  | { scope: 'platform' }
+  | { scope: 'reseller'; resellerId: string }
+  | { scope: 'institute'; tenantId: string };
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -157,7 +162,7 @@ export class AuthService {
         deviceInfo: meta?.deviceInfo,
       })
       .catch(() => {});
-    this.emitLoginNotification(user.id, null, meta);
+    this.emitLoginNotification(user.id, { scope: 'platform' }, meta);
 
     return result;
   }
@@ -210,7 +215,7 @@ export class AuthService {
       );
       result.user.primaryNavSlugs = await this.getPrimaryNavSlugs(m.roleId);
     }
-    this.emitLoginNotification(user.id, null, meta);
+    this.emitLoginNotification(user.id, { scope: 'reseller', resellerId: m.resellerId }, meta);
 
     return result;
   }
@@ -266,7 +271,7 @@ export class AuthService {
         );
         result.user.primaryNavSlugs = await this.getPrimaryNavSlugs(m.roleId);
       }
-      this.emitLoginNotification(user.id, m.tenantId, meta);
+      this.emitLoginNotification(user.id, { scope: 'institute', tenantId: m.tenantId }, meta);
 
       return result;
     }
@@ -336,7 +341,7 @@ export class AuthService {
           deviceInfo: meta?.deviceInfo,
         })
         .catch(() => {});
-      this.emitLoginNotification(user.id, m.tenantId, meta);
+      this.emitLoginNotification(user.id, { scope: 'institute', tenantId: m.tenantId }, meta);
 
       return result;
     }
@@ -439,7 +444,11 @@ export class AuthService {
       })
       .catch(() => {});
 
-    this.emitLoginNotification(user.id, membership.tenantId, meta);
+    this.emitLoginNotification(
+      user.id,
+      { scope: 'institute', tenantId: membership.tenantId },
+      meta,
+    );
 
     return result;
   }
@@ -1025,15 +1034,17 @@ export class AuthService {
 
   // ── Login notification (NATS) ────────────────────────
 
-  emitLoginNotification(userId: string, tenantId: string | null, meta?: RequestMeta): void {
+  emitLoginNotification(userId: string, portal: LoginPortal, meta?: RequestMeta): void {
     const event: AuthSecurityEvent = {
-      tenantId,
+      tenantId: portal.scope === 'institute' ? portal.tenantId : null,
       userId,
       eventType: 'LOGIN',
       metadata: {
         ip: meta?.ip,
         userAgent: meta?.userAgent,
       },
+      scope: portal.scope,
+      resellerId: portal.scope === 'reseller' ? portal.resellerId : null,
     };
     this.eventBus.emit(NOTIFICATION_SUBJECTS.AUTH_SECURITY, event);
   }

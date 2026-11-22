@@ -3,7 +3,13 @@ import { Ctx, EventPattern, Payload } from '@nestjs/microservices';
 import { JetStreamContext } from '@roviq/nats-jetstream';
 import { BillingReadRepository } from '../repositories/billing-read.repository';
 import type { SubscriptionDetails } from '../repositories/types';
-import { NotificationTriggerService } from '../services/notification-trigger.service';
+import { NotificationDispatcher } from '../services/notification-dispatcher.service';
+import {
+  instituteAudience,
+  PLATFORM_AUDIENCE,
+  sourceOf,
+} from '../services/recipient-resolver.service';
+import type { BillingMessageKind } from '../types/billing-event.type';
 
 interface SubscriptionEventPayload {
   subscriptionId: string;
@@ -18,13 +24,46 @@ interface WebhookEventPayload {
   provider: string;
 }
 
+function subscriptionKind(suffix: string, details: SubscriptionDetails): BillingMessageKind | null {
+  switch (suffix) {
+    case 'created':
+      return details.planAmount === 0 ? 'subscription-activated' : 'subscription-pending';
+    case 'canceled':
+      return 'subscription-canceled';
+    case 'paused':
+      return 'subscription-paused';
+    case 'resumed':
+      return 'subscription-resumed';
+    default:
+      return null;
+  }
+}
+
+function webhookKind(eventType: string): BillingMessageKind | null {
+  switch (eventType) {
+    case 'subscription.activated':
+      return 'subscription-activated';
+    case 'subscription.charged':
+    case 'payment.captured':
+      return 'payment-received';
+    case 'subscription.halted':
+      return 'payment-failed';
+    case 'subscription.cancelled':
+      return 'subscription-canceled';
+    case 'subscription.completed':
+      return 'subscription-ended';
+    default:
+      return null;
+  }
+}
+
 @Controller()
 export class BillingNotificationController {
   private readonly logger = new Logger(BillingNotificationController.name);
 
   constructor(
     private readonly billingRepo: BillingReadRepository,
-    private readonly triggerService: NotificationTriggerService,
+    private readonly dispatcher: NotificationDispatcher,
   ) {}
 
   @EventPattern('BILLING.subscription.*', {
@@ -43,12 +82,11 @@ export class BillingNotificationController {
     const details = await this.billingRepo.findSubscriptionDetails(data.subscriptionId);
     if (!details) return;
 
-    const suffix = subject.split('.').pop() ?? '';
-    const { notificationSubject, body } = this.composeSubscriptionMessage(suffix, details);
-    if (!notificationSubject) return;
+    const kind = subscriptionKind(subject.split('.').pop() ?? '', details);
+    if (!kind) return;
 
     const ownerUserId = await this.findInstituteOwnerUserId(details.instituteId);
-    await this.triggerForRecipients({ notificationSubject, body, suffix }, ownerUserId, null);
+    await this.notify(kind, details, ownerUserId, null, ctx);
   }
 
   @EventPattern('BILLING.webhook.*', {
@@ -67,125 +105,52 @@ export class BillingNotificationController {
     const details = await this.billingRepo.findSubscriptionDetails(data.subscriptionId);
     if (!details) return;
 
-    const eventType = data.eventType.toLowerCase();
-    const { notificationSubject, body } = this.composeWebhookMessage(eventType, details);
-    if (!notificationSubject) return;
+    const kind = webhookKind(data.eventType.toLowerCase());
+    if (!kind) return;
 
     const [ownerUserId, platformAdminUser] = await Promise.all([
       this.findInstituteOwnerUserId(details.instituteId),
       this.billingRepo.findPlatformAdminUser(),
     ]);
-
-    await this.triggerForRecipients(
-      { notificationSubject, body, suffix: eventType },
-      ownerUserId,
-      platformAdminUser?.id ?? null,
-    );
+    await this.notify(kind, details, ownerUserId, platformAdminUser?.id ?? null, ctx);
   }
 
-  private composeSubscriptionMessage(
-    suffix: string,
+  private async notify(
+    kind: BillingMessageKind,
     details: SubscriptionDetails,
-  ): { notificationSubject: string; body: string } {
-    const { planName, planAmount } = details;
-
-    switch (suffix) {
-      case 'created':
-        return planAmount === 0
-          ? {
-              notificationSubject: 'Subscription activated',
-              body: `Your subscription to ${planName} is now active.`,
-            }
-          : {
-              notificationSubject: 'Subscription pending payment',
-              body: `A subscription to ${planName} has been created — complete payment to activate.`,
-            };
-      case 'canceled':
-        return {
-          notificationSubject: 'Subscription canceled',
-          body: `Your ${planName} subscription has been canceled.`,
-        };
-      case 'paused':
-        return {
-          notificationSubject: 'Subscription paused',
-          body: `Your ${planName} subscription has been paused.`,
-        };
-      case 'resumed':
-        return {
-          notificationSubject: 'Subscription resumed',
-          body: `Your ${planName} subscription has been resumed.`,
-        };
-      default:
-        return { notificationSubject: '', body: '' };
-    }
-  }
-
-  private composeWebhookMessage(
-    eventType: string,
-    details: SubscriptionDetails,
-  ): { notificationSubject: string; body: string } {
-    const { planName, planAmount, planCurrency } = details;
-
-    switch (eventType) {
-      case 'subscription.activated':
-        return {
-          notificationSubject: 'Subscription activated',
-          body: `Your subscription to ${planName} is now active.`,
-        };
-      case 'subscription.charged':
-      case 'payment.captured':
-        return {
-          notificationSubject: 'Payment received',
-          body: `Payment of ${planAmount} ${planCurrency} received for ${planName}.`,
-        };
-      case 'subscription.halted':
-        return {
-          notificationSubject: 'Payment failed',
-          body: `Payment failed for ${planName} — please update your payment method.`,
-        };
-      case 'subscription.cancelled':
-        return {
-          notificationSubject: 'Subscription canceled',
-          body: `Your ${planName} subscription has been canceled.`,
-        };
-      case 'subscription.completed':
-        return {
-          notificationSubject: 'Subscription ended',
-          body: `Your ${planName} subscription period has ended.`,
-        };
-      default:
-        return { notificationSubject: '', body: '' };
-    }
-  }
-
-  private async triggerForRecipients(
-    message: { notificationSubject: string; body: string; suffix: string },
     ownerUserId: string | null,
     platformAdminUserId: string | null,
+    ctx: JetStreamContext,
   ): Promise<void> {
-    const eventType = message.suffix.replace(/\./g, '-');
+    const message = {
+      type: 'BILLING_EVENT',
+      params: {
+        kind,
+        subscriptionId: details.subscriptionId,
+        instituteId: details.instituteId,
+        planName: details.planName,
+        planAmount: details.planAmount,
+        planCurrency: details.planCurrency,
+      },
+    } as const;
+    const source = sourceOf(ctx);
 
     if (ownerUserId) {
-      await this.triggerService.trigger({
-        workflowId: 'billing-event',
-        to: { subscriberId: ownerUserId },
-        payload: {
-          subject: message.notificationSubject,
-          body: message.body,
-          eventType,
-        },
+      await this.dispatcher.dispatch({
+        message,
+        audience: instituteAudience(details.instituteId),
+        recipient: { userId: ownerUserId, membershipId: null },
+        source,
+        inApp: true,
       });
     }
-
     if (platformAdminUserId) {
-      await this.triggerService.trigger({
-        workflowId: 'billing-event',
-        to: { subscriberId: platformAdminUserId },
-        payload: {
-          subject: message.notificationSubject,
-          body: message.body,
-          eventType,
-        },
+      await this.dispatcher.dispatch({
+        message,
+        audience: PLATFORM_AUDIENCE,
+        recipient: { userId: platformAdminUserId, membershipId: null },
+        source,
+        inApp: true,
       });
     }
   }

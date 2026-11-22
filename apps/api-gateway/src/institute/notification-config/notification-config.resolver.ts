@@ -33,12 +33,4 @@ export class NotificationConfigResolver {
     assertTenantContext(user);
     return this.notificationConfigService.update(user.tenantId, input);
   }
-
-  @Mutation(() => Boolean)
-  async registerDeviceToken(
-    @Args('token') token: string,
-    @CurrentUser() user: AuthUser,
-  ): Promise<boolean> {
-    return this.notificationConfigService.registerDeviceToken(user.userId, token);
-  }
 }

@@ -21,7 +21,10 @@ export * from './groups';
 // Live views (one per soft-deletable table — read-side default)
 export * from './live-views';
 // Notification
+export * from './notification/device-tokens';
 export * from './notification/notification-configs';
+export * from './notification/notification-deliveries';
+export * from './notification/notifications';
 // Reseller
 export * from './reseller/reseller-memberships';
 export * from './reseller/resellers';

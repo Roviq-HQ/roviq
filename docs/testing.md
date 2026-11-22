@@ -47,7 +47,7 @@ Current header behavior differs from the original ROV-18 wrappers: missing tenan
 
 ## CI and pre-push
 
-The local gate health-checks long-running infrastructure first, then waits for the Novu bootstrap and seed containers to exit successfully. It starts the API and notification service in that order without restarting their completed setup dependencies. Standalone setup containers use their exit status rather than `compose up --wait`, which expects a running or healthy service when no dependent is selected.
+The local gate health-checks long-running infrastructure first, then waits for the seed container to exit successfully. It starts the API and notification service in that order without restarting their completed setup dependencies. Standalone setup containers use their exit status rather than `compose up --wait`, which expects a running or healthy service when no dependent is selected.
 
 - `pnpm test:e2e:api` routes through the cacheable Nx target `api-gateway-e2e:test-e2e`; `pnpm test:e2e:ui` through `web-e2e-suite:e2e` (single invocation, single cache hash) covering web-admin-e2e, web-institute-e2e, web-reseller-e2e plus cross-portal.
 - The UI target's cache inputs (`e2eFrontend`) include `e2eStack`: gateway, notification-service, `libs`, `ee`, migrations, seed scripts and the e2e Docker files. A backend-only change therefore re-runs the Playwright suite on pre-push instead of replaying a cached pass.
@@ -118,13 +118,12 @@ Compose files live under `docker/` and are selected explicitly per use case — 
 | `compose.dev.yaml` | Full dev stack (infra + apps, port 3000) | Running the stack in Docker instead of Tilt |
 | `compose.e2e.yaml` | Migrated+seeded `roviq_test` stack on port 3004 (host 5435 for PG, 9004 for object storage (`E2E_STORAGE_PORT`)) | `pnpm test:e2e:api`, `pnpm test:e2e:ui`, CI `e2e-api`/`e2e-ui` jobs |
 | `compose.app.yaml` | Application-only bundle (no infra) | Compose-in-compose reuse |
-| `compose.novu.yaml` | Novu notification stack | Notification smoke tests |
 
 Convenience scripts:
 
 ```bash
 pnpm infra:up       # docker compose -f docker/compose.infra.yaml up -d
-pnpm e2e:up         # scripts/e2e-compose.sh up -d --build --wait (re-seeds; recreates the backend if its source changed), then novu-bridge-sync
+pnpm e2e:up         # scripts/e2e-compose.sh up -d --build --wait (re-seeds; recreates the backend if its source changed)
 pnpm e2e:clean      # re-run migrate+seed on existing e2e stack
 pnpm e2e:down       # stop e2e stack, keep volumes and .e2e/
 pnpm e2e:nuke       # stop e2e stack, wipe volumes and .e2e/
@@ -160,7 +159,6 @@ Backend services share one toolchain-only image (`roviq-e2e-backend`, target `e2
 - Containers run as the invoking user, so files they write stay owned by you (or the CI runner).
 - `.e2e/dist` and `.e2e/nx` (git-ignored) are mounted over `dist/` and `.nx/` inside the containers. The host's `dist/` and `.nx/` are never touched, so Tilt's dev gateway and the e2e stack run side by side.
 - Only `migrate-and-seed` declares the image `build`; the other services reference the tag. Several build definitions for one tag give it a new ID on every `up --build`, which recreates the containers.
-- `novu-bridge-sync` is in the `setup` profile and is run by `pnpm e2e:up` after the stack is healthy. As a plain service it made `up --wait` fail intermittently with `exited (0)`.
 - Requires a Linux host on the Node major in `.nvmrc`; run `pnpm install` on the host after dependency changes — there is no image rebuild.
 
 ### E2E stack decisions (ROV-277, 2026-11-16)
@@ -175,7 +173,6 @@ Each row is a decision with its reason. Evidence and timings: `docs/changelogs/t
 | Containers run as the invoking user | Files written into the bind mount stay owned by the developer or the CI runner, so no `chmod`/`chown` steps | Hard-code a UID |
 | api-gateway is the only Nx builder; notification-service runs its output | Two Nx processes writing `dist/libs` at once race | Run `nx serve` in a second container on the same `dist` |
 | Only `migrate-and-seed` declares the image `build` | Several build definitions for one tag gave it a new ID on every `up --build`, recreating the containers | Add `build:` to another service using the shared tag |
-| `novu-bridge-sync` is in the `setup` profile and run by `pnpm e2e:up` | `up --wait` fails intermittently with `exited (0)` on a one-shot service nothing depends on | Start a leaf one-shot service from `up --wait` |
 | Every compose call goes through `scripts/e2e-compose.sh` | It sets the workspace path and UID the compose file requires and creates the mount targets | Call `docker compose -f docker/compose.e2e.yaml` directly |
 | CI caches `.e2e/nx/cache` together with `.e2e/nx/workspace-data` | Nx ignores the cache folder without its index (`machine.db`) | Cache the cache folder alone |
 | CI runs the Nx test targets directly after `pnpm e2e:up` | `pnpm test:e2e:*` start and re-seed the stack a second time | Use `pnpm test:e2e:*` in CI steps |
@@ -218,7 +215,7 @@ The seeders in `libs/database/src/seed/` use deterministic UUIDs (`SEED_IDS` in 
 | HTTP flow (billing lifecycle) | Vitest | `e2e/api-gateway-e2e/src/` | Billing CRUD, subscription lifecycle |
 | RLS isolation | Vitest | `e2e/api-gateway-e2e/src/` | Cross-tenant data leakage prevention |
 | Audit trail | Vitest | `e2e/api-gateway-e2e/src/` | Mutation → NATS → audit log entry |
-| Novu notifications | Vitest | `e2e/api-gateway-e2e/src/` | Novu API smoke, login notification flow |
+| Notification email | Vitest | `e2e/api-gateway-e2e/src/` | Welcome email with the temporary password, read from Mailpit |
 | Paid billing | Vitest | `e2e/api-gateway-e2e/src/` | Paid plan assignment, gateway interaction |
 | Browser UI | Playwright | `e2e/<app>-e2e/src/` | Login flows, institute picker |
 
@@ -294,7 +291,7 @@ Coverage:
 - Logout: success, refresh token invalidation after logout
 - Audit: full pipeline (mutation → NATS → consumer → DB), GraphQL query API, pagination, RLS isolation, immutability, @NoAudit opt-out
 - RLS isolation: cross-tenant notification config isolation, unauthenticated rejection
-- Notifications: the `notifications.api-e2e.spec.ts` suite auto-skips at test collection when Novu is unreachable. `probeNovuReachableSync` (in `e2e/api-gateway-e2e/src/helpers/novu.ts`) runs a synchronous TCP probe against `NOVU_API_URL` with a ~3s timeout at module load; on failure the suite is skipped with a specific reason in the Vitest output rather than letting each test time out at 30s. To force-skip locally during unrelated e2e runs, point `NOVU_API_URL` at any closed port (e.g. `NOVU_API_URL=http://localhost:59999`).
+- Notifications: email goes to the e2e Mailpit; `waitForEmail` in `e2e/api-gateway-e2e/src/helpers/mailpit.ts` reads it (used by `must-change-password.api-e2e.spec.ts`).
 
 ### Password policy
 
@@ -350,7 +347,7 @@ Every Playwright test runs a WCAG 2.0/2.1 A+AA scan via `@axe-core/playwright` o
 
 - **Only `critical` impact fails the test** — missing form labels, non-keyboard-reachable controls, zero-contrast text. These are real barriers.
 - **Serious / moderate / minor violations** (color contrast variance, landmark nesting, etc.) are surfaced as `a11y-non-critical` test annotations in the HTML report so they can be triaged over time without blocking CI.
-- Known third-party noise is excluded: `[data-novu-inbox]`, `[data-sonner-toaster]`, and the Radix UI rules `scrollable-region-focusable`, `aria-hidden-focus`, `document-title`.
+- Known third-party noise is excluded: `[data-sonner-toaster]`, and the Radix UI rules `scrollable-region-focusable`, `aria-hidden-focus`, `document-title`.
 - Opt out per-test when needed: `test.use({ checkAccessibility: false })` — used by visual-regression specs where a11y is already covered elsewhere.
 - The fixture also reports missing i18n keys, unexpected console errors, and GraphQL responses that contain an `errors` array.
 

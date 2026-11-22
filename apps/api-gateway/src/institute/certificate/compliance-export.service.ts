@@ -10,7 +10,7 @@ import {
 } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { TemporalClientService } from '../../common/temporal/temporal-client.service';
+import { TemporalClientService } from '@roviq/temporal';
 import { FileService } from '../../files/file.service';
 import { complianceExportFileName } from './export-file-name';
 import { ExportReportRepository } from './repositories/export-report.repository';

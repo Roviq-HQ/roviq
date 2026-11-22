@@ -7,7 +7,7 @@ describe('toDlqRow', () => {
       {
         originalSubject: 'NOTIFICATION.user.created',
         payload: { userId: 'u1' },
-        error: 'Novu 503',
+        error: 'Handler 503',
         retryCount: 5,
         correlationId: 'corr-1',
         tenantId: 't1',
@@ -20,7 +20,7 @@ describe('toDlqRow', () => {
       originalSubject: 'NOTIFICATION.user.created',
       originStream: 'NOTIFICATION',
       payload: { userId: 'u1' },
-      error: 'Novu 503',
+      error: 'Handler 503',
       retryCount: 5,
       correlationId: 'corr-1',
       tenantId: 't1',

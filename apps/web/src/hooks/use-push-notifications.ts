@@ -1,40 +1,62 @@
 'use client';
 
+import { useAuth } from '@roviq/auth';
 import { gql, useMutation } from '@roviq/graphql';
 import { getFcmToken } from '@roviq/ui/lib/firebase';
-import { useEffect, useRef } from 'react';
-import type {
-  RegisterDeviceTokenMutation,
-  RegisterDeviceTokenMutationVariables,
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  RegisterDeviceTokenDocument,
+  UnregisterDeviceTokenDocument,
 } from './use-push-notifications.generated';
 
-const REGISTER_DEVICE_TOKEN = gql`
-  mutation RegisterDeviceToken($token: String!) {
-    registerDeviceToken(token: $token)
+export const REGISTER_DEVICE_TOKEN = gql`
+  mutation RegisterDeviceToken($token: String!, $platform: DevicePlatform!) {
+    registerDeviceToken(token: $token, platform: $platform)
   }
 `;
 
+export const UNREGISTER_DEVICE_TOKEN = gql`
+  mutation UnregisterDeviceToken($token: String!) {
+    unregisterDeviceToken(token: $token)
+  }
+`;
+
+/**
+ * Registers this browser's push token for the signed-in user. Call `unregisterPushToken`
+ * just before logging out so the next person on this browser does not get their pushes.
+ */
 export function usePushNotifications() {
-  const [registerToken] = useMutation<
-    RegisterDeviceTokenMutation,
-    RegisterDeviceTokenMutationVariables
-  >(REGISTER_DEVICE_TOKEN);
-  const registered = useRef(false);
+  const { isImpersonated } = useAuth();
+  const [registerToken] = useMutation(RegisterDeviceTokenDocument);
+  const [unregisterToken] = useMutation(UnregisterDeviceTokenDocument);
+  const registered = useRef<string | null>(null);
+  const requested = useRef(false);
 
   useEffect(() => {
-    if (registered.current) return;
+    // An impersonated session may not register devices; the server refuses it.
+    if (requested.current || isImpersonated) return;
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
     if (!vapidKey) return;
+    requested.current = true;
 
     getFcmToken(vapidKey)
-      .then((token) => {
-        if (token) {
-          registered.current = true;
-          registerToken({ variables: { token } });
-        }
+      .then(async (token) => {
+        if (!token) return;
+        await registerToken({ variables: { token, platform: 'WEB' } });
+        registered.current = token;
       })
       .catch(() => {
-        // User denied permission or browser doesn't support push notifications — skip silently
+        // Permission denied, push unsupported, or registration refused: the app works without push.
       });
-  }, [registerToken]);
+  }, [registerToken, isImpersonated]);
+
+  const unregisterPushToken = useCallback(() => {
+    const token = registered.current;
+    if (!token) return;
+    registered.current = null;
+    // Best effort: logout neither waits for nor fails on it.
+    unregisterToken({ variables: { token } }).catch(() => undefined);
+  }, [unregisterToken]);
+
+  return { unregisterPushToken };
 }

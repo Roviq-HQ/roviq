@@ -8,8 +8,7 @@ export interface StreamConfig {
    *    commands/jobs where a single worker handles each event.
    *  - `interest` — each message delivered to every consumer whose filter
    *    matches; retained until all interested consumers ack. Right for
-   *    fanout (`NOTIFICATION.user.created` needs both the welcome-email
-   *    listener AND the Novu-subscriber-sync listener).
+   *    fanout (several listeners on one subject).
    *  - `limits` — retained by count/size/age regardless of consumer state.
    */
   retention: 'workqueue' | 'limits' | 'interest';

@@ -1,70 +1,49 @@
-/**
- * NestJS-based Temporal worker for student bulk import.
- *
- * Registers the BulkStudentImportWorkflow and its activities
- * on the 'student-bulk-import' task queue.
- *
- * Follows the same pattern as BillingWorkerService (ee/billing/workflows/billing.worker.ts).
- * Uses ConfigService for all env access.
- */
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { DrizzleDB } from '@roviq/database';
 import { StorageClient } from '@roviq/storage';
-import { NativeConnection, Worker } from '@temporalio/worker';
+import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
 import { IdentityService } from '../../../auth/identity.service';
 import { WorkflowFileStore } from '../../../files/workflow-file-store';
-import { createDrizzleForWorker } from './worker-db';
+import { createBulkStudentImportActivities } from './bulk-student-import.activities';
+import { bulkStudentImportWorkflowsPath } from './bulk-student-import.workflows-path';
 
 const TASK_QUEUE = 'student-bulk-import';
 
+/**
+ * Runs BulkStudentImportWorkflow (ROV-155, ROV-301) in this gateway when
+ * STUDENT_IMPORT_WORKER_ENABLED is 'true'.
+ */
 @Injectable()
-export class BulkStudentImportWorkerService implements OnModuleInit {
-  private readonly logger = new Logger(BulkStudentImportWorkerService.name);
-
+export class BulkStudentImportWorkerService extends EmbeddedTemporalWorker {
   constructor(
-    private readonly config: ConfigService,
+    config: ConfigService,
     private readonly identityService: IdentityService,
     private readonly storage: StorageClient,
-  ) {}
-
-  async onModuleInit() {
-    // Only start worker if explicitly enabled (avoids running in every API instance)
-    if (this.config.get<string>('STUDENT_IMPORT_WORKER_ENABLED') !== 'true') return;
-
-    this.startWorker().catch((err) => {
-      this.logger.error('Student import worker failed to start', (err as Error).message);
+  ) {
+    super(config, {
+      flag: 'STUDENT_IMPORT_WORKER_ENABLED',
+      label: 'Student import worker',
+      taskQueue: TASK_QUEUE,
+      loggerName: BulkStudentImportWorkerService.name,
+      restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });
   }
 
-  private async startWorker(): Promise<void> {
-    const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
-    const dbUrl = this.config.get<string>(
-      'DATABASE_URL_MIGRATE',
-      'postgresql://roviq:roviq_dev@localhost:5434/roviq',
-    );
-    const connection = await NativeConnection.connect({ address });
-    const db = await createDrizzleForWorker(dbUrl);
+  protected createActivities(db: DrizzleDB) {
+    // No NATS client: student.admitted events are not wired yet; IdentityService emits
+    // NOTIFICATION.user.created itself.
+    return {
+      ...createBulkStudentImportActivities(
+        db,
+        null,
+        this.identityService,
+        new WorkflowFileStore(db, this.storage),
+      ),
+    };
+  }
 
-    const { createBulkStudentImportActivities } = await import(
-      './bulk-student-import.activities.js'
-    );
-    // NATS client passed as null — student.admitted events still pending wiring;
-    // IdentityService owns user creation and emits NOTIFICATION.user.created internally.
-    const activities = createBulkStudentImportActivities(
-      db,
-      null,
-      this.identityService,
-      new WorkflowFileStore(db, this.storage),
-    );
-
-    const worker = await Worker.create({
-      connection,
-      taskQueue: TASK_QUEUE,
-      workflowsPath: require.resolve('./bulk-student-import.workflow'),
-      activities,
-    });
-
-    this.logger.log(`Student import worker started on queue: ${TASK_QUEUE}`);
-    await worker.run();
+  protected workflowsPath(): string {
+    return bulkStudentImportWorkflowsPath();
   }
 }

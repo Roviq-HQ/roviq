@@ -115,6 +115,22 @@ export const testIds = {
     drawerClose: 'drawer-close',
   },
 
+  // ── Topbar notification bell + panel (apps/web/src/components/notifications) ──
+  notificationBell: {
+    trigger: 'notification-bell',
+    badge: 'notification-bell-badge',
+    panel: 'notification-panel',
+    list: 'notification-list',
+    item: (id: string) => `notification-item-${id}`,
+    markAllBtn: 'notification-mark-all-btn',
+    loadMoreBtn: 'notification-load-more-btn',
+    loading: 'notification-loading',
+    empty: 'notification-empty',
+    error: 'notification-error',
+    retryBtn: 'notification-retry-btn',
+    readOnlyNote: 'notification-read-only-note',
+  },
+
   // ── Admin: institutes list + filters + columns ─────────────────────────
   adminInstitutes: {
     page: 'institutes-page',

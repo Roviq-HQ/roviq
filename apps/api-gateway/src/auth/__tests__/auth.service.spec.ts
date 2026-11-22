@@ -646,6 +646,8 @@ describe('AuthService', () => {
         userId: 'user-1',
         eventType: 'LOGIN',
         metadata: { ip: '10.0.0.1', userAgent: 'vitest' },
+        scope: 'institute',
+        resellerId: null,
       });
     });
 

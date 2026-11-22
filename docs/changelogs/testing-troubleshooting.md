@@ -923,3 +923,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the screen redirects 4 s after success and the test waited for that in real time. Typing three fields plus 4 s leaves under 1 s of the 5 s test budget, so a loaded machine goes over. The `waitFor` timeout of 6 s was longer than the test's own.
 - **Fix:** the test uses fake timers (`shouldAdvanceTime: true`) and advances 4 s itself. It also asserts that the redirect has not happened before the delay.
 - **Lesson:** never wait out a product delay in real time in a component test. Advance fake timers past it.
+
+## 2026-11-22 — diagnosed and fixed: CI `Test` failed on `notifications:test` with no test output (ROV-314)
+
+- **Symptom:** on the pull request, the `Test` job failed with `Failed tasks: notifications:test`. The task printed nothing but the executor's deprecation line. The pre-push gate had passed on the same commit.
+- **Cause:** ROV-314 removed the Novu code from `libs/backend/notifications`, and with it the library's last spec files. Vitest exits 1 when a project has no test files. CI runs each project's own target (`nx affected -t test`); the pre-push gate runs the root Vitest projects (`pnpm test:unit`), where an empty library is not an error.
+- **Fix:** `passWithNoTests: true` in the library's `vitest.config.ts`. A spec added there later still runs.
+- **Lesson:** after deleting the last spec of a library, run `pnpm nx run <project>:test` once. The pre-push gate does not run per-project test targets, so it cannot catch this.

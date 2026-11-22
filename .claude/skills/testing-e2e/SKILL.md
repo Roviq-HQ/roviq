@@ -1,20 +1,20 @@
 ---
 name: testing-e2e
-description: Use when writing, modifying, or reviewing E2E API tests (*.api-e2e.spec.ts) — covers Vitest E2E against a running api-gateway + Temporal + Novu stack, GraphQL gql() helper, the 7 auth helpers, seed contract, subscription patterns with graphql-ws ticket exchange, payment webhook simulation, Novu notification assertions, and the forbidden patterns uncovered by the Hurl migration.
+description: Use when writing, modifying, or reviewing E2E API tests (*.api-e2e.spec.ts) — covers Vitest E2E against a running api-gateway + Temporal + Mailpit stack, GraphQL gql() helper, the 7 auth helpers, seed contract, subscription patterns with graphql-ws ticket exchange, payment webhook simulation, Mailpit email assertions, and the forbidden patterns uncovered by the Hurl migration.
 ---
 
 # E2E API Test Rules
 
 ## What this skill covers
 
-Vitest `*.api-e2e.spec.ts` tests that run against a **fully running external stack** — api-gateway, postgres, redis, nats, temporal, notification-service, novu-api, object storage (RustFS). Nothing is in-process, nothing is mocked. The test is a pure external HTTP / graphql-ws client.
+Vitest `*.api-e2e.spec.ts` tests that run against a **fully running external stack** — api-gateway, postgres, redis, nats, temporal, notification-service, mailpit, object storage (RustFS). Nothing is in-process, nothing is mocked. The test is a pure external HTTP / graphql-ws client.
 
 Hurl (`*.hurl`) is **dead**. Do not add new `.hurl` files. Any leftover files in `e2e/api-gateway-e2e/hurl/` are pending deletion as their domains finish migration — they are not an extension point.
 
 ## File location & naming
 
 - Specs: `e2e/api-gateway-e2e/src/{domain}.api-e2e.spec.ts` — one file per domain or cross-cutting concern.
-- Helpers: `e2e/api-gateway-e2e/src/helpers/` (`auth.ts`, `gql-client.ts`, `ws-client.ts`, `webhook.ts`, `novu.ts`).
+- Helpers: `e2e/api-gateway-e2e/src/helpers/` (`auth.ts`, `gql-client.ts`, `ws-client.ts`, `webhook.ts`, `mailpit.ts`).
 - Shared fixtures: `e2e/shared/` — cross-cutting assets reused by Vitest E2E and Playwright.
 
 ## Prerequisites
@@ -26,10 +26,10 @@ pnpm test:e2e:api      # runs the Vitest E2E project against the up stack
 
 `pnpm e2e:up` is the only sanctioned way to bring up the Docker stack — it runs `docker compose -p <this instance's e2e project> -f docker/compose.e2e.yaml up -d --wait` after a staged startup of the infra layer, which is what the `--wait` health-gate expects. Do not invoke `docker compose … up` directly.
 
-The compose project seeds `roviq_test` (port 5435) and provisions Temporal, Novu, and notification-service. If Novu credentials can't be resolved (`helpers/novu.ts` reads from env, then from the `roviq-e2e_novu_creds` docker volume), notification-dependent suites flip to `describe.skip` with a reason — they do not fail the run.
+The compose project seeds `roviq_test` (port 5435) and provisions Temporal, Mailpit and notification-service (which sends email to Mailpit and logs push, SMS and WhatsApp).
 
 > Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
-> The Compose project is `roviq-e2e` in instance 0 and `roviq-e2e-<slot>` otherwise, so container and volume names change with it. Never hardcode a port, project or container name in a spec or helper: derive it from `E2E_API_PORT`, `E2E_POSTGRES_PORT`, `E2E_NATS_PORT`, `E2E_NOVU_API_PORT`, `E2E_WEB_PORT` or `ROVIQ_E2E_COMPOSE_PROJECT` with the instance 0 value as the default.
+> The Compose project is `roviq-e2e` in instance 0 and `roviq-e2e-<slot>` otherwise, so container and volume names change with it. Never hardcode a port, project or container name in a spec or helper: derive it from `E2E_API_PORT`, `E2E_POSTGRES_PORT`, `E2E_NATS_PORT`, `E2E_WEB_PORT` or `ROVIQ_E2E_COMPOSE_PROJECT` with the instance 0 value as the default.
 
 ## Making GraphQL requests
 
@@ -177,11 +177,9 @@ await simulatePaymentWebhook({
 
 HMAC secret defaults to `process.env.RAZORPAY_WEBHOOK_SECRET` / `CASHFREE_WEBHOOK_SECRET` and must match the api-gateway's running config. The helper returns `{ status, body }` — assert `status === 200|201` before asserting on GraphQL-visible side effects.
 
-## Novu notifications
+## Email (Mailpit)
 
-`./helpers/novu` exposes `getNovuCreds`, `novuHealth`, `ensureNovuSubscriber`, `deleteNovuSubscriber`, `listNovuNotifications`, and `waitForNotification(subscriberId, timeoutMs)`. Credentials are resolved in order: env (`NOVU_API_URL`, `NOVU_SECRET_KEY`, `NOVU_APPLICATION_IDENTIFIER`) → the `roviq-e2e_novu_creds` docker volume populated by `novu-bootstrap`. The in-network `novu-api:3000` hostname is rewritten to the host-published `http://localhost:3443` automatically.
-
-`notifications.api-e2e.spec.ts` is the canonical pattern: it calls `getNovuCreds()` at module load, catches any thrown error into a `skipReason`, and switches the top-level `describe` to `describe.skip` with that reason — specs do not fail if the stack is partially up.
+The notification service sends every email to the e2e Mailpit. `./helpers/mailpit` exposes `waitForEmail(address, subjectPart, timeoutMs)`, which polls the Mailpit API on `E2E_MAILPIT_API_PORT` (slot 0: 8026) and returns `{ subject, text }`. `must-change-password.api-e2e.spec.ts` reads the first admin's temporary password this way. Push, SMS and WhatsApp use the `log` provider in e2e, so nothing can be read back from them; assert on `notification_deliveries` instead. In-app notifications are asserted through the inbox API (`notifications` and `notificationUnreadCount` queries), as `notifications.api-e2e.spec.ts` does.
 
 ## Enums — always UPPER_SNAKE from `@roviq/common-types`
 
@@ -229,4 +227,4 @@ Cross-scope rejection and cross-tenant isolation that are already covered by the
 - **No string interpolation for credentials in GraphQL queries.** Always use the `variables` object (query-injection risk and makes the query cacheable).
 - **No `describe.skip` without a reason + issue link.** The skip title must name the blocker (e.g. `ROV-232 — TCIssuanceWorkflow worker not registered`).
 - **No `subscriptions-transport-ws`.** Use `graphql-ws` v6 via `subscribeOnce`.
-- **No testing internal implementation details.** Assert on the externally observable outcome (GraphQL response, subscription event, Novu inbox entry), never on which NATS subject was published or which SQL ran.
+- **No testing internal implementation details.** Assert on the externally observable outcome (GraphQL response, subscription event, email in Mailpit), never on which NATS subject was published or which SQL ran.

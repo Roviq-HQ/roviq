@@ -48,12 +48,15 @@ describe('ComplianceExportWorkerService', () => {
   let error: MockInstance<Logger['error']>;
 
   beforeEach(() => {
+    // ConfigService falls back to process.env; a developer's .env must not switch the worker on.
+    vi.stubEnv('COMPLIANCE_EXPORT_WORKER_ENABLED', undefined);
     error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   function startable() {

@@ -1,12 +1,3 @@
-export { MockNotificationAdapter } from './adapters/mock.adapter';
-export { NovuAdapter } from './adapters/novu.adapter';
-export { createNovuClient } from './novu-client.factory';
-export {
-  NOTIFICATION_PORT,
-  type NotificationPort,
-  type SubscriberData,
-  type TriggerPayload,
-} from './ports/notification.port';
 export type {
   ApprovalRequestedEvent,
   ApprovalResolvedEvent,

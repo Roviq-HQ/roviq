@@ -32,6 +32,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/academic-year.service.ts',
   'apps/api-gateway/src/files/repositories/file.drizzle-repository.ts',
+  // ROV-314: device_tokens is platform-role only; every write is keyed by the token user id.
+  'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts',
+  // ROV-314: notification, delivery and impersonation-session fixtures for the inbox tests only.
+  'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
   // ROV-301: files read as the caller's own role; profile photo writes on the shared user profile.
   'apps/api-gateway/src/files/file.loaders.ts',
   'apps/api-gateway/src/files/profile-photo.service.ts',
@@ -180,6 +184,14 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',
+  // ROV-314 event consumer: guardians and memberships read as the event's institute
+  'apps/notification-service/src/repositories/recipient-read.drizzle-repository.ts',
+  // ROV-314: users, phone_numbers and device_tokens are platform tables; no JWT in a consumer
+  'apps/notification-service/src/repositories/contact-read.drizzle-repository.ts',
+  // ROV-314: notifications and notification_deliveries are written by roviq_admin only
+  'apps/notification-service/src/repositories/notification-write.drizzle-repository.ts',
+  // ROV-314 integration fixtures: institutes, guardian links and stored notification rows
+  'apps/notification-service/src/__tests__/notification-pipeline.integration.spec.ts',
   'ee/apps/api-gateway/src/billing/billing-event.consumer.ts',
   'ee/apps/api-gateway/src/billing/billing.repository.ts',
   'ee/apps/api-gateway/src/billing/repositories/gateway-config.repository.ts',

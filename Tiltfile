@@ -89,7 +89,8 @@ local_resource(
 )
 
 # API Gateway (NestJS) — core backend, all frontends depend on this
-# Dev server watches apps/api-gateway/src and ee/apps/api-gateway/src via tsconfig
+# Runs from TypeScript source (SWC on load, no dist/); `node --watch` restarts it when any file
+# it loaded changes, app or library. Type errors show in the `typecheck` resource.
 local_resource(
   'api-gateway',
   labels=['dev'],
@@ -126,15 +127,14 @@ local_resource(
   links=[local_url('WEB_PORT', '4200')],
 )
 
-# Notification Service (NestJS) — async event processing via NATS
-# Triggering this also brings up the full Novu self-hosted stack via resource_deps.
+# Notification Service (NestJS) — async event processing via NATS; runs from source like api-gateway
 local_resource(
   'notification-service',
   labels=['dev'],
   serve_cmd='pnpm run dev:notifications',
   serve_dir='.',
   deps=[],
-  resource_deps=['db-push', 'nats', 'novu-api', 'novu-worker', 'novu-ws', 'novu-dashboard'],
+  resource_deps=['db-push', 'nats', 'temporal', 'mailpit'],
   auto_init=False,
 )
 
@@ -147,7 +147,6 @@ dc_resource('postgres', labels=['infra'])
 dc_resource('redis', labels=['infra'])
 dc_resource('nats', labels=['infra'],
             links=[local_url('DEV_NATS_MONITOR_PORT', '8222')])
-dc_resource('mongodb', labels=['infra'])
 dc_resource('object-storage', labels=['infra'],
             links=[local_url('DEV_STORAGE_CONSOLE_PORT', '9003')])
 
@@ -156,33 +155,9 @@ dc_resource('temporal', labels=['infra'], resource_deps=['postgres'])
 dc_resource('temporal-ui', labels=['infra'], auto_init=False,
             links=[local_url('DEV_TEMPORAL_UI_PORT', '8233')])
 
-# ─── Novu Self-Hosted (manual) ───────────────────────────────────────────────
-# Start manually when working with local notifications
-
-compose('./docker/compose.novu.yaml')
-
-dc_resource('novu-api', labels=['novu'], resource_deps=['redis', 'mongodb'],
-            auto_init=False, links=[local_url('DEV_NOVU_API_PORT', '3340')])
-dc_resource('novu-worker', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False)
-dc_resource('novu-ws', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False, links=[local_url('DEV_NOVU_WS_PORT', '3342')])
-dc_resource('novu-dashboard', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False, links=[local_url('DEV_NOVU_DASHBOARD_PORT', '4000')])
-
-# One-click setup: register, get API key, update .env, remove branding, sync bridge
-# allow_parallel: runs in its own build lane so a stuck/long-running setup does not
-# block api-gateway/web/notification-service (Tilt serializes local_resource builds
-# globally by default).
-local_resource(
-  'novu-setup',
-  cmd='scripts/novu-setup.sh',
-  resource_deps=['novu-api'],
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
-  allow_parallel=True,
-  labels=['novu'],
-)
+# Mailpit — catches dev email from the notification service
+dc_resource('mailpit', labels=['infra'],
+            links=[local_url('DEV_MAILPIT_WEB_PORT', '8025')])
 
 # ─── DB Utils ─────────────────────────────────────────────────────────────────
 
@@ -263,11 +238,13 @@ local_resource(
 
 # ─── NX ───────────────────────────────────────────────────────────────────────
 
+# Type-checks api-gateway and notification-service (with the library sources they import) in
+# watch mode, without emitting. The dev servers skip type-checking, so errors show up here.
+# The full gate stays `pnpm typecheck` (build-all below).
 local_resource(
   'typecheck',
-  cmd='pnpm run typecheck',
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
+  serve_cmd='pnpm run typecheck:watch',
+  resource_deps=['pnpm-install'],
   labels=['nx'],
 )
 
@@ -299,6 +276,9 @@ local_resource(
 # ─── Observability (manual) ──────────────────────────────────────────────────
 # Start manually when debugging performance or tracing issues.
 # Trigger `observability` to bring up the entire stack with one click.
+# The dev servers send telemetry only when OTEL_EXPORTER_OTLP_ENDPOINT is set: add
+# `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:<DEV_OTEL_GRPC_PORT>` to .env (`pnpm instance:ports`
+# prints the port), then `pnpm tilt trigger api-gateway`. Unset, no OpenTelemetry SDK loads.
 
 dc_resource('prometheus', labels=['observability'], auto_init=False)
 dc_resource('tempo', labels=['observability'], auto_init=False)

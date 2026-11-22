@@ -62,6 +62,7 @@ export class DlqConsumer implements OnModuleInit, OnModuleDestroy {
     description: 'Total messages dead-lettered and persisted',
   });
   private consumerMessages: ConsumerMessages | null = null;
+  private consuming: Promise<void> | null = null;
   private js!: JetStreamClient;
 
   constructor(
@@ -72,12 +73,13 @@ export class DlqConsumer implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     this.js = jetstream(this.nc);
     await this.ensureConsumer();
-    void this.startConsuming();
+    this.consuming = this.startConsuming();
   }
 
+  /** Stops pulling and lets the message in hand finish; DlqModule closes the pool and NATS. */
   async onModuleDestroy(): Promise<void> {
     await this.consumerMessages?.close();
-    await this.pool.end();
+    await this.consuming;
   }
 
   private async ensureConsumer(): Promise<void> {

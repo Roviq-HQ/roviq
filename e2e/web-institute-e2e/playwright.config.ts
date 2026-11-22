@@ -46,7 +46,6 @@ export default defineConfig({
       E2E_PROBE: '1',
       NEXT_PUBLIC_API_URL:
         process.env.NEXT_PUBLIC_API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3004'}`,
-      NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: '',
     },
   },
 });

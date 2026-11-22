@@ -88,8 +88,6 @@ const IGNORED_ERROR_PATTERNS: RegExp[] = [
   /favicon\.ico.*404/,
   // WebSocket reconnection attempts (expected during test setup)
   /WebSocket connection to .* failed/,
-  // Novu notification inbox — not running in e2e environment
-  /ERR_CONNECTION_REFUSED/,
   // Radix UI nested interactive element warnings
   /cannot be a descendant of|cannot contain a nested/,
   // Browser resource load failures (404s on navigation — expected for unimplemented pages)
@@ -283,7 +281,6 @@ export const test = base.extend<ConsoleGuardianFixture>({
         const a11yResults = await new AxeBuilder({ page })
           .withTags([...AXE_WCAG_TAGS])
           // Exclude third-party widgets whose DOM we don't control
-          .exclude('[data-novu-inbox]')
           .exclude('[data-sonner-toaster]')
           // Radix UI primitives generate DOM that triggers these rules but
           // cannot be fixed from application code (open Radix issues)

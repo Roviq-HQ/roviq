@@ -1,0 +1,25 @@
+{
+  "name": "temporal",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/backend/temporal/src",
+  "projectType": "library",
+  "targets": {
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "config": "libs/backend/temporal/vitest.config.ts"
+      }
+    },
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/temporal",
+        "main": "libs/backend/temporal/src/index.ts",
+        "tsConfig": "libs/backend/temporal/tsconfig.lib.json",
+        "assets": ["libs/backend/temporal/*.md"]
+      }
+    }
+  },
+  "tags": []
+}

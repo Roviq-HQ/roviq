@@ -6,16 +6,22 @@ import {
   type ApprovalResolvedEvent,
   NOTIFICATION_SUBJECTS,
 } from '@roviq/notifications';
-import { NotificationTriggerService } from '../services/notification-trigger.service';
-import { PreferenceLoaderService } from '../services/preference-loader.service';
+import { NotificationDispatcher } from '../services/notification-dispatcher.service';
+import {
+  instituteAudience,
+  RecipientResolver,
+  sourceOf,
+} from '../services/recipient-resolver.service';
+import type { RegularPayload } from '../types/registry';
 
+/** No producer emits approval events yet; their ids are membership ids. */
 @Controller()
 export class ApprovalListener {
   private readonly logger = new Logger(ApprovalListener.name);
 
   constructor(
-    private readonly triggerService: NotificationTriggerService,
-    private readonly preferenceLoader: PreferenceLoaderService,
+    private readonly dispatcher: NotificationDispatcher,
+    private readonly recipients: RecipientResolver,
   ) {}
 
   @EventPattern('NOTIFICATION.approval.*', {
@@ -27,77 +33,48 @@ export class ApprovalListener {
     @Ctx() ctx: JetStreamContext,
   ): Promise<void> {
     const subject = ctx.getSubject();
-    this.logger.log(`Received approval event on subject "${subject}"`);
-
     if (subject === NOTIFICATION_SUBJECTS.APPROVAL_REQUESTED) {
-      await this.handleRequested(event as ApprovalRequestedEvent);
+      await this.toMember(event.tenantId, event.approverId, ctx, {
+        type: 'APPROVAL_REQUESTED',
+        params: {
+          approvalType: event.approvalType,
+          requesterName: event.requesterName,
+          summary: event.summary,
+          entityId: event.entityId,
+        },
+      });
     } else if (subject === NOTIFICATION_SUBJECTS.APPROVAL_RESOLVED) {
-      await this.handleResolved(event as ApprovalResolvedEvent);
+      await this.toMember(event.tenantId, event.requesterId, ctx, {
+        type: 'APPROVAL_RESOLVED',
+        params: {
+          approvalType: event.approvalType,
+          status: event.status,
+          reviewerName: event.reviewerName,
+          remarks: event.remarks ?? null,
+        },
+      });
     }
   }
 
-  private async handleRequested(event: ApprovalRequestedEvent): Promise<void> {
-    this.logger.log(
-      `Processing approval requested by "${event.requesterName}" for "${event.approverName}" ` +
-        `in tenant "${event.tenantId}"`,
-    );
-
-    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'APPROVAL');
-
-    await this.triggerService.trigger({
-      workflowId: 'approval-request',
-      to: { subscriberId: event.approverId },
-      payload: {
-        requesterName: event.requesterName,
-        approvalType: event.approvalType,
-        summary: event.summary,
-        actionUrl: this.approvalActionUrl(event.approvalType),
-        config: {
-          inApp: config.inApp,
-          whatsapp: config.whatsapp,
-          email: config.email,
-          push: config.push,
-        },
-      },
-      tenantId: event.tenantId,
+  private async toMember(
+    tenantId: string,
+    membershipId: string,
+    ctx: JetStreamContext,
+    message: RegularPayload,
+  ): Promise<void> {
+    const member = await this.recipients.member(tenantId, membershipId);
+    if (!member) {
+      this.logger.warn(
+        `Membership "${membershipId}" not found in institute "${tenantId}"; ${message.type} not sent`,
+      );
+      return;
+    }
+    await this.dispatcher.dispatch({
+      message,
+      audience: instituteAudience(tenantId),
+      recipient: member.recipient,
+      source: sourceOf(ctx),
+      inApp: true,
     });
-  }
-
-  private async handleResolved(event: ApprovalResolvedEvent): Promise<void> {
-    this.logger.log(
-      `Processing approval ${event.status} by "${event.reviewerName}" ` +
-        `for "${event.requesterName}" in tenant "${event.tenantId}"`,
-    );
-
-    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'APPROVAL');
-
-    await this.triggerService.trigger({
-      workflowId: 'approval-request',
-      to: { subscriberId: event.requesterId },
-      payload: {
-        requesterName: event.requesterName,
-        approvalType: event.approvalType,
-        summary: this.resolvedSummary(event),
-        actionUrl: this.approvalActionUrl(event.approvalType),
-        config: {
-          inApp: config.inApp,
-          whatsapp: config.whatsapp,
-          email: config.email,
-          push: config.push,
-        },
-      },
-      tenantId: event.tenantId,
-    });
-  }
-
-  private approvalActionUrl(approvalType: string): string {
-    if (approvalType === 'LEAVE') return '/en/institute/leave';
-    return '/en/institute/dashboard';
-  }
-
-  private resolvedSummary(event: ApprovalResolvedEvent): string {
-    const status = event.status.toLowerCase();
-    const remarks = event.remarks ? ` Remarks: ${event.remarks}` : '';
-    return `${event.approvalType} request was ${status} by ${event.reviewerName}.${remarks}`;
   }
 }

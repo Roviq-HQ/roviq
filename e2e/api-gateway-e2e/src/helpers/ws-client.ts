@@ -89,6 +89,64 @@ export async function subscribeOnce<T>(
   });
 }
 
+/**
+ * Like `subscribeOnce`, but skips events until `matches` accepts one. For feeds where other
+ * specs running in parallel can push unrelated events to the same user.
+ */
+export async function subscribeUntil<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  token: string,
+  matches: (data: T) => boolean,
+  timeoutMs = 5000,
+): Promise<T> {
+  const ticket = await exchangeWsTicket(token);
+
+  return new Promise<T>((resolve, reject) => {
+    const client = createClient({
+      url: WS_URL,
+      webSocketImpl: WebSocket,
+      connectionParams: { ticket },
+      retryAttempts: 0,
+    });
+    const finish = (settle: () => void) => {
+      clearTimeout(timer);
+      unsubscribe();
+      client.dispose();
+      settle();
+    };
+    const timer = setTimeout(
+      () => finish(() => reject(new Error('Subscription timeout: no matching event'))),
+      timeoutMs,
+    );
+
+    const unsubscribe = client.subscribe(
+      { query, variables },
+      {
+        next: (message) => {
+          if (message.errors && message.errors.length > 0) {
+            const errors = message.errors;
+            finish(() =>
+              reject(new Error(`Subscription returned errors: ${JSON.stringify(errors)}`)),
+            );
+            return;
+          }
+          if (message.data === null || message.data === undefined) {
+            finish(() =>
+              reject(new Error(`Subscription returned empty data: ${JSON.stringify(message)}`)),
+            );
+            return;
+          }
+          const data = message.data as T;
+          if (matches(data)) finish(() => resolve(data));
+        },
+        error: (err) => finish(() => reject(err)),
+        complete: () => {},
+      },
+    );
+  });
+}
+
 export type WsConnectOutcome = { acknowledged: true } | { acknowledged: false; closeCode: number };
 
 function closeCodeOf(event: unknown): number {

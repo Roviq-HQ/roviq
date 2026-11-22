@@ -33,6 +33,7 @@ import enInstituteSettings from '../../messages/en/instituteSettings.json';
 import enLeave from '../../messages/en/leave.json';
 import enLocale from '../../messages/en/locale.json';
 import enNav from '../../messages/en/nav.json';
+import enNotificationInbox from '../../messages/en/notificationInbox.json';
 import enNotifications from '../../messages/en/notifications.json';
 import enObservability from '../../messages/en/observability.json';
 import enPeopleLinks from '../../messages/en/peopleLinks.json';
@@ -82,6 +83,7 @@ import hiInstituteSettings from '../../messages/hi/instituteSettings.json';
 import hiLeave from '../../messages/hi/leave.json';
 import hiLocale from '../../messages/hi/locale.json';
 import hiNav from '../../messages/hi/nav.json';
+import hiNotificationInbox from '../../messages/hi/notificationInbox.json';
 import hiNotifications from '../../messages/hi/notifications.json';
 import hiObservability from '../../messages/hi/observability.json';
 import hiPeopleLinks from '../../messages/hi/peopleLinks.json';
@@ -134,6 +136,7 @@ const en = {
   leave: enLeave,
   locale: enLocale,
   nav: enNav,
+  notificationInbox: enNotificationInbox,
   notifications: enNotifications,
   observability: enObservability,
   profile: enProfile,
@@ -186,6 +189,7 @@ const hi = {
   leave: hiLeave,
   locale: hiLocale,
   nav: hiNav,
+  notificationInbox: hiNotificationInbox,
   notifications: hiNotifications,
   observability: hiObservability,
   profile: hiProfile,

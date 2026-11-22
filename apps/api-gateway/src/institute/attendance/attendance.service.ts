@@ -349,15 +349,8 @@ export class AttendanceService {
       });
     }
     if (entry.status === 'ABSENT' || entry.status === 'LATE') {
-      // Fires a guardian-facing Novu workflow via notification-service.
-      // Subject name matches NOTIFICATION_SUBJECTS.ATTENDANCE_ABSENT in
-      // @roviq/notifications so the existing listener + Novu workflow pick
-      // this up without a catalog change.
-      //
-      // AT-003: enrich the payload with student/section/standard names so
-      // guardians get human-readable copy ("Aarav was absent from 7-A on
-      // 2026-04-29") instead of a membership id. Producer already has the
-      // joined student row at hand via studentService.
+      // notification-service alerts the student's guardians (ROV-314). AT-003: the
+      // names make the copy readable instead of showing a membership id.
       const display = await this.resolveAbsenceDisplay(entry.studentId).catch((err) => {
         this.logger.warn(
           `Failed to resolve absence display for ${entry.studentId}: ${(err as Error).message}`,

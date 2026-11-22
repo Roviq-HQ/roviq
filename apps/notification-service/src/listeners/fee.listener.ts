@@ -6,16 +6,21 @@ import {
   type FeeReminderEvent,
   NOTIFICATION_SUBJECTS,
 } from '@roviq/notifications';
-import { NotificationTriggerService } from '../services/notification-trigger.service';
-import { PreferenceLoaderService } from '../services/preference-loader.service';
+import { NotificationDispatcher } from '../services/notification-dispatcher.service';
+import {
+  instituteAudience,
+  RecipientResolver,
+  sourceOf,
+} from '../services/recipient-resolver.service';
+import type { RegularPayload } from '../types/registry';
 
 @Controller()
 export class FeeListener {
   private readonly logger = new Logger(FeeListener.name);
 
   constructor(
-    private readonly triggerService: NotificationTriggerService,
-    private readonly preferenceLoader: PreferenceLoaderService,
+    private readonly dispatcher: NotificationDispatcher,
+    private readonly recipients: RecipientResolver,
   ) {}
 
   @EventPattern('NOTIFICATION.fee.*', {
@@ -27,72 +32,57 @@ export class FeeListener {
     @Ctx() ctx: JetStreamContext,
   ): Promise<void> {
     const subject = ctx.getSubject();
-    this.logger.log(`Received fee event on subject "${subject}"`);
-
     if (subject === NOTIFICATION_SUBJECTS.FEE_OVERDUE) {
-      await this.handleOverdue(event as FeeOverdueEvent);
+      await this.toGuardians(event, ctx, {
+        type: 'FEE_OVERDUE',
+        params: {
+          studentId: event.studentId,
+          studentName: event.studentName,
+          feeId: event.feeId,
+          amount: event.amount,
+          currency: event.currency,
+          dueDate: event.dueDate,
+          daysOverdue: event.daysOverdue,
+          feeType: event.feeType,
+        },
+      });
     } else if (subject === NOTIFICATION_SUBJECTS.FEE_REMINDER) {
-      await this.handleReminder(event as FeeReminderEvent);
+      await this.toGuardians(event, ctx, {
+        type: 'FEE_REMINDER',
+        params: {
+          studentId: event.studentId,
+          studentName: event.studentName,
+          feeId: event.feeId,
+          amount: event.amount,
+          currency: event.currency,
+          dueDate: event.dueDate,
+          feeType: event.feeType,
+          feePeriod: event.feePeriod,
+        },
+      });
     }
   }
 
-  private async handleOverdue(event: FeeOverdueEvent): Promise<void> {
-    this.logger.log(
-      `Processing fee overdue for student "${event.studentId}" in tenant "${event.tenantId}"`,
-    );
-
-    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'FEE');
-
-    await this.triggerService.trigger({
-      workflowId: 'fee-overdue',
-      to: { subscriberId: event.studentId },
-      payload: {
-        studentName: event.studentName,
-        feeId: event.feeId,
-        amount: event.amount,
-        currency: event.currency,
-        dueDate: event.dueDate,
-        daysOverdue: event.daysOverdue,
-        feeType: event.feeType,
-        config: {
-          inApp: config.inApp,
-          whatsapp: config.whatsapp,
-          email: config.email,
-          push: config.push,
-        },
-        digestCron: config.digestCron,
-      },
-      tenantId: event.tenantId,
-    });
-  }
-
-  private async handleReminder(event: FeeReminderEvent): Promise<void> {
-    this.logger.log(
-      `Processing fee reminder for student "${event.studentId}" in tenant "${event.tenantId}"`,
-    );
-
-    const config = await this.preferenceLoader.loadConfig(event.tenantId, 'FEE');
-
-    await this.triggerService.trigger({
-      workflowId: 'fee-reminder',
-      to: { subscriberId: event.studentId },
-      payload: {
-        studentName: event.studentName,
-        feeId: event.feeId,
-        amount: event.amount,
-        currency: event.currency,
-        dueDate: event.dueDate,
-        feeType: event.feeType,
-        feePeriod: event.feePeriod,
-        config: {
-          inApp: config.inApp,
-          whatsapp: config.whatsapp,
-          email: config.email,
-          push: config.push,
-        },
-        digestCron: config.digestCron,
-      },
-      tenantId: event.tenantId,
-    });
+  private async toGuardians(
+    event: { tenantId: string; studentId: string },
+    ctx: JetStreamContext,
+    message: RegularPayload,
+  ): Promise<void> {
+    const guardians = await this.recipients.guardiansOfStudent(event.tenantId, event.studentId);
+    if (guardians.length === 0) {
+      this.logger.warn(
+        `No linked guardian for student membership "${event.studentId}" in institute "${event.tenantId}"; ${message.type} not sent`,
+      );
+      return;
+    }
+    for (const recipient of guardians) {
+      await this.dispatcher.dispatch({
+        message,
+        audience: instituteAudience(event.tenantId),
+        recipient,
+        source: sourceOf(ctx),
+        inApp: true,
+      });
+    }
   }
 }

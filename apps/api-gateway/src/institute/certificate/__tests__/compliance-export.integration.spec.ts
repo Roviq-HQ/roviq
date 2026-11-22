@@ -18,6 +18,7 @@ import {
   withAdmin,
   withTenant,
 } from '@roviq/database';
+import { TemporalClientService } from '@roviq/temporal';
 import {
   cleanupTestInstitute,
   createInstituteToken,
@@ -35,7 +36,6 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../../app/app.module';
-import { TemporalClientService } from '../../../common/temporal/temporal-client.service';
 import {
   COMPLIANCE_EXPORT_EXECUTION_TIMEOUT_MS,
   COMPLIANCE_EXPORT_STALE_AFTER_MS,
