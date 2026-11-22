@@ -916,3 +916,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** `audit_logs` is partitioned, and `drizzle-kit push` does not see an index on a partitioned table. The index was declared in the Drizzle schema, so every push after the first tried to create it again. A reset pushes only once, which is why only the second push (Tilt's `db-push`) failed.
 - **Fix:** the index is no longer declared in the schema. It is created by the ROV-311 custom migration with `IF NOT EXISTS`, like `audit_logs_synthetic_origin_idx`.
 - **Lesson:** an index on a partitioned table belongs in a custom migration only. After a schema change, run `pnpm db:push` a second time on a reset database; it must succeed.
+
+## 2026-11-22 — diagnosed and fixed: CI `Test` failed on `notifications:test` with no test output (ROV-314)
+
+- **Symptom:** on the pull request, the `Test` job failed with `Failed tasks: notifications:test`. The task printed nothing but the executor's deprecation line. The pre-push gate had passed on the same commit.
+- **Cause:** ROV-314 removed the Novu code from `libs/backend/notifications`, and with it the library's last spec files. Vitest exits 1 when a project has no test files. CI runs each project's own target (`nx affected -t test`); the pre-push gate runs the root Vitest projects (`pnpm test:unit`), where an empty library is not an error.
+- **Fix:** `passWithNoTests: true` in the library's `vitest.config.ts`. A spec added there later still runs.
+- **Lesson:** after deleting the last spec of a library, run `pnpm nx run <project>:test` once. The pre-push gate does not run per-project test targets, so it cannot catch this.
