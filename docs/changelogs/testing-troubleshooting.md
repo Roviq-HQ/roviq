@@ -954,3 +954,11 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the test read any academic year, standard and section of the seed institute (`LIMIT 1`, no order) and then inserted a row that pointed at them. Integration files run in parallel on one database, and other specs create and hard-delete such rows, so the year could vanish between the read and the insert. With no seed rows the test returned early and passed without asserting anything.
 - **Fix:** the test inserts its own year, standard and section inside its transaction.
 - **Lesson:** an integration test creates every row it depends on. Never pick "any row" of a shared institute, and never `return` early when the data is missing.
+
+## 2026-11-23 — diagnosed, local fix only: pre-push `int` failed with `drizzle-kit migrate failed` after a migration was regenerated
+
+- **Symptom:** `pnpm ci:check` failed in `int` before any test ran: `Error: drizzle-kit migrate failed (exit 1) against localhost:<port>/roviq_test`, then "No test files found". It also failed on slot 3 with a port clash on the e2e Mailpit port after ROV-314 landed.
+- **Cause 1:** the branch's migration was regenerated after a rebase (new folder name, same SQL). The local `roviq_test` database had the old folder recorded as applied, so `migrate` ran the new folder and its `CREATE TABLE` hit a table that already existed. The integration global setup only resets an empty database.
+- **Cause 2:** a slot's `.env` is generated once. Ports added later (`E2E_MAILPIT_API_PORT`) were missing, so the slot fell back to slot 0's port.
+- **Fix:** `pnpm db:reset --test` in that checkout after regenerating a migration; `pnpm instance:env <slot>` after `main` adds a port.
+- **Lesson:** regenerating a migration changes its identity. Reset the test database (and `pnpm tilt trigger db-clean` for the dev one) right after, and re-run `instance:env` in a long-lived slot whenever `scripts/lib/instance.ts` gains a port.
