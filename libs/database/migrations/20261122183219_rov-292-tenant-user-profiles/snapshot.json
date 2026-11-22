@@ -1,8 +1,8 @@
 {
-  "id": "408b16af-ca46-4564-aa69-83484c365a1d",
-  "prevIds": ["e264bd53-13be-4f86-b184-222764a829af"],
   "version": "8",
   "dialect": "postgres",
+  "id": "c8ce4d17-abfd-475f-97ef-07dc20f10a88",
+  "prevIds": ["c7c251d5-792e-4ebc-aa6f-b814f462171d"],
   "ddl": [
     {
       "values": [
@@ -26358,7 +26358,7 @@
         }
       ],
       "isUnique": true,
-      "where": null,
+      "where": "\"deleted_at\" IS NULL",
       "with": "",
       "method": "btree",
       "concurrently": false,
