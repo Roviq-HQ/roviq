@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DRIZZLE_DB, type DrizzleDB } from '@roviq/database';
 import { StorageClient } from '@roviq/storage';
+import { TemporalClientModule } from '@roviq/temporal';
 import { FilesModule } from '../../files/files.module';
 import { WorkflowFileStore } from '../../files/workflow-file-store';
 import { PdfModule } from '../../pdf/pdf.module';
@@ -18,7 +19,7 @@ import { TCResolver } from './tc.resolver';
 import { TCIssuanceWorkerService } from './workflows/tc-issuance.worker';
 
 @Module({
-  imports: [ComplianceExportModule, FilesModule, PdfModule],
+  imports: [ComplianceExportModule, FilesModule, PdfModule, TemporalClientModule],
   providers: [
     { provide: TcRepository, useClass: TcDrizzleRepository },
     { provide: CertificateRepository, useClass: CertificateDrizzleRepository },
