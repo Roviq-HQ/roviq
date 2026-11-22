@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import {
@@ -8,6 +8,7 @@ import {
   type InstituteReadAccess,
 } from '@roviq/casl';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { ChangeStudentClassInput } from './dto/change-student-class.input';
 import { EnrollStudentInput, UpdateStudentSectionInput } from './dto/enroll-student.input';
 import { SetPromotionDecisionsInput } from './dto/set-promotion-decisions.input';
 import { StudentAcademicHistoryModel } from './models/student-academic-history.model';
@@ -49,6 +50,29 @@ export class StudentAcademicResolver {
   async updateStudentSection(@Args('input') input: UpdateStudentSectionInput): Promise<string> {
     const result = await this.academicService.changeSection(input);
     return result.id;
+  }
+
+  @Mutation(() => ID, {
+    description:
+      "Moves a student to another class of the same year, with capacity check; aligns last year's result.",
+  })
+  @CheckAbility({ action: 'update', subject: 'Student' })
+  async changeStudentClass(@Args('input') input: ChangeStudentClassInput): Promise<string> {
+    const result = await this.academicService.changeClass(input);
+    return result.id;
+  }
+
+  @Mutation(() => Boolean, {
+    description:
+      'Removes a student from one academic year (soft-deletes the year record). Refused with STUDENT_YEAR_HAS_RECORDS once the year holds attendance, marks, assessments or report cards.',
+  })
+  @CheckAbility({ action: 'update', subject: 'Student' })
+  async removeStudentFromYear(
+    @Args('studentAcademicId', { type: () => ID }, ParseUUIDPipe) studentAcademicId: string,
+    @Args('reason', { description: '3 to 500 characters after trimming.' }) reason: string,
+  ): Promise<boolean> {
+    await this.academicService.removeFromYear(studentAcademicId, reason);
+    return true;
   }
 
   @Mutation(() => Int, {

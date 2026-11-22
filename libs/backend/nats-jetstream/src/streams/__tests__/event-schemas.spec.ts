@@ -61,6 +61,29 @@ describe('flatEventSchemas', () => {
       ).not.toThrow();
     });
 
+    it('STUDENT.removed_from_year accepts a valid payload', () => {
+      expect(() =>
+        flatEventSchemas['STUDENT.removed_from_year'].parse({
+          studentProfileId: U1,
+          academicYearId: U2,
+          sectionId: U3,
+          reason: 'Enrolled by mistake',
+          tenantId: U5,
+        }),
+      ).not.toThrow();
+    });
+
+    it('STUDENT.removed_from_year rejects when reason is missing', () => {
+      expect(() =>
+        flatEventSchemas['STUDENT.removed_from_year'].parse({
+          studentProfileId: U1,
+          academicYearId: U2,
+          sectionId: U3,
+          tenantId: U5,
+        }),
+      ).toThrow(ZodError);
+    });
+
     it('STUDENT.left rejects when tcNumber is absent entirely', () => {
       expect(() =>
         flatEventSchemas['STUDENT.left'].parse({

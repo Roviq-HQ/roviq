@@ -2,7 +2,9 @@ import { gql, useLazyQuery, useMutation, useQuery, useSubscription } from '@rovi
 import type {
   AcademicYearModel,
   AuditLog,
+  ChangeStudentClassInput,
   CreateStudentInput,
+  EnrollStudentInput,
   GuardianModel,
   ListGuardiansFilterInput,
   SectionModel,
@@ -84,7 +86,7 @@ const STUDENTS_EXPORT_QUERY = gql`
   }
 `;
 
-export function useStudents(filter?: StudentListFilter) {
+export function useStudents(filter?: StudentListFilter, options: { skip?: boolean } = {}) {
   const { data, loading, fetchMore, refetch } = useQuery<{
     listStudents: {
       edges: Array<{ cursor: string; node: StudentListNode }>;
@@ -94,6 +96,7 @@ export function useStudents(filter?: StudentListFilter) {
   }>(STUDENTS_LIST_QUERY, {
     variables: { filter: { first: 25, ...filter } },
     notifyOnNetworkStatusChange: true,
+    skip: options.skip,
   });
 
   const loadMore = () => {
@@ -606,6 +609,48 @@ export function useUpdateStudentSection() {
     UPDATE_STUDENT_SECTION,
     { refetchQueries: ['InstituteStudents'] },
   );
+}
+
+// ─── Correcting one student after a rollover (ROV-322) ────────────────────
+
+const PLACEMENT_REFETCH = ['InstituteStudents', 'InstituteStudent', 'InstituteStudentAcademics'];
+
+const ENROLL_STUDENT = gql`
+  mutation EnrollStudentInYear($input: EnrollStudentInput!) {
+    enrollStudent(input: $input)
+  }
+`;
+
+export function useEnrollStudent() {
+  return useMutation<{ enrollStudent: string }, { input: EnrollStudentInput }>(ENROLL_STUDENT, {
+    refetchQueries: PLACEMENT_REFETCH,
+  });
+}
+
+const CHANGE_STUDENT_CLASS = gql`
+  mutation ChangeStudentClass($input: ChangeStudentClassInput!) {
+    changeStudentClass(input: $input)
+  }
+`;
+
+export function useChangeStudentClass() {
+  return useMutation<{ changeStudentClass: string }, { input: ChangeStudentClassInput }>(
+    CHANGE_STUDENT_CLASS,
+    { refetchQueries: PLACEMENT_REFETCH },
+  );
+}
+
+const REMOVE_STUDENT_FROM_YEAR = gql`
+  mutation RemoveStudentFromYear($studentAcademicId: ID!, $reason: String!) {
+    removeStudentFromYear(studentAcademicId: $studentAcademicId, reason: $reason)
+  }
+`;
+
+export function useRemoveStudentFromYear() {
+  return useMutation<
+    { removeStudentFromYear: boolean },
+    { studentAcademicId: string; reason: string }
+  >(REMOVE_STUDENT_FROM_YEAR, { refetchQueries: PLACEMENT_REFETCH });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────

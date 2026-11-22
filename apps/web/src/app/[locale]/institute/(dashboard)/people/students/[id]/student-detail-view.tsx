@@ -104,9 +104,12 @@ import {
   History,
   Info,
   Loader2,
+  MoveRight,
   Plus,
   ShieldCheck,
   Star,
+  UserMinus,
+  UserPlus,
   UserRound,
   Users,
   XCircle,
@@ -129,9 +132,11 @@ import { useLinkGuardianToStudent } from '../../guardians/use-guardians';
 import { PersonNameLink, usePersonDetailContext } from '../../person-detail-dialog';
 import { UnlinkGuardianButton } from '../../unlink-guardian-dialog';
 import { useLinkErrorMessage } from '../../use-link-error-message';
+import { ChangeClassDialog, EnrolStudentDialog, RemoveFromYearDialog } from '../placement-dialogs';
 import {
   type GuardianPickerNode,
   type StudentDetailNode,
+  useAcademicYearsForStudents,
   useGuardiansForStudentPicker,
   useStudent,
   useStudentAcademics,
@@ -383,7 +388,7 @@ export function StudentDetailView({ studentId }: { studentId: string }) {
                   </TabsContent>
                   <TabsContent value="academics">
                     <ErrorBoundary FallbackComponent={TabErrorFallback}>
-                      <AcademicsTab studentProfileId={student.id} />
+                      <AcademicsTab student={student} />
                     </ErrorBoundary>
                   </TabsContent>
                   <TabsContent value="attendance">
@@ -1340,37 +1345,105 @@ function AuditTab({ studentId }: { studentId: string }) {
 
 // ─── Academics tab ────────────────────────────────────────────────────────
 
-function AcademicsTab({ studentProfileId }: { studentProfileId: string }) {
+type PlacementDialog = 'enrol' | 'changeClass' | 'remove' | null;
+
+function AcademicsTab({ student }: { student: StudentDetailNode }) {
   const t = useTranslations('students');
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
-  const { data, loading } = useStudentAcademics(studentProfileId);
+  const { data, loading } = useStudentAcademics(student.id);
+  const { data: yearsData } = useAcademicYearsForStudents();
+  const [dialog, setDialog] = React.useState<PlacementDialog>(null);
 
   if (loading && !data) {
     return <TabSkeleton />;
   }
 
   const rows = data?.listStudentAcademics ?? [];
+  const activeYear = yearsData?.academicYears.find((y) => y.isActive) ?? null;
+  const activeRow = activeYear
+    ? rows.find((row) => row.academicYearId === activeYear.id)
+    : undefined;
+  const studentName = [resolveI18n(student.firstName), resolveI18n(student.lastName)]
+    .filter(Boolean)
+    .join(' ');
+  const closeDialog = (open: boolean) => {
+    if (!open) setDialog(null);
+  };
+
+  const notPlaced = activeYear && !activeRow && (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      <span>{t('placement.notPlacedNotice', { year: activeYear.label })}</span>
+      <Can I="create" a="Student">
+        <Button
+          size="sm"
+          onClick={() => setDialog('enrol')}
+          title={t('placement.enrolButton')}
+          data-testid={instituteStudents.detailEnrolBtn}
+        >
+          <UserPlus aria-hidden="true" className="size-4" />
+          {t('placement.enrolButton')}
+        </Button>
+      </Can>
+    </div>
+  );
+
+  const dialogs = activeYear && (
+    <>
+      <EnrolStudentDialog
+        open={dialog === 'enrol'}
+        onOpenChange={closeDialog}
+        studentProfileId={student.id}
+        studentName={studentName}
+        academicYearId={activeYear.id}
+        yearLabel={activeYear.label}
+      />
+      {activeRow && (
+        <>
+          <ChangeClassDialog
+            open={dialog === 'changeClass'}
+            onOpenChange={closeDialog}
+            studentAcademicId={activeRow.id}
+            academicYearId={activeYear.id}
+            yearLabel={activeYear.label}
+            currentStandardId={activeRow.standardId}
+            currentSectionId={activeRow.sectionId}
+          />
+          <RemoveFromYearDialog
+            open={dialog === 'remove'}
+            onOpenChange={closeDialog}
+            studentAcademicId={activeRow.id}
+            yearLabel={activeYear.label}
+          />
+        </>
+      )}
+    </>
+  );
 
   if (rows.length === 0) {
     return (
-      <Empty className="py-12">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <GraduationCap aria-hidden="true" />
-          </EmptyMedia>
-          <EmptyTitle data-testid={instituteStudents.detailAcademicsEmpty}>
-            {t('detail.academics.empty')}
-          </EmptyTitle>
-          <EmptyDescription>{t('detail.academics.emptyDescription')}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <div className="space-y-3">
+        {notPlaced}
+        <Empty className="py-12">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GraduationCap aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle data-testid={instituteStudents.detailAcademicsEmpty}>
+              {t('detail.academics.empty')}
+            </EmptyTitle>
+            <EmptyDescription>{t('detail.academics.emptyDescription')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        {dialogs}
+      </div>
     );
   }
 
   return (
     <Card>
       <CardContent className="pt-6 space-y-3">
+        {notPlaced}
         {rows.map((row) => (
           <div
             key={row.id}
@@ -1401,11 +1474,41 @@ function AcademicsTab({ studentProfileId }: { studentProfileId: string }) {
                 </Badge>
               )}
             </div>
-            <div className="text-xs text-muted-foreground">
-              {format(parseISO(row.updatedAt), 'dd/MM/yyyy')}
+            <div className="flex flex-col items-end gap-2">
+              <div className="text-xs text-muted-foreground">
+                {format(parseISO(row.updatedAt), 'dd/MM/yyyy')}
+              </div>
+              {row.id === activeRow?.id && (
+                <Can I="update" a="Student">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDialog('changeClass')}
+                      title={t('placement.changeClassButton')}
+                      data-testid={instituteStudents.detailChangeClassBtn}
+                    >
+                      <MoveRight aria-hidden="true" className="size-4" />
+                      {t('placement.changeClassButton')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive"
+                      onClick={() => setDialog('remove')}
+                      title={t('placement.removeButton')}
+                      data-testid={instituteStudents.detailRemoveFromYearBtn}
+                    >
+                      <UserMinus aria-hidden="true" className="size-4" />
+                      {t('placement.removeButton')}
+                    </Button>
+                  </div>
+                </Can>
+              )}
             </div>
           </div>
         ))}
+        {dialogs}
       </CardContent>
     </Card>
   );

@@ -28,5 +28,8 @@
   "SUBJECT_CODE_DUPLICATE": "This board code is already used by another subject in this standard.",
   "STUDENT_ACADEMIC_NOT_FOUND": "One or more of the selected students has no record in this academic year. Refresh the list and try again.",
   "SECTION_HAS_STUDENTS": "This section still has students. Move them to another section before deleting it.",
-  "STUDENT_ALREADY_ENROLLED": "This student is already enrolled in that academic year."
+  "STUDENT_ALREADY_ENROLLED": "This student is already enrolled in that academic year.",
+  "STUDENT_YEAR_HAS_RECORDS": "This student already has attendance, marks or report cards in this year, so they cannot be removed from it.",
+  "STANDARD_NOT_FOUND": "That class was not found in this academic year. Refresh and try again.",
+  "SECTION_NOT_FOUND": "That section was not found in the chosen class. Refresh and try again."
 }

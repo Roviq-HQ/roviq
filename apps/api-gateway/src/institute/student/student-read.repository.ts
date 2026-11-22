@@ -16,14 +16,58 @@ import {
   userDocumentsLive,
   withTenant,
 } from '@roviq/database';
-import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  lt,
+  notExists,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
+import { alias, QueryBuilder } from 'drizzle-orm/pg-core';
 import { nameStartsWith } from '../../common/name-search';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { loadUserDocumentFiles } from '../../files/user-document-files';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { StudentStatisticsModel } from './models/student-statistics.model';
 import { activeAcademicYearIds, studentReadPredicate } from './student-read-predicate';
+import { CONTINUING_STATUSES } from './year-rollover';
+
+const qb = new QueryBuilder();
+const earlierAcademic = alias(studentAcademicsLive, 'earlier_academic');
+const earlierYear = alias(academicYearsLive, 'earlier_year');
+const targetYear = alias(academicYearsLive, 'target_year');
+const placedAcademic = alias(studentAcademicsLive, 'placed_academic');
+
+/** The student's year record in the latest year that starts before `yearId`. */
+function latestPlacementBefore(yearId: string): SQL {
+  const latest = qb
+    .select({ id: earlierAcademic.id })
+    .from(earlierAcademic)
+    .innerJoin(earlierYear, eq(earlierYear.id, earlierAcademic.academicYearId))
+    .where(
+      and(
+        eq(earlierAcademic.studentProfileId, studentProfilesLive.id),
+        lt(
+          earlierYear.startDate,
+          qb
+            .select({ startDate: targetYear.startDate })
+            .from(targetYear)
+            .where(eq(targetYear.id, yearId)),
+        ),
+      ),
+    )
+    .orderBy(desc(earlierYear.startDate))
+    .limit(1);
+  return sql`${studentAcademicsLive.id} = (${latest})`;
+}
 
 /** The institute's own copy of the student's name, demographics and picture. */
 function studentProfileJoin() {
@@ -56,7 +100,10 @@ export class StudentReadRepository {
     return this.loadList(
       filter,
       access.user,
-      studentReadPredicate(access.ability, filter.academicYearId ?? null),
+      studentReadPredicate(
+        access.ability,
+        filter.notPlacedInYearId ?? filter.academicYearId ?? null,
+      ),
     );
   }
   listForAttendance(filter: StudentFilterInput, ctx: InstituteContext) {
@@ -145,7 +192,7 @@ export class StudentReadRepository {
 
     // Resolve academic year (default to active)
     let academicYearId = filter.academicYearId;
-    if (!academicYearId) {
+    if (!academicYearId && !filter.notPlacedInYearId) {
       const activeYear = await withTenant(this.db, ctx, async (tx) => {
         return tx
           .select({ id: academicYearsLive.id })
@@ -160,6 +207,12 @@ export class StudentReadRepository {
 
     const conditions = this.buildListConditions(filter, academicYearId);
     if (restriction) conditions.push(restriction);
+    const academicJoin = filter.notPlacedInYearId
+      ? and(
+          eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
+          latestPlacementBefore(filter.notPlacedInYearId),
+        )
+      : eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id);
 
     // Cursor decode
     let cursorCondition: ReturnType<typeof sql> | undefined;
@@ -204,10 +257,7 @@ export class StudentReadRepository {
         .select({ total: count() })
         .from(studentProfilesLive)
         .innerJoin(tenantUserProfilesLive, studentProfileJoin())
-        .leftJoin(
-          studentAcademicsLive,
-          eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-        )
+        .leftJoin(studentAcademicsLive, academicJoin)
         .where(countWhere);
 
       // Fetch rows
@@ -264,10 +314,7 @@ export class StudentReadRepository {
         })
         .from(studentProfilesLive)
         .innerJoin(tenantUserProfilesLive, studentProfileJoin())
-        .leftJoin(
-          studentAcademicsLive,
-          eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
-        )
+        .leftJoin(studentAcademicsLive, academicJoin)
         .leftJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
         .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
         .leftJoin(
@@ -453,6 +500,23 @@ export class StudentReadRepository {
     const conditions: SQL[] = [];
     if (academicYearId) {
       conditions.push(eq(studentAcademicsLive.academicYearId, academicYearId));
+    }
+    if (filter.notPlacedInYearId) {
+      conditions.push(
+        isNotNull(studentAcademicsLive.id),
+        inArray(studentProfilesLive.academicStatus, [...CONTINUING_STATUSES]),
+        notExists(
+          qb
+            .select({ id: placedAcademic.id })
+            .from(placedAcademic)
+            .where(
+              and(
+                eq(placedAcademic.studentProfileId, studentProfilesLive.id),
+                eq(placedAcademic.academicYearId, filter.notPlacedInYearId),
+              ),
+            ),
+        ),
+      );
     }
     if (filter.standardId) {
       conditions.push(eq(studentAcademicsLive.standardId, filter.standardId));

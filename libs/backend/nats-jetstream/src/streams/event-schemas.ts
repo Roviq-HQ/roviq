@@ -53,6 +53,13 @@ const STUDENT_SCHEMAS = {
     studentProfileId: uuid,
     tenantId: uuid,
   }),
+  'STUDENT.removed_from_year': z.object({
+    studentProfileId: uuid,
+    academicYearId: uuid,
+    sectionId: uuid,
+    reason: str,
+    tenantId: uuid,
+  }),
   'STUDENT.statusChanged': z.object({
     studentProfileId: uuid,
     fromStatus: str,
