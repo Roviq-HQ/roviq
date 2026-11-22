@@ -1,6 +1,6 @@
 # Important rules
 
-### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table. Some of the code is written by older models, so if you are fable 5.2 or above, you are allowed to completely change anything to reduce bugs, tighten security, less technical debt, faster launching of the product, and a lot of things.
+### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table. Some of the code is written by older models, so if you are fable 5.2 or above, you are allowed to completely change anything to reduce bugs, tighten security, less technical debt, faster launching of the product, and a lot of things. Use that freedom inside the issue you are working on: a rewrite or redesign that no issue asks for is a proposal to the user first.
 
 **Always use `pnpm tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Always call it as `pnpm tilt …`, never bare `tilt`: the wrapper targets this checkout's own Tilt, while bare `tilt` can hit another instance's. Examples:
 
@@ -34,6 +34,16 @@ Several agents work at the same time, each in its own git worktree with its own 
 - **Do not wait for a busy checkout.** When the next task is ready and your worktree still has uncommitted work or a test run in progress, start the next task in another instance at once. There are four extra slots (1 to `MAX_SLOT` in `scripts/lib/instance.ts`). If none is unused, find a stale one and reuse it; do not create a plain `git worktree` outside the slots. A slot is stale when all of these hold: its branch's PR is merged (or `git rev-list --count origin/main..HEAD` is 0), `git status --short` is empty, and its Tilt does not answer. Reuse it with `git switch -c <branch> origin/main` in that checkout, `pnpm install`, `pnpm tilt up`. A slot with unmerged commits or uncommitted files is not stale, however old: leave it, and if every slot is in real use, tell the user.
 - **Browser testing**: cookies on `localhost` are shared across ports. Use a separate browser profile or context per instance, or a login in one instance signs the other out.
 - New code must not hardcode a dev or e2e port. Read the instance variable with the slot 0 value as the default (`process.env.E2E_API_PORT ?? '3004'`, `${DEV_POSTGRES_PORT:-5434}`); the table is in `scripts/lib/instance.ts`.
+
+## What to work on
+
+Before starting an issue, read the Linear document **"Roadmap: order of work"** (team Roviq). It names the current stage and the order of issues inside it.
+
+- Work on the current stage. Asked for something from a later stage? Say so once, then do it.
+- Do what the issue asks, plus what keeps the checks green. A small pre-existing bug is still fixed at once in its own commit; a new feature, a redesign or a rewrite is a proposal to the user. This product has slipped by adding good ideas to the task in hand.
+- Every new or changed operation that takes an id needs a test in which another institute's or reseller's id is refused.
+- Linear issues and this repository are public. Hosting, provider, cost and backup details go in a Linear document, never in an issue, a comment, a commit or `docs/`.
+- A review of the whole product from one role (CTO, product, security, a parent) is a Linear document; start from **"Role reviews: index and template"**.
 
 ## Identity
 
