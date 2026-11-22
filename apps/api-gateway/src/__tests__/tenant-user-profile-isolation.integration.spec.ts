@@ -849,6 +849,86 @@ describe('Per-institute profiles and phone numbers (integration)', () => {
     });
   });
 
+  describe('a staff member', () => {
+    const UPDATE_STAFF = `mutation ($id: ID!, $input: UpdateStaffInput!) {
+      updateStaffMember(id: $id, input: $input) { id firstName lastName dateOfBirth }
+    }`;
+
+    it("is renamed in the institute's copy only, and not by another institute", async () => {
+      const staff = await createStaff(a, { lastName: { en: 'Das' } });
+      assert(staff.data);
+      const { id, userId } = staff.data.createStaffMember;
+      const input = {
+        firstName: { en: 'Kiranjit' },
+        lastName: null,
+        dateOfBirth: '1988-02-03',
+        version: 1,
+      };
+
+      const refused = await gql(UPDATE_STAFF, { id, input }, b);
+      const updated = await gql<{ updateStaffMember: Record<string, unknown> }>(
+        UPDATE_STAFF,
+        { id, input },
+        a,
+      );
+
+      expect(codeOf(refused)).toBe(ErrorCode.STAFF_NOT_FOUND);
+      expect(updated.data?.updateStaffMember).toEqual({
+        id,
+        firstName: { en: 'Kiranjit' },
+        lastName: null,
+        dateOfBirth: '1988-02-03',
+      });
+      const [account] = await asAdmin((tx) =>
+        tx
+          .select({ firstName: userProfiles.firstName, lastName: userProfiles.lastName })
+          .from(userProfiles)
+          .where(eq(userProfiles.userId, userId)),
+      );
+      expect(account).toEqual({ firstName: { en: 'Kiran' }, lastName: { en: 'Das' } });
+    });
+  });
+
+  describe('name search on the people lists', () => {
+    it('finds a student, a staff member and a guardian by the start of a name', async () => {
+      const tag = `Zq${randomUUID().slice(0, 6)}`;
+      const student = await createStudent(a, { firstName: { en: `${tag}student` } });
+      const staff = await createStaff(a, { firstName: { en: `${tag}staff` } });
+      const guardian = await createGuardian(a, { firstName: { en: `${tag}guardian` } });
+      assert(student.data && staff.data && guardian.data);
+      const search = tag.slice(0, 6);
+
+      const students = await gql<{ listStudents: { edges: { node: { id: string } }[] } }>(
+        `query ($filter: StudentFilterInput) { listStudents(filter: $filter) { edges { node { id } } } }`,
+        { filter: { search } },
+        a,
+      );
+      const staffList = await gql<{ listStaff: { id: string }[] }>(
+        `query ($filter: ListStaffFilterInput) { listStaff(filter: $filter) { id } }`,
+        { filter: { search } },
+        a,
+      );
+      const guardians = await gql<{ listGuardians: { id: string }[] }>(
+        `query ($filter: ListGuardiansFilterInput) { listGuardians(filter: $filter) { id } }`,
+        { filter: { search } },
+        a,
+      );
+      const inB = await gql<{ listStaff: { id: string }[] }>(
+        `query ($filter: ListStaffFilterInput) { listStaff(filter: $filter) { id } }`,
+        { filter: { search } },
+        b,
+      );
+
+      expect(students.errors).toBeUndefined();
+      expect(students.data?.listStudents.edges.map((e) => e.node.id)).toEqual([
+        student.data.createStudent.id,
+      ]);
+      expect(staffList.data?.listStaff).toEqual([{ id: staff.data.createStaffMember.id }]);
+      expect(guardians.data?.listGuardians).toEqual([{ id: guardian.data.createGuardian.id }]);
+      expect(inB.data?.listStaff).toEqual([]);
+    });
+  });
+
   describe('bulk import', () => {
     it('creates two students for two rows (siblings) with the same phone', async () => {
       const number = mobile();

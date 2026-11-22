@@ -814,6 +814,7 @@ function buildProfileSchema(t: ReturnType<typeof useTranslations>, defaultLocale
     firstName: buildI18nTextSchema(t('detail.profile.firstNameRequired'), defaultLocale),
     lastName: buildI18nTextSchema(t('detail.profile.lastNameRequired'), defaultLocale).optional(),
     gender: emptyStringToUndefined(z.enum(['MALE', 'FEMALE', 'OTHER']).optional()),
+    dateOfBirth: emptyStringToUndefined(z.string().optional()),
     socialCategory: z.enum(['GENERAL', 'OBC', 'SC', 'ST', 'EWS']),
     bloodGroup: emptyStringToUndefined(z.string().optional()),
     religion: emptyStringToUndefined(z.string().optional()),
@@ -850,6 +851,7 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
         ? { en: student.lastName.en ?? '', hi: student.lastName.hi ?? '' }
         : undefined,
       gender: (student.gender as ProfileFormValues['gender']) ?? undefined,
+      dateOfBirth: student.dateOfBirth ?? '',
       socialCategory: student.socialCategory as ProfileFormValues['socialCategory'],
       bloodGroup: student.bloodGroup ?? '',
       religion: student.religion ?? '',
@@ -876,6 +878,7 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
           firstName: parsed.firstName,
           lastName: parsed.lastName,
           gender: parsed.gender,
+          dateOfBirth: parsed.dateOfBirth,
           socialCategory: parsed.socialCategory,
           bloodGroup: parsed.bloodGroup,
           religion: parsed.religion,
@@ -999,6 +1002,14 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
                     options={genderOptions}
                     placeholder={t('detail.profile.genderPlaceholder')}
                     testId="students-detail-gender-select"
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="dateOfBirth">
+                {(field) => (
+                  <field.DateField
+                    label={t('detail.profile.dateOfBirth')}
+                    testId={instituteStudents.detailDobInput}
                   />
                 )}
               </form.AppField>

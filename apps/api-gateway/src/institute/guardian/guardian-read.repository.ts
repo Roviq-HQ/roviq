@@ -15,6 +15,7 @@ import {
   withTenant,
 } from '@roviq/database';
 import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { nameStartsWith } from '../../common/name-search';
 import { activeAcademicYearIds, studentReadPredicate } from '../student/student-read-predicate';
 import type { ListGuardiansFilterInput } from './dto/list-guardians-filter.input';
 import { guardianLinkedReadPredicate, guardianReadPredicate } from './guardian-read-predicate';
@@ -105,7 +106,7 @@ export class GuardianReadRepository {
 
       const searchClause = search
         ? or(
-            sql`${tenantUserProfilesLive.searchVector} @@ plainto_tsquery('simple', ${search})`,
+            nameStartsWith(tenantUserProfilesLive.searchVector, search),
             ilike(phoneNumbersLive.number, `%${search}%`),
           )
         : undefined;

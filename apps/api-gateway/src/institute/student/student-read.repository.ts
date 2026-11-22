@@ -18,6 +18,7 @@ import {
 } from '@roviq/database';
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { nameStartsWith } from '../../common/name-search';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { loadUserDocumentFiles } from '../../files/user-document-files';
 import type { StudentFilterInput } from './dto/student-filter.input';
@@ -474,7 +475,7 @@ export class StudentReadRepository {
     if (filter.search) {
       const searchTerm = filter.search;
       const searchCondition = or(
-        sql`${tenantUserProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
+        nameStartsWith(tenantUserProfilesLive.searchVector, searchTerm),
         ilike(studentProfilesLive.admissionNumber, `%${searchTerm}%`),
       );
       if (searchCondition) conditions.push(searchCondition);

@@ -18,8 +18,7 @@ export class ListGuardiansFilterInput {
     description:
       'Full-text search across first/last name via the generated ' +
       '`tenant_user_profiles.search_vector` column (English + Hindi tokens). ' +
-      'Uses plainto_tsquery, so input is treated as literal text (no ' +
-      'operator parsing) which protects against query injection.',
+      'Each typed word matches the start of a name word; punctuation is ignored.',
   })
   @IsOptional()
   @IsString()

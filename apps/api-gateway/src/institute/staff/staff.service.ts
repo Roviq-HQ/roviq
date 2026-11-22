@@ -24,7 +24,8 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
-import { ensureTenantUserProfile } from '../../auth/tenant-user-profile';
+import { ensureTenantUserProfile, updateTenantUserProfile } from '../../auth/tenant-user-profile';
+import { nameStartsWith } from '../../common/name-search';
 import type { CreateStaffInput } from './dto/create-staff.input';
 import type { ListStaffFilterInput } from './dto/list-staff-filter.input';
 import type { UpdateStaffInput } from './dto/update-staff.input';
@@ -117,13 +118,8 @@ export class StaffService {
         conditions.push(eq(staffProfilesLive.employmentType, filter.employmentType));
       if (filter.isClassTeacher != null)
         conditions.push(eq(staffProfilesLive.isClassTeacher, filter.isClassTeacher));
-      // Search uses the multilingual search_vector GIN index — `plainto_tsquery`
-      // matches names in any locale because the generated tsvector flattens
-      // every value of the i18nText jsonb on insert.
       if (filter.search) {
-        conditions.push(
-          sql`${tenantUserProfilesLive.searchVector} @@ plainto_tsquery('simple', ${filter.search})`,
-        );
+        conditions.push(nameStartsWith(tenantUserProfilesLive.searchVector, filter.search));
       }
 
       const limit = filter.first ?? 20;
@@ -342,6 +338,17 @@ export class StaffService {
             'Staff profile was modified by another request (version mismatch)',
           );
         }
+        await updateTenantUserProfile(tx, {
+          tenantId,
+          userId: rows[0].userId,
+          actorId,
+          changes: {
+            ...(input.firstName != null && { firstName: input.firstName }),
+            ...(input.lastName !== undefined && { lastName: input.lastName }),
+            ...(input.gender != null && { gender: input.gender }),
+            ...(input.dateOfBirth != null && { dateOfBirth: input.dateOfBirth }),
+          },
+        });
         return rows[0];
       },
     );

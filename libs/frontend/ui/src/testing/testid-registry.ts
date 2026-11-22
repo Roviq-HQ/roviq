@@ -871,6 +871,7 @@ export const testIds = {
     detailViewExamsLink: 'students-detail-view-exams-link',
     detailDraftDiscardBtn: 'students-detail-draft-discard-btn',
     detailDraftRestoreBtn: 'students-detail-draft-restore-btn',
+    detailDobInput: 'students-detail-dob-input',
     detailResetBtn: 'students-detail-reset-btn',
     detailUploadDocCancelBtn: 'students-detail-upload-doc-cancel-btn',
     detailLinkGuardianBtn: 'student-detail-link-guardian-btn',
@@ -1309,6 +1310,7 @@ export const testIds = {
     emptyAddBtn: 'guardians-empty-add-btn',
     // Detail page
     detailTitle: 'guardian-detail-title',
+    detailPhone: 'guardian-detail-phone',
     detailNotFoundTitle: 'guardian-detail-not-found-title',
     detailTabProfile: 'guardian-detail-tab-profile',
     detailTabChildren: 'guardian-detail-tab-children',
@@ -1372,6 +1374,7 @@ export const testIds = {
     detailTabAudit: 'staff-detail-tab-audit',
     detailDraftDiscardBtn: 'staff-detail-draft-discard-btn',
     detailDraftRestoreBtn: 'staff-detail-draft-restore-btn',
+    detailDobInput: 'staff-detail-dob-input',
     detailAddQualificationBtn: 'staff-detail-add-qualification-btn',
     qualificationDialog: 'staff-qualification-dialog',
     qualificationCurrentCertificate: 'staff-qualification-current-certificate',

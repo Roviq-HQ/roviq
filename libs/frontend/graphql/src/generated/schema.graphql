@@ -3913,7 +3913,7 @@ input ListCertificateFilterInput {
 """Filter for listing guardians in an institute"""
 input ListGuardiansFilterInput {
   """
-  Full-text search across first/last name via the generated `tenant_user_profiles.search_vector` column (English + Hindi tokens). Uses plainto_tsquery, so input is treated as literal text (no operator parsing) which protects against query injection.
+  Full-text search across first/last name via the generated `tenant_user_profiles.search_vector` column (English + Hindi tokens). Each typed word matches the start of a name word; punctuation is ignored.
   """
   search: String
 }
@@ -7696,10 +7696,21 @@ input UpdateSectionInput {
 
 """Input for updating staff member — optimistic concurrency via version"""
 input UpdateStaffInput {
+  """Date of birth (YYYY-MM-DD)"""
+  dateOfBirth: String
   department: String
   designation: String
   employmentType: EmploymentType
+
+  """
+  First name as this institute records it. Changes the institute's copy only.
+  """
+  firstName: I18nText
+  gender: Gender
   isClassTeacher: Boolean
+
+  """Last name as this institute records it. Null removes it."""
+  lastName: I18nText
   socialCategory: SocialCategory
   specialization: String
 

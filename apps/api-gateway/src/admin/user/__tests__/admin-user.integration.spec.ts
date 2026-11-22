@@ -135,7 +135,7 @@ describe('Admin user queries (integration)', () => {
       });
       await tx
         .insert(phoneNumbers)
-        .values({ userId, countryCode: '91', number: phone, isPrimary: true, ...audit });
+        .values({ userId, countryCode: '+91', number: phone, isPrimary: true, ...audit });
       await tx.insert(userIdentifiers).values([
         {
           userId,
@@ -239,7 +239,7 @@ describe('Admin user queries (integration)', () => {
       gender: 'FEMALE',
       nationality: 'Indian',
     });
-    expect(user?.primaryPhone).toEqual({ countryCode: '91', number: phone });
+    expect(user?.primaryPhone).toEqual({ countryCode: '+91', number: phone });
     expect(user?.lastActiveAt).not.toBeNull();
     expect(user?.memberships.map((m) => m.tenantId).sort()).toEqual(
       [instituteA.tenantId, instituteB.tenantId].sort(),
