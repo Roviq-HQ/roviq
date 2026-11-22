@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
 import { notificationChannel, notificationDeliveryStatus } from '../common/enums';
-import { roviqAdmin, roviqApp } from '../common/rls-policies';
+import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
 import { institutes } from '../tenant/institutes';
 import { notifications } from './notifications';
@@ -88,6 +88,12 @@ export const notificationDeliveries = pgTable(
       for: 'select',
       to: roviqApp,
       using: sql`scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+    }),
+    // Stated, not implied: a reseller reads no delivery row (its SELECT grant is revoked too).
+    pgPolicy('notification_deliveries_reseller_none', {
+      for: 'select',
+      to: roviqReseller,
+      using: sql`false`,
     }),
     pgPolicy('notification_deliveries_admin_select', {
       for: 'select',
