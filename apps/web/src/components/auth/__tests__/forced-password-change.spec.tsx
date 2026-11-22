@@ -119,6 +119,8 @@ describe('ForcedPasswordChange', () => {
   });
 
   it('changes the password, confirms, and then sends the user to sign in', async () => {
+    // The redirect waits 4 s; real time would leave no room in the 5 s test budget.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const accessToken = storeSession(true);
     const { changePassword } = renderScreen();
     await screen.findByTestId(ids.title);
@@ -127,7 +129,9 @@ describe('ForcedPasswordChange', () => {
 
     expect(changePassword).toHaveBeenCalledWith('Temp-Password-1', 'New-Pass-2x', accessToken);
     expect(await screen.findByTestId(ids.success)).toHaveTextContent(copy.successTitle);
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'), { timeout: 6000 });
+    expect(replace).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(4000));
+    expect(replace).toHaveBeenCalledWith('/login');
   });
 
   it.each([
