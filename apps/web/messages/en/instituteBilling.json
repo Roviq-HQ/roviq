@@ -41,7 +41,21 @@
     "title": "Invoices",
     "description": "View your billing invoices.",
     "empty": "No invoices yet.",
-    "due": "Due"
+    "due": "Due",
+    "emptyFiltered": "No invoices match this status. Try another status or clear the filter.",
+    "accessDenied": "You do not have permission to view invoices.",
+    "loadMore": "Load more",
+    "filters": {
+      "status": "Status",
+      "clearFilters": "Clear filters"
+    },
+    "columns": {
+      "invoiceNumber": "Invoice",
+      "billingPeriod": "Billing period",
+      "total": "Total",
+      "status": "Status",
+      "dueDate": "Due date"
+    }
   },
   "invoiceDetail": {
     "title": "Invoice Details",
@@ -109,6 +123,7 @@
     "RAZORPAY": "Razorpay",
     "CASHFREE": "Cashfree",
     "UPI": "UPI",
+    "UPI_P2P": "UPI transfer (UTR)",
     "BANK_TRANSFER": "Bank Transfer",
     "CASH": "Cash",
     "CHEQUE": "Cheque"
@@ -128,5 +143,10 @@
     "checkoutUnavailable": "The payment window could not be opened. Check your internet connection and try again.",
     "pdfFailed": "The invoice PDF could not be downloaded. Please try again.",
     "PAYER_CONTACT_MISSING": "Online payment needs your institute's phone number and email. Add them in institute settings, then try again."
+  },
+  "realtime": {
+    "newInvoice": "New invoice",
+    "newInvoiceDescription": "A new invoice has been raised for your institute.",
+    "openInvoice": "Open"
   }
 }

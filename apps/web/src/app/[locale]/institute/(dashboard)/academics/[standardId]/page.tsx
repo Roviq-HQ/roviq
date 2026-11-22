@@ -28,6 +28,7 @@ import {
   EmptyTitle,
   FieldGroup,
   I18nField,
+  setServerFieldError,
   Tabs,
   TabsContent,
   TabsList,
@@ -692,18 +693,8 @@ function CreateSectionDialog({
         form.reset();
       } catch (err) {
         dispatchSectionError(err, t, {
-          'name.en': (message) =>
-            form.setFieldMeta('name.en', (prev) => ({
-              ...prev,
-              isTouched: true,
-              errorMap: { ...prev.errorMap, onSubmit: message },
-            })),
-          streamName: (message) =>
-            form.setFieldMeta('streamName', (prev) => ({
-              ...prev,
-              isTouched: true,
-              errorMap: { ...prev.errorMap, onSubmit: message },
-            })),
+          'name.en': (message) => setServerFieldError(form, 'name.en', message),
+          streamName: (message) => setServerFieldError(form, 'streamName', message),
         });
       }
     },
@@ -944,12 +935,7 @@ function CreateSubjectDialog({ standardId: _standardId }: { standardId: string }
         form.reset();
       } catch (err) {
         dispatchSubjectError(err, t, {
-          boardCode: (message) =>
-            form.setFieldMeta('boardCode', (prev) => ({
-              ...prev,
-              isTouched: true,
-              errorMap: { ...prev.errorMap, onSubmit: message },
-            })),
+          boardCode: (message) => setServerFieldError(form, 'boardCode', message),
         });
       }
     },

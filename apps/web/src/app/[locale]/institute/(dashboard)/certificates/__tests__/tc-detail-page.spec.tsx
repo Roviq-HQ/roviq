@@ -4,6 +4,7 @@
  */
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { ErrorCode, TC_STATUS_VALUES, type TcStatus } from '@roviq/common-types';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ const tcState = vi.hoisted(() => ({
   status: 'GENERATED',
   isDuplicate: false,
   tcData: null as Record<string, string | null> | null,
+  pdf: null as { id: string } | null,
 }));
 
 function tcNode(status: string) {
@@ -36,8 +38,8 @@ function tcNode(status: string) {
     isDuplicate: tcState.isDuplicate,
     isCounterSigned: false,
     originalTcId: tcState.isDuplicate ? 'tc-original' : null,
-    pdfUrl: null,
-    qrVerificationUrl: null,
+    pdf: tcState.pdf,
+    verificationUrl: null,
     academicYearId: 'year-1',
     studentProfileId: 'student-1',
     studentFirstName: { en: 'Asha' },
@@ -65,6 +67,7 @@ const DUPLICATES = [
 const approve: [ReturnType<typeof vi.fn>, { loading: boolean }] = [vi.fn(), { loading: false }];
 const issue: [ReturnType<typeof vi.fn>, { loading: boolean }] = [vi.fn(), { loading: false }];
 const other: [ReturnType<typeof vi.fn>, { loading: boolean }] = [vi.fn(), { loading: false }];
+const generatePdf: [ReturnType<typeof vi.fn>, { loading: boolean }] = [vi.fn(), { loading: false }];
 const useTCsMock = vi.fn((_filter: { originalTcId?: string }) => ({
   tcs: DUPLICATES,
   loading: false,
@@ -78,8 +81,25 @@ vi.mock('../use-certificates', () => ({
   useTCs: (filter: { originalTcId?: string }) => useTCsMock(filter),
   useApproveTC: () => approve,
   useIssueTC: () => issue,
+  useGenerateTCPdf: () => generatePdf,
   useRejectTC: () => other,
   useRequestDuplicateTC: () => other,
+}));
+
+vi.mock('@web/components/file-upload/file-download-button', () => ({
+  FileDownloadButton: ({
+    fileId,
+    label,
+    testId,
+  }: {
+    fileId: string;
+    label: string;
+    testId: string;
+  }) => (
+    <button type="button" data-testid={testId} data-file-id={fileId}>
+      {label}
+    </button>
+  ),
 }));
 
 vi.mock('sonner', () => ({
@@ -91,6 +111,7 @@ beforeEach(() => {
   tcState.status = 'GENERATED';
   tcState.isDuplicate = false;
   tcState.tcData = null;
+  tcState.pdf = null;
 });
 
 import TCDetailPage from '../tc/[id]/page';
@@ -183,6 +204,37 @@ describe('TCDetailPage (component)', () => {
     expect(
       screen.getByRole('button', { name: messagesEn.tc.requestDuplicate }),
     ).toBeInTheDocument();
+  });
+
+  it('downloads the PDF of an issued TC through the audited button, not a link', () => {
+    tcState.status = 'ISSUED';
+    tcState.pdf = { id: 'file-1' };
+    renderWithProviders(<TCDetailPage />);
+
+    const download = screen.getByTestId(testIds.instituteCertificatesTc.downloadPdfBtn);
+    expect(download).toHaveAttribute('data-file-id', 'file-1');
+    expect(download).toHaveTextContent(messagesEn.actions.downloadPdf);
+    expect(
+      screen.queryByTestId(testIds.instituteCertificatesTc.generatePdfBtn),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers Generate PDF on an issued TC that has no PDF, and nothing before issue', async () => {
+    tcState.status = 'ISSUED';
+    const { unmount } = renderWithProviders(<TCDetailPage />);
+
+    await userEvent.click(screen.getByTestId(testIds.instituteCertificatesTc.generatePdfBtn));
+    expect(generatePdf[0]).toHaveBeenCalledWith({ variables: { id: 'tc-1' } });
+    unmount();
+
+    tcState.status = 'APPROVED';
+    renderWithProviders(<TCDetailPage />);
+    expect(
+      screen.queryByTestId(testIds.instituteCertificatesTc.generatePdfBtn),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(testIds.instituteCertificatesTc.downloadPdfBtn),
+    ).not.toBeInTheDocument();
   });
 
   it('labels the TC fields in certificate order and hides unknown keys', () => {

@@ -26,6 +26,9 @@ import type { DrizzleDB } from '../../providers';
 import { SEED_ADMIN_PHONE, SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
+// Seeded people own their addresses: their email can identify them when a role is granted.
+const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
+
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 
 export async function seedInstituteRoles(tx: DrizzleDB, inst1Id: string, inst2Id: string) {
@@ -115,6 +118,7 @@ export async function seedUsersAndMemberships(
       username: SEED_CREDENTIALS.ADMIN.username,
       email: 'admin@svm-ggn.edu.in',
       passwordHash: adminPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
     .returning();
@@ -127,6 +131,7 @@ export async function seedUsersAndMemberships(
       username: SEED_CREDENTIALS.TEACHER.username,
       email: 'teacher1@svm-ggn.edu.in',
       passwordHash: teacherPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
     .returning();
@@ -139,6 +144,7 @@ export async function seedUsersAndMemberships(
       username: SEED_CREDENTIALS.STUDENT.username,
       email: 'student1@svm-ggn.edu.in',
       passwordHash: studentPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
     .returning();
@@ -151,6 +157,7 @@ export async function seedUsersAndMemberships(
       username: SEED_CREDENTIALS.RESELLER.username,
       email: 'reseller1@roviq.com',
       passwordHash: resellerPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
     .returning();
@@ -164,6 +171,7 @@ export async function seedUsersAndMemberships(
       username: SEED_CREDENTIALS.GUARDIAN.username,
       email: 'guardian1@svm-ggn.edu.in',
       passwordHash: guardianPassword,
+      emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
     })
     .onConflictDoUpdate({ target: users.username, set: { updatedAt: new Date() } })
     .returning();

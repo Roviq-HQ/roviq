@@ -27,6 +27,7 @@ import { InstituteAccessGuard } from '../auth/middleware/institute-access.guard'
 import { MustChangePasswordGuard } from '../auth/middleware/must-change-password.guard';
 import { ResellerAccessGuard } from '../auth/middleware/reseller-access.guard';
 import { TenantMiddleware } from '../auth/middleware/tenant.middleware';
+import { TokenVersionGuard } from '../auth/middleware/token-version.guard';
 import { consumeWsTicket } from '../auth/ws-ticket.store';
 import { CaslModule } from '../casl/casl.module';
 import { readFieldMiddleware } from '../casl/read-field.middleware';
@@ -41,6 +42,7 @@ import { InstituteScopeModule } from '../institute/institute-scope.module';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
 import { NovuProxyModule } from '../novu-proxy/novu-proxy.module';
 import { PasskeyModule } from '../passkey/passkey.module';
+import { PublicVerificationModule } from '../public-verification/public-verification.module';
 import { ResellerModule } from '../reseller/reseller.module';
 import { AppController } from './app.controller';
 import { AppResolver } from './app.resolver';
@@ -125,6 +127,7 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     AdminModule,
     ResellerModule,
     InstituteScopeModule,
+    PublicVerificationModule,
     NovuProxyModule,
     EeModule.register(),
   ],
@@ -140,6 +143,11 @@ const gqlErrorLogger = new Logger('GraphqlErrorFormatter');
     DateOnlyScalar,
     DateTimeScalar,
     I18nTextScalar,
+    // First: a token whose sessions were ended must not reach any other check.
+    {
+      provide: APP_GUARD,
+      useClass: TokenVersionGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: ImpersonationSessionGuard,

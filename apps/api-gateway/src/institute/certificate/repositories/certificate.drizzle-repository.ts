@@ -11,7 +11,8 @@ import {
   userProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { markFilesReady } from '../../../files/file-attachment';
 import { CertificateRepository } from './certificate.repository';
 import type {
   CertificateListFilter,
@@ -125,13 +126,34 @@ export class CertificateDrizzleRepository extends CertificateRepository {
           status: CertificateStatus.ISSUED,
           issuedDate: data.issuedDate,
           issuedBy: data.actorId,
-          pdfUrl: data.pdfUrl,
           updatedBy: data.actorId,
         })
         .where(eq(issuedCertificates.id, data.id))
         .returning(),
     );
     return row ?? null;
+  }
+
+  attachPdf(
+    ctx: InstituteContext,
+    data: { certificateId: string; fileId: string; actorId: string },
+  ): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .update(issuedCertificates)
+        .set({ pdfFileId: data.fileId, updatedBy: data.actorId })
+        .where(
+          and(eq(issuedCertificates.id, data.certificateId), isNull(issuedCertificates.pdfFileId)),
+        )
+        .returning({ id: issuedCertificates.id });
+      if (rows.length === 0) return false;
+      await markFilesReady(tx, {
+        fileIds: [data.fileId],
+        purpose: 'CERTIFICATE_PDF',
+        userId: data.actorId,
+      });
+      return true;
+    });
   }
 
   async findById(ctx: InstituteContext, id: string): Promise<IssuedCertificateRow | null> {

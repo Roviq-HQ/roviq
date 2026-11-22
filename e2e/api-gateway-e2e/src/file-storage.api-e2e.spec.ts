@@ -69,6 +69,12 @@ const DOWNLOAD_URL = `mutation Download($fileId: ID!) { fileDownloadUrl(fileId: 
 
 const PDF = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(4096, 0x20)]);
 const NOT_A_PDF = Buffer.from('MZ this is an executable pretending to be a PDF');
+// The standard antivirus test file, inside a PDF. Split so this source is not itself flagged.
+const INFECTED_PDF = Buffer.from(
+  ['%PDF-1.7\n', 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$', 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'].join(
+    '',
+  ),
+);
 
 function codeOf(res: { errors?: readonly { extensions?: Record<string, unknown> }[] }) {
   return res.errors?.[0]?.extensions?.code;
@@ -386,6 +392,21 @@ describe('File storage E2E', () => {
       const res = await applyLeave(tokenA, SEED_IDS.MEMBERSHIP_ADMIN_INST1, '2027-01-12', [fileId]);
 
       expect(codeOf(res)).toBe(ErrorCode.FILE_CONTENT_MISMATCH);
+    });
+
+    it('should refuse a file the malware scan flags, and never serve it', async () => {
+      const fileId = await uploadFile(tokenA, INFECTED_PDF);
+
+      const res = await applyLeave(tokenA, SEED_IDS.MEMBERSHIP_ADMIN_INST1, '2027-01-27', [fileId]);
+      expect(codeOf(res)).toBe(ErrorCode.FILE_INFECTED);
+
+      // Quarantined: it can be neither attached again nor downloaded.
+      const again = await applyLeave(tokenA, SEED_IDS.MEMBERSHIP_ADMIN_INST1, '2027-01-27', [
+        fileId,
+      ]);
+      expect(codeOf(again)).toBe(ErrorCode.FILE_NOT_FOUND);
+      const download = await gql<{ fileDownloadUrl: string }>(DOWNLOAD_URL, { fileId }, tokenA);
+      expect(codeOf(download)).toBe(ErrorCode.FILE_NOT_FOUND);
     });
 
     it('should refuse to attach a file that was requested but never uploaded', async () => {

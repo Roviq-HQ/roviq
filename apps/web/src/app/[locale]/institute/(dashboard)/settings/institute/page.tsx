@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryState } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { StorageUsageCard } from './components/storage-usage-card';
 import { InstituteBrandingTab } from './institute-branding-tab';
 import { InstituteConfigTab } from './institute-config-tab';
 import { InstituteInfoTab } from './institute-info-tab';
@@ -103,6 +104,8 @@ export default function InstituteSettingsPage() {
         <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
       </div>
+
+      <StorageUsageCard />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

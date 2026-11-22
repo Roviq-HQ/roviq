@@ -13,6 +13,8 @@ export interface UserRecord {
   passwordChangedAt: Date | null;
   /** ROV-96 — first-login enforcement. True when an admin-created user has never rotated their temp password. */
   mustChangePassword: boolean;
+  emailVerifiedAt: Date | null;
+  tokenVersion: number;
 }
 
 export interface InstituteInfo {

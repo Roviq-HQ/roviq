@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
@@ -148,10 +149,9 @@ function fieldErrorFor(code: string | null) {
       return { field: 'code', messageKey: 'codeDuplicate' } as const;
     case ErrorCode.RESELLER_INVALID:
       return { field: 'resellerId', messageKey: 'resellerInvalid' } as const;
-    case ErrorCode.INSTITUTE_ADMIN_EMAIL_UNAVAILABLE:
-      return { field: 'firstAdmin.email', messageKey: 'firstAdmin.emailUnavailable' } as const;
-    case ErrorCode.PHONE_ALREADY_IN_USE:
-      return { field: 'firstAdmin.phone', messageKey: 'firstAdmin.phoneInUse' } as const;
+    case ErrorCode.INSTITUTE_ADMIN_UNAVAILABLE:
+      // One message for every reason; the server never says which detail is the problem.
+      return { field: 'firstAdmin.email', messageKey: 'firstAdmin.unavailable' } as const;
     default:
       return null;
   }
@@ -293,11 +293,7 @@ export default function CreateInstitutePage() {
         const fieldError = fieldErrorFor(code);
         if (fieldError) {
           const message = t(fieldError.messageKey);
-          form.setFieldMeta(fieldError.field, (prev) => ({
-            ...prev,
-            isTouched: true,
-            errorMap: { ...prev.errorMap, onChange: message },
-          }));
+          setServerFieldError(form, fieldError.field, message);
           toast.error(message);
         } else {
           toast.error(t('error'), {

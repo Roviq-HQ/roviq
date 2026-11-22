@@ -1,6 +1,16 @@
 import { entityColumns, resellers, roviqAdmin, roviqReseller } from '@roviq/database';
 import { sql } from 'drizzle-orm';
-import { boolean, index, jsonb, pgPolicy, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  pgPolicy,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { gatewayConfigStatus } from './enums';
 
 export const gatewayConfigs = pgTable(
@@ -25,6 +35,10 @@ export const gatewayConfigs = pgTable(
   (table) => [
     index('gwc_reseller_id_idx').on(table.resellerId),
     index('gwc_reseller_provider_idx').on(table.resellerId, table.provider),
+    // Online orders go to the default config, so a reseller has at most one.
+    uniqueIndex('gwc_reseller_default_key')
+      .on(table.resellerId)
+      .where(sql`is_default AND deleted_at IS NULL`),
     // Reseller: full CRUD on own gateway configs. Soft-delete visibility
     // lives in `gatewayConfigsLive`, not RLS — see drizzle-database skill.
     pgPolicy('gwc_reseller_all', {

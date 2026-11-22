@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { AuditInstitute } from '@roviq/audit';
 import { assertResellerContext, CurrentUser, ResellerScope } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import type { AuthUser } from '@roviq/common-types';
@@ -146,6 +147,7 @@ export class ResellerBillingResolver {
   // Subscriptions (ROV-116)
   // ---------------------------------------------------------------------------
 
+  @AuditInstitute('input.tenantId')
   @Mutation(() => AssignPlanResult, { name: 'assignPlanToInstitute' })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'create', subject: 'Subscription' })
@@ -244,6 +246,7 @@ export class ResellerBillingResolver {
     return items;
   }
 
+  @AuditInstitute('input.tenantId')
   @Mutation(() => InvoiceModel, { name: 'generateInvoice' })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'create', subject: 'Invoice' })
@@ -271,7 +274,7 @@ export class ResellerBillingResolver {
     @Args('invoiceId', { type: () => ID }) invoiceId: string,
     @Args('input') input: ManualPaymentInput,
   ) {
-    return this.paymentService.recordManualPayment(rid(user), invoiceId, input);
+    return this.paymentService.recordManualPayment(rid(user), invoiceId, input, user.membershipId);
   }
 
   @Mutation(() => InvoiceModel, { name: 'issueRefund' })
@@ -342,6 +345,19 @@ export class ResellerBillingResolver {
   // ---------------------------------------------------------------------------
   // UPI P2P verification (ROV-119 — reseller verifies/rejects UPI proofs)
   // ---------------------------------------------------------------------------
+
+  @Query(() => [PaymentModel], {
+    name: 'invoicePayments',
+    description: 'Every payment recorded against one invoice, newest first',
+  })
+  @UseGuards(AbilityGuard)
+  @CheckAbility({ action: 'read', subject: 'Payment' })
+  async resellerInvoicePayments(
+    @CurrentUser() user: AuthUser,
+    @Args('invoiceId', { type: () => ID }) invoiceId: string,
+  ) {
+    return this.paymentService.listInvoicePayments(rid(user), invoiceId);
+  }
 
   @Query(() => [PaymentModel], { name: 'unverifiedPayments' })
   @UseGuards(AbilityGuard)

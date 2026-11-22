@@ -47,6 +47,19 @@ export const testIds = {
     save: 'institute-locales-save',
   },
 
+  accountEmail: {
+    card: 'account-email-card',
+    loading: 'account-email-loading',
+    retryBtn: 'account-email-retry-btn',
+    address: 'account-email-address',
+    verifiedBadge: 'account-email-verified-badge',
+    unverifiedBadge: 'account-email-unverified-badge',
+    sendBtn: 'account-email-send-btn',
+    codeInput: 'account-email-code-input',
+    codeError: 'account-email-code-error',
+    verifyBtn: 'account-email-verify-btn',
+    resendBtn: 'account-email-resend-btn',
+  },
   accountLocale: {
     card: 'account-language-card',
     select: 'account-language-select',
@@ -105,6 +118,11 @@ export const testIds = {
   // ── Admin: institutes list + filters + columns ─────────────────────────
   adminInstitutes: {
     page: 'institutes-page',
+    deletedOpenBtn: 'institutes-deleted-open-btn',
+    deletedDialog: 'institutes-deleted-dialog',
+    deletedEmpty: 'institutes-deleted-empty',
+    deletedRow: (id: string) => `institutes-deleted-row-${id}`,
+    deletedRestoreBtn: (id: string) => `institutes-deleted-restore-btn-${id}`,
     title: 'institutes-title',
     description: 'institutes-description',
     table: 'institutes-table',
@@ -281,6 +299,7 @@ export const testIds = {
     instituteFilterClear: 'audit-log-institute-filter-clear',
     clearFilters: 'audit-log-clear-filters',
     entityLink: (logId: string) => `audit-log-entity-link-${logId}`,
+    outsideActorBadge: (id: string) => `audit-log-outside-actor-${id}`,
     detailEntityLink: 'audit-log-detail-entity-link',
   },
 
@@ -391,6 +410,7 @@ export const testIds = {
     tenantTable: 'admin-monitoring-tenant-table',
     tenantRow: (id: string) => `admin-monitoring-tenant-row-${id}`,
     tenantSort: (field: string) => `admin-monitoring-tenant-sort-${field}`,
+    tenantStorage: (id: string) => `admin-monitoring-tenant-storage-${id}`,
     tenantResellerFilter: 'admin-monitoring-tenant-reseller-filter',
     tenantEmpty: 'admin-monitoring-tenant-empty',
     tenantError: 'admin-monitoring-tenant-error',
@@ -827,6 +847,7 @@ export const testIds = {
     detailDocumentRemoveConfirmBtn: 'students-detail-document-remove-confirm-btn',
     detailDocumentRemoveCancelBtn: 'students-detail-document-remove-cancel-btn',
     detailTcEmpty: 'students-detail-tc-empty',
+    detailTcDownloadBtn: (id: string) => `students-detail-tc-download-btn-${id}`,
     detailAuditEmpty: 'students-detail-audit-empty',
     detailAcademicsEmpty: 'students-detail-academics-empty',
     detailTitle: 'students-detail-title',
@@ -1083,8 +1104,21 @@ export const testIds = {
   },
 
   // ── Institute: certificates → TC ──────────────────────────────────────
+  // Public TC verification page (opened from the QR code)
+  tcVerify: {
+    card: 'tc-verify-card',
+    loading: 'tc-verify-loading',
+    error: 'tc-verify-error',
+    retryBtn: 'tc-verify-retry-btn',
+    notFound: 'tc-verify-not-found',
+    valid: 'tc-verify-valid',
+    invalid: 'tc-verify-invalid',
+    serial: 'tc-verify-serial',
+  },
   instituteCertificatesTc: {
     title: 'tc-title',
+    downloadPdfBtn: 'tc-download-pdf-btn',
+    generatePdfBtn: 'tc-generate-pdf-btn',
     table: 'tc-table',
     // Request dialog
     requestAcademicYearInfo: 'tc-request-academic-year-info',
@@ -1344,6 +1378,10 @@ export const testIds = {
 
   // ── Institute: settings → institute info/branding/config ──────────────
   instituteSettings: {
+    storageCard: 'settings-storage-card',
+    storageUsed: 'settings-storage-used',
+    storageBar: 'settings-storage-bar',
+    storageWarning: 'settings-storage-warning',
     // Info tab
     infoRefreshBtn: 'settings-info-refresh-btn',
     infoCodeInput: 'settings-info-code-input',
@@ -1713,6 +1751,7 @@ export const testIds = {
   // ── Reseller: billing → gateway configs ───────────────────────────────
   resellerBillingGateway: {
     vpaInfo: 'billing-gateway-vpa-info',
+    defaultSwitch: 'billing-gateway-default-switch',
     keyIdInfo: 'billing-gateway-key-id-info',
     keySecretInfo: 'billing-gateway-key-secret-info',
     webhookSecretInfo: 'billing-gateway-webhook-secret-info',
@@ -1720,20 +1759,41 @@ export const testIds = {
     defaultInfo: 'billing-gateway-default-info',
   },
 
+  // ── Reseller: billing → dashboard ─────────────────────────────────────
+  resellerBillingDashboard: {
+    metric: (name: 'mrr' | 'active' | 'churn' | 'overdue') => `reseller-billing-dashboard-${name}`,
+  },
+
+  // ── Reseller: billing → UPI verification ──────────────────────────────
+  resellerBillingUpi: {
+    table: 'reseller-billing-upi-table',
+    empty: 'reseller-billing-upi-empty',
+  },
+
   // ── Reseller: billing → invoices ──────────────────────────────────────
   resellerBillingInvoices: {
+    table: 'reseller-billing-invoices-table',
+    statusFilter: 'reseller-billing-invoices-status-filter',
     // Record payment dialog
     recordPaymentMethodInfo: 'billing-record-payment-method-info',
     recordPaymentReceiptInfo: 'billing-record-payment-receipt-info',
-    recordPaymentCollectedByInfo: 'billing-record-payment-collected-by-info',
+    recordPaymentCollectedBySelf: 'billing-record-payment-collected-by-self',
     recordPaymentCollectionDateInfo: 'billing-record-payment-collection-date-info',
     // Refund dialog
     refundAmountInfo: 'billing-refund-amount-info',
     refundReasonInfo: 'billing-refund-reason-info',
+    refundPaymentSelect: 'billing-refund-payment-select',
+    refundPaymentOption: (id: string) => `billing-refund-payment-option-${id}`,
+    refundNoPayment: 'billing-refund-no-payment',
+    refundAmountError: 'billing-refund-amount-error',
+    refundSubmit: 'billing-refund-submit',
   },
 
   // ── Reseller: billing → subscriptions ─────────────────────────────────
   resellerBillingSubscriptions: {
+    table: 'reseller-billing-subscriptions-table',
+    pauseBtn: 'billing-subscription-pause-btn',
+    resumeBtn: 'billing-subscription-resume-btn',
     assignPlanBtn: 'billing-assign-plan-btn',
     // Assign plan dialog
     assignPlanDialog: 'billing-assign-plan-dialog',
@@ -1743,10 +1803,33 @@ export const testIds = {
     subscriptionReasonInfo: 'billing-subscription-reason-info',
   },
 
+  // ── Institute: billing → overview and payments ──────────────────────
+  instituteBillingOverview: {
+    subscriptionCard: 'institute-billing-subscription-card',
+    statusBadge: 'institute-billing-status-badge',
+    noSubscription: 'institute-billing-no-subscription',
+  },
+  instituteBillingPayments: {
+    list: 'institute-payments-list',
+    empty: 'institute-payments-empty',
+    row: (id: string) => `institute-payment-row-${id}`,
+  },
+
   // ── Institute: billing → invoice detail ──────────────────────────────
   instituteBillingInvoice: {
     payOnlineBtn: 'institute-invoice-pay-online-btn',
     paymentConfirming: 'institute-invoice-payment-confirming',
     lineItemRow: (index: number) => `institute-invoice-line-item-${index}`,
+  },
+
+  // ── Institute: billing → invoice list ────────────────────────────────
+  instituteBillingInvoices: {
+    table: 'institute-invoices-table',
+    statusFilter: 'institute-invoices-status-filter',
+    clearFilters: 'institute-invoices-clear-filters',
+    loadMore: 'institute-invoices-load-more',
+    empty: 'institute-invoices-empty',
+    accessDenied: 'institute-invoices-access-denied',
+    invoiceLink: (id: string) => `institute-invoice-link-${id}`,
   },
 } as const;

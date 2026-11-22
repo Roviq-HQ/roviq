@@ -1,7 +1,12 @@
 'use client';
 
 import { gql, useLazyQuery, useMutation, useQuery } from '@roviq/graphql';
-import type { InvoiceModel, PaymentModel, SubscriptionModel } from '@roviq/graphql/generated';
+import type {
+  InvoiceModel,
+  InvoiceStatus,
+  PaymentModel,
+  SubscriptionModel,
+} from '@roviq/graphql/generated';
 
 export type MySubscription = SubscriptionModel;
 
@@ -85,8 +90,8 @@ const MY_INVOICE_QUERY = gql`
 `;
 
 const MY_INVOICES_QUERY = gql`
-  query MyInvoices($first: Int, $after: String) {
-    myInvoices(first: $first, after: $after) {
+  query MyInvoices($filter: BillingFilterInput, $first: Int, $after: String) {
+    myInvoices(filter: $filter, first: $first, after: $after) {
       id tenantId invoiceNumber status
       subtotalAmount taxAmount totalAmount paidAmount currency
       periodStart periodEnd dueAt paidAt createdAt
@@ -152,9 +157,18 @@ export function useMyInvoice(id: string) {
   return { invoice: data?.myInvoice ?? null, loading, error, refetch };
 }
 
-export function useMyInvoices(first = 20, after?: string) {
+export function useMyInvoices({
+  first,
+  status,
+  skip,
+}: {
+  first: number;
+  status?: InvoiceStatus;
+  skip: boolean;
+}) {
   const { data, loading, error } = useQuery<MyInvoicesQuery>(MY_INVOICES_QUERY, {
-    variables: { first, after },
+    variables: { filter: status ? { status } : undefined, first },
+    skip,
   });
   return { invoices: data?.myInvoices ?? [], loading, error };
 }

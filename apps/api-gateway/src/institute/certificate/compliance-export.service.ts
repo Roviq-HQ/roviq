@@ -88,10 +88,14 @@ export class ComplianceExportService {
   }
 
   /** 60-second link to a finished export, for a platform admin. */
-  async adminDownloadUrl(admin: PlatformContext, fileId: string): Promise<string> {
+  /** `tenantId`: the institute the export belongs to, for the audit entry of the download. */
+  async adminDownloadUrl(
+    admin: PlatformContext,
+    fileId: string,
+  ): Promise<{ url: string; tenantId: string | null }> {
     const file = await this.repo.findCompletedExportFile(admin, fileId);
     if (!file) throw new BusinessException(ErrorCode.EXPORT_REPORT_NOT_FOUND, 'Export not found.');
-    return this.files.signedDownloadUrl(file);
+    return { url: await this.files.signedDownloadUrl(file), tenantId: file.tenantId };
   }
 
   /** A run Temporal has already ended never updates its row; close such rows here. */

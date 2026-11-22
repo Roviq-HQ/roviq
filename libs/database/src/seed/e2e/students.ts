@@ -17,6 +17,9 @@ import type { DrizzleDB } from '../../providers';
 import { SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
 
+// Seeded people own their addresses: their email can identify them when a role is granted.
+const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
+
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 
 interface StudentFixture {
@@ -144,6 +147,7 @@ export async function seedE2eStudents(
         username: s.username,
         email: s.email,
         passwordHash: studentPassword,
+        emailVerifiedAt: SEED_EMAIL_VERIFIED_AT,
       })),
     )
     .onConflictDoNothing({ target: users.id });

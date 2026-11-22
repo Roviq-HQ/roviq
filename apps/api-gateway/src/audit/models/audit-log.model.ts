@@ -8,6 +8,12 @@ export class AuditLog {
   @Field(() => ID)
   id!: string;
 
+  @Field({
+    description:
+      "Who acted: 'institute', 'reseller' or 'platform'. An institute also sees reseller and platform actions that were about it.",
+  })
+  scope!: string;
+
   /** NULL for platform and reseller-scoped actions */
   @Field(() => String, { nullable: true })
   tenantId!: string | null;

@@ -66,3 +66,10 @@ export interface CreateFileData {
   sizeBytes: number;
   status: FileStatus;
 }
+
+export interface StorageUsageRecord {
+  /** Files attached to a record. */
+  readyBytes: number;
+  /** Declared size of uploads started and not yet attached or expired. */
+  pendingBytes: number;
+}

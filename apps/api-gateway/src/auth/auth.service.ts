@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
@@ -20,6 +20,8 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
+import { REDIS_CLIENT } from '@roviq/redis';
+import type Redis from 'ioredis';
 import { AuthEventService } from './auth-event.service';
 import type { AuthPayload, InstituteLoginResult } from './dto/auth-payload';
 import { LoginLockoutService } from './login-lockout.service';
@@ -29,6 +31,7 @@ import { RefreshTokenRepository } from './repositories/refresh-token.repository'
 import { ResellerMembershipRepository } from './repositories/reseller-membership.repository';
 import type { RefreshTokenWithRelations, UserRecord } from './repositories/types';
 import { UserRepository } from './repositories/user.repository';
+import { recordTokenVersion } from './token-version-cache';
 
 const ACCOUNT_LOCKED_MESSAGE = 'Too many attempts. Try again in 30 minutes.';
 
@@ -44,6 +47,8 @@ interface AccessTokenPayload {
   type: 'access';
   /** ROV-96 — first-login enforcement claim. Read by MustChangePasswordGuard via JwtStrategy. */
   mustChangePassword?: boolean;
+  /** `users.token_version` at issue; an older value than the user's current one is refused. */
+  tv: number;
   // Impersonation fields (optional)
   isImpersonated?: boolean;
   impersonatorId?: string;
@@ -97,6 +102,7 @@ export class AuthService {
     private readonly abilityFactory: AbilityFactory,
     private readonly lockout: LoginLockoutService,
     private readonly eventBus: EventBusService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   getPreferredLocale(userId: string): Promise<string | null> {
@@ -710,8 +716,10 @@ export class AuthService {
     }
 
     const newHash = await hash(newPassword);
-    await this.userRepo.updatePassword(userId, newHash);
+    const tokenVersion = await this.userRepo.updatePassword(userId, newHash);
     await this.refreshTokenRepo.revokeAllForUser(userId, 'password_change');
+    // Ends the access tokens already issued, on their next request.
+    await recordTokenVersion(this.redis, userId, tokenVersion);
 
     this.authEventService
       .emit({
@@ -1054,6 +1062,7 @@ export class AuthService {
       roleId: opts.roleId,
       type: 'access',
       mustChangePassword: opts.user.mustChangePassword ?? false,
+      tv: opts.user.tokenVersion,
     };
 
     const refreshPayload: RefreshTokenPayload = {

@@ -107,6 +107,11 @@ vi.mock('../../people/students/use-students', () => ({
 interface LeaveFixture {
   id: string;
   userId: string;
+  applicant: {
+    firstName: Record<string, string>;
+    lastName: Record<string, string> | null;
+    admissionNumber: string | null;
+  } | null;
   startDate: string;
   endDate: string;
   type: 'MEDICAL' | 'CASUAL' | 'BEREAVEMENT' | 'EXAM' | 'OTHER';
@@ -165,6 +170,11 @@ function pendingLeave(overrides: Partial<LeaveFixture> = {}): LeaveFixture {
   return {
     id: 'leave-1',
     userId: STUDENT.membershipId,
+    applicant: {
+      firstName: { en: 'Priya' },
+      lastName: { en: 'Singh' },
+      admissionNumber: 'S-2026/0001',
+    },
     startDate: '2026-04-10',
     endDate: '2026-04-11',
     type: 'CASUAL',
@@ -293,12 +303,33 @@ describe('LeavesPage', () => {
     expect(querySetters.get('userId')).toHaveBeenCalledWith(STUDENT.membershipId);
   });
 
-  it('names the applicant from the student list by membership id', () => {
+  it('names a student applicant with the admission number', () => {
     hookState.leaves = [pendingLeave()];
     renderWithProviders(<LeavesPage />);
     expect(screen.getByTestId('leave-row-leave-1-applicant')).toHaveTextContent(
       'Priya Singh · S-2026/0001',
     );
+  });
+
+  it('names a staff applicant, who is not in the student list, by name alone', () => {
+    hookState.leaves = [
+      pendingLeave({
+        userId: 'staff-membership-1',
+        applicant: {
+          firstName: { en: 'Rajesh' },
+          lastName: { en: 'Sharma' },
+          admissionNumber: null,
+        },
+      }),
+    ];
+    renderWithProviders(<LeavesPage />);
+    expect(screen.getByTestId('leave-row-leave-1-applicant')).toHaveTextContent(/^Rajesh Sharma$/);
+  });
+
+  it('says the person is unknown, never part of an id, when there is no profile', () => {
+    hookState.leaves = [pendingLeave({ userId: 'abcdef12-0000', applicant: null })];
+    renderWithProviders(<LeavesPage />);
+    expect(screen.getByTestId('leave-row-leave-1-applicant')).toHaveTextContent(/^Unknown person$/);
   });
 
   it('confirms an approval with a translated message, not the button label', async () => {

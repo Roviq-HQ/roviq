@@ -26,6 +26,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -430,11 +431,7 @@ function CreateStandardDialog({ yearId }: { yearId: string }) {
           err,
           t('errors.STANDARD_NAME_DUPLICATE'),
           (message) => {
-            form.setFieldMeta('name.en', (prev) => ({
-              ...prev,
-              isTouched: true,
-              errorMap: { ...prev.errorMap, onSubmit: message },
-            }));
+            setServerFieldError(form, 'name.en', message);
           },
           t('errors.STANDARD_NAME_DUPLICATE'),
         );
@@ -631,11 +628,7 @@ function EditStandardSheet({
           err,
           t('errors.STANDARD_NAME_DUPLICATE'),
           (message) => {
-            form.setFieldMeta('name.en', (prev) => ({
-              ...prev,
-              isTouched: true,
-              errorMap: { ...prev.errorMap, onSubmit: message },
-            }));
+            setServerFieldError(form, 'name.en', message);
           },
           t('errors.STANDARD_NAME_DUPLICATE'),
         );

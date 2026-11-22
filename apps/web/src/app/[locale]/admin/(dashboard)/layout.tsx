@@ -14,13 +14,13 @@ import {
   FolderTree,
   LayoutDashboard,
   Settings,
-  Shield,
   Store,
   UserCog,
   Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
 // Hooks below (push registration, Novu) call the API, so they run only once the route allows it.
@@ -38,6 +38,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { logout, user } = useAuth();
 
   usePushNotifications();
+  const changeLocale = useLocaleChange();
 
   const subscriberId = user?.id ?? '';
   const [subscriberHash, setSubscriberHash] = useState<string>();
@@ -80,7 +81,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       ability: { action: 'read', subject: 'AuditLog' },
     },
     [NAV_SLUGS.settings]: {
-      href: '/settings',
+      href: '/settings/sessions',
       icon: Settings,
       label: t('settings'),
     },
@@ -99,6 +100,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   ];
 
   const config: LayoutConfig = {
+    onLocaleChange: changeLocale,
     appName: tCommon('appNameAdmin'),
     user: user ? { username: user.username, email: user.email } : undefined,
     onLogout: logout,
@@ -127,7 +129,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       {
         title: t('system'),
         items: [
-          { title: t('roles'), href: '/roles', icon: Shield },
           { title: t('auditLogs'), href: '/audit-logs', icon: FileText },
           {
             title: t('impersonationSessions'),
@@ -143,7 +144,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             icon: Activity,
             ability: { action: 'read', subject: 'SystemHealth' },
           },
-          { title: t('settings'), href: '/settings', icon: Settings },
+          { title: t('settings'), href: '/settings/sessions', icon: Settings },
           { title: t('account'), href: '/account', icon: UserCog },
         ],
       },

@@ -27,6 +27,10 @@ const PLATFORM_ONLY_DIR = 'admin';
 // another tenant's or reseller's rows. One entry per function: a new one fails CI.
 // These are reviewed claims, not proofs — re-check the function when you touch it.
 export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.markEmailVerified':
+    'The user id is the caller’s own, from the token, after the code sent to that account’s email was checked; impersonation sessions are refused.',
+  'apps/api-gateway/src/public-verification/tc-verification.repository.ts#TcVerificationRepository.findByToken':
+    'Public TC check by the 32-character random token from the printed QR code; runs only the verify_tc() function, which returns the six fields of the verification page.',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#AuditQueryDrizzleRepository.findAuditLogs':
     'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#runInContext':

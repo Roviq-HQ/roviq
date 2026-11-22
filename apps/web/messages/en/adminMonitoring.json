@@ -63,13 +63,14 @@
   },
   "tenants": {
     "heading": "Institute activity",
-    "description": "Active users and API calls per institute over the last 24 hours. Refreshes every minute.",
+    "description": "Active users and API calls per institute over the last 24 hours, and the storage its files use. Refreshes every minute.",
     "columns": {
       "institute": "Institute",
       "reseller": "Reseller",
       "activeUsers": "Active users (24h)",
       "apiCalls": "API calls (24h)",
-      "trend": "7-day trend"
+      "trend": "7-day trend",
+      "storage": "Storage used"
     },
     "sortBy": "Sort by {column}",
     "sortedAsc": "sorted ascending",

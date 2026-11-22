@@ -38,7 +38,8 @@ interface TCNode {
   studentProfileId: string;
   isDuplicate: boolean;
   originalTcId: string | null;
-  pdfUrl: string | null;
+  verificationUrl: string | null;
+  pdf: { id: string; url: string | null } | null;
 }
 
 const REQUEST_TC = /* GraphQL */ `
@@ -51,7 +52,11 @@ const REQUEST_TC = /* GraphQL */ `
       studentProfileId
       isDuplicate
       originalTcId
-      pdfUrl
+      verificationUrl
+      pdf {
+        id
+        url
+      }
     }
   }
 `;
@@ -100,7 +105,11 @@ const ISSUE_TC = /* GraphQL */ `
       studentProfileId
       isDuplicate
       originalTcId
-      pdfUrl
+      verificationUrl
+      pdf {
+        id
+        url
+      }
     }
   }
 `;
@@ -115,7 +124,11 @@ const REQUEST_DUPLICATE_TC = /* GraphQL */ `
       studentProfileId
       isDuplicate
       originalTcId
-      pdfUrl
+      verificationUrl
+      pdf {
+        id
+        url
+      }
     }
   }
 `;
@@ -178,7 +191,8 @@ describe('Certificate E2E', () => {
       expect(tc.studentProfileId).toBe(studentProfileId);
       expect(tc.isDuplicate).toBe(false);
       expect(tc.originalTcId).toBeNull();
-      expect(tc.pdfUrl).toBeNull();
+      expect(tc.pdf).toBeNull();
+      expect(tc.verificationUrl).toBeNull();
 
       // One request in progress per student: a second is refused until this one is closed.
       const second = await gql<{ requestTC: TCNode }>(
@@ -378,6 +392,32 @@ describe('Certificate E2E', () => {
       const issuedTc = issued.data?.issueTC;
       assert(issuedTc);
       expect(issuedTc.status).toBe(TcStatus.ISSUED);
+
+      // The PDF is a sensitive file: no URL on the reference, a 60-second link on request.
+      assert(issuedTc.pdf);
+      expect(issuedTc.pdf.url).toBeNull();
+      const download = await gql<{ fileDownloadUrl: string }>(
+        'mutation ($id: ID!) { fileDownloadUrl(fileId: $id) }',
+        { id: issuedTc.pdf.id },
+        adminToken,
+      );
+      expect(download.errors).toBeUndefined();
+      assert(download.data);
+      const pdf = Buffer.from(await (await fetch(download.data.fileDownloadUrl)).arrayBuffer());
+      expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+
+      // Anyone holding the printed TC can check it without signing in.
+      const token = issuedTc.verificationUrl?.split('/').pop();
+      assert(token);
+      const verified = await gql<{ verifyTC: { serialNumber: string; isValid: boolean } | null }>(
+        'query ($token: String!) { verifyTC(token: $token) { serialNumber isValid } }',
+        { token },
+      );
+      expect(verified.errors).toBeUndefined();
+      expect(verified.data?.verifyTC).toEqual({
+        serialNumber: issuedTc.tcSerialNumber,
+        isValid: true,
+      });
       expect(issuedTc.tcSerialNumber).not.toBe(requested.data?.requestTC.tcSerialNumber);
       expect(issuedTc.tcSerialNumber.startsWith('TC-REQ-')).toBe(false);
 

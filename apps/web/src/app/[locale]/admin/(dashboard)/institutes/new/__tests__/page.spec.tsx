@@ -198,14 +198,14 @@ describe('CreateInstitutePage (admin)', () => {
     createInstituteMock.mockRejectedValue(
       new CombinedGraphQLErrors({
         errors: [
-          { message: 'raw server text', extensions: { code: 'INSTITUTE_ADMIN_EMAIL_UNAVAILABLE' } },
+          { message: 'raw server text', extensions: { code: 'INSTITUTE_ADMIN_UNAVAILABLE' } },
         ],
       }),
     );
     await restoreAndCompleteDraft();
     await submit();
 
-    const message = adminMessagesEn.create.firstAdmin.emailUnavailable;
+    const message = adminMessagesEn.create.firstAdmin.unavailable;
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
     expect(screen.getByTestId(testIds.adminInstitutes.newFirstAdminEmail)).toHaveAttribute(
       'aria-invalid',
@@ -213,24 +213,6 @@ describe('CreateInstitutePage (admin)', () => {
     );
     expect(await screen.findAllByText(message)).not.toHaveLength(0);
     expect(pushMock).not.toHaveBeenCalled();
-  });
-
-  it('marks the first admin mobile when another account already owns it', async () => {
-    createInstituteMock.mockRejectedValue(
-      new CombinedGraphQLErrors({
-        errors: [{ message: 'raw server text', extensions: { code: 'PHONE_ALREADY_IN_USE' } }],
-      }),
-    );
-    await restoreAndCompleteDraft();
-    await submit();
-
-    const message = adminMessagesEn.create.firstAdmin.phoneInUse;
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
-    expect(screen.getByTestId(testIds.adminInstitutes.newFirstAdminPhone)).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
-    expect(await screen.findAllByText(message)).not.toHaveLength(0);
   });
 
   it('shows the length error for an 11-digit first admin mobile instead of cutting it', async () => {

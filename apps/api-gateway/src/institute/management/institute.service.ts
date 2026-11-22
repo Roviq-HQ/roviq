@@ -22,6 +22,7 @@ import { UpdateInstituteLocalesInput } from './dto/update-institute-locales.inpu
 import { InstituteRepository } from './repositories/institute.repository';
 import type {
   CreateInstituteData,
+  DeletedInstituteRecord,
   InstituteRecord,
   UpdateInstituteConfigData,
 } from './repositories/types';
@@ -96,16 +97,12 @@ export class InstituteService {
     const resolved = await this.identity.findOrCreateUserByEmail(firstAdmin.email, actorId, {
       phone: firstAdmin.phone ? { countryCode: '+91', number: firstAdmin.phone } : undefined,
     });
-    if (resolved.kind === 'unavailable' && resolved.reason === 'phone_taken') {
-      throw new BusinessException(
-        ErrorCode.PHONE_ALREADY_IN_USE,
-        'The first admin mobile number already belongs to another account',
-      );
-    }
     if (resolved.kind === 'unavailable') {
+      // One answer for every reason: which one applies would reveal whether an email or a
+      // mobile number is registered, and in what state.
       throw new BusinessException(
-        ErrorCode.INSTITUTE_ADMIN_EMAIL_UNAVAILABLE,
-        `The first admin email cannot be used (${resolved.reason})`,
+        ErrorCode.INSTITUTE_ADMIN_UNAVAILABLE,
+        'These first admin details cannot be used',
       );
     }
     if (resolved.kind === 'created') {
@@ -295,6 +292,10 @@ export class InstituteService {
     await this.instituteRepo.softDelete(id);
     this.emitEvent(EVENT_PATTERNS.INSTITUTE.deleted, { instituteId: id, tenantId: id });
     return true;
+  }
+
+  listDeleted(): Promise<DeletedInstituteRecord[]> {
+    return this.instituteRepo.listDeleted();
   }
 
   async restore(id: string): Promise<InstituteRecord> {

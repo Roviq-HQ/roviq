@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  integer,
   pgPolicy,
   pgTable,
   text,
@@ -26,6 +27,17 @@ export const users = pgTable(
     passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
     /** True when the user was created with a system-generated temp password and must change it before any other action. */
     mustChangePassword: boolean('must_change_password').default(false).notNull(),
+    /**
+     * When the user proved they read the mailbox of `email` (a code sent only there). NULL for
+     * an address someone else typed: such an account is never reused for a role granted by
+     * email, because whoever created it may hold its password.
+     */
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    /**
+     * Raised whenever every session of the user must end (password change, temporary password
+     * reissue). Access tokens carry the value they were issued with; an older one is refused.
+     */
+    tokenVersion: integer('token_version').default(0).notNull(),
     ...entityColumns,
   },
   (table) => [

@@ -53,6 +53,7 @@ import type { LayoutConfig } from '../types';
 // ── Fixtures ───────────────────────────────────────────────────────────────
 const baseConfig: LayoutConfig = {
   appName: 'Roviq',
+  onLocaleChange: vi.fn(),
   navGroups: [
     {
       title: 'Main',

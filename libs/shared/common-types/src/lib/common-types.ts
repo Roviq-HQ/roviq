@@ -335,6 +335,8 @@ interface AuthUserBase {
   type: 'access';
   /** ROV-96 — true when the user was created with a temp password and must rotate it before any other operation. */
   mustChangePassword?: boolean;
+  /** `users.token_version` the access token was issued with; an older one is refused. */
+  tokenVersion?: number;
   // Impersonation fields
   isImpersonated?: boolean;
   impersonatorId?: string;

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   check,
+  index,
   inet,
   jsonb,
   pgPolicy,
@@ -28,6 +29,13 @@ export const auditLogs = pgTable(
     tenantId: uuid('tenant_id').references(() => institutes.id),
     /** Set only for reseller-scoped actions; NULL for platform/institute */
     resellerId: uuid('reseller_id').references(() => resellers.id),
+    /**
+     * Institute a platform or reseller action was about (suspend, export, plan change), so
+     * that institute can read the row too. NULL for institute-scoped rows, which carry
+     * `tenant_id`. No foreign key: the id comes from request arguments, and one bad value
+     * must not fail the whole insert batch.
+     */
+    subjectTenantId: uuid('subject_tenant_id'),
     /** The user whose data was affected by the action */
     userId: uuid('user_id')
       .notNull()
@@ -85,13 +93,19 @@ export const auditLogs = pgTable(
       END`,
     ),
 
+    check('chk_audit_subject_tenant', sql`"subject_tenant_id" IS NULL OR "scope" <> 'institute'`),
+    index('audit_logs_subject_tenant_idx')
+      .on(table.subjectTenantId, table.createdAt)
+      .where(sql`"subject_tenant_id" IS NOT NULL`),
+
     // === RLS Policies (5-role model) ===
 
-    // roviq_app: can INSERT any row, can SELECT only institute-scoped rows for their tenant
+    // roviq_app: can INSERT any row, can SELECT its own institute-scoped rows and the
+    // platform/reseller rows that name it as their subject
     pgPolicy('audit_app_read', {
       for: 'select',
       to: roviqApp,
-      using: sql`scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
+      using: sql`(scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid) OR subject_tenant_id = current_setting('app.current_tenant_id', true)::uuid`,
     }),
     pgPolicy('audit_app_insert', {
       for: 'insert',

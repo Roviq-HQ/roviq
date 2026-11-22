@@ -2,6 +2,7 @@ import type { InstituteContext } from '@roviq/common-types';
 import type {
   CreateDuplicateTcData,
   CreateTcRequestData,
+  InstituteLetterheadRow,
   IssueTcData,
   StudentStatusRow,
   TcDetailsRow,
@@ -51,6 +52,15 @@ export abstract class TcRepository {
    */
   abstract issueDuplicate(ctx: InstituteContext, data: IssueTcData): Promise<string>;
   abstract findDetails(ctx: InstituteContext, id: string): Promise<TcDetailsRow | null>;
+  abstract findLetterhead(ctx: InstituteContext): Promise<InstituteLetterheadRow | null>;
+  /**
+   * Makes the rendered PENDING file READY and points the TC at it, in one transaction.
+   * False when the TC already has a PDF (a concurrent render won).
+   */
+  abstract attachPdf(
+    ctx: InstituteContext,
+    data: { tcId: string; fileId: string; actorId: string },
+  ): Promise<boolean>;
   /** Newest first, at most 50. */
   abstract list(ctx: InstituteContext, filter: TcListFilter): Promise<TcDetailsRow[]>;
 }

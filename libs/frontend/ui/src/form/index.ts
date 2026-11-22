@@ -20,6 +20,7 @@ export { SwitchField, type SwitchFieldProps } from './fields/switch-field';
 export { TextField, type TextFieldProps } from './fields/text-field';
 export { TextareaField, type TextareaFieldProps } from './fields/textarea-field';
 export { SubmitButton, type SubmitButtonProps } from './form-components';
+export { setServerFieldError } from './server-field-error';
 export {
   fieldContext,
   formContext,

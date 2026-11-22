@@ -18,14 +18,18 @@ const mockEmit = vi.fn().mockResolvedValue(undefined);
 const mockAuditEmitter = createMock<AuditEmitter>({ emit: mockEmit });
 
 // ── Mock NoAudit decorator (Reflector.createDecorator returns a symbol-like ref) ──
-const { mockNoAudit } = vi.hoisted(() => ({
+const { mockNoAudit, mockAuditInstitute, mockMarked } = vi.hoisted(() => ({
   mockNoAudit: Symbol('NoAudit'),
+  mockAuditInstitute: Symbol('AuditInstitute'),
+  mockMarked: vi.fn<(req: object) => string | null>(),
 }));
 
 vi.mock('@roviq/audit', () => ({
   AuditEmitter: vi.fn(),
   AuditModule: vi.fn(),
   NoAudit: mockNoAudit,
+  AuditInstitute: mockAuditInstitute,
+  markedAuditInstitute: mockMarked,
   AuditMask: vi.fn(),
   getAuditMaskedFields: vi.fn().mockReturnValue([]),
 }));
@@ -239,6 +243,7 @@ describe('AuditInterceptor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMarked.mockReturnValue(null);
     mockReflector = createMockReflector();
     interceptor = new AuditInterceptor(mockReflector, mockAuditEmitter);
   });
@@ -333,6 +338,157 @@ describe('AuditInterceptor', () => {
       expect(payload.scope).toBe('platform');
       expect(payload.tenantId).toBeNull();
       expect(payload.resellerId).toBeNull();
+    });
+  });
+
+  // ── subject institute (ROV-311) ──
+
+  const INSTITUTE_ID = '00000000-0000-7000-a000-000000000101';
+  const platformUser = {
+    userId: 'admin-1',
+    scope: 'platform',
+    membershipId: 'm1',
+    roleId: 'r1',
+    type: 'access',
+  };
+  const decoratedWith = (path: string) =>
+    mockReflector.get.mockImplementation((key: unknown) =>
+      key === mockAuditInstitute ? path : undefined,
+    );
+
+  it('names the institute a platform action is about, read from the decorated argument', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: platformUser,
+      fieldName: 'adminSuspendInstitute',
+      args: { id: INSTITUTE_ID, reason: 'unpaid' },
+    });
+    mockGqlCreate(gqlContext);
+    decoratedWith('id');
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.scope).toBe('platform');
+      expect(payload.tenantId).toBeNull();
+      expect(payload.subjectTenantId).toBe(INSTITUTE_ID);
+    });
+  });
+
+  it('reads a nested argument path for a reseller action', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: { ...platformUser, scope: 'reseller', resellerId: 'reseller-1' },
+      args: { input: { tenantId: INSTITUTE_ID, planId: 'plan-1' } },
+    });
+    mockGqlCreate(gqlContext);
+    decoratedWith('input.tenantId');
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit.mock.calls[0][0].subjectTenantId).toBe(INSTITUTE_ID);
+    });
+  });
+
+  it('names the institute on the audit entry of a failed platform action too', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: platformUser,
+      args: { id: INSTITUTE_ID },
+    });
+    mockGqlCreate(gqlContext);
+    decoratedWith('id');
+
+    await new Promise<void>((resolve) => {
+      interceptor.intercept(context, createErrorCallHandler(new Error('boom'))).subscribe({
+        error: () => {
+          expect(mockEmit.mock.calls[0][0].subjectTenantId).toBe(INSTITUTE_ID);
+          resolve();
+        },
+      });
+    });
+  });
+
+  it('does not name an institute from the arguments of a refused reseller action', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: { ...platformUser, scope: 'reseller', resellerId: 'reseller-1' },
+      fieldName: 'resellerSuspendInstitute',
+      args: { id: INSTITUTE_ID, reason: 'text written into a stranger log' },
+    });
+    mockGqlCreate(gqlContext);
+    decoratedWith('id');
+
+    await new Promise<void>((resolve) => {
+      interceptor.intercept(context, createErrorCallHandler(new Error('not yours'))).subscribe({
+        error: () => {
+          expect(mockEmit.mock.calls[0][0].subjectTenantId).toBeNull();
+          resolve();
+        },
+      });
+    });
+  });
+
+  it('keeps an institute the server confirmed even when the reseller action then fails', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: { ...platformUser, scope: 'reseller', resellerId: 'reseller-1' },
+      args: { id: 'ignored' },
+    });
+    mockGqlCreate(gqlContext);
+    mockMarked.mockReturnValue(INSTITUTE_ID);
+
+    await new Promise<void>((resolve) => {
+      interceptor.intercept(context, createErrorCallHandler(new Error('later step'))).subscribe({
+        error: () => {
+          expect(mockEmit.mock.calls[0][0].subjectTenantId).toBe(INSTITUTE_ID);
+          resolve();
+        },
+      });
+    });
+  });
+
+  it('leaves the subject empty when the argument is not a UUID', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: platformUser,
+      args: { id: "x' OR 1=1" },
+    });
+    mockGqlCreate(gqlContext);
+    decoratedWith('id');
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit.mock.calls[0][0].subjectTenantId).toBeNull();
+    });
+  });
+
+  it('leaves the subject empty for an undecorated platform mutation', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: platformUser,
+      args: { id: INSTITUTE_ID },
+    });
+    mockGqlCreate(gqlContext);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit.mock.calls[0][0].subjectTenantId).toBeNull();
+    });
+  });
+
+  it('uses the institute a resolver named while it ran', async () => {
+    const { context, gqlContext } = createMockGqlContext({
+      user: platformUser,
+      args: { fileId: '00000000-0000-7000-a000-0000000000f1' },
+    });
+    mockGqlCreate(gqlContext);
+    mockMarked.mockReturnValue(INSTITUTE_ID);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      expect(mockEmit.mock.calls[0][0].subjectTenantId).toBe(INSTITUTE_ID);
+    });
+  });
+
+  it('never sets a subject on an institute action, which carries tenantId itself', async () => {
+    const { context, gqlContext } = createMockGqlContext({ args: { id: INSTITUTE_ID } });
+    mockGqlCreate(gqlContext);
+    decoratedWith('id');
+    mockMarked.mockReturnValue(INSTITUTE_ID);
+
+    await subscribeAndExpect(interceptor.intercept(context, createMockCallHandler()), () => {
+      const payload = mockEmit.mock.calls[0][0];
+      expect(payload.scope).toBe('institute');
+      expect(payload.subjectTenantId).toBeUndefined();
     });
   });
 

@@ -20,6 +20,7 @@ import {
   FieldSet,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { EmailVerification } from '@web/components/account/email-verification';
 import { LanguagePreference } from '@web/components/account/language-preference';
 import { useAuthErrorLabels } from '@web/hooks/use-auth-error-labels';
 import { usePasswordChangeLabels } from '@web/hooks/use-password-change-labels';
@@ -230,6 +231,7 @@ export default function AccountPage() {
 
         {/* Passkey security (ZJRNK — encourage passkey adoption in account settings). */}
         <LanguagePreference />
+        <EmailVerification />
         <PasskeyManager
           mutations={passkeyMutations}
           labels={passkeyLabels}

@@ -55,15 +55,14 @@ export const EVENT_PATTERNS = {
     },
     payment: {
       refunded: 'BILLING.payment.refunded',
-      // Aggregate subject for the GraphQL `myPaymentStatusChanged` /
-      // `resellerPaymentReceived` subscription. Currently subscribed by
-      // EE billing-subscriptions.resolver but not emitted anywhere — the
-      // service-layer fix is tracked separately; allow-listed in the
-      // orphan-symmetry test until the emit is added.
+      // Aggregate behind the GraphQL `myPaymentStatusChanged` /
+      // `resellerPaymentStatusChanged` subscriptions: PaymentService emits it
+      // alongside every specific payment event.
       status_changed: 'BILLING.payment.status_changed',
       succeeded: 'BILLING.payment.succeeded',
       upi_p2p_rejected: 'BILLING.payment.upi_p2p_rejected',
       upi_p2p_submitted: 'BILLING.payment.upi_p2p_submitted',
+      upi_p2p_verified: 'BILLING.payment.upi_p2p_verified',
     },
     plan: {
       archived: 'BILLING.plan.archived',
@@ -110,6 +109,9 @@ export const EVENT_PATTERNS = {
     completed: 'EXPORT.completed',
     failed: 'EXPORT.failed',
     requested: 'EXPORT.requested',
+  },
+  FILE: {
+    quarantined: 'FILE.quarantined',
   },
   GROUP: {
     membership_resolved: 'GROUP.membership_resolved',

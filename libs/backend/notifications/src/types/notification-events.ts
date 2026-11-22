@@ -79,6 +79,8 @@ export interface AuthSecurityEventMetadata {
   otp?: string;
   /** Recipient phone (with country code) for IMPERSONATION_OTP events */
   recipientPhone?: string;
+  /** The only address an EMAIL_VERIFICATION code may be sent to */
+  recipientEmail?: string;
   /** Purpose tag for OTP delivery (e.g. 'impersonation_consent') */
   purpose?: string;
   [key: string]: unknown;

@@ -6,11 +6,13 @@ import {
   files,
   instituteBranding,
   instituteGroupBranding,
+  issuedCertificates,
   leaveFiles,
   mkAdminCtx,
   resellers,
   SYSTEM_USER_ID,
   staffQualifications,
+  tcRegister,
   userDocumentFiles,
   userProfiles,
   withAdmin,
@@ -61,6 +63,8 @@ export const FILE_RETIREMENT: { readonly [P in FilePurpose]: 'REFERENCED' | 'TIM
   BULK_IMPORT_CSV: 'TIMED',
   BULK_IMPORT_REPORT: 'TIMED',
   COMPLIANCE_EXPORT: 'REFERENCED',
+  TC_PDF: 'REFERENCED',
+  CERTIFICATE_PDF: 'REFERENCED',
 };
 
 function purposesRetiredBy(rule: 'REFERENCED' | 'TIMED'): FilePurpose[] {
@@ -129,6 +133,12 @@ function inUse(fileId: typeof files.id) {
     ),
     exists(
       sql`(select ${one} from ${exportReports} where ${exportReports.fileId} = ${fileId} and ${exportReports.deletedAt} is null)`,
+    ),
+    exists(
+      sql`(select ${one} from ${tcRegister} where ${tcRegister.pdfFileId} = ${fileId} and ${tcRegister.deletedAt} is null)`,
+    ),
+    exists(
+      sql`(select ${one} from ${issuedCertificates} where ${issuedCertificates.pdfFileId} = ${fileId} and ${issuedCertificates.deletedAt} is null)`,
     ),
     exists(
       sql`(select ${one} from ${instituteBranding} where ${fileId} in (${instituteBranding.logoFileId}, ${instituteBranding.faviconFileId}, ${instituteBranding.coverImageFileId}))`,

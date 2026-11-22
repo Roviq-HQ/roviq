@@ -1,5 +1,5 @@
 import { requestContext } from '@roviq/request-context';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvoiceService } from '../reseller/invoice.service';
 
 const TEST_CTX: import('@roviq/request-context').RequestContext = {
@@ -183,6 +183,101 @@ describe('InvoiceService', () => {
         'inv-1',
         expect.objectContaining({ status: 'REFUNDED', paidAmount: 0n }),
       );
+    });
+
+    it('should return the updated invoice', async () => {
+      const updated = { id: 'inv-1', status: 'PARTIALLY_PAID', paidAmount: 60000n };
+      repo.findById.mockResolvedValue({ id: 'inv-1', paidAmount: 100000n });
+      repo.updateStatus.mockResolvedValue(updated);
+
+      const result = await service.markRefunded('reseller-1', 'inv-1', 40000n);
+
+      expect(result).toEqual(updated);
+    });
+
+    it('should return null when the invoice does not exist', async () => {
+      repo.findById.mockResolvedValue(null);
+
+      const result = await service.markRefunded('reseller-1', 'inv-1', 40000n);
+
+      expect(result).toBeNull();
+      expect(repo.updateStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('markPaymentReversed', () => {
+    const NOW = new Date('2026-06-15T10:00:00.000Z');
+    const BEFORE_DUE = new Date('2026-06-30T00:00:00.000Z');
+    const AFTER_DUE = new Date('2026-06-01T00:00:00.000Z');
+    const PAID_AT = new Date('2026-06-10T00:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function invoice(overrides: { paidAmount: bigint; dueAt: Date }) {
+      return { id: 'inv-1', totalAmount: 100000n, paidAt: PAID_AT, ...overrides };
+    }
+
+    it('should return a fully reversed invoice to SENT before its due date and clear paidAt', async () => {
+      repo.findById.mockResolvedValue(invoice({ paidAmount: 100000n, dueAt: BEFORE_DUE }));
+
+      await service.markPaymentReversed('reseller-1', 'inv-1', 100000n);
+
+      expect(repo.updateStatus).toHaveBeenCalledWith('reseller-1', 'inv-1', {
+        paidAmount: 0n,
+        status: 'SENT',
+        paidAt: null,
+      });
+    });
+
+    it('should return a fully reversed invoice to OVERDUE after its due date', async () => {
+      repo.findById.mockResolvedValue(invoice({ paidAmount: 100000n, dueAt: AFTER_DUE }));
+
+      await service.markPaymentReversed('reseller-1', 'inv-1', 100000n);
+
+      expect(repo.updateStatus).toHaveBeenCalledWith('reseller-1', 'inv-1', {
+        paidAmount: 0n,
+        status: 'OVERDUE',
+        paidAt: null,
+      });
+    });
+
+    it('should mark PARTIALLY_PAID when part of the amount remains paid', async () => {
+      repo.findById.mockResolvedValue(invoice({ paidAmount: 100000n, dueAt: BEFORE_DUE }));
+
+      await service.markPaymentReversed('reseller-1', 'inv-1', 40000n);
+
+      expect(repo.updateStatus).toHaveBeenCalledWith('reseller-1', 'inv-1', {
+        paidAmount: 60000n,
+        status: 'PARTIALLY_PAID',
+        paidAt: null,
+      });
+    });
+
+    it('should stay PAID and keep paidAt when other payments still cover the total', async () => {
+      repo.findById.mockResolvedValue(invoice({ paidAmount: 150000n, dueAt: BEFORE_DUE }));
+
+      await service.markPaymentReversed('reseller-1', 'inv-1', 50000n);
+
+      expect(repo.updateStatus).toHaveBeenCalledWith('reseller-1', 'inv-1', {
+        paidAmount: 100000n,
+        status: 'PAID',
+        paidAt: PAID_AT,
+      });
+    });
+
+    it('should not update anything when the invoice does not exist', async () => {
+      repo.findById.mockResolvedValue(null);
+
+      await service.markPaymentReversed('reseller-1', 'inv-1', 100000n);
+
+      expect(repo.updateStatus).not.toHaveBeenCalled();
     });
   });
 });

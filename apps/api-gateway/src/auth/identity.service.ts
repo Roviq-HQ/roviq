@@ -13,6 +13,7 @@ import {
   phoneNumbers,
   phoneNumbersLive,
   platformMemberships,
+  refreshTokens,
   resellerMemberships,
   resellerMembershipsLive,
   userProfiles,
@@ -25,7 +26,10 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
+import { REDIS_CLIENT } from '@roviq/redis';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import type Redis from 'ioredis';
+import { recordTokenVersion } from './token-version-cache';
 
 export interface CreateUserInput {
   /** Email address (placeholder allowed for system-created users without one). */
@@ -114,8 +118,12 @@ export type EmailUserResolution =
   | { kind: 'created'; userId: string; email: string; tempPassword: string }
   | {
       kind: 'unavailable';
-      /** `phone_taken` only when a new user was asked for with a phone another account owns. */
-      reason: 'ambiguous' | 'deleted' | 'username_taken' | 'phone_taken';
+      /**
+       * Never shown to the caller: each reason would tell them something about an account that
+       * is not theirs. `email_unverified`: the address belongs to an account whose owner has not
+       * proved they read that mailbox (SF-045).
+       */
+      reason: 'ambiguous' | 'deleted' | 'username_taken' | 'phone_taken' | 'email_unverified';
     };
 
 @Injectable()
@@ -123,6 +131,7 @@ export class IdentityService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     // private readonly authEventService: AuthEventService, // TODO: Add this back in when we have a way to emit the event
   ) {}
 
@@ -130,15 +139,29 @@ export class IdentityService {
    * Users whose email equals `email`, ignoring case, soft-deleted ones included: the email
    * stays globally unique after deletion, so a deleted owner still holds it.
    */
-  async findUsersByEmail(email: string): Promise<{ userId: string; isDeleted: boolean }[]> {
+  async findUsersByEmail(
+    email: string,
+  ): Promise<
+    { userId: string; isDeleted: boolean; isEmailVerified: boolean; createdBy: string }[]
+  > {
     const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
       tx
-        .select({ id: users.id, deletedAt: users.deletedAt })
+        .select({
+          id: users.id,
+          deletedAt: users.deletedAt,
+          emailVerifiedAt: users.emailVerifiedAt,
+          createdBy: users.createdBy,
+        })
         .from(users) // allow-base-read: a soft-deleted user still owns its email
         .where(sql`lower(${users.email}) = lower(${email})`)
         .orderBy(users.id),
     );
-    return rows.map((r) => ({ userId: r.id, isDeleted: r.deletedAt !== null }));
+    return rows.map((r) => ({
+      userId: r.id,
+      isDeleted: r.deletedAt !== null,
+      isEmailVerified: r.emailVerifiedAt !== null,
+      createdBy: r.createdBy,
+    }));
   }
 
   /** Whether any user, soft-deleted included, already has this Roviq ID. */
@@ -186,7 +209,15 @@ export class IdentityService {
     if (matches.length > 1) return { kind: 'unavailable', reason: 'ambiguous' };
     const [existing] = matches;
     if (existing?.isDeleted) return { kind: 'unavailable', reason: 'deleted' };
-    if (existing) return { kind: 'existing', userId: existing.userId, email };
+    if (existing) {
+      // SECURITY (SF-045): whoever created an account may hold its password (the welcome also
+      // goes to the phone they typed), so an unverified address only identifies its owner to
+      // the same actor who created it.
+      if (!existing.isEmailVerified && existing.createdBy !== actorId) {
+        return { kind: 'unavailable', reason: 'email_unverified' };
+      }
+      return { kind: 'existing', userId: existing.userId, email };
+    }
     // Never link by Roviq ID: an unrelated account may use this address as its username.
     if (await this.isUsernameTaken(email)) return { kind: 'unavailable', reason: 'username_taken' };
     if (newUser.phone && (await this.isPhoneTaken(newUser.phone))) {
@@ -279,16 +310,31 @@ export class IdentityService {
   async reissueTempPassword(userId: string, actorId: string): Promise<string | null> {
     const tempPassword = randomBytes(16).toString('base64url');
     const passwordHash = await hash(tempPassword);
-    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
+    // Same three steps as a password change: whoever holds the old temporary password must
+    // lose the sessions it opened, not only the password.
+    const tokenVersion = await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
+      const [row] = await tx
         .update(users)
-        .set({ passwordHash, mustChangePassword: true, updatedBy: actorId })
+        .set({
+          passwordHash,
+          mustChangePassword: true,
+          tokenVersion: sql`${users.tokenVersion} + 1`,
+          updatedBy: actorId,
+        })
         .where(
           and(eq(users.id, userId), eq(users.mustChangePassword, true), isNull(users.deletedAt)),
         )
-        .returning({ id: users.id }),
-    );
-    return rows.length > 0 ? tempPassword : null;
+        .returning({ tokenVersion: users.tokenVersion });
+      if (!row) return null;
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), revokedReason: 'password_change' })
+        .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+      return row.tokenVersion;
+    });
+    if (tokenVersion === null) return null;
+    await recordTokenVersion(this.redis, userId, tokenVersion);
+    return tempPassword;
   }
 
   /** The live membership of this user in the institute with this role, if any. */

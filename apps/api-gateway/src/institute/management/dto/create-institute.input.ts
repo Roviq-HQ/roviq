@@ -19,7 +19,7 @@ import {
 
 @InputType({
   description:
-    'The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_EMAIL_UNAVAILABLE when the email cannot identify one live account.',
+    'The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_UNAVAILABLE when the email cannot identify one live account.',
 })
 export class InstituteFirstAdminInput {
   @Field({ description: 'First name, shown on the account and in the welcome message.' })

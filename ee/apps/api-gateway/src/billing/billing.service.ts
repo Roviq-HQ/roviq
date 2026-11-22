@@ -47,20 +47,10 @@ export class BillingService {
     private readonly config: ConfigService,
   ) {}
 
+  // Not wired to any resolver. The aggregate `status_changed` events that feed the GraphQL
+  // subscriptions need institute and reseller ids on every payload; add them before wiring this.
   private emitEvent(pattern: EventPattern, data: Record<string, unknown>) {
     this.eventBus.emit(pattern, data);
-    if (
-      (pattern as string).startsWith('BILLING.subscription.') &&
-      pattern !== EVENT_PATTERNS.BILLING.subscription.status_changed
-    ) {
-      this.eventBus.emit(EVENT_PATTERNS.BILLING.subscription.status_changed, data);
-    }
-    if (
-      (pattern as string).startsWith('BILLING.payment.') &&
-      pattern !== EVENT_PATTERNS.BILLING.payment.status_changed
-    ) {
-      this.eventBus.emit(EVENT_PATTERNS.BILLING.payment.status_changed, data);
-    }
   }
 
   private rethrowGatewayError(error: unknown): never {

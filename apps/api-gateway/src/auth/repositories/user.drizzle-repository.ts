@@ -19,6 +19,8 @@ const userSelect = {
   status: usersLive.status,
   passwordChangedAt: usersLive.passwordChangedAt,
   mustChangePassword: usersLive.mustChangePassword,
+  emailVerifiedAt: usersLive.emailVerifiedAt,
+  tokenVersion: usersLive.tokenVersion,
 } as const;
 
 @Injectable()
@@ -70,16 +72,29 @@ export class UserDrizzleRepository extends UserRepository {
     );
   }
 
-  async updatePassword(userId: string, passwordHash: string): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+  async updatePassword(userId: string, passwordHash: string): Promise<number> {
+    const [row] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
       tx
         .update(users)
         .set({
           passwordHash,
           passwordChangedAt: sql`now()`,
           mustChangePassword: false,
+          tokenVersion: sql`${users.tokenVersion} + 1`,
           updatedBy: userId,
         })
+        .where(eq(users.id, userId))
+        .returning({ tokenVersion: users.tokenVersion }),
+    );
+    if (!row) throw new Error(`User ${userId} not found while updating the password`);
+    return row.tokenVersion;
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+      tx
+        .update(users)
+        .set({ emailVerifiedAt: sql`now()`, updatedBy: userId })
         .where(eq(users.id, userId)),
     );
   }

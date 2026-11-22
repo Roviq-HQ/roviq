@@ -21,28 +21,32 @@ export class InvoiceFieldResolver {
     private readonly crypto: CryptoService,
   ) {
     // Batch reseller IDs → UPI_DIRECT VPA lookup
-    this.upiConfigLoader = new DataLoader(async (resellerIds: readonly string[]) => {
-      const results = new Map<string, string | null>();
-      for (const resellerId of new Set(resellerIds)) {
-        try {
-          const configs = await this.gatewayConfigRepo.findByResellerId(resellerId);
-          const upiConfig = configs.find(
-            (c) => c.provider === 'UPI_DIRECT' && c.status === 'ACTIVE',
-          );
-          if (upiConfig?.credentials) {
-            const decrypted = this.crypto.decrypt(upiConfig.credentials as string) as {
-              vpa?: string;
-            };
-            results.set(resellerId, decrypted.vpa ?? null);
-          } else {
+    this.upiConfigLoader = new DataLoader(
+      async (resellerIds: readonly string[]) => {
+        const results = new Map<string, string | null>();
+        for (const resellerId of new Set(resellerIds)) {
+          try {
+            const configs = await this.gatewayConfigRepo.findByResellerId(resellerId);
+            const upiConfig = configs.find(
+              (c) => c.provider === 'UPI_DIRECT' && c.status === 'ACTIVE',
+            );
+            if (upiConfig?.credentials) {
+              const decrypted = this.crypto.decrypt<{ VPA?: string }>(
+                upiConfig.credentials as string,
+              );
+              results.set(resellerId, decrypted.VPA ?? null);
+            } else {
+              results.set(resellerId, null);
+            }
+          } catch {
             results.set(resellerId, null);
           }
-        } catch {
-          results.set(resellerId, null);
         }
-      }
-      return resellerIds.map((id) => results.get(id) ?? null);
-    });
+        return resellerIds.map((id) => results.get(id) ?? null);
+      },
+      // The resolver is a singleton: a cached answer would outlive a config change.
+      { cache: false },
+    );
   }
 
   @ResolveField('upiPaymentUri', () => String, { nullable: true })

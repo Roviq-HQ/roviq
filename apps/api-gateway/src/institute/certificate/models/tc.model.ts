@@ -76,11 +76,14 @@ export class TCModel {
   })
   clearances?: ClearanceEntryObject[];
 
-  @Field(() => String, { nullable: true })
-  pdfUrl?: string | null;
+  /** Resolved into `pdf` by TcPdfResolver. */
+  pdfFileId!: string | null;
 
-  @Field(() => String, { nullable: true })
-  qrVerificationUrl?: string | null;
+  @Field(() => String, {
+    nullable: true,
+    description: 'Public page the QR code on the TC opens; null until the TC is issued',
+  })
+  verificationUrl?: string | null;
 
   @Field(() => Boolean)
   isDuplicate!: boolean;
@@ -125,8 +128,8 @@ export class CertificateModel {
   @Field(() => GraphQLJSON)
   certificateData!: unknown;
 
-  @Field(() => String, { nullable: true })
-  pdfUrl?: string | null;
+  /** Resolved into `pdf` by CertificatePdfResolver. */
+  pdfFileId!: string | null;
 
   @Field(() => String, { nullable: true })
   purpose?: string | null;

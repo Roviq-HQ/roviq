@@ -20,7 +20,7 @@ import {
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { admissionReadPredicate } from '../../institute/admission/admission-read-predicate';
 import { leaveInScope } from '../../institute/leave/repositories/leave-scope';
 import { studentReadPredicate } from '../../institute/student/student-read-predicate';
@@ -34,6 +34,7 @@ import type {
   FileLeaveOwner,
   FileRecord,
   ProcessedImageData,
+  StorageUsageRecord,
 } from './types';
 
 const writeReturning = {
@@ -151,6 +152,40 @@ export class FileDrizzleRepository extends FileRepository {
     });
   }
 
+  async storageUsage(): Promise<StorageUsageRecord> {
+    return this.run(async (tx, { tenantId }) => {
+      if (!tenantId) throw new Error('Storage usage is per institute');
+      const rows = await tx
+        .select({
+          readyBytes: sql<string>`coalesce(sum(${filesLive.sizeBytes}) filter (where ${filesLive.status} = 'READY'), 0)`,
+          pendingBytes: sql<string>`coalesce(sum(${filesLive.sizeBytes}) filter (where ${filesLive.status} = 'PENDING'), 0)`,
+        })
+        .from(filesLive)
+        // Its own files, plus the files about each of its members. A person in two institutes
+        // counts in full for both: each of them can upload to and read that person's files.
+        .where(
+          or(
+            eq(filesLive.tenantId, tenantId),
+            and(
+              isNull(filesLive.tenantId),
+              isNull(filesLive.resellerId),
+              inArray(
+                filesLive.subjectUserId,
+                tx
+                  .select({ userId: membershipsLive.userId })
+                  .from(membershipsLive)
+                  .where(eq(membershipsLive.tenantId, tenantId)),
+              ),
+            ),
+          ),
+        );
+      return {
+        readyBytes: Number(rows[0]?.readyBytes ?? 0),
+        pendingBytes: Number(rows[0]?.pendingBytes ?? 0),
+      };
+    });
+  }
+
   async markReady(ids: string[], purpose: FilePurpose): Promise<void> {
     await this.run((tx, { userId }) => markFilesReady(tx, { fileIds: ids, purpose, userId }));
   }
@@ -236,6 +271,15 @@ export class FileDrizzleRepository extends FileRepository {
       await tx
         .update(files)
         .set({ status: 'REJECTED', updatedBy: userId })
+        .where(and(eq(files.id, id), eq(files.status, 'PENDING'), isNull(files.deletedAt)));
+    });
+  }
+
+  async markQuarantined(id: string): Promise<void> {
+    await this.run(async (tx, { userId }) => {
+      await tx
+        .update(files)
+        .set({ status: 'QUARANTINED', updatedBy: userId })
         .where(and(eq(files.id, id), eq(files.status, 'PENDING'), isNull(files.deletedAt)));
     });
   }

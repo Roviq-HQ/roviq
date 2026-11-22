@@ -136,7 +136,9 @@
       "studentNotFound": "The student could not be found.",
       "validation": "Some details are not valid. Check them and try again.",
       "forbidden": "Your role is not allowed to do this.",
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "unsupportedScript": "The certificate has text in a script the PDF cannot print yet. Use English or Hindi in the student and institute details, then try again.",
+      "pdfNotReady": "The PDF is made when the TC is issued."
     },
     "fields": {
       "studentName": "Name of the pupil",
@@ -162,6 +164,10 @@
       "remarks": "Other remarks",
       "dateOfIssue": "Date of issue",
       "rejectionReason": "Reason for rejection"
+    },
+    "generatePdf": {
+      "success": "PDF generated",
+      "error": "Could not generate the PDF"
     }
   },
   "other": {
@@ -282,12 +288,32 @@
     "back": "Back",
     "print": "Print",
     "downloadPdf": "Download PDF",
-    "verifyQr": "Verify"
+    "verifyQr": "Verify",
+    "generatePdf": "Generate PDF"
   },
   "empty": {
     "noMatch": "No matching certificates",
     "noMatchDescription": "Try adjusting your filters or search terms."
   },
   "duplicate": "Duplicate",
-  "original": "Original"
+  "original": "Original",
+  "verify": {
+    "title": "Transfer certificate check",
+    "checking": "Checking the certificate…",
+    "valid": "This certificate is genuine",
+    "validDescription": "It matches a transfer certificate issued through Roviq.",
+    "invalid": "This certificate is not valid",
+    "invalidDescription": "It was cancelled after it was made, or it was never issued. Contact the institute that gave it to you.",
+    "notFound": "No certificate found",
+    "notFoundDescription": "This link does not match any transfer certificate. Scan the code on the certificate again.",
+    "error": "The certificate could not be checked. Try again in a moment.",
+    "retry": "Try again",
+    "duplicate": "Duplicate copy",
+    "fields": {
+      "serial": "TC number",
+      "student": "Name of the pupil",
+      "institute": "Institute",
+      "issuedOn": "Date of issue"
+    }
+  }
 }

@@ -94,10 +94,14 @@ export const ErrorCode = {
   TIER_CHANGE_REQUIRES_ACTIVE: 'TIER_CHANGE_REQUIRES_ACTIVE',
   /** Initial reseller admin email is held by a deleted user, by several users, or is another user's Roviq ID */
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: 'RESELLER_ADMIN_EMAIL_UNAVAILABLE',
-  /** First institute admin email is held by a deleted user, by several users, or is another user's Roviq ID */
-  INSTITUTE_ADMIN_EMAIL_UNAVAILABLE: 'INSTITUTE_ADMIN_EMAIL_UNAVAILABLE',
-  /** A new account was asked for with a mobile number another account already owns */
-  PHONE_ALREADY_IN_USE: 'PHONE_ALREADY_IN_USE',
+  /** The first institute admin's email or mobile cannot be used; the reason is never disclosed */
+  INSTITUTE_ADMIN_UNAVAILABLE: 'INSTITUTE_ADMIN_UNAVAILABLE',
+  /** The email verification code is wrong, expired, or was tried too many times */
+  EMAIL_VERIFICATION_CODE_INVALID: 'EMAIL_VERIFICATION_CODE_INVALID',
+  /** A verification code was sent moments ago; wait before asking for another */
+  EMAIL_VERIFICATION_TOO_SOON: 'EMAIL_VERIFICATION_TOO_SOON',
+  /** The daily number of verification codes for this account is used up */
+  EMAIL_VERIFICATION_LIMIT_REACHED: 'EMAIL_VERIFICATION_LIMIT_REACHED',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',
   /** Suspend attempted on a reseller that is already suspended */
@@ -259,6 +263,10 @@ export const ErrorCode = {
   TC_NOT_FOUND: 'TC_NOT_FOUND',
   /** The student already has a Transfer Certificate request in progress */
   TC_ALREADY_REQUESTED: 'TC_ALREADY_REQUESTED',
+  /** A PDF could not be rendered because its text uses a script no bundled font covers */
+  PDF_UNSUPPORTED_SCRIPT: 'PDF_UNSUPPORTED_SCRIPT',
+  /** The PDF of this record has not been rendered yet; issue it or generate it first */
+  PDF_NOT_READY: 'PDF_NOT_READY',
   /** Reseller team member not found */
   TEAM_MEMBER_NOT_FOUND: 'TEAM_MEMBER_NOT_FOUND',
   /** The invited person already has a membership (active or inactive) in this reseller */
@@ -324,6 +332,12 @@ export const ErrorCode = {
   FILE_CONTENT_MISMATCH: 'FILE_CONTENT_MISMATCH',
   /** The image could not be read, or has more pixels than is accepted */
   FILE_IMAGE_INVALID: 'FILE_IMAGE_INVALID',
+  /** The malware scanner found a threat in the uploaded file; the file was removed */
+  FILE_INFECTED: 'FILE_INFECTED',
+  /** The malware scanner could not be reached; the upload is kept and the request can be retried */
+  FILE_SCAN_UNAVAILABLE: 'FILE_SCAN_UNAVAILABLE',
+  /** The institute has used the storage its plan allows; delete files or upgrade the plan */
+  STORAGE_QUOTA_EXCEEDED: 'STORAGE_QUOTA_EXCEEDED',
   /** Too many uploads started and not yet attached to anything */
   FILE_UPLOAD_LIMIT_REACHED: 'FILE_UPLOAD_LIMIT_REACHED',
 
@@ -450,8 +464,10 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   INVALID_TIER: HttpStatus.BAD_REQUEST,
   TIER_CHANGE_REQUIRES_ACTIVE: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
-  INSTITUTE_ADMIN_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
-  PHONE_ALREADY_IN_USE: HttpStatus.CONFLICT,
+  INSTITUTE_ADMIN_UNAVAILABLE: HttpStatus.CONFLICT,
+  EMAIL_VERIFICATION_CODE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
+  EMAIL_VERIFICATION_TOO_SOON: HttpStatus.TOO_MANY_REQUESTS,
+  EMAIL_VERIFICATION_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   INVALID_SLUG: HttpStatus.BAD_REQUEST,
   RESELLER_ALREADY_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -526,6 +542,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SUBSCRIPTION_PLAN_NOT_FOUND: HttpStatus.NOT_FOUND,
   TC_NOT_FOUND: HttpStatus.NOT_FOUND,
   TC_ALREADY_REQUESTED: HttpStatus.CONFLICT,
+  PDF_UNSUPPORTED_SCRIPT: HttpStatus.UNPROCESSABLE_ENTITY,
+  PDF_NOT_READY: HttpStatus.CONFLICT,
   TEAM_MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
   TEAM_MEMBER_ALREADY_EXISTS: HttpStatus.CONFLICT,
   TEAM_MEMBER_EMAIL_UNAVAILABLE: HttpStatus.CONFLICT,
@@ -556,6 +574,9 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   FILE_TOO_LARGE: HttpStatus.BAD_REQUEST,
   FILE_CONTENT_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_IMAGE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_INFECTED: HttpStatus.UNPROCESSABLE_ENTITY,
+  FILE_SCAN_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  STORAGE_QUOTA_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   FILE_UPLOAD_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
   EXPORT_REPORT_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXPORT_START_FAILED: HttpStatus.SERVICE_UNAVAILABLE,

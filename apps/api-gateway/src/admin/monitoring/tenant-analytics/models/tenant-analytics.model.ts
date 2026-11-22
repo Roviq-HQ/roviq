@@ -1,4 +1,4 @@
-import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
 import type { I18nContent } from '@roviq/database';
 import { I18nTextScalar, PageInfo } from '@roviq/nestjs-graphql';
 
@@ -23,6 +23,12 @@ export class TenantAnalyticsModel {
     description: 'Distinct users with a refresh token created or used in the last 24h',
   })
   activeUsers24h!: number;
+
+  @Field(() => Float, {
+    description:
+      "Bytes of the institute's stored files plus documents and photos of its members. A person in several institutes counts for each, so the column does not add up to total storage.",
+  })
+  storageUsedBytes!: number;
 
   @Field(() => Int, {
     nullable: true,

@@ -26,8 +26,10 @@ const TC_FIELDS = `
   isDuplicate
   isCounterSigned
   originalTcId
-  pdfUrl
-  qrVerificationUrl
+  pdf {
+    id
+  }
+  verificationUrl
   academicYearId
   studentProfileId
   studentFirstName
@@ -187,6 +189,19 @@ export function useRejectTC() {
   });
 }
 
+const GENERATE_TC_PDF_MUTATION = gql`
+  mutation GenerateTCPdf($id: ID!) {
+    generateTCPdf(id: $id) {
+      ${TC_FIELDS}
+    }
+  }
+`;
+
+/** Renders the PDF of an issued TC whose render at issue failed. */
+export function useGenerateTCPdf() {
+  return useMutation<{ generateTCPdf: TCNode }, { id: string }>(GENERATE_TC_PDF_MUTATION);
+}
+
 export function useIssueTC() {
   return useMutation<{ issueTC: TCNode }, { id: string }>(ISSUE_TC_MUTATION, {
     update: evictTcLists,
@@ -204,7 +219,9 @@ const CERTIFICATE_FIELDS = `
   studentProfileId
   staffProfileId
   certificateData
-  pdfUrl
+  pdf {
+    id
+  }
   createdAt
 `;
 

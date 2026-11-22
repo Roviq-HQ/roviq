@@ -1,7 +1,7 @@
 'use client';
 
 import { Money } from '@roviq/domain';
-import { extractGraphQLError, gql, useQuery } from '@roviq/graphql';
+import { gql, useQuery } from '@roviq/graphql';
 import type { Locale } from '@roviq/i18n';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
@@ -19,6 +19,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useSubscriptionPlans } from '../plans/use-plans';
+import { useResellerBillingErrorMessage } from '../use-reseller-billing-error-message';
 
 type InstitutesForAssignQuery = {
   resellerListInstitutes: {
@@ -48,6 +49,7 @@ interface AssignPlanDialogProps {
 
 export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) {
   const t = useTranslations('billing');
+  const errorMessage = useResellerBillingErrorMessage();
   const locale = useLocale();
   const ti = useI18nField();
   const { plans } = useSubscriptionPlans();
@@ -94,7 +96,7 @@ export function AssignPlanDialog({ open, onOpenChange }: AssignPlanDialogProps) 
         onOpenChange(false);
       } catch (err) {
         toast.error(t('subscriptions.assign.error'), {
-          description: extractGraphQLError(err, t('subscriptions.assign.error')),
+          description: errorMessage(err),
         });
       }
     },

@@ -2,6 +2,7 @@ import {
   AUTH_SCOPE_VALUES,
   AUTH_SECURITY_EVENT_TYPE_VALUES,
   COMPLIANCE_REPORT_TYPE_VALUES,
+  FILE_PURPOSE_VALUES,
 } from '@roviq/common-types';
 import { z } from 'zod';
 import type { EventPattern } from './event-patterns';
@@ -263,19 +264,26 @@ const BILLING_SCHEMAS = {
   }),
   'BILLING.subscription.plan_changed': z.object({
     subscriptionId: uuid,
+    tenantId: uuid,
+    resellerId: uuid,
     oldPlanId: uuid,
     newPlanId: uuid,
     prorationDelta: z.unknown().optional(),
   }),
+  // The three ids are what the GraphQL subscription filters match on.
   'BILLING.subscription.status_changed': z
     .object({
-      subscriptionId: uuid.optional(),
+      subscriptionId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.payment.succeeded': z
     .object({
       paymentId: uuid,
       invoiceId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.payment.refunded': z
@@ -285,7 +293,10 @@ const BILLING_SCHEMAS = {
     .catchall(z.unknown()),
   'BILLING.payment.status_changed': z
     .object({
-      paymentId: uuid.optional(),
+      paymentId: uuid,
+      invoiceId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.payment.upi_p2p_submitted': z
@@ -298,9 +309,16 @@ const BILLING_SCHEMAS = {
       paymentId: uuid.optional(),
     })
     .catchall(z.unknown()),
+  'BILLING.payment.upi_p2p_verified': z
+    .object({
+      paymentId: uuid.optional(),
+    })
+    .catchall(z.unknown()),
   'BILLING.invoice.generated': z
     .object({
-      invoiceId: uuid.optional(),
+      invoiceId: uuid,
+      tenantId: uuid,
+      resellerId: uuid,
     })
     .catchall(z.unknown()),
   'BILLING.invoice.paid': z
@@ -328,6 +346,7 @@ const AUDIT_SCHEMAS = {
       scope: z.enum(AUTH_SCOPE_VALUES),
       tenantId: uuid.nullable(),
       resellerId: uuid.nullable().optional(),
+      subjectTenantId: uuid.nullable().optional(),
       userId: uuid,
       actorId: uuid,
       action: str,
@@ -361,6 +380,7 @@ const NOTIFICATION_SCHEMAS = {
       .object({
         otp: z.string().optional(),
         recipientPhone: z.string().optional(),
+        recipientEmail: z.string().optional(),
         purpose: z.string().optional(),
       })
       .catchall(z.unknown()),
@@ -421,6 +441,19 @@ const EXPORT_SCHEMAS = {
     rowCount: z.number().int().nonnegative(),
   }),
   'EXPORT.failed': exportReportBase.extend({ errorCode: str }),
+} as const;
+
+const FILE_SCHEMAS = {
+  'FILE.quarantined': z.object({
+    // Null for a reseller's file and for a file about a person
+    tenantId: uuid.nullable(),
+    resellerId: uuid.nullable(),
+    fileId: uuid,
+    purpose: z.enum(FILE_PURPOSE_VALUES),
+    uploadedBy: uuid,
+    // Name the scanner gave the threat, e.g. "Win.Test.EICAR_HDB-1"
+    signature: str,
+  }),
 } as const;
 
 const USER_SCHEMAS = {
@@ -646,6 +679,7 @@ export const _DOMAIN_SCHEMA_MAPS = [
   CERTIFICATE_SCHEMAS,
   TC_SCHEMAS,
   EXPORT_SCHEMAS,
+  FILE_SCHEMAS,
   USER_SCHEMAS,
   GUARDIAN_SCHEMAS,
   STAFF_SCHEMAS,

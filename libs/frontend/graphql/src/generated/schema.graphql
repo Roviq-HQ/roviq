@@ -948,6 +948,11 @@ type AuditLog {
   metadata: JSON
   resellerName: String
   resellerTier: String
+
+  """
+  Who acted: 'institute', 'reseller' or 'platform'. An institute also sees reseller and platform actions that were about it.
+  """
+  scope: String!
   source: String!
   syntheticOrigin: String
   tenantId: String
@@ -1089,6 +1094,37 @@ enum BillingInterval {
   MONTHLY
   QUARTERLY
   SEMI_ANNUAL
+}
+
+"""
+An invoice was generated. Carries ids only: refetch the invoice to read it.
+"""
+type BillingInvoiceEvent {
+  invoiceId: ID!
+
+  """Institute the invoice was raised for"""
+  tenantId: ID!
+}
+
+"""
+A payment was received or changed state (UPI proof submitted, verified, rejected, refunded). Carries ids only: refetch the payment or its invoice.
+"""
+type BillingPaymentEvent {
+  invoiceId: ID!
+  paymentId: ID!
+
+  """Institute that owes the invoice"""
+  tenantId: ID!
+}
+
+"""
+A subscription changed (created, paused, resumed, cancelled, expired or moved to another plan). Carries ids only: refetch the subscription to read its new state.
+"""
+type BillingSubscriptionEvent {
+  subscriptionId: ID!
+
+  """Institute the subscription belongs to"""
+  tenantId: ID!
 }
 
 enum BoardType {
@@ -1249,7 +1285,11 @@ type CertificateModel {
   certificateData: JSON!
   createdAt: DateTime!
   id: ID!
-  pdfUrl: String
+
+  """
+  The rendered PDF once issued. Sensitive: `url` is null; download through `fileDownloadUrl`.
+  """
+  pdf: FileRef
   purpose: String
   serialNumber: String!
   staffProfileId: String
@@ -2194,6 +2234,18 @@ enum DaySession {
   MORNING
 }
 
+"""A deleted institute, as listed for restoring"""
+type DeletedInstituteModel {
+  code: String
+  deletedAt: DateTime!
+  id: ID!
+  name: I18nText!
+  slug: String!
+
+  """The status it returns to when restored"""
+  status: InstituteStatus!
+}
+
 """
 A soft-deleted student, staff member or guardian, as shown in the Deleted list. Restore it with the matching restore mutation.
 """
@@ -2323,6 +2375,16 @@ enum EducationLevel {
   SECONDARY
   SENIOR_SECONDARY
   UPPER_PRIMARY
+}
+
+"""Whether the signed-in user has proved they read their account's email"""
+type EmailVerificationModel {
+  email: String!
+
+  """
+  An account with an unverified email cannot be given a role by email (first admin, reseller team) by anyone but the person who created it.
+  """
+  isVerified: Boolean!
 }
 
 """Emergency contact within medical info"""
@@ -2636,6 +2698,7 @@ enum FilePurpose {
   APPLICATION_DOCUMENT
   BULK_IMPORT_CSV
   BULK_IMPORT_REPORT
+  CERTIFICATE_PDF
   COMPLIANCE_EXPORT
   INSTITUTE_COVER
   INSTITUTE_FAVICON
@@ -2645,6 +2708,7 @@ enum FilePurpose {
   RESELLER_FAVICON
   RESELLER_LOGO
   STAFF_CERTIFICATE
+  TC_PDF
   USER_DOCUMENT
 }
 
@@ -3403,7 +3467,7 @@ input InstituteFilterInput {
 }
 
 """
-The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_EMAIL_UNAVAILABLE when the email cannot identify one live account.
+The person who becomes the institute admin. Matched to a Roviq account by email when the institute is requested or created (an existing account is reused unchanged, otherwise one is created); setup gives that account access and, if it has never logged in, sends its login details by email/SMS. INSTITUTE_ADMIN_UNAVAILABLE when the email cannot identify one live account.
 """
 input InstituteFirstAdminInput {
   """
@@ -3699,10 +3763,20 @@ type KeyCountEntry {
   key: String!
 }
 
+"""The person a leave application is for"""
+type LeaveApplicant {
+  """Set when the applicant is a student."""
+  admissionNumber: String
+  firstName: I18nText!
+  lastName: I18nText
+}
+
 """
 A leave application for a student or staff member. When status=APPROVED and the date is in range, attendance seeds LEAVE for the student.
 """
 type LeaveModel {
+  """Name of the person the leave is for; null when they have no profile."""
+  applicant: LeaveApplicant
   createdAt: DateTime!
 
   """Membership id that approved or rejected."""
@@ -3851,7 +3925,6 @@ input LunchSlotInput {
 
 input ManualPaymentInput {
   amountPaise: BigInt!
-  collectedById: String
   collectionDate: String
   method: PaymentMethod!
   notes: String
@@ -4019,6 +4092,10 @@ type Mutation {
 
   """Re-publish a dead-lettered message to its original subject"""
   adminReplayDlqMessage(id: ID!): DlqMessageModel!
+
+  """
+  Bring a deleted institute back with the status it had when it was deleted.
+  """
   adminRestoreInstitute(id: ID!): InstituteModel!
 
   """
@@ -4246,12 +4323,20 @@ type Mutation {
   Get a download URL for one file, valid for 60 seconds. A mutation, so every call is audited.
   """
   fileDownloadUrl(fileId: ID!): String!
+
+  """Render the PDF of an issued certificate that has none"""
+  generateCertificatePdf(id: ID!): CertificateModel!
   generateInvoice(input: GenerateInvoiceInput!): InvoiceModel!
   generatePasskeyAuthOptions(username: String): PasskeyAuthOptions!
   generatePasskeyRegistrationOptions(input: GeneratePasskeyRegistrationInput!): JSON!
 
   """Generate per-student instances for a section."""
   generateReportCards(reportCardId: ID!, sectionId: ID!): Int!
+
+  """
+  Render the PDF of an issued TC that has none (the render at issue failed)
+  """
+  generateTCPdf(id: ID!): TCModel!
 
   """Grant parental consent for a data processing purpose (DPDP Act 2023)"""
   grantConsent(input: GrantConsentInput!): ConsentRecordModel!
@@ -4329,6 +4414,11 @@ type Mutation {
   Request duplicate TC (PRD §5.3) — is_duplicate=true, references original
   """
   requestDuplicateTC(input: RequestDuplicateTCInput!): TCModel!
+
+  """
+  Send a 6-digit code to the account email. Valid for 10 minutes; a new one can be requested after 60 seconds.
+  """
+  requestEmailVerification: Boolean!
 
   """
   Start a file upload. Returns a URL that accepts one PUT of the declared size and type. The file is unusable until a mutation attaches it by `fileId`.
@@ -4538,6 +4628,9 @@ type Mutation {
   Saves a document for a student from files uploaded beforehand with `requestFileUpload`.
   """
   uploadStudentDocument(input: UploadStudentDocumentInput!): StudentDocumentModel!
+
+  """Confirm the code sent by `requestEmailVerification`."""
+  verifyEmail(code: String!): Boolean!
   verifyPasskeyAuth(input: VerifyPasskeyAuthInput!): InstituteLoginResult!
   verifyPasskeyRegistration(input: VerifyPasskeyRegistrationInput!): PasskeyInfo!
   verifyPayment(input: VerifyPaymentGqlInput!): PaymentModel!
@@ -4792,6 +4885,9 @@ type Query {
   adminImpersonationSessions(activeOnly: Boolean, first: Int = 50, sessionId: String): [ImpersonationSessionModel!]!
   adminInstituteStatistics: InstituteStatisticsModel!
 
+  """Deleted institutes, most recently deleted first (at most 200)."""
+  adminListDeletedInstitutes: [DeletedInstituteModel!]!
+
   """Platform admin: list dead-lettered NATS messages (ROV-19)"""
   adminListDlqMessages(filter: DlqMessageFilterInput): DlqMessageConnection!
 
@@ -4976,6 +5072,9 @@ type Query {
 
   """List institute roles available for primary-nav customization."""
   instituteRoles: [Role!]!
+
+  """Every payment recorded against one invoice, newest first"""
+  invoicePayments(invoiceId: ID!): [PaymentModel!]!
   invoices(after: String, filter: BillingFilterInput, first: Int = 20, instituteId: ID): [InvoiceModel!]!
   leave(id: ID!): LeaveModel!
 
@@ -5060,6 +5159,9 @@ type Query {
 
   """Get current consent status for all linked children and purposes"""
   myConsentStatus: [ConsentStatus!]!
+
+  """The signed-in user's email address and whether it is verified."""
+  myEmailVerification: EmailVerificationModel!
   myGroups: [GroupMembershipModel!]!
   myInstitute: InstituteModel!
 
@@ -5173,6 +5275,9 @@ type Query {
     academicYearId: ID
   ): [StandardModel!]!
 
+  """Storage used by the institute's files and the limit of its plan"""
+  storageUsage: StorageUsage!
+
   """Aggregate student statistics"""
   studentStatistics: StudentStatisticsModel!
 
@@ -5221,6 +5326,11 @@ type Query {
     status: TimetableStatus
   ): PaginatedTimetablesModel!
   unverifiedPayments(after: String, first: Int = 20): [PaymentModel!]!
+
+  """
+  Public check of a transfer certificate by the token in its QR code. Null when no TC has the token.
+  """
+  verifyTC(token: String!): TcVerificationModel
 }
 
 input RefundInput {
@@ -6116,6 +6226,19 @@ type StatusCount {
   status: String!
 }
 
+"""
+Storage taken by the institute's files and its members' files, against what its plan allows
+"""
+type StorageUsage {
+  """Bytes the plan allows; null when the plan sets no limit"""
+  limitBytes: Float
+
+  """
+  Bytes of files attached to records of the institute, plus documents and photos of its members. A person who belongs to several institutes counts in full for each.
+  """
+  usedBytes: Float!
+}
+
 """Stream (specialisation) for a section — name and short code."""
 input StreamInput {
   """Short code used in reports, e.g. "SC", "CO", "AR"."""
@@ -6460,14 +6583,33 @@ type Subscription {
   instituteConfigUpdated: InstituteModel!
   instituteSetupProgress: JSON!
   instituteUpdated: InstituteModel!
-  myInvoiceGenerated: InvoiceModel!
-  myPaymentStatusChanged: PaymentModel!
-  mySubscriptionStatusChanged: SubscriptionModel!
+
+  """Fires when an invoice is raised for this institute"""
+  myInvoiceGenerated: BillingInvoiceEvent!
+
+  """
+  Fires when one of this institute's payments is received or changes state
+  """
+  myPaymentStatusChanged: BillingPaymentEvent!
+
+  """Fires when this institute's subscription changes"""
+  mySubscriptionStatusChanged: BillingSubscriptionEvent!
   resellerInstituteCreated: InstituteModel!
   resellerInstituteStatusChanged: InstituteModel!
-  resellerInvoiceGenerated: InvoiceModel!
-  resellerPaymentReceived: PaymentModel!
-  resellerSubscriptionChanged: SubscriptionModel!
+
+  """Fires when an invoice is raised for one of this reseller's institutes"""
+  resellerInvoiceGenerated: BillingInvoiceEvent!
+
+  """Fires when money is captured or recorded against an invoice"""
+  resellerPaymentReceived: BillingPaymentEvent!
+
+  """
+  Fires on every payment change, including a UPI proof waiting for verification, a rejection and a refund
+  """
+  resellerPaymentStatusChanged: BillingPaymentEvent!
+
+  """Fires when a subscription of one of this reseller's institutes changes"""
+  resellerSubscriptionChanged: BillingSubscriptionEvent!
   studentUpdated(studentId: ID!): StudentModel!
   studentsInTenantUpdated: StudentModel!
 }
@@ -6565,8 +6707,11 @@ type TCModel {
 
   """For a duplicate, the issued TC it copies; null on an original"""
   originalTcId: String
-  pdfUrl: String
-  qrVerificationUrl: String
+
+  """
+  The rendered PDF once issued. Sensitive: `url` is null; download through `fileDownloadUrl`.
+  """
+  pdf: FileRef
   reason: String!
 
   """
@@ -6585,6 +6730,9 @@ type TCModel {
   """CBSE TC fields frozen at generation (see CbseTcData)"""
   tcData: JSON
   tcSerialNumber: String!
+
+  """Public page the QR code on the TC opens; null until the TC is issued"""
+  verificationUrl: String
 }
 
 enum TcStatus {
@@ -6598,6 +6746,21 @@ enum TcStatus {
   ISSUED
   REQUESTED
   REVIEW_PENDING
+}
+
+"""What the public verification page shows for a TC"""
+type TcVerificationModel {
+  """Institute name by locale"""
+  instituteName: I18nText!
+  isDuplicate: Boolean!
+
+  """False when the TC was cancelled or is not issued"""
+  isValid: Boolean!
+
+  """Issue date, YYYY-MM-DD"""
+  issuedOn: String
+  serialNumber: String!
+  studentName: String
 }
 
 """
@@ -6629,6 +6792,11 @@ type TenantAnalytics {
   instituteName: I18nText!
   resellerId: ID!
   resellerName: String!
+
+  """
+  Bytes of the institute's stored files plus documents and photos of its members. A person in several institutes counts for each, so the column does not add up to total storage.
+  """
+  storageUsedBytes: Float!
 }
 
 type TenantAnalyticsConnection {
@@ -6652,6 +6820,7 @@ enum TenantAnalyticsSortField {
   ACTIVE_USERS_24H
   API_CALLS_24H
   INSTITUTE_NAME
+  STORAGE_USED
 }
 
 """Term/semester period within an academic year"""

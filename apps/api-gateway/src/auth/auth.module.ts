@@ -6,6 +6,8 @@ import { InstituteRoleModule } from '../institute/role/role.module';
 import { AuthResolver } from './auth.resolver';
 import { AuthService } from './auth.service';
 import { AuthEventService } from './auth-event.service';
+import { EmailVerificationResolver } from './email-verification.resolver';
+import { EmailVerificationService } from './email-verification.service';
 import { IdentityService } from './identity.service';
 import { ImpersonationResolver } from './impersonation.resolver';
 import { ImpersonationService } from './impersonation.service';
@@ -28,6 +30,8 @@ import { WsTicketController } from './ws-ticket.controller';
     AuthService,
     AuthEventService,
     AuthResolver,
+    EmailVerificationService,
+    EmailVerificationResolver,
     IdentityService,
     ImpersonationService,
     ImpersonationResolver,

@@ -14,6 +14,11 @@ export interface AuditEventPayload {
   tenantId: string | null;
   /** Set only for reseller-scoped actions; NULL otherwise */
   resellerId: string | null;
+  /**
+   * Institute a platform or reseller action was about; that institute can then read the row.
+   * Never set on institute-scoped events (they carry `tenantId`).
+   */
+  subjectTenantId?: string | null;
 
   /** Identity being acted as (the affected user) */
   userId: string;

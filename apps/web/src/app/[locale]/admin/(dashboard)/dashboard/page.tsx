@@ -35,7 +35,7 @@ export default function AdminDashboardPage() {
       id: 'settings',
       title: t('viewSettings'),
       description: t('viewSettingsDescription'),
-      href: '/settings',
+      href: '/settings/sessions',
       icon: Settings,
     },
   ];

@@ -17,6 +17,8 @@ import {
   membershipsLive,
   mkInstituteCtx,
   softDelete,
+  studentProfilesLive,
+  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -28,6 +30,7 @@ import { LeaveRepository } from './leave.repository';
 import { leaveInScope, mayApplyFor } from './leave-scope';
 import type {
   CreateLeaveData,
+  LeaveApplicantRecord,
   LeaveListQuery,
   LeaveOnDateQuery,
   LeaveRecord,
@@ -63,7 +66,7 @@ const writeReturning = {
   updatedAt: leaves.updatedAt,
 } as const;
 
-type LeaveRow = Omit<LeaveRecord, 'files'>;
+type LeaveRow = Omit<LeaveRecord, 'files' | 'applicant'>;
 
 const LEAVE_FILE_PURPOSE = 'LEAVE_ATTACHMENT';
 
@@ -84,12 +87,42 @@ async function loadFiles(tx: DrizzleDB, leaveIds: string[]): Promise<Map<string,
   return byLeave;
 }
 
+/** Name of each applicant, and the admission number of a student, keyed by membership id. */
+async function loadApplicants(
+  tx: DrizzleDB,
+  membershipIds: string[],
+): Promise<Map<string, LeaveApplicantRecord>> {
+  const unique = [...new Set(membershipIds)];
+  if (unique.length === 0) return new Map();
+  const rows = await tx
+    .select({
+      membershipId: membershipsLive.id,
+      firstName: userProfilesLive.firstName,
+      lastName: userProfilesLive.lastName,
+      admissionNumber: studentProfilesLive.admissionNumber,
+    })
+    .from(membershipsLive)
+    .innerJoin(userProfilesLive, eq(userProfilesLive.userId, membershipsLive.userId))
+    .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, membershipsLive.id))
+    .where(inArray(membershipsLive.id, unique));
+  return new Map(rows.map(({ membershipId, ...applicant }) => [membershipId, applicant]));
+}
+
 async function withFiles(tx: DrizzleDB, rows: LeaveRow[]): Promise<LeaveRecord[]> {
+  // One after the other: both run on the transaction's single connection.
   const byLeave = await loadFiles(
     tx,
     rows.map((row) => row.id),
   );
-  return rows.map((row) => ({ ...row, files: byLeave.get(row.id) ?? [] }));
+  const applicants = await loadApplicants(
+    tx,
+    rows.map((row) => row.userId),
+  );
+  return rows.map((row) => ({
+    ...row,
+    applicant: applicants.get(row.userId) ?? null,
+    files: byLeave.get(row.id) ?? [],
+  }));
 }
 
 async function attachFiles(

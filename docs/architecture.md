@@ -255,8 +255,30 @@ reference `files.id`; no table stores a URL. Design and remaining work: Linear R
 | Delete | `markFilesDeleted(tx, …)` in the same transaction that detaches the file. The row and objects stay for a 30-day grace period, then the file sweeper removes them (see "File sweeper" below). |
 | Client library | `@roviq/storage` wraps `@aws-sdk/client-s3`. Application code never calls S3 directly and uses nothing provider-specific; `pnpm storage:check` tests a provider against what the app relies on. `FakeStorageClient` is the in-memory version for unit tests. |
 
-Status flow: `PENDING` → `READY` → `DELETED`, or `PENDING` → `REJECTED` when verification fails
-(`FILE_STATE_MACHINE`).
+Status flow: `PENDING` → `READY` → `DELETED`, `PENDING` → `REJECTED` when verification fails, or
+`PENDING` → `QUARANTINED` when the malware scan finds a threat (`FILE_STATE_MACHINE`).
+
+Storage quota (ROV-302): `requestFileUpload` refuses an institute-owned upload with
+`STORAGE_QUOTA_EXCEEDED` when the institute's `READY` bytes, plus the declared size of its
+uploads still `PENDING`, plus the new file would pass `maxStorageMb` of its plan
+(`EntitlementService.storageLimitBytes`: no limit when EE is off or the plan says `null`,
+`DEFAULT_ENTITLEMENTS` when EE is on and the institute has no subscription). Files about
+a person (documents, photos; `tenant_id` null) count for every institute that person is a
+member of, in full for each, and their upload is refused the same way. Reseller files are not
+counted; files the server writes are counted but never refused. Usage is one
+indexed `SUM` per upload request, not a cache. `storageUsage` (institute) and
+`adminTenantAnalytics.storageUsedBytes` (platform) show the same `READY` sum.
+
+Malware scan (ROV-303): a file that is not an image is read from its pending key and sent to the
+`FileScanner` before it is copied to the key it is served from, so nothing unscanned ever sits
+there. An infected file becomes `QUARANTINED`: its bytes are deleted, the row is kept (the
+sweeper never removes it), and a `FILE.quarantined` event plus a `quarantineFile` audit entry
+name the uploader. Without a verdict the request fails with `FILE_SCAN_UNAVAILABLE` and the
+file stays `PENDING`. Images are not scanned because only their re-encoded sizes are stored;
+files the server writes itself are not scanned. Scanners: `ClamavFileScanner` (clamd `INSTREAM`
+over TCP), `EicarFileScanner` outside production, and `DisabledFileScanner`, which is what
+production uses until ClamAV is turned on (`docs/deployment.md` → "Malware scanning
+of uploads").
 
 ### File sweeper
 
@@ -314,3 +336,19 @@ Frontend: `<FileUpload>` and `useFileUpload()` in `apps/web/src/components/file-
 | Institute-timezone calendar | `getInstituteToday(institute)` from `apps/api-gateway/src/common/timezone` (API-gateway-internal) | Falls back to `Asia/Kolkata` |
 
 **The DD/MM footgun**: India displays DD/MM/YYYY. ISO stores YYYY-MM-DD. These must never be confused — store ISO, parse ISO, display via hook. A display string must never be re-parsed as a date.
+
+## Audit log
+
+**Platform and reseller actions on an institute (ROV-311).** Such an action is audited in the
+platform or reseller scope with `tenant_id` NULL. So that the institute can see it,
+`audit_logs.subject_tenant_id` names the institute the action was about, and the
+`audit_app_read` policy lets an institute read its own rows and the rows that name it. The
+resolver says which argument holds the institute id with `@AuditInstitute('id')` (or
+`'input.tenantId'`); a mutation whose arguments do not hold it (a download by file id) calls
+`markAuditInstitute(req, id)`. The institute's audit screen marks these rows "Roviq platform" or
+"Reseller"; of such a row it gets the actor, the action and the stated reason, not the IP
+address, browser, raw arguments or error text. The institute is named from the arguments only
+when the action succeeded (a platform admin excepted, who may act on any institute), and a
+trigger clears the subject of a reseller row that names an institute of another reseller. A new platform or
+reseller mutation that acts on one institute needs the decorator, or the institute will not see
+it.

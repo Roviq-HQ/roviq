@@ -1,7 +1,7 @@
 'use client';
 
 import { extractGraphQLErrorCode } from '@roviq/graphql';
-import { Link, useFormatDate } from '@roviq/i18n';
+import { Link, useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   Badge,
   Button,
@@ -32,6 +32,7 @@ import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { type ApplicantFacts, leaveSubject } from '../leave-abilities';
+import { leaveApplicantLabel } from '../leave-applicant';
 import { LeaveCancelAction, WithApplicantFacts } from '../leave-cancel-action';
 import { leaveActionErrorKey } from '../leave-errors';
 import {
@@ -260,6 +261,7 @@ function LeaveLoadError({ error, onRetry }: { error: unknown; onRetry: () => voi
 function LeaveDetailCard({ leave }: { leave: LeaveRecord }) {
   const t = useTranslations('leave');
   const { format } = useFormatDate();
+  const resolveI18n = useI18nField();
 
   return (
     <Card data-testid={instituteLeave.detailCard}>
@@ -280,7 +282,11 @@ function LeaveDetailCard({ leave }: { leave: LeaveRecord }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <DetailRow label={t('fields.userId')} value={leave.userId} testId="leave-detail-user" />
+        <DetailRow
+          label={t('fields.userId')}
+          value={leaveApplicantLabel(leave.applicant, resolveI18n) ?? t('applicantUnknown')}
+          testId="leave-detail-user"
+        />
         <DetailRow
           label={`${t('fields.startDate')} – ${t('fields.endDate')}`}
           value={`${format(parseIsoDateLocal(leave.startDate), 'dd MMM yyyy')} – ${format(

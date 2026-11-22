@@ -51,6 +51,18 @@ export class TCResolver {
   }
 
   @Mutation(() => TCModel, {
+    description: 'Render the PDF of an issued TC that has none (the render at issue failed)',
+  })
+  @CheckAbility({ action: 'manage', subject: 'TC' })
+  async generateTCPdf(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TCModel> {
+    assertTenantContext(user);
+    return this.certService.generateTCPdf(user, id);
+  }
+
+  @Mutation(() => TCModel, {
     description: 'Issue TC — generates serial, PDF, marks student transferred_out',
   })
   @CheckAbility({ action: 'manage', subject: 'TC' })

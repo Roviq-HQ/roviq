@@ -10,6 +10,8 @@ export abstract class UserRepository {
    * ROV-96 — Set a brand-new password and clear the first-login flag in one statement.
    * Updates `password_hash`, sets `password_changed_at = now()`, and resets
    * `must_change_password = false`. Used by the changePassword mutation.
+   * Also raises `token_version`, which ends every access token issued before, and returns it.
    */
-  abstract updatePassword(userId: string, passwordHash: string): Promise<void>;
+  abstract updatePassword(userId: string, passwordHash: string): Promise<number>;
+  abstract markEmailVerified(userId: string): Promise<void>;
 }

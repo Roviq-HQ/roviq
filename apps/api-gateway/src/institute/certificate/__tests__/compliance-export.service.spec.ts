@@ -315,6 +315,8 @@ describe('ComplianceExportService', () => {
   });
 
   describe('adminDownloadUrl', () => {
+    const EXPORT_TENANT = '00000000-0000-7000-a000-0000000000e1';
+
     it('should answer EXPORT_REPORT_NOT_FOUND for a file that is not a finished export', async () => {
       vi.mocked(repo.findCompletedExportFile).mockResolvedValue(null);
 
@@ -325,13 +327,19 @@ describe('ComplianceExportService', () => {
     });
 
     it('should sign a short-lived link for a finished export', async () => {
-      const file = createMock<FileRecord>({ id: REPORT, purpose: 'COMPLIANCE_EXPORT' });
+      const file = createMock<FileRecord>({
+        id: REPORT,
+        purpose: 'COMPLIANCE_EXPORT',
+        tenantId: EXPORT_TENANT,
+      });
       vi.mocked(repo.findCompletedExportFile).mockResolvedValue(file);
       vi.mocked(files.signedDownloadUrl).mockResolvedValue('https://storage.example/x.xlsx');
 
-      await expect(service.adminDownloadUrl(admin, REPORT)).resolves.toBe(
-        'https://storage.example/x.xlsx',
-      );
+      // The institute comes back with the link so the download is audited against it.
+      await expect(service.adminDownloadUrl(admin, REPORT)).resolves.toEqual({
+        url: 'https://storage.example/x.xlsx',
+        tenantId: EXPORT_TENANT,
+      });
       expect(files.signedDownloadUrl).toHaveBeenCalledWith(file);
     });
   });

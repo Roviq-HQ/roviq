@@ -49,6 +49,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
   'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
+  'apps/api-gateway/src/auth/__tests__/email-verification.integration.spec.ts',
   'apps/api-gateway/src/auth/__tests__/institute-status-access.integration.spec.ts',
   'apps/api-gateway/src/institute/section/__tests__/section-strength.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
@@ -66,6 +67,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-97: global guard reads the reseller's status before any resolver runs.
   // Reads an institute's status for any institute-scope token, before a tenant context exists.
   'apps/api-gateway/src/auth/middleware/institute-access.guard.ts',
+  // Reads one user's token_version before any resolver runs; the id comes from the verified token.
+  'apps/api-gateway/src/auth/middleware/token-version.guard.ts',
   'apps/api-gateway/src/auth/middleware/reseller-access.guard.ts',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts',
   'apps/api-gateway/src/auth/repositories/platform-membership.drizzle-repository.ts',
@@ -113,6 +116,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/tc-register.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/udise-dcf.export.ts',
+  // Public TC verification: an anonymous caller, served only through the verify_tc() function.
+  'apps/api-gateway/src/public-verification/tc-verification.repository.ts',
   'apps/api-gateway/src/institute/certificate/workflows/compliance-export.activities.ts',
   'apps/api-gateway/src/institute/certificate/workflows/tc-issuance.activities.ts',
   'apps/api-gateway/src/institute/consent/consent.service.ts',
@@ -168,6 +173,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts',
   // ROV-101 fixture: reads the teacher role's stored name to compare with the API.
   'apps/api-gateway/src/reseller/user/__tests__/user-listing-roles.integration.spec.ts',
+  // ROV-302 integration fixture: inserts files of each status and owner to measure usage
+  'apps/api-gateway/src/files/__tests__/storage-quota.integration.spec.ts',
+  // ROV-311 integration fixture: inserts audit rows and reads them as each institute's role
+  'apps/api-gateway/src/audit/__tests__/audit-subject-institute.integration.spec.ts',
   'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',

@@ -97,6 +97,44 @@ The R2 column is from Cloudflare's documentation and has not been run against th
 `pnpm storage:check` decides: in particular it proves that a presigned upload is refused when the
 body's size or type differs from what was signed, which the upload design depends on.
 
+## Malware scanning of uploads
+
+**Off in production for now** (owner's decision, 2026-11-21): with `FILE_SCANNER` unset, a
+production gateway stores and serves uploaded documents unscanned and logs a warning at start.
+The scanning code is in place (ROV-303); turning it on needs only the steps below.
+
+What scanning does when on: every uploaded file that is not an image (PDF, CSV, XLSX) is
+scanned before it can be attached to a record. Images are not scanned: they are re-encoded, and
+only the re-encoded sizes are stored.
+
+`FILE_SCANNER` values:
+
+- `off`: no scanning. The default when `NODE_ENV=production`.
+- `clamav`: scan through a ClamAV daemon. Needs `CLAMAV_HOST` (and `CLAMAV_PORT` if not 3310);
+  the gateway does not start without it.
+- `eicar`: detects only the EICAR test file. The default outside production, for development
+  and automated tests; refused when `NODE_ENV=production`.
+
+To turn scanning on:
+
+- Run the `clamav/clamav` image (the commented `clamav` service in `docker/compose.app.yaml`)
+  and set `FILE_SCANNER=clamav` and `CLAMAV_HOST` on every api-gateway.
+- **Memory and start-up:** `clamd` keeps its signatures in memory, about 1.5 GB. The first start
+  downloads the signature database; keep `/var/lib/clamav` on a volume. The image runs
+  `freshclam` itself, so it needs outbound HTTPS to `database.clamav.net`.
+- **Not reachable from outside:** `clamd` has no authentication. Keep port 3310 on the private
+  network only.
+- **Size limit:** the largest upload is 50 MB. `clamd` refuses a stream above its
+  `StreamMaxLength` (100 MB in the official image); do not lower it below 50 MB.
+- **When the scanner is down** uploads of documents fail with `FILE_SCAN_UNAVAILABLE` and can be
+  retried; nothing unscanned is attached. Alert on the health check of the container.
+- **An infected file** is refused with `FILE_INFECTED`, its bytes are deleted and its `files`
+  row stays with status `QUARANTINED`. A `FILE.quarantined` event and an audit entry
+  (`quarantineFile`) name the uploader and the institute.
+- **To test a deployment** upload the EICAR test file as a `.csv` where a CSV is accepted (bulk
+  student import). ClamAV recognises EICAR only at the start of a file, so an EICAR string
+  placed after a PDF header is reported clean.
+
 ## Background workers
 
 Temporal workers run inside the api-gateway process, switched on per instance with a
@@ -135,6 +173,22 @@ that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
   It connects with `DATABASE_URL` and runs as `roviq_admin`, reaching partition DDL through the
   `SECURITY DEFINER` functions `ensure_monthly_partition` and `detach_monthly_partition`.
 
+## PDF generation
+
+Transfer certificates and other certificates are rendered inside the api-gateway with Typst
+(`@myriaddreamin/typst-ts-node-compiler`). No browser or system binary is needed.
+
+- The package ships one native binary per platform as an optional dependency. The image must
+  be installed on the platform it runs on (`pnpm install` inside the image), not copied from a
+  different one.
+- Fonts are in the build output at `dist/apps/api-gateway/src/assets/fonts` (Noto Sans and Noto
+  Sans Devanagari). Text in a script without a font is refused with `PDF_UNSUPPORTED_SCRIPT`
+  instead of being printed as boxes; to add a script see `apps/api-gateway/src/assets/fonts/README.md`.
+- `INSTITUTE_PORTAL_URL` must be the public address of the institute portal
+  (`https://app.roviq.com`). It is printed in the QR code of every transfer certificate as
+  `<url>/verify/tc/<token>`. A certificate printed with the wrong address cannot be fixed later.
+- The page `/verify/tc/<token>` and the `verifyTC` query are public on purpose.
+
 ## Redis
 
 Redis is on the request path for access control, not only for caching:
@@ -142,9 +196,11 @@ Redis is on the request path for access control, not only for caching:
 - `ResellerAccessGuard` (ROV-97) reads `auth:reseller-access:<id>` on every reseller-scope request, and suspension writes a block marker there. If Redis is unreachable these requests fail rather than skip the check.
 - The same guard reads `auth:reseller-member-access:<membershipId>` (ROV-185). A role change, a deactivation and a tier change write the role the member's tokens must carry (or `blocked`) there for 11 minutes, one minute longer than a reseller access token lives. If the key is lost early, a token issued before the change keeps its old role until it expires (at most 10 minutes); refresh tokens are unaffected because the database checks the membership.
 - `ImpersonationSessionGuard` reads `impersonation-session:<id>` and its tombstone on every impersonated request.
-- One-time impersonation codes, impersonation OTP requests and ws-tickets live only in Redis.
+- `InstituteAccessGuard` reads `auth:institute-access:<id>` on every institute-scope request; a status change or delete writes a block marker there.
+- `TokenVersionGuard` reads `auth:token-version:<userId>` on every authenticated request. A password change writes the new version there, which ends the access tokens issued before it at once. If the key is lost the guard reads `users.token_version` from the database, so nothing is let through wrongly.
+- One-time impersonation codes, impersonation OTP requests, pending email verification codes and ws-tickets live only in Redis.
 
-Plan Redis availability with that in mind; a Redis outage blocks reseller users and impersonation.
+Plan Redis availability with that in mind; a Redis outage blocks every signed-in request.
 
 ## Impersonation OTP delivery
 

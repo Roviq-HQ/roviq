@@ -3,6 +3,9 @@ import { LanguagePreferencePage } from './pages/LanguagePreferencePage';
 
 export function languagePreferenceTests(portal: 'admin' | 'reseller' | 'institute') {
   test.describe('Account language preference', () => {
+    // Both tests change the same account's saved language.
+    test.describe.configure({ mode: 'serial' });
+
     let original: string | null | undefined;
 
     test.afterEach(async ({ page }) => {
@@ -11,7 +14,7 @@ export function languagePreferenceTests(portal: 'admin' | 'reseller' | 'institut
       }
     });
 
-    test('persists across refresh while allowing a temporary topbar override', async ({ page }) => {
+    test('persists across refresh', async ({ page }) => {
       const account = new LanguagePreferencePage(page, portal);
       await account.goto();
       original = await account.readPreference();
@@ -20,12 +23,22 @@ export function languagePreferenceTests(portal: 'admin' | 'reseller' | 'institut
       expect(await account.readPreference()).toBe('hi');
       await account.refresh();
       await account.expectHindi();
-      await account.temporarilyUseEnglish();
-      expect(await account.readPreference()).toBe('hi');
-      await account.refresh();
-      await account.expectHindi();
       await account.select('browser');
       await expect.poll(() => account.readPreference()).toBeNull();
+    });
+
+    test('keeps a language picked in the topbar after a reload', async ({ page }) => {
+      const account = new LanguagePreferencePage(page, portal);
+      await account.goto();
+      original = await account.readPreference();
+      await account.switchInTopbar('hi');
+      await expect.poll(() => account.readPreference()).toBe('hi');
+      await account.refresh();
+      await account.expectHindi();
+      await account.switchInTopbar('en');
+      await expect.poll(() => account.readPreference()).toBe('en');
+      await account.refresh();
+      await account.expectEnglish();
     });
   });
 }

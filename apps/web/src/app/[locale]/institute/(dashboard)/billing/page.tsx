@@ -10,11 +10,14 @@ import {
   CardTitle,
   Skeleton,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { parseISO } from 'date-fns';
 import { AlertTriangle, Calendar, CreditCard, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { type MySubscription, useMySubscription } from './use-billing';
+
+const { instituteBillingOverview: ids } = testIds;
 
 /** Status → badge variant mapping (BI-005). Unknown statuses fall back to
  * `secondary` so a backend that ships a new enum value never renders a
@@ -70,7 +73,7 @@ export default function InstituteBillingPage() {
 function NoSubscriptionState() {
   const t = useTranslations('instituteBilling');
   return (
-    <Card>
+    <Card data-testid={ids.noSubscription}>
       <CardContent className="flex flex-col items-center justify-center py-16">
         <Shield className="mb-4 size-16 text-muted-foreground" />
         <h2 className="text-xl font-semibold">{t('noSubscription.title')}</h2>
@@ -138,14 +141,14 @@ function SubscriptionCard({ subscription }: { subscription: MySubscription }) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Card>
+      <Card data-testid={ids.subscriptionCard}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="size-5" />
               {plan ? ti(plan.name) : t('unknownPlan')}
             </CardTitle>
-            <Badge variant={statusVariant(subscription.status)}>
+            <Badge variant={statusVariant(subscription.status)} data-testid={ids.statusBadge}>
               {t(`statuses.${subscription.status}`)}
             </Badge>
           </div>
