@@ -940,3 +940,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Also found:** migrations m1 to m7 added `*_fk` foreign keys that the schema also creates as `*_fkey`; 68 keys existed twice and were checked twice on every write.
 - **Fix:** the strength triggers are statement-level and recount each affected section once (cold run of the spec: 47 s → 4.5 s of test time). The gate files are listed once in the job env and passed to the full run as `INTEGRATION_EXCLUDE`. `requestTC` uses the shared `TemporalClientService`, which the integration spec replaces with a recorder. A migration drops each `*_fk` key that has an identical twin, and `foreign-key-duplicates.integration.spec.ts` fails if one comes back.
 - **Lesson:** a CLI `--exclude` does not reach a Vitest project that sets its own `exclude`, and `nx run <target> --exclude=…` is read by Nx itself. A step that is slow only right after `db:reset` points at a query planned without statistics; look for a per-row trigger.
+
+## 2026-11-22 — diagnosed and fixed: pre-push e2e failed with `ECONNREFUSED 127.0.0.1:8026`
+
+- **Symptom:** `must-change-password.api-e2e.spec.ts` failed in `pnpm ci:check` on slot 0 with `connect ECONNREFUSED` on the e2e Mailpit port. The same push gate passed in other slots and in CI.
+- **Cause:** ROV-314 added `mailpit` to `docker/compose.e2e.yaml`, but `scripts/ci-check.sh` starts the e2e infra by name and its list did not include it. The gate passed only where `pnpm e2e:up` (which starts every service) had created the container earlier.
+- **Fix:** `mailpit` is in the list of infra services that `ci-check.sh` starts.
+- **Lesson:** a new service in `compose.e2e.yaml` must also be added to the service list in `scripts/ci-check.sh`.
