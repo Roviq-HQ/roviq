@@ -1,5 +1,5 @@
 import { Field, ID, InputType, Int } from '@nestjs/graphql';
-import { GenderRestriction } from '@roviq/common-types';
+import { BatchStatus, GenderRestriction } from '@roviq/common-types';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import {
   IsEnum,
@@ -123,4 +123,12 @@ export class CreateSectionInput {
     description: 'Membership ID of the staff member assigned as class teacher.',
   })
   classTeacherId?: string;
+
+  @IsOptional()
+  @IsEnum(BatchStatus)
+  @Field(() => BatchStatus, {
+    nullable: true,
+    description: 'Lifecycle state of this section batch (Upcoming → Active → Completed).',
+  })
+  batchStatus?: BatchStatus;
 }

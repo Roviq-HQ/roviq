@@ -147,6 +147,7 @@ export class SectionDrizzleRepository extends SectionRepository {
           displayOrder: data.displayOrder ?? 0,
           startTime: data.startTime,
           endTime: data.endTime,
+          batchStatus: data.batchStatus as BatchEnum | undefined,
           createdBy: userId,
           updatedBy: userId,
         })

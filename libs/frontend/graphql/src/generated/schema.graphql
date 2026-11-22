@@ -1866,6 +1866,9 @@ input CreateSectionInput {
   """Academic year this section is created under."""
   academicYearId: ID!
 
+  """Lifecycle state of this section batch (Upcoming → Active → Completed)."""
+  batchStatus: BatchStatus
+
   """Maximum number of students allowed in this section."""
   capacity: Int = 40
 
