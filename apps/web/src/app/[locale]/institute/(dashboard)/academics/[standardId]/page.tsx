@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
+import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
 import type { StreamObject } from '@roviq/graphql/generated';
 import {
   buildI18nTextSchema,
@@ -17,6 +17,7 @@ import {
   DataTable,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -46,6 +47,7 @@ import {
   Download,
   Layers,
   Plus,
+  Trash2,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -61,6 +63,7 @@ import {
   type Subject,
   useCreateSection,
   useCreateSubject,
+  useDeleteSection,
   useSections,
   useStandards,
   useSubjectsByStandard,
@@ -231,6 +234,7 @@ function SectionsTab({
 }) {
   const resolveI18n = useI18nField();
   const sectionColumnHelper = createColumnHelper<Section>();
+  const [deleteSection, setDeleteSection] = React.useState<Section | null>(null);
 
   const sectionColumns: ColumnDef<Section, unknown>[] = [
     sectionColumnHelper.accessor('name', {
@@ -311,6 +315,24 @@ function SectionsTab({
         </Can>
       ),
     }) as ColumnDef<Section, unknown>,
+    sectionColumnHelper.display({
+      id: 'actions',
+      cell: ({ row }) => (
+        <Can I="delete" a="Section">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={t('deleteSection')}
+            title={t('deleteSection')}
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => setDeleteSection(row.original)}
+            data-testid={instituteAcademics.sectionDeleteBtn(row.original.id)}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </Can>
+      ),
+    }) as ColumnDef<Section, unknown>,
   ];
 
   if (loading) {
@@ -350,7 +372,69 @@ function SectionsTab({
         data={sections}
         data-testid={instituteAcademics.sectionsTable}
       />
+      <DeleteSectionDialog
+        section={deleteSection}
+        open={!!deleteSection}
+        onOpenChange={(open) => !open && setDeleteSection(null)}
+      />
     </div>
+  );
+}
+
+function DeleteSectionDialog({
+  section,
+  open,
+  onOpenChange,
+}: {
+  section: Section | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const t = useTranslations('academics');
+  const tError = useTranslations('error');
+  const resolveI18n = useI18nField();
+  const { deleteSection, loading } = useDeleteSection();
+  const name = resolveI18n(section?.name) ?? '';
+
+  const handleDelete = async () => {
+    if (!section) return;
+    try {
+      await deleteSection(section.id);
+      toast.success(t('deleted'));
+      onOpenChange(false);
+    } catch (err) {
+      const code = extractGraphQLErrorCode(err);
+      toast.error(code && tError.has(code) ? tError(code) : tError('errorDescription'));
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm" data-testid={instituteAcademics.sectionDeleteDialog}>
+        <DialogHeader>
+          <DialogTitle>{t('deleteConfirmTitle', { name })}</DialogTitle>
+          <DialogDescription>{t('deleteConfirmDescription', { name })}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid={instituteAcademics.sectionDeleteCancelBtn}
+          >
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={loading}
+            onClick={handleDelete}
+            data-testid={instituteAcademics.sectionDeleteConfirmBtn}
+          >
+            {loading ? t('deleting') : t('deleteSection')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

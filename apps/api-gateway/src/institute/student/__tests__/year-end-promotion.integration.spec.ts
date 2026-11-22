@@ -616,6 +616,145 @@ describe('Year-end promotion (integration)', () => {
     });
   });
 
+  describe('section kept at rollover', () => {
+    const addSection = (
+      tenantId: string,
+      academicYearId: string,
+      standardId: string,
+      name: Record<string, string>,
+      displayOrder: number,
+    ) =>
+      withAdmin(result.db, mkAdminCtx(ORIGIN), async (tx) => {
+        const [row] = await tx
+          .insert(sections)
+          .values({
+            tenantId,
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+            standardId,
+            academicYearId,
+            name,
+            displayLabel: name.en,
+            displayOrder,
+            capacity: 40,
+          })
+          .returning({ id: sections.id });
+        return row.id;
+      });
+
+    const moveToSection = (fixture: YearFixture, key: string, sectionId: string) =>
+      withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+        tx
+          .update(studentAcademics)
+          .set({ sectionId })
+          .where(eq(studentAcademics.id, must(fixture.students.get(key), key).academicId)),
+      );
+
+    const rollOver = (fixture: YearFixture) =>
+      withTenant(result.db, mkInstituteCtx(fixture.tenantId, ORIGIN), (tx) =>
+        rollOverStudents(tx, {
+          tenantId: fixture.tenantId,
+          previousYearId: fixture.prevYearId,
+          academicYearId: fixture.nextYearId,
+          write: true,
+        }),
+      );
+
+    const sectionsOf = async (fixture: YearFixture) =>
+      new Map((await nextYearRows(fixture)).map((r) => [r.studentProfileId, r.sectionId]));
+
+    it('should keep the section name, case-insensitively, at the next level and when detained, never using another institute’s section', async () => {
+      const inst = await createTestInstitute(result.db);
+      const fixture = await createYears(result.db, inst.tenantId, {
+        prevOrders: [5],
+        nextOrders: [5, 6],
+        nextSectionOrders: [5, 6],
+        students: [
+          { key: 'inB', order: 5 },
+          { key: 'detainedInB', order: 5, promotionStatus: PromotionStatus.DETAINED },
+          { key: 'inLowerC', order: 5 },
+          { key: 'inA', order: 5 },
+        ],
+      });
+      const prev5 = must(fixture.prevStandards.get(5), 'prev level 5');
+      const next5 = must(fixture.nextStandards.get(5), 'next level 5');
+      const next6 = must(fixture.nextStandards.get(6), 'next level 6');
+      const prevB = await addSection(inst.tenantId, fixture.prevYearId, prev5, { en: 'B' }, 2);
+      const prevC = await addSection(inst.tenantId, fixture.prevYearId, prev5, { en: ' c ' }, 3);
+      const next6B = await addSection(inst.tenantId, fixture.nextYearId, next6, { en: 'B' }, 2);
+      const next6C = await addSection(inst.tenantId, fixture.nextYearId, next6, { en: 'C' }, 3);
+      const next5B = await addSection(inst.tenantId, fixture.nextYearId, next5, { en: 'B' }, 2);
+      // RLS must hide it: it would win both on name and on display order.
+      await addSection(otherInst.tenantId, fixture.nextYearId, next6, { en: 'B', hi: 'बी' }, 0);
+      await moveToSection(fixture, 'inB', prevB);
+      await moveToSection(fixture, 'detainedInB', prevB);
+      await moveToSection(fixture, 'inLowerC', prevC);
+
+      const preview = await gql<PreviewData>(
+        PREVIEW,
+        { academicYearId: fixture.nextYearId },
+        tokenFor(inst),
+      );
+      const counts = await rollOver(fixture);
+
+      const expectedCounts = {
+        movingUp: 3,
+        staying: 1,
+        completing: 0,
+        notCarried: 0,
+        noClassInNewYear: 0,
+        alreadyPlaced: 0,
+      };
+      expect(preview.data?.academicYearRolloverPreview).toEqual(expectedCounts);
+      expect(counts).toEqual(expectedCounts);
+      expect(await sectionsOf(fixture)).toEqual(
+        new Map([
+          [profile(fixture, 'inB'), next6B],
+          [profile(fixture, 'detainedInB'), next5B],
+          [profile(fixture, 'inLowerC'), next6C],
+          [profile(fixture, 'inA'), fixture.nextSections.get(6)],
+        ]),
+      );
+    });
+
+    it('should fall back to the first section by display order when the new class has no section of that name', async () => {
+      const inst = await createTestInstitute(result.db);
+      const fixture = await createYears(result.db, inst.tenantId, {
+        prevOrders: [5],
+        nextOrders: [6],
+        nextSectionOrders: [6],
+        students: [{ key: 'inB', order: 5 }],
+      });
+      const prevB = await addSection(
+        inst.tenantId,
+        fixture.prevYearId,
+        must(fixture.prevStandards.get(5), 'prev level 5'),
+        { en: 'B' },
+        2,
+      );
+      const firstOfNext6 = await addSection(
+        inst.tenantId,
+        fixture.nextYearId,
+        must(fixture.nextStandards.get(6), 'next level 6'),
+        { en: 'Z' },
+        0,
+      );
+      await moveToSection(fixture, 'inB', prevB);
+
+      const counts = await rollOver(fixture);
+
+      expect(counts).toEqual({
+        movingUp: 1,
+        staying: 0,
+        completing: 0,
+        notCarried: 0,
+        noClassInNewYear: 0,
+        alreadyPlaced: 0,
+      });
+      expect(await sectionsOf(fixture)).toEqual(new Map([[profile(fixture, 'inB'), firstOfNext6]]));
+    });
+  });
+
   describe('setPromotionDecisions', () => {
     const SET = `
       mutation Set($input: SetPromotionDecisionsInput!) { setPromotionDecisions(input: $input) }`;

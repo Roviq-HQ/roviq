@@ -974,6 +974,10 @@ export const testIds = {
     sectionNewBtn: 'academics-section-new-btn',
     sectionsTable: 'academics-sections-table',
     sectionViewTimetableBtn: (id: string) => `academics-section-view-timetable-${id}-btn`,
+    sectionDeleteBtn: (id: string) => `academics-section-${id}-delete-btn`,
+    sectionDeleteDialog: 'academics-section-delete-dialog',
+    sectionDeleteCancelBtn: 'academics-section-delete-cancel-btn',
+    sectionDeleteConfirmBtn: 'academics-section-delete-confirm-btn',
     sectionCreateCancelBtn: 'academics-section-create-cancel-btn',
     // Subjects
     subjectNewBtn: 'academics-subject-new-btn',

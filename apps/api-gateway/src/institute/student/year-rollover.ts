@@ -38,7 +38,8 @@ type CountRow = { [K in keyof YearRolloverCounts]: number } & Record<string, unk
  * Year-end promotion rule, shared by the `ACADEMIC_YEAR.activated` consumer and the activation
  * preview. Must run inside `withTenant`: every read goes through RLS-filtered `*_live` views.
  * Standards belong to one year, so the target level (a `numeric_order`) is matched to the new
- * year's standard with that order; the student goes into its first section.
+ * year's standard with that order; the student keeps a section of the same English name there,
+ * else goes into its first section.
  */
 export async function rollOverStudents(
   tx: DrizzleDB,
@@ -82,6 +83,7 @@ export async function rollOverStudents(
                ELSE 'next'
              END AS rule,
              pts.numeric_order AS explicit_order,
+             lower(btrim(psec.name->>'en')) AS section_key,
              -- Both years: an institute that adds a class this year has no higher level last year.
              (SELECT min(hs.numeric_order) FROM standards_live hs
                WHERE hs.academic_year_id IN (${previousYearId}::uuid, ${academicYearId}::uuid)
@@ -90,6 +92,7 @@ export async function rollOverStudents(
       JOIN student_profiles_live sp ON sp.id = sa.student_profile_id
       JOIN standards_live cs ON cs.id = sa.standard_id
       LEFT JOIN standards_live pts ON pts.id = sa.promoted_to_standard_id
+      LEFT JOIN sections_live psec ON psec.id = sa.section_id
       WHERE sa.academic_year_id = ${previousYearId}::uuid
         AND sp.academic_status IN (${statuses})
         AND EXISTS (SELECT 1 FROM academic_years_live ay WHERE ay.id = ${academicYearId}::uuid)
@@ -113,7 +116,8 @@ export async function rollOverStudents(
       LEFT JOIN LATERAL (
         SELECT s.id FROM sections_live s
         WHERE s.standard_id = ns.id AND s.academic_year_id = ${academicYearId}::uuid
-        ORDER BY s.display_order, s.id
+        ORDER BY COALESCE(lower(btrim(s.name->>'en')) = t.section_key, false) DESC,
+                 s.display_order, s.id
         LIMIT 1
       ) sec ON true
       WHERE NOT (t.rule = 'next' AND t.target_order IS NULL)

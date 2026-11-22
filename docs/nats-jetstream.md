@@ -216,8 +216,12 @@ or RE_ENROLLED, the row's `promotion_status` decides the target level (`numeric_
 | `PENDING` or none in a COACHING institute; `DETAINED` | The same level |
 | `GRADUATED`, `TRANSFERRED` | No row (`notCarried`) |
 
-The target level is matched to the new year's standard with that `numeric_order`; the student
-goes into its section with the lowest `display_order` (then id). The insert is `ON CONFLICT
+The target level is matched to the new year's standard with that `numeric_order`. The student
+keeps their section: they go into that standard's live section whose English name
+(`name->>'en'`, trimmed, case-insensitive) equals their previous-year section's, so 5-B moves to
+6-B and a detained 5-B student stays in 5-B. When the previous section is gone or no section of
+that name exists, or for ties, the section with the lowest `display_order` (then id) is used.
+There is no capacity check. The insert is `ON CONFLICT
 DO NOTHING` on the live `(student_profile_id, academic_year_id)` index, so redelivery is safe.
 The handler logs one line with the counts: `movingUp`, `staying`, `completing` (top level, no
 next level), `notCarried`, `noClassInNewYear` (no standard or section at the target level) and
