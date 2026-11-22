@@ -146,6 +146,8 @@ export const AppSubject = {
   Export: 'Export',
   /** Dead-lettered NATS message — platform admin inspects, replays, or discards (ROV-19) */
   DlqMessage: 'DlqMessage',
+  /** One attempt to send a notification outside the app — platform support reads it (ROV-314) */
+  NotificationDelivery: 'NotificationDelivery',
   /** Platform infrastructure health — dependency status, stream lag, alerts (ROV-184) */
   SystemHealth: 'SystemHealth',
 } as const;

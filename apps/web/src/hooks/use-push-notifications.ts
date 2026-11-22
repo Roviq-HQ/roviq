@@ -9,8 +9,8 @@ import type {
 } from './use-push-notifications.generated';
 
 const REGISTER_DEVICE_TOKEN = gql`
-  mutation RegisterDeviceToken($token: String!) {
-    registerDeviceToken(token: $token)
+  mutation RegisterDeviceToken($token: String!, $platform: DevicePlatform!) {
+    registerDeviceToken(token: $token, platform: $platform)
   }
 `;
 
@@ -30,7 +30,7 @@ export function usePushNotifications() {
       .then((token) => {
         if (token) {
           registered.current = true;
-          registerToken({ variables: { token } });
+          registerToken({ variables: { token, platform: 'WEB' } });
         }
       })
       .catch(() => {

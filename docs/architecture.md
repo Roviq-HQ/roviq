@@ -24,10 +24,11 @@ roviq/
 │   │       │   ├── academic-year/    # Academic year lifecycle
 │   │       │   ├── institute-group/  # Institute group service, models (shared with admin/reseller)
 │   │       │   ├── role/             # Institute roles and primary nav
-│   │       │   ├── notification-config/  # Tenant notification channels, device tokens
+│   │       │   ├── notification-config/  # Tenant notification channels
 │   │       │   ├── audit/        # auditLogs, entityAuditTimeline
 │   │       │   └── setup/        # Temporal InstituteSetupWorkflow
 │   │       ├── auth/             # JWT, login, impersonation, auth events, repositories, ws-ticket
+│   │       ├── notification-inbox/  # Every scope's own in-app inbox, live feed, push device tokens
 │   │       ├── audit/            # Audit interceptor, consumer, service, partition workflow (no resolvers)
 │   │       ├── dlq/              # DLQ consumer and service (resolver lives in admin/dlq)
 │   │       ├── casl/             # CASL ability guard + module

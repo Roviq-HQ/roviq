@@ -1,6 +1,8 @@
 import { type Type } from '@nestjs/common';
 import { Field, Int, ObjectType } from '@nestjs/graphql';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { PageInfo } from '@roviq/nestjs-graphql';
+import { isUUID } from 'class-validator';
 
 /**
  * Creates a Relay-style Connection type for the given node type.
@@ -39,4 +41,14 @@ export function encodeCursor(data: Record<string, unknown>): string {
 /** Decode a cursor to an object */
 export function decodeCursor(cursor: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(cursor, 'base64url').toString('utf-8'));
+}
+
+/** Reverses `encodeCursor({ id })` for keyset pages on a uuid id; anything else is refused. */
+export function decodeIdCursor(cursor: string): string {
+  const match = /^\{"id":"([0-9a-f-]{36})"\}$/.exec(Buffer.from(cursor, 'base64url').toString());
+  const id = match?.[1];
+  if (!id || !isUUID(id)) {
+    throw new BusinessException(ErrorCode.VALIDATION_FAILED, 'Invalid cursor');
+  }
+  return id;
 }

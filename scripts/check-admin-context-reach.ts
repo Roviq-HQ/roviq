@@ -27,6 +27,10 @@ const PLATFORM_ONLY_DIR = 'admin';
 // another tenant's or reseller's rows. One entry per function: a new one fails CI.
 // These are reviewed claims, not proofs — re-check the function when you touch it.
 export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
+  'apps/api-gateway/src/notification-inbox/repositories/notification-inbox.drizzle-repository.ts#NotificationInboxDrizzleRepository.run':
+    "Admin role only for a platform-scope token (the caller's own PlatformContext); every query adds ownedBy(): scope = 'platform' AND recipient_user_id = the token user, so another user's or scope's id answers NOTIFICATION_NOT_FOUND.",
+  'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts#DeviceTokenDrizzleRepository.run':
+    'device_tokens is platform-role only. Every write is keyed by the token user id, never an argument; unregister retires only a row whose user_id is the caller, and register moves a token to the caller only by retiring the old row.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.markEmailVerified':
     'The user id is the caller’s own, from the token, after the code sent to that account’s email was checked; impersonation sessions are refused.',
   'apps/api-gateway/src/public-verification/tc-verification.repository.ts#TcVerificationRepository.findByToken':

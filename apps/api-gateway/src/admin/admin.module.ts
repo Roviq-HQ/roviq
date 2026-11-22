@@ -20,6 +20,7 @@ import { AdminInstituteFieldResolver } from './institute/admin-institute-field.r
 import { AdminInstituteGroupResolver } from './institute-group/admin-institute-group.resolver';
 import { AdminMonitoringModule } from './monitoring/admin-monitoring.module';
 import { AdminTenantAnalyticsModule } from './monitoring/tenant-analytics/admin-tenant-analytics.module';
+import { AdminNotificationModule } from './notification/admin-notification.module';
 import { AdminResellerResolver } from './reseller/admin-reseller.resolver';
 import { AdminResellerService } from './reseller/admin-reseller.service';
 import { AdminResellerSubscriptionResolver } from './reseller/admin-reseller.subscription';
@@ -39,6 +40,7 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminMonitoringModule, // system health + tenant analytics (ROV-184)
     AdminTenantAnalyticsModule,
     AdminComplianceExportModule, // compliance exports of any institute (ROV-296)
+    AdminNotificationModule, // notification delivery log for support (ROV-314)
   ],
   providers: [
     AdminResellerService,

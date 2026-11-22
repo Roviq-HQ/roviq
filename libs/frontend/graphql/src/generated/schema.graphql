@@ -2269,6 +2269,13 @@ type DepartmentCount {
   department: String!
 }
 
+"""Operating system family of a device that receives push messages."""
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
 type DlqMessageConnection {
   edges: [DlqMessageEdge!]!
   pageInfo: PageInfo!
@@ -4145,6 +4152,9 @@ type Mutation {
   archiveAcademicYear(id: ID!): AcademicYearModel!
   archiveExam(id: ID!): ExamModel!
 
+  """Hides one of your notifications from the inbox."""
+  archiveNotification(id: ID!): NotificationModel!
+
   """
   Archive (deactivate) a subscription plan. Blocks new subscriptions but does not affect existing ones.
   """
@@ -4359,10 +4369,16 @@ type Mutation {
     currentRefreshToken: String!
   ): Boolean!
 
+  """Marks every unread notification read; returns how many."""
+  markAllNotificationsRead: Int!
+
   """
   Mark a single student. For sessions older than today this throws ATTENDANCE_EDIT_WINDOW_CLOSED unless the caller supplies `overridePastDay: true`, and ATTENDANCE_OVERRIDE_FORBIDDEN unless the caller may `update` AttendanceOverride for the section. Overrides are audited.
   """
   markAttendance(input: MarkAttendanceInput!, overridePastDay: Boolean, overrideReason: String): AttendanceEntryModel!
+
+  """Marks one of your notifications read. Already read is not an error."""
+  markNotificationRead(id: ID!): NotificationModel!
 
   """
   Open a session and seed its roster. A date before today requires the AttendanceOverride permission (ATTENDANCE_OVERRIDE_FORBIDDEN otherwise).
@@ -4381,7 +4397,14 @@ type Mutation {
   publishReportCards(reportCardId: ID!): Int!
   recordManualPayment(input: ManualPaymentInput!, invoiceId: ID!): InvoiceModel!
   refreshToken(token: String!): AuthPayload!
-  registerDeviceToken(token: String!): Boolean!
+
+  """Registers this device for the signed-in user's push messages."""
+  registerDeviceToken(
+    platform: DevicePlatform!
+
+    """FCM or APNs token as the device reported it."""
+    token: String!
+  ): Boolean!
 
   """Reject an application"""
   rejectApplication(id: ID!, reason: String): ApplicationModel!
@@ -4563,6 +4586,11 @@ type Mutation {
   Unlink a guardian from a student. If primary, must provide newPrimaryGuardianId
   """
   unlinkGuardianFromStudent(input: UnlinkGuardianInput!): Boolean!
+
+  """
+  Stops push messages to this device. Succeeds whether or not it was registered.
+  """
+  unregisterDeviceToken(token: String!): Boolean!
   updateAcademicYear(id: ID!, input: UpdateAcademicYearInput!): AcademicYearModel!
 
   """Update application status (state machine validated)"""
@@ -4689,6 +4717,14 @@ enum NepStage {
   SECONDARY
 }
 
+"""Channel outside the app a notification was sent on."""
+enum NotificationChannel {
+  EMAIL
+  PUSH
+  SMS
+  WHATSAPP
+}
+
 type NotificationConfigModel {
   digestCron: String
   digestEnabled: Boolean!
@@ -4699,6 +4735,96 @@ type NotificationConfigModel {
   pushEnabled: Boolean!
   tenantId: String!
   whatsappEnabled: Boolean!
+}
+
+type NotificationConnection {
+  edges: [NotificationEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type NotificationDeliveryConnection {
+  edges: [NotificationDeliveryEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type NotificationDeliveryEdge {
+  cursor: String!
+  node: NotificationDeliveryModel!
+}
+
+"""Filters for the notification delivery log; all optional."""
+input NotificationDeliveryFilterInput {
+  channel: NotificationChannel
+  recipientUserId: ID
+  status: NotificationDeliveryStatus
+  tenantId: ID
+
+  """Notification kind, e.g. ATTENDANCE_ABSENT."""
+  type: String
+}
+
+"""One attempt to send a notification outside the app (append-only log)."""
+type NotificationDeliveryModel {
+  attempt: Int!
+  channel: NotificationChannel!
+  createdAt: DateTime!
+
+  """Why a FAILED attempt failed."""
+  errorCode: String
+  id: ID!
+
+  """The in-app copy, if any; null for codes and welcome messages."""
+  notificationId: ID
+
+  """Adapter that handled the attempt."""
+  provider: String
+  providerMessageId: String
+  recipientUserId: ID!
+  resellerId: ID
+
+  """'institute', 'reseller' or 'platform'."""
+  scope: String!
+
+  """Why a SKIPPED attempt was not made."""
+  skipReason: String
+  status: NotificationDeliveryStatus!
+  tenantId: ID
+  type: String!
+}
+
+"""Outcome of one delivery attempt."""
+enum NotificationDeliveryStatus {
+  DELIVERED
+  FAILED
+  SENT
+  SKIPPED
+}
+
+type NotificationEdge {
+  cursor: String!
+  node: NotificationModel!
+}
+
+"""One in-app notification addressed to the signed-in user."""
+type NotificationModel {
+  archivedAt: DateTime
+
+  """All locales; the client picks one."""
+  body: I18nText!
+  createdAt: DateTime!
+
+  """Deep-link target and entity ids for the client to open."""
+  data: JSON
+  id: ID!
+  readAt: DateTime
+
+  """All locales; the client picks one."""
+  title: I18nText!
+
+  """Notification kind, e.g. ATTENDANCE_ABSENT or LEAVE_DECIDED."""
+  type: String!
 }
 
 type PageInfo {
@@ -4913,6 +5039,9 @@ type Query {
 
   """List all users, newest first, with search and filters (platform admin)"""
   adminListUsers(filter: AdminListUsersFilterInput): AdminUserConnection!
+
+  """Platform support: every notification delivery attempt, newest first."""
+  adminNotificationDeliveries(after: String, filter: NotificationDeliveryFilterInput, first: Int = 20): NotificationDeliveryConnection!
 
   """
   Platform admin: one reseller's billing summary (MRR, subscriptions, overdue)
@@ -5171,6 +5300,11 @@ type Query {
   myInstituteGroup: InstituteGroupModel
   myInvoice(id: ID!): InvoiceModel
   myInvoices(after: String, filter: BillingFilterInput, first: Int = 20): [InvoiceModel!]!
+
+  """
+  The signed-in user's notifications in this scope, newest first, archived ones left out.
+  """
+  myNotifications(after: String, first: Int = 20, unreadOnly: Boolean = false): NotificationConnection!
   myPasskeys: [PasskeyInfo!]!
   myPaymentHistory(after: String, first: Int = 20): [PaymentModel!]!
 
@@ -5187,6 +5321,9 @@ type Query {
     currentRefreshToken: String!
   ): [SessionInfo!]!
   mySubscription: SubscriptionModel
+
+  """Unread, unarchived notifications of the signed-in user."""
+  myUnreadNotificationCount: Int!
   notificationConfigs: [NotificationConfigModel!]!
 
   """
@@ -6594,6 +6731,9 @@ type Subscription {
 
   """Fires when this institute's subscription changes"""
   mySubscriptionStatusChanged: BillingSubscriptionEvent!
+
+  """A new notification for the signed-in user in this scope."""
+  notificationReceived: NotificationModel!
   resellerInstituteCreated: InstituteModel!
   resellerInstituteStatusChanged: InstituteModel!
 

@@ -1,0 +1,105 @@
+query E2eNotificationAttendanceSession($id: ID!) {
+  attendanceSession(id: $id) {
+    sectionId
+    academicYearId
+  }
+}
+
+mutation E2eNotificationOpenAttendanceSession($input: CreateAttendanceSessionInput!) {
+  openAttendanceSession(input: $input) {
+    id
+  }
+}
+
+mutation E2eNotificationMarkAttendance(
+  $input: MarkAttendanceInput!
+  $overridePastDay: Boolean
+  $overrideReason: String
+) {
+  markAttendance(
+    input: $input
+    overridePastDay: $overridePastDay
+    overrideReason: $overrideReason
+  ) {
+    id
+    status
+  }
+}
+
+query E2eMyUnreadNotificationCount {
+  myUnreadNotificationCount
+}
+
+query E2eMyNotifications($first: Int, $unreadOnly: Boolean) {
+  myNotifications(first: $first, unreadOnly: $unreadOnly) {
+    totalCount
+    edges {
+      node {
+        id
+        type
+        readAt
+      }
+    }
+  }
+}
+
+mutation E2eMarkNotificationRead($id: ID!) {
+  markNotificationRead(id: $id) {
+    id
+    readAt
+  }
+}
+
+subscription E2eNotificationReceived {
+  notificationReceived {
+    id
+    type
+    title
+    body
+    data
+    readAt
+    archivedAt
+    createdAt
+  }
+}
+
+query E2eAdminNotificationDeliveries($filter: NotificationDeliveryFilterInput, $first: Int) {
+  adminNotificationDeliveries(filter: $filter, first: $first) {
+    totalCount
+    edges {
+      node {
+        id
+        notificationId
+        recipientUserId
+        tenantId
+        type
+        channel
+        status
+      }
+    }
+  }
+}
+
+mutation E2eNotificationStartImpersonation(
+  $targetUserId: String!
+  $targetTenantId: String!
+  $reason: String!
+) {
+  adminStartImpersonation(
+    targetUserId: $targetUserId
+    targetTenantId: $targetTenantId
+    reason: $reason
+  ) {
+    code
+  }
+}
+
+mutation E2eNotificationExchangeImpersonationCode($code: String!) {
+  exchangeImpersonationCode(code: $code) {
+    accessToken
+  }
+}
+
+mutation E2eNotificationEndImpersonation($sessionId: String!) {
+  endImpersonation(sessionId: $sessionId)
+}

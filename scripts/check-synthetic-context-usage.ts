@@ -32,6 +32,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/academic-year.service.ts',
   'apps/api-gateway/src/files/repositories/file.drizzle-repository.ts',
+  // ROV-314: device_tokens is platform-role only; every write is keyed by the token user id.
+  'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts',
+  // ROV-314: notification, delivery and impersonation-session fixtures for the inbox tests only.
+  'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
   // ROV-301: files read as the caller's own role; profile photo writes on the shared user profile.
   'apps/api-gateway/src/files/file.loaders.ts',
   'apps/api-gateway/src/files/profile-photo.service.ts',
