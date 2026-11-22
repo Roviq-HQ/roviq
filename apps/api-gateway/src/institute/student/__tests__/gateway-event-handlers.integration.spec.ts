@@ -300,7 +300,7 @@ describe('Gateway event handlers (integration)', () => {
   });
 
   describe('ACADEMIC_YEAR.activated', () => {
-    it('should place continuing students in the new year, promoted ones in the promoted standard', async () => {
+    it('should move an undecided student up one level and a promoted one to the promoted standard', async () => {
       await studentHandler.onAcademicYearActivated({
         academicYearId: a.nextYearId,
         tenantId: a.tenantId,
@@ -313,8 +313,8 @@ describe('Gateway event handlers (integration)', () => {
       expect(byStudent.get(a.students.continuing)).toEqual({
         id: byStudent.get(a.students.continuing)?.id,
         studentProfileId: a.students.continuing,
-        standardId: a.next.class5,
-        sectionId: a.nextSections.s5First,
+        standardId: a.next.class6,
+        sectionId: a.nextSections.s6,
         tenantId: a.tenantId,
         createdBy: SYSTEM_USER_ID,
         updatedBy: SYSTEM_USER_ID,
@@ -324,7 +324,7 @@ describe('Gateway event handlers (integration)', () => {
       });
       expect(byStudent.get(a.students.promoted)?.standardId).toBe(a.next.class6);
       expect(byStudent.get(a.students.promoted)?.sectionId).toBe(a.nextSections.s6);
-      // Class 7 has no section in the new year; a graduated student does not continue.
+      // Class 7 is the top level, so moving up leaves no class; a graduated student does not continue.
       expect(byStudent.has(a.students.noSection)).toBe(false);
       expect(byStudent.has(a.students.graduated)).toBe(false);
     });

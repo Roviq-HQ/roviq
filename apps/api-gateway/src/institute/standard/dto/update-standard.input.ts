@@ -1,5 +1,5 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { EducationLevel, NepStage } from '@roviq/common-types';
+import { EducationLevel, MIN_STANDARD_NUMERIC_ORDER, NepStage } from '@roviq/common-types';
 import { I18nTextScalar } from '@roviq/nestjs-graphql';
 import { IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
 
@@ -16,11 +16,12 @@ export class UpdateStandardInput {
   name?: Record<string, string>;
 
   @IsInt()
-  @Min(0)
+  @Min(MIN_STANDARD_NUMERIC_ORDER)
   @IsOptional()
   @Field(() => Int, {
     nullable: true,
-    description: 'Sort order used for display in timetables and reports (0 = first).',
+    description:
+      'Class level: 1 for Class 1, 12 for Class 12; pre-primary below 1 (Nursery -3, LKG -2, UKG -1). Matches a class across academic years at rollover. From -5.',
   })
   numericOrder?: number;
 

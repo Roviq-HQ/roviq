@@ -10,17 +10,26 @@ NestJS custom transport for NATS JetStream. Provides `@EventPattern`/`@MessagePa
 
 ```typescript
 // main.ts
-import { JetStreamServer, STREAMS } from '@roviq/nats-jetstream';
+import { connectJetStreamMicroservice, STREAMS } from '@roviq/nats-jetstream';
 
-app.connectMicroservice<MicroserviceOptions>({
-  strategy: new JetStreamServer({
-    servers: [config.get('NATS_URL')],
-    streams: Object.values(STREAMS),
-    dlq: { enabled: true },
-  }),
+connectJetStreamMicroservice(app, {
+  servers: [config.getOrThrow('NATS_URL')],
+  streams: Object.values(STREAMS),
+  dlq: { enabled: true },
 });
 await app.startAllMicroservices();
 ```
+
+`connectJetStreamMicroservice` is the only way an app connects the transport
+(`pnpm check:event-handlers` refuses a bare `app.connectMicroservice()`). It:
+
+- connects `JetStreamServer` with `inheritAppConfig: false`, so the HTTP/GraphQL global guards,
+  filters and interceptors do not run for event deliveries;
+- installs `RethrowRpcExceptionFilter` (`@Catch()`), which rethrows what the handler threw.
+  Without it Nest's default RPC filter replaces every error with `Internal server error`, and
+  the retry log and the DLQ row lose the real cause. Nest builds each handler's exception chain
+  when the listeners are registered, so the helper connects with `deferInitialization: true`,
+  adds the filter, then registers the listeners itself.
 
 ### Client (publisher side)
 
@@ -161,20 +170,21 @@ All handlers of a subject must declare the same extras (`stream`, `durable`, `ma
 
 A handler that throws resolves through Nest's RPC exception filter into an erroring Observable;
 the server unwraps it, so the failure reaches the retry and DLQ path instead of being acked.
+`RethrowRpcExceptionFilter` keeps the original error object in that Observable.
 
 The class must be listed in its module's `controllers`, and the app's `main.ts` must call
-`connectMicroservice()`: Nest scans only controllers for message patterns, and without the
+`connectJetStreamMicroservice()`: Nest scans only controllers for message patterns, and without the
 transport nothing subscribes. `pnpm check:event-handlers` fails the build on either mistake.
 
 ### api-gateway consumers
 
-The gateway consumes some of its own events (ROV-316). Its `main.ts` connects `JetStreamServer`
-with `inheritAppConfig: false`, so the HTTP/GraphQL global guards, exception filter and audit
+The gateway consumes some of its own events (ROV-316). Its `main.ts` connects through
+`connectJetStreamMicroservice` (`inheritAppConfig: false`), so the HTTP/GraphQL global guards, exception filter and audit
 interceptor do not run for event deliveries (they read a request an event does not have).
 
 | Subject | Handlers | Effect |
 | ------- | -------- | ------ |
-| `ACADEMIC_YEAR.activated` | `StudentEventHandler`, `GroupInvalidationHandler` | Continuing students get a row in the new year; dynamic groups are invalidated |
+| `ACADEMIC_YEAR.activated` | `StudentEventHandler`, `GroupInvalidationHandler` | Continuing students get a row in the new year by the year-end promotion rule below; dynamic groups are invalidated |
 | `SECTION.deleted` | `StudentEventHandler`, `GroupInvalidationHandler` | The deleted section's `student_academics` rows are soft-deleted; section-based groups are invalidated |
 | `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` |
 | `GROUP.rules_updated` | `GroupInvalidationHandler` | That group gets `resolved_at = NULL` |
@@ -189,11 +199,29 @@ interceptor do not run for event deliveries (they read a request an event does n
   with the event's `tenantId`, reads `*Live` views and writes base tables. An id of another
   institute in the payload matches nothing under RLS.
 - **Idempotency**: each handler is safe to run twice and harmless for an institute, year, section
-  or group that no longer exists. The year rollover is one `INSERT … SELECT … ON CONFLICT DO
-  NOTHING`; standards belong to one year, so the target standard is matched in the new year by
-  `numeric_order`, and the student goes into its section with the lowest `display_order` (then
-  id). A student whose target standard has no section in the new year is skipped and counted in
-  the log. `SECTION.deleted` acts only while the section is still deleted.
+  or group that no longer exists. `SECTION.deleted` acts only while the section is still deleted.
+
+#### Year-end promotion rule (`ACADEMIC_YEAR.activated`)
+
+`rollOverStudents()` in `apps/api-gateway/src/institute/student/year-rollover.ts` is one SQL
+statement shared by the consumer (`write: true`) and the `academicYearRolloverPreview` query
+(`write: false`), so the preview and the rollover cannot disagree. For each live
+`student_academics` row of the previous year whose student is still ENROLLED, PROMOTED, DETAINED
+or RE_ENROLLED, the row's `promotion_status` decides the target level (`numeric_order`):
+
+| `promotion_status` | Target level |
+| ------------------ | ------------ |
+| `PROMOTED` with `promoted_to_standard_id` | That standard's level |
+| `PROMOTED` without a target; `PENDING` or none (not a COACHING institute) | The next level: the smallest order above the current one among the live standards of either year, so a class added only in the new year receives last year's top class |
+| `PENDING` or none in a COACHING institute; `DETAINED` | The same level |
+| `GRADUATED`, `TRANSFERRED` | No row (`notCarried`) |
+
+The target level is matched to the new year's standard with that `numeric_order`; the student
+goes into its section with the lowest `display_order` (then id). The insert is `ON CONFLICT
+DO NOTHING` on the live `(student_profile_id, academic_year_id)` index, so redelivery is safe.
+The handler logs one line with the counts: `movingUp`, `staying`, `completing` (top level, no
+next level), `notCarried`, `noClassInNewYear` (no standard or section at the target level) and
+`alreadyPlaced` (any row, live or deleted, already in the new year).
 
 ### JetStreamContext API
 
@@ -298,6 +326,15 @@ new JetStreamServer({
 })
 ```
 
+### Failure log
+
+Every failed delivery logs one error line with the pattern, the delivery count, what happens
+next (nak delay or DLQ) and the error text, with the stack attached:
+
+```
+Handler failed for "GROUP.rules_updated" (delivery 2/3), nak with 2000ms delay: ZodError: [...]
+```
+
 ### Dead Letter Queue (DLQ)
 
 After `maxDeliver` retries exhausted:
@@ -305,6 +342,11 @@ After `maxDeliver` retries exhausted:
 2. Original message terminated
 
 DLQ payload includes: `originalSubject`, `payload`, `error`, `retryCount`, `correlationId`, `tenantId`, `failedAt`.
+
+`error` comes from `deadLetterErrorText(err)`: `<error name>: <message of the innermost cause>`,
+cut to 500 characters. A Drizzle query error therefore stores the PostgreSQL message (for example
+`Error: duplicate key value violates unique constraint "…"`), never the SQL text or its
+parameters.
 
 **Safe DLQ**: If DLQ publish fails, message is nak'd with 60s delay instead of terminated. Message is never lost unless both handler AND DLQ are broken.
 
@@ -371,5 +413,5 @@ You're publishing outside a request handler. Use `NatsRecordBuilder` with explic
 If you change a stream's subjects or maxDeliver and do a rolling deploy, old instances may have old config. The server handles this with `streams.add()` → fallback to `streams.update()`. **Immutable fields** (retention, storage) cannot be auto-updated — require manual migration.
 
 ### Consumer not receiving messages
-Run `pnpm check:event-handlers`: the handler class must be in a module's `controllers` (not `providers`) and the app's `main.ts` must call `connectMicroservice()`.
+Run `pnpm check:event-handlers`: the handler class must be in a module's `controllers` (not `providers`) and the app's `main.ts` must call `connectJetStreamMicroservice()`.
 Check that the `filter_subject` matches your published subject. Wildcard `*` matches one token, `>` matches one or more. The server uses the `@EventPattern` subject as the `filter_subject`.

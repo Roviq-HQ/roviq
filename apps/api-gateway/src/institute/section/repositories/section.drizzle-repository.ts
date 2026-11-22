@@ -8,6 +8,7 @@ import {
   sections,
   sectionsLive,
   softDelete,
+  studentAcademicsLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -194,6 +195,17 @@ export class SectionDrizzleRepository extends SectionRepository {
   async softDelete(id: string): Promise<void> {
     const tenantId = this.getTenantId();
     await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:section'), async (tx) => {
+      const [enrolled] = await tx
+        .select({ id: studentAcademicsLive.id })
+        .from(studentAcademicsLive)
+        .where(eq(studentAcademicsLive.sectionId, id))
+        .limit(1);
+      if (enrolled) {
+        throw new BusinessException(
+          ErrorCode.SECTION_HAS_STUDENTS,
+          'Section still has students; move them before deleting it',
+        );
+      }
       await softDelete(tx, sections, id);
     });
   }

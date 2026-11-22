@@ -197,6 +197,31 @@
     "changeSuccess": "Moved {count, plural, one {# student} other {# students}} to the new section",
     "changePartial": "Moved {succeeded} students; {failed} failed. Check details and try again."
   },
+  "yearEnd": {
+    "button": "Year-end result",
+    "dialogTitle": "Record year-end result",
+    "dialogDescription": "Applies to {count, plural, one {# selected student} other {# selected students}}. The result is used when the next academic year is activated.",
+    "resultLabel": "Result",
+    "options": {
+      "PROMOTED": "Promote",
+      "DETAINED": "Detain",
+      "GRADUATED": "Completed final class",
+      "PENDING": "Clear"
+    },
+    "optionHelp": {
+      "PROMOTED": "Moves up to the next class at the next year activation.",
+      "DETAINED": "Stays in the same class next year.",
+      "GRADUATED": "Not carried into the next year.",
+      "PENDING": "Removes the recorded result."
+    },
+    "missingAcademicRecord": "{count, plural, one {# student has} other {# students have}} no record in the current year and will be skipped.",
+    "success": "Saved the result for {count, plural, one {# student} other {# students}}",
+    "badge": {
+      "PROMOTED": "Promoted",
+      "DETAINED": "Detained",
+      "GRADUATED": "Completed"
+    }
+  },
   "detail": {
     "back": "Back to students",
     "notFound": "Student not found",

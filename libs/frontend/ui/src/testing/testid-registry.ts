@@ -892,6 +892,14 @@ export const testIds = {
     newSocialCategoryInfo: 'students-new-social-category-info',
     newAcademicYearInfo: 'students-new-academic-year-info',
     newAdmissionTypeInfo: 'students-new-admission-type-info',
+    // Year-end result bulk action
+    bulkYearEndBtn: 'students-bulk-year-end-btn',
+    yearEndDialog: 'students-year-end-dialog',
+    yearEndOption: (status: string) => `students-year-end-option-${status}`,
+    yearEndMissingRecord: 'students-year-end-missing-record',
+    yearEndApplyBtn: 'students-year-end-apply-btn',
+    yearEndCancelBtn: 'students-year-end-cancel-btn',
+    promotionBadge: (id: string) => `students-promotion-badge-${id}`,
   },
 
   // ── Institute: settings → roles (primary nav per role) ─────────────────
@@ -935,6 +943,14 @@ export const testIds = {
     editSaveBtn: 'academic-years-edit-save-btn',
     editCancelBtn: 'academic-years-edit-cancel-btn',
     editDiscardDraftBtn: 'academic-years-edit-discard-draft-btn',
+    // Activation confirmation
+    activateBtn: (id: string) => `academic-years-activate-btn-${id}`,
+    activateDialog: 'academic-years-activate-dialog',
+    activatePreview: 'academic-years-activate-preview',
+    activatePreviewLine: (key: string) => `academic-years-activate-preview-${key}`,
+    activatePreviewWarning: 'academic-years-activate-preview-warning',
+    activateConfirmBtn: 'academic-years-activate-confirm-btn',
+    activateCancelBtn: 'academic-years-activate-cancel-btn',
   },
 
   // ── Institute: academics (standards/sections/subjects) ────────────────

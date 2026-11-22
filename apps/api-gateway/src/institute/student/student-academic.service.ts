@@ -1,4 +1,4 @@
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode, PromotionStatus } from '@roviq/common-types';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 /**
  * Student enrollment + section change service (ROV-154).
@@ -23,8 +23,9 @@ import {
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { EnrollStudentInput, UpdateStudentSectionInput } from './dto/enroll-student.input';
+import type { SetPromotionDecisionsInput } from './dto/set-promotion-decisions.input';
 
 @Injectable()
 export class StudentAcademicService {
@@ -117,11 +118,21 @@ export class StudentAcademicService {
             createdBy: actorId,
             updatedBy: actorId,
           })
+          .onConflictDoNothing({
+            target: [studentAcademics.studentProfileId, studentAcademics.academicYearId],
+            where: sql`${studentAcademics.deletedAt} IS NULL`,
+          })
           .returning({ id: studentAcademics.id });
 
         return rows[0];
       },
     );
+    if (!result) {
+      throw new BusinessException(
+        ErrorCode.STUDENT_ALREADY_ENROLLED,
+        'Student is already enrolled in this academic year',
+      );
+    }
 
     // Emit warning if at optimal capacity
     if (section.currentStrength + 1 >= norms.optimal) {
@@ -203,6 +214,37 @@ export class StudentAcademicService {
     );
 
     return { id: current[0].id };
+  }
+
+  // ── YEAR-END RESULT ───────────────────────────────────────
+
+  /** All-or-nothing: one unknown id writes nothing. The rollover reads the result later. */
+  async setPromotionDecisions(input: SetPromotionDecisionsInput): Promise<number> {
+    const tenantId = this.getTenantId();
+    const actorId = this.getUserId();
+    const ids = [...new Set(input.studentAcademicIds)];
+
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:student-academic'), async (tx) => {
+      const updated = await tx
+        .update(studentAcademics)
+        .set({
+          promotionStatus: input.status,
+          ...(input.status !== PromotionStatus.PROMOTED && { promotedToStandardId: null }),
+          updatedBy: actorId,
+          updatedAt: new Date(),
+          version: sql`${studentAcademics.version} + 1`,
+        })
+        .where(and(inArray(studentAcademics.id, ids), isNull(studentAcademics.deletedAt)))
+        .returning({ id: studentAcademics.id });
+
+      if (updated.length !== ids.length) {
+        throw new BusinessException(
+          ErrorCode.STUDENT_ACADEMIC_NOT_FOUND,
+          'Student academic record not found',
+        );
+      }
+      return updated.length;
+    });
   }
 
   // ── PRIVATE HELPERS ───────────────────────────────────────

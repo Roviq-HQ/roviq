@@ -1,5 +1,6 @@
 'use client';
 
+import { MIN_STANDARD_NUMERIC_ORDER } from '@roviq/common-types';
 import { extractGraphQLError } from '@roviq/graphql';
 import { buildI18nTextSchema, useI18nField, useInstituteLocales, zodValidator } from '@roviq/i18n';
 import {
@@ -83,7 +84,7 @@ function buildStandardSchema(
 ) {
   return z.object({
     name: buildI18nTextSchema(t('errors.STANDARD_NAME_DUPLICATE'), defaultLocale),
-    numericOrder: z.number().int().min(0),
+    numericOrder: z.number().int().min(MIN_STANDARD_NUMERIC_ORDER),
     level: z.union([z.enum(LEVEL_VALUES), z.literal('')]),
     nepStage: z.union([z.enum(NEP_STAGE_VALUES), z.literal('')]),
     department: z.union([z.enum(LEVEL_VALUES), z.literal('')]),
@@ -473,8 +474,9 @@ function CreateStandardDialog({ yearId }: { yearId: string }) {
                 {(field) => (
                   <field.NumberField
                     label={t('numericOrder')}
+                    description={t('numericOrderHelp')}
                     testId="academics-standard-numeric-order-input"
-                    min={0}
+                    min={MIN_STANDARD_NUMERIC_ORDER}
                   />
                 )}
               </form.AppField>
@@ -668,8 +670,9 @@ function EditStandardSheet({
                 {(field) => (
                   <field.NumberField
                     label={t('numericOrder')}
+                    description={t('numericOrderHelp')}
                     testId="academics-standard-numeric-order-input"
-                    min={0}
+                    min={MIN_STANDARD_NUMERIC_ORDER}
                   />
                 )}
               </form.AppField>

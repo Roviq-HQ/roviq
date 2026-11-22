@@ -6,6 +6,7 @@ import { AcademicYearService } from './academic-year.service';
 import { CreateAcademicYearInput } from './dto/create-academic-year.input';
 import { UpdateAcademicYearInput } from './dto/update-academic-year.input';
 import { AcademicYearModel } from './models/academic-year.model';
+import { AcademicYearRolloverPreview } from './models/academic-year-rollover-preview.model';
 import type { AcademicYearRecord } from './repositories/types';
 
 @UseGuards(GqlAuthGuard, InstituteScopeGuard, AbilityGuard)
@@ -46,6 +47,17 @@ export class AcademicYearResolver {
     @Args('input') input: UpdateAcademicYearInput,
   ): Promise<AcademicYearRecord> {
     return this.academicYearService.update(id, input);
+  }
+
+  @Query(() => AcademicYearRolloverPreview, {
+    description:
+      'Counts what activating this year would do to the students of the active year. Writes nothing.',
+  })
+  @CheckAbility({ action: 'update', subject: 'AcademicYear' })
+  async academicYearRolloverPreview(
+    @Args('academicYearId', { type: () => ID }) academicYearId: string,
+  ): Promise<AcademicYearRolloverPreview> {
+    return this.academicYearService.previewRollover(academicYearId);
   }
 
   @Mutation(() => AcademicYearModel)

@@ -1,4 +1,5 @@
 import type { AcademicYearStatus } from '@roviq/database';
+import type { YearRolloverCounts } from '../../student/year-rollover';
 import type { AcademicYearRecord, CreateAcademicYearData, UpdateAcademicYearData } from './types';
 
 export abstract class AcademicYearRepository {
@@ -16,4 +17,6 @@ export abstract class AcademicYearRepository {
   abstract activate(id: string, previousActiveId: string | null): Promise<AcademicYearRecord>;
   abstract updateStatus(id: string, status: AcademicYearStatus): Promise<AcademicYearRecord>;
   abstract softDelete(id: string): Promise<void>;
+  /** Counts what activating `targetYearId` would do to students of the active year; writes nothing. */
+  abstract previewRollover(targetYearId: string): Promise<YearRolloverCounts>;
 }

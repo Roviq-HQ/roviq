@@ -1,5 +1,5 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import {
   AbilityGuard,
@@ -9,6 +9,7 @@ import {
 } from '@roviq/casl';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { EnrollStudentInput, UpdateStudentSectionInput } from './dto/enroll-student.input';
+import { SetPromotionDecisionsInput } from './dto/set-promotion-decisions.input';
 import { StudentAcademicHistoryModel } from './models/student-academic-history.model';
 import { StudentAcademicService } from './student-academic.service';
 import { StudentQueryService } from './student-query.service';
@@ -48,5 +49,14 @@ export class StudentAcademicResolver {
   async updateStudentSection(@Args('input') input: UpdateStudentSectionInput): Promise<string> {
     const result = await this.academicService.changeSection(input);
     return result.id;
+  }
+
+  @Mutation(() => Int, {
+    description:
+      'Records the year-end result on student year records; returns how many were updated. Applied at the next year activation.',
+  })
+  @CheckAbility({ action: 'update', subject: 'Student' })
+  async setPromotionDecisions(@Args('input') input: SetPromotionDecisionsInput): Promise<number> {
+    return this.academicService.setPromotionDecisions(input);
   }
 }
