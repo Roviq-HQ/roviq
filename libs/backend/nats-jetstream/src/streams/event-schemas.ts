@@ -724,3 +724,6 @@ export const flatEventSchemas: Record<string, z.ZodTypeAny> = _flatEventSchemas;
 export type EventPayload<P extends EventPattern> = P extends keyof FlatEventSchemas
   ? z.infer<FlatEventSchemas[P]>
   : Record<string, unknown>;
+
+/** `flatEventSchemas` keyed by subject with each schema's own type, for consumers to `.parse()`. */
+export const eventPayloadSchemas: FlatEventSchemas = _flatEventSchemas;

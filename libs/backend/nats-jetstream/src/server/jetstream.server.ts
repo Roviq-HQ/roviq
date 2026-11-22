@@ -13,7 +13,11 @@ import {
 import type { NatsConnection } from '@nats-io/nats-core';
 import { connect } from '@nats-io/transport-node';
 import { Logger } from '@nestjs/common';
-import { ServerNats } from '@nestjs/microservices';
+import {
+  type MsPattern,
+  type MessageHandler as NestMessageHandler,
+  ServerNats,
+} from '@nestjs/microservices';
 import { AuthScope } from '@roviq/common-types';
 import { type RequestContext, requestContext } from '@roviq/request-context';
 import { RESILIENT_NATS_OPTIONS } from '../connection-options';
@@ -28,6 +32,7 @@ import { assertDriftRecreateAllowed } from '../streams/drift-gate';
 import { DEFAULT_DLQ_STREAM } from '../streams/stream.config';
 import { ensureStreams } from '../streams/stream.manager';
 import { DeserializationError, HandlerTimeoutError } from './errors';
+import { assertConsistentExtras, type ChainHandler, runHandlerChain } from './handler-chain';
 import { resolveConsumerConfig } from './resolve-consumer-config';
 import { Semaphore } from './semaphore';
 
@@ -44,8 +49,7 @@ interface IncomingPacket {
   data: unknown;
 }
 
-/** Handler function type matching NestJS microservice handler signature */
-type MessageHandler = (data: unknown, ctx: JetStreamContext) => Promise<unknown>;
+type MessageHandler = ChainHandler<JetStreamContext>;
 
 /**
  * NestJS custom transport server that uses JetStream pull consumers
@@ -61,6 +65,8 @@ export class JetStreamServer extends ServerNats {
   protected override readonly logger = new Logger(JetStreamServer.name);
 
   private readonly consumers = new Map<string, ConsumerMessages>();
+  /** Every event handler per pattern, in registration order (Nest would chain them via `next`). */
+  private readonly handlerChains = new Map<string, MessageHandler[]>();
   private js!: NatsJetStreamClient;
   private nc!: NatsConnection;
 
@@ -71,6 +77,34 @@ export class JetStreamServer extends ServerNats {
     // so our extra fields pass through safely
     super(options as Parameters<typeof ServerNats.prototype.listen>[0] & JetStreamServerOptions);
     this.jsOptions = options;
+  }
+
+  /**
+   * Nest links a second event handler of a pattern to the first through `next` and runs both
+   * in parallel from the first. Keep them in a list instead, so a delivery runs them one after
+   * another and fails when any of them fails.
+   */
+  override addHandler(
+    pattern: MsPattern,
+    callback: NestMessageHandler,
+    isEventHandler = false,
+    extras: Record<string, unknown> = {},
+  ): void {
+    const route = this.normalizePattern(pattern);
+    const chain = this.handlerChains.get(route);
+    if (isEventHandler && chain && this.messageHandlers.has(route)) {
+      callback.isEventHandler = true;
+      callback.extras = extras;
+      chain.push(callback);
+      return;
+    }
+    super.addHandler(pattern, callback, isEventHandler, extras);
+    this.handlerChains.set(route, [callback]);
+  }
+
+  /** The handlers a delivery on `pattern` runs; `handler` is the head Nest stored. */
+  handlerChainFor(pattern: string, handler: MessageHandler): readonly MessageHandler[] {
+    return this.handlerChains.get(pattern) ?? [handler];
   }
 
   /**
@@ -150,6 +184,7 @@ export class JetStreamServer extends ServerNats {
     const jsm = await jetstreamManager(this.nc);
 
     for (const [pattern, handler] of this.messageHandlers) {
+      assertConsistentExtras(pattern, this.handlerChainFor(pattern, handler));
       const config = this.resolveConsumerConfig(
         pattern,
         handler.extras as ConsumerExtras | undefined,
@@ -246,7 +281,7 @@ export class JetStreamServer extends ServerNats {
       );
 
       // Start the consumer asynchronously — non-blocking
-      void this.startConsumer(pattern, handler as MessageHandler, config);
+      void this.startConsumer(pattern, this.handlerChainFor(pattern, handler), config);
     }
   }
 
@@ -255,7 +290,7 @@ export class JetStreamServer extends ServerNats {
    */
   private async startConsumer(
     pattern: string,
-    handler: MessageHandler,
+    chain: readonly MessageHandler[],
     config: ResolvedConsumerConfig,
   ): Promise<void> {
     try {
@@ -268,7 +303,7 @@ export class JetStreamServer extends ServerNats {
       });
 
       this.consumers.set(config.durable, messages);
-      void this.consumeLoop(pattern, messages, handler, config);
+      void this.consumeLoop(pattern, messages, chain, config);
     } catch (err) {
       this.logger.error(
         `Failed to start consumer "${config.durable}" on stream "${config.stream}": ${err instanceof Error ? err.message : String(err)}`,
@@ -283,14 +318,14 @@ export class JetStreamServer extends ServerNats {
   private async consumeLoop(
     pattern: string,
     messages: ConsumerMessages,
-    handler: MessageHandler,
+    chain: readonly MessageHandler[],
     config: ResolvedConsumerConfig,
   ): Promise<void> {
     const semaphore = new Semaphore(config.concurrency);
 
     for await (const msg of messages) {
       await semaphore.acquire();
-      void this.processMessage(pattern, msg, handler, config).finally(() => semaphore.release());
+      void this.processMessage(pattern, msg, chain, config).finally(() => semaphore.release());
     }
   }
 
@@ -301,7 +336,7 @@ export class JetStreamServer extends ServerNats {
   private async processMessage(
     pattern: string,
     msg: JsMsg,
-    handler: MessageHandler,
+    chain: readonly MessageHandler[],
     config: ResolvedConsumerConfig,
   ): Promise<void> {
     const deliveryCount = msg.info.deliveryCount;
@@ -330,7 +365,7 @@ export class JetStreamServer extends ServerNats {
 
     try {
       await requestContext.run(requestCtx, () =>
-        this.executeHandler(handler, payload, ctx, config.handlerTimeout),
+        this.executeHandler(chain, payload, ctx, config.handlerTimeout),
       );
       msg.ack();
     } catch (err) {
@@ -503,12 +538,12 @@ export class JetStreamServer extends ServerNats {
   }
 
   /**
-   * Execute the handler with a timeout using Promise.race.
+   * Run the handler chain under one timeout using Promise.race.
    * The AbortController signal is set on the context so handlers
    * can cooperatively cancel long-running operations.
    */
   private executeHandler(
-    handler: MessageHandler,
+    chain: readonly MessageHandler[],
     payload: unknown,
     ctx: JetStreamContext,
     timeout: number,
@@ -516,7 +551,7 @@ export class JetStreamServer extends ServerNats {
     let timer: ReturnType<typeof setTimeout>;
 
     return Promise.race([
-      handler(payload, ctx).finally(() => clearTimeout(timer)),
+      runHandlerChain(chain, payload, ctx).finally(() => clearTimeout(timer)),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
           reject(new HandlerTimeoutError(timeout));
