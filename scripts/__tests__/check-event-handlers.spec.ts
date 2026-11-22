@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   type AppSources,
-  callsConnectMicroservice,
   checkApp,
+  connectsJetStream,
   findHandlerClasses,
   findModuleControllers,
 } from '../check-event-handlers';
@@ -18,7 +18,7 @@ export class Plain { run() {} }
 
 const MAIN_CONNECTED = `
 const app = await NestFactory.create(AppModule);
-app.connectMicroservice({ strategy: new JetStreamServer(opts) });
+connectJetStreamMicroservice(app, opts);
 await app.startAllMicroservices();
 `;
 
@@ -52,11 +52,20 @@ describe('findModuleControllers', () => {
   });
 });
 
-describe('callsConnectMicroservice', () => {
-  it('should detect the call and ignore a mention in a comment', () => {
-    expect(callsConnectMicroservice('main.ts', MAIN_CONNECTED)).toBe(true);
+describe('connectsJetStream', () => {
+  it('should detect the helper call and ignore a mention in a comment', () => {
+    expect(connectsJetStream('main.ts', MAIN_CONNECTED)).toBe(true);
     expect(
-      callsConnectMicroservice('main.ts', '// app.connectMicroservice()\napp.listen(1);'),
+      connectsJetStream('main.ts', '// connectJetStreamMicroservice(app, opts)\napp.listen(1);'),
+    ).toBe(false);
+  });
+
+  it('should not accept a bare connectMicroservice call, which skips the error filter', () => {
+    expect(
+      connectsJetStream(
+        'main.ts',
+        'app.connectMicroservice({ strategy: new JetStreamServer(opts) });\nawait app.startAllMicroservices();',
+      ),
     ).toBe(false);
   });
 });
@@ -77,6 +86,24 @@ describe('checkApp', () => {
     ]);
   });
 
+  it('should fail when main.ts connects the transport without the helper', () => {
+    const violations = checkApp(
+      app(
+        '@Module({ controllers: [SectionHandler] }) class M {}',
+        'app.connectMicroservice({ strategy: new JetStreamServer(opts) });',
+      ),
+    );
+
+    expect(violations).toEqual([
+      {
+        className: 'SectionHandler',
+        file: 'apps/x/src/section.handler.ts',
+        reason:
+          'has message-pattern handlers but apps/x/src/main.ts never calls connectJetStreamMicroservice()',
+      },
+    ]);
+  });
+
   it('should fail when main.ts connects no microservice', () => {
     const violations = checkApp(
       app('@Module({ controllers: [SectionHandler] }) class M {}', 'await app.listen(3000);'),
@@ -87,7 +114,7 @@ describe('checkApp', () => {
         className: 'SectionHandler',
         file: 'apps/x/src/section.handler.ts',
         reason:
-          'has message-pattern handlers but apps/x/src/main.ts never calls connectMicroservice()',
+          'has message-pattern handlers but apps/x/src/main.ts never calls connectJetStreamMicroservice()',
       },
     ]);
   });

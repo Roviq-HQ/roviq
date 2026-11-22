@@ -2,9 +2,8 @@ import 'json-bigint-patch';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import type { MicroserviceOptions } from '@nestjs/microservices';
 import { validationExceptionFactory } from '@roviq/common-types';
-import { JetStreamServer, STREAMS } from '@roviq/nats-jetstream';
+import { connectJetStreamMicroservice, STREAMS } from '@roviq/nats-jetstream';
 import { enableGracefulShutdown } from '@roviq/telemetry';
 import { Runtime } from '@temporalio/worker';
 import helmet from 'helmet';
@@ -43,18 +42,11 @@ async function bootstrap() {
     }),
   );
 
-  // inheritAppConfig stays off: the HTTP/GraphQL guards, filter and interceptor read a request
-  // that an event delivery does not have.
-  app.connectMicroservice<MicroserviceOptions>(
-    {
-      strategy: new JetStreamServer({
-        servers: [config.getOrThrow<string>('NATS_URL')],
-        streams: Object.values(STREAMS),
-        dlq: { enabled: true },
-      }),
-    },
-    { inheritAppConfig: false },
-  );
+  connectJetStreamMicroservice(app, {
+    servers: [config.getOrThrow<string>('NATS_URL')],
+    streams: Object.values(STREAMS),
+    dlq: { enabled: true },
+  });
   await app.startAllMicroservices();
 
   const port = config.get<number>('API_GATEWAY_PORT', 3000);

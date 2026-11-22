@@ -10,6 +10,7 @@ import { headers, type NatsConnection } from '@nats-io/nats-core';
 import { connect } from '@nats-io/transport-node';
 import { NatsRecordBuilder } from '@nestjs/microservices';
 import { type RequestContext, requestContext } from '@roviq/request-context';
+import { DrizzleQueryError } from 'drizzle-orm';
 import { firstValueFrom } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { JetStreamClient } from '../client/jetstream.client';
@@ -296,7 +297,7 @@ describe('JetStream transport with a real broker', () => {
     await expectTerminated(consumer, {
       originalSubject: subject,
       payload,
-      error,
+      error: `Error: ${error}`,
       retryCount: 3,
       correlationId: 'integration-correlation',
       tenantId: 'integration-tenant',
@@ -306,6 +307,27 @@ describe('JetStream transport with a real broker', () => {
       .poll(() => terminated, poll)
       .toEqual([{ stream: stream.name, consumer: durable, deliveries: 3 }]);
     advisory.unsubscribe();
+  });
+
+  it('dead-letters the innermost cause of a wrapped error, without the query text', async () => {
+    const consumer = await readDlq();
+    await startWorker(async () => {
+      throw new DrizzleQueryError(
+        'insert into "t" ("secret") values ($1)',
+        ['secret-param'],
+        new Error('duplicate key value violates unique constraint "uq_x"'),
+      );
+    });
+    const payload = { id: randomUUID() };
+    await publish(payload);
+    await expectTerminated(consumer, {
+      originalSubject: subject,
+      payload,
+      error: 'Error: duplicate key value violates unique constraint "uq_x"',
+      retryCount: 3,
+      correlationId: 'integration-correlation',
+      tenantId: 'integration-tenant',
+    });
   });
 
   it('dead-letters malformed JSON and continues with the next valid message', async () => {

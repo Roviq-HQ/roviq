@@ -1,7 +1,9 @@
 // CI guard — a NestJS `@EventPattern` / `@MessagePattern` handler only receives messages when
 // (a) its class is in a module's `controllers` (Nest scans only controllers for patterns) and
-// (b) the app's `main.ts` connects a microservice transport. Without either, the handler
-// compiles, its events reach NATS, and nothing consumes them (ROV-316).
+// (b) the app's `main.ts` connects the transport through `connectJetStreamMicroservice()`. Without
+// either, the handler compiles, its events reach NATS, and nothing consumes them (ROV-316). A bare
+// `app.connectMicroservice()` does not count: it skips the filter that keeps a handler's real error
+// for the dead-letter entry (ROV-321).
 //
 // An `ee/apps/<name>` handler is hosted by `apps/<name>`: modules of both count, and the
 // `main.ts` is `apps/<name>/src/main.ts`.
@@ -88,14 +90,14 @@ export function findModuleControllers(file: string, text: string): Set<string> {
   return names;
 }
 
-/** Whether `main.ts` calls `<app>.connectMicroservice(...)`. */
-export function callsConnectMicroservice(file: string, text: string): boolean {
+/** Whether `main.ts` calls `connectJetStreamMicroservice(...)` from `@roviq/nats-jetstream`. */
+export function connectsJetStream(file: string, text: string): boolean {
   let found = false;
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'connectMicroservice'
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'connectJetStreamMicroservice'
     ) {
       found = true;
     }
@@ -120,7 +122,7 @@ export function checkApp(app: AppSources): Violation[] {
   for (const f of app.files) {
     for (const name of findModuleControllers(f.path, f.text)) controllers.add(name);
   }
-  const connected = app.mainText !== null && callsConnectMicroservice(app.mainPath, app.mainText);
+  const connected = app.mainText !== null && connectsJetStream(app.mainPath, app.mainText);
 
   const violations: Violation[] = [];
   for (const h of handlers) {
@@ -134,7 +136,7 @@ export function checkApp(app: AppSources): Violation[] {
     if (!connected) {
       violations.push({
         ...h,
-        reason: `has message-pattern handlers but ${app.mainPath} never calls connectMicroservice()`,
+        reason: `has message-pattern handlers but ${app.mainPath} never calls connectJetStreamMicroservice()`,
       });
     }
   }
@@ -202,7 +204,7 @@ function main(): number {
   }
   process.stderr.write(
     '\nMove the class from `providers` to `controllers` of its module, and connect the transport in main.ts\n' +
-      '(app.connectMicroservice({ strategy: new JetStreamServer(...) }) + app.startAllMicroservices()).\n',
+      '(connectJetStreamMicroservice(app, { servers, streams, dlq }) + app.startAllMicroservices()).\n',
   );
   return 1;
 }

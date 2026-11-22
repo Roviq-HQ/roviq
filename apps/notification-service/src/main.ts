@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import type { MicroserviceOptions } from '@nestjs/microservices';
-import { JetStreamServer, STREAMS } from '@roviq/nats-jetstream';
+import { connectJetStreamMicroservice, STREAMS } from '@roviq/nats-jetstream';
 import { enableGracefulShutdown } from '@roviq/telemetry';
 import { Runtime } from '@temporalio/worker';
 import { Logger } from 'nestjs-pino';
@@ -16,12 +15,10 @@ async function bootstrap() {
   enableGracefulShutdown(app);
   const config = app.get(ConfigService);
 
-  app.connectMicroservice<MicroserviceOptions>({
-    strategy: new JetStreamServer({
-      servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
-      streams: Object.values(STREAMS),
-      dlq: { enabled: true },
-    }),
+  connectJetStreamMicroservice(app, {
+    servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
+    streams: Object.values(STREAMS),
+    dlq: { enabled: true },
   });
   await app.startAllMicroservices();
 

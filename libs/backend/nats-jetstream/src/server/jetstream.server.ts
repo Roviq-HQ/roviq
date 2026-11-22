@@ -31,6 +31,7 @@ import type {
 import { assertDriftRecreateAllowed } from '../streams/drift-gate';
 import { DEFAULT_DLQ_STREAM } from '../streams/stream.config';
 import { ensureStreams } from '../streams/stream.manager';
+import { deadLetterErrorText } from './error-text';
 import { DeserializationError, HandlerTimeoutError } from './errors';
 import { assertConsistentExtras, type ChainHandler, runHandlerChain } from './handler-chain';
 import { resolveConsumerConfig } from './resolve-consumer-config';
@@ -464,7 +465,8 @@ export class JetStreamServer extends ServerNats {
   }
 
   /**
-   * Handle handler execution failure: log, exponential backoff, DLQ on exhaustion.
+   * Handle handler execution failure: one error log with the stack, then exponential backoff,
+   * or the DLQ on the last delivery. The rethrow filter means Nest no longer logs it.
    */
   private async handleFailure(
     pattern: string,
@@ -477,12 +479,19 @@ export class JetStreamServer extends ServerNats {
     correlationId: string,
     tenantId: string | undefined,
   ): Promise<void> {
-    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorText = deadLetterErrorText(err);
+    const exhausted = deliveryCount >= config.maxDeliver;
+    const delay = this.nakDelay(ctx, deliveryCount);
+    const next = exhausted ? 'sending to DLQ' : `nak with ${delay}ms delay`;
+    this.logger.error(
+      `Handler failed for "${pattern}" (delivery ${deliveryCount}/${config.maxDeliver}), ${next}: ${errorText}`,
+      err instanceof Error ? err.stack : undefined,
+    );
 
-    if (deliveryCount >= config.maxDeliver) {
-      await this.sendToDlqOrNak(msg, payload, errorMessage, deliveryCount, correlationId, tenantId);
+    if (exhausted) {
+      await this.sendToDlqOrNak(msg, payload, errorText, deliveryCount, correlationId, tenantId);
     } else {
-      this.nakWithBackoff(msg, ctx, pattern, config, deliveryCount, errorMessage);
+      msg.nak(delay);
     }
   }
 
@@ -516,25 +525,11 @@ export class JetStreamServer extends ServerNats {
     }
   }
 
-  /**
-   * Nak with exponential backoff, respecting handler-set nak delay.
-   */
-  private nakWithBackoff(
-    msg: JsMsg,
-    ctx: JetStreamContext,
-    pattern: string,
-    config: ResolvedConsumerConfig,
-    deliveryCount: number,
-    errorMessage: string,
-  ): void {
+  /** Exponential backoff, unless the handler set its own nak delay. */
+  private nakDelay(ctx: JetStreamContext, deliveryCount: number): number {
     const baseDelay = this.jsOptions.retry?.baseDelay ?? 1_000;
     const maxDelay = this.jsOptions.retry?.maxDelay ?? 60_000;
-    const nakDelay = ctx.getNakDelay() ?? Math.min(baseDelay * 2 ** (deliveryCount - 1), maxDelay);
-    msg.nak(nakDelay);
-    this.logger.warn(
-      `Handler failed for "${pattern}", nak with ${nakDelay}ms delay ` +
-        `(delivery ${deliveryCount}/${config.maxDeliver}): ${errorMessage}`,
-    );
+    return ctx.getNakDelay() ?? Math.min(baseDelay * 2 ** (deliveryCount - 1), maxDelay);
   }
 
   /**
