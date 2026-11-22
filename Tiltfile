@@ -127,14 +127,13 @@ local_resource(
 )
 
 # Notification Service (NestJS) — async event processing via NATS
-# Triggering this also brings up the full Novu self-hosted stack via resource_deps.
 local_resource(
   'notification-service',
   labels=['dev'],
   serve_cmd='pnpm run dev:notifications',
   serve_dir='.',
   deps=[],
-  resource_deps=['db-push', 'nats', 'temporal', 'mailpit', 'novu-api', 'novu-worker', 'novu-ws', 'novu-dashboard'],
+  resource_deps=['db-push', 'nats', 'temporal', 'mailpit'],
   auto_init=False,
 )
 
@@ -147,7 +146,6 @@ dc_resource('postgres', labels=['infra'])
 dc_resource('redis', labels=['infra'])
 dc_resource('nats', labels=['infra'],
             links=[local_url('DEV_NATS_MONITOR_PORT', '8222')])
-dc_resource('mongodb', labels=['infra'])
 dc_resource('object-storage', labels=['infra'],
             links=[local_url('DEV_STORAGE_CONSOLE_PORT', '9003')])
 
@@ -159,34 +157,6 @@ dc_resource('temporal-ui', labels=['infra'], auto_init=False,
 # Mailpit — catches dev email from the notification service
 dc_resource('mailpit', labels=['infra'],
             links=[local_url('DEV_MAILPIT_WEB_PORT', '8025')])
-
-# ─── Novu Self-Hosted (manual) ───────────────────────────────────────────────
-# Start manually when working with local notifications
-
-compose('./docker/compose.novu.yaml')
-
-dc_resource('novu-api', labels=['novu'], resource_deps=['redis', 'mongodb'],
-            auto_init=False, links=[local_url('DEV_NOVU_API_PORT', '3340')])
-dc_resource('novu-worker', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False)
-dc_resource('novu-ws', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False, links=[local_url('DEV_NOVU_WS_PORT', '3342')])
-dc_resource('novu-dashboard', labels=['novu'], resource_deps=['novu-api'],
-            auto_init=False, links=[local_url('DEV_NOVU_DASHBOARD_PORT', '4000')])
-
-# One-click setup: register, get API key, update .env, remove branding, sync bridge
-# allow_parallel: runs in its own build lane so a stuck/long-running setup does not
-# block api-gateway/web/notification-service (Tilt serializes local_resource builds
-# globally by default).
-local_resource(
-  'novu-setup',
-  cmd='scripts/novu-setup.sh',
-  resource_deps=['novu-api'],
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
-  allow_parallel=True,
-  labels=['novu'],
-)
 
 # ─── DB Utils ─────────────────────────────────────────────────────────────────
 

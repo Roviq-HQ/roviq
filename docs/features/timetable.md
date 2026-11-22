@@ -54,7 +54,7 @@ Pages: list + full-screen create dialog (`page.tsx`), grid editor (`[timetableId
 - **People → student** — student detail sidebar links to the student's section `section-timetable` (the student/parent read-only view; `read:Timetable` is granted to student/parent roles).
 - **Attendance** — each non-break slot on the day-schedule page links to `/institute/attendance` pre-filled with `date`/`standard`/`section`/`period` (the numeric period label maps to the attendance period; the attendance page already reads these via nuqs).
 
-## Deviations from the legacy (Mongo) module — intentional
+## Deviations from the legacy module — intentional
 
 1. Per-date **overrides** replace daily full snapshots — any date queryable, no cron, no storage bloat, fixes the legacy snapshot dup-teacher bug.
 2. **Times as `time`** + minutes math (not `HH:mm:ss` string parsing).

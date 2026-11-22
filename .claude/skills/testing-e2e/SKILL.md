@@ -29,7 +29,7 @@ pnpm test:e2e:api      # runs the Vitest E2E project against the up stack
 The compose project seeds `roviq_test` (port 5435) and provisions Temporal, Mailpit and notification-service (which sends email to Mailpit and logs push, SMS and WhatsApp).
 
 > Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
-> The Compose project is `roviq-e2e` in instance 0 and `roviq-e2e-<slot>` otherwise, so container and volume names change with it. Never hardcode a port, project or container name in a spec or helper: derive it from `E2E_API_PORT`, `E2E_POSTGRES_PORT`, `E2E_NATS_PORT`, `E2E_NOVU_API_PORT`, `E2E_WEB_PORT` or `ROVIQ_E2E_COMPOSE_PROJECT` with the instance 0 value as the default.
+> The Compose project is `roviq-e2e` in instance 0 and `roviq-e2e-<slot>` otherwise, so container and volume names change with it. Never hardcode a port, project or container name in a spec or helper: derive it from `E2E_API_PORT`, `E2E_POSTGRES_PORT`, `E2E_NATS_PORT`, `E2E_WEB_PORT` or `ROVIQ_E2E_COMPOSE_PROJECT` with the instance 0 value as the default.
 
 ## Making GraphQL requests
 
@@ -179,7 +179,7 @@ HMAC secret defaults to `process.env.RAZORPAY_WEBHOOK_SECRET` / `CASHFREE_WEBHOO
 
 ## Email (Mailpit)
 
-The notification service sends every email to the e2e Mailpit. `./helpers/mailpit` exposes `waitForEmail(address, subjectPart, timeoutMs)`, which polls the Mailpit API on `E2E_MAILPIT_API_PORT` (slot 0: 8026) and returns `{ subject, text }`. `must-change-password.api-e2e.spec.ts` reads the first admin's temporary password this way. Push, SMS and WhatsApp use the `log` provider in e2e, so nothing can be read back from them; assert on `notification_deliveries` instead.
+The notification service sends every email to the e2e Mailpit. `./helpers/mailpit` exposes `waitForEmail(address, subjectPart, timeoutMs)`, which polls the Mailpit API on `E2E_MAILPIT_API_PORT` (slot 0: 8026) and returns `{ subject, text }`. `must-change-password.api-e2e.spec.ts` reads the first admin's temporary password this way. Push, SMS and WhatsApp use the `log` provider in e2e, so nothing can be read back from them; assert on `notification_deliveries` instead. In-app notifications are asserted through the inbox API (`notifications` and `notificationUnreadCount` queries), as `notifications.api-e2e.spec.ts` does.
 
 ## Enums — always UPPER_SNAKE from `@roviq/common-types`
 

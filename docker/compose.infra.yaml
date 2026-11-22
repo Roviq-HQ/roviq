@@ -64,20 +64,6 @@ services:
       nats:
         condition: service_healthy
 
-  mongodb:
-    image: mongo:8
-    # Host port is 27018 (not the default 27017) to avoid clashing with other
-    # local mongo instances. Novu connects via internal DNS (mongodb:27017),
-    # so only external tools (mongosh/compass) use localhost:27018.
-    ports: ["${DEV_MONGODB_PORT:-27018}:27017"]
-    volumes:
-      - mongodb_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   # S3-compatible object storage. Production uses a managed S3 service (docs/deployment.md).
   object-storage:
     image: rustfs/rustfs:1.0.6
@@ -212,7 +198,6 @@ volumes:
   postgres_data:
   redis_data:
   nats_data:
-  mongodb_data:
   object_storage_data:
   tempo_data:
   loki_data:

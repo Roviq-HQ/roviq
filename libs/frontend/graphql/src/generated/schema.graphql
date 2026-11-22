@@ -7535,9 +7535,7 @@ input UpdateNotificationConfigInput {
   """Whether to show this notification as an in-app bell/feed notification."""
   inAppEnabled: Boolean
 
-  """
-  Notification type key, e.g. "FEE_REMINDER", "ATTENDANCE_ALERT". Must match a registered Novu event slug.
-  """
+  """Notification type key, e.g. "FEE_REMINDER", "ATTENDANCE_ALERT"."""
   notificationType: String!
 
   """Whether to deliver this notification via push (FCM/APNS)."""

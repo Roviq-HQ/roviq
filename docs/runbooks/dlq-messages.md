@@ -21,8 +21,8 @@ nothing is lost; it waits for inspection and replay.
 
 Causes, in rough order of likelihood:
 
-1. **Downstream dependency down** — e.g. the Novu circuit breaker is
-   open, so every notification handler invocation fails until retries
+1. **Downstream dependency down** — e.g. a provider circuit breaker is
+   open, so every handler invocation that needs it fails until retries
    are exhausted. Check the `circuit_breaker_state` gauge.
 2. **Bad payload** — a malformed or schema-incompatible event the
    handler can't process; it fails deterministically on every retry.

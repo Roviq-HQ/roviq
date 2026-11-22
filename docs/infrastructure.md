@@ -97,7 +97,6 @@ Things to know:
 - In a slot other than 0, plain `tilt trigger` talks to the main Tilt on 10350. Use `pnpm tilt …`,
   or export `TILT_PORT`. Claude Code sessions opened in the worktree have it set already.
 - Browser cookies on `localhost` are shared across ports. Use a separate browser profile per instance. The Playwright MCP browser already has one per Claude session (`PLAYWRIGHT_MCP_ISOLATED` in `.claude/settings.json`).
-- A new instance has an empty Novu. Run `pnpm tilt trigger novu-setup` there if you need notifications.
 - Unset `NX_WORKSPACE_ROOT_PATH` in a worktree's shell if it is set, or Nx uses the main checkout.
 - Remove an instance with `pnpm tilt down`, `docker compose -p roviq-<slot> down -v`, then
   `git worktree remove ../roviq-<slot>`.

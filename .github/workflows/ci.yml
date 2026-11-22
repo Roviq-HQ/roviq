@@ -84,16 +84,6 @@ jobs:
       BILLING_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       IDENTITY_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       ROVIQ_EE: "true"
-      # Novu — NotificationConfigService boots via configService.getOrThrow at
-      # AppModule load time. Integration tests boot the module → these are
-      # required even without a live Novu server.
-      NOVU_SECRET_KEY: placeholder
-      NOVU_APPLICATION_IDENTIFIER: placeholder
-      NOVU_MODE: local
-      NOVU_API_URL: http://localhost:3340
-      NOVU_WS_URL: http://localhost:3342
-      NOVU_JWT_SECRET: novu-local-jwt-secret-change-me
-      NOVU_STORE_ENCRYPTION_KEY: novulocalstoreencrkey12345678abc
       # Object storage — env validation requires these at AppModule load. No integration
       # test talks to a live store, so nothing listens on this endpoint.
       S3_ENDPOINT: http://localhost:9002
@@ -408,7 +398,6 @@ jobs:
           WS_URL: ws://localhost:3004/api/graphql
           NEXT_PUBLIC_API_URL: http://localhost:3004
           NEXT_PUBLIC_WS_URL: ws://localhost:3004
-          NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: ''
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

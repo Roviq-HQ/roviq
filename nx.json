@@ -144,8 +144,7 @@
       "{workspaceRoot}/e2e/web-admin-e2e/**/*",
       "{workspaceRoot}/e2e/web-institute-e2e/**/*",
       "{workspaceRoot}/e2e/web-reseller-e2e/**/*",
-      { "env": "NEXT_PUBLIC_API_URL" },
-      { "env": "NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER" }
+      { "env": "NEXT_PUBLIC_API_URL" }
     ]
   },
   "plugins": [

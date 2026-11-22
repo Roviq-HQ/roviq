@@ -4,8 +4,6 @@ import { validate } from '../env.validation';
 const BASE = {
   DATABASE_URL: 'postgresql://roviq_pooler@localhost/roviq',
   NATS_URL: 'nats://localhost:4222',
-  NOVU_SECRET_KEY: 'placeholder',
-  NOVU_APPLICATION_IDENTIFIER: 'placeholder',
 };
 
 describe('notification-service env validation', () => {

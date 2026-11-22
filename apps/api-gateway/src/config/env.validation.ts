@@ -67,8 +67,6 @@ const envSchema = z.looseObject({
   JWT_REFRESH_EXPIRATION: z.string().optional(),
   ROVIQ_EE: z.string().optional(),
   NOTIFICATION_SERVICE_URL: z.string().optional(),
-  NOVU_MODE: z.enum(['local', 'cloud']).optional(),
-  NOVU_API_URL: z.string().url().optional(),
   BILLING_RETURN_URL: z.string().url().optional(),
   // Malware scanner for uploads; unset means off in production, eicar elsewhere (ROV-303)
   FILE_SCANNER: z.enum(['clamav', 'eicar', 'off']).optional(),

@@ -64,9 +64,9 @@ Services emit NATS JetStream events through the private `emitEvent(pattern, data
 | `ATTENDANCE_SESSION.deleted` | `AttendanceService.deleteSession` | Soft-delete audit |
 | `ATTENDANCE_ENTRY.marked` | `AttendanceService.markAttendance` | Single-mark audit |
 | `ATTENDANCE_ENTRY.past_day_edited` | `AttendanceService.markAttendance` (override path) | Admin override audit |
-| `NOTIFICATION.attendance.absent` | `AttendanceService.markAttendance` (when status=ABSENT) | Fan-out to Novu workflow `attendance-absent` |
+| `NOTIFICATION.attendance.absent` | `AttendanceService.markAttendance` (when status=ABSENT) | Fan-out to the `ATTENDANCE_ABSENT` notification |
 | `LEAVE.applied` / `LEAVE.updated` / `LEAVE.approved` / `LEAVE.rejected` / `LEAVE.cancelled` / `LEAVE.deleted` | `LeaveService` | Audit + downstream reporting |
-| `NOTIFICATION.leave.decided` | `LeaveService.approve` / `.reject` | Fan-out to Novu workflow `leave-decided` |
+| `NOTIFICATION.leave.decided` | `LeaveService.approve` / `.reject` | Fan-out to the `LEAVE_DECIDED` notification |
 | `HOLIDAY.created` / `HOLIDAY.updated` / `HOLIDAY.deleted` | `HolidayService` | Calendar cache invalidation |
 
 ## 3. Frontend
@@ -98,12 +98,12 @@ Below is the exact flow that ties the three modules together.
 
 **HOLIDAY → session-creation blocker.** `openAttendanceSession` calls `HolidayService.onDate(date)` before inserting. If any holiday row spans the date, the service throws `ATTENDANCE_ON_HOLIDAY: <names>` and the transaction short-circuits. This is intentionally strict — there is no per-session override, because downstream reports assume holiday dates have zero sessions. The check runs *after* the idempotence check so re-opening a session that predates a later-added holiday still returns the existing record.
 
-**Notification fan-out.** The backend emits `NOTIFICATION.*` events on significant domain transitions. `apps/notification-service` consumes them via NATS listeners and triggers Novu workflows:
+**Notification fan-out.** The backend emits `NOTIFICATION.*` events on significant domain transitions. `apps/notification-service` consumes them via NATS listeners and sends notifications:
 
-| Event | Novu workflow | Channels |
+| Event | Notification type | Channels |
 | --- | --- | --- |
-| `NOTIFICATION.attendance.absent` | `attendance-absent` | in-app → digest → WhatsApp → email → push |
-| `NOTIFICATION.leave.decided` | `leave-decided` | in-app → email |
+| `NOTIFICATION.attendance.absent` | `ATTENDANCE_ABSENT` | in-app → digest → WhatsApp → email → push |
+| `NOTIFICATION.leave.decided` | `LEAVE_DECIDED` | in-app → email |
 
 ## 5. Permissions matrix
 

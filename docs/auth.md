@@ -202,7 +202,7 @@ The user is signed out on every device, including the one that changed the passw
 
 An email address typed by someone else does not prove who owns an account: the welcome message with the temporary password also goes by SMS to the phone the creator typed.
 
-- `users.email_verified_at` is set when the user enters a 6-digit code on their Account page (`requestEmailVerification`, `verifyEmail`). The code is sent by the `email-verification` Novu workflow to the email address only: no SMS, no in-app message. It lives 10 minutes, allows 5 guesses, and a new one can be requested after 60 seconds.
+- `users.email_verified_at` is set when the user enters a 6-digit code on their Account page (`requestEmailVerification`, `verifyEmail`). The code is sent inline by `apps/notification-service` to the email address only: no SMS, no in-app message. It lives 10 minutes, allows 5 guesses, and a new one can be requested after 60 seconds.
 - `IdentityService.findOrCreateUserByEmail` (first institute admin, reseller team invite, reseller creation) reuses an existing account only when its email is verified, or when the same actor created it. Otherwise it answers `unavailable` and the caller shows one generic error.
 - The reason an email or phone is refused is never sent to the client (`INSTITUTE_ADMIN_UNAVAILABLE`, `TEAM_MEMBER_EMAIL_UNAVAILABLE`, `RESELLER_ADMIN_EMAIL_UNAVAILABLE`).
 - Seeded users are verified. Only `roviq_admin` can update `users`, so no institute or reseller role can set the column.
@@ -267,7 +267,7 @@ A new `institutes.require_impersonation_consent BOOLEAN NOT NULL DEFAULT false` 
 Flow when the OTP gate fires:
 
 1. Caller invokes `<scope>StartImpersonation(input)`.
-2. Backend generates a 6-digit OTP and parks the whole request (impersonator, target, reason, IP, recipient) at Redis key `impersonation-otp:{requestId}` with `EX 300` (5 min). It emits `NOTIFICATION.auth.security` with `eventType: 'IMPERSONATION_OTP'`; the notification-service delivers it via Novu to the institute's longest-standing active `institute_admin`. **No `impersonation_sessions` row exists yet**, so an abandoned request never shows up as an active session.
+2. Backend generates a 6-digit OTP and parks the whole request (impersonator, target, reason, IP, recipient) at Redis key `impersonation-otp:{requestId}` with `EX 300` (5 min). It emits `NOTIFICATION.auth.security` with `eventType: 'IMPERSONATION_OTP'`; the notification-service sends it inline to the institute's longest-standing active `institute_admin`. **No `impersonation_sessions` row exists yet**, so an abandoned request never shows up as an active session.
 3. Resolver returns `{ sessionId, requiresOtp: true }` instead of `{ code }`. `sessionId` here is the pending request id.
 4. Institute admin reads the OTP and shares it with the impersonator out-of-band.
 5. Caller submits `<scope>VerifyImpersonationOtp(sessionId, otp)`.
@@ -388,7 +388,7 @@ Institute services (student, staff, guardian, admission, …) and Temporal activ
 - Argon2id-hashes a freshly-generated temporary password.
 - Inserts the `users` row with `must_change_password = true`.
 - Creates the appropriate membership row(s) inside the same transaction wrapper.
-- Emits `NOTIFICATION.user.created` so the notification-service can deliver welcome credentials (Roviq ID + temp password) via Novu.
+- Emits `NOTIFICATION.user.created` so the notification-service can deliver welcome credentials (Roviq ID + temp password) inline, stored nowhere.
 
 This gives us one place to enforce password policy, audit the creation event, and (in future) plug in passkey provisioning. Reviews should reject any new `db.insert(users)` / `db.insert(memberships)` outside `auth/identity.service.ts`.
 

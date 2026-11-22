@@ -164,8 +164,6 @@ services:
       # Four-role model: runtime connects via roviq_pooler.
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq
       NATS_URL: nats://nats:4222
-      NOVU_SECRET_KEY: ${NOVU_SECRET_KEY:-placeholder}
-      NOVU_APPLICATION_IDENTIFIER: ${NOVU_APPLICATION_IDENTIFIER:-placeholder}
       NOTIFICATION_SERVICE_PORT: 3002
     depends_on:
       postgres:

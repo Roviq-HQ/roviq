@@ -4,7 +4,7 @@ import type { AuthSecurityEventType } from '@roviq/common-types';
  * Emitted by AttendanceService when an entry lands in ABSENT or LATE state.
  *
  * Includes denormalised display fields (student name, section/standard) so the
- * Novu template at the notification-service listener doesn't have to issue a
+ * message at the notification-service listener doesn't have to issue a
  * follow-up SQL hop per event (AT-003). The producer already has them on hand
  * because section + student are joined when seeding/marking.
  *
@@ -154,7 +154,7 @@ export interface BillingWebhookNotificationEvent extends BillingNotificationEven
 /**
  * Emitted by the institute LeaveService when a leave application is approved
  * or rejected. Consumed by notification-service to ping the applicant and
- * (transitively) linked guardians via the `leave-decided` Novu workflow.
+ * (transitively) linked guardians.
  */
 export interface LeaveDecidedEvent {
   tenantId: string;

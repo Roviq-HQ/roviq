@@ -62,7 +62,6 @@ declare global {
       E2E_WEB_PORT?: string;
       E2E_POSTGRES_PORT?: string;
       E2E_NATS_PORT?: string;
-      E2E_NOVU_API_PORT?: string;
       /** Host port of this instance's e2e object storage (slot 0: 9004). */
       E2E_STORAGE_PORT?: string;
       /** Host port of this instance's e2e Mailpit API (slot 0: 8026). */

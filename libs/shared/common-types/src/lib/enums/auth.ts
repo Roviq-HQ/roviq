@@ -75,7 +75,7 @@ export const AuthScope = Object.fromEntries(AUTH_SCOPE_VALUES.map((v) => [v, v])
 
 // ─── AuthSecurityEventType ──────────────────────────────────────────────────
 // Events emitted on the `NOTIFICATION.auth.security` subject. Consumed by
-// notification-service to decide which Novu workflow to trigger and by the
+// notification-service to decide which message to send and by the
 // user's recent-activity feed.
 
 export const AUTH_SECURITY_EVENT_TYPE_VALUES = [

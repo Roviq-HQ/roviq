@@ -8,8 +8,6 @@ import { expect, test as setup } from '@playwright/test';
 const EXPECTED = {
   NEXT_PUBLIC_API_URL:
     process.env.NEXT_PUBLIC_API_URL ?? `http://localhost:${process.env.E2E_API_PORT ?? '3004'}`,
-  NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER:
-    process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER ?? '',
 };
 
 const WEB_PORT = process.env.E2E_WEB_PORT ?? '4201';

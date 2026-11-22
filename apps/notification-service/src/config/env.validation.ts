@@ -12,14 +12,6 @@ const envSchema = z
       error: 'NATS_URL — NATS server URL for event streaming (e.g. nats://localhost:4222)',
     }),
 
-    // Novu — still read by the subscriber sync and device token services until they are removed
-    NOVU_SECRET_KEY: z.string({
-      error: 'NOVU_SECRET_KEY — Novu secret key for server-side API calls',
-    }),
-    NOVU_APPLICATION_IDENTIFIER: z.string({
-      error: 'NOVU_APPLICATION_IDENTIFIER — Novu application identifier',
-    }),
-
     // Temporal: the notification worker runs only when the flag is 'true'
     TEMPORAL_ADDRESS: z.string().optional(),
     NOTIFICATION_WORKER_ENABLED: z.enum(['true', 'false']).optional(),
@@ -35,8 +27,6 @@ const envSchema = z
 
     // Optional
     NODE_ENV: z.string().optional(),
-    NOVU_MODE: z.enum(['local', 'cloud']).optional(),
-    NOVU_API_URL: z.string().url().optional(),
     NOTIFICATION_SERVICE_PORT: z.coerce.number().optional(),
     LOG_LEVEL: z.string().optional(),
   })

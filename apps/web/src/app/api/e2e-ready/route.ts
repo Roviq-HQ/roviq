@@ -15,8 +15,6 @@ export function GET() {
     ok: true,
     env: {
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? null,
-      NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER:
-        process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER ?? null,
       NODE_ENV: process.env.NODE_ENV ?? null,
     },
     buildId: process.env.NEXT_BUILD_ID ?? null,

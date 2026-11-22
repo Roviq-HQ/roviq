@@ -16,16 +16,13 @@ import { AttendanceListener } from '../listeners/attendance.listener';
 import { AuthListener } from '../listeners/auth.listener';
 import { FeeListener } from '../listeners/fee.listener';
 import { LeaveListener } from '../listeners/leave.listener';
-import { SubscriberSyncListener } from '../listeners/subscriber-sync.listener';
 import { UserListener } from '../listeners/user.listener';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
 import { ContactReadRepository } from '../repositories/contact-read.repository';
 import { NotificationServiceRepositoryModule } from '../repositories/notification-service-repository.module';
 import { NotificationWriteRepository } from '../repositories/notification-write.repository';
-import { DeviceTokenService } from '../services/device-token.service';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
-import { SubscriberSyncService } from '../services/subscriber-sync.service';
 import { NotificationWorkerService } from '../workflows/notification.worker';
 
 @Module({
@@ -46,7 +43,6 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     AuthListener,
     FeeListener,
     LeaveListener,
-    SubscriberSyncListener,
     UserListener,
   ],
   providers: [
@@ -85,8 +81,6 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     RecipientResolver,
     NotificationWorkerService,
     NotificationWorkerHealthIndicator,
-    SubscriberSyncService,
-    DeviceTokenService,
   ],
 })
 export class AppModule {}
