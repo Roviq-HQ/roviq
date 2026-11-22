@@ -37,6 +37,7 @@ export interface CreateSectionData {
   displayOrder?: number;
   startTime?: string;
   endTime?: string;
+  batchStatus?: string;
 }
 
 export interface UpdateSectionData {

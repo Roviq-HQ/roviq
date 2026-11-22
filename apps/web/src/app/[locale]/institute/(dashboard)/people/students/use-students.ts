@@ -6,6 +6,7 @@ import type {
   GuardianModel,
   ListGuardiansFilterInput,
   SectionModel,
+  SetPromotionDecisionsInput,
   StandardModel,
   StudentAcademicHistoryModel,
   StudentDocumentModel,
@@ -38,6 +39,7 @@ const STUDENT_LIST_FIELDS = `
   currentSectionId
   currentStandardName
   currentSectionName
+  promotionStatus
   primaryGuardianProfileId
   primaryGuardianFirstName
   primaryGuardianLastName
@@ -578,6 +580,19 @@ const UPDATE_STUDENT_SECTION = gql`
     updateStudentSection(input: $input)
   }
 `;
+
+const SET_PROMOTION_DECISIONS = gql`
+  mutation SetPromotionDecisions($input: SetPromotionDecisionsInput!) {
+    setPromotionDecisions(input: $input)
+  }
+`;
+
+export function useSetPromotionDecisions() {
+  return useMutation<{ setPromotionDecisions: number }, { input: SetPromotionDecisionsInput }>(
+    SET_PROMOTION_DECISIONS,
+    { refetchQueries: ['InstituteStudents'] },
+  );
+}
 
 export function useUpdateStudent() {
   return useMutation<

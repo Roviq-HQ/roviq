@@ -24,6 +24,7 @@
   "groupedView": "By Department",
   "name": "Name",
   "numericOrder": "Order",
+  "numericOrderHelp": "Class number: 1 for Class 1, 12 for Class 12. Pre-primary goes below 1: Nursery -3, LKG -2, UKG -1. The same number links this class across academic years.",
   "level": "Level",
   "nepStage": "NEP Stage",
   "department": "Department",

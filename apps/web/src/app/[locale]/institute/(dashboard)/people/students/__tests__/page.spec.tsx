@@ -7,7 +7,8 @@
  */
 import type { RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '@roviq/common-types';
-import { AcademicStatus, Gender, SocialCategory } from '@roviq/common-types';
+import { AcademicStatus, Gender, PromotionStatus, SocialCategory } from '@roviq/common-types';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -78,11 +79,21 @@ const mockStudent = {
   createdAt: '2025-04-01T00:00:00Z',
   updatedAt: '2025-04-01T00:00:00Z',
   version: 1,
+  promotionStatus: null,
+};
+
+const detainedStudent = {
+  ...mockStudent,
+  id: 'stu-2',
+  admissionNumber: 'ADM-002',
+  firstName: { en: 'Meera' },
+  currentStudentAcademicId: 'sa-2',
+  promotionStatus: PromotionStatus.DETAINED,
 };
 
 vi.mock('../use-students', () => ({
   useStudents: () => ({
-    students: [mockStudent],
+    students: [mockStudent, detainedStudent],
     totalCount: 1,
     hasNextPage: false,
     loading: false,
@@ -95,6 +106,7 @@ vi.mock('../use-students', () => ({
   useStudentsExport: () => [vi.fn(async () => ({ data: undefined })), { loading: false }],
   useUpdateStudentAcademic: () => [vi.fn(), { loading: false }],
   useUpdateStudentSection: () => [vi.fn(), { loading: false }],
+  useSetPromotionDecisions: () => [vi.fn(), { loading: false }],
 }));
 
 // Import AFTER mocks so they apply.
@@ -155,5 +167,33 @@ describe('StudentsPage (component)', () => {
     const bulkStrings = messagesEn.bulk as Record<string, string>;
     const clearText = bulkStrings.clearSelection;
     expect(await screen.findByText(clearText)).toBeInTheDocument();
+  });
+
+  it('shows the recorded year-end result as a badge only when one is recorded', () => {
+    renderPage();
+
+    expect(
+      screen.getAllByTestId(testIds.instituteStudents.promotionBadge('stu-2'))[0],
+    ).toHaveTextContent(messagesEn.yearEnd.badge.DETAINED);
+    expect(screen.queryByTestId(testIds.instituteStudents.promotionBadge('stu-1'))).toBeNull();
+  });
+
+  it('offers Year-end result in the bulk bar to a user who can update students', async () => {
+    renderPage([{ action: ['read', 'update'], subject: 'Student' }]);
+
+    await userEvent.click(screen.getAllByRole('checkbox', { name: messagesEn.bulk.selectRow })[0]);
+
+    expect(await screen.findByTestId(testIds.instituteStudents.bulkYearEndBtn)).toHaveTextContent(
+      messagesEn.yearEnd.button,
+    );
+  });
+
+  it('hides Year-end result from a user who cannot update students', async () => {
+    renderPage([{ action: 'read', subject: 'Student' }]);
+
+    await userEvent.click(screen.getAllByRole('checkbox', { name: messagesEn.bulk.selectRow })[0]);
+
+    expect(await screen.findByText(messagesEn.bulk.clearSelection)).toBeInTheDocument();
+    expect(screen.queryByTestId(testIds.instituteStudents.bulkYearEndBtn)).toBeNull();
   });
 });

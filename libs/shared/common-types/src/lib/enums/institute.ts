@@ -182,6 +182,9 @@ export const AffiliationStatus = Object.fromEntries(
   AFFILIATION_STATUS_VALUES.map((v) => [v, v]),
 ) as { readonly [K in AffiliationStatus]: K };
 
+/** Lowest standard `numeric_order`: pre-primary sits below Class 1 (Nursery -3, LKG -2, UKG -1). */
+export const MIN_STANDARD_NUMERIC_ORDER = -5;
+
 // ─── EducationLevel ─────────────────────────────────────────────────────────
 
 export const EDUCATION_LEVEL_VALUES = [

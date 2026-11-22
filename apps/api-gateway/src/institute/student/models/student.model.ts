@@ -4,6 +4,7 @@ import {
   AdmissionType,
   Gender,
   MinorityType,
+  PromotionStatus,
   SocialCategory,
   StudentStream,
 } from '@roviq/common-types';
@@ -63,6 +64,11 @@ registerEnumType(SocialCategory, {
 registerEnumType(MinorityType, {
   name: 'MinorityType',
   description: 'Religious minority community per National Commission for Minorities Act.',
+});
+registerEnumType(PromotionStatus, {
+  name: 'PromotionStatus',
+  description:
+    'Year-end result recorded on a student year record. The year rollover reads it: PROMOTED moves up, DETAINED stays, GRADUATED and TRANSFERRED are not carried; PENDING or none moves up (stays in a COACHING institute).',
 });
 registerEnumType(StudentStream, {
   name: 'StudentStream',
@@ -208,6 +214,12 @@ export class StudentModel {
 
   @Field(() => I18nTextScalar, { nullable: true })
   currentSectionName?: I18nContent | null;
+
+  @Field(() => PromotionStatus, {
+    nullable: true,
+    description: 'Year-end result recorded on the year record this row shows.',
+  })
+  promotionStatus?: PromotionStatus | null;
 
   /**
    * Primary guardian (is_primary_contact = true) display name — denormalised

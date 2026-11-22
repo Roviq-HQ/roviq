@@ -144,6 +144,10 @@ export const ErrorCode = {
   STREAM_REQUIRED: 'STREAM_REQUIRED',
   /** Section capacity exceeded — provide an override reason or increase capacity */
   SECTION_CAPACITY_EXCEEDED: 'SECTION_CAPACITY_EXCEEDED',
+  /** Section still has students in it — move them to another section before deleting */
+  SECTION_HAS_STUDENTS: 'SECTION_HAS_STUDENTS',
+  /** Student already has a record in that academic year */
+  STUDENT_ALREADY_ENROLLED: 'STUDENT_ALREADY_ENROLLED',
   /** Board code is already used by another subject in this standard */
   SUBJECT_CODE_DUPLICATE: 'SUBJECT_CODE_DUPLICATE',
 
@@ -491,6 +495,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   LAST_GUARDIAN_CANNOT_BE_DELETED: HttpStatus.UNPROCESSABLE_ENTITY,
   STREAM_REQUIRED: HttpStatus.BAD_REQUEST,
   SECTION_CAPACITY_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
+  SECTION_HAS_STUDENTS: HttpStatus.CONFLICT,
+  STUDENT_ALREADY_ENROLLED: HttpStatus.CONFLICT,
   SUBJECT_CODE_DUPLICATE: HttpStatus.CONFLICT,
   TIMETABLE_NOT_FOUND: HttpStatus.NOT_FOUND,
   TIMETABLE_NAME_DUPLICATE: HttpStatus.CONFLICT,

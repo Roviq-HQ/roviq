@@ -16,9 +16,12 @@ export type {
   RetryOptions,
   StreamConfig,
 } from './interfaces/jetstream.options';
+export { connectJetStreamMicroservice } from './server/connect';
+export { deadLetterErrorText } from './server/error-text';
 export { DeserializationError, HandlerTimeoutError } from './server/errors';
 // Server
 export { JetStreamServer } from './server/jetstream.server';
+export { RethrowRpcExceptionFilter } from './server/rethrow-rpc-exception.filter';
 // Event subject registry — single source of truth for every NATS subject
 // emitted or subscribed to. `EventBusService.emit` accepts only `EventPattern`.
 export {
@@ -27,7 +30,11 @@ export {
   flattenEventPatterns,
 } from './streams/event-patterns';
 // Zod payload schemas paired to every EVENT_PATTERNS leaf.
-export { type EventPayload, flatEventSchemas } from './streams/event-schemas';
+export {
+  type EventPayload,
+  eventPayloadSchemas,
+  flatEventSchemas,
+} from './streams/event-schemas';
 // Streams
 export {
   AUDIT_LOG_CONSUMER,

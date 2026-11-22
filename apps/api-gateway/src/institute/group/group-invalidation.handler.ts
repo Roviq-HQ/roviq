@@ -1,9 +1,3 @@
-/**
- * NATS cache invalidation consumer for groups (ROV-163).
- *
- * Listens for domain events and invalidates affected groups by setting
- * resolved_at = NULL (lazy invalidation — next resolveGroupMembers re-evaluates).
- */
 import { Controller, Inject, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { GroupMembershipType } from '@roviq/common-types';
@@ -15,138 +9,112 @@ import {
   mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
+import { and, arrayOverlaps, eq, inArray, isNull, type SQL } from 'drizzle-orm';
+import { gatewayConsumer } from '../../common/events/gateway-consumer';
 
+const ORIGIN = 'consumer:group-invalidation';
+
+/**
+ * Sets `groups.resolved_at = NULL` on groups whose members an event may have changed; the next
+ * read re-resolves them. Idempotent, so redelivery is harmless.
+ */
 @Controller()
 export class GroupInvalidationHandler {
   private readonly logger = new Logger(GroupInvalidationHandler.name);
 
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
 
-  /**
-   * student.enrolled → invalidate groups with 'standard_id' or 'section_id' in rule_dimensions
-   */
-  @EventPattern('STUDENT.enrolled')
-  async onStudentEnrolled(@Payload() data: { tenantId: string }): Promise<void> {
-    await this.invalidateByDimensions(data.tenantId, ['standard_id', 'section_id']);
+  @EventPattern(EVENT_PATTERNS.STUDENT.enrolled, gatewayConsumer(EVENT_PATTERNS.STUDENT.enrolled))
+  async onStudentEnrolled(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.enrolled].parse(data);
+    await this.invalidateByDimensions(tenantId, ['standard_id', 'section_id']);
   }
 
-  /**
-   * student.section_changed → invalidate groups with 'section_id' in rule_dimensions
-   */
-  @EventPattern('STUDENT.section_changed')
-  async onStudentSectionChanged(@Payload() data: { tenantId: string }): Promise<void> {
-    await this.invalidateByDimensions(data.tenantId, ['section_id']);
+  @EventPattern(
+    EVENT_PATTERNS.STUDENT.section_changed,
+    gatewayConsumer(EVENT_PATTERNS.STUDENT.section_changed),
+  )
+  async onStudentSectionChanged(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.section_changed].parse(data);
+    await this.invalidateByDimensions(tenantId, ['section_id']);
   }
 
-  /**
-   * student.promoted → invalidate groups with 'standard_id' in rule_dimensions
-   */
-  @EventPattern('STUDENT.promoted')
-  async onStudentPromoted(@Payload() data: { tenantId: string }): Promise<void> {
-    await this.invalidateByDimensions(data.tenantId, ['standard_id']);
+  @EventPattern(EVENT_PATTERNS.STUDENT.promoted, gatewayConsumer(EVENT_PATTERNS.STUDENT.promoted))
+  async onStudentPromoted(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.promoted].parse(data);
+    await this.invalidateByDimensions(tenantId, ['standard_id']);
   }
 
-  /**
-   * student.left → invalidate ALL dynamic groups (student removed from pool)
-   */
-  @EventPattern('STUDENT.left')
-  async onStudentLeft(@Payload() data: { tenantId: string }): Promise<void> {
-    await this.invalidateAllDynamic(data.tenantId);
+  /** A student who left drops out of every rule-based group. */
+  @EventPattern(EVENT_PATTERNS.STUDENT.left, gatewayConsumer(EVENT_PATTERNS.STUDENT.left))
+  async onStudentLeft(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.left].parse(data);
+    await this.invalidateAllDynamic(tenantId);
   }
 
-  /**
-   * academic_year.activated → invalidate ALL dynamic groups (full refresh needed)
-   */
-  @EventPattern('ACADEMIC_YEAR.activated')
-  async onAcademicYearActivated(@Payload() data: { tenantId: string }): Promise<void> {
-    await this.invalidateAllDynamic(data.tenantId);
+  @EventPattern(
+    EVENT_PATTERNS.ACADEMIC_YEAR.activated,
+    gatewayConsumer(EVENT_PATTERNS.ACADEMIC_YEAR.activated),
+  )
+  async onAcademicYearActivated(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.ACADEMIC_YEAR.activated].parse(data);
+    await this.invalidateAllDynamic(tenantId);
   }
 
-  /**
-   * section.deleted → invalidate groups with 'section_id' in rule_dimensions
-   */
-  @EventPattern('SECTION.deleted')
-  async onSectionDeleted(@Payload() data: { tenantId: string }): Promise<void> {
-    await this.invalidateByDimensions(data.tenantId, ['section_id']);
+  @EventPattern(EVENT_PATTERNS.SECTION.deleted, gatewayConsumer(EVENT_PATTERNS.SECTION.deleted))
+  async onSectionDeleted(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.SECTION.deleted].parse(data);
+    await this.invalidateByDimensions(tenantId, ['section_id']);
   }
 
-  /**
-   * group.rules_updated → invalidate that specific group only
-   */
-  @EventPattern('GROUP.rules_updated')
-  async onGroupRulesUpdated(@Payload() data: { groupId: string; tenantId: string }): Promise<void> {
-    await withTenant(
-      this.db,
-      mkInstituteCtx(data.tenantId, 'consumer:group-invalidation'),
-      async (tx) => {
-        await tx.update(groups).set({ resolvedAt: null }).where(eq(groups.id, data.groupId));
-      },
-    );
-    this.logger.log(`Invalidated group ${data.groupId} (rules updated)`);
+  @EventPattern(
+    EVENT_PATTERNS.GROUP.rules_updated,
+    gatewayConsumer(EVENT_PATTERNS.GROUP.rules_updated),
+  )
+  async onGroupRulesUpdated(@Payload() data: unknown): Promise<void> {
+    const { groupId, tenantId } =
+      eventPayloadSchemas[EVENT_PATTERNS.GROUP.rules_updated].parse(data);
+    const count = await this.invalidate(tenantId, eq(groups.id, groupId));
+    this.logger.log(`Group ${groupId} rules updated: invalidated ${count} group`);
   }
 
-  // ── PRIVATE HELPERS ───────────────────────────────────────
-
-  /**
-   * Invalidate groups whose rules depend on any of the given dimensions.
-   * Sets resolved_at = NULL on matching groups → lazy re-resolution.
-   */
   private async invalidateByDimensions(tenantId: string, dimensions: string[]): Promise<void> {
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'consumer:group-invalidation'),
-      async (tx) => {
-        // Find group_ids whose rules reference any of the given dimensions
-        const affectedRules = await tx
-          .select({ groupId: groupRulesLive.groupId })
-          .from(groupRulesLive)
-          .where(
-            sql`${groupRulesLive.ruleDimensions} && ARRAY[${sql.join(
-              dimensions.map((d) => sql`${d}`),
-              sql`, `,
-            )}]::text[]`,
-          );
+    const count = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+      this.invalidateIn(
+        tx,
+        inArray(
+          groups.id,
+          tx
+            .select({ id: groupRulesLive.groupId })
+            .from(groupRulesLive)
+            .where(arrayOverlaps(groupRulesLive.ruleDimensions, dimensions)),
+        ),
+      ),
+    );
+    this.logger.log(`Invalidated ${count} groups for dimensions: ${dimensions.join(', ')}`);
+  }
 
-        if (affectedRules.length === 0) return;
+  private async invalidateAllDynamic(tenantId: string): Promise<void> {
+    const count = await this.invalidate(
+      tenantId,
+      inArray(groups.membershipType, [GroupMembershipType.DYNAMIC, GroupMembershipType.HYBRID]),
+    );
+    this.logger.log(`Invalidated all ${count} dynamic/hybrid groups`);
+  }
 
-        const groupIds = affectedRules.map((r) => r.groupId);
-        await tx
-          .update(groups)
-          .set({ resolvedAt: null })
-          .where(
-            sql`${groups.id} IN (${sql.join(
-              groupIds.map((id) => sql`${id}::uuid`),
-              sql`, `,
-            )})`,
-          );
-
-        this.logger.log(
-          `Invalidated ${groupIds.length} groups for dimensions: ${dimensions.join(', ')}`,
-        );
-      },
+  private invalidate(tenantId: string, where: SQL): Promise<number> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+      this.invalidateIn(tx, where),
     );
   }
 
-  /** Invalidate ALL dynamic/hybrid groups in a tenant */
-  private async invalidateAllDynamic(tenantId: string): Promise<void> {
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'consumer:group-invalidation'),
-      async (tx) => {
-        const result = await tx
-          .update(groups)
-          .set({ resolvedAt: null })
-          .where(
-            inArray(groups.membershipType, [
-              GroupMembershipType.DYNAMIC,
-              GroupMembershipType.HYBRID,
-            ]),
-          )
-          .returning({ id: groups.id });
-
-        this.logger.log(`Invalidated all ${result.length} dynamic/hybrid groups`);
-      },
-    );
+  private async invalidateIn(tx: DrizzleDB, where: SQL): Promise<number> {
+    const rows = await tx
+      .update(groups)
+      .set({ resolvedAt: null })
+      .where(and(where, isNull(groups.deletedAt)))
+      .returning({ id: groups.id });
+    return rows.length;
   }
 }

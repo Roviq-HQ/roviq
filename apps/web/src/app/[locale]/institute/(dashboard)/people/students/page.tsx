@@ -53,6 +53,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   ChevronUp,
+  ClipboardCheck,
   Download,
   GraduationCap,
   MoveRight,
@@ -91,6 +92,7 @@ import {
   useStudentsInTenantUpdated,
   useUpdateStudentSection,
 } from './use-students';
+import { YearEndResultDialog } from './year-end-result-dialog';
 
 /**
  * Matches the values accepted by StudentFilterInput.academicStatus. These are
@@ -580,6 +582,7 @@ export default function StudentsPage() {
   // ── Multi-select state for bulk actions ─────────────────────────────────
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [bulkSectionOpen, setBulkSectionOpen] = React.useState(false);
+  const [yearEndOpen, setYearEndOpen] = React.useState(false);
 
   // Wrap the nuqs filter setter so that any filter change also drops the
   // current selection — selecting students from a previous filtered view
@@ -725,10 +728,13 @@ export default function StudentsPage() {
             );
           }
           return (
-            <span className="text-sm">
-              {std ?? ''}
-              {std && sec ? ' · ' : ''}
-              {sec ?? ''}
+            <span className="inline-flex flex-wrap items-center gap-1.5 text-sm">
+              <span>
+                {std ?? ''}
+                {std && sec ? ' · ' : ''}
+                {sec ?? ''}
+              </span>
+              <PromotionBadge student={row.original} />
             </span>
           );
         },
@@ -987,6 +993,16 @@ export default function StudentsPage() {
               }}
             />
 
+            <YearEndResultDialog
+              open={yearEndOpen}
+              onOpenChange={setYearEndOpen}
+              students={selectedStudents}
+              onSuccess={() => {
+                setSelectedIds(new Set());
+                refetch();
+              }}
+            />
+
             <ResponsiveDataTable
               data-testid={testIds.instituteStudents.table}
               columns={columns}
@@ -1092,6 +1108,17 @@ export default function StudentsPage() {
                           {t('bulk.changeSection')}
                         </Button>
                       </Can>
+                      <Can I="update" a="Student">
+                        <Button
+                          variant="outline"
+                          onClick={() => setYearEndOpen(true)}
+                          title={t('yearEnd.button')}
+                          data-testid={testIds.instituteStudents.bulkYearEndBtn}
+                        >
+                          <ClipboardCheck aria-hidden="true" className="size-4" />
+                          {t('yearEnd.button')}
+                        </Button>
+                      </Can>
                       <Button
                         variant="ghost"
                         onClick={() => setSelectedIds(new Set())}
@@ -1113,6 +1140,31 @@ export default function StudentsPage() {
         )
       }
     </Can>
+  );
+}
+
+// ─── Year-end result badge ────────────────────────────────────────────────
+
+const PROMOTION_BADGE = {
+  PROMOTED: { icon: ArrowUpCircle, className: STATUS_CLASS.PROMOTED },
+  DETAINED: { icon: AlertCircle, className: STATUS_CLASS.DETAINED },
+  GRADUATED: { icon: GraduationCap, className: STATUS_CLASS.PASSED_OUT },
+} as const;
+
+function PromotionBadge({ student }: { student: StudentListNode }) {
+  const t = useTranslations('students');
+  const status = student.promotionStatus;
+  if (status !== 'PROMOTED' && status !== 'DETAINED' && status !== 'GRADUATED') return null;
+  const { icon: Icon, className } = PROMOTION_BADGE[status];
+  return (
+    <Badge
+      variant="secondary"
+      className={`inline-flex items-center gap-1 text-[11px] ${className}`}
+      data-testid={testIds.instituteStudents.promotionBadge(student.id)}
+    >
+      <Icon aria-hidden="true" className="size-3" />
+      {t(`yearEnd.badge.${status}`)}
+    </Badge>
   );
 }
 

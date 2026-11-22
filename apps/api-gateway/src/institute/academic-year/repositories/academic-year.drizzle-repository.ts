@@ -13,6 +13,7 @@ import {
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { rollOverStudents, type YearRolloverCounts } from '../../student/year-rollover';
 import { AcademicYearRepository } from './academic-year.repository';
 import type { AcademicYearRecord, CreateAcademicYearData, UpdateAcademicYearData } from './types';
 
@@ -87,6 +88,32 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
         .from(academicYearsLive)
         .where(eq(academicYearsLive.isActive, true));
       return (rows[0] as AcademicYearRecord | undefined) ?? null;
+    });
+  }
+
+  async previewRollover(targetYearId: string): Promise<YearRolloverCounts> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:academic-year'), async (tx) => {
+      const [active] = await tx
+        .select({ id: academicYearsLive.id })
+        .from(academicYearsLive)
+        .where(eq(academicYearsLive.isActive, true));
+      if (!active) {
+        return {
+          movingUp: 0,
+          staying: 0,
+          completing: 0,
+          notCarried: 0,
+          noClassInNewYear: 0,
+          alreadyPlaced: 0,
+        };
+      }
+      return rollOverStudents(tx, {
+        tenantId,
+        previousYearId: active.id,
+        academicYearId: targetYearId,
+        write: false,
+      });
     });
   }
 

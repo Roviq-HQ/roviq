@@ -56,6 +56,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/auth/__tests__/email-verification.integration.spec.ts',
   'apps/api-gateway/src/auth/__tests__/institute-status-access.integration.spec.ts',
   'apps/api-gateway/src/institute/section/__tests__/section-strength.integration.spec.ts',
+  // ROV-316: integration fixtures (years, standards, sections, students, groups) for the JetStream handlers.
+  'apps/api-gateway/src/institute/student/__tests__/gateway-event-handlers.integration.spec.ts',
+  // ROV-321: integration fixtures (years, standards, institute type) and the write-mode rollover.
+  'apps/api-gateway/src/institute/student/__tests__/year-end-promotion.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
   'apps/api-gateway/src/admin/user/__tests__/admin-user.integration.spec.ts',
   'apps/api-gateway/src/admin/reseller/admin-reseller.service.ts',

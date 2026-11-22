@@ -1,7 +1,7 @@
 'use client';
 
 import { gql, useMutation, useQuery } from '@roviq/graphql';
-import type { AcademicYearModel } from '@roviq/graphql/generated';
+import type { AcademicYearModel, AcademicYearRolloverPreview } from '@roviq/graphql/generated';
 
 const ACADEMIC_YEARS_QUERY = gql`
   query AcademicYears {
@@ -51,6 +51,19 @@ const ACTIVATE_ACADEMIC_YEAR = gql`
       label
       isActive
       status
+    }
+  }
+`;
+
+const ACADEMIC_YEAR_ROLLOVER_PREVIEW = gql`
+  query AcademicYearRolloverPreview($academicYearId: ID!) {
+    academicYearRolloverPreview(academicYearId: $academicYearId) {
+      movingUp
+      staying
+      completing
+      notCarried
+      noClassInNewYear
+      alreadyPlaced
     }
   }
 `;
@@ -123,6 +136,22 @@ export function useActivateAcademicYear() {
     activateYear: (id: string) => mutate({ variables: { id } }),
     loading,
   };
+}
+
+export type RolloverPreview = Omit<AcademicYearRolloverPreview, '__typename'>;
+
+/** Loads only while `academicYearId` is set, and never from cache: student records change. */
+export function useAcademicYearRolloverPreview(academicYearId: string | null) {
+  const { data, loading, error } = useQuery<{ academicYearRolloverPreview: RolloverPreview }>(
+    ACADEMIC_YEAR_ROLLOVER_PREVIEW,
+    {
+      variables: { academicYearId: academicYearId ?? '' },
+      skip: !academicYearId,
+      fetchPolicy: 'network-only',
+    },
+  );
+
+  return { preview: data?.academicYearRolloverPreview ?? null, loading, error };
 }
 
 export function useArchiveAcademicYear() {

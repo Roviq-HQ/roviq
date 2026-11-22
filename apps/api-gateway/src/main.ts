@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { validationExceptionFactory } from '@roviq/common-types';
+import { connectJetStreamMicroservice, STREAMS } from '@roviq/nats-jetstream';
 import { enableGracefulShutdown } from '@roviq/telemetry';
 import { Runtime } from '@temporalio/worker';
 import helmet from 'helmet';
@@ -40,6 +41,13 @@ async function bootstrap() {
       exceptionFactory: validationExceptionFactory,
     }),
   );
+
+  connectJetStreamMicroservice(app, {
+    servers: [config.getOrThrow<string>('NATS_URL')],
+    streams: Object.values(STREAMS),
+    dlq: { enabled: true },
+  });
+  await app.startAllMicroservices();
 
   const port = config.get<number>('API_GATEWAY_PORT', 3000);
   await app.listen(port);

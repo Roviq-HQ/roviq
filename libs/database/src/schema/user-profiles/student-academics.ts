@@ -64,8 +64,10 @@ export const studentAcademics = pgTable(
       .onDelete('restrict')
       .onUpdate('cascade'),
 
-    /** One enrollment record per student per academic year */
-    uniqueIndex('uq_student_academic_year').on(table.studentProfileId, table.academicYearId),
+    /** One live enrollment per student per academic year; a soft-deleted row releases the key. */
+    uniqueIndex('uq_student_academic_year')
+      .on(table.studentProfileId, table.academicYearId)
+      .where(sql`${table.deletedAt} IS NULL`),
     /** Section roster lookup: all students in a section for an academic year */
     index('idx_student_academics_section')
       .on(table.tenantId, table.academicYearId, table.sectionId)

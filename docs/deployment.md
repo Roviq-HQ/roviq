@@ -146,6 +146,15 @@ To turn scanning on:
   had not closed. Give the container a stop grace period above 10 s (Docker's default of 10 s
   cuts it short; Kubernetes' 30 s is enough).
 
+## Event consumers
+
+The api-gateway is a JetStream consumer as well as a publisher (ROV-316). At start-up it creates
+or updates its durable consumers (`gateway-*`) on the `ACADEMIC_YEAR`, `SECTION`, `STUDENT` and
+`GROUP` streams and fails to start if NATS refuses, so its NATS account needs JetStream consumer
+management on those streams. Every gateway instance binds the same durables and shares the work.
+On the first start after this change the consumers receive the messages already retained in
+those streams; the handlers are idempotent, so this is safe.
+
 ## Background workers
 
 Temporal workers run inside the api-gateway process, switched on per instance with a

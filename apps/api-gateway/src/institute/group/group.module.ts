@@ -4,7 +4,8 @@ import { GroupService } from './group.service';
 import { GroupInvalidationHandler } from './group-invalidation.handler';
 
 @Module({
-  providers: [GroupService, GroupResolver, GroupInvalidationHandler],
+  controllers: [GroupInvalidationHandler],
+  providers: [GroupService, GroupResolver],
   exports: [GroupService],
 })
 export class GroupModule {}

@@ -110,6 +110,33 @@ type AcademicYearModel {
   updatedAt: DateTime!
 }
 
+"""
+What activating an academic year would do to the students of the currently active year. All zero when no year is active.
+"""
+type AcademicYearRolloverPreview {
+  """Students who already have a record in the new year."""
+  alreadyPlaced: Int!
+
+  """
+  Students in the highest class with no recorded result: no place in the new year.
+  """
+  completing: Int!
+
+  """Students placed in a higher class than last year."""
+  movingUp: Int!
+
+  """
+  Students whose class in the new year has no standard or no section yet.
+  """
+  noClassInNewYear: Int!
+
+  """Students recorded as GRADUATED or TRANSFERRED."""
+  notCarried: Int!
+
+  """Students placed in the same class as last year."""
+  staying: Int!
+}
+
 enum AcademicYearStatus {
   ACTIVE
   ARCHIVED
@@ -1866,6 +1893,9 @@ input CreateSectionInput {
   """Academic year this section is created under."""
   academicYearId: ID!
 
+  """Lifecycle state of this section batch (Upcoming → Active → Completed)."""
+  batchStatus: BatchStatus
+
   """Maximum number of students allowed in this section."""
   capacity: Int = 40
 
@@ -2009,7 +2039,9 @@ input CreateStandardInput {
   """
   nepStage: NepStage
 
-  """Sort order used for display in timetables and reports (0 = first)."""
+  """
+  Class level: 1 for Class 1, 12 for Class 12; pre-primary below 1 (Nursery -3, LKG -2, UKG -1). Matches a class across academic years at rollover. From -5.
+  """
   numericOrder: Int!
 
   """
@@ -4556,6 +4588,11 @@ type Mutation {
     fileId: ID
   ): Boolean!
 
+  """
+  Records the year-end result on student year records; returns how many were updated. Applied at the next year activation.
+  """
+  setPromotionDecisions(input: SetPromotionDecisionsInput!): Int!
+
   """Set or remove a staff member profile picture."""
   setStaffPhoto(
     """
@@ -4970,6 +5007,17 @@ input PreviewCertificateInput {
 }
 
 """
+Year-end result recorded on a student year record. The year rollover reads it: PROMOTED moves up, DETAINED stays, GRADUATED and TRANSFERRED are not carried; PENDING or none moves up (stays in a COACHING institute).
+"""
+enum PromotionStatus {
+  DETAINED
+  GRADUATED
+  PENDING
+  PROMOTED
+  TRANSFERRED
+}
+
+"""
 Whether a staff qualification is an academic degree or a professional certification.
 """
 enum QualificationType {
@@ -4979,6 +5027,11 @@ enum QualificationType {
 
 type Query {
   academicYear(id: ID!): AcademicYearModel!
+
+  """
+  Counts what activating this year would do to the students of the active year. Writes nothing.
+  """
+  academicYearRolloverPreview(academicYearId: ID!): AcademicYearRolloverPreview!
   academicYears: [AcademicYearModel!]!
   activeAcademicYear: AcademicYearModel
 
@@ -6198,6 +6251,15 @@ type SessionInfo {
   userAgent: String
 }
 
+"""Records the year-end result on student year records."""
+input SetPromotionDecisionsInput {
+  """PENDING, PROMOTED, DETAINED or GRADUATED. TRANSFERRED is refused."""
+  status: PromotionStatus!
+
+  """1 to 500 student year record ids (studentAcademicId)."""
+  studentAcademicIds: [ID!]!
+}
+
 """
 A single progress update emitted by the institute-setup Temporal workflow
 """
@@ -6595,6 +6657,9 @@ type StudentModel {
   Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
   """
   profileImage: FileRef
+
+  """Year-end result recorded on the year record this row shows."""
+  promotionStatus: PromotionStatus
   religion: String
   rollNumber: String
   rteCertificate: String
@@ -7707,7 +7772,9 @@ input UpdateStandardInput {
   """
   nepStage: NepStage
 
-  """Sort order used for display in timetables and reports (0 = first)."""
+  """
+  Class level: 1 for Class 1, 12 for Class 12; pre-primary below 1 (Nursery -3, LKG -2, UKG -1). Matches a class across academic years at rollover. From -5.
+  """
   numericOrder: Int
 
   """

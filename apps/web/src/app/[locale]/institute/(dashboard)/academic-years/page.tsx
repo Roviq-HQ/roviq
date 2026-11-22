@@ -36,12 +36,12 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ActivateYearDialog } from './activate-year-dialog';
 import { CreateYearDialog } from './create-year-dialog';
 import { EditYearSheet } from './edit-year-sheet';
 import {
   type AcademicYear,
   useAcademicYears,
-  useActivateAcademicYear,
   useArchiveAcademicYear,
   useDeleteAcademicYear,
 } from './use-academic-years';
@@ -227,7 +227,7 @@ function YearCard({ year, onEdit }: { year: AcademicYear; onEdit: (year: Academi
             </Can>
             {year.status === 'PLANNING' && (
               <Can I="activate" a="AcademicYear">
-                <ActivateButton year={year} />
+                <ActivateYearDialog year={year} />
               </Can>
             )}
             {year.status === 'COMPLETING' && (
@@ -244,50 +244,6 @@ function YearCard({ year, onEdit }: { year: AcademicYear; onEdit: (year: Academi
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function ActivateButton({ year }: { year: AcademicYear }) {
-  const t = useTranslations('academicYears');
-  const { activateYear, loading } = useActivateAcademicYear();
-  const [open, setOpen] = useState(false);
-
-  const handleActivate = async () => {
-    try {
-      await activateYear(year.id);
-      toast.success(t('activated', { year: year.label }));
-      setOpen(false);
-    } catch (err) {
-      const message = (err as Error).message;
-      if (message.includes('already active')) {
-        toast.error(t('errors.YEAR_ALREADY_ACTIVE'));
-      } else {
-        toast.error(message);
-      }
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="default" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Zap className="size-3.5" />
-        {t('activate')}
-      </Button>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('activateTitle')}</DialogTitle>
-          <DialogDescription>{t('activateConfirm', { year: year.label })}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleActivate} disabled={loading}>
-            {loading ? t('activating') : t('activate')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

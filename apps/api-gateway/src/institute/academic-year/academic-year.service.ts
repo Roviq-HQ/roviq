@@ -10,6 +10,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { eq } from 'drizzle-orm';
+import type { YearRolloverCounts } from '../student/year-rollover';
 import type { CreateAcademicYearInput } from './dto/create-academic-year.input';
 import type { UpdateAcademicYearInput } from './dto/update-academic-year.input';
 import { AcademicYearRepository } from './repositories/academic-year.repository';
@@ -171,6 +172,11 @@ export class AcademicYearService {
     });
 
     return record;
+  }
+
+  async previewRollover(id: string): Promise<YearRolloverCounts> {
+    await this.findById(id);
+    return this.repo.previewRollover(id);
   }
 
   async archive(id: string): Promise<AcademicYearRecord> {

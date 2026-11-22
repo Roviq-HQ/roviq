@@ -328,24 +328,29 @@ describe('ROV-153: student_academics', () => {
         admissionNumber: 'ACAD-001',
       });
 
-      // Find an academic year, standard, and section for the institute
-      const ayRes = await client.query(
-        `SELECT id FROM academic_years WHERE tenant_id = $1 LIMIT 1`,
-        [SEED.INSTITUTE_1],
+      // Own year, standard and section: a row borrowed from the seed or from another spec
+      // can be deleted by that spec between the read and the insert.
+      const {
+        rows: [{ id: academicYearId }],
+      } = await client.query<{ id: string }>(
+        `INSERT INTO academic_years (tenant_id, label, start_date, end_date, created_by, updated_by)
+         VALUES ($1, '2090-91', '2090-04-01', '2091-03-31', $2, $2) RETURNING id`,
+        [SEED.INSTITUTE_1, testUser],
       );
-      if (ayRes.rows.length === 0) return; // Skip if no seed data
-
-      const stdRes = await client.query(`SELECT id FROM standards WHERE tenant_id = $1 LIMIT 1`, [
-        SEED.INSTITUTE_1,
-      ]);
-      const secRes = await client.query(`SELECT id FROM sections WHERE tenant_id = $1 LIMIT 1`, [
-        SEED.INSTITUTE_1,
-      ]);
-      if (stdRes.rows.length === 0 || secRes.rows.length === 0) return;
-
-      const academicYearId = ayRes.rows[0].id;
-      const standardId = stdRes.rows[0].id;
-      const sectionId = secRes.rows[0].id;
+      const {
+        rows: [{ id: standardId }],
+      } = await client.query<{ id: string }>(
+        `INSERT INTO standards (tenant_id, academic_year_id, name, numeric_order, created_by, updated_by)
+         VALUES ($1, $2, '{"en":"ROV-153 Class"}', 1, $3, $3) RETURNING id`,
+        [SEED.INSTITUTE_1, academicYearId, testUser],
+      );
+      const {
+        rows: [{ id: sectionId }],
+      } = await client.query<{ id: string }>(
+        `INSERT INTO sections (tenant_id, standard_id, academic_year_id, name, created_by, updated_by)
+         VALUES ($1, $2, $3, '{"en":"A"}', $4, $4) RETURNING id`,
+        [SEED.INSTITUTE_1, standardId, academicYearId, testUser],
+      );
 
       // First enrollment — should succeed
       await client.query(

@@ -42,6 +42,16 @@
   "activateConfirm": "Activating {year} will deactivate the current active year. All users will see the new year as active. Continue?",
   "activating": "Activating...",
   "activated": "{year} is now the active academic year",
+  "rolloverPreview": {
+    "title": "What happens to students",
+    "movingUp": "{count, plural, one {# student moves up} other {# students move up}} to the next class.",
+    "staying": "{count, plural, one {# student stays} other {# students stay}} in the same class.",
+    "completing": "{count, plural, one {# student is} other {# students are}} in the highest class and will not be carried into the new year.",
+    "notCarried": "{count, plural, one {# student is} other {# students are}} marked completed or transferred and will not be carried.",
+    "alreadyPlaced": "{count, plural, one {# student already has} other {# students already have}} a class in the new year and will not be moved.",
+    "noClassInNewYear": "{count, plural, one {# student has} other {# students have}} no class or section waiting in the new year and will be left out. Create the missing classes and sections in the new year first.",
+    "none": "No students will be moved."
+  },
   "archive": "Archive",
   "archiveTitle": "Archive Academic Year",
   "archiveConfirm": "Archiving {year} will make it read-only. This cannot be undone. Continue?",

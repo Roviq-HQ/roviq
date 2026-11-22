@@ -25,5 +25,8 @@
   "HAS_RECORDED_ASSESSMENTS": "Cannot delete — assessments have been recorded.",
   "STREAM_REQUIRED": "A stream must be selected for this standard.",
   "SECTION_CAPACITY_EXCEEDED": "Section capacity has been exceeded.",
-  "SUBJECT_CODE_DUPLICATE": "This board code is already used by another subject in this standard."
+  "SUBJECT_CODE_DUPLICATE": "This board code is already used by another subject in this standard.",
+  "STUDENT_ACADEMIC_NOT_FOUND": "One or more of the selected students has no record in this academic year. Refresh the list and try again.",
+  "SECTION_HAS_STUDENTS": "This section still has students. Move them to another section before deleting it.",
+  "STUDENT_ALREADY_ENROLLED": "This student is already enrolled in that academic year."
 }

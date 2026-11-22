@@ -7,5 +7,6 @@ export abstract class SectionRepository {
   abstract findByAcademicYear(academicYearId: string): Promise<SectionRecord[]>;
   abstract create(data: CreateSectionData): Promise<SectionRecord>;
   abstract update(id: string, data: UpdateSectionData): Promise<SectionRecord>;
+  /** Throws SECTION_HAS_STUDENTS while a live student record points at the section. */
   abstract softDelete(id: string): Promise<void>;
 }

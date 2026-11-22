@@ -17,6 +17,7 @@ import { BulkStudentImportWorkerService } from './workflows/bulk-student-import.
 
 @Module({
   imports: [AuthModule, FilesModule],
+  controllers: [StudentEventHandler],
   providers: [
     StudentService,
     StudentQueryService,
@@ -24,7 +25,6 @@ import { BulkStudentImportWorkerService } from './workflows/bulk-student-import.
     StudentResolver,
     StudentAcademicService,
     StudentAcademicResolver,
-    StudentEventHandler,
     StudentBulkImportService,
     StudentBulkImportResolver,
     BulkImportReportResolver,

@@ -103,6 +103,7 @@ export class StudentReadRepository {
           rollNumber: studentAcademicsLive.rollNumber,
           currentStandardName: standardsLive.name,
           currentSectionName: sectionsLive.name,
+          promotionStatus: studentAcademicsLive.promotionStatus,
         })
         .from(studentProfilesLive)
         .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
@@ -250,6 +251,7 @@ export class StudentReadRepository {
           rollNumber: studentAcademicsLive.rollNumber,
           currentStandardName: standardsLive.name,
           currentSectionName: sectionsLive.name,
+          promotionStatus: studentAcademicsLive.promotionStatus,
           primaryGuardianProfileId: guardianProfilesLive.id,
           primaryGuardianFirstName: guardianUserProfiles.firstName,
           primaryGuardianLastName: guardianUserProfiles.lastName,

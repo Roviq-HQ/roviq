@@ -1,168 +1,88 @@
-/**
- * NATS event consumers for the student module (ROV-154).
- *
- * Listens for domain events that affect student data:
- * - academic_year.activated → create student_academics rows for continuing students
- * - section.deleted → soft-delete affected student_academics (sectionId is NOT NULL)
- */
 import { Controller, Inject, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
-import { AcademicStatus, PromotionStatus } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
   mkInstituteCtx,
+  SYSTEM_USER_ID,
   sectionsLive,
   studentAcademics,
-  studentAcademicsLive,
-  studentProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, eq, sql } from 'drizzle-orm';
+import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
+import { and, eq, isNull, notExists } from 'drizzle-orm';
+import { gatewayConsumer } from '../../common/events/gateway-consumer';
+import { rollOverStudents } from './year-rollover';
 
+const ORIGIN = 'consumer:student-event.handler';
+
+/** JetStream consumers for events that change students' year records. Safe to redeliver. */
 @Controller()
 export class StudentEventHandler {
   private readonly logger = new Logger(StudentEventHandler.name);
 
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
 
-  /**
-   * When a new academic year is activated, create student_academics rows
-   * for all continuing students (enrolled/promoted in the previous year).
-   *
-   * Copies from the previous year's enrollment, keeping the same standard
-   * (or promoted standard if promotion_status = 'promoted').
-   */
-  @EventPattern('ACADEMIC_YEAR.activated')
-  async onAcademicYearActivated(
-    @Payload()
-    data: { tenantId: string; academicYearId: string; previousAcademicYearId?: string },
-  ): Promise<void> {
-    const { tenantId, academicYearId, previousAcademicYearId } = data;
-
-    if (!previousAcademicYearId) {
-      this.logger.log('No previous academic year — skipping student rollover');
+  /** Places each continuing student of the previous year by the promotion rule in `year-rollover.ts`. */
+  @EventPattern(
+    EVENT_PATTERNS.ACADEMIC_YEAR.activated,
+    gatewayConsumer(EVENT_PATTERNS.ACADEMIC_YEAR.activated),
+  )
+  async onAcademicYearActivated(@Payload() data: unknown): Promise<void> {
+    const { tenantId, academicYearId, previousYearId } =
+      eventPayloadSchemas[EVENT_PATTERNS.ACADEMIC_YEAR.activated].parse(data);
+    if (!previousYearId) {
+      this.logger.log(`Year ${academicYearId} has no previous year; no student rollover`);
       return;
     }
 
-    this.logger.log(
-      `Rolling over students from year ${previousAcademicYearId} to ${academicYearId}`,
+    const counts = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+      rollOverStudents(tx, { tenantId, previousYearId, academicYearId, write: true }),
     );
 
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'consumer:student-event.handler'),
-      async (tx) => {
-        const previousEnrollments = await tx
-          .select({
-            studentProfileId: studentAcademicsLive.studentProfileId,
-            standardId: studentAcademicsLive.standardId,
-            sectionId: studentAcademicsLive.sectionId,
-            promotionStatus: studentAcademicsLive.promotionStatus,
-            promotedToStandardId: studentAcademicsLive.promotedToStandardId,
-            tenantId: studentAcademicsLive.tenantId,
-            createdBy: studentAcademicsLive.createdBy,
-          })
-          .from(studentAcademicsLive)
-          .innerJoin(
-            studentProfilesLive,
-            eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
-          )
-          .where(
-            and(
-              eq(studentAcademicsLive.academicYearId, previousAcademicYearId),
-              sql`${studentProfilesLive.academicStatus} IN (${AcademicStatus.ENROLLED}, ${AcademicStatus.PROMOTED}, ${AcademicStatus.DETAINED}, ${AcademicStatus.RE_ENROLLED})`,
-            ),
-          );
-
-        let created = 0;
-        for (const prev of previousEnrollments) {
-          const targetStandardId =
-            prev.promotionStatus === PromotionStatus.PROMOTED && prev.promotedToStandardId
-              ? prev.promotedToStandardId
-              : prev.standardId;
-
-          const targetSections = await tx
-            .select({ id: sectionsLive.id })
-            .from(sectionsLive)
-            .where(
-              and(
-                eq(sectionsLive.standardId, targetStandardId),
-                eq(sectionsLive.academicYearId, academicYearId),
-              ),
-            )
-            .limit(1);
-
-          if (targetSections.length === 0) {
-            this.logger.warn(
-              `No section found for standard ${targetStandardId} in year ${academicYearId} — skipping student ${prev.studentProfileId}`,
-            );
-            continue;
-          }
-
-          try {
-            await tx
-              .insert(studentAcademics)
-              .values({
-                studentProfileId: prev.studentProfileId,
-                academicYearId,
-                standardId: targetStandardId,
-                sectionId: targetSections[0].id,
-                tenantId: prev.tenantId,
-                createdBy: prev.createdBy,
-                updatedBy: prev.createdBy,
-              })
-              .onConflictDoNothing();
-            created++;
-          } catch (error) {
-            this.logger.warn(
-              `Failed to create enrollment for student ${prev.studentProfileId}: ${error}`,
-            );
-          }
-        }
-
-        this.logger.log(
-          `Student rollover complete: ${created} enrollments created from ${previousEnrollments.length} previous`,
-        );
-      },
+    this.logger.log(
+      `Student rollover ${previousYearId} -> ${academicYearId}: ` +
+        `movingUp=${counts.movingUp} staying=${counts.staying} completing=${counts.completing} ` +
+        `notCarried=${counts.notCarried} noClassInNewYear=${counts.noClassInNewYear} ` +
+        `alreadyPlaced=${counts.alreadyPlaced}`,
     );
   }
 
   /**
-   * When a section is deleted, soft-delete affected student_academics rows.
-   *
-   * Cannot null out section_id because the column is NOT NULL.
-   * Soft-deleted rows are invisible to normal queries (RLS filters deleted_at IS NULL).
-   * Students need manual reassignment to a new section.
+   * `section_id` is NOT NULL, so the section's student rows are soft-deleted for reassignment.
+   * Only while the section is still deleted: a stale event must not empty a live section.
    */
-  @EventPattern('SECTION.deleted')
-  async onSectionDeleted(@Payload() data: { sectionId: string; tenantId: string }): Promise<void> {
-    const { sectionId, tenantId } = data;
+  @EventPattern(EVENT_PATTERNS.SECTION.deleted, gatewayConsumer(EVENT_PATTERNS.SECTION.deleted))
+  async onSectionDeleted(@Payload() data: unknown): Promise<void> {
+    const { sectionId, tenantId } = eventPayloadSchemas[EVENT_PATTERNS.SECTION.deleted].parse(data);
 
-    this.logger.warn(`Section ${sectionId} deleted — soft-deleting affected student_academics`);
-
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'consumer:student-event.handler'),
-      async (tx) => {
-        const affected = await tx
-          .update(studentAcademics)
-          .set({
-            deletedAt: new Date(),
-            updatedBy: 'SYSTEM',
-          })
-          .where(
-            and(
-              eq(studentAcademics.sectionId, sectionId),
-              sql`${studentAcademics.deletedAt} IS NULL`,
+    const affected = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) => {
+      const now = new Date();
+      return tx
+        .update(studentAcademics)
+        .set({
+          deletedAt: now,
+          deletedBy: SYSTEM_USER_ID,
+          updatedAt: now,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .where(
+          and(
+            eq(studentAcademics.sectionId, sectionId),
+            isNull(studentAcademics.deletedAt),
+            notExists(
+              tx
+                .select({ id: sectionsLive.id })
+                .from(sectionsLive)
+                .where(eq(sectionsLive.id, sectionId)),
             ),
-          )
-          .returning({ id: studentAcademics.id });
+          ),
+        )
+        .returning({ id: studentAcademics.id });
+    });
 
-        this.logger.warn(
-          `Soft-deleted ${affected.length} student_academics rows for section ${sectionId}`,
-        );
-      },
+    this.logger.log(
+      `Section ${sectionId} deleted: soft-deleted ${affected.length} student_academics rows`,
     );
   }
 }
