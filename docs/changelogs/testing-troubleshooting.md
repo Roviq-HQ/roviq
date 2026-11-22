@@ -909,3 +909,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** `scripts/db-reset.ts` builds the schema with `drizzle-kit push` (which does not diff policies) and then replays only the custom migrations, the ones whose first line is a `--` comment. The replayed `audit-logs-infra` migration re-creates `audit_logs` and its policies with their original text. A generated migration is not replayed, so its policy change is lost.
 - **Fix:** the migration starts with a comment, which makes it custom and replayed after `audit-logs-infra`. Its other statements find their objects already there; the replay tolerates that.
 - **Lesson:** a policy change on a table that a custom migration re-creates (today only `audit_logs`) must itself be a custom migration. Check the policy with `pg_policy` after a reset, not only the migration list.
+
+## 2026-11-22 — diagnosed and fixed: Tilt `db-push` failed on every start after ROV-311 (index on `audit_logs`)
+
+- **Symptom:** after a restart of the dev stack, `db-push` failed 30 times with `relation "audit_logs_subject_tenant_idx" already exists` and the api-gateway never started. `db-clean`, the test reset and the pre-push gate all passed.
+- **Cause:** `audit_logs` is partitioned, and `drizzle-kit push` does not see an index on a partitioned table. The index was declared in the Drizzle schema, so every push after the first tried to create it again. A reset pushes only once, which is why only the second push (Tilt's `db-push`) failed.
+- **Fix:** the index is no longer declared in the schema. It is created by the ROV-311 custom migration with `IF NOT EXISTS`, like `audit_logs_synthetic_origin_idx`.
+- **Lesson:** an index on a partitioned table belongs in a custom migration only. After a schema change, run `pnpm db:push` a second time on a reset database; it must succeed.
