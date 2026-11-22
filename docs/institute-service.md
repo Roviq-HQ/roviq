@@ -86,7 +86,8 @@ Located in `apps/api-gateway/src/admin/institute/`:
 | `adminListInstitutes` | `read:Institute` | Full-text search + filters |
 | `adminGetInstitute` | `read:Institute` | Full detail with nested data |
 | `adminDeleteInstitute` | `delete:Institute` | Soft delete (platform admin only) |
-| `adminRestoreInstitute` | `restore:Institute` | Restore from trash |
+| `adminListDeletedInstitutes` | `restore:Institute` | Deleted institutes, for the admin portal's Deleted institutes dialog |
+| `adminRestoreInstitute` | `restore:Institute` | Restore from trash; clears the access block the deletion wrote |
 | `adminInstituteStatistics` | `view_statistics:Institute` | Cross-tenant aggregate stats |
 
 ### Reseller Scope (`@ResellerScope()`, `withReseller()`)

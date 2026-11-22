@@ -198,7 +198,7 @@ Configure how you accept payments from institutes.
 
 #### Other Gateway Actions
 
-- **Set as Default** -- mark a gateway as the default for new subscriptions.
+- **Set as Default** -- mark a gateway as the default for new subscriptions. A reseller has one default gateway at a time; setting a new one replaces the old. A bare UPI address (UPI Direct) cannot be the default because it cannot take online orders.
 - **Test Mode** -- toggle test mode on or off. When test mode is enabled, no real transactions are processed.
 
 ### UPI Verification

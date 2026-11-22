@@ -35,8 +35,8 @@ Resolvers live under [apps/api-gateway/src/institute/certificate/](apps/api-gate
 
 ## Database schema
 
-- [`tc_register`](libs/database/src/schema/admission/tc-register.ts) — TC serial number, student FK, reason, status enum, issue date, duplicate flag. Serials are `TC/{academic year label}/NNNN` (for example `TC/2025-26/0001`). The counter restarts each academic year, and the year label keeps serials unique per tenant ([tc-serial.ts](apps/api-gateway/src/institute/certificate/tc-serial.ts)).
-- [`issued_certificates`](libs/database/src/schema/admission/issued-certificates.ts) — certificate instances with template FK, rendered PDF URL, serial number.
+- [`tc_register`](libs/database/src/schema/admission/tc-register.ts) — TC serial number, student FK, reason, status enum, issue date, duplicate flag. Serials are `TC/{academic year label}/NNNN` (for example `TC/2025-26/0001`). The counter restarts each academic year, and the year label keeps serials unique per tenant ([tc-serial.ts](apps/api-gateway/src/institute/certificate/tc-serial.ts)). The issued PDF is `pdf_file_id`; `verification_token` (unique) is the token in the QR code.
+- [`issued_certificates`](libs/database/src/schema/admission/issued-certificates.ts) — certificate instances with template FK, serial number and `pdf_file_id` (the rendered PDF in the `files` table; there is no URL column).
 - [`certificate_templates`](libs/database/src/schema/admission/certificate-templates.ts) — tenant-configurable templates (bonafide, character, migration).
 - [`groups`](libs/database/src/schema/groups/groups.ts) — dynamic student cohort definitions (backend only — see Known gaps).
 - [`group_rules`](libs/database/src/schema/groups/group-rules.ts) — JsonLogic rule rows per group.
@@ -44,6 +44,13 @@ Resolvers live under [apps/api-gateway/src/institute/certificate/](apps/api-gate
 - [`group_children`](libs/database/src/schema/groups/group-children.ts) — group composition / nesting.
 
 All tables spread `tenantColumns` and use `tenantPolicies()` for RLS.
+
+## PDFs and public verification (ROV-211)
+
+- PDFs are rendered with Typst inside the api-gateway ([certificate-pdf.service.ts](apps/api-gateway/src/institute/certificate/certificate-pdf.service.ts)); no browser is involved. The result is stored through the file storage core and returned as a `FileRef`.
+- Text in a script with no bundled font is refused with `PDF_UNSUPPORTED_SCRIPT`. Fonts: `apps/api-gateway/src/assets/fonts/README.md`.
+- Every TC prints a QR code to `<INSTITUTE_PORTAL_URL>/verify/tc/<token>`. The page ([verify/tc/[token]/page.tsx](apps/web/src/app/[locale]/institute/verify/tc/[token]/page.tsx)) and the `verifyTC` query ([public-verification/](apps/api-gateway/src/public-verification/)) are public on purpose.
+- Production needs: `docs/deployment.md` → "PDF generation".
 
 ## Multi-language names
 

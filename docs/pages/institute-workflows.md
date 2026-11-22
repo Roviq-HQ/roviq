@@ -421,6 +421,14 @@ The Payments page shows a history of all payments made by your institute.
 
 Click **Save Changes** after making any modifications.
 
+#### Storage
+
+The **Storage** card on the Settings page shows how much storage your institute has used against the allowance of its plan.
+
+- Files of the institute count, and so do documents and photos of its students, staff and guardians.
+- A warning appears once 80% is used. At 100%, new uploads are refused with a message until files are deleted or the plan is upgraded.
+- If your plan sets no limit, the card shows only what is used.
+
 ---
 
 ### Notification Preferences
@@ -462,11 +470,22 @@ Audit Logs record all important actions performed within your institute. This he
    - **What** was done (for example, "Created standard Class 5", "Updated institute settings")
    - **When** it happened (date and time)
 
+Actions that Roviq staff or your reseller take on your institute (for example suspending it, exporting its data or changing its plan) also appear here, marked **Roviq platform** or **Reseller**. For these entries you see who acted, what was done and the stated reason.
+
 Use the filters and search to find specific entries.
 
 > **Note:** Audit logs are read-only. They cannot be edited or deleted.
 
 ---
+
+## Account (Email Verification)
+
+Verifying your email shows that the address is yours. Until you verify it, an institute or reseller cannot give your account a new role by typing your email.
+
+1. In the sidebar, click **Account** (under the System group).
+2. On the email card, click **Send verification code**. A 6-digit code is sent to your email.
+3. Type the code and confirm. The code is valid for 10 minutes and allows 5 attempts.
+4. You can ask for a new code after 60 seconds, up to 5 codes a day.
 
 ## Account (Passkey Manager)
 

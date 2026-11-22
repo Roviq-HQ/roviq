@@ -93,7 +93,7 @@ Deletion is a soft delete -- the institute is removed from normal views but can 
 
 ### Restoring a Deleted Institute
 
-1. Access the deleted/trashed institutes view.
+1. On the **Institutes** page, open the **Deleted institutes** dialog.
 2. Find the institute you want to restore.
 3. Click **Restore**.
 4. The institute reappears in the institute list with its previous status.

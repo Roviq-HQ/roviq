@@ -161,6 +161,8 @@ Static `CREATE TABLE foo_YYYY_MM PARTITION OF foo` lists silently break the day 
 - **App boot + daily**: add an `OnModuleInit` provider on the dedicated pool. Pattern: `apps/api-gateway/src/audit/audit-partition-maintainer.ts`. Boot alone misses long-lived pods.
 - **`scripts/db-reset.ts`**: append to `PARTITIONED_TABLES` in `ensureMonthlyPartitions()` so dev/e2e/integration DBs share the buffer.
 
+**Indexes on a partitioned table go in a custom migration only** (`CREATE INDEX IF NOT EXISTS`), never in the Drizzle schema: `drizzle-kit push` does not see them and re-creates them on every push, which fails Tilt's `db-push`. After a schema change, a second `pnpm db:push` on a reset database must succeed.
+
 Parent RLS/GRANTs do not cover a partition queried by name. `ensure_monthly_partition` calls `lock_down_partitions(parent)` (ROV-64), which strips every non-owner privilege from each child and FORCEs RLS with no policies. Never create a partition with raw `CREATE TABLE … PARTITION OF` (it is born open, and `roviq_admin` cannot run the DDL anyway) and never name a partition in application SQL. Detach via `detach_monthly_partition(parent, name)`.
 
 ### Gotchas

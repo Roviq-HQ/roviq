@@ -20,32 +20,47 @@ Service side-effects → AuditEmitter → NATS JetStream (AUDIT.log)
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `audit_logs` table | `libs/database/src/schema/audit/audit-logs.ts` | 19-column partitioned table with RLS |
+| `audit_logs` table | `libs/database/src/schema/audit/audit-logs.ts` | 20-column partitioned table with RLS |
 | `AuditInterceptor` | `apps/api-gateway/src/audit/audit.interceptor.ts` | Gateway mutation capture (Layer 1) |
 | `AuditEmitter` | `libs/backend/audit/src/audit-emitter.ts` | Service-level event emission (Layer 2) |
 | `AuditConsumer` | `apps/api-gateway/src/audit/audit.consumer.ts` | Batched raw SQL writes from NATS |
 | Resolvers | `apps/api-gateway/src/{admin,reseller,institute}/audit/*-audit.resolver.ts` | `adminAuditLogs`, `adminAuthEvents` (platform), `resellerAuditLogs` (reseller), `auditLogs`, `entityAuditTimeline` (institute) |
-| Decorators | `libs/backend/audit/src/decorators/` | `@AuditMask()`, `@NoAudit()` |
+| Decorators | `libs/backend/audit/src/decorators/` | `@AuditMask()`, `@NoAudit()`, `@AuditInstitute()` |
 | Partition workflow | `apps/api-gateway/src/audit/workflows/` | Temporal cron for monthly partition management |
 
 ## Database Schema
 
-19 columns, partitioned by `created_at` (monthly), FORCE ROW LEVEL SECURITY:
+20 columns, partitioned by `created_at` (monthly), FORCE ROW LEVEL SECURITY:
 
 - **Scope columns**: `scope`, `tenant_id` (nullable), `reseller_id` (nullable)
+- **Subject column**: `subject_tenant_id` (nullable), the institute a platform or reseller action was about. `chk_audit_subject_tenant` keeps it NULL on institute-scoped rows
 - **Actor columns**: `user_id`, `actor_id`, `impersonator_id`, `impersonation_session_id`
 - **Event columns**: `action`, `action_type`, `entity_type`, `entity_id`, `changes` (JSONB), `metadata` (JSONB)
 - **Tracing**: `correlation_id`, `ip_address`, `user_agent`, `source`
 - **CHECK constraint** (`chk_audit_scope`): enforces scope/FK consistency
 
+**Indexes live in custom migrations only.** `drizzle-kit push` does not see an index on a partitioned table, so an index declared in the Drizzle schema is created again on every push and Tilt's `db-push` fails with "already exists". Create it in a custom migration with `CREATE INDEX IF NOT EXISTS` (examples: `audit_logs_synthetic_origin_idx`, `audit_logs_subject_tenant_idx`).
+
 ## RLS Policies (5 roles)
 
 | Role | SELECT | INSERT | UPDATE | DELETE |
 |------|--------|--------|--------|--------|
-| `roviq_app` | scope='institute' + tenant match | Yes | **Denied** | **Denied** |
+| `roviq_app` | scope='institute' + tenant match, or `subject_tenant_id` = tenant | Yes | **Denied** | **Denied** |
 | `roviq_reseller` | their institutes + own reseller entries | Yes | **Denied** | **Denied** |
 | `roviq_admin` | All | All | All | All |
 | `roviq_pooler` | **Denied** (NOINHERIT) | — | — | — |
+
+### Platform and reseller actions about an institute (ROV-311)
+
+An institute also reads the platform- and reseller-scoped rows that name it in `subject_tenant_id`.
+
+- **Naming the institute**: `@AuditInstitute('<argument path>')` on the resolver method (for example `@AuditInstitute('id')` or `@AuditInstitute('input.instituteId')`). When the arguments do not hold the id, call `markAuditInstitute(req, id)` in the resolver once the institute is known. A new platform or reseller mutation that acts on one institute must carry one of the two, or the institute will not see it. Nothing enforces this yet.
+- **Refused actions**: the interceptor takes the subject from the arguments only when the mutation succeeded or the caller is a platform admin. A refused reseller action names an institute only if the server confirmed it with `markAuditInstitute`.
+- **Database trigger**: `trg_audit_logs_check_subject_tenant` clears the subject of a reseller row whose institute belongs to another reseller.
+- **What the institute gets**: the `auditLogs` query returns actor, action and the stated reason of such a row. IP address, user agent, impersonation ids are nulled and `metadata` is reduced to `{ reason }`. RLS exposes the whole row to SQL run as `roviq_app`, which only the gateway does.
+- **Screen**: rows carry `scope`; the institute audit page marks them "Roviq platform" or "Reseller".
+- **Not covered**: `adminStartImpersonation` (`@NoAudit`) and `adminUserDocumentDownloadUrl` (names no institute).
+- **The migration is custom** (first line is a comment): `db:reset` replays `audit-logs-infra`, which re-creates the audit policies with their original text, so a policy change must be replayed after it.
 
 ### Partition children are sealed
 
