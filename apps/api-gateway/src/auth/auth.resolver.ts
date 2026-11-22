@@ -7,6 +7,7 @@ import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { AuthService } from './auth.service';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator';
 import { AuthPayload, InstituteLoginResult, SessionInfo, UserType } from './dto/auth-payload';
+import { ChangePasswordArgs } from './dto/change-password.args';
 import { UpdateLocaleInput } from './dto/update-locale.input';
 import { extractMeta, type GqlContext } from './gql-context';
 
@@ -167,15 +168,14 @@ export class AuthResolver {
   @UseGuards(GqlAuthGuard)
   @AllowWhenPasswordChangeRequired()
   async changePassword(
-    @Args('currentPassword') currentPassword: string,
-    @Args('newPassword') newPassword: string,
+    @Args() args: ChangePasswordArgs,
     @CurrentUser() user: AuthUser,
     @Context() ctx: GqlContext,
   ): Promise<boolean> {
     await this.authService.changePassword(
       user.userId,
-      currentPassword,
-      newPassword,
+      args.currentPassword,
+      args.newPassword,
       extractMeta(ctx),
     );
     return true;

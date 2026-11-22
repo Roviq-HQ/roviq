@@ -81,7 +81,11 @@ export default function InvoicesPage() {
                     changeStatus(INVOICE_STATUS_VALUES.find((s) => s === v) ?? null)
                   }
                 >
-                  <SelectTrigger className="w-[180px]" data-testid={ids.statusFilter}>
+                  <SelectTrigger
+                    className="w-[180px]"
+                    data-testid={ids.statusFilter}
+                    aria-label={t('invoices.filters.status')}
+                  >
                     <SelectValue placeholder={t('invoices.filters.status')} />
                   </SelectTrigger>
                   <SelectContent>
