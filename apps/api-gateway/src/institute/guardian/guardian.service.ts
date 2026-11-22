@@ -280,6 +280,15 @@ export class GuardianService {
       this.db,
       mkInstituteCtx(tenantId, 'service:guardian'),
       async (tx) => {
+        // Separate "not here" (another institute's id included) from a version mismatch.
+        const [existing] = await tx
+          .select({ id: guardianProfilesLive.id })
+          .from(guardianProfilesLive)
+          .where(eq(guardianProfilesLive.id, id))
+          .limit(1);
+        if (!existing) {
+          throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
+        }
         return tx
           .update(guardianProfiles)
           .set({
