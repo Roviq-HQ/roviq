@@ -424,6 +424,8 @@ describe('ImpersonationService', () => {
           target_user_id: 'tgt-1',
           session_id: FIXED_UUID,
         },
+        scope: 'institute',
+        resellerId: null,
       });
     });
 

@@ -1161,6 +1161,8 @@ export class ImpersonationService {
         target_user_id: request.targetUserId,
         session_id: requestId,
       },
+      scope: 'institute',
+      resellerId: null,
     };
     this.eventBus.emit(NOTIFICATION_SUBJECTS.AUTH_SECURITY, event);
     return requestId;

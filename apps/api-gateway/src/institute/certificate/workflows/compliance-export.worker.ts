@@ -2,9 +2,9 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '@roviq/event-bus';
 import { StorageClient } from '@roviq/storage';
+import { openWorkerDb } from '@roviq/temporal';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import type { Pool } from 'pg';
-import { openWorkerDb } from '../../../common/temporal/worker-db';
 import { WorkflowFileStore } from '../../../files/workflow-file-store';
 import { ExportReportDrizzleRepository } from '../repositories/export-report.drizzle-repository';
 import { createComplianceExportActivities } from './compliance-export.activities';

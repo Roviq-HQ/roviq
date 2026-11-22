@@ -18,6 +18,8 @@ const NOTIFICATION = {
   AUTH_SECURITY: 'NOTIFICATION.auth.security',
   FEE_OVERDUE: 'NOTIFICATION.fee.overdue',
   FEE_REMINDER: 'NOTIFICATION.fee.reminder',
+  // Emitted by notification-service after it stores a new in-app notification; carries no text.
+  INAPP_CREATED: 'NOTIFICATION.inapp.created',
   LEAVE_DECIDED: 'NOTIFICATION.leave.decided',
   USER_CREATED: 'NOTIFICATION.user.created',
   USER_UPDATED: 'NOTIFICATION.user.updated',

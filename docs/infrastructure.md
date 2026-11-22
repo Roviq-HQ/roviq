@@ -24,6 +24,7 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | Object storage (RustFS) | 9002 (API), 9003 (console), 9004 (e2e API) | S3-compatible object storage |
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
+| Mailpit | 1025 (SMTP), 8025 (web/API), 8026 (e2e API) | Catches every email the notification service sends in dev and e2e |
 | OTel Collector | 4317 (gRPC), 4318 (HTTP), 13133 (health) | OpenTelemetry collector — receives traces/metrics/logs, fans out to Tempo/Loki/Prometheus |
 | Tempo | 3200 | Distributed tracing backend (Grafana Tempo 2.7.2) |
 | Loki | 3100 | Log aggregation backend |

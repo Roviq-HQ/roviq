@@ -1,21 +1,26 @@
 import { Controller, Logger } from '@nestjs/common';
 import { Ctx, EventPattern, Payload } from '@nestjs/microservices';
-import type { JetStreamContext } from '@roviq/nats-jetstream';
+import { JetStreamContext } from '@roviq/nats-jetstream';
 import { type LeaveDecidedEvent, NOTIFICATION_SUBJECTS } from '@roviq/notifications';
-import { NotificationTriggerService } from '../services/notification-trigger.service';
+import { NotificationDispatcher } from '../services/notification-dispatcher.service';
+import {
+  instituteAudience,
+  RecipientResolver,
+  sourceOf,
+} from '../services/recipient-resolver.service';
 
 /**
- * Consumes `NOTIFICATION.leave.decided` events emitted by the institute
- * LeaveService when a leave application reaches a terminal decision
- * (APPROVED or REJECTED). Triggers the `leave-decided` Novu workflow,
- * addressed to the applicant's membership id — Novu resolves to the
- * subscriber's preferred channel (in-app + email by default).
+ * `NOTIFICATION.leave.decided`: tells the applicant (a membership id) and, when the applicant
+ * is a student, the linked guardians.
  */
 @Controller()
 export class LeaveListener {
   private readonly logger = new Logger(LeaveListener.name);
 
-  constructor(private readonly triggerService: NotificationTriggerService) {}
+  constructor(
+    private readonly dispatcher: NotificationDispatcher,
+    private readonly recipients: RecipientResolver,
+  ) {}
 
   @EventPattern(NOTIFICATION_SUBJECTS.LEAVE_DECIDED, {
     stream: 'NOTIFICATION',
@@ -23,22 +28,48 @@ export class LeaveListener {
   })
   async handleDecided(
     @Payload() event: LeaveDecidedEvent,
-    @Ctx() _ctx: JetStreamContext,
+    @Ctx() ctx: JetStreamContext,
   ): Promise<void> {
-    this.logger.log(
-      `Processing leave decision "${event.status}" for leave "${event.leaveId}" (user "${event.userId}")`,
-    );
-
-    await this.triggerService.trigger({
-      workflowId: 'leave-decided',
-      to: { subscriberId: event.userId },
-      payload: {
-        tenantId: event.tenantId,
-        leaveId: event.leaveId,
-        userId: event.userId,
-        status: event.status,
+    const applicant = await this.recipients.member(event.tenantId, event.userId);
+    if (!applicant) {
+      this.logger.warn(
+        `Leave applicant membership "${event.userId}" not found in institute "${event.tenantId}"; not sent`,
+      );
+      return;
+    }
+    const audience = instituteAudience(event.tenantId);
+    const source = sourceOf(ctx);
+    const leave = {
+      leaveId: event.leaveId,
+      status: event.status,
+      applicantName: event.applicantName ?? null,
+      startDate: event.startDate ?? null,
+      endDate: event.endDate ?? null,
+    };
+    await this.dispatcher.dispatch({
+      message: {
+        type: 'LEAVE_DECIDED',
+        params: { ...leave, audience: 'applicant' },
       },
-      tenantId: event.tenantId,
+      audience,
+      recipient: applicant.recipient,
+      source,
+      inApp: true,
     });
+    if (!applicant.isStudent) return;
+
+    const guardians = await this.recipients.guardiansOfStudent(event.tenantId, event.userId);
+    for (const recipient of guardians) {
+      await this.dispatcher.dispatch({
+        message: {
+          type: 'LEAVE_DECIDED',
+          params: { ...leave, audience: 'guardian' },
+        },
+        audience,
+        recipient,
+        source,
+        inApp: true,
+      });
+    }
   }
 }

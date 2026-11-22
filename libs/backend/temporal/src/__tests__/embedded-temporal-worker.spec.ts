@@ -18,12 +18,13 @@ const ENABLED = {
 class TestWorker extends EmbeddedTemporalWorker {
   readonly afterStartFn = vi.fn(async (_address: string) => {});
 
-  constructor(config: ConfigService) {
+  constructor(config: ConfigService, restartDelayMs?: number) {
     super(config, {
       flag: FLAG,
       label: 'Test worker',
       taskQueue: TASK_QUEUE,
       loggerName: TestWorker.name,
+      restartDelayMs,
     });
   }
 
@@ -68,6 +69,7 @@ describe('EmbeddedTemporalWorker', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -186,6 +188,145 @@ describe('EmbeddedTemporalWorker', () => {
     expect(nativeClose).toHaveBeenCalledTimes(1);
     expect(poolEnd).toHaveBeenCalledTimes(1);
     expect(error).not.toHaveBeenCalled();
+  });
+
+  describe('workerStatus', () => {
+    it('should be disabled when the flag is off', () => {
+      const service = new TestWorker(new ConfigService({}));
+
+      service.onModuleInit();
+
+      expect(service.workerStatus).toBe('disabled');
+    });
+
+    it('should be starting until the worker is created, then running', async () => {
+      startable();
+      let release = () => {};
+      vi.mocked(NativeConnection.connect).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve(createMock<NativeConnection>({ close: vi.fn(async () => {}) }));
+          }),
+      );
+      const service = new TestWorker(new ConfigService(ENABLED));
+
+      service.onModuleInit();
+      expect(service.workerStatus).toBe('starting');
+      release();
+
+      await vi.waitFor(() => expect(service.workerStatus).toBe('running'));
+      await service.onModuleDestroy();
+    });
+
+    it('should be stopped when the worker cannot start', async () => {
+      vi.spyOn(NativeConnection, 'connect').mockRejectedValue(new Error('temporal unreachable'));
+      vi.spyOn(Pool.prototype, 'end').mockResolvedValue(undefined);
+      const service = new TestWorker(new ConfigService(ENABLED));
+
+      service.onModuleInit();
+      await service.onModuleDestroy();
+
+      expect(service.workerStatus).toBe('stopped');
+    });
+
+    it('should be stopped when a running worker crashes', async () => {
+      const { worker } = startable();
+      vi.mocked(worker.run).mockRejectedValue(new Error('worker crashed'));
+      const service = new TestWorker(new ConfigService(ENABLED));
+
+      service.onModuleInit();
+
+      await vi.waitFor(() => expect(service.workerStatus).toBe('stopped'));
+      await service.onModuleDestroy();
+    });
+
+    it('should be stopped after shutdown', async () => {
+      startable();
+      const service = new TestWorker(new ConfigService(ENABLED));
+
+      service.onModuleInit();
+      await service.onModuleDestroy();
+
+      expect(service.workerStatus).toBe('stopped');
+    });
+  });
+
+  describe('restart after a stop', () => {
+    const DELAY = 1_000;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    });
+
+    it('should start again after a failed start and end running', async () => {
+      startable();
+      vi.mocked(NativeConnection.connect).mockRejectedValueOnce(new Error('temporal unreachable'));
+      const service = new TestWorker(new ConfigService(ENABLED), DELAY);
+
+      service.onModuleInit();
+      await vi.waitFor(() => expect(service.workerStatus).toBe('stopped'));
+      expect(NativeConnection.connect).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(DELAY);
+
+      await vi.waitFor(() => expect(service.workerStatus).toBe('running'));
+      expect(NativeConnection.connect).toHaveBeenCalledTimes(2);
+      expect(error).toHaveBeenCalledTimes(1);
+      await service.onModuleDestroy();
+    });
+
+    it('should start again when run() ends with an error', async () => {
+      const { worker, create } = startable();
+      vi.mocked(worker.run).mockRejectedValueOnce(new Error('worker crashed'));
+      const service = new TestWorker(new ConfigService(ENABLED), DELAY);
+
+      service.onModuleInit();
+      await vi.waitFor(() =>
+        expect(error).toHaveBeenCalledWith(
+          'Test worker stopped with an error',
+          expect.stringContaining('worker crashed'),
+        ),
+      );
+      await vi.waitFor(() => expect(service.workerStatus).toBe('stopped'));
+
+      await vi.advanceTimersByTimeAsync(DELAY);
+
+      await vi.waitFor(() => expect(service.workerStatus).toBe('running'));
+      expect(create).toHaveBeenCalledTimes(2);
+      await service.onModuleDestroy();
+    });
+
+    it('should start nothing when shut down during the delay, and leave nothing open', async () => {
+      const { create, nativeClose, poolEnd } = startable();
+      vi.mocked(Worker.create).mockRejectedValue(new Error('bundle failed'));
+      const service = new TestWorker(new ConfigService(ENABLED), DELAY);
+
+      service.onModuleInit();
+      await vi.waitFor(() => expect(service.workerStatus).toBe('stopped'));
+      await service.onModuleDestroy();
+      await vi.advanceTimersByTimeAsync(DELAY * 5);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(NativeConnection.connect).toHaveBeenCalledTimes(1);
+      expect(nativeClose).toHaveBeenCalledTimes(1);
+      expect(poolEnd).toHaveBeenCalledTimes(1);
+      expect(service.workerStatus).toBe('stopped');
+    });
+
+    it('should not start again when the worker does not opt in', async () => {
+      startable();
+      vi.mocked(NativeConnection.connect).mockRejectedValue(new Error('temporal unreachable'));
+      const service = new TestWorker(new ConfigService(ENABLED));
+
+      service.onModuleInit();
+      await vi.waitFor(() => expect(service.workerStatus).toBe('stopped'));
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(NativeConnection.connect).toHaveBeenCalledTimes(1);
+      expect(Logger.prototype.warn).not.toHaveBeenCalled();
+      await service.onModuleDestroy();
+    });
   });
 
   it('should log a worker that stops with an error and still close its connections once', async () => {

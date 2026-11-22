@@ -52,6 +52,7 @@ export interface FeeReminderEvent {
   feePeriod: string;
 }
 
+/** No producer emits this yet. `requesterId` and `approverId` are membership ids. */
 export interface ApprovalRequestedEvent {
   tenantId: string;
   requesterId: string;
@@ -63,6 +64,7 @@ export interface ApprovalRequestedEvent {
   summary: string;
 }
 
+/** No producer emits this yet. `requesterId` and `reviewerId` are membership ids. */
 export interface ApprovalResolvedEvent {
   tenantId: string;
   requesterId: string;
@@ -88,9 +90,17 @@ export interface AuthSecurityEventMetadata {
 
 export interface AuthSecurityEvent {
   tenantId: string | null;
+  /** User id (not a membership id). */
   userId: string;
   eventType: AuthSecurityEventType;
   metadata: AuthSecurityEventMetadata;
+  /**
+   * Portal the event belongs to; picks where the in-app copy is shown. Absent: institute
+   * when `tenantId` is set, otherwise no in-app copy.
+   */
+  scope?: 'platform' | 'reseller' | 'institute';
+  /** Set when `scope` is 'reseller'. */
+  resellerId?: string | null;
 }
 
 /**
@@ -110,7 +120,7 @@ export interface UserCreatedEvent {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
-  /** Plaintext temporary password — for Novu delivery only, never persisted after this event */
+  /** Plaintext temporary password — for the welcome message only, never persisted after this event */
   tempPassword: string;
 }
 
@@ -152,4 +162,9 @@ export interface LeaveDecidedEvent {
   /** Membership id of the applicant (student or staff). */
   userId: string;
   status: 'APPROVED' | 'REJECTED';
+  /** Applicant's display name; null when the membership has no profile. */
+  applicantName?: string | null;
+  /** Inclusive leave range, `YYYY-MM-DD` (leaves.start_date / end_date). */
+  startDate?: string;
+  endDate?: string;
 }

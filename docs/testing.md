@@ -218,7 +218,7 @@ The seeders in `libs/database/src/seed/` use deterministic UUIDs (`SEED_IDS` in 
 | HTTP flow (billing lifecycle) | Vitest | `e2e/api-gateway-e2e/src/` | Billing CRUD, subscription lifecycle |
 | RLS isolation | Vitest | `e2e/api-gateway-e2e/src/` | Cross-tenant data leakage prevention |
 | Audit trail | Vitest | `e2e/api-gateway-e2e/src/` | Mutation → NATS → audit log entry |
-| Novu notifications | Vitest | `e2e/api-gateway-e2e/src/` | Novu API smoke, login notification flow |
+| Notification email | Vitest | `e2e/api-gateway-e2e/src/` | Welcome email with the temporary password, read from Mailpit |
 | Paid billing | Vitest | `e2e/api-gateway-e2e/src/` | Paid plan assignment, gateway interaction |
 | Browser UI | Playwright | `e2e/<app>-e2e/src/` | Login flows, institute picker |
 
@@ -294,7 +294,7 @@ Coverage:
 - Logout: success, refresh token invalidation after logout
 - Audit: full pipeline (mutation → NATS → consumer → DB), GraphQL query API, pagination, RLS isolation, immutability, @NoAudit opt-out
 - RLS isolation: cross-tenant notification config isolation, unauthenticated rejection
-- Notifications: the `notifications.api-e2e.spec.ts` suite auto-skips at test collection when Novu is unreachable. `probeNovuReachableSync` (in `e2e/api-gateway-e2e/src/helpers/novu.ts`) runs a synchronous TCP probe against `NOVU_API_URL` with a ~3s timeout at module load; on failure the suite is skipped with a specific reason in the Vitest output rather than letting each test time out at 30s. To force-skip locally during unrelated e2e runs, point `NOVU_API_URL` at any closed port (e.g. `NOVU_API_URL=http://localhost:59999`).
+- Notifications: email goes to the e2e Mailpit; `waitForEmail` in `e2e/api-gateway-e2e/src/helpers/mailpit.ts` reads it (used by `must-change-password.api-e2e.spec.ts`).
 
 ### Password policy
 

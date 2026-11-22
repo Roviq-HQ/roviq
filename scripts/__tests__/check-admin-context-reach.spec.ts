@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   collectImplementations,
@@ -109,6 +109,55 @@ describe('collectReach + findViolations', () => {
       unlisted: [{ file: 'institute/a.drizzle-repository.ts', root: 'institute/a.resolver.ts' }],
       stale: [],
     });
+  });
+
+  it('ties a subclass to the file that declares its base, not to the barrel it came through', () => {
+    const resolver = write(
+      'institute/a.resolver.ts',
+      "import { Client } from '../lib/index';\nClient;",
+    );
+    const barrel = write(
+      'lib/index.ts',
+      "export { Client } from './client';\nexport { BaseWorker } from './base-worker';",
+    );
+    const client = write('lib/client.ts', 'export class Client {}');
+    const baseWorker = write('lib/base-worker.ts', 'export abstract class BaseWorker {}');
+    const worker = write(
+      'jobs/a.worker.ts',
+      "import { BaseWorker } from '../lib/index';\nimport { run } from './a.activities';\nexport class AWorker extends BaseWorker { go() { return run; } }",
+    );
+    const activities = write(
+      'jobs/a.activities.ts',
+      "export const run = () => withAdmin(db, mkAdminCtx('a'), fn);",
+    );
+
+    const implementations = collectImplementations(
+      [resolver, barrel, client, baseWorker, worker, activities],
+      {},
+    );
+    const reach = collectReach([resolver], {}, root, implementations);
+
+    expect([...implementations.entries()]).toEqual([[baseWorker, [worker]]]);
+    expect(findViolations(reach, {}, root)).toEqual({ unlisted: [], stale: [] });
+  });
+
+  it('follows a dynamic import of a barrel to everything the barrel exports', () => {
+    const resolver = write(
+      'institute/a.resolver.ts',
+      "import { Client } from '../lib/index';\nexport const load = () => import('../lib/index');\nClient;",
+    );
+    const barrel = write(
+      'lib/index.ts',
+      "export { Client } from './client';\nexport { BaseWorker } from './base-worker';",
+    );
+    const client = write('lib/client.ts', 'export class Client {}');
+    const baseWorker = write('lib/base-worker.ts', 'export abstract class BaseWorker {}');
+
+    const reach = collectReach([resolver], {}, root, new Map());
+
+    expect([...reach.keys()].sort()).toEqual(
+      [resolver, barrel, client, baseWorker].map((file) => relative(root, file)).sort(),
+    );
   });
 
   it('terminates on an import cycle', () => {

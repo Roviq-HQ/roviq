@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
-import { EmbeddedTemporalWorker } from '../../common/temporal/embedded-temporal-worker';
+import { EmbeddedTemporalWorker } from '@roviq/temporal';
 import { InstituteSetupService } from '../management/seed/institute-setup.service';
 import { createInstituteSetupActivities } from './institute-setup.activities';
 import { INSTITUTE_SETUP_TASK_QUEUE } from './institute-setup.types';

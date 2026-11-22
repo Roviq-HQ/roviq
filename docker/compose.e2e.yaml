@@ -126,6 +126,17 @@ services:
       retries: 20
       start_period: 30s
 
+  # Email sink for e2e; tests read messages through its API on the host port.
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "${E2E_MAILPIT_API_PORT:-8026}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # --- Novu self-hosted (mirrors compose.novu.yaml, internal ports only) ---
 
   mongodb:
@@ -377,11 +388,23 @@ services:
       # env_file carries the host instance's port; in-network callers use 3002.
       NOTIFICATION_SERVICE_PORT: "3002"
       NODE_ENV: test
+      TEMPORAL_ADDRESS: temporal:7233
+      NOTIFICATION_WORKER_ENABLED: "true"
+      NOTIFICATION_EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
+      EMAIL_FROM: "Roviq <no-reply@roviq.test>"
+      NOTIFICATION_PUSH_PROVIDER: log
+      NOTIFICATION_SMS_PROVIDER: log
+      NOTIFICATION_WHATSAPP_PROVIDER: log
       E2E_BACKEND_FINGERPRINT: ${E2E_BACKEND_FINGERPRINT:?run via scripts/e2e-compose.sh}
     depends_on:
       api-gateway:
         condition: service_healthy
       nats:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     healthcheck:
       test:

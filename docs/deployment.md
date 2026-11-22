@@ -173,6 +173,25 @@ that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
   It connects with `DATABASE_URL` and runs as `roviq_admin`, reaching partition DDL through the
   `SECURITY DEFINER` functions `ensure_monthly_partition` and `detach_monthly_partition`.
 
+## Notification delivery
+
+The notification service writes in-app notifications to Postgres and delivers email, push, SMS
+and WhatsApp itself (ROV-314). It needs `TEMPORAL_ADDRESS`, and
+`NOTIFICATION_WORKER_ENABLED=true` on at least one notification-service instance: that worker
+runs the delivery and digest workflows on task queue `notifications`. Without it, in-app rows are
+still written but no email, push or WhatsApp message is sent. Codes and temporary passwords
+(email verification, impersonation OTP, welcome) do not use Temporal; they are sent at once.
+
+Each channel needs a provider; a channel with none records every send as skipped (`no_provider`).
+
+- **Email**: `NOTIFICATION_EMAIL_PROVIDER=smtp`, `SMTP_URL` (`smtps://user:pass@host:465`) and
+  `EMAIL_FROM` (`Roviq <no-reply@your-domain>`). The sending domain needs SPF and DKIM.
+- **Push**: `NOTIFICATION_PUSH_PROVIDER=fcm` and `FCM_SERVICE_ACCOUNT_JSON`, the whole service
+  account key JSON of the Firebase project. Tokens FCM reports as unregistered are retired.
+- **SMS and WhatsApp**: no production provider yet. The `log` provider sends nothing and is
+  refused at start when `NODE_ENV=production`, so leave these unset until a provider exists;
+  impersonation codes then cannot reach a phone.
+
 ## PDF generation
 
 Transfer certificates and other certificates are rendered inside the api-gateway with Typst

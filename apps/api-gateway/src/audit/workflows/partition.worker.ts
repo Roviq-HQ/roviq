@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
+import { EmbeddedTemporalWorker } from '@roviq/temporal';
 import { Client, Connection } from '@temporalio/client';
-import { EmbeddedTemporalWorker } from '../../common/temporal/embedded-temporal-worker';
 import { createPartitionActivities } from './partition.activities';
 import {
   AUDIT_MAINTENANCE_TASK_QUEUE,

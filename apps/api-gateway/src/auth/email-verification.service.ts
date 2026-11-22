@@ -85,6 +85,9 @@ export class EmailVerificationService {
       userId,
       eventType: 'EMAIL_VERIFICATION',
       metadata: { otp: code, recipientEmail: user.email },
+      // The address belongs to the account, not to one portal.
+      scope: 'platform',
+      resellerId: null,
     };
     this.eventBus.emit(NOTIFICATION_SUBJECTS.AUTH_SECURITY, event);
   }

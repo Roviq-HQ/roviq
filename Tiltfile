@@ -134,7 +134,7 @@ local_resource(
   serve_cmd='pnpm run dev:notifications',
   serve_dir='.',
   deps=[],
-  resource_deps=['db-push', 'nats', 'novu-api', 'novu-worker', 'novu-ws', 'novu-dashboard'],
+  resource_deps=['db-push', 'nats', 'temporal', 'mailpit', 'novu-api', 'novu-worker', 'novu-ws', 'novu-dashboard'],
   auto_init=False,
 )
 
@@ -155,6 +155,10 @@ dc_resource('object-storage', labels=['infra'],
 dc_resource('temporal', labels=['infra'], resource_deps=['postgres'])
 dc_resource('temporal-ui', labels=['infra'], auto_init=False,
             links=[local_url('DEV_TEMPORAL_UI_PORT', '8233')])
+
+# Mailpit — catches dev email from the notification service
+dc_resource('mailpit', labels=['infra'],
+            links=[local_url('DEV_MAILPIT_WEB_PORT', '8025')])
 
 # ─── Novu Self-Hosted (manual) ───────────────────────────────────────────────
 # Start manually when working with local notifications

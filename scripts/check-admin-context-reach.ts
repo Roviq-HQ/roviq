@@ -261,21 +261,108 @@ export function collectImplementations(
     const bases = new Set([...source.matchAll(/\bextends\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
     if (bases.size === 0) continue;
 
-    const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, false);
-    for (const statement of sourceFile.statements) {
-      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
-        continue;
-      }
-      const bindings = statement.importClause?.namedBindings;
-      if (!bindings || !ts.isNamedImports(bindings)) continue;
-      if (!bindings.elements.some((element) => bases.has(element.name.text))) continue;
-
-      const baseFile = resolveImport(statement.moduleSpecifier.text, file, compilerOptions);
-      if (!baseFile) continue;
-      implementations.set(baseFile, [...(implementations.get(baseFile) ?? []), file]);
+    for (const baseFile of baseDeclaringFiles(file, source, bases, compilerOptions)) {
+      const known = implementations.get(baseFile) ?? [];
+      if (!known.includes(file)) implementations.set(baseFile, [...known, file]);
     }
   }
   return implementations;
+}
+
+/** Files that declare the classes `file` imports by name and extends. */
+function baseDeclaringFiles(
+  file: string,
+  source: string,
+  bases: ReadonlySet<string>,
+  compilerOptions: ts.CompilerOptions,
+): string[] {
+  const declaring: string[] = [];
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, false);
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
+      continue;
+    }
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    const imported = bindings.elements.filter((element) => bases.has(element.name.text));
+    if (imported.length === 0) continue;
+
+    const target = resolveImport(statement.moduleSpecifier.text, file, compilerOptions);
+    if (!target) continue;
+    for (const element of imported) {
+      declaring.push(
+        declaringFile((element.propertyName ?? element.name).text, target, compilerOptions),
+      );
+    }
+  }
+  return declaring;
+}
+
+/** Specifiers this file uses only as `import { a, b } from '…'`, with the names imported. */
+function namedOnlyImports(file: string, source: string): Map<string, string[]> {
+  const named = new Map<string, string[]>();
+  const other = new Set<string>();
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, false);
+  for (const statement of sourceFile.statements) {
+    if (
+      (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      const specifier = statement.moduleSpecifier.text;
+      const clause = ts.isImportDeclaration(statement) ? statement.importClause : undefined;
+      const bindings = clause?.namedBindings;
+      if (clause && !clause.name && bindings && ts.isNamedImports(bindings)) {
+        const names = bindings.elements.map((e) => (e.propertyName ?? e.name).text);
+        named.set(specifier, [...(named.get(specifier) ?? []), ...names]);
+      } else {
+        other.add(specifier);
+      }
+    }
+  }
+  for (const specifier of other) named.delete(specifier);
+  return named;
+}
+
+/** A dynamic `import('x')` or `require('x')` reaches all of x, whatever the static imports name. */
+function loadsWholeModule(source: string, specifier: string): boolean {
+  const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:import|require)\\(\\s*['"\`]${escaped}['"\`]`).test(source);
+}
+
+/**
+ * Follows `export { X } from` re-exports to the file that declares X. Without this, a class
+ * imported through a barrel ties every importer of the barrel to every subclass.
+ */
+function declaringFile(name: string, file: string, compilerOptions: ts.CompilerOptions): string {
+  let current = file;
+  let exported = name;
+  for (let hop = 0; hop < 10; hop += 1) {
+    const source = ts.sys.readFile(current);
+    if (source === undefined) return current;
+    const sourceFile = ts.createSourceFile(current, source, ts.ScriptTarget.Latest, false);
+    let next: { file: string; name: string } | undefined;
+    for (const statement of sourceFile.statements) {
+      if (
+        !ts.isExportDeclaration(statement) ||
+        !statement.moduleSpecifier ||
+        !ts.isStringLiteral(statement.moduleSpecifier) ||
+        !statement.exportClause ||
+        !ts.isNamedExports(statement.exportClause)
+      ) {
+        continue;
+      }
+      const match = statement.exportClause.elements.find((e) => e.name.text === exported);
+      if (!match) continue;
+      const resolved = resolveImport(statement.moduleSpecifier.text, current, compilerOptions);
+      if (resolved) next = { file: resolved, name: (match.propertyName ?? match.name).text };
+      break;
+    }
+    if (!next) return current;
+    current = next.file;
+    exported = next.name;
+  }
+  return current;
 }
 
 /**
@@ -312,9 +399,17 @@ function neighbours(
   if (source === undefined) return [];
 
   const next = [...(implementations.get(file) ?? [])];
+  const named = namedOnlyImports(file, source);
   for (const imported of ts.preProcessFile(source, true, true).importedFiles) {
     const resolved = resolveImport(imported.fileName, file, compilerOptions);
-    if (resolved) next.push(resolved);
+    if (!resolved) continue;
+    const names = named.get(imported.fileName);
+    if (names && !loadsWholeModule(source, imported.fileName)) {
+      // Through a barrel, only the files that declare the imported names are reached.
+      for (const name of names) next.push(declaringFile(name, resolved, compilerOptions));
+    } else {
+      next.push(resolved);
+    }
   }
   return next.filter(
     (candidate) => !toRel(projectRoot, candidate).startsWith('..') && !isTestFile(candidate),

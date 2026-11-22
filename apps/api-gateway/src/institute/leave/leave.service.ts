@@ -17,9 +17,20 @@ import { FileService } from '../../files/file.service';
 import type { CreateLeaveInput } from './dto/create-leave.input';
 import type { UpdateLeaveInput } from './dto/update-leave.input';
 import { LeaveRepository } from './repositories/leave.repository';
-import type { LeaveRecord } from './repositories/types';
+import type { LeaveApplicantRecord, LeaveRecord } from './repositories/types';
 
 const MIN_DOCUMENTED_DAYS = 3;
+
+// The notification copy is written once for both locales, so the name is flattened like the
+// attendance alert's: English, else the first locale given.
+function applicantDisplayName(applicant: LeaveApplicantRecord | null): string | null {
+  if (!applicant) return null;
+  const pick = (text: Record<string, string> | null) =>
+    text ? (text.en ?? Object.values(text)[0] ?? null) : null;
+  return (
+    [pick(applicant.firstName), pick(applicant.lastName)].filter(Boolean).join(' ').trim() || null
+  );
+}
 const LEAVE_FILE_PURPOSE = 'LEAVE_ATTACHMENT';
 
 @Injectable()
@@ -153,6 +164,9 @@ export class LeaveService {
       tenantId: record.tenantId,
       userId: record.userId,
       status: LeaveStatus.APPROVED,
+      applicantName: applicantDisplayName(record.applicant),
+      startDate: record.startDate,
+      endDate: record.endDate,
     });
     return record;
   }
@@ -182,6 +196,9 @@ export class LeaveService {
       tenantId: record.tenantId,
       userId: record.userId,
       status: LeaveStatus.REJECTED,
+      applicantName: applicantDisplayName(record.applicant),
+      startDate: record.startDate,
+      endDate: record.endDate,
     });
     return record;
   }

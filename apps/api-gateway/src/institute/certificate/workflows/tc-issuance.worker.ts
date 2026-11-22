@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
-import { EmbeddedTemporalWorker } from '../../../common/temporal/embedded-temporal-worker';
+import { EmbeddedTemporalWorker } from '@roviq/temporal';
 import { createTCIssuanceActivities } from './tc-issuance.activities';
 import { DEFAULT_TC_TASK_QUEUE } from './tc-issuance.types';
 import { tcIssuanceWorkflowsPath } from './tc-issuance.workflows-path';

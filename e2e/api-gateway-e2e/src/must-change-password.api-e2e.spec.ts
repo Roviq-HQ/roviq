@@ -1,25 +1,16 @@
 /**
  * First-login password change against the running stack: a platform admin creates an
  * institute with a first admin, setup creates that account with a temporary password and
- * sends the welcome through Novu, and the first admin's session may only read `me` and
- * change the password until it does.
- *
- * The temporary password is read from the welcome notification, so the suite skips when
- * Novu is not reachable (same rule as notifications.api-e2e.spec.ts).
+ * emails the welcome, and the first admin's session may only read `me` and change the
+ * password until it does. The temporary password is read from the welcome email in Mailpit.
  */
 import assert from 'node:assert';
 import { describe, expect, it } from 'vitest';
 import { loginAsPlatformAdmin } from './helpers/auth';
 import { firstAdminInput } from './helpers/first-admin';
 import { gql } from './helpers/gql-client';
-import { listNovuNotifications, probeNovuReachableSync, waitForNotification } from './helpers/novu';
+import { waitForEmail } from './helpers/mailpit';
 import { waitForSetupComplete } from './helpers/wait-for-setup-complete';
-
-const skipReason = probeNovuReachableSync();
-const describeOrSkip = skipReason ? describe.skip.bind(describe) : describe.bind(null);
-if (skipReason) {
-  console.warn(`[must-change-password.api-e2e] skipped: ${skipReason}`);
-}
 
 const NEW_PASSWORD = 'First-Admin-Pass-9';
 
@@ -31,19 +22,13 @@ interface InstituteLogin {
   instituteLogin: { accessToken: string | null; refreshToken: string | null };
 }
 
-function tempPasswordFrom(feed: { data: unknown[] }): string {
-  for (const entry of feed.data) {
-    if (typeof entry !== 'object' || entry === null || !('payload' in entry)) continue;
-    const payload = entry.payload;
-    if (typeof payload === 'object' && payload !== null && 'tempPassword' in payload) {
-      const value = payload.tempPassword;
-      if (typeof value === 'string') return value;
-    }
-  }
-  throw new Error('No welcome notification with a temporary password');
+function tempPasswordFrom(text: string): string {
+  const match = /^Temporary password: (\S+)$/m.exec(text);
+  if (!match) throw new Error('The welcome email carries no temporary password');
+  return match[1];
 }
 
-describeOrSkip('First-login password change E2E', () => {
+describe('First-login password change E2E', () => {
   it('blocks the new first admin until they change the temporary password', async () => {
     const adminToken = (await loginAsPlatformAdmin()).accessToken;
     const firstAdmin = firstAdminInput();
@@ -86,8 +71,8 @@ describeOrSkip('First-login password change E2E', () => {
       (edge) => edge.node.email === firstAdmin.email,
     )?.node;
     assert(account);
-    await waitForNotification(account.id);
-    const tempPassword = tempPasswordFrom(await listNovuNotifications(account.id));
+    const welcome = await waitForEmail(firstAdmin.email, 'Welcome to Roviq');
+    const tempPassword = tempPasswordFrom(welcome.text);
 
     const first = await gql<InstituteLogin>(INSTITUTE_LOGIN, {
       u: account.username,
