@@ -1,7 +1,8 @@
 /**
- * Profile pictures through the real stack. A picture belongs to the person, so it is stored
- * under the user, cropped square, shown in every institute the person is a member of, and
- * nowhere else.
+ * Profile pictures through the real stack. Each institute keeps its own picture of a person
+ * (`setStudentPhoto` and the like): stored under the user, cropped square, owned by that
+ * institute and shown nowhere else. The person's own account picture (`setMyProfilePhoto`)
+ * is shown in every institute they belong to.
  *
  * RLS on person-owned files as each database role: `files-rls.integration.spec.ts`.
  */
@@ -162,7 +163,7 @@ describe('Profile photo E2E', () => {
       expect(new URL(first.sm).searchParams.get('X-Amz-Expires')).toBe('43200');
     });
 
-    it('should show the picture to the student themselves', async () => {
+    it("should leave the student's own account picture as it was", async () => {
       const { accessToken } = await loginAsStudent();
 
       const res = await gql<{
@@ -170,7 +171,13 @@ describe('Profile photo E2E', () => {
       }>(MY_PHOTO, undefined, accessToken);
 
       expect(res.errors).toBeUndefined();
-      expect(res.data?.myProfile.userProfile.profileImage?.id).toBe(firstFileId);
+      expect(res.data?.myProfile.userProfile.profileImage).toBeNull();
+    });
+
+    it('should refuse another institute reading the picture', async () => {
+      const res = await gql(DOWNLOAD_URL, { fileId: firstFileId }, tokenB);
+
+      expect(codeOf(res)).toBe(ErrorCode.FILE_NOT_FOUND);
     });
 
     it('should delete the old picture when a new one replaces it', async () => {
@@ -219,6 +226,23 @@ describe('Profile photo E2E', () => {
       const res = await gql(SET_STUDENT_PHOTO, { id: SEED_IDS.STUDENT_PROFILE_1, fileId }, tokenB);
 
       expect(codeOf(res)).toBe(ErrorCode.STUDENT_NOT_FOUND);
+      expect(await studentPhoto(tokenA)).toBeNull();
+    });
+
+    it("should refuse another institute removing this institute's student picture", async () => {
+      const fileId = await upload(tokenA, SEED_IDS.USER_STUDENT);
+      const set = await gql(SET_STUDENT_PHOTO, { id: SEED_IDS.STUDENT_PROFILE_1, fileId }, tokenA);
+      expect(set.errors).toBeUndefined();
+
+      const res = await gql(
+        SET_STUDENT_PHOTO,
+        { id: SEED_IDS.STUDENT_PROFILE_1, fileId: null },
+        tokenB,
+      );
+
+      expect(codeOf(res)).toBe(ErrorCode.STUDENT_NOT_FOUND);
+      expect((await studentPhoto(tokenA))?.id).toBe(fileId);
+      await gql(SET_STUDENT_PHOTO, { id: SEED_IDS.STUDENT_PROFILE_1, fileId: null }, tokenA);
     });
 
     it('should refuse a picture uploaded for one person being set on another', async () => {

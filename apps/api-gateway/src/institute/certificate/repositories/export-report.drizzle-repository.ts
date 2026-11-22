@@ -16,6 +16,7 @@ import {
   instituteIdentifiersLive,
   institutesLive,
   SYSTEM_USER_ID,
+  tenantUserProfilesLive,
   userProfilesLive,
   withAdmin,
   withTenant,
@@ -49,8 +50,15 @@ const recordColumns = {
   rowCount: exportReportsLive.rowCount,
   errorCode: exportReportsLive.errorCode,
   requestedBy: exportReportsLive.requestedBy,
-  requesterFirstName: userProfilesLive.firstName,
-  requesterLastName: userProfilesLive.lastName,
+  // A staff member is named as the institute records them; a platform admin by their account.
+  requesterFirstName: sql<Record<
+    string,
+    string
+  > | null>`CASE WHEN ${tenantUserProfilesLive.id} IS NOT NULL THEN ${tenantUserProfilesLive.firstName} ELSE ${userProfilesLive.firstName} END`,
+  requesterLastName: sql<Record<
+    string,
+    string
+  > | null>`CASE WHEN ${tenantUserProfilesLive.id} IS NOT NULL THEN ${tenantUserProfilesLive.lastName} ELSE ${userProfilesLive.lastName} END`,
   requestedAt: exportReportsLive.requestedAt,
   completedAt: exportReportsLive.completedAt,
   version: exportReportsLive.version,
@@ -273,6 +281,13 @@ export class ExportReportDrizzleRepository extends ExportReportRepository {
       .select(recordColumns)
       .from(exportReportsLive)
       .leftJoin(academicYearsLive, eq(academicYearsLive.id, exportReportsLive.academicYearId))
+      .leftJoin(
+        tenantUserProfilesLive,
+        and(
+          eq(tenantUserProfilesLive.userId, exportReportsLive.requestedBy),
+          eq(tenantUserProfilesLive.tenantId, exportReportsLive.tenantId),
+        ),
+      )
       .leftJoin(userProfilesLive, eq(userProfilesLive.userId, exportReportsLive.requestedBy));
   }
 

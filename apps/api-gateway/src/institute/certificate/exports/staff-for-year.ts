@@ -3,7 +3,7 @@ import {
   type DrizzleDB,
   staffProfilesLive,
   staffQualificationsLive,
-  userProfilesLive,
+  tenantUserProfilesLive,
 } from '@roviq/database';
 import { and, asc, eq, gte, isNull, lte, or } from 'drizzle-orm';
 
@@ -51,13 +51,19 @@ export function staffEmployedDuring(tx: DrizzleDB, year: { startDate: string; en
       trainedForCwsn: staffProfilesLive.trainedForCwsn,
       isDisabled: staffProfilesLive.isDisabled,
       disabilityType: staffProfilesLive.disabilityType,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
-      gender: userProfilesLive.gender,
-      dateOfBirth: userProfilesLive.dateOfBirth,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
+      gender: tenantUserProfilesLive.gender,
+      dateOfBirth: tenantUserProfilesLive.dateOfBirth,
     })
     .from(staffProfilesLive)
-    .leftJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
+    .leftJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, staffProfilesLive.userId),
+        eq(tenantUserProfilesLive.tenantId, staffProfilesLive.tenantId),
+      ),
+    )
     .where(
       and(
         or(

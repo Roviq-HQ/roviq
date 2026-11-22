@@ -42,7 +42,7 @@ export async function StudentAdmissionWorkflow(
   );
 
   // 4. Create user_profile from form_data
-  await activities.createUserProfile(userId, formData, actorId);
+  await activities.createUserProfile(tenantId, userId, formData, actorId);
 
   // 5. Create student_profile with admission_number
   const { studentProfileId, admissionNumber } = await activities.createStudentProfile(

@@ -23,13 +23,14 @@ import {
   studentAcademicsLive,
   studentGuardianLinksLive,
   studentProfilesLive,
+  tenantUserProfilesLive,
   userProfiles,
   userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { UpdateMyProfileInput } from './dto/update-my-profile.input';
 
 @Injectable()
@@ -81,7 +82,6 @@ export class ProfileService {
 
     const roleName = (role?.name as Record<string, string>)?.en ?? '';
 
-    // Get common user_profile
     const profile = await withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
       const rows = await tx
         .select()
@@ -94,15 +94,34 @@ export class ProfileService {
     if (!profile)
       throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
 
+    // The page shows the details "as recorded by the institute", so they come from the
+    // institute's copy. The picture is the user's own account picture, which this page changes.
+    const [recorded] = await withTenant(
+      this.db,
+      mkInstituteCtx(tenantId, 'service:profile'),
+      (tx) =>
+        tx
+          .select()
+          .from(tenantUserProfilesLive)
+          .where(
+            and(
+              eq(tenantUserProfilesLive.tenantId, tenantId),
+              eq(tenantUserProfilesLive.userId, userId),
+            ),
+          )
+          .limit(1),
+    );
+    const personal = recorded ?? profile;
+
     const userProfileData = {
       id: profile.id,
       userId: profile.userId,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      gender: profile.gender,
-      dateOfBirth: profile.dateOfBirth,
-      bloodGroup: profile.bloodGroup,
-      nationality: profile.nationality,
+      firstName: personal.firstName,
+      lastName: personal.lastName,
+      gender: personal.gender,
+      dateOfBirth: personal.dateOfBirth,
+      bloodGroup: personal.bloodGroup,
+      nationality: personal.nationality,
       profileImageFileId: profile.profileImageFileId,
     };
 
@@ -189,23 +208,39 @@ export class ProfileService {
 
       if (guardianProfile[0]) {
         // Single JOIN query instead of N+1 per child
-        children = await withAdmin(this.db, mkAdminCtx('service:profile'), async (tx) => {
-          return tx
-            .select({
-              studentProfileId: studentGuardianLinksLive.studentProfileId,
-              relationship: studentGuardianLinksLive.relationship,
-              isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
-              firstName: userProfilesLive.firstName,
-              lastName: userProfilesLive.lastName,
-            })
-            .from(studentGuardianLinksLive)
-            .innerJoin(
-              studentProfilesLive,
-              eq(studentGuardianLinksLive.studentProfileId, studentProfilesLive.id),
-            )
-            .innerJoin(userProfilesLive, eq(studentProfilesLive.userId, userProfilesLive.userId))
-            .where(eq(studentGuardianLinksLive.guardianProfileId, guardianProfile[0].id));
-        });
+        // The children's names as this institute records them.
+        children = await withTenant(
+          this.db,
+          mkInstituteCtx(tenantId, 'service:profile'),
+          async (tx) => {
+            return tx
+              .select({
+                studentProfileId: studentGuardianLinksLive.studentProfileId,
+                relationship: studentGuardianLinksLive.relationship,
+                isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
+                firstName: tenantUserProfilesLive.firstName,
+                lastName: tenantUserProfilesLive.lastName,
+              })
+              .from(studentGuardianLinksLive)
+              .innerJoin(
+                studentProfilesLive,
+                eq(studentGuardianLinksLive.studentProfileId, studentProfilesLive.id),
+              )
+              .innerJoin(
+                tenantUserProfilesLive,
+                and(
+                  eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+                  eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+                ),
+              )
+              .where(
+                and(
+                  eq(studentGuardianLinksLive.guardianProfileId, guardianProfile[0].id),
+                  eq(studentProfilesLive.tenantId, tenantId),
+                ),
+              );
+          },
+        );
       }
 
       return {
@@ -258,7 +293,12 @@ export class ProfileService {
         if (existing.length > 0) {
           await tx
             .update(phoneNumbers)
-            .set({ number: phone, updatedBy: userId })
+            .set({
+              number: phone,
+              // A typed number is unverified: a verified row must not carry it (SF-053).
+              isVerified: sql`${phoneNumbers.number} = ${phone} AND ${phoneNumbers.isVerified}`,
+              updatedBy: userId,
+            })
             .where(eq(phoneNumbers.id, existing[0].id));
         } else {
           await tx.insert(phoneNumbers).values({

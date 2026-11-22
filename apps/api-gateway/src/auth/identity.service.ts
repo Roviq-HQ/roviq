@@ -29,6 +29,7 @@ import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import type Redis from 'ioredis';
+import { ensureTenantUserProfile } from './tenant-user-profile';
 import { recordTokenVersion } from './token-version-cache';
 
 export interface CreateUserInput {
@@ -176,7 +177,10 @@ export class IdentityService {
     return row !== undefined;
   }
 
-  /** Whether a live phone row already holds this number; the unique index allows one owner. */
+  /**
+   * Whether a verified phone row holds this number. Only a verified number has one owner; a
+   * typed one is contact data and may repeat across users.
+   */
   async isPhoneTaken(phone: { countryCode: string; number: string }): Promise<boolean> {
     const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
       tx
@@ -186,6 +190,7 @@ export class IdentityService {
           and(
             eq(phoneNumbersLive.countryCode, phone.countryCode),
             eq(phoneNumbersLive.number, phone.number),
+            eq(phoneNumbersLive.isVerified, true),
           ),
         )
         .limit(1),
@@ -232,19 +237,27 @@ export class IdentityService {
     return { kind: 'created', userId: created.userId, email, tempPassword: created.tempPassword };
   }
 
-  /** A profile carrying the user's name; an existing profile is left as it is. */
+  /**
+   * The account-level profile carrying the user's name; an existing profile is left as it is,
+   * because only the user edits it. A plain string is stored as the English name.
+   */
   async ensureUserProfile(
     userId: string,
-    name: { firstName: string; lastName?: string },
+    name: {
+      firstName: string | Record<string, string>;
+      lastName?: string | Record<string, string> | null;
+    },
     actorId: string,
   ): Promise<void> {
+    const i18n = (value: string | Record<string, string>) =>
+      typeof value === 'string' ? { en: value } : value;
     await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
       tx
         .insert(userProfiles)
         .values({
           userId,
-          firstName: { en: name.firstName },
-          lastName: name.lastName ? { en: name.lastName } : null,
+          firstName: i18n(name.firstName),
+          lastName: name.lastName ? i18n(name.lastName) : null,
           createdBy: actorId,
           updatedBy: actorId,
         })
@@ -406,7 +419,7 @@ export class IdentityService {
         this.db,
         mkInstituteCtx(tenantId, 'service:identity'),
         async (tx) => {
-          return tx
+          const [membership] = await tx
             .insert(memberships)
             .values({
               userId: input.userId,
@@ -418,6 +431,25 @@ export class IdentityService {
               updatedBy: input.actorId,
             })
             .returning({ id: memberships.id });
+          // The institute's own copy of the person's name starts from the account name.
+          const [account] = await tx
+            .select({
+              firstName: userProfilesLive.firstName,
+              lastName: userProfilesLive.lastName,
+            })
+            .from(userProfilesLive)
+            .where(eq(userProfilesLive.userId, input.userId))
+            .limit(1);
+          if (account) {
+            await ensureTenantUserProfile(tx, {
+              tenantId,
+              userId: input.userId,
+              actorId: input.actorId,
+              firstName: account.firstName,
+              lastName: account.lastName,
+            });
+          }
+          return [membership];
         },
       );
       return { membershipId: row.id, scope: 'institute' };

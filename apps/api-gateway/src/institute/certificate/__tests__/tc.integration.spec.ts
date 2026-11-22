@@ -30,6 +30,7 @@ import {
   studentAcademics,
   studentProfiles,
   tcRegister,
+  tenantUserProfiles,
   userProfiles,
   users,
   withAdmin,
@@ -144,6 +145,15 @@ async function createEnrolledStudent(
       .returning({ id: users.id });
 
     await tx.insert(userProfiles).values({
+      userId: user.id,
+      firstName: { en: `Student ${suffix}` },
+      lastName: { en: 'Kumar' },
+      gender: Gender.MALE,
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+    });
+    await tx.insert(tenantUserProfiles).values({
+      tenantId: tenantId,
       userId: user.id,
       firstName: { en: `Student ${suffix}` },
       lastName: { en: 'Kumar' },

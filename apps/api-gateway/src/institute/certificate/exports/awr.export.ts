@@ -12,7 +12,7 @@ import {
   standardsLive,
   studentAcademicsLive,
   studentProfilesLive,
-  userProfilesLive,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
@@ -53,15 +53,21 @@ function admittedDuring(tx: DrizzleDB, year: { id: string; startDate: string; en
       admissionType: studentProfilesLive.admissionType,
       academicStatus: studentProfilesLive.academicStatus,
       socialCategory: studentProfilesLive.socialCategory,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
-      gender: userProfilesLive.gender,
-      dateOfBirth: userProfilesLive.dateOfBirth,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
+      gender: tenantUserProfilesLive.gender,
+      dateOfBirth: tenantUserProfilesLive.dateOfBirth,
       standardName: standardsLive.name,
       sectionName: sectionsLive.name,
     })
     .from(studentProfilesLive)
-    .leftJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+    .leftJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+        eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+      ),
+    )
     .leftJoin(
       studentAcademicsLive,
       and(

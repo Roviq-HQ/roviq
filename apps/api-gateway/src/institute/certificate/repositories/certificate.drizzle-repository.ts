@@ -8,7 +8,7 @@ import {
   issuedCertificatesLive,
   studentProfilesLive,
   tenantSequences,
-  userProfilesLive,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
@@ -58,11 +58,17 @@ export class CertificateDrizzleRepository extends CertificateRepository {
         .select({
           admissionNumber: studentProfilesLive.admissionNumber,
           admissionClass: studentProfilesLive.admissionClass,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
         })
         .from(studentProfilesLive)
-        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .leftJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+            eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+          ),
+        )
         .where(eq(studentProfilesLive.id, studentProfileId))
         .limit(1),
     );

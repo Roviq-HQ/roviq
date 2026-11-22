@@ -17,6 +17,7 @@ import {
 import type { DrizzleDB } from '../../providers';
 import { SEED_CREDENTIALS, SEED_PERSON_NAMES } from '../fixtures';
 import { SEED_IDS } from '../ids';
+import { seedTenantUserProfile } from '../tenant-user-profile';
 
 // Seeded people own their addresses: their email can identify them when a role is granted.
 const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
@@ -54,6 +55,13 @@ export async function seedDemoSubjectTeacher(
       ...BY,
     })
     .onConflictDoNothing();
+  await seedTenantUserProfile(tx, {
+    tenantId: inst1Id,
+    userId: user.id,
+    firstName: SEED_PERSON_NAMES.SUBJECT_TEACHER.firstName,
+    lastName: SEED_PERSON_NAMES.SUBJECT_TEACHER.lastName,
+    gender: 'FEMALE',
+  });
 
   await tx
     .insert(memberships)

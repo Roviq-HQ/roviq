@@ -7,6 +7,7 @@ export * from './staff-qualifications';
 export * from './student-academics';
 export * from './student-guardian-links';
 export * from './student-profiles';
+export * from './tenant-user-profiles';
 export * from './user-addresses';
 export * from './user-document-files';
 export * from './user-documents';

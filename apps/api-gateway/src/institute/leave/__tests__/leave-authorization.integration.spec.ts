@@ -20,6 +20,7 @@ import {
   studentAcademics,
   studentGuardianLinks,
   studentProfiles,
+  tenantUserProfiles,
   userProfiles,
   withAdmin,
 } from '@roviq/database';
@@ -153,6 +154,13 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
         firstName: { en: `Student ${name}` },
         gender: Gender.MALE,
       });
+      await tx.insert(tenantUserProfiles).values({
+        tenantId: tenant.tenantId,
+        ...by,
+        userId: person.userId,
+        firstName: { en: `Student ${name}` },
+        gender: Gender.MALE,
+      });
       const [profile] = await tx
         .insert(studentProfiles)
         .values({
@@ -251,6 +259,12 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
         userId: parentOfA1.userId,
         firstName: { en: 'Parent' },
       });
+      await tx.insert(tenantUserProfiles).values({
+        tenantId: tenant.tenantId,
+        ...by,
+        userId: parentOfA1.userId,
+        firstName: { en: 'Parent' },
+      });
       const [guardian] = await tx
         .insert(guardianProfiles)
         .values({
@@ -270,6 +284,14 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
 
       // The class teacher is left without a profile on purpose (ROV-312).
       await tx.insert(userProfiles).values({
+        ...by,
+        userId: subjectTeacher.userId,
+        firstName: { en: 'Meera', hi: 'मीरा' },
+        lastName: { en: 'Iyer' },
+        gender: Gender.FEMALE,
+      });
+      await tx.insert(tenantUserProfiles).values({
+        tenantId: tenant.tenantId,
         ...by,
         userId: subjectTeacher.userId,
         firstName: { en: 'Meera', hi: 'मीरा' },
@@ -322,6 +344,12 @@ describe('ROV-304 leave authorization through GraphQL and PostgreSQL', () => {
         await tx.delete(sections).where(inArray(sections.tenantId, tenantIds));
         await tx.delete(standards).where(inArray(standards.tenantId, tenantIds));
         await tx.delete(academicYears).where(inArray(academicYears.tenantId, tenantIds));
+        await tx.delete(tenantUserProfiles).where(
+          inArray(
+            tenantUserProfiles.userId,
+            actors.map((entry) => entry.userId),
+          ),
+        );
         await tx.delete(userProfiles).where(
           inArray(
             userProfiles.userId,

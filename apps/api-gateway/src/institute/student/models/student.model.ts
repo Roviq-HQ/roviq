@@ -91,7 +91,7 @@ export class StudentModel {
   @Field(() => String, { nullable: true })
   membershipId!: string;
 
-  // ── Personal (from user_profiles) ───────────────────────
+  // ── Personal (from tenant_user_profiles) ────────────────
   /** Multilingual via i18nText; resolved via useI18nField() on the frontend. */
   @Field(() => I18nTextScalar)
   firstName!: I18nContent;
@@ -224,7 +224,7 @@ export class StudentModel {
   /**
    * Primary guardian (is_primary_contact = true) display name — denormalised
    * onto the list row to avoid N+1 lookups on the students table.
-   * Resolved from user_profiles joined through guardian_profiles.
+   * Resolved from the institute's tenant_user_profiles joined through guardian_profiles.
    */
   @Field(() => ID, {
     nullable: true,

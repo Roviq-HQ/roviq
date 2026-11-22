@@ -18,18 +18,14 @@ import {
   guardianProfiles,
   guardianProfilesLive,
   memberships,
-  mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbers,
   phoneNumbersLive,
   rolesLive,
   softDelete,
   studentGuardianLinks,
   studentGuardianLinksLive,
   studentProfilesLive,
-  userProfiles,
-  userProfilesLive,
-  withAdmin,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -37,6 +33,7 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
+import { ensureTenantUserProfile, updateTenantUserProfile } from '../../auth/tenant-user-profile';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
   LinkGuardianInput,
@@ -65,8 +62,8 @@ export class GuardianService {
   }
 
   /**
-   * Central SELECT shape for the list/detail queries — joins user_profiles
-   * so every row carries the guardian's display name + photo + gender.
+   * Central SELECT shape for the list/detail queries — joins the institute's
+   * profile copy so every row carries the guardian's display name + photo + gender.
    * Also LEFT JOINs phone_numbers to surface the guardian's primary phone
    * number, and computes a linked-students count via scalar subquery so
    * the list page can render the "Linked students" column without N+1.
@@ -85,11 +82,11 @@ export class GuardianService {
       version: guardianProfilesLive.version,
       createdAt: guardianProfilesLive.createdAt,
       updatedAt: guardianProfilesLive.updatedAt,
-      // user_profile join
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
-      profileImageFileId: userProfilesLive.profileImageFileId,
-      gender: userProfilesLive.gender,
+      // the institute's copy of the guardian's name and picture
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
+      profileImageFileId: tenantUserProfilesLive.profileImageFileId,
+      gender: tenantUserProfilesLive.gender,
       // phone_numbers join (primary phone only)
       primaryPhone: phoneNumbersLive.number,
       // Scalar subquery: count of linked students (excludes soft-deleted links).
@@ -111,7 +108,13 @@ export class GuardianService {
         return tx
           .select(this.guardianSelect())
           .from(guardianProfilesLive)
-          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfilesLive.userId))
+          .innerJoin(
+            tenantUserProfilesLive,
+            and(
+              eq(tenantUserProfilesLive.userId, guardianProfilesLive.userId),
+              eq(tenantUserProfilesLive.tenantId, guardianProfilesLive.tenantId),
+            ),
+          )
           .leftJoin(
             phoneNumbersLive,
             and(
@@ -132,52 +135,27 @@ export class GuardianService {
     const tenantId = this.tenantId;
     const actorId = this.userId;
 
+    const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
+
+    // Always a new guardian: a typed number never picks an existing account (SF-053). Staff
+    // link a sibling to a parent already on file with `linkGuardianToStudent`.
     const suffix = crypto.randomUUID().slice(0, 12);
     const email = input.email ?? `guardian-${suffix}@roviq.placeholder`;
     const username = `guardian-${tenantId.slice(0, 8)}-${suffix}`;
-    const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
 
+    // The typed number is stored as unverified contact data, whoever else also holds it.
     const { userId: newUserId } = await this.identityService.createUser({
       email,
       username,
       phone,
-      actorId: this.userId,
+      actorId,
     });
     const newUser = { id: newUserId };
-
-    if (input.phone) {
-      const phone = input.phone;
-      await withAdmin(this.db, mkAdminCtx('service:guardian'), async (tx) => {
-        await tx
-          .insert(phoneNumbers)
-          .values({
-            createdBy: this.userId,
-            updatedBy: this.userId,
-            userId: newUser.id,
-            countryCode: '+91',
-            number: phone,
-            isPrimary: true,
-            label: 'personal',
-          })
-          .onConflictDoNothing();
-      });
-    }
-
-    // Create user_profile
-    await withAdmin(this.db, mkAdminCtx('service:guardian'), async (tx) => {
-      await tx
-        .insert(userProfiles)
-        .values({
-          userId: newUser.id,
-          firstName: input.firstName,
-          lastName: input.lastName ?? null,
-          gender: input.gender ?? null,
-          nationality: 'Indian',
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .onConflictDoNothing();
-    });
+    await this.identityService.ensureUserProfile(
+      newUser.id,
+      { firstName: input.firstName, lastName: input.lastName },
+      actorId,
+    );
 
     // Find parent role using DefaultRoles constant
     const guardianRole = await withTenant(
@@ -208,7 +186,7 @@ export class GuardianService {
       this.db,
       mkInstituteCtx(tenantId, 'service:guardian'),
       async (tx) => {
-        return tx
+        const inserted = await tx
           .insert(memberships)
           .values({
             userId: newUser.id,
@@ -220,6 +198,15 @@ export class GuardianService {
             updatedBy: actorId,
           })
           .returning({ id: memberships.id });
+        await ensureTenantUserProfile(tx, {
+          tenantId,
+          userId: newUser.id,
+          actorId,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          gender: input.gender,
+        });
+        return inserted;
       },
     );
 
@@ -245,7 +232,6 @@ export class GuardianService {
       },
     );
 
-    // If student_id provided, link immediately
     if (input.studentProfileId && input.relationship) {
       await this.linkToStudent({
         guardianProfileId: profile.id,
@@ -256,7 +242,7 @@ export class GuardianService {
     }
 
     // Re-fetch via findById so the response includes the joined name/photo
-    // columns populated from user_profiles (mirrors student.service pattern).
+    // columns populated from the institute's profile copy (mirrors student.service pattern).
     return this.findById(profile.id);
   }
 
@@ -311,26 +297,22 @@ export class GuardianService {
       );
     }
 
-    // Name fields live on the platform-level `user_profiles` table, which
-    // requires `withAdmin()` (no RLS on users/user_profiles). Only write the
-    // keys the caller actually supplied so we never clobber an unsupplied
-    // locale column.
     if (data.firstName !== undefined || data.lastName !== undefined) {
-      const guardianUserId = updatedRows[0].userId;
-      await withAdmin(this.db, mkAdminCtx('service:guardian'), async (tx) => {
-        await tx
-          .update(userProfiles)
-          .set({
+      await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), (tx) =>
+        updateTenantUserProfile(tx, {
+          tenantId,
+          userId: updatedRows[0].userId,
+          actorId,
+          changes: {
             ...(data.firstName !== undefined && { firstName: data.firstName }),
             ...(data.lastName !== undefined && { lastName: data.lastName }),
-            updatedBy: actorId,
-          })
-          .where(eq(userProfiles.userId, guardianUserId));
-      });
+          },
+        }),
+      );
     }
 
     // Re-fetch through the joined select so the response carries the
-    // updated row AND the user_profiles display fields in one object.
+    // updated row AND the institute's profile display fields in one object.
     return this.findById(id);
   }
 
@@ -400,12 +382,18 @@ export class GuardianService {
       return tx
         .select({
           id: guardianProfiles.id,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
           deletedAt: sql<Date>`${guardianProfiles.deletedAt}`.mapWith(guardianProfiles.deletedAt),
         })
         .from(guardianProfiles) // allow-base-read: the Deleted list shows trashed rows
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, guardianProfiles.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, guardianProfiles.userId),
+            eq(tenantUserProfilesLive.tenantId, guardianProfiles.tenantId),
+          ),
+        )
         .where(isNotNull(guardianProfiles.deletedAt))
         .orderBy(desc(guardianProfiles.deletedAt));
     });

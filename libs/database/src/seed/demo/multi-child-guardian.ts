@@ -20,6 +20,7 @@ import {
 import type { DrizzleDB } from '../../providers';
 import { SEED_CREDENTIALS, SEED_PERSON_NAMES } from '../fixtures';
 import { SEED_IDS } from '../ids';
+import { seedTenantUserProfile } from '../tenant-user-profile';
 
 // Seeded people own their addresses: their email can identify them when a role is granted.
 const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
@@ -130,6 +131,13 @@ export async function seedDemoMultiChildGuardian(
         ...BY,
       })
       .onConflictDoNothing();
+    await seedTenantUserProfile(tx, {
+      tenantId: inst1Id,
+      userId: p.userId,
+      firstName: p.names.firstName,
+      lastName: p.names.lastName,
+      gender: p.gender,
+    });
 
     await tx
       .insert(authProviders)

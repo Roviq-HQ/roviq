@@ -20,6 +20,7 @@ import {
   roles,
   SYSTEM_USER_ID,
   studentProfiles,
+  tenantUserProfiles,
   userDocumentFiles,
   userDocuments,
   userProfiles,
@@ -104,6 +105,13 @@ describe('deleteStudentDocument (integration)', () => {
         })
         .returning({ id: users.id });
       await tx.insert(userProfiles).values({
+        userId: user.id,
+        firstName: { en: `Student ${suffix}` },
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+      });
+      await tx.insert(tenantUserProfiles).values({
+        tenantId: tenant.tenantId,
         userId: user.id,
         firstName: { en: `Student ${suffix}` },
         createdBy: SYSTEM_USER_ID,
@@ -270,6 +278,7 @@ describe('deleteStudentDocument (integration)', () => {
         await tx.delete(studentProfiles).where(eq(studentProfiles.id, studentProfileId));
       }
       if (studentUserId) {
+        await tx.delete(tenantUserProfiles).where(eq(tenantUserProfiles.userId, studentUserId));
         await tx.delete(userProfiles).where(eq(userProfiles.userId, studentUserId));
         await tx.delete(memberships).where(eq(memberships.userId, studentUserId));
         await tx.delete(users).where(eq(users.id, studentUserId));

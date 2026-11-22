@@ -137,7 +137,7 @@ export class GuardianLinkModel {
  * Read model for the "Guardians" tab on the student detail page (ROV-167):
  * a guardian linked to a specific student, with the link metadata
  * (relationship, primary flag) and the guardian's resolved name + contact
- * info from user_profiles. Avoids cascading queries on the frontend.
+ * info from the institute's profile copy. Avoids cascading queries on the frontend.
  */
 @ObjectType({
   description: 'Guardian linked to a student, joined with display name and link metadata',
@@ -218,13 +218,13 @@ export class GuardianLinkedStudentModel {
   studentProfileId!: string;
 
   @Field(() => I18nTextScalar, {
-    description: "Student's first name (i18nText) from user_profiles.",
+    description: "Student's first name (i18nText) from the institute's profile copy.",
   })
   firstName!: I18nContent;
 
   @Field(() => I18nTextScalar, {
     nullable: true,
-    description: "Student's last name (i18nText) from user_profiles; optional.",
+    description: "Student's last name (i18nText) from the institute's profile copy; optional.",
   })
   lastName?: I18nContent | null;
 

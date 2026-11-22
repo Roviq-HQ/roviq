@@ -77,6 +77,7 @@ export interface StudentAdmissionActivities {
   ): Promise<{ userId: string; membershipId: string }>;
 
   createUserProfile(
+    tenantId: string,
     userId: string,
     formData: Record<string, unknown>,
     createdBy: string,

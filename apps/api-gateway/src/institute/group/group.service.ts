@@ -419,10 +419,10 @@ export class GroupService {
       // Read from `*_live` views (soft-delete-hiding) but alias them back to
       // the base table names so the column references emitted by
       // `groupRuleToDrizzleSql` (DIMENSION_TO_COLUMN — e.g., "student_profiles"."gender")
-      // resolve. user_profiles is not soft-deletable, so it stays as-is.
+      // resolve, including "tenant_user_profiles" (the institute's copy of the demographics).
       const rows = await tx.execute(
         sql`SELECT student_profiles.membership_id FROM student_profiles_live AS student_profiles
-            INNER JOIN user_profiles ON user_profiles.user_id = student_profiles.user_id
+            INNER JOIN tenant_user_profiles_live AS tenant_user_profiles ON tenant_user_profiles.user_id = student_profiles.user_id AND tenant_user_profiles.tenant_id = student_profiles.tenant_id
             LEFT JOIN student_academics_live AS student_academics ON student_academics.student_profile_id = student_profiles.id
             LEFT JOIN sections_live AS sections ON sections.id = student_academics.section_id
             WHERE ${whereClause}
@@ -431,7 +431,7 @@ export class GroupService {
 
       const countRows = await tx.execute(
         sql`SELECT COUNT(*)::int AS total FROM student_profiles_live AS student_profiles
-            INNER JOIN user_profiles ON user_profiles.user_id = student_profiles.user_id
+            INNER JOIN tenant_user_profiles_live AS tenant_user_profiles ON tenant_user_profiles.user_id = student_profiles.user_id AND tenant_user_profiles.tenant_id = student_profiles.tenant_id
             LEFT JOIN student_academics_live AS student_academics ON student_academics.student_profile_id = student_profiles.id
             LEFT JOIN sections_live AS sections ON sections.id = student_academics.section_id
             WHERE ${whereClause}`,
@@ -627,7 +627,7 @@ export class GroupService {
       async (tx) => {
         return tx.execute(
           sql`SELECT student_profiles.membership_id FROM student_profiles_live AS student_profiles
-            INNER JOIN user_profiles ON user_profiles.user_id = student_profiles.user_id
+            INNER JOIN tenant_user_profiles_live AS tenant_user_profiles ON tenant_user_profiles.user_id = student_profiles.user_id AND tenant_user_profiles.tenant_id = student_profiles.tenant_id
             LEFT JOIN student_academics_live AS student_academics ON student_academics.student_profile_id = student_profiles.id
             LEFT JOIN sections_live AS sections ON sections.id = student_academics.section_id
             WHERE ${combinedWhere}`,

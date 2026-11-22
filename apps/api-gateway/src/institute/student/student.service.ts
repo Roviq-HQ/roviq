@@ -27,17 +27,15 @@ import {
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbersLive,
   rolesLive,
   softDelete,
   studentAcademics,
   studentAcademicsLive,
   studentProfiles,
   studentProfilesLive,
+  tenantUserProfilesLive,
   userDocuments,
   userDocumentsLive,
-  userProfiles,
-  userProfilesLive,
   withAdmin,
   withTenant,
 } from '@roviq/database';
@@ -45,6 +43,11 @@ import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
 import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
+import {
+  ensureTenantUserProfile,
+  type TenantUserProfileFields,
+  updateTenantUserProfile,
+} from '../../auth/tenant-user-profile';
 import { FileService } from '../../files/file.service';
 import { markFilesReady } from '../../files/file-attachment';
 import {
@@ -93,45 +96,13 @@ export class StudentService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    // 1. Find or create user (NATS stub — direct DB)
-    let userId: string;
-    const phone = input.phone;
-    if (phone) {
-      const existing = await withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
-        return tx
-          .select({ userId: phoneNumbersLive.userId })
-          .from(phoneNumbersLive)
-          .where(and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)))
-          .limit(1);
-      });
-      if (existing.length > 0) {
-        userId = existing[0].userId;
-      } else {
-        userId = await this.createUser(input, actorId);
-      }
-    } else {
-      userId = await this.createUser(input, actorId);
-    }
-
-    // 2. Create user_profile (idempotent)
-    await withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
-      await tx
-        .insert(userProfiles)
-        .values({
-          userId,
-          firstName: input.firstName,
-          lastName: input.lastName ?? null,
-          gender: input.gender ?? null,
-          dateOfBirth: input.dateOfBirth ?? null,
-          bloodGroup: input.bloodGroup ?? null,
-          religion: input.religion ?? null,
-          motherTongue: input.motherTongue ?? null,
-          nationality: 'Indian',
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .onConflictDoNothing();
-    });
+    // A typed number never identifies an existing account (SF-053): every student is a new user.
+    const userId = await this.createUser(input.phone, actorId);
+    await this.identityService.ensureUserProfile(
+      userId,
+      { firstName: input.firstName, lastName: input.lastName },
+      actorId,
+    );
 
     // 3. Find student role + create membership
     const studentRole = await withTenant(
@@ -162,7 +133,7 @@ export class StudentService {
       this.db,
       mkInstituteCtx(tenantId, 'service:student'),
       async (tx) => {
-        return tx
+        const inserted = await tx
           .insert(memberships)
           .values({
             userId,
@@ -175,6 +146,19 @@ export class StudentService {
           })
           .onConflictDoNothing()
           .returning({ id: memberships.id });
+        await ensureTenantUserProfile(tx, {
+          tenantId,
+          userId,
+          actorId,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          gender: input.gender,
+          dateOfBirth: input.dateOfBirth,
+          bloodGroup: input.bloodGroup,
+          religion: input.religion,
+          motherTongue: input.motherTongue,
+        });
+        return inserted;
       },
     );
 
@@ -660,13 +644,19 @@ export class StudentService {
       return tx
         .select({
           id: studentProfiles.id,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
           identifier: studentProfiles.admissionNumber,
           deletedAt: sql<Date>`${studentProfiles.deletedAt}`.mapWith(studentProfiles.deletedAt),
         })
         .from(studentProfiles) // allow-base-read: the Deleted list shows trashed rows
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfiles.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, studentProfiles.userId),
+            eq(tenantUserProfilesLive.tenantId, studentProfiles.tenantId),
+          ),
+        )
         .where(isNotNull(studentProfiles.deletedAt))
         .orderBy(desc(studentProfiles.deletedAt));
     });
@@ -805,39 +795,31 @@ export class StudentService {
     input: UpdateStudentInput,
     actorId: string,
   ): Promise<void> {
-    const updates: Record<string, unknown> = {};
-    const fields = [
-      'firstName',
-      'lastName',
-      'gender',
-      'dateOfBirth',
-      'bloodGroup',
-      'religion',
-      'motherTongue',
-    ] as const;
-    for (const field of fields) {
-      if (input[field] !== undefined) updates[field] = input[field];
-    }
+    const updates: Partial<TenantUserProfileFields> = {
+      ...(input.firstName !== undefined && { firstName: input.firstName }),
+      ...(input.lastName !== undefined && { lastName: input.lastName }),
+      ...(input.gender !== undefined && { gender: input.gender }),
+      ...(input.dateOfBirth !== undefined && { dateOfBirth: input.dateOfBirth }),
+      ...(input.bloodGroup !== undefined && { bloodGroup: input.bloodGroup }),
+      ...(input.religion !== undefined && { religion: input.religion }),
+      ...(input.motherTongue !== undefined && { motherTongue: input.motherTongue }),
+    };
 
     if (Object.keys(updates).length === 0) return;
 
-    const profile = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ userId: studentProfilesLive.userId })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, id))
-          .limit(1);
-      },
-    );
-
-    await withAdmin(this.db, mkAdminCtx('service:student'), async (tx) => {
-      await tx
-        .update(userProfiles)
-        .set({ ...updates, updatedBy: actorId })
-        .where(eq(userProfiles.userId, profile[0].userId));
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
+      const [profile] = await tx
+        .select({ userId: studentProfilesLive.userId })
+        .from(studentProfilesLive)
+        .where(eq(studentProfilesLive.id, id))
+        .limit(1);
+      if (!profile) return;
+      await updateTenantUserProfile(tx, {
+        tenantId,
+        userId: profile.userId,
+        actorId,
+        changes: updates,
+      });
     });
   }
 
@@ -859,19 +841,15 @@ export class StudentService {
     }
   }
 
-  private async createUser(input: CreateStudentInput, actorId: string): Promise<string> {
+  private async createUser(phone: string | undefined, actorId: string): Promise<string> {
     const suffix = crypto.randomUUID().slice(0, 12);
-    const email = `student-${suffix}@roviq.placeholder`;
-    const username = `student-${suffix}`;
-    const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
-
     const { userId } = await this.identityService.createUser({
-      email,
-      username,
-      phone,
+      email: `student-${suffix}@roviq.placeholder`,
+      username: `student-${suffix}`,
+      // Unverified contact data: it may repeat across users and never links accounts.
+      phone: phone ? { countryCode: '+91', number: phone } : undefined,
       actorId,
     });
-
     return userId;
   }
 }

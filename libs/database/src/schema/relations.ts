@@ -367,6 +367,17 @@ export const relations = defineRelations(schema, (r) => ({
     }),
   },
 
+  tenantUserProfiles: {
+    user: r.one.users({
+      from: r.tenantUserProfiles.userId,
+      to: r.users.id,
+    }),
+    institute: r.one.institutes({
+      from: r.tenantUserProfiles.tenantId,
+      to: r.institutes.id,
+    }),
+  },
+
   userIdentifiers: {
     user: r.one.users({
       from: r.userIdentifiers.userId,

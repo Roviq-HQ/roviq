@@ -73,6 +73,7 @@ import { staffQualifications } from './user-profiles/staff-qualifications';
 import { studentAcademics } from './user-profiles/student-academics';
 import { studentGuardianLinks } from './user-profiles/student-guardian-links';
 import { studentProfiles } from './user-profiles/student-profiles';
+import { tenantUserProfiles } from './user-profiles/tenant-user-profiles';
 import { userAddresses } from './user-profiles/user-addresses';
 import { userDocumentFiles } from './user-profiles/user-document-files';
 import { userDocuments } from './user-profiles/user-documents';
@@ -286,6 +287,9 @@ export const groupMembershipsLive = liveView('group_memberships_live').as((qb) =
 );
 export const userProfilesLive = liveView('user_profiles_live').as((qb) =>
   qb.select().from(userProfiles).where(isNull(userProfiles.deletedAt)),
+);
+export const tenantUserProfilesLive = liveView('tenant_user_profiles_live').as((qb) =>
+  qb.select().from(tenantUserProfiles).where(isNull(tenantUserProfiles.deletedAt)),
 );
 export const userAddressesLive = liveView('user_addresses_live').as((qb) =>
   qb.select().from(userAddresses).where(isNull(userAddresses.deletedAt)),

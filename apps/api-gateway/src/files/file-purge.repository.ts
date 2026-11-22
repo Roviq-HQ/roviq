@@ -13,6 +13,7 @@ import {
   SYSTEM_USER_ID,
   staffQualifications,
   tcRegister,
+  tenantUserProfiles,
   userDocumentFiles,
   userProfiles,
   withAdmin,
@@ -156,6 +157,9 @@ function referenced(fileId: typeof files.id) {
     inUse(fileId),
     exists(
       sql`(select ${one} from ${userProfiles} where ${userProfiles.profileImageFileId} = ${fileId})`,
+    ),
+    exists(
+      sql`(select ${one} from ${tenantUserProfiles} where ${tenantUserProfiles.profileImageFileId} = ${fileId})`,
     ),
     exists(
       sql`(select ${one} from ${resellers} where ${fileId} in (${resellers.logoFileId}, ${resellers.faviconFileId}))`,

@@ -16,7 +16,6 @@ import {
   academicYearsLive,
   type DrizzleDB,
   guardianProfilesLive,
-  mkAdminCtx,
   mkInstituteCtx,
   standardsLive,
   studentAcademicsLive,
@@ -24,8 +23,7 @@ import {
   studentProfilesLive,
   tcRegister,
   tcRegisterLive,
-  userProfilesLive,
-  withAdmin,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
@@ -360,32 +358,47 @@ export function createTCIssuanceActivities(db: DrizzleDB): TCIssuanceActivities 
       if (sp.length === 0) throw new Error('Student profile not found');
       const student = sp[0];
 
-      // Fetch user_profile
-      const up = await withAdmin(db, mkAdminCtx('workflow:tc-issuance.activities'), async (tx) => {
-        return tx
-          .select()
-          .from(userProfilesLive)
-          .where(eq(userProfilesLive.userId, student.userId))
-          .limit(1);
-      });
+      // The institute's own record of the student
+      const up = await withTenant(
+        db,
+        mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
+        async (tx) => {
+          return tx
+            .select()
+            .from(tenantUserProfilesLive)
+            .where(
+              and(
+                eq(tenantUserProfilesLive.tenantId, tenantId),
+                eq(tenantUserProfilesLive.userId, student.userId),
+              ),
+            )
+            .limit(1);
+        },
+      );
 
       // Fetch guardian names via JOIN
-      const guardianLinks = await withAdmin(
+      const guardianLinks = await withTenant(
         db,
-        mkAdminCtx('workflow:tc-issuance.activities'),
+        mkInstituteCtx(tenantId, 'workflow:tc-issuance.activities'),
         async (tx) => {
           return tx
             .select({
               relationship: studentGuardianLinksLive.relationship,
-              firstName: userProfilesLive.firstName,
-              lastName: userProfilesLive.lastName,
+              firstName: tenantUserProfilesLive.firstName,
+              lastName: tenantUserProfilesLive.lastName,
             })
             .from(studentGuardianLinksLive)
             .innerJoin(
               guardianProfilesLive,
               eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
             )
-            .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId))
+            .innerJoin(
+              tenantUserProfilesLive,
+              and(
+                eq(tenantUserProfilesLive.userId, guardianProfilesLive.userId),
+                eq(tenantUserProfilesLive.tenantId, guardianProfilesLive.tenantId),
+              ),
+            )
             .where(eq(studentGuardianLinksLive.studentProfileId, studentProfileId));
         },
       );

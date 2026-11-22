@@ -48,7 +48,7 @@ Resolvers live under [apps/api-gateway/src/institute/staff/](apps/api-gateway/sr
 - [`staff_qualifications`](libs/database/src/schema/user-profiles/staff-qualifications.ts) — degrees, institutions, years.
 - [`guardian_profiles`](libs/database/src/schema/user-profiles/guardian-profiles.ts) — relationship enum, occupation, portal access flag.
 - [`student_guardian_links`](libs/database/src/schema/user-profiles/student-guardian-links.ts) — many-to-many link table with `isPrimary`, `canPickup`, `notifyOn`.
-- [`user_profiles`](libs/database/src/schema/user-profiles/user-profiles.ts) — joined for firstName/lastName/contact.
+- [`tenant_user_profiles`](libs/database/src/schema/user-profiles/tenant-user-profiles.ts) — the institute's own copy of the person's name, gender, date of birth and picture; joined on user and tenant. `user_profiles` is the account-level profile and is not read here (see `docs/auth.md` → "People and phone numbers").
 
 All tables spread `tenantColumns`; `student_guardian_links` uses `tenantPolicies()` for RLS.
 

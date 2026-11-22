@@ -14,25 +14,29 @@ export const CBSE_REGISTRATION_FIELDS: Record<string, CbseRegistrationFieldDef> 
   /** Full name in capitals, no abbreviations */
   fullName: {
     header: 'Student Name (CAPITALS)',
-    source: 'user_profiles.first_name + last_name UPPER()',
+    source: 'tenant_user_profiles.first_name + last_name UPPER()',
     required: true,
   },
   /** Mother's name */
   motherName: {
     header: "Mother's Name",
-    source: 'guardian_profiles (mother) user_profiles',
+    source: 'guardian_profiles (mother) tenant_user_profiles',
     required: true,
   },
   /** Father's/Guardian's name */
   fatherName: {
     header: "Father's/Guardian's Name",
-    source: 'guardian_profiles (father/legal_guardian) user_profiles',
+    source: 'guardian_profiles (father/legal_guardian) tenant_user_profiles',
     required: true,
   },
   /** DD/MM/YYYY */
-  dateOfBirth: { header: 'Date of Birth', source: 'user_profiles.date_of_birth', required: true },
+  dateOfBirth: {
+    header: 'Date of Birth',
+    source: 'tenant_user_profiles.date_of_birth',
+    required: true,
+  },
   /** male/female/transgender */
-  gender: { header: 'Gender', source: 'user_profiles.gender', required: true },
+  gender: { header: 'Gender', source: 'tenant_user_profiles.gender', required: true },
   /** 12-digit APAAR; "REFUSED" if consent denied; "NOGEN" if technical failure */
   apaarId: {
     header: 'APAAR ID',

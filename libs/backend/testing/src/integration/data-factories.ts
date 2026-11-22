@@ -9,6 +9,7 @@ import {
   resellers,
   roles,
   SYSTEM_USER_ID,
+  tenantUserProfiles,
   users,
   withAdmin,
 } from '@roviq/database';
@@ -261,6 +262,7 @@ export async function createTestTeacher(db: DrizzleDB, tenantId: string): Promis
  */
 export async function cleanupTestTeacher(db: DrizzleDB, teacher: TestTeacher): Promise<void> {
   await withAdmin(db, mkAdminCtx('test:data-factories'), async (tx) => {
+    await tx.delete(tenantUserProfiles).where(eq(tenantUserProfiles.userId, teacher.userId));
     await tx.delete(memberships).where(eq(memberships.id, teacher.membershipId));
     await tx.delete(roles).where(eq(roles.id, teacher.roleId));
     await tx.delete(users).where(eq(users.id, teacher.userId));
@@ -347,6 +349,7 @@ export async function createTestReseller(db: DrizzleDB): Promise<TestReseller> {
  */
 export async function cleanupTestInstitute(db: DrizzleDB, tenant: TestInstitute): Promise<void> {
   await withAdmin(db, mkAdminCtx('test:data-factories'), async (tx) => {
+    await tx.delete(tenantUserProfiles).where(eq(tenantUserProfiles.tenantId, tenant.tenantId));
     await tx.delete(memberships).where(eq(memberships.tenantId, tenant.tenantId));
     await tx.delete(roles).where(eq(roles.tenantId, tenant.tenantId));
     await tx.delete(institutes).where(eq(institutes.id, tenant.tenantId));

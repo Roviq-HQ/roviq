@@ -34,13 +34,13 @@ export class TCModel {
   studentProfileId!: string;
 
   @Field(() => I18nTextScalar, {
-    description: 'Student first name (i18n) joined from user_profiles',
+    description: "Student first name (i18n) joined from the institute's profile copy",
   })
   studentFirstName!: I18nContent;
 
   @Field(() => I18nTextScalar, {
     nullable: true,
-    description: 'Student last name (i18n) joined from user_profiles',
+    description: "Student last name (i18n) joined from the institute's profile copy",
   })
   studentLastName?: I18nContent | null;
 

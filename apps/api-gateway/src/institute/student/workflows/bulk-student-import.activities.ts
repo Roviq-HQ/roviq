@@ -16,22 +16,19 @@ import {
 import {
   type DrizzleDB,
   memberships,
-  mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbersLive,
   rolesLive,
   studentAcademics,
   studentProfiles,
   studentProfilesLive,
   tenantSequences,
-  userProfiles,
-  withAdmin,
   withTenant,
 } from '@roviq/database';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
 import { and, eq, sql } from 'drizzle-orm';
 import Papa from 'papaparse';
 import type { IdentityService } from '../../../auth/identity.service';
+import { ensureTenantUserProfile } from '../../../auth/tenant-user-profile';
 import { nextAdmissionNumber } from '../admission-number.sequence';
 import type {
   BulkStudentImportActivities,
@@ -359,22 +356,6 @@ interface NatsEmitter {
 
 // ── Extracted DB helpers for insertBatch ──────────────────
 
-/** Find existing user by phone number. Returns userId or null. */
-async function findUserByPhone(db: DrizzleDB, phone: string): Promise<string | null> {
-  const existing = await withAdmin(
-    db,
-    mkAdminCtx('workflow:bulk-student-import.activities'),
-    async (tx) => {
-      return tx
-        .select({ userId: phoneNumbersLive.userId })
-        .from(phoneNumbersLive)
-        .where(and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, phone)))
-        .limit(1);
-    },
-  );
-  return existing.length > 0 ? existing[0].userId : null;
-}
-
 /** Check if admission number already exists for this tenant. */
 async function admissionNumberExists(
   db: DrizzleDB,
@@ -404,6 +385,7 @@ async function createUser(
 ): Promise<string> {
   const email = row.email ?? `student-${Date.now()}-${row.rowNumber}@roviq.placeholder`;
   const username = `student-${tenantId.slice(0, 8)}-${Date.now()}-${row.rowNumber}`;
+  // Unverified contact data: siblings share a parent's number and each is still a new user.
   const phone = row.phone ? { countryCode: '+91', number: row.phone } : undefined;
 
   const { userId } = await identityService.createUser({ email, username, phone, actorId });
@@ -477,30 +459,32 @@ interface InsertRowContext {
   emitEvent: (pattern: EventPattern, data: unknown) => void;
 }
 
-/** Create user_profile record (idempotent via onConflictDoNothing). */
+/** The account name, and the institute's own copy with the demographics. Both idempotent. */
 async function upsertUserProfile(
-  db: DrizzleDB,
+  ctx: Pick<InsertRowContext, 'db' | 'identityService' | 'tenantId' | 'createdBy'>,
   userId: string,
   row: ValidatedRow,
-  createdBy: string,
 ): Promise<void> {
-  await withAdmin(db, mkAdminCtx('workflow:bulk-student-import.activities'), async (tx) => {
-    await tx
-      .insert(userProfiles)
-      .values({
+  const name = {
+    firstName: { en: row.firstName },
+    lastName: row.lastName ? { en: row.lastName } : null,
+  };
+  await ctx.identityService.ensureUserProfile(userId, name, ctx.createdBy);
+  await withTenant(
+    ctx.db,
+    mkInstituteCtx(ctx.tenantId, 'workflow:bulk-student-import.activities'),
+    (tx) =>
+      ensureTenantUserProfile(tx, {
+        tenantId: ctx.tenantId,
         userId,
-        firstName: { en: row.firstName },
-        lastName: row.lastName ? { en: row.lastName } : null,
+        actorId: ctx.createdBy,
+        ...name,
         gender: row.gender,
         dateOfBirth: row.dateOfBirth,
         bloodGroup: row.bloodGroup ?? null,
         religion: row.religion ?? null,
-        nationality: 'Indian',
-        createdBy,
-        updatedBy: createdBy,
-      })
-      .onConflictDoNothing();
-  });
+      }),
+  );
 }
 
 /** Create membership for the student. Returns membershipId, or null if already exists. */
@@ -624,16 +608,10 @@ async function insertSingleRow(
     return 'skipped';
   }
 
-  // Dedup by phone -> find or create user
-  let userId = row.phone ? await findUserByPhone(ctx.db, row.phone) : null;
-  if (userId) {
-    logger.log(`Row ${row.rowNumber}: Found existing user by phone ${row.phone}`);
-  } else {
-    userId = await createUser(ctx.identityService, row, ctx.tenantId, ctx.createdBy);
-  }
+  // A typed number never identifies an existing account (SF-053): every row is a new user.
+  const userId = await createUser(ctx.identityService, row, ctx.tenantId, ctx.createdBy);
 
-  // Create user_profile (idempotent)
-  await upsertUserProfile(ctx.db, userId, row, ctx.createdBy);
+  await upsertUserProfile(ctx, userId, row);
 
   // Create membership
   const membershipId = await createMembership(

@@ -23,6 +23,7 @@ import {
   studentAcademics,
   studentProfiles,
   studentProfilesLive,
+  tenantUserProfiles,
   userAddresses,
   userDocuments,
   userIdentifiers,
@@ -71,6 +72,7 @@ const USER_GROUPS_TABLES = [
   'student_academics',
   'student_guardian_links',
   'student_profiles',
+  'tenant_user_profiles',
   'user_addresses',
   'user_documents',
   'user_identifiers',
@@ -182,6 +184,13 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       userId: person.userId,
       firstName: { en: 'Student' },
     });
+    await tx.insert(tenantUserProfiles).values({
+      tenantId: tenantId,
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+      userId: person.userId,
+      firstName: { en: 'Student' },
+    });
     const [profile] = await tx
       .insert(studentProfiles)
       .values({
@@ -244,6 +253,16 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
     }));
     await tx.insert(userProfiles).values(
       userRows.map((row, index) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        userId: row.id,
+        firstName: { en: `Perf ${index}` },
+        gender: attributes[index].gender,
+      })),
+    );
+    await tx.insert(tenantUserProfiles).values(
+      userRows.map((row, index) => ({
+        tenantId: tenantId,
         createdBy: SYSTEM_USER_ID,
         updatedBy: SYSTEM_USER_ID,
         userId: row.id,

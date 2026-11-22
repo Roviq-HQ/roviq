@@ -10,7 +10,7 @@ describe('groupRuleToSql', () => {
   it('simple equality → parameterized SQL with table-qualified column', () => {
     const result = groupRuleToSql({ '==': [{ var: 'gender' }, 'female'] });
     expect(result).toBeDefined();
-    expect(result?.sqlString).toContain('"user_profiles"."gender"');
+    expect(result?.sqlString).toContain('"tenant_user_profiles"."gender"');
     expect(result?.params).toContain('female');
   });
 
@@ -26,7 +26,7 @@ describe('groupRuleToSql', () => {
     });
     expect(result).toBeDefined();
     // All 5 columns should appear in the SQL
-    expect(result?.sqlString).toContain('"user_profiles"."gender"');
+    expect(result?.sqlString).toContain('"tenant_user_profiles"."gender"');
     expect(result?.sqlString).toContain('"student_profiles"."social_category"');
     expect(result?.sqlString).toContain('"student_academics"."standard_id"');
     expect(result?.sqlString).toContain('"student_profiles"."stream"');

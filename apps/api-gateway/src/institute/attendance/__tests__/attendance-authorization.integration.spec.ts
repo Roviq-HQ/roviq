@@ -22,6 +22,7 @@ import {
   studentAcademics,
   studentGuardianLinks,
   studentProfiles,
+  tenantUserProfiles,
   userProfiles,
   withAdmin,
 } from '@roviq/database';
@@ -179,6 +180,14 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
         firstName: { en: `Student ${name}` },
         gender: Gender.FEMALE,
       });
+      await tx.insert(tenantUserProfiles).values({
+        tenantId: tenantId,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        userId: person.userId,
+        firstName: { en: `Student ${name}` },
+        gender: Gender.FEMALE,
+      });
       const [profile] = await tx
         .insert(studentProfiles)
         .values({
@@ -328,6 +337,13 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
           userId: person.userId,
           firstName: { en: 'Parent' },
         });
+        await tx.insert(tenantUserProfiles).values({
+          tenantId: t,
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+          userId: person.userId,
+          firstName: { en: 'Parent' },
+        });
         const [guardian] = await tx
           .insert(guardianProfiles)
           .values({ tenantId: t, userId: person.userId, membershipId: person.membershipId, ...by })
@@ -373,6 +389,12 @@ describe('ROV-268 attendance section authorization through GraphQL and PostgreSQ
         await tx.delete(sections).where(inArray(sections.tenantId, tenantIds));
         await tx.delete(standards).where(inArray(standards.tenantId, tenantIds));
         await tx.delete(academicYears).where(inArray(academicYears.tenantId, tenantIds));
+        await tx.delete(tenantUserProfiles).where(
+          inArray(
+            tenantUserProfiles.userId,
+            actors.map((entry) => entry.userId),
+          ),
+        );
         await tx.delete(userProfiles).where(
           inArray(
             userProfiles.userId,

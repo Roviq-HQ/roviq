@@ -15,7 +15,7 @@ import {
 
 @InputType({ description: 'Input for creating a new student (ROV-154)' })
 export class CreateStudentInput {
-  // ── Personal (→ user_profiles) ──────────────────────────
+  // ── Personal (→ tenant_user_profiles) ───────────────────
   @Field(() => I18nTextScalar)
   @IsObject()
   firstName!: I18nContent;

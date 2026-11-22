@@ -25,6 +25,7 @@ import {
 import type { DrizzleDB } from '../../providers';
 import { SEED_ADMIN_PHONE, SEED_CREDENTIALS } from '../fixtures';
 import { SEED_IDS } from '../ids';
+import { seedTenantUserProfile } from '../tenant-user-profile';
 
 // Seeded people own their addresses: their email can identify them when a role is granted.
 const SEED_EMAIL_VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
@@ -190,27 +191,51 @@ export async function seedUsersAndMemberships(
     .onConflictDoNothing();
 
   // ── User profiles (needed by myProfile resolver + profile page) ──
-  for (const { userId, firstName, lastName, gender } of [
-    { userId: admin.id, firstName: { en: 'Admin' }, lastName: { en: 'Roviq' }, gender: 'MALE' },
-    { userId: teacher.id, firstName: { en: 'Rajesh' }, lastName: { en: 'Sharma' }, gender: 'MALE' },
-    { userId: student.id, firstName: { en: 'Priya' }, lastName: { en: 'Singh' }, gender: 'FEMALE' },
+  // `tenants` lists the institutes that keep their own copy of the person's profile.
+  for (const { userId, firstName, lastName, gender, tenants } of [
+    {
+      userId: admin.id,
+      firstName: { en: 'Admin' },
+      lastName: { en: 'Roviq' },
+      gender: 'MALE',
+      tenants: [inst1Id, inst2Id],
+    },
+    {
+      userId: teacher.id,
+      firstName: { en: 'Rajesh' },
+      lastName: { en: 'Sharma' },
+      gender: 'MALE',
+      tenants: [inst1Id],
+    },
+    {
+      userId: student.id,
+      firstName: { en: 'Priya' },
+      lastName: { en: 'Singh' },
+      gender: 'FEMALE',
+      tenants: [inst1Id],
+    },
     {
       userId: guardianUser.id,
       firstName: { en: 'Suresh' },
       lastName: { en: 'Kumar' },
       gender: 'MALE',
+      tenants: [inst1Id],
     },
     {
       userId: resellerUser.id,
       firstName: { en: 'Reseller' },
       lastName: { en: 'One' },
       gender: 'MALE',
+      tenants: [],
     },
   ] as const) {
     await tx
       .insert(userProfiles)
       .values({ userId, firstName, lastName, gender, ...BY })
       .onConflictDoNothing();
+    for (const tenantId of tenants) {
+      await seedTenantUserProfile(tx, { tenantId, userId, firstName, lastName, gender });
+    }
   }
 
   // admin — member of BOTH institutes + platform admin

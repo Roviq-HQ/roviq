@@ -7,8 +7,8 @@ import {
   studentAcademicsLive,
   studentGuardianLinksLive,
   studentProfilesLive,
+  tenantUserProfilesLive,
   userIdentifiersLive,
-  userProfilesLive,
 } from '@roviq/database';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 
@@ -39,11 +39,11 @@ export function studentsInYear(
       cwsnType: studentProfilesLive.cwsnType,
       isRteAdmitted: studentProfilesLive.isRteAdmitted,
       stream: studentProfilesLive.stream,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
-      gender: userProfilesLive.gender,
-      dateOfBirth: userProfilesLive.dateOfBirth,
-      motherTongue: userProfilesLive.motherTongue,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
+      gender: tenantUserProfilesLive.gender,
+      dateOfBirth: tenantUserProfilesLive.dateOfBirth,
+      motherTongue: tenantUserProfilesLive.motherTongue,
       rollNumber: studentAcademicsLive.rollNumber,
       standardId: studentAcademicsLive.standardId,
       standardName: standardsLive.name,
@@ -56,7 +56,13 @@ export function studentsInYear(
       studentProfilesLive,
       eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
     )
-    .leftJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+    .leftJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+        eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+      ),
+    )
     .innerJoin(standardsLive, eq(standardsLive.id, studentAcademicsLive.standardId))
     .leftJoin(sectionsLive, eq(sectionsLive.id, studentAcademicsLive.sectionId))
     .where(
@@ -77,15 +83,21 @@ export function guardianNames(tx: DrizzleDB) {
       studentProfileId: studentGuardianLinksLive.studentProfileId,
       relationship: studentGuardianLinksLive.relationship,
       userId: guardianProfilesLive.userId,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
     })
     .from(studentGuardianLinksLive)
     .innerJoin(
       guardianProfilesLive,
       eq(studentGuardianLinksLive.guardianProfileId, guardianProfilesLive.id),
     )
-    .innerJoin(userProfilesLive, eq(guardianProfilesLive.userId, userProfilesLive.userId));
+    .innerJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, guardianProfilesLive.userId),
+        eq(tenantUserProfilesLive.tenantId, guardianProfilesLive.tenantId),
+      ),
+    );
 }
 
 export type GuardianNameRow = Awaited<ReturnType<typeof guardianNames>>[number];

@@ -20,7 +20,7 @@ import {
   studentProfilesLive,
   tcRegister,
   tcRegisterLive,
-  userProfilesLive,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, asc, count, desc, eq, isNull, type SQL, sql } from 'drizzle-orm';
@@ -67,8 +67,8 @@ const detailsColumns = {
   originalTcId: tcRegisterLive.originalTcId,
   isCounterSigned: tcRegisterLive.isCounterSigned,
   createdAt: tcRegisterLive.createdAt,
-  studentFirstName: userProfilesLive.firstName,
-  studentLastName: userProfilesLive.lastName,
+  studentFirstName: tenantUserProfilesLive.firstName,
+  studentLastName: tenantUserProfilesLive.lastName,
   // The student's standard in the TC's academic year
   standardName: standardsLive.name,
 } as const;
@@ -381,7 +381,13 @@ export class TcDrizzleRepository extends TcRepository {
         .select(detailsColumns)
         .from(tcRegisterLive)
         .innerJoin(studentProfilesLive, eq(studentProfilesLive.id, tcRegisterLive.studentProfileId))
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+            eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+          ),
+        )
         .leftJoin(
           studentAcademicsLive,
           and(

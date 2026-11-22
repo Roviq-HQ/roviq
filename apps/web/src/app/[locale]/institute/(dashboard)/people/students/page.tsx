@@ -107,7 +107,7 @@ const ACADEMIC_STATUSES = [
   'PASSED_OUT',
 ] as const;
 
-/** Values accepted by StudentFilterInput.gender (joined from user_profiles). */
+/** Values accepted by StudentFilterInput.gender (joined from tenant_user_profiles). */
 const GENDERS = ['MALE', 'FEMALE', 'OTHER'] as const;
 
 /**

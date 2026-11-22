@@ -24,7 +24,7 @@ export class UpdateStudentInput {
   @Min(1)
   version!: number;
 
-  // ── Personal (→ user_profiles) ──────────────────────────
+  // ── Personal (→ tenant_user_profiles) ───────────────────
   @Field(() => I18nTextScalar, { nullable: true })
   @IsObject()
   @IsOptional()
