@@ -188,6 +188,7 @@ Full rationale + enforcing CI gate for each line: `docs/references/mistake-refer
 - Every `@CheckAbility` pair must be reachable by a role, every grant used (`ability-coverage.spec.ts`)
 - Reads from `<table>Live` views, writes to the base table · new soft-deletable table needs a `*Live` view, every `pgTable` needs RLS · ``.default(sql`uuidv7()`)``
 - `eventBus.emit(EVENT_PATTERNS.…)` via `EventBusService`, never `natsClient.emit` · every event prefix needs a stream
+- `@EventPattern` classes go in module `controllers`, and the app's `main.ts` calls `connectMicroservice()` (`pnpm check:event-handlers`)
 - `defineStateMachine` for status transitions · `calendarDaysBetween` / `isValidDateRange` / `rangesOverlap` from `@roviq/common-types/date-range`
 - UI: `<Button>` and `<FieldInfoPopover>` from `@roviq/ui`, `useTranslations()`, `useFormatDate()`, scope-prefixed nav hrefs
 - Testids: `testIds` registry from `@roviq/ui/testing/testid-registry` + `page.getByTestId()`; literal `data-testid` fails `pnpm check:testids`

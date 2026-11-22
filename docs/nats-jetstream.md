@@ -149,6 +149,52 @@ async handleRequested(@Payload() event: ApprovalRequestedEvent) { /* ... */ }
 async handleResolved(@Payload() event: ApprovalResolvedEvent) { /* ... */ }
 ```
 
+### Several handlers for one subject
+
+A workqueue stream lets one consumer filter on a subject, so every handler of that subject in
+an app shares one durable. The server keeps all of them and runs them for each delivery in
+registration order, one after another, under one `handlerTimeout`. If any handler throws, the
+delivery fails (nak with backoff, DLQ after `maxDeliver`) and the later handlers do not run on
+that attempt; on redelivery the whole chain runs again, so every handler must be idempotent.
+All handlers of a subject must declare the same extras (`stream`, `durable`, `maxDeliver`,
+`ackWait`, …); start-up fails with an error naming the subject and both values otherwise.
+
+A handler that throws resolves through Nest's RPC exception filter into an erroring Observable;
+the server unwraps it, so the failure reaches the retry and DLQ path instead of being acked.
+
+The class must be listed in its module's `controllers`, and the app's `main.ts` must call
+`connectMicroservice()`: Nest scans only controllers for message patterns, and without the
+transport nothing subscribes. `pnpm check:event-handlers` fails the build on either mistake.
+
+### api-gateway consumers
+
+The gateway consumes some of its own events (ROV-316). Its `main.ts` connects `JetStreamServer`
+with `inheritAppConfig: false`, so the HTTP/GraphQL global guards, exception filter and audit
+interceptor do not run for event deliveries (they read a request an event does not have).
+
+| Subject | Handlers | Effect |
+| ------- | -------- | ------ |
+| `ACADEMIC_YEAR.activated` | `StudentEventHandler`, `GroupInvalidationHandler` | Continuing students get a row in the new year; dynamic groups are invalidated |
+| `SECTION.deleted` | `StudentEventHandler`, `GroupInvalidationHandler` | The deleted section's `student_academics` rows are soft-deleted; section-based groups are invalidated |
+| `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` |
+| `GROUP.rules_updated` | `GroupInvalidationHandler` | That group gets `resolved_at = NULL` |
+
+- **Durable naming**: `gateway-<subject in kebab case>` (e.g. `gateway-academic-year-activated`),
+  with an explicit `stream`, both from `gatewayConsumer(pattern)` in
+  `apps/api-gateway/src/common/events/gateway-consumer.ts`. Every gateway handler of a subject
+  uses it, so they cannot disagree.
+- **Payloads** are validated first with `eventPayloadSchemas[pattern].parse(data)`; a payload
+  that fails goes to the DLQ after the retries.
+- **Tenant isolation**: each handler runs in `withTenant(db, mkInstituteCtx(tenantId, origin), …)`
+  with the event's `tenantId`, reads `*Live` views and writes base tables. An id of another
+  institute in the payload matches nothing under RLS.
+- **Idempotency**: each handler is safe to run twice and harmless for an institute, year, section
+  or group that no longer exists. The year rollover is one `INSERT … SELECT … ON CONFLICT DO
+  NOTHING`; standards belong to one year, so the target standard is matched in the new year by
+  `numeric_order`, and the student goes into its section with the lowest `display_order` (then
+  id). A student whose target standard has no section in the new year is skipped and counted in
+  the log. `SECTION.deleted` acts only while the section is still deleted.
+
 ### JetStreamContext API
 
 ```typescript
@@ -325,4 +371,5 @@ You're publishing outside a request handler. Use `NatsRecordBuilder` with explic
 If you change a stream's subjects or maxDeliver and do a rolling deploy, old instances may have old config. The server handles this with `streams.add()` → fallback to `streams.update()`. **Immutable fields** (retention, storage) cannot be auto-updated — require manual migration.
 
 ### Consumer not receiving messages
+Run `pnpm check:event-handlers`: the handler class must be in a module's `controllers` (not `providers`) and the app's `main.ts` must call `connectMicroservice()`.
 Check that the `filter_subject` matches your published subject. Wildcard `*` matches one token, `>` matches one or more. The server uses the `@EventPattern` subject as the `filter_subject`.
