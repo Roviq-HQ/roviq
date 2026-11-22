@@ -695,4 +695,49 @@ describe('notification pipeline (integration)', () => {
       expect(temporal.startWorkflowOnce).not.toHaveBeenCalled();
     });
   });
+
+  describe('sign-in alert', () => {
+    it('should store only the in-app row, with the plain IPv4 address', async () => {
+      const member = await createTestTeacher(db, institute.tenantId);
+      userIds.push(member.userId);
+      extraTeachers.push(member);
+      const event: AuthSecurityEvent = {
+        userId: member.userId,
+        tenantId: institute.tenantId,
+        eventType: 'LOGIN',
+        scope: 'institute',
+        resellerId: null,
+        metadata: { ip: '::ffff:127.0.0.1' },
+      };
+
+      await new AuthListener(dispatcher).handleSecurity(event, jetStreamCtx());
+
+      const rows = await rowsFor(member.userId);
+      expect(rows).toHaveLength(1);
+      const [row] = rows;
+      assert(row);
+      expect({
+        scope: row.scope,
+        tenantId: row.tenantId,
+        type: row.type,
+        title: row.title,
+      }).toEqual({
+        scope: 'institute',
+        tenantId: institute.tenantId,
+        type: 'AUTH_LOGIN',
+        title: { en: 'New sign-in to your account', hi: 'आपके खाते में नया साइन-इन' },
+      });
+      // The time is the moment of the call; its format is pinned in notification-types.spec.ts.
+      expect(row.body.en).toMatch(
+        /^A new sign-in was detected from IP 127\.0\.0\.1 at \d{1,2} \w{3} \d{4}, \d{1,2}:\d{2} [ap]m\. If this wasn't you, secure your account immediately\.$/,
+      );
+      expect(row.body.hi).toMatch(
+        /^\d{1,2} \S+ \d{4}, \d{2}:\d{2} पर IP 127\.0\.0\.1 से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना खाता सुरक्षित करें।$/,
+      );
+      expect(await deliveriesFor(member.userId)).toEqual([]);
+      expect(email.sent).toEqual([]);
+      expect(temporal.startWorkflowOnce).not.toHaveBeenCalled();
+      expect(temporal.signalWithStart).not.toHaveBeenCalled();
+    });
+  });
 });

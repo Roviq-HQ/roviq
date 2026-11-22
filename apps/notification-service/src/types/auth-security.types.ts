@@ -24,6 +24,8 @@ function formatTime(iso: string, locale: Locale): string {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: 'Asia/Kolkata',
+    // hi-IN defaults to an English "am/pm"; Hindi copy reads a 24-hour clock.
+    ...(locale === 'hi' ? { hourCycle: 'h23' } : {}),
   }).format(new Date(iso));
 }
 
@@ -72,6 +74,8 @@ const COPY: Record<AuthAlertKey, AuthCopy> = {
   },
 };
 
+// A sign-in alert on every sign-in is noise outside the app.
+const IN_APP_ONLY: readonly NotificationChannel[] = [];
 const BASE_CHANNELS: readonly NotificationChannel[] = ['EMAIL', 'PUSH'];
 // WhatsApp only where the user must act at once.
 const WITH_WHATSAPP: readonly NotificationChannel[] = ['EMAIL', 'WHATSAPP', 'PUSH'];
@@ -102,7 +106,7 @@ function authAlertType(
   };
 }
 
-export const authLoginType = authAlertType('AUTH_LOGIN', BASE_CHANNELS);
+export const authLoginType = authAlertType('AUTH_LOGIN', IN_APP_ONLY);
 export const authPasswordResetType = authAlertType('AUTH_PASSWORD_RESET', WITH_WHATSAPP);
 export const authNewDeviceType = authAlertType('AUTH_NEW_DEVICE', WITH_WHATSAPP);
 export const authAccountLockedType = authAlertType('AUTH_ACCOUNT_LOCKED', BASE_CHANNELS);

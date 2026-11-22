@@ -78,7 +78,7 @@ const SAMPLES: { [K in RegularTypeKey]: RegularMessage<K> } = {
     type: 'AUTH_LOGIN',
     params: {
       ip: '203.0.113.7',
-      at: '2026-04-10T04:30:00.000Z',
+      at: '2026-11-22T12:47:00.000Z',
       accountPath: '/institute/account',
     },
   },
@@ -327,6 +327,38 @@ describe('regular type copy', () => {
     expect(() =>
       composeDigest({ type: 'FEE_REMINDER', items: [SAMPLES.FEE_REMINDER.params] }, 'EMAIL', 'en'),
     ).toThrow('Notification type FEE_REMINDER has no digest');
+  });
+
+  it('should word a sign-in with a 12-hour clock in English and a 24-hour clock in Hindi', () => {
+    expect(composeInApp(SAMPLES.AUTH_LOGIN)).toEqual({
+      title: { en: 'New sign-in to your account', hi: 'आपके खाते में नया साइन-इन' },
+      body: {
+        en: "A new sign-in was detected from IP 203.0.113.7 at 22 Nov 2026, 6:17 pm. If this wasn't you, secure your account immediately.",
+        hi: '22 नव॰ 2026, 18:17 पर IP 203.0.113.7 से नया साइन-इन हुआ। यदि यह आप नहीं थे, तो तुरंत अपना खाता सुरक्षित करें।',
+      },
+      data: { path: '/institute/account' },
+    });
+  });
+
+  it('should word a new-device email with the same clocks', () => {
+    const sample = SAMPLES.AUTH_NEW_DEVICE;
+
+    expect(composeOutside(sample, 'EMAIL', 'en')).toEqual({
+      subject: 'New device sign-in',
+      body: "Your account was accessed from a new device at 10 Apr 2026, 10:00 am (IP: 203.0.113.7). If this wasn't you, secure your account.",
+    });
+    expect(composeOutside(sample, 'EMAIL', 'hi')).toEqual({
+      subject: 'नए उपकरण से साइन-इन',
+      body: '10 अप्रैल 2026, 10:00 पर एक नए उपकरण से आपके खाते में प्रवेश हुआ (IP: 203.0.113.7)। यदि यह आप नहीं थे, तो अपना खाता सुरक्षित करें।',
+    });
+  });
+
+  it('should keep the sign-in alert in the app and the other security alerts on their channels', () => {
+    expect(REGULAR_TYPES.AUTH_LOGIN.channels).toEqual([]);
+    expect(REGULAR_TYPES.AUTH_PASSWORD_RESET.channels).toEqual(['EMAIL', 'WHATSAPP', 'PUSH']);
+    expect(REGULAR_TYPES.AUTH_NEW_DEVICE.channels).toEqual(['EMAIL', 'WHATSAPP', 'PUSH']);
+    expect(REGULAR_TYPES.AUTH_ACCOUNT_LOCKED.channels).toEqual(['EMAIL', 'PUSH']);
+    expect(REGULAR_TYPES.AUTH_SESSION_REVOKED.channels).toEqual(['EMAIL', 'PUSH']);
   });
 
   it('should mark only the security alerts and billing events as critical', () => {

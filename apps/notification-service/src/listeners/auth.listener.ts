@@ -1,3 +1,4 @@
+import { isIPv4 } from 'node:net';
 import { Controller, Logger } from '@nestjs/common';
 import { Ctx, EventPattern, Payload } from '@nestjs/microservices';
 import type { AuthSecurityEventType } from '@roviq/common-types';
@@ -37,6 +38,12 @@ export function authAudience(event: AuthSecurityEvent): { audience: Audience; in
     return { audience: { scope, tenantId: null, resellerId: event.resellerId }, inApp: true };
   }
   return { audience: PLATFORM_AUDIENCE, inApp: scope === 'platform' };
+}
+
+/** A dual-stack socket reports an IPv4 client as `::ffff:a.b.c.d`; people know the IPv4 form. */
+export function displayIp(ip: string): string {
+  const mapped = /^::ffff:(.+)$/i.exec(ip)?.[1];
+  return mapped !== undefined && isIPv4(mapped) ? mapped : ip;
 }
 
 @Controller()
@@ -87,7 +94,7 @@ export class AuthListener {
       return;
     }
 
-    const ip = typeof metadata.ip === 'string' ? metadata.ip : null;
+    const ip = typeof metadata.ip === 'string' ? displayIp(metadata.ip) : null;
     await this.dispatcher.dispatch({
       message: {
         type: ALERT_TYPE[eventType],

@@ -3,7 +3,7 @@ import type { AuthSecurityEvent } from '@roviq/notifications';
 import { createMock } from '@roviq/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationDispatcher } from '../../services/notification-dispatcher.service';
-import { AuthListener, authAudience } from '../auth.listener';
+import { AuthListener, authAudience, displayIp } from '../auth.listener';
 
 const TENANT = '019a0000-0000-7000-8000-000000000001';
 const RESELLER = '019a0000-0000-7000-8000-000000000003';
@@ -90,6 +90,21 @@ describe('AuthListener', () => {
     });
   });
 
+  it('should show an IPv4 address that arrives IPv6-mapped in its plain form', async () => {
+    await listener.handleSecurity(event({ metadata: { ip: '::ffff:127.0.0.1' } }), ctx);
+
+    expect(dispatcher.dispatch).toHaveBeenCalledWith({
+      message: {
+        type: 'AUTH_LOGIN',
+        params: { ip: '127.0.0.1', at: NOW.toISOString(), accountPath: '/institute/account' },
+      },
+      audience: { scope: 'institute', tenantId: TENANT, resellerId: null },
+      recipient: { userId: 'user-1', membershipId: null },
+      source: { stream: 'NOTIFICATION', sequence: 9 },
+      inApp: true,
+    });
+  });
+
   it('should send the verification code only to the address the event names', async () => {
     await listener.handleSecurity(
       event({
@@ -134,5 +149,18 @@ describe('AuthListener', () => {
     );
 
     expect(dispatcher.dispatchSecret).not.toHaveBeenCalled();
+  });
+});
+
+describe('displayIp', () => {
+  it.each([
+    ['::ffff:127.0.0.1', '127.0.0.1'],
+    ['::FFFF:203.0.113.7', '203.0.113.7'],
+    ['203.0.113.7', '203.0.113.7'],
+    ['2001:db8::1', '2001:db8::1'],
+    ['::ffff:7f00:1', '::ffff:7f00:1'],
+    ['::1', '::1'],
+  ])('should show %s as %s', (raw, shown) => {
+    expect(displayIp(raw)).toBe(shown);
   });
 });
