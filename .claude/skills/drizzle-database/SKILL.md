@@ -102,7 +102,7 @@ After ANY schema change:
 - Tenant-scoped tables: spread `...tenantColumns` (tenantId + timestamps + tracking + soft delete + version)
 - Every other mutable table, including identity tables (`users`, `refresh_tokens`, `phone_numbers`, `auth_providers`, `user_profiles`, the three membership tables, `resellers`): spread `...entityColumns`. `refresh_tokens` uses `entityColumns` plus its own nullable `tenant_id`
 - Exempt, and the only tables that may skip audit + soft-delete columns:
-  - append-only records: `audit_logs`, `auth_events`, `dlq_messages`, `consent_records`, `impersonation_sessions`
+  - append-only records: `audit_logs`, `auth_events`, `dlq_messages`, `consent_records`, `impersonation_sessions`, `notification_deliveries`
   - counters: `tenant_sequences`, `reseller_invoice_sequences`
   - EE financial records (`invoices`, `payments`, `subscriptions`): `trackingColumns`, status only, never deleted
 - A row inserted before its actor exists (self-registration) or by an unattended flow uses `SYSTEM_USER_ID`. Otherwise pass the acting user's id explicitly — `created_by` / `updated_by` are NOT NULL with no default on purpose
