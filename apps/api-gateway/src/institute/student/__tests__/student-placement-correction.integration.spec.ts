@@ -652,6 +652,47 @@ describe('Student placement correction (integration)', () => {
       expect(emit).not.toHaveBeenCalled();
     });
 
+    it('should refuse to enrol with an id of another institute, another year or another class', async () => {
+      const student = await addStudent(result.db, inst.tenantId);
+      const valid = {
+        studentProfileId: student.profileId,
+        academicYearId: years.nextYearId,
+        standardId: next5,
+        sectionId: n5A,
+      };
+      const cases: [Record<string, string>, string][] = [
+        [{ studentProfileId: other.profileId }, 'STUDENT_NOT_FOUND'],
+        [{ academicYearId: other.yearId }, 'ACADEMIC_YEAR_NOT_FOUND'],
+        [{ standardId: other.standardId }, 'STANDARD_NOT_FOUND'],
+        [{ standardId: prev5 }, 'STANDARD_NOT_FOUND'],
+        [{ sectionId: n6B }, 'SECTION_NOT_FOUND'],
+        [{ sectionId: other.sectionId }, 'SECTION_NOT_FOUND'],
+      ];
+      const before = await rowsOf(inst.tenantId);
+      const otherBefore = await rowsOf(otherInst.tenantId);
+      const emit = vi.spyOn(result.app.get(EventBusService), 'emit');
+
+      for (const [wrong, code] of cases) {
+        const response = await gql<{ enrollStudent: string }>(
+          ENROLL,
+          { input: { ...valid, ...wrong } },
+          token,
+        );
+        expect(response.data).toBeNull();
+        expect(response.errors?.[0]?.extensions?.code).toBe(code);
+      }
+
+      expect(await rowsOf(inst.tenantId)).toEqual(before);
+      expect(await rowsOf(otherInst.tenantId)).toEqual(otherBefore);
+      expect(emit).not.toHaveBeenCalled();
+
+      const ok = await gql<{ enrollStudent: string }>(ENROLL, { input: valid }, token);
+      expect(ok.errors).toBeUndefined();
+      expect(await liveRowsIn(student.profileId, years.nextYearId)).toEqual([
+        { standardId: next5, sectionId: n5A },
+      ]);
+    });
+
     it('should mark section- and standard-based groups of this institute unresolved, not another’s', async () => {
       const student = await placedStudent(5);
       const emit = vi.spyOn(result.app.get(EventBusService), 'emit');

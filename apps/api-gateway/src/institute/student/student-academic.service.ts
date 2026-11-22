@@ -107,6 +107,10 @@ export class StudentAcademicService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
+    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student-academic'), (tx) =>
+      this.assertEnrolTarget(tx, input),
+    );
+
     // Get section and capacity norms
     const { section, norms } = await this.getSectionWithNorms(tenantId, input.sectionId);
 
@@ -582,6 +586,29 @@ export class StudentAcademicService {
       throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
     }
     return standard;
+  }
+
+  /** Foreign keys do not apply RLS: without this, another institute's student or year id is accepted. */
+  private async assertEnrolTarget(tx: DrizzleDB, input: EnrollStudentInput): Promise<void> {
+    const [student] = await tx
+      .select({ id: studentProfilesLive.id })
+      .from(studentProfilesLive)
+      .where(eq(studentProfilesLive.id, input.studentProfileId))
+      .limit(1);
+    if (!student) {
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
+    }
+
+    const [year] = await tx
+      .select({ id: academicYearsLive.id })
+      .from(academicYearsLive)
+      .where(eq(academicYearsLive.id, input.academicYearId))
+      .limit(1);
+    if (!year) {
+      throw new BusinessException(ErrorCode.ACADEMIC_YEAR_NOT_FOUND, 'Academic year not found');
+    }
+
+    await this.assertClassInYear(tx, input.academicYearId, input.standardId, input.sectionId);
   }
 
   private getSectionWithNorms(tenantId: string, sectionId: string) {

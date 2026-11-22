@@ -121,7 +121,10 @@ Three actions fix one student without touching anyone else (ROV-322).
   It lists students who are still studying here (ENROLLED, PROMOTED, DETAINED, RE_ENROLLED),
   have a year record in an earlier year and none in the selected one; class and section show
   their last placement. Each row has **Enrol in this year**, which calls `enrollStudent`; the
-  student page offers the same button when the student has no row in the active year. A
+  student page offers the same button when the student has no row in the active year.
+  `enrollStudent` refuses a student or year of another institute (`STUDENT_NOT_FOUND`,
+  `ACADEMIC_YEAR_NOT_FOUND`), a class outside the year (`STANDARD_NOT_FOUND`) and a section
+  outside the class (`SECTION_NOT_FOUND`). A
   teacher's section-limited view finds nobody here, since nobody has a section in that year.
 - **Remove from this year.** Next to Change class. `removeStudentFromYear(studentAcademicId,
   reason)` soft-deletes the year record (reason 3 to 500 characters, kept in the audit log as
