@@ -234,6 +234,25 @@ describe('notifications', () => {
     });
   });
 
+  it('a dedupe key is used once, also after its row is soft-deleted', async () => {
+    await inTx(async (client) => {
+      const insert = `INSERT INTO notifications
+          (scope, tenant_id, recipient_user_id, type, title, body, dedupe_key, created_by, updated_by)
+        VALUES ('institute', $1, $2, 'LEAVE_DECIDED', $3, $4, $5, $6, $6)`;
+      const key = `test:${randomUUID()}`;
+      const row = [SEED_IDS.INSTITUTE_1, SEED_IDS.USER_ADMIN, TITLE, BODY, key, SYSTEM];
+
+      await client.query(insert, row);
+      await expectRefused(client, /notifications_dedupe_key_key/, insert, row);
+
+      await client.query(
+        'UPDATE notifications SET deleted_at = now(), deleted_by = $1 WHERE dedupe_key = $2',
+        [SYSTEM, key],
+      );
+      await expectRefused(client, /notifications_dedupe_key_key/, insert, row);
+    });
+  });
+
   it('a row must name the institute or reseller its scope requires', async () => {
     await inTx(async (client) => {
       const insert = `INSERT INTO notifications

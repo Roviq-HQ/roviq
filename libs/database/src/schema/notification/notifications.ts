@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -49,6 +50,8 @@ export const notifications = pgTable(
     body: i18nText('body').notNull(),
     /** Deep-link target and entity ids. Never a one-time code or a password. */
     data: jsonb().$type<Record<string, unknown>>(),
+    /** Source event and recipient; a redelivered event must not create a second row. */
+    dedupeKey: text('dedupe_key'),
     readAt: timestamp('read_at', { withTimezone: true }),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     ...entityColumns,
@@ -63,6 +66,8 @@ export const notifications = pgTable(
         ELSE false
       END`,
     ),
+    // Not partial: a soft-deleted notification must stay deleted when its event is redelivered.
+    uniqueIndex('notifications_dedupe_key_key').using('btree', table.dedupeKey.asc().nullsLast()),
     index('notifications_tenant_id_idx').using('btree', table.tenantId.asc().nullsLast()),
     index('notifications_recipient_inbox_idx')
       .using(
