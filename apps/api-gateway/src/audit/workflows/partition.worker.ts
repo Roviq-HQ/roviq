@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
-import { EmbeddedTemporalWorker } from '@roviq/temporal';
+import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
 import { Client, Connection } from '@temporalio/client';
 import { createPartitionActivities } from './partition.activities';
 import {
@@ -24,6 +24,7 @@ export class AuditPartitionWorkerService extends EmbeddedTemporalWorker {
       label: 'Audit partition worker',
       taskQueue: AUDIT_MAINTENANCE_TASK_QUEUE,
       loggerName: AuditPartitionWorkerService.name,
+      restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });
   }
 

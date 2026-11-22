@@ -139,7 +139,8 @@ To turn scanning on:
 
 Temporal workers run inside the api-gateway process, switched on per instance with a
 `*_WORKER_ENABLED=true` variable. Set each flag on exactly the gateway instances that should run
-that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal.
+that worker; every instance needs `TEMPORAL_ADDRESS` to reach Temporal. A worker that fails to
+start or stops (Temporal restarted, connection lost) tries to start again every 30 seconds.
 
 - **`FILE_SWEEPER_WORKER_ENABLED`** (ROV-300): the hourly file sweeper (`docs/architecture.md` →
   "File sweeper"). It creates the `file-sweeper-hourly` schedule at start if Temporal does not

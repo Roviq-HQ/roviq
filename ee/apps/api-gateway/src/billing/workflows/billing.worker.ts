@@ -1,51 +1,30 @@
-/**
- * NestJS-based billing Temporal worker.
- *
- * Registers billing automation workflows on the 'billing-automation' task queue.
- * Uses ConfigService for all env access.
- */
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NativeConnection, Worker } from '@temporalio/worker';
-import { createDrizzleForWorker } from './worker-db';
+import type { DrizzleDB } from '@roviq/database';
+import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
+import { createBillingActivities } from './billing.activities';
+import { billingWorkflowsPath } from './billing.workflows-path';
 
 const TASK_QUEUE = 'billing-automation';
 
+/** Runs the billing automation workflows (ROV-124) in this gateway when BILLING_WORKER_ENABLED is 'true'. */
 @Injectable()
-export class BillingWorkerService implements OnModuleInit {
-  private readonly logger = new Logger(BillingWorkerService.name);
-
-  constructor(private readonly config: ConfigService) {}
-
-  async onModuleInit() {
-    // Only start worker if explicitly enabled (avoids running in every API instance)
-    if (this.config.get<string>('BILLING_WORKER_ENABLED') !== 'true') return;
-
-    this.startWorker().catch((err) => {
-      this.logger.error('Billing worker failed to start', (err as Error).message);
+export class BillingWorkerService extends EmbeddedTemporalWorker {
+  constructor(config: ConfigService) {
+    super(config, {
+      flag: 'BILLING_WORKER_ENABLED',
+      label: 'Billing worker',
+      taskQueue: TASK_QUEUE,
+      loggerName: BillingWorkerService.name,
+      restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });
   }
 
-  private async startWorker(): Promise<void> {
-    const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
-    const dbUrl = this.config.get<string>(
-      'DATABASE_URL_MIGRATE',
-      'postgresql://roviq:roviq_dev@localhost:5434/roviq',
-    );
-    const connection = await NativeConnection.connect({ address });
-    const db = await createDrizzleForWorker(dbUrl);
+  protected createActivities(db: DrizzleDB) {
+    return { ...createBillingActivities(db) };
+  }
 
-    const { createBillingActivities } = await import('./billing.activities.js');
-    const activities = createBillingActivities(db);
-
-    const worker = await Worker.create({
-      connection,
-      taskQueue: TASK_QUEUE,
-      workflowsPath: require.resolve('./workflows'),
-      activities,
-    });
-
-    this.logger.log(`Billing worker started on queue: ${TASK_QUEUE}`);
-    await worker.run();
+  protected workflowsPath(): string {
+    return billingWorkflowsPath();
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
-import { EmbeddedTemporalWorker } from '@roviq/temporal';
+import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { ConsentGate } from '../delivery/consent-gate';
@@ -10,9 +10,6 @@ import { NotificationWriteDrizzleRepository } from '../repositories/notification
 import { createNotificationActivities } from './notification.activities';
 import { notificationWorkflowsPath } from './notification.workflows-path';
 import { NOTIFICATION_TASK_QUEUE } from './notification-workflow.types';
-
-/** Docker restarts only an exited process, so a stopped worker must start itself again. */
-export const NOTIFICATION_WORKER_RESTART_DELAY_MS = 30_000;
 
 /**
  * Runs the delivery and digest workflows (ROV-314) in notification-service when
@@ -31,7 +28,7 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
       label: 'Notification worker',
       taskQueue: NOTIFICATION_TASK_QUEUE,
       loggerName: NotificationWorkerService.name,
-      restartDelayMs: NOTIFICATION_WORKER_RESTART_DELAY_MS,
+      restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });
   }
 

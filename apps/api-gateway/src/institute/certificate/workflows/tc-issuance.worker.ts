@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DrizzleDB } from '@roviq/database';
-import { EmbeddedTemporalWorker } from '@roviq/temporal';
+import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq/temporal';
 import { createTCIssuanceActivities } from './tc-issuance.activities';
 import { DEFAULT_TC_TASK_QUEUE } from './tc-issuance.types';
 import { tcIssuanceWorkflowsPath } from './tc-issuance.workflows-path';
@@ -19,6 +19,7 @@ export class TCIssuanceWorkerService extends EmbeddedTemporalWorker {
       // Same variable and default as CertificateService uses to start the workflow.
       taskQueue: config.get<string>('TEMPORAL_TC_TASK_QUEUE', DEFAULT_TC_TASK_QUEUE),
       loggerName: TCIssuanceWorkerService.name,
+      restartDelayMs: EMBEDDED_WORKER_RESTART_DELAY_MS,
     });
   }
 

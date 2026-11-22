@@ -11,6 +11,9 @@ import { openWorkerDb } from './worker-db';
  */
 export type EmbeddedWorkerStatus = 'disabled' | 'starting' | 'running' | 'stopped';
 
+/** Docker restarts only an exited process, so a stopped worker must start itself again. */
+export const EMBEDDED_WORKER_RESTART_DELAY_MS = 30_000;
+
 /**
  * A Temporal worker that runs inside the app (api-gateway, notification-service) when its `*_WORKER_ENABLED` flag is 'true',
  * and stops cleanly on shutdown. Same lifecycle as the file sweeper and compliance export
