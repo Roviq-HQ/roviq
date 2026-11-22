@@ -1,7 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
   check,
-  index,
   inet,
   jsonb,
   pgPolicy,
@@ -94,9 +93,8 @@ export const auditLogs = pgTable(
     ),
 
     check('chk_audit_subject_tenant', sql`"subject_tenant_id" IS NULL OR "scope" <> 'institute'`),
-    index('audit_logs_subject_tenant_idx')
-      .on(table.subjectTenantId, table.createdAt)
-      .where(sql`"subject_tenant_id" IS NOT NULL`),
+    // audit_logs_subject_tenant_idx lives in the rov-311 migration: drizzle-kit push cannot see
+    // an index on a partitioned table and would create it again on every run.
 
     // === RLS Policies (5-role model) ===
 
