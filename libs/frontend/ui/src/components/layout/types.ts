@@ -1,5 +1,6 @@
 import type { AppAction, AppSubject } from '@roviq/common-types';
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 export interface NavItem {
   title: string;
@@ -31,15 +32,6 @@ export interface InstituteSwitcherConfig {
 export interface UserInfo {
   username: string;
   email: string;
-}
-
-export interface NotificationConfig {
-  applicationIdentifier: string;
-  subscriberId: string;
-  subscriberHash: string;
-  tenantId?: string;
-  backendUrl?: string;
-  socketUrl?: string;
 }
 
 /**
@@ -99,7 +91,8 @@ export interface LayoutConfig {
   /** Replaces "Log out" in the user menu, e.g. while the tab is an impersonation session. */
   logoutLabel?: string;
   instituteSwitcher?: InstituteSwitcherConfig;
-  notifications?: NotificationConfig;
+  /** Topbar notification bell; the app supplies it because it fetches its own data. */
+  notificationBell?: ReactNode;
   /**
    * Symbolic-slug → render-info map used to resolve bottom-nav slugs into
    * actual links. Required when `bottomNav` is set.

@@ -8,6 +8,7 @@ import type { LayoutConfig, NavGroup, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
 import { ImpersonationBannerView } from '@web/components/impersonation/impersonation-banner';
 import { useImpersonationSession } from '@web/components/impersonation/use-impersonation-session';
+import { NotificationBell } from '@web/components/notifications/notification-bell';
 import { useRoleName } from '@web/hooks/use-role-name';
 import {
   Award,
@@ -36,7 +37,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 import { BillingRealtime } from './billing/billing-realtime';
@@ -54,22 +55,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const ti = useI18nField();
   const roleName = useRoleName();
 
-  usePushNotifications();
+  const { unregisterPushToken } = usePushNotifications();
   const changeLocale = useLocaleChange();
-
-  const subscriberId = user?.id ?? '';
-  const [subscriberHash, setSubscriberHash] = useState<string>();
-
-  useEffect(() => {
-    if (!subscriberId || !process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER) return;
-    fetch('/api/novu-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscriberId }),
-    })
-      .then((r) => r.json())
-      .then((data) => setSubscriberHash(data.subscriberHash));
-  }, [subscriberId]);
+  const signOut = () => {
+    unregisterPushToken();
+    void logout();
+  };
 
   const instituteSwitcher =
     memberships && memberships.length > 1 && user?.tenantId
@@ -283,19 +274,10 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     appName: tCommon('appNameInstitute'),
     user: user ? { username: user.username, email: user.email } : undefined,
     // Log out would sign the impersonator out of their own account; this tab only exits.
-    onLogout: impersonation.active ? impersonation.exit : logout,
+    onLogout: impersonation.active ? impersonation.exit : signOut,
     logoutLabel: impersonation.active ? tAuth('exitImpersonation') : undefined,
     instituteSwitcher,
-    notifications: process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER
-      ? {
-          applicationIdentifier: process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER,
-          subscriberId,
-          subscriberHash: subscriberHash ?? '',
-          tenantId: user?.tenantId,
-          backendUrl: process.env.NEXT_PUBLIC_NOVU_BACKEND_URL || undefined,
-          socketUrl: process.env.NEXT_PUBLIC_NOVU_SOCKET_URL || undefined,
-        }
-      : undefined,
+    notificationBell: <NotificationBell />,
     navGroups: [
       {
         title: t('overview'),

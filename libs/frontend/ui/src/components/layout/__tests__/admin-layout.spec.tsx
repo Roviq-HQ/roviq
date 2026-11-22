@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createMongoAbility, type RawRuleOf } from '@casl/ability';
 import type { AppAbility } from '@roviq/common-types';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { Home } from 'lucide-react';
 import type * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -26,11 +26,6 @@ vi.mock('next-intl', () => ({
 vi.mock('next-themes', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useTheme: () => ({ theme: 'light', setTheme: vi.fn(), resolvedTheme: 'light' }),
-}));
-
-// @novu/nextjs Inbox is a heavy widget that opens a websocket. Stub it.
-vi.mock('@novu/nextjs', () => ({
-  Inbox: () => <div data-testid="novu-inbox-stub" />,
 }));
 
 // next/image
@@ -117,6 +112,16 @@ describe('AdminLayout', () => {
 
     expect(screen.queryByTestId('bottom-tab-bar')).not.toBeInTheDocument();
     expect(screen.getByText('page-content')).toBeInTheDocument();
+  });
+
+  it('renders the app-supplied notification bell inside the topbar', () => {
+    render(
+      <AdminLayout config={{ ...baseConfig, notificationBell: <span>bell-slot</span> }}>
+        <div>page-content</div>
+      </AdminLayout>,
+    );
+
+    expect(within(screen.getByTestId('topbar')).getByText('bell-slot')).toBeInTheDocument();
   });
 
   describe('nav item abilities', () => {

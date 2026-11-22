@@ -4,6 +4,7 @@ import { ProtectedRoute, useAuth } from '@roviq/auth';
 import { NAV_SLUGS } from '@roviq/common-types';
 import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
+import { NotificationBell } from '@web/components/notifications/notification-bell';
 import {
   Activity,
   BarChart2,
@@ -19,11 +20,10 @@ import {
   Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
 import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
-// Hooks below (push registration, Novu) call the API, so they run only once the route allows it.
+// Hooks below (push registration, notification bell) call the API, so they run only once the route allows it.
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
@@ -37,22 +37,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const tCommon = useTranslations('common');
   const { logout, user } = useAuth();
 
-  usePushNotifications();
+  const { unregisterPushToken } = usePushNotifications();
   const changeLocale = useLocaleChange();
-
-  const subscriberId = user?.id ?? '';
-  const [subscriberHash, setSubscriberHash] = useState<string>();
-
-  useEffect(() => {
-    if (!subscriberId || !process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER) return;
-    fetch('/api/novu-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscriberId }),
-    })
-      .then((r) => r.json())
-      .then((data) => setSubscriberHash(data.subscriberHash));
-  }, [subscriberId]);
+  const signOut = () => {
+    unregisterPushToken();
+    void logout();
+  };
 
   // Admin registry covers the platform-admin destinations. The audit-log page
   // lives at `/audit-logs` (note the trailing 's'), unlike institute/reseller.
@@ -103,18 +93,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     onLocaleChange: changeLocale,
     appName: tCommon('appNameAdmin'),
     user: user ? { username: user.username, email: user.email } : undefined,
-    onLogout: logout,
-    notifications:
-      subscriberHash && process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER
-        ? {
-            applicationIdentifier: process.env.NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER,
-            subscriberId,
-            subscriberHash,
-            tenantId: user?.tenantId,
-            backendUrl: process.env.NEXT_PUBLIC_NOVU_BACKEND_URL || undefined,
-            socketUrl: process.env.NEXT_PUBLIC_NOVU_SOCKET_URL || undefined,
-          }
-        : undefined,
+    onLogout: signOut,
+    notificationBell: <NotificationBell />,
     navGroups: [
       {
         title: t('overview'),

@@ -59,7 +59,6 @@ export {
   type NavGroup,
   type NavItem,
   type NavRegistryEntry,
-  type NotificationConfig,
   navAbility,
   type UserInfo,
 } from './components/layout/types';

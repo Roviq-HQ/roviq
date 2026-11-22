@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Building2, Check, ChevronsUpDown, Monitor, Moon, Sun } from 'lucide-react';
+import { Building2, Check, ChevronsUpDown, Monitor, Moon, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
@@ -16,7 +16,6 @@ import {
 } from '../ui/dropdown-menu';
 import { Breadcrumbs } from './breadcrumbs';
 import { LocaleSwitcher } from './locale-switcher';
-import { NotificationBell } from './notification-bell';
 import { MobileSidebar } from './sidebar';
 import type { InstituteSwitcherConfig, LayoutConfig } from './types';
 
@@ -162,7 +161,6 @@ function UserMenu({
 }
 
 export function Topbar({ config }: { config: LayoutConfig }) {
-  const tNav = useTranslations('nav');
   return (
     <header
       data-testid={layout.topbar}
@@ -174,14 +172,7 @@ export function Topbar({ config }: { config: LayoutConfig }) {
         <Breadcrumbs />
       </div>
       <div className="ms-auto flex shrink-0 items-center gap-1">
-        {config.notifications ? (
-          <NotificationBell config={config.notifications} />
-        ) : (
-          <Button variant="ghost" size="icon" aria-label={tNav('notifications')}>
-            <Bell className="size-4" />
-            <span className="sr-only">{tNav('notifications')}</span>
-          </Button>
-        )}
+        {config.notificationBell}
         <ThemeToggle />
         <div className="hidden xl:block">
           <LocaleSwitcher onLocaleChange={config.onLocaleChange} />

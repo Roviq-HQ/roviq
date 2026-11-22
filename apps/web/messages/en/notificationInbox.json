@@ -1,0 +1,17 @@
+{
+  "bellLabel": "{count, plural, =0 {Notifications} one {Notifications, # unread} other {Notifications, # unread}}",
+  "title": "Notifications",
+  "markAllRead": "Mark all as read",
+  "loadMore": "Load more",
+  "loadingMore": "Loading…",
+  "loading": "Loading notifications",
+  "empty": "No notifications yet",
+  "emptyDescription": "Updates about attendance, leave, fees and your account appear here.",
+  "error": "Could not load notifications.",
+  "retry": "Try again",
+  "unread": "New",
+  "markFailed": "Could not mark the notification as read. Please try again.",
+  "markAllFailed": "Could not mark all notifications as read. Please try again.",
+  "markAllDone": "{count, plural, one {# notification marked as read} other {# notifications marked as read}}",
+  "readOnlyNote": "You are viewing as another user, so notifications cannot be marked as read here."
+}

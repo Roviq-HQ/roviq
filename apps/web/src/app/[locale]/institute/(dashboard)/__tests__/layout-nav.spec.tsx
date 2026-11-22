@@ -3,10 +3,13 @@
  * the viewer lacks (covered in admin-layout.spec), so every gated page's item must carry one.
  */
 import type { LayoutConfig } from '@roviq/ui';
+import { NotificationBell } from '@web/components/notifications/notification-bell';
+import { isValidElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../../../__test-utils__/render-with-providers';
 
 const captured = vi.hoisted(() => ({ config: null as LayoutConfig | null }));
+const session = vi.hoisted(() => ({ logout: vi.fn(), unregisterPushToken: vi.fn() }));
 
 vi.mock('@roviq/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@roviq/ui')>()),
@@ -19,7 +22,7 @@ vi.mock('@roviq/ui', async (importOriginal) => ({
 vi.mock('@roviq/auth', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth: () => ({
-    logout: vi.fn(),
+    logout: session.logout,
     user: { id: 'user-1', username: 'teacher', tenantId: 'tenant-1', abilityRules: [] },
     memberships: [],
     switchInstitute: vi.fn(),
@@ -28,7 +31,9 @@ vi.mock('@roviq/auth', () => ({
 vi.mock('@web/components/impersonation/use-impersonation-session', () => ({
   useImpersonationSession: () => ({ active: false }),
 }));
-vi.mock('../../../../../hooks/use-push-notifications', () => ({ usePushNotifications: vi.fn() }));
+vi.mock('../../../../../hooks/use-push-notifications', () => ({
+  usePushNotifications: () => ({ unregisterPushToken: session.unregisterPushToken }),
+}));
 vi.mock('../institute-locales-provider', () => ({
   CurrentInstituteLocalesProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -74,5 +79,34 @@ describe('Institute sidebar abilities', () => {
 
     expect(sidebarItem('/dashboard').ability).toBeUndefined();
     expect(sidebarItem('/profile').ability).toBeUndefined();
+  });
+});
+
+describe('Institute topbar', () => {
+  it('drops the browser push token, then logs out', () => {
+    renderWithProviders(
+      <InstituteDashboard>
+        <div />
+      </InstituteDashboard>,
+    );
+
+    captured.config?.onLogout?.();
+
+    expect(session.unregisterPushToken).toHaveBeenCalledTimes(1);
+    expect(session.logout).toHaveBeenCalledTimes(1);
+    expect(session.unregisterPushToken.mock.invocationCallOrder[0]).toBeLessThan(
+      session.logout.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('hands the topbar our notification bell', () => {
+    renderWithProviders(
+      <InstituteDashboard>
+        <div />
+      </InstituteDashboard>,
+    );
+
+    const bell = captured.config?.notificationBell;
+    expect(isValidElement(bell) && bell.type).toBe(NotificationBell);
   });
 });
