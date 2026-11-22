@@ -150,6 +150,7 @@ reads the same value. Tenant context and audit consumers use this request value.
 - **EventBusService**: publishes to both NATS JetStream (for cross-service) and GraphQL PubSub (for subscriptions) in a single `emit()` call
 - **GraphQL Subscriptions**: 8 subscriptions across 3 scopes with tenant/reseller filtering via `graphql-ws`
 - **Temporal**: used for long-running workflows (institute setup pipeline, audit partition management)
+- **JetStream consumers**: `apps/notification-service` consumes the `NOTIFICATION` stream; `apps/api-gateway` connects `JetStreamServer` too and consumes `ACADEMIC_YEAR.activated`, `SECTION.deleted`, `STUDENT.*` and `GROUP.rules_updated` for the student year rollover and group invalidation (durables `gateway-<subject>`). Subject list and rules: `docs/nats-jetstream.md` → "api-gateway consumers".
 - **JetStream retention**: every business stream uses `workqueue` retention so each message is dispatched to exactly one durable handler. The `NOTIFICATION` stream is the single exception — it uses `interest` retention because workqueue retention rejects overlapping consumer filters. `interest` fans out to every bound consumer and retains each message until all have acked. Stream config lives in `libs/backend/nats-jetstream/src/streams/stream.config.ts`.
 
 ### Service Layer Rules
