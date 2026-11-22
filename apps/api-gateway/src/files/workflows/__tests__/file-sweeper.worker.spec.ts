@@ -51,6 +51,8 @@ describe('FileSweeperWorkerService', () => {
   let error: MockInstance<Logger['error']>;
 
   beforeEach(() => {
+    // ConfigService falls back to process.env; a developer's .env must not switch the worker on.
+    vi.stubEnv('FILE_SWEEPER_WORKER_ENABLED', undefined);
     ensureSchedule.mockReset();
     error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -58,6 +60,7 @@ describe('FileSweeperWorkerService', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   function startable() {
