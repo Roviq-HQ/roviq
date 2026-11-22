@@ -51,6 +51,7 @@ import {
 } from '@roviq/testing/integration';
 import { eq, inArray, sql } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
 import { studentReadPredicate } from '../institute/student/student-read-predicate';
@@ -394,6 +395,14 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       );
       await seedPerfStudents(tx);
     });
+    // Autovacuum gathers statistics within a minute of a bulk load; the budget below is for that
+    // steady state. Planned with none, the rule query pairs every profile with every enrolment.
+    const owner = new Pool({ connectionString: process.env.DATABASE_URL_TEST_MIGRATE });
+    try {
+      await owner.query('ANALYZE tenant_user_profiles, student_profiles, student_academics');
+    } finally {
+      await owner.end();
+    }
   }, 120_000);
 
   afterAll(async () => {

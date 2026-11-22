@@ -962,3 +962,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause 2:** a slot's `.env` is generated once. Ports added later (`E2E_MAILPIT_API_PORT`) were missing, so the slot fell back to slot 0's port.
 - **Fix:** `pnpm db:reset --test` in that checkout after regenerating a migration; `pnpm instance:env <slot>` after `main` adds a port.
 - **Lesson:** regenerating a migration changes its identity. Reset the test database (and `pnpm tilt trigger db-clean` for the dev one) right after, and re-run `instance:env` in a long-lived slot whenever `scripts/lib/instance.ts` gains a port.
+
+## 2026-11-23 — diagnosed and fixed: CI `Test` failed the 2,000-student group-rule budget (570 ms against 500 ms)
+
+- **Symptom:** the "User & Groups Security Invariants" step failed on `resolves a 5-dimension group rule over 2000 students within 500ms` in CI and on a freshly reset local database. On a database that had run other suites it took about 35 ms.
+- **Cause:** the fixture bulk-loads 2,000 students and queries at once, so the tables have no statistics. After ROV-292 the rule query joins `tenant_user_profiles`; with every estimate at one row the planner paired each profile with each enrolment row (500,000 pairs, 510 ms). Found with `auto_explain` (`log_analyze`) set on `roviq_test`.
+- **Fix:** the fixture runs `ANALYZE` on the three tables it loads, over the owner connection, before the timed request (44 ms on a cold database). The 500 ms budget is unchanged.
+- **Lesson:** a timing test that follows a bulk insert must analyze the tables it loaded, as autovacuum does in production within a minute. This is the second failure of this kind in this spec (see the 2026-11-22 entry on the section-strength trigger).
