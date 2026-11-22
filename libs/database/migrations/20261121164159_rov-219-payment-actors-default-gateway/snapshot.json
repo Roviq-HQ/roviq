@@ -1,8 +1,8 @@
 {
+  "id": "44bbde6b-5276-4969-ab2d-b43e4ff461f0",
+  "prevIds": ["cc90470b-4eb8-4f29-9e72-fbd769004c16"],
   "version": "8",
   "dialect": "postgres",
-  "id": "05adfb27-bc21-4d8a-9269-cb9175f8bae7",
-  "prevIds": ["11f5feac-d570-4972-9045-07199071a22c"],
   "ddl": [
     {
       "values": [
@@ -314,14 +314,16 @@
         "INSTITUTE_LOGO",
         "INSTITUTE_FAVICON",
         "INSTITUTE_COVER",
-        "COMPLIANCE_EXPORT"
+        "COMPLIANCE_EXPORT",
+        "TC_PDF",
+        "CERTIFICATE_PDF"
       ],
       "name": "FilePurpose",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": ["PENDING", "READY", "REJECTED", "DELETED"],
+      "values": ["PENDING", "READY", "REJECTED", "QUARANTINED", "DELETED"],
       "name": "FileStatus",
       "entityType": "enums",
       "schema": "public"
@@ -2586,14 +2588,14 @@
       "table": "issued_certificates"
     },
     {
-      "type": "text",
+      "type": "uuid",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "pdf_url",
+      "name": "pdf_file_id",
       "entityType": "columns",
       "schema": "public",
       "table": "issued_certificates"
@@ -2963,14 +2965,14 @@
       "table": "tc_register"
     },
     {
-      "type": "text",
+      "type": "uuid",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "pdf_url",
+      "name": "pdf_file_id",
       "entityType": "columns",
       "schema": "public",
       "table": "tc_register"
@@ -2983,7 +2985,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "qr_verification_url",
+      "name": "verification_token",
       "entityType": "columns",
       "schema": "public",
       "table": "tc_register"
@@ -3218,6 +3220,19 @@
       "generated": null,
       "identity": null,
       "name": "reseller_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "audit_logs"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "subject_tenant_id",
       "entityType": "columns",
       "schema": "public",
       "table": "audit_logs"
@@ -4869,6 +4884,32 @@
       "generated": null,
       "identity": null,
       "name": "must_change_password",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "email_verified_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "token_version",
       "entityType": "columns",
       "schema": "public",
       "table": "users"
@@ -10583,7 +10624,7 @@
     {
       "type": "date",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -10596,7 +10637,7 @@
     {
       "type": "date",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -11876,6 +11917,19 @@
       "generated": null,
       "identity": null,
       "name": "address",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "institutes"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "first_admin_user_id",
       "entityType": "columns",
       "schema": "public",
       "table": "institutes"
@@ -20487,6 +20541,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "verification_token",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "uq_tc_verification_token",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "tc_register"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "tenant_id",
           "isExpression": false,
           "asc": true,
@@ -20559,6 +20634,55 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "tc_register"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "original_tc_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"status\" = 'DUPLICATE_REQUESTED' AND \"deleted_at\" IS NULL",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "uq_tc_register_open_duplicate",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "tc_register"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "subject_tenant_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"subject_tenant_id\" IS NOT NULL",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "audit_logs_subject_tenant_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "audit_logs"
     },
     {
       "nameExplicit": true,
@@ -26339,6 +26463,19 @@
     },
     {
       "nameExplicit": false,
+      "columns": ["pdf_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "issued_certificates_pdf_file_id_files_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "issued_certificates"
+    },
+    {
+      "nameExplicit": false,
       "columns": ["issued_by"],
       "schemaTo": "public",
       "tableTo": "users",
@@ -26424,6 +26561,19 @@
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "tc_register_approved_by_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "tc_register"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["pdf_file_id"],
+      "schemaTo": "public",
+      "tableTo": "files",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "tc_register_pdf_file_id_files_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "tc_register"
@@ -27857,6 +28007,19 @@
       "entityType": "fks",
       "schema": "public",
       "table": "institute_identifiers"
+    },
+    {
+      "nameExplicit": false,
+      "columns": ["first_admin_user_id"],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": ["id"],
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
+      "name": "institutes_first_admin_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "institutes"
     },
     {
       "nameExplicit": false,
@@ -29866,6 +30029,13 @@
       "table": "audit_logs"
     },
     {
+      "value": "\"subject_tenant_id\" IS NULL OR \"scope\" <> 'institute'",
+      "name": "chk_audit_subject_tenant",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "audit_logs"
+    },
+    {
       "value": "\"portal\" IN ('platform', 'reseller', 'institute')",
       "name": "chk_auth_events_portal",
       "entityType": "checks",
@@ -30541,7 +30711,7 @@
       "as": "PERMISSIVE",
       "for": "SELECT",
       "roles": ["roviq_app"],
-      "using": "scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid",
+      "using": "(scope = 'institute' AND tenant_id = current_setting('app.current_tenant_id', true)::uuid) OR subject_tenant_id = current_setting('app.current_tenant_id', true)::uuid",
       "withCheck": null,
       "name": "audit_app_read",
       "entityType": "policies",
@@ -35939,7 +36109,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"name\", \"slug\", \"code\", \"type\", \"structure_framework\", \"setup_status\", \"contact\", \"address\", \"timezone\", \"currency\", \"supported_locales\", \"default_locale\", \"settings\", \"is_demo\", \"require_impersonation_consent\", \"departments\", \"status\", \"reseller_id\", \"group_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institutes\" where (\"institutes\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"name\", \"slug\", \"code\", \"type\", \"structure_framework\", \"setup_status\", \"contact\", \"address\", \"first_admin_user_id\", \"timezone\", \"currency\", \"supported_locales\", \"default_locale\", \"settings\", \"is_demo\", \"require_impersonation_consent\", \"departments\", \"status\", \"reseller_id\", \"group_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"institutes\" where (\"institutes\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
@@ -35972,7 +36142,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"template_id\", \"student_profile_id\", \"staff_profile_id\", \"serial_number\", \"status\", \"certificate_data\", \"pdf_url\", \"issued_date\", \"issued_by\", \"purpose\", \"valid_until\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"issued_certificates\" where (\"issued_certificates\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"template_id\", \"student_profile_id\", \"staff_profile_id\", \"serial_number\", \"status\", \"certificate_data\", \"pdf_file_id\", \"issued_date\", \"issued_by\", \"purpose\", \"valid_until\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"issued_certificates\" where (\"issued_certificates\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
@@ -36764,7 +36934,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"student_profile_id\", \"tc_serial_number\", \"academic_year_id\", \"status\", \"tc_data\", \"requested_by\", \"requested_at\", \"reason\", \"clearances\", \"generated_at\", \"reviewed_by\", \"approved_by\", \"approved_at\", \"issued_at\", \"issued_to\", \"pdf_url\", \"qr_verification_url\", \"is_counter_signed\", \"counter_signed_by\", \"is_duplicate\", \"original_tc_id\", \"duplicate_reason\", \"duplicate_fee\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"tc_register\" where (\"tc_register\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"student_profile_id\", \"tc_serial_number\", \"academic_year_id\", \"status\", \"tc_data\", \"requested_by\", \"requested_at\", \"reason\", \"clearances\", \"generated_at\", \"reviewed_by\", \"approved_by\", \"approved_at\", \"issued_at\", \"issued_to\", \"pdf_file_id\", \"verification_token\", \"is_counter_signed\", \"counter_signed_by\", \"is_duplicate\", \"original_tc_id\", \"duplicate_reason\", \"duplicate_fee\", \"tenant_id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"tc_register\" where (\"tc_register\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
@@ -37127,7 +37297,7 @@
       "schema": "public"
     },
     {
-      "definition": "select \"id\", \"email\", \"username\", \"password_hash\", \"avatar_url\", \"preferred_locale\", \"status\", \"password_changed_at\", \"must_change_password\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"users\" where (\"users\".\"deleted_at\" is null)",
+      "definition": "select \"id\", \"email\", \"username\", \"password_hash\", \"avatar_url\", \"preferred_locale\", \"status\", \"password_changed_at\", \"must_change_password\", \"email_verified_at\", \"token_version\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"deleted_at\", \"deleted_by\", \"version\" from \"users\" where (\"users\".\"deleted_at\" is null)",
       "with": {
         "checkOption": null,
         "securityBarrier": null,
