@@ -2,15 +2,18 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { MicroserviceOptions } from '@nestjs/microservices';
 import { JetStreamServer, STREAMS } from '@roviq/nats-jetstream';
+import { enableGracefulShutdown } from '@roviq/telemetry';
+import { Runtime } from '@temporalio/worker';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app/app.module';
 
 async function bootstrap() {
+  // enableGracefulShutdown owns SIGTERM/SIGINT and stops the worker in onModuleDestroy; Temporal's
+  // own handlers would stop it first, and the worker would schedule a restart.
+  Runtime.install({ shutdownSignals: [] });
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
-  // Temporal's runtime listens for SIGTERM to stop its workers, which removes Node's default
-  // exit. Without these hooks a stopped process keeps its port and consumes events with no worker.
-  app.enableShutdownHooks();
+  enableGracefulShutdown(app);
   const config = app.get(ConfigService);
 
   app.connectMicroservice<MicroserviceOptions>({

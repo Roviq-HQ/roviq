@@ -126,18 +126,28 @@ function createMockNats(): NatsConnection {
   return createMock<NatsConnection>();
 }
 
+/** Like the real iterator: waits for messages after the last one and ends when closed. */
 function createMessageStream(messages: MockJsMsg[]): ConsumerMessages {
   let index = 0;
+  let closed = false;
+  let endWaiting: (() => void) | null = null;
   const iterator: AsyncIterator<JsMsg> = {
     next: () => {
       if (index < messages.length) {
         return Promise.resolve({ value: messages[index++], done: false });
       }
-      return new Promise(() => {});
+      if (closed) return Promise.resolve({ value: undefined, done: true });
+      return new Promise((resolve) => {
+        endWaiting = () => resolve({ value: undefined, done: true });
+      });
     },
   };
   return createMock<ConsumerMessages>({
-    close: vi.fn(),
+    close: vi.fn(async () => {
+      closed = true;
+      endWaiting?.();
+      return undefined;
+    }),
     [Symbol.asyncIterator]: () => iterator,
   });
 }
@@ -443,8 +453,9 @@ describe('AuditConsumer', () => {
     );
   });
 
-  it('cleans up on module destroy (flushes buffer, closes pool)', async () => {
-    const stream = createMessageStream([]);
+  it('stops pulling and flushes the buffer on module destroy, leaving the pool open', async () => {
+    const msg = createMockMessage(createAuditEvent());
+    const stream = createMessageStream([msg]);
     setupJetstreamMocks(stream);
 
     consumer = new AuditConsumer(createMockNats(), mockPool.pool);
@@ -452,8 +463,10 @@ describe('AuditConsumer', () => {
     await vi.advanceTimersByTimeAsync(0);
     await consumer.onModuleDestroy();
 
-    expect(stream.close).toHaveBeenCalled();
-    expect(mockPool.end).toHaveBeenCalledOnce();
+    expect(stream.close).toHaveBeenCalledOnce();
+    expect(mockPool.query).toHaveBeenCalledOnce();
+    expect(msg.ack).toHaveBeenCalledOnce();
+    expect(mockPool.end).not.toHaveBeenCalled();
   });
 
   it('serializes JSONB fields (changes, metadata) as JSON strings', async () => {

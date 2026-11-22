@@ -7,6 +7,8 @@ import * as schema from './schema';
 import { relations } from './schema/relations';
 
 export const DRIZZLE_DB = Symbol('DRIZZLE_DB');
+/** The pg Pool behind DRIZZLE_DB, so DatabaseModule can end it on shutdown. */
+export const DRIZZLE_POOL = Symbol('DRIZZLE_POOL');
 
 /** Full-typed Drizzle DB — two generics for db.query.* relational types */
 export type DrizzleDB = NodePgDatabase<typeof schema, typeof relations>;
@@ -18,14 +20,19 @@ export function createDrizzleDb(pool: Pool): DrizzleDB {
 
 export const drizzleProviders: Provider[] = [
   {
-    provide: DRIZZLE_DB,
+    provide: DRIZZLE_POOL,
     inject: [ConfigService],
-    useFactory: (config: ConfigService): DrizzleDB => {
-      const pool = new Pool({
+    useFactory: (config: ConfigService): Pool =>
+      new Pool({
         connectionString: config.getOrThrow<string>('DATABASE_URL'),
         max: 20,
         idleTimeoutMillis: 30_000,
-      });
+      }),
+  },
+  {
+    provide: DRIZZLE_DB,
+    inject: [DRIZZLE_POOL],
+    useFactory: (pool: Pool): DrizzleDB => {
       return drizzle({
         client: pool,
         schema,

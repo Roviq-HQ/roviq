@@ -62,10 +62,11 @@ function fakeWorker() {
 
 describe('EmbeddedTemporalWorker', () => {
   let error: MockInstance<Logger['error']>;
+  let log: MockInstance<Logger['log']>;
 
   beforeEach(() => {
     error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -188,6 +189,16 @@ describe('EmbeddedTemporalWorker', () => {
     expect(nativeClose).toHaveBeenCalledTimes(1);
     expect(poolEnd).toHaveBeenCalledTimes(1);
     expect(error).not.toHaveBeenCalled();
+    expect(log).toHaveBeenLastCalledWith('Test worker stopped');
+  });
+
+  it('should not log a stop for a worker that never ran', async () => {
+    const service = new TestWorker(new ConfigService({}));
+
+    service.onModuleInit();
+    await service.onModuleDestroy();
+
+    expect(log).not.toHaveBeenCalled();
   });
 
   describe('workerStatus', () => {

@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JetStreamClient } from '@roviq/nats-jetstream';
 
@@ -20,4 +20,11 @@ import { JetStreamClient } from '@roviq/nats-jetstream';
   ],
   exports: ['JETSTREAM_CLIENT'],
 })
-export class NatsJetStreamModule {}
+export class NatsJetStreamModule implements OnApplicationShutdown {
+  constructor(@Inject('JETSTREAM_CLIENT') private readonly client: JetStreamClient) {}
+
+  // After HTTP and consumers stopped, so the events they emitted while finishing are published.
+  async onApplicationShutdown(): Promise<void> {
+    await this.client.close();
+  }
+}

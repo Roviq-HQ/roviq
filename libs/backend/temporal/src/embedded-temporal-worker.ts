@@ -72,9 +72,11 @@ export abstract class EmbeddedTemporalWorker implements OnModuleInit, OnModuleDe
     this.retryTimer = null;
     // Whatever startup is still opening must exist before it can be closed.
     await this.starting;
-    if (this.worker?.getState() === 'RUNNING') this.worker.shutdown();
+    const wasRunning = this.worker?.getState() === 'RUNNING';
+    if (wasRunning) this.worker?.shutdown();
     await this.running;
     await this.closeConnections();
+    if (wasRunning) this.logger.log(`${this.settings.label} stopped`);
   }
 
   private async start(): Promise<void> {

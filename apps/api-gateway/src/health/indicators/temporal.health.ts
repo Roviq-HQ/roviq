@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { Connection } from '@temporalio/client';
@@ -7,7 +7,7 @@ import { logProbeFailure, PROBE_TIMEOUT_MS, type ProbeResult, runProbe } from '.
 const SERVING = 1;
 
 @Injectable()
-export class TemporalHealthIndicator implements OnModuleDestroy {
+export class TemporalHealthIndicator implements OnApplicationShutdown {
   private readonly connection: Connection | null;
 
   constructor(
@@ -38,7 +38,7 @@ export class TemporalHealthIndicator implements OnModuleDestroy {
     return indicator.down();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  async onApplicationShutdown(): Promise<void> {
     await this.connection?.close();
   }
 }

@@ -106,6 +106,7 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
   private buffer: BufferedMessage[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
   private consumerMessages: ConsumerMessages | null = null;
+  private consuming: Promise<void> | null = null;
   private jsClient!: JetStreamClient;
 
   constructor(
@@ -117,14 +118,15 @@ export class AuditConsumer implements OnModuleInit, OnModuleDestroy {
     this.jsClient = jetstream(this.nc);
     await this.ensureConsumer();
     this.startFlushTimer();
-    void this.startConsuming();
+    this.consuming = this.startConsuming();
   }
 
+  /** Stops pulling and writes what is buffered; AuditModule closes the pool and NATS afterwards. */
   async onModuleDestroy(): Promise<void> {
     await this.consumerMessages?.close();
+    await this.consuming;
     if (this.flushTimer) clearInterval(this.flushTimer);
     await this.flush();
-    await this.pool.end();
   }
 
   private async ensureConsumer(): Promise<void> {

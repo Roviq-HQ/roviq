@@ -56,17 +56,19 @@ export function feedEventOf(
 export class NotificationInboxConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationInboxConsumer.name);
   private messages: ConsumerMessages | null = null;
+  private consuming: Promise<void> | null = null;
 
   constructor(@Inject(NOTIFICATION_INBOX_NATS) private readonly nc: NatsConnection) {}
 
   async onModuleInit(): Promise<void> {
     await this.ensureConsumer();
-    void this.consume();
+    this.consuming = this.consume();
   }
 
+  /** Stops pulling; NotificationInboxModule closes the connection. */
   async onModuleDestroy(): Promise<void> {
     await this.messages?.close();
-    await this.nc.close();
+    await this.consuming;
   }
 
   private async ensureConsumer(): Promise<void> {

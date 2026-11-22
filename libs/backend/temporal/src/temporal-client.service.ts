@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Client,
@@ -15,7 +15,7 @@ import {
  * by every later one, instead of a connection per request.
  */
 @Injectable()
-export class TemporalClientService implements OnModuleDestroy {
+export class TemporalClientService implements OnApplicationShutdown {
   private readonly connection: Connection;
   private readonly client: Client;
 
@@ -62,7 +62,8 @@ export class TemporalClientService implements OnModuleDestroy {
     return handle.signaledRunId;
   }
 
-  async onModuleDestroy(): Promise<void> {
+  // After HTTP and the JetStream microservice stopped: their handlers start workflows.
+  async onApplicationShutdown(): Promise<void> {
     await this.connection.close();
   }
 }
