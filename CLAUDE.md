@@ -17,7 +17,7 @@
 - `pnpm test:all` — full test pipeline: unit + integration + e2e:api + e2e:ui
 - `pnpm ci:check` — unified lint/typecheck/test/e2e gate, run by `.husky/pre-push`. CI jobs, Nx cache targets, bypass flags: `docs/testing.md` → "CI and pre-push".
 
-Tilt auto-detects file changes for app resources (api-gateway, web) — no `pnpm tilt trigger` needed after editing code, just check logs. Use `pnpm tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `pnpm tilt logs`.
+Tilt auto-detects file changes for app resources (api-gateway, notification-service, web) — no `pnpm tilt trigger` needed after editing code, just check logs. The two backend apps run from source without type-checking: type errors show in `pnpm tilt logs typecheck`, not in the app's log. Use `pnpm tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `pnpm tilt logs`.
 
 Tilt `codegen` resource runs `pnpm codegen --watch` automatically — regenerates GraphQL types when schema or document files change. After adding/modifying GraphQL resolvers or frontend queries, check `pnpm tilt logs codegen` to confirm types regenerated.
 

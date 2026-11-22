@@ -17,9 +17,9 @@ pnpm tilt up
 Tilt handles everything automatically:
 - Creates `.env` from `.env.example` on first run
 - Installs dependencies (`pnpm install`)
-- Starts infra (Postgres, Redis, NATS, object storage (RustFS), Temporal, OTel/Grafana stack) in Docker
+- Starts infra (Postgres, Redis, NATS, object storage (RustFS), Temporal) in Docker; the OTel/Grafana stack starts on demand (`observability`)
 - Pushes Drizzle schema to database and seeds test data
-- Starts all apps locally
+- Starts all apps locally; the API gateway and notification service run from TypeScript source and restart by themselves when you save a file (`docs/infrastructure.md` → "How the backend apps run in dev")
 
 Open the Tilt UI at http://localhost:10350 to monitor all resources.
 
@@ -96,7 +96,8 @@ pnpm tilt up                  # Start everything (infra + apps)
 pnpm tilt down                # Stop everything
 
 # Individual apps (if not using Tilt)
-pnpm run dev:gateway      # API gateway               (port 3005)
+pnpm run dev:gateway      # API gateway, from source    (port 3005)
+pnpm run dev:notifications # Notification service       (port 3002)
 pnpm run dev:web          # Web app                     (port 4200)
 
 # Database (handled automatically by Tilt, but available manually)
@@ -110,5 +111,6 @@ pnpm run db:studio        # Drizzle Studio (visual DB browser)
 pnpm run lint             # Biome lint check
 pnpm run lint:fix         # Biome auto-fix
 pnpm run format           # Biome format
-pnpm run typecheck        # TypeScript type checking
+pnpm run typecheck        # TypeScript type checking (Nx builds, the gate)
+pnpm run typecheck:watch  # Watch-mode type check of the two backend apps (Tilt `typecheck`)
 ```

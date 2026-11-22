@@ -89,7 +89,8 @@ local_resource(
 )
 
 # API Gateway (NestJS) — core backend, all frontends depend on this
-# Dev server watches apps/api-gateway/src and ee/apps/api-gateway/src via tsconfig
+# Runs from TypeScript source (SWC on load, no dist/); `node --watch` restarts it when any file
+# it loaded changes, app or library. Type errors show in the `typecheck` resource.
 local_resource(
   'api-gateway',
   labels=['dev'],
@@ -126,7 +127,7 @@ local_resource(
   links=[local_url('WEB_PORT', '4200')],
 )
 
-# Notification Service (NestJS) — async event processing via NATS
+# Notification Service (NestJS) — async event processing via NATS; runs from source like api-gateway
 local_resource(
   'notification-service',
   labels=['dev'],
@@ -237,11 +238,13 @@ local_resource(
 
 # ─── NX ───────────────────────────────────────────────────────────────────────
 
+# Type-checks api-gateway and notification-service (with the library sources they import) in
+# watch mode, without emitting. The dev servers skip type-checking, so errors show up here.
+# The full gate stays `pnpm typecheck` (build-all below).
 local_resource(
   'typecheck',
-  cmd='pnpm run typecheck',
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
+  serve_cmd='pnpm run typecheck:watch',
+  resource_deps=['pnpm-install'],
   labels=['nx'],
 )
 
@@ -273,6 +276,9 @@ local_resource(
 # ─── Observability (manual) ──────────────────────────────────────────────────
 # Start manually when debugging performance or tracing issues.
 # Trigger `observability` to bring up the entire stack with one click.
+# The dev servers send telemetry only when OTEL_EXPORTER_OTLP_ENDPOINT is set: add
+# `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:<DEV_OTEL_GRPC_PORT>` to .env (`pnpm instance:ports`
+# prints the port), then `pnpm tilt trigger api-gateway`. Unset, no OpenTelemetry SDK loads.
 
 dc_resource('prometheus', labels=['observability'], auto_init=False)
 dc_resource('tempo', labels=['observability'], auto_init=False)

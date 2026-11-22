@@ -135,6 +135,17 @@ To turn scanning on:
   student import). ClamAV recognises EICAR only at the start of a file, so an EICAR string
   placed after a PDF header is reported clean.
 
+## Telemetry and shutdown
+
+- Set `OTEL_EXPORTER_OTLP_ENDPOINT` only where an OpenTelemetry collector runs. Unset, the
+  gateway starts no SDK and exports nothing; set to an unreachable address, every export fails
+  and the data is lost.
+- On SIGTERM the gateway and the notification service stop accepting connections, finish
+  in-flight requests, stop their consumers and Temporal workers, close NATS, Temporal, database
+  pools and Redis, flush telemetry (at most 2 s) and exit 0. Past 10 s they exit 1 and log what
+  had not closed. Give the container a stop grace period above 10 s (Docker's default of 10 s
+  cuts it short; Kubernetes' 30 s is enough).
+
 ## Background workers
 
 Temporal workers run inside the api-gateway process, switched on per instance with a
