@@ -947,3 +947,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** ROV-314 added `mailpit` to `docker/compose.e2e.yaml`, but `scripts/ci-check.sh` starts the e2e infra by name and its list did not include it. The gate passed only where `pnpm e2e:up` (which starts every service) had created the container earlier.
 - **Fix:** `mailpit` is in the list of infra services that `ci-check.sh` starts.
 - **Lesson:** a new service in `compose.e2e.yaml` must also be added to the service list in `scripts/ci-check.sh`.
+
+## 2026-11-22 — diagnosed and fixed: `student-profiles-schema` unique test failed once with a foreign-key error
+
+- **Symptom:** pre-push `int` failed once in `student-profiles-schema.integration.spec.ts` › "UNIQUE(student_profile_id, academic_year_id) → duplicate fails": `violates foreign key constraint "student_academics_academic_year_id_academic_years_id_fkey"` on the first insert. It had passed in the two gate runs before.
+- **Cause:** the test read any academic year, standard and section of the seed institute (`LIMIT 1`, no order) and then inserted a row that pointed at them. Integration files run in parallel on one database, and other specs create and hard-delete such rows, so the year could vanish between the read and the insert. With no seed rows the test returned early and passed without asserting anything.
+- **Fix:** the test inserts its own year, standard and section inside its transaction.
+- **Lesson:** an integration test creates every row it depends on. Never pick "any row" of a shared institute, and never `return` early when the data is missing.
