@@ -26,6 +26,7 @@ import {
   standards,
   studentAcademics,
   studentProfiles,
+  tenantUserProfiles,
   userProfiles,
   users,
   withAdmin,
@@ -157,6 +158,14 @@ async function createFixture(db: DrizzleDB, tenantId: string): Promise<Fixture> 
         gender: Gender.FEMALE,
         createdBy: SYSTEM_USER_ID,
         updatedBy: SYSTEM_USER_ID,
+      });
+      // The institute's own copy: its lists and exports read this, not the account profile.
+      await tx.insert(tenantUserProfiles).values({
+        ...audit,
+        userId: user.id,
+        firstName: { en: `Student ${suffix}` },
+        lastName: { en: 'Sharma' },
+        gender: Gender.FEMALE,
       });
       const [membership] = await tx
         .insert(memberships)

@@ -24,6 +24,7 @@ import {
   standards,
   studentAcademics,
   studentProfiles,
+  tenantUserProfiles,
   userProfiles,
   users,
   withAdmin,
@@ -182,6 +183,14 @@ async function createYears(
         gender: Gender.MALE,
         createdBy: SYSTEM_USER_ID,
         updatedBy: SYSTEM_USER_ID,
+      });
+      // The institute's own copy: its lists and exports read this, not the account profile.
+      await tx.insert(tenantUserProfiles).values({
+        ...audit,
+        userId: user.id,
+        firstName: { en: `Student ${spec.key}` },
+        lastName: { en: 'Verma' },
+        gender: Gender.MALE,
       });
       const [membership] = await tx
         .insert(memberships)
