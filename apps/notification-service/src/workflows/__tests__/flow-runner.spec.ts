@@ -240,11 +240,20 @@ describe('runFlow: other shapes', () => {
   });
 
   it('should run two different flows through the same function', async () => {
-    const parallel = await run(REGULAR_TYPES.APPROVAL_REQUESTED.flow, ['u1']);
-    const chain = await run(REGULAR_TYPES.AUTH_NEW_DEVICE.flow, ['u1']);
+    const chain = defineFlow({
+      steps: [
+        step.app({ waitForArrival: '2 minutes' }),
+        step.channel('WHATSAPP', { waitForArrival: '2 minutes' }),
+        step.channel('EMAIL'),
+      ],
+    });
 
-    expect(parallel).toEqual([send('u1', 'WHATSAPP'), send('u1', 'EMAIL'), send('u1', 'PUSH')]);
-    expect(chain).toEqual([
+    expect(await run(REGULAR_TYPES.APPROVAL_REQUESTED.flow, ['u1'])).toEqual([
+      send('u1', 'WHATSAPP'),
+      send('u1', 'EMAIL'),
+      send('u1', 'PUSH'),
+    ]);
+    expect(await run(chain, ['u1'])).toEqual([
       send('u1', 'PUSH'),
       wait(2),
       send('u1', 'WHATSAPP'),
@@ -253,10 +262,10 @@ describe('runFlow: other shapes', () => {
     ]);
   });
 
-  it("should use a critical type's two-minute waits", async () => {
+  it('should send a security alert on every channel without a wait', async () => {
     const events = await run(REGULAR_TYPES.AUTH_ACCOUNT_LOCKED.flow, ['u1']);
 
-    expect(events).toEqual([send('u1', 'PUSH'), wait(2), send('u1', 'EMAIL')]);
+    expect(events).toEqual([send('u1', 'PUSH'), send('u1', 'EMAIL')]);
   });
 
   it('should send nothing for the in-app step alone', async () => {

@@ -32,6 +32,27 @@ describe('registered flows', () => {
     expect(channelsOf(guardianAlertFlow())).toEqual(['PUSH', 'WHATSAPP', 'SMS']);
   });
 
+  it('should never let a critical type wait for arrival: reading the alert in a stolen session must not stop the email', () => {
+    const waits = (flow: NotificationFlow) =>
+      flow.steps.flatMap((s) =>
+        s.kind === 'send'
+          ? [s.waitMs]
+          : s.kind === 'for_each_recipient'
+            ? s.steps.map((i) => i.waitMs)
+            : [],
+      );
+    const critical = Object.values(REGULAR_TYPES).filter((type) => type.critical);
+
+    expect(critical.length).toBeGreaterThan(0);
+    for (const type of critical) {
+      expect([type.key, waits(type.flow).filter((ms) => ms !== null)]).toEqual([type.key, []]);
+      expect([type.key, type.flow.steps.some((s) => s.kind === 'delay')]).toEqual([
+        type.key,
+        false,
+      ]);
+    }
+  });
+
   it('should send approval and billing on all their channels at once', () => {
     expect(REGULAR_TYPES.APPROVAL_REQUESTED.flow.steps).toEqual([
       step.parallel(['WHATSAPP', 'EMAIL', 'PUSH']),

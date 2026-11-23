@@ -358,18 +358,20 @@ describe('regular type copy', () => {
     const channels = (key: RegularTypeKey) => channelsOf(REGULAR_TYPES[key].flow);
 
     expect(channels('AUTH_LOGIN')).toEqual([]);
-    expect(channels('AUTH_PASSWORD_RESET')).toEqual(['PUSH', 'WHATSAPP', 'EMAIL']);
-    expect(channels('AUTH_NEW_DEVICE')).toEqual(['PUSH', 'WHATSAPP', 'EMAIL']);
+    expect(channels('AUTH_PASSWORD_RESET')).toEqual(['PUSH', 'EMAIL', 'WHATSAPP']);
+    expect(channels('AUTH_NEW_DEVICE')).toEqual(['PUSH', 'EMAIL', 'WHATSAPP']);
     expect(channels('AUTH_ACCOUNT_LOCKED')).toEqual(['PUSH', 'EMAIL']);
     expect(channels('AUTH_SESSION_REVOKED')).toEqual(['PUSH', 'EMAIL']);
   });
 
-  it('should wait two minutes between the channels of a security alert', () => {
-    const waits = (key: RegularTypeKey) =>
-      REGULAR_TYPES[key].flow.steps.map((s) => (s.kind === 'send' ? s.waitMs : 'not a send'));
+  it('should send a security alert on every channel at once, waiting for nothing', () => {
+    const steps = (key: RegularTypeKey) =>
+      REGULAR_TYPES[key].flow.steps.map((s) =>
+        s.kind === 'send' ? [s.channels, s.waitMs] : 'not a send',
+      );
 
-    expect(waits('AUTH_NEW_DEVICE')).toEqual([120_000, 120_000, null]);
-    expect(waits('AUTH_ACCOUNT_LOCKED')).toEqual([120_000, null]);
+    expect(steps('AUTH_NEW_DEVICE')).toEqual([[['PUSH', 'EMAIL', 'WHATSAPP'], null]]);
+    expect(steps('AUTH_ACCOUNT_LOCKED')).toEqual([[['PUSH', 'EMAIL'], null]]);
   });
 
   it('should mark only the security alerts and billing events as critical', () => {

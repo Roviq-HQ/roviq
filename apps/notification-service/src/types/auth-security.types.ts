@@ -117,18 +117,12 @@ export const authNewDeviceWhatsApp: TypeTemplates<AuthSecurityParams> = {
 
 // A sign-in alert on every sign-in is noise outside the app.
 const IN_APP_ONLY = defineFlow({ steps: [step.inAppOnly()] });
-// The app first; email when the devices do not confirm within two minutes.
-const BASE_FLOW = defineFlow({
-  steps: [step.app({ waitForArrival: '2 minutes' }), step.channel('EMAIL')],
-});
+// Every channel at once and no wait: an account alert must reach the owner outside the app
+// whatever the app reports. With a wait, whoever holds a stolen session could read or
+// acknowledge the alert there and so stop the email about their own sign-in.
+const BASE_FLOW = defineFlow({ steps: [step.parallel(['PUSH', 'EMAIL'])] });
 // WhatsApp only where the user must act at once.
-const WITH_WHATSAPP = defineFlow({
-  steps: [
-    step.app({ waitForArrival: '2 minutes' }),
-    step.channel('WHATSAPP', { waitForArrival: '2 minutes' }),
-    step.channel('EMAIL'),
-  ],
-});
+const WITH_WHATSAPP = defineFlow({ steps: [step.parallel(['PUSH', 'EMAIL', 'WHATSAPP'])] });
 
 function authAlertType(
   key: AuthAlertKey,
