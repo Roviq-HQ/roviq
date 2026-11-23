@@ -88,7 +88,7 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | Tempo | 3200 | Distributed tracing backend (Grafana Tempo 2.7.2) |
 | Loki | 3100 | Log aggregation backend |
 | Prometheus | 9090 | Metrics scraping and storage |
-| Grafana | 3001 | Observability dashboards — also embedded in admin-portal at `/observability` |
+| Grafana | 3001 | Observability dashboards — also embedded in the admin portal at `/observability` |
 
 ### Object storage
 
@@ -177,7 +177,7 @@ App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
                                         → Loki    (logs)
                                         → Prometheus (metrics, namespace: roviq)
                                              ↓
-                                        Grafana (3001) ← embedded in admin-portal
+                                        Grafana (3001) ← embedded in the admin portal
 ```
 
 - **Switch**: the SDK starts only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (preloaded by `libs/backend/telemetry/src/init-telemetry.ts`). Unset, nothing loads: the metric instruments in the code are OpenTelemetry API no-ops and log lines carry no trace ids. To use the dev stack, set it to `http://localhost:<DEV_OTEL_GRPC_PORT>` in `.env` and trigger `observability`.
@@ -186,7 +186,7 @@ App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
 - **Per-tenant API usage** (ROV-184): the api-gateway counter `roviq.api.requests` (Apollo plugin `TenantApiRequestsPlugin`) adds 1 per GraphQL operation over HTTP from an institute-scope caller, labelled `tenant_id`. graphql-ws subscriptions are not counted. Prometheus series: `roviq_roviq_api_requests_total`. The platform-admin query `adminTenantAnalytics` (module `apps/api-gateway/src/admin/monitoring/tenant-analytics/`, ability `read SystemHealth`) reads it with `sum by (tenant_id)(increase(…[24h]))` for `apiCalls24h` and a 7-point 1-day-step range for `activityTrend7d`; `activeUsers24h` comes from `refresh_tokens` (distinct users with a token created or used in the last 24h). When Prometheus is unreachable the query still answers, with `metricsAvailable: false` and null API-call fields. A tenant's calls made before its series was first scraped are not counted, because `increase()` needs two samples.
 - **File sweeper** (ROV-300): the api-gateway counter `file_sweeper_files_total` (Prometheus: `roviq_file_sweeper_files_total`) counts files the hourly sweeper handled, labelled `action` (`pending`, `rejected`, `deleted`, `retired_timed`, `retired_unused`, `purge`) and `result` (`removed`, `failed`, `skipped`). For the two `retired_*` actions, `removed` means the file was marked DELETED, not yet erased. A steady `failed` count means storage refuses deletes. See `docs/architecture.md` → "File sweeper".
 - **Logs**: OTel Pino instrumentation injects `trace_id`/`span_id` into log records for correlation (log shipping to Loki requires a separate pipeline — not yet configured).
-- **Grafana dashboard**: provisioned at `docker/grafana/dashboards/overview.json`, accessible at http://localhost:3001/d/roviq-overview or via the admin-portal Observability page.
+- **Grafana dashboard**: every JSON file in `docker/grafana/dashboards/` is provisioned into Grafana (http://localhost:3001), which the admin portal also links from its Observability page.
 
 ### Health checks and system health (ROV-184)
 
@@ -250,7 +250,7 @@ The parent's RLS and GRANTs do not cover a partition queried by name.
 `ensure_monthly_partition` calls `lock_down_partitions(parent)`, which strips every non-owner
 privilege from each child and forces RLS with no policies. Never create a partition with a raw
 `CREATE TABLE … PARTITION OF` and never name a partition in application SQL. Detach with
-`detach_monthly_partition(parent, name)`. More: `docs/audit-logging.md`.
+`detach_monthly_partition(parent, name)`. More: `docs/features/audit-logging.md`.
 
 ## NATS JetStream Streams
 
@@ -307,4 +307,4 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | OTEL_SERVICE_VERSION | Service version reported in traces and metrics |
 | LOG_LEVEL | Pino log level (default: info) |
 | NEXT_PUBLIC_API_URL | Public API base URL for browser-side requests (default: http://localhost:3005) |
-| NEXT_PUBLIC_GRAFANA_URL | Grafana base URL for the admin-portal Observability iframe (default: http://localhost:3001) |
+| NEXT_PUBLIC_GRAFANA_URL | Grafana base URL for the admin portal Observability iframe (default: http://localhost:3001) |

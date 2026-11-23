@@ -1,4 +1,6 @@
-# Institute Service — API Reference
+# Institutes: API reference
+
+Every GraphQL operation, event and error code of the institute domain. The model and the lifecycles are in [institutes.md](institutes.md).
 
 ## Platform Scope (Admin)
 
@@ -176,7 +178,7 @@ Every operation here acts on the caller's own institute (the tenant in the token
 | `RESELLER_INVALID` | 422 | Reseller not found or inactive |
 | `SYSTEM_RESELLER_PROTECTED` | 422 | Cannot modify "Roviq Direct" |
 | `CONCURRENT_MODIFICATION` | 409 | Version mismatch on update |
-| `ACADEMIC_YEAR_OVERLAP` | 400 | Date range overlaps (schools only) |
+| `ACADEMIC_YEAR_OVERLAP` | 400 | Date range overlaps (`SCHOOL` institutes only) |
 | `INVALID_DATE_RANGE` | 400 | Start date >= end date |
 | `LAST_ACADEMIC_YEAR` | 422 | Cannot delete last year |
 | `YEAR_ALREADY_ACTIVE` | 409 | Year is already active |

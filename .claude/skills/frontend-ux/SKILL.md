@@ -4,7 +4,7 @@ description: Use when working on any frontend code, UI components, pages, forms,
 ---
 
 Before implementing any UI component, read the matching rule from the reference:
-`sed -n '/\[TAGID\]/,/^---$/p' docs/references/frontend-ux-reference.md`
+`sed -n '/\[TAGID\]/,/^---$/p' docs/references/frontend-ux.md`
 This is mandatory, not optional — the reference contains problem context, edge cases, and implementation details that this file omits for brevity.
 
 Users are Indian institute admins, clerks, teachers, parents — non-technical, on 1366×768/1920x1080 laptops or Android phones, unreliable 4G/5G.

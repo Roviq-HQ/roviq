@@ -28,8 +28,6 @@ libs/prisma-client/
 
 # Obsidian
 docs/.obsidian/
-docs/plans
-docs/superpowers
 
 # Playwright auth state
 **/playwright/.auth/
@@ -46,6 +44,7 @@ CLAUDE.local.md
 .idea/
 .vscode/
 
+# Local working notes: plans, specs and reviews are Linear documents, not repo docs
 docs/plans
 docs/institute
 docs/superpowers

@@ -60,7 +60,7 @@ type MessageHandler = ChainHandler<JetStreamContext>;
  * and message routing. Overrides listen(), bindEvents(), and close()
  * to use JetStream consumers instead of core NATS subscriptions.
  *
- * @see docs/superpowers/specs/2026-03-17-nats-jetstream-transport-design.md
+ * @see docs/guides/events.md
  */
 export class JetStreamServer extends ServerNats {
   protected override readonly logger = new Logger(JetStreamServer.name);

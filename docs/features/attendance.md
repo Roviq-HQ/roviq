@@ -130,13 +130,11 @@ Guard enforcement order: `GqlAuthGuard` → `InstituteScopeGuard` (or `PlatformS
 
 **Holiday strictness.** `ATTENDANCE_ON_HOLIDAY` has no override path at the service layer. If an institute publishes a holiday, attendance cannot be recorded for that day. The only recourse is to delete/shrink the holiday, then re-open the session.
 
-**Audit pipeline.** Every write goes through the standard audit listener (see `docs/audit-logging.md`). Field diffs are recorded; past-day overrides additionally set `metadata.overrideReason`.
+**Audit pipeline.** Every write goes through the standard audit listener (see `docs/features/audit-logging.md`). Field diffs are recorded; past-day overrides additionally set `metadata.overrideReason`.
 
 **Admin cross-tenant view.** `adminAttendanceSummary(date)` aggregates every tenant's sessions via `withAdmin(db, tx => tx.execute(sql\`…\`))` — bypassing RLS is intentional for platform-admin reporting. The query joins `attendance_sessions` → `attendance_entries` → `institutes` and groups by `tenant_id + name`, emitting one row per institute with per-status counts + `sessionCount`. See `apps/api-gateway/src/admin/attendance/` for the implementation.
 
-## 7. Deferred
-
-Known gaps documented here so nothing is silently dropped. Each entry should get a Linear issue when prioritised.
+## 7. Current limits
 
 - **Half-Day status.** `AttendanceStatus` is a four-value enum (`PRESENT / ABSENT / LEAVE / LATE`). A `HALF_DAY` status — common in Indian institutes — would require (a) an enum migration, (b) UI affordance on the teacher roster, (c) a new report bucket, and (d) a notification rule (is half-day an absent? both?). Deferred.
 - **Leave attachments.** Uploaded through `<FileUpload>` with purpose `LEAVE_ATTACHMENT` (PDF, JPG, PNG, WebP, 10 MB each, up to 10) and linked through `leave_files`. No virus scan yet (ROV-303).

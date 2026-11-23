@@ -2,7 +2,7 @@
 
 The **Timetable** module lets your institute build and manage weekly class schedules. A timetable belongs to one academic year, covers a chosen set of sections, has a grid of periods (with lunch breaks and optional extra classes), and assigns a **subject, teacher, and room** to each period on each working day.
 
-This guide is part of the [Institute Portal User Guide](./institute-workflows.md).
+This guide is part of the [Institute Portal User Guide](./institute-portal.md).
 
 Find it in the sidebar under **Academic > Timetable**.
 

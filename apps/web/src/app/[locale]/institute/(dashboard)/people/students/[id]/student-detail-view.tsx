@@ -1538,7 +1538,7 @@ function GuardiansTab({
 
   // Only render the CTA + dialog for users who can actually mutate the
   // link — the backend guards `linkGuardianToStudent` with `update Guardian`
-  // (see docs/staff-and-guardians.md). Without this wrapper, read-only roles
+  // (see docs/features/staff-and-guardians.md). Without this wrapper, read-only roles
   // would see a button that always throws a 403.
   const linkButton = (
     <Can I="update" a="Guardian">

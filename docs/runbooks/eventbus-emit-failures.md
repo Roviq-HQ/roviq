@@ -108,7 +108,7 @@ NATS_URL=$NATS_URL pnpm check:jetstream-drift
 
 ## Related
 
-- Source: `apps/api-gateway/src/common/event-bus.service.ts`
+- Source: `libs/backend/event-bus/src/event-bus.service.ts`
 - Alert rule: `docs/observability/alerts/eventbus-emit-failures.yaml`
 - Dashboard: `docs/observability/dashboards/event-bus.json`
 - Linear: ROV-257

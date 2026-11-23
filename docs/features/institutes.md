@@ -1,7 +1,6 @@
-# Institute Service
+# Institutes
 
-> Implemented in Phase 1–4 of the Institute Management milestone.
-> PRD: `docs/plans/institute-service-prd-v3_1.md`
+The institute (the tenant) and its academic structure. Every operation is listed in [institutes-api.md](institutes-api.md).
 
 ## Overview
 
@@ -66,7 +65,7 @@ PLANNING → ACTIVE → COMPLETING → ARCHIVED
 
 - Exactly one active per institute (partial unique index)
 - CHECK constraint: `start_date < end_date`
-- Overlap validation for schools (coaching exempt)
+- Overlap validation for `SCHOOL` institutes (`COACHING` is exempt)
 - Activation deactivates current year in single transaction
 
 ## Three-Scope Resolver Architecture

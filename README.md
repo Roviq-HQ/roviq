@@ -16,7 +16,7 @@
 [![NX](https://img.shields.io/badge/NX-143055?logo=nx&logoColor=white)](https://nx.dev/)
 [![pnpm](https://img.shields.io/badge/pnpm-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
 
-<a href="docs/">Docs</a> · <a href="https://github.com/Roviq-HQ/roviq/issues">Issues</a>
+<a href="docs/README.md">Docs</a> · <a href="https://github.com/Roviq-HQ/roviq/issues">Issues</a>
 
 </div>
 
@@ -30,66 +30,52 @@
 
 **Your data, your control.** Open source, open API, self-hostable. No vendor lock-in, no data hostage.
 
-## Quick Start
+## Quick start
 
-Requires: [Node.js 20+](https://nodejs.org/), [pnpm](https://pnpm.io/), [Docker](https://www.docker.com/), [Tilt](https://tilt.dev/)
+Requires [Node.js 24](https://nodejs.org/), [pnpm](https://pnpm.io/), [Docker](https://www.docker.com/) and [Tilt](https://tilt.dev/).
 
 ```bash
 git clone https://github.com/Roviq-HQ/roviq.git
 cd roviq
-tilt up
+pnpm tilt up
 ```
 
-Tilt handles everything — dependencies, environment setup, database migrations, and seeding.
+Tilt installs the dependencies, starts the databases, applies the schema, seeds test data and starts the apps. Then open:
 
-Then open http://localhost:4200 (Admin Portal) or http://localhost:4300 (Institute Portal).
+| Portal | URL |
+|--------|-----|
+| Institute | http://localhost:4200 |
+| Admin | http://admin.localhost:4200 |
+| Reseller | http://reseller.localhost:4200 |
 
+Test logins and the full walkthrough are in [Getting started](docs/getting-started.md).
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) — full setup walkthrough
-- [Architecture](docs/architecture.md) — system design and project structure
-- [Auth & Authorization](docs/auth.md) — how authentication and permissions work
-- [Infrastructure](docs/infrastructure.md) — database, messaging, and services
-- [Testing](docs/testing.md) — running and writing tests
-- [Frontend](docs/frontend.md) — UI patterns and conventions
+[docs/README.md](docs/README.md) lists every document. The usual first reads:
 
-## Roadmap
+- [Getting started](docs/getting-started.md): set up and log in
+- [Architecture](docs/architecture.md): repository layout, libraries, design decisions
+- [Auth](docs/auth.md): scopes, tokens, permissions
+- [Testing](docs/testing.md): test types and commands
+- [Contributing](CONTRIBUTING.md): how a change reaches `main`
 
-- [x] Platform foundation
-- [ ] Multi-tenant institute onboarding
-- [ ] User authentication and role-based access
-- [ ] Admin Portal — manage institutes, subscriptions, and support
-- [ ] Institute Portal — dashboards, staff, and daily operations
-- [ ] Timetable and attendance management
-- [ ] Fee collection and financial reporting
-- [ ] DIKSHA content integration
-- [ ] UDISE-compatible reporting and compliance
+## What is inside
 
-Track progress on [GitHub Issues](https://github.com/Roviq-HQ/roviq/issues).
+| Path | Contents |
+|------|----------|
+| `apps/api-gateway` | NestJS GraphQL API |
+| `apps/notification-service` | NestJS service that delivers notifications |
+| `apps/web` | Next.js app serving the institute, admin and reseller portals |
+| `libs/` | Shared libraries (`@roviq/*`): database, auth, UI, events |
+| `ee/` | Enterprise Edition: billing and payment gateways |
+| `e2e/` | API and browser end-to-end tests |
 
-## Project Structure
+PostgreSQL 18 with row-level security, Redis, NATS JetStream, Temporal and S3-compatible storage run in Docker.
 
-```
-roviq/
-├── apps/
-│   ├── api-gateway/            # GraphQL gateway — auth, audit, routing
-│   ├── admin-portal/           # Super admin UI (Next.js)
-│   └── institute-portal/       # Institute-facing UI (Next.js)
-├── libs/
-│   ├── database/               # Drizzle ORM schema, RLS policies, tenant helpers
-│   ├── common-types/           # Shared types, CASL subjects/actions
-│   ├── nats-jetstream/         # NestJS JetStream custom transport
-│   ├── resilience/            # Circuit breaker (opossum)
-│   ├── ui/                     # shadcn/ui component library
-│   ├── graphql/                # Apollo Client config
-│   ├── auth/                   # Auth context, guards, token utils
-│   └── i18n/                   # next-intl config, locale routing
-├── e2e/                        # End-to-end tests
-├── scripts/                    # DB init, seed, migration helpers
-├── docs/                       # Architecture decisions, specs
-└── Tiltfile                    # Local dev orchestration
-```
+## Licence
+
+[AGPL-3.0](LICENSE). The `ee/` directory has its own [licence](ee/LICENSE).
 
 ---
 

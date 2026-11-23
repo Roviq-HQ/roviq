@@ -1,11 +1,11 @@
 # Frontend UX Reference — Roviq
 
-> **SYNC RULE**: This file and `.claude/rules/frontend-ux.md` are paired.
+> **SYNC RULE**: This file and `.claude/skills/frontend-ux/SKILL.md` are paired.
 > Any addition, removal, or edit to a rule in either file MUST be reflected in the other.
-> The rules file contains the concise one-liner; this file contains the full detail.
+> The skill file contains the concise one-liner; this file contains the full detail.
 > Before committing, verify both files have the same set of tags.
 >
-> **Lookup**: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/frontend-ux-reference.md`
+> **Lookup**: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/frontend-ux.md`
 > This extracts the full rule from tag to the next `---` delimiter.
 
 ---
@@ -77,7 +77,7 @@ Use `Field`/`FieldLabel`/`FieldError`/`FieldGroup`/`FieldSet` for all forms. Nev
 
 - Wrap every input in `<Field>` — set `data-invalid` on Field, `aria-invalid` on the control
 - Group related fields with `<FieldGroup>`, semantic sections with `<FieldSet>` + `<FieldLegend>`
-- `<FieldError>` accepts `errors` array (TanStack Form `field.state.meta.errors`, Standard Schema / Zod issues). Use the `@roviq/ui` form kit (`useAppForm`) which wires this automatically — never render `<FieldError>` by hand from a form page. See [forms.md](../forms.md).
+- `<FieldError>` accepts `errors` array (TanStack Form `field.state.meta.errors`, Standard Schema / Zod issues). Use the `@roviq/ui` form kit (`useAppForm`) which wires this automatically — never render `<FieldError>` by hand from a form page. See [forms.md](../guides/forms.md).
 - Orientation: `vertical` (default), `horizontal` (label beside control), `responsive` (auto via container query)
 - For checkboxes/switches: nest `<Field>` inside `<FieldLabel>` for selectable field groups
 - Add `<FieldDescription>` for helper text, `<FieldContent>` to group control + description in horizontal layouts
@@ -236,7 +236,7 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 
 ### [DNMPQ] Human Labels
 
-**Problem:** Technical/DB labels ("Max Users", "Tenant ID", "RTE Quota %") mean nothing to a school clerk.
+**Problem:** Technical/DB labels ("Max Users", "Tenant ID", "RTE Quota %") mean nothing to an institute clerk.
 **Rules:**
 
 - Use domain language: "Right to Education — Reserved Seats (25%)" not "RTE Quota %"
@@ -321,7 +321,7 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 - Schema rename / removal → typecheck failure on every consumer of the document, not a runtime exception. The `pnpm check:codegen-drift` CI gate fails when the committed `*.generated.ts` files are out of sync with the schema (catches "I forgot to commit the regenerated file" PRs).
 - After adding or modifying a `gql\`…\`` operation: run `pnpm codegen` locally (or wait for Tilt's watcher), inspect the regenerated `*.generated.ts`, and commit it alongside the source. Treat generated files as source — they are checked into git.
 - Apollo `useQuery`/`useMutation`/`useSubscription` accept the typed document directly; `data` and `variables` are inferred without manual generic parameters. Do NOT pass a raw query string to Apollo hooks.
-- E2E specs share the same model — `e2e/api-gateway-e2e/__generated__/graphql.ts` provides typed documents, and the `gql()` helper accepts both typed nodes (preferred) and raw strings (legacy form, being migrated).
+- E2E specs share the same model — `e2e/api-gateway-e2e/src/__generated__/graphql.ts` provides typed documents, and the `gql()` helper accepts both typed nodes (preferred) and raw strings (legacy form, being migrated).
 
 **Why this exists:** the same registry-vs-drift principle as the testid registry ([TSTID]) — making the schema the single source of truth so a rename cannot silently desync the consumers.
 
@@ -630,7 +630,7 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 
 ### [OJAAC] Offline Handling
 
-**Problem:** Rural school, intermittent 4G. Long form submitted → network error → data lost.
+**Problem:** Rural institute, intermittent 4G. Long form submitted → network error → data lost.
 **Rules:**
 
 - Detect online/offline → persistent banner: "You're offline. Changes saved when you reconnect."
@@ -1076,7 +1076,7 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 
 ### [ZJRNK] Active Session Visibility
 
-**Problem:** Shared passwords (common in Indian schools). No way to see other active sessions.
+**Problem:** Shared passwords (common in Indian institutes). No way to see other active sessions.
 **Rules:**
 
 - Account settings: list active sessions with device, location, last active time

@@ -271,7 +271,7 @@ launch lint pnpm -s lint
 
 # Static gates — fast, always run regardless of affected set since they catch
 # global drift (live views / RLS / testid registry / drizzle migration↔snapshot
-# consistency / context and NATS allowlists / test conventions).
+# consistency / context and NATS allowlists / test conventions / doc links).
 launch gates bash -c 'set -e
   pnpm -s check:live-views
   pnpm -s check:live-views-coverage
@@ -283,6 +283,7 @@ launch gates bash -c 'set -e
   pnpm -s check:admin-context-reach
   pnpm -s check:direct-nats-emit
   pnpm -s check:event-handlers
+  pnpm -s check:docs
   pnpm -s test:check-integration
   pnpm -s test:check-dates'
 

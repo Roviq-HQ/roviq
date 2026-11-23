@@ -39,7 +39,7 @@ Working example: `apps/web/src/app/[locale]/institute/(dashboard)/people/student
 
 ## Playwright UI tests
 
-- Import `test` and `expect` from `e2e/shared/console-guardian`, not from `@playwright/test`: every test then fails on a console error, a GraphQL response with `errors`, a missing translation or a critical accessibility violation.
+- Import `test` and `expect` from `e2e/shared/console-guardian.ts`, not from `@playwright/test`: every test then fails on a console error, a GraphQL response with `errors`, a missing translation or a critical accessibility violation.
 - Login happens once per project in `src/auth.setup.ts`, which saves `storageState`; specs never log in inline. Credentials, names and ids come from `e2e/shared/seed-fixtures.ts` (`E2E_USERS`, `SEED`).
 - Page objects live in `src/pages/` of the project and `e2e/shared/pages/`; a spec holds no selectors of its own. Locators use `page.getByTestId(testIds.…)` or role and name.
 - The three projects share one Next.js app on the e2e web port (slot 0: 4201): `localhost`, `admin.localhost`, `reseller.localhost`. Read the port from `E2E_WEB_PORT`; never type it. Run with `pnpm test:e2e:ui`.
