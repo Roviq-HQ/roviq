@@ -32,6 +32,23 @@ The app resources (api-gateway, notification-service, web) restart on file chang
 is only for the manual resources. The test commands (`pnpm e2e:up`, `pnpm test:e2e:api`,
 `pnpm ci:check` and the rest) are in `docs/testing.md` → "Commands".
 
+### When the dev app looks wrong
+
+Check these before debugging the code:
+
+1. **Stale gateway.** `node --watch` sometimes misses a file change. Find the process and its start
+   time, and compare with your last edit:
+   `ss -ltnp | grep :<API port>` gives the pid, `ps -o lstart -p <pid>` the start time. If it is
+   older than the edit, `pnpm tilt trigger api-gateway` and wait for `/api/health/ready`.
+2. **Stale type-check.** The `typecheck` resource watches with built library types and can show an
+   error for a symbol that exists. `pnpm nx run <project>:typecheck` is the answer that counts.
+3. **Codegen ran while the gateway was restarting.** It fails with `ECONNREFUSED`; run
+   `pnpm codegen` again once the gateway answers.
+4. **Changed `.env`.** Tilt reads it once at start. Stop Tilt and `pnpm tilt up` again; check a
+   running process with `tr '\0' '\n' < /proc/<pid>/environ | grep NAME`.
+5. **Schema behind the branch.** `pnpm tilt logs db-push`; `pnpm tilt trigger db-clean` resets and
+   re-seeds this instance's own database.
+
 ### How the backend apps run in dev
 
 `api-gateway` and `notification-service` run from their TypeScript sources, not from `dist/`

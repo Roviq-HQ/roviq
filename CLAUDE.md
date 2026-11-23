@@ -2,16 +2,17 @@
 
 ### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table. Some of the code is written by older models, so if you are fable 5.2 or above, you are allowed to completely change anything to reduce bugs, tighten security, less technical debt, faster launching of the product, and a lot of things. Use that freedom inside the issue you are working on: a rewrite or redesign that no issue asks for is a proposal to the user first.
 
-**Always use `pnpm tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Always call it as `pnpm tilt …`, never bare `tilt`: the wrapper targets this checkout's own Tilt, while bare `tilt` can hit another instance's.
+## Dev environment
 
-- Tilt resources and triggers (`db-push`, `db-seed`, `db-clean`, `api-gateway`, `web`, `e2e-gateway`, `e2e-ui`): `docs/infrastructure.md` → "Tilt commands".
-- Test commands (`pnpm e2e:up`, `pnpm test:e2e:api`, `pnpm test:e2e:ui`, `pnpm test:all`, `pnpm ci:check`): `docs/testing.md` → "Commands". Run `pnpm e2e:up` before any e2e test, and again after a backend change.
+Tilt runs everything: apps, databases, migrations, seeds. Never run `pnpm db:*`, `nx serve` or `nx dev` yourself, and always type `pnpm tilt …`, never bare `tilt` (the wrapper targets this checkout's own Tilt). Commands and resources: `docs/infrastructure.md` → "Tilt commands"; test commands: `docs/testing.md` → "Commands".
 
-Tilt auto-detects file changes for app resources (api-gateway, notification-service, web) — no `pnpm tilt trigger` needed after editing code, just check logs. The two backend apps run from source without type-checking: type errors show in `pnpm tilt logs typecheck`, not in the app's log. Use `pnpm tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `pnpm tilt logs`.
-
-Tilt `codegen` resource runs `pnpm codegen --watch` automatically — regenerates GraphQL types when schema or document files change. After adding/modifying GraphQL resolvers or frontend queries, check `pnpm tilt logs codegen` to confirm types regenerated.
-
-Use `pnpm tilt logs <resource>` to check output when things fail (e.g., `pnpm tilt logs db-clean`, `pnpm tilt logs api-gateway`, `pnpm tilt logs e2e-gateway`).
+- **Start of a session**: `pnpm tilt get uiresources`. No answer means Tilt is down: start it (`pnpm tilt up`) before anything else.
+- **After a code change** the apps restart themselves; `pnpm tilt trigger <resource>` is for `db-push`, `db-seed`, `db-clean` and the e2e resources. Read results with `pnpm tilt logs <resource>`.
+- **The dev gateway can miss a restart.** When the running app contradicts the code or a passing test, compare the process start time with your last edit and run `pnpm tilt trigger api-gateway` (steps: `docs/infrastructure.md` → "When the dev app looks wrong").
+- **Type errors are not in the app log.** The backend apps run from source unchecked: use `pnpm nx run <project>:typecheck`.
+- **GraphQL types** regenerate through the `codegen` resource, which needs the gateway up. After a resolver or query change, confirm in `pnpm tilt logs codegen`, or run `pnpm codegen` once the gateway answers.
+- **`.env` is read when Tilt starts.** A changed variable reaches the apps only after Tilt restarts.
+- **E2E**: `pnpm test:e2e:api` and `pnpm ci:check` rebuild and re-seed the e2e stack themselves. Before any other e2e run, and after a backend change, run `pnpm e2e:up`.
 
 ## Parallel dev instances
 
