@@ -5,9 +5,10 @@ import { GuardianResolver } from './guardian.resolver';
 import { GuardianService } from './guardian.service';
 import { GuardianQueryService } from './guardian-query.service';
 import { GuardianReadRepository } from './guardian-read.repository';
+import { GuardianRepositoryModule } from './repositories/guardian-repository.module';
 
 @Module({
-  imports: [AuthModule, SignInDetailsModule],
+  imports: [AuthModule, SignInDetailsModule, GuardianRepositoryModule],
   providers: [GuardianService, GuardianResolver, GuardianQueryService, GuardianReadRepository],
   exports: [GuardianService],
 })

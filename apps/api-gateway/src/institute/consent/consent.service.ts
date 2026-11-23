@@ -6,33 +6,34 @@
  * The latest row per (guardian, student, purpose) determines current consent state.
  */
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
-import {
-  consentRecords,
-  DRIZZLE_DB,
-  type DrizzleDB,
-  guardianProfilesLive,
-  mkInstituteCtx,
-  studentGuardianLinksLive,
-  withTenant,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { eq, sql } from 'drizzle-orm';
 import type { GrantConsentInput } from './dto/grant-consent.input';
 import type { WithdrawConsentInput } from './dto/withdraw-consent.input';
+import { ConsentRepository } from './repositories/consent.repository';
+import type { LatestConsentRow } from './repositories/types';
 
 interface ConsentMetadata {
   ipAddress?: string;
   userAgent?: string;
 }
 
+function toConsentStatus(row: LatestConsentRow) {
+  return {
+    studentProfileId: row.student_profile_id,
+    purpose: row.purpose,
+    isGranted: row.is_granted,
+    lastUpdatedAt: row.created_at ? new Date(row.created_at) : null,
+  };
+}
+
 @Injectable()
 export class ConsentService {
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: ConsentRepository,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -47,50 +48,24 @@ export class ConsentService {
    * Each guardian has exactly one guardian_profile per institute (unique membershipId).
    */
   private async resolveGuardianProfileId(tenantId: string, membershipId: string): Promise<string> {
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:consent'),
-      async (tx) => {
-        return tx
-          .select({ id: guardianProfilesLive.id })
-          .from(guardianProfilesLive)
-          .where(eq(guardianProfilesLive.membershipId, membershipId))
-          .limit(1);
-      },
-    );
-
-    if (rows.length === 0) {
+    const id = await this.repo.findGuardianProfileId(tenantId, membershipId);
+    if (id === null) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'Only guardians can manage consent records');
     }
-
-    return rows[0].id;
+    return id;
   }
 
-  /**
-   * Validates that the given guardian is linked to the given student in this tenant.
-   * Throws ForbiddenException if the link does not exist.
-   */
   private async validateGuardianStudentLink(
     tenantId: string,
     guardianProfileId: string,
     studentProfileId: string,
   ): Promise<void> {
-    const links = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:consent'),
-      async (tx) => {
-        return tx
-          .select({ id: studentGuardianLinksLive.id })
-          .from(studentGuardianLinksLive)
-          .where(
-            sql`${studentGuardianLinksLive.guardianProfileId} = ${guardianProfileId}
-            AND ${studentGuardianLinksLive.studentProfileId} = ${studentProfileId}`,
-          )
-          .limit(1);
-      },
+    const linked = await this.repo.isGuardianLinkedToStudent(
+      tenantId,
+      guardianProfileId,
+      studentProfileId,
     );
-
-    if (links.length === 0) {
+    if (!linked) {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
         'Guardian is not linked to the specified student',
@@ -108,28 +83,15 @@ export class ConsentService {
 
     await this.validateGuardianStudentLink(tenantId, guardianProfileId, input.studentProfileId);
 
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:consent'),
-      async (tx) => {
-        return tx
-          .insert(consentRecords)
-          .values({
-            tenantId,
-            guardianProfileId,
-            studentProfileId: input.studentProfileId,
-            purpose: input.purpose,
-            isGranted: true,
-            grantedAt: new Date(),
-            verificationMethod: input.verificationMethod ?? null,
-            ipAddress: metadata.ipAddress ?? null,
-            userAgent: metadata.userAgent ?? null,
-          })
-          .returning();
-      },
-    );
-
-    const record = rows[0];
+    const record = await this.repo.insertGrant({
+      tenantId,
+      guardianProfileId,
+      studentProfileId: input.studentProfileId,
+      purpose: input.purpose,
+      verificationMethod: input.verificationMethod ?? null,
+      ipAddress: metadata.ipAddress ?? null,
+      userAgent: metadata.userAgent ?? null,
+    });
 
     this.eventBus.emit(EVENT_PATTERNS.CONSENT.given, {
       tenantId,
@@ -155,27 +117,14 @@ export class ConsentService {
 
     await this.validateGuardianStudentLink(tenantId, guardianProfileId, input.studentProfileId);
 
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:consent'),
-      async (tx) => {
-        return tx
-          .insert(consentRecords)
-          .values({
-            tenantId,
-            guardianProfileId,
-            studentProfileId: input.studentProfileId,
-            purpose: input.purpose,
-            isGranted: false,
-            withdrawnAt: new Date(),
-            ipAddress: metadata.ipAddress ?? null,
-            userAgent: metadata.userAgent ?? null,
-          })
-          .returning();
-      },
-    );
-
-    const record = rows[0];
+    const record = await this.repo.insertWithdrawal({
+      tenantId,
+      guardianProfileId,
+      studentProfileId: input.studentProfileId,
+      purpose: input.purpose,
+      ipAddress: metadata.ipAddress ?? null,
+      userAgent: metadata.userAgent ?? null,
+    });
 
     this.eventBus.emit(EVENT_PATTERNS.CONSENT.withdrawn, {
       tenantId,
@@ -201,34 +150,8 @@ export class ConsentService {
   async consentStatusForStudent(studentProfileId: string) {
     const tenantId = this.tenantId;
 
-    const record = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:consent'),
-      async (tx) => {
-        return tx.execute<{
-          student_profile_id: string;
-          purpose: string;
-          is_granted: boolean;
-          created_at: Date;
-        }>(
-          sql`SELECT DISTINCT ON (purpose)
-            student_profile_id,
-            purpose,
-            is_granted,
-            created_at
-          FROM consent_records
-          WHERE student_profile_id = ${studentProfileId}
-          ORDER BY purpose, created_at DESC`,
-        );
-      },
-    );
-
-    return record.rows.map((row) => ({
-      studentProfileId: row.student_profile_id,
-      purpose: row.purpose,
-      isGranted: row.is_granted,
-      lastUpdatedAt: row.created_at ? new Date(row.created_at) : null,
-    }));
+    const rows = await this.repo.latestForStudent(tenantId, studentProfileId);
+    return rows.map(toConsentStatus);
   }
 
   /**
@@ -239,34 +162,7 @@ export class ConsentService {
     const tenantId = this.tenantId;
     const guardianProfileId = await this.resolveGuardianProfileId(tenantId, membershipId);
 
-    // Use DISTINCT ON to get the latest consent record per (student, purpose)
-    const record = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:consent'),
-      async (tx) => {
-        return tx.execute<{
-          student_profile_id: string;
-          purpose: string;
-          is_granted: boolean;
-          created_at: Date;
-        }>(
-          sql`SELECT DISTINCT ON (student_profile_id, purpose)
-            student_profile_id,
-            purpose,
-            is_granted,
-            created_at
-          FROM consent_records
-          WHERE guardian_profile_id = ${guardianProfileId}
-          ORDER BY student_profile_id, purpose, created_at DESC`,
-        );
-      },
-    );
-
-    return record.rows.map((row) => ({
-      studentProfileId: row.student_profile_id,
-      purpose: row.purpose,
-      isGranted: row.is_granted,
-      lastUpdatedAt: row.created_at ? new Date(row.created_at) : null,
-    }));
+    const rows = await this.repo.latestForGuardian(tenantId, guardianProfileId);
+    return rows.map(toConsentStatus);
   }
 }

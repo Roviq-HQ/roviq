@@ -5,51 +5,61 @@
  * sibling discovery, and divorce/access revocation.
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  BusinessException,
-  DefaultRoles,
-  ErrorCode,
-  type GuardianEducationLevel,
-} from '@roviq/common-types';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  guardianProfiles,
-  guardianProfilesLive,
-  memberships,
-  mkInstituteCtx,
-  phoneNumbersLive,
-  rolesLive,
-  softDelete,
-  studentGuardianLinks,
-  studentGuardianLinksLive,
-  studentProfilesLive,
-  tenantUserProfilesLive,
-  withTenant,
-} from '@roviq/database';
+import { Injectable, Logger } from '@nestjs/common';
+import { BusinessException, ErrorCode, type GuardianEducationLevel } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
-import { ensureTenantUserProfile, updateTenantUserProfile } from '../../auth/tenant-user-profile';
 import { SignInDetailsService } from '../sign-in-details/sign-in-details.service';
-import { withSignInStates } from '../sign-in-details/sign-in-status';
-import { englishOrFirst, readSignInTarget } from '../sign-in-details/sign-in-target';
+import { englishOrFirst } from '../sign-in-details/sign-in-target';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
   LinkGuardianInput,
   RevokeGuardianAccessInput,
   UnlinkGuardianInput,
 } from './dto/link-guardian.input';
+import { GuardianRepository } from './repositories/guardian.repository';
+import type { LockedGuardianLink, UnlinkPlan } from './repositories/types';
+
+/** Refuses an unlink the rules forbid; otherwise names the link to remove and the new primary. */
+function planUnlink(links: LockedGuardianLink[], input: UnlinkGuardianInput): UnlinkPlan {
+  const link = links.find((l) => l.guardianProfileId === input.guardianProfileId);
+  if (!link)
+    throw new BusinessException(
+      ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+      'Guardian-student link not found',
+    );
+  if (links.length <= 1)
+    throw new BusinessException(
+      ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
+      'Cannot unlink the last guardian from a student',
+    );
+
+  const replacement = input.newPrimaryGuardianId;
+  if (link.isPrimaryContact && !replacement)
+    throw new BusinessException(
+      ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
+      'Cannot unlink primary contact without providing newPrimaryGuardianId',
+    );
+  const replacementLink = replacement
+    ? links.find((l) => l.guardianProfileId === replacement && l.id !== link.id)
+    : undefined;
+  if (replacement && (!link.isPrimaryContact || !replacementLink))
+    throw new BusinessException(
+      ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID,
+      'newPrimaryGuardianId must be another guardian linked to this student, and only when unlinking the primary contact',
+    );
+
+  return { linkId: link.id, replacementLinkId: replacementLink?.id ?? null };
+}
 
 @Injectable()
 export class GuardianService {
   private readonly logger = new Logger(GuardianService.name);
 
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: GuardianRepository,
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
     private readonly signInDetails: SignInDetailsService,
@@ -65,75 +75,11 @@ export class GuardianService {
     return getRequestContext().userId;
   }
 
-  /**
-   * Central SELECT shape for the list/detail queries — joins the institute's
-   * profile copy so every row carries the guardian's display name + photo + gender.
-   * Also LEFT JOINs phone_numbers to surface the guardian's primary phone
-   * number, and computes a linked-students count via scalar subquery so
-   * the list page can render the "Linked students" column without N+1.
-   * Mirrors the `student.service.ts` helper pattern: one place to maintain,
-   * avoids column drift between `findById` and `list`.
-   */
-  private guardianSelect() {
-    return {
-      id: guardianProfilesLive.id,
-      userId: guardianProfilesLive.userId,
-      membershipId: guardianProfilesLive.membershipId,
-      occupation: guardianProfilesLive.occupation,
-      organization: guardianProfilesLive.organization,
-      designation: guardianProfilesLive.designation,
-      educationLevel: guardianProfilesLive.educationLevel,
-      version: guardianProfilesLive.version,
-      createdAt: guardianProfilesLive.createdAt,
-      updatedAt: guardianProfilesLive.updatedAt,
-      // the institute's copy of the guardian's name and picture
-      firstName: tenantUserProfilesLive.firstName,
-      lastName: tenantUserProfilesLive.lastName,
-      profileImageFileId: tenantUserProfilesLive.profileImageFileId,
-      gender: tenantUserProfilesLive.gender,
-      // phone_numbers join (primary phone only)
-      primaryPhone: phoneNumbersLive.number,
-      // Scalar subquery: count of linked students (excludes soft-deleted links).
-      // Cast to int so Drizzle returns `number`, not `string` (PG COUNT returns bigint).
-      linkedStudentCount: sql<number>`(
-        SELECT COUNT(*)::int
-        FROM ${studentGuardianLinksLive}
-        WHERE ${studentGuardianLinksLive.guardianProfileId} = ${guardianProfilesLive.id}
-      )`.as('linked_student_count'),
-    } as const;
-  }
-
   private async findById(id: string) {
-    const tenantId = this.tenantId;
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        const found = await tx
-          .select(this.guardianSelect())
-          .from(guardianProfilesLive)
-          .innerJoin(
-            tenantUserProfilesLive,
-            and(
-              eq(tenantUserProfilesLive.userId, guardianProfilesLive.userId),
-              eq(tenantUserProfilesLive.tenantId, guardianProfilesLive.tenantId),
-            ),
-          )
-          .leftJoin(
-            phoneNumbersLive,
-            and(
-              eq(phoneNumbersLive.userId, guardianProfilesLive.userId),
-              eq(phoneNumbersLive.isPrimary, true),
-            ),
-          )
-          .where(eq(guardianProfilesLive.id, id))
-          .limit(1);
-        return withSignInStates(tx, tenantId, found);
-      },
-    );
-    if (rows.length === 0)
+    const row = await this.repo.findById(this.tenantId, id);
+    if (!row)
       throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian profile ${id} not found`);
-    return rows[0];
+    return row;
   }
 
   async create(input: CreateGuardianInput) {
@@ -162,80 +108,35 @@ export class GuardianService {
       actorId,
     );
 
-    // Find parent role using DefaultRoles constant
-    const guardianRole = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        return tx
-          .select({ id: rolesLive.id })
-          .from(rolesLive)
-          .where(
-            and(
-              eq(rolesLive.tenantId, tenantId),
-              sql`${rolesLive.name}->>'en' = ${DefaultRoles.Parent}`,
-            ),
-          )
-          .limit(1);
-      },
-    );
+    const guardianRoleId = await this.repo.findParentRoleId(tenantId);
 
-    if (guardianRole.length === 0)
+    if (guardianRoleId === null)
       throw new BusinessException(
         ErrorCode.ROLE_NOT_FOUND,
         'Parent role not found for this institute',
       );
 
-    // Create membership
-    const newMembership = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        const inserted = await tx
-          .insert(memberships)
-          .values({
-            userId: newUser.id,
-            tenantId,
-            roleId: guardianRole[0].id,
-            status: 'ACTIVE',
-            abilities: [],
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning({ id: memberships.id });
-        await ensureTenantUserProfile(tx, {
-          tenantId,
-          userId: newUser.id,
-          actorId,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          gender: input.gender,
-        });
-        return inserted;
+    const newMembership = await this.repo.createMembership({
+      tenantId,
+      userId: newUser.id,
+      roleId: guardianRoleId,
+      actorId,
+      profile: {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        gender: input.gender,
       },
-    );
+    });
 
-    // Create guardian_profile
-    const profile = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        const rows = await tx
-          .insert(guardianProfiles)
-          .values({
-            userId: newUser.id,
-            membershipId: newMembership[0].id,
-            tenantId,
-            occupation: input.occupation ?? null,
-            organization: input.organization ?? null,
-            educationLevel: input.educationLevel ?? null,
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning();
-        return rows[0];
-      },
-    );
+    const profile = await this.repo.createProfile({
+      tenantId,
+      userId: newUser.id,
+      membershipId: newMembership.id,
+      occupation: input.occupation ?? null,
+      organization: input.organization ?? null,
+      educationLevel: input.educationLevel ?? null,
+      actorId,
+    });
 
     this.signInDetails.sendOnCreate({
       tenantId,
@@ -265,18 +166,7 @@ export class GuardianService {
   /** New temporary password for a guardian of this institute who has not signed in yet. */
   async resendSignInDetails(id: string): Promise<boolean> {
     const tenantId = this.tenantId;
-    const target = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        const [profile] = await tx
-          .select({ userId: guardianProfilesLive.userId })
-          .from(guardianProfilesLive)
-          .where(eq(guardianProfilesLive.id, id))
-          .limit(1);
-        return profile ? readSignInTarget(tx, tenantId, profile.userId) : null;
-      },
-    );
+    const target = await this.repo.findSignInTarget(tenantId, id);
     if (!target)
       throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian profile ${id} not found`);
     await this.signInDetails.resend(tenantId, target, this.userId);
@@ -298,36 +188,17 @@ export class GuardianService {
     const tenantId = this.tenantId;
     const actorId = this.userId;
 
-    // Bump version + write guardian_profiles columns inside the tenant scope.
-    const updatedRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        // Separate "not here" (another institute's id included) from a version mismatch.
-        const [existing] = await tx
-          .select({ id: guardianProfilesLive.id })
-          .from(guardianProfilesLive)
-          .where(eq(guardianProfilesLive.id, id))
-          .limit(1);
-        if (!existing) {
-          throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
-        }
-        return tx
-          .update(guardianProfiles)
-          .set({
-            ...(data.occupation != null && { occupation: data.occupation }),
-            ...(data.organization != null && { organization: data.organization }),
-            ...(data.designation != null && { designation: data.designation }),
-            ...(data.educationLevel != null && { educationLevel: data.educationLevel }),
-            updatedBy: actorId,
-            version: sql`${guardianProfiles.version} + 1`,
-          })
-          .where(and(eq(guardianProfiles.id, id), eq(guardianProfiles.version, data.version)))
-          .returning({ id: guardianProfiles.id, userId: guardianProfiles.userId });
-      },
-    );
+    const result = await this.repo.updateProfile(tenantId, id, actorId, data.version, {
+      ...(data.occupation != null && { occupation: data.occupation }),
+      ...(data.organization != null && { organization: data.organization }),
+      ...(data.designation != null && { designation: data.designation }),
+      ...(data.educationLevel != null && { educationLevel: data.educationLevel }),
+    });
 
-    if (updatedRows.length === 0) {
+    if (result.kind === 'not_found') {
+      throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
+    }
+    if (result.kind === 'version_mismatch') {
       throw new BusinessException(
         ErrorCode.CONCURRENT_MODIFICATION,
         'Guardian profile version mismatch',
@@ -335,17 +206,10 @@ export class GuardianService {
     }
 
     if (data.firstName !== undefined || data.lastName !== undefined) {
-      await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), (tx) =>
-        updateTenantUserProfile(tx, {
-          tenantId,
-          userId: updatedRows[0].userId,
-          actorId,
-          changes: {
-            ...(data.firstName !== undefined && { firstName: data.firstName }),
-            ...(data.lastName !== undefined && { lastName: data.lastName }),
-          },
-        }),
-      );
+      await this.repo.updateInstituteProfile(tenantId, result.userId, actorId, {
+        ...(data.firstName !== undefined && { firstName: data.firstName }),
+        ...(data.lastName !== undefined && { lastName: data.lastName }),
+      });
     }
 
     // Re-fetch through the joined select so the response carries the
@@ -358,41 +222,11 @@ export class GuardianService {
     const actorId = this.userId;
 
     // Check: guardian is not the only guardian for any student
-    const links = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        return tx
-          .select({ studentProfileId: studentGuardianLinksLive.studentProfileId })
-          .from(studentGuardianLinksLive)
-          .where(eq(studentGuardianLinksLive.guardianProfileId, id));
-      },
-    );
+    const studentProfileIds = await this.repo.listLinkedStudentIds(tenantId, id);
 
-    for (const link of links) {
-      const otherGuardians = await withTenant(
-        this.db,
-        mkInstituteCtx(tenantId, 'service:guardian'),
-        async (tx) => {
-          // Links to already-deleted guardians do not count as another guardian.
-          return tx
-            .select({ id: studentGuardianLinksLive.id })
-            .from(studentGuardianLinksLive)
-            .innerJoin(
-              guardianProfilesLive,
-              eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
-            )
-            .where(
-              and(
-                eq(studentGuardianLinksLive.studentProfileId, link.studentProfileId),
-                sql`${studentGuardianLinksLive.guardianProfileId} != ${id}`,
-              ),
-            )
-            .limit(1);
-        },
-      );
-
-      if (otherGuardians.length === 0) {
+    for (const studentProfileId of studentProfileIds) {
+      const hasOther = await this.repo.hasOtherGuardian(tenantId, studentProfileId, id);
+      if (!hasOther) {
         throw new BusinessException(
           ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
           'Cannot delete guardian who is the only guardian for a student. Unlink or assign another guardian first.',
@@ -400,57 +234,22 @@ export class GuardianService {
       }
     }
 
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      const rows = await tx
-        .update(guardianProfiles)
-        .set({ deletedAt: new Date(), deletedBy: actorId })
-        .where(and(eq(guardianProfiles.id, id), sql`${guardianProfiles.deletedAt} IS NULL`))
-        .returning();
-      if (rows.length === 0)
-        throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
-    });
+    const deleted = await this.repo.softDelete(tenantId, id, actorId);
+    if (!deleted)
+      throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian ${id} not found`);
 
     return true;
   }
 
   async listDeleted() {
-    const tenantId = this.tenantId;
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      return tx
-        .select({
-          id: guardianProfiles.id,
-          firstName: tenantUserProfilesLive.firstName,
-          lastName: tenantUserProfilesLive.lastName,
-          deletedAt: sql<Date>`${guardianProfiles.deletedAt}`.mapWith(guardianProfiles.deletedAt),
-        })
-        .from(guardianProfiles) // allow-base-read: the Deleted list shows trashed rows
-        .innerJoin(
-          tenantUserProfilesLive,
-          and(
-            eq(tenantUserProfilesLive.userId, guardianProfiles.userId),
-            eq(tenantUserProfilesLive.tenantId, guardianProfiles.tenantId),
-          ),
-        )
-        .where(isNotNull(guardianProfiles.deletedAt))
-        .orderBy(desc(guardianProfiles.deletedAt));
-    });
+    return this.repo.listDeleted(this.tenantId);
   }
 
   async restore(id: string): Promise<boolean> {
-    const tenantId = this.tenantId;
-    const actorId = this.userId;
-
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      const rows = await tx
-        .update(guardianProfiles)
-        .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
-        .where(and(eq(guardianProfiles.id, id), isNotNull(guardianProfiles.deletedAt)))
-        .returning({ id: guardianProfiles.id });
-      if (rows.length === 0) {
-        throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, 'Deleted guardian not found');
-      }
-    });
-
+    const restored = await this.repo.restore(this.tenantId, id, this.userId);
+    if (!restored) {
+      throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, 'Deleted guardian not found');
+    }
     return true;
   }
 
@@ -459,37 +258,13 @@ export class GuardianService {
   async linkToStudent(input: LinkGuardianInput) {
     const tenantId = this.tenantId;
 
-    // Validate student exists in this tenant
-    const student = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        return tx
-          .select({ id: studentProfilesLive.id })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, input.studentProfileId))
-          .limit(1);
-      },
-    );
-    if (student.length === 0)
+    if (!(await this.repo.studentExists(tenantId, input.studentProfileId)))
       throw new BusinessException(
         ErrorCode.STUDENT_NOT_FOUND,
         'Student profile not found in this institute',
       );
 
-    // Validate guardian exists in this tenant
-    const guardian = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        return tx
-          .select({ id: guardianProfilesLive.id })
-          .from(guardianProfilesLive)
-          .where(eq(guardianProfilesLive.id, input.guardianProfileId))
-          .limit(1);
-      },
-    );
-    if (guardian.length === 0)
+    if (!(await this.repo.guardianExists(tenantId, input.guardianProfileId)))
       throw new BusinessException(
         ErrorCode.GUARDIAN_NOT_FOUND,
         'Guardian profile not found in this institute',
@@ -497,53 +272,27 @@ export class GuardianService {
 
     // If setting as primary contact, clear any existing primary for this student
     if (input.isPrimaryContact) {
-      await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-        await tx
-          .update(studentGuardianLinks)
-          .set({ isPrimaryContact: false, updatedBy: this.userId })
-          .where(
-            and(
-              eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
-              eq(studentGuardianLinks.isPrimaryContact, true),
-            ),
-          );
-      });
+      await this.repo.clearPrimaryContact(tenantId, input.studentProfileId, this.userId);
     }
 
-    // Create the link (unique constraint prevents duplicates)
-    const link = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        try {
-          const rows = await tx
-            .insert(studentGuardianLinks)
-            .values({
-              createdBy: this.userId,
-              updatedBy: this.userId,
-              tenantId,
-              studentProfileId: input.studentProfileId,
-              guardianProfileId: input.guardianProfileId,
-              relationship: input.relationship,
-              isPrimaryContact: input.isPrimaryContact ?? false,
-              isEmergencyContact: input.isEmergencyContact ?? false,
-              canPickup: input.canPickup ?? true,
-              livesWith: input.livesWith ?? true,
-            })
-            .returning();
-          return rows[0];
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (message.includes('uq_student_guardian')) {
-            throw new BusinessException(
-              ErrorCode.GUARDIAN_ALREADY_LINKED,
-              'This guardian is already linked to this student',
-            );
-          }
-          throw error;
-        }
-      },
-    );
+    // The unique constraint refuses a duplicate link.
+    const result = await this.repo.createLink({
+      tenantId,
+      actorId: this.userId,
+      studentProfileId: input.studentProfileId,
+      guardianProfileId: input.guardianProfileId,
+      relationship: input.relationship,
+      isPrimaryContact: input.isPrimaryContact ?? false,
+      isEmergencyContact: input.isEmergencyContact ?? false,
+      canPickup: input.canPickup ?? true,
+      livesWith: input.livesWith ?? true,
+    });
+    if (result.kind === 'already_linked') {
+      throw new BusinessException(
+        ErrorCode.GUARDIAN_ALREADY_LINKED,
+        'This guardian is already linked to this student',
+      );
+    }
 
     this.eventBus.emit(EVENT_PATTERNS.GUARDIAN.linked, {
       guardianProfileId: input.guardianProfileId,
@@ -552,71 +301,15 @@ export class GuardianService {
       tenantId,
     });
 
-    return link;
+    return result.link;
   }
 
   async unlinkFromStudent(input: UnlinkGuardianInput) {
     const tenantId = this.tenantId;
 
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      // Locks the student's live links so two concurrent unlinks cannot both
-      // pass the last-guardian check. A link to a deleted guardian is not a
-      // guardian the student still has, so the join drops it.
-      const links = await tx
-        .select({
-          id: studentGuardianLinks.id,
-          guardianProfileId: studentGuardianLinks.guardianProfileId,
-          isPrimaryContact: studentGuardianLinks.isPrimaryContact,
-        })
-        .from(studentGuardianLinks) // allow-base-read: FOR UPDATE row lock, filtered to live rows
-        .innerJoin(
-          guardianProfilesLive,
-          eq(guardianProfilesLive.id, studentGuardianLinks.guardianProfileId),
-        )
-        .where(
-          and(
-            eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
-            isNull(studentGuardianLinks.deletedAt),
-          ),
-        )
-        .for('update', { of: studentGuardianLinks });
-
-      const link = links.find((l) => l.guardianProfileId === input.guardianProfileId);
-      if (!link)
-        throw new BusinessException(
-          ErrorCode.GUARDIAN_LINK_NOT_FOUND,
-          'Guardian-student link not found',
-        );
-      if (links.length <= 1)
-        throw new BusinessException(
-          ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
-          'Cannot unlink the last guardian from a student',
-        );
-
-      const replacement = input.newPrimaryGuardianId;
-      if (link.isPrimaryContact && !replacement)
-        throw new BusinessException(
-          ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
-          'Cannot unlink primary contact without providing newPrimaryGuardianId',
-        );
-      const replacementLink = replacement
-        ? links.find((l) => l.guardianProfileId === replacement && l.id !== link.id)
-        : undefined;
-      if (replacement && (!link.isPrimaryContact || !replacementLink))
-        throw new BusinessException(
-          ErrorCode.REPLACEMENT_PRIMARY_GUARDIAN_INVALID,
-          'newPrimaryGuardianId must be another guardian linked to this student, and only when unlinking the primary contact',
-        );
-
-      // Soft delete first: the one-primary-per-student index ignores deleted rows.
-      await softDelete(tx, studentGuardianLinks, link.id);
-      if (replacementLink) {
-        await tx
-          .update(studentGuardianLinks)
-          .set({ isPrimaryContact: true, updatedBy: this.userId })
-          .where(eq(studentGuardianLinks.id, replacementLink.id));
-      }
-    });
+    await this.repo.unlink(tenantId, input.studentProfileId, this.userId, (links) =>
+      planUnlink(links, input),
+    );
 
     this.eventBus.emit(EVENT_PATTERNS.GUARDIAN.unlinked, {
       guardianProfileId: input.guardianProfileId,
@@ -634,35 +327,17 @@ export class GuardianService {
    * Only institute_admin can call this (CASL enforced at resolver level).
    */
   async revokeAccess(input: RevokeGuardianAccessInput) {
-    const tenantId = this.tenantId;
-
-    const updated = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:guardian'),
-      async (tx) => {
-        const rows = await tx
-          .update(studentGuardianLinks)
-          .set({
-            canPickup: false,
-            isPrimaryContact: false,
-            updatedBy: this.userId,
-          })
-          .where(
-            and(
-              eq(studentGuardianLinks.studentProfileId, input.studentProfileId),
-              eq(studentGuardianLinks.guardianProfileId, input.guardianProfileId),
-            ),
-          )
-          .returning();
-
-        if (rows.length === 0)
-          throw new BusinessException(
-            ErrorCode.GUARDIAN_LINK_NOT_FOUND,
-            'Guardian-student link not found',
-          );
-        return rows[0];
-      },
+    const updated = await this.repo.revokeAccess(
+      this.tenantId,
+      input.studentProfileId,
+      input.guardianProfileId,
+      this.userId,
     );
+    if (!updated)
+      throw new BusinessException(
+        ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+        'Guardian-student link not found',
+      );
 
     this.logger.log(
       `Guardian access revoked: guardian=${input.guardianProfileId}, student=${input.studentProfileId}, reason=${input.reason ?? 'not specified'}`,
@@ -673,18 +348,6 @@ export class GuardianService {
 
   /** Get all students linked to a guardian (sibling discovery for parent dashboard) */
   async getLinkedStudents(guardianProfileId: string) {
-    const tenantId = this.tenantId;
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:guardian'), async (tx) => {
-      return tx
-        .select({
-          linkId: studentGuardianLinksLive.id,
-          studentProfileId: studentGuardianLinksLive.studentProfileId,
-          relationship: studentGuardianLinksLive.relationship,
-          isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
-          canPickup: studentGuardianLinksLive.canPickup,
-        })
-        .from(studentGuardianLinksLive)
-        .where(eq(studentGuardianLinksLive.guardianProfileId, guardianProfileId));
-    });
+    return this.repo.listLinkedStudents(this.tenantId, guardianProfileId);
   }
 }
