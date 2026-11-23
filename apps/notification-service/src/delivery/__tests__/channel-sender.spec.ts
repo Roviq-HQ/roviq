@@ -5,7 +5,7 @@ import { NotificationWriteRepository } from '../../repositories/notification-wri
 import { type ChannelAdapter, ChannelAdapterError } from '../adapters/channel-adapter';
 import { ChannelAdapters } from '../adapters/channel-adapters';
 import { type ChannelAttempt, ChannelSender } from '../channel-sender';
-import { AllowAllConsentGate, ConsentGate } from '../consent-gate';
+import type { ConsentGate } from '../consent-gate';
 
 const INSTITUTE = {
   scope: 'institute',
@@ -52,7 +52,7 @@ describe('ChannelSender', () => {
     });
     sender = new ChannelSender(
       new ChannelAdapters([email]),
-      new AllowAllConsentGate(),
+      createMock<ConsentGate>({ allows: vi.fn().mockResolvedValue(true) }),
       contacts,
       writes,
     );
@@ -103,6 +103,7 @@ describe('ChannelSender', () => {
       channel: 'EMAIL',
       type: 'FEE_REMINDER',
       tenantId: INSTITUTE.tenantId,
+      studentMembershipId: null,
     });
   });
 

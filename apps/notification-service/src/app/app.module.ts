@@ -9,7 +9,7 @@ import { InstitutePortal } from '../config/institute-portal';
 import { BillingNotificationController } from '../controllers/billing-notification.controller';
 import { buildChannelAdapters, ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
-import { AllowAllConsentGate, ConsentGate } from '../delivery/consent-gate';
+import { ConsentGate, GuardianConsentGate } from '../delivery/consent-gate';
 import { HealthController } from '../health/health.controller';
 import { NotificationWorkerHealthIndicator } from '../health/worker.health';
 import { ApprovalListener } from '../listeners/approval.listener';
@@ -66,7 +66,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
         ),
       inject: [ConfigService, ContactReadRepository],
     },
-    { provide: ConsentGate, useClass: AllowAllConsentGate },
+    { provide: ConsentGate, useClass: GuardianConsentGate },
     {
       provide: ChannelSender,
       useFactory: (

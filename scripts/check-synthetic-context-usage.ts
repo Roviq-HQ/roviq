@@ -198,6 +198,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/repositories/recipient-read.drizzle-repository.ts',
   // ROV-314: users, phone_numbers and device_tokens are platform tables; no JWT in a consumer
   'apps/notification-service/src/repositories/contact-read.drizzle-repository.ts',
+  // ROV-269: reads a guardian's consent rows under the institute named by the event.
+  'apps/notification-service/src/repositories/consent-read.drizzle-repository.ts',
   // ROV-314: notifications and notification_deliveries are written by roviq_admin only
   'apps/notification-service/src/repositories/notification-write.drizzle-repository.ts',
   // ROV-314 integration fixtures: institutes, guardian links and stored notification rows
