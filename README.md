@@ -106,7 +106,8 @@ an Nx monorepo. The [architecture](docs/architecture.md) has the diagram and the
 ## Roadmap and feedback
 
 Planned work and bugs are in [GitHub Issues](https://github.com/Roviq-HQ/roviq/issues). Open one
-to report a problem or ask for a feature.
+to report a problem or ask for a feature. Report a security problem privately: [SECURITY.md](SECURITY.md).
+For an Enterprise licence outside the terms in `ee/LICENSE`, write to licensing@nbb.ai.
 
 ---
 

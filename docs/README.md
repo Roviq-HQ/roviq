@@ -11,6 +11,7 @@ Start here. Every document under `docs/` is listed on this page.
 | [Architecture](architecture.md) | See the system on one diagram, the repository layout and the main design decisions |
 | [Security overview](security.md) | Learn how institutes are kept apart and how access is controlled |
 | [Contributing](../CONTRIBUTING.md) | Learn how a change gets from a branch to `main` |
+| [Security policy](../SECURITY.md) | Report a vulnerability |
 
 ## How the system works
 

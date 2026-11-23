@@ -74,6 +74,10 @@ Detail: [Architecture](architecture.md#file-storage), [Deployment](deployment.md
 
 Detail: [Auth](auth.md#people-and-phone-numbers-rov-292), [Deployment](deployment.md#notification-delivery).
 
+## Reporting a vulnerability
+
+Email security@nbb.ai. The policy is in [SECURITY.md](../SECURITY.md).
+
 ## What this page does not claim
 
 Roviq is pre-release. This page describes controls that are in the code and covered by tests. It

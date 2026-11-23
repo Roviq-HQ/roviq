@@ -21,6 +21,10 @@ databases, the migrations, the seeds and the apps.
    leave your machine.
 8. Open a pull request against `main` that names the issue.
 
+## Security problems
+
+Do not open a public issue. Follow [SECURITY.md](SECURITY.md).
+
 ## Conventions
 
 The project rules (naming, tenant isolation, authorization, testing, the checks a change must pass)
