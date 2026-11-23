@@ -1,5 +1,35 @@
 # Architecture
 
+## System overview
+
+```mermaid
+flowchart LR
+  browser[Browser] -->|pages| web[web<br/>Next.js, three portals]
+  browser -->|GraphQL over HTTP and WebSocket| api[api-gateway<br/>NestJS]
+  api --> pg[(PostgreSQL 18<br/>row-level security)]
+  api --> redis[(Redis)]
+  api --> s3[(Object storage<br/>S3-compatible)]
+  api <--> temporal[Temporal<br/>workflows]
+  api -->|events| nats[NATS JetStream]
+  nats --> api
+  nats --> notif[notification-service<br/>NestJS]
+  notif --> pg
+  notif --> out[Email, push]
+```
+
+- **web** renders the three portals and picks one from the host name. The browser then talks to
+  the API directly.
+- **api-gateway** is the only public backend. Every request carries a token of one scope
+  (platform, reseller or institute) and runs in the database as that scope's role
+  ([auth.md](auth.md)). Temporal workers run inside this process.
+- **PostgreSQL** holds all institutes in one database and keeps them apart with row-level
+  security ([security.md](security.md)).
+- **NATS JetStream** carries domain events. The gateway consumes them for the audit log and for
+  work that follows a change; **notification-service** consumes them to deliver notifications
+  ([guides/events.md](guides/events.md)).
+- **Redis** holds short-lived state: cached role abilities, login lockouts, one-time tickets.
+- **Object storage** holds uploaded and generated files; the gateway signs a link per file.
+
 ## Repository layout
 
 ```text

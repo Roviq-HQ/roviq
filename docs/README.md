@@ -6,8 +6,10 @@ Start here. Every document under `docs/` is listed on this page.
 
 | Document | Read it to |
 |----------|------------|
+| [Product overview](product.md) | Learn what Roviq does, who uses it, the editions and what is not built yet |
 | [Getting started](getting-started.md) | Run Roviq on your machine and log in |
-| [Architecture](architecture.md) | Learn the repository layout, the libraries and the main design decisions |
+| [Architecture](architecture.md) | See the system on one diagram, the repository layout and the main design decisions |
+| [Security overview](security.md) | Learn how institutes are kept apart and how access is controlled |
 | [Contributing](../CONTRIBUTING.md) | Learn how a change gets from a branch to `main` |
 
 ## How the system works
@@ -88,6 +90,7 @@ script can check, and runs in the pre-push gate.
 | Full text behind a rule list | `references/` |
 | What production needs | `deployment.md` |
 | Enterprise Edition | `ee/docs/` |
+| What the product does, for someone deciding whether to use it | `product.md`; a claim goes there only when the feature is built |
 | A plan, spec, PRD, decision record, review, test checklist or session note | Not in this repository: these are Linear documents |
 
 **Rules**
@@ -105,7 +108,10 @@ script can check, and runs in the pre-push gate.
 5. **Every document is listed on this page**, and every link and path in it resolves.
 6. **Keep a document one type.** A guide does not explain the design; a reference does not teach.
    Link across instead.
-7. **Do not list what the code already lists** (every file in a folder, every field of a table)
+7. **Claim only what is built.** `README.md` and `product.md` are read by people deciding whether
+   to use Roviq. A feature is named there when a user can use it today, and a limit is stated
+   plainly.
+8. **Do not list what the code already lists** (every file in a folder, every field of a table)
    unless the document adds meaning to each item. Such lists go stale first.
 
 **Format**

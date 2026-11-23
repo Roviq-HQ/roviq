@@ -2,7 +2,7 @@
 
 # Roviq
 
-**The open-source platform to run your institute**
+**Open-source institute management for India**
 
 [![CI](https://github.com/Roviq-HQ/roviq/actions/workflows/ci.yml/badge.svg)](https://github.com/Roviq-HQ/roviq/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -22,13 +22,41 @@
 
 ---
 
+Roviq runs the records, the daily routine and the paperwork of an institute in one system:
+admissions, students and staff, attendance, timetables, examinations, certificates and government
+reports. It is built for Indian schools, coaching centres and libraries, in English and Hindi.
+
+> **Status: pre-release.** Roviq is under active development and is not running in production
+> yet. The database schema and the API can still change.
+
 ## Why Roviq
 
-**Built for institute staff, not IT departments.** Most actions take fewer than 3 clicks. AI handles the tedious work — generating timetables, detecting attendance anomalies, auto-filling forms — so staff don't have to.
+**One system instead of five.** Admissions, attendance, timetables, exams and certificates share
+the same student and staff records, so nothing is typed twice. Approved leave shows up in the
+attendance roster; a holiday blocks it; a period in the timetable opens its attendance sheet.
 
-**One platform, not five.** Admissions, attendance, timetables, fees, and reporting in a single system. No juggling between disconnected tools.
+**Built for India.** CBSE, BSEH and RBSE subject catalogues, the NEP 2020 and 10+2 structures,
+exports for UDISE+, CBSE and state portals, transfer certificates anyone can verify online, and
+every screen in English and Hindi.
 
-**Your data, your control.** Open source, open API, self-hostable. No vendor lock-in, no data hostage.
+**Many institutes, kept apart by the database.** One installation serves many institutes.
+PostgreSQL row-level security separates them, every change lands in an audit log the institute
+can read, and a reseller's support staff can enter an institute only with its one-time code.
+[How it is secured](docs/security.md).
+
+**Open source.** The core is AGPL-3.0, with a GraphQL API for everything the portals do. You can
+read it, run it and change it.
+
+## What is in it
+
+| For | Roviq gives them |
+|-----|------------------|
+| **Institutes** | Admissions, student and staff records, guardians, daily attendance, leave and holidays, timetables with substitutions, exams and report cards, transfer and other certificates, roles and permissions, notifications, an audit log |
+| **Resellers** | A portal to create and support their institutes, with plans, subscriptions and invoices (Enterprise) and their own team |
+| **Platform operators** | A portal for institutes and resellers, system health, audit and supervised support access |
+
+The full list, and what is **not** built yet (student fee collection, online exams, SMS and
+WhatsApp delivery), is in the [product overview](docs/product.md).
 
 ## Quick start
 
@@ -40,7 +68,7 @@ cd roviq
 pnpm tilt up
 ```
 
-Tilt installs the dependencies, starts the databases, applies the schema, seeds test data and starts the apps. Then open:
+Tilt installs the dependencies, starts the databases, applies the schema, seeds demo data and starts the apps. Then open:
 
 | Portal | URL |
 |--------|-----|
@@ -48,34 +76,37 @@ Tilt installs the dependencies, starts the databases, applies the schema, seeds 
 | Admin | http://admin.localhost:4200 |
 | Reseller | http://reseller.localhost:4200 |
 
-Test logins and the full walkthrough are in [Getting started](docs/getting-started.md).
+Demo logins and the full walkthrough are in [Getting started](docs/getting-started.md).
 
 ## Documentation
 
-[docs/README.md](docs/README.md) lists every document. The usual first reads:
+[docs/README.md](docs/README.md) lists every document. Where to start:
 
-- [Getting started](docs/getting-started.md): set up and log in
-- [Architecture](docs/architecture.md): repository layout, libraries, design decisions
-- [Auth](docs/auth.md): scopes, tokens, permissions
-- [Testing](docs/testing.md): test types and commands
-- [Contributing](CONTRIBUTING.md): how a change reaches `main`
+| You want to | Read |
+|-------------|------|
+| Know what Roviq does | [Product overview](docs/product.md) |
+| Use the portals | User guides: [institute](docs/user-guides/institute-portal.md), [reseller](docs/user-guides/reseller-portal.md), [admin](docs/user-guides/admin-portal.md) |
+| Judge the design and the security | [Architecture](docs/architecture.md), [Security overview](docs/security.md) |
+| Run it in production | [Deployment](docs/deployment.md) |
+| Work on the code | [Getting started](docs/getting-started.md), [Contributing](CONTRIBUTING.md) |
 
-## What is inside
+## Built with
 
-| Path | Contents |
-|------|----------|
-| `apps/api-gateway` | NestJS GraphQL API |
-| `apps/notification-service` | NestJS service that delivers notifications |
-| `apps/web` | Next.js app serving the institute, admin and reseller portals |
-| `libs/` | Shared libraries (`@roviq/*`): database, auth, UI, events |
-| `ee/` | Enterprise Edition: billing and payment gateways |
-| `e2e/` | API and browser end-to-end tests |
+TypeScript throughout: a NestJS GraphQL API, a Next.js web app, PostgreSQL 18 with row-level
+security, Redis, NATS JetStream for events, Temporal for workflows and S3-compatible storage, in
+an Nx monorepo. The [architecture](docs/architecture.md) has the diagram and the reasons.
 
-PostgreSQL 18 with row-level security, Redis, NATS JetStream, Temporal and S3-compatible storage run in Docker.
+## Editions and licence
 
-## Licence
+| Edition | Contents | Licence |
+|---------|----------|---------|
+| Community | Everything outside `ee/` | [AGPL-3.0](LICENSE) |
+| Enterprise | Adds `ee/`: subscription billing and payment gateways | [Business Source License 1.1](ee/LICENSE) |
 
-[AGPL-3.0](LICENSE). The `ee/` directory has its own [licence](ee/LICENSE).
+## Roadmap and feedback
+
+Planned work and bugs are in [GitHub Issues](https://github.com/Roviq-HQ/roviq/issues). Open one
+to report a problem or ask for a feature.
 
 ---
 
