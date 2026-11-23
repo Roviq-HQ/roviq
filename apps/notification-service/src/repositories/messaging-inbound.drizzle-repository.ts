@@ -9,9 +9,10 @@ import {
   withAdmin,
 } from '@roviq/database';
 import { and, desc, eq, inArray, isNotNull, or } from 'drizzle-orm';
+import { arrivalOf } from './flow-arrival-of';
 import { MessagingInboundRepository } from './messaging-inbound.repository';
 import { sameNumberSenderIds } from './same-number-senders';
-import type { InboundPerson, ReceiptInput } from './types';
+import type { InboundPerson, ReceiptInput, ReceiptResult } from './types';
 
 const ORIGIN = 'repository:messaging-inbound';
 
@@ -21,7 +22,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
     super();
   }
 
-  async recordReceipt(input: ReceiptInput): Promise<'recorded' | 'duplicate' | 'unknown_message'> {
+  async recordReceipt(input: ReceiptInput): Promise<ReceiptResult> {
     return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
       // The sender is part of the key: a report arriving on one number cannot touch a
       // message another institute's number sent.
@@ -34,7 +35,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
         .from(notificationDeliveries)
         .where(and(ofMessage, eq(notificationDeliveries.status, 'SENT')))
         .limit(1);
-      if (!sent) return 'unknown_message';
+      if (!sent) return { kind: 'unknown_message' };
 
       const fresh = await this.insertEvent(
         tx,
@@ -43,7 +44,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
         'receipt',
         input.person,
       );
-      if (!fresh) return 'duplicate';
+      if (!fresh) return { kind: 'duplicate' };
 
       if (input.onlyIfNotDelivered) {
         const [delivered] = await tx
@@ -51,7 +52,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
           .from(notificationDeliveries)
           .where(and(ofMessage, eq(notificationDeliveries.status, 'DELIVERED')))
           .limit(1);
-        if (delivered) return 'recorded';
+        if (delivered) return { kind: 'recorded', arrival: null };
       }
       await tx.insert(notificationDeliveries).values({
         scope: sent.scope,
@@ -66,10 +67,11 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
         senderId: sent.senderId,
         templateCategory: sent.templateCategory,
         providerMessageId: sent.providerMessageId,
+        flowId: sent.flowId,
         status: input.status,
         errorCode: input.status === 'FAILED' ? (input.errorCode ?? 'WA_REJECTED') : null,
       });
-      return 'recorded';
+      return { kind: 'recorded', arrival: arrivalOf(sent, input.status) };
     });
   }
 

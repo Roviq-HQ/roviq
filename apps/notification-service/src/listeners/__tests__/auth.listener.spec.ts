@@ -84,7 +84,8 @@ describe('AuthListener', () => {
         params: { ip: '203.0.113.7', at: NOW.toISOString(), accountPath: '/institute/account' },
       },
       audience: { scope: 'institute', tenantId: TENANT, resellerId: null },
-      recipient: { userId: 'user-1', membershipId: null },
+      recipients: [{ userId: 'user-1', membershipId: null }],
+      recipientsRef: null,
       source: { stream: 'NOTIFICATION', sequence: 9 },
       inApp: true,
     });
@@ -99,7 +100,8 @@ describe('AuthListener', () => {
         params: { ip: '127.0.0.1', at: NOW.toISOString(), accountPath: '/institute/account' },
       },
       audience: { scope: 'institute', tenantId: TENANT, resellerId: null },
-      recipient: { userId: 'user-1', membershipId: null },
+      recipients: [{ userId: 'user-1', membershipId: null }],
+      recipientsRef: null,
       source: { stream: 'NOTIFICATION', sequence: 9 },
       inApp: true,
     });

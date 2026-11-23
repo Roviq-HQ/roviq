@@ -15,7 +15,7 @@ import { notificationWorkflowsPath } from './notification.workflows-path';
 import { NOTIFICATION_TASK_QUEUE } from './notification-workflow.types';
 
 /**
- * Runs the delivery and digest workflows (ROV-314) in notification-service when
+ * Runs the flow and digest workflows (ROV-314, ROV-332) in notification-service when
  * NOTIFICATION_WORKER_ENABLED is 'true'. Without it in-app rows are still written, but no
  * email, push, SMS or WhatsApp message of a non-secret type leaves.
  */
@@ -36,18 +36,16 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
   }
 
   protected createActivities(db: DrizzleDB) {
+    const recipients = new RecipientReadDrizzleRepository(db);
+    const writes = new NotificationWriteDrizzleRepository(db);
     const sender = new ChannelSender(
       this.adapters,
       this.consent,
       new ContactReadDrizzleRepository(db),
-      new NotificationWriteDrizzleRepository(db),
-      new WhatsAppRoute(
-        new MessagingSenderDrizzleRepository(db),
-        new RecipientReadDrizzleRepository(db),
-        new Clock(),
-      ),
+      writes,
+      new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
     );
-    return { ...createNotificationActivities(sender) };
+    return { ...createNotificationActivities({ sender, recipients, writes }) };
   }
 
   protected workflowsPath(): string {

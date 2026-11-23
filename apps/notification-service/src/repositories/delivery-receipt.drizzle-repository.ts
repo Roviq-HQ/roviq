@@ -8,7 +8,8 @@ import {
 } from '@roviq/database';
 import { and, eq, sql } from 'drizzle-orm';
 import { DeliveryReceiptRepository } from './delivery-receipt.repository';
-import type { ProviderReceipt } from './types';
+import { arrivalOf } from './flow-arrival-of';
+import type { ProviderReceipt, ReceiptResult } from './types';
 
 const ORIGIN = 'repository:delivery-receipt';
 
@@ -18,7 +19,7 @@ export class DeliveryReceiptDrizzleRepository extends DeliveryReceiptRepository 
     super();
   }
 
-  async record(receipt: ProviderReceipt): Promise<'recorded' | 'duplicate' | 'unknown_message'> {
+  async record(receipt: ProviderReceipt): Promise<ReceiptResult> {
     return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
       const ofMessage = and(
         eq(notificationDeliveries.provider, receipt.provider),
@@ -33,14 +34,14 @@ export class DeliveryReceiptDrizzleRepository extends DeliveryReceiptRepository 
         .from(notificationDeliveries)
         .where(and(ofMessage, eq(notificationDeliveries.status, 'SENT')))
         .limit(1);
-      if (!sent) return 'unknown_message';
+      if (!sent) return { kind: 'unknown_message' };
 
       const [same] = await tx
         .select({ id: notificationDeliveries.id })
         .from(notificationDeliveries)
         .where(and(ofMessage, eq(notificationDeliveries.status, receipt.status)))
         .limit(1);
-      if (same) return 'duplicate';
+      if (same) return { kind: 'duplicate' };
 
       await tx.insert(notificationDeliveries).values({
         scope: sent.scope,
@@ -53,10 +54,11 @@ export class DeliveryReceiptDrizzleRepository extends DeliveryReceiptRepository 
         provider: sent.provider,
         attempt: sent.attempt,
         providerMessageId: sent.providerMessageId,
+        flowId: sent.flowId,
         status: receipt.status,
         errorCode: receipt.status === 'FAILED' ? (receipt.errorCode ?? 'SMS_UNDELIVERED') : null,
       });
-      return 'recorded';
+      return { kind: 'recorded', arrival: arrivalOf(sent, receipt.status) };
     });
   }
 }

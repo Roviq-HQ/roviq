@@ -1,12 +1,14 @@
-import type { NotificationChannel } from '@roviq/common-types';
+import type { NotificationChannel, NotificationSkipReason } from '@roviq/common-types';
 import type { Audience } from '../repositories/types';
 import type { RegularDigest, RegularMessage } from '../types/compose';
+import type { NotificationFlow } from '../types/flow';
 import type { RegularTypeKey } from '../types/registry';
 
 export const NOTIFICATION_TASK_QUEUE = 'notifications';
-export const DELIVERY_WORKFLOW_TYPE = 'NotificationDeliveryWorkflow';
+export const FLOW_WORKFLOW_TYPE = 'NotificationFlowWorkflow';
 export const DIGEST_WORKFLOW_TYPE = 'NotificationDigestWorkflow';
 export const DIGEST_ITEM_SIGNAL = 'digestItem';
+export const FLOW_ARRIVAL_SIGNAL = 'flowArrival';
 
 export const CHANNEL_ACTIVITY_RETRY = {
   maximumAttempts: 5,
@@ -14,28 +16,48 @@ export const CHANNEL_ACTIVITY_RETRY = {
   backoffCoefficient: 2,
 } as const;
 
-export interface ChannelPlan {
-  channel: NotificationChannel;
-  /** Institute setting; false records a `channel_disabled` skip. */
-  enabled: boolean;
-}
+/** Where a flow's recipients came from; the send re-checks it so a removed one is not sent to. */
+export type RecipientsRef = { kind: 'guardians_of_student'; studentMembershipId: string } | null;
 
-/** Never carries an address or a secret; addresses are read inside the activity. */
-interface RecipientTarget {
-  audience: Audience;
-  recipientUserId: string;
-}
-
-export interface DeliveryWorkflowInput extends RecipientTarget {
-  message: RegularMessage<RegularTypeKey>;
+/** One recipient of a flow: ids only. */
+export interface FlowRecipient {
+  userId: string;
+  /** Their in-app row; null when none was written. */
   notificationId: string | null;
-  channels: ChannelPlan[];
+}
+
+/** Proof that a message reached a recipient of the flow. */
+export interface FlowArrival {
+  recipientUserId: string;
+  via: NotificationChannel | 'IN_APP';
+}
+
+/** Never carries an address, a name or a secret; addresses are read inside the activity. */
+export interface FlowWorkflowInput {
+  /** The workflow id; stored on every delivery row so reports can find the flow. */
+  flowId: string;
+  audience: Audience;
+  message: RegularMessage<RegularTypeKey>;
+  /** In alert order. */
+  recipients: FlowRecipient[];
+  recipientsRef: RecipientsRef;
+  flow: NotificationFlow;
+  /** Institute settings per channel; false records a `channel_disabled` skip. */
+  enabled: Record<NotificationChannel, boolean>;
+  critical: boolean;
+  /** Push payload data: entity ids and the deep-link path. */
   data: Record<string, string>;
 }
 
-export interface DigestWorkflowInput extends RecipientTarget {
+export interface DigestWorkflowInput {
+  audience: Audience;
+  recipientUserId: string;
   type: RegularTypeKey;
-  channels: ChannelPlan[];
+  flow: NotificationFlow;
+  enabled: Record<NotificationChannel, boolean>;
+  critical: boolean;
+  /** A guardian after the first: the summary goes by the app alone, without paid channels or email. */
+  appOnly: boolean;
   /** ISO time of the first run, computed by the caller from the cron in the institute's timezone. */
   runAt: string;
 }
@@ -48,7 +70,9 @@ export interface DigestItem {
   runAt: string;
 }
 
-export interface SendChannelInput extends RecipientTarget {
+export interface SendChannelInput {
+  audience: Audience;
+  recipientUserId: string;
   channel: NotificationChannel;
   enabled: boolean;
   content:
@@ -57,6 +81,19 @@ export interface SendChannelInput extends RecipientTarget {
   data: Record<string, string>;
   /** False on the workflow's last try: a deferral is then recorded as skipped instead. */
   deferrable: boolean;
+  /** Stored on the delivery row; null when no workflow waits for arrival. */
+  flowId: string | null;
+  recipientsRef: RecipientsRef;
+}
+
+export interface RecordSkipInput {
+  audience: Audience;
+  recipientUserId: string;
+  notificationId: string | null;
+  type: RegularTypeKey;
+  channel: NotificationChannel;
+  reason: NotificationSkipReason;
+  flowId: string | null;
 }
 
 /** Quiet hours or a full sender: the workflow sleeps until `deferUntil` and tries again. */
@@ -70,12 +107,23 @@ export interface NotificationActivities {
    * Temporal retries.
    */
   sendChannel(input: SendChannelInput): Promise<'SENT' | 'SKIPPED' | ChannelDeferral>;
+  /** One SKIPPED delivery row for a channel the flow did not try. */
+  recordSkip(input: RecordSkipInput): Promise<void>;
 }
 
 /** How often a channel may be deferred; the try after the last one sends or records a skip. */
 export const MAX_CHANNEL_DEFERRALS = 30;
 
-export const deliveryWorkflowId = (dedupeKey: string) => `notification-delivery:${dedupeKey}`;
+/** The data a send carries; a push also carries its notification id so a device can acknowledge it. */
+export function sendData(
+  data: Record<string, string>,
+  channel: NotificationChannel,
+  notificationId: string | null,
+): Record<string, string> {
+  return channel === 'PUSH' && notificationId !== null ? { ...data, notificationId } : data;
+}
+
+export const flowWorkflowId = (eventKey: string) => `notification-flow:${eventKey}`;
 
 export const digestWorkflowId = (tenantId: string, recipientUserId: string, type: RegularTypeKey) =>
   `notification-digest:${tenantId}:${recipientUserId}:${type}`;

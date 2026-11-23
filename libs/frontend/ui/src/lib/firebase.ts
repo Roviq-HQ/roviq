@@ -52,3 +52,36 @@ export function onForegroundMessage(callback: (payload: MessagePayload) => void)
   const messaging = getMessaging(app);
   return onMessage(messaging, callback);
 }
+
+/** Posted by the service worker to open pages when it shows a push in the background. */
+export const PUSH_SHOWN_MESSAGE = 'roviq:push-shown';
+
+function shownNotificationId(data: unknown): string | null {
+  if (typeof data !== 'object' || data === null) return null;
+  if (!('type' in data) || data.type !== PUSH_SHOWN_MESSAGE) return null;
+  return 'notificationId' in data && typeof data.notificationId === 'string'
+    ? data.notificationId
+    : null;
+}
+
+/**
+ * Calls back with the notification id of every push this browser shows: in the foreground
+ * straight from the messaging SDK, in the background relayed by the service worker (which has
+ * no session of its own). Returns the function that stops listening.
+ */
+export async function onPushShown(callback: (notificationId: string) => void): Promise<() => void> {
+  if (!(await isSupported())) return () => undefined;
+  const stopForeground = onForegroundMessage((payload) => {
+    const id = payload.data?.notificationId;
+    if (id) callback(id);
+  });
+  const fromWorker = (event: MessageEvent) => {
+    const id = shownNotificationId(event.data);
+    if (id) callback(id);
+  };
+  navigator.serviceWorker.addEventListener('message', fromWorker);
+  return () => {
+    stopForeground();
+    navigator.serviceWorker.removeEventListener('message', fromWorker);
+  };
+}

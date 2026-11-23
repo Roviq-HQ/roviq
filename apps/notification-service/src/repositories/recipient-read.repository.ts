@@ -13,6 +13,15 @@ export abstract class RecipientReadRepository {
     tenantId: string,
     studentMembershipId: string,
   ): Promise<GuardianRecord[]>;
+  /**
+   * The user is still an active guardian linked to the student with this membership id; read at
+   * send time, so a guardian unlinked after an alert started is not sent to.
+   */
+  abstract isActiveGuardianOf(
+    tenantId: string,
+    studentMembershipId: string,
+    guardianUserId: string,
+  ): Promise<boolean>;
   abstract findMembership(tenantId: string, membershipId: string): Promise<MembershipRecord | null>;
   abstract findInstituteTimezone(tenantId: string): Promise<string | null>;
   /** The institute's name in every locale it was entered in. */

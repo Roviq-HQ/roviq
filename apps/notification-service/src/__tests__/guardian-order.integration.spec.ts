@@ -41,7 +41,7 @@ import { NotificationWriteDrizzleRepository } from '../repositories/notification
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
-import type { DeliveryWorkflowInput } from '../workflows/notification-workflow.types';
+import type { DigestWorkflowInput } from '../workflows/notification-workflow.types';
 
 const CTX = 'test:guardian-order';
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -52,12 +52,9 @@ interface GuardianSpec {
   staff: Staff;
 }
 
-/** The delivery and the digest workflow input both carry the recipient and the channel plan. */
-function isWorkflowInput(
-  value: unknown,
-): value is Pick<DeliveryWorkflowInput, 'recipientUserId' | 'channels'> {
+function isDigestInput(value: unknown): value is DigestWorkflowInput {
   return (
-    typeof value === 'object' && value !== null && 'recipientUserId' in value && 'channels' in value
+    typeof value === 'object' && value !== null && 'recipientUserId' in value && 'appOnly' in value
   );
 }
 
@@ -281,10 +278,12 @@ describe('guardian order for alerts (integration)', () => {
 
     const targets = await resolver.guardiansOfStudent(institute.tenantId, student.membershipId);
 
-    expect(targets.map((target) => target.recipient.userId)).toEqual(
-      guardians.map((guardian) => guardian.userId),
+    expect(targets).toEqual(
+      guardians.map((guardian) => ({
+        userId: guardian.userId,
+        membershipId: guardian.membershipId,
+      })),
     );
-    expect(targets.map((target) => target.appOnly)).toEqual([false, true]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('has no primary guardian'));
   });
 
@@ -299,7 +298,7 @@ describe('guardian order for alerts (integration)', () => {
     expect(asForeign).toEqual([]);
   });
 
-  it('should give every guardian the in-app alert, and the paid channels to the first only', async () => {
+  it('should give every guardian the in-app alert, and the paid digest channels to the first only', async () => {
     const { student, guardians } = await makeFamily([
       { primary: true, staff: 'no' },
       { primary: false, staff: 'active' },
@@ -336,20 +335,19 @@ describe('guardian order for alerts (integration)', () => {
     );
     expect(inApp.map((row) => row.userId).sort()).toEqual([primary.userId, staff.userId].sort());
 
-    const plans = new Map<string, string[]>();
-    const started = [
-      ...temporal.startWorkflowOnce.mock.calls,
-      ...temporal.signalWithStart.mock.calls,
-    ];
-    for (const [, options] of started) {
-      const [input] = options.args ?? [];
-      assert(isWorkflowInput(input));
-      plans.set(
-        input.recipientUserId,
-        input.channels.map((plan) => plan.channel),
-      );
+    // The institute keeps the default daily digest, so each guardian's alert waits in a digest.
+    expect(temporal.startWorkflowOnce).not.toHaveBeenCalled();
+    const plans = new Map<string, boolean>();
+    for (const [, options] of temporal.signalWithStart.mock.calls) {
+      const [input] = options.args;
+      assert(isDigestInput(input));
+      plans.set(input.recipientUserId, input.appOnly);
     }
-    expect(plans.get(staff.userId)).toEqual(['WHATSAPP', 'EMAIL', 'PUSH']);
-    expect(plans.get(primary.userId)).toEqual(['PUSH']);
+    expect(plans).toEqual(
+      new Map([
+        [staff.userId, false],
+        [primary.userId, true],
+      ]),
+    );
   });
 });

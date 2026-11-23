@@ -14,6 +14,7 @@ import {
   memberships,
   mkAdminCtx,
   notifications,
+  phoneNumbers,
   SYSTEM_USER_ID,
   studentGuardianLinks,
   studentProfiles,
@@ -61,16 +62,25 @@ import { NotificationWriteDrizzleRepository } from '../repositories/notification
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
+import { appOnlyFlow, channelsOf } from '../types/flow';
 import { DigestBuffer, runDigestLoop } from '../workflows/digest-logic';
+import { runFlow } from '../workflows/flow-runner';
 import { createNotificationActivities } from '../workflows/notification.activities';
-import type {
-  DeliveryWorkflowInput,
-  DigestItem,
-  DigestWorkflowInput,
+import {
+  type DigestItem,
+  type DigestWorkflowInput,
+  type FlowWorkflowInput,
+  sendData,
 } from '../workflows/notification-workflow.types';
 
 const CTX = 'test:notification-pipeline';
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
+const GUARDIAN_PHONE = (() => {
+  const number = `9${Math.floor(Math.random() * 1e9)
+    .toString()
+    .padStart(9, '0')}`;
+  return { countryCode: '+91', number, full: `+91${number}` };
+})();
 
 class RecordingAdapter implements ChannelAdapter {
   readonly provider = 'recording';
@@ -86,11 +96,11 @@ class RecordingAdapter implements ChannelAdapter {
   }
 }
 
-function isDeliveryInput(value: unknown): value is DeliveryWorkflowInput {
-  return typeof value === 'object' && value !== null && 'message' in value && 'channels' in value;
+function isFlowInput(value: unknown): value is FlowWorkflowInput {
+  return typeof value === 'object' && value !== null && 'flowId' in value && 'recipients' in value;
 }
 function isDigestInput(value: unknown): value is DigestWorkflowInput {
-  return typeof value === 'object' && value !== null && 'runAt' in value && 'channels' in value;
+  return typeof value === 'object' && value !== null && 'runAt' in value && 'appOnly' in value;
 }
 function isDigestItem(value: unknown): value is DigestItem {
   return typeof value === 'object' && value !== null && 'dedupeKey' in value && 'message' in value;
@@ -127,6 +137,8 @@ describe('notification pipeline (integration)', () => {
   });
   const eventBus = createMock<EventBusService>({ emit: vi.fn() });
   let sender: ChannelSender;
+  let writes: NotificationWriteDrizzleRepository;
+  let recipientRepo: RecipientReadDrizzleRepository;
   let dispatcher: NotificationDispatcher;
   let attendance: AttendanceListener;
   let users: UserListener;
@@ -159,21 +171,35 @@ describe('notification pipeline (integration)', () => {
     return rows;
   }
 
-  async function runDelivery(input: DeliveryWorkflowInput, attempt = 1) {
-    const activities = createNotificationActivities(sender, () => attempt);
-    return Promise.allSettled(
-      input.channels.map((plan) =>
+  const activitiesAt = (attempt: number) =>
+    createNotificationActivities({ sender, recipients: recipientRepo, writes }, () => attempt);
+
+  /** One activity per channel of the flow and recipient, as one execution of each would run. */
+  async function runDelivery(input: FlowWorkflowInput, attempt = 1) {
+    const activities = activitiesAt(attempt);
+    const plans = input.recipients.flatMap((recipient) =>
+      channelsOf(input.flow).map((channel) => ({ recipient, channel })),
+    );
+    const results = await Promise.allSettled(
+      plans.map(({ recipient, channel }) =>
         activities.sendChannel({
           audience: input.audience,
-          recipientUserId: input.recipientUserId,
-          channel: plan.channel,
-          enabled: plan.enabled,
-          content: { kind: 'single', message: input.message, notificationId: input.notificationId },
-          data: input.data,
+          recipientUserId: recipient.userId,
+          channel,
+          enabled: input.enabled[channel],
+          content: {
+            kind: 'single',
+            message: input.message,
+            notificationId: recipient.notificationId,
+          },
+          data: sendData(input.data, channel, recipient.notificationId),
           deferrable: true,
+          flowId: input.flowId,
+          recipientsRef: input.recipientsRef,
         }),
       ),
     );
+    return plans.map((plan, i) => ({ ...plan, result: results[i] }));
   }
 
   function absence(overrides: Partial<AttendanceAbsentEvent> = {}): AttendanceAbsentEvent {
@@ -247,11 +273,19 @@ describe('notification pipeline (integration)', () => {
         guardianProfileId: guardianProfile.id,
         relationship: GuardianRelationship.FATHER,
       });
+      await tx.insert(phoneNumbers).values({
+        ...by,
+        userId: guardian.userId,
+        isPrimary: true,
+        countryCode: GUARDIAN_PHONE.countryCode,
+        number: GUARDIAN_PHONE.number,
+      });
     });
 
     const contacts = new ContactReadDrizzleRepository(db);
-    const writes = new NotificationWriteDrizzleRepository(db);
+    writes = new NotificationWriteDrizzleRepository(db);
     const recipients = new RecipientReadDrizzleRepository(db);
+    recipientRepo = recipients;
     sender = new ChannelSender(
       new ChannelAdapters([email, sms]),
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
@@ -280,6 +314,7 @@ describe('notification pipeline (integration)', () => {
     email.sent.length = 0;
     sms.sent.length = 0;
     email.failWith = null;
+    sms.failWith = null;
     temporal.startWorkflowOnce.mockClear();
     temporal.signalWithStart.mockClear();
     eventBus.emit.mockClear();
@@ -307,6 +342,7 @@ describe('notification pipeline (integration)', () => {
       await tx.delete(guardianProfiles).where(inArray(guardianProfiles.tenantId, tenantIds));
       await tx.delete(studentProfiles).where(inArray(studentProfiles.tenantId, tenantIds));
       await tx.delete(userProfiles).where(eq(userProfiles.userId, student.userId));
+      await tx.delete(phoneNumbers).where(eq(phoneNumbers.userId, guardian.userId));
     });
     await cleanupTestTeacher(db, student);
     await cleanupTestTeacher(db, guardian);
@@ -437,38 +473,63 @@ describe('notification pipeline (integration)', () => {
         assert(isDigestItem(item));
         buffer.add({ dedupeKey: item.dedupeKey, runAt: item.runAt, value: item.message });
       }
-      const activities = createNotificationActivities(sender, () => 1);
+      expect(input.appOnly).toBe(false);
+      const activities = activitiesAt(1);
+      const waits: number[] = [];
       const summaries = await runDigestLoop({
         firstRunAt: Date.parse(input.runAt),
         buffer,
         sleepUntil: async () => {},
+        // The summary walks the type's flow, as the digest workflow does.
         send: async (messages) => {
-          await Promise.allSettled(
-            input.channels.map((plan) =>
-              activities.sendChannel({
-                audience: input.audience,
-                recipientUserId: input.recipientUserId,
-                channel: plan.channel,
-                enabled: plan.enabled,
-                content: {
-                  kind: 'digest',
-                  digest: { type: input.type, items: messages.map((m) => m.params) },
-                },
-                data: {},
-                deferrable: true,
-              }),
-            ),
+          const digest = { type: input.type, items: messages.map((m) => m.params) };
+          await runFlow(
+            {
+              flow: input.appOnly ? appOnlyFlow(input.flow) : input.flow,
+              recipients: [input.recipientUserId],
+              conditions: { type_is_critical: input.critical, audience_is_institute: true },
+            },
+            {
+              send: async (userId, channel) => {
+                const result = await activities.sendChannel({
+                  audience: input.audience,
+                  recipientUserId: userId,
+                  channel,
+                  enabled: input.enabled[channel],
+                  content: { kind: 'digest', digest },
+                  data: {},
+                  deferrable: true,
+                  flowId: null,
+                  recipientsRef: null,
+                });
+                return typeof result === 'string' ? result : 'SKIPPED';
+              },
+              waitForArrival: async (ms) => {
+                waits.push(ms);
+                return false;
+              },
+              arrived: () => false,
+              sleep: async () => {},
+              recordSkip: async () => {},
+            },
           );
         },
       });
 
       expect(summaries).toBe(1);
-      expect(email.sent.map((m) => [m.to, m.subject, m.body])).toEqual([
-        [
-          [`${guardian.username}@test.local`],
-          'Attendance alerts: 1 absence, 1 late arrival',
-          '2 attendance alerts were recorded today.',
-        ],
+      expect(sms.sent.map((m) => [m.to, m.body])).toEqual([
+        [[GUARDIAN_PHONE.full], '2 attendance alerts were recorded today.'],
+      ]);
+      expect(email.sent).toEqual([]);
+      // No device token, so the app step sent nothing and did not wait; the SMS is the last send.
+      expect(waits).toEqual([]);
+      const rows = (await deliveriesFor(guardian.userId)).filter(
+        (d) => d.type === 'ATTENDANCE_ABSENT' && d.notification_id === null,
+      );
+      expect(rows.map((d) => [d.channel, d.status, d.skip_reason])).toEqual([
+        ['PUSH', 'SKIPPED', 'channel_disabled'],
+        ['WHATSAPP', 'SKIPPED', 'no_consent'],
+        ['SMS', 'SENT', null],
       ]);
     });
   });
@@ -561,6 +622,7 @@ describe('notification pipeline (integration)', () => {
         audience: { scope: 'institute', tenantId: institute.tenantId, resellerId: null },
         recipientUserId: guardian.userId,
         notificationId: null,
+        flowId: null,
         channelEnabled: true,
         critical: false,
         deferrable: true,
@@ -578,6 +640,11 @@ describe('notification pipeline (integration)', () => {
         new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
         new ContactReadDrizzleRepository(db),
         new NotificationWriteDrizzleRepository(db),
+        new WhatsAppRoute(
+          new MessagingSenderDrizzleRepository(db),
+          new RecipientReadDrizzleRepository(db),
+          new Clock(),
+        ),
       );
     });
 
@@ -630,11 +697,12 @@ describe('notification pipeline (integration)', () => {
 
     it('should not gate a recipient who is not a guardian of the institute', async () => {
       const outcome = await consentSender.attempt({
-        type: 'APPROVAL_REQUEST',
+        type: 'APPROVAL_REQUESTED',
         channel: 'WHATSAPP',
         audience: { scope: 'institute', tenantId: institute.tenantId, resellerId: null },
         recipientUserId: student.userId,
         notificationId: null,
+        flowId: null,
         channelEnabled: true,
         critical: false,
         deferrable: true,
@@ -698,19 +766,23 @@ describe('notification pipeline (integration)', () => {
         },
       },
       audience: { scope: 'institute' as const, tenantId: institute.tenantId, resellerId: null },
-      recipient: { userId: guardian.userId, membershipId: guardian.membershipId },
+      recipients: [{ userId: guardian.userId, membershipId: guardian.membershipId }],
+      recipientsRef: {
+        kind: 'guardians_of_student' as const,
+        studentMembershipId: student.membershipId,
+      },
       inApp: true,
     });
 
-    function startedInput(): DeliveryWorkflowInput {
+    function startedInput(): FlowWorkflowInput {
       const [call] = temporal.startWorkflowOnce.mock.calls;
       assert(call);
       const input = call[1].args?.[0];
-      assert(isDeliveryInput(input));
+      assert(isFlowInput(input));
       return input;
     }
 
-    it('should record channel_disabled without calling the adapter when email is off', async () => {
+    it('should record channel_disabled without calling the adapter when WhatsApp is off', async () => {
       await withAdmin(db, mkAdminCtx(CTX), (tx) =>
         tx.insert(instituteNotificationConfigs).values({
           ...by,
@@ -723,11 +795,12 @@ describe('notification pipeline (integration)', () => {
       sequence += 1;
 
       await dispatcher.dispatch({ ...reminder(), source: { stream: 'NOTIFICATION', sequence } });
-      await runDelivery(startedInput());
+      const input = startedInput();
+      await runDelivery(input);
 
-      expect(email.sent).toEqual([]);
       const rows = (await deliveriesFor(guardian.userId)).filter(
-        (d) => d.type === 'FEE_REMINDER' && d.channel === 'EMAIL',
+        (d) =>
+          d.notification_id === input.recipients[0]?.notificationId && d.channel === 'WHATSAPP',
       );
       expect(rows.map((d) => [d.status, d.skip_reason, d.provider, d.attempt])).toEqual([
         ['SKIPPED', 'channel_disabled', null, 1],
@@ -735,13 +808,7 @@ describe('notification pipeline (integration)', () => {
     });
 
     it('should record FAILED rows with the error code per attempt and keep the in-app row', async () => {
-      await withAdmin(db, mkAdminCtx(CTX), (tx) =>
-        tx
-          .update(instituteNotificationConfigs)
-          .set({ emailEnabled: true })
-          .where(eq(instituteNotificationConfigs.tenantId, institute.tenantId)),
-      );
-      email.failWith = 'ECONNECTION';
+      sms.failWith = 'ECONNECTION';
       sequence += 1;
 
       await dispatcher.dispatch({ ...reminder(), source: { stream: 'NOTIFICATION', sequence } });
@@ -749,19 +816,20 @@ describe('notification pipeline (integration)', () => {
       const first = await runDelivery(input, 1);
       const second = await runDelivery(input, 2);
 
-      const emailResult = first.find((_, i) => input.channels[i]?.channel === 'EMAIL');
-      assert(emailResult?.status === 'rejected');
-      expect(emailResult.reason).toBeInstanceOf(ApplicationFailure);
-      expect(second.filter((r) => r.status === 'rejected')).toHaveLength(1);
+      const smsResult = first.find((r) => r.channel === 'SMS')?.result;
+      assert(smsResult?.status === 'rejected');
+      expect(smsResult.reason).toBeInstanceOf(ApplicationFailure);
+      expect(second.filter((r) => r.result?.status === 'rejected')).toHaveLength(1);
+      const notificationId = input.recipients[0]?.notificationId;
+      assert(notificationId);
       const failed = (await deliveriesFor(guardian.userId)).filter(
-        (d) => d.status === 'FAILED' && d.notification_id === input.notificationId,
+        (d) => d.status === 'FAILED' && d.notification_id === notificationId,
       );
       expect(failed.map((d) => [d.channel, d.provider, d.error_code, d.attempt])).toEqual([
-        ['EMAIL', 'recording', 'ECONNECTION', 1],
-        ['EMAIL', 'recording', 'ECONNECTION', 2],
+        ['SMS', 'recording', 'ECONNECTION', 1],
+        ['SMS', 'recording', 'ECONNECTION', 2],
       ]);
-      assert(input.notificationId);
-      const inApp = (await rowsFor(guardian.userId)).filter((r) => r.id === input.notificationId);
+      const inApp = (await rowsFor(guardian.userId)).filter((r) => r.id === notificationId);
       expect(inApp.map((r) => r.type)).toEqual(['FEE_REMINDER']);
     });
   });

@@ -104,6 +104,7 @@ describe('SMS delivery through the provider adapter (integration)', () => {
       audience: { scope: 'institute', tenantId: institute.tenantId, resellerId: null },
       recipientUserId: user.userId,
       notificationId: null,
+      flowId: null,
       channelEnabled: true,
       critical: true,
       deferrable: false,

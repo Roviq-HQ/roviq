@@ -35,6 +35,7 @@ export class NotificationWriteDrizzleRepository extends NotificationWriteReposit
           body: row.body,
           data: row.data,
           dedupeKey: row.dedupeKey,
+          flowId: row.flowId,
           createdBy: SYSTEM_USER_ID,
           updatedBy: SYSTEM_USER_ID,
         })
@@ -64,6 +65,7 @@ export class NotificationWriteDrizzleRepository extends NotificationWriteReposit
         type: row.type,
         channel: row.channel,
         attempt: row.attempt,
+        flowId: row.flowId,
         status: outcome.status,
         provider: outcome.provider,
         providerMessageId: outcome.status === 'SENT' ? outcome.providerMessageId : null,

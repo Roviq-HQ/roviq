@@ -10,6 +10,8 @@ export interface NotificationRecord {
   readAt: Date | null;
   archivedAt: Date | null;
   createdAt: Date;
+  /** The delivery flow this notification belongs to; never exposed by the API. */
+  flowId: string | null;
 }
 
 export interface NotificationPage {
@@ -34,6 +36,9 @@ export abstract class NotificationInboxRepository {
   abstract countUnread(viewer: NotificationViewer): Promise<number>;
   abstract findOne(viewer: NotificationViewer, id: string): Promise<NotificationRecord | null>;
   abstract markRead(viewer: NotificationViewer, id: string): Promise<NotificationRecord | null>;
-  abstract markAllRead(viewer: NotificationViewer): Promise<number>;
+  /** `flowNotificationIds`: the rows just marked that belong to a delivery flow. */
+  abstract markAllRead(
+    viewer: NotificationViewer,
+  ): Promise<{ count: number; flowNotificationIds: string[] }>;
   abstract archive(viewer: NotificationViewer, id: string): Promise<NotificationRecord | null>;
 }

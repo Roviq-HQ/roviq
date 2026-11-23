@@ -7,6 +7,7 @@ import {
 } from '../delivery/whatsapp/whatsapp-template';
 import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
 import { formatCalendarDate } from './calendar-date';
+import { guardianAlertFlow } from './flow';
 import {
   type Locale,
   localized,
@@ -164,12 +165,14 @@ function summary(
   return { subject: locale === 'hi' ? 'उपस्थिति सूचना' : 'Attendance Alert', body };
 }
 
-/** One alert per session, student, status and guardian, however often the entry is re-marked. */
+/**
+ * One alert per session, student and status, however often the entry is re-marked. The event key:
+ * each guardian's in-app row adds their user id to it.
+ */
 export function attendanceAbsentDedupeKey(
   p: Pick<AttendanceAbsentParams, 'sessionId' | 'studentId' | 'status'>,
-  recipientUserId: string,
 ): string {
-  return `attendance:${p.sessionId}:${p.studentId}:${p.status}:${recipientUserId}`;
+  return `attendance:${p.sessionId}:${p.studentId}:${p.status}`;
 }
 
 export const attendanceAbsentType: RegularNotificationType<AttendanceAbsentParams> = {
@@ -177,7 +180,7 @@ export const attendanceAbsentType: RegularNotificationType<AttendanceAbsentParam
   secret: false,
   settingsCategory: 'ATTENDANCE',
   critical: false,
-  channels: ['WHATSAPP', 'EMAIL', 'PUSH'],
+  flow: guardianAlertFlow(),
   digest: { defaultCron: '0 18 * * *', summaryCopy: summary },
   inAppCopy: (p) => ({
     title: localized((l) =>

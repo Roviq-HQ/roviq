@@ -23,6 +23,8 @@ export interface ChannelAttempt {
   audience: Audience;
   recipientUserId: string;
   notificationId: string | null;
+  /** The flow workflow that sent it; null for a secret type. Stored on the delivery row. */
+  flowId: string | null;
   /** Institute setting for this channel; true for critical and secret types. */
   channelEnabled: boolean;
   /** Critical and secret types: quiet hours do not apply, and over a sender's cap they wait. */
@@ -78,6 +80,7 @@ export class ChannelSender {
       channel: a.channel,
       attempt: a.attempt,
       outcome,
+      flowId: a.flowId,
     });
     return outcome;
   }

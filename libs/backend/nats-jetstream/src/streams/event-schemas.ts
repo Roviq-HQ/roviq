@@ -408,6 +408,9 @@ const NOTIFICATION_SCHEMAS = {
     resellerId: uuid.nullable(),
     recipientUserId: uuid,
   }),
+  // Pointers only: the notification service reads the row itself before it acts on either.
+  'NOTIFICATION.inapp.seen': z.object({ notificationId: uuid, recipientUserId: uuid }),
+  'NOTIFICATION.push.acknowledged': z.object({ notificationId: uuid, recipientUserId: uuid }),
   'NOTIFICATION.user.created': z.object({}).catchall(z.unknown()),
   'NOTIFICATION.user.updated': z.object({}).catchall(z.unknown()),
 } as const;

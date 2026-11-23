@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { describe, expect, it } from 'vitest';
 import { composeSecret } from '../../../types/compose';
+import { channelsOf } from '../../../types/flow';
 import { LOCALES, type Locale } from '../../../types/notification-type';
 import { REGULAR_TYPES, SECRET_TYPES, type SecretPayload } from '../../../types/registry';
 import { placeholdersOf, renderTemplate } from '../../whatsapp/whatsapp-template';
@@ -248,8 +249,13 @@ describe('smsDraftForSecret', () => {
 });
 
 describe('smsDraftForRegular', () => {
-  it('should match the registry: no regular type lists SMS', () => {
-    for (const type of Object.values(REGULAR_TYPES)) expect(type.channels).not.toContain('SMS');
+  it('should name SMS only in the guardian flows, which record no_template until one is registered', () => {
+    const withSms = Object.values(REGULAR_TYPES)
+      .filter((type) => channelsOf(type.flow).includes('SMS'))
+      .map((type) => type.key)
+      .sort();
+
+    expect(withSms).toEqual(['ATTENDANCE_ABSENT', 'FEE_OVERDUE', 'FEE_REMINDER', 'LEAVE_DECIDED']);
   });
 
   it('should give no draft while no regular type sends SMS', () => {

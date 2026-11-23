@@ -16,13 +16,6 @@ export function sourceOf(ctx: JetStreamContext): EventSource {
   return { stream: ctx.getStream(), sequence: ctx.getSequence().stream };
 }
 
-/** One guardian of a student, in alert order. */
-export interface GuardianTarget {
-  recipient: Recipient;
-  /** True for every guardian after the first: they get the app copy, not a paid message. */
-  appOnly: boolean;
-}
-
 export interface ResolvedMember {
   recipient: Recipient;
   isStudent: boolean;
@@ -40,21 +33,18 @@ export class RecipientResolver {
 
   /**
    * A student's guardians in alert order (ROV-328): the one who is staff of the institute, else
-   * the primary contact, then the others. Only the first is sent WhatsApp, SMS and email.
+   * the primary contact, then the others. The type's flow decides who is sent what (ROV-332).
    */
-  async guardiansOfStudent(
-    tenantId: string,
-    studentMembershipId: string,
-  ): Promise<GuardianTarget[]> {
+  async guardiansOfStudent(tenantId: string, studentMembershipId: string): Promise<Recipient[]> {
     const guardians = await this.repo.findStudentGuardians(tenantId, studentMembershipId);
     if (guardians.length > 0 && !guardians.some((guardian) => guardian.isPrimaryContact)) {
       this.logger.warn(
         `Student membership "${studentMembershipId}" in institute "${tenantId}" has no primary guardian; using the earliest link`,
       );
     }
-    return guardians.map((guardian, index) => ({
-      recipient: { userId: guardian.userId, membershipId: guardian.membershipId },
-      appOnly: index > 0,
+    return guardians.map((guardian) => ({
+      userId: guardian.userId,
+      membershipId: guardian.membershipId,
     }));
   }
 

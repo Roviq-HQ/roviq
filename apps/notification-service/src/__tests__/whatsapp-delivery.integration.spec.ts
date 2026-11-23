@@ -19,6 +19,7 @@ import {
   SYSTEM_USER_ID,
   withAdmin,
 } from '@roviq/database';
+import { TemporalClientService } from '@roviq/temporal';
 import {
   cleanupTestInstitute,
   cleanupTestTeacher,
@@ -33,7 +34,7 @@ import { ApplicationFailure } from '@temporalio/activity';
 import { eq } from 'drizzle-orm';
 import type { Request } from 'express';
 import pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WhatsAppWebhookController } from '../controllers/whatsapp-webhook.controller';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { WhatsAppCloudAdapter } from '../delivery/adapters/whatsapp-cloud.adapter';
@@ -49,6 +50,7 @@ import { MessagingSenderDrizzleRepository } from '../repositories/messaging-send
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import type { Audience } from '../repositories/types';
+import { FlowArrivals } from '../services/flow-arrivals.service';
 import {
   AUTO_REPLY,
   START_CONFIRMATION,
@@ -151,6 +153,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
   let controller: WhatsAppWebhookController;
   const provider = new FakeProvider();
   const clock = new SetClock();
+  const temporal = createMock<TemporalClientService>({ signal: vi.fn().mockResolvedValue(true) });
   const phoneA = randomPhone();
   const phoneB = randomPhone();
   const senderIds: string[] = [];
@@ -186,8 +189,16 @@ describe('WhatsApp delivery and webhook (integration)', () => {
     user: TestTeacher,
     message: RegularPayload = approval,
     deferrable = true,
+    flowId: string | null = null,
   ) {
-    return createNotificationActivities(sender, () => 1).sendChannel({
+    return createNotificationActivities(
+      {
+        sender,
+        recipients: new RecipientReadDrizzleRepository(db),
+        writes: new NotificationWriteDrizzleRepository(db),
+      },
+      () => 1,
+    ).sendChannel({
       audience: audienceOf(institute),
       recipientUserId: user.userId,
       channel: 'WHATSAPP',
@@ -195,6 +206,8 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       content: { kind: 'single', message, notificationId: null },
       data: {},
       deferrable,
+      flowId,
+      recipientsRef: null,
     });
   }
 
@@ -370,7 +383,13 @@ describe('WhatsApp delivery and webhook (integration)', () => {
     );
     controller = new WhatsAppWebhookController(
       cloud,
-      new WhatsAppWebhookService(senders, new MessagingInboundDrizzleRepository(db), cloud, clock),
+      new WhatsAppWebhookService(
+        senders,
+        new MessagingInboundDrizzleRepository(db),
+        cloud,
+        clock,
+        new FlowArrivals(temporal),
+      ),
     );
   });
 
@@ -382,6 +401,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
     provider.requests.length = 0;
     provider.answers.length = 0;
     clock.at = NOON;
+    temporal.signal.mockClear();
   });
 
   afterAll(async () => {
@@ -632,6 +652,40 @@ describe('WhatsApp delivery and webhook (integration)', () => {
           template_category: 'UTILITY',
         },
       ]);
+    });
+
+    it('should copy the flow id and tell the flow once its WhatsApp is delivered (ROV-332)', async () => {
+      const platform = await addSender({ scope: 'platform' });
+      const flowId = `notification-flow:spec-${provider.run}`;
+      await send(instituteA, userA, approval, true, flowId);
+      const messageId = provider.lastMessageId();
+
+      await post(report(platform.numberId, messageId, 'delivered', phoneA.full));
+      await post(report(platform.numberId, messageId, 'delivered', phoneA.full));
+      await post(report(platform.numberId, messageId, 'read', phoneA.full));
+
+      const { rows } = await superPool.query<{ status: string; flow_id: string | null }>(
+        `SELECT status, flow_id FROM notification_deliveries
+          WHERE recipient_user_id = $1 ORDER BY created_at, id`,
+        [userA.userId],
+      );
+      expect(rows).toEqual([
+        { status: 'SENT', flow_id: flowId },
+        { status: 'DELIVERED', flow_id: flowId },
+      ]);
+      expect(temporal.signal.mock.calls).toEqual([
+        [flowId, 'flowArrival', [{ recipientUserId: userA.userId, via: 'WHATSAPP' }]],
+      ]);
+    });
+
+    it('should tell no flow about a report of a message sent outside a flow', async () => {
+      const platform = await addSender({ scope: 'platform' });
+      await send(instituteA, userA);
+
+      await post(report(platform.numberId, provider.lastMessageId(), 'delivered', phoneA.full));
+
+      expect((await deliveries(userA.userId)).map((d) => d.status)).toEqual(['SENT', 'DELIVERED']);
+      expect(temporal.signal).not.toHaveBeenCalled();
     });
 
     it('should append DELIVERED for a read report that arrives without a delivery report', async () => {

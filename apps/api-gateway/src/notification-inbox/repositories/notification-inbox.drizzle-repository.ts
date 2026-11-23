@@ -63,6 +63,7 @@ const liveFields = {
   readAt: notificationsLive.readAt,
   archivedAt: notificationsLive.archivedAt,
   createdAt: notificationsLive.createdAt,
+  flowId: notificationsLive.flowId,
 };
 
 const baseFields = {
@@ -74,6 +75,7 @@ const baseFields = {
   readAt: notifications.readAt,
   archivedAt: notifications.archivedAt,
   createdAt: notifications.createdAt,
+  flowId: notifications.flowId,
 };
 
 @Injectable()
@@ -151,7 +153,9 @@ export class NotificationInboxDrizzleRepository extends NotificationInboxReposit
     });
   }
 
-  async markAllRead(viewer: NotificationViewer): Promise<number> {
+  async markAllRead(
+    viewer: NotificationViewer,
+  ): Promise<{ count: number; flowNotificationIds: string[] }> {
     return this.run(viewer, async (tx) => {
       const updated = await tx
         .update(notifications)
@@ -164,8 +168,11 @@ export class NotificationInboxDrizzleRepository extends NotificationInboxReposit
             isNull(notifications.readAt),
           ),
         )
-        .returning({ id: notifications.id });
-      return updated.length;
+        .returning({ id: notifications.id, flowId: notifications.flowId });
+      return {
+        count: updated.length,
+        flowNotificationIds: updated.filter((row) => row.flowId !== null).map((row) => row.id),
+      };
     });
   }
 

@@ -69,6 +69,12 @@ export const NOTIFICATION_SKIP_REASON_VALUES = [
   'opted_out',
   // The sender, or this institute's share of it, reached its daily cap
   'sender_cap',
+  // Another step or recipient of the flow was reached first, so this one was not tried
+  'not_needed',
+  // The step's condition did not hold for this notification
+  'condition_not_met',
+  // The recipient was unlinked after the flow started
+  'recipient_removed',
 ] as const;
 
 export type NotificationSkipReason = (typeof NOTIFICATION_SKIP_REASON_VALUES)[number];
@@ -81,6 +87,9 @@ export const NotificationSkipReason = {
   NO_TEMPLATE: 'no_template',
   OPTED_OUT: 'opted_out',
   SENDER_CAP: 'sender_cap',
+  NOT_NEEDED: 'not_needed',
+  CONDITION_NOT_MET: 'condition_not_met',
+  RECIPIENT_REMOVED: 'recipient_removed',
 } as const satisfies Record<string, NotificationSkipReason>;
 
 // ─── NotificationDeliveryStatus ─────────────────────────────────────────────

@@ -5,6 +5,8 @@ import {
   type DevicePlatform,
   ErrorCode,
 } from '@roviq/common-types';
+import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { isUUID } from 'class-validator';
 import { decodeIdCursor, encodeCursor } from '../common/pagination/relay-pagination.model';
 import {
@@ -41,7 +43,16 @@ export class NotificationInboxService {
   constructor(
     private readonly inbox: NotificationInboxRepository,
     private readonly devices: DeviceTokenRepository,
+    private readonly eventBus: EventBusService,
   ) {}
+
+  /** A read or an archive ends the notification's delivery flow: no paid message follows. */
+  private seen(user: AuthUser, notificationId: string): void {
+    this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.INAPP_SEEN, {
+      notificationId,
+      recipientUserId: user.userId,
+    });
+  }
 
   async list(
     user: AuthUser,
@@ -83,13 +94,16 @@ export class NotificationInboxService {
     if (!isUUID(id)) throw notFound();
     const row = await this.inbox.markRead(viewer, id);
     if (!row) throw notFound();
+    if (row.flowId !== null) this.seen(user, row.id);
     return row;
   }
 
   async markAllRead(user: AuthUser): Promise<number> {
     const viewer = notificationViewerOf(user);
     assertOwnSession(user);
-    return this.inbox.markAllRead(viewer);
+    const { count, flowNotificationIds } = await this.inbox.markAllRead(viewer);
+    for (const id of flowNotificationIds) this.seen(user, id);
+    return count;
   }
 
   async archive(user: AuthUser, id: string): Promise<NotificationRecord> {
@@ -98,7 +112,25 @@ export class NotificationInboxService {
     if (!isUUID(id)) throw notFound();
     const row = await this.inbox.archive(viewer, id);
     if (!row) throw notFound();
+    if (row.flowId !== null) this.seen(user, row.id);
     return row;
+  }
+
+  /**
+   * The recipient's device says it showed the push. Only a pointer is published: the
+   * notification service finds the push it sent for this row and records the delivery.
+   */
+  async acknowledgeDelivery(user: AuthUser, id: string): Promise<boolean> {
+    const viewer = notificationViewerOf(user);
+    assertOwnSession(user);
+    if (!isUUID(id)) throw notFound();
+    const row = await this.inbox.findOne(viewer, id);
+    if (!row) throw notFound();
+    this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.PUSH_ACKNOWLEDGED, {
+      notificationId: row.id,
+      recipientUserId: user.userId,
+    });
+    return true;
   }
 
   async registerDeviceToken(

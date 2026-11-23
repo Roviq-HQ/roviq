@@ -101,7 +101,8 @@ export class AuthListener {
         params: { ip, at: new Date().toISOString(), accountPath: ACCOUNT_PATH[audience.scope] },
       },
       audience,
-      recipient: { userId: event.userId, membershipId: null },
+      recipients: [{ userId: event.userId, membershipId: null }],
+      recipientsRef: null,
       source: sourceOf(ctx),
       inApp,
     });

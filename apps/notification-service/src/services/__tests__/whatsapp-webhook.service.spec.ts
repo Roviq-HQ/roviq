@@ -9,6 +9,7 @@ import { Clock } from '../../delivery/whatsapp/whatsapp-route';
 import { MessagingInboundRepository } from '../../repositories/messaging-inbound.repository';
 import { MessagingSenderRepository } from '../../repositories/messaging-sender.repository';
 import type { MessagingSenderRecord } from '../../repositories/types';
+import { FlowArrivals } from '../flow-arrivals.service';
 import {
   AUTO_REPLY,
   START_CONFIRMATION,
@@ -45,6 +46,7 @@ describe('WhatsAppWebhookService', () => {
   let sendText: MockInstance<WhatsAppCloudClient['sendText']>;
   let clock: Clock;
   let sender: MessagingSenderRecord;
+  let arrivals: ReturnType<typeof createMock<FlowArrivals>>;
   let service: WhatsAppWebhookService;
 
   beforeEach(() => {
@@ -64,13 +66,14 @@ describe('WhatsAppWebhookService', () => {
       findByProviderNumber: vi.fn().mockResolvedValue(sender),
     });
     inbound = createMock<MessagingInboundRepository>({
-      recordReceipt: vi.fn().mockResolvedValue('recorded'),
+      recordReceipt: vi.fn().mockResolvedValue({ kind: 'recorded', arrival: null }),
       recordPreference: vi.fn().mockResolvedValue({ changed: true, phone: PHONE }),
       recordMessage: vi.fn().mockResolvedValue({ reply: true }),
     });
     clock = new Clock();
     vi.spyOn(clock, 'now').mockReturnValue(new Date('2026-11-23T10:00:00.000Z'));
-    service = new WhatsAppWebhookService(senders, inbound, cloud, clock);
+    arrivals = createMock<FlowArrivals>({ arrived: vi.fn().mockResolvedValue(undefined) });
+    service = new WhatsAppWebhookService(senders, inbound, cloud, clock, arrivals);
   });
 
   it('should record nothing and send nothing for a number that is no sender here', async () => {
@@ -164,6 +167,37 @@ describe('WhatsAppWebhookService', () => {
         onlyIfNotDelivered: false,
         person: PERSON,
       });
+    });
+
+    it('should tell the flow when a delivered report proves its message arrived', async () => {
+      inbound.recordReceipt.mockResolvedValue({
+        kind: 'recorded',
+        arrival: {
+          flowId: 'notification-flow:key-1',
+          recipientUserId: 'user-1',
+          channel: 'WHATSAPP',
+        },
+      });
+
+      await service.handle([receipt('delivered')]);
+
+      expect(arrivals.arrived).toHaveBeenCalledWith(
+        'notification-flow:key-1',
+        'user-1',
+        'WHATSAPP',
+      );
+    });
+
+    it.each([
+      ['a report of a message with no flow', { kind: 'recorded', arrival: null }],
+      ['a repeated report', { kind: 'duplicate' }],
+      ['a report of an unknown message', { kind: 'unknown_message' }],
+    ] as const)('should signal no flow for %s', async (_name, result) => {
+      inbound.recordReceipt.mockResolvedValue(result);
+
+      await service.handle([receipt('delivered')]);
+
+      expect(arrivals.arrived).not.toHaveBeenCalled();
     });
 
     it('should let a repository error propagate', async () => {

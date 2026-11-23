@@ -52,6 +52,8 @@ export const notifications = pgTable(
     data: jsonb().$type<Record<string, unknown>>(),
     /** Source event and recipient; a redelivered event must not create a second row. */
     dedupeKey: text('dedupe_key'),
+    /** The delivery flow (workflow id) this row belongs to; a read or an archive ends that flow. */
+    flowId: text('flow_id'),
     readAt: timestamp('read_at', { withTimezone: true }),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     ...entityColumns,

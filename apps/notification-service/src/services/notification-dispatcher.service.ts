@@ -4,7 +4,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { TemporalClientService } from '@roviq/temporal';
 import { ChannelSender, toPushData } from '../delivery/channel-sender';
-import { resolveChannelSettings } from '../delivery/channel-settings';
+import { type ChannelSettings, resolveChannelSettings } from '../delivery/channel-settings';
 import { nextDigestRunOrDefault } from '../delivery/digest-schedule';
 import { smsDraftForSecret } from '../delivery/sms/sms-templates';
 import { NotificationConfigReadRepository } from '../repositories/notification-config-read.repository';
@@ -12,6 +12,7 @@ import { NotificationWriteRepository } from '../repositories/notification-write.
 import { RecipientReadRepository } from '../repositories/recipient-read.repository';
 import type { Audience, Recipient } from '../repositories/types';
 import { composeInApp, composeSecret } from '../types/compose';
+import { appOnlyFlow, channelsOf } from '../types/flow';
 import {
   REGULAR_TYPES,
   type RegularPayload,
@@ -19,17 +20,27 @@ import {
   type SecretPayload,
 } from '../types/registry';
 import {
-  type ChannelPlan,
-  DELIVERY_WORKFLOW_TYPE,
-  type DeliveryWorkflowInput,
   DIGEST_ITEM_SIGNAL,
   DIGEST_WORKFLOW_TYPE,
   type DigestItem,
   type DigestWorkflowInput,
-  deliveryWorkflowId,
   digestWorkflowId,
+  FLOW_WORKFLOW_TYPE,
+  type FlowRecipient,
+  type FlowWorkflowInput,
+  flowWorkflowId,
   NOTIFICATION_TASK_QUEUE,
+  type RecipientsRef,
 } from '../workflows/notification-workflow.types';
+
+interface DigestSchedule {
+  tenantId: string;
+  cron: string;
+  defaultCron: string;
+}
+
+/** The in-app row of one recipient of an event. */
+const recipientKey = (eventKey: string, userId: string) => `${eventKey}:${userId}`;
 
 /** The JetStream message an event came in; its stream sequence makes the dedupe key. */
 export interface EventSource {
@@ -40,24 +51,20 @@ export interface EventSource {
 export interface RegularDispatch {
   message: RegularPayload;
   audience: Audience;
-  recipient: Recipient;
+  /** In alert order; one flow walks them all. */
+  recipients: Recipient[];
+  /** Where the recipients came from, re-checked at each send; null for the one the event names. */
+  recipientsRef: RecipientsRef;
   source: EventSource;
   /**
-   * Business key for a type where a re-sent event must not alert twice (one absence, one
-   * alert). Without it the key is the event's stream sequence, unique per message.
+   * The event key, without any recipient: a business key for a type where a re-sent event must
+   * not alert twice (one absence, one alert), or a distinct key for a second dispatch of the same
+   * event. Without it the key is the event's stream sequence and type.
    */
   dedupeKey?: string;
   /** False when the event names no portal to show an in-app copy in. */
   inApp: boolean;
-  /**
-   * True for a student's guardian after the first (ROV-328): the in-app copy and push only.
-   * WhatsApp, SMS and email go to the first guardian alone.
-   */
-  appOnly?: boolean;
 }
-
-/** Channels a guardian after the first still gets; the in-app row is not a channel. */
-const APP_CHANNELS: ReadonlySet<NotificationChannel> = new Set(['PUSH']);
 
 export interface SecretDispatch {
   message: SecretPayload;
@@ -79,8 +86,9 @@ export class RetryWait {
 const SECRET_BACKOFF_MS = [1_000, 3_000];
 
 /**
- * The one entry point every listener calls (ROV-314). Writes the in-app row, then hands the
- * outside channels to Temporal (delivery or digest workflow). Secret types never reach Temporal:
+ * The one entry point every listener calls (ROV-314). Writes each recipient's in-app row, then
+ * hands the outside channels to Temporal: one flow workflow per event (ROV-332), or a digest
+ * workflow per recipient. Secret types never reach Temporal:
  * they are sent here, inside the listener call.
  */
 @Injectable()
@@ -98,7 +106,8 @@ export class NotificationDispatcher {
   ) {}
 
   async dispatch(req: RegularDispatch): Promise<void> {
-    const { message, audience, recipient } = req;
+    const { message, audience } = req;
+    if (req.recipients.length === 0) return;
     const type = REGULAR_TYPES[message.type];
     const row =
       type.settingsCategory !== null && audience.tenantId !== null
@@ -111,90 +120,113 @@ export class NotificationDispatcher {
       },
       row,
     );
-    const dedupeKey =
-      req.dedupeKey ??
-      `${req.source.stream}:${req.source.sequence}:${message.type}:${recipient.userId}`;
+    const eventKey = req.dedupeKey ?? `${req.source.stream}:${req.source.sequence}:${message.type}`;
+    // A digest collects the outside channels per recipient; otherwise one flow walks them all.
+    const plan: DigestSchedule | { flowId: string } =
+      settings.digestCron !== null && type.digest !== null && audience.tenantId !== null
+        ? {
+            tenantId: audience.tenantId,
+            cron: settings.digestCron,
+            defaultCron: type.digest.defaultCron,
+          }
+        : { flowId: flowWorkflowId(eventKey) };
+    const outside = channelsOf(type.flow).length > 0;
+    // Only a row some workflow waits on carries its id: seen events for others signal nothing.
+    const flowId = outside && 'flowId' in plan ? plan.flowId : null;
     const copy = composeInApp(message);
 
-    let notificationId: string | null = null;
-    if (req.inApp && settings.inApp) {
-      const stored = await this.writes.insertInApp({
-        audience,
-        recipient,
-        type: message.type,
-        title: { ...copy.title },
-        body: { ...copy.body },
-        data: copy.data,
-        dedupeKey,
-      });
-      notificationId = stored.id;
-      if (stored.created) {
-        this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.INAPP_CREATED, {
-          notificationId: stored.id,
-          scope: audience.scope,
-          tenantId: audience.tenantId,
-          resellerId: audience.resellerId,
-          recipientUserId: recipient.userId,
+    const recipients: FlowRecipient[] = [];
+    for (const recipient of req.recipients) {
+      let notificationId: string | null = null;
+      if (req.inApp && settings.inApp) {
+        const stored = await this.writes.insertInApp({
+          audience,
+          recipient,
+          type: message.type,
+          title: { ...copy.title },
+          body: { ...copy.body },
+          data: copy.data,
+          dedupeKey: recipientKey(eventKey, recipient.userId),
+          flowId,
         });
+        notificationId = stored.id;
+        if (stored.created) {
+          this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.INAPP_CREATED, {
+            notificationId: stored.id,
+            scope: audience.scope,
+            tenantId: audience.tenantId,
+            resellerId: audience.resellerId,
+            recipientUserId: recipient.userId,
+          });
+        }
       }
+      recipients.push({ userId: recipient.userId, notificationId });
     }
 
-    const channels: ChannelPlan[] = type.channels
-      .filter((channel) => !req.appOnly || APP_CHANNELS.has(channel))
-      .map((channel) => ({ channel, enabled: settings.channels[channel] }));
-    if (channels.length === 0) return;
+    if (!outside) return;
 
-    if (settings.digestCron !== null && type.digest !== null && audience.tenantId !== null) {
-      await this.signalDigest(
-        req,
-        audience.tenantId,
-        settings.digestCron,
-        type.digest.defaultCron,
-        channels,
-        dedupeKey,
-      );
+    if (!('flowId' in plan)) {
+      for (const [index, recipient] of req.recipients.entries()) {
+        const key = recipientKey(eventKey, recipient.userId);
+        await this.signalDigest(req, recipient, index > 0, plan, key, settings);
+      }
       return;
     }
 
-    const input: DeliveryWorkflowInput = {
+    const input: FlowWorkflowInput = {
+      flowId: plan.flowId,
       audience,
-      recipientUserId: recipient.userId,
       message,
-      notificationId,
-      channels,
+      recipients,
+      recipientsRef: req.recipientsRef,
+      flow: type.flow,
+      enabled: settings.channels,
+      critical: type.critical,
       data: toPushData(copy.data),
     };
-    const started = await this.temporal.startWorkflowOnce(DELIVERY_WORKFLOW_TYPE, {
-      workflowId: deliveryWorkflowId(dedupeKey),
+    const started = await this.temporal.startWorkflowOnce(FLOW_WORKFLOW_TYPE, {
+      workflowId: plan.flowId,
       taskQueue: NOTIFICATION_TASK_QUEUE,
       args: [input],
     });
-    if (!started) this.logger.log(`Delivery for ${dedupeKey} already started; redelivered event`);
+    if (!started) this.logger.log(`Flow ${plan.flowId} already started; redelivered event`);
   }
 
   private async signalDigest(
     req: RegularDispatch,
-    tenantId: string,
-    cron: string,
-    defaultCron: string,
-    channels: ChannelPlan[],
+    recipient: Recipient,
+    appOnly: boolean,
+    schedule: DigestSchedule,
     dedupeKey: string,
+    settings: ChannelSettings,
   ): Promise<void> {
+    const type = REGULAR_TYPES[req.message.type];
+    // A guardian after the first is sent no paid channel or email (ROV-328); maybe nothing at all.
+    if (appOnly && channelsOf(appOnlyFlow(type.flow)).length === 0) return;
+    const { tenantId } = schedule;
     const timezone = (await this.recipients.findInstituteTimezone(tenantId)) ?? 'Asia/Kolkata';
-    const { runAt, usedDefault } = nextDigestRunOrDefault(cron, defaultCron, timezone, new Date());
+    const { runAt, usedDefault } = nextDigestRunOrDefault(
+      schedule.cron,
+      schedule.defaultCron,
+      timezone,
+      new Date(),
+    );
     if (usedDefault) {
       this.logger.warn(`Institute ${tenantId} has an invalid digest cron; using the default`);
     }
     const input: DigestWorkflowInput = {
       audience: req.audience,
-      recipientUserId: req.recipient.userId,
+      recipientUserId: recipient.userId,
       type: req.message.type,
-      channels,
+      flow: type.flow,
+      enabled: settings.channels,
+      critical: type.critical,
+      appOnly,
       runAt: runAt.toISOString(),
     };
     const item: DigestItem = { dedupeKey, message: req.message, runAt: runAt.toISOString() };
     await this.temporal.signalWithStart(DIGEST_WORKFLOW_TYPE, {
-      workflowId: digestWorkflowId(tenantId, req.recipient.userId, req.message.type),
+      workflowId: digestWorkflowId(tenantId, recipient.userId, req.message.type),
       taskQueue: NOTIFICATION_TASK_QUEUE,
       args: [input],
       signal: DIGEST_ITEM_SIGNAL,
@@ -219,6 +251,7 @@ export class NotificationDispatcher {
           audience: req.audience,
           recipientUserId: req.recipientUserId,
           notificationId: null,
+          flowId: null,
           channelEnabled: true,
           critical: true,
           deferrable: false,

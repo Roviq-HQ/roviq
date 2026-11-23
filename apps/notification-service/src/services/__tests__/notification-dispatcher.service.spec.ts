@@ -9,6 +9,11 @@ import { NotificationConfigReadRepository } from '../../repositories/notificatio
 import { NotificationWriteRepository } from '../../repositories/notification-write.repository';
 import { RecipientReadRepository } from '../../repositories/recipient-read.repository';
 import type { DeliveryOutcome } from '../../repositories/types';
+import { guardianAlertFlow } from '../../types/flow';
+import type {
+  DigestWorkflowInput,
+  FlowWorkflowInput,
+} from '../../workflows/notification-workflow.types';
 import {
   NotificationDispatcher,
   type RegularDispatch,
@@ -19,6 +24,7 @@ import {
 const TENANT = '019a0000-0000-7000-8000-000000000001';
 const INSTITUTE = { scope: 'institute', tenantId: TENANT, resellerId: null } as const;
 const GUARDIAN = { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' };
+const SECOND = { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' };
 const SOURCE = { stream: 'NOTIFICATION', sequence: 41 };
 const NOW = new Date('2026-04-10T05:00:00.000Z');
 
@@ -37,7 +43,8 @@ const ABSENCE: RegularDispatch = {
     },
   },
   audience: INSTITUTE,
-  recipient: GUARDIAN,
+  recipients: [GUARDIAN],
+  recipientsRef: { kind: 'guardians_of_student', studentMembershipId: 'membership-student-1' },
   source: SOURCE,
   inApp: true,
 };
@@ -57,10 +64,18 @@ const REMINDER: RegularDispatch = {
     },
   },
   audience: INSTITUTE,
-  recipient: GUARDIAN,
+  recipients: [GUARDIAN],
+  recipientsRef: { kind: 'guardians_of_student', studentMembershipId: 'membership-student-1' },
   source: SOURCE,
   inApp: true,
 };
+
+function isDigestInput(value: unknown): value is DigestWorkflowInput {
+  return typeof value === 'object' && value !== null && 'appOnly' in value;
+}
+function isFlowInput(value: unknown): value is FlowWorkflowInput {
+  return typeof value === 'object' && value !== null && 'flowId' in value;
+}
 
 const SENT: DeliveryOutcome = { status: 'SENT', provider: 'log', providerMessageId: 'm1' };
 const FAILED: DeliveryOutcome = {
@@ -115,6 +130,27 @@ describe('NotificationDispatcher', () => {
   });
 
   describe('dispatch', () => {
+    const ABSENCE_COPY = {
+      title: { en: 'Absence recorded', hi: 'अनुपस्थिति दर्ज' },
+      body: {
+        en: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 10 April 2026. Please contact the institute if this is incorrect.',
+        hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
+      },
+      data: {
+        sessionId: 'session-1',
+        studentId: 'membership-student-1',
+        path: '/institute/attendance',
+      },
+    };
+    const NO_DIGEST = {
+      inAppEnabled: true,
+      whatsappEnabled: true,
+      emailEnabled: true,
+      pushEnabled: true,
+      digestEnabled: false,
+      digestCron: null,
+    };
+
     it('should store the in-app row and announce it', async () => {
       await dispatcher.dispatch(ABSENCE);
 
@@ -123,17 +159,10 @@ describe('NotificationDispatcher', () => {
         audience: INSTITUTE,
         recipient: GUARDIAN,
         type: 'ATTENDANCE_ABSENT',
-        title: { en: 'Absence recorded', hi: 'अनुपस्थिति दर्ज' },
-        body: {
-          en: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 10 April 2026. Please contact the institute if this is incorrect.',
-          hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
-        },
-        data: {
-          sessionId: 'session-1',
-          studentId: 'membership-student-1',
-          path: '/institute/attendance',
-        },
+        ...ABSENCE_COPY,
         dedupeKey: 'NOTIFICATION:41:ATTENDANCE_ABSENT:user-guardian-1',
+        // A digest walks no flow, so no workflow waits for this row to be seen.
+        flowId: null,
       });
       expect(eventBus.emit).toHaveBeenCalledWith('NOTIFICATION.inapp.created', {
         notificationId: 'notification-1',
@@ -165,11 +194,10 @@ describe('NotificationDispatcher', () => {
             audience: INSTITUTE,
             recipientUserId: 'user-guardian-1',
             type: 'ATTENDANCE_ABSENT',
-            channels: [
-              { channel: 'WHATSAPP', enabled: true },
-              { channel: 'EMAIL', enabled: true },
-              { channel: 'PUSH', enabled: false },
-            ],
+            flow: guardianAlertFlow(),
+            enabled: { EMAIL: true, PUSH: false, SMS: true, WHATSAPP: true },
+            critical: false,
+            appOnly: false,
             runAt: '2026-04-10T12:30:00.000Z',
           },
         ],
@@ -184,8 +212,30 @@ describe('NotificationDispatcher', () => {
       });
     });
 
-    it('should key the row and the digest item by the business key the listener gives', async () => {
-      const key = 'attendance:session-1:membership-student-1:ABSENT:user-guardian-1';
+    it('should collect a digest per guardian, the later ones by the app alone', async () => {
+      await dispatcher.dispatch({ ...ABSENCE, recipients: [GUARDIAN, SECOND] });
+
+      const started = temporal.signalWithStart.mock.calls.map(([, options]) => {
+        const [input] = options.args;
+        assert(isDigestInput(input));
+        return [options.workflowId, input.recipientUserId, input.appOnly];
+      });
+      expect(started).toEqual([
+        [
+          `notification-digest:${TENANT}:user-guardian-1:ATTENDANCE_ABSENT`,
+          'user-guardian-1',
+          false,
+        ],
+        [
+          `notification-digest:${TENANT}:user-guardian-2:ATTENDANCE_ABSENT`,
+          'user-guardian-2',
+          true,
+        ],
+      ]);
+    });
+
+    it('should key each in-app row and digest item by the event key and the recipient', async () => {
+      const key = 'attendance:session-1:membership-student-1:ABSENT';
 
       await dispatcher.dispatch({ ...ABSENCE, dedupeKey: key });
 
@@ -193,130 +243,112 @@ describe('NotificationDispatcher', () => {
         audience: INSTITUTE,
         recipient: GUARDIAN,
         type: 'ATTENDANCE_ABSENT',
-        title: { en: 'Absence recorded', hi: 'अनुपस्थिति दर्ज' },
-        body: {
-          en: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 10 April 2026. Please contact the institute if this is incorrect.',
-          hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
-        },
-        data: {
-          sessionId: 'session-1',
-          studentId: 'membership-student-1',
-          path: '/institute/attendance',
-        },
-        dedupeKey: key,
+        ...ABSENCE_COPY,
+        dedupeKey: `${key}:user-guardian-1`,
+        flowId: null,
       });
-      expect(temporal.signalWithStart).toHaveBeenCalledWith('NotificationDigestWorkflow', {
-        workflowId: `notification-digest:${TENANT}:user-guardian-1:ATTENDANCE_ABSENT`,
-        taskQueue: 'notifications',
-        args: [
+      expect(temporal.signalWithStart.mock.calls.map(([, options]) => options.signalArgs)).toEqual([
+        [
           {
-            audience: INSTITUTE,
-            recipientUserId: 'user-guardian-1',
-            type: 'ATTENDANCE_ABSENT',
-            channels: [
-              { channel: 'WHATSAPP', enabled: true },
-              { channel: 'EMAIL', enabled: true },
-              { channel: 'PUSH', enabled: false },
-            ],
+            dedupeKey: `${key}:user-guardian-1`,
+            message: ABSENCE.message,
             runAt: '2026-04-10T12:30:00.000Z',
           },
         ],
-        signal: 'digestItem',
-        signalArgs: [
-          { dedupeKey: key, message: ABSENCE.message, runAt: '2026-04-10T12:30:00.000Z' },
-        ],
-      });
+      ]);
     });
 
-    it('should derive the delivery workflow id from the business key the listener gives', async () => {
-      await dispatcher.dispatch({ ...REMINDER, dedupeKey: 'business-key-1' });
+    it('should start one flow for all guardians, keyed by the event, with ids only', async () => {
+      configs.findByTenantAndType.mockResolvedValue(NO_DIGEST);
+      writes.insertInApp
+        .mockResolvedValueOnce({ id: 'notification-1', created: true })
+        .mockResolvedValueOnce({ id: 'notification-2', created: true });
 
-      expect(temporal.startWorkflowOnce).toHaveBeenCalledWith('NotificationDeliveryWorkflow', {
-        workflowId: 'notification-delivery:business-key-1',
-        taskQueue: 'notifications',
-        args: [
+      await dispatcher.dispatch({
+        ...ABSENCE,
+        recipients: [GUARDIAN, SECOND],
+        dedupeKey: 'attendance:session-1:membership-student-1:ABSENT',
+      });
+
+      const flowId = 'notification-flow:attendance:session-1:membership-student-1:ABSENT';
+      expect(writes.insertInApp.mock.calls.map(([row]) => [row.dedupeKey, row.flowId])).toEqual([
+        ['attendance:session-1:membership-student-1:ABSENT:user-guardian-1', flowId],
+        ['attendance:session-1:membership-student-1:ABSENT:user-guardian-2', flowId],
+      ]);
+      expect(temporal.startWorkflowOnce.mock.calls).toEqual([
+        [
+          'NotificationFlowWorkflow',
           {
-            audience: INSTITUTE,
-            recipientUserId: 'user-guardian-1',
-            message: REMINDER.message,
-            notificationId: 'notification-1',
-            channels: [
-              { channel: 'EMAIL', enabled: true },
-              { channel: 'WHATSAPP', enabled: true },
-              { channel: 'PUSH', enabled: false },
+            workflowId: flowId,
+            taskQueue: 'notifications',
+            args: [
+              {
+                flowId,
+                audience: INSTITUTE,
+                message: ABSENCE.message,
+                recipients: [
+                  { userId: 'user-guardian-1', notificationId: 'notification-1' },
+                  { userId: 'user-guardian-2', notificationId: 'notification-2' },
+                ],
+                recipientsRef: ABSENCE.recipientsRef,
+                flow: guardianAlertFlow(),
+                enabled: { EMAIL: true, PUSH: true, SMS: true, WHATSAPP: true },
+                critical: false,
+                data: ABSENCE_COPY.data,
+              },
             ],
-            data: {
-              feeId: 'fee-1',
-              studentId: 'membership-student-1',
-              path: '/institute/dashboard',
-            },
           },
         ],
-      });
+      ]);
+      expect(temporal.signalWithStart).not.toHaveBeenCalled();
     });
 
-    it('should start one delivery workflow keyed by the event for a type without a digest', async () => {
+    it('should key the flow by the event stream sequence and type without a business key', async () => {
       await dispatcher.dispatch(REMINDER);
 
-      expect(temporal.startWorkflowOnce).toHaveBeenCalledWith('NotificationDeliveryWorkflow', {
-        workflowId: 'notification-delivery:NOTIFICATION:41:FEE_REMINDER:user-guardian-1',
-        taskQueue: 'notifications',
-        args: [
-          {
-            audience: INSTITUTE,
-            recipientUserId: 'user-guardian-1',
-            message: REMINDER.message,
-            notificationId: 'notification-1',
-            channels: [
-              { channel: 'EMAIL', enabled: true },
-              { channel: 'WHATSAPP', enabled: true },
-              { channel: 'PUSH', enabled: false },
-            ],
-            data: {
-              feeId: 'fee-1',
-              studentId: 'membership-student-1',
-              path: '/institute/dashboard',
-            },
-          },
-        ],
-      });
+      expect(
+        temporal.startWorkflowOnce.mock.calls.map(([type, options]) => [type, options.workflowId]),
+      ).toEqual([['NotificationFlowWorkflow', 'notification-flow:NOTIFICATION:41:FEE_REMINDER']]);
+      expect(writes.insertInApp.mock.calls.map(([row]) => row.dedupeKey)).toEqual([
+        'NOTIFICATION:41:FEE_REMINDER:user-guardian-1',
+      ]);
     });
 
-    it('should skip the in-app row when the institute turned in-app off', async () => {
-      configs.findByTenantAndType.mockResolvedValue({
-        inAppEnabled: false,
-        whatsappEnabled: false,
-        emailEnabled: true,
-        pushEnabled: false,
-        digestEnabled: false,
-        digestCron: null,
-      });
+    it('should skip the in-app row when the institute turned in-app off, and still start the flow', async () => {
+      configs.findByTenantAndType.mockResolvedValue({ ...NO_DIGEST, inAppEnabled: false });
 
       await dispatcher.dispatch(ABSENCE);
 
       expect(writes.insertInApp).not.toHaveBeenCalled();
-      expect(temporal.startWorkflowOnce).toHaveBeenCalledWith('NotificationDeliveryWorkflow', {
-        workflowId: 'notification-delivery:NOTIFICATION:41:ATTENDANCE_ABSENT:user-guardian-1',
-        taskQueue: 'notifications',
-        args: [
-          {
-            audience: INSTITUTE,
-            recipientUserId: 'user-guardian-1',
-            message: ABSENCE.message,
-            notificationId: null,
-            channels: [
-              { channel: 'WHATSAPP', enabled: false },
-              { channel: 'EMAIL', enabled: true },
-              { channel: 'PUSH', enabled: false },
-            ],
-            data: {
-              sessionId: 'session-1',
-              studentId: 'membership-student-1',
-              path: '/institute/attendance',
-            },
-          },
-        ],
+      const [call] = temporal.startWorkflowOnce.mock.calls;
+      assert(call);
+      const [input] = call[1].args ?? [];
+      assert(isFlowInput(input));
+      expect(input.recipients).toEqual([{ userId: 'user-guardian-1', notificationId: null }]);
+    });
+
+    it('should start no workflow for a type with no channel outside the app', async () => {
+      await dispatcher.dispatch({
+        message: {
+          type: 'AUTH_LOGIN',
+          params: { ip: null, at: '2026-04-10T05:00:00.000Z', accountPath: '/institute/account' },
+        },
+        audience: INSTITUTE,
+        recipients: [GUARDIAN],
+        recipientsRef: null,
+        source: SOURCE,
+        inApp: true,
       });
+
+      expect(writes.insertInApp.mock.calls.map(([row]) => row.flowId)).toEqual([null]);
+      expect(temporal.startWorkflowOnce).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing for an event with no recipient', async () => {
+      await dispatcher.dispatch({ ...REMINDER, recipients: [] });
+
+      expect(writes.insertInApp).not.toHaveBeenCalled();
+      expect(temporal.startWorkflowOnce).not.toHaveBeenCalled();
     });
   });
 
@@ -345,6 +377,7 @@ describe('NotificationDispatcher', () => {
         audience: { scope: 'platform', tenantId: null, resellerId: null },
         recipientUserId: 'user-1',
         notificationId: null,
+        flowId: null,
         channelEnabled: true,
         critical: true,
         deferrable: false,

@@ -45,6 +45,7 @@ function attempt(overrides: Partial<ChannelAttempt> = {}): ChannelAttempt {
     audience: INSTITUTE,
     recipientUserId: 'user-guardian-1',
     notificationId: 'notification-1',
+    flowId: 'notification-flow:key-1',
     channelEnabled: true,
     critical: false,
     deferrable: true,
@@ -115,6 +116,7 @@ describe('ChannelSender', () => {
       channel: 'EMAIL',
       attempt: 1,
       outcome: { status: 'SENT', provider: 'smtp', providerMessageId: 'smtp-1' },
+      flowId: 'notification-flow:key-1',
     });
   });
 
@@ -180,6 +182,7 @@ describe('ChannelSender', () => {
       channel: 'EMAIL',
       attempt: 2,
       outcome: { status: 'FAILED', provider: 'smtp', errorCode: 'ECONNECTION', retryable: true },
+      flowId: 'notification-flow:key-1',
     });
   });
 
@@ -318,6 +321,7 @@ describe('ChannelSender', () => {
         channel: 'WHATSAPP',
         attempt: 1,
         outcome: expected,
+        flowId: 'notification-flow:key-1',
       });
     });
 
@@ -372,6 +376,7 @@ describe('ChannelSender', () => {
         channel: 'WHATSAPP',
         attempt: 1,
         outcome: expected,
+        flowId: 'notification-flow:key-1',
       });
     });
 
@@ -398,6 +403,7 @@ describe('ChannelSender', () => {
         channel: 'WHATSAPP',
         attempt: 1,
         outcome: expected,
+        flowId: 'notification-flow:key-1',
       });
     });
 

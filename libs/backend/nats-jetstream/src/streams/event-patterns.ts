@@ -20,7 +20,11 @@ const NOTIFICATION = {
   FEE_REMINDER: 'NOTIFICATION.fee.reminder',
   // Emitted by notification-service after it stores a new in-app notification; carries no text.
   INAPP_CREATED: 'NOTIFICATION.inapp.created',
+  // Emitted by the gateway when the recipient reads or archives an in-app notification of a flow.
+  INAPP_SEEN: 'NOTIFICATION.inapp.seen',
   LEAVE_DECIDED: 'NOTIFICATION.leave.decided',
+  // Emitted by the gateway when the recipient's device reports that it showed a push.
+  PUSH_ACKNOWLEDGED: 'NOTIFICATION.push.acknowledged',
   USER_CREATED: 'NOTIFICATION.user.created',
   USER_UPDATED: 'NOTIFICATION.user.updated',
 } as const;
