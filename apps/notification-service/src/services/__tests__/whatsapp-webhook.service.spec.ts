@@ -9,7 +9,12 @@ import { Clock } from '../../delivery/whatsapp/whatsapp-route';
 import { MessagingInboundRepository } from '../../repositories/messaging-inbound.repository';
 import { MessagingSenderRepository } from '../../repositories/messaging-sender.repository';
 import type { MessagingSenderRecord } from '../../repositories/types';
-import { AUTO_REPLY, STOP_CONFIRMATION, WhatsAppWebhookService } from '../whatsapp-webhook.service';
+import {
+  AUTO_REPLY,
+  START_CONFIRMATION,
+  STOP_CONFIRMATION,
+  WhatsAppWebhookService,
+} from '../whatsapp-webhook.service';
 
 const TOKEN = 'fake-access-token-1';
 const NUMBER_ID = 'fake-number-id-1';
@@ -60,7 +65,7 @@ describe('WhatsAppWebhookService', () => {
     });
     inbound = createMock<MessagingInboundRepository>({
       recordReceipt: vi.fn().mockResolvedValue('recorded'),
-      recordOptOut: vi.fn().mockResolvedValue({ created: true, phone: PHONE }),
+      recordPreference: vi.fn().mockResolvedValue({ changed: true, phone: PHONE }),
       recordMessage: vi.fn().mockResolvedValue({ reply: true }),
     });
     clock = new Clock();
@@ -82,13 +87,13 @@ describe('WhatsAppWebhookService', () => {
             providerErrorCode: null,
           },
         ],
-        messages: [{ messageId: 'wamid.in-1', ...PERSON, stop: true }],
+        messages: [{ messageId: 'wamid.in-1', ...PERSON, intent: 'stop' }],
       }),
     ]);
 
     expect(senders.findByProviderNumber).toHaveBeenCalledWith('whatsapp_cloud', NUMBER_ID);
     expect(inbound.recordReceipt).not.toHaveBeenCalled();
-    expect(inbound.recordOptOut).not.toHaveBeenCalled();
+    expect(inbound.recordPreference).not.toHaveBeenCalled();
     expect(inbound.recordMessage).not.toHaveBeenCalled();
     expect(sendText).not.toHaveBeenCalled();
   });
@@ -169,14 +174,19 @@ describe('WhatsAppWebhookService', () => {
   });
 
   describe('stop requests', () => {
-    const stop = batch({ messages: [{ messageId: 'wamid.in-1', ...PERSON, stop: true }] });
+    const stop = batch({ messages: [{ messageId: 'wamid.in-1', ...PERSON, intent: 'stop' }] });
 
-    it('should record the opt-out and confirm it to the phone the repository returned', async () => {
-      inbound.recordOptOut.mockResolvedValue({ created: true, phone: '+919000000002' });
+    it('should record the stop and confirm it to the phone the repository returned', async () => {
+      inbound.recordPreference.mockResolvedValue({ changed: true, phone: '+919000000002' });
 
       await service.handle([stop]);
 
-      expect(inbound.recordOptOut).toHaveBeenCalledWith('sender-1', 'wamid.in-1', PERSON);
+      expect(inbound.recordPreference).toHaveBeenCalledWith(
+        'sender-1',
+        'wamid.in-1',
+        PERSON,
+        'STOP',
+      );
       expect(inbound.recordMessage).not.toHaveBeenCalled();
       expect(sendText).toHaveBeenCalledTimes(1);
       expect(sendText).toHaveBeenCalledWith(
@@ -186,16 +196,17 @@ describe('WhatsAppWebhookService', () => {
       );
     });
 
-    it('should not confirm an opt-out that already existed', async () => {
-      inbound.recordOptOut.mockResolvedValue({ created: false, phone: PHONE });
+    it('should neither confirm nor auto-reply to a stop that changed nothing', async () => {
+      inbound.recordPreference.mockResolvedValue({ changed: false, phone: PHONE });
 
       await service.handle([stop]);
 
+      expect(inbound.recordMessage).not.toHaveBeenCalled();
       expect(sendText).not.toHaveBeenCalled();
     });
 
     it('should not confirm when no phone is known', async () => {
-      inbound.recordOptOut.mockResolvedValue({ created: true, phone: null });
+      inbound.recordPreference.mockResolvedValue({ changed: true, phone: null });
 
       await service.handle([stop]);
 
@@ -210,7 +221,7 @@ describe('WhatsAppWebhookService', () => {
 
       await service.handle([stop]);
 
-      expect(inbound.recordOptOut).toHaveBeenCalledTimes(1);
+      expect(inbound.recordPreference).toHaveBeenCalledTimes(1);
       expect(sendText).not.toHaveBeenCalled();
     });
 
@@ -227,15 +238,106 @@ describe('WhatsAppWebhookService', () => {
     });
 
     it('should let a repository error propagate', async () => {
-      inbound.recordOptOut.mockRejectedValue(new Error('connection terminated'));
+      inbound.recordPreference.mockRejectedValue(new Error('connection terminated'));
 
       await expect(service.handle([stop])).rejects.toThrow('connection terminated');
       expect(sendText).not.toHaveBeenCalled();
     });
   });
 
+  it('should say in both languages that security alerts stop too and how to start again', () => {
+    const [english, hindi] = STOP_CONFIRMATION.split('\n\n');
+    expect(english).toContain('START');
+    expect(english).toContain('security');
+    expect(hindi).toContain('START');
+    expect(hindi).toContain('सुरक्षा');
+  });
+
+  describe('start requests', () => {
+    const start = batch({ messages: [{ messageId: 'wamid.in-5', ...PERSON, intent: 'start' }] });
+
+    it('should record the start and confirm it, and nothing else', async () => {
+      inbound.recordPreference.mockResolvedValue({ changed: true, phone: '+919000000002' });
+
+      await service.handle([start]);
+
+      expect(inbound.recordPreference).toHaveBeenCalledWith(
+        'sender-1',
+        'wamid.in-5',
+        PERSON,
+        'START',
+      );
+      expect(inbound.recordMessage).not.toHaveBeenCalled();
+      expect(sendText.mock.calls).toEqual([
+        [{ providerNumberId: NUMBER_ID, accessToken: TOKEN }, '+919000000002', START_CONFIRMATION],
+      ]);
+    });
+
+    it('should handle a start from a person who never stopped as an ordinary message', async () => {
+      inbound.recordPreference.mockResolvedValue({ changed: false, phone: PHONE });
+
+      await service.handle([start]);
+
+      expect(inbound.recordMessage).toHaveBeenCalledWith(
+        'sender-1',
+        'wamid.in-5',
+        PERSON,
+        '2026-11-23',
+      );
+      expect(sendText.mock.calls).toEqual([
+        [{ providerNumberId: NUMBER_ID, accessToken: TOKEN }, PHONE, AUTO_REPLY],
+      ]);
+    });
+
+    it('should send nothing for an unchanged start when the repository says not to reply', async () => {
+      inbound.recordPreference.mockResolvedValue({ changed: false, phone: PHONE });
+      inbound.recordMessage.mockResolvedValue({ reply: false });
+
+      await service.handle([start]);
+
+      expect(inbound.recordMessage).toHaveBeenCalledTimes(1);
+      expect(sendText).not.toHaveBeenCalled();
+    });
+
+    it('should not confirm a start when no phone is known', async () => {
+      inbound.recordPreference.mockResolvedValue({ changed: true, phone: null });
+
+      await service.handle([start]);
+
+      expect(inbound.recordMessage).not.toHaveBeenCalled();
+      expect(sendText).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'PAUSED',
+      'BLOCKED',
+    ] as const)('should not confirm a start through a %s sender', async (status) => {
+      senders.findByProviderNumber.mockResolvedValue({ ...sender, status });
+
+      await service.handle([start]);
+
+      expect(inbound.recordPreference).toHaveBeenCalledTimes(1);
+      expect(inbound.recordMessage).not.toHaveBeenCalled();
+      expect(sendText).not.toHaveBeenCalled();
+    });
+
+    it('should swallow a provider failure of the confirmation', async () => {
+      sendText.mockRejectedValue(new ChannelAdapterError('WA_UNREACHABLE', 'request failed'));
+
+      await expect(service.handle([start])).resolves.toBeUndefined();
+    });
+
+    it('should let a repository error propagate', async () => {
+      inbound.recordPreference.mockRejectedValue(new Error('connection terminated'));
+
+      await expect(service.handle([start])).rejects.toThrow('connection terminated');
+      expect(inbound.recordMessage).not.toHaveBeenCalled();
+      expect(sendText).not.toHaveBeenCalled();
+    });
+  });
+
   describe('other messages', () => {
-    const other = batch({ messages: [{ messageId: 'wamid.in-2', ...PERSON, stop: false }] });
+    const other = batch({ messages: [{ messageId: 'wamid.in-2', ...PERSON, intent: 'other' }] });
 
     it('should record the message for the day in India and send the auto reply', async () => {
       await service.handle([other]);
@@ -246,7 +348,7 @@ describe('WhatsAppWebhookService', () => {
         PERSON,
         '2026-11-23',
       );
-      expect(inbound.recordOptOut).not.toHaveBeenCalled();
+      expect(inbound.recordPreference).not.toHaveBeenCalled();
       expect(sendText).toHaveBeenCalledWith(
         { providerNumberId: NUMBER_ID, accessToken: TOKEN },
         PHONE,
@@ -279,7 +381,12 @@ describe('WhatsAppWebhookService', () => {
       await service.handle([
         batch({
           messages: [
-            { messageId: 'wamid.in-3', phone: null, providerUserId: 'fake-user-1', stop: false },
+            {
+              messageId: 'wamid.in-3',
+              phone: null,
+              providerUserId: 'fake-user-1',
+              intent: 'other',
+            },
           ],
         }),
       ]);
@@ -306,7 +413,7 @@ describe('WhatsAppWebhookService', () => {
 
     await service.handle([
       batch({ providerNumberId: 'fake-number-id-unknown', messages: [] }),
-      batch({ messages: [{ messageId: 'wamid.in-4', ...PERSON, stop: false }] }),
+      batch({ messages: [{ messageId: 'wamid.in-4', ...PERSON, intent: 'other' }] }),
     ]);
 
     expect(senders.findByProviderNumber.mock.calls).toEqual([

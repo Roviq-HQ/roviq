@@ -5,9 +5,10 @@ import { roviqAdmin } from '../common/rls-policies';
 import { messagingSenders } from './messaging-senders';
 
 /**
- * A person asked a sender to stop. Append-only and platform role only: no role updates or
- * deletes a row, and request roles hold no right on the table. The inbound event can arrive
- * without a phone number, so the provider's user id is kept beside it.
+ * A person asked a sender to stop, or to start again. Append-only and platform role only: no
+ * role updates or deletes a row, and request roles hold no right on the table. The latest row
+ * of a person decides; no row means messages may be sent. The inbound event can arrive without
+ * a phone number, so the provider's user id is kept beside it.
  */
 export const messagingOptOuts = pgTable(
   'messaging_opt_outs',
@@ -17,12 +18,15 @@ export const messagingOptOuts = pgTable(
       .notNull()
       .references(() => messagingSenders.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
     channel: notificationChannel().notNull(),
+    /** `STOP`: send nothing more. `START`: the person asked to get messages again. */
+    action: text().default('STOP').notNull(),
     /** With country code, e.g. '+919876543210'. */
     recipientPhone: text('recipient_phone'),
     providerUserId: text('provider_user_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    check('chk_messaging_opt_outs_action', sql`"action" IN ('STOP', 'START')`),
     check(
       'chk_messaging_opt_outs_recipient',
       sql`"recipient_phone" IS NOT NULL OR "provider_user_id" IS NOT NULL`,

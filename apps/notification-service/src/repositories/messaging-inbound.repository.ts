@@ -11,15 +11,17 @@ export abstract class MessagingInboundRepository {
   ): Promise<'recorded' | 'duplicate' | 'unknown_message'>;
 
   /**
-   * Appends an opt-out for the person. `created` is false for a repeated event or a person who
-   * already opted out. `phone` is the number to confirm to, looked up from earlier events when
-   * the event came without one.
+   * Appends the person's request to stop or to start again. `changed` is false for a repeated
+   * event, and when the request changes nothing (STOP from a person already stopped, START
+   * from one who never stopped). `phone` is the number to confirm to, looked up from earlier
+   * events when the event came without one.
    */
-  abstract recordOptOut(
+  abstract recordPreference(
     senderId: string,
     eventId: string,
     person: InboundPerson,
-  ): Promise<{ created: boolean; phone: string | null }>;
+    action: 'STOP' | 'START',
+  ): Promise<{ changed: boolean; phone: string | null }>;
 
   /**
    * Records an inbound message. `reply` is true for the first one of the person on `day`,

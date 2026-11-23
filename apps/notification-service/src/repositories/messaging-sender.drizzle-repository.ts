@@ -11,7 +11,7 @@ import {
   notificationDeliveries,
   withAdmin,
 } from '@roviq/database';
-import { and, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { MessagingSenderRepository } from './messaging-sender.repository';
 import { sameNumberSenderIds } from './same-number-senders';
 import type { MessagingSenderRecord, SenderSentCounts } from './types';
@@ -92,7 +92,7 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
 
   async isOptedOut(senderId: string, phone: string): Promise<boolean> {
     return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
-      // A stop request can arrive with the provider's user id and no phone. It still counts
+      // The latest request decides: a later START lifts a STOP. A stop request can arrive with the provider's user id and no phone. It still counts
       // once any event of this number has tied that user id to the phone.
       const userIdsOfPhone = tx
         .select({ providerUserId: messagingInboundEvents.providerUserId })
@@ -104,8 +104,8 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
             isNotNull(messagingInboundEvents.providerUserId),
           ),
         );
-      const [row] = await tx
-        .select({ id: messagingOptOuts.id })
+      const [latest] = await tx
+        .select({ action: messagingOptOuts.action })
         .from(messagingOptOuts)
         .where(
           and(
@@ -116,8 +116,9 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
             ),
           ),
         )
+        .orderBy(desc(messagingOptOuts.createdAt), desc(messagingOptOuts.id))
         .limit(1);
-      return row !== undefined;
+      return latest?.action === 'STOP';
     });
   }
 

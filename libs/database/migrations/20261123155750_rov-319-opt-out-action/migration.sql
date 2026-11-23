@@ -1,0 +1,2 @@
+ALTER TABLE "messaging_opt_outs" ADD COLUMN "action" text DEFAULT 'STOP' NOT NULL;--> statement-breakpoint
+ALTER TABLE "messaging_opt_outs" ADD CONSTRAINT "chk_messaging_opt_outs_action" CHECK ("action" IN ('STOP', 'START'));

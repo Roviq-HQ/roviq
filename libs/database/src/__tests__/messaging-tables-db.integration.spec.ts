@@ -327,6 +327,25 @@ describe('messaging_opt_outs and messaging_inbound_events: constraints', () => {
     });
   });
 
+  it('an opt-out row says STOP unless it says START, and nothing else', async () => {
+    await inTx(async (client) => {
+      const sender = await insertSender(client, {
+        scope: 'institute',
+        tenantId: SEED_IDS.INSTITUTE_1,
+      });
+      const insert = `INSERT INTO messaging_opt_outs (sender_id, channel, recipient_phone, action)
+                      VALUES ($1, 'WHATSAPP', '+919000000003', $2)`;
+      await client.query(insert, [sender, 'START']);
+      await expectRefused(client, /chk_messaging_opt_outs_action/, insert, [sender, 'PAUSE']);
+      const { rows } = await client.query<{ action: string }>(
+        `INSERT INTO messaging_opt_outs (sender_id, channel, recipient_phone)
+         VALUES ($1, 'WHATSAPP', '+919000000004') RETURNING action`,
+        [sender],
+      );
+      expect(rows).toEqual([{ action: 'STOP' }]);
+    });
+  });
+
   it('an event id is stored once per sender, and one automatic reply per person and day', async () => {
     await inTx(async (client) => {
       const sender = await insertSender(client, {

@@ -15,6 +15,7 @@ export abstract class MessagingSenderRepository {
     providerNumberId: string,
   ): Promise<MessagingSenderRecord | null>;
 
+  /** The person's latest request to this sender's number was STOP. */
   abstract isOptedOut(senderId: string, phone: string): Promise<boolean>;
 
   /** Messages the provider accepted from this sender since `since`; `forTenant` is the institute's part. */

@@ -73,23 +73,30 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
     });
   }
 
-  async recordOptOut(
+  async recordPreference(
     senderId: string,
     eventId: string,
     person: InboundPerson,
-  ): Promise<{ created: boolean; phone: string | null }> {
+    action: 'STOP' | 'START',
+  ): Promise<{ changed: boolean; phone: string | null }> {
     return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
       const phone = person.phone ?? (await this.phoneOf(tx, senderId, person.providerUserId));
       const known: InboundPerson = { phone, providerUserId: person.providerUserId };
-      const fresh = await this.insertEvent(tx, senderId, eventId, 'opt_out', known);
-      if (!fresh || (await this.hasOptedOut(tx, senderId, known))) return { created: false, phone };
+      const kind = action === 'STOP' ? 'opt_out' : 'opt_in';
+      const stopped = await this.hasOptedOut(tx, senderId, known);
+      // START from a person who is not stopped is an ordinary message: the event is left for
+      // `recordMessage` to store.
+      if (action === 'START' && !stopped) return { changed: false, phone };
+      const fresh = await this.insertEvent(tx, senderId, eventId, kind, known);
+      if (!fresh || stopped === (action === 'STOP')) return { changed: false, phone };
       await tx.insert(messagingOptOuts).values({
         senderId,
         channel: 'WHATSAPP',
+        action,
         recipientPhone: phone,
         providerUserId: person.providerUserId,
       });
-      return { created: true, phone };
+      return { changed: true, phone };
     });
   }
 
@@ -116,7 +123,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
     tx: DrizzleDB,
     senderId: string,
     providerEventId: string,
-    kind: 'receipt' | 'opt_out' | 'message',
+    kind: 'receipt' | 'opt_out' | 'opt_in' | 'message',
     person: InboundPerson,
     autoReplyDay: string | null = null,
   ): Promise<boolean> {
@@ -138,6 +145,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
     return inserted.length > 0;
   }
 
+  /** The person's latest request to this number, if any, was STOP. */
   private async hasOptedOut(
     tx: DrizzleDB,
     senderId: string,
@@ -150,12 +158,13 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
         : eq(messagingOptOuts.providerUserId, person.providerUserId),
     );
     if (who === undefined) return false;
-    const [row] = await tx
-      .select({ id: messagingOptOuts.id })
+    const [latest] = await tx
+      .select({ action: messagingOptOuts.action })
       .from(messagingOptOuts)
       .where(and(inArray(messagingOptOuts.senderId, sameNumberSenderIds(tx, senderId)), who))
+      .orderBy(desc(messagingOptOuts.createdAt), desc(messagingOptOuts.id))
       .limit(1);
-    return row !== undefined;
+    return latest?.action === 'STOP';
   }
 
   /** The number an earlier event of this sender tied to the provider's user id. */

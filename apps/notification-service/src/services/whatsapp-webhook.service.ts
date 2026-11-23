@@ -17,8 +17,13 @@ import type { MessagingSenderRecord } from '../repositories/types';
 
 /** Sent once when a person asks to stop. Both languages: the person's own is not known here. */
 export const STOP_CONFIRMATION =
-  'You will not get WhatsApp alerts from this number any more. Alerts stay available in the app.\n\n' +
-  'अब आपको इस नंबर से व्हाट्सऐप सूचनाएँ नहीं मिलेंगी। सूचनाएँ ऐप में उपलब्ध रहेंगी।';
+  'You will not get WhatsApp alerts from this number any more. This includes security alerts about your account; those still reach you by email and in the app. Send START to get WhatsApp alerts again.\n\n' +
+  'अब आपको इस नंबर से व्हाट्सऐप सूचनाएँ नहीं मिलेंगी। इसमें आपके खाते की सुरक्षा सूचनाएँ भी शामिल हैं; वे ईमेल और ऐप में मिलती रहेंगी। व्हाट्सऐप सूचनाएँ फिर से पाने के लिए START भेजें।';
+
+/** Sent once when a person who stopped asks to get alerts again. */
+export const START_CONFIRMATION =
+  'You will get WhatsApp alerts from this number again. Send STOP to stop them.\n\n' +
+  'अब आपको इस नंबर से व्हाट्सऐप सूचनाएँ फिर से मिलेंगी। इन्हें बंद करने के लिए STOP भेजें।';
 
 /** The one reply a day to anything else a person writes. */
 export const AUTO_REPLY =
@@ -29,8 +34,8 @@ export const AUTO_REPLY =
 const REPLY_DAY_TIMEZONE = 'Asia/Kolkata';
 
 /**
- * Acts on what the provider reports: delivery reports become delivery rows, a stop request
- * becomes an opt-out, anything else gets one fixed reply a day. Every step is safe to repeat,
+ * Acts on what the provider reports: delivery reports become delivery rows, STOP and START
+ * change whether the person is sent to, anything else gets one fixed reply a day. Every step is safe to repeat,
  * and the institute is known only through the sender the event arrived on.
  */
 @Injectable()
@@ -76,10 +81,28 @@ export class WhatsAppWebhookService {
 
   private async onMessage(sender: MessagingSenderRecord, message: InboundMessage): Promise<void> {
     const person = { phone: message.phone, providerUserId: message.providerUserId };
-    if (message.stop) {
-      const optOut = await this.inbound.recordOptOut(sender.id, message.messageId, person);
-      if (optOut.created) await this.reply(sender, optOut.phone, STOP_CONFIRMATION);
+    if (message.intent === 'stop') {
+      const stop = await this.inbound.recordPreference(
+        sender.id,
+        message.messageId,
+        person,
+        'STOP',
+      );
+      if (stop.changed) await this.reply(sender, stop.phone, STOP_CONFIRMATION);
       return;
+    }
+    if (message.intent === 'start') {
+      const start = await this.inbound.recordPreference(
+        sender.id,
+        message.messageId,
+        person,
+        'START',
+      );
+      if (start.changed) {
+        await this.reply(sender, start.phone, START_CONFIRMATION);
+        return;
+      }
+      // START from a person who never stopped is an ordinary message.
     }
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: REPLY_DAY_TIMEZONE }).format(
       this.clock.now(),

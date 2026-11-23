@@ -269,16 +269,18 @@ messages each institute sent in a month by template category.
 **Rules applied to every WhatsApp send**, in this order after the institute setting and consent:
 
 1. No active sender: skipped (`no_provider`). No approved template: skipped (`no_template`).
-2. The person sent STOP (or a Hindi equivalent) to that sender: skipped (`opted_out`). An
-   opt-out is per sender and is never removed.
+2. The person's latest request to that number was STOP (or a Hindi equivalent): skipped
+   (`opted_out`). This stops every WhatsApp message, security alerts included; those still go
+   by email, push and in the app. Sending START lifts it. A request belongs to the number, so
+   it survives the sender being removed and registered again.
 3. Quiet hours, 21:00 to 07:00 in the institute's timezone: a non-critical message waits until
    07:00. Critical messages (security alerts) are sent at once.
 4. The sender reached its daily cap in the last 24 hours, or the institute reached its share of
    the platform's sender: a non-critical message is skipped (`sender_cap`), a critical one waits
    and tries again every hour.
 
-Push and email go first, then WhatsApp. A person who writes to a sender's number gets one fixed
-reply a day saying the number only sends alerts; the text of what they wrote is not stored.
+Push and email go first, then WhatsApp. STOP and START are each confirmed once. A person who
+writes anything else to a sender's number gets one fixed reply a day saying the number only sends alerts; the text of what they wrote is not stored.
 There is no inbox.
 
 ## PDF generation

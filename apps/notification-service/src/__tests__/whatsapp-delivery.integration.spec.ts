@@ -51,6 +51,7 @@ import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.d
 import type { Audience } from '../repositories/types';
 import {
   AUTO_REPLY,
+  START_CONFIRMATION,
   STOP_CONFIRMATION,
   WhatsAppWebhookService,
 } from '../services/whatsapp-webhook.service';
@@ -727,6 +728,47 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       provider.requests.length = 0;
 
       await expect(send(instituteA, userA)).resolves.toBe('SENT');
+    });
+
+    it('should send again after START, confirm it once, and treat START from a person who never stopped as an ordinary message', async () => {
+      const platform = await addSender({ scope: 'platform' });
+      await post(inbound(platform.numberId, phoneA.full, 'STOP'));
+      await expect(send(instituteA, userA)).resolves.toBe('SKIPPED');
+      provider.requests.length = 0;
+
+      const start = inbound(platform.numberId, phoneA.full, ' start ');
+      await post(start);
+      await post(start);
+      await post(inbound(platform.numberId, phoneA.full, 'शुरू करें'));
+
+      // One confirmation however often the event repeats; a later START changes nothing and
+      // gets the day's one fixed reply.
+      expect(provider.requests.map((r) => r.body.text?.body)).toEqual([
+        START_CONFIRMATION,
+        AUTO_REPLY,
+      ]);
+      const rows = await superPool.query<{ action: string }>(
+        'SELECT action FROM messaging_opt_outs WHERE sender_id = $1 ORDER BY created_at, id',
+        [platform.id],
+      );
+      expect(rows.rows.map((r) => r.action)).toEqual(['STOP', 'START']);
+      await expect(send(instituteA, userA)).resolves.toBe('SENT');
+
+      // A person who never stopped: START is not a preference change.
+      provider.requests.length = 0;
+      await post(inbound(platform.numberId, phoneB.full, 'START'));
+      expect(provider.requests.map((r) => r.body.text?.body)).toEqual([AUTO_REPLY]);
+      expect(await count('messaging_opt_outs', platform.id)).toBe(2);
+
+      // And STOP again after START stops again.
+      await post(inbound(platform.numberId, phoneA.full, 'stop'));
+      await expect(send(instituteA, userA)).resolves.toBe('SKIPPED');
+    });
+
+    it('should tell the person in the stop confirmation that security alerts stop too and how to start again', () => {
+      for (const part of ['security alerts', 'START', 'सुरक्षा', 'email']) {
+        expect(STOP_CONFIRMATION).toContain(part);
+      }
     });
 
     it('should keep an opt-out when the number is removed and registered again', async () => {

@@ -140,7 +140,7 @@ describe('parseWebhookPayload', () => {
             messageId: 'wamid.in-1',
             phone: '+919000000001',
             providerUserId: 'fake-user-1',
-            stop: true,
+            intent: 'stop',
           },
         ],
       },
@@ -168,7 +168,7 @@ describe('parseWebhookPayload', () => {
             messageId: 'wamid.in-2',
             phone: '+919000000001',
             providerUserId: 'fake-user-1',
-            stop: false,
+            intent: 'other',
           },
         ],
       },
@@ -193,7 +193,7 @@ describe('parseWebhookPayload', () => {
         messageId: 'wamid.in-3',
         phone: '+919000000001',
         providerUserId: 'fake-user-1',
-        stop: false,
+        intent: 'other',
       },
     ]);
   });
@@ -211,7 +211,7 @@ describe('parseWebhookPayload', () => {
     );
 
     expect(batch?.messages).toEqual([
-      { messageId: 'wamid.in-4', phone: null, providerUserId: 'fake-user-2', stop: true },
+      { messageId: 'wamid.in-4', phone: null, providerUserId: 'fake-user-2', intent: 'stop' },
     ]);
   });
 
@@ -221,8 +221,46 @@ describe('parseWebhookPayload', () => {
     );
 
     expect(batch?.messages).toEqual([
-      { messageId: 'wamid.in-5', phone: null, providerUserId: null, stop: false },
+      { messageId: 'wamid.in-5', phone: null, providerUserId: null, intent: 'other' },
     ]);
+  });
+
+  it.each([
+    ['a text', { type: 'text', text: { body: ' Start! ' } }],
+    ['a button reply', { type: 'button', button: { text: 'START', payload: 'fake-payload' } }],
+    ['a Hindi text', { type: 'text', text: { body: 'शुरू करें।' } }],
+  ])('should read %s asking to start again', (_case, content) => {
+    const [batch] = parseWebhookPayload(
+      body(
+        change({
+          contacts: [CONTACT],
+          messages: [{ from: '919000000001', id: 'wamid.in-start', ...content }],
+        }),
+      ),
+    );
+
+    expect(batch?.messages).toEqual([
+      {
+        messageId: 'wamid.in-start',
+        phone: '+919000000001',
+        providerUserId: 'fake-user-1',
+        intent: 'start',
+      },
+    ]);
+  });
+
+  it('should read a sentence that contains start as other', () => {
+    const [batch] = parseWebhookPayload(
+      body(
+        change({
+          messages: [
+            { from: '919000000001', id: 'wamid.in-s2', text: { body: 'please start the bus' } },
+          ],
+        }),
+      ),
+    );
+
+    expect(batch?.messages.map((m) => m.intent)).toEqual(['other']);
   });
 
   it('should read a button reply whose text is a stop word', () => {
@@ -247,7 +285,7 @@ describe('parseWebhookPayload', () => {
         messageId: 'wamid.in-6',
         phone: '+919000000001',
         providerUserId: 'fake-user-1',
-        stop: true,
+        intent: 'stop',
       },
     ]);
   });
@@ -296,7 +334,7 @@ describe('parseWebhookPayload', () => {
         providerNumberId: NUMBER_ID,
         receipts: [],
         messages: [
-          { messageId: 'wamid.b', phone: '+919000000002', providerUserId: null, stop: true },
+          { messageId: 'wamid.b', phone: '+919000000002', providerUserId: null, intent: 'stop' },
         ],
       },
       {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isStopRequest } from './stop-words';
+import { type InboundIntent, intentOf } from './stop-words';
 
 /** A delivery report for a message this service sent. */
 export interface InboundReceipt {
@@ -17,7 +17,8 @@ export interface InboundMessage {
   messageId: string;
   phone: string | null;
   providerUserId: string | null;
-  stop: boolean;
+  /** A stop request, a request to start again, or anything else. */
+  intent: InboundIntent;
 }
 
 export interface InboundBatch {
@@ -109,7 +110,7 @@ function toMessage(raw: unknown, contact: Contact | undefined): InboundMessage |
     messageId: message.data.id,
     phone: toPhone(message.data.from) ?? toPhone(contact?.wa_id),
     providerUserId: message.data.from_user_id ?? message.data.user_id ?? contact?.user_id ?? null,
-    stop: isStopRequest(text),
+    intent: intentOf(text),
   };
 }
 
