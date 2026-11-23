@@ -44,6 +44,8 @@ const GUARDIAN_LIST_FIELDS = `
   version
   createdAt
   updatedAt
+  signInStatus
+  signInDetailsSentAt
 `;
 
 const GUARDIANS_LIST_QUERY = gql`
@@ -77,6 +79,21 @@ export function useGuardian(id: string) {
     variables: { id },
     skip: !id,
   });
+}
+
+// ─── Sign-in details (ROV-315) ────────────────────────────────────────────
+
+const RESEND_GUARDIAN_SIGN_IN_DETAILS = gql`
+  mutation ResendGuardianSignInDetails($guardianProfileId: ID!) {
+    resendGuardianSignInDetails(guardianProfileId: $guardianProfileId)
+  }
+`;
+
+export function useResendGuardianSignInDetails() {
+  return useMutation<{ resendGuardianSignInDetails: boolean }, { guardianProfileId: string }>(
+    RESEND_GUARDIAN_SIGN_IN_DETAILS,
+    { refetchQueries: ['InstituteGuardians', 'InstituteGuardian'] },
+  );
 }
 
 // ─── Linked children (guardian → students) ───────────────────────────────

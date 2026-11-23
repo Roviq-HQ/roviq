@@ -213,6 +213,9 @@ Each channel needs a provider; a channel with none records every send as skipped
 - **SMS and WhatsApp**: no production provider yet. The `log` provider sends nothing and is
   refused at start when `NODE_ENV=production`, so leave these unset until a provider exists;
   impersonation codes then cannot reach a phone.
+- **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
+  prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
+  same value as the api-gateway's.
 
 ## PDF generation
 

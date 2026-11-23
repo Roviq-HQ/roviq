@@ -25,6 +25,10 @@ const envSchema = z
     EMAIL_FROM: z.string().optional(),
     FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
 
+    // Public address of the institute portal, named in sign-in details; defaults to localhost:WEB_PORT
+    INSTITUTE_PORTAL_URL: z.string().optional(),
+    WEB_PORT: z.string().optional(),
+
     // Optional
     NODE_ENV: z.string().optional(),
     NOTIFICATION_SERVICE_PORT: z.coerce.number().optional(),

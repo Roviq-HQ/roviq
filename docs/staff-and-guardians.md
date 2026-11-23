@@ -39,6 +39,10 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 | `listLinkedStudents` | Query | `[Student!]!` | `read Guardian` |
 | `listStudentGuardians` | Query | `[Guardian!]!` | `read Student` |
 | `revokeGuardianAccess` | Mutation | `Boolean` | `update Guardian` |
+| `resendStaffSignInDetails` | Mutation | `Boolean` | `update Staff` |
+| `resendGuardianSignInDetails` | Mutation | `Boolean` | `update Guardian` |
+
+`Staff.signInStatus` / `Guardian.signInStatus` and `signInDetailsSentAt` show whether the person has signed in or was sent their details; the lists and detail pages show them with a "Send sign-in details" button. Rules: `docs/auth.md` → "Sign-in details for staff and guardians".
 
 Resolvers live under [apps/api-gateway/src/institute/staff/](apps/api-gateway/src/institute/staff/) and [apps/api-gateway/src/institute/guardian/](apps/api-gateway/src/institute/guardian/), decorated with `@InstituteScope()`.
 

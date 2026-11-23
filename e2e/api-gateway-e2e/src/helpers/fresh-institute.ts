@@ -62,7 +62,7 @@ export async function loginAsFreshInstituteAdmin(type: InstituteType): Promise<s
     (edge) => edge.node.email === firstAdmin.email,
   )?.node.username;
   assert(username);
-  const welcome = await waitForEmail(firstAdmin.email, 'Welcome to Roviq');
+  const welcome = await waitForEmail(firstAdmin.email, 'Roviq sign-in details for');
   const tempPassword = /^Temporary password: (\S+)$/m.exec(welcome.text)?.[1];
   assert(tempPassword);
 

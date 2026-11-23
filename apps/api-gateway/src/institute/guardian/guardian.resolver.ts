@@ -92,6 +92,17 @@ export class GuardianResolver {
     return this.guardianService.update(id, input) as Promise<GuardianModel>;
   }
 
+  @Mutation(() => Boolean, {
+    description:
+      'Send a guardian a new temporary password with their username, by email and SMS. Only before their first sign-in; at most once a minute and five times a day per person.',
+  })
+  @CheckAbility({ action: 'update', subject: 'Guardian' })
+  async resendGuardianSignInDetails(
+    @Args('guardianProfileId', { type: () => ID }) guardianProfileId: string,
+  ): Promise<boolean> {
+    return this.guardianService.resendSignInDetails(guardianProfileId);
+  }
+
   @Mutation(() => Boolean, { description: 'Soft-delete a guardian' })
   @CheckAbility({ action: 'delete', subject: 'Guardian' })
   async deleteGuardian(@Args('id', { type: () => ID }) id: string): Promise<boolean> {

@@ -88,6 +88,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useFormDraft } from '../../../../../../../hooks/use-form-draft';
+import { ResendSignInDetailsButton, SignInStatusBadge } from '../../sign-in-details';
 import {
   type StaffDetailNode,
   type StaffQualificationNode,
@@ -373,6 +374,19 @@ function StaffHeader({ staff, onBack }: { staff: StaffDetailNode; onBack: () => 
                 {t('detail.sidebar.classTeacher')}
               </Badge>
             ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <SignInStatusBadge
+              profileId={staff.id}
+              status={staff.signInStatus}
+              sentAt={staff.signInDetailsSentAt}
+            />
+            <ResendSignInDetailsButton
+              kind="staff"
+              profileId={staff.id}
+              status={staff.signInStatus}
+              name={fullName}
+            />
           </div>
         </div>
         <Can I="read" a="Timetable">

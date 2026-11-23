@@ -1373,6 +1373,12 @@ export const testIds = {
     unlinkLastGuardianNotice: 'guardian-unlink-last-guardian-notice',
     unlinkConfirmBtn: 'guardian-unlink-confirm-btn',
     unlinkCancelBtn: 'guardian-unlink-cancel-btn',
+    // Sign-in details (staff and guardians)
+    signInStatus: (profileId: string) => `sign-in-status-${profileId}`,
+    resendSignInBtn: 'sign-in-resend-btn',
+    resendSignInDialog: 'sign-in-resend-dialog',
+    resendSignInConfirmBtn: 'sign-in-resend-confirm-btn',
+    resendSignInCancelBtn: 'sign-in-resend-cancel-btn',
   },
 
   // ── Institute: people → staff ──────────────────────────────────────────

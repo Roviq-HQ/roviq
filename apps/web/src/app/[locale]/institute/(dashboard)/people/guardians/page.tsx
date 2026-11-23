@@ -24,6 +24,7 @@ import { Plus, Search, SearchX, Users, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { parseAsString, useQueryStates } from 'nuqs';
 import * as React from 'react';
+import { SignInStatusBadge } from '../sign-in-details';
 import { type GuardianListNode, useGuardians } from './use-guardians';
 
 const { instituteGuardians } = testIds;
@@ -42,6 +43,7 @@ const filterParsers = {
  */
 export default function GuardiansPage() {
   const t = useTranslations('guardians');
+  const tSignIn = useTranslations('signInDetails');
   const tCommon = useTranslations('common');
   const resolveI18n = useI18nField();
   const { format: formatNumber } = useFormatNumber();
@@ -117,6 +119,17 @@ export default function GuardiansPage() {
           ),
       },
       {
+        accessorKey: 'signInStatus',
+        header: tSignIn('column'),
+        cell: ({ row }) => (
+          <SignInStatusBadge
+            profileId={row.original.id}
+            status={row.original.signInStatus}
+            sentAt={row.original.signInDetailsSentAt}
+          />
+        ),
+      },
+      {
         accessorKey: 'linkedStudentCount',
         header: t('columns.linkedStudents'),
         cell: ({ row }) => (
@@ -166,7 +179,7 @@ export default function GuardiansPage() {
         ),
       },
     ],
-    [t, fullName, initials, formatNumber],
+    [t, tSignIn, fullName, initials, formatNumber],
   );
 
   const hasFilters = Boolean(filters.search);

@@ -90,6 +90,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { PersonNameLink, usePersonDetailContext } from '../../person-detail-dialog';
+import { ResendSignInDetailsButton, SignInStatusBadge } from '../../sign-in-details';
 import { UnlinkGuardianButton } from '../../unlink-guardian-dialog';
 import { useLinkErrorMessage } from '../../use-link-error-message';
 import {
@@ -347,6 +348,17 @@ function GuardianSidebar({
               <div className="text-sm text-muted-foreground">{guardian.occupation}</div>
             ) : null}
           </div>
+          <SignInStatusBadge
+            profileId={guardian.id}
+            status={guardian.signInStatus}
+            sentAt={guardian.signInDetailsSentAt}
+          />
+          <ResendSignInDetailsButton
+            kind="guardian"
+            profileId={guardian.id}
+            status={guardian.signInStatus}
+            name={fullName}
+          />
           <Separator />
           <div className="w-full space-y-2 text-sm">
             <div className="flex items-center justify-between">

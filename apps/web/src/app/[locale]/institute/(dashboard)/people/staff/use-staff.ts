@@ -43,6 +43,8 @@ const STAFF_LIST_FIELDS = `
   createdAt
   updatedAt
   version
+  signInStatus
+  signInDetailsSentAt
 `;
 
 const STAFF_LIST_QUERY = gql`
@@ -120,6 +122,21 @@ export function useUpdateStaffMember() {
   >(UPDATE_STAFF, {
     refetchQueries: ['InstituteStaff', 'InstituteStaffMember'],
   });
+}
+
+// ─── Sign-in details (ROV-315) ───────────────────────────────────────────
+
+const RESEND_STAFF_SIGN_IN_DETAILS = gql`
+  mutation ResendStaffSignInDetails($staffProfileId: ID!) {
+    resendStaffSignInDetails(staffProfileId: $staffProfileId)
+  }
+`;
+
+export function useResendStaffSignInDetails() {
+  return useMutation<{ resendStaffSignInDetails: boolean }, { staffProfileId: string }>(
+    RESEND_STAFF_SIGN_IN_DETAILS,
+    { refetchQueries: ['InstituteStaff', 'InstituteStaffMember'] },
+  );
 }
 
 // ─── Qualifications ──────────────────────────────────────────────────────

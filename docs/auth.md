@@ -392,6 +392,21 @@ Institute services (student, staff, guardian, admission, …) and Temporal activ
 
 This gives us one place to enforce password policy, audit the creation event, and (in future) plug in passkey provisioning. Reviews should reject any new `db.insert(users)` / `db.insert(memberships)` outside `auth/identity.service.ts`.
 
+## Sign-in details for staff and guardians (ROV-315)
+
+A staff member or guardian the institute creates gets a new account and is sent its Roviq ID and temporary password. `SignInDetailsService` (`apps/api-gateway/src/institute/sign-in-details/`) does the sending.
+
+- **When**: on `createStaffMember`, on `createGuardian`, and when the admission workflow creates a guardian. Nothing is sent when the workflow links an existing guardian (a sibling's parent found by phone): that person already has a password.
+- **Where**: only to real addresses. A `…@roviq.placeholder` email (`isPlaceholderEmail`) is dropped, so `UserCreatedEvent.email` may be null. A person with neither a real email nor a phone gets nothing.
+- **Message**: with scope `institute` the copy names the institute and the sign-in page, `INSTITUTE_PORTAL_URL` (default `http://localhost:<WEB_PORT>`) plus `/login`. The first institute admin gets the same copy.
+- **Resend**: `resendStaffSignInDetails(staffProfileId)` (`update Staff`) and `resendGuardianSignInDetails(guardianProfileId)` (`update Guardian`). The profile is read through its live view under `withTenant`, so another institute's id answers `STAFF_NOT_FOUND` / `GUARDIAN_NOT_FOUND`. Then, in order:
+  - no real address → `SIGN_IN_CONTACT_MISSING` (422);
+  - the person has set a password → `SIGN_IN_ALREADY_COMPLETED` (409);
+  - more than one per person per minute or five per day → `TOO_MANY_REQUESTS` (Redis `auth:sign-in-resend:<userId>:minute` / `:day`);
+  - `IdentityService.reissueTempPassword` sets a new temporary password, ends the old one's sessions, and returns null if the person set a password meanwhile (→ `SIGN_IN_ALREADY_COMPLETED`).
+- **Status**: `Staff` and `Guardian` carry `signInStatus` (`SIGNED_IN`, `DETAILS_SENT`, `SEND_FAILED`, `NOT_SENT_NO_CONTACT`, `NOT_SENT`) and `signInDetailsSentAt`. They come from `users.must_change_password` and the latest `USER_WELCOME` row per channel in `notification_deliveries` for this institute, read in two queries per list.
+- The temporary password is never in a GraphQL response, a log line, an audit row or a stored notification.
+
 ## People and phone numbers (ROV-292)
 
 A mobile number is not a person: one parent's number is on several children, numbers are recycled, and front-desk staff type what the form says. So a typed number never identifies an account.

@@ -541,7 +541,8 @@ export class IdentityService {
   sendWelcomeNotification(payload: {
     userId: string;
     username: string;
-    email: string;
+    /** Null when the account has no real address; a placeholder address must never be passed. */
+    email: string | null;
     phone?: { countryCode: string; number: string };
     firstName?: string;
     lastName?: string;

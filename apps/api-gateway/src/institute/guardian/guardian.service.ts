@@ -34,6 +34,9 @@ import { getRequestContext } from '@roviq/request-context';
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import { ensureTenantUserProfile, updateTenantUserProfile } from '../../auth/tenant-user-profile';
+import { SignInDetailsService } from '../sign-in-details/sign-in-details.service';
+import { withSignInStates } from '../sign-in-details/sign-in-status';
+import { englishOrFirst, readSignInTarget } from '../sign-in-details/sign-in-target';
 import type { CreateGuardianInput } from './dto/create-guardian.input';
 import type {
   LinkGuardianInput,
@@ -49,6 +52,7 @@ export class GuardianService {
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
+    private readonly signInDetails: SignInDetailsService,
   ) {}
 
   private get tenantId(): string {
@@ -105,7 +109,7 @@ export class GuardianService {
       this.db,
       mkInstituteCtx(tenantId, 'service:guardian'),
       async (tx) => {
-        return tx
+        const found = await tx
           .select(this.guardianSelect())
           .from(guardianProfilesLive)
           .innerJoin(
@@ -124,6 +128,7 @@ export class GuardianService {
           )
           .where(eq(guardianProfilesLive.id, id))
           .limit(1);
+        return withSignInStates(tx, tenantId, found);
       },
     );
     if (rows.length === 0)
@@ -144,7 +149,7 @@ export class GuardianService {
     const username = `guardian-${tenantId.slice(0, 8)}-${suffix}`;
 
     // The typed number is stored as unverified contact data, whoever else also holds it.
-    const { userId: newUserId } = await this.identityService.createUser({
+    const { userId: newUserId, tempPassword } = await this.identityService.createUser({
       email,
       username,
       phone,
@@ -232,6 +237,17 @@ export class GuardianService {
       },
     );
 
+    this.signInDetails.sendOnCreate({
+      tenantId,
+      userId: newUser.id,
+      username,
+      email: input.email,
+      phone,
+      firstName: englishOrFirst(input.firstName),
+      lastName: englishOrFirst(input.lastName),
+      tempPassword,
+    });
+
     if (input.studentProfileId && input.relationship) {
       await this.linkToStudent({
         guardianProfileId: profile.id,
@@ -244,6 +260,27 @@ export class GuardianService {
     // Re-fetch via findById so the response includes the joined name/photo
     // columns populated from the institute's profile copy (mirrors student.service pattern).
     return this.findById(profile.id);
+  }
+
+  /** New temporary password for a guardian of this institute who has not signed in yet. */
+  async resendSignInDetails(id: string): Promise<boolean> {
+    const tenantId = this.tenantId;
+    const target = await withTenant(
+      this.db,
+      mkInstituteCtx(tenantId, 'service:guardian'),
+      async (tx) => {
+        const [profile] = await tx
+          .select({ userId: guardianProfilesLive.userId })
+          .from(guardianProfilesLive)
+          .where(eq(guardianProfilesLive.id, id))
+          .limit(1);
+        return profile ? readSignInTarget(tx, tenantId, profile.userId) : null;
+      },
+    );
+    if (!target)
+      throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian profile ${id} not found`);
+    await this.signInDetails.resend(tenantId, target, this.userId);
+    return true;
   }
 
   async update(

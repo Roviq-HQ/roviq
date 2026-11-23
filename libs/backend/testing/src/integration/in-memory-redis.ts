@@ -4,7 +4,7 @@ import type { Redis } from 'ioredis';
 /**
  * Redis stand-in that actually stores values, for integration tests of flows
  * that read back what they wrote (one-time codes, OTP requests, tickets).
- * Covers the string commands those flows use; expiry is honoured lazily.
+ * Covers the string commands those flows use (SET honours EX and NX); expiry is honoured lazily.
  */
 export function createInMemoryRedis(): Redis {
   const store = new Map<string, { value: string; expiresAt: number | null }>();
@@ -28,6 +28,7 @@ export function createInMemoryRedis(): Redis {
   return createMock<Redis>({
     get: async (key: string) => live(key)?.value ?? null,
     set: async (key: string, value: string | number, ...args: unknown[]) => {
+      if (args.includes('NX') && live(key)) return null;
       store.set(key, { value: String(value), expiresAt: expiryFrom(args) });
       return 'OK';
     },

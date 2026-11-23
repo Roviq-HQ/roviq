@@ -57,6 +57,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Boolean existence check for a number the caller typed for a new account; refusing a taken number is what keeps the welcome from going to another person’s phone.',
   'apps/api-gateway/src/auth/identity.service.ts#IdentityService.isUsernameTaken':
     'Boolean existence check; the reseller invite answers every unusable address with one error code.',
+  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.reissueTempPassword':
+    'The resend mutations pass the user id read from the staff or guardian profile through its live view under withTenant with the caller’s tenant, so another institute’s profile id answers STAFF_NOT_FOUND or GUARDIAN_NOT_FOUND first (sign-in-details.integration.spec.ts); the update only touches a user who has never set a password.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertActiveResellerMembership':
     'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
   'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertStillAuthorized':

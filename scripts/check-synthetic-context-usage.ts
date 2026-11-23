@@ -64,6 +64,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/__tests__/year-end-promotion.integration.spec.ts',
   // ROV-322: integration fixtures (years, classes, records, groups) and the write-mode rollover.
   'apps/api-gateway/src/institute/student/__tests__/student-placement-correction.integration.spec.ts',
+  // ROV-315: integration fixtures (users, delivery rows) and the leak check over audit and notification tables.
+  'apps/api-gateway/src/institute/sign-in-details/__tests__/sign-in-details.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
   'apps/api-gateway/src/admin/user/__tests__/admin-user.integration.spec.ts',
   'apps/api-gateway/src/admin/reseller/admin-reseller.service.ts',

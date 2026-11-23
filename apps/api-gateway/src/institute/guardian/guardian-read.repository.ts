@@ -16,6 +16,7 @@ import {
 } from '@roviq/database';
 import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { nameStartsWith } from '../../common/name-search';
+import { withSignInStates } from '../sign-in-details/sign-in-status';
 import { activeAcademicYearIds, studentReadPredicate } from '../student/student-read-predicate';
 import type { ListGuardiansFilterInput } from './dto/list-guardians-filter.input';
 import { guardianLinkedReadPredicate, guardianReadPredicate } from './guardian-read-predicate';
@@ -57,7 +58,7 @@ export class GuardianReadRepository {
 
   async findById(id: string, access: InstituteReadAccess) {
     const rows = await withTenant(this.db, access.user, async (tx) => {
-      return tx
+      const found = await tx
         .select(this.guardianSelect(access))
         .from(guardianProfilesLive)
         .innerJoin(
@@ -76,6 +77,7 @@ export class GuardianReadRepository {
         )
         .where(and(eq(guardianProfilesLive.id, id), guardianReadPredicate(access.ability)))
         .limit(1);
+      return withSignInStates(tx, access.user.tenantId, found);
     });
     if (rows.length === 0)
       throw new BusinessException(ErrorCode.GUARDIAN_NOT_FOUND, `Guardian profile ${id} not found`);
@@ -111,7 +113,10 @@ export class GuardianReadRepository {
           )
         : undefined;
 
-      return baseQuery.where(and(searchClause, guardianReadPredicate(access.ability))).limit(200);
+      const rows = await baseQuery
+        .where(and(searchClause, guardianReadPredicate(access.ability)))
+        .limit(200);
+      return withSignInStates(tx, access.user.tenantId, rows);
     });
   }
 

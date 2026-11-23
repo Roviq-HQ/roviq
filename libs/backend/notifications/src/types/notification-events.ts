@@ -115,7 +115,8 @@ export interface UserCreatedEvent {
   tenantId: string | null;
   resellerId: string | null;
   username: string;
-  email: string;
+  /** Null when the account has no real address; the email is then not sent. */
+  email: string | null;
   /** Primary phone with country-code prefix (e.g. '+918888888888'), null if none provided */
   phone: string | null;
   firstName: string | null;
