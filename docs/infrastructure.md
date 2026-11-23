@@ -157,6 +157,14 @@ Things to know:
   or export `TILT_PORT`. Claude Code sessions opened in the worktree have it set already.
 - Browser cookies on `localhost` are shared across ports. Use a separate browser profile per instance. The Playwright MCP browser already has one per Claude session (`PLAYWRIGHT_MCP_ISOLATED` in `.claude/settings.json`).
 - Unset `NX_WORKSPACE_ROOT_PATH` in a worktree's shell if it is set, or Nx uses the main checkout.
+- **Reusing a stale slot.** When every slot has a worktree, reuse one that is stale: its branch's
+  PR is merged (or `git rev-list --count origin/main..HEAD` is 0), `git status --short` is empty,
+  and its Tilt does not answer (`pnpm tilt get uiresources` fails). In that checkout:
+  `git fetch origin`, `git switch -c <branch> origin/main`, `pnpm install`, `pnpm tilt up`. A slot
+  with unmerged commits or uncommitted files is not stale, however old: leave it, and if every
+  slot is in real use, tell the user.
+- A `../roviq-<slot>` folder that is not a worktree (left behind by containers, owned by root)
+  blocks `pnpm instance:new` for that slot. Use another slot and tell the user.
 - Remove an instance with `pnpm tilt down`, `docker compose -p roviq-<slot> down -v`, then
   `git worktree remove ../roviq-<slot>`.
 

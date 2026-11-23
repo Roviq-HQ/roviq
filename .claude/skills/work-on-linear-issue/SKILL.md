@@ -27,7 +27,7 @@ description: Use when starting work on a Linear issue — provides the full work
 - Write tests (unit: `*.spec.ts`, integration: `*.integration.test.ts`)
 - Run issue's Verification commands, compare to expected output
 - Run the full pre-commit gate (see Hard Rules in CLAUDE.md)
-- **Browser-verify without being asked**: drive every touched code path in the running app, backend-only changes included (root `CLAUDE.md` → "Browser Verification")
+- **Browser-verify without being asked**: drive every touched code path in the running app, backend-only changes included (`docs/working-method.md` → "Browser pass")
 - `git diff | grep -i "school"` — zero results
 - **When e2e/UI tests fail**: Use the Playwright MCP tool to debug interactively — take screenshots, inspect DOM snapshots, check console messages, and trace network requests to identify the root cause before changing code
 
@@ -36,10 +36,10 @@ description: Use when starting work on a Linear issue — provides the full work
 - `git diff --stat` — only files related to this issue
 
 ## 6. Prepare Manual Acceptance
-- Follow **Manual acceptance handoff** in root `CLAUDE.md`: ready-made local-dev fixtures inserted in seconds, verified logins, and a Linear checklist with credentials, record links, actions and exact expected results.
+- Follow `docs/working-method.md` → "Manual acceptance handoff": ready-made local-dev fixtures inserted in seconds, verified logins, and a Linear checklist with credentials, record links, actions and exact expected results.
 - Prepare the fixture insert during implementation. Reuse the running environment; the user should do no setup.
 - Keep one-time review tooling out of the feature commit and remove it after completed review. Preserve regression tests; do not delete DB fixtures without a request.
 
 ## 7. Report
 - Summarize changes, list files, show test results, note concerns
-- Browser-verify every touched code path yourself before reporting (root `CLAUDE.md` → "Browser Verification"), then commit under the [NACPR] rule. Never hand the commit back because the browser pass was skipped
+- Browser-verify every touched code path yourself before reporting (`docs/working-method.md` → "Browser pass"), then commit under the [NACPR] rule. Never hand the commit back because the browser pass was skipped
