@@ -14,21 +14,22 @@ import {
   AuditInstitute,
   markedAuditInstitute,
   NoAudit,
+  redactAuditMasked,
 } from '@roviq/audit';
 import { type AuthUser, isSyntheticContext } from '@roviq/common-types';
 import { catchError, type Observable, tap } from 'rxjs';
 import { extractActionType, extractEntityType } from './audit.helpers';
 
 /**
- * JSON-safe serialization of mutation args.
- * BigInt values (e.g., billing paise amounts) are converted to strings
- * since JSON.stringify throws on BigInt.
+ * JSON-safe copy of the mutation args for the audit row: fields marked `@AuditMask()` are
+ * redacted, and BigInt values (billing paise amounts) become strings.
  */
 function safeSerializeArgs(args: unknown): Record<string, unknown> | null {
   try {
-    return JSON.parse(
-      JSON.stringify(args, (_key, value) => (typeof value === 'bigint' ? value.toString() : value)),
-    );
+    const redacted = redactAuditMasked(args);
+    return typeof redacted === 'object' && redacted !== null && !Array.isArray(redacted)
+      ? { ...redacted }
+      : null;
   } catch {
     return null;
   }

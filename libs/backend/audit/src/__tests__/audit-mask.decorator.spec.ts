@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AuditMask, getAuditMaskedFields } from '../decorators/audit-mask.decorator';
+import {
+  AuditMask,
+  getAuditMaskedFields,
+  redactAuditMasked,
+} from '../decorators/audit-mask.decorator';
 
 describe('AuditMask decorator', () => {
   it('returns masked field names for a decorated class', () => {
@@ -47,5 +51,45 @@ describe('AuditMask decorator', () => {
 
     expect(getAuditMaskedFields(InputA)).toEqual(['secret']);
     expect(getAuditMaskedFields(InputB)).toEqual([]);
+  });
+
+  describe('redactAuditMasked', () => {
+    class SenderInput {
+      @AuditMask()
+      spyToken!: string;
+
+      @AuditMask()
+      spyCredentials!: Record<string, string>;
+
+      label!: string;
+    }
+
+    it('redacts a masked field at any depth and leaves the rest', () => {
+      expect(SenderInput).toBeDefined();
+      const redacted = redactAuditMasked({
+        input: { spyToken: 'tok-123', label: 'Front desk', nested: [{ spyToken: 'tok-456' }] },
+        spyToken: 'bare-argument',
+      });
+
+      expect(redacted).toEqual({
+        input: {
+          spyToken: '[REDACTED]',
+          label: 'Front desk',
+          nested: [{ spyToken: '[REDACTED]' }],
+        },
+        spyToken: '[REDACTED]',
+      });
+      expect(JSON.stringify(redacted)).not.toMatch(/tok-|bare-argument/);
+    });
+
+    it('redacts a masked object whole, keeps null, and writes bigint as a string', () => {
+      expect(
+        redactAuditMasked({
+          spyCredentials: { clientId: 'id', clientSecret: 'shh' },
+          spyToken: null,
+          amountPaise: 150000n,
+        }),
+      ).toEqual({ spyCredentials: '[REDACTED]', spyToken: null, amountPaise: '150000' });
+    });
   });
 });
