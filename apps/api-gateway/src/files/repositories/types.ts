@@ -73,3 +73,20 @@ export interface StorageUsageRecord {
   /** Declared size of uploads started and not yet attached or expired. */
   pendingBytes: number;
 }
+
+/** Outcome of replacing a profile picture in one transaction. */
+export type ProfilePhotoChange = 'not_found' | 'unchanged' | 'updated';
+
+export interface SetOwnProfilePhotoData {
+  userId: string;
+  fileId: string | null;
+  purpose: FilePurpose;
+}
+
+export interface SetInstituteProfilePhotoData {
+  tenantId: string;
+  actorId: string;
+  targetUserId: string;
+  fileId: string | null;
+  purpose: FilePurpose;
+}

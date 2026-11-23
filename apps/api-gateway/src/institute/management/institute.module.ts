@@ -10,9 +10,10 @@ import { InstituteFirstAdminFieldResolver } from './institute-first-admin.resolv
 import { InstituteRepositoryModule } from './repositories/institute-repository.module';
 import { InstituteSeederService } from './seed/institute-seeder.service';
 import { InstituteSetupService } from './seed/institute-setup.service';
+import { SeedRepositoryModule } from './seed/repositories/seed-repository.module';
 
 @Module({
-  imports: [InstituteRepositoryModule, FilesModule, AuthModule],
+  imports: [InstituteRepositoryModule, SeedRepositoryModule, FilesModule, AuthModule],
   providers: [
     InstituteService,
     InstituteResolver,

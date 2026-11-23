@@ -14,6 +14,7 @@ import { EntitlementCacheConsumer } from './entitlement-cache.consumer';
 import { InstituteBillingResolver } from './institute/institute-billing.resolver';
 import { InvoiceFieldResolver } from './invoice-field.resolver';
 import { PlanFieldResolver } from './plan-field.resolver';
+import { DashboardRepository } from './repositories/dashboard.repository';
 import { GatewayConfigRepository } from './repositories/gateway-config.repository';
 import { InvoiceRepository } from './repositories/invoice.repository';
 import { PaymentRepository } from './repositories/payment.repository';
@@ -45,6 +46,7 @@ import { BillingWorkerService } from './workflows/billing.worker';
     InvoiceRepository,
     PaymentRepository,
     GatewayConfigRepository,
+    DashboardRepository,
     BillingService,
     PlanService,
     SubscriptionService,

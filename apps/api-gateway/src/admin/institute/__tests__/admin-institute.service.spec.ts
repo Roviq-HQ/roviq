@@ -2,12 +2,12 @@ import { ConfigService } from '@nestjs/config';
 import { ErrorCode, ResellerStatus } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
-import { getTableName } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstituteService } from '../../../institute/management/institute.service';
 import { InstituteRepository } from '../../../institute/management/repositories/institute.repository';
 import type { InstituteRecord } from '../../../institute/management/repositories/types';
 import { AdminInstituteService } from '../admin-institute.service';
+import { AdminInstituteRepository } from '../repositories/admin-institute.repository';
 
 // ── Temporal mock — fire-and-forget path just logs the warning ────────────────
 
@@ -15,107 +15,6 @@ vi.mock('@temporalio/client', () => ({
   Connection: { connect: vi.fn().mockRejectedValue(new Error('temporal unavailable')) },
   Client: vi.fn(),
 }));
-
-// ── Drizzle withAdmin mock ────────────────────────────────────────────────────
-
-/**
- * Per-table row registry used by the select chain. Tests populate this before
- * calling the service method so any `tx.select().from(table)…` inside `withAdmin`
- * resolves to the staged rows.
- */
-interface TxStages {
-  /** Rows to return for each table, keyed by Drizzle table name. */
-  tableRows?: Record<string, unknown[]>;
-  /** Set of (tableName) whose `update().set().where().returning()` result to capture. */
-  trackUpdates?: string[];
-}
-
-function createTxMock(stages: TxStages = {}) {
-  const calls = {
-    updates: {} as Record<string, { values: Record<string, unknown> }[]>,
-  };
-
-  for (const t of stages.trackUpdates ?? []) {
-    calls.updates[t] = [];
-  }
-
-  // After the live-views migration, services may read from `<table>_live`
-  // views instead of the base table. Fixtures stay keyed by base name; if a
-  // view is queried, fall back to the underlying base table's rows.
-  const resolveRows = (tableName: string): unknown[] => {
-    const direct = stages.tableRows?.[tableName];
-    if (direct) return direct;
-    if (tableName.endsWith('_live')) {
-      return stages.tableRows?.[tableName.slice(0, -5)] ?? [];
-    }
-    return [];
-  };
-
-  /**
-   * Returns a real Promise augmented with fluent chaining methods.
-   * Every method (where / limit / orderBy) returns the same Promise so callers
-   * can chain arbitrarily before awaiting. Using Object.assign on a real Promise
-   * avoids the `noThenProperty` rule that fires on plain object literals.
-   */
-  function makeChain(rows: unknown[]) {
-    const p = Promise.resolve(rows);
-    const noop = () => p;
-    return Object.assign(p, {
-      where: noop,
-      limit: noop,
-      orderBy: noop,
-      returning: () => Promise.resolve(rows),
-    });
-  }
-
-  const tx = {
-    select: vi.fn(() => ({
-      from: (table: unknown) => {
-        const name =
-          typeof table === 'object' && table !== null ? getTableName(table as never) : '';
-        return makeChain(resolveRows(name));
-      },
-    })),
-    update: vi.fn((table: unknown) => {
-      const name = typeof table === 'object' && table !== null ? getTableName(table as never) : '';
-      return {
-        set: (values: Record<string, unknown>) => ({
-          where: (_cond: unknown) => {
-            if (name in calls.updates) {
-              calls.updates[name].push({ values });
-            }
-            const rows = resolveRows(name);
-            return Object.assign(Promise.resolve(), {
-              returning: () =>
-                Promise.resolve(
-                  rows.length ? [{ ...(rows[0] as Record<string, unknown>), ...values }] : [],
-                ),
-            });
-          },
-        }),
-      };
-    }),
-  };
-
-  return { tx, calls };
-}
-
-vi.mock('@roviq/database', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@roviq/database')>();
-  return {
-    ...actual,
-    withAdmin: vi.fn(
-      async (_db: unknown, ctxOrFn: unknown, fnArg?: (tx: unknown) => Promise<unknown>) => {
-        const fn =
-          typeof ctxOrFn === 'function'
-            ? (ctxOrFn as (tx: unknown) => Promise<unknown>)
-            : (fnArg as (tx: unknown) => Promise<unknown>);
-        const tx = (globalThis as { __rovInstTx?: unknown }).__rovInstTx;
-        return fn(tx);
-      },
-    ),
-  };
-});
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -164,10 +63,6 @@ function makeInstituteRecord(overrides: Partial<InstituteRecord> = {}): Institut
   };
 }
 
-function setTx(tx: unknown) {
-  (globalThis as { __rovInstTx?: unknown }).__rovInstTx = tx;
-}
-
 // ── Test setup ────────────────────────────────────────────────────────────────
 
 describe('AdminInstituteService', () => {
@@ -176,6 +71,7 @@ describe('AdminInstituteService', () => {
   let instituteRepo: InstituteRepository;
   let eventBus: EventBusService;
   let configService: ConfigService;
+  let adminRepo: AdminInstituteRepository;
 
   beforeEach(() => {
     instituteService = createMock<InstituteService>({
@@ -198,12 +94,19 @@ describe('AdminInstituteService', () => {
       get: vi.fn().mockReturnValue('localhost:7233'),
     });
 
+    adminRepo = createMock<AdminInstituteRepository>({
+      findReseller: vi.fn().mockResolvedValue(null),
+      instituteGroupExists: vi.fn().mockResolvedValue(false),
+      findAcademicTreeRows: vi.fn().mockResolvedValue({ academicYearId: null }),
+      findPrimaryBoard: vi.fn().mockResolvedValue(undefined),
+    });
+
     service = new AdminInstituteService(
       instituteService,
       instituteRepo,
       eventBus,
       configService,
-      {} as never, // DrizzleDB — only used inside withAdmin which is mocked
+      adminRepo,
     );
   });
 
@@ -211,8 +114,7 @@ describe('AdminInstituteService', () => {
 
   describe('reassignReseller', () => {
     it('throws RESELLER_INVALID when target reseller is not found', async () => {
-      const { tx } = createTxMock({ tableRows: { resellers: [] } });
-      setTx(tx);
+      vi.mocked(adminRepo.findReseller).mockResolvedValue(null);
 
       await expect(service.reassignReseller(INSTITUTE_ID, NEW_RESELLER_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_INVALID,
@@ -221,12 +123,11 @@ describe('AdminInstituteService', () => {
     });
 
     it('throws RESELLER_INVALID when target reseller is not active', async () => {
-      const { tx } = createTxMock({
-        tableRows: {
-          resellers: [{ id: NEW_RESELLER_ID, status: ResellerStatus.SUSPENDED, isActive: false }],
-        },
+      vi.mocked(adminRepo.findReseller).mockResolvedValue({
+        id: NEW_RESELLER_ID,
+        status: ResellerStatus.SUSPENDED,
+        isActive: false,
       });
-      setTx(tx);
 
       await expect(service.reassignReseller(INSTITUTE_ID, NEW_RESELLER_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_INVALID,
@@ -235,12 +136,11 @@ describe('AdminInstituteService', () => {
     });
 
     it('throws RESELLER_INVALID when reseller status is ACTIVE but isActive=false', async () => {
-      const { tx } = createTxMock({
-        tableRows: {
-          resellers: [{ id: NEW_RESELLER_ID, status: ResellerStatus.ACTIVE, isActive: false }],
-        },
+      vi.mocked(adminRepo.findReseller).mockResolvedValue({
+        id: NEW_RESELLER_ID,
+        status: ResellerStatus.ACTIVE,
+        isActive: false,
       });
-      setTx(tx);
 
       await expect(service.reassignReseller(INSTITUTE_ID, NEW_RESELLER_ID)).rejects.toMatchObject({
         code: ErrorCode.RESELLER_INVALID,
@@ -248,12 +148,11 @@ describe('AdminInstituteService', () => {
     });
 
     it('updates ownership and emits INSTITUTE.reseller_reassigned on success', async () => {
-      const { tx } = createTxMock({
-        tableRows: {
-          resellers: [{ id: NEW_RESELLER_ID, status: ResellerStatus.ACTIVE, isActive: true }],
-        },
+      vi.mocked(adminRepo.findReseller).mockResolvedValue({
+        id: NEW_RESELLER_ID,
+        status: ResellerStatus.ACTIVE,
+        isActive: true,
       });
-      setTx(tx);
 
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ resellerId: RESELLER_ID }),
@@ -281,8 +180,7 @@ describe('AdminInstituteService', () => {
 
   describe('assignGroup', () => {
     it('rejects when group does not exist', async () => {
-      const { tx } = createTxMock({ tableRows: { institute_groups: [] } });
-      setTx(tx);
+      vi.mocked(adminRepo.instituteGroupExists).mockResolvedValue(false);
 
       await expect(service.assignGroup(INSTITUTE_ID, GROUP_ID)).rejects.toMatchObject({
         code: ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
@@ -291,8 +189,7 @@ describe('AdminInstituteService', () => {
     });
 
     it('assigns group and emits INSTITUTE.group_assigned', async () => {
-      const { tx } = createTxMock({ tableRows: { institute_groups: [{ id: GROUP_ID }] } });
-      setTx(tx);
+      vi.mocked(adminRepo.instituteGroupExists).mockResolvedValue(true);
 
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ groupId: null }),
@@ -317,8 +214,7 @@ describe('AdminInstituteService', () => {
 
     it('carries previous groupId in the event when reassigning between groups', async () => {
       const OLD_GROUP = 'eeeeeeee-eeee-4eee-eeee-eeeeeeeeeeee';
-      const { tx } = createTxMock({ tableRows: { institute_groups: [{ id: GROUP_ID }] } });
-      setTx(tx);
+      vi.mocked(adminRepo.instituteGroupExists).mockResolvedValue(true);
 
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ groupId: OLD_GROUP }),
@@ -340,9 +236,6 @@ describe('AdminInstituteService', () => {
 
   describe('removeGroup', () => {
     it('sets groupId to null and emits INSTITUTE.group_removed', async () => {
-      const { tx } = createTxMock({});
-      setTx(tx);
-
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ groupId: GROUP_ID }),
       );
@@ -364,9 +257,6 @@ describe('AdminInstituteService', () => {
 
   describe('retrySetup', () => {
     it('throws SETUP_NOT_COMPLETE (idempotency) when setup is already COMPLETED', async () => {
-      const { tx } = createTxMock({});
-      setTx(tx);
-
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ setupStatus: 'COMPLETED' }),
       );
@@ -378,10 +268,7 @@ describe('AdminInstituteService', () => {
     });
 
     it('triggers workflow (fire-and-forget) and emits INSTITUTE.setup_retry_triggered when setupStatus is not COMPLETED', async () => {
-      const { tx } = createTxMock({
-        tableRows: { institute_affiliations: [] }, // loadPrimaryBoard → no rows
-      });
-      setTx(tx);
+      vi.mocked(adminRepo.findPrimaryBoard).mockResolvedValue(undefined);
 
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ setupStatus: 'FAILED' }),
@@ -397,8 +284,7 @@ describe('AdminInstituteService', () => {
     });
 
     it('still resolves even if Temporal is unreachable', async () => {
-      const { tx } = createTxMock({ tableRows: { institute_affiliations: [] } });
-      setTx(tx);
+      vi.mocked(adminRepo.findPrimaryBoard).mockResolvedValue(undefined);
 
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ setupStatus: 'IN_PROGRESS' }),
@@ -424,8 +310,7 @@ describe('AdminInstituteService', () => {
     });
 
     it('transitions to PENDING, emits approved + status_changed', async () => {
-      const { tx } = createTxMock({ tableRows: { institute_affiliations: [] } });
-      setTx(tx);
+      vi.mocked(adminRepo.findPrimaryBoard).mockResolvedValue(undefined);
 
       vi.mocked(instituteService.findById).mockResolvedValue(
         makeInstituteRecord({ status: 'PENDING_APPROVAL' }),
@@ -506,8 +391,7 @@ describe('AdminInstituteService', () => {
 
   describe('getAcademicTree', () => {
     it('returns empty standards list when no academic year exists', async () => {
-      const { tx } = createTxMock({ tableRows: { academic_years: [] } });
-      setTx(tx);
+      vi.mocked(adminRepo.findAcademicTreeRows).mockResolvedValue({ academicYearId: null });
 
       const tree = await service.getAcademicTree(INSTITUTE_ID);
 
@@ -522,26 +406,23 @@ describe('AdminInstituteService', () => {
       const SEC_ID = 'e3333333-3333-4333-3333-333333333333';
       const SUBJ_ID = 'u4444444-4444-4444-4444-444444444444';
 
-      const { tx } = createTxMock({
-        tableRows: {
-          academic_years: [{ id: YEAR_ID }],
-          standards: [
-            { id: STD_ID, name: { en: 'Class 5' }, numericOrder: 5, department: 'PRIMARY' },
-          ],
-          sections: [{ id: SEC_ID, name: { en: 'A' }, stream: null, standardId: STD_ID }],
-          standard_subjects: [{ subjectId: SUBJ_ID, standardId: STD_ID }],
-          subjects: [
-            {
-              id: SUBJ_ID,
-              name: 'Mathematics',
-              shortName: 'Math',
-              boardCode: 'CBSE-041',
-              type: 'ACADEMIC',
-            },
-          ],
-        },
+      vi.mocked(adminRepo.findAcademicTreeRows).mockResolvedValue({
+        academicYearId: YEAR_ID,
+        standards: [
+          { id: STD_ID, name: { en: 'Class 5' }, numericOrder: 5, department: 'PRIMARY' },
+        ],
+        sections: [{ id: SEC_ID, name: { en: 'A' }, stream: null, standardId: STD_ID }],
+        standardSubjects: [{ subjectId: SUBJ_ID, standardId: STD_ID }],
+        subjects: [
+          {
+            id: SUBJ_ID,
+            name: 'Mathematics',
+            shortName: 'Math',
+            boardCode: 'CBSE-041',
+            type: 'ACADEMIC',
+          },
+        ],
       });
-      setTx(tx);
 
       const tree = await service.getAcademicTree(INSTITUTE_ID);
 
@@ -563,16 +444,13 @@ describe('AdminInstituteService', () => {
       const STD_ID = 's2222222-2222-4222-2222-222222222222';
       const MISSING_SUBJ = 'missing-subject-id';
 
-      const { tx } = createTxMock({
-        tableRows: {
-          academic_years: [{ id: YEAR_ID }],
-          standards: [{ id: STD_ID, name: { en: 'Class 1' }, numericOrder: 1, department: null }],
-          sections: [],
-          standard_subjects: [{ subjectId: MISSING_SUBJ, standardId: STD_ID }],
-          subjects: [], // subject row is gone
-        },
+      vi.mocked(adminRepo.findAcademicTreeRows).mockResolvedValue({
+        academicYearId: YEAR_ID,
+        standards: [{ id: STD_ID, name: { en: 'Class 1' }, numericOrder: 1, department: null }],
+        sections: [],
+        standardSubjects: [{ subjectId: MISSING_SUBJ, standardId: STD_ID }],
+        subjects: [], // subject row is gone
       });
-      setTx(tx);
 
       const tree = await service.getAcademicTree(INSTITUTE_ID);
 

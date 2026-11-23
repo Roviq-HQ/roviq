@@ -1,18 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  mkInstituteCtx,
-  sections,
-  sectionsLive,
-  standardSubjects,
-  standards,
-  standardsLive,
-  subjects,
-  subjectsLive,
-  withTenant,
-} from '@roviq/database';
-import { and, eq, sql } from 'drizzle-orm';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   BOARD_EXAM_CLASSES,
   BOARD_SUBJECTS,
@@ -22,12 +8,14 @@ import {
   LIBRARY_SECTIONS,
   LIBRARY_STANDARD,
 } from './board-templates';
+import { InstituteSeederRepository } from './repositories/institute-seeder.repository';
+import type { StandardSeed } from './repositories/types';
 
 @Injectable()
 export class InstituteSeederService {
   private readonly logger = new Logger(InstituteSeederService.name);
 
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(private readonly repo: InstituteSeederRepository) {}
 
   /**
    * Seed standards for selected departments using board-appropriate templates.
@@ -40,64 +28,22 @@ export class InstituteSeederService {
     board: string | undefined,
     userId: string,
   ): Promise<string[]> {
-    const createdIds: string[] = [];
+    const seeds: StandardSeed[] = [];
+    for (const dept of departments) {
+      const templates = DEPARTMENT_STANDARDS[dept];
+      if (!templates) {
+        this.logger.warn(`Unknown department: ${dept}, skipping`);
+        continue;
+      }
+      for (const tmpl of templates) {
+        const isBoardExamClass = board
+          ? (BOARD_EXAM_CLASSES[board] ?? []).includes(tmpl.numericOrder)
+          : tmpl.isBoardExamClass;
+        seeds.push({ template: tmpl, isBoardExamClass });
+      }
+    }
 
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'seeder:institute-seeder.service'),
-      async (tx) => {
-        for (const dept of departments) {
-          const templates = DEPARTMENT_STANDARDS[dept];
-          if (!templates) {
-            this.logger.warn(`Unknown department: ${dept}, skipping`);
-            continue;
-          }
-
-          for (const tmpl of templates) {
-            // Idempotency: check if standard already exists
-            const existing = await tx
-              .select({ id: standardsLive.id })
-              .from(standardsLive)
-              .where(
-                and(
-                  eq(standardsLive.academicYearId, academicYearId),
-                  eq(standardsLive.numericOrder, tmpl.numericOrder),
-                ),
-              );
-
-            if (existing.length > 0) {
-              createdIds.push(existing[0].id);
-              continue;
-            }
-
-            const isBoardExam = board
-              ? (BOARD_EXAM_CLASSES[board] ?? []).includes(tmpl.numericOrder)
-              : tmpl.isBoardExamClass;
-
-            const rows = await tx
-              .insert(standards)
-              .values({
-                tenantId,
-                academicYearId,
-                name: { en: tmpl.name },
-                numericOrder: tmpl.numericOrder,
-                level: tmpl.level as (typeof standards.level.enumValues)[number],
-                nepStage: tmpl.nepStage as (typeof standards.nepStage.enumValues)[number],
-                department: tmpl.department,
-                isBoardExamClass: isBoardExam,
-                streamApplicable: tmpl.streamApplicable,
-                udiseClassCode: tmpl.udiseClassCode,
-                maxStudentsPerSection: 40,
-                createdBy: userId,
-                updatedBy: userId,
-              })
-              .returning({ id: standards.id });
-
-            createdIds.push(rows[0].id);
-          }
-        }
-      },
-    );
+    const createdIds = await this.repo.seedStandards(tenantId, academicYearId, userId, seeds);
 
     this.logger.log(`Seeded ${createdIds.length} standards for ${departments.join(', ')}`);
     return createdIds;
@@ -115,52 +61,11 @@ export class InstituteSeederService {
     count = DEFAULT_SECTIONS_PER_STANDARD,
     names = DEFAULT_SECTION_NAMES,
   ): Promise<string[]> {
-    const createdIds: string[] = [];
-
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'seeder:institute-seeder.service'),
-      async (tx) => {
-        for (let i = 0; i < count; i++) {
-          const name = names[i] ?? String.fromCodePoint(65 + i); // A, B, C, D...
-
-          const existing = await tx
-            .select({ id: sectionsLive.id })
-            .from(sectionsLive)
-            .where(
-              and(
-                eq(sectionsLive.standardId, standardId),
-                sql`${sectionsLive.name}->>'en' = ${name}`,
-              ),
-            );
-
-          if (existing.length > 0) {
-            createdIds.push(existing[0].id);
-            continue;
-          }
-
-          const rows = await tx
-            .insert(sections)
-            .values({
-              tenantId,
-              standardId,
-              academicYearId,
-              name: { en: name },
-              displayOrder: i,
-              genderRestriction: 'CO_ED',
-              capacity: 40,
-              currentStrength: 0,
-              createdBy: userId,
-              updatedBy: userId,
-            })
-            .returning({ id: sections.id });
-
-          createdIds.push(rows[0].id);
-        }
-      },
+    const sectionNames = Array.from(
+      { length: count },
+      (_, i) => names[i] ?? String.fromCodePoint(65 + i), // A, B, C, D...
     );
-
-    return createdIds;
+    return this.repo.seedSections(tenantId, standardId, academicYearId, userId, sectionNames);
   }
 
   /**
@@ -179,82 +84,7 @@ export class InstituteSeederService {
       return [];
     }
 
-    const createdIds: string[] = [];
-
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'seeder:institute-seeder.service'),
-      async (tx) => {
-        // Load all standards for this academic year to map numericOrder → id
-        const allStandards = await tx
-          .select({ id: standardsLive.id, numericOrder: standardsLive.numericOrder })
-          .from(standardsLive)
-          .where(eq(standardsLive.academicYearId, academicYearId));
-
-        const orderToId = new Map(allStandards.map((s) => [s.numericOrder, s.id]));
-
-        for (const tmpl of templates) {
-          // Idempotency: check by name + boardCode
-          const existing = await tx
-            .select({ id: subjectsLive.id })
-            .from(subjectsLive)
-            .where(
-              and(
-                eq(subjectsLive.name, tmpl.name),
-                tmpl.boardCode
-                  ? eq(subjectsLive.boardCode, tmpl.boardCode)
-                  : eq(subjectsLive.name, tmpl.name),
-              ),
-            );
-
-          let subjectId: string;
-
-          if (existing.length > 0) {
-            subjectId = existing[0].id;
-          } else {
-            const rows = await tx
-              .insert(subjects)
-              .values({
-                tenantId,
-                name: tmpl.name,
-                shortName: tmpl.shortName,
-                boardCode: tmpl.boardCode,
-                type: tmpl.type as (typeof subjects.type.enumValues)[number],
-                isMandatory: tmpl.isMandatory,
-                hasPractical: tmpl.hasPractical,
-                theoryMarks: tmpl.theoryMarks,
-                practicalMarks: tmpl.practicalMarks,
-                internalMarks: tmpl.internalMarks,
-                isElective: false,
-                createdBy: userId,
-                updatedBy: userId,
-              })
-              .returning({ id: subjects.id });
-
-            subjectId = rows[0].id;
-          }
-
-          createdIds.push(subjectId);
-
-          // Link to applicable standards
-          for (const classNum of tmpl.applicableClasses) {
-            const standardId = orderToId.get(classNum);
-            if (!standardId) continue;
-
-            await tx
-              .insert(standardSubjects)
-              .values({
-                tenantId,
-                subjectId,
-                standardId,
-                createdBy: userId,
-                updatedBy: userId,
-              })
-              .onConflictDoNothing();
-          }
-        }
-      },
-    );
+    const createdIds = await this.repo.seedSubjects(tenantId, academicYearId, userId, templates);
 
     this.logger.log(`Seeded ${createdIds.length} subjects for board ${board}`);
     return createdIds;
@@ -264,39 +94,11 @@ export class InstituteSeederService {
    * Seed library structure: single standard + 2 sections.
    */
   async seedLibrary(tenantId: string, academicYearId: string, userId: string): Promise<void> {
-    let libraryStandardId = '';
-
-    await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'seeder:institute-seeder.service'),
-      async (tx) => {
-        const existing = await tx
-          .select({ id: standardsLive.id })
-          .from(standardsLive)
-          .where(
-            and(
-              eq(standardsLive.academicYearId, academicYearId),
-              sql`${standardsLive.name}->>'en' = ${LIBRARY_STANDARD.name}`,
-            ),
-          );
-
-        if (existing.length > 0) {
-          libraryStandardId = existing[0].id;
-        } else {
-          const rows = await tx
-            .insert(standards)
-            .values({
-              tenantId,
-              academicYearId,
-              name: { en: LIBRARY_STANDARD.name },
-              numericOrder: LIBRARY_STANDARD.numericOrder,
-              createdBy: userId,
-              updatedBy: userId,
-            })
-            .returning({ id: standards.id });
-          libraryStandardId = rows[0].id;
-        }
-      },
+    const libraryStandardId = await this.repo.findOrCreateNamedStandard(
+      tenantId,
+      academicYearId,
+      userId,
+      LIBRARY_STANDARD,
     );
 
     await this.seedSections(

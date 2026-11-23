@@ -1,7 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE_DB, type DrizzleDB, mkResellerCtx, withReseller } from '@roviq/database';
-import { invoices, plans, subscriptions } from '@roviq/ee-database';
-import { and, count, eq, gte } from 'drizzle-orm';
+import { Injectable } from '@nestjs/common';
+import { DashboardRepository } from '../repositories/dashboard.repository';
 
 /** Normalize plan interval to monthly factor */
 const INTERVAL_MONTHLY_FACTOR: Record<string, number> = {
@@ -17,71 +15,37 @@ const INTERVAL_MONTHLY_FACTOR: Record<string, number> = {
 
 @Injectable()
 export class DashboardService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(private readonly repo: DashboardRepository) {}
 
   async getDashboard(resellerId: string) {
-    return withReseller(
-      this.db,
-      mkResellerCtx(resellerId, 'service:reseller-dashboard'),
-      async (tx) => {
-        // MRR: sum of active subscription amounts normalized to monthly
-        const activeSubsWithPlans = await tx
-          .select({
-            amount: plans.amount,
-            interval: plans.interval,
-          })
-          .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id)) // allow-base-read: billing records keep their plan after it is deleted
-          .where(eq(subscriptions.status, 'ACTIVE'));
+    // Churned in last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
+    const { activeSubsWithPlans, statusCounts, churned, overdue } =
+      await this.repo.findDashboardRows(resellerId, thirtyDaysAgo);
 
-        let mrr = 0n;
-        for (const row of activeSubsWithPlans) {
-          const factor = INTERVAL_MONTHLY_FACTOR[row.interval] ?? 1;
-          mrr += BigInt(Math.round(Number(row.amount) * factor));
-        }
+    // MRR: sum of active subscription amounts normalized to monthly
+    let mrr = 0n;
+    for (const row of activeSubsWithPlans) {
+      const factor = INTERVAL_MONTHLY_FACTOR[row.interval] ?? 1;
+      mrr += BigInt(Math.round(Number(row.amount) * factor));
+    }
 
-        // Subscriptions by status
-        const statusCounts = await tx
-          .select({ status: subscriptions.status, count: count() })
-          .from(subscriptions)
-          .groupBy(subscriptions.status);
+    const subscriptionsByStatus: Record<string, number> = {};
+    let activeCount = 0;
+    for (const row of statusCounts) {
+      subscriptionsByStatus[row.status] = row.count;
+      if (row.status === 'ACTIVE') activeCount = row.count;
+    }
 
-        const subscriptionsByStatus: Record<string, number> = {};
-        let activeCount = 0;
-        for (const row of statusCounts) {
-          subscriptionsByStatus[row.status] = row.count;
-          if (row.status === 'ACTIVE') activeCount = row.count;
-        }
+    const churnRate = activeCount + churned > 0 ? churned / (activeCount + churned) : 0;
 
-        // Churned in last 30 days
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
-        const [{ churned }] = await tx
-          .select({ churned: count() })
-          .from(subscriptions)
-          .where(
-            and(
-              eq(subscriptions.status, 'CANCELLED'),
-              gte(subscriptions.cancelledAt, thirtyDaysAgo),
-            ),
-          );
-
-        const churnRate = activeCount + churned > 0 ? churned / (activeCount + churned) : 0;
-
-        // Overdue invoice count
-        const [{ overdue }] = await tx
-          .select({ overdue: count() })
-          .from(invoices)
-          .where(eq(invoices.status, 'OVERDUE'));
-
-        return {
-          mrr,
-          activeSubscriptions: activeCount,
-          churnedLast30Days: churned,
-          churnRate: Math.round(churnRate * 10000) / 10000,
-          overdueInvoiceCount: overdue,
-          subscriptionsByStatus,
-        };
-      },
-    );
+    return {
+      mrr,
+      activeSubscriptions: activeCount,
+      churnedLast30Days: churned,
+      churnRate: Math.round(churnRate * 10000) / 10000,
+      overdueInvoiceCount: overdue,
+      subscriptionsByStatus,
+    };
   }
 }

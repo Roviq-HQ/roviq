@@ -1,195 +1,74 @@
-import { Inject, Injectable } from '@nestjs/common';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  institutesLive,
-  membershipsLive,
-  mkResellerCtx,
-  rolesLive,
-  userProfilesLive,
-  usersLive,
-  withReseller,
-} from '@roviq/database';
-import { and, asc, count, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
+import { Injectable } from '@nestjs/common';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import type { ResellerListUsersFilterInput } from './dto/reseller-list-users-filter.input';
+import { ResellerUserRepository } from './repositories/reseller-user.repository';
+import type { ResellerUserMembershipRow } from './repositories/types';
 
 @Injectable()
 export class ResellerUserService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(private readonly repo: ResellerUserRepository) {}
 
-  /** Build WHERE conditions from the filter input, starting with the reseller-scoped base condition */
-  private buildListConditions(filter: ResellerListUsersFilterInput): SQL[] {
-    // Base condition: users who have at least one membership in the reseller's institutes.
-    // The `withReseller` context ensures `institutes` RLS restricts to this reseller's institutes.
-    // `_live` views excludes soft-deleted rows, so explicit deleted_at filters are redundant.
-    const userSubquery = sql`EXISTS (
-      SELECT 1 FROM memberships_live m
-      INNER JOIN institutes_live i ON i.id = m.tenant_id
-      WHERE m.user_id = ${usersLive.id}
-    )`;
-
-    const conditions: SQL[] = [userSubquery];
-
-    if (filter.search) {
-      const searchTerm = filter.search.trim();
-      if (searchTerm.length >= 2) {
-        const tsQuery = searchTerm
-          .split(/\s+/)
-          .map((w) => `${w}:*`)
-          .join(' & ');
-        const searchCondition = or(
-          sql`${userProfilesLive.searchVector} @@ to_tsquery('simple', ${tsQuery})`,
-          sql`${usersLive.username} ILIKE ${`%${searchTerm}%`}`,
-        );
-        if (searchCondition) conditions.push(searchCondition);
-      } else {
-        const pattern = `%${searchTerm}%`;
-        const searchCondition = or(
-          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
-          sql`${usersLive.username} ILIKE ${pattern}`,
-        );
-        if (searchCondition) conditions.push(searchCondition);
-      }
-    }
-
-    if (filter.instituteId) {
-      conditions.push(
-        sql`EXISTS (
-          SELECT 1 FROM memberships_live m
-          WHERE m.user_id = ${usersLive.id}
-          AND m.tenant_id = ${filter.instituteId}
-        )`,
-      );
-    }
-
-    if (filter.membershipStatus && filter.membershipStatus.length > 0) {
-      const statusList = filter.membershipStatus.map((s) => `'${s}'`).join(',');
-      conditions.push(
-        sql`EXISTS (
-          SELECT 1 FROM memberships_live m
-          INNER JOIN institutes_live i ON i.id = m.tenant_id
-          WHERE m.user_id = ${usersLive.id}
-          AND m.status IN (${sql.raw(statusList)})
-        )`,
-      );
-    }
-
+  /** List users who have memberships in institutes belonging to this reseller. */
+  async list(resellerId: string, filter: ResellerListUsersFilterInput) {
+    let afterId: string | undefined;
     if (filter.after) {
       const cursor = decodeCursor(filter.after);
-      if (cursor.id) {
-        conditions.push(sql`${usersLive.id} > ${cursor.id as string}`);
-      }
+      if (cursor.id) afterId = cursor.id as string;
     }
 
-    return conditions;
-  }
+    const { totalCount, hasNextPage, nodes, memberships } = await this.repo.list(resellerId, {
+      search: filter.search,
+      instituteId: filter.instituteId,
+      membershipStatus: filter.membershipStatus,
+      afterId,
+      limit: filter.first ?? 20,
+    });
 
-  /**
-   * List users who have memberships in institutes belonging to this reseller.
-   * Uses `withReseller` so RLS scopes visibility to the reseller's institutes only.
-   */
-  async list(resellerId: string, filter: ResellerListUsersFilterInput) {
-    return withReseller(this.db, mkResellerCtx(resellerId, 'service:reseller-user'), async (tx) => {
-      const conditions = this.buildListConditions(filter);
-      const where = and(...conditions);
-      const limit = filter.first ?? 20;
+    const membershipsByUser = new Map<string, ResellerUserMembershipRow[]>();
+    for (const row of memberships) {
+      const existing = membershipsByUser.get(row.userId) ?? [];
+      existing.push(row);
+      membershipsByUser.set(row.userId, existing);
+    }
 
-      // Fetch users with left-joined profile
-      const [totalResult, userRows] = await Promise.all([
-        tx
-          .select({ value: count() })
-          .from(usersLive)
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-          .where(where),
-        tx
-          .select({
-            id: usersLive.id,
-            email: usersLive.email,
-            username: usersLive.username,
-            status: usersLive.status,
-            createdAt: usersLive.createdAt,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
-            profileImageFileId: userProfilesLive.profileImageFileId,
-          })
-          .from(usersLive)
-          .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-          .where(where)
-          .orderBy(asc(usersLive.createdAt))
-          .limit(limit + 1),
-      ]);
-
-      const hasNextPage = userRows.length > limit;
-      const nodes = hasNextPage ? userRows.slice(0, limit) : userRows;
-
-      // Batch-load memberships scoped to this reseller's institutes
-      const userIds = nodes.map((u) => u.id);
-      const membershipRows =
-        userIds.length > 0
-          ? await tx
-              .select({
-                id: membershipsLive.id,
-                userId: membershipsLive.userId,
-                tenantId: membershipsLive.tenantId,
-                roleId: membershipsLive.roleId,
-                roleName: rolesLive.name,
-                status: membershipsLive.status,
-                instituteName: institutesLive.name,
-              })
-              .from(membershipsLive)
-              .innerJoin(institutesLive, eq(institutesLive.id, membershipsLive.tenantId))
-              .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-              .where(inArray(membershipsLive.userId, userIds))
-          : [];
-
-      // Group memberships by userId
-      const membershipsByUser = new Map<string, typeof membershipRows>();
-      for (const row of membershipRows) {
-        const existing = membershipsByUser.get(row.userId) ?? [];
-        existing.push(row);
-        membershipsByUser.set(row.userId, existing);
-      }
-
-      const edges = nodes.map((row) => {
-        const userMemberships = membershipsByUser.get(row.id) ?? [];
-        return {
-          node: {
-            id: row.id,
-            email: row.email,
-            username: row.username,
-            status: row.status,
-            createdAt: row.createdAt,
-            profile: row.firstName
-              ? {
-                  firstName: row.firstName,
-                  lastName: row.lastName,
-                  profileImageFileId: row.profileImageFileId,
-                }
-              : null,
-            memberships: userMemberships.map((m) => ({
-              id: m.id,
-              tenantId: m.tenantId,
-              roleId: m.roleId,
-              roleName: m.roleName,
-              status: m.status,
-              instituteName: (m.instituteName as Record<string, string> | null)?.en ?? null,
-            })),
-          },
-          cursor: encodeCursor({ id: row.id }),
-        };
-      });
-
+    const edges = nodes.map((row) => {
+      const userMemberships = membershipsByUser.get(row.id) ?? [];
       return {
-        edges,
-        pageInfo: {
-          hasNextPage,
-          hasPreviousPage: !!filter.after,
-          startCursor: edges[0]?.cursor,
-          endCursor: edges[edges.length - 1]?.cursor,
+        node: {
+          id: row.id,
+          email: row.email,
+          username: row.username,
+          status: row.status,
+          createdAt: row.createdAt,
+          profile: row.firstName
+            ? {
+                firstName: row.firstName,
+                lastName: row.lastName,
+                profileImageFileId: row.profileImageFileId,
+              }
+            : null,
+          memberships: userMemberships.map((m) => ({
+            id: m.id,
+            tenantId: m.tenantId,
+            roleId: m.roleId,
+            roleName: m.roleName,
+            status: m.status,
+            instituteName: (m.instituteName as Record<string, string> | null)?.en ?? null,
+          })),
         },
-        totalCount: totalResult[0]?.value ?? 0,
+        cursor: encodeCursor({ id: row.id }),
       };
     });
+
+    return {
+      edges,
+      pageInfo: {
+        hasNextPage,
+        hasPreviousPage: !!filter.after,
+        startCursor: edges[0]?.cursor,
+        endCursor: edges[edges.length - 1]?.cursor,
+      },
+      totalCount,
+    };
   }
 }

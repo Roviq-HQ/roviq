@@ -1,25 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BusinessException, ErrorCode, ResellerStatus } from '@roviq/common-types';
-import {
-  academicYearsLive,
-  DRIZZLE_DB,
-  type DrizzleDB,
-  instituteAffiliationsLive,
-  instituteGroupsLive,
-  mkAdminCtx,
-  resellersLive,
-  sectionsLive,
-  standardSubjectsLive,
-  standardsLive,
-  subjectsLive,
-  withAdmin,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { Client, Connection } from '@temporalio/client';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { InstituteService } from '../../institute/management/institute.service';
 import { InstituteRepository } from '../../institute/management/repositories/institute.repository';
@@ -27,6 +12,8 @@ import type { InstituteRecord } from '../../institute/management/repositories/ty
 import { INSTITUTE_SETUP_TASK_QUEUE } from '../../institute/setup/institute-setup.types';
 import type { AdminListInstitutesFilterInput } from './dto/admin-list-institutes-filter.input';
 import type { AcademicTreeModel } from './models/academic-tree.model';
+import { AdminInstituteRepository } from './repositories/admin-institute.repository';
+import type { AcademicTreeSectionRow, AcademicTreeSubjectRow } from './repositories/types';
 
 @Injectable()
 export class AdminInstituteService {
@@ -37,7 +24,7 @@ export class AdminInstituteService {
     private readonly instituteRepo: InstituteRepository,
     private readonly eventBus: EventBusService,
     private readonly configService: ConfigService,
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly adminRepo: AdminInstituteRepository,
   ) {}
 
   async list(filter: AdminListInstitutesFilterInput) {
@@ -147,18 +134,7 @@ export class AdminInstituteService {
     const institute = await this.instituteService.findById(instituteId);
 
     // Verify the target reseller exists and is active
-    const rows = await withAdmin(this.db, mkAdminCtx('service:admin-institute'), async (tx) =>
-      tx
-        .select({
-          id: resellersLive.id,
-          status: resellersLive.status,
-          isActive: resellersLive.isActive,
-        })
-        .from(resellersLive)
-        .where(eq(resellersLive.id, newResellerId))
-        .limit(1),
-    );
-    const target = rows[0];
+    const target = await this.adminRepo.findReseller(newResellerId);
     if (!target) {
       throw new BusinessException(ErrorCode.RESELLER_INVALID, 'Target reseller not found');
     }
@@ -191,14 +167,7 @@ export class AdminInstituteService {
   async assignGroup(instituteId: string, groupId: string): Promise<InstituteRecord> {
     const institute = await this.instituteService.findById(instituteId);
 
-    const rows = await withAdmin(this.db, mkAdminCtx('service:admin-institute'), async (tx) =>
-      tx
-        .select({ id: instituteGroupsLive.id })
-        .from(instituteGroupsLive)
-        .where(eq(instituteGroupsLive.id, groupId))
-        .limit(1),
-    );
-    if (rows.length === 0) {
+    if (!(await this.adminRepo.instituteGroupExists(groupId))) {
       throw new BusinessException(
         ErrorCode.INSTITUTE_GROUP_NOT_FOUND,
         `Institute group ${groupId} not found`,
@@ -219,117 +188,59 @@ export class AdminInstituteService {
   }
 
   /**
-   * Read-only academic structure tree for admin viewing. Uses withAdmin to
-   * bypass RLS so platform admins can view any institute's academic data.
+   * Read-only academic structure tree for admin viewing, read as the platform
+   * so admins can view any institute's academic data.
    * Picks the most recently active academic year — passing an explicit
    * academicYearId is a future enhancement.
    */
   async getAcademicTree(instituteId: string): Promise<AcademicTreeModel> {
     await this.instituteService.findById(instituteId);
 
-    return withAdmin(this.db, mkAdminCtx('service:admin-institute'), async (tx) => {
-      // Pick the most recent academic year for this institute
-      const yearRows = await tx
-        .select({ id: academicYearsLive.id })
-        .from(academicYearsLive)
-        .where(eq(academicYearsLive.tenantId, instituteId))
-        .orderBy(desc(academicYearsLive.startDate))
-        .limit(1);
-      const academicYearId = yearRows[0]?.id;
+    const rows = await this.adminRepo.findAcademicTreeRows(instituteId);
+    if (rows.academicYearId === null) {
+      return { instituteId, academicYearId: null, standards: [] };
+    }
+    const { academicYearId, standards: standardRows, sections: sectionRows } = rows;
+    const { standardSubjects: stdSubjectRows, subjects: subjectRows } = rows;
 
-      if (!academicYearId) {
-        return { instituteId, academicYearId: null, standards: [] };
-      }
+    const sectionsByStandard = new Map<string, AcademicTreeSectionRow[]>();
+    for (const s of sectionRows) {
+      const list = sectionsByStandard.get(s.standardId) ?? [];
+      list.push(s);
+      sectionsByStandard.set(s.standardId, list);
+    }
 
-      const [standardRows, sectionRows, stdSubjectRows, subjectRows] = await Promise.all([
-        tx
-          .select({
-            id: standardsLive.id,
-            name: standardsLive.name,
-            numericOrder: standardsLive.numericOrder,
-            department: standardsLive.department,
-          })
-          .from(standardsLive)
-          .where(
-            and(
-              eq(standardsLive.tenantId, instituteId),
-              eq(standardsLive.academicYearId, academicYearId),
-            ),
-          )
-          .orderBy(asc(standardsLive.numericOrder)),
-        tx
-          .select({
-            id: sectionsLive.id,
-            name: sectionsLive.name,
-            stream: sectionsLive.stream,
-            standardId: sectionsLive.standardId,
-          })
-          .from(sectionsLive)
-          .where(
-            and(
-              eq(sectionsLive.tenantId, instituteId),
-              eq(sectionsLive.academicYearId, academicYearId),
-            ),
-          )
-          .orderBy(asc(sectionsLive.displayOrder), asc(sectionsLive.name)),
-        tx
-          .select({
-            subjectId: standardSubjectsLive.subjectId,
-            standardId: standardSubjectsLive.standardId,
-          })
-          .from(standardSubjectsLive)
-          .where(eq(standardSubjectsLive.tenantId, instituteId)),
-        tx
-          .select({
-            id: subjectsLive.id,
-            name: subjectsLive.name,
-            shortName: subjectsLive.shortName,
-            boardCode: subjectsLive.boardCode,
-            type: subjectsLive.type,
-          })
-          .from(subjectsLive)
-          .where(eq(subjectsLive.tenantId, instituteId)),
-      ]);
+    const subjectsById = new Map(subjectRows.map((s) => [s.id, s]));
+    const subjectsByStandard = new Map<string, AcademicTreeSubjectRow[]>();
+    for (const link of stdSubjectRows) {
+      const subject = subjectsById.get(link.subjectId);
+      if (!subject) continue;
+      const list = subjectsByStandard.get(link.standardId) ?? [];
+      list.push(subject);
+      subjectsByStandard.set(link.standardId, list);
+    }
 
-      const sectionsByStandard = new Map<string, typeof sectionRows>();
-      for (const s of sectionRows) {
-        const list = sectionsByStandard.get(s.standardId) ?? [];
-        list.push(s);
-        sectionsByStandard.set(s.standardId, list);
-      }
-
-      const subjectsById = new Map(subjectRows.map((s) => [s.id, s]));
-      const subjectsByStandard = new Map<string, typeof subjectRows>();
-      for (const link of stdSubjectRows) {
-        const subject = subjectsById.get(link.subjectId);
-        if (!subject) continue;
-        const list = subjectsByStandard.get(link.standardId) ?? [];
-        list.push(subject);
-        subjectsByStandard.set(link.standardId, list);
-      }
-
-      return {
-        instituteId,
-        academicYearId,
-        standards: standardRows.map((std) => ({
-          id: std.id,
-          name: std.name as Record<string, string>,
-          department: std.department ?? null,
-          sections: (sectionsByStandard.get(std.id) ?? []).map((sec) => ({
-            id: sec.id,
-            name: sec.name as Record<string, string>,
-            stream: (sec.stream as Record<string, unknown> | null) ?? null,
-          })),
-          subjects: (subjectsByStandard.get(std.id) ?? []).map((sub) => ({
-            id: sub.id,
-            name: sub.name,
-            shortName: sub.shortName ?? null,
-            boardCode: sub.boardCode ?? null,
-            type: sub.type,
-          })),
+    return {
+      instituteId,
+      academicYearId,
+      standards: standardRows.map((std) => ({
+        id: std.id,
+        name: std.name as Record<string, string>,
+        department: std.department ?? null,
+        sections: (sectionsByStandard.get(std.id) ?? []).map((sec) => ({
+          id: sec.id,
+          name: sec.name as Record<string, string>,
+          stream: (sec.stream as Record<string, unknown> | null) ?? null,
         })),
-      };
-    });
+        subjects: (subjectsByStandard.get(std.id) ?? []).map((sub) => ({
+          id: sub.id,
+          name: sub.name,
+          shortName: sub.shortName ?? null,
+          boardCode: sub.boardCode ?? null,
+          type: sub.type,
+        })),
+      })),
+    };
   }
 
   /** Remove an institute's group assignment. Emits `INSTITUTE.group_removed`. */
@@ -378,19 +289,7 @@ export class AdminInstituteService {
    * `undefined` when no active affiliation exists.
    */
   private async loadPrimaryBoard(instituteId: string): Promise<string | undefined> {
-    return withAdmin(this.db, mkAdminCtx('service:admin-institute'), async (tx) => {
-      const rows = await tx
-        .select({ board: instituteAffiliationsLive.board })
-        .from(instituteAffiliationsLive)
-        .where(eq(instituteAffiliationsLive.tenantId, instituteId))
-        // Undated rows (recorded at request time) rank after dated ones; oldest row breaks ties.
-        .orderBy(
-          sql`${instituteAffiliationsLive.validFrom} ASC NULLS LAST`,
-          asc(instituteAffiliationsLive.createdAt),
-        )
-        .limit(1);
-      return rows[0]?.board ?? undefined;
-    });
+    return this.adminRepo.findPrimaryBoard(instituteId);
   }
 
   /**
