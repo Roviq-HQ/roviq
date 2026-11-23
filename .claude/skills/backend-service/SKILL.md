@@ -34,7 +34,10 @@ A scope guard proves who the caller is, not which rows are theirs.
 ## Resolvers, services, repositories
 
 - Code-first GraphQL only (`@ObjectType`, `@InputType`, `@Resolver`); no `.graphql` schema files. Resolvers are thin: validate input through the DTO, call one service method, return.
-- Queries belong in a repository; services hold the rules. Many older services still query through `DRIZZLE_DB` directly: follow the file you are in, and do not refactor a service into a repository unless the issue asks.
+- **Services never touch the database.** A `*.service.ts` file imports no `DRIZZLE_DB`, wrapper (`withTenant` / `withAdmin` / `withReseller`), `mk*Ctx`, table, `*Live` view or `drizzle-orm` operator; `pnpm check:service-db-access` fails otherwise (types and a few pure helpers are allowed). The service holds the rules: validation, state transitions, error codes, events, calls to other services.
+- **Every query lives in a repository**, in the feature's `repositories/` folder: `<name>.repository.ts` (abstract class the service injects), `<name>.drizzle-repository.ts` (the implementation with `@Inject(DRIZZLE_DB)`), `types.ts` (record and input types) and `<name>-repository.module.ts`. Model: `apps/api-gateway/src/institute/leave/`.
+- **One repository method per unit of work.** Statements that must commit together run in one method and one transaction. When a rule decides between two statements, the method returns a small typed result (`{ kind: 'not_found' } | { kind: 'ok', row }`) and the service turns it into the `BusinessException`; the repository does not decide business meaning.
+- Unit-test a service against a mocked repository (`createMock<Repository>()`); test the repository's SQL in an integration spec. Never mock the Drizzle transaction.
 - GraphQL returns `i18nText` fields as the whole object; never resolve a locale on the backend.
 - Give `@Field`, `@InputType` and mutations a `description` when the name does not say it all: rules, formats, units (paise, epoch ms), limits. It is the API's only documentation.
 - Lists: cursor pagination, one query per page for any per-row extra (no N+1), sort columns from a whitelist.

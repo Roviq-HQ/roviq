@@ -21,6 +21,34 @@ const SCAN_ROOTS = [join(ROOT, 'apps'), join(ROOT, 'ee'), join(ROOT, 'libs')];
 // Every file currently authorized to import a synthetic-context factory.
 // See header comment. Sorted alphabetically — easier to diff in PRs.
 export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
+  // Repository refactor: each file below holds the queries its service ran before, with the
+  // same contexts and origins; the services themselves no longer reach the database.
+  'apps/api-gateway/src/admin/attendance/repositories/admin-attendance.drizzle-repository.ts',
+  'apps/api-gateway/src/admin/institute/repositories/admin-institute.drizzle-repository.ts',
+  'apps/api-gateway/src/admin/reseller/repositories/admin-reseller.drizzle-repository.ts',
+  'apps/api-gateway/src/auth/repositories/auth-event.drizzle-repository.ts',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts',
+  'apps/api-gateway/src/dlq/repositories/dlq.drizzle-repository.ts',
+  'apps/api-gateway/src/files/repositories/profile-photo.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/admission/__tests__/application-create.integration.spec.ts',
+  'apps/api-gateway/src/institute/admission/admission-read.repository.ts',
+  'apps/api-gateway/src/institute/admission/repositories/admission.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/consent/repositories/consent.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/group/repositories/group.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/guardian/repositories/guardian.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/management/seed/repositories/institute-seeder.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/management/seed/repositories/institute-setup.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/staff/repositories/staff-qualification.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/student/__tests__/student-read-statistics.spec.ts',
+  'apps/api-gateway/src/institute/student/__tests__/student-section-change.integration.spec.ts',
+  'apps/api-gateway/src/institute/student/repositories/student-academic.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts',
+  'apps/api-gateway/src/institute/student/student-read.repository.ts',
+  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts',
+  'apps/api-gateway/src/reseller/user/repositories/reseller-user.drizzle-repository.ts',
+  'ee/apps/api-gateway/src/billing/repositories/dashboard.repository.ts',
   'apps/api-gateway/src/__tests__/billing.integration.spec.ts',
   'apps/api-gateway/src/__tests__/integration-app.integration.spec.ts',
   'apps/api-gateway/src/__tests__/people-restore.integration.spec.ts',
@@ -32,7 +60,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/tenant-user-profile-isolation.integration.spec.ts',
   // ROV-205: isolated security-invariant fixtures and RLS-scoped predicate execution only.
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
-  'apps/api-gateway/src/institute/academic-year/academic-year.service.ts',
   'apps/api-gateway/src/files/repositories/file.drizzle-repository.ts',
   // ROV-314: device_tokens is platform-role only; every write is keyed by the token user id.
   'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts',
@@ -40,7 +67,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
   // ROV-301: files read as the caller's own role; profile photo writes on the shared user profile.
   'apps/api-gateway/src/files/file.loaders.ts',
-  'apps/api-gateway/src/files/profile-photo.service.ts',
   'apps/api-gateway/src/institute/profile-photo/profile-photo-target.repository.ts',
   // ROV-210: isolated fixtures for the files RLS and attach-guard tests only.
   'apps/api-gateway/src/files/__tests__/files-rls.integration.spec.ts',
@@ -49,11 +75,9 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-300: isolated fixtures (institutes, files, link rows) for the sweeper tests only.
   'apps/api-gateway/src/files/__tests__/file-sweeper.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts',
-  'apps/api-gateway/src/admin/attendance/admin-attendance.service.ts',
   'apps/api-gateway/src/admin/institute/admin-institute.loaders.ts',
   // ROV-184: integration fixtures (refresh tokens) for the tenant analytics query.
   'apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts',
-  'apps/api-gateway/src/admin/institute/admin-institute.service.ts',
   'apps/api-gateway/src/admin/reseller/__tests__/reseller-suspension.integration.spec.ts',
   'apps/api-gateway/src/auth/__tests__/email-verification.integration.spec.ts',
   'apps/api-gateway/src/auth/__tests__/institute-status-access.integration.spec.ts',
@@ -68,15 +92,11 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/sign-in-details/__tests__/sign-in-details.integration.spec.ts',
   // ROV-181: integration fixtures (profile, phone, identifiers, auth events) for admin user queries.
   'apps/api-gateway/src/admin/user/__tests__/admin-user.integration.spec.ts',
-  'apps/api-gateway/src/admin/reseller/admin-reseller.service.ts',
   'apps/api-gateway/src/admin/user/repositories/admin-user.drizzle-repository.ts',
   'apps/api-gateway/src/audit/repositories/audit-partition.drizzle-repository.ts',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts',
   'apps/api-gateway/src/audit/workflows/partition.activities.ts',
   'apps/api-gateway/src/auth/__tests__/impersonation.integration.spec.ts',
-  'apps/api-gateway/src/auth/auth-event.service.ts',
-  'apps/api-gateway/src/auth/identity.service.ts',
-  'apps/api-gateway/src/auth/impersonation.service.ts',
   'apps/api-gateway/src/auth/middleware/impersonation-session.guard.ts',
   // ROV-97: global guard reads the reseller's status before any resolver runs.
   // Reads an institute's status for any institute-scope token, before a tenant context exists.
@@ -93,12 +113,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/role/repositories/role.drizzle-repository.ts',
   'apps/api-gateway/src/casl/__tests__/read-field.middleware.spec.ts',
   // ROV-19: platform-admin DLQ reader — no repository layer; admin tool mirrors admin-reseller.service.
-  'apps/api-gateway/src/dlq/dlq.service.ts',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts',
   'apps/api-gateway/src/institute/admission/__tests__/admission-statistics.spec.ts',
   'apps/api-gateway/src/institute/admission/__tests__/application.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/__tests__/enquiry.integration.spec.ts',
-  'apps/api-gateway/src/institute/admission/admission.service.ts',
   'apps/api-gateway/src/institute/admission/workflows/student-admission.activities.ts',
   // ROV-232: flags test accounts as needing a password change and grants a platform role.
   'apps/api-gateway/src/auth/__tests__/must-change-password.integration.spec.ts',
@@ -110,9 +128,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/attendance/__tests__/attendance.integration.spec.ts',
   'apps/api-gateway/src/institute/attendance/repositories/attendance.drizzle-repository.ts',
   'apps/api-gateway/src/institute/bot/__tests__/bot-api-key.integration.spec.ts',
-  'apps/api-gateway/src/institute/bot/bot.service.ts',
   'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts',
-  'apps/api-gateway/src/institute/certificate/__tests__/certificate.spec.ts',
   // ROV-296: isolated fixtures and RLS probes for the compliance export tests only.
   'apps/api-gateway/src/institute/certificate/__tests__/compliance-export-activities.integration.spec.ts',
   'apps/api-gateway/src/institute/certificate/__tests__/compliance-export.integration.spec.ts',
@@ -124,8 +140,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts',
   // ROV-296: phone_numbers has no institute policy; read as admin only for this institute's people.
   'apps/api-gateway/src/institute/certificate/exports/cbse-candidates.ts',
-  'apps/api-gateway/src/institute/certificate/exports/cbse-loc.export.ts',
-  'apps/api-gateway/src/institute/certificate/exports/cbse-registration.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/rte-report.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/tc-register.export.ts',
@@ -134,38 +148,23 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/public-verification/tc-verification.repository.ts',
   'apps/api-gateway/src/institute/certificate/workflows/compliance-export.activities.ts',
   'apps/api-gateway/src/institute/certificate/workflows/tc-issuance.activities.ts',
-  'apps/api-gateway/src/institute/consent/consent.service.ts',
   'apps/api-gateway/src/institute/examination/repositories/examination.drizzle-repository.ts',
-  'apps/api-gateway/src/institute/group/__tests__/group-rule-engine.spec.ts',
   'apps/api-gateway/src/institute/group/group-invalidation.handler.ts',
-  'apps/api-gateway/src/institute/group/group.service.ts',
-  'apps/api-gateway/src/institute/guardian/__tests__/guardian-link.spec.ts',
-  'apps/api-gateway/src/institute/guardian/__tests__/guardian-linking.spec.ts',
-  'apps/api-gateway/src/institute/guardian/guardian.service.ts',
   'apps/api-gateway/src/institute/holiday/repositories/holiday.drizzle-repository.ts',
   // ROV-304: isolated fixtures for the leave read/write/decide authorization tests only.
   'apps/api-gateway/src/institute/leave/__tests__/leave-authorization.integration.spec.ts',
   'apps/api-gateway/src/institute/leave/repositories/leave.drizzle-repository.ts',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts',
-  'apps/api-gateway/src/institute/management/seed/institute-seeder.service.ts',
-  'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts',
   'apps/api-gateway/src/institute/section/repositories/section.drizzle-repository.ts',
   'apps/api-gateway/src/institute/setup/institute-setup.activities.ts',
-  'apps/api-gateway/src/institute/staff/__tests__/staff-qualification.spec.ts',
-  'apps/api-gateway/src/institute/staff/staff-qualification.service.ts',
-  'apps/api-gateway/src/institute/staff/staff.service.ts',
   'apps/api-gateway/src/institute/standard/repositories/standard.drizzle-repository.ts',
   'apps/api-gateway/src/institute/student/__tests__/admission-number-series.integration.spec.ts',
-  'apps/api-gateway/src/institute/student/__tests__/student-academic.service.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-detail.integration.spec.ts',
   // ROV-300: isolated fixtures for the student document removal tests only.
   'apps/api-gateway/src/institute/student/__tests__/student-document-removal.integration.spec.ts',
   // ROV-300: isolated fixtures for the student document upload tests only.
   'apps/api-gateway/src/institute/student/__tests__/student-document-upload.integration.spec.ts',
-  'apps/api-gateway/src/institute/student/__tests__/student.service.spec.ts',
-  'apps/api-gateway/src/institute/student/student-academic.service.ts',
   'apps/api-gateway/src/institute/student/student-event.handler.ts',
-  'apps/api-gateway/src/institute/student/student.service.ts',
   // File access for Temporal activities; every query runs as the institute the workflow names.
   'apps/api-gateway/src/files/workflow-file-store.ts',
   'apps/api-gateway/src/files/__tests__/workflow-file-store.integration.spec.ts',
@@ -174,7 +173,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/subject/repositories/subject.drizzle-repository.ts',
   'apps/api-gateway/src/institute/timetable/__tests__/teacher-options.integration.spec.ts',
   'apps/api-gateway/src/institute/timetable/repositories/timetable.drizzle-repository.ts',
-  'apps/api-gateway/src/institute/user/profile.service.ts',
   'apps/api-gateway/src/institute/notification-config/repositories/notification-config.drizzle-repository.ts',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts',
   // ROV-290: isolated reseller/group fixtures and direct group-link assertions only.
@@ -191,7 +189,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/files/__tests__/storage-quota.integration.spec.ts',
   // ROV-311 integration fixture: inserts audit rows and reads them as each institute's role
   'apps/api-gateway/src/audit/__tests__/audit-subject-institute.integration.spec.ts',
-  'apps/api-gateway/src/reseller/user/reseller-user.service.ts',
   'apps/notification-service/src/repositories/billing-read.drizzle-repository.ts',
   'apps/notification-service/src/repositories/notification-config-read.drizzle-repository.ts',
   // ROV-314 event consumer: guardians and memberships read as the event's institute
@@ -211,7 +208,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'ee/apps/api-gateway/src/billing/repositories/payment.repository.ts',
   'ee/apps/api-gateway/src/billing/repositories/plan.repository.ts',
   'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts',
-  'ee/apps/api-gateway/src/billing/reseller/dashboard.service.ts',
   'ee/apps/api-gateway/src/billing/subscription-reader.impl.ts',
   'ee/apps/api-gateway/src/billing/workflows/billing.activities.ts',
   'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts',
@@ -219,7 +215,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'libs/backend/casl/src/repositories/role.drizzle-repository.ts',
   'libs/backend/casl/src/seed-roles.ts',
   'libs/backend/testing/src/integration/data-factories.ts',
-  'libs/database/src/__tests__/branded-context.spec.ts',
   'libs/database/src/index.ts',
   'libs/database/src/seed/demo/index.ts',
   'libs/database/src/seed/e2e/index.ts',

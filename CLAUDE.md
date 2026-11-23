@@ -101,6 +101,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - `assertTenantContext()` / `assertResellerContext()` / `assertPlatformContext()` / `assertInstituteWithReseller()` instead of inline `ForbiddenException`
 - A scope guard is not tenant isolation: institute/reseller code never passes a caller-supplied id to `withAdmin` code without an ownership check · platform operations live in `admin/` resolvers (`pnpm check:admin-context-reach`)
 - Foreign keys do not apply RLS: read every caller-supplied id under the caller's own context before storing a reference to it
+- A `*.service.ts` never queries the database: every query is a repository method, one per unit of work (`pnpm check:service-db-access`)
 - `mk*Ctx()` only in workflow activities, seeders, event-consumer repos, integration fixtures (`pnpm check:synthetic-context-usage`)
 - `ability.can()`, never role checks · scope decorators at class level, not `APP_GUARD` · `GqlAuthGuard` from `@roviq/auth-backend`
 - Every `@CheckAbility` pair must be reachable by a role, every grant used (`ability-coverage.spec.ts`)

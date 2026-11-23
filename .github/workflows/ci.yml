@@ -40,6 +40,8 @@ jobs:
         run: pnpm run check:admin-context-reach
       - name: Check direct NATS emit usage (registry-bypass allowlist)
         run: pnpm run check:direct-nats-emit
+      - name: Check service database access (services query through repositories only)
+        run: pnpm run check:service-db-access
       - name: Check event handlers (message-pattern classes are controllers of a connected app)
         run: pnpm run check:event-handlers
       - name: Check testid literals (registry-migrated files use testIds)
