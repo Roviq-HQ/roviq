@@ -1,9 +1,27 @@
+import assert from 'node:assert';
 import { createMock } from '@roviq/testing';
 import { ApplicationFailure } from '@temporalio/activity';
 import { describe, expect, it, vi } from 'vitest';
 import { ChannelSender } from '../../delivery/channel-sender';
+import {
+  whatsappDigestTemplateFor,
+  whatsappTemplateFor,
+} from '../../delivery/whatsapp/whatsapp-templates';
+import type { RegularDigest, RegularMessage } from '../../types/compose';
 import { createNotificationActivities } from '../notification.activities';
 import type { SendChannelInput } from '../notification-workflow.types';
+
+const INPUT_MESSAGE = {
+  type: 'LEAVE_DECIDED',
+  params: {
+    leaveId: 'leave-1',
+    status: 'APPROVED',
+    audience: 'applicant',
+    applicantName: 'Priya Verma',
+    startDate: '2026-04-20',
+    endDate: '2026-04-21',
+  },
+} as const;
 
 const INPUT: SendChannelInput = {
   audience: {
@@ -14,6 +32,7 @@ const INPUT: SendChannelInput = {
   recipientUserId: 'user-guardian-1',
   channel: 'EMAIL',
   enabled: true,
+  deferrable: true,
   content: {
     kind: 'single',
     message: {
@@ -52,9 +71,12 @@ describe('sendChannel activity', () => {
 
   it('should throw a retryable failure carrying only the error code', async () => {
     const sender = createMock<ChannelSender>({
-      attempt: vi
-        .fn()
-        .mockResolvedValue({ status: 'FAILED', provider: 'smtp', errorCode: 'EAUTH_535' }),
+      attempt: vi.fn().mockResolvedValue({
+        status: 'FAILED',
+        provider: 'smtp',
+        errorCode: 'EAUTH_535',
+        retryable: true,
+      }),
     });
 
     const result = createNotificationActivities(sender, () => 1).sendChannel(INPUT);
@@ -108,5 +130,145 @@ describe('sendChannel activity', () => {
       subject: 'Attendance alerts: 1 absence, 1 late arrival',
       body: '2 attendance alerts were recorded today.',
     });
+  });
+
+  it('should return the deferral time as an ISO string', async () => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'DEFERRED', until: new Date('2026-11-24T01:30:00.000Z') }),
+    });
+
+    const result = await createNotificationActivities(sender, () => 1).sendChannel(INPUT);
+
+    expect(result).toEqual({ deferUntil: '2026-11-24T01:30:00.000Z' });
+  });
+
+  it('should throw a non-retryable failure when the provider would refuse again', async () => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi.fn().mockResolvedValue({
+        status: 'FAILED',
+        provider: 'whatsapp_cloud',
+        errorCode: 'WA_TEMPLATE_REJECTED',
+        retryable: false,
+      }),
+    });
+
+    const result = createNotificationActivities(sender, () => 1).sendChannel(INPUT);
+
+    await expect(result).rejects.toBeInstanceOf(ApplicationFailure);
+    await expect(result).rejects.toMatchObject({
+      type: 'WA_TEMPLATE_REJECTED',
+      nonRetryable: true,
+    });
+  });
+
+  it.each([
+    [
+      'AUTH_NEW_DEVICE',
+      true,
+      {
+        type: 'AUTH_NEW_DEVICE',
+        params: { ip: null, at: '2026-11-23T05:00:00.000Z', accountPath: '/institute/account' },
+      },
+    ],
+    ['LEAVE_DECIDED', false, INPUT_MESSAGE],
+  ] as const)('should take critical for %s from the type registry (%s)', async (_type, critical, message) => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+
+    await createNotificationActivities(sender, () => 1).sendChannel({
+      ...INPUT,
+      content: { kind: 'single', message, notificationId: null },
+    });
+
+    expect(sender.attempt.mock.calls.map(([a]) => a.critical)).toEqual([critical]);
+  });
+
+  it('should give the registry template of a single message', async () => {
+    const message: RegularMessage<'FEE_REMINDER'> = {
+      type: 'FEE_REMINDER',
+      params: {
+        studentId: 'membership-student-1',
+        studentName: 'Aarav Sharma',
+        feeId: 'fee-1',
+        amount: 5000,
+        currency: 'INR',
+        dueDate: '2026-04-20',
+        feeType: 'Tuition',
+        feePeriod: 'April 2026',
+      },
+    };
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+
+    await createNotificationActivities(sender, () => 1).sendChannel({
+      ...INPUT,
+      channel: 'WHATSAPP',
+      content: { kind: 'single', message, notificationId: null },
+    });
+
+    const [call] = sender.attempt.mock.calls;
+    assert(call);
+    const template = call[0].template;
+    assert(template);
+    const expected = whatsappTemplateFor(message, 'hi');
+    expect(expected).not.toBeNull();
+    expect(template('hi')).toEqual(expected);
+  });
+
+  it('should give the registry digest template of a digest run', async () => {
+    const absence = {
+      studentId: 'm1',
+      studentName: 'Aarav Sharma',
+      markedAt: '09:05',
+      sessionDate: '2026-04-10',
+      sectionName: 'A',
+      standardName: 'Class 5',
+    };
+    const digest: RegularDigest<'ATTENDANCE_ABSENT'> = {
+      type: 'ATTENDANCE_ABSENT',
+      items: [
+        { ...absence, sessionId: 's1', status: 'ABSENT' },
+        { ...absence, sessionId: 's2', status: 'LATE', markedAt: '09:40' },
+      ],
+    };
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+
+    await createNotificationActivities(sender, () => 1).sendChannel({
+      ...INPUT,
+      channel: 'WHATSAPP',
+      content: { kind: 'digest', digest },
+    });
+
+    const [call] = sender.attempt.mock.calls;
+    assert(call);
+    const template = call[0].template;
+    assert(template);
+    const expected = whatsappDigestTemplateFor(digest, 'en');
+    expect(expected).not.toBeNull();
+    expect(template('en')).toEqual(expected);
+  });
+
+  it.each([true, false])('should pass deferrable %s through to the attempt', async (deferrable) => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+
+    await createNotificationActivities(sender, () => 1).sendChannel({ ...INPUT, deferrable });
+
+    expect(sender.attempt.mock.calls.map(([a]) => a.deferrable)).toEqual([deferrable]);
   });
 });

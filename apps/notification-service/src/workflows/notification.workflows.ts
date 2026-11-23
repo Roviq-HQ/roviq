@@ -15,7 +15,9 @@ import {
   DIGEST_ITEM_SIGNAL,
   type DigestItem,
   type DigestWorkflowInput,
+  MAX_CHANNEL_DEFERRALS,
   type NotificationActivities,
+  type SendChannelInput,
 } from './notification-workflow.types';
 
 const activities = proxyActivities<NotificationActivities>({
@@ -25,19 +27,44 @@ const activities = proxyActivities<NotificationActivities>({
 
 export const digestItemSignal = defineSignal<[DigestItem]>(DIGEST_ITEM_SIGNAL);
 
+type ChannelSend = Omit<SendChannelInput, 'deferrable'>;
+
+/** Sends on one channel, sleeping through each deferral (quiet hours, a full sender). */
+async function sendChannel(input: ChannelSend): Promise<void> {
+  for (let deferrals = 0; deferrals <= MAX_CHANNEL_DEFERRALS; deferrals += 1) {
+    const result = await activities.sendChannel({
+      ...input,
+      deferrable: deferrals < MAX_CHANNEL_DEFERRALS,
+    });
+    // The last call is not deferrable, so it answers with a final outcome.
+    if (typeof result === 'string' || deferrals === MAX_CHANNEL_DEFERRALS) return;
+    const wait = Date.parse(result.deferUntil) - Date.now();
+    if (wait > 0) await sleep(wait);
+  }
+}
+
+/**
+ * Push and email go first, then WhatsApp, then SMS. One channel failing (after its retries)
+ * or waiting must not stop the others.
+ */
+async function sendInOrder(inputs: ChannelSend[]): Promise<void> {
+  const later = (i: ChannelSend) => i.channel === 'WHATSAPP' || i.channel === 'SMS';
+  await Promise.allSettled(inputs.filter((i) => !later(i)).map(sendChannel));
+  for (const channel of ['WHATSAPP', 'SMS'] as const) {
+    await Promise.allSettled(inputs.filter((i) => i.channel === channel).map(sendChannel));
+  }
+}
+
 export async function NotificationDeliveryWorkflow(input: DeliveryWorkflowInput): Promise<void> {
-  // One channel failing (after its retries) must not stop the others.
-  await Promise.allSettled(
-    input.channels.map((plan) =>
-      activities.sendChannel({
-        audience: input.audience,
-        recipientUserId: input.recipientUserId,
-        channel: plan.channel,
-        enabled: plan.enabled,
-        content: { kind: 'single', message: input.message, notificationId: input.notificationId },
-        data: input.data,
-      }),
-    ),
+  await sendInOrder(
+    input.channels.map((plan) => ({
+      audience: input.audience,
+      recipientUserId: input.recipientUserId,
+      channel: plan.channel,
+      enabled: plan.enabled,
+      content: { kind: 'single', message: input.message, notificationId: input.notificationId },
+      data: input.data,
+    })),
   );
 }
 
@@ -58,17 +85,15 @@ export async function NotificationDigestWorkflow(input: DigestWorkflowInput): Pr
     },
     send: async (messages) => {
       const digest = { type: input.type, items: messages.map((m) => m.params) };
-      await Promise.allSettled(
-        input.channels.map((plan) =>
-          activities.sendChannel({
-            audience: input.audience,
-            recipientUserId: input.recipientUserId,
-            channel: plan.channel,
-            enabled: plan.enabled,
-            content: { kind: 'digest', digest },
-            data: {},
-          }),
-        ),
+      await sendInOrder(
+        input.channels.map((plan) => ({
+          audience: input.audience,
+          recipientUserId: input.recipientUserId,
+          channel: plan.channel,
+          enabled: plan.enabled,
+          content: { kind: 'digest', digest },
+          data: {},
+        })),
       );
     },
   });

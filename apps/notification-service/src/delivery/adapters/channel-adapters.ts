@@ -1,8 +1,10 @@
 import type { NotificationChannel } from '@roviq/common-types';
+import type { WhatsAppCloud } from '../whatsapp/whatsapp-cloud';
 import type { ChannelAdapter } from './channel-adapter';
 import { type DeviceTokenRetirer, FcmPushAdapter } from './fcm.adapter';
 import { LogChannelAdapter } from './log.adapter';
 import { SmtpEmailAdapter } from './smtp.adapter';
+import { WhatsAppCloudAdapter } from './whatsapp-cloud.adapter';
 
 /** The adapter chosen for each channel; a channel without one is skipped as `no_provider`. */
 export class ChannelAdapters {
@@ -21,7 +23,7 @@ export interface ProviderSettings {
   NOTIFICATION_EMAIL_PROVIDER?: 'smtp' | 'log';
   NOTIFICATION_PUSH_PROVIDER?: 'fcm' | 'log';
   NOTIFICATION_SMS_PROVIDER?: 'log';
-  NOTIFICATION_WHATSAPP_PROVIDER?: 'log';
+  NOTIFICATION_WHATSAPP_PROVIDER?: 'cloud' | 'log';
   SMTP_URL?: string;
   EMAIL_FROM?: string;
   FCM_SERVICE_ACCOUNT_JSON?: string;
@@ -31,6 +33,7 @@ export interface ProviderSettings {
 export function buildChannelAdapters(
   settings: ProviderSettings,
   tokens: DeviceTokenRetirer,
+  whatsapp: WhatsAppCloud,
 ): ChannelAdapters {
   const adapters: ChannelAdapter[] = [];
 
@@ -47,7 +50,9 @@ export function buildChannelAdapters(
   }
 
   if (settings.NOTIFICATION_SMS_PROVIDER === 'log') adapters.push(new LogChannelAdapter('SMS'));
-  if (settings.NOTIFICATION_WHATSAPP_PROVIDER === 'log') {
+  if (settings.NOTIFICATION_WHATSAPP_PROVIDER === 'cloud') {
+    adapters.push(new WhatsAppCloudAdapter(whatsapp));
+  } else if (settings.NOTIFICATION_WHATSAPP_PROVIDER === 'log') {
     adapters.push(new LogChannelAdapter('WHATSAPP'));
   }
 

@@ -41,4 +41,61 @@ describe('notification-service env validation', () => {
 
     expect(validate(env)).toEqual(env);
   });
+
+  describe('the WhatsApp cloud provider', () => {
+    const CLOUD = {
+      ...BASE,
+      NOTIFICATION_WHATSAPP_PROVIDER: 'cloud',
+      WHATSAPP_API_BASE_URL: 'https://graph.example.test/v99.0',
+      WHATSAPP_APP_SECRET: 'fake-app-secret',
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'fake-verify-token',
+      MESSAGING_ENCRYPTION_KEY: '0123456789abcdef'.repeat(4),
+    };
+
+    it('should accept the provider with all four settings', () => {
+      expect(validate(CLOUD)).toEqual(CLOUD);
+    });
+
+    it.each([
+      'WHATSAPP_API_BASE_URL',
+      'WHATSAPP_APP_SECRET',
+      'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+      'MESSAGING_ENCRYPTION_KEY',
+    ] as const)('should name %s when it is missing', (name) => {
+      const { [name]: _missing, ...env } = CLOUD;
+
+      expect(() => validate(env)).toThrow(
+        `${name} — required when NOTIFICATION_WHATSAPP_PROVIDER=cloud`,
+      );
+    });
+
+    it('should name every missing setting at once', () => {
+      expect(() => validate({ ...BASE, NOTIFICATION_WHATSAPP_PROVIDER: 'cloud' })).toThrow(
+        'WHATSAPP_API_BASE_URL, WHATSAPP_APP_SECRET, WHATSAPP_WEBHOOK_VERIFY_TOKEN, MESSAGING_ENCRYPTION_KEY — required when NOTIFICATION_WHATSAPP_PROVIDER=cloud',
+      );
+    });
+
+    it.each([
+      ['too short', '0123456789abcdef'],
+      ['too long', `${'0123456789abcdef'.repeat(4)}00`],
+      ['not hex', 'g'.repeat(64)],
+    ])('should refuse an encryption key that is %s', (_case, key) => {
+      expect(() => validate({ ...CLOUD, MESSAGING_ENCRYPTION_KEY: key })).toThrow(
+        'MESSAGING_ENCRYPTION_KEY — 64 hex characters (32 bytes)',
+      );
+    });
+
+    it('should refuse an API address that is not a URL', () => {
+      expect(() => validate({ ...CLOUD, WHATSAPP_API_BASE_URL: 'not a url' })).toThrow(
+        'Invalid notification-service environment',
+      );
+    });
+
+    it.each([
+      ['log', { ...BASE, NOTIFICATION_WHATSAPP_PROVIDER: 'log' }],
+      ['unset', BASE],
+    ])('should need none of the settings when the provider is %s', (_case, env) => {
+      expect(validate(env)).toEqual(env);
+    });
+  });
 });

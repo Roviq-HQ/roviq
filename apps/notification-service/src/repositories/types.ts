@@ -1,4 +1,6 @@
 import type {
+  MessageTemplateCategory,
+  MessagingSenderStatus,
   NotificationChannel,
   NotificationSkipReason,
   NotificationTypeKey,
@@ -60,10 +62,40 @@ export interface InAppRow {
   dedupeKey: string;
 }
 
+/** The sender and template a WhatsApp attempt went through; stored on its delivery row. */
+export interface DeliveryRoute {
+  senderId: string;
+  templateCategory: MessageTemplateCategory | null;
+}
+
 export type DeliveryOutcome =
-  | { status: 'SENT'; provider: string; providerMessageId: string | null }
-  | { status: 'FAILED'; provider: string; errorCode: string }
+  | { status: 'SENT'; provider: string; providerMessageId: string | null; route?: DeliveryRoute }
+  | {
+      status: 'FAILED';
+      provider: string;
+      errorCode: string;
+      /** False when trying again cannot help (a refused template, a number not on WhatsApp). */
+      retryable: boolean;
+      route?: DeliveryRoute;
+    }
   | { status: 'SKIPPED'; provider: string | null; skipReason: NotificationSkipReason };
+
+/** A sender with its encrypted access token. Never leaves the notification service. */
+export interface MessagingSenderRecord {
+  id: string;
+  scope: string;
+  tenantId: string | null;
+  status: MessagingSenderStatus;
+  providerNumberId: string;
+  dailyCap: number;
+  instituteDailyCap: number | null;
+  accessTokenEncrypted: Buffer;
+}
+
+export interface SenderSentCounts {
+  total: number;
+  forTenant: number;
+}
 
 export interface DeliveryRow {
   audience: Audience;
@@ -73,4 +105,23 @@ export interface DeliveryRow {
   channel: NotificationChannel;
   attempt: number;
   outcome: DeliveryOutcome;
+}
+
+/** Who an inbound event is about: a phone number, the provider's user id, or both. */
+export interface InboundPerson {
+  phone: string | null;
+  providerUserId: string | null;
+}
+
+export interface ReceiptInput {
+  senderId: string;
+  /** Unique per report: the message id and the reported status. */
+  eventId: string;
+  providerMessageId: string;
+  status: 'DELIVERED' | 'FAILED';
+  /** Set for FAILED. */
+  errorCode: string | null;
+  /** A read report: append DELIVERED only when no delivery report came before it. */
+  onlyIfNotDelivered: boolean;
+  person: InboundPerson;
 }

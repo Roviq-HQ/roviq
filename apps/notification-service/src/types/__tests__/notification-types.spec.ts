@@ -183,7 +183,7 @@ describe('regular type copy', () => {
     });
     expect(composeOutside(sample, 'WHATSAPP', 'hi')).toEqual({
       subject: 'उपस्थिति सूचना',
-      body: '22 नवंबर 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया।',
+      body: 'उपस्थिति सूचना: Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। तिथि: 22 नवंबर 2026।',
     });
   });
 
@@ -231,7 +231,7 @@ describe('regular type copy', () => {
 
     try {
       expect(composeOutside(message, 'WHATSAPP', 'en').body).toBe(
-        'Your ward Aarav Sharma (Class 5-A) was marked absent on 1 January 2026.',
+        'Attendance update: Aarav Sharma (Class 5-A) was marked absent. Date: 1 January 2026.',
       );
     } finally {
       vi.unstubAllEnvs();

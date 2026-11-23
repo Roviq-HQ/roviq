@@ -48,12 +48,14 @@ import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
+import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { AttendanceListener } from '../listeners/attendance.listener';
 import { AuthListener } from '../listeners/auth.listener';
 import { LeaveListener } from '../listeners/leave.listener';
 import { UserListener } from '../listeners/user.listener';
 import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
+import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
 import { NotificationConfigReadDrizzleRepository } from '../repositories/notification-config-read.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
@@ -168,6 +170,7 @@ describe('notification pipeline (integration)', () => {
           enabled: plan.enabled,
           content: { kind: 'single', message: input.message, notificationId: input.notificationId },
           data: input.data,
+          deferrable: true,
         }),
       ),
     );
@@ -254,6 +257,7 @@ describe('notification pipeline (integration)', () => {
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
       contacts,
       writes,
+      new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
     );
     dispatcher = new NotificationDispatcher(
       new NotificationConfigReadDrizzleRepository(db),
@@ -451,6 +455,7 @@ describe('notification pipeline (integration)', () => {
                   digest: { type: input.type, items: messages.map((m) => m.params) },
                 },
                 data: {},
+                deferrable: true,
               }),
             ),
           );
@@ -557,6 +562,8 @@ describe('notification pipeline (integration)', () => {
         recipientUserId: guardian.userId,
         notificationId: null,
         channelEnabled: true,
+        critical: false,
+        deferrable: true,
         attempt: 1,
         address: { given: channel === 'EMAIL' ? 'guardian@example.in' : '+919876543210' },
         data,
@@ -629,6 +636,8 @@ describe('notification pipeline (integration)', () => {
         recipientUserId: student.userId,
         notificationId: null,
         channelEnabled: true,
+        critical: false,
+        deferrable: true,
         attempt: 1,
         address: { given: '+919876500000' },
         data: {},

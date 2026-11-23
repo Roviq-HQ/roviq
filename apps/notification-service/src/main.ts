@@ -10,7 +10,7 @@ async function bootstrap() {
   // enableGracefulShutdown owns SIGTERM/SIGINT and stops the worker in onModuleDestroy; Temporal's
   // own handlers would stop it first, and the worker would schedule a restart.
   Runtime.install({ shutdownSignals: [] });
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   enableGracefulShutdown(app);
   const config = app.get(ConfigService);

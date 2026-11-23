@@ -20,7 +20,15 @@ const envSchema = z
     NOTIFICATION_EMAIL_PROVIDER: z.enum(['smtp', 'log']).optional(),
     NOTIFICATION_PUSH_PROVIDER: z.enum(['fcm', 'log']).optional(),
     NOTIFICATION_SMS_PROVIDER: z.enum(['log']).optional(),
-    NOTIFICATION_WHATSAPP_PROVIDER: z.enum(['log']).optional(),
+    NOTIFICATION_WHATSAPP_PROVIDER: z.enum(['cloud', 'log']).optional(),
+    // WhatsApp provider ('cloud'): API address, webhook secrets, and the key sender tokens are encrypted with
+    WHATSAPP_API_BASE_URL: z.url().optional(),
+    WHATSAPP_APP_SECRET: z.string().min(1).optional(),
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+    MESSAGING_ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/, 'MESSAGING_ENCRYPTION_KEY — 64 hex characters (32 bytes)')
+      .optional(),
     SMTP_URL: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
     FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
@@ -45,6 +53,32 @@ const envSchema = z
       ctx.addIssue({
         code: 'custom',
         message: 'FCM_SERVICE_ACCOUNT_JSON — required when NOTIFICATION_PUSH_PROVIDER=fcm',
+      });
+    }
+    if (env.NOTIFICATION_WHATSAPP_PROVIDER === 'cloud') {
+      const missing = (
+        [
+          'WHATSAPP_API_BASE_URL',
+          'WHATSAPP_APP_SECRET',
+          'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+          'MESSAGING_ENCRYPTION_KEY',
+        ] as const
+      ).filter((name) => !env[name]);
+      if (missing.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `${missing.join(', ')} — required when NOTIFICATION_WHATSAPP_PROVIDER=cloud`,
+        });
+      }
+    }
+    if (
+      env.NODE_ENV === 'production' &&
+      env.MESSAGING_ENCRYPTION_KEY &&
+      /^0+$/.test(env.MESSAGING_ENCRYPTION_KEY)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused in production',
       });
     }
     if (env.NODE_ENV === 'production') {

@@ -1,3 +1,11 @@
+import { MessageTemplateCategory } from '@roviq/common-types';
+import { buttonPathOf, clipVariable } from '../delivery/whatsapp/template-variables';
+import {
+  cleanVariable,
+  renderTemplate,
+  type WhatsAppTemplate,
+} from '../delivery/whatsapp/whatsapp-template';
+import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
 import { type Locale, localized, type RegularNotificationType } from './notification-type';
 
 export interface ApprovalRequestedParams {
@@ -17,6 +25,33 @@ export interface ApprovalResolvedParams {
 function approvalPath(approvalType: string): string {
   return approvalType === 'LEAVE' ? '/institute/leave' : '/institute/dashboard';
 }
+
+const FREE_TEXT_MAX = 200;
+const NONE: Record<Locale, string> = { en: 'none', hi: 'कोई नहीं' };
+
+/** The approved body closes the sentence itself. */
+function freeText(value: string | null, locale: Locale): string {
+  return clipVariable((value ?? '').trim().replace(/[.।]+$/, ''), FREE_TEXT_MAX, NONE[locale]);
+}
+
+const requestedWhatsApp: WhatsAppTemplate<ApprovalRequestedParams> = {
+  name: 'approval_requested_v1',
+  category: MessageTemplateCategory.UTILITY,
+  body: {
+    en: 'Approval needed: {{1}} submitted a {{2}} request. Summary: {{3}}.',
+    hi: 'स्वीकृति आवश्यक: {{1}} ने {{2}} अनुरोध भेजा है। सारांश: {{3}}।',
+  },
+  variables: (p, locale) => [
+    cleanVariable(p.requesterName, locale === 'hi' ? 'एक सदस्य' : 'a member'),
+    cleanVariable(p.approvalType, locale === 'hi' ? 'नया' : 'new'),
+    freeText(p.summary, locale),
+  ],
+  buttonPath: (p) => buttonPathOf(approvalPath(p.approvalType)),
+};
+
+export const approvalRequestedWhatsApp: TypeTemplates<ApprovalRequestedParams> = {
+  single: requestedWhatsApp,
+};
 
 const requestedTitle = (p: ApprovalRequestedParams, locale: Locale) =>
   locale === 'hi' ? `स्वीकृति आवश्यक: ${p.approvalType}` : `Approval Needed: ${p.approvalType}`;
@@ -46,10 +81,10 @@ export const approvalRequestedType: RegularNotificationType<ApprovalRequestedPar
     if (channel === 'WHATSAPP') {
       return {
         subject: requestedTitle(p, locale),
-        body:
-          locale === 'hi'
-            ? `स्वीकृति आवश्यक: ${p.requesterName} ने ${p.approvalType} अनुरोध भेजा है। ${p.summary}`
-            : `Approval needed: ${p.requesterName} submitted a ${p.approvalType} request. ${p.summary}`,
+        body: renderTemplate(
+          requestedWhatsApp.body[locale],
+          requestedWhatsApp.variables(p, locale),
+        ),
       };
     }
     if (channel === 'PUSH') {
@@ -68,6 +103,26 @@ const resolvedTitle = (p: ApprovalResolvedParams, locale: Locale) =>
   locale === 'hi'
     ? `${p.approvalType} अनुरोध ${resolvedWord(p.status, locale)}`
     : `${p.approvalType} request ${resolvedWord(p.status, locale)}`;
+
+const resolvedWhatsApp: WhatsAppTemplate<ApprovalResolvedParams> = {
+  name: 'approval_resolved_v1',
+  category: MessageTemplateCategory.UTILITY,
+  body: {
+    en: 'Request update: the {{1}} request, reviewed by {{2}}, was {{3}}. Remarks: {{4}}.',
+    hi: 'अनुरोध अपडेट: {{1}} अनुरोध की समीक्षा {{2}} ने की और इसे {{3}} किया गया। टिप्पणी: {{4}}।',
+  },
+  variables: (p, locale) => [
+    cleanVariable(p.approvalType, locale === 'hi' ? 'प्रस्तुत' : 'submitted'),
+    cleanVariable(p.reviewerName, locale === 'hi' ? 'समीक्षक' : 'the reviewer'),
+    resolvedWord(p.status, locale),
+    freeText(p.remarks, locale),
+  ],
+  buttonPath: (p) => buttonPathOf(approvalPath(p.approvalType)),
+};
+
+export const approvalResolvedWhatsApp: TypeTemplates<ApprovalResolvedParams> = {
+  single: resolvedWhatsApp,
+};
 
 function resolvedLine(p: ApprovalResolvedParams, locale: Locale): string {
   const word = resolvedWord(p.status, locale);
@@ -91,8 +146,11 @@ export const approvalResolvedType: RegularNotificationType<ApprovalResolvedParam
     body: localized((l) => resolvedLine(p, l)),
     data: { approvalType: p.approvalType, status: p.status, path: approvalPath(p.approvalType) },
   }),
-  outsideCopy: (p, _channel, locale) => ({
+  outsideCopy: (p, channel, locale) => ({
     subject: resolvedTitle(p, locale),
-    body: resolvedLine(p, locale),
+    body:
+      channel === 'WHATSAPP'
+        ? renderTemplate(resolvedWhatsApp.body[locale], resolvedWhatsApp.variables(p, locale))
+        : resolvedLine(p, locale),
   }),
 };

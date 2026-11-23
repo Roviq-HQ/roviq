@@ -148,6 +148,8 @@ export const AppSubject = {
   DlqMessage: 'DlqMessage',
   /** One attempt to send a notification outside the app — platform support reads it (ROV-314) */
   NotificationDelivery: 'NotificationDelivery',
+  /** A WhatsApp number messages are sent from, the platform's or an institute's (ROV-319) */
+  MessagingSender: 'MessagingSender',
   /** Platform infrastructure health — dependency status, stream lag, alerts (ROV-184) */
   SystemHealth: 'SystemHealth',
 } as const;

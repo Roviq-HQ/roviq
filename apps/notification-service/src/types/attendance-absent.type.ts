@@ -1,4 +1,11 @@
-import type { NotificationChannel } from '@roviq/common-types';
+import { MessageTemplateCategory, type NotificationChannel } from '@roviq/common-types';
+import { buttonPathOf, nameList } from '../delivery/whatsapp/template-variables';
+import {
+  cleanVariable,
+  renderTemplate,
+  type WhatsAppTemplate,
+} from '../delivery/whatsapp/whatsapp-template';
+import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
 import { formatCalendarDate } from './calendar-date';
 import {
   type Locale,
@@ -19,6 +26,8 @@ export interface AttendanceAbsentParams {
   sectionName: string | null;
   standardName: string | null;
 }
+
+const ATTENDANCE_PATH = '/institute/attendance';
 
 function statusWord(status: AttendanceAbsentParams['status'], locale: Locale): string {
   if (locale === 'hi') return status === 'LATE' ? 'विलंब से उपस्थित' : 'अनुपस्थित';
@@ -78,6 +87,57 @@ function digestSubject(items: readonly AttendanceAbsentParams[], locale: Locale)
   return `Attendance alerts: ${parts.filter(Boolean).join(', ')}`;
 }
 
+const WARD: Record<Locale, string> = { en: 'your ward', hi: 'आपके बच्चे' };
+
+const whatsappSingle: WhatsAppTemplate<AttendanceAbsentParams> = {
+  name: 'attendance_absent_v1',
+  category: MessageTemplateCategory.UTILITY,
+  body: {
+    en: 'Attendance update: {{1}} ({{2}}) was marked {{3}}. Date: {{4}}.',
+    hi: 'उपस्थिति सूचना: {{1}} ({{2}}) को {{3}} दर्ज किया गया। तिथि: {{4}}।',
+  },
+  variables: (p, locale) => [
+    cleanVariable(p.studentName ?? '', WARD[locale]),
+    cleanVariable(
+      sectionLabel(p, locale) ?? '',
+      locale === 'hi' ? 'कक्षा उपलब्ध नहीं' : 'class not given',
+    ),
+    statusWord(p.status, locale),
+    cleanVariable(
+      formatCalendarDate(p.sessionDate, locale) ?? '',
+      locale === 'hi' ? 'आज' : 'today',
+    ),
+  ],
+  buttonPath: () => buttonPathOf(ATTENDANCE_PATH),
+};
+
+const whatsappDigest: WhatsAppTemplate<readonly AttendanceAbsentParams[]> = {
+  name: 'attendance_absent_digest_v1',
+  category: MessageTemplateCategory.UTILITY,
+  body: {
+    en: 'Attendance summary for {{1}}: {{2}} absent and {{3}} late marks were recorded today.',
+    hi: 'उपस्थिति सारांश, {{1}}: आज {{2}} अनुपस्थिति और {{3}} विलंब दर्ज हुए।',
+  },
+  variables: (items, locale) => {
+    const late = items.filter((p) => p.status === 'LATE').length;
+    return [
+      nameList(
+        items.map((p) => p.studentName),
+        locale === 'hi' ? 'आपका बच्चा' : 'your ward',
+        locale,
+      ),
+      String(items.length - late),
+      String(late),
+    ];
+  },
+  buttonPath: () => buttonPathOf(ATTENDANCE_PATH),
+};
+
+export const attendanceAbsentWhatsApp: TypeTemplates<AttendanceAbsentParams> = {
+  single: whatsappSingle,
+  digest: whatsappDigest,
+};
+
 function summary(
   items: readonly AttendanceAbsentParams[],
   channel: NotificationChannel,
@@ -85,6 +145,14 @@ function summary(
 ): OutsideCopy {
   const [first] = items;
   const one = items.length === 1 && first ? first : null;
+  if (channel === 'WHATSAPP') {
+    return {
+      subject: locale === 'hi' ? 'उपस्थिति सूचना' : 'Attendance Alert',
+      body: one
+        ? renderTemplate(whatsappSingle.body[locale], whatsappSingle.variables(one, locale))
+        : renderTemplate(whatsappDigest.body[locale], whatsappDigest.variables(items, locale)),
+    };
+  }
   const body = one
     ? single(one, locale)
     : locale === 'hi'
@@ -126,7 +194,7 @@ export const attendanceAbsentType: RegularNotificationType<AttendanceAbsentParam
         ? `${single(p, l)} यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।`
         : `${single(p, l)} Please contact the institute if this is incorrect.`,
     ),
-    data: { sessionId: p.sessionId, studentId: p.studentId, path: '/institute/attendance' },
+    data: { sessionId: p.sessionId, studentId: p.studentId, path: ATTENDANCE_PATH },
   }),
   outsideCopy: (p, channel, locale) => summary([p], channel, locale),
 };

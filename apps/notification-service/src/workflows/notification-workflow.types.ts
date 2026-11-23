@@ -55,12 +55,25 @@ export interface SendChannelInput extends RecipientTarget {
     | { kind: 'single'; message: RegularMessage<RegularTypeKey>; notificationId: string | null }
     | { kind: 'digest'; digest: RegularDigest<RegularTypeKey> };
   data: Record<string, string>;
+  /** False on the workflow's last try: a deferral is then recorded as skipped instead. */
+  deferrable: boolean;
+}
+
+/** Quiet hours or a full sender: the workflow sleeps until `deferUntil` and tries again. */
+export interface ChannelDeferral {
+  deferUntil: string;
 }
 
 export interface NotificationActivities {
-  /** One delivery row per execution; throws on a provider failure so Temporal retries. */
-  sendChannel(input: SendChannelInput): Promise<'SENT' | 'SKIPPED'>;
+  /**
+   * One delivery row per execution (none for a deferral); throws on a provider failure so
+   * Temporal retries.
+   */
+  sendChannel(input: SendChannelInput): Promise<'SENT' | 'SKIPPED' | ChannelDeferral>;
 }
+
+/** How often a channel may be deferred; the try after the last one sends or records a skip. */
+export const MAX_CHANNEL_DEFERRALS = 30;
 
 export const deliveryWorkflowId = (dedupeKey: string) => `notification-delivery:${dedupeKey}`;
 

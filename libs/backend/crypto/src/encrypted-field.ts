@@ -8,7 +8,10 @@ const AUTH_TAG_LENGTH = 16;
 
 /** Reads a 64-character hex key (32 bytes) from the environment; refuses any other shape. */
 function readKey(config: ConfigService, name: string): Buffer {
-  const hexKey = config.getOrThrow<string>(name);
+  return parseKey(config.getOrThrow<string>(name), name);
+}
+
+function parseKey(hexKey: string, name: string): Buffer {
   if (!/^[0-9a-fA-F]{64}$/.test(hexKey)) {
     throw new Error(
       `${name} must be a 64-character hex string (32 bytes). ` +
@@ -54,15 +57,15 @@ export class IdentityCryptoService {
 }
 
 /**
- * Encrypts the provider access token of a messaging sender with the key in
- * `MESSAGING_ENCRYPTION_KEY`. A key of its own: leaking one does not open the other's data.
+ * Encrypts the provider access token of a messaging sender. A key of its own
+ * (`MESSAGING_ENCRYPTION_KEY`): leaking one key does not open the other's data. Takes the key
+ * itself, so each app builds it from its own configuration.
  */
-@Injectable()
 export class MessagingTokenCipher {
   private readonly key: Buffer;
 
-  constructor(config: ConfigService) {
-    this.key = readKey(config, 'MESSAGING_ENCRYPTION_KEY');
+  constructor(hexKey: string) {
+    this.key = parseKey(hexKey, 'MESSAGING_ENCRYPTION_KEY');
   }
 
   encrypt(token: string): Buffer {
