@@ -5,186 +5,80 @@ description: Use when working with database schema, Drizzle ORM, migrations, RLS
 
 # Database
 
-## Drizzle ORM v1 beta
+PostgreSQL 18 with row-level security, Drizzle ORM **v1 beta** (`drizzle-orm@beta`, `drizzle-kit@beta`). Stable v0.x APIs and examples do not apply; check the installed version's docs (Context7) before using an API you have not seen in this repo.
 
-### Version
+## Roles and wrappers
 
-- drizzle-orm@beta, drizzle-kit@beta
-- NEVER use stable v0.x APIs — we are on v1 beta track
+| Role | Used for |
+|---|---|
+| `roviq` | Superuser. Migrations only (`DATABASE_URL_MIGRATE`) |
+| `roviq_pooler` | The login role of the apps (`DATABASE_URL`). `NOINHERIT`: it can do nothing until a wrapper switches role |
+| `roviq_app` | Institute scope. RLS filters on `app.current_tenant_id` |
+| `roviq_reseller` | Reseller scope. RLS filters on `app.current_reseller_id` |
+| `roviq_admin` | Platform scope. Policies are `USING (true)`: it sees every tenant |
 
-### Critical rules
-
-- ALWAYS `strict: true` in drizzle.config.ts
-- NEVER use `drizzle-kit push` on any shared database
-- NEVER use `serial()` — use `integer().primaryKey().generatedAlwaysAsIdentity()`
-- NEVER use old `relations()` — use `defineRelations()` (RQBv2)
-- NEVER pass `{ schema }` to drizzle() — pass `{ schema, relations }`
-- NEVER import from `drizzle-zod` — use `drizzle-orm/zod`
-- `$onUpdate` is an alias for `$onUpdateFn` — both accept `() => TData | SQL`
-- NEVER use `.defaultRandom()` — use `.default(sql`uuidv7()`)` for all UUIDs (PostgreSQL 18 native)
-
-### Three query APIs — know which to use
-
-- `db.query` is RQBv2 (object-based filters, `with:` for relations): `db.query.users.findMany({ with: { posts: true } })`
-- `db.select().from(table).where()` is SQL-like (joins, aggregations, raw control)
-- `db._query` is legacy RQBv1 (callback-based). NEVER use `db._query`.
-- The `with:` option does NOT exist on `db.select()` — that's a compile error
-- Complex JOINs do NOT work in `db.query` — use `db.select()` with `.innerJoin()`
-
-### RLS & multi-tenancy
-
-#### Database roles & connection mapping
-
-- Three database roles: `roviq` (superuser, migrations only), `roviq_app` (runtime, RLS enforced), `roviq_admin` (admin, policy-based bypass)
-- `DATABASE_URL` uses `roviq_pooler` which assumes `roviq_app` at runtime, `DATABASE_URL_ADMIN` uses `roviq_admin`, `DATABASE_URL_MIGRATE` uses `roviq` superuser
-- RLS bypass is policy-based, NOT role-level — no runtime role has `BYPASSRLS`
-- Connection flow: `roviq_pooler` (NOINHERIT LOGIN) → assumes `roviq_app`/`roviq_reseller`/`roviq_admin` via `SET LOCAL ROLE` inside wrappers
-
-#### Query wrappers (branded RequestContext, ROV-248)
-
-- Single Drizzle instance (DRIZZLE_DB), not separate admin/tenant instances
-- Wrappers take a **branded `RequestContext`** as the second arg — wrong scope/wrapper combos are TypeScript errors:
-  - `withTenant(db, ctx: InstituteContext, async (tx) => {…})` — was `(db, tenantId: string, fn)`
-  - `withReseller(db, ctx: ResellerContext, async (tx) => {…})` — was `(db, resellerId: string, fn)`
-  - `withAdmin(db, ctx: PlatformContext, async (tx) => {…})` — was 2-arg `(db, fn)`
-- Resolvers obtain the branded ctx by narrowing `req.user`: `assertTenantContext(user)` / `assertResellerContext(user)` / `assertPlatformContext(user)` from `@roviq/auth-backend`. EE billing flows that need both `tenantId` AND `resellerId` use `assertInstituteWithReseller(user)` (replaces the old double-assert that narrowed to `never`).
-- Workflows / seeders / event consumers without a JWT use the **synthetic-context factories**: `mkInstituteCtx(tenantId)`, `mkResellerCtx(resellerId)`, `mkAdminCtx()` from `@roviq/database`. They mint a typed context with the synthetic-user UUID `00000000-0000-0000-0000-000000000000`. Allowlisted via `pnpm check:synthetic-context-usage` — adding a new caller requires explicit allowlist + security review.
-- `withTenant` extracts `tenantId` from ctx and sets `app.current_tenant_id` via SET LOCAL — does NOT read from ALS
-- `withAdmin` sets `ROLE roviq_admin` via SET LOCAL — `roviq_admin` policy is `USING (true)` for cross-tenant ops
-- Compile-time invariant locked by `libs/database/src/__tests__/branded-context.spec.ts` (Vitest `expectTypeOf`)
-- **`withTrash` no longer exists.** Soft-delete visibility moved out of RLS — see "Soft delete" below.
-
-#### RLS policies
-
-- RLS policies defined via `tenantPolicies(name)` or `entityPolicies(name)` helpers
-- NEVER write inline policy SQL per table — always use the helpers
-- `pgRole('roviq_app').existing()` and `pgRole('roviq_admin').existing()` for policy `to` targets
-- Hard DELETE blocked for `roviq_app` — policy `USING (false)`. Only `roviq_admin` can hard delete
-
-#### Platform vs Tenant tables
-
-- **Platform-level (NO RLS):** `users`, `institutes`, `phone_numbers`, `auth_providers` — use `withAdmin(db, fn)`
-- **Tenant-scoped (RLS enforced):** `memberships`, `profiles`, `roles`, `refresh_tokens`, `student_guardians`, and all business data — use `withTenant(db, tenantId, fn)`
-- Exception: `withAdmin()` for platform admin cross-tenant ops and auth service (user lookup at login)
-
-#### Schema change checklist (tenant-scoped tables)
-
-Every tenant-scoped table MUST have ALL of these:
-
-- `tenantId: uuid('tenant_id').notNull()` — use `tenantColumns` spread for standard tables
-- Index on `tenant_id` — without this, RLS does full table scans
-- RLS policies via `tenantPolicies('table_name')` helper (includes tenant isolation + admin bypass + soft-delete filter)
-
-After ANY schema change:
-
-- Run `pnpm tilt trigger db-push` to sync schema to DB
-- Update `scripts/seed.ts` to match the new schema
-- Grep for old field names / unique constraints across `scripts/`, `e2e/`, and test files
-
-### CASL authorization
-
-- Dynamic roles — abilities stored in DB, not hardcoded
-- Abilities live on `Membership`, NOT `User` — each membership has a personal `abilities` field combined with role abilities per request
-- AbilityFactory reads from `Membership.abilities`
-- Use CASL guards and decorators:
+No runtime role has `BYPASSRLS`. Every query runs inside one wrapper, which opens a transaction and does `SET LOCAL ROLE` plus the context variable:
 
 ```typescript
-@UseGuards(GqlAuthGuard, AbilityGuard)
-@CheckAbility({ action: 'create', subject: 'Attendance' })
+withTenant(db, ctx: InstituteContext, async (tx) => { … })
+withReseller(db, ctx: ResellerContext, async (tx) => { … })
+withAdmin(db, ctx: PlatformContext, async (tx) => { … })
 ```
 
-- NEVER hardcode role checks — `if (user.role === 'teacher')` is banned; use `ability.can()` instead
-- `GqlAuthGuard` comes from `@roviq/auth-backend`, NOT from `@roviq/casl`
-- CASL lives in `@roviq/casl` (`libs/backend/casl/`) — authorization only, not authentication
+- The context is **branded**: the wrong context for a wrapper is a compile error. Resolvers narrow `req.user` with `assertTenantContext` / `assertResellerContext` / `assertPlatformContext` / `assertInstituteWithReseller` from `@roviq/auth-backend`.
+- Code with no JWT (workflow activities, seeders, event consumers, integration fixtures) builds one with `mkInstituteCtx(tenantId, origin)`, `mkResellerCtx(resellerId, origin)`, `mkAdminCtx(origin)`. These skip the JWT, so every importing file must be on the allowlist of `pnpm check:synthetic-context-usage`, with a reason.
+- `withAdmin` reads and writes every tenant. Institute or reseller code never hands it a caller-supplied id without first proving, under the caller's own context, that the row is theirs (`pnpm check:admin-context-reach`).
+- Never `db.transaction`, `$transaction` or a bare `db.select` outside a wrapper.
 
-### Column conventions
+## What RLS does not do for you
 
-- Tenant-scoped tables: spread `...tenantColumns` (tenantId + timestamps + tracking + soft delete + version)
-- Every other mutable table, including identity tables (`users`, `refresh_tokens`, `phone_numbers`, `auth_providers`, `user_profiles`, the three membership tables, `resellers`): spread `...entityColumns`. `refresh_tokens` uses `entityColumns` plus its own nullable `tenant_id`
-- Exempt, and the only tables that may skip audit + soft-delete columns:
-  - append-only records: `audit_logs`, `auth_events`, `dlq_messages`, `consent_records`, `impersonation_sessions`, `notification_deliveries`
-  - counters: `tenant_sequences`, `reseller_invoice_sequences`
-  - EE financial records (`invoices`, `payments`, `subscriptions`): `trackingColumns`, status only, never deleted
-- A row inserted before its actor exists (self-registration) or by an unattended flow uses `SYSTEM_USER_ID`. Otherwise pass the acting user's id explicitly — `created_by` / `updated_by` are NOT NULL with no default on purpose
-- Unique indexes on a soft-deletable table are partial (`WHERE deleted_at IS NULL`) so a deleted row releases its key. Exceptions that stay global: `users.email`, `users.username`, `resellers.slug` (a deleted identity must not be claimable by someone else). An `onConflict` on a partial index needs `targetWhere: sql`deleted_at IS NULL``
-- Billing EE tables: spread `...entityColumns` (like tenantColumns but without tenantId)
-- Immutable event tables (payment_events): only `createdAt`, no update/delete columns
-- `createdBy`/`updatedBy` — read from `getRequestContext().userId`. `SYSTEM_USER_ID` for automated ops
-- `deletedBy` is nullable — only populated on soft delete
-- `version` column — used for optimistic concurrency and future sync
-- Multi-language text: use `i18nText('column_name')` → jsonb typed as `Record<string, string>`
-- For tables with `tenantColumns` spread, add tenant FK via `foreignKey()` in constraints
+- **Foreign keys do not apply RLS**, and `WITH CHECK` sees only the new row's `tenant_id`. A row can therefore point at another institute's student, year or class. Before storing a caller-supplied id, read it through its `*Live` view inside the caller's `withTenant`, and check that related ids agree (the class belongs to the year, the section to the class).
+- A rule that must hold on every code path belongs in the database too: GRANT, RLS policy, CHECK or trigger. Test it by attempting the forbidden write as the role.
+- `.enableRLS()` only does `ENABLE`. `FORCE ROW LEVEL SECURITY` is applied in custom SQL.
+- Hard `DELETE` is blocked for `roviq_app` (`USING (false)`): it silently removes nothing.
 
-### Status & deletion — separate concerns
+## Tables
 
-- **NEVER `isActive: boolean()`** — use domain-specific `pgEnum` status. Each entity owns its enum
-- **Status ≠ deletion.** Delete = "created by mistake." Deactivate = "still referenced but disabled"
-- Separate mutations: `deletePlan` vs `deactivatePlan`. Explicit status transitions, not generic `updateStatus()`
-- **Financial records: status only, no delete** — invoices, subscriptions, ledger entries. `cancelSubscription`, `refundInvoice` — never delete
-- Status enums per domain: `plan_status`, `user_status`, `membership_status`, `institute_status`, `role_status`, etc.
+- Tenant-scoped table: spread `...tenantColumns` (tenant id, timestamps, `created_by` / `updated_by`, soft delete, `version`), an index starting with `tenant_id`, and `...tenantPolicies('table_name')`. Never write policy SQL inline.
+- Any other mutable table: `...entityColumns` and `entityPolicies(...)`.
+- Exempt from audit and soft-delete columns: append-only records (`audit_logs`, `auth_events`, `dlq_messages`, `consent_records`, `impersonation_sessions`, `notification_deliveries`), counters, and EE financial records (status only, never deleted).
+- Every `pgTable` opts into RLS or is on the exempt list (`pnpm check:rls-coverage`).
+- `created_by` / `updated_by` are NOT NULL with no default on purpose: pass the acting user's id, or `SYSTEM_USER_ID` for unattended work.
+- Ids: ``.default(sql`uuidv7()`)``. Never `serial()`, `.defaultRandom()` or `gen_random_uuid()`.
+- Tenant-authored names: `i18nText('name')` (jsonb `{ en, hi }`). Not for emails, usernames, codes or enums.
+- Status is a domain `pgEnum` from `@roviq/common-types` (UPPER_SNAKE), never `isActive: boolean()`. Status and deletion are different things.
+- Schema files live in `libs/database/src/schema/` by domain; the barrel re-exports every table; relations are in `schema/relations.ts` with `defineRelations()`.
 
-### Soft delete
+## Soft delete and `*Live` views
 
-- **Visibility lives in `<table>_live` security_invoker views** — NOT in RLS, NOT in service-level `isNull(deletedAt)` predicates. Every soft-deletable table has a corresponding `<table>Live` export from `@roviq/database` (e.g. `subjects`/`subjectsLive`, `studentProfiles`/`studentProfilesLive`). Reads MUST use the `*Live` view; writes target the base table.
-- The view is created `WITH (security_invoker = true)` so SELECT runs RLS as the calling DB role — without that, the view runs as its owner and would leak rows across tenants. PG 15+ feature; PG 18 inlines the view with the partial index for free.
-- INSERT/UPDATE/DELETE … RETURNING must hit the **base table** — Drizzle pgViews are read-only. Repository pattern: a `liveColumns` projection (read) + a `writeReturning` projection (insert/update return).
-- NEVER use `db.delete()` — always `softDelete(db, table, id)` which throws `NotFoundException` directly. A `DELETE` issued as `roviq_app` matches the `USING (false)` policy and silently removes nothing. For a bulk soft delete, `UPDATE … SET deleted_at, deleted_by, updated_by … WHERE deleted_at IS NULL`. Helper sits in `@roviq/database` and is now a plain UPDATE (the old `withTrashFlag` dance is gone).
-- Restore: `restoreDeleted(db, table, id)` — caller looks up the row through the **base table** (no view filter) and the helper clears `deletedAt`/`deletedBy`.
-- Trash listings (admin recycle bin, audit cross-tenant break-glass): query the base table directly with an explicit `isNull(table.deletedAt)` opposite (`isNotNull(...)`). Don't reach for the view.
-- Three CI gates lock soft-delete + RLS end-to-end (Item 6 / ROV-250):
-  - `pnpm check:live-views` — bans application code reading a soft-deletable base table (`.from()` or any join) outside `__tests__/`. The table list is derived from the `*Live` exports, so a new view is enforced automatically. Annotate intentional cases with `// allow-base-read: <reason>`.
-  - `pnpm check:live-views-coverage` — every `pgTable` that spreads `tenantColumns`/`entityColumns` or declares `deletedAt:` MUST have a matching `<table>Live` export from `live-views.ts`. Adding a soft-deletable table without the view fails CI.
-  - `pnpm check:rls-coverage` — every `pgTable` MUST opt into RLS (`tenantPolicies()` / `entityPolicies()` / inline `pgPolicy()` / `.enableRLS()`) or be on `RLS_EXEMPT_BASENAMES` with a justification (platform-level user tables governed by DB-role GRANTs).
-- `notDeleted(table)` helper (also in `@roviq/database`) returns `isNull(table.deletedAt)` for the rare case a query needs to combine "live" with another table without its own view.
-- **`withTrash()` no longer exists.** It was removed when soft-delete moved out of RLS — there's nothing left to toggle.
+- Every soft-deletable table has a `<table>Live` view (`security_invoker`, so RLS runs as the caller). **Read from the view, write to the base table.** `INSERT/UPDATE … RETURNING` target the base table.
+- Delete with `softDelete(tx, table, id)`; a bulk one is an `UPDATE … SET deleted_at, deleted_by, updated_by … WHERE deleted_at IS NULL`. Restore with `restoreDeleted(tx, table, id)`. Never `db.delete()`.
+- A read of the base table is allowed only for trash listings or where deleted rows must count (for example "was this student ever placed in this year"), and carries `// allow-base-read: <reason>`.
+- Unique indexes are partial (`WHERE deleted_at IS NULL`) so a deleted row releases its key. An upsert on one needs the predicate too: `.onConflictDoNothing({ target: […], where: sql\`deleted_at IS NULL\` })`. Global on purpose: `users.email`, `users.username`, `resellers.slug`.
+- Gates: `pnpm check:live-views` (no base-table reads in app code) and `pnpm check:live-views-coverage` (every soft-deletable table has its view).
 
-### Schema patterns
+## Queries
 
-- All schema files in libs/database/src/schema/ organized by domain
-- Use reusable helpers from common/columns.ts (timestamps, trackingColumns, entityColumns, tenantColumns, i18nText)
-- Cross-file references use lazy evaluation: `.references(() => otherTable.id)`
-- Barrel export in schema/index.ts must re-export ALL tables (but NOT relations — breaks circular ref)
-- Relations in schema/relations.ts using `defineRelations()` — exported separately from main barrel
-- EE relations in ee/libs/database/ using `defineRelationsPart()` — merge via `{ ...relations, ...part }`
-- drizzle.config.ts `schema` points to barrel `./src/schema/index.ts` (NOT glob `**/*.ts` — causes duplicates)
+- `db.query.*` is the relational API (`with:` for relations). `tx.select().from()` is the SQL-like API (joins, aggregates). `with:` does not exist on `select()`. Never `db._query`.
+- `drizzle({ schema, relations })`, and `DrizzleDB` is `NodePgDatabase<typeof schema, typeof relations>`.
+- Zod from tables: `drizzle-orm/zod`, not `drizzle-zod`.
+- **A raw `sql\`\`` fragment inside a single-table `select` loses table names**: `${a.userId} = ${b.id}` renders as `"user_id" = "id"` and a correlated `EXISTS` then matches nothing (ROV-315). Use a join, a second statement with `inArray`, or the query builder's `exists(...)` with aliased tables, and cover it with an integration test.
+- A self-join or a correlated subquery over the same view needs `alias(view, 'name')`.
+- One statement per `tx.execute()`: PostgreSQL rejects several commands in a prepared statement.
+- Optimistic concurrency: `WHERE version = expected` and `version = version + 1`.
 
-### Types
+## Changing the schema
 
-- `DrizzleDB` type requires TWO generics: `NodePgDatabase<typeof schema, typeof relations>`
-- Without the second generic, `db.query.*` won't have relational query types
+- Dev: edit the schema; Tilt's `db-push` applies it to this instance's own database. `pnpm tilt trigger db-clean` resets and re-seeds it. Never run `drizzle-kit push`, `pnpm db:*` or `db-migrate` yourself.
+- A change that must reach other environments is a migration in `libs/database/migrations/` (one folder per migration): `pnpm nx run database:db:generate` from the schema, or `drizzle-kit generate --custom --name=<name>` for hand-written SQL (functions, triggers, FORCE RLS, partitioned-table indexes). On a Fable session migrations are written by Fable, not by a subagent.
+- `drizzle-kit` does not diff RLS policies, and a renamed policy makes `generate` ask questions: keep policy names stable.
+- After a schema change: update `scripts/seed*.ts`, grep `scripts/`, `e2e/` and the specs for old column names, and run the integration specs of the area (the test database migrates itself at the start of a run).
+- Time-partitioned tables: create partitions only through `ensure_monthly_partition(parent, month_start)`, wire the three places the pattern needs (create migration, boot maintainer, `scripts/db-reset.ts`), and keep their indexes in custom SQL. Details: `docs/infrastructure.md` → "Time-partitioned tables".
 
-### Time-RANGE partitioned tables
+## CASL
 
-Static `CREATE TABLE foo_YYYY_MM PARTITION OF foo` lists silently break the day wall-clock crosses the last upper bound — production and tests both. Use `ensure_monthly_partition(parent regclass, month_start timestamptz)` (installed by `20260501033334_ensure-monthly-partition`) and wire all three sites — skipping any one re-introduces the drift:
+Abilities are stored on roles and on `Membership`, combined per request. Check with `@CheckAbility({ action, subject })` or `ability.can()`; never compare role names. Every pair must be reachable by a role (`ability-coverage.spec.ts`).
 
-- **Create migration**: backfill with `SELECT ensure_monthly_partition('foo'::regclass, gs) FROM generate_series(date_trunc('month', NOW()), date_trunc('month', NOW()) + interval '6 months', interval '1 month') gs;`
-- **App boot + daily**: add an `OnModuleInit` provider on the dedicated pool. Pattern: `apps/api-gateway/src/audit/audit-partition-maintainer.ts`. Boot alone misses long-lived pods.
-- **`scripts/db-reset.ts`**: append to `PARTITIONED_TABLES` in `ensureMonthlyPartitions()` so dev/e2e/integration DBs share the buffer.
+## Tests
 
-**Indexes on a partitioned table go in a custom migration only** (`CREATE INDEX IF NOT EXISTS`), never in the Drizzle schema: `drizzle-kit push` does not see them and re-creates them on every push, which fails Tilt's `db-push`. After a schema change, a second `pnpm db:push` on a reset database must succeed.
-
-Parent RLS/GRANTs do not cover a partition queried by name. `ensure_monthly_partition` calls `lock_down_partitions(parent)` (ROV-64), which strips every non-owner privilege from each child and FORCEs RLS with no policies. Never create a partition with raw `CREATE TABLE … PARTITION OF` (it is born open, and `roviq_admin` cannot run the DDL anyway) and never name a partition in application SQL. Detach via `detach_monthly_partition(parent, name)`.
-
-### Gotchas
-
-- `drizzle-kit push` does NOT diff RLS policies — it skips them. Drop+recreate schema for clean policy state
-- `.enableRLS()` only does `ENABLE`, not `FORCE`. Apply `FORCE ROW LEVEL SECURITY` via raw SQL in custom migrations
-- Renamed RLS policies cause `drizzle-kit generate` interactive prompts. Use consistent naming or ask user to reset DB
-- PostgreSQL prepared statements reject multi-command strings in a single `tx.execute()`. Use separate `await tx.execute()` calls for each statement
-- Reseller-scoped queries: wrap in `withReseller(db, resellerId, async (tx) => {...})` — sets reseller context for RLS
-
-### Migration commands
-
-- Generate: `nx run database:db:generate`
-- Apply: `nx run database:db:migrate`
-- Reset: `pnpm db:reset` (drop all + push) or `pnpm db:reset --seed`
-- Check conflicts: `nx run database:db:check`
-- Custom migration: `drizzle-kit generate --custom --name=description`
-- Migration folder uses v3 structure (folder-per-migration). There is NO `meta/_journal.json` file.
-
-### Testing
-
-- Unit tests: mock DRIZZLE_DB provider with jest/vitest mocks
-- Wrap tests with `withTestContext()` from `@roviq/common-types` for request context
-- Integration tests: use PGlite for speed, Testcontainers for RLS testing
-- The abstract repository pattern means most tests don't touch Drizzle directly
+Queries, RLS and constraints are tested in integration specs against the real database (`testing-integration` skill). A unit test with a mocked transaction proves nothing about SQL.

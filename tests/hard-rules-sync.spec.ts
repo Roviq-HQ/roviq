@@ -25,13 +25,13 @@ function uniqueTags(tags: string[]): string[] {
 const rulesContent = readFileSync(RULES_PATH, 'utf-8');
 const refContent = readFileSync(REF_PATH, 'utf-8');
 
-// Only extract tags from the Hard Rules section of CLAUDE.md
-const hardRulesSection = rulesContent.match(/## Hard Rules[\s\S]*?(?=\n## )/)?.[0] ?? '';
+// Only extract tags from the Hard rules section of CLAUDE.md
+const hardRulesSection = rulesContent.match(/## Hard rules[\s\S]*?(?=\n## )/)?.[0] ?? '';
 const rulesTags = uniqueTags(extractAllTags(hardRulesSection));
 const refTags = uniqueTags(extractHeadingTags(refContent));
 
 describe('hard-rules CLAUDE.md ↔ reference sync', () => {
-  it('Hard Rules section exists in CLAUDE.md', () => {
+  it('Hard rules section exists in CLAUDE.md', () => {
     expect(hardRulesSection.length).toBeGreaterThan(0);
   });
 

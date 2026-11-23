@@ -1,6 +1,6 @@
 # Hard Rules Reference — Roviq
 
-> **SYNC RULE**: This file and `CLAUDE.md` § Hard Rules are paired.
+> **SYNC RULE**: This file and `CLAUDE.md` → "Hard rules" are paired.
 > Any addition, removal, or edit to a rule in either file MUST be reflected in the other.
 > CLAUDE.md contains concise one-liners; this file contains full detail.
 > Before committing, verify both files have the same set of tags.
@@ -21,7 +21,7 @@ Scoring: +5 for every standard/proper approach, -5 for every simplest-but-not-pr
 
 ### [NACPR] Test Fully, Then Commit
 
-A change is committed automatically once it is tested thoroughly in the browser and by automated tests. Both are the agent's job. Skipping the browser pass and handing back `git add` + `git commit` is not allowed: run the browser pass (root `CLAUDE.md` → "Browser Verification"), then commit. Output the full commands for copy-paste only when the browser pass is truly impossible, and name the blocker you tried and failed to remove. Push and merge only when the user asks for it.
+A change is committed automatically once it is tested thoroughly in the browser and by automated tests. Both are the agent's job. Skipping the browser pass and handing back `git add` + `git commit` is not allowed: run the browser pass (`docs/working-method.md` → "Browser pass"), then commit. Output the full commands for copy-paste only when the browser pass is truly impossible, and name the blocker you tried and failed to remove. Push and merge only when the user asks for it.
 
 Commit message format:
 - Header ≤100 chars with detailed message
@@ -85,7 +85,7 @@ Never put `any`, `as unknown`, or `as never` to silence type errors. Resolution 
 ### [BFCMT] Before Commit
 
 Before committing, verify every touched code path, on your own initiative and without being asked:
-1. Browser-verify end-to-end with Playwright, following root `CLAUDE.md` → "Browser Verification". Backend-only changes count: drive the UI flows that reach the changed code
+1. Browser-verify end-to-end with Playwright, following `docs/working-method.md` → "Browser pass". Backend-only changes count: drive the UI flows that reach the changed code
 2. Write/update unit + component + e2e tests
 3. Run `pnpm lint:fix` to fix formatting
 
@@ -98,12 +98,6 @@ There is no such thing as "pre-existing errors." If you encounter them, fix and 
 ---
 
 ## CODE CONVENTIONS
-
-### [RDPKG] Read Package.json Scripts
-
-Before running commands related to the app, read `package.json` scripts to use the correct command. Run `pnpm lint:fix` frequently to keep formatting clean.
-
----
 
 ### [NPENV] Process.env Restrictions
 

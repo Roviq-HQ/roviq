@@ -18,11 +18,16 @@ pnpm test:int                     # vitest --project integration
                                   # starts dev Postgres/Redis/NATS itself if they are stopped (scripts/int-infra.ts)
 
 # E2E tests (requires Docker stack: pnpm e2e:up)
-pnpm test:e2e:api                 # Vitest GraphQL tests against api-gateway:3004
-pnpm test:e2e:ui                  # Playwright UI tests across 3 portals
+pnpm e2e:up                       # start the Docker e2e stack (stays running); re-seeds every time.
+                                  # The backend is a fixed build with no watcher: run it again after a
+                                  # backend change (about 45 s; 16 s when the backend is unchanged).
+                                  # test:e2e:api and ci:check run it themselves.
+pnpm test:e2e:api                 # Vitest GraphQL tests against api-gateway:3004. All new E2E API tests go here.
+pnpm test:e2e:ui                  # Playwright UI tests across 3 portals plus cross-portal
 
 # Full pipeline
 pnpm test:all                     # unit + int + e2e:api + e2e:ui
+pnpm ci:check                     # lint/typecheck/test/e2e gate, run by .husky/pre-push (see "CI and pre-push")
 
 # Coverage
 pnpm test:coverage                # unit-node + unit-dom with v8 coverage

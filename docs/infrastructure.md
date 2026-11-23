@@ -12,6 +12,43 @@ pnpm tilt get uiresources # Check resource status
 
 Tilt UI: http://localhost:10350
 
+### Tilt commands
+
+Run apps, migrations, seeds and resets through Tilt, always as `pnpm tilt …` (the wrapper targets
+this checkout's Tilt).
+
+| Command | What it does |
+|---|---|
+| `pnpm tilt trigger db-push` | Push the schema |
+| `pnpm tilt trigger db-seed` | Seed data |
+| `pnpm tilt trigger db-clean` | Reset the database and re-seed |
+| `pnpm tilt trigger api-gateway` | Restart the API |
+| `pnpm tilt trigger web` | Restart the web app |
+| `pnpm tilt trigger e2e-gateway` | Run the API e2e tests |
+| `pnpm tilt trigger e2e-ui` | Run the Playwright UI tests for all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e) |
+| `pnpm tilt logs <resource>` | Read a resource's output, e.g. `db-clean`, `api-gateway`, `typecheck`, `codegen` |
+
+The app resources (api-gateway, notification-service, web) restart on file changes, so a trigger
+is only for the manual resources. The test commands (`pnpm e2e:up`, `pnpm test:e2e:api`,
+`pnpm ci:check` and the rest) are in `docs/testing.md` → "Commands".
+
+### When the dev app looks wrong
+
+Check these before debugging the code:
+
+1. **Stale gateway.** `node --watch` sometimes misses a file change. Find the process and its start
+   time, and compare with your last edit:
+   `ss -ltnp | grep :<API port>` gives the pid, `ps -o lstart -p <pid>` the start time. If it is
+   older than the edit, `pnpm tilt trigger api-gateway` and wait for `/api/health/ready`.
+2. **Stale type-check.** The `typecheck` resource watches with built library types and can show an
+   error for a symbol that exists. `pnpm nx run <project>:build` is the answer that counts.
+3. **Codegen ran while the gateway was restarting.** It fails with `ECONNREFUSED`; run
+   `pnpm codegen` again once the gateway answers.
+4. **Changed `.env`.** Tilt reads it once at start. Stop Tilt and `pnpm tilt up` again; check a
+   running process with `tr '\0' '\n' < /proc/<pid>/environ | grep NAME`.
+5. **Schema behind the branch.** `pnpm tilt logs db-push`; `pnpm tilt trigger db-clean` resets and
+   re-seeds this instance's own database.
+
 ### How the backend apps run in dev
 
 `api-gateway` and `notification-service` run from their TypeScript sources, not from `dist/`
@@ -120,6 +157,14 @@ Things to know:
   or export `TILT_PORT`. Claude Code sessions opened in the worktree have it set already.
 - Browser cookies on `localhost` are shared across ports. Use a separate browser profile per instance. The Playwright MCP browser already has one per Claude session (`PLAYWRIGHT_MCP_ISOLATED` in `.claude/settings.json`).
 - Unset `NX_WORKSPACE_ROOT_PATH` in a worktree's shell if it is set, or Nx uses the main checkout.
+- **Reusing a stale slot.** When every slot has a worktree, reuse one that is stale: its branch's
+  PR is merged (or `git rev-list --count origin/main..HEAD` is 0), `git status --short` is empty,
+  and its Tilt does not answer (`pnpm tilt get uiresources` fails). In that checkout:
+  `git fetch origin`, `git switch -c <branch> origin/main`, `pnpm install`, `pnpm tilt up`. A slot
+  with unmerged commits or uncommitted files is not stale, however old: leave it, and if every
+  slot is in real use, tell the user.
+- A `../roviq-<slot>` folder that is not a worktree (left behind by containers, owned by root)
+  blocks `pnpm instance:new` for that slot. Use another slot and tell the user.
 - Remove an instance with `pnpm tilt down`, `docker compose -p roviq-<slot> down -v`, then
   `git worktree remove ../roviq-<slot>`.
 
@@ -179,6 +224,33 @@ pnpm run db:reset         # Nuke DB + re-push schema (or use db-clean in Tilt UI
 pnpm run db:reset --seed  # Nuke + push + seed in one step
 pnpm run db:studio        # Open Drizzle Studio (visual DB browser)
 ```
+
+### Time-partitioned tables
+
+A fixed list of `CREATE TABLE foo_YYYY_MM PARTITION OF foo` breaks the day the clock passes the
+last partition, in production and in tests alike. Use
+`ensure_monthly_partition(parent regclass, month_start timestamptz)` (migration
+`20260501033334_ensure-monthly-partition`) and wire all three places; skipping one brings the
+problem back:
+
+- **The create migration** backfills:
+  `SELECT ensure_monthly_partition('foo'::regclass, gs) FROM generate_series(date_trunc('month', NOW()), date_trunc('month', NOW()) + interval '6 months', interval '1 month') gs;`
+- **At app start and daily**: an `OnModuleInit` provider on the dedicated pool. Pattern:
+  `apps/api-gateway/src/audit/audit-partition-maintainer.ts`. Start-up alone misses long-lived
+  processes.
+- **`scripts/db-reset.ts`**: add the table to `PARTITIONED_TABLES` in `ensureMonthlyPartitions()`
+  so dev, e2e and integration databases get the same buffer.
+
+Indexes on a partitioned table go in a custom migration only (`CREATE INDEX IF NOT EXISTS`), never
+in the Drizzle schema: `drizzle-kit push` does not see them and re-creates them on every push,
+which fails Tilt's `db-push`. After a schema change, a second push on a reset database must
+succeed.
+
+The parent's RLS and GRANTs do not cover a partition queried by name.
+`ensure_monthly_partition` calls `lock_down_partitions(parent)`, which strips every non-owner
+privilege from each child and forces RLS with no policies. Never create a partition with a raw
+`CREATE TABLE … PARTITION OF` and never name a partition in application SQL. Detach with
+`detach_monthly_partition(parent, name)`. More: `docs/audit-logging.md`.
 
 ## NATS JetStream Streams
 

@@ -1,216 +1,64 @@
 ---
 name: testing-integration
-description: Use when writing, modifying, or reviewing integration tests (*.integration.spec.ts) — covers NestJS Test.createTestingModule with real PostgreSQL, RLS pipeline testing, cross-scope rejection, cross-tenant isolation, CASL enforcement, and audit pipeline tests
+description: Use when writing, modifying, or reviewing integration tests (*.integration.spec.ts) — NestJS booted in process against real PostgreSQL with RLS: app boot, tokens, fixtures, cross-institute and ability refusals, events, and what must be covered per operation
 ---
 
-# Integration Test Rules
+# Integration tests
 
-## What Is an Integration Test in Roviq
+A NestJS module booted **in process** with `Test.createTestingModule()` against the **real test database** (`roviq_test`, all roles and RLS in force), driven through GraphQL over supertest. This is the layer that proves queries, RLS, scope guards, `@CheckAbility` and tenant isolation. Shared conventions and commands: `testing-unit` skill.
 
-A test that boots a NestJS module **in-process** via `Test.createTestingModule()` with a **real PostgreSQL database** (5-role RLS setup) and exercises the resolver → service → repository → `withTenant()` → `SET LOCAL ROLE` → RLS pipeline. HTTP requests go through **supertest** against the in-process app.
+Copy the shape of a current spec instead of writing from memory: `apps/api-gateway/src/institute/student/__tests__/student-placement-correction.integration.spec.ts`.
 
-This is the layer that catches:
-- `withTenant()` / `withReseller()` / `withAdmin()` wrapper bugs
-- Scope guard wiring (`@PlatformScope`, `@ResellerScope`, `@InstituteScope`)
-- CASL `@CheckAbility` decorator enforcement against real DB rows
-- `accessibleBy()` Drizzle query scoping
-- Audit interceptor → NATS publish (with mocked or real NATS)
-- Cross-tenant RLS isolation through the actual application stack
-- JWT validation through the real auth pipeline
-
-## Framework & Runner
-
-- **Vitest** with `--project integration` (defined in `vitest.workspace.ts`).
-- File naming: `__tests__/{name}.integration.spec.ts` colocated next to the source.
-- Runs with `pool: 'forks'` for process isolation — each test file gets its own process.
-- `pnpm test:int` to run all integration tests.
-
-## Prerequisites
-
-Integration tests require a running test database with the full 5-role setup:
-```bash
-pnpm db:reset --test   # runs migrations + custom SQL (roles, GRANTs, RLS) + seed
-```
-
-`db:push` is NOT sufficient — it skips `CREATE ROLE`, `GRANT`, `FORCE ROW LEVEL SECURITY`, and custom SQL migrations. Never use `db:push` for test database setup.
-
-## Using `@roviq/testing/integration` Library
-
-Integration tests import from `@roviq/testing/integration` — the heavy split barrel that pulls in supertest, Drizzle, `@node-rs/argon2`, and the NestJS testing module. Unit tests use `@roviq/testing` (light entry, exports only `createMock` and pure factories).
+## Boot, token, request
 
 ```typescript
 import {
-  createIntegrationApp,
-  createPlatformToken,
-  createResellerToken,
-  createInstituteToken,
-  createTestInstitute,
-  createTestReseller,
-  createTestTeacher,
-  cleanupTestInstitute,
-  cleanupTestReseller,
-  cleanupTestTeacher,
-  gqlRequest,
-  type IntegrationAppResult,
+  createInstituteToken, createIntegrationApp, createTestInstitute, createTestTeacher,
+  cleanupTestTeacher, gqlRequest, type IntegrationAppResult, type TestInstitute,
 } from '@roviq/testing/integration';
-```
+import { AppModule } from '../../../app/app.module';
 
-### Booting the App
+let result: IntegrationAppResult;
+beforeAll(async () => { result = await createIntegrationApp({ modules: [AppModule] }); });
+afterAll(async () => { await result?.close(); });
 
-```typescript
-describe('Student Resolver (integration)', () => {
-  let app: INestApplication;
-  let gql: ReturnType<typeof gqlRequest>;
-
-  beforeAll(async () => {
-    const result = await createIntegrationApp([InstituteModule]);
-    app = result.app;
-    gql = result.gql;
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
+const inst = await createTestInstitute(result.db);            // fresh institute with its admin
+const token = createInstituteToken({
+  sub: inst.userId, tenantId: inst.tenantId, membershipId: inst.membershipId, roleId: inst.roleId,
 });
-```
-
-`createIntegrationApp()` boots `Test.createTestingModule()` with:
-- Real PostgreSQL via `DATABASE_URL_TEST`
-- Mocked NATS (default) or real NATS via `createIntegrationAppWithNats()`
-- Mocked Redis, Temporal
-- Real JWT validation, scope guards, CASL, audit interceptor
-- supertest bound to the in-process HTTP server
-
-### Making GraphQL Requests
-
-```typescript
-it('should return students for authenticated institute admin', async () => {
-  const token = createInstituteToken(userId, tenantId);
-  const { data, errors } = await gql(
-    `query { students(first: 10) { edges { node { id name } } } }`,
-    {},
-    token,
-  );
-  expect(errors).toBeUndefined();
-  expect(data.students.edges.length).toBeGreaterThan(0);
+const res = await gqlRequest<{ enrollStudent: string }>(result.httpServer, {
+  query: ENROLL, variables: { input }, token,
 });
+expect(res.errors?.[0]?.extensions?.code).toBe('STUDENT_NOT_FOUND');
 ```
 
-### Cross-Scope Rejection (CRITICAL — every scope guard must have this)
+- The database is prepared for you: the project's global setup creates `roviq_test` if missing and applies pending migrations. No reset command is needed, and none may be run from a test.
+- Redis is an in-memory stand-in, NATS and Temporal are mocked. `createIntegrationAppWithNats` boots against real NATS; use it only for a test that needs a consumer to run (the audit pipeline).
+- Other scopes: `createPlatformToken`, `createResellerToken`, `createTestReseller`. A role with fewer abilities: `createTestTeacher(result.db, tenantId)`, cleaned with `cleanupTestTeacher`.
+- An emitted event is asserted by spying on the bus: `vi.spyOn(result.app.get(EventBusService), 'emit')`. A consumer is tested by getting the handler from the app and calling it with the payload.
 
-```typescript
-it('should reject reseller token on @PlatformScope resolver', async () => {
-  const resellerToken = createResellerToken(userId, resellerId);
-  const { errors } = await gql(
-    `query { adminInstitutes(first: 10) { edges { node { id } } } }`,
-    {},
-    resellerToken,
-  );
-  expect(errors).toBeDefined();
-  expect(errors[0].extensions.code).toBe('FORBIDDEN');
-});
+## Fixtures
 
-it('should reject institute token on @PlatformScope resolver', async () => {
-  const instituteToken = createInstituteToken(userId, tenantId);
-  const { errors } = await gql(
-    `query { adminInstitutes(first: 10) { edges { node { id } } } }`,
-    {},
-    instituteToken,
-  );
-  expect(errors).toBeDefined();
-  expect(errors[0].extensions.code).toBe('FORBIDDEN');
-});
-```
+- Create your own institute per `describe` with `createTestInstitute`; never insert into, or change, seeded rows. Ids come from the database (`uuidv7()`) or `randomUUID()`, never typed in.
+- Rows the factories do not cover are inserted with `withAdmin(result.db, mkAdminCtx('test:<spec-name>'), …)`. That needs the spec's path in `SYNTHETIC_CONTEXT_ALLOWLIST` (`scripts/check-synthetic-context-usage.ts`).
+- Insert what the code under test really reads. A student, staff member or guardian needs the institute's own profile copy (`tenant_user_profiles`) as well as the account profile, or the lists return nothing. An academic year's label must match `YYYY-YY`. When a fixture breaks a CHECK or a foreign key, fix the fixture; the constraint is right.
+- Tests in one file share the database: do not borrow "any" row with `LIMIT 1`, and do not assume a table is empty. A test that changes a shared fixture runs after the tests that read it, or creates its own.
+- No `TRUNCATE`, no `DELETE` of rows you did not create.
 
-**Every `@PlatformScope`, `@ResellerScope`, and `@InstituteScope` resolver MUST have cross-scope rejection tests.** This is the G2 gap from the audit — zero tests existed before.
+## What every new or changed operation needs
 
-### Cross-Tenant RLS Isolation
+1. **The normal case** through the real database, asserting the stored rows, not only the response.
+2. **Another institute's id is refused** for every id the operation takes (and another reseller's, in reseller scope), with the entity's not-found code, and **nothing is written in either institute**: compare the rows before and after.
+3. **A role without the ability is refused** (`FORBIDDEN`). A new `@CheckAbility` pair must also pass `ability-coverage.spec.ts`.
+4. **Wrong scope is refused** for a new resolver class: a reseller or platform token on an institute resolver, and the reverse.
+5. **Each business refusal** with its `ErrorCode`, and no event emitted on a refusal.
+6. **Ids that disagree with each other** (a class of another year, a section of another class).
+7. A database-enforced rule (GRANT, RLS, CHECK, trigger) is tested by attempting the forbidden write as that role and expecting the refusal.
 
-```typescript
-it('should not return tenant B students when scoped to tenant A', async () => {
-  const tenantA = await createTestInstitute(pool);
-  const tenantB = await createTestInstitute(pool);
+Prove a new test can fail: break the code once, or write the test before the fix and see it fail for the right reason.
 
-  // Create a student in tenant B
-  // (via direct DB insert using withTenant for setup)
+## Not here
 
-  // Query as tenant A
-  const tokenA = createInstituteToken(tenantA.userId, tenantA.tenantId);
-  const { data } = await gql(`query { students(first: 100) { edges { node { id } } } }`, {}, tokenA);
-
-  // Tenant A should see 0 students from tenant B
-  const ids = data.students.edges.map((e: any) => e.node.id);
-  expect(ids).not.toContain(tenantBStudentId);
-});
-```
-
-### Audit Pipeline (end-to-end with real NATS)
-
-```typescript
-describe('Audit pipeline', () => {
-  let app: INestApplication;
-  let gql: ReturnType<typeof gqlRequest>;
-  let pool: Pool;
-
-  beforeAll(async () => {
-    // Use createIntegrationAppWithNats for real NATS
-    const result = await createIntegrationAppWithNats([InstituteModule, AuditModule]);
-    app = result.app;
-    gql = result.gql;
-    pool = result.pool;
-  });
-
-  it('should write audit log via NATS consumer after mutation', async () => {
-    const token = createInstituteToken(userId, tenantId);
-    await gql(`mutation { updateStudent(input: { id: "${studentId}", name: "Rajesh" }) { id } }`, {}, token);
-
-    // Poll audit_logs — consumer processes asynchronously
-    const rows = await waitForAuditLog(pool, tenantId, 'updateStudent', 5000);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].action_type).toBe('UPDATE');
-    expect(rows[0].entity_type).toBe('Student');
-  });
-});
-```
-
-```typescript
-async function waitForCondition(fn: () => Promise<boolean>, timeoutMs = 5000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (await fn()) return;
-    await new Promise(r => setTimeout(r, 100));
-  }
-  throw new Error('Condition not met within timeout');
-}
-```
-
-## Test Data Setup
-
-- **Create fresh test data per suite** using `createTestInstitute()`, `createTestReseller()`, `createTestTeacher()` from `@roviq/testing/integration`. These create real DB rows with random UUIDs — zero collision with seed data.
-- **Can READ seed data** — look up system role IDs (`SEED.ROLE_INSTITUTE_ADMIN.id`) for membership creation.
-- **Never INSERT into seed entities** — no creating memberships for seeded users (this was Issue 1 from the testing report).
-
-## Cleanup
-
-- **Transaction rollback** for most tests: wrap in `BEGIN` / `ROLLBACK`.
-- For tests that need committed data (RLS policy tests, triggers): use `afterEach` with targeted `DELETE` in reverse FK order.
-- **Never `TRUNCATE`** — too aggressive, breaks concurrent test runs.
-- `app.close()` in `afterAll` to release connection pool.
-
-## What MUST Be Integration Tested (minimum per module)
-
-For every new module/resolver, agents must write at minimum:
-1. **Happy path** — authenticated request returns correct data through real DB
-2. **Cross-scope rejection** — wrong scope token returns FORBIDDEN
-3. **Cross-tenant isolation** — tenant A cannot see tenant B data
-4. **Error path** — invalid input returns validation error through real pipeline
-
-## Forbidden in Integration Tests
-
-- Mocking the database — that's the whole point of this layer. If you mock Drizzle/PG, it's a unit test. Name it `*.spec.ts`.
-- `vi.useFakeTimers()` — integration tests run against real async systems
-- Testing pure logic that belongs in unit tests (fee math, string transforms)
-- Hardcoded UUIDs that could collide — use `randomUUID()` or `createTestInstitute()`
-- Skipping cleanup — leaked test data causes flaky tests in CI
-- `any` type casts to bypass type errors on test data
-- Naming a file `*.integration.spec.ts` when it mocks the database (the upi-p2p anti-pattern)
+- A mocked database (`pnpm test:check-integration` fails the gate), `vi.useFakeTimers()`, pure logic that a unit test covers.
+- Asserting a secret's absence only in the response: also read the rows that could hold it (`audit_logs`, `notifications`, `notification_deliveries`).
+- After a rebase onto a `main` that changed the same area, run the spec again: fixtures written before the rebase may no longer match.
