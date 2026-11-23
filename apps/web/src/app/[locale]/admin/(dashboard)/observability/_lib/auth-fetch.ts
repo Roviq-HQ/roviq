@@ -27,10 +27,9 @@ export function errMessage(err: unknown): string {
 }
 
 /**
- * Service-name allowlist — restricts what we allow into a Prometheus /
- * Loki / Tempo selector. Names are user-controlled (URL state) so without
- * this, a crafted `?svc=foo"} | drop` triggers LogQL/TraceQL injection in
- * the consumers (see review M3). Also used by buildQueries.
+ * Service-name allowlist for the PromQL label selectors built in the browser.
+ * Names come from URL state; the logs and traces routes check the same pattern
+ * again on the server before building SQL.
  */
 export function sanitizeServiceNames(names: readonly string[]): string[] {
   return names.filter((s) => /^[a-zA-Z0-9_.-]+$/.test(s));

@@ -5,41 +5,22 @@ import { useState } from 'react';
 import { authFetch, errMessage, sanitizeServiceNames } from '../_lib/auth-fetch';
 import type { TimeRange } from '../_lib/constants';
 import { METRIC_INFO } from '../_lib/metric-descriptions';
+import { openObserveTraceUrl } from '../_lib/openobserve-links';
 import { usePollingEffect } from '../_lib/polling';
 import { PanelShell } from './panel-shell';
 
-// Tempo datasource UID — see _components/panel-menu.tsx for why we hardcode UIDs.
-const TEMPO_UID = 'P214B5B846CF3925F';
-
-function buildTempoTraceUrl(grafanaUrl: string, traceId: string): string {
-  const panes = {
-    roviq: {
-      datasource: TEMPO_UID,
-      queries: [
-        {
-          refId: 'A',
-          queryType: 'traceql',
-          query: traceId,
-          datasource: { type: 'tempo', uid: TEMPO_UID },
-        },
-      ],
-      range: { from: 'now-1h', to: 'now' },
-    },
-  };
-  return `${grafanaUrl}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify(panes))}`;
+interface TraceHit {
+  _timestamp?: number;
+  trace_id?: string;
+  service_name?: string;
+  operation_name?: string;
+  duration?: number;
 }
 
-interface TempoTrace {
-  traceID: string;
-  rootServiceName?: string;
-  rootTraceName?: string;
-  startTimeUnixNano?: string;
-  durationMs?: number;
-}
-
-interface TempoSearchResponse {
-  traces?: TempoTrace[];
+interface TraceSearchResponse {
+  hits?: TraceHit[];
   error?: string;
+  message?: string;
 }
 
 interface RecentTracesPanelProps {
@@ -47,7 +28,7 @@ interface RecentTracesPanelProps {
   refreshMs: number | null;
   services: string[];
   className?: string;
-  grafanaUrl: string;
+  openObserveUrl: string;
   headerRight?: React.ReactNode;
 }
 
@@ -56,52 +37,35 @@ export function RecentTracesPanel({
   refreshMs,
   services,
   className,
-  grafanaUrl,
+  openObserveUrl,
   headerRight,
 }: RecentTracesPanelProps) {
-  const [traces, setTraces] = useState<TempoTrace[] | null>(null);
+  const [traces, setTraces] = useState<TraceHit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
   const sinceSeconds = range.seconds;
-  // Sanitised so the user-controlled URL state can't inject TraceQL (review M3).
-  const safeServiceRegex = sanitizeServiceNames(services).join('|');
+  const serviceList = sanitizeServiceNames(services).join(',');
 
   usePollingEffect(
     async () => {
       try {
-        const params = new URLSearchParams({
-          // Over-fetch so we still have ~20 to show after the noise filter.
-          limit: '60',
-          sinceSeconds: String(sinceSeconds),
-        });
-        // Always filter out noise that crowds out real traffic — Docker
-        // compose healthcheck pings, the api-gateway's own /api/health,
-        // GraphQL introspection (codegen). User asked for these specifically.
-        const noiseExclusions = [
-          'resource.service.name != "compose"',
-          'name != "GET /api/health"',
-          'name != "HEAD /_ping"',
-          'name != "query IntrospectionQuery"',
-        ];
-        const clauses = safeServiceRegex
-          ? [`resource.service.name=~"${safeServiceRegex}"`, ...noiseExclusions]
-          : noiseExclusions;
-        params.set('q', `{ ${clauses.join(' && ')} }`);
-
+        // The route filters out health checks and introspection server-side.
+        const params = new URLSearchParams({ limit: '20', sinceSeconds: String(sinceSeconds) });
+        if (serviceList) params.set('services', serviceList);
         const res = await authFetch(`/api/traces?${params}`);
-        const body = (await res.json()) as TempoSearchResponse;
-        if (body.error) {
-          setError(body.error);
+        const body = (await res.json()) as TraceSearchResponse;
+        if (!res.ok) {
+          setError(body.error ?? body.message ?? `traces query failed (HTTP ${res.status})`);
           return;
         }
-        setTraces((body.traces ?? []).slice(0, 20));
+        setTraces((body.hits ?? []).filter((t) => Boolean(t.trace_id)));
         setLastFetchedAt(Date.now());
         setError(null);
       } catch (err) {
         setError(errMessage(err));
       }
     },
-    { refreshMs, deps: [sinceSeconds, safeServiceRegex] },
+    { refreshMs, deps: [sinceSeconds, serviceList] },
   );
 
   return (
@@ -135,9 +99,11 @@ export function RecentTracesPanel({
             </thead>
             <tbody>
               {traces.map((trace) => {
-                const startedMs = trace.startTimeUnixNano
-                  ? Math.floor(Number(trace.startTimeUnixNano) / 1_000_000)
-                  : 0;
+                const traceId = trace.trace_id ?? '';
+                const startedUs = trace._timestamp ?? 0;
+                const startedMs = Math.floor(startedUs / 1_000);
+                const durationMs =
+                  trace.duration !== undefined ? Math.round(trace.duration / 1_000) : null;
                 const startedAt = startedMs
                   ? new Date(startedMs).toLocaleTimeString(undefined, {
                       hour: '2-digit',
@@ -146,22 +112,22 @@ export function RecentTracesPanel({
                     })
                   : '–';
                 return (
-                  <tr key={trace.traceID} className="border-b last:border-0 hover:bg-muted/40">
+                  <tr key={traceId} className="border-b last:border-0 hover:bg-muted/40">
                     <td className="px-2 py-1.5 font-mono text-[11px]">
-                      {trace.rootServiceName ?? '–'}
+                      {trace.service_name ?? '–'}
                     </td>
                     <td className="truncate px-2 py-1.5">
                       <a
-                        href={buildTempoTraceUrl(grafanaUrl, trace.traceID)}
+                        href={openObserveTraceUrl(openObserveUrl, traceId, startedUs)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline"
                       >
-                        {trace.rootTraceName ?? trace.traceID.slice(0, 16)}
+                        {trace.operation_name ?? traceId.slice(0, 16)}
                       </a>
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums">
-                      {trace.durationMs ? `${trace.durationMs} ms` : '–'}
+                      {durationMs !== null ? `${durationMs} ms` : '–'}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
                       {startedAt}

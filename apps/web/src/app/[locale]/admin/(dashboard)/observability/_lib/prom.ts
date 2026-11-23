@@ -108,7 +108,7 @@ export function useRangeQuery(
       try {
         const body = await fetchRange(query, { seconds, step });
         if (body.status !== 'success') {
-          setError(body.error ?? 'prometheus error');
+          setError(body.error ?? 'metrics query error');
           return;
         }
         setData(body.data ?? null);
@@ -151,19 +151,15 @@ export function useInstantQuery(
 
 /**
  * Builds the queries object for the dashboard. Service names are sanitised
- * (allowlist-only chars) before interpolation — URL state is user-controlled
- * so without sanitising, a crafted `?svc=foo"})` would break out of the label
- * selector and inject arbitrary PromQL (review M3).
+ * (allowlist-only chars) before interpolation: URL state is user-controlled,
+ * so a crafted `?svc=foo"})` would otherwise break out of the label selector.
  */
 export function buildQueries(services: string[]): Record<string, string> {
   const safe = sanitizeServiceNames(services);
   const svc = safe.length > 0 ? safe.join('|') : '.+';
-  const m = (extra = '') =>
-    `roviq_http_server_duration_milliseconds_count{exported_job=~"${svc}"${extra}}`;
-  const b = (extra = '') =>
-    `roviq_http_server_duration_milliseconds_bucket{exported_job=~"${svc}"${extra}}`;
-  const s = (extra = '') =>
-    `roviq_http_server_duration_milliseconds_sum{exported_job=~"${svc}"${extra}}`;
+  const m = (extra = '') => `http_server_duration_count{service_name=~"${svc}"${extra}}`;
+  const b = (extra = '') => `http_server_duration_bucket{service_name=~"${svc}"${extra}}`;
+  const s = (extra = '') => `http_server_duration_sum{service_name=~"${svc}"${extra}}`;
   return {
     requestRate: `sum by (http_method, http_route) (rate(${m()}[1m]))`,
     errorRate5xx: `sum by (http_method, http_route) (rate(${m(',http_status_code=~"5.."')}[1m]))`,
@@ -173,20 +169,14 @@ export function buildQueries(services: string[]): Record<string, string> {
     totalRequests: `sum(${m()}) or vector(0)`,
     totalRequests5m: `sum(increase(${m()}[5m])) or vector(0)`,
     errorPct: `100 * sum(rate(${m(',http_status_code=~"5.."')}[5m])) / clamp_min(sum(rate(${m()}[5m])), 1) or vector(0)`,
-    // Metric is already `_milliseconds_*` (OTel-named, ms unit). DON'T multiply
-    // by 1000 — that gave microseconds and made the panel disagree with Grafana
-    // by a factor of ~1000.
+    // The OTel histogram is already in milliseconds; do not scale it.
     avgResponseMs: `sum(rate(${s()}[5m])) / clamp_min(sum(rate(${m()}[5m])), 1) or vector(0)`,
-    // Each sparkline now plots the SAME function as its parent stat over time,
-    // so the small chart shows you how today's number got to where it is.
-    // Sparklines that show something different from the parent stat are
-    // confusing (looks like a mismatch with Grafana — they're really plotting
-    // unrelated quantities).
+    // Each sparkline plots the same function as its parent stat over time.
     totalRequestsSpark: `sum(${m()})`,
     totalRequests5mSpark: `sum(increase(${m()}[5m]))`,
     avgResponseSpark: `sum(rate(${s()}[1m])) / clamp_min(sum(rate(${m()}[1m])), 1)`,
-    eventBusEmit: 'sum by (subject_prefix) (rate(roviq_event_bus_emit_total[1m]))',
-    eventBusFailed: 'sum by (subject_prefix) (rate(roviq_event_bus_emit_failed_total[1m]))',
+    eventBusEmit: 'sum by (subject_prefix) (rate(event_bus_emit_total[1m]))',
+    eventBusFailed: 'sum by (subject_prefix) (rate(event_bus_emit_failed_total[1m]))',
   };
 }
 

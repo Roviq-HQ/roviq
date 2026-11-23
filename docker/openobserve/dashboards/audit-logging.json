@@ -1,0 +1,412 @@
+{
+  "version": 5,
+  "title": "Roviq: audit logging",
+  "description": "Audit pipeline: events published and consumed, consumer lag, dead letters and impersonation.",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "panel_1",
+          "type": "line",
+          "title": "Audit event throughput",
+          "description": "Events per second published by the interceptor and written by the consumer.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (scope) (rate(audit_events_published_total[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "published {scope}"
+              }
+            },
+            {
+              "query": "sum(rate(audit_events_consumed_total[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "consumed"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 64,
+            "h": 16,
+            "i": 1
+          }
+        },
+        {
+          "id": "panel_2",
+          "type": "line",
+          "title": "Consumer lag",
+          "description": "Audit events waiting for the audit consumer.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "jetstream_consumer_num_pending{stream_name=\"AUDIT\",consumer_name=\"audit-log-writer\"}",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "pending"
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 0,
+            "w": 64,
+            "h": 16,
+            "i": 2
+          }
+        },
+        {
+          "id": "panel_3",
+          "type": "metric",
+          "title": "Dead-lettered audit events",
+          "description": "Audit events sent to the dead-letter queue since the gateway started.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(audit_events_dlq_total) or vector(0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 0,
+            "w": 64,
+            "h": 16,
+            "i": 3
+          }
+        },
+        {
+          "id": "panel_4",
+          "type": "line",
+          "title": "Error rate",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (error_type) (rate(audit_events_error_total[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{error_type}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 64,
+            "h": 16,
+            "i": 4
+          }
+        },
+        {
+          "id": "panel_5",
+          "type": "pie",
+          "title": "Events by scope",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (scope) (audit_events_published_total)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{scope}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 16,
+            "w": 64,
+            "h": 16,
+            "i": 5
+          }
+        },
+        {
+          "id": "panel_6",
+          "type": "pie",
+          "title": "Events by source",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (source) (audit_events_published_total)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{source}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 16,
+            "w": 64,
+            "h": 16,
+            "i": 6
+          }
+        },
+        {
+          "id": "panel_7",
+          "type": "line",
+          "title": "Impersonated actions",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (scope) (rate(audit_impersonation_total[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{scope}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 32,
+            "w": 64,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "panel_8",
+          "type": "bar",
+          "title": "Top entity types",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (entity_type) (audit_events_published_total))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{entity_type}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 32,
+            "w": 64,
+            "h": 16,
+            "i": 8
+          }
+        },
+        {
+          "id": "panel_9",
+          "type": "metric",
+          "title": "Events published",
+          "description": "Audit events published since the gateway started.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(audit_events_published_total) or vector(0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 32,
+            "w": 64,
+            "h": 16,
+            "i": 9
+          }
+        }
+      ]
+    }
+  ]
+}

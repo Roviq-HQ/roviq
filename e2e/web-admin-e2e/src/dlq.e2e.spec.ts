@@ -129,8 +129,8 @@ async function seedRow(
 }
 
 test.describe('Admin Observability — Dead Letter Queue (ROV-19)', () => {
-  // The observability page's metric/alert panels proxy to Prometheus + Grafana,
-  // which are not part of the e2e Docker stack — those panels emit 500s the
+  // The observability page's metric/alert panels proxy to OpenObserve, which is
+  // not part of the e2e Docker stack — those panels emit errors the
   // console-guardian would otherwise fail on. They are unrelated to the DLQ tab
   // under test, so opt out of the global console assertion for this suite.
   test.use({ failOnConsoleErrors: false });

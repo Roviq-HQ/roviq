@@ -17,7 +17,7 @@ pnpm tilt up
 Tilt handles everything automatically:
 - Creates `.env` from `.env.example` on first run
 - Installs dependencies (`pnpm install`)
-- Starts infra (Postgres, Redis, NATS, object storage (RustFS), Temporal) in Docker; the OTel/Grafana stack starts on demand (`observability`)
+- Starts infra (Postgres, Redis, NATS, object storage (RustFS), Temporal) in Docker; OpenObserve (logs, metrics, traces) starts on demand (`pnpm tilt trigger observability`)
 - Pushes Drizzle schema to database and seeds test data
 - Starts all apps locally; the API gateway and notification service run from TypeScript source and restart by themselves when you save a file (`docs/infrastructure.md` → "How the backend apps run in dev")
 
@@ -51,9 +51,7 @@ open http://localhost:3005/api/graphql
 curl http://localhost:3005/api/health
 
 # Observability (also accessible via web app → Observability)
-open http://localhost:3001                   # Grafana
-open http://localhost:9090                   # Prometheus
-open http://localhost:3200                   # Tempo
+open http://localhost:5080                   # OpenObserve, after `pnpm tilt trigger observability`
 
 # Institute login (single institute → direct JWT)
 curl -s http://localhost:3005/api/graphql -X POST \

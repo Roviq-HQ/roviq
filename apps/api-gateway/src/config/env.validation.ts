@@ -87,6 +87,29 @@ const envSchema = z
     CLAMAV_HOST: z.string().optional(),
     CLAMAV_PORT: z.coerce.number().optional(),
 
+    // Telemetry and OpenObserve (docs/deployment.md → "Telemetry and shutdown"). Unset endpoint: telemetry off.
+    OTEL_EXPORTER_OTLP_ENDPOINT: z
+      .url({
+        protocol: /^https?$/,
+        error: 'OTEL_EXPORTER_OTLP_ENDPOINT — OTLP gRPC URL (e.g. http://openobserve:5081)',
+      })
+      .optional(),
+    OTEL_EXPORTER_OTLP_HEADERS: z
+      .string()
+      .regex(/^[^=,\s]+=[^,]+(,[^=,\s]+=[^,]+)*$/, {
+        error: 'OTEL_EXPORTER_OTLP_HEADERS — comma-separated key=value pairs',
+      })
+      .optional(),
+    OPENOBSERVE_URL: z
+      .url({
+        protocol: /^https?$/,
+        error: 'OPENOBSERVE_URL — OpenObserve HTTP URL (e.g. http://openobserve:5080)',
+      })
+      .optional(),
+    OPENOBSERVE_ORG: z.string().optional(),
+    OPENOBSERVE_USER: z.string().optional(),
+    OPENOBSERVE_PASSWORD: z.string().optional(),
+
     // Temporal — used by certificate (TC issuance) and admission workflows.
     // Address defaults to localhost:7233 inside services; CE-002 made the
     // task-queue name configurable so the worker queue can be renamed without

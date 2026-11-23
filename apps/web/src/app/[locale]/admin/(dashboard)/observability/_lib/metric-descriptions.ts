@@ -1,7 +1,4 @@
 // Single source of truth for what every observability panel actually shows.
-// Mirrored in `docker/grafana/dashboards/overview.json` (panel `.description`)
-// so Grafana shows the same `(i)` hover text. **If you change a description
-// here, update the Grafana dashboard JSON too** (verified during local dev).
 
 export interface MetricDescription {
   /** Short title used as the panel header. */
@@ -59,17 +56,17 @@ export const METRIC_INFO = {
   jetstreamStreams: {
     title: 'JetStream Streams',
     description:
-      'Live per-stream stats scraped from NATS (`prometheus-nats-exporter`): message count, bytes used, consumer count, pending deliveries. Green = healthy (no pending), amber = some pending, red = redelivers or pending >100.',
+      'Live per-stream stats the api-gateway reads from NATS JetStream: message count, bytes used, consumer count, pending deliveries. Green = healthy (no pending), amber = some pending, red = redelivers or pending >100.',
   },
   recentTraces: {
     title: 'Recent Traces',
     description:
-      'Most recent OpenTelemetry traces from Tempo, excluding noise (Docker healthchecks, codegen introspection, /api/health). Click a trace to inspect its spans in Grafana Tempo Explore.',
+      'Most recent incoming requests and events traced by OpenTelemetry, excluding noise (Docker healthchecks, codegen introspection, /api/health). Click a trace to inspect its spans in OpenObserve.',
   },
   recentLogs: {
     title: 'Recent Logs',
     description:
-      'Most recent log lines from Loki, parsed for level + service + message. Empty when no shipper (Promtail/Alloy) is forwarding the api-gateway logs to Loki.',
+      'Most recent log lines the services export to OpenObserve over OTLP, with level, service and message. Empty when no service has logged in this range.',
   },
 } as const;
 

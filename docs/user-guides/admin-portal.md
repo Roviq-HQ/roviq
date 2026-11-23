@@ -267,8 +267,8 @@ On the **Impersonation** tab, an additional **scope** filter lets you show entri
 ## Observability
 
 1. From the sidebar, open **Observability**.
-2. An embedded **Grafana dashboard** is displayed, showing platform health metrics, request rates, error rates, and resource usage.
-3. Use the Grafana controls to adjust time ranges and drill into specific panels.
+2. The page shows request rates, error rates and response times, the event bus, the NATS streams, recent traces and logs, and the dead-letter queue, each on its own tab. A banner lists the alerts that are firing.
+3. Use the toolbar to change the time range, the refresh interval and the services shown. **Open in OpenObserve** on the toolbar or on a panel opens the same data in OpenObserve.
 
 ---
 

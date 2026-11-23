@@ -1,0 +1,32 @@
+{
+  "name": "eventbus_emit_failures_critical",
+  "description": "The gateway is failing to publish events to NATS faster than 10 per minute for 10 minutes. Consumers are missing events. Check NATS and the stream registration.",
+  "stream_type": "metrics",
+  "stream_name": "event_bus_emit_failed_total",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "sum by (subject_prefix) (rate(event_bus_emit_failed_total[5m]))",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0.166667
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 15
+  },
+  "pending_period_sec": 600,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "critical",
+    "component": "event-bus",
+    "runbook": "docs/runbooks/eventbus-emit-failures.md"
+  }
+}

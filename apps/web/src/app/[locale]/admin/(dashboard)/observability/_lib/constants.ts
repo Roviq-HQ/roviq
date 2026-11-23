@@ -32,6 +32,7 @@ export const REFRESH_INTERVALS = [
 export type TimeRange = (typeof TIME_RANGES)[number];
 export type RefreshInterval = (typeof REFRESH_INTERVALS)[number];
 
-export const GRAFANA_URL =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GRAFANA_URL) ||
-  'http://localhost:3001';
+export const OPENOBSERVE_UI_URL = (
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_OPENOBSERVE_URL) ||
+  'http://localhost:5080'
+).replace(/\/+$/, '');

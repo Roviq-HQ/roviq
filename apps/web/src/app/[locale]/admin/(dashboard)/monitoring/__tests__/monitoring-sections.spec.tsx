@@ -69,7 +69,7 @@ describe('ServiceStatusGrid', () => {
 });
 
 describe('AlertsPanel', () => {
-  it('should say metrics are unavailable rather than all clear when Prometheus is down', () => {
+  it('should say metrics are unavailable rather than all clear when OpenObserve is down', () => {
     renderWithProviders(<AlertsPanel health={{ alerts: [], alertsAvailable: false }} />);
 
     expect(screen.getByTestId(ids.alertsUnavailable)).toBeInTheDocument();

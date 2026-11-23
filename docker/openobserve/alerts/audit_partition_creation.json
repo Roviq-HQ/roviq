@@ -1,0 +1,31 @@
+{
+  "name": "audit_partition_creation",
+  "description": "It is the 28th or later and no audit event has been consumed. Check the audit consumer and the partition workflow in Temporal.",
+  "stream_type": "metrics",
+  "stream_name": "audit_events_consumed_total",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "day_of_month() >= 28 and absent(audit_events_consumed_total)",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 720
+  },
+  "pending_period_sec": 3600,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "warning",
+    "component": "audit"
+  }
+}

@@ -144,12 +144,12 @@ enum AcademicYearStatus {
   PLANNING
 }
 
-"""A firing Prometheus alert"""
+"""A firing OpenObserve alert"""
 type ActiveAlert {
   """Alert summary (falls back to description, then the alert name)"""
   message: String!
 
-  """Prometheus alertname label"""
+  """Alert name"""
   name: String!
   severity: AlertSeverity!
 
@@ -773,7 +773,7 @@ enum AffiliationStatus {
   REVOKED
 }
 
-"""Severity label of a firing Prometheus alert"""
+"""Severity label of a firing alert"""
 enum AlertSeverity {
   CRITICAL
   INFO
@@ -7095,11 +7095,11 @@ enum SubscriptionStatus {
 
 """Platform-wide health snapshot (ROV-184)"""
 type SystemHealth {
-  """Firing Prometheus alerts only"""
+  """Firing alerts only"""
   alerts: [ActiveAlert!]!
 
   """
-  False when Prometheus is unreachable — `alerts` is then empty, not "all clear"
+  False when OpenObserve is unreachable — `alerts` is then empty, not "all clear"
   """
   alertsAvailable: Boolean!
   checkedAt: DateTime!
@@ -7199,12 +7199,12 @@ type TenantAnalytics {
   activeUsers24h: Int!
 
   """
-  7 daily API-call totals, oldest to newest (each a 24h window ending at that point); null when Prometheus is unavailable
+  7 daily API-call totals, oldest to newest (each a 24h window ending at that point); null when metrics are unavailable
   """
   activityTrend7d: [Int!]
 
   """
-  Institute-scope GraphQL operations in the last 24h; null when Prometheus is unavailable
+  Institute-scope GraphQL operations in the last 24h; null when metrics are unavailable
   """
   apiCalls24h: Int
   instituteId: ID!
@@ -7222,7 +7222,7 @@ type TenantAnalyticsConnection {
   edges: [TenantAnalyticsEdge!]!
 
   """
-  False when Prometheus could not be queried; API-call columns are then null
+  False when OpenObserve could not be queried; API-call columns are then null
   """
   metricsAvailable: Boolean!
   pageInfo: PageInfo!

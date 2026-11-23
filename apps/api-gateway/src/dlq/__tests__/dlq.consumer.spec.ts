@@ -43,4 +43,21 @@ describe('toDlqRow', () => {
     expect(row.tenantId).toBeNull();
     expect(row.originStream).toBe('AUDIT');
   });
+
+  it('should store no institute when the publisher sent an empty tenant id', () => {
+    const row = toDlqRow(
+      {
+        originalSubject: 'AUDIT.log',
+        payload: null,
+        error: 'Malformed JSON payload',
+        retryCount: 1,
+        correlationId: 'unknown',
+        tenantId: '',
+        failedAt: '2026-05-27T00:00:00.000Z',
+      },
+      8n,
+    );
+
+    expect(row.tenantId).toBeNull();
+  });
 });

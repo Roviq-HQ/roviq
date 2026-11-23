@@ -2,9 +2,11 @@
 
 ## Symptom
 
-Grafana alert `DlqMessagesWarning` (or `…Critical`) firing — sustained
-`roviq_nats_dlq_messages_total` rate above threshold for one or more
-`origin_stream` labels.
+OpenObserve alert `dlq_messages_warning` (or `dlq_messages_critical`) is firing: the
+`nats_dlq_messages_total` rate has stayed above 1 per minute for 5 minutes (critical: 10 per
+minute for 10 minutes) for one or more `origin_stream` labels. You see it as an email, in the
+alert banner of the admin Observability page, and in OpenObserve under **Alerts**, where the
+alert's history lists each evaluation with its value.
 
 User-facing impact depends on which stream is dead-lettering — if it's
 `NOTIFICATION.*` an institute's users miss notifications; if `BILLING.*`
@@ -31,10 +33,12 @@ Causes, in rough order of likelihood:
 
 ## Investigate
 
-1. Open the admin observability dashboard → **Dead Letter Queue** tab.
+1. Open the admin portal → **Observability** → **Dead Letter Queue** tab.
 2. Filter by the failing `origin_stream`.
 3. Inspect each row's **payload** and **error** to identify the cause.
-4. Correlate with `circuit_breaker_state` — if a breaker is open, the
+4. To see which stream is affected and since when, open OpenObserve → **Metrics** and run
+   `sum by (origin_stream) (rate(nats_dlq_messages_total[5m]))`.
+5. Correlate with `circuit_breaker_state` — if a breaker is open, the
    dead-letters are a symptom of the downstream outage, not a payload
    or handler bug.
 
@@ -51,7 +55,7 @@ Causes, in rough order of likelihood:
 
 ## After the incident
 
-1. Confirm `roviq_nats_dlq_messages_total` rate has returned to baseline
+1. Confirm the `nats_dlq_messages_total` rate has returned to baseline
    and the DLQ tab is drained for the affected `origin_stream`.
 2. If the cause was a recurring payload/handler bug, file a follow-up PR
    to make it impossible (validation, type tightening).
@@ -60,5 +64,5 @@ Causes, in rough order of likelihood:
 
 ## Related
 
-- Alert rule: `docs/observability/alerts/dlq-messages.yaml`
+- Alert rules: `docker/openobserve/alerts/dlq_messages_warning.json`, `docker/openobserve/alerts/dlq_messages_critical.json`
 - Linear: ROV-19

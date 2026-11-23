@@ -14,7 +14,7 @@ import { StreamsPanel } from './_components/streams-panel';
 import { TimeseriesPanel } from './_components/timeseries-panel';
 import { Toolbar } from './_components/toolbar';
 import { RecentTracesPanel } from './_components/traces-panel';
-import { GRAFANA_URL } from './_lib/constants';
+import { OPENOBSERVE_UI_URL } from './_lib/constants';
 import { METRIC_INFO } from './_lib/metric-descriptions';
 import { emitRefreshNow } from './_lib/polling';
 import { buildLatencyUnion, buildQueries } from './_lib/prom';
@@ -49,7 +49,7 @@ export function ObservabilityDashboard() {
         onRefreshNow={emitRefreshNow}
         services={services}
         setServices={setServices}
-        grafanaUrl={GRAFANA_URL}
+        openObserveUrl={OPENOBSERVE_UI_URL}
       />
       <AlertsBanner refreshMs={refreshMs} />
       <Tabs value={tab} onValueChange={setTab}>
@@ -74,7 +74,9 @@ export function ObservabilityDashboard() {
               yUnit="req/s"
               decimals={3}
               className="col-span-12 row-span-2 lg:col-span-6"
-              headerRight={<PanelMenu promQuery={queries.requestRate} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={queries.requestRate} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
             <TimeseriesPanel
               {...METRIC_INFO.errorRate5xx}
@@ -85,7 +87,9 @@ export function ObservabilityDashboard() {
               yUnit="req/s"
               decimals={3}
               className="col-span-12 row-span-2 lg:col-span-6"
-              headerRight={<PanelMenu promQuery={queries.errorRate5xx} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={queries.errorRate5xx} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
             <TimeseriesPanel
               {...METRIC_INFO.latencyQuantiles}
@@ -96,7 +100,9 @@ export function ObservabilityDashboard() {
               yUnit="ms"
               decimals={0}
               className="col-span-12 row-span-2 lg:col-span-6"
-              headerRight={<PanelMenu promQuery={latencyUnion} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={latencyUnion} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
             <StatPanel
               {...METRIC_INFO.totalRequests}
@@ -107,7 +113,9 @@ export function ObservabilityDashboard() {
               color="#73BF69"
               sparklineQuery={queries.totalRequestsSpark}
               className="col-span-6 lg:col-span-3"
-              headerRight={<PanelMenu promQuery={queries.totalRequests} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={queries.totalRequests} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
             <StatPanel
               {...METRIC_INFO.totalRequests5m}
@@ -119,7 +127,10 @@ export function ObservabilityDashboard() {
               sparklineQuery={queries.totalRequests5mSpark}
               className="col-span-6 lg:col-span-3"
               headerRight={
-                <PanelMenu promQuery={queries.totalRequests5m} grafanaUrl={GRAFANA_URL} />
+                <PanelMenu
+                  promQuery={queries.totalRequests5m}
+                  openObserveUrl={OPENOBSERVE_UI_URL}
+                />
               }
             />
             <GaugePanel
@@ -128,7 +139,9 @@ export function ObservabilityDashboard() {
               refreshMs={refreshMs}
               thresholds={ERROR_THRESHOLDS}
               className="col-span-6 lg:col-span-3"
-              headerRight={<PanelMenu promQuery={queries.errorPct} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={queries.errorPct} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
             <StatPanel
               {...METRIC_INFO.avgResponseMs}
@@ -140,7 +153,9 @@ export function ObservabilityDashboard() {
               color="#73BF69"
               sparklineQuery={queries.avgResponseSpark}
               className="col-span-6 lg:col-span-3"
-              headerRight={<PanelMenu promQuery={queries.avgResponseMs} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={queries.avgResponseMs} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
           </div>
         </TabsContent>
@@ -156,7 +171,9 @@ export function ObservabilityDashboard() {
               yUnit="evt/s"
               decimals={2}
               className="col-span-12 row-span-2 lg:col-span-6"
-              headerRight={<PanelMenu promQuery={queries.eventBusEmit} grafanaUrl={GRAFANA_URL} />}
+              headerRight={
+                <PanelMenu promQuery={queries.eventBusEmit} openObserveUrl={OPENOBSERVE_UI_URL} />
+              }
             />
             <TimeseriesPanel
               {...METRIC_INFO.eventBusFailed}
@@ -168,7 +185,7 @@ export function ObservabilityDashboard() {
               decimals={2}
               className="col-span-12 row-span-2 lg:col-span-6"
               headerRight={
-                <PanelMenu promQuery={queries.eventBusFailed} grafanaUrl={GRAFANA_URL} />
+                <PanelMenu promQuery={queries.eventBusFailed} openObserveUrl={OPENOBSERVE_UI_URL} />
               }
             />
           </div>
@@ -186,16 +203,16 @@ export function ObservabilityDashboard() {
               range={range}
               refreshMs={refreshMs}
               services={services}
-              grafanaUrl={GRAFANA_URL}
+              openObserveUrl={OPENOBSERVE_UI_URL}
               className="col-span-12"
-              headerRight={<PanelMenu tracesQuery="" grafanaUrl={GRAFANA_URL} />}
+              headerRight={<PanelMenu section="traces" openObserveUrl={OPENOBSERVE_UI_URL} />}
             />
             <RecentLogsPanel
               range={range}
               refreshMs={refreshMs}
               services={services}
               className="col-span-12"
-              headerRight={<PanelMenu logsQuery='{exported_job=~".+"}' grafanaUrl={GRAFANA_URL} />}
+              headerRight={<PanelMenu section="logs" openObserveUrl={OPENOBSERVE_UI_URL} />}
             />
           </div>
         </TabsContent>

@@ -6,7 +6,7 @@ export const TENANT_ANALYTICS_SORT_FIELD_VALUES = [
   'INSTITUTE_NAME',
   // Distinct users with a refresh token created or used in the last 24h
   'ACTIVE_USERS_24H',
-  // API operations in the last 24h (Prometheus); null values sort as zero
+  // API operations in the last 24h (OpenObserve); null values sort as zero
   'API_CALLS_24H',
   // Bytes of the institute's own stored files
   'STORAGE_USED',

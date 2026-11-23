@@ -13,7 +13,7 @@ registerEnumType(ServiceHealthStatus, {
 });
 registerEnumType(AlertSeverity, {
   name: 'AlertSeverity',
-  description: 'Severity label of a firing Prometheus alert',
+  description: 'Severity label of a firing alert',
 });
 
 @ObjectType('ServiceHealth', {
@@ -66,9 +66,9 @@ export class ConnectionStatsModel {
   http!: number;
 }
 
-@ObjectType('ActiveAlert', { description: 'A firing Prometheus alert' })
+@ObjectType('ActiveAlert', { description: 'A firing OpenObserve alert' })
 export class ActiveAlertModel {
-  @Field({ description: 'Prometheus alertname label' })
+  @Field({ description: 'Alert name' })
   name!: string;
 
   @Field(() => AlertSeverity)
@@ -94,11 +94,11 @@ export class SystemHealthModel {
   @Field(() => ConnectionStatsModel)
   connections!: ConnectionStatsModel;
 
-  @Field(() => [ActiveAlertModel], { description: 'Firing Prometheus alerts only' })
+  @Field(() => [ActiveAlertModel], { description: 'Firing alerts only' })
   alerts!: ActiveAlertModel[];
 
   @Field({
-    description: 'False when Prometheus is unreachable — `alerts` is then empty, not "all clear"',
+    description: 'False when OpenObserve is unreachable — `alerts` is then empty, not "all clear"',
   })
   alertsAvailable!: boolean;
 

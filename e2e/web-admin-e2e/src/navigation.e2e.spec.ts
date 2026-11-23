@@ -12,7 +12,7 @@ const SIDEBAR_LINKS = [
   { name: 'Institute Groups', path: '/institute-groups' },
   // System group
   { name: 'Audit Logs', path: '/audit-logs' },
-  // Observability embeds a Grafana iframe (localhost:3001) — skipped in E2E
+  // Observability reads OpenObserve, which the e2e stack does not run — skipped in E2E
   { name: 'Account', path: '/account' },
 ] as const;
 

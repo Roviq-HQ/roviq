@@ -2,9 +2,9 @@
 
 ## Symptom
 
-Grafana alert `EventBusEmitFailuresWarning` (or `…Critical`) firing —
-sustained `roviq_event_bus_emit_failed_total` rate above threshold for one or
-more `subject_prefix` labels.
+OpenObserve alert `eventbus_emit_failures_warning` (or `eventbus_emit_failures_critical`) is
+firing: the `event_bus_emit_failed_total` rate has stayed above 1 per minute for 5 minutes
+(critical: 10 per minute for 10 minutes) for one or more `subject_prefix` labels.
 
 User-facing impact depends on which prefix is failing — if it's
 `AUDIT.*` the audit pipeline is dropping rows; if `NOTIFICATION.*` users
@@ -36,13 +36,10 @@ Causes, in rough order of likelihood:
 Run from a host with `nats` CLI + cluster credentials.
 
 ```bash
-# 1. Which subjects are failing? (requires Loki query against api-gateway logs)
-#    Look for the structured log:
-#      { "event_bus.emit.failed": true, "event_bus.subject_prefix": "AUDIT" }
-#
-#    Or via Grafana → Explore → log query:
-#      {service="api-gateway"} | json | event_bus_emit_failed = "true"
-#      | line_format "{{.event_bus_subject}}"
+# 1. Which subjects are failing? In OpenObserve → Metrics:
+#      sum by (subject_prefix) (rate(event_bus_emit_failed_total[5m]))
+#    and the api-gateway error lines in OpenObserve → Logs, stream `default`:
+#      service_name = 'api-gateway' AND severity = 'error'
 
 # 2. NATS cluster health
 nats --server $NATS_URL server check connection
@@ -98,7 +95,7 @@ NATS_URL=$NATS_URL pnpm check:jetstream-drift
 
 ## After the incident
 
-1. Confirm `roviq_event_bus_emit_failed_total` rate has returned to baseline
+1. Confirm the `event_bus_emit_failed_total` rate has returned to baseline
    for ~15 minutes.
 2. If the cause was a stream-config issue, file a follow-up PR to make
    the misconfig impossible (e.g. tightening `check:jetstream-drift`
@@ -109,6 +106,6 @@ NATS_URL=$NATS_URL pnpm check:jetstream-drift
 ## Related
 
 - Source: `libs/backend/event-bus/src/event-bus.service.ts`
-- Alert rule: `docs/observability/alerts/eventbus-emit-failures.yaml`
-- Dashboard: `docs/observability/dashboards/event-bus.json`
+- Alert rules: `docker/openobserve/alerts/eventbus_emit_failures_warning.json`, `docker/openobserve/alerts/eventbus_emit_failures_critical.json`
+- Dashboard: `docker/openobserve/dashboards/event-bus.json`
 - Linear: ROV-257

@@ -27,7 +27,7 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
-import { PrometheusClient } from '../../admin/monitoring/prometheus.client';
+import { OpenObserveClient } from '../../admin/monitoring/openobserve.client';
 import { AppModule } from '../../app/app.module';
 
 const ORIGIN = 'test:storage-quota';
@@ -154,8 +154,8 @@ describe('storage quota and usage (integration)', () => {
         { provide: StorageClient, useValue: new FakeStorageClient() },
         { provide: EntitlementService, useValue: entitlements },
         {
-          provide: PrometheusClient,
-          useValue: createMock<PrometheusClient>({
+          provide: OpenObserveClient,
+          useValue: createMock<OpenObserveClient>({
             query: vi.fn().mockResolvedValue([]),
             queryRange: vi.fn().mockResolvedValue([]),
           }),

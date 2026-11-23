@@ -10,92 +10,22 @@ import {
 } from '@roviq/ui';
 import { Copy, ExternalLink, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  type OpenObserveSection,
+  openObserveMetricsUrl,
+  openObserveSectionUrl,
+} from '../_lib/openobserve-links';
 
-interface PanelMenuProps {
-  promQuery?: string;
-  tracesQuery?: string;
-  logsQuery?: string;
-  grafanaUrl: string;
-}
-
-// Datasource UIDs are stable per Grafana provisioning (see
-// docker/grafana/provisioning/datasources/datasources.yaml). They are
-// what Grafana 13's Explore expects in the `datasource` field of each
-// query — the type name alone (e.g. `'tempo'`) is NOT enough.
-const PROM_UID = 'PBFA97CFB590B2093';
-const TEMPO_UID = 'P214B5B846CF3925F';
-const LOKI_UID = 'P8E80F9AEF21F6940';
-
-interface ExplorePane {
-  datasource: string;
-  queries: Array<Record<string, unknown>>;
-  range: { from: string; to: string };
-}
-
-/**
- * Builds a Grafana 13 Explore deep-link.
- *
- * Grafana 13 deprecated the legacy `?left=<json>` query param in favour of:
- *   /explore?schemaVersion=1&orgId=1&panes=<encoded>
- * where `panes` is `{ "<paneId>": ExplorePane }`. The legacy `left=` form
- * was silently dropping us at the homepage.
- *
- * Each query inside a pane MUST carry its own `datasource: { type, uid }`
- * field — Grafana ignores the pane-level datasource for query routing.
- */
-function buildExploreUrl(grafanaUrl: string, props: PanelMenuProps): string {
-  let pane: ExplorePane | null = null;
-  if (props.promQuery !== undefined) {
-    pane = {
-      datasource: PROM_UID,
-      queries: [
-        {
-          refId: 'A',
-          expr: props.promQuery,
-          datasource: { type: 'prometheus', uid: PROM_UID },
-        },
-      ],
-      range: { from: 'now-1h', to: 'now' },
-    };
-  } else if (props.tracesQuery !== undefined) {
-    pane = {
-      datasource: TEMPO_UID,
-      queries: [
-        {
-          refId: 'A',
-          queryType: 'traceql',
-          query: props.tracesQuery || '{}',
-          datasource: { type: 'tempo', uid: TEMPO_UID },
-        },
-      ],
-      range: { from: 'now-1h', to: 'now' },
-    };
-  } else if (props.logsQuery !== undefined) {
-    pane = {
-      datasource: LOKI_UID,
-      queries: [
-        {
-          refId: 'A',
-          expr: props.logsQuery,
-          datasource: { type: 'loki', uid: LOKI_UID },
-        },
-      ],
-      range: { from: 'now-1h', to: 'now' },
-    };
-  }
-  if (!pane) return `${grafanaUrl}/explore?orgId=1`;
-
-  // Pane-id key can be any short string; Grafana's UI generates random
-  // 3-char keys. We use a deterministic prefix so the URL stays stable
-  // across renders (avoids React `key` thrash if used as a key).
-  const panes = { roviq: pane };
-  const encoded = encodeURIComponent(JSON.stringify(panes));
-  return `${grafanaUrl}/explore?schemaVersion=1&orgId=1&panes=${encoded}`;
-}
+type PanelMenuProps =
+  | { promQuery: string; openObserveUrl: string }
+  | { section: Exclude<OpenObserveSection, 'metrics'>; openObserveUrl: string };
 
 export function PanelMenu(props: PanelMenuProps) {
-  const exploreUrl = buildExploreUrl(props.grafanaUrl, props);
-  const promQuery = props.promQuery;
+  const promQuery = 'promQuery' in props ? props.promQuery : undefined;
+  const exploreUrl =
+    'promQuery' in props
+      ? openObserveMetricsUrl(props.openObserveUrl, props.promQuery)
+      : openObserveSectionUrl(props.openObserveUrl, props.section);
 
   const handleCopy = async () => {
     if (promQuery === undefined) return;
@@ -118,7 +48,7 @@ export function PanelMenu(props: PanelMenuProps) {
         <DropdownMenuItem asChild>
           <a href={exploreUrl} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="mr-2 size-4" />
-            Open in Grafana
+            Open in OpenObserve
           </a>
         </DropdownMenuItem>
         {promQuery !== undefined ? (

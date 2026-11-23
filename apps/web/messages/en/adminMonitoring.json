@@ -32,7 +32,7 @@
   },
   "alerts": {
     "heading": "Active alerts",
-    "unavailable": "Metrics unavailable — Prometheus cannot be reached, so alerts cannot be shown.",
+    "unavailable": "Metrics unavailable — OpenObserve cannot be reached, so alerts cannot be shown.",
     "empty": "No alerts are firing.",
     "since": "Since {time}",
     "severity": {

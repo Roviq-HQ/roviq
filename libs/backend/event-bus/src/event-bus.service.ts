@@ -46,7 +46,7 @@ export class EventBusService {
         // Structured fields (`event_bus.emit.failed`, `event_bus.subject`,
         // `event_bus.subject_prefix`) so the log shipper can extract a
         // counter without parsing free-form strings — matched by the
-        // Grafana alert in `docs/observability/alerts/`.
+        // alert in `docker/openobserve/alerts/`.
         this.logger.warn(
           {
             'event_bus.emit.failed': true,

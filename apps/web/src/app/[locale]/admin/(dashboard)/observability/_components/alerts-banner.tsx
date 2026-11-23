@@ -2,22 +2,12 @@
 
 import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useState } from 'react';
+import type {
+  ObservabilityAlert,
+  ObservabilityAlertsResponse,
+} from '../../../../../api/_lib/alert-model';
 import { authFetch } from '../_lib/auth-fetch';
 import { usePollingEffect } from '../_lib/polling';
-
-interface PromAlert {
-  labels: Record<string, string>;
-  annotations: Record<string, string>;
-  state: 'firing' | 'pending' | 'inactive';
-  activeAt: string;
-  value: string;
-}
-
-interface PromAlertsResponse {
-  status?: string;
-  data?: { alerts?: PromAlert[] };
-  error?: string;
-}
 
 type Severity = 'critical' | 'warning' | 'info';
 
@@ -44,7 +34,7 @@ function normalizeSeverity(raw: string | undefined): Severity {
   return 'info';
 }
 
-function summarize(alert: PromAlert): string {
+function summarize(alert: ObservabilityAlert): string {
   return (
     alert.annotations.summary ??
     alert.annotations.description ??
@@ -54,7 +44,7 @@ function summarize(alert: PromAlert): string {
 }
 
 export function AlertsBanner({ refreshMs }: AlertsBannerProps) {
-  const [alerts, setAlerts] = useState<PromAlert[]>([]);
+  const [alerts, setAlerts] = useState<ObservabilityAlert[]>([]);
   const [expanded, setExpanded] = useState<Record<Severity, boolean>>({
     critical: false,
     warning: false,
@@ -70,7 +60,7 @@ export function AlertsBanner({ refreshMs }: AlertsBannerProps) {
     async () => {
       try {
         const res = await authFetch('/api/alerts');
-        const body = (await res.json()) as PromAlertsResponse;
+        const body = (await res.json()) as Partial<ObservabilityAlertsResponse>;
         const all = body.data?.alerts ?? [];
         setAlerts(all.filter((a) => a.state === 'firing'));
       } catch {
@@ -82,7 +72,7 @@ export function AlertsBanner({ refreshMs }: AlertsBannerProps) {
 
   if (alerts.length === 0) return null;
 
-  const grouped = new Map<Severity, PromAlert[]>();
+  const grouped = new Map<Severity, ObservabilityAlert[]>();
   for (const alert of alerts) {
     const sev = normalizeSeverity(alert.labels.severity);
     const list = grouped.get(sev) ?? [];

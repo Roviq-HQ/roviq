@@ -68,6 +68,37 @@ services:
   #     retries: 5
   #     start_period: 300s
 
+  # Logs, metrics, traces, dashboards and alerts (docs/deployment.md → "Telemetry"). No published
+  # port: the UI and the API are reachable on the private network only.
+  openobserve:
+    image: openobserve/openobserve:v1.1.2
+    networks: [roviq-net]
+    environment:
+      ZO_ROOT_USER_EMAIL: ${OPENOBSERVE_USER:?OPENOBSERVE_USER must be set}
+      ZO_ROOT_USER_PASSWORD: ${OPENOBSERVE_PASSWORD:?OPENOBSERVE_PASSWORD must be set}
+      ZO_DATA_DIR: /data
+      # No usage reports to the vendor.
+      ZO_TELEMETRY: "false"
+      # It grows into whatever memory it is given and preallocates write-ahead-log files (MB).
+      ZO_MEMORY_CACHE_MAX_SIZE: "256"
+      ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE: "512"
+      ZO_MEM_TABLE_MAX_SIZE: "256"
+      ZO_MAX_FILE_SIZE_IN_MEMORY: "64"
+      ZO_MAX_FILE_SIZE_ON_DISK: "32"
+      ZO_COMPACT_DATA_RETENTION_DAYS: "30"
+      # Mail server for alert emails; without it `pnpm observability:load` loads no alerts.
+      ZO_SMTP_ENABLED: ${OPENOBSERVE_SMTP_ENABLED:-false}
+      ZO_SMTP_HOST: ${OPENOBSERVE_SMTP_HOST:-}
+      ZO_SMTP_PORT: ${OPENOBSERVE_SMTP_PORT:-587}
+      ZO_SMTP_USER_NAME: ${OPENOBSERVE_SMTP_USER:-}
+      ZO_SMTP_PASSWORD: ${OPENOBSERVE_SMTP_PASSWORD:-}
+      ZO_SMTP_FROM_EMAIL: ${OPENOBSERVE_SMTP_FROM:-}
+      ZO_SMTP_ENCRYPTION: ${OPENOBSERVE_SMTP_ENCRYPTION:-starttls}
+    mem_limit: 2g
+    cpus: 1
+    volumes:
+      - roviq-openobserve:/data
+
   temporal:
     image: temporalio/auto-setup:latest
     networks: [roviq-net]
@@ -136,6 +167,12 @@ services:
       WEBAUTHN_RP_ID: localhost
       WEBAUTHN_RP_NAME: Roviq
       ALLOWED_ORIGINS: http://localhost:4200
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5081
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?OTEL_EXPORTER_OTLP_HEADERS must be set}
+      OTEL_SERVICE_NAME: api-gateway
+      OPENOBSERVE_URL: http://openobserve:5080
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:?OPENOBSERVE_USER must be set}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:?OPENOBSERVE_PASSWORD must be set}
     depends_on:
       postgres:
         condition: service_healthy
@@ -152,6 +189,9 @@ services:
       PORT: 4200
       NEXT_PUBLIC_API_URL: http://localhost:3000
       NEXT_PUBLIC_WS_URL: ws://localhost:3000
+      OPENOBSERVE_URL: http://openobserve:5080
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:?OPENOBSERVE_USER must be set}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:?OPENOBSERVE_PASSWORD must be set}
     depends_on:
       api-gateway:
         condition: service_started
@@ -177,3 +217,4 @@ networks:
 volumes:
   # clamav-db:
   roviq-pgdata:
+  roviq-openobserve:

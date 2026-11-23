@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BusinessException, ErrorCode, type PlatformContext } from '@roviq/common-types';
-import { PrometheusClient, PrometheusUnavailableError } from '../prometheus.client';
+import { OpenObserveClient, OpenObserveUnavailableError } from '../openobserve.client';
 import {
   type AdminTenantAnalyticsArgs,
   SortOrder,
@@ -15,8 +15,8 @@ import {
   type TenantInstituteRecord,
 } from './repositories/tenant-analytics.repository';
 
-/** Prometheus series of the `roviq.api.requests` OTel counter (collector adds the `roviq_` namespace and `_total`). */
-export const TENANT_API_REQUESTS_SERIES = 'roviq_roviq_api_requests_total';
+/** OpenObserve series of the `roviq.api.requests` OTel counter (dots become underscores). */
+export const TENANT_API_REQUESTS_SERIES = 'roviq_api_requests';
 
 const DAY_SEC = 86_400;
 const TREND_DAYS = 7;
@@ -33,10 +33,10 @@ export class TenantAnalyticsService {
 
   constructor(
     private readonly repo: TenantAnalyticsRepository,
-    private readonly prometheus: PrometheusClient,
+    private readonly openObserve: OpenObserveClient,
   ) {}
 
-  // Sorting can depend on Prometheus values, so the whole institute list is built in memory
+  // Sorting can depend on metric values, so the whole institute list is built in memory
   // and sliced; fine for the expected low thousands of institutes.
   async list(
     ctx: PlatformContext,
@@ -82,8 +82,8 @@ export class TenantAnalyticsService {
     const startSec = nowSec - (TREND_DAYS - 1) * DAY_SEC;
     try {
       const [calls, trend] = await Promise.all([
-        this.prometheus.query(`sum by (tenant_id) (increase(${TENANT_API_REQUESTS_SERIES}[24h]))`),
-        this.prometheus.queryRange(
+        this.openObserve.query(`sum by (tenant_id) (increase(${TENANT_API_REQUESTS_SERIES}[24h]))`),
+        this.openObserve.queryRange(
           `sum by (tenant_id) (increase(${TENANT_API_REQUESTS_SERIES}[1d]))`,
           startSec,
           nowSec,
@@ -97,14 +97,14 @@ export class TenantAnalyticsService {
         ),
       };
     } catch (err) {
-      if (!(err instanceof PrometheusUnavailableError)) throw err;
+      if (!(err instanceof OpenObserveUnavailableError)) throw err;
       this.logger.warn(`Tenant API metrics omitted: ${err.message}`);
       return null;
     }
   }
 }
 
-/** One value per day from `startSec`, oldest first; days Prometheus returned nothing for are 0. */
+/** One value per day from `startSec`, oldest first; days OpenObserve returned nothing for are 0. */
 export function zeroFillTrend(
   values: Array<[number, number]>,
   startSec: number,

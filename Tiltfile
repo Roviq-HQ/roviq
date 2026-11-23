@@ -274,27 +274,34 @@ local_resource(
 )
 
 # ─── Observability (manual) ──────────────────────────────────────────────────
-# Start manually when debugging performance or tracing issues.
-# Trigger `observability` to bring up the entire stack with one click.
-# The dev servers send telemetry only when OTEL_EXPORTER_OTLP_ENDPOINT is set: add
-# `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:<DEV_OTEL_GRPC_PORT>` to .env (`pnpm instance:ports`
-# prints the port), then `pnpm tilt trigger api-gateway`. Unset, no OpenTelemetry SDK loads.
+# Off by default. `pnpm tilt trigger observability` starts OpenObserve, loads the dashboards and
+# alerts, and restarts the backend dev servers, which export telemetry whenever this instance's
+# OpenObserve answers at their start (scripts/dev-telemetry-env.sh).
+# `pnpm tilt trigger observability-off` stops it and restarts them without telemetry.
 
-dc_resource('prometheus', labels=['observability'], auto_init=False)
-dc_resource('tempo', labels=['observability'], auto_init=False)
-dc_resource('loki', labels=['observability'], auto_init=False)
-dc_resource('otel-collector', labels=['observability'], resource_deps=['tempo', 'loki'],
-            auto_init=False)
-dc_resource('grafana', labels=['observability'], resource_deps=['prometheus', 'tempo', 'loki'],
-            auto_init=False, links=[local_url('DEV_GRAFANA_PORT', '3001')])
+dc_resource('openobserve', labels=['observability'], auto_init=False,
+            links=[local_url('DEV_OPENOBSERVE_PORT', '5080')])
 
-# Aggregator: triggering this pulls up every observability dc_resource above.
+RESTART_BACKENDS = 'tilt trigger api-gateway && tilt trigger notification-service'
+
+# allow_parallel: Tilt queues updates one at a time, and these commands wait on updates they trigger.
+# OpenObserve is started only when it is not answering: triggering a running container restarts it.
 local_resource(
   'observability',
-  cmd='echo "Observability stack up: Grafana %s"' % local_url('DEV_GRAFANA_PORT', '3001'),
-  resource_deps=['prometheus', 'tempo', 'loki', 'otel-collector', 'grafana'],
+  cmd='curl -sf -o /dev/null --max-time 2 %s/healthz || (tilt enable openobserve && tilt trigger openobserve); ' % local_url('DEV_OPENOBSERVE_PORT', '5080')
+    + 'pnpm run observability:load && ' + RESTART_BACKENDS,
   trigger_mode=TRIGGER_MODE_MANUAL,
   auto_init=False,
+  allow_parallel=True,
   labels=['observability'],
-  links=[local_url('DEV_GRAFANA_PORT', '3001')],
+  links=[local_url('DEV_OPENOBSERVE_PORT', '5080')],
+)
+
+local_resource(
+  'observability-off',
+  cmd='tilt disable openobserve && ' + RESTART_BACKENDS,
+  trigger_mode=TRIGGER_MODE_MANUAL,
+  auto_init=False,
+  allow_parallel=True,
+  labels=['observability'],
 )

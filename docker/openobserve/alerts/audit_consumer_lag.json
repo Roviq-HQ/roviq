@@ -1,0 +1,31 @@
+{
+  "name": "audit_consumer_lag",
+  "description": "More than 30 audit events have been waiting for the audit consumer for 5 minutes. Check the consumer and the database.",
+  "stream_type": "metrics",
+  "stream_name": "jetstream_consumer_num_pending",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "jetstream_consumer_num_pending{stream_name=\"AUDIT\",consumer_name=\"audit-log-writer\"}",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 30
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 60
+  },
+  "pending_period_sec": 300,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "warning",
+    "component": "audit"
+  }
+}
