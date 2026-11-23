@@ -1,6 +1,6 @@
 # Hard Rules Reference — Roviq
 
-> **SYNC RULE**: This file and `CLAUDE.md` § Hard Rules are paired.
+> **SYNC RULE**: This file and `CLAUDE.md` → "Hard rules" are paired.
 > Any addition, removal, or edit to a rule in either file MUST be reflected in the other.
 > CLAUDE.md contains concise one-liners; this file contains full detail.
 > Before committing, verify both files have the same set of tags.
@@ -98,12 +98,6 @@ There is no such thing as "pre-existing errors." If you encounter them, fix and 
 ---
 
 ## CODE CONVENTIONS
-
-### [RDPKG] Read Package.json Scripts
-
-Before running commands related to the app, read `package.json` scripts to use the correct command. Run `pnpm lint:fix` frequently to keep formatting clean.
-
----
 
 ### [NPENV] Process.env Restrictions
 
