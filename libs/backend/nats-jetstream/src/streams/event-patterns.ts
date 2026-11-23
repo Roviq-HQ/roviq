@@ -200,10 +200,8 @@ export const EVENT_PATTERNS = {
     admitted: 'STUDENT.admitted',
     enrolled: 'STUDENT.enrolled',
     left: 'STUDENT.left',
-    // Subscribed by group-invalidation.handler; emitter lives in a future
-    // year-end promotion flow. Kept registered so the symmetry check
-    // accepts the subscriber.
     promoted: 'STUDENT.promoted',
+    removed_from_year: 'STUDENT.removed_from_year',
     section_changed: 'STUDENT.section_changed',
     // Historical camelCase key — kept for wire compatibility with already-
     // deployed subscribers. New subjects under STUDENT use snake_case.

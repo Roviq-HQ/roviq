@@ -1338,6 +1338,23 @@ input ChangePlanInput {
   subscriptionId: ID!
 }
 
+"""
+Moves a student to another class and section of the same academic year. Last year's result follows: PROMOTED to the new class when it is higher, DETAINED when it is the same level.
+"""
+input ChangeStudentClassInput {
+  """Required reason when overriding capacity hard limit"""
+  overrideReason: String
+
+  """A section of that standard."""
+  sectionId: ID!
+
+  """A standard of the same academic year as the record."""
+  standardId: ID!
+
+  """The student year record (studentAcademicId) to move."""
+  studentAcademicId: ID!
+}
+
 """Clear one assignment cell."""
 input ClearTimetableEntryInput {
   dayOfWeek: String!
@@ -4235,6 +4252,11 @@ type Mutation {
   """
   changePassword(currentPassword: String!, newPassword: String!): Boolean!
   changePlan(input: ChangePlanInput!): SubscriptionModel!
+
+  """
+  Moves a student to another class of the same year, with capacity check; aligns last year's result.
+  """
+  changeStudentClass(input: ChangeStudentClassInput!): ID!
   clearTimetableDayOverride(id: ID!): Boolean!
   clearTimetableEntry(input: ClearTimetableEntryInput!): Boolean!
 
@@ -4454,6 +4476,15 @@ type Mutation {
   removeApplicationDocument(id: ID!): Boolean!
   removeExamSchedule(id: ID!): Boolean!
   removePasskey(passkeyId: String!): Boolean!
+
+  """
+  Removes a student from one academic year (soft-deletes the year record). Refused with STUDENT_YEAR_HAS_RECORDS once the year holds attendance, marks, assessments or report cards.
+  """
+  removeStudentFromYear(
+    """3 to 500 characters after trimming."""
+    reason: String!
+    studentAcademicId: ID!
+  ): Boolean!
 
   """Remove the subject from a section (idempotent). Returns the subject."""
   removeSubjectFromSection(sectionId: ID!, subjectId: ID!): SubjectModel!
@@ -6536,6 +6567,11 @@ input StudentFilterInput {
   first: Int = 25
   gender: Gender
   isRteAdmitted: Boolean
+
+  """
+  Students still studying here who have a year record before this year but none in it. Class and section then show their latest placement. Cannot be combined with academicYearId.
+  """
+  notPlacedInYearId: ID
 
   """Sort directive (e.g. admissionNumber:asc)"""
   orderBy: String

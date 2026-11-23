@@ -177,13 +177,7 @@ describe('STREAMS registry coverage', () => {
     const emitted = new Set(hits.filter((h) => h.kind === 'emit').map((h) => h.subject));
     const subscribers = hits.filter((h) => h.kind === 'subscribe' && !isWildcardSubject(h.subject));
 
-    // STUDENT.promoted: subscriber (`group-invalidation.handler`) is wired
-    // for the year-end promotion flow shipped via the dedicated promotion
-    // workflow (which sets fromStandardId/toStandardId/academicYearId).
-    // Status-machine transitions to PROMOTED are NOT a valid emit point —
-    // they don't carry the standard/year context the spec requires. Listed
-    // here until the promotion workflow's emit lands.
-    const allowOrphan = new Set<string>([EVENT_PATTERNS.STUDENT.promoted]);
+    const allowOrphan = new Set<string>();
 
     const orphanSubscribers = subscribers
       .map((h) => h.subject)

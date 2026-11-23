@@ -29,6 +29,8 @@ The student management module (Linear issue **ROV-167**) provides the institute-
 | `enrollStudent` | Mutation | `StudentAcademic` | `update Student` |
 | `updateStudentSection` | Mutation | `StudentAcademic` | `update Student` |
 | `setPromotionDecisions` | Mutation | `Int` (rows updated) | `update Student` |
+| `changeStudentClass` | Mutation | `ID` (the year record) | `update Student` |
+| `removeStudentFromYear` | Mutation | `Boolean` | `update Student` |
 | `studentStatistics` | Query | `StudentStatistics` | `read Student` |
 | `studentUpdated` | Subscription | `Student` | `read Student` |
 
@@ -99,6 +101,39 @@ Pre-primary classes use levels below 1 (Nursery -3, LKG -2, UKG -1; from -5), so
 up into Class 1 like any other level. A section that still has students cannot be deleted
 (`SECTION_HAS_STUDENTS`), and enrolling a student twice in one year fails with
 `STUDENT_ALREADY_ENROLLED`.
+
+## Correcting one student after a rollover
+
+Three actions fix one student without touching anyone else (ROV-322).
+
+- **Change class.** On the student page → Academics, the row of the active year has
+  **Change class**. It calls `changeStudentClass(input: { studentAcademicId, standardId,
+  sectionId, overrideReason })`: the class must belong to the same academic year as the record
+  (`STANDARD_NOT_FOUND`), the section to that class (`SECTION_NOT_FOUND`); the same class and
+  section is `VALIDATION_FAILED`; a full section is `SECTION_CAPACITY_EXCEEDED` until an
+  override reason is given (the dialog asks for it only then). Last year's result follows in
+  the same transaction: `PROMOTED` when the new class is higher than last year's (with
+  `promoted_to_standard_id` set to the new class), `DETAINED` when it is the same level (target
+  cleared), unchanged when lower or when last year's row is `TRANSFERRED`.
+  Emits `STUDENT.section_changed` and `STUDENT.promoted`.
+- **Place a student the rollover skipped.** The students list has a **Not placed in this year**
+  filter (`listStudents(filter: { notPlacedInYearId })`, not combinable with `academicYearId`).
+  It lists students who are still studying here (ENROLLED, PROMOTED, DETAINED, RE_ENROLLED),
+  have a year record in an earlier year and none in the selected one; class and section show
+  their last placement. Each row has **Enrol in this year**, which calls `enrollStudent`; the
+  student page offers the same button when the student has no row in the active year.
+  `enrollStudent` refuses a student or year of another institute (`STUDENT_NOT_FOUND`,
+  `ACADEMIC_YEAR_NOT_FOUND`), a class outside the year (`STANDARD_NOT_FOUND`) and a section
+  outside the class (`SECTION_NOT_FOUND`). A
+  teacher's section-limited view finds nobody here, since nobody has a section in that year.
+- **Remove from this year.** Next to Change class. `removeStudentFromYear(studentAcademicId,
+  reason)` soft-deletes the year record (reason 3 to 500 characters, kept in the audit log as
+  the mutation's arguments) and emits `STUDENT.removed_from_year`. It is refused with
+  `STUDENT_YEAR_HAS_RECORDS` once the student has, in that year, a live attendance entry, exam
+  mark, exam topic assessment, co-scholastic assessment or report card. The student then shows
+  under **Not placed in this year** and can be enrolled again; a redelivered
+  `ACADEMIC_YEAR.activated` does not place them back, because the rollover skips any row in
+  the new year, deleted ones included.
 
 ## Known gaps + follow-ups
 

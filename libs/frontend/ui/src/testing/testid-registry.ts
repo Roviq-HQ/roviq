@@ -901,6 +901,23 @@ export const testIds = {
     yearEndApplyBtn: 'students-year-end-apply-btn',
     yearEndCancelBtn: 'students-year-end-cancel-btn',
     promotionBadge: (id: string) => `students-promotion-badge-${id}`,
+    // Correcting one student after a rollover (ROV-322)
+    notPlacedFilter: 'students-not-placed-filter',
+    enrolRowBtn: (id: string) => `students-enrol-row-btn-${id}`,
+    detailEnrolBtn: 'students-detail-enrol-btn',
+    detailChangeClassBtn: 'students-detail-change-class-btn',
+    detailRemoveFromYearBtn: 'students-detail-remove-from-year-btn',
+    enrolDialog: 'students-enrol-dialog',
+    changeClassDialog: 'students-change-class-dialog',
+    placementStandardSelect: 'students-placement-standard-select',
+    placementSectionSelect: 'students-placement-section-select',
+    placementOverrideReasonInput: 'students-placement-override-reason-input',
+    placementSubmitBtn: 'students-placement-submit-btn',
+    placementCancelBtn: 'students-placement-cancel-btn',
+    removeFromYearDialog: 'students-remove-from-year-dialog',
+    removeFromYearReasonInput: 'students-remove-from-year-reason-input',
+    removeFromYearConfirmBtn: 'students-remove-from-year-confirm-btn',
+    removeFromYearCancelBtn: 'students-remove-from-year-cancel-btn',
   },
 
   // ── Institute: settings → roles (primary nav per role) ─────────────────

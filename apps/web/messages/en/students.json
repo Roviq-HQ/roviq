@@ -492,5 +492,33 @@
       "emptyDescription": "Edits and lifecycle events for this student will be recorded here.",
       "truncated": "Showing recent entries · {count} total"
     }
+  },
+  "placement": {
+    "notPlacedFilter": "Not placed in this year",
+    "notPlacedFilterHelp": "Students still studying here who have no class in the selected year",
+    "lastPlacement": "Last class",
+    "enrolButton": "Enrol in this year",
+    "enrolTitle": "Enrol in {year}",
+    "enrolDescription": "Choose a class and section for {name}.",
+    "enrolSuccess": "{name} enrolled in {year}",
+    "notPlacedNotice": "Not placed in {year}",
+    "changeClassButton": "Change class",
+    "changeClassTitle": "Change class",
+    "changeClassDescription": "Move this student to another class or section of {year}. Last year's result is updated to match the new class.",
+    "changeClassSuccess": "Class changed",
+    "overrideReasonLabel": "Reason for exceeding capacity",
+    "overrideReasonHelp": "This section is full. Give a reason to place the student anyway.",
+    "submit": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "removeButton": "Remove from this year",
+    "removeTitle": "Remove from {year}?",
+    "removeDescription": "Use this when the student was placed in this year by mistake. The student then shows under “Not placed in this year” and can be enrolled again. Not possible once attendance, marks or report cards exist for this year.",
+    "removeReasonLabel": "Reason",
+    "removeReasonHelp": "Kept in the audit log. 3 to 500 characters.",
+    "removeReasonError": "Enter a reason of 3 to 500 characters.",
+    "removeConfirm": "Remove",
+    "removing": "Removing…",
+    "removeSuccess": "Removed from {year}"
   }
 }

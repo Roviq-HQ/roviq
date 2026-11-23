@@ -187,6 +187,7 @@ interceptor do not run for event deliveries (they read a request an event does n
 | `ACADEMIC_YEAR.activated` | `StudentEventHandler`, `GroupInvalidationHandler` | Continuing students get a row in the new year by the year-end promotion rule below; dynamic groups are invalidated |
 | `SECTION.deleted` | `StudentEventHandler`, `GroupInvalidationHandler` | The deleted section's `student_academics` rows are soft-deleted; section-based groups are invalidated |
 | `STUDENT.enrolled`, `STUDENT.section_changed`, `STUDENT.promoted`, `STUDENT.left` | `GroupInvalidationHandler` | Groups whose rules use the changed dimension get `resolved_at = NULL` |
+| `STUDENT.removed_from_year` | `GroupInvalidationHandler` | Every dynamic and hybrid group of the institute gets `resolved_at = NULL` (emitted by `removeStudentFromYear`) |
 | `GROUP.rules_updated` | `GroupInvalidationHandler` | That group gets `resolved_at = NULL` |
 
 - **Durable naming**: `gateway-<subject in kebab case>` (e.g. `gateway-academic-year-activated`),

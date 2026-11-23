@@ -26,6 +26,15 @@ export class StudentFilterInput {
   @IsUUID()
   academicYearId?: string;
 
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'Students still studying here who have a year record before this year but none in it. Class and section then show their latest placement. Cannot be combined with academicYearId.',
+  })
+  @IsOptional()
+  @IsUUID()
+  notPlacedInYearId?: string;
+
   @Field(() => ID, { nullable: true })
   @IsOptional()
   @IsUUID()

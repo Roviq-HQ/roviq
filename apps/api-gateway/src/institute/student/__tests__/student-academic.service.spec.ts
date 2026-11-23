@@ -19,6 +19,14 @@ function queueResult(result: unknown) {
   resultQueue.push(result);
 }
 
+/** assertEnrolTarget: student, year, standard and section lookups, in that order. */
+function queueEnrolTarget() {
+  queueResult([{ id: 'student-1' }]);
+  queueResult([{ id: 'ay-1' }]);
+  queueResult([{ numericOrder: 5 }]);
+  queueResult([{ id: 'sec-1' }]);
+}
+
 function resetQueue() {
   resultQueue.length = 0;
   queueIndex = 0;
@@ -169,6 +177,7 @@ describe('StudentAcademicService (unit)', () => {
 
   describe('enroll', () => {
     it('throws SECTION_CAPACITY_EXCEEDED when section is at hardMax and no overrideReason', async () => {
+      queueEnrolTarget();
       // getSectionWithNorms → section SELECT returns a section at hardMax (45/45).
       queueResult([{ currentStrength: 45, capacity: 45 }]);
       // getSectionWithNorms → config SELECT returns default norms.
@@ -185,6 +194,7 @@ describe('StudentAcademicService (unit)', () => {
     });
 
     it('rejects for capacity overflow', async () => {
+      queueEnrolTarget();
       queueResult([{ currentStrength: 50, capacity: 45 }]);
       queueResult([{ sectionStrengthNorms: { optimal: 40, hardMax: 45, exemptionAllowed: true } }]);
 
@@ -199,6 +209,7 @@ describe('StudentAcademicService (unit)', () => {
     });
 
     it('succeeds past capacity when overrideReason is provided', async () => {
+      queueEnrolTarget();
       // getSectionWithNorms: section at cap.
       queueResult([{ currentStrength: 45, capacity: 45 }]);
       queueResult([{ sectionStrengthNorms: { optimal: 40, hardMax: 45, exemptionAllowed: true } }]);

@@ -54,6 +54,15 @@ export class GroupInvalidationHandler {
   }
 
   @EventPattern(
+    EVENT_PATTERNS.STUDENT.removed_from_year,
+    gatewayConsumer(EVENT_PATTERNS.STUDENT.removed_from_year),
+  )
+  async onStudentRemovedFromYear(@Payload() data: unknown): Promise<void> {
+    const { tenantId } = eventPayloadSchemas[EVENT_PATTERNS.STUDENT.removed_from_year].parse(data);
+    await this.invalidateAllDynamic(tenantId);
+  }
+
+  @EventPattern(
     EVENT_PATTERNS.ACADEMIC_YEAR.activated,
     gatewayConsumer(EVENT_PATTERNS.ACADEMIC_YEAR.activated),
   )

@@ -2,7 +2,8 @@ import { AcademicStatus, InstituteType, PromotionStatus } from '@roviq/common-ty
 import { type DrizzleDB, SYSTEM_USER_ID } from '@roviq/database';
 import { sql } from 'drizzle-orm';
 
-const CONTINUING_STATUSES = [
+/** Academic statuses of a student who is still studying in the institute. */
+export const CONTINUING_STATUSES = [
   AcademicStatus.ENROLLED,
   AcademicStatus.PROMOTED,
   AcademicStatus.DETAINED,

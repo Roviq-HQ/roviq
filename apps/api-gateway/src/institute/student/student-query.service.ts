@@ -20,6 +20,7 @@ export class StudentQueryService {
       [filter.gender, 'gender'],
       [filter.academicStatus, 'academicStatus'],
       [filter.academicYearId, 'currentAcademicYearId'],
+      [filter.notPlacedInYearId, 'currentAcademicYearId'],
       [filter.search, 'admissionNumber'],
       [filter.socialCategory, 'socialCategory'],
       [filter.isRteAdmitted, 'isRteAdmitted'],
@@ -33,6 +34,12 @@ export class StudentQueryService {
           'Cannot filter students by a restricted field',
         );
       }
+    }
+    if (filter.notPlacedInYearId && filter.academicYearId) {
+      throw new BusinessException(
+        ErrorCode.VALIDATION_FAILED,
+        'notPlacedInYearId cannot be combined with academicYearId',
+      );
     }
     if (filter.orderBy) {
       const field = filter.orderBy.split(':')[0];

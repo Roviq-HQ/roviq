@@ -62,6 +62,7 @@ import {
   SearchX,
   ShieldCheck,
   Upload,
+  UserPlus,
   X,
   XCircle,
 } from 'lucide-react';
@@ -79,6 +80,7 @@ import * as React from 'react';
 import { toast } from 'sonner';
 import { useMediaQuery } from '../../../../../../hooks/use-media-query';
 import { PersonNameLink } from '../person-detail-dialog';
+import { EnrolStudentDialog } from './placement-dialogs';
 import {
   type SectionPickerNode,
   type StandardPickerNode,
@@ -176,6 +178,7 @@ interface StudentsFilterToolbarProps {
   setSearchInput: (value: string) => void;
   filters: {
     academicYearId: string | null;
+    notPlaced: boolean | null;
     standardId: string | null;
     sectionId: string | null;
     academicStatus: string[] | null;
@@ -192,6 +195,7 @@ interface StudentsFilterToolbarProps {
     standardId?: string | null;
     sectionId?: string | null;
     academicYearId?: string | null;
+    notPlaced?: boolean | null;
     academicStatus?: string[] | null;
     gender?: string | null;
     socialCategory?: string | null;
@@ -259,11 +263,29 @@ function StudentsFilterToolbar(props: StudentsFilterToolbarProps) {
           ))}
         </SelectContent>
       </Select>
+      <Button
+        variant={filters.notPlaced ? 'default' : 'outline'}
+        aria-pressed={filters.notPlaced === true}
+        title={t('placement.notPlacedFilterHelp')}
+        disabled={!effectiveYearId}
+        onClick={() =>
+          updateFilters({
+            notPlaced: filters.notPlaced ? null : true,
+            standardId: null,
+            sectionId: null,
+          })
+        }
+        data-testid={testIds.instituteStudents.notPlacedFilter}
+      >
+        {filters.notPlaced && <Check aria-hidden="true" className="size-4" />}
+        {t('placement.notPlacedFilter')}
+      </Button>
       <Select
         value={filters.standardId ?? '__all__'}
         onValueChange={(v) =>
           updateFilters({ standardId: v === '__all__' ? null : v, sectionId: null })
         }
+        disabled={filters.notPlaced === true}
       >
         <SelectTrigger className="w-[160px]" aria-label={t('filters.standard')}>
           <SelectValue placeholder={t('filters.allStandards')} />
@@ -280,7 +302,7 @@ function StudentsFilterToolbar(props: StudentsFilterToolbarProps) {
       <Select
         value={filters.sectionId ?? '__all__'}
         onValueChange={(v) => updateFilters({ sectionId: v === '__all__' ? null : v })}
-        disabled={!filters.standardId}
+        disabled={!filters.standardId || filters.notPlaced === true}
       >
         <SelectTrigger className="w-[160px]" aria-label={t('filters.section')}>
           <SelectValue placeholder={t('filters.allSections')} />
@@ -413,6 +435,7 @@ function StudentsFilterToolbar(props: StudentsFilterToolbarProps) {
               standardId: null,
               sectionId: null,
               academicYearId: null,
+              notPlaced: null,
               academicStatus: null,
               gender: null,
               socialCategory: null,
@@ -442,6 +465,8 @@ const filterParsers = {
   standardId: parseAsString,
   sectionId: parseAsString,
   academicYearId: parseAsString,
+  /** Students with no class in the selected year (ROV-322). */
+  notPlaced: parseAsBoolean,
   /** Multi-select academic status as URL array. */
   academicStatus: parseAsArrayOf(parseAsString),
   gender: parseAsString,
@@ -483,13 +508,26 @@ export default function StudentsPage() {
     resetPagination();
   }, [debouncedSearch, setFilters, resetPagination]);
 
+  // ── Academic years — the list's year, also the year "not placed" refers to ──
+  const { data: yearsData } = useAcademicYearsForStudents();
+  const academicYears = yearsData?.academicYears ?? [];
+  // Default filter to the active year when nothing is selected in the URL.
+  const activeYear = academicYears.find((y) => y.isActive) ?? null;
+  const effectiveYearId = filters.academicYearId ?? activeYear?.id ?? null;
+  const effectiveYearLabel = academicYears.find((y) => y.id === effectiveYearId)?.label ?? '';
+  const notPlaced = filters.notPlaced === true;
+
   const queryFilter = React.useMemo<StudentListFilter>(() => {
     const f: StudentListFilter = { first: filters.size };
     if (currentCursor) f.after = currentCursor;
     if (filters.search) f.search = filters.search;
-    if (filters.standardId) f.standardId = filters.standardId;
-    if (filters.sectionId) f.sectionId = filters.sectionId;
-    if (filters.academicYearId) f.academicYearId = filters.academicYearId;
+    if (notPlaced) {
+      if (effectiveYearId) f.notPlacedInYearId = effectiveYearId;
+    } else {
+      if (filters.standardId) f.standardId = filters.standardId;
+      if (filters.sectionId) f.sectionId = filters.sectionId;
+      if (filters.academicYearId) f.academicYearId = filters.academicYearId;
+    }
     if (filters.academicStatus && filters.academicStatus.length > 0) {
       f.academicStatus = filters.academicStatus as AcademicStatus[];
     }
@@ -498,21 +536,18 @@ export default function StudentsPage() {
     if (typeof filters.isRteAdmitted === 'boolean') f.isRteAdmitted = filters.isRteAdmitted;
     if (filters.orderBy) f.orderBy = filters.orderBy;
     return f;
-  }, [filters, currentCursor]);
+  }, [filters, currentCursor, notPlaced, effectiveYearId]);
 
-  const { students, totalCount, hasNextPage, loading, refetch } = useStudents(queryFilter);
+  const { students, totalCount, hasNextPage, loading, refetch } = useStudents(queryFilter, {
+    skip: notPlaced && !effectiveYearId,
+  });
 
   // Live tenant-wide updates — refetch list on every `STUDENT.updated` event.
   useStudentsInTenantUpdated(() => {
     refetch();
   });
 
-  // ── Standards / academic years for filter dropdowns ─────────────────────
-  const { data: yearsData } = useAcademicYearsForStudents();
-  const academicYears = yearsData?.academicYears ?? [];
-  // Default filter to the active year when nothing is selected in the URL.
-  const activeYear = academicYears.find((y) => y.isActive) ?? null;
-  const effectiveYearId = filters.academicYearId ?? activeYear?.id ?? null;
+  // ── Standards for filter dropdowns ──────────────────────────────────────
   const { data: standardsData } = useStandardsForYear(effectiveYearId);
   const standardsList = standardsData?.standards ?? [];
   const { data: filterSectionsData } = useSectionsForStandard(filters.standardId);
@@ -583,6 +618,7 @@ export default function StudentsPage() {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [bulkSectionOpen, setBulkSectionOpen] = React.useState(false);
   const [yearEndOpen, setYearEndOpen] = React.useState(false);
+  const [enrolTarget, setEnrolTarget] = React.useState<{ id: string; name: string } | null>(null);
 
   // Wrap the nuqs filter setter so that any filter change also drops the
   // current selection — selecting students from a previous filtered view
@@ -718,7 +754,7 @@ export default function StudentsPage() {
       },
       {
         id: 'classSection',
-        header: t('columns.classSection'),
+        header: notPlaced ? t('placement.lastPlacement') : t('columns.classSection'),
         cell: ({ row }) => {
           const std = resolveI18n(row.original.currentStandardName);
           const sec = resolveI18n(row.original.currentSectionName);
@@ -822,8 +858,34 @@ export default function StudentsPage() {
           </span>
         ),
       },
+      ...(notPlaced
+        ? [
+            {
+              id: 'placementActions',
+              header: '',
+              cell: ({ row }) => (
+                <Can I="create" a="Student">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    title={t('placement.enrolButton')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEnrolTarget({ id: row.original.id, name: fullName(row.original) });
+                    }}
+                    data-testid={testIds.instituteStudents.enrolRowBtn(row.original.id)}
+                  >
+                    <UserPlus aria-hidden="true" className="size-4" />
+                    {t('placement.enrolButton')}
+                  </Button>
+                </Can>
+              ),
+            } satisfies ColumnDef<StudentListNode>,
+          ]
+        : []),
     ],
     [
+      notPlaced,
       t,
       fullName,
       guardianName,
@@ -993,6 +1055,20 @@ export default function StudentsPage() {
               }}
             />
 
+            {enrolTarget && effectiveYearId && (
+              <EnrolStudentDialog
+                open
+                onOpenChange={(open) => {
+                  if (!open) setEnrolTarget(null);
+                }}
+                studentProfileId={enrolTarget.id}
+                studentName={enrolTarget.name}
+                academicYearId={effectiveYearId}
+                yearLabel={effectiveYearLabel}
+                onSuccess={() => refetch()}
+              />
+            )}
+
             <YearEndResultDialog
               open={yearEndOpen}
               onOpenChange={setYearEndOpen}
@@ -1017,7 +1093,7 @@ export default function StudentsPage() {
                     ? t('columns.notAssigned')
                     : `${std ?? ''}${std && sec ? ' · ' : ''}${sec ?? ''}`;
                 const statusKey = student.academicStatus?.toUpperCase() ?? '';
-                return (
+                const card = (
                   <Link
                     href={`/institute/people/students/${student.id}`}
                     data-testid={testIds.instituteStudents.studentCard(student.id)}
@@ -1037,6 +1113,24 @@ export default function StudentsPage() {
                         : '—'}
                     </div>
                   </Link>
+                );
+                if (!notPlaced) return card;
+                return (
+                  <div className="space-y-2">
+                    {card}
+                    <Can I="create" a="Student">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="min-h-[44px] w-full"
+                        onClick={() => setEnrolTarget({ id: student.id, name: fullName(student) })}
+                        data-testid={testIds.instituteStudents.enrolRowBtn(student.id)}
+                      >
+                        <UserPlus aria-hidden="true" className="size-4" />
+                        {t('placement.enrolButton')}
+                      </Button>
+                    </Can>
+                  </div>
                 );
               }}
               emptyState={

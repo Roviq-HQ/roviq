@@ -148,6 +148,8 @@ export const ErrorCode = {
   SECTION_HAS_STUDENTS: 'SECTION_HAS_STUDENTS',
   /** Student already has a record in that academic year */
   STUDENT_ALREADY_ENROLLED: 'STUDENT_ALREADY_ENROLLED',
+  /** Student has attendance, marks, assessments or report cards in that year — cannot remove */
+  STUDENT_YEAR_HAS_RECORDS: 'STUDENT_YEAR_HAS_RECORDS',
   /** Board code is already used by another subject in this standard */
   SUBJECT_CODE_DUPLICATE: 'SUBJECT_CODE_DUPLICATE',
 
@@ -497,6 +499,7 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   SECTION_CAPACITY_EXCEEDED: HttpStatus.UNPROCESSABLE_ENTITY,
   SECTION_HAS_STUDENTS: HttpStatus.CONFLICT,
   STUDENT_ALREADY_ENROLLED: HttpStatus.CONFLICT,
+  STUDENT_YEAR_HAS_RECORDS: HttpStatus.CONFLICT,
   SUBJECT_CODE_DUPLICATE: HttpStatus.CONFLICT,
   TIMETABLE_NOT_FOUND: HttpStatus.NOT_FOUND,
   TIMETABLE_NAME_DUPLICATE: HttpStatus.CONFLICT,
