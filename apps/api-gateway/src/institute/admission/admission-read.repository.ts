@@ -13,6 +13,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   enquiriesLive,
+  mkInstituteCtx,
   withTenant,
 } from '@roviq/database';
 import { and, count, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
@@ -35,8 +36,9 @@ export class AdmissionReadRepository {
       admissionReadPredicate(access.ability, 'Application'),
     );
   }
-  getForMutation(id: string, ctx: InstituteContext) {
-    return this.loadApplication(id, ctx, undefined);
+  /** Unrestricted read for the service's own mutations; same origin as its writes. */
+  getForMutation(id: string, tenantId: string) {
+    return this.loadApplication(id, mkInstituteCtx(tenantId, 'service:admission'), undefined);
   }
   async isVisible(id: string, subject: 'Enquiry' | 'Application', access: InstituteReadAccess) {
     const table = subject === 'Enquiry' ? enquiriesLive : admissionApplicationsLive;

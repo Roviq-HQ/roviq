@@ -1,13 +1,7 @@
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-/**
- * Student CRUD service (ROV-154).
- *
- * Direct service → Drizzle (no abstract repository).
- * Auth/user creation uses direct DB stubs (same pattern as bulk import).
- * TODO: Replace user creation with NATS calls when Identity Service is ready.
- */
+/** Student CRUD service (ROV-154). Queries live in StudentRepository and StudentReadRepository. */
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   AcademicStatus,
   AdmissionType,
@@ -19,50 +13,18 @@ import {
   USER_DOCUMENT_TYPE_VALUES,
   UserDocumentType,
 } from '@roviq/common-types';
-import {
-  academicYearsLive,
-  DRIZZLE_DB,
-  type DrizzleDB,
-  memberships,
-  membershipsLive,
-  mkAdminCtx,
-  mkInstituteCtx,
-  rolesLive,
-  softDelete,
-  studentAcademics,
-  studentAcademicsLive,
-  studentProfiles,
-  studentProfilesLive,
-  tenantUserProfilesLive,
-  userDocuments,
-  userDocumentsLive,
-  withAdmin,
-  withTenant,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { getRequestContext } from '@roviq/request-context';
-import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
-import {
-  ensureTenantUserProfile,
-  type TenantUserProfileFields,
-  updateTenantUserProfile,
-} from '../../auth/tenant-user-profile';
+import type { TenantUserProfileFields } from '../../auth/tenant-user-profile';
 import { FileService } from '../../files/file.service';
-import { markFilesReady } from '../../files/file-attachment';
-import {
-  attachUserDocumentFiles,
-  loadUserDocumentFiles,
-  removeUserDocument,
-} from '../../files/user-document-files';
-import { nextAdmissionNumber } from './admission-number.sequence';
 import type { CreateStudentInput } from './dto/create-student.input';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
+import { StudentRepository } from './repositories/student.repository';
 import { StudentReadRepository } from './student-read.repository';
-import { studentReadPredicate } from './student-read-predicate';
 
 const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
 
@@ -71,7 +33,7 @@ export class StudentService {
   private readonly logger = new Logger(StudentService.name);
 
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repository: StudentRepository,
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
     private readonly readRepository: StudentReadRepository,
@@ -105,51 +67,21 @@ export class StudentService {
     );
 
     // 3. Find student role + create membership
-    const studentRole = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ id: rolesLive.id })
-          .from(rolesLive)
-          .where(
-            and(
-              eq(rolesLive.tenantId, tenantId),
-              sql`${rolesLive.name}->>'en' = 'student' OR ${rolesLive.name}->>'en' = 'Student'`,
-            ),
-          )
-          .limit(1);
-      },
-    );
-
-    if (studentRole.length === 0) {
+    const studentRoleId = await this.repository.findStudentRoleId(tenantId);
+    if (!studentRoleId) {
       throw new BusinessException(
         ErrorCode.ROLE_NOT_FOUND,
         'Student role not found for this institute',
       );
     }
 
-    const newMemberships = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        const inserted = await tx
-          .insert(memberships)
-          .values({
-            userId,
-            tenantId,
-            roleId: studentRole[0].id,
-            status: 'ACTIVE',
-            abilities: [],
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .onConflictDoNothing()
-          .returning({ id: memberships.id });
-        await ensureTenantUserProfile(tx, {
-          tenantId,
-          userId,
-          actorId,
+    // An existing membership inserts nothing: look it up instead.
+    const membershipId =
+      (await this.repository.createMembership(tenantId, {
+        userId,
+        roleId: studentRoleId,
+        actorId,
+        profile: {
           firstName: input.firstName,
           lastName: input.lastName,
           gender: input.gender,
@@ -157,89 +89,43 @@ export class StudentService {
           bloodGroup: input.bloodGroup,
           religion: input.religion,
           motherTongue: input.motherTongue,
-        });
-        return inserted;
-      },
-    );
-
-    // If membership already exists, find it
-    let membershipId: string;
-    if (newMemberships.length > 0) {
-      membershipId = newMemberships[0].id;
-    } else {
-      const existing = await withTenant(
-        this.db,
-        mkInstituteCtx(tenantId, 'service:student'),
-        async (tx) => {
-          return tx
-            .select({ id: membershipsLive.id })
-            .from(membershipsLive)
-            .where(
-              and(
-                eq(membershipsLive.userId, userId),
-                eq(membershipsLive.tenantId, tenantId),
-                eq(membershipsLive.roleId, studentRole[0].id),
-              ),
-            )
-            .limit(1);
         },
-      );
-      membershipId = existing[0].id;
-    }
+      })) ?? (await this.repository.findMembershipId(tenantId, userId, studentRoleId));
 
     // 4–5. Admission number + student_profile in one transaction (no gaps on failure)
     const admissionDate = input.admissionDate ?? new Date().toISOString().split('T')[0];
-    const { newProfiles, admissionNumber } = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        const admissionNumber = await nextAdmissionNumber(tx, tenantId, input.standardId);
-        const newProfiles = await tx
-          .insert(studentProfiles)
-          .values({
-            userId,
-            membershipId,
-            tenantId,
-            admissionNumber,
-            admissionDate,
-            admissionClass: input.admissionClass ?? null,
-            admissionType: input.admissionType ?? AdmissionType.NEW,
-            academicStatus: AcademicStatus.ENROLLED,
-            socialCategory: input.socialCategory ?? SocialCategory.GENERAL,
-            caste: input.caste ?? null,
-            isMinority: input.isMinority ?? false,
-            minorityType: input.minorityType ?? null,
-            isBpl: input.isBpl ?? false,
-            isCwsn: input.isCwsn ?? false,
-            cwsnType: input.cwsnType ?? null,
-            isRteAdmitted: input.isRteAdmitted ?? false,
-            rteCertificate: input.rteCertificate ?? null,
-            previousSchoolName: input.previousSchoolName ?? null,
-            previousSchoolBoard: input.previousSchoolBoard ?? null,
-            previousSchoolUdise: input.previousSchoolUdise ?? null,
-            incomingTcNumber: input.incomingTcNumber ?? null,
-            incomingTcDate: input.incomingTcDate ?? null,
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning({ id: studentProfiles.id });
-        return { newProfiles, admissionNumber };
-      },
-    );
-
-    const studentProfileId = newProfiles[0].id;
+    const { studentProfileId, admissionNumber } = await this.repository.createProfile(tenantId, {
+      userId,
+      membershipId,
+      standardId: input.standardId,
+      actorId,
+      admissionDate,
+      admissionClass: input.admissionClass ?? null,
+      admissionType: input.admissionType ?? AdmissionType.NEW,
+      academicStatus: AcademicStatus.ENROLLED,
+      socialCategory: input.socialCategory ?? SocialCategory.GENERAL,
+      caste: input.caste ?? null,
+      isMinority: input.isMinority ?? false,
+      minorityType: input.minorityType ?? null,
+      isBpl: input.isBpl ?? false,
+      isCwsn: input.isCwsn ?? false,
+      cwsnType: input.cwsnType ?? null,
+      isRteAdmitted: input.isRteAdmitted ?? false,
+      rteCertificate: input.rteCertificate ?? null,
+      previousSchoolName: input.previousSchoolName ?? null,
+      previousSchoolBoard: input.previousSchoolBoard ?? null,
+      previousSchoolUdise: input.previousSchoolUdise ?? null,
+      incomingTcNumber: input.incomingTcNumber ?? null,
+      incomingTcDate: input.incomingTcDate ?? null,
+    });
 
     // 6. Create student_academics (initial enrollment)
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      await tx.insert(studentAcademics).values({
-        studentProfileId,
-        academicYearId: input.academicYearId,
-        standardId: input.standardId,
-        sectionId: input.sectionId,
-        tenantId,
-        createdBy: actorId,
-        updatedBy: actorId,
-      });
+    await this.repository.createInitialAcademic(tenantId, {
+      studentProfileId,
+      academicYearId: input.academicYearId,
+      standardId: input.standardId,
+      sectionId: input.sectionId,
+      actorId,
     });
 
     // 7. Emit event
@@ -284,23 +170,12 @@ export class StudentService {
       );
     }
 
-    const studentRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ userId: studentProfilesLive.userId })
-          .from(studentProfilesLive)
-          .where(
-            and(
-              eq(studentProfilesLive.id, input.studentProfileId),
-              studentReadPredicate(ability, null),
-            ),
-          )
-          .limit(1);
-      },
+    const userId = await this.repository.findReadableUserId(
+      tenantId,
+      input.studentProfileId,
+      ability,
     );
-    if (studentRows.length === 0) {
+    if (!userId) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
@@ -308,43 +183,18 @@ export class StudentService {
     if (input.type === 'AADHAAR_CARD' && !ability.can('read', 'Student', 'aadhaar')) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'Not allowed to add this document type');
     }
-    const userId = studentRows[0].userId;
 
     await this.files.verifyUploads(input.fileIds, DOCUMENT_FILE_PURPOSE);
 
-    const { inserted, files } = await withAdmin(
-      this.db,
-      mkAdminCtx('service:student'),
-      async (tx) => {
-        // The files must have been uploaded for this very student.
-        await markFilesReady(tx, {
-          fileIds: input.fileIds,
-          purpose: DOCUMENT_FILE_PURPOSE,
-          userId: actorId,
-          subjectUserId: userId,
-        });
-        const rows = await tx
-          .insert(userDocuments)
-          .values({
-            createdBy: actorId,
-            updatedBy: actorId,
-            userId,
-            type: input.type,
-            description: input.description ?? null,
-            referenceNumber: input.referenceNumber ?? null,
-          })
-          .returning();
-        const document = rows[0];
-        await attachUserDocumentFiles(tx, {
-          documentId: document.id,
-          userId,
-          fileIds: input.fileIds,
-          actorId,
-        });
-        const attached = await loadUserDocumentFiles(tx, [document.id]);
-        return { inserted: document, files: attached.get(document.id) ?? [] };
-      },
-    );
+    const { document: inserted, files } = await this.repository.createDocument({
+      userId,
+      actorId,
+      type: input.type,
+      description: input.description ?? null,
+      referenceNumber: input.referenceNumber ?? null,
+      fileIds: input.fileIds,
+      filePurpose: DOCUMENT_FILE_PURPOSE,
+    });
 
     this.logger.log(
       `Student document uploaded: student=${input.studentProfileId} type=${input.type} actor=${actorId}`,
@@ -375,28 +225,14 @@ export class StudentService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    const documents = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ type: userDocumentsLive.type })
-          .from(userDocumentsLive)
-          .innerJoin(studentProfilesLive, eq(studentProfilesLive.userId, userDocumentsLive.userId))
-          .where(and(eq(userDocumentsLive.id, documentId), studentReadPredicate(ability, null)))
-          .limit(1);
-      },
-    );
-    const document = documents[0];
+    const type = await this.repository.findReadableDocumentType(tenantId, documentId, ability);
     // Same field rule as the document list: a caller who cannot see Aadhaar cannot remove it.
-    const hidden = document?.type === 'AADHAAR_CARD' && !ability.can('read', 'Student', 'aadhaar');
-    if (!document || hidden) {
+    const hidden = type === 'AADHAAR_CARD' && !ability.can('read', 'Student', 'aadhaar');
+    if (!type || hidden) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Document not found');
     }
 
-    const removed = await withAdmin(this.db, mkAdminCtx('service:student'), (tx) =>
-      removeUserDocument(tx, { documentId, actorId }),
-    );
+    const removed = await this.repository.removeDocument(documentId, actorId);
     if (!removed) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Document not found');
     }
@@ -414,33 +250,20 @@ export class StudentService {
    */
   async findByMembershipId(membershipId: string): Promise<StudentModel | null> {
     const tenantId = this.getTenantId();
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ id: studentProfilesLive.id })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.membershipId, membershipId))
-          .limit(1);
-      },
+    const studentProfileId = await this.repository.findProfileIdByMembership(
+      tenantId,
+      membershipId,
     );
-    if (rows.length === 0) return null;
-    return this.findById(rows[0].id);
+    if (!studentProfileId) return null;
+    return this.findById(studentProfileId);
   }
 
   async findById(id: string) {
-    return this.readRepository.findForMutation(
-      id,
-      mkInstituteCtx(this.getTenantId(), 'service:student'),
-    );
+    return this.readRepository.findForMutation(id, this.getTenantId());
   }
 
   async list(filter: StudentFilterInput) {
-    return this.readRepository.listForAttendance(
-      filter,
-      mkInstituteCtx(this.getTenantId(), 'service:student'),
-    );
+    return this.readRepository.listForAttendance(filter, this.getTenantId());
   }
 
   async update(id: string, input: UpdateStudentInput): Promise<StudentModel> {
@@ -455,28 +278,14 @@ export class StudentService {
     // Optimistic concurrency: update student_profile WHERE version = expected
     const profileUpdates = this.buildStudentProfileUpdates(input, actorId);
 
-    const updated = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .update(studentProfiles)
-          .set({
-            ...profileUpdates,
-            version: sql`${studentProfiles.version} + 1`,
-          })
-          .where(
-            and(
-              eq(studentProfiles.id, id),
-              eq(studentProfiles.version, input.version),
-              isNull(studentProfiles.deletedAt),
-            ),
-          )
-          .returning({ id: studentProfiles.id });
-      },
+    const updated = await this.repository.updateProfile(
+      tenantId,
+      id,
+      input.version,
+      profileUpdates,
     );
 
-    if (updated.length === 0) {
+    if (!updated) {
       await this.throwVersionConflict(tenantId, id);
     }
 
@@ -516,28 +325,13 @@ export class StudentService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    const current = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({
-            academicStatus: studentProfilesLive.academicStatus,
-            tcIssued: studentProfilesLive.tcIssued,
-            version: studentProfilesLive.version,
-          })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, id))
-          .limit(1);
-      },
-    );
-
-    if (current.length === 0) {
+    const current = await this.repository.findStatus(tenantId, id);
+    if (!current) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
-    STUDENT_ACADEMIC_STATE_MACHINE.assertTransition(current[0].academicStatus, newStatus);
-    if (newStatus === AcademicStatus.TRANSFERRED_OUT && !current[0].tcIssued) {
+    STUDENT_ACADEMIC_STATE_MACHINE.assertTransition(current.academicStatus, newStatus);
+    if (newStatus === AcademicStatus.TRANSFERRED_OUT && !current.tcIssued) {
       throw new BusinessException(
         ErrorCode.TC_REQUIRED_FOR_TRANSFER,
         'Cannot transfer out without issuing a Transfer Certificate',
@@ -552,25 +346,14 @@ export class StudentService {
       updates.tcReason = reason;
     }
 
-    const updated = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .update(studentProfiles)
-          .set({ ...updates, version: sql`${studentProfiles.version} + 1` })
-          .where(and(eq(studentProfiles.id, id), isNull(studentProfiles.deletedAt)))
-          .returning({ id: studentProfiles.id });
-      },
-    );
-
-    if (updated.length === 0) {
+    const updated = await this.repository.setStatus(tenantId, id, updates);
+    if (!updated) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.statusChanged, {
       studentProfileId: id,
-      fromStatus: current[0].academicStatus,
+      fromStatus: current.academicStatus,
       toStatus: newStatus,
       reason: reason ?? null,
       tenantId,
@@ -585,9 +368,7 @@ export class StudentService {
       });
     }
 
-    this.logger.log(
-      `Student ${id} status transitioned: ${current[0].academicStatus} → ${newStatus}`,
-    );
+    this.logger.log(`Student ${id} status transitioned: ${current.academicStatus} → ${newStatus}`);
 
     return this.findById(id);
   }
@@ -598,102 +379,39 @@ export class StudentService {
     const tenantId = this.getTenantId();
 
     // Check for active enrollments in current year (exclude students who already left)
-    const activeEnrollments = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ id: studentAcademicsLive.id })
-          .from(studentAcademicsLive)
-          .innerJoin(
-            academicYearsLive,
-            eq(academicYearsLive.id, studentAcademicsLive.academicYearId),
-          )
-          .innerJoin(
-            studentProfilesLive,
-            eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
-          )
-          .where(
-            and(
-              eq(studentAcademicsLive.studentProfileId, id),
-              eq(academicYearsLive.isActive, true),
-              notInArray(studentProfilesLive.academicStatus, [...StudentService.LEFT_STATUSES]),
-            ),
-          )
-          .limit(1);
-      },
-    );
-
-    if (activeEnrollments.length > 0) {
+    const hasActiveEnrollment = await this.repository.hasActiveEnrollment(tenantId, id, [
+      ...StudentService.LEFT_STATUSES,
+    ]);
+    if (hasActiveEnrollment) {
       throw new BusinessException(
         ErrorCode.HAS_ACTIVE_ENROLLMENTS,
         'Cannot delete student with active enrollments in the current academic year',
       );
     }
 
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      await softDelete(tx, studentProfiles, id);
-    });
+    await this.repository.softDelete(tenantId, id);
 
     return true;
   }
 
   async listDeleted() {
-    const tenantId = this.getTenantId();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      return tx
-        .select({
-          id: studentProfiles.id,
-          firstName: tenantUserProfilesLive.firstName,
-          lastName: tenantUserProfilesLive.lastName,
-          identifier: studentProfiles.admissionNumber,
-          deletedAt: sql<Date>`${studentProfiles.deletedAt}`.mapWith(studentProfiles.deletedAt),
-        })
-        .from(studentProfiles) // allow-base-read: the Deleted list shows trashed rows
-        .innerJoin(
-          tenantUserProfilesLive,
-          and(
-            eq(tenantUserProfilesLive.userId, studentProfiles.userId),
-            eq(tenantUserProfilesLive.tenantId, studentProfiles.tenantId),
-          ),
-        )
-        .where(isNotNull(studentProfiles.deletedAt))
-        .orderBy(desc(studentProfiles.deletedAt));
-    });
+    return this.repository.listDeleted(this.getTenantId());
   }
 
   async restore(id: string): Promise<boolean> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      const [deleted] = await tx
-        .select({ admissionNumber: studentProfiles.admissionNumber })
-        .from(studentProfiles) // allow-base-read: restore looks up a trashed row
-        .where(and(eq(studentProfiles.id, id), isNotNull(studentProfiles.deletedAt)));
-      if (!deleted) {
-        throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Deleted student not found');
-      }
-
-      // The admission number is unique among live students only, so it may
-      // have been reissued while this record sat in the Deleted list.
-      const [taken] = await tx
-        .select({ id: studentProfilesLive.id })
-        .from(studentProfilesLive)
-        .where(eq(studentProfilesLive.admissionNumber, deleted.admissionNumber))
-        .limit(1);
-      if (taken) {
-        throw new BusinessException(
-          ErrorCode.ADMISSION_NUMBER_TAKEN,
-          `Admission number ${deleted.admissionNumber} is now used by another student`,
-        );
-      }
-
-      await tx
-        .update(studentProfiles)
-        .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
-        .where(eq(studentProfiles.id, id));
-    });
+    const result = await this.repository.restore(tenantId, id, actorId);
+    if (result.kind === 'not_found') {
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Deleted student not found');
+    }
+    if (result.kind === 'admission_number_taken') {
+      throw new BusinessException(
+        ErrorCode.ADMISSION_NUMBER_TAKEN,
+        `Admission number ${result.admissionNumber} is now used by another student`,
+      );
+    }
 
     return true;
   }
@@ -707,30 +425,16 @@ export class StudentService {
     id: string,
     input: UpdateStudentInput,
   ): Promise<void> {
-    const current = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({
-            academicStatus: studentProfilesLive.academicStatus,
-            tcIssued: studentProfilesLive.tcIssued,
-          })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, id))
-          .limit(1);
-      },
-    );
-
-    if (current.length === 0) {
+    const current = await this.repository.findStatus(tenantId, id);
+    if (!current) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
 
     STUDENT_ACADEMIC_STATE_MACHINE.assertTransition(
-      current[0].academicStatus as AcademicStatus,
+      current.academicStatus,
       input.academicStatus as AcademicStatus,
     );
-    const tcIssued = input.tcIssued ?? current[0].tcIssued;
+    const tcIssued = input.tcIssued ?? current.tcIssued;
     if (input.academicStatus === AcademicStatus.TRANSFERRED_OUT && !tcIssued) {
       throw new BusinessException(
         ErrorCode.TC_REQUIRED_FOR_TRANSFER,
@@ -768,19 +472,7 @@ export class StudentService {
   }
 
   private async throwVersionConflict(tenantId: string, id: string): Promise<never> {
-    const exists = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:student'),
-      async (tx) => {
-        return tx
-          .select({ id: studentProfilesLive.id })
-          .from(studentProfilesLive)
-          .where(eq(studentProfilesLive.id, id))
-          .limit(1);
-      },
-    );
-
-    if (exists.length === 0) {
+    if (!(await this.repository.exists(tenantId, id))) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
     throw new BusinessException(
@@ -807,20 +499,7 @@ export class StudentService {
 
     if (Object.keys(updates).length === 0) return;
 
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:student'), async (tx) => {
-      const [profile] = await tx
-        .select({ userId: studentProfilesLive.userId })
-        .from(studentProfilesLive)
-        .where(eq(studentProfilesLive.id, id))
-        .limit(1);
-      if (!profile) return;
-      await updateTenantUserProfile(tx, {
-        tenantId,
-        userId: profile.userId,
-        actorId,
-        changes: updates,
-      });
-    });
+    await this.repository.updateTenantProfile(tenantId, id, actorId, updates);
   }
 
   private static readonly LEFT_STATUSES = new Set<AcademicStatus>([

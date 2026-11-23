@@ -1,10 +1,6 @@
-/**
- * Admission service — enquiry CRM + application lifecycle + statistics (ROV-159).
- *
- * Direct service → Drizzle (no abstract repository).
- */
+/** Admission service — enquiry CRM + application lifecycle (ROV-159). Queries live in AdmissionRepository. */
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ADMISSION_APPLICATION_STATE_MACHINE,
@@ -15,20 +11,6 @@ import {
   ErrorCode,
   REJECTION_REASON_MAX_LENGTH,
 } from '@roviq/common-types';
-import {
-  academicYearsLive,
-  admissionApplications,
-  admissionApplicationsLive,
-  DRIZZLE_DB,
-  type DrizzleDB,
-  enquiries,
-  enquiriesLive,
-  mkInstituteCtx,
-  sectionsLive,
-  standardsLive,
-  tenantSequences,
-  withTenant,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
@@ -37,9 +19,7 @@ import {
   Connection as TemporalConnection,
   WorkflowExecutionAlreadyStartedError,
 } from '@temporalio/client';
-import { and, eq, sql } from 'drizzle-orm';
 import { AdmissionReadRepository } from './admission-read.repository';
-import { toApplicationModel, toEnquiryModel } from './admission-records';
 import type {
   CreateApplicationInput,
   UpdateApplicationInput,
@@ -48,20 +28,16 @@ import type { CreateEnquiryInput } from './dto/create-enquiry.input';
 import type { UpdateEnquiryInput } from './dto/update-enquiry.input';
 import type { ApplicationModel } from './models/application.model';
 import type { EnquiryModel } from './models/enquiry.model';
+import { AdmissionRepository } from './repositories/admission.repository';
+import type { ApplicationUpdate } from './repositories/types';
 import { STUDENT_ADMISSION_TASK_QUEUE } from './workflows/student-admission.types';
 
-/**
- * Drizzle row types — single source of truth for the shape returned by
- * `db.select().from(...)`. The mapper functions below pluck the subset of
- * fields the GraphQL `EnquiryModel`/`ApplicationModel` exposes, eliminating
- * the `as unknown as Model` casts banned by the [NTESC] hard rule.
- */
 @Injectable()
 export class AdmissionService {
   private readonly logger = new Logger(AdmissionService.name);
 
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repository: AdmissionRepository,
     private readonly eventBus: EventBusService,
     private readonly readRepository: AdmissionReadRepository,
     private readonly config: ConfigService,
@@ -79,30 +55,6 @@ export class AdmissionService {
     return userId;
   }
 
-  /**
-   * Generate the next human-readable enquiry number (e.g. `ENQ-000123`).
-   * Uses the atomic `next_sequence_value()` function with a per-tenant
-   * `enq_no` row in `tenant_sequences`, creating it on first use.
-   */
-  private async generateEnquiryNumber(tenantId: string): Promise<string> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'service:admission'), async (tx) => {
-      await tx
-        .insert(tenantSequences)
-        .values({
-          tenantId,
-          sequenceName: 'enq_no',
-          currentValue: 0n,
-          formatTemplate: 'ENQ-{value:06d}',
-        })
-        .onConflictDoNothing();
-      const result = await tx.execute(
-        sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, 'enq_no')`,
-      );
-      const row = result.rows[0] as { next_val: string; formatted: string };
-      return row.formatted || `ENQ-${row.next_val}`;
-    });
-  }
-
   // ══════════════════════════════════════════════════════════
   // ENQUIRY CRUD
   // ══════════════════════════════════════════════════════════
@@ -112,64 +64,36 @@ export class AdmissionService {
     const actorId = this.getUserId();
 
     // Auto-dedup: check for same phone + class combo
-    const duplicates = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .select({ id: enquiriesLive.id })
-          .from(enquiriesLive)
-          .where(
-            and(
-              eq(enquiriesLive.parentPhone, input.parentPhone),
-              eq(enquiriesLive.classRequested, input.classRequested),
-            ),
-          )
-          .limit(1);
-      },
+    const isDuplicate = await this.repository.hasDuplicateEnquiry(
+      tenantId,
+      input.parentPhone,
+      input.classRequested,
     );
 
-    const isDuplicate = duplicates.length > 0;
+    const enquiryNumber = await this.repository.nextEnquiryNumber(tenantId);
 
-    const enquiryNumber = await this.generateEnquiryNumber(tenantId);
-
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .insert(enquiries)
-          .values({
-            tenantId,
-            enquiryNumber,
-            studentName: input.studentName,
-            dateOfBirth: input.dateOfBirth ?? null,
-            gender: input.gender ?? null,
-            classRequested: input.classRequested,
-            academicYearId: input.academicYearId ?? null,
-            parentName: input.parentName,
-            parentPhone: input.parentPhone,
-            parentEmail: input.parentEmail ?? null,
-            parentRelation: input.parentRelation,
-            source: input.source ?? EnquirySource.WALK_IN,
-            referredBy: input.referredBy ?? null,
-            assignedTo: input.assignedTo ?? null,
-            previousSchool: input.previousSchool ?? null,
-            previousBoard: input.previousBoard ?? null,
-            siblingInSchool: input.siblingInSchool ?? false,
-            siblingAdmissionNo: input.siblingAdmissionNo ?? null,
-            specialNeeds: input.specialNeeds ?? null,
-            notes: input.notes ?? null,
-            status: EnquiryStatus.NEW,
-            followUpDate: input.followUpDate ?? null,
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning();
-      },
-    );
-
-    const enquiry = toEnquiryModel(rows[0]);
+    const enquiry = await this.repository.createEnquiry(tenantId, actorId, enquiryNumber, {
+      studentName: input.studentName,
+      dateOfBirth: input.dateOfBirth ?? null,
+      gender: input.gender ?? null,
+      classRequested: input.classRequested,
+      academicYearId: input.academicYearId ?? null,
+      parentName: input.parentName,
+      parentPhone: input.parentPhone,
+      parentEmail: input.parentEmail ?? null,
+      parentRelation: input.parentRelation,
+      source: input.source ?? EnquirySource.WALK_IN,
+      referredBy: input.referredBy ?? null,
+      assignedTo: input.assignedTo ?? null,
+      previousSchool: input.previousSchool ?? null,
+      previousBoard: input.previousBoard ?? null,
+      siblingInSchool: input.siblingInSchool ?? false,
+      siblingAdmissionNo: input.siblingAdmissionNo ?? null,
+      specialNeeds: input.specialNeeds ?? null,
+      notes: input.notes ?? null,
+      status: EnquiryStatus.NEW,
+      followUpDate: input.followUpDate ?? null,
+    });
 
     // Spread the full record so the `@Subscription(() => EnquiryModel)`
     // resolver can serve any selected field (id, etc.) without null-field
@@ -216,19 +140,12 @@ export class AdmissionService {
       updates.lastContactedAt = new Date();
     }
 
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx.update(enquiries).set(updates).where(eq(enquiries.id, id)).returning();
-      },
-    );
-
-    if (rows.length === 0) {
+    const enquiry = await this.repository.updateEnquiry(tenantId, id, updates);
+    if (!enquiry) {
       throw new BusinessException(ErrorCode.ENQUIRY_NOT_FOUND, 'Enquiry not found');
     }
 
-    return toEnquiryModel(rows[0]);
+    return enquiry;
   }
 
   async convertEnquiryToApplication(
@@ -240,19 +157,10 @@ export class AdmissionService {
     const actorId = this.getUserId();
 
     // Load enquiry
-    const enqRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx.select().from(enquiriesLive).where(eq(enquiriesLive.id, enquiryId)).limit(1);
-      },
-    );
-
-    if (enqRows.length === 0) {
+    const enq = await this.repository.findEnquiry(tenantId, enquiryId);
+    if (!enq) {
       throw new BusinessException(ErrorCode.ENQUIRY_NOT_FOUND, 'Enquiry not found');
     }
-
-    const enq = enqRows[0];
 
     if (enq.convertedToApplicationId) {
       throw new BusinessException(
@@ -275,41 +183,21 @@ export class AdmissionService {
       specialNeeds: enq.specialNeeds,
     };
 
-    const appRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        const apps = await tx
-          .insert(admissionApplications)
-          .values({
-            tenantId,
-            enquiryId,
-            academicYearId,
-            standardId,
-            formData,
-            status: AdmissionApplicationStatus.SUBMITTED,
-            isRteApplication: false,
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning();
-
-        // Update enquiry
-        await tx
-          .update(enquiries)
-          .set({
-            status: EnquiryStatus.APPLICATION_SUBMITTED,
-            convertedToApplicationId: apps[0].id,
-            updatedBy: actorId,
-          })
-          .where(eq(enquiries.id, enquiryId));
-
-        return apps;
+    const application = await this.repository.convertEnquiry(tenantId, actorId, {
+      enquiryId,
+      application: {
+        enquiryId,
+        academicYearId,
+        standardId,
+        formData,
+        status: AdmissionApplicationStatus.SUBMITTED,
+        isRteApplication: false,
       },
-    );
+      enquiryStatus: EnquiryStatus.APPLICATION_SUBMITTED,
+    });
 
-    this.logger.log(`Enquiry ${enquiryId} converted to application ${appRows[0].id}`);
-    return toApplicationModel(appRows[0]);
+    this.logger.log(`Enquiry ${enquiryId} converted to application ${application.id}`);
+    return application;
   }
 
   // ══════════════════════════════════════════════════════════
@@ -323,18 +211,7 @@ export class AdmissionService {
     // Validate the referenced standard exists in this tenant before writing.
     // The FK would catch a missing row, but the domain error surfaces a clearer
     // message to the caller and avoids a round-trip for a generic 500.
-    const standardRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .select({ id: standardsLive.id })
-          .from(standardsLive)
-          .where(eq(standardsLive.id, input.standardId))
-          .limit(1);
-      },
-    );
-    if (standardRows.length === 0) {
+    if (!(await this.repository.standardExists(tenantId, input.standardId))) {
       throw new BusinessException(
         ErrorCode.STANDARD_NOT_FOUND,
         `Standard ${input.standardId} not found in this institute`,
@@ -344,61 +221,36 @@ export class AdmissionService {
     // Applications must target an ACTIVE academic year — admissions for
     // archived/completing years are not accepted, and planning years are not
     // yet open.
-    const yearRows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .select({ id: academicYearsLive.id, isActive: academicYearsLive.isActive })
-          .from(academicYearsLive)
-          .where(eq(academicYearsLive.id, input.academicYearId))
-          .limit(1);
-      },
-    );
-    if (yearRows.length === 0) {
+    const year = await this.repository.findAcademicYear(tenantId, input.academicYearId);
+    if (!year) {
       throw new BusinessException(
         ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
         `Academic year ${input.academicYearId} not found in this institute`,
       );
     }
-    if (!yearRows[0].isActive) {
+    if (!year.isActive) {
       throw new BusinessException(
         ErrorCode.ACADEMIC_YEAR_NOT_ACTIVE,
         `Academic year ${input.academicYearId} is not active — applications cannot be accepted`,
       );
     }
 
-    const rows = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:admission'),
-      async (tx) => {
-        return tx
-          .insert(admissionApplications)
-          .values({
-            tenantId,
-            enquiryId: input.enquiryId ?? null,
-            academicYearId: input.academicYearId,
-            standardId: input.standardId,
-            sectionId: input.sectionId ?? null,
-            formData: input.formData,
-            status: AdmissionApplicationStatus.SUBMITTED,
-            isRteApplication: input.isRteApplication ?? false,
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .returning();
-      },
-    );
+    const application = await this.repository.createApplication(tenantId, actorId, {
+      enquiryId: input.enquiryId ?? null,
+      academicYearId: input.academicYearId,
+      standardId: input.standardId,
+      sectionId: input.sectionId ?? null,
+      formData: input.formData,
+      status: AdmissionApplicationStatus.SUBMITTED,
+      isRteApplication: input.isRteApplication ?? false,
+    });
 
-    this.logger.log(`Application created: ${rows[0].id}`);
-    return toApplicationModel(rows[0]);
+    this.logger.log(`Application created: ${application.id}`);
+    return application;
   }
 
   async getApplication(id: string): Promise<ApplicationModel> {
-    return this.readRepository.getForMutation(
-      id,
-      mkInstituteCtx(this.getTenantId(), 'service:admission'),
-    );
+    return this.readRepository.getForMutation(id, this.getTenantId());
   }
 
   async updateApplication(id: string, input: UpdateApplicationInput): Promise<ApplicationModel> {
@@ -419,24 +271,15 @@ export class AdmissionService {
   ): Promise<ApplicationModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
-    const ctx = mkInstituteCtx(tenantId, 'service:admission');
 
-    const current = await withTenant(this.db, ctx, async (tx) => {
-      return tx
-        .select({ status: admissionApplicationsLive.status })
-        .from(admissionApplicationsLive)
-        .where(eq(admissionApplicationsLive.id, id))
-        .limit(1);
-    });
-
-    if (current.length === 0) {
+    const oldStatus = await this.repository.findApplicationStatus(tenantId, id);
+    if (!oldStatus) {
       throw new BusinessException(ErrorCode.APPLICATION_NOT_FOUND, 'Application not found');
     }
 
-    const oldStatus = current[0].status;
     ADMISSION_APPLICATION_STATE_MACHINE.assertTransition(oldStatus, input.status);
 
-    const updates: Partial<typeof admissionApplications.$inferInsert> = {
+    const updates: ApplicationUpdate = {
       status: input.status,
       updatedBy: actorId,
     };
@@ -457,15 +300,13 @@ export class AdmissionService {
 
     // Status predicate makes the transition atomic: a concurrent writer that
     // already moved the row leaves this UPDATE matching nothing.
-    const rows = await withTenant(this.db, ctx, async (tx) => {
-      return tx
-        .update(admissionApplications)
-        .set(updates)
-        .where(and(eq(admissionApplications.id, id), eq(admissionApplications.status, oldStatus)))
-        .returning();
-    });
-
-    if (rows.length === 0) {
+    const updated = await this.repository.updateApplicationIfStatus(
+      tenantId,
+      id,
+      oldStatus,
+      updates,
+    );
+    if (!updated) {
       throw new BusinessException(
         ErrorCode.CONCURRENT_MODIFICATION,
         'Application status changed while this update was in progress — reload and retry',
@@ -480,7 +321,7 @@ export class AdmissionService {
     });
 
     this.logger.log(`Application ${id}: ${oldStatus} → ${input.status}`);
-    return toApplicationModel(rows[0]);
+    return updated;
   }
 
   /**
@@ -492,7 +333,6 @@ export class AdmissionService {
   async approveAndEnroll(id: string, sectionId?: string): Promise<ApplicationModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
-    const ctx = mkInstituteCtx(tenantId, 'service:admission');
 
     let current = await this.getApplication(id);
     ADMISSION_APPLICATION_STATE_MACHINE.assertTransition(
@@ -509,19 +349,7 @@ export class AdmissionService {
         'Choose a section before enrolling this applicant',
       );
     }
-    const section = await withTenant(this.db, ctx, async (tx) => {
-      return tx
-        .select({ id: sectionsLive.id })
-        .from(sectionsLive)
-        .where(
-          and(
-            eq(sectionsLive.id, targetSectionId),
-            eq(sectionsLive.standardId, current.standardId),
-          ),
-        )
-        .limit(1);
-    });
-    if (section.length === 0) {
+    if (!(await this.repository.sectionInStandard(tenantId, targetSectionId, current.standardId))) {
       throw new BusinessException(
         ErrorCode.SECTION_STANDARD_MISMATCH,
         'Section does not belong to the class this application is for',
@@ -529,25 +357,19 @@ export class AdmissionService {
     }
 
     if (targetSectionId !== current.sectionId) {
-      const rows = await withTenant(this.db, ctx, async (tx) => {
-        return tx
-          .update(admissionApplications)
-          .set({ sectionId: targetSectionId, updatedBy: actorId })
-          .where(
-            and(
-              eq(admissionApplications.id, id),
-              eq(admissionApplications.status, AdmissionApplicationStatus.FEE_PAID),
-            ),
-          )
-          .returning();
-      });
-      if (rows.length === 0) {
+      const updated = await this.repository.updateApplicationIfStatus(
+        tenantId,
+        id,
+        AdmissionApplicationStatus.FEE_PAID,
+        { sectionId: targetSectionId, updatedBy: actorId },
+      );
+      if (!updated) {
         throw new BusinessException(
           ErrorCode.CONCURRENT_MODIFICATION,
           'Application status changed while this update was in progress — reload and retry',
         );
       }
-      current = toApplicationModel(rows[0]);
+      current = updated;
     }
 
     const address = this.config.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
