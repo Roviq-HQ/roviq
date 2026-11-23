@@ -24,7 +24,8 @@
 
 Roviq runs the records, the daily routine and the paperwork of an institute in one system:
 admissions, students and staff, attendance, timetables, examinations, certificates and government
-reports. It is built for Indian schools, coaching centres and libraries, in English and Hindi.
+reports. It is built for Indian institutes (pre-primary to senior secondary, coaching centres and
+libraries), in English and Hindi.
 
 > **Status: pre-release.** Roviq is under active development and is not running in production
 > yet. The database schema and the API can still change.

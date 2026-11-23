@@ -20,7 +20,7 @@ change without a migration path.
 
 | Institute type | Notes |
 |----------------|-------|
-| School | Pre-primary to senior secondary; NEP 2020 or the traditional 10+2 structure |
+| Pre-primary to senior secondary | The NEP 2020 or the traditional 10+2 structure |
 | Coaching centre | No fixed class ladder; academic years may overlap |
 | Library | Reading rooms and libraries |
 

@@ -9,7 +9,7 @@ Many institutes share one database. The database, not the application, keeps the
 
 | Control | How it works | Detail |
 |---------|--------------|--------|
-| Row-level security | Every table has PostgreSQL row-level security, forced even for the table owner. A query sees only the rows of the institute named in the transaction | [Architecture](architecture.md#multi-tenancy-rls-over-schema-per-tenant) |
+| Row-level security | Every table that holds an institute's data has PostgreSQL row-level security, forced even for the table owner. A query sees only the rows of the institute named in the transaction. Two account tables with no institute column (sign-in providers, phone numbers) are protected by grants instead | [Architecture](architecture.md#multi-tenancy-rls-over-schema-per-tenant) |
 | Separate database roles | The app logs in as a role with no data access, and each request switches to the role of its scope: institute, reseller or platform. No role bypasses row-level security | [Infrastructure](infrastructure.md#database) |
 | Rules in the database | Security rules are grants, policies, constraints and triggers where PostgreSQL can express them, so no code path can skip them. Tests attempt the forbidden write as each role | [Testing](testing.md#security-invariants) |
 | Automated gates | A table without row-level security, or institute code that reaches platform-level access, fails the build | [Mistakes](references/mistakes.md) |
