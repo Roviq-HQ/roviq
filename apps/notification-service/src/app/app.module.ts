@@ -5,6 +5,7 @@ import { EventBusModule } from '@roviq/event-bus';
 import { TelemetryModule } from '@roviq/telemetry';
 import { TemporalClientModule } from '@roviq/temporal';
 import { type NotificationEnv, validate } from '../config/env.validation';
+import { InstitutePortal } from '../config/institute-portal';
 import { BillingNotificationController } from '../controllers/billing-notification.controller';
 import { buildChannelAdapters, ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
@@ -78,6 +79,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     },
     NotificationDispatcher,
     RetryWait,
+    InstitutePortal,
     RecipientResolver,
     NotificationWorkerService,
     NotificationWorkerHealthIndicator,

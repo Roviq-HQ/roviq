@@ -12,4 +12,6 @@ export abstract class RecipientReadRepository {
   ): Promise<Recipient[]>;
   abstract findMembership(tenantId: string, membershipId: string): Promise<MembershipRecord | null>;
   abstract findInstituteTimezone(tenantId: string): Promise<string | null>;
+  /** The institute's name in every locale it was entered in. */
+  abstract findInstituteName(tenantId: string): Promise<Record<string, string> | null>;
 }

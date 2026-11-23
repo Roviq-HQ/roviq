@@ -82,6 +82,15 @@ export interface UserWelcomeParams {
   username: string;
   firstName: string | null;
   tempPassword: string;
+  /**
+   * Set for an account an institute created: the person did not ask for it, so the message
+   * names the institute and where to sign in.
+   */
+  institute: { name: Record<string, string>; signInUrl: string } | null;
+}
+
+function nameIn(name: Record<string, string>, locale: 'en' | 'hi'): string {
+  return name[locale] ?? name.en ?? Object.values(name)[0] ?? '';
 }
 
 /** Carries the temporary password, so it never becomes an in-app row. */
@@ -91,6 +100,46 @@ export const userWelcomeType: SecretNotificationType<UserWelcomeParams> = {
   channels: ['EMAIL', 'SMS'],
   outsideCopy: (p, channel, locale) => {
     const name = p.firstName ?? p.username;
+    if (p.institute) {
+      const institute = nameIn(p.institute.name, locale);
+      const url = p.institute.signInUrl;
+      if (channel === 'SMS') {
+        return {
+          subject: '',
+          body:
+            locale === 'hi'
+              ? `Roviq: ${institute} ने आपका खाता बनाया है। यूज़रनेम: ${p.username} | अस्थायी पासवर्ड: ${p.tempPassword}। ${url} पर साइन इन करें और अपना पासवर्ड बनाएँ।`
+              : `Roviq: ${institute} created your account. Username: ${p.username} | Temp password: ${p.tempPassword}. Sign in at ${url} and set your own password.`,
+        };
+      }
+      return locale === 'hi'
+        ? {
+            subject: `${institute} के लिए आपके Roviq साइन-इन विवरण`,
+            body: [
+              `नमस्ते ${name},`,
+              '',
+              `${institute} ने Roviq पर आपके लिए एक खाता बनाया है।`,
+              `यूज़रनेम: ${p.username}`,
+              `अस्थायी पासवर्ड: ${p.tempPassword}`,
+              '',
+              `${url} पर साइन इन करें। पहली बार साइन इन करते समय आपसे अपना पासवर्ड बनाने को कहा जाएगा।`,
+              `यदि आपको इसकी अपेक्षा नहीं थी, तो ${institute} से संपर्क करें।`,
+            ].join('\n'),
+          }
+        : {
+            subject: `Your Roviq sign-in details for ${institute}`,
+            body: [
+              `Hi ${name},`,
+              '',
+              `${institute} has created a Roviq account for you.`,
+              `Username: ${p.username}`,
+              `Temporary password: ${p.tempPassword}`,
+              '',
+              `Sign in at ${url}. You will be asked to choose your own password the first time.`,
+              `If you did not expect this, contact ${institute}.`,
+            ].join('\n'),
+          };
+    }
     if (channel === 'SMS') {
       return {
         subject: '',

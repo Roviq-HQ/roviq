@@ -399,15 +399,20 @@ export function createStudentAdmissionActivities(
       // A typed phone number proves nothing about who typed it. An account is reused only when
       // the number already belongs to an active guardian of this institute (a sibling's
       // admission); nobody else gains a membership or a child without consenting (SF-040).
-      const guardianUserId = await (async (): Promise<string> => {
-        const phone = parentPhone ? { countryCode: '+91', number: parentPhone } : undefined;
+      const phone = parentPhone ? { countryCode: '+91', number: parentPhone } : undefined;
+      // `created` only when this run made the account: a sibling's guardian, or a retry that
+      // finds the account, gets no second welcome.
+      const guardian = await (async (): Promise<{
+        userId: string;
+        created: { username: string; tempPassword: string } | null;
+      }> => {
         if (phone) {
           const sibling = await withTenant(
             db,
             mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
             (tx) => findActiveGuardianByPhone(tx, { tenantId, phone }),
           );
-          if (sibling) return sibling.userId;
+          if (sibling) return { userId: sibling.userId, created: null };
         }
 
         // Check by deterministic placeholder email before creating — a Temporal
@@ -429,18 +434,19 @@ export function createStudentAdmissionActivities(
         );
         if (existingByEmail.length > 0) {
           logger.log(`Found existing placeholder guardian by email: ${existingByEmail[0].id}`);
-          return existingByEmail[0].id;
+          return { userId: existingByEmail[0].id, created: null };
         }
 
-        const { userId: newId } = await identityService.createUser({
+        const { userId: newId, tempPassword } = await identityService.createUser({
           email,
           username,
           // Unverified contact data: it may repeat across users and never links accounts.
           phone,
           actorId: createdBy,
         });
-        return newId;
+        return { userId: newId, created: { username, tempPassword } };
       })();
+      const guardianUserId = guardian.userId;
 
       if (parentName) {
         await identityService.ensureUserProfile(
@@ -563,6 +569,20 @@ export function createStudentAdmissionActivities(
         );
         return created[0].id;
       })();
+
+      // The account's email is a placeholder, so the welcome goes by SMS or not at all.
+      if (guardian.created && phone) {
+        identityService.sendWelcomeNotification({
+          userId: guardianUserId,
+          username: guardian.created.username,
+          email: null,
+          phone,
+          firstName: parentName,
+          tempPassword: guardian.created.tempPassword,
+          scope: 'institute',
+          tenantId,
+        });
+      }
 
       const relationship = (Object.values(GuardianRelationship) as string[]).includes(
         (relationshipRaw ?? '').toUpperCase(),

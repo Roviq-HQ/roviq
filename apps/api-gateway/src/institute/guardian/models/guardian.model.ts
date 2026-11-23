@@ -2,6 +2,7 @@ import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { Gender, GuardianEducationLevel, GuardianRelationship } from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
 import { DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
+import { SignInStatus } from '../../sign-in-details/sign-in-status.enum';
 
 registerEnumType(GuardianEducationLevel, {
   name: 'GuardianEducationLevel',
@@ -96,6 +97,18 @@ export class GuardianModel {
 
   @Field(() => DateTimeScalar, { description: 'Most recent update timestamp (UTC).' })
   updatedAt!: Date;
+
+  @Field(() => SignInStatus, {
+    description: 'Where this person stands with their first sign-in, as this institute sees it.',
+  })
+  signInStatus!: SignInStatus;
+
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description:
+      'When the latest sign-in details reached the email or SMS provider; null if never.',
+  })
+  signInDetailsSentAt?: Date | null;
 }
 
 @ObjectType({ description: 'Student-guardian link with relationship details' })

@@ -42,6 +42,7 @@ import { useTranslations } from 'next-intl';
 import { parseAsBoolean, parseAsInteger, parseAsString, useQueryStates } from 'nuqs';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { SignInStatusBadge } from '../sign-in-details';
 import { type StaffListFilter, type StaffListNode, useStaff } from './use-staff';
 
 const { instituteStaff } = testIds;
@@ -67,6 +68,7 @@ const filterParsers = {
 
 export default function StaffPage() {
   const t = useTranslations('staff');
+  const tSignIn = useTranslations('signInDetails');
   const resolveI18n = useI18nField();
   const router = useRouter();
   const [filters, setFilters] = useQueryStates(filterParsers);
@@ -231,6 +233,17 @@ export default function StaffPage() {
         },
       },
       {
+        accessorKey: 'signInStatus',
+        header: tSignIn('column'),
+        cell: ({ row }) => (
+          <SignInStatusBadge
+            profileId={row.original.id}
+            status={row.original.signInStatus}
+            sentAt={row.original.signInDetailsSentAt}
+          />
+        ),
+      },
+      {
         accessorKey: 'isClassTeacher',
         header: t('columns.isClassTeacher'),
         cell: ({ row }) =>
@@ -247,7 +260,7 @@ export default function StaffPage() {
           ),
       },
     ],
-    [t, fullName, allOnPageSelected, togglePage, toggleRow, selectedIds],
+    [t, tSignIn, fullName, allOnPageSelected, togglePage, toggleRow, selectedIds],
   );
 
   const hasFilters =

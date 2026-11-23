@@ -1,0 +1,29 @@
+{
+  "column": "Sign-in",
+  "status": {
+    "SIGNED_IN": "Signed in",
+    "DETAILS_SENT": "Sign-in details sent on {date}",
+    "DETAILS_SENT_UNDATED": "Sign-in details sent",
+    "SEND_FAILED": "Sending failed",
+    "NOT_SENT_NO_CONTACT": "Not sent: no email or phone",
+    "NOT_SENT": "Not sent yet"
+  },
+  "resend": {
+    "button": "Send sign-in details again",
+    "buttonTitle": "Send {name} a new temporary password by email and SMS",
+    "title": "Send new sign-in details to {name}?",
+    "description": "{name} gets their username and a new temporary password by email and SMS. The previous temporary password stops working, and anyone signed in with it is signed out.",
+    "confirm": "Send",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "success": "New sign-in details are on their way to {name}",
+    "failed": "Could not send sign-in details to {name}",
+    "errors": {
+      "SIGN_IN_ALREADY_COMPLETED": "{name} has already signed in and set a password, so there is nothing to send.",
+      "SIGN_IN_CONTACT_MISSING": "{name} has no email or mobile number. Add one to their profile, then send again.",
+      "TOO_MANY_REQUESTS": "Sign-in details were sent to {name} too recently. Wait a minute and try again; at most five can be sent in a day.",
+      "STAFF_NOT_FOUND": "This staff member no longer exists in this institute.",
+      "GUARDIAN_NOT_FOUND": "This guardian no longer exists in this institute."
+    }
+  }
+}

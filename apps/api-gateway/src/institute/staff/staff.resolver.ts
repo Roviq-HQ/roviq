@@ -49,6 +49,17 @@ export class StaffResolver {
     return this.staffService.update(id, input) as Promise<StaffModel>;
   }
 
+  @Mutation(() => Boolean, {
+    description:
+      'Send a staff member a new temporary password with their username, by email and SMS. Only before their first sign-in; at most once a minute and five times a day per person.',
+  })
+  @CheckAbility({ action: 'update', subject: 'Staff' })
+  async resendStaffSignInDetails(
+    @Args('staffProfileId', { type: () => ID }) staffProfileId: string,
+  ): Promise<boolean> {
+    return this.staffService.resendSignInDetails(staffProfileId);
+  }
+
   @Query(() => [DeletedPersonModel], {
     description: 'Soft-deleted staff members of this institute, most recently deleted first.',
   })

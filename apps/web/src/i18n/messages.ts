@@ -45,6 +45,7 @@ import enRoles from '../../messages/en/roles.json';
 import enSelectInstitute from '../../messages/en/selectInstitute.json';
 import enSessions from '../../messages/en/sessions.json';
 import enSettings from '../../messages/en/settings.json';
+import enSignInDetails from '../../messages/en/signInDetails.json';
 import enStaff from '../../messages/en/staff.json';
 import enStudentImport from '../../messages/en/studentImport.json';
 import enStudents from '../../messages/en/students.json';
@@ -95,6 +96,7 @@ import hiRoles from '../../messages/hi/roles.json';
 import hiSelectInstitute from '../../messages/hi/selectInstitute.json';
 import hiSessions from '../../messages/hi/sessions.json';
 import hiSettings from '../../messages/hi/settings.json';
+import hiSignInDetails from '../../messages/hi/signInDetails.json';
 import hiStaff from '../../messages/hi/staff.json';
 import hiStudentImport from '../../messages/hi/studentImport.json';
 import hiStudents from '../../messages/hi/students.json';
@@ -120,6 +122,7 @@ const en = {
   dashboard: enDashboard,
   deletedRecords: enDeletedRecords,
   peopleLinks: enPeopleLinks,
+  signInDetails: enSignInDetails,
   dlq: enDlq,
   error: enError,
   examinations: enExaminations,
@@ -173,6 +176,7 @@ const hi = {
   dashboard: hiDashboard,
   deletedRecords: hiDeletedRecords,
   peopleLinks: hiPeopleLinks,
+  signInDetails: hiSignInDetails,
   dlq: hiDlq,
   error: hiError,
   examinations: hiExaminations,

@@ -69,6 +69,8 @@ interface MockGuardian {
   version: number;
   createdAt: string;
   updatedAt: string;
+  signInStatus: 'SIGNED_IN' | 'DETAILS_SENT' | 'SEND_FAILED' | 'NOT_SENT_NO_CONTACT' | 'NOT_SENT';
+  signInDetailsSentAt: string | null;
 }
 
 const FIXTURE_GUARDIAN: MockGuardian = {
@@ -88,6 +90,8 @@ const FIXTURE_GUARDIAN: MockGuardian = {
   version: 3,
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-10T00:00:00Z',
+  signInStatus: 'DETAILS_SENT',
+  signInDetailsSentAt: '2025-01-02T09:00:00Z',
 };
 
 interface UpdateGuardianCall {
@@ -252,6 +256,14 @@ describe('GuardianDetailPage (component)', () => {
     renderPage();
     expect(screen.getAllByText(/Priya Sharma/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Accountant/).length).toBeGreaterThan(0);
+  });
+
+  it('shows when sign-in details were sent, with the resend button (ROV-315)', () => {
+    renderPage();
+    expect(screen.getByTestId('sign-in-status-guardian-1')).toHaveTextContent(
+      'Sign-in details sent on 02/01/2025',
+    );
+    expect(screen.getByTestId('sign-in-resend-btn')).toBeInTheDocument();
   });
 
   it('renders all three tabs (Profile / Children / Audit)', () => {

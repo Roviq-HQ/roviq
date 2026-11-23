@@ -128,3 +128,31 @@ export type AuthFailureReason = (typeof AUTH_FAILURE_REASON_VALUES)[number];
 export const AuthFailureReason = Object.fromEntries(
   AUTH_FAILURE_REASON_VALUES.map((v) => [v, v]),
 ) as { readonly [K in AuthFailureReason]: K };
+
+// ─── SignInStatus ───────────────────────────────────────────────────────────
+// Where a staff member or guardian stands with their first sign-in, as the institute sees it.
+
+export const SIGN_IN_STATUS_VALUES = [
+  // The person has signed in and set their own password
+  'SIGNED_IN',
+  // The latest sign-in details reached the provider on at least one channel
+  'DETAILS_SENT',
+  // The latest send failed on every channel that had an address
+  'SEND_FAILED',
+  // Nothing was sent: the person has no real email and no phone
+  'NOT_SENT_NO_CONTACT',
+  // Nothing was sent yet (created before sending existed, or the send is still running)
+  'NOT_SENT',
+] as const;
+
+export type SignInStatus = (typeof SIGN_IN_STATUS_VALUES)[number];
+export const SignInStatus = Object.fromEntries(SIGN_IN_STATUS_VALUES.map((v) => [v, v])) as {
+  readonly [K in SignInStatus]: K;
+};
+
+/** Domain of the address given to an account that has no email; nothing is ever sent to it. */
+export const PLACEHOLDER_EMAIL_DOMAIN = 'roviq.placeholder';
+
+export function isPlaceholderEmail(email: string): boolean {
+  return email.toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`);
+}

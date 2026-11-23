@@ -26,6 +26,9 @@ import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
 import { ensureTenantUserProfile, updateTenantUserProfile } from '../../auth/tenant-user-profile';
 import { nameStartsWith } from '../../common/name-search';
+import { SignInDetailsService } from '../sign-in-details/sign-in-details.service';
+import { withSignInStates } from '../sign-in-details/sign-in-status';
+import { englishOrFirst, readSignInTarget } from '../sign-in-details/sign-in-target';
 import type { CreateStaffInput } from './dto/create-staff.input';
 import type { ListStaffFilterInput } from './dto/list-staff-filter.input';
 import type { UpdateStaffInput } from './dto/update-staff.input';
@@ -36,6 +39,7 @@ export class StaffService {
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
     private readonly identityService: IdentityService,
+    private readonly signInDetails: SignInDetailsService,
   ) {}
 
   private get tenantId(): string {
@@ -88,7 +92,7 @@ export class StaffService {
       this.db,
       mkInstituteCtx(tenantId, 'service:staff'),
       async (tx) => {
-        return tx
+        const found = await tx
           .select(this.staffSelectLive())
           .from(staffProfilesLive)
           .innerJoin(
@@ -100,6 +104,7 @@ export class StaffService {
           )
           .where(eq(staffProfilesLive.id, id))
           .limit(1);
+        return withSignInStates(tx, tenantId, found);
       },
     );
     if (rows.length === 0)
@@ -136,7 +141,7 @@ export class StaffService {
         )
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .limit(limit);
-      return rows;
+      return withSignInStates(tx, tenantId, rows);
     });
   }
 
@@ -162,7 +167,7 @@ export class StaffService {
     // It is stored as unverified contact data.
     const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
 
-    const { userId: newUserId } = await this.identityService.createUser({
+    const { userId: newUserId, tempPassword } = await this.identityService.createUser({
       email,
       username,
       phone,
@@ -286,10 +291,42 @@ export class StaffService {
       tenantId,
     });
 
+    this.signInDetails.sendOnCreate({
+      tenantId,
+      userId: newUser.id,
+      username,
+      email: input.email,
+      phone,
+      firstName: englishOrFirst(input.firstName),
+      lastName: englishOrFirst(input.lastName),
+      tempPassword,
+    });
+
     // Re-fetch via findById so the GraphQL StaffModel response includes the
     // joined name + photo from the institute's profile copy (StaffModel.firstName is now
     // i18nText and required).
     return this.findById(profile.id);
+  }
+
+  /** New temporary password for a staff member of this institute who has not signed in yet. */
+  async resendSignInDetails(id: string): Promise<boolean> {
+    const tenantId = this.tenantId;
+    const target = await withTenant(
+      this.db,
+      mkInstituteCtx(tenantId, 'service:staff'),
+      async (tx) => {
+        const [profile] = await tx
+          .select({ userId: staffProfilesLive.userId })
+          .from(staffProfilesLive)
+          .where(eq(staffProfilesLive.id, id))
+          .limit(1);
+        return profile ? readSignInTarget(tx, tenantId, profile.userId) : null;
+      },
+    );
+    if (!target)
+      throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, `Staff profile ${id} not found`);
+    await this.signInDetails.resend(tenantId, target, this.userId);
+    return true;
   }
 
   async update(id: string, input: UpdateStaffInput) {

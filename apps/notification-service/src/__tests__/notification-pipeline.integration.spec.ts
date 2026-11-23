@@ -4,6 +4,7 @@
  * (there is no Temporal test server in this repo).
  */
 import assert from 'node:assert/strict';
+import { ConfigService } from '@nestjs/config';
 import { Gender, GuardianRelationship } from '@roviq/common-types';
 import {
   createDrizzleDb,
@@ -41,6 +42,7 @@ import { ApplicationFailure } from '@temporalio/activity';
 import { eq, inArray } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { InstitutePortal } from '../config/institute-portal';
 import type { ChannelAdapter, ChannelMessage } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
@@ -122,6 +124,7 @@ describe('notification pipeline (integration)', () => {
   let sender: ChannelSender;
   let dispatcher: NotificationDispatcher;
   let attendance: AttendanceListener;
+  let users: UserListener;
 
   async function rowsFor(userId: string) {
     return withAdmin(db, mkAdminCtx(CTX), (tx) =>
@@ -257,6 +260,11 @@ describe('notification pipeline (integration)', () => {
       createMock<RetryWait>({ wait: vi.fn().mockResolvedValue(undefined) }),
     );
     attendance = new AttendanceListener(dispatcher, new RecipientResolver(recipients));
+    users = new UserListener(
+      dispatcher,
+      recipients,
+      new InstitutePortal(new ConfigService({ INSTITUTE_PORTAL_URL: 'https://app.roviq.test/' })),
+    );
   });
 
   beforeEach(() => {
@@ -625,10 +633,15 @@ describe('notification pipeline (integration)', () => {
         tempPassword: 'Tmp-ROV314-9xQ2',
       };
 
-      await new UserListener(dispatcher).handleUserCreated(event, jetStreamCtx());
+      await users.handleUserCreated(event, jetStreamCtx());
 
       expect(email.sent.map((m) => m.to)).toEqual([[event.email]]);
       expect(email.sent[0]?.body).toContain('Tmp-ROV314-9xQ2');
+      // ROV-315: the person did not ask for the account, so the institute and the portal are named.
+      expect(email.sent[0]?.subject).toBe(
+        `Your Roviq sign-in details for Test Institute ${institute.slug.slice('test-'.length)}`,
+      );
+      expect(email.sent[0]?.body).toContain('Sign in at https://app.roviq.test/login.');
       expect(sms.sent).toEqual([]);
       const rows = await deliveriesFor(institute.userId);
       expect(rows.map((d) => [d.channel, d.status, d.skip_reason, d.notification_id])).toEqual([
@@ -636,6 +649,34 @@ describe('notification pipeline (integration)', () => {
         ['SMS', 'SKIPPED', 'no_address', null],
       ]);
       await assertNoSecretStored(institute.userId, 'Tmp-ROV314-9xQ2');
+    });
+
+    it('should text the welcome when the event has a phone and no email (ROV-315)', async () => {
+      const event: UserCreatedEvent = {
+        userId: student.userId,
+        scope: 'institute',
+        tenantId: institute.tenantId,
+        resellerId: null,
+        username: student.username,
+        email: null,
+        phone: '+919876512345',
+        firstName: null,
+        lastName: null,
+        tempPassword: 'Tmp-ROV315-sms7',
+      };
+
+      await users.handleUserCreated(event, jetStreamCtx());
+
+      expect(email.sent).toEqual([]);
+      expect(sms.sent.map((m) => m.to)).toEqual([['+919876512345']]);
+      expect(sms.sent[0]?.body).toContain('Tmp-ROV315-sms7');
+      expect(sms.sent[0]?.body).toContain('https://app.roviq.test/login');
+      const rows = (await deliveriesFor(student.userId)).filter((d) => d.type === 'USER_WELCOME');
+      expect(rows.map((d) => [d.channel, d.status, d.skip_reason])).toEqual([
+        ['EMAIL', 'SKIPPED', 'no_address'],
+        ['SMS', 'SENT', null],
+      ]);
+      await assertNoSecretStored(student.userId, 'Tmp-ROV315-sms7');
     });
 
     it('should email a verification code only to the address the event names', async () => {

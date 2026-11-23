@@ -71,7 +71,7 @@ describe('First-login password change E2E', () => {
       (edge) => edge.node.email === firstAdmin.email,
     )?.node;
     assert(account);
-    const welcome = await waitForEmail(firstAdmin.email, 'Welcome to Roviq');
+    const welcome = await waitForEmail(firstAdmin.email, 'Roviq sign-in details for');
     const tempPassword = tempPasswordFrom(welcome.text);
 
     const first = await gql<InstituteLogin>(INSTITUTE_LOGIN, {

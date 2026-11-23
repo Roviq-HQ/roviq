@@ -3168,6 +3168,16 @@ type GuardianModel {
   """
   profileImage: FileRef
 
+  """
+  When the latest sign-in details reached the email or SMS provider; null if never.
+  """
+  signInDetailsSentAt: DateTime
+
+  """
+  Where this person stands with their first sign-in, as this institute sees it.
+  """
+  signInStatus: SignInStatus!
+
   """Most recent update timestamp (UTC)."""
   updatedAt: DateTime!
 
@@ -4562,6 +4572,16 @@ type Mutation {
   """Edit the reseller's own name, registration, contact and address"""
   resellerUpdateProfile(input: ResellerUpdateProfileInput!): ResellerProfileModel!
   resellerVerifyImpersonationOtp(otp: String!, sessionId: String!): StartImpersonationResult!
+
+  """
+  Send a guardian a new temporary password with their username, by email and SMS. Only before their first sign-in; at most once a minute and five times a day per person.
+  """
+  resendGuardianSignInDetails(guardianProfileId: ID!): Boolean!
+
+  """
+  Send a staff member a new temporary password with their username, by email and SMS. Only before their first sign-in; at most once a minute and five times a day per person.
+  """
+  resendStaffSignInDetails(staffProfileId: ID!): Boolean!
 
   """Resolve group members (triggers rule evaluation + cache refresh)"""
   resolveGroupMembers(groupId: ID!): GroupResolutionUpdate!
@@ -6344,6 +6364,24 @@ type ShiftConfigModel {
   start: String!
 }
 
+"""Where a staff member or guardian stands with their first sign-in."""
+enum SignInStatus {
+  """The latest sign-in details reached the email or SMS provider"""
+  DETAILS_SENT
+
+  """Nothing sent yet"""
+  NOT_SENT
+
+  """Nothing sent: no real email and no phone"""
+  NOT_SENT_NO_CONTACT
+
+  """The latest send failed"""
+  SEND_FAILED
+
+  """Signed in and set their own password"""
+  SIGNED_IN
+}
+
 """Social category for government reporting (UDISE+, RTE Act)."""
 enum SocialCategory {
   EWS
@@ -6388,6 +6426,16 @@ type StaffModel {
   Profile picture. Ask for `url(variant: SM)` in lists and `MD` in headers.
   """
   profileImage: FileRef
+
+  """
+  When the latest sign-in details reached the email or SMS provider; null if never.
+  """
+  signInDetailsSentAt: DateTime
+
+  """
+  Where this person stands with their first sign-in, as this institute sees it.
+  """
+  signInStatus: SignInStatus!
   socialCategory: SocialCategory
   specialization: String
   updatedAt: DateTime!

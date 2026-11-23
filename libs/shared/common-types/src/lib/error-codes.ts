@@ -102,6 +102,10 @@ export const ErrorCode = {
   EMAIL_VERIFICATION_TOO_SOON: 'EMAIL_VERIFICATION_TOO_SOON',
   /** The daily number of verification codes for this account is used up */
   EMAIL_VERIFICATION_LIMIT_REACHED: 'EMAIL_VERIFICATION_LIMIT_REACHED',
+  /** The person already signed in and set a password; new sign-in details cannot be sent */
+  SIGN_IN_ALREADY_COMPLETED: 'SIGN_IN_ALREADY_COMPLETED',
+  /** The person has no real email and no phone, so sign-in details have nowhere to go */
+  SIGN_IN_CONTACT_MISSING: 'SIGN_IN_CONTACT_MISSING',
   /** Reseller slug is empty or cannot be derived from the provided name */
   INVALID_SLUG: 'INVALID_SLUG',
   /** Suspend attempted on a reseller that is already suspended */
@@ -476,6 +480,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   EMAIL_VERIFICATION_CODE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   EMAIL_VERIFICATION_TOO_SOON: HttpStatus.TOO_MANY_REQUESTS,
   EMAIL_VERIFICATION_LIMIT_REACHED: HttpStatus.TOO_MANY_REQUESTS,
+  SIGN_IN_ALREADY_COMPLETED: HttpStatus.CONFLICT,
+  SIGN_IN_CONTACT_MISSING: HttpStatus.UNPROCESSABLE_ENTITY,
   INVALID_SLUG: HttpStatus.BAD_REQUEST,
   RESELLER_ALREADY_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,
   RESELLER_NOT_SUSPENDED: HttpStatus.UNPROCESSABLE_ENTITY,

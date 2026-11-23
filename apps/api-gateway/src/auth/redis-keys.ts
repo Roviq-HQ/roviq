@@ -13,6 +13,8 @@ export const REDIS_KEYS = {
   TOKEN_VERSION: 'auth:token-version:',
   /** SHA-256 of a user's pending email verification code; `:attempts` counts the guesses. EX = code lifetime. */
   EMAIL_VERIFICATION: 'auth:email-verify:',
+  /** Resends of a user's sign-in details: `<userId>:minute` (NX, EX 60) and `<userId>:day` (counter, EX 1 day). */
+  SIGN_IN_RESEND: 'auth:sign-in-resend:',
   /** Sliding-window counter for failed login attempts, keyed by lowercased username. EX = FAILURE_WINDOW_SECONDS. */
   LOGIN_FAILURES: 'auth:failed-login:',
   /** Active lockout marker for a username. Presence ⇒ login is blocked for LOCKOUT_DURATION_SECONDS. */

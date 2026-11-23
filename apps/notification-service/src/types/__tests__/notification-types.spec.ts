@@ -441,7 +441,12 @@ describe('secret types', () => {
   });
 
   it('should word the welcome email with the username and temporary password', () => {
-    const params = { username: 'priya.verma', firstName: 'Priya', tempPassword: 'Tmp-9xQ2' };
+    const params = {
+      username: 'priya.verma',
+      firstName: 'Priya',
+      tempPassword: 'Tmp-9xQ2',
+      institute: null,
+    };
 
     expect(composeSecret('USER_WELCOME', params, 'EMAIL', 'en')).toEqual({
       subject: 'Welcome to Roviq — your account is ready',
@@ -459,5 +464,58 @@ describe('secret types', () => {
       subject: '',
       body: 'Roviq: खाता तैयार है। यूज़रनेम: priya.verma | अस्थायी पासवर्ड: Tmp-9xQ2। पहली बार लॉग इन करते समय इसे बदलें।',
     });
+  });
+
+  it('should name the institute and its sign-in address in a welcome it created (ROV-315)', () => {
+    const params = {
+      username: 'staff-0191-ab12',
+      firstName: 'Kiran',
+      tempPassword: 'Tmp-7kP4',
+      institute: {
+        name: { en: 'Sunrise Public', hi: 'सनराइज़ पब्लिक' },
+        signInUrl: 'https://app.roviq.com/login',
+      },
+    };
+
+    expect(composeSecret('USER_WELCOME', params, 'EMAIL', 'en')).toEqual({
+      subject: 'Your Roviq sign-in details for Sunrise Public',
+      body: [
+        'Hi Kiran,',
+        '',
+        'Sunrise Public has created a Roviq account for you.',
+        'Username: staff-0191-ab12',
+        'Temporary password: Tmp-7kP4',
+        '',
+        'Sign in at https://app.roviq.com/login. You will be asked to choose your own password the first time.',
+        'If you did not expect this, contact Sunrise Public.',
+      ].join('\n'),
+    });
+    expect(composeSecret('USER_WELCOME', params, 'EMAIL', 'hi')).toEqual({
+      subject: 'सनराइज़ पब्लिक के लिए आपके Roviq साइन-इन विवरण',
+      body: [
+        'नमस्ते Kiran,',
+        '',
+        'सनराइज़ पब्लिक ने Roviq पर आपके लिए एक खाता बनाया है।',
+        'यूज़रनेम: staff-0191-ab12',
+        'अस्थायी पासवर्ड: Tmp-7kP4',
+        '',
+        'https://app.roviq.com/login पर साइन इन करें। पहली बार साइन इन करते समय आपसे अपना पासवर्ड बनाने को कहा जाएगा।',
+        'यदि आपको इसकी अपेक्षा नहीं थी, तो सनराइज़ पब्लिक से संपर्क करें।',
+      ].join('\n'),
+    });
+    expect(composeSecret('USER_WELCOME', params, 'SMS', 'en')).toEqual({
+      subject: '',
+      body: 'Roviq: Sunrise Public created your account. Username: staff-0191-ab12 | Temp password: Tmp-7kP4. Sign in at https://app.roviq.com/login and set your own password.',
+    });
+    expect(
+      composeSecret(
+        'USER_WELCOME',
+        { ...params, institute: { ...params.institute, name: { en: 'Sunrise Public' } } },
+        'SMS',
+        'hi',
+      ).body,
+    ).toBe(
+      'Roviq: Sunrise Public ने आपका खाता बनाया है। यूज़रनेम: staff-0191-ab12 | अस्थायी पासवर्ड: Tmp-7kP4। https://app.roviq.com/login पर साइन इन करें और अपना पासवर्ड बनाएँ।',
+    );
   });
 });

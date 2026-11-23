@@ -2,6 +2,7 @@ import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { EmploymentType, Gender, SocialCategory } from '@roviq/common-types';
 import type { I18nContent } from '@roviq/database';
 import { DateOnlyScalar, DateTimeScalar, I18nTextScalar } from '@roviq/nestjs-graphql';
+import { SignInStatus } from '../../sign-in-details/sign-in-status.enum';
 
 registerEnumType(EmploymentType, {
   name: 'EmploymentType',
@@ -83,6 +84,18 @@ export class StaffModel {
    */
   @Field(() => Int)
   version!: number;
+
+  @Field(() => SignInStatus, {
+    description: 'Where this person stands with their first sign-in, as this institute sees it.',
+  })
+  signInStatus!: SignInStatus;
+
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description:
+      'When the latest sign-in details reached the email or SMS provider; null if never.',
+  })
+  signInDetailsSentAt?: Date | null;
 }
 
 @ObjectType({ description: 'Staff statistics by department' })

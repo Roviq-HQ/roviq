@@ -71,4 +71,15 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
       return row?.timezone ?? null;
     });
   }
+
+  async findInstituteName(tenantId: string): Promise<Record<string, string> | null> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const [row] = await tx
+        .select({ name: institutesLive.name })
+        .from(institutesLive)
+        .where(eq(institutesLive.id, tenantId))
+        .limit(1);
+      return row?.name ?? null;
+    });
+  }
 }
