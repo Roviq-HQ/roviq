@@ -103,7 +103,7 @@ export class RotateMessagingSenderTokenArgs {
 }
 
 @ArgsType()
-export class WhatsAppUsageArgs {
+export class UsageMonthArgs {
   @Field({ description: 'Calendar month as YYYY-MM, in India time (Asia/Kolkata).' })
   @Matches(MONTH, { message: 'month must be YYYY-MM' })
   month!: string;

@@ -494,6 +494,19 @@ type AdminResellerTeamMemberModel {
   username: String!
 }
 
+"""
+SMS messages the provider accepted (status SENT) in one month, per institute and notification type.
+"""
+type AdminSmsUsageRow {
+  sentCount: Int!
+
+  """The institute; null for platform-scope messages."""
+  tenantId: ID
+
+  """The notification type key, such as FEE_REMINDER."""
+  type: String!
+}
+
 """Payload for adminUpdateReseller — slug and tier are not updatable here"""
 input AdminUpdateResellerInput {
   """Pass null to clear"""
@@ -5251,6 +5264,14 @@ type Query {
   Typeahead search for users by name, username, email or phone (platform admin)
   """
   adminSearchUsers(limit: Int! = 10, query: String!): [AdminUserModel!]!
+
+  """
+  SMS messages the provider accepted (status SENT) in one calendar month, counted in India time (Asia/Kolkata), one row per institute and notification type.
+  """
+  adminSmsUsage(
+    """Calendar month as YYYY-MM, in India time (Asia/Kolkata)."""
+    month: String!
+  ): [AdminSmsUsageRow!]!
 
   """
   Platform admin: status of every platform dependency, stream lag, alerts (ROV-184)

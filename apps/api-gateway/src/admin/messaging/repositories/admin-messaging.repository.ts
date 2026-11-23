@@ -3,6 +3,7 @@ import type {
   MessagingSenderRecord,
   RegisterMessagingSenderData,
   RegisterMessagingSenderResult,
+  SmsUsageRecord,
   UpdateMessagingSenderData,
   WhatsAppUsageRecord,
 } from './types';
@@ -39,4 +40,6 @@ export abstract class AdminMessagingRepository {
   abstract delete(ctx: PlatformContext, id: string): Promise<boolean>;
   /** SENT WhatsApp deliveries in calendar month `month` (YYYY-MM, India time), per institute and category. */
   abstract whatsAppUsage(ctx: PlatformContext, month: string): Promise<WhatsAppUsageRecord[]>;
+  /** SENT SMS deliveries in calendar month `month` (YYYY-MM, India time), per institute and type. */
+  abstract smsUsage(ctx: PlatformContext, month: string): Promise<SmsUsageRecord[]>;
 }
