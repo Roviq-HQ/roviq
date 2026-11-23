@@ -39,7 +39,7 @@ Resolvers live under [apps/api-gateway/src/institute/student/](apps/api-gateway/
 - [`student_profiles`](libs/database/src/schema/user-profiles/student-profiles.ts) — core student row with admission no, status enum, `search_vector` for FTS.
 - [`student_academics`](libs/database/src/schema/user-profiles/student-academics.ts) — per-academic-year enrollment (standard, section, roll number).
 - [`student_guardian_links`](libs/database/src/schema/user-profiles/student-guardian-links.ts) — link table (read-only from student service; writes via guardian service).
-- [`user_profiles`](libs/database/src/schema/user-profiles/user-profiles.ts) — joined for firstName/lastName/dob.
+- [`tenant_user_profiles`](libs/database/src/schema/user-profiles/tenant-user-profiles.ts) — the institute's own copy of the student's name, demographics and picture; joined on user and tenant. `user_profiles` is the account-level profile and is not read here (see `docs/auth.md` → "People and phone numbers").
 - [`user_documents`](libs/database/src/schema/user-profiles/user-documents.ts) — joined via `withAdmin()` for Aadhar/birth cert uploads.
 
 All tables spread `tenantColumns` and use `tenantPolicies()` for RLS + admin bypass + soft-delete filter.

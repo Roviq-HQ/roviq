@@ -23,6 +23,7 @@ import {
   studentGuardianLinks,
   studentProfiles,
   tcRegister,
+  tenantUserProfiles,
   userIdentifiers,
   userProfiles,
   users,
@@ -95,6 +96,14 @@ describe.skipIf(!hasTestDb)('Compliance export generators (integration)', () => 
     assert(user);
     userIds.push(user.id);
     await tx.insert(userProfiles).values({
+      userId: user.id,
+      firstName: { en: first },
+      lastName: { en: 'Verma' },
+      ...profile,
+      ...BY,
+    });
+    await tx.insert(tenantUserProfiles).values({
+      tenantId: tenantId,
       userId: user.id,
       firstName: { en: first },
       lastName: { en: 'Verma' },
@@ -345,6 +354,7 @@ describe.skipIf(!hasTestDb)('Compliance export generators (integration)', () => 
       if (userIds.length > 0) {
         await tx.delete(userIdentifiers).where(inArray(userIdentifiers.userId, userIds));
         await tx.delete(phoneNumbers).where(inArray(phoneNumbers.userId, userIds));
+        await tx.delete(tenantUserProfiles).where(inArray(tenantUserProfiles.userId, userIds));
         await tx.delete(userProfiles).where(inArray(userProfiles.userId, userIds));
       }
       await tx.delete(sections).where(inArray(sections.tenantId, tenantIds));

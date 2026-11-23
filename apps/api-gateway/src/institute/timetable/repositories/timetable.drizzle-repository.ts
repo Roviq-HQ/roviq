@@ -11,6 +11,7 @@ import {
   staffProfilesLive,
   standardsLive,
   subjectsLive,
+  tenantUserProfilesLive,
   timetableDayOverrides,
   timetableDayOverridesLive,
   timetableEntries,
@@ -21,7 +22,6 @@ import {
   timetableSectionsLive,
   timetables,
   timetablesLive,
-  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -879,11 +879,17 @@ export class TimetableDrizzleRepository extends TimetableRepository {
         const rows = await tx
           .select({
             membershipId: staffProfilesLive.membershipId,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
+            firstName: tenantUserProfilesLive.firstName,
+            lastName: tenantUserProfilesLive.lastName,
           })
           .from(staffProfilesLive)
-          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
+          .innerJoin(
+            tenantUserProfilesLive,
+            and(
+              eq(tenantUserProfilesLive.userId, staffProfilesLive.userId),
+              eq(tenantUserProfilesLive.tenantId, staffProfilesLive.tenantId),
+            ),
+          )
           .where(inArray(staffProfilesLive.membershipId, teacherIds));
         for (const r of rows) {
           teachers[r.membershipId] =
@@ -902,11 +908,17 @@ export class TimetableDrizzleRepository extends TimetableRepository {
       const rows = await tx
         .select({
           membershipId: staffProfilesLive.membershipId,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
         })
         .from(staffProfilesLive)
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, staffProfilesLive.userId),
+            eq(tenantUserProfilesLive.tenantId, staffProfilesLive.tenantId),
+          ),
+        )
         .limit(100);
       return rows;
     });

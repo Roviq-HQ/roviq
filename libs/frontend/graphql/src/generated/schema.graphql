@@ -3062,7 +3062,7 @@ type GuardianLinkedStudentModel {
   """
   currentStandardName: I18nText
 
-  """Student's first name (i18nText) from user_profiles."""
+  """Student's first name (i18nText) from the institute's profile copy."""
   firstName: I18nText!
 
   """True if the linked guardian should be contacted in emergencies."""
@@ -3071,7 +3071,9 @@ type GuardianLinkedStudentModel {
   """True if the linked guardian is the primary contact for this student."""
   isPrimaryContact: Boolean!
 
-  """Student's last name (i18nText) from user_profiles; optional."""
+  """
+  Student's last name (i18nText) from the institute's profile copy; optional.
+  """
   lastName: I18nText
 
   """student_guardian_links row id — used by the unlink mutation."""
@@ -3911,7 +3913,7 @@ input ListCertificateFilterInput {
 """Filter for listing guardians in an institute"""
 input ListGuardiansFilterInput {
   """
-  Full-text search across first/last name via the generated `user_profiles.search_vector` column (English + Hindi tokens). Uses plainto_tsquery, so input is treated as literal text (no operator parsing) which protects against query injection.
+  Full-text search across first/last name via the generated `tenant_user_profiles.search_vector` column (English + Hindi tokens). Each typed word matches the start of a name word; punctuation is ignored.
   """
   search: String
 }
@@ -6925,10 +6927,10 @@ type TCModel {
   standardName: I18nText
   status: TcStatus!
 
-  """Student first name (i18n) joined from user_profiles"""
+  """Student first name (i18n) joined from the institute's profile copy"""
   studentFirstName: I18nText!
 
-  """Student last name (i18n) joined from user_profiles"""
+  """Student last name (i18n) joined from the institute's profile copy"""
   studentLastName: I18nText
   studentProfileId: String!
 
@@ -7694,10 +7696,21 @@ input UpdateSectionInput {
 
 """Input for updating staff member — optimistic concurrency via version"""
 input UpdateStaffInput {
+  """Date of birth (YYYY-MM-DD)"""
+  dateOfBirth: String
   department: String
   designation: String
   employmentType: EmploymentType
+
+  """
+  First name as this institute records it. Changes the institute's copy only.
+  """
+  firstName: I18nText
+  gender: Gender
   isClassTeacher: Boolean
+
+  """Last name as this institute records it. Null removes it."""
+  lastName: I18nText
   socialCategory: SocialCategory
   specialization: String
 

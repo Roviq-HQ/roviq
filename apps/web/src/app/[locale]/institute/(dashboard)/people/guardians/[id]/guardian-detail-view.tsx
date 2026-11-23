@@ -348,7 +348,20 @@ function GuardianSidebar({
             ) : null}
           </div>
           <Separator />
-          <div className="w-full text-sm">
+          <div className="w-full space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{t('columns.phone')}</span>
+              {guardian.primaryPhone ? (
+                <span
+                  className="font-mono tabular-nums"
+                  data-testid={instituteGuardians.detailPhone}
+                >
+                  +91 {guardian.primaryPhone}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">{t('notSet')}</span>
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">
                 <Users className="mr-1 inline size-3.5" />

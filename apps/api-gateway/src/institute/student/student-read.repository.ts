@@ -12,17 +12,26 @@ import {
   studentAcademicsLive,
   studentGuardianLinksLive,
   studentProfilesLive,
+  tenantUserProfilesLive,
   userDocumentsLive,
-  userProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { nameStartsWith } from '../../common/name-search';
 import { decodeCursor, encodeCursor } from '../../common/pagination/relay-pagination.model';
 import { loadUserDocumentFiles } from '../../files/user-document-files';
 import type { StudentFilterInput } from './dto/student-filter.input';
 import type { StudentStatisticsModel } from './models/student-statistics.model';
 import { activeAcademicYearIds, studentReadPredicate } from './student-read-predicate';
+
+/** The institute's own copy of the student's name, demographics and picture. */
+function studentProfileJoin() {
+  return and(
+    eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+    eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+  );
+}
 
 @Injectable()
 export class StudentReadRepository {
@@ -86,15 +95,15 @@ export class StudentReadRepository {
           version: studentProfilesLive.version,
           createdAt: studentProfilesLive.createdAt,
           updatedAt: studentProfilesLive.updatedAt,
-          // user_profile join
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
-          gender: userProfilesLive.gender,
-          dateOfBirth: userProfilesLive.dateOfBirth,
-          bloodGroup: userProfilesLive.bloodGroup,
-          religion: userProfilesLive.religion,
-          motherTongue: userProfilesLive.motherTongue,
-          profileImageFileId: userProfilesLive.profileImageFileId,
+          // the institute's copy of the student's name and demographics
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
+          gender: tenantUserProfilesLive.gender,
+          dateOfBirth: tenantUserProfilesLive.dateOfBirth,
+          bloodGroup: tenantUserProfilesLive.bloodGroup,
+          religion: tenantUserProfilesLive.religion,
+          motherTongue: tenantUserProfilesLive.motherTongue,
+          profileImageFileId: tenantUserProfilesLive.profileImageFileId,
           // current academic
           currentStudentAcademicId: studentAcademicsLive.id,
           currentStandardId: studentAcademicsLive.standardId,
@@ -106,7 +115,7 @@ export class StudentReadRepository {
           promotionStatus: studentAcademicsLive.promotionStatus,
         })
         .from(studentProfilesLive)
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .innerJoin(tenantUserProfilesLive, studentProfileJoin())
         .leftJoin(
           studentAcademicsLive,
           and(
@@ -185,11 +194,8 @@ export class StudentReadRepository {
     }
     const orderExpr = orderDir === 'asc' ? asc(orderColumn) : desc(orderColumn);
 
-    // Aliased tables for the primary-guardian join — we reach from
-    // student_guardian_links -> guardian_profiles -> user_profiles via
-    // the guardian's user_id. Aliased so we don't collide with the main
-    // user_profiles join (which holds the student's own name).
-    const guardianUserProfiles = alias(userProfilesLive, 'guardian_user_profiles');
+    // The primary guardian's name is a second join on the institute's profile copies.
+    const guardianTenantProfiles = alias(tenantUserProfilesLive, 'guardian_tenant_user_profiles');
 
     return withTenant(this.db, ctx, async (tx) => {
       // Count total (without cursor)
@@ -197,7 +203,7 @@ export class StudentReadRepository {
       const [{ total }] = await tx
         .select({ total: count() })
         .from(studentProfilesLive)
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .innerJoin(tenantUserProfilesLive, studentProfileJoin())
         .leftJoin(
           studentAcademicsLive,
           eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
@@ -236,14 +242,14 @@ export class StudentReadRepository {
           version: studentProfilesLive.version,
           createdAt: studentProfilesLive.createdAt,
           updatedAt: studentProfilesLive.updatedAt,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
-          gender: userProfilesLive.gender,
-          dateOfBirth: userProfilesLive.dateOfBirth,
-          bloodGroup: userProfilesLive.bloodGroup,
-          religion: userProfilesLive.religion,
-          motherTongue: userProfilesLive.motherTongue,
-          profileImageFileId: userProfilesLive.profileImageFileId,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
+          gender: tenantUserProfilesLive.gender,
+          dateOfBirth: tenantUserProfilesLive.dateOfBirth,
+          bloodGroup: tenantUserProfilesLive.bloodGroup,
+          religion: tenantUserProfilesLive.religion,
+          motherTongue: tenantUserProfilesLive.motherTongue,
+          profileImageFileId: tenantUserProfilesLive.profileImageFileId,
           currentStudentAcademicId: studentAcademicsLive.id,
           currentStandardId: studentAcademicsLive.standardId,
           currentSectionId: studentAcademicsLive.sectionId,
@@ -253,11 +259,11 @@ export class StudentReadRepository {
           currentSectionName: sectionsLive.name,
           promotionStatus: studentAcademicsLive.promotionStatus,
           primaryGuardianProfileId: guardianProfilesLive.id,
-          primaryGuardianFirstName: guardianUserProfiles.firstName,
-          primaryGuardianLastName: guardianUserProfiles.lastName,
+          primaryGuardianFirstName: guardianTenantProfiles.firstName,
+          primaryGuardianLastName: guardianTenantProfiles.lastName,
         })
         .from(studentProfilesLive)
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .innerJoin(tenantUserProfilesLive, studentProfileJoin())
         .leftJoin(
           studentAcademicsLive,
           eq(studentAcademicsLive.studentProfileId, studentProfilesLive.id),
@@ -276,8 +282,11 @@ export class StudentReadRepository {
           eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
         )
         .leftJoin(
-          guardianUserProfiles,
-          eq(guardianUserProfiles.userId, guardianProfilesLive.userId),
+          guardianTenantProfiles,
+          and(
+            eq(guardianTenantProfiles.userId, guardianProfilesLive.userId),
+            eq(guardianTenantProfiles.tenantId, guardianProfilesLive.tenantId),
+          ),
         )
         .where(where)
         .orderBy(orderExpr, asc(studentProfilesLive.id))
@@ -344,11 +353,11 @@ export class StudentReadRepository {
         .groupBy(studentAcademicsLive.standardId);
 
       const byGender = await tx
-        .select({ gender: userProfilesLive.gender, count: count() })
+        .select({ gender: tenantUserProfilesLive.gender, count: count() })
         .from(studentProfilesLive)
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .innerJoin(tenantUserProfilesLive, studentProfileJoin())
         .where(restriction)
-        .groupBy(userProfilesLive.gender);
+        .groupBy(tenantUserProfilesLive.gender);
 
       const byCategory = await tx
         .select({ category: studentProfilesLive.socialCategory, count: count() })
@@ -461,12 +470,12 @@ export class StudentReadRepository {
       conditions.push(eq(studentProfilesLive.isRteAdmitted, filter.isRteAdmitted));
     }
     if (filter.gender) {
-      conditions.push(eq(userProfilesLive.gender, filter.gender));
+      conditions.push(eq(tenantUserProfilesLive.gender, filter.gender));
     }
     if (filter.search) {
       const searchTerm = filter.search;
       const searchCondition = or(
-        sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${searchTerm})`,
+        nameStartsWith(tenantUserProfilesLive.searchVector, searchTerm),
         ilike(studentProfilesLive.admissionNumber, `%${searchTerm}%`),
       );
       if (searchCondition) conditions.push(searchCondition);

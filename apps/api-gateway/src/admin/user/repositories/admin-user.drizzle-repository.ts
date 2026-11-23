@@ -36,6 +36,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
+import { toPrefixTsQuery } from '../../../common/name-search';
 import { decodeCursor, encodeCursor } from '../../../common/pagination/relay-pagination.model';
 import { fileLiveColumns } from '../../../files/repositories/file-columns';
 import type { FileRecord } from '../../../files/repositories/types';
@@ -62,15 +63,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Postgres text form keeps microseconds; a JS Date would round them away and skip rows. */
 const createdAtText = sql<string>`${usersLive.createdAt}::text`;
-
-/** Builds a prefix tsquery from free text; punctuation would make to_tsquery throw. */
-function toPrefixTsQuery(term: string): string | null {
-  const words = term
-    .split(/\s+/)
-    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter((w) => w.length > 0);
-  return words.length > 0 ? words.map((w) => `${w}:*`).join(' & ') : null;
-}
 
 /** Aadhaar is shown as its last four digits only, whatever format the stored mask uses. */
 export function identifierDisplayValue(

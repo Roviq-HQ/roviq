@@ -11,7 +11,7 @@ import {
   mkInstituteCtx,
   studentProfilesLive,
   tcRegisterLive,
-  userProfilesLive,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { and, asc, eq } from 'drizzle-orm';
@@ -42,12 +42,18 @@ function issuedTcs(tx: DrizzleDB, academicYearId: string) {
       issuedAt: tcRegisterLive.issuedAt,
       isDuplicate: tcRegisterLive.isDuplicate,
       admissionNumber: studentProfilesLive.admissionNumber,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
     })
     .from(tcRegisterLive)
     .leftJoin(studentProfilesLive, eq(studentProfilesLive.id, tcRegisterLive.studentProfileId))
-    .leftJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+    .leftJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+        eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+      ),
+    )
     .where(
       and(
         eq(tcRegisterLive.academicYearId, academicYearId),

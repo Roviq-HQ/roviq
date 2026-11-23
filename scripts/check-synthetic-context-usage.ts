@@ -28,6 +28,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/soft-delete-audit.integration.spec.ts',
   // ROV-204: isolated authorization fixtures and in-memory read-policy tests only.
   'apps/api-gateway/src/__tests__/student-read-authorization.integration.spec.ts',
+  // ROV-292: fixtures, and reads/writes as roviq_app with another institute's tenant context.
+  'apps/api-gateway/src/__tests__/tenant-user-profile-isolation.integration.spec.ts',
   // ROV-205: isolated security-invariant fixtures and RLS-scoped predicate execution only.
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
   'apps/api-gateway/src/institute/academic-year/academic-year.service.ts',

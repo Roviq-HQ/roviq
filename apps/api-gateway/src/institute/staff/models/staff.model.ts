@@ -19,11 +19,11 @@ export class StaffModel {
   @Field()
   membershipId!: string;
 
-  // ── Personal (joined from user_profiles) ──────────────────
+  // ── Personal (joined from tenant_user_profiles) ───────────
   /**
-   * First name resolved from `user_profiles`. Required by the staff list
+   * First name resolved from the institute's `tenant_user_profiles` copy. Required by the staff list
    * page (rov-169) which displays "Name" as a primary column. Cannot be
-   * null because every staff member has a user profile created on staff
+   * null because every staff member gets the institute's profile copy on staff
    * creation.
    */
   /** Multilingual via i18nText; resolved via useI18nField() on the frontend. */

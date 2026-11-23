@@ -38,7 +38,7 @@ const filterParsers = {
  * Guardians are a small list per institute (typically < 1000), so we skip
  * cursor pagination and render the full set in one shot with a 200-row
  * server-side cap. Free-text search runs over the joined
- * user_profiles.search_vector on the server (plainto_tsquery).
+ * tenant_user_profiles.search_vector on the server (plainto_tsquery).
  */
 export default function GuardiansPage() {
   const t = useTranslations('guardians');

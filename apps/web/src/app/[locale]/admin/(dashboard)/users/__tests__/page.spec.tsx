@@ -61,7 +61,7 @@ function makeUser(overrides: Partial<UserListNode> = {}): UserListNode {
     status: 'ACTIVE',
     createdAt: '2026-01-10T00:00:00.000Z',
     lastActiveAt: null,
-    primaryPhone: { __typename: 'AdminUserPhoneModel', countryCode: '91', number: '9876543210' },
+    primaryPhone: { __typename: 'AdminUserPhoneModel', countryCode: '+91', number: '9876543210' },
     profile: {
       __typename: 'AdminUserProfileModel',
       firstName: { en: 'Priya' },

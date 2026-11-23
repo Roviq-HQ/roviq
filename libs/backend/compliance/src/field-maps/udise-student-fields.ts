@@ -19,36 +19,44 @@ export interface UdiseStudentFieldDef {
  * Each key is the internal field name used in the export row.
  */
 export const UDISE_STUDENT_FIELDS: Record<string, UdiseStudentFieldDef> = {
-  /** 1. Student Name — user_profiles.first_name + last_name */
+  /** 1. Student Name — tenant_user_profiles.first_name + last_name */
   studentName: {
     header: 'Student Name',
     section: 'GP',
-    source: 'user_profiles.first_name + last_name',
+    source: 'tenant_user_profiles.first_name + last_name',
   },
-  /** 2. Father's Name — via student_guardian_links (father) + user_profiles */
+  /** 2. Father's Name — via student_guardian_links (father) + tenant_user_profiles */
   fatherName: {
     header: "Father's Name",
     section: 'GP',
-    source: 'student_guardian_links → guardian user_profiles (father)',
+    source: 'student_guardian_links → guardian tenant_user_profiles (father)',
   },
-  /** 3. Mother's Name — via student_guardian_links (mother) + user_profiles */
+  /** 3. Mother's Name — via student_guardian_links (mother) + tenant_user_profiles */
   motherName: {
     header: "Mother's Name",
     section: 'GP',
-    source: 'student_guardian_links → guardian user_profiles (mother)',
+    source: 'student_guardian_links → guardian tenant_user_profiles (mother)',
   },
-  /** 4. Date of Birth — user_profiles.date_of_birth */
-  dateOfBirth: { header: 'Date of Birth', section: 'GP', source: 'user_profiles.date_of_birth' },
-  /** 5. Gender — user_profiles.gender */
-  gender: { header: 'Gender', section: 'GP', source: 'user_profiles.gender' },
+  /** 4. Date of Birth — tenant_user_profiles.date_of_birth */
+  dateOfBirth: {
+    header: 'Date of Birth',
+    section: 'GP',
+    source: 'tenant_user_profiles.date_of_birth',
+  },
+  /** 5. Gender — tenant_user_profiles.gender */
+  gender: { header: 'Gender', section: 'GP', source: 'tenant_user_profiles.gender' },
   /** 6. Aadhaar Number (masked) — user_identifiers(type=aadhaar).value_masked */
   aadhaarMasked: {
     header: 'Aadhaar Number',
     section: 'GP',
     source: 'user_identifiers(type=aadhaar).value_masked',
   },
-  /** 7. Mother Tongue — user_profiles.mother_tongue */
-  motherTongue: { header: 'Mother Tongue', section: 'GP', source: 'user_profiles.mother_tongue' },
+  /** 7. Mother Tongue — tenant_user_profiles.mother_tongue */
+  motherTongue: {
+    header: 'Mother Tongue',
+    section: 'GP',
+    source: 'tenant_user_profiles.mother_tongue',
+  },
   /** 8. Social Category — student_profiles.social_category */
   socialCategory: {
     header: 'Social Category',

@@ -25,7 +25,6 @@ import {
   membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbersLive,
   rolesLive,
   sectionsLive,
   studentAcademics,
@@ -33,7 +32,6 @@ import {
   studentGuardianLinksLive,
   studentProfiles,
   studentProfilesLive,
-  userProfiles,
   usersLive,
   withAdmin,
   withTenant,
@@ -43,6 +41,10 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { ApplicationFailure } from '@temporalio/common';
 import { and, eq, sql } from 'drizzle-orm';
 import type { IdentityService } from '../../../auth/identity.service';
+import {
+  ensureTenantUserProfile,
+  findActiveGuardianByPhone,
+} from '../../../auth/tenant-user-profile';
 import { nextAdmissionNumber } from '../../student/admission-number.sequence';
 import type {
   ApplicationPayload,
@@ -264,29 +266,32 @@ export function createStudentAdmissionActivities(
       return { userId, membershipId };
     },
 
-    async createUserProfile(userId, formData, createdBy) {
+    async createUserProfile(tenantId, userId, formData, createdBy) {
       const firstNameStr = (formData.firstName ??
         formData.first_name ??
         formData.studentName ??
         formData.student_name ??
         'Student') as string;
       const lastNameStr = (formData.lastName ?? formData.last_name) as string | undefined;
+      const name = {
+        firstName: { en: firstNameStr },
+        lastName: lastNameStr ? { en: lastNameStr } : null,
+      };
 
-      await withAdmin(db, mkAdminCtx('workflow:student-admission.activities'), async (tx) => {
-        await tx
-          .insert(userProfiles)
-          .values({
+      await identityService.ensureUserProfile(userId, name, createdBy);
+      await withTenant(
+        db,
+        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
+        (tx) =>
+          ensureTenantUserProfile(tx, {
+            tenantId,
             userId,
-            firstName: { en: firstNameStr },
-            lastName: lastNameStr ? { en: lastNameStr } : null,
+            actorId: createdBy,
+            ...name,
             gender: (formData.gender as Gender) ?? null,
             dateOfBirth: ((formData.dateOfBirth ?? formData.date_of_birth) as string) ?? null,
-            nationality: 'Indian',
-            createdBy,
-            updatedBy: createdBy,
-          })
-          .onConflictDoNothing();
-      });
+          }),
+      );
     },
 
     async createStudentProfile(
@@ -378,43 +383,6 @@ export function createStudentAdmissionActivities(
     },
 
     async linkGuardians(tenantId, studentProfileId, formData, createdBy, seed) {
-      const findPhoneOwner = async (number: string): Promise<string | undefined> => {
-        const rows = await withAdmin(
-          db,
-          mkAdminCtx('workflow:student-admission.activities'),
-          async (tx) =>
-            tx
-              .select({ userId: phoneNumbersLive.userId })
-              .from(phoneNumbersLive)
-              .where(
-                and(eq(phoneNumbersLive.countryCode, '+91'), eq(phoneNumbersLive.number, number)),
-              )
-              .limit(1),
-        );
-        return rows.at(0)?.userId;
-      };
-      const isParentIn = async (tenant: string, userId: string): Promise<boolean> => {
-        const rows = await withTenant(
-          db,
-          mkInstituteCtx(tenant, 'workflow:student-admission.activities'),
-          async (tx) =>
-            tx
-              .select({ id: membershipsLive.id })
-              .from(membershipsLive)
-              .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-              .where(
-                and(
-                  eq(membershipsLive.userId, userId),
-                  eq(membershipsLive.tenantId, tenant),
-                  eq(membershipsLive.status, 'ACTIVE'),
-                  sql`${rolesLive.name}->>'en' = ${DefaultRoles.Parent}`,
-                ),
-              )
-              .limit(1),
-        );
-        return rows.length > 0;
-      };
-
       const parentPhone = (formData.parentPhone ?? formData.parent_phone) as string | undefined;
       const parentName = (formData.parentName ?? formData.parent_name) as string | undefined;
       const relationshipRaw = (formData.parentRelation ?? formData.parent_relation) as
@@ -428,12 +396,19 @@ export function createStudentAdmissionActivities(
         return;
       }
 
-      // A typed phone number proves nothing about who typed it. The account that owns it is
-      // reused only when it is already a parent in this institute (a sibling's admission);
-      // any other owner would gain a membership and a child without consenting (SF-040).
+      // A typed phone number proves nothing about who typed it. An account is reused only when
+      // the number already belongs to an active guardian of this institute (a sibling's
+      // admission); nobody else gains a membership or a child without consenting (SF-040).
       const guardianUserId = await (async (): Promise<string> => {
-        const phoneOwner = parentPhone ? await findPhoneOwner(parentPhone) : undefined;
-        if (phoneOwner && (await isParentIn(tenantId, phoneOwner))) return phoneOwner;
+        const phone = parentPhone ? { countryCode: '+91', number: parentPhone } : undefined;
+        if (phone) {
+          const sibling = await withTenant(
+            db,
+            mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
+            (tx) => findActiveGuardianByPhone(tx, { tenantId, phone }),
+          );
+          if (sibling) return sibling.userId;
+        }
 
         // Check by deterministic placeholder email before creating — a Temporal
         // retry would otherwise fail with a unique-constraint violation on
@@ -460,28 +435,19 @@ export function createStudentAdmissionActivities(
         const { userId: newId } = await identityService.createUser({
           email,
           username,
-          // The number stays with its owner; this guardian has none until a verified claim.
-          phone:
-            parentPhone && !phoneOwner ? { countryCode: '+91', number: parentPhone } : undefined,
+          // Unverified contact data: it may repeat across users and never links accounts.
+          phone,
           actorId: createdBy,
         });
         return newId;
       })();
 
-      // Upsert the guardian's user_profile so the display name is populated.
       if (parentName) {
-        await withAdmin(db, mkAdminCtx('workflow:student-admission.activities'), async (tx) => {
-          await tx
-            .insert(userProfiles)
-            .values({
-              userId: guardianUserId,
-              firstName: { en: parentName },
-              nationality: 'Indian',
-              createdBy,
-              updatedBy: createdBy,
-            })
-            .onConflictDoNothing();
-        });
+        await identityService.ensureUserProfile(
+          guardianUserId,
+          { firstName: parentName },
+          createdBy,
+        );
       }
 
       // Find the tenant's Parent role.
@@ -547,6 +513,21 @@ export function createStudentAdmissionActivities(
         );
         return created[0].id;
       })();
+
+      // An existing copy (a sibling's parent) is left as the institute recorded it.
+      if (parentName) {
+        await withTenant(
+          db,
+          mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
+          (tx) =>
+            ensureTenantUserProfile(tx, {
+              tenantId,
+              userId: guardianUserId,
+              actorId: createdBy,
+              firstName: { en: parentName },
+            }),
+        );
+      }
 
       // Find-or-create the guardian_profile (one per membership, enforced by a
       // unique constraint on guardian_profiles.membership_id).

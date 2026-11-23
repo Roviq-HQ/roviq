@@ -11,16 +11,16 @@ export interface UdiseTeacherFieldDef {
 
 export const UDISE_TEACHER_FIELDS: Record<string, UdiseTeacherFieldDef> = {
   /** 1. Teacher Name */
-  teacherName: { header: 'Teacher Name', source: 'user_profiles.first_name + last_name' },
+  teacherName: { header: 'Teacher Name', source: 'tenant_user_profiles.first_name + last_name' },
   /** 2. Aadhaar (masked) */
   aadhaarMasked: {
     header: 'Aadhaar Number',
     source: 'user_identifiers(type=aadhaar).value_masked',
   },
   /** 3. Date of Birth */
-  dateOfBirth: { header: 'Date of Birth', source: 'user_profiles.date_of_birth' },
+  dateOfBirth: { header: 'Date of Birth', source: 'tenant_user_profiles.date_of_birth' },
   /** 4. Gender */
-  gender: { header: 'Gender', source: 'user_profiles.gender' },
+  gender: { header: 'Gender', source: 'tenant_user_profiles.gender' },
   /** 5. Social Category */
   socialCategory: { header: 'Social Category', source: 'staff_profiles.social_category' },
   /** 6. Nature of Appointment */

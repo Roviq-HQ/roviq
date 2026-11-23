@@ -19,9 +19,11 @@ export const phoneNumbers = pgTable(
     ...entityColumns,
   },
   (table) => [
+    // A typed number is contact data and may repeat; only a verified number has one owner.
     uniqueIndex('phone_numbers_country_code_number_key')
       .using('btree', table.countryCode.asc().nullsLast(), table.number.asc().nullsLast())
-      .where(sql`${table.deletedAt} IS NULL`),
+      .where(sql`${table.isVerified} = true AND ${table.deletedAt} IS NULL`),
+    index('phone_numbers_number_idx').on(table.countryCode, table.number),
     index('phone_numbers_user_id_idx').using('btree', table.userId.asc().nullsLast()),
     /** Partial unique: exactly one primary phone per user (enforced at DB level) */
     uniqueIndex('idx_phone_numbers_primary')

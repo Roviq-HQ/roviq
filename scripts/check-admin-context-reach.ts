@@ -129,10 +129,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts).',
   'apps/api-gateway/src/institute/group/group.service.ts#GroupService.listMembers':
     'Reads usernames for user ids taken from membership rows fetched under tenant RLS.',
-  'apps/api-gateway/src/institute/guardian/guardian.service.ts#GuardianService.create':
-    'Writes platform-level user tables for the user it just created.',
-  'apps/api-gateway/src/institute/guardian/guardian.service.ts#GuardianService.update':
-    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. KNOWN GAP (ROV-292): the profile row is shared across institutes.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.create':
     'Reseller scope passes its own reseller id from the token as owner; no existing group is read or changed.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.findMembershipsByUser':
@@ -159,14 +155,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateStatus':
     'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership.',
-  'apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create':
-    'Writes platform-level user tables for the user it just created.',
-  'apps/api-gateway/src/files/profile-photo.service.ts#ProfilePhotoService.set':
-    'Writes the platform-level user profile (no tenant RLS) for a user id read from a student, staff or guardian row under tenant RLS, or taken from the verified token. The file must have been uploaded for that same user. Cross-institute refusal: profile-photo.api-e2e.spec.ts.',
-  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.applyUserProfileUpdates':
-    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. KNOWN GAP (ROV-292): the profile row is shared across institutes.',
-  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.create':
-    'KNOWN GAP (ROV-292): reuses an existing user matched by phone number without consent. Otherwise writes rows for the user it just created.',
+  'apps/api-gateway/src/files/profile-photo.service.ts#ProfilePhotoService.setOwn':
+    'Keyed by the user id in the verified token; the file must have been uploaded by and for that same user.',
   'apps/api-gateway/src/institute/student/student.service.ts#StudentService.deleteDocument':
     'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/student.service.ts#StudentService.uploadDocument':

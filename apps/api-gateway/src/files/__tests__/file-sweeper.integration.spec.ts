@@ -23,6 +23,7 @@ import {
   SYSTEM_USER_ID,
   staffProfiles,
   staffQualifications,
+  tenantUserProfiles,
   userDocumentFiles,
   userDocuments,
   userProfiles,
@@ -114,6 +115,7 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
   let tenantB: TestInstitute;
   let brandingId: string;
   let profileId: string;
+  let instituteCopyId: string;
   let reseller: TestReseller;
   let staffProfileId: string;
   let storage: FlakyStorage;
@@ -296,6 +298,14 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
         .where(eq(userProfiles.id, profileId)),
     );
 
+  const pointInstituteCopyAt = (fileId: string) =>
+    asAdmin((tx) =>
+      tx
+        .update(tenantUserProfiles)
+        .set({ profileImageFileId: fileId })
+        .where(eq(tenantUserProfiles.id, instituteCopyId)),
+    );
+
   const pointResellerLogoAt = (fileId: string | null) =>
     asAdmin((tx) =>
       tx.update(resellers).set({ logoFileId: fileId }).where(eq(resellers.id, reseller.resellerId)),
@@ -390,6 +400,20 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
     );
     assert(profile);
     profileId = profile.id;
+    const [instituteCopy] = await asAdmin((tx) =>
+      tx
+        .insert(tenantUserProfiles)
+        .values({
+          tenantId: tenantA.tenantId,
+          userId: tenantA.userId,
+          firstName: { en: 'Sweeper' },
+          createdBy: SYSTEM_USER_ID,
+          updatedBy: SYSTEM_USER_ID,
+        })
+        .returning({ id: tenantUserProfiles.id }),
+    );
+    assert(instituteCopy);
+    instituteCopyId = instituteCopy.id;
     reseller = await createTestReseller(db);
     const [staff] = await asAdmin((tx) =>
       tx
@@ -428,6 +452,10 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
         .set({ profileImageFileId: null })
         .where(eq(userProfiles.id, profileId));
       await tx
+        .update(tenantUserProfiles)
+        .set({ profileImageFileId: null })
+        .where(eq(tenantUserProfiles.id, instituteCopyId));
+      await tx
         .update(resellers)
         .set({ logoFileId: null })
         .where(eq(resellers.id, reseller.resellerId));
@@ -455,6 +483,7 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
     await asAdmin(async (tx) => {
       await tx.delete(instituteBranding).where(eq(instituteBranding.id, brandingId));
       await tx.delete(userProfiles).where(eq(userProfiles.id, profileId));
+      await tx.delete(tenantUserProfiles).where(eq(tenantUserProfiles.id, instituteCopyId));
       // Its qualifications go with it (ON DELETE CASCADE).
       await tx.delete(staffProfiles).where(eq(staffProfiles.id, staffProfileId));
     });
@@ -729,6 +758,24 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
       expect(summary.deleted).toEqual(NONE);
     });
 
+    it("should never remove a deleted profile photo that an institute's profile copy still points at", async () => {
+      const photo = await insertFile(tenantA, {
+        status: 'DELETED',
+        purpose: 'PROFILE_PHOTO',
+        image: true,
+        createdAt: daysAgo(60),
+        deletedAt: daysAgo(31),
+      });
+      await pointInstituteCopyAt(photo.id);
+      await putStored(photo);
+
+      const summary = await sweeper.sweep(NOW);
+
+      expect((await rowOf(photo.id))?.status).toBe('DELETED');
+      expect(storedLeft(photo)).toEqual(storedKeysOf(photo));
+      expect(summary.deleted).toEqual(NONE);
+    });
+
     it('should never remove a deleted reseller logo that its reseller still points at', async () => {
       const logo = await insertFile(tenantA, {
         status: 'DELETED',
@@ -933,6 +980,21 @@ describe.skipIf(!hasTestDb)('FileSweeper (integration)', () => {
         createdAt: hoursAgo(25),
       });
       await pointProfileAt(photo.id);
+
+      const summary = await sweeper.sweep(NOW);
+
+      expect((await rowOf(photo.id))?.status).toBe('READY');
+      expect(summary.retired).toEqual({ timed: 0, unused: 0 });
+    });
+
+    it("should keep a profile photo that an institute's profile copy points at", async () => {
+      const photo = await insertFile(tenantA, {
+        status: 'READY',
+        purpose: 'PROFILE_PHOTO',
+        image: true,
+        createdAt: hoursAgo(25),
+      });
+      await pointInstituteCopyAt(photo.id);
 
       const summary = await sweeper.sweep(NOW);
 

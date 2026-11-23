@@ -392,6 +392,21 @@ Institute services (student, staff, guardian, admission, …) and Temporal activ
 
 This gives us one place to enforce password policy, audit the creation event, and (in future) plug in passkey provisioning. Reviews should reject any new `db.insert(users)` / `db.insert(memberships)` outside `auth/identity.service.ts`.
 
+## People and phone numbers (ROV-292)
+
+A mobile number is not a person: one parent's number is on several children, numbers are recycled, and front-desk staff type what the form says. So a typed number never identifies an account.
+
+| Rule | Where it is enforced |
+| -- | -- |
+| Creating a student, a staff member or a bulk-import row always creates a new user. Nothing is looked up by number. | `StudentService.create`, `StaffService.create`, `bulk-student-import.activities.ts` |
+| A guardian is matched by number by the admission workflow only, among the **active guardians of the same institute** (a sibling's parent), only on a number that staff recorded (not one the guardian typed into their own profile), and only when exactly one guardian has it. In every other case a new user is created. | `findActiveGuardianByPhone` in `auth/tenant-user-profile.ts`, used by the admission `linkGuardians` activity. `GuardianService.create` (the form) always creates a new guardian; staff link a sibling with `linkGuardianToStudent` |
+| The typed number is stored as unverified contact data and may repeat across users. Only a verified number has one owner, and a number a user changes on their own profile becomes unverified. | Partial unique index `phone_numbers_country_code_number_key` (`WHERE is_verified = true AND deleted_at IS NULL`) |
+| Each institute keeps its own copy of a person's name, demographics and picture. Another institute of the same person cannot read or change it. | `tenant_user_profiles` (tenant RLS, unique on `tenant_id, user_id`), written by `ensureTenantUserProfile` / `updateTenantUserProfile` inside `withTenant` |
+| `user_profiles` is the account-level name and picture. Institute code creates it with the user and never changes it afterwards; only the user does (`updateMyProfile`, `setMyProfilePhoto`). The platform and reseller portals read it. | `IdentityService.ensureUserProfile` (insert only); `roviq_app` has no write policy on the table |
+| A membership created through `IdentityService.createMembership` (an institute's first admin, for example) gets the institute copy from the account name. | `IdentityService.createMembership` |
+
+Until a person can claim an account by OTP, a person in two institutes has two logins.
+
 ## CASL Authorization
 
 ### Backend

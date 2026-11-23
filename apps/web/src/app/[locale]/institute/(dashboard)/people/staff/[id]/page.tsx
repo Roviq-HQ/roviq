@@ -400,10 +400,9 @@ function StaffHeader({ staff, onBack }: { staff: StaffDetailNode; onBack: () => 
 // ─── Profile tab (editable) ──────────────────────────────────────────────
 
 /**
- * Zod schema for the editable subset of staff profile fields. We only edit
- * fields that are semantically safe to change post-onboarding. Dates of
- * birth and joining are read-only in this form; the employee ID is
- * assigned at creation and not editable here. Status transitions (activate
+ * Zod schema for the editable subset of staff profile fields. The date of
+ * joining is read-only in this form; the employee ID is assigned at creation
+ * and not editable here. Status transitions (activate
  * / deactivate) must go through named domain mutations — not implemented on
  * this tab by design (see `.claude/rules/entity-lifecycle.md`).
  */
@@ -414,6 +413,7 @@ const buildProfileSchema = (defaultLocale: string) =>
     // because the I18nField always renders both locale rows and would emit
     // empty strings rather than `undefined` when the user clears them.
     lastName: buildI18nTextOptionalSchema(defaultLocale),
+    dateOfBirth: z.string().optional(),
     designation: z.string().optional(),
     department: z.string().optional(),
     employmentType: z.enum(EMPLOYMENT_TYPES).optional(),
@@ -442,6 +442,7 @@ function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; l
       lastName: staff.lastName
         ? { en: staff.lastName.en ?? '', hi: staff.lastName.hi ?? '' }
         : { en: '', hi: '' },
+      dateOfBirth: staff.dateOfBirth ?? '',
       designation: staff.designation ?? '',
       department: staff.department ?? '',
       employmentType: (staff.employmentType as ProfileFormValues['employmentType']) ?? undefined,
@@ -462,6 +463,9 @@ function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; l
           variables: {
             id: staff.id,
             input: {
+              firstName: parsed.firstName,
+              lastName: parsed.lastName ?? null,
+              dateOfBirth: parsed.dateOfBirth || undefined,
               designation: parsed.designation || undefined,
               department: parsed.department || undefined,
               employmentType: parsed.employmentType as EmploymentType | undefined,
@@ -561,19 +565,14 @@ function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; l
                 label={t('detail.profile.lastName')}
                 testId="staff-detail-lastname-input"
               />
-              <Field>
-                <FieldLabel htmlFor="staff-dob">{t('detail.profile.dateOfBirth')}</FieldLabel>
-                <Input
-                  id="staff-dob"
-                  value={
-                    staff.dateOfBirth
-                      ? format(parseISO(staff.dateOfBirth), 'dd/MM/yyyy')
-                      : t('detail.sidebar.notSet')
-                  }
-                  readOnly
-                  disabled
-                />
-              </Field>
+              <form.AppField name="dateOfBirth">
+                {(field) => (
+                  <field.DateField
+                    label={t('detail.profile.dateOfBirth')}
+                    testId={instituteStaff.detailDobInput}
+                  />
+                )}
+              </form.AppField>
             </FieldGroup>
           </FieldSet>
 

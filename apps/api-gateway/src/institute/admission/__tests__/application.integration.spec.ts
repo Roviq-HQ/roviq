@@ -32,6 +32,7 @@ import {
   standards,
   studentGuardianLinks,
   studentProfiles,
+  tenantUserProfiles,
   withAdmin,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -769,14 +770,26 @@ describe('Admission applications (integration)', () => {
         .select({ userId: phoneNumbers.userId })
         .from(phoneNumbers)
         .where(and(eq(phoneNumbers.countryCode, '+91'), eq(phoneNumbers.number, outsiderPhone)));
-      return { outsiderMemberships, outsiderProfiles, links, phoneOwners };
+      const outsiderInstituteCopies = await tx
+        .select({ id: tenantUserProfiles.id })
+        .from(tenantUserProfiles)
+        .where(
+          and(eq(tenantUserProfiles.userId, outsiderId), eq(tenantUserProfiles.tenantId, tenantId)),
+        );
+      return { outsiderMemberships, outsiderProfiles, outsiderInstituteCopies, links, phoneOwners };
     });
 
     expect(stored.outsiderMemberships).toEqual([]);
     expect(stored.outsiderProfiles).toEqual([]);
-    expect(stored.phoneOwners).toEqual([{ userId: outsiderId }]);
+    expect(stored.outsiderInstituteCopies).toEqual([]);
     expect(stored.links).toHaveLength(1);
-    expect(stored.links[0]?.guardianUserId).not.toBe(outsiderId);
+    const guardianUserId = stored.links[0]?.guardianUserId;
+    assert(guardianUserId);
+    expect(guardianUserId).not.toBe(outsiderId);
+    // The new guardian keeps the typed number as unverified contact data.
+    expect(stored.phoneOwners.map((o) => o.userId).sort()).toEqual(
+      [outsiderId, guardianUserId].sort(),
+    );
   });
 
   it('admission activities: a sibling is linked to the parent already in the institute', async () => {

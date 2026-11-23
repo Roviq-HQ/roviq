@@ -2,7 +2,7 @@
  * Staff service (ROV-157).
  *
  * Handles staff CRUD, employee_id generation, and NATS events.
- * Uses withTenant/withAdmin for RLS enforcement.
+ * Uses withTenant for RLS enforcement.
  */
 
 import { Inject, Injectable } from '@nestjs/common';
@@ -11,16 +11,12 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   memberships,
-  mkAdminCtx,
   mkInstituteCtx,
-  phoneNumbers,
   rolesLive,
   staffProfiles,
   staffProfilesLive,
   tenantSequences,
-  userProfiles,
-  userProfilesLive,
-  withAdmin,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
@@ -28,6 +24,8 @@ import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { IdentityService } from '../../auth/identity.service';
+import { ensureTenantUserProfile, updateTenantUserProfile } from '../../auth/tenant-user-profile';
+import { nameStartsWith } from '../../common/name-search';
 import type { CreateStaffInput } from './dto/create-staff.input';
 import type { ListStaffFilterInput } from './dto/list-staff-filter.input';
 import type { UpdateStaffInput } from './dto/update-staff.input';
@@ -53,7 +51,7 @@ export class StaffService {
   /**
    * Standard projection for the staff list and detail queries — joins
    * `staff_profiles_live` (security_invoker view that hides soft-deleted
-   * rows) with `user_profiles` so the GraphQL StaffModel gets resolved
+   * rows) with the institute's `tenant_user_profiles` copy so the GraphQL StaffModel gets resolved
    * name + photo + DOB + gender on every read. Centralised so findById
    * and list select the same shape. Writes (INSERT/UPDATE RETURNING) target
    * the base `staff_profiles` table directly because RETURNING can't go
@@ -64,11 +62,11 @@ export class StaffService {
       id: staffProfilesLive.id,
       userId: staffProfilesLive.userId,
       membershipId: staffProfilesLive.membershipId,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
-      gender: userProfilesLive.gender,
-      dateOfBirth: userProfilesLive.dateOfBirth,
-      profileImageFileId: userProfilesLive.profileImageFileId,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
+      gender: tenantUserProfilesLive.gender,
+      dateOfBirth: tenantUserProfilesLive.dateOfBirth,
+      profileImageFileId: tenantUserProfilesLive.profileImageFileId,
       employeeId: staffProfilesLive.employeeId,
       designation: staffProfilesLive.designation,
       department: staffProfilesLive.department,
@@ -93,7 +91,13 @@ export class StaffService {
         return tx
           .select(this.staffSelectLive())
           .from(staffProfilesLive)
-          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
+          .innerJoin(
+            tenantUserProfilesLive,
+            and(
+              eq(tenantUserProfilesLive.userId, staffProfilesLive.userId),
+              eq(tenantUserProfilesLive.tenantId, staffProfilesLive.tenantId),
+            ),
+          )
           .where(eq(staffProfilesLive.id, id))
           .limit(1);
       },
@@ -114,13 +118,8 @@ export class StaffService {
         conditions.push(eq(staffProfilesLive.employmentType, filter.employmentType));
       if (filter.isClassTeacher != null)
         conditions.push(eq(staffProfilesLive.isClassTeacher, filter.isClassTeacher));
-      // Search uses the multilingual search_vector GIN index — `plainto_tsquery`
-      // matches names in any locale because the generated tsvector flattens
-      // every value of the i18nText jsonb on insert.
       if (filter.search) {
-        conditions.push(
-          sql`${userProfilesLive.searchVector} @@ plainto_tsquery('simple', ${filter.search})`,
-        );
+        conditions.push(nameStartsWith(tenantUserProfilesLive.searchVector, filter.search));
       }
 
       const limit = filter.first ?? 20;
@@ -128,7 +127,13 @@ export class StaffService {
       const rows = await tx
         .select(this.staffSelectLive())
         .from(staffProfilesLive)
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, staffProfilesLive.userId),
+            eq(tenantUserProfilesLive.tenantId, staffProfilesLive.tenantId),
+          ),
+        )
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .limit(limit);
       return rows;
@@ -153,6 +158,8 @@ export class StaffService {
     const suffix = crypto.randomUUID().slice(0, 12);
     const email = input.email ?? `staff-${suffix}@roviq.placeholder`;
     const username = `staff-${tenantId.slice(0, 8)}-${suffix}`;
+    // Staff always get their own account: a typed number never links an existing one (SF-053).
+    // It is stored as unverified contact data.
     const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
 
     const { userId: newUserId } = await this.identityService.createUser({
@@ -163,41 +170,11 @@ export class StaffService {
     });
     const newUser = { id: newUserId };
 
-    // Create phone record if provided
-    if (input.phone) {
-      const phone = input.phone;
-      await withAdmin(this.db, mkAdminCtx('service:staff'), async (tx) => {
-        await tx
-          .insert(phoneNumbers)
-          .values({
-            createdBy: actorId,
-            updatedBy: actorId,
-            userId: newUser.id,
-            countryCode: '+91',
-            number: phone,
-            isPrimary: true,
-            label: 'personal',
-          })
-          .onConflictDoNothing();
-      });
-    }
-
-    // Create user_profile
-    await withAdmin(this.db, mkAdminCtx('service:staff'), async (tx) => {
-      await tx
-        .insert(userProfiles)
-        .values({
-          userId: newUser.id,
-          firstName: input.firstName,
-          lastName: input.lastName ?? null,
-          gender: input.gender ?? null,
-          dateOfBirth: input.dateOfBirth ?? null,
-          nationality: 'Indian',
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .onConflictDoNothing();
-    });
+    await this.identityService.ensureUserProfile(
+      newUser.id,
+      { firstName: input.firstName, lastName: input.lastName },
+      actorId,
+    );
 
     // Find teacher role using DefaultRoles constant — read via `roles_live`
     // to skip soft-deleted role rows.
@@ -229,7 +206,7 @@ export class StaffService {
       this.db,
       mkInstituteCtx(tenantId, 'service:staff'),
       async (tx) => {
-        return tx
+        const inserted = await tx
           .insert(memberships)
           .values({
             userId: newUser.id,
@@ -241,6 +218,16 @@ export class StaffService {
             updatedBy: actorId,
           })
           .returning({ id: memberships.id });
+        await ensureTenantUserProfile(tx, {
+          tenantId,
+          userId: newUser.id,
+          actorId,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          gender: input.gender,
+          dateOfBirth: input.dateOfBirth,
+        });
+        return inserted;
       },
     );
 
@@ -300,7 +287,7 @@ export class StaffService {
     });
 
     // Re-fetch via findById so the GraphQL StaffModel response includes the
-    // joined name + photo from user_profiles (StaffModel.firstName is now
+    // joined name + photo from the institute's profile copy (StaffModel.firstName is now
     // i18nText and required).
     return this.findById(profile.id);
   }
@@ -351,12 +338,23 @@ export class StaffService {
             'Staff profile was modified by another request (version mismatch)',
           );
         }
+        await updateTenantUserProfile(tx, {
+          tenantId,
+          userId: rows[0].userId,
+          actorId,
+          changes: {
+            ...(input.firstName != null && { firstName: input.firstName }),
+            ...(input.lastName !== undefined && { lastName: input.lastName }),
+            ...(input.gender != null && { gender: input.gender }),
+            ...(input.dateOfBirth != null && { dateOfBirth: input.dateOfBirth }),
+          },
+        });
         return rows[0];
       },
     );
 
     // Re-fetch via findById so the GraphQL response includes the joined
-    // name + photo from user_profiles.
+    // name + photo from the institute's profile copy.
     return this.findById(updated.id);
   }
 
@@ -400,13 +398,19 @@ export class StaffService {
       return tx
         .select({
           id: staffProfiles.id,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
           identifier: staffProfiles.employeeId,
           deletedAt: sql<Date>`${staffProfiles.deletedAt}`.mapWith(staffProfiles.deletedAt),
         })
         .from(staffProfiles) // allow-base-read: the Deleted list shows trashed rows
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfiles.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, staffProfiles.userId),
+            eq(tenantUserProfilesLive.tenantId, staffProfiles.tenantId),
+          ),
+        )
         .where(isNotNull(staffProfiles.deletedAt))
         .orderBy(desc(staffProfiles.deletedAt));
     });

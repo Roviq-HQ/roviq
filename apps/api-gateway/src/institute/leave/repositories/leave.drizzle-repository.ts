@@ -18,7 +18,7 @@ import {
   mkInstituteCtx,
   softDelete,
   studentProfilesLive,
-  userProfilesLive,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -97,12 +97,18 @@ async function loadApplicants(
   const rows = await tx
     .select({
       membershipId: membershipsLive.id,
-      firstName: userProfilesLive.firstName,
-      lastName: userProfilesLive.lastName,
+      firstName: tenantUserProfilesLive.firstName,
+      lastName: tenantUserProfilesLive.lastName,
       admissionNumber: studentProfilesLive.admissionNumber,
     })
     .from(membershipsLive)
-    .innerJoin(userProfilesLive, eq(userProfilesLive.userId, membershipsLive.userId))
+    .innerJoin(
+      tenantUserProfilesLive,
+      and(
+        eq(tenantUserProfilesLive.userId, membershipsLive.userId),
+        eq(tenantUserProfilesLive.tenantId, membershipsLive.tenantId),
+      ),
+    )
     .leftJoin(studentProfilesLive, eq(studentProfilesLive.membershipId, membershipsLive.id))
     .where(inArray(membershipsLive.id, unique));
   return new Map(rows.map(({ membershipId, ...applicant }) => [membershipId, applicant]));

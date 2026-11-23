@@ -13,6 +13,7 @@ import {
   SYSTEM_USER_ID,
   staffProfiles,
   studentProfiles,
+  tenantUserProfiles,
   userProfiles,
   users,
   withAdmin,
@@ -57,6 +58,9 @@ async function createPerson(db: DrizzleDB, tenantId: string, label: string): Pro
       })
       .returning({ id: users.id });
     await tx.insert(userProfiles).values({ userId: user.id, firstName: { en: label }, ...AUDIT });
+    await tx
+      .insert(tenantUserProfiles)
+      .values({ tenantId: tenantId, userId: user.id, firstName: { en: label }, ...AUDIT });
     const [role] = await tx
       .insert(roles)
       .values({

@@ -4,5 +4,6 @@ export type UserListNode = AdminListUsersQuery['adminListUsers']['edges'][number
 export type UserDetail = AdminGetUserQuery['adminGetUser'];
 
 export function formatPhone(phone: { countryCode: string; number: string } | null | undefined) {
-  return phone ? `+${phone.countryCode} ${phone.number}` : null;
+  // The stored country code already carries its plus sign.
+  return phone ? `${phone.countryCode} ${phone.number}` : null;
 }

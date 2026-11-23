@@ -26,6 +26,7 @@ import {
   standardSubjectsLive,
   standardsLive,
   subjectsLive,
+  tenantUserProfiles,
   userProfiles,
   users,
   withAdmin,
@@ -320,6 +321,30 @@ describe('Institute setup: approval workflow and direct creation (integration)',
     expect(profiles).toEqual([]);
     expect(welcome).not.toHaveBeenCalled();
     welcome.mockRestore();
+  });
+
+  it("gives the first admin the institute's own copy of their name", async () => {
+    const email = uniqueEmail('copy');
+    const institute = await createInstitute(email, 'copy');
+    await setup.createDefaultRoles(institute.id);
+    const [requested] = await usersWithEmail(result.db, email);
+    assert(requested);
+
+    await setup.createFirstAdmin(institute.id, SYSTEM_USER_ID);
+
+    const copies = await withAdmin(result.db, mkAdminCtx('test:institute-setup'), (tx) =>
+      tx
+        .select({
+          tenantId: tenantUserProfiles.tenantId,
+          firstName: tenantUserProfiles.firstName,
+          lastName: tenantUserProfiles.lastName,
+        })
+        .from(tenantUserProfiles)
+        .where(eq(tenantUserProfiles.userId, requested.id)),
+    );
+    expect(copies).toEqual([
+      { tenantId: institute.id, firstName: { en: 'Meera' }, lastName: { en: 'Joshi' } },
+    ]);
   });
 
   it('gives a never-logged-in admin a fresh temporary password and welcome on every run', async () => {

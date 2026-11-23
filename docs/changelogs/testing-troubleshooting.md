@@ -954,3 +954,18 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the test read any academic year, standard and section of the seed institute (`LIMIT 1`, no order) and then inserted a row that pointed at them. Integration files run in parallel on one database, and other specs create and hard-delete such rows, so the year could vanish between the read and the insert. With no seed rows the test returned early and passed without asserting anything.
 - **Fix:** the test inserts its own year, standard and section inside its transaction.
 - **Lesson:** an integration test creates every row it depends on. Never pick "any row" of a shared institute, and never `return` early when the data is missing.
+
+## 2026-11-23 — diagnosed, local fix only: pre-push `int` failed with `drizzle-kit migrate failed` after a migration was regenerated
+
+- **Symptom:** `pnpm ci:check` failed in `int` before any test ran: `Error: drizzle-kit migrate failed (exit 1) against localhost:<port>/roviq_test`, then "No test files found". It also failed on slot 3 with a port clash on the e2e Mailpit port after ROV-314 landed.
+- **Cause 1:** the branch's migration was regenerated after a rebase (new folder name, same SQL). The local `roviq_test` database had the old folder recorded as applied, so `migrate` ran the new folder and its `CREATE TABLE` hit a table that already existed. The integration global setup only resets an empty database.
+- **Cause 2:** a slot's `.env` is generated once. Ports added later (`E2E_MAILPIT_API_PORT`) were missing, so the slot fell back to slot 0's port.
+- **Fix:** `pnpm db:reset --test` in that checkout after regenerating a migration; `pnpm instance:env <slot>` after `main` adds a port.
+- **Lesson:** regenerating a migration changes its identity. Reset the test database (and `pnpm tilt trigger db-clean` for the dev one) right after, and re-run `instance:env` in a long-lived slot whenever `scripts/lib/instance.ts` gains a port.
+
+## 2026-11-23 — diagnosed and fixed: CI `Test` failed the 2,000-student group-rule budget (570 ms against 500 ms)
+
+- **Symptom:** the "User & Groups Security Invariants" step failed on `resolves a 5-dimension group rule over 2000 students within 500ms` in CI and on a freshly reset local database. On a database that had run other suites it took about 35 ms.
+- **Cause:** the fixture bulk-loads 2,000 students and queries at once, so the tables have no statistics. After ROV-292 the rule query joins `tenant_user_profiles`; with every estimate at one row the planner paired each profile with each enrolment row (500,000 pairs, 510 ms). Found with `auto_explain` (`log_analyze`) set on `roviq_test`.
+- **Fix:** the fixture runs `ANALYZE` on the three tables it loads, over the owner connection, before the timed request (44 ms on a cold database). The 500 ms budget is unchanged.
+- **Lesson:** a timing test that follows a bulk insert must analyze the tables it loaded, as autovacuum does in production within a minute. This is the second failure of this kind in this spec (see the 2026-11-22 entry on the section-strength trigger).

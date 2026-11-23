@@ -23,6 +23,7 @@ import {
   studentAcademics,
   studentProfiles,
   studentProfilesLive,
+  tenantUserProfiles,
   userAddresses,
   userDocuments,
   userIdentifiers,
@@ -50,6 +51,7 @@ import {
 } from '@roviq/testing/integration';
 import { eq, inArray, sql } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
 import { studentReadPredicate } from '../institute/student/student-read-predicate';
@@ -71,6 +73,7 @@ const USER_GROUPS_TABLES = [
   'student_academics',
   'student_guardian_links',
   'student_profiles',
+  'tenant_user_profiles',
   'user_addresses',
   'user_documents',
   'user_identifiers',
@@ -182,6 +185,13 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       userId: person.userId,
       firstName: { en: 'Student' },
     });
+    await tx.insert(tenantUserProfiles).values({
+      tenantId: tenantId,
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+      userId: person.userId,
+      firstName: { en: 'Student' },
+    });
     const [profile] = await tx
       .insert(studentProfiles)
       .values({
@@ -244,6 +254,16 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
     }));
     await tx.insert(userProfiles).values(
       userRows.map((row, index) => ({
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+        userId: row.id,
+        firstName: { en: `Perf ${index}` },
+        gender: attributes[index].gender,
+      })),
+    );
+    await tx.insert(tenantUserProfiles).values(
+      userRows.map((row, index) => ({
+        tenantId: tenantId,
         createdBy: SYSTEM_USER_ID,
         updatedBy: SYSTEM_USER_ID,
         userId: row.id,
@@ -375,6 +395,14 @@ describe('ROV-205 User & Groups security invariants against PostgreSQL', () => {
       );
       await seedPerfStudents(tx);
     });
+    // Autovacuum gathers statistics within a minute of a bulk load; the budget below is for that
+    // steady state. Planned with none, the rule query pairs every profile with every enrolment.
+    const owner = new Pool({ connectionString: process.env.DATABASE_URL_TEST_MIGRATE });
+    try {
+      await owner.query('ANALYZE tenant_user_profiles, student_profiles, student_academics');
+    } finally {
+      await owner.end();
+    }
   }, 120_000);
 
   afterAll(async () => {

@@ -16,12 +16,22 @@ export async function markFilesReady(
     subjectUserId?: string;
     /** In a transaction that is not bound to one institute: the institute that must own them. */
     tenantId?: string;
+    /**
+     * Makes this institute the owner of a person's file, so no other institute of the same
+     * person can read it. The caller's transaction must run as that institute.
+     */
+    claimForTenantId?: string;
   },
 ): Promise<void> {
   if (params.fileIds.length === 0) return;
   const rows = await tx
     .update(files)
-    .set({ status: 'READY', updatedBy: params.userId, version: sql`${files.version} + 1` })
+    .set({
+      status: 'READY',
+      updatedBy: params.userId,
+      version: sql`${files.version} + 1`,
+      ...(params.claimForTenantId && { tenantId: params.claimForTenantId }),
+    })
     .where(
       and(
         inArray(files.id, params.fileIds),

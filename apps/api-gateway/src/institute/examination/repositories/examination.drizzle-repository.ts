@@ -39,7 +39,7 @@ import {
   subjectsLive,
   subjectTopics,
   subjectTopicsLive,
-  userProfilesLive,
+  tenantUserProfilesLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -829,15 +829,21 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           studentProfileId: studentProfilesLive.id,
           membershipId: studentProfilesLive.membershipId,
           rollNumber: studentAcademicsLive.rollNumber,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
+          firstName: tenantUserProfilesLive.firstName,
+          lastName: tenantUserProfilesLive.lastName,
         })
         .from(studentAcademicsLive)
         .innerJoin(
           studentProfilesLive,
           eq(studentProfilesLive.id, studentAcademicsLive.studentProfileId),
         )
-        .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+        .innerJoin(
+          tenantUserProfilesLive,
+          and(
+            eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+            eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+          ),
+        )
         .where(
           and(
             eq(studentAcademicsLive.sectionId, sectionId),
@@ -891,11 +897,17 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         const rows = await tx
           .select({
             membershipId: studentProfilesLive.membershipId,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
+            firstName: tenantUserProfilesLive.firstName,
+            lastName: tenantUserProfilesLive.lastName,
           })
           .from(studentProfilesLive)
-          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, studentProfilesLive.userId))
+          .innerJoin(
+            tenantUserProfilesLive,
+            and(
+              eq(tenantUserProfilesLive.userId, studentProfilesLive.userId),
+              eq(tenantUserProfilesLive.tenantId, studentProfilesLive.tenantId),
+            ),
+          )
           .where(inArray(studentProfilesLive.membershipId, studentIds));
         for (const r of rows) {
           students[r.membershipId] =
@@ -906,11 +918,17 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
         const rows = await tx
           .select({
             membershipId: staffProfilesLive.membershipId,
-            firstName: userProfilesLive.firstName,
-            lastName: userProfilesLive.lastName,
+            firstName: tenantUserProfilesLive.firstName,
+            lastName: tenantUserProfilesLive.lastName,
           })
           .from(staffProfilesLive)
-          .innerJoin(userProfilesLive, eq(userProfilesLive.userId, staffProfilesLive.userId))
+          .innerJoin(
+            tenantUserProfilesLive,
+            and(
+              eq(tenantUserProfilesLive.userId, staffProfilesLive.userId),
+              eq(tenantUserProfilesLive.tenantId, staffProfilesLive.tenantId),
+            ),
+          )
           .where(inArray(staffProfilesLive.membershipId, staffIds));
         for (const r of rows) {
           staff[r.membershipId] = `${i18nDisplay(r.firstName)} ${i18nDisplay(r.lastName)}`.trim();

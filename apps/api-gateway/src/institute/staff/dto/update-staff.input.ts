@@ -1,13 +1,25 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { EmploymentType, SocialCategory } from '@roviq/common-types';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { EmploymentType, Gender, SocialCategory } from '@roviq/common-types';
+import type { I18nContent } from '@roviq/database';
+import { I18nTextScalar } from '@roviq/nestjs-graphql';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 // Validator `message:` strings below are hardcoded English pending
 // backend i18n (ROV-222). Once that lands, swap each to
 // `i18nValidationMessage('validation.staff.*')`.
 
 /**
- * Input for updating a staff member's employment record. All content
+ * Input for updating a staff member's personal and employment record. All content
  * fields are optional — only dirty fields are sent; `version` is required
  * and enforces optimistic concurrency in the service layer.
  *
@@ -17,6 +29,32 @@ import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from '
  */
 @InputType({ description: 'Input for updating staff member — optimistic concurrency via version' })
 export class UpdateStaffInput {
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: "First name as this institute records it. Changes the institute's copy only.",
+  })
+  @IsOptional()
+  @IsObject()
+  firstName?: I18nContent;
+
+  @Field(() => I18nTextScalar, {
+    nullable: true,
+    description: 'Last name as this institute records it. Null removes it.',
+  })
+  @IsOptional()
+  @IsObject()
+  lastName?: I18nContent | null;
+
+  @Field(() => Gender, { nullable: true })
+  @IsOptional()
+  @IsEnum(Gender, { message: 'gender must be one of: MALE, FEMALE, OTHER' })
+  gender?: Gender;
+
+  @Field(() => String, { nullable: true, description: 'Date of birth (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString({}, { message: 'dateOfBirth must be a valid ISO 8601 date string' })
+  dateOfBirth?: string;
+
   @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()

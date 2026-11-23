@@ -121,8 +121,12 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
     });
     await identity.ensureUserProfile(userId, FIRST_ADMIN, SYSTEM_USER_ID);
     await withAdmin(result.db, mkAdminCtx('test:first-admin'), async (tx) => {
-      // The owner of this account has proved the mailbox, so its email may identify it.
+      // The owner of this account has proved the mailbox and the mobile, so both identify it.
       await tx.update(users).set({ emailVerifiedAt: new Date() }).where(eq(users.id, userId));
+      await tx
+        .update(phoneNumbers)
+        .set({ isVerified: true })
+        .where(eq(phoneNumbers.userId, userId));
       await tx
         .update(institutes)
         .set({ firstAdminUserId: userId })
@@ -336,7 +340,7 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
     expect(instituteMemberships).toEqual([]);
   });
 
-  it('refuses a new first admin whose mobile another account owns and creates nothing', async () => {
+  it('refuses a new first admin whose verified mobile another account owns and creates nothing', async () => {
     const email = `phone-taken-${randomUUID().slice(0, 8)}@institute.test`;
     const slug = `first-admin-phone-${randomUUID().slice(0, 8)}`;
 
@@ -363,6 +367,36 @@ describe('InstituteModel.firstAdmin visibility (integration)', () => {
       users: await tx.select({ id: users.id }).from(users).where(eq(users.email, email)),
     }));
     expect(state).toEqual({ institutes: [], users: [] });
+  });
+
+  it('creates a new first admin with a mobile another account holds unverified, and keeps it', async () => {
+    const sharedPhone = uniqueMobile();
+    const { userId: holderId } = await identity.createUser({
+      email: `phone-holder-${randomUUID().slice(0, 8)}@institute.test`,
+      username: `phone-holder-${randomUUID().slice(0, 8)}`,
+      phone: { countryCode: '+91', number: sharedPhone },
+      actorId: owner.userId,
+    });
+    const email = `shared-phone-${randomUUID().slice(0, 8)}@institute.test`;
+
+    const id = await requestInstitute({ firstName: 'Asha', email, phone: sharedPhone });
+
+    const holders = await withAdmin(result.db, mkAdminCtx('test:first-admin'), (tx) =>
+      tx
+        .select({ userId: phoneNumbers.userId, isVerified: phoneNumbers.isVerified })
+        .from(phoneNumbers)
+        .where(eq(phoneNumbers.number, sharedPhone)),
+    );
+    const [firstAdmin] = await withAdmin(result.db, mkAdminCtx('test:first-admin'), (tx) =>
+      tx
+        .select({ userId: institutes.firstAdminUserId })
+        .from(institutes)
+        .where(eq(institutes.id, id)),
+    );
+    assert(firstAdmin?.userId);
+    expect(firstAdmin.userId).not.toBe(holderId);
+    expect(holders.map((h) => h.userId).sort()).toEqual([holderId, firstAdmin.userId].sort());
+    expect(holders.every((h) => !h.isVerified)).toBe(true);
   });
 
   it('ignores a taken mobile when the email belongs to an existing account', async () => {

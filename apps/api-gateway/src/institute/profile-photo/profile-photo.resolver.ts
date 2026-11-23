@@ -1,8 +1,8 @@
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Resolver } from '@nestjs/graphql';
-import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
+import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
-import { type AuthUser, BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { ProfilePhotoService } from '../../files/profile-photo.service';
 import { type PersonKind, ProfilePhotoTargetRepository } from './profile-photo-target.repository';
 
@@ -57,17 +57,16 @@ export class ProfilePhotoResolver {
   // No @CheckAbility: everyone may change their own picture.
   @Mutation(() => Boolean, { description: 'Set or remove your own profile picture.' })
   async setMyProfilePhoto(
-    @CurrentUser() user: AuthUser,
     @Args('fileId', FILE_ID_ARG, new ParseUUIDPipe({ optional: true })) fileId: string | null,
   ): Promise<boolean> {
-    await this.photos.set(user.userId, fileId);
+    await this.photos.setOwn(fileId);
     return true;
   }
 
   private async setFor(kind: PersonKind, profileId: string, fileId: string | null) {
     const userId = await this.targets.findUserId(kind, profileId);
     if (!userId) throw new BusinessException(NOT_FOUND[kind], 'Profile not found');
-    await this.photos.set(userId, fileId);
+    await this.photos.setForInstitute(userId, fileId);
     return true;
   }
 }

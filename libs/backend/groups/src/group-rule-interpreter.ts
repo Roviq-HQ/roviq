@@ -17,19 +17,19 @@ const interpret = createSqlInterpreter(allInterpreters);
  * Maps the 18+ group rule dimensions to their actual DB columns.
  *
  * These are the dimensions from PRD Part 4 §1.2:
- * - user_profiles: gender, date_of_birth, religion, mother_tongue, nationality
+ * - tenant_user_profiles (the institute's copy): gender, date_of_birth, religion, mother_tongue, nationality
  * - student_profiles: social_category, is_minority, is_bpl, is_cwsn,
  *   is_rte_admitted, academic_status, stream, admission_type
  * - student_academics: standard_id, section_id, house_id, route_id
  * - sections (via join): shift, medium
  */
 const DIMENSION_TO_COLUMN: Record<string, string> = {
-  // user_profiles
-  gender: '"user_profiles"."gender"',
-  date_of_birth: '"user_profiles"."date_of_birth"',
-  religion: '"user_profiles"."religion"',
-  mother_tongue: '"user_profiles"."mother_tongue"',
-  nationality: '"user_profiles"."nationality"',
+  // tenant_user_profiles: the institute's own copy of the demographics
+  gender: '"tenant_user_profiles"."gender"',
+  date_of_birth: '"tenant_user_profiles"."date_of_birth"',
+  religion: '"tenant_user_profiles"."religion"',
+  mother_tongue: '"tenant_user_profiles"."mother_tongue"',
+  nationality: '"tenant_user_profiles"."nationality"',
   // student_profiles
   social_category: '"student_profiles"."social_category"',
   is_minority: '"student_profiles"."is_minority"',
@@ -61,7 +61,7 @@ export type JsonLogicRule = Record<string, unknown>;
  *
  * @example
  * groupRuleToSql({ "==": [{ "var": "gender" }, "female"] })
- * // → { sqlString: '"user_profiles"."gender" = $1', params: ['female'] }
+ * // → { sqlString: '"tenant_user_profiles"."gender" = $1', params: ['female'] }
  */
 export function groupRuleToSql(
   rule: JsonLogicRule | null | undefined,
@@ -72,7 +72,7 @@ export function groupRuleToSql(
   const [sqlString, params] = interpret(ast, {
     ...pg,
     // Override escapeField to use our dimension→column mapping.
-    // The mapping values are already pre-escaped (e.g., '"user_profiles"."gender"')
+    // The mapping values are already pre-escaped (e.g., '"tenant_user_profiles"."gender"')
     // so we return them directly instead of applying pg's default escaping.
     escapeField: (field: string) => DIMENSION_TO_COLUMN[field] ?? pg.escapeField(field),
     joinRelation: () => false,
