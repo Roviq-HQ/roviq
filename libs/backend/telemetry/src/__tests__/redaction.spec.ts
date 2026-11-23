@@ -20,6 +20,15 @@ describe('serializeRequest', () => {
     expect(serializeRequest(req)).toEqual({ id: 'req-1', method: 'POST', url: '/api/graphql' });
   });
 
+  it('should replace the secret segment of the SMS webhook address', () => {
+    expect(
+      serializeRequest({ id: 2, method: 'POST', url: '/webhooks/sms/s3cr3t-value?x=1' }),
+    ).toEqual({ id: 2, method: 'POST', url: '/webhooks/sms/[REDACTED]' });
+    expect(serializeRequest({ id: 3, method: 'POST', url: '/webhooks/whatsapp' }).url).toBe(
+      '/webhooks/whatsapp',
+    );
+  });
+
   it('should drop the query string', () => {
     expect(serializeRequest({ id: 1, method: 'GET', url: '/api/files?code=one-time' })).toEqual({
       id: 1,

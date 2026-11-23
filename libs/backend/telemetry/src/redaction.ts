@@ -7,8 +7,11 @@ export function isUntracedPath(url: string | undefined): boolean {
   return UNTRACED_PATHS.some((prefix) => url?.startsWith(prefix) ?? false);
 }
 
+// A provider that cannot sign its calls is given a secret path instead (the SMS delivery reports).
+const SECRET_PATH = /^(\/webhooks\/sms\/)[^/]+/;
+
 function pathOnly(url: string | undefined): string | undefined {
-  return url?.split('?', 1)[0];
+  return url?.split('?', 1)[0]?.replace(SECRET_PATH, '$1[REDACTED]');
 }
 
 interface LoggedRequest {
