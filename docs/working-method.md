@@ -54,7 +54,7 @@ database read).
 
 1. The spec files you touched pass; the output is saved to a file and read from there.
 2. The browser pass above is clean.
-3. `pnpm lint:fix`; `pnpm nx run <project>:typecheck` for each project you touched.
+3. `pnpm lint:fix`; `pnpm nx run <project>:build` for each project you touched.
 4. Docs are updated in the same change.
 5. The Linear issue and its comments are re-read against the work: every item of "Verification",
    nothing from "Does NOT Change".

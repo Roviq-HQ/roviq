@@ -24,7 +24,7 @@ Tilt runs everything: apps, databases, migrations, seeds. Never run `pnpm db:*`,
 - **Start of a session**: `pnpm tilt get uiresources`. No answer means Tilt is down: start it (`pnpm tilt up`) before anything else.
 - **After a code change** the apps restart themselves; `pnpm tilt trigger <resource>` is for `db-push`, `db-seed`, `db-clean` and the e2e resources. Read results with `pnpm tilt logs <resource>`.
 - **The dev gateway can miss a restart.** When the running app contradicts the code or a passing test, compare the process start time with your last edit and run `pnpm tilt trigger api-gateway` (steps: `docs/infrastructure.md` → "When the dev app looks wrong").
-- **Type errors are not in the app log.** The backend apps run from source unchecked: use `pnpm nx run <project>:typecheck`. A hand-run `tsc` checks nothing here.
+- **Type errors are not in the app log.** The backend apps run from source unchecked: use `pnpm nx run <project>:build` (there is no `typecheck` target; `pnpm typecheck` builds every project). A bare `tsc --noEmit` at the root checks nothing.
 - **GraphQL types** regenerate through the `codegen` resource, which needs the gateway up. After a resolver or query change, confirm in `pnpm tilt logs codegen`, or run `pnpm codegen` once the gateway answers.
 - **`.env` is read when Tilt starts.** A changed variable reaches the apps only after Tilt restarts.
 - **E2E**: `pnpm test:e2e:api` and `pnpm ci:check` rebuild and re-seed the e2e stack themselves. Before any other e2e run, and after a backend change, run `pnpm e2e:up`.

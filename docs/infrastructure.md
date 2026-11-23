@@ -41,7 +41,7 @@ Check these before debugging the code:
    `ss -ltnp | grep :<API port>` gives the pid, `ps -o lstart -p <pid>` the start time. If it is
    older than the edit, `pnpm tilt trigger api-gateway` and wait for `/api/health/ready`.
 2. **Stale type-check.** The `typecheck` resource watches with built library types and can show an
-   error for a symbol that exists. `pnpm nx run <project>:typecheck` is the answer that counts.
+   error for a symbol that exists. `pnpm nx run <project>:build` is the answer that counts.
 3. **Codegen ran while the gateway was restarting.** It fails with `ECONNREFUSED`; run
    `pnpm codegen` again once the gateway answers.
 4. **Changed `.env`.** Tilt reads it once at start. Stop Tilt and `pnpm tilt up` again; check a
