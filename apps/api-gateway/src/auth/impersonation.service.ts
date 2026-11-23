@@ -9,33 +9,14 @@ import {
   AppSubject,
   BusinessException,
   canImpersonateInstituteRole,
-  DefaultRoles,
   ErrorCode,
   RESELLER_TIER_ROLE,
 } from '@roviq/common-types';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  type I18nContent,
-  impersonationSessions,
-  institutesLive,
-  membershipsLive,
-  mkAdminCtx,
-  phoneNumbersLive,
-  platformMembershipsLive,
-  resellerMembershipsLive,
-  rolesLive,
-  userProfilesLive,
-  usersLive,
-  withAdmin,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import type { AuthSecurityEvent } from '@roviq/notifications';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { and, asc, desc, eq, gt, inArray, isNull, lte, type SQL, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
 import type Redis from 'ioredis';
 import { AuthEventService } from './auth-event.service';
 import type { ImpersonationAuthPayload } from './dto/impersonation.dto';
@@ -45,6 +26,8 @@ import {
 } from './dto/impersonation-session.model';
 import { invalidateImpersonationSessions } from './impersonation-session-cache';
 import { REDIS_KEYS } from './redis-keys';
+import { ImpersonationRepository } from './repositories/impersonation.repository';
+import type { ImpersonatorRoleNames } from './repositories/types';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -120,6 +103,20 @@ function deriveSessionStatus(
   return ImpersonationSessionStatus.ACTIVE;
 }
 
+/** The impersonator's role name from the membership table matching their scope, or null. */
+function impersonatorRoleOf(
+  roles: ImpersonatorRoleNames,
+  scope: string,
+  userId: string,
+  tenantId: string | null,
+): ImpersonationSessionModel['impersonatorRole'] {
+  if (scope === 'platform') return roles.platform.get(userId) ?? null;
+  if (scope === 'reseller') return roles.reseller.get(userId) ?? null;
+  if (scope === 'institute' && tenantId)
+    return roles.institute.get(`${userId}:${tenantId}`) ?? null;
+  return null;
+}
+
 function otpMatches(expected: string, given: string): boolean {
   const a = Buffer.from(expected);
   const b = Buffer.from(given);
@@ -133,7 +130,7 @@ export class ImpersonationService {
     private readonly jwtService: JwtService,
     private readonly authEventService: AuthEventService,
     private readonly abilityFactory: AbilityFactory,
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: ImpersonationRepository,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly eventBus: EventBusService,
   ) {}
@@ -163,15 +160,9 @@ export class ImpersonationService {
       );
     }
 
-    const targetUser = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({ id: usersLive.id, status: usersLive.status })
-        .from(usersLive)
-        .where(eq(usersLive.id, targetUserId))
-        .limit(1),
-    );
+    const targetUser = await this.repo.findUserStatus(targetUserId);
 
-    if (targetUser.length === 0 || targetUser[0].status !== 'ACTIVE') {
+    if (!targetUser || targetUser.status !== 'ACTIVE') {
       throw new BusinessException(
         ErrorCode.IMPERSONATION_TARGET_INVALID,
         'Target user not found or inactive',
@@ -180,23 +171,9 @@ export class ImpersonationService {
 
     // Every active membership the target holds here: the rank check must see
     // the most senior one, and the session is pinned to the oldest.
-    const targetMemberships = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          id: membershipsLive.id,
-          roleName: sql<string>`${rolesLive.name}->>'en'`,
-          roleAbilities: rolesLive.abilities,
-        })
-        .from(membershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-        .where(
-          and(
-            eq(membershipsLive.userId, targetUserId),
-            eq(membershipsLive.tenantId, targetTenantId),
-            eq(membershipsLive.status, 'ACTIVE'),
-          ),
-        )
-        .orderBy(asc(membershipsLive.createdAt), asc(membershipsLive.id)),
+    const targetMemberships = await this.repo.findActiveMembershipsWithRole(
+      targetUserId,
+      targetTenantId,
     );
     const targetMembership = targetMemberships[0];
 
@@ -207,17 +184,7 @@ export class ImpersonationService {
       );
     }
 
-    const [targetInstitute] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          id: institutesLive.id,
-          resellerId: institutesLive.resellerId,
-          requireImpersonationConsent: institutesLive.requireImpersonationConsent,
-        })
-        .from(institutesLive)
-        .where(eq(institutesLive.id, targetTenantId))
-        .limit(1),
-    );
+    const targetInstitute = await this.repo.findInstitute(targetTenantId);
 
     if (!targetInstitute) {
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Target institute not found');
@@ -367,74 +334,22 @@ export class ImpersonationService {
     ) as CodePayload;
 
     // Fetch all required data in parallel within a single transaction
-    const [targetUsers, membershipRows, sessions, instituteRows] = await withAdmin(
-      this.db,
-      mkAdminCtx('service:impersonation'),
-      (tx) =>
-        Promise.all([
-          tx
-            .select({
-              id: usersLive.id,
-              username: usersLive.username,
-              firstName: userProfilesLive.firstName,
-              lastName: userProfilesLive.lastName,
-            })
-            .from(usersLive)
-            .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-            .where(and(eq(usersLive.id, targetUserId), eq(usersLive.status, 'ACTIVE')))
-            .limit(1),
-          tx
-            .select({
-              id: membershipsLive.id,
-              tenantId: membershipsLive.tenantId,
-              roleId: membershipsLive.roleId,
-            })
-            .from(membershipsLive)
-            .where(
-              and(
-                // Exactly the membership that was authorized at start.
-                eq(membershipsLive.id, targetMembershipId),
-                eq(membershipsLive.userId, targetUserId),
-                eq(membershipsLive.tenantId, tenantId),
-                eq(membershipsLive.status, 'ACTIVE'),
-              ),
-            )
-            .limit(1),
-          tx
-            .select({
-              id: impersonationSessions.id,
-              impersonatorId: impersonationSessions.impersonatorId,
-              impersonatorScope: impersonationSessions.impersonatorScope,
-              endedAt: impersonationSessions.endedAt,
-              expiresAt: impersonationSessions.expiresAt,
-            })
-            .from(impersonationSessions)
-            .where(eq(impersonationSessions.id, sessionId))
-            .limit(1),
-          tx
-            .select({
-              id: institutesLive.id,
-              name: institutesLive.name,
-              resellerId: institutesLive.resellerId,
-            })
-            .from(institutesLive)
-            .where(eq(institutesLive.id, tenantId))
-            .limit(1),
-        ]),
-    );
+    const { targetUser, membership, session, institute } = await this.repo.findExchangeRows({
+      sessionId,
+      targetUserId,
+      targetMembershipId,
+      tenantId,
+    });
 
-    const targetUser = targetUsers[0];
     if (!targetUser)
       throw new BusinessException(ErrorCode.ACCOUNT_INACTIVE, 'Target user no longer active');
 
-    const membership = membershipRows[0];
     if (!membership)
       throw new BusinessException(
         ErrorCode.NO_ACTIVE_MEMBERSHIP,
         'Target user no longer has an active membership',
       );
 
-    const session = sessions[0];
     if (!session)
       throw new BusinessException(
         ErrorCode.IMPERSONATION_SESSION_INVALID,
@@ -447,7 +362,6 @@ export class ImpersonationService {
         'Impersonation session has ended',
       );
 
-    const institute = instituteRows[0];
     if (!institute)
       throw new BusinessException(ErrorCode.INSTITUTE_NOT_FOUND, 'Institute not found');
 
@@ -513,20 +427,7 @@ export class ImpersonationService {
     actor: AuthUser,
     meta: ImpersonationMeta,
   ): Promise<void> {
-    const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          id: impersonationSessions.id,
-          impersonatorId: impersonationSessions.impersonatorId,
-          impersonatorScope: impersonationSessions.impersonatorScope,
-          targetUserId: impersonationSessions.targetUserId,
-          targetTenantId: impersonationSessions.targetTenantId,
-          endedAt: impersonationSessions.endedAt,
-        })
-        .from(impersonationSessions)
-        .where(eq(impersonationSessions.id, sessionId))
-        .limit(1),
-    );
+    const session = await this.repo.findSessionForEnd(sessionId);
 
     if (!session) {
       throw new BusinessException(
@@ -544,15 +445,7 @@ export class ImpersonationService {
 
     const endedReason = await this.resolveEndReason(session, actor);
 
-    await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .update(impersonationSessions)
-        .set({
-          endedAt: new Date(),
-          endedReason,
-        })
-        .where(and(eq(impersonationSessions.id, sessionId), isNull(impersonationSessions.endedAt))),
-    );
+    await this.repo.endSession(sessionId, new Date(), endedReason);
 
     await invalidateImpersonationSessions(this.redis, [sessionId]);
     this.emitSessionEnded(session.id, session.targetTenantId, session.impersonatorScope);
@@ -579,23 +472,7 @@ export class ImpersonationService {
    * replicas never record the same session twice.
    */
   async expireOverdueSessions(): Promise<number> {
-    const expired = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .update(impersonationSessions)
-        .set({ endedAt: impersonationSessions.expiresAt, endedReason: 'expired' })
-        .where(
-          and(
-            isNull(impersonationSessions.endedAt),
-            lte(impersonationSessions.expiresAt, sql`now()`),
-          ),
-        )
-        .returning({
-          id: impersonationSessions.id,
-          impersonatorId: impersonationSessions.impersonatorId,
-          impersonatorScope: impersonationSessions.impersonatorScope,
-          targetTenantId: impersonationSessions.targetTenantId,
-        }),
-    );
+    const expired = await this.repo.expireOverdueSessions();
 
     for (const session of expired) {
       this.emitSessionEnded(session.id, session.targetTenantId, session.impersonatorScope);
@@ -625,153 +502,19 @@ export class ImpersonationService {
     activeOnly?: boolean;
     limit: number;
   }): Promise<ImpersonationSessionModel[]> {
-    return withAdmin(this.db, mkAdminCtx('service:impersonation-list'), async (tx) => {
-      const conditions: SQL[] = [];
-
-      if (opts.resellerId) {
-        const staff = await tx
-          .select({ userId: resellerMembershipsLive.userId })
-          .from(resellerMembershipsLive)
-          .where(eq(resellerMembershipsLive.resellerId, opts.resellerId));
-        const staffIds = staff.map((s) => s.userId);
-        if (staffIds.length === 0) return [];
-        conditions.push(inArray(impersonationSessions.impersonatorId, staffIds));
-      }
-      if (opts.sessionId) conditions.push(eq(impersonationSessions.id, opts.sessionId));
-      if (opts.activeOnly) {
-        // Active means neither ended nor past its expiry, matching `status`.
-        conditions.push(isNull(impersonationSessions.endedAt));
-        conditions.push(gt(impersonationSessions.expiresAt, new Date()));
-      }
-
-      const impersonator = alias(usersLive, 'impersonator');
-      const target = alias(usersLive, 'target_user');
-      const verifier = alias(usersLive, 'otp_verifier');
-
-      const rows = await tx
-        .select({
-          id: impersonationSessions.id,
-          impersonatorId: impersonationSessions.impersonatorId,
-          impersonatorScope: impersonationSessions.impersonatorScope,
-          impersonatorName: impersonator.username,
-          targetUserId: impersonationSessions.targetUserId,
-          targetUserName: target.username,
-          targetTenantId: impersonationSessions.targetTenantId,
-          targetTenantName: institutesLive.name,
-          reason: impersonationSessions.reason,
-          ipAddress: impersonationSessions.ipAddress,
-          userAgent: impersonationSessions.userAgent,
-          startedAt: impersonationSessions.startedAt,
-          expiresAt: impersonationSessions.expiresAt,
-          endedAt: impersonationSessions.endedAt,
-          endedReason: impersonationSessions.endedReason,
-          otpVerified: impersonationSessions.otpVerified,
-          otpVerifiedByName: verifier.username,
-        })
-        .from(impersonationSessions)
-        .leftJoin(impersonator, eq(impersonator.id, impersonationSessions.impersonatorId))
-        .leftJoin(target, eq(target.id, impersonationSessions.targetUserId))
-        .leftJoin(verifier, eq(verifier.id, impersonationSessions.otpVerifiedBy))
-        .leftJoin(institutesLive, eq(institutesLive.id, impersonationSessions.targetTenantId))
-        .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(impersonationSessions.startedAt))
-        .limit(opts.limit);
-
-      // Resolve each impersonator's role name from the membership table matching
-      // their scope (platform/reseller/institute). Batched per scope so the cost
-      // is at most three extra queries regardless of how many sessions returned.
-      const roleByScope = await this.resolveImpersonatorRoles(tx, rows);
-
-      const now = Date.now();
-      return rows.map((row) => ({
-        ...row,
-        targetTenantName: row.targetTenantName ?? null,
-        impersonatorRole: roleByScope(
-          row.impersonatorScope,
-          row.impersonatorId,
-          row.targetTenantId,
-        ),
-        status: deriveSessionStatus(row.endedAt, row.endedReason, row.expiresAt, now),
-      }));
-    });
-  }
-
-  /**
-   * Batch-resolves impersonator role names for a set of session rows. The role lives in a
-   * different membership table per scope: platform → platform_memberships, reseller →
-   * reseller_memberships, institute → memberships (scoped to the session's target tenant).
-   * Returns a lookup `(scope, userId, tenantId) => role name | null`.
-   */
-  private async resolveImpersonatorRoles(
-    tx: DrizzleDB,
-    rows: { impersonatorScope: string; impersonatorId: string; targetTenantId: string | null }[],
-  ): Promise<(scope: string, userId: string, tenantId: string | null) => I18nContent | null> {
-    const idsFor = (scope: string) => [
-      ...new Set(rows.filter((r) => r.impersonatorScope === scope).map((r) => r.impersonatorId)),
-    ];
-    const platformIds = idsFor('platform');
-    const resellerIds = idsFor('reseller');
-    const institutePairs = rows.filter(
-      (r) => r.impersonatorScope === 'institute' && r.targetTenantId,
-    );
-
-    const platformRoles = new Map<string, I18nContent>();
-    const resellerRoles = new Map<string, I18nContent>();
-    const instituteRoles = new Map<string, I18nContent>(); // key: `${userId}:${tenantId}`
-
-    if (platformIds.length) {
-      const found = await tx
-        .select({ userId: platformMembershipsLive.userId, roleName: rolesLive.name })
-        .from(platformMembershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, platformMembershipsLive.roleId))
-        .where(inArray(platformMembershipsLive.userId, platformIds));
-      for (const r of found) platformRoles.set(r.userId, r.roleName);
-    }
-
-    if (resellerIds.length) {
-      const found = await tx
-        .select({ userId: resellerMembershipsLive.userId, roleName: rolesLive.name })
-        .from(resellerMembershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, resellerMembershipsLive.roleId))
-        .where(
-          and(
-            inArray(resellerMembershipsLive.userId, resellerIds),
-            eq(resellerMembershipsLive.isActive, true),
-          ),
-        );
-      // First active reseller membership wins — display only.
-      for (const r of found)
-        if (!resellerRoles.has(r.userId)) resellerRoles.set(r.userId, r.roleName);
-    }
-
-    if (institutePairs.length) {
-      const userIds = [...new Set(institutePairs.map((p) => p.impersonatorId))];
-      const tenantIds = [...new Set(institutePairs.map((p) => p.targetTenantId as string))];
-      const found = await tx
-        .select({
-          userId: membershipsLive.userId,
-          tenantId: membershipsLive.tenantId,
-          roleName: rolesLive.name,
-        })
-        .from(membershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-        .where(
-          and(
-            inArray(membershipsLive.userId, userIds),
-            inArray(membershipsLive.tenantId, tenantIds),
-            eq(membershipsLive.status, 'ACTIVE'),
-          ),
-        );
-      for (const r of found) instituteRoles.set(`${r.userId}:${r.tenantId}`, r.roleName);
-    }
-
-    return (scope, userId, tenantId) => {
-      if (scope === 'platform') return platformRoles.get(userId) ?? null;
-      if (scope === 'reseller') return resellerRoles.get(userId) ?? null;
-      if (scope === 'institute' && tenantId)
-        return instituteRoles.get(`${userId}:${tenantId}`) ?? null;
-      return null;
-    };
+    const { rows, roles } = await this.repo.listSessions(opts);
+    const now = Date.now();
+    return rows.map((row) => ({
+      ...row,
+      targetTenantName: row.targetTenantName ?? null,
+      impersonatorRole: impersonatorRoleOf(
+        roles,
+        row.impersonatorScope,
+        row.impersonatorId,
+        row.targetTenantId,
+      ),
+      status: deriveSessionStatus(row.endedAt, row.endedReason, row.expiresAt, now),
+    }));
   }
 
   // ── Private: authorization helpers ───────────────────────
@@ -797,13 +540,7 @@ export class ImpersonationService {
     if (actor.scope !== 'reseller') return;
 
     await this.assertActiveResellerMembership(actor);
-    const [institute] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({ resellerId: institutesLive.resellerId })
-        .from(institutesLive)
-        .where(eq(institutesLive.id, pending.tenantId))
-        .limit(1),
-    );
+    const institute = await this.repo.findInstituteResellerId(pending.tenantId);
     if (institute?.resellerId !== actor.resellerId) {
       throw new BusinessException(
         ErrorCode.FORBIDDEN,
@@ -814,21 +551,12 @@ export class ImpersonationService {
 
   /** The token can be minutes old; the reseller membership must still be active now. */
   private async assertActiveResellerMembership(actor: ResellerContext): Promise<void> {
-    const [membership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({ id: resellerMembershipsLive.id })
-        .from(resellerMembershipsLive)
-        .where(
-          and(
-            eq(resellerMembershipsLive.id, actor.membershipId),
-            eq(resellerMembershipsLive.userId, actor.userId),
-            eq(resellerMembershipsLive.resellerId, actor.resellerId),
-            eq(resellerMembershipsLive.isActive, true),
-          ),
-        )
-        .limit(1),
-    );
-    if (!membership) {
+    const active = await this.repo.hasActiveResellerMembership({
+      membershipId: actor.membershipId,
+      userId: actor.userId,
+      resellerId: actor.resellerId,
+    });
+    if (!active) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 'No active reseller membership');
     }
   }
@@ -841,23 +569,9 @@ export class ImpersonationService {
   async canImpersonateInInstitute(actor: InstituteContext, targetUserId: string): Promise<boolean> {
     if (actor.isImpersonated || actor.userId === targetUserId) return false;
 
-    const targetRoles = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          name: sql<string>`${rolesLive.name}->>'en'`,
-          abilities: rolesLive.abilities,
-        })
-        .from(membershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-        .innerJoin(usersLive, eq(usersLive.id, membershipsLive.userId))
-        .where(
-          and(
-            eq(membershipsLive.userId, targetUserId),
-            eq(membershipsLive.tenantId, actor.tenantId),
-            eq(membershipsLive.status, 'ACTIVE'),
-            eq(usersLive.status, 'ACTIVE'),
-          ),
-        ),
+    const targetRoles = await this.repo.findActiveUserRolesInInstitute(
+      targetUserId,
+      actor.tenantId,
     );
     if (targetRoles.length === 0) return false;
     return (await this.intraInstituteRefusal(actor, actor.tenantId, targetRoles)) === null;
@@ -880,26 +594,11 @@ export class ImpersonationService {
   ): Promise<string | null> {
     if (actor.tenantId !== tenantId) return 'No active membership in this institute';
 
-    const [actorMembership] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          id: membershipsLive.id,
-          roleId: membershipsLive.roleId,
-          roleName: sql<string>`${rolesLive.name}->>'en'`,
-          roleAbilities: rolesLive.abilities,
-        })
-        .from(membershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-        .where(
-          and(
-            eq(membershipsLive.id, actor.membershipId),
-            eq(membershipsLive.userId, actor.userId),
-            eq(membershipsLive.tenantId, tenantId),
-            eq(membershipsLive.status, 'ACTIVE'),
-          ),
-        )
-        .limit(1),
-    );
+    const actorMembership = await this.repo.findActiveActorMembership({
+      membershipId: actor.membershipId,
+      userId: actor.userId,
+      tenantId,
+    });
 
     if (!actorMembership) return 'No active membership in this institute';
 
@@ -959,18 +658,9 @@ export class ImpersonationService {
     }
 
     if (session.impersonatorScope !== 'reseller') throw denied;
-    const [teammate] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({ id: resellerMembershipsLive.id })
-        .from(resellerMembershipsLive)
-        .where(
-          and(
-            eq(resellerMembershipsLive.userId, session.impersonatorId),
-            eq(resellerMembershipsLive.resellerId, actor.resellerId),
-            eq(resellerMembershipsLive.isActive, true),
-          ),
-        )
-        .limit(1),
+    const teammate = await this.repo.hasActiveResellerMembershipOf(
+      session.impersonatorId,
+      actor.resellerId,
     );
     if (!teammate) throw denied;
     return 'revoked';
@@ -993,40 +683,15 @@ export class ImpersonationService {
   }
 
   private async isPlatformFullAdmin(userId: string): Promise<boolean> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({ abilities: rolesLive.abilities })
-        .from(platformMembershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, platformMembershipsLive.roleId))
-        .where(
-          and(
-            eq(platformMembershipsLive.userId, userId),
-            eq(platformMembershipsLive.isActive, true),
-          ),
-        )
-        .limit(1),
-    );
-    return (row?.abilities ?? []).some(
+    const abilities = await this.repo.findPlatformRoleAbilities(userId);
+    return (abilities ?? []).some(
       (rule) => rule.action === AppAction.Manage && rule.subject === AppSubject.All,
     );
   }
 
   private async isResellerFullAdmin(userId: string, resellerId: string): Promise<boolean> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({ roleName: sql<string>`${rolesLive.name}->>'en'` })
-        .from(resellerMembershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, resellerMembershipsLive.roleId))
-        .where(
-          and(
-            eq(resellerMembershipsLive.userId, userId),
-            eq(resellerMembershipsLive.resellerId, resellerId),
-            eq(resellerMembershipsLive.isActive, true),
-          ),
-        )
-        .limit(1),
-    );
-    return row?.roleName === RESELLER_TIER_ROLE.FULL_MANAGEMENT;
+    const roleName = await this.repo.findResellerRoleName(userId, resellerId);
+    return roleName === RESELLER_TIER_ROLE.FULL_MANAGEMENT;
   }
 
   private emitSessionEnded(id: string, tenantId: string | null, impersonatorScope: string): void {
@@ -1044,30 +709,25 @@ export class ImpersonationService {
     otpVerifiedBy: string | null,
   ): Promise<string> {
     const now = new Date();
-    const [session] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .insert(impersonationSessions)
-        .values({
-          impersonatorId: request.impersonatorId,
-          impersonatorScope: request.impersonatorScope,
-          targetUserId: request.targetUserId,
-          targetTenantId: request.tenantId,
-          reason: request.reason,
-          ipAddress: request.ip,
-          userAgent: request.userAgent,
-          startedAt: now,
-          expiresAt: new Date(now.getTime() + MAX_SESSION_DURATION_MS),
-          otpVerified: otpVerifiedBy ? now : null,
-          otpVerifiedBy,
-        })
-        .returning({ id: impersonationSessions.id }),
-    );
+    const sessionId = await this.repo.createSession({
+      impersonatorId: request.impersonatorId,
+      impersonatorScope: request.impersonatorScope,
+      targetUserId: request.targetUserId,
+      targetTenantId: request.tenantId,
+      reason: request.reason,
+      ipAddress: request.ip,
+      userAgent: request.userAgent,
+      startedAt: now,
+      expiresAt: new Date(now.getTime() + MAX_SESSION_DURATION_MS),
+      otpVerified: otpVerifiedBy ? now : null,
+      otpVerifiedBy,
+    });
     this.eventBus.emit(EVENT_PATTERNS.IMPERSONATION.session_started, {
-      id: session.id,
+      id: sessionId,
       tenantId: request.tenantId,
       impersonatorScope: request.impersonatorScope,
     });
-    return session.id;
+    return sessionId;
   }
 
   // ── Private: issue exchange code ─────────────────────────
@@ -1091,44 +751,16 @@ export class ImpersonationService {
   ): Promise<string> {
     // Resolve the admin and their phone BEFORE writing to Redis: without a
     // phone the OTP cannot be delivered and the caller would wait forever.
-    const [adminRow] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          userId: membershipsLive.userId,
-        })
-        .from(membershipsLive)
-        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
-        .where(
-          and(
-            eq(membershipsLive.tenantId, request.tenantId),
-            eq(membershipsLive.status, 'ACTIVE'),
-            sql`${rolesLive.name}->>'en' = ${DefaultRoles.InstituteAdmin}`,
-          ),
-        )
-        // Longest-standing admin, so the recipient is the same on every request.
-        .orderBy(asc(membershipsLive.createdAt), asc(membershipsLive.id))
-        .limit(1),
-    );
+    const adminUserId = await this.repo.findInstituteAdminUserId(request.tenantId);
 
-    if (!adminRow) {
+    if (adminUserId === null) {
       throw new BusinessException(
         ErrorCode.IMPERSONATION_CONSENT_UNAVAILABLE,
         'Cannot request impersonation consent — institute has no active institute_admin',
       );
     }
 
-    const [phoneRow] = await withAdmin(this.db, mkAdminCtx('service:impersonation'), (tx) =>
-      tx
-        .select({
-          countryCode: phoneNumbersLive.countryCode,
-          number: phoneNumbersLive.number,
-        })
-        .from(phoneNumbersLive)
-        .where(
-          and(eq(phoneNumbersLive.userId, adminRow.userId), eq(phoneNumbersLive.isPrimary, true)),
-        )
-        .limit(1),
-    );
+    const phoneRow = await this.repo.findPrimaryPhone(adminUserId);
 
     if (!phoneRow) {
       throw new BusinessException(
@@ -1141,7 +773,7 @@ export class ImpersonationService {
     const requestId = randomUUID();
     const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
 
-    const pending: PendingOtp = { ...request, otp, verifierUserId: adminRow.userId };
+    const pending: PendingOtp = { ...request, otp, verifierUserId: adminUserId };
     await this.redis.set(
       `${REDIS_KEYS.IMPERSONATION_OTP}${requestId}`,
       JSON.stringify(pending),
@@ -1151,7 +783,7 @@ export class ImpersonationService {
 
     const event: AuthSecurityEvent = {
       tenantId: request.tenantId,
-      userId: adminRow.userId,
+      userId: adminUserId,
       eventType: 'IMPERSONATION_OTP',
       metadata: {
         otp,

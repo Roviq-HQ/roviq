@@ -2,34 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { hash } from '@node-rs/argon2';
 import type { AbilityRule, AuthScope } from '@roviq/common-types';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  memberships,
-  membershipsLive,
-  mkAdminCtx,
-  mkInstituteCtx,
-  mkResellerCtx,
-  phoneNumbers,
-  phoneNumbersLive,
-  platformMemberships,
-  refreshTokens,
-  resellerMemberships,
-  resellerMembershipsLive,
-  userProfiles,
-  userProfilesLive,
-  users,
-  usersLive,
-  withAdmin,
-  withReseller,
-  withTenant,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { NOTIFICATION_SUBJECTS } from '@roviq/notifications';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import type Redis from 'ioredis';
-import { ensureTenantUserProfile } from './tenant-user-profile';
+import { IdentityRepository } from './repositories/identity.repository';
 import { recordTokenVersion } from './token-version-cache';
 
 export interface CreateUserInput {
@@ -130,7 +107,7 @@ export type EmailUserResolution =
 @Injectable()
 export class IdentityService {
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: IdentityRepository,
     private readonly eventBus: EventBusService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     // private readonly authEventService: AuthEventService, // TODO: Add this back in when we have a way to emit the event
@@ -145,18 +122,7 @@ export class IdentityService {
   ): Promise<
     { userId: string; isDeleted: boolean; isEmailVerified: boolean; createdBy: string }[]
   > {
-    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
-        .select({
-          id: users.id,
-          deletedAt: users.deletedAt,
-          emailVerifiedAt: users.emailVerifiedAt,
-          createdBy: users.createdBy,
-        })
-        .from(users) // allow-base-read: a soft-deleted user still owns its email
-        .where(sql`lower(${users.email}) = lower(${email})`)
-        .orderBy(users.id),
-    );
+    const rows = await this.repo.findUsersByEmail(email);
     return rows.map((r) => ({
       userId: r.id,
       isDeleted: r.deletedAt !== null,
@@ -167,14 +133,7 @@ export class IdentityService {
 
   /** Whether any user, soft-deleted included, already has this Roviq ID. */
   async isUsernameTaken(username: string): Promise<boolean> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
-        .select({ id: users.id })
-        .from(users) // allow-base-read: a soft-deleted user still owns its username
-        .where(eq(users.username, username))
-        .limit(1),
-    );
-    return row !== undefined;
+    return this.repo.usernameExists(username);
   }
 
   /**
@@ -182,20 +141,7 @@ export class IdentityService {
    * typed one is contact data and may repeat across users.
    */
   async isPhoneTaken(phone: { countryCode: string; number: string }): Promise<boolean> {
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
-        .select({ id: phoneNumbersLive.id })
-        .from(phoneNumbersLive)
-        .where(
-          and(
-            eq(phoneNumbersLive.countryCode, phone.countryCode),
-            eq(phoneNumbersLive.number, phone.number),
-            eq(phoneNumbersLive.isVerified, true),
-          ),
-        )
-        .limit(1),
-    );
-    return row !== undefined;
+    return this.repo.verifiedPhoneExists(phone);
   }
 
   /**
@@ -251,52 +197,27 @@ export class IdentityService {
   ): Promise<void> {
     const i18n = (value: string | Record<string, string>) =>
       typeof value === 'string' ? { en: value } : value;
-    await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
-        .insert(userProfiles)
-        .values({
-          userId,
-          firstName: i18n(name.firstName),
-          lastName: name.lastName ? i18n(name.lastName) : null,
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .onConflictDoNothing(),
-    );
+    await this.repo.insertUserProfileIfMissing({
+      userId,
+      firstName: i18n(name.firstName),
+      lastName: name.lastName ? i18n(name.lastName) : null,
+      actorId,
+    });
   }
 
   /** Email, name and primary phone of a live user; null when the user is gone. */
   async findUserContact(userId: string): Promise<UserContact | null> {
-    return withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-      const [user] = await tx
-        .select({
-          email: usersLive.email,
-          username: usersLive.username,
-          mustChangePassword: usersLive.mustChangePassword,
-          firstName: userProfilesLive.firstName,
-          lastName: userProfilesLive.lastName,
-        })
-        .from(usersLive)
-        .leftJoin(userProfilesLive, eq(userProfilesLive.userId, usersLive.id))
-        .where(eq(usersLive.id, userId))
-        .limit(1);
-      if (!user) return null;
-      const [phone] = await tx
-        .select({ countryCode: phoneNumbersLive.countryCode, number: phoneNumbersLive.number })
-        .from(phoneNumbersLive)
-        .where(eq(phoneNumbersLive.userId, userId))
-        .orderBy(desc(phoneNumbersLive.isPrimary), asc(phoneNumbersLive.createdAt))
-        .limit(1);
-      return {
-        userId,
-        email: user.email,
-        username: user.username,
-        mustChangePassword: user.mustChangePassword,
-        firstName: user.firstName ? pickName(user.firstName) : null,
-        lastName: user.lastName ? pickName(user.lastName) : null,
-        phone: phone ?? null,
-      };
-    });
+    const user = await this.repo.findUserContact(userId);
+    if (!user) return null;
+    return {
+      userId,
+      email: user.email,
+      username: user.username,
+      mustChangePassword: user.mustChangePassword,
+      firstName: user.firstName ? pickName(user.firstName) : null,
+      lastName: user.lastName ? pickName(user.lastName) : null,
+      phone: user.phone,
+    };
   }
 
   /**
@@ -304,15 +225,7 @@ export class IdentityService {
    * and phone were typed by the reseller's own staff; any other account's are not theirs to see.
    */
   async wasCreatedByReseller(userId: string, resellerId: string): Promise<boolean> {
-    const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
-      tx
-        .select({ id: usersLive.id })
-        .from(usersLive)
-        .innerJoin(resellerMembershipsLive, eq(resellerMembershipsLive.userId, usersLive.createdBy))
-        .where(and(eq(usersLive.id, userId), eq(resellerMembershipsLive.resellerId, resellerId)))
-        .limit(1),
-    );
-    return rows.length > 0;
+    return this.repo.wasCreatedByReseller(userId, resellerId);
   }
 
   /**
@@ -325,26 +238,7 @@ export class IdentityService {
     const passwordHash = await hash(tempPassword);
     // Same three steps as a password change: whoever holds the old temporary password must
     // lose the sessions it opened, not only the password.
-    const tokenVersion = await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-      const [row] = await tx
-        .update(users)
-        .set({
-          passwordHash,
-          mustChangePassword: true,
-          tokenVersion: sql`${users.tokenVersion} + 1`,
-          updatedBy: actorId,
-        })
-        .where(
-          and(eq(users.id, userId), eq(users.mustChangePassword, true), isNull(users.deletedAt)),
-        )
-        .returning({ tokenVersion: users.tokenVersion });
-      if (!row) return null;
-      await tx
-        .update(refreshTokens)
-        .set({ revokedAt: new Date(), revokedReason: 'password_change' })
-        .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
-      return row.tokenVersion;
-    });
+    const tokenVersion = await this.repo.replaceTempPassword(userId, passwordHash, actorId);
     if (tokenVersion === null) return null;
     await recordTokenVersion(this.redis, userId, tokenVersion);
     return tempPassword;
@@ -356,145 +250,67 @@ export class IdentityService {
     tenantId: string,
     roleId: string,
   ): Promise<{ membershipId: string } | null> {
-    const [row] = await withTenant(this.db, mkInstituteCtx(tenantId, 'service:identity'), (tx) =>
-      tx
-        .select({ id: membershipsLive.id })
-        .from(membershipsLive)
-        .where(
-          and(
-            eq(membershipsLive.userId, userId),
-            eq(membershipsLive.tenantId, tenantId),
-            eq(membershipsLive.roleId, roleId),
-          ),
-        )
-        .limit(1),
-    );
-    return row ? { membershipId: row.id } : null;
+    const membershipId = await this.repo.findInstituteMembershipId(userId, tenantId, roleId);
+    return membershipId !== null ? { membershipId } : null;
   }
 
   async createUser(input: CreateUserInput): Promise<CreateUserResult> {
     const tempPassword = randomBytes(16).toString('base64url');
     const passwordHash = await hash(tempPassword);
 
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-      return tx
-        .insert(users)
-        .values({
-          createdBy: input.actorId,
-          updatedBy: input.actorId,
-          email: input.email,
-          username: input.username,
-          passwordHash,
-          mustChangePassword: true,
-        })
-        .returning({ id: users.id });
+    const userId = await this.repo.insertUser({
+      email: input.email,
+      username: input.username,
+      passwordHash,
+      actorId: input.actorId,
     });
 
     if (input.phone) {
-      const phone = input.phone;
-      await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-        await tx
-          .insert(phoneNumbers)
-          .values({
-            createdBy: input.actorId,
-            updatedBy: input.actorId,
-            userId: row.id,
-            countryCode: phone.countryCode,
-            number: phone.number,
-            isPrimary: true,
-            label: 'personal',
-          })
-          .onConflictDoNothing();
+      await this.repo.insertPrimaryPhone({
+        userId,
+        countryCode: input.phone.countryCode,
+        number: input.phone.number,
+        actorId: input.actorId,
       });
     }
 
-    return { userId: row.id, tempPassword };
+    return { userId, tempPassword };
   }
 
   async createMembership(input: CreateMembershipInput): Promise<CreateMembershipResult> {
     if (input.scope === 'institute') {
       if (!input.tenantId) throw new Error('tenantId is required for institute-scope membership');
-      const tenantId = input.tenantId;
-      const [row] = await withTenant(
-        this.db,
-        mkInstituteCtx(tenantId, 'service:identity'),
-        async (tx) => {
-          const [membership] = await tx
-            .insert(memberships)
-            .values({
-              userId: input.userId,
-              tenantId,
-              roleId: input.roleId,
-              status: 'ACTIVE',
-              abilities: input.abilities ?? [],
-              createdBy: input.actorId,
-              updatedBy: input.actorId,
-            })
-            .returning({ id: memberships.id });
-          // The institute's own copy of the person's name starts from the account name.
-          const [account] = await tx
-            .select({
-              firstName: userProfilesLive.firstName,
-              lastName: userProfilesLive.lastName,
-            })
-            .from(userProfilesLive)
-            .where(eq(userProfilesLive.userId, input.userId))
-            .limit(1);
-          if (account) {
-            await ensureTenantUserProfile(tx, {
-              tenantId,
-              userId: input.userId,
-              actorId: input.actorId,
-              firstName: account.firstName,
-              lastName: account.lastName,
-            });
-          }
-          return [membership];
-        },
-      );
-      return { membershipId: row.id, scope: 'institute' };
+      const membershipId = await this.repo.insertInstituteMembership({
+        userId: input.userId,
+        tenantId: input.tenantId,
+        roleId: input.roleId,
+        abilities: input.abilities ?? [],
+        actorId: input.actorId,
+      });
+      return { membershipId, scope: 'institute' };
     }
 
     if (input.scope === 'reseller') {
       if (!input.resellerId)
         throw new Error('resellerId is required for reseller-scope membership');
-      const resellerId = input.resellerId;
-      const [row] = await withReseller(
-        this.db,
-        mkResellerCtx(resellerId, 'service:identity'),
-        async (tx) => {
-          return tx
-            .insert(resellerMemberships)
-            .values({
-              createdBy: input.actorId,
-              updatedBy: input.actorId,
-              userId: input.userId,
-              resellerId,
-              roleId: input.roleId,
-              isActive: true,
-              abilities: input.abilities ?? [],
-            })
-            .returning({ id: resellerMemberships.id });
-        },
-      );
-      return { membershipId: row.id, scope: 'reseller' };
+      const membershipId = await this.repo.insertResellerMembership({
+        userId: input.userId,
+        resellerId: input.resellerId,
+        roleId: input.roleId,
+        abilities: input.abilities ?? [],
+        actorId: input.actorId,
+      });
+      return { membershipId, scope: 'reseller' };
     }
 
     // platform
-    const [row] = await withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
-      return tx
-        .insert(platformMemberships)
-        .values({
-          createdBy: input.actorId,
-          updatedBy: input.actorId,
-          userId: input.userId,
-          roleId: input.roleId,
-          isActive: true,
-          abilities: input.abilities ?? [],
-        })
-        .returning({ id: platformMemberships.id });
+    const membershipId = await this.repo.insertPlatformMembership({
+      userId: input.userId,
+      roleId: input.roleId,
+      abilities: input.abilities ?? [],
+      actorId: input.actorId,
     });
-    return { membershipId: row.id, scope: 'platform' };
+    return { membershipId, scope: 'platform' };
   }
 
   async createUserWithMembership(
