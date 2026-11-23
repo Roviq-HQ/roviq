@@ -769,6 +769,42 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       expect(provider.requests).toHaveLength(0);
     });
 
+    it('should honour a stop request that came without a phone as soon as a report ties the person to one', async () => {
+      const platform = await addSender({ scope: 'platform' });
+      await post(
+        envelope(platform.numberId, {
+          contacts: [{ user_id: 'provider-user-late' }],
+          messages: [
+            {
+              id: 'in.stop-first',
+              from_user_id: 'provider-user-late',
+              type: 'text',
+              text: { body: 'STOP' },
+            },
+          ],
+        }),
+      );
+      const optOuts = await superPool.query(
+        'SELECT recipient_phone, provider_user_id FROM messaging_opt_outs WHERE sender_id = $1',
+        [platform.id],
+      );
+      expect(optOuts.rows).toEqual([
+        { recipient_phone: null, provider_user_id: 'provider-user-late' },
+      ]);
+
+      // Nothing ties the person to a phone yet, so this one cannot be stopped.
+      await expect(send(instituteA, userA)).resolves.toBe('SENT');
+      await post(
+        report(platform.numberId, provider.lastMessageId(), 'delivered', phoneA.full, {
+          recipient_user_id: 'provider-user-late',
+        }),
+      );
+
+      await expect(send(instituteA, userA)).resolves.toBe('SKIPPED');
+      await expect(send(instituteB, userB)).resolves.toBe('SENT');
+      expect((await deliveries(userA.userId)).at(-1)).toMatchObject({ skip_reason: 'opted_out' });
+    });
+
     it('should find the phone of a person who writes without one from an earlier delivery report', async () => {
       const platform = await addSender({ scope: 'platform' });
       await send(instituteA, userA);
