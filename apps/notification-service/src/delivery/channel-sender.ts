@@ -71,6 +71,7 @@ export class ChannelSender {
           channel: a.channel,
           type: a.type,
           tenantId: a.audience.tenantId,
+          studentMembershipId: a.data.studentId ?? null,
         }),
       hasProvider: adapter !== null,
       resolveAddresses: async () => {

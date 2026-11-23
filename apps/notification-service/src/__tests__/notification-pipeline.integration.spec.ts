@@ -47,11 +47,12 @@ import type { ChannelAdapter, ChannelMessage } from '../delivery/adapters/channe
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
-import { AllowAllConsentGate } from '../delivery/consent-gate';
+import { GuardianConsentGate } from '../delivery/consent-gate';
 import { AttendanceListener } from '../listeners/attendance.listener';
 import { AuthListener } from '../listeners/auth.listener';
 import { LeaveListener } from '../listeners/leave.listener';
 import { UserListener } from '../listeners/user.listener';
+import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { NotificationConfigReadDrizzleRepository } from '../repositories/notification-config-read.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
@@ -111,6 +112,8 @@ describe('notification pipeline (integration)', () => {
   let foreignInstitute: TestInstitute;
   let student: TestTeacher;
   let guardian: TestTeacher;
+  let studentProfileId: string;
+  let guardianProfileId: string;
   const userIds: string[] = [];
   const extraTeachers: TestTeacher[] = [];
 
@@ -232,6 +235,8 @@ describe('notification pipeline (integration)', () => {
         })
         .returning({ id: guardianProfiles.id });
       assert(studentProfile && guardianProfile);
+      studentProfileId = studentProfile.id;
+      guardianProfileId = guardianProfile.id;
       await tx.insert(studentGuardianLinks).values({
         ...by,
         tenantId: institute.tenantId,
@@ -246,7 +251,7 @@ describe('notification pipeline (integration)', () => {
     const recipients = new RecipientReadDrizzleRepository(db);
     sender = new ChannelSender(
       new ChannelAdapters([email, sms]),
-      new AllowAllConsentGate(),
+      new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
       contacts,
       writes,
     );
@@ -285,6 +290,9 @@ describe('notification pipeline (integration)', () => {
       userIds,
     ]);
     await superPool.query('DELETE FROM notifications WHERE recipient_user_id = ANY($1)', [userIds]);
+    await superPool.query('DELETE FROM consent_records WHERE guardian_profile_id = $1', [
+      guardianProfileId,
+    ]);
     await withAdmin(db, mkAdminCtx(CTX), async (tx) => {
       await tx
         .delete(instituteNotificationConfigs)
@@ -524,6 +532,144 @@ describe('notification pipeline (integration)', () => {
       expect(await deliveriesFor(staff.userId)).toEqual([]);
       expect(temporal.startWorkflowOnce).not.toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('WhatsApp consent (ROV-269)', () => {
+    const whatsapp = new RecordingAdapter('WHATSAPP');
+    let consentSender: ChannelSender;
+
+    /** Appends one consent row as the superuser; the table is append-only for the app role. */
+    async function recordConsent(isGranted: boolean, tenantId = institute.tenantId) {
+      await superPool.query(
+        `INSERT INTO consent_records
+           (tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted)
+         VALUES ($1, $2, $3, 'whatsapp_communication', $4)`,
+        [tenantId, guardianProfileId, studentProfileId, isGranted],
+      );
+    }
+
+    function send(channel: 'WHATSAPP' | 'EMAIL', data: Record<string, string>) {
+      return consentSender.attempt({
+        type: 'ATTENDANCE_ABSENT',
+        channel,
+        audience: { scope: 'institute', tenantId: institute.tenantId, resellerId: null },
+        recipientUserId: guardian.userId,
+        notificationId: null,
+        channelEnabled: true,
+        attempt: 1,
+        address: { given: channel === 'EMAIL' ? 'guardian@example.in' : '+919876543210' },
+        data,
+        compose: () => ({ subject: 'Absent today', body: 'Aarav was marked absent.' }),
+      });
+    }
+    const aboutStudent = () => ({ studentId: student.membershipId });
+
+    beforeAll(() => {
+      consentSender = new ChannelSender(
+        new ChannelAdapters([email, whatsapp]),
+        new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
+        new ContactReadDrizzleRepository(db),
+        new NotificationWriteDrizzleRepository(db),
+      );
+    });
+
+    beforeEach(() => {
+      whatsapp.sent.length = 0;
+    });
+
+    it('should follow the latest consent row: none, granted, withdrawn, granted again', async () => {
+      const blocked = { status: 'SKIPPED', provider: null, skipReason: 'no_consent' };
+      const whatsappRows = async () =>
+        (await deliveriesFor(guardian.userId)).filter((d) => d.channel === 'WHATSAPP');
+      const before = (await whatsappRows()).length;
+
+      // Another institute's row for the same pair must not count: RLS hides it.
+      await recordConsent(true, foreignInstitute.tenantId);
+      expect(await send('WHATSAPP', aboutStudent())).toEqual(blocked);
+      // Other channels are not gated by this consent.
+      expect((await send('EMAIL', aboutStudent())).status).toBe('SENT');
+
+      await recordConsent(true);
+      expect((await send('WHATSAPP', aboutStudent())).status).toBe('SENT');
+
+      await recordConsent(false);
+      expect(await send('WHATSAPP', aboutStudent())).toEqual(blocked);
+      // A message about no particular student has no granted pair to rely on either.
+      expect(await send('WHATSAPP', {})).toEqual(blocked);
+
+      await recordConsent(true);
+      expect((await send('WHATSAPP', aboutStudent())).status).toBe('SENT');
+      expect((await send('WHATSAPP', {})).status).toBe('SENT');
+
+      expect(whatsapp.sent).toHaveLength(3);
+      const rows = (await whatsappRows()).slice(before);
+      expect(rows.map((d) => [d.status, d.skip_reason])).toEqual([
+        ['SKIPPED', 'no_consent'],
+        ['SENT', null],
+        ['SKIPPED', 'no_consent'],
+        ['SKIPPED', 'no_consent'],
+        ['SENT', null],
+        ['SENT', null],
+      ]);
+    });
+
+    it('should block a message about a student of another institute', async () => {
+      const outcome = await send('WHATSAPP', { studentId: foreignInstitute.membershipId });
+
+      expect(outcome).toEqual({ status: 'SKIPPED', provider: null, skipReason: 'no_consent' });
+      expect(whatsapp.sent).toEqual([]);
+    });
+
+    it('should not gate a recipient who is not a guardian of the institute', async () => {
+      const outcome = await consentSender.attempt({
+        type: 'APPROVAL_REQUEST',
+        channel: 'WHATSAPP',
+        audience: { scope: 'institute', tenantId: institute.tenantId, resellerId: null },
+        recipientUserId: student.userId,
+        notificationId: null,
+        channelEnabled: true,
+        attempt: 1,
+        address: { given: '+919876500000' },
+        data: {},
+        compose: () => ({ subject: 'Approval needed', body: 'A leave request is waiting.' }),
+      });
+
+      expect(outcome.status).toBe('SENT');
+    });
+
+    it('should not let consent for one child cover a message about another', async () => {
+      // The guardian's consent for the first student is granted (previous test). Link a second.
+      const sibling = await createTestTeacher(db, institute.tenantId);
+      extraTeachers.push(sibling);
+      userIds.push(sibling.userId);
+      await withAdmin(db, mkAdminCtx(CTX), async (tx) => {
+        const [siblingProfile] = await tx
+          .insert(studentProfiles)
+          .values({
+            ...by,
+            tenantId: institute.tenantId,
+            userId: sibling.userId,
+            membershipId: sibling.membershipId,
+            admissionNumber: `ROV269-${sibling.membershipId.slice(-6)}`,
+            admissionDate: '2025-04-01',
+          })
+          .returning({ id: studentProfiles.id });
+        assert(siblingProfile);
+        await tx.insert(studentGuardianLinks).values({
+          ...by,
+          tenantId: institute.tenantId,
+          studentProfileId: siblingProfile.id,
+          guardianProfileId,
+          relationship: GuardianRelationship.FATHER,
+        });
+      });
+      const blocked = { status: 'SKIPPED', provider: null, skipReason: 'no_consent' };
+
+      expect((await send('WHATSAPP', aboutStudent())).status).toBe('SENT');
+      expect(await send('WHATSAPP', { studentId: sibling.membershipId })).toEqual(blocked);
+      // A message that names no student needs every linked student granted.
+      expect(await send('WHATSAPP', {})).toEqual(blocked);
     });
   });
 
