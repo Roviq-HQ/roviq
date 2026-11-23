@@ -5,7 +5,7 @@
 > CLAUDE.md contains concise one-liners; this file contains full detail.
 > Before committing, verify both files have the same set of tags.
 >
-> **Lookup**: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules-reference.md`
+> **Lookup**: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules.md`
 
 ---
 

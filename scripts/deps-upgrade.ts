@@ -218,7 +218,7 @@ You are done when **all** of these hold:
 
 - Node 24, pnpm@10.33.0
 - Root package.json holds all app deps; workspaces are \`libs/*\` and \`ee/*\`
-- Hard rules at \`docs/references/hard-rules-reference.md\` — tags [NWKRD] (no workarounds) and [NTESC] (no type escape hatches) are the canonical statements of the forbidden patterns above
+- Hard rules at \`docs/references/hard-rules.md\` — tags [NWKRD] (no workarounds) and [NTESC] (no type escape hatches) are the canonical statements of the forbidden patterns above
 - Conventions at \`CLAUDE.md\` (root) — respect them
 - Budget cap: $${budgetUsd} (safety limit, not target)
 

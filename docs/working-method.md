@@ -74,7 +74,7 @@ before pushing: fixtures written before the rebase may no longer match the schem
 
 ## Working with subagents
 
-The split of work between models is rule `[MDLSP]` (`docs/references/hard-rules-reference.md`).
+The split of work between models is rule `[MDLSP]` (`docs/references/hard-rules.md`).
 These are the pace rules that go with it.
 
 - **Prove the instance is usable before sending an agent to it**: the gateway answers 200, the

@@ -1,12 +1,5 @@
 # Authentication & Authorization
 
-## Recent additions
-
-- **ROV-93** — Scope-prefixed impersonation mutations. The flat `startImpersonation` / `verifyImpersonationOtp` / `endImpersonation` resolvers are gone. Each scope owns its own mutations (see Impersonation).
-- **ROV-94** — Cross-scope impersonation OTP gate. Reseller-scope impersonation always requires an OTP; platform-scope honours the new `institutes.require_impersonation_consent` boolean.
-- **ROV-96** — `mustChangePassword` invariant + `MustChangePasswordGuard`. Every login that flips the JWT bit forces the user through `changePassword` before any other resolver responds.
-- **ROV-209** — Brute-force lockout via `LoginLockoutService` (Redis sliding window) + `IdentityService` boundary for all user/membership writes.
-
 ## Data Model
 
 - **User** — platform-level (no RLS), globally unique username/email. No tenantId/roleId.
@@ -16,8 +9,6 @@
   - `memberships` — User↔Institute with role. Tenant-scoped (RLS). Holds per-member `abilities` overrides. `roviq_reseller` reads the rows of its own institutes and cannot write. A platform role never lives here: migration `rov-88-platform-membership-backfill` moves any such row into `platform_memberships`.
 - **AuthProvider** — platform-level, tracks auth methods per user (password, passkey, OAuth — future).
 - **RefreshToken** — stores `membership_scope` ('platform'|'reseller'|'institute') + `membership_id` (polymorphic, references the scope's membership table).
-
-Design doc: `docs/plans/2026-03-06-user-identity-auth-redesign.md`
 
 ## Error Codes
 
@@ -238,8 +229,6 @@ Behaviour:
 - Username matching is case-insensitive (`usernameLower`) so attackers cannot defeat the counter by toggling case.
 
 ## Impersonation
-
-> Source-of-truth detail: `docs/plans/auth-final-prd.md` §12.
 
 ### Mutations (ROV-93)
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
 const RULES_PATH = path.join(ROOT, 'CLAUDE.md');
-const REF_PATH = path.join(ROOT, 'docs/references/hard-rules-reference.md');
+const REF_PATH = path.join(ROOT, 'docs/references/hard-rules.md');
 
 const INLINE_TAG_RE = /\[([A-Z]{5})\]/g;
 const HEADING_TAG_RE = /^###\s+\[([A-Z]{5})\]/gm;

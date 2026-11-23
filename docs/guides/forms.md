@@ -2,7 +2,7 @@
 
 Every form in Roviq uses the `@roviq/ui` form kit, which wraps `@tanstack/react-form` with typed field components, the Roviq `Field`/`FieldLabel`/`FieldError` shells, and schema helpers in `@roviq/i18n`.
 
-No other form library is supported. `react-hook-form` was fully retired in the TanStack-form migration (see [superpowers/specs/2026-04-16-tanstack-form-migration-design.md](superpowers/specs/2026-04-16-tanstack-form-migration-design.md)).
+No other form library is supported. `react-hook-form` was fully retired in the TanStack-form migration.
 
 ## Quick start
 

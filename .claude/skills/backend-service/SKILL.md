@@ -64,7 +64,7 @@ One source in `@roviq/common-types` (`X_VALUES` tuple, type, and value object), 
 - A new subject: add it to `EVENT_PATTERNS` and its Zod schema to `event-schemas.ts` (`libs/backend/nats-jetstream/src/streams/`); its prefix must have a stream. Name it `ENTITY.action`, snake_case for new actions. Always include `tenantId`.
 - Emit **after** the transaction commits, and do not await it.
 - The payload is also published to the in-process GraphQL pubsub. Never put a secret in a payload that a subscription could select.
-- A consumer is a class with `@EventPattern(EVENT_PATTERNS.X.y, gatewayConsumer(pattern))` listed in a module's **`controllers`**; the app's `main.ts` calls `connectJetStreamMicroservice()`. Parse the payload with `eventPayloadSchemas[pattern].parse(data)`. Handlers must be safe to run twice: delivery is at least once. Streams are work queues: one durable per subject, shared by all handlers of that subject. (`pnpm check:event-handlers`, `docs/nats-jetstream.md`.)
+- A consumer is a class with `@EventPattern(EVENT_PATTERNS.X.y, gatewayConsumer(pattern))` listed in a module's **`controllers`**; the app's `main.ts` calls `connectJetStreamMicroservice()`. Parse the payload with `eventPayloadSchemas[pattern].parse(data)`. Handlers must be safe to run twice: delivery is at least once. Streams are work queues: one durable per subject, shared by all handlers of that subject. (`pnpm check:event-handlers`, `docs/guides/events.md`.)
 
 ## Who owns which tables
 

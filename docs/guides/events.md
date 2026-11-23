@@ -1,8 +1,6 @@
-# @roviq/nats-jetstream — Usage Guide
+# Events: publishing and consuming with `@roviq/nats-jetstream`
 
 NestJS custom transport for NATS JetStream. Provides `@EventPattern`/`@MessagePattern` decorator support with durable pull consumers, automatic context propagation, DLQ, retry with exponential backoff, and concurrency control.
-
-**Replaces:** `@roviq/nats-utils` (deleted)
 
 ## Quick Start
 

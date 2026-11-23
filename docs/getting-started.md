@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24 (the version in `.nvmrc`)
 - pnpm (package manager)
 - Docker Desktop
 - [Tilt](https://docs.tilt.dev/install.html) (dev environment orchestrator)
@@ -25,8 +25,8 @@ Open the Tilt UI at http://localhost:10350 to monitor all resources.
 
 ## Test Credentials
 
-| Username | Password | Role | Orgs |
-|----------|----------|------|------|
+| Username | Password | Role | Institutes |
+|----------|----------|------|------------|
 | admin | admin123 | institute_admin | 2 institutes (shows institute picker) |
 | teacher1 | teacher123 | teacher | 1 institute (direct login) |
 | student1 | student123 | student | 1 institute (direct login) |
@@ -51,7 +51,7 @@ open http://localhost:3005/api/graphql
 curl http://localhost:3005/api/health
 
 # Observability (also accessible via web app → Observability)
-open http://localhost:3001/d/roviq-overview  # Grafana dashboard
+open http://localhost:3001                   # Grafana
 open http://localhost:9090                   # Prometheus
 open http://localhost:3200                   # Tempo
 
@@ -77,16 +77,13 @@ curl -s http://localhost:3005/api/graphql -X POST \
   -d '{"query":"mutation { adminLogin(username: \"admin\", password: \"admin123\") { accessToken user { username scope } } }"}'
 ```
 
-## Running Tests
+## Running tests
 
 ```bash
-pnpm run test                     # unit + integration (nx run-many -t test)
-pnpm run test:int                 # integration tests only (real DB, roviq_test)
-pnpm run test:e2e:api             # Vitest E2E API (requires pnpm e2e:up)
-pnpm run test:e2e:ui              # Playwright UI tests across 3 portals (requires pnpm e2e:up)
-pnpm run test:all                 # full pipeline: unit + int + e2e:api + e2e:ui
-nx affected -t test               # only changed projects
+pnpm run test        # unit tests of every project
 ```
+
+Integration and end-to-end tests need their own stack. Every command is in [testing.md](testing.md#commands).
 
 ## Dev Scripts
 

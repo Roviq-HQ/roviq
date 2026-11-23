@@ -17,7 +17,7 @@ import { RESILIENT_NATS_OPTIONS } from '../connection-options';
  * Extends ClientNats to reuse connection lifecycle, serialization,
  * and request/response (send). Overrides emit/dispatchEvent for JetStream.
  *
- * @see docs/superpowers/specs/2026-03-17-nats-jetstream-transport-design.md
+ * @see docs/guides/events.md
  */
 export class JetStreamClient extends ClientNats {
   protected override readonly logger = new Logger(JetStreamClient.name);

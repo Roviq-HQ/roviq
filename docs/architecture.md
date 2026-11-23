@@ -1,75 +1,124 @@
 # Architecture
 
-## Monorepo Structure
+## System overview
+
+```mermaid
+flowchart LR
+  browser[Browser] -->|pages| web[web<br/>Next.js, three portals]
+  browser -->|GraphQL over HTTP and WebSocket| api[api-gateway<br/>NestJS]
+  api --> pg[(PostgreSQL 18<br/>row-level security)]
+  api --> redis[(Redis)]
+  api --> s3[(Object storage<br/>S3-compatible)]
+  api <--> temporal[Temporal<br/>workflows]
+  api -->|events| nats[NATS JetStream]
+  nats --> api
+  nats --> notif[notification-service<br/>NestJS]
+  notif --> pg
+  notif --> out[Email, push]
+```
+
+- **web** renders the three portals and picks one from the host name. The browser then talks to
+  the API directly.
+- **api-gateway** is the only public backend. Every request carries a token of one scope
+  (platform, reseller or institute) and runs in the database as that scope's role
+  ([auth.md](auth.md)). Temporal workers run inside this process.
+- **PostgreSQL** holds all institutes in one database and keeps them apart with row-level
+  security ([security.md](security.md)).
+- **NATS JetStream** carries domain events. The gateway consumes them for the audit log and for
+  work that follows a change; **notification-service** consumes them to deliver notifications
+  ([guides/events.md](guides/events.md)).
+- **Redis** holds short-lived state: cached role abilities, login lockouts, one-time tickets.
+- **Object storage** holds uploaded and generated files; the gateway signs a link per file.
+
+## Repository layout
 
 ```text
 roviq/
 ├── apps/
-│   ├── api-gateway/          # NestJS — GraphQL API entry point
-│   │   └── src/
-│   │       ├── admin/            # Platform-scope resolvers (@PlatformScope)
-│   │       │   ├── institute/    # Admin institute CRUD, lifecycle, statistics
-│   │       │   ├── reseller/     # Admin reseller management
-│   │       │   ├── audit/        # adminAuditLogs, adminAuthEvents
-│   │       │   └── dlq/          # Dead-letter queue list, replay, discard
-│   │       ├── reseller/         # Reseller-scope resolvers (@ResellerScope)
-│   │       │   ├── institute/    # Reseller institute requests, suspend/reactivate
-│   │       │   ├── institute-group/  # Reseller group management
-│   │       │   └── audit/        # resellerAuditLogs
-│   │       ├── institute/        # Institute-scope resolvers (@InstituteScope)
-│   │       │   ├── management/   # Institute CRUD, branding, config
-│   │       │   ├── standard/     # Grade levels
-│   │       │   ├── section/      # Class sections
-│   │       │   ├── subject/      # Subjects & curriculum
-│   │       │   ├── academic-year/    # Academic year lifecycle
-│   │       │   ├── institute-group/  # Institute group service, models (shared with admin/reseller)
-│   │       │   ├── role/             # Institute roles and primary nav
-│   │       │   ├── notification-config/  # Tenant notification channels
-│   │       │   ├── audit/        # auditLogs, entityAuditTimeline
-│   │       │   └── setup/        # Temporal InstituteSetupWorkflow
-│   │       ├── auth/             # JWT, login, impersonation, auth events, repositories, ws-ticket
-│   │       ├── notification-inbox/  # Every scope's own in-app inbox, live feed, push device tokens
-│   │       ├── audit/            # Audit interceptor, consumer, service, partition workflow (no resolvers)
-│   │       ├── dlq/              # DLQ consumer and service (resolver lives in admin/dlq)
-│   │       ├── casl/             # CASL ability guard + module
-│   │       └── common/           # Pagination, pubsub, event bus
-│   └── web/                  # Next.js 16 — unified web app (admin/reseller/institute)
+│   ├── api-gateway/           # NestJS GraphQL API (the only public backend)
+│   ├── notification-service/  # NestJS, consumes NATS events and delivers notifications
+│   └── web/                   # Next.js 16, one app for the three portals
 ├── libs/
-│   ├── shared/
-│   │   └── common-types/     # @roviq/common-types — CASL, AuthUser, ErrorCodes, events
-│   ├── database/             # @roviq/database — Drizzle schema, RLS, tenant helpers
-│   │   ├── src/schema/       # Table definitions organized by domain
-│   │   ├── migrations/       # Custom SQL migrations (FORCE RLS, GRANTs, indexes)
-│   │   └── seed/board-catalogs/  # CBSE/BSEH/RBSE subject seed data (JSON)
-│   ├── backend/
-│   │   ├── auth/             # @roviq/auth-backend — scope guards, JWT strategy
-│   │   ├── casl/             # @roviq/casl — ability factory, guards, decorators
-│   │   ├── nats-jetstream/   # @roviq/nats-jetstream — NATS JetStream client
-│   │   └── telemetry/        # @roviq/telemetry — OpenTelemetry, Pino logger
-│   └── frontend/
-│       ├── auth/             # @roviq/auth — React auth context, login
-│       ├── graphql/          # @roviq/graphql — Apollo Client, codegen
-│       ├── i18n/             # @roviq/i18n — next-intl, formatting
-│       └── ui/               # @roviq/ui — shadcn/ui components
-├── ee/                       # Enterprise Edition (billing, payment gateways)
-├── e2e/
-│   └── api-gateway-e2e/      # E2E tests (Hurl + Vitest)
-├── scripts/
-│   ├── seed.ts               # Test data seeder
-│   ├── seed-ids.ts           # Deterministic UUIDs for seeding
-│   └── db-reset.ts           # Drop + push + FORCE RLS + GRANTs + seed
-└── docs/
+│   ├── shared/                # Used by backend and frontend
+│   ├── backend/               # NestJS libraries
+│   ├── frontend/              # React libraries
+│   └── database/              # Drizzle schema, RLS policies, migrations, seeds
+├── ee/                        # Enterprise Edition (billing, payment gateways), own licence
+├── e2e/                       # API e2e (Vitest) and UI e2e (Playwright) projects
+├── tools/                     # Nx projects that own the shared `test:int` and `e2e` targets
+├── scripts/                   # Seeds, database reset, instance tooling, the `check:*` gates
+├── docker/                    # Compose files and service configuration
+├── docs/                      # Start at docs/README.md
+└── Tiltfile                   # Dev environment
 ```
 
-### Web App Structure
+### api-gateway
+
+`apps/api-gateway/src/` has one directory per auth scope, and shared modules beside them:
+
+| Directory | Holds |
+|-----------|-------|
+| `admin/` | Platform-scope resolvers (`@PlatformScope`) |
+| `reseller/` | Reseller-scope resolvers (`@ResellerScope`) |
+| `institute/` | Institute-scope resolvers (`@InstituteScope`), one directory per domain (`student/`, `attendance/`, `timetable/`, …) |
+| `auth/`, `passkey/` | Login, tokens, impersonation, auth events, passkeys |
+| `audit/` | Audit interceptor, consumer and partition workflow (the resolvers live in each scope) |
+| `casl/` | Ability guard and module |
+| `dlq/` | Dead-letter consumer and service (the resolver lives in `admin/dlq/`) |
+| `files/`, `pdf/` | File uploads and scanning, PDF generation |
+| `notification-inbox/` | Each scope's in-app inbox, live feed and push device tokens |
+| `public-verification/` | Public certificate verification, no login |
+| `user-profile/`, `health/`, `common/`, `config/`, `nats/` | Own profile, health checks, shared helpers, configuration, transport wiring |
+
+Enterprise modules live in `ee/apps/api-gateway/src/` and are switched on with `ROVIQ_EE=true`.
+
+### web
 
 ```text
-apps/web/src/app/[locale]/
-  admin/             — platform admin pages (audit-logs, billing, observability)
-  reseller/          — reseller pages (placeholder)
-  institute/         — institute pages (dashboard, select-institute, settings)
-middleware.ts        — hostname → scope rewrite (admin.* → /admin/, default → /institute/)
+apps/web/src/
+├── app/[locale]/
+│   ├── admin/       # platform portal
+│   ├── reseller/    # reseller portal
+│   └── institute/   # institute portal
+├── components/      # components shared by the portals (docs/frontend.md → "Common components")
+└── middleware.ts    # host name → scope (admin.* → /admin, reseller.* → /reseller, else /institute)
 ```
+
+### Libraries
+
+Every library is imported as `@roviq/<name>`.
+
+| Package | Path | Purpose |
+|---------|------|---------|
+| `@roviq/common-types` | `libs/shared/common-types` | CASL subjects and actions, `AuthUser`, error codes, event patterns, state machines, date ranges |
+| `@roviq/domain` | `libs/shared/domain` | Value objects |
+| `@roviq/request-context` | `libs/shared/request-context` | Per-request context (tenant, reseller, user, scope, correlation id) |
+| `@roviq/database` | `libs/database` | Drizzle schema, RLS policies, `withTenant` / `withReseller` / `withAdmin`, migrations, seeds |
+| `@roviq/auth-backend` | `libs/backend/auth` | Scope guards, JWT strategy, context assertions |
+| `@roviq/casl` | `libs/backend/casl` | Ability factory, `AbilityGuard`, `@CheckAbility` |
+| `@roviq/audit` | `libs/backend/audit` | Audit decorators and emitter |
+| `@roviq/event-bus` | `libs/backend/event-bus` | `EventBusService`: one call publishes to NATS and GraphQL subscriptions |
+| `@roviq/nats-jetstream` | `libs/backend/nats-jetstream` | NestJS transport for NATS JetStream |
+| `@roviq/pubsub` | `libs/backend/pubsub` | GraphQL subscription pub/sub |
+| `@roviq/redis` | `libs/backend/redis` | Redis module and constants |
+| `@roviq/storage` | `libs/backend/storage` | S3-compatible object storage |
+| `@roviq/temporal` | `libs/backend/temporal` | Temporal client and embedded worker |
+| `@roviq/telemetry` | `libs/backend/telemetry` | OpenTelemetry and the Pino logger |
+| `@roviq/resilience` | `libs/backend/resilience` | Circuit breaker |
+| `@roviq/crypto` | `libs/backend/crypto` | Encrypted fields |
+| `@roviq/entitlements` | `libs/backend/entitlements` | Plan entitlement checks |
+| `@roviq/groups` | `libs/backend/groups` | Group rule interpreter (JsonLogic) |
+| `@roviq/compliance` | `libs/backend/compliance` | Field maps for compliance exports |
+| `@roviq/notifications` | `libs/backend/notifications` | Notification types shared by the two backend apps |
+| `@roviq/nestjs-graphql` | `libs/backend/nestjs-graphql` | Shared scalars and the paginated type |
+| `@roviq/testing` | `libs/backend/testing` | Integration-test harness |
+| `@roviq/auth` | `libs/frontend/auth` | React auth context, login, token handling |
+| `@roviq/graphql` | `libs/frontend/graphql` | Apollo Client setup, generated types |
+| `@roviq/i18n` | `libs/frontend/i18n` | next-intl setup, formatting, form schemas |
+| `@roviq/ui` | `libs/frontend/ui` | Components (shadcn/ui), the form kit, the testid registry |
+| `@roviq/ee-payments` | `ee/libs/backend/payments` | Payment gateway adapters |
+| `@roviq/ee-database` | `ee/libs/database` | Billing schema and seeds |
+| `@roviq/ee-billing-types` | `ee/libs/shared/billing-types` | Billing types shared with the frontend |
 
 ## HTTP request correlation (ROV-80)
 
@@ -150,7 +199,7 @@ reads the same value. Tenant context and audit consumers use this request value.
 - **EventBusService**: publishes to both NATS JetStream (for cross-service) and GraphQL PubSub (for subscriptions) in a single `emit()` call
 - **GraphQL Subscriptions**: 8 subscriptions across 3 scopes with tenant/reseller filtering via `graphql-ws`
 - **Temporal**: used for long-running workflows (institute setup pipeline, audit partition management)
-- **JetStream consumers**: `apps/notification-service` consumes the `NOTIFICATION` stream; `apps/api-gateway` connects `JetStreamServer` too and consumes `ACADEMIC_YEAR.activated`, `SECTION.deleted`, `STUDENT.*` and `GROUP.rules_updated` for the student year rollover and group invalidation (durables `gateway-<subject>`). Subject list and rules: `docs/nats-jetstream.md` → "api-gateway consumers".
+- **JetStream consumers**: `apps/notification-service` consumes the `NOTIFICATION` stream; `apps/api-gateway` connects `JetStreamServer` too and consumes `ACADEMIC_YEAR.activated`, `SECTION.deleted`, `STUDENT.*` and `GROUP.rules_updated` for the student year rollover and group invalidation (durables `gateway-<subject>`). Subject list and rules: `docs/guides/events.md` → "api-gateway consumers".
 - **JetStream retention**: every business stream uses `workqueue` retention so each message is dispatched to exactly one durable handler. The `NOTIFICATION` stream is the single exception — it uses `interest` retention because workqueue retention rejects overlapping consumer filters. `interest` fans out to every bound consumer and retains each message until all have acked. Stream config lives in `libs/backend/nats-jetstream/src/streams/stream.config.ts`.
 
 ### Service Layer Rules
@@ -219,7 +268,7 @@ a renamed page only updates the per-portal `navRegistry`.
 
 ### Institute Service
 
-See `docs/institute-service.md` for full documentation of the institute module including schema, resolvers, RLS, events, and Temporal workflow.
+See `docs/features/institutes.md` for full documentation of the institute module including schema, resolvers, RLS, events, and Temporal workflow.
 
 ### Attendance, Leaves & Holidays
 

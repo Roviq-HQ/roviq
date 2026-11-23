@@ -49,14 +49,14 @@ A change is done when all of this is true. Do it without being asked, and do not
 
 1. **Tests exist and pass** for every new code path. While working, run only the spec files you touched, save the output to a file and grep it. Every new or changed operation that takes an id has a test in which another institute's or reseller's id is refused.
 2. **You drove it in the browser** (Playwright MCP, this instance's dev app): every touched path through the real UI — normal flow, one boundary or forbidden case, a refresh, an account or portal switch. Backend-only changes count: drive the screens that reach the code. Check the screen, the console, the network responses and the stored effect. Method and time-savers: `docs/working-method.md` → "Browser pass". A failed check is a bug: fix it, add a regression test, check again. If no UI reaches the code, say so and verify against the running gateway instead.
-3. **`pnpm lint:fix` is clean, docs are updated** in the same change, and for a model change you have checked RLS on every affected table.
+3. **`pnpm lint:fix` and `pnpm check:docs` are clean, docs are updated** in the same change (rules: "Docs" below), and for a model change you have checked RLS on every affected table.
 4. **Commit** (conventional commit, header ≤ 100 characters), a pre-existing fix in its own commit. Commit and open the PR as soon as the issue's own flows pass; extras are a second, small PR.
 5. **Push and merge only when the user asks.** The push runs the one full gate for the branch (`pnpm ci:check`, about 8 minutes): do not run it by hand first. Redirect the push output to a file and look for `[ci:check] FAILED`; never judge it by `; echo $?` or through `tail`.
 6. **Report** each flow you drove and what you saw, and name anything you could not verify with its reason.
 
 ## Hard rules
 
-Full text of a rule: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules-reference.md`. Read it when the rule applies to what you are doing.
+Full text of a rule: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules.md`. Read it when the rule applies to what you are doing.
 
 - [NWKRD] No workarounds: find the root cause and fix it properly.
 - [NACPR] [BFCMT] Test fully (automated and in the browser), then commit. See "Finishing a change".
@@ -94,7 +94,7 @@ The app connects as `roviq_pooler` and each wrapper switches to `roviq_app`, `ro
 
 ## Quick mistake reference
 
-Rationale and the enforcing gate for each line: `docs/references/mistake-reference.md`. Read it before touching the area a line names.
+Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. Read it before touching the area a line names.
 
 - `selectInstitute(membershipId)`, not `tenantId` · abilities live on `Membership`, not `User`
 - `withTenant/withReseller/withAdmin(db, ctx, fn)` with the branded ctx — no `$transaction`, no `tenantTransaction()`
@@ -119,9 +119,12 @@ Rationale and the enforcing gate for each line: `docs/references/mistake-referen
 
 ## Docs
 
-- `docs/architecture.md` · `docs/auth.md` · `docs/frontend.md` · `docs/infrastructure.md` · `docs/testing.md` (strategy, commands, CI, Compose files) · `docs/getting-started.md`
-- `docs/working-method.md` — browser pass, checks before calling work done, working with subagents
-- `docs/deployment.md` — what production needs. Add to it when a change needs something from production
-- `docs/dependency-updates.md` — `pnpm deps:update` (minors) and `pnpm deps:upgrade` (majors, one at a time)
-- `docs/changelogs/testing-troubleshooting.md` — append-only log of testing-infra problems and fixes. After fixing one, append an entry; never edit an old one
-- The PRD, decisions and role reviews are Linear documents. An infrastructure, convention or architecture change is recorded in a Linear issue or document as well as in `docs/`
+`docs/README.md` lists every document and holds the writing rules ("Writing docs"). Read the index before looking for a doc, and the rules before writing one.
+
+- **Describe the system as it is now**: no history, plans, known-gap lists or session notes. A plan, spec, PRD, decision or review is a Linear document; work not done is a Linear issue.
+- **One home for each fact**: find the document that owns it and edit that; link from elsewhere, never copy.
+- **Same change as the code**: `git grep` every renamed file, command, variable or operation across `docs/`, `CLAUDE.md` and `.claude/skills/`.
+- **A new document** goes in the folder the index names for its type, and gets a line in `docs/README.md`.
+- **`pnpm check:docs`** must pass: every link and backticked path resolves, every doc is in the index.
+- `docs/deployment.md` gets a section when a change needs something from production. `docs/changelogs/testing-troubleshooting.md` is append-only: after fixing a testing-infra problem append an entry, never edit an old one.
+- An infrastructure, convention or architecture change is recorded in a Linear issue or document as well as in `docs/`.

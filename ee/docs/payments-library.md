@@ -44,7 +44,7 @@ interface PaymentGateway {
 2. Implement `PaymentGateway` interface
 3. Register in `PaymentGatewayFactory` constructor
 4. Add env vars to `.env.example` and `env.validation.ts`
-5. Add webhook endpoint in `ee/apps/api-gateway/src/billing/webhook.controller.ts`
+5. Add a webhook controller in `ee/apps/api-gateway/src/billing/webhook/`
 
 ## Error Handling
 

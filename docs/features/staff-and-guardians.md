@@ -8,13 +8,12 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 
 | Route | Component | Purpose | CASL ability |
 |-------|-----------|---------|--------------|
-| `/institute/people/staff` | [page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/staff/page.tsx) | Staff list with filters & search | `read Staff` |
-| `/institute/people/staff/new` | [new/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx) | Hire staff wizard | `create Staff` |
-| `/institute/people/staff/[id]` | [[id]/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/staff/[id]/page.tsx) | Staff detail tabs (Profile, Qualifications, Documents, Audit) | `read Staff` |
-| `/institute/people/staff/[id]/edit` | [[id]/edit/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/staff/[id]/edit/page.tsx) | Edit staff profile | `update Staff` |
-| `/institute/people/guardians` | [page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/page.tsx) | Guardian list | `read Guardian` |
-| `/institute/people/guardians/new` | [new/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/new/page.tsx) | Add guardian | `create Guardian` |
-| `/institute/people/guardians/[id]` | [[id]/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/[id]/page.tsx) | Guardian detail + linked students | `read Guardian` |
+| `/institute/people/staff` | [page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/staff/page.tsx>) | Staff list with filters & search | `read Staff` |
+| `/institute/people/staff/new` | [new/page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx>) | Hire staff wizard | `create Staff` |
+| `/institute/people/staff/[id]` | [[id]/page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/staff/[id]/page.tsx>) | Staff detail tabs (Profile, Qualifications, Documents, Audit) | `read Staff` |
+| `/institute/people/guardians` | [page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/page.tsx>) | Guardian list | `read Guardian` |
+| `/institute/people/guardians/new` | [new/page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/new/page.tsx>) | Add guardian | `create Guardian` |
+| `/institute/people/guardians/[id]` | [[id]/page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/[id]/page.tsx>) | Guardian detail + linked students | `read Guardian` |
 
 ## GraphQL surface
 
@@ -44,15 +43,15 @@ The staff and guardians module (Linear issue **ROV-169**) provides the institute
 
 `Staff.signInStatus` / `Guardian.signInStatus` and `signInDetailsSentAt` show whether the person has signed in or was sent their details; the lists and detail pages show them with a "Send sign-in details" button. Rules: `docs/auth.md` → "Sign-in details for staff and guardians".
 
-Resolvers live under [apps/api-gateway/src/institute/staff/](apps/api-gateway/src/institute/staff/) and [apps/api-gateway/src/institute/guardian/](apps/api-gateway/src/institute/guardian/), decorated with `@InstituteScope()`.
+Resolvers live under [apps/api-gateway/src/institute/staff/](<../../apps/api-gateway/src/institute/staff/>) and [apps/api-gateway/src/institute/guardian/](<../../apps/api-gateway/src/institute/guardian/>), decorated with `@InstituteScope()`.
 
 ## Database schema
 
-- [`staff_profiles`](libs/database/src/schema/user-profiles/staff-profiles.ts) — employee code, department, designation, status enum.
-- [`staff_qualifications`](libs/database/src/schema/user-profiles/staff-qualifications.ts) — degrees, institutions, years.
-- [`guardian_profiles`](libs/database/src/schema/user-profiles/guardian-profiles.ts) — relationship enum, occupation, portal access flag.
-- [`student_guardian_links`](libs/database/src/schema/user-profiles/student-guardian-links.ts) — many-to-many link table with `isPrimary`, `canPickup`, `notifyOn`.
-- [`tenant_user_profiles`](libs/database/src/schema/user-profiles/tenant-user-profiles.ts) — the institute's own copy of the person's name, gender, date of birth and picture; joined on user and tenant. `user_profiles` is the account-level profile and is not read here (see `docs/auth.md` → "People and phone numbers").
+- [`staff_profiles`](<../../libs/database/src/schema/user-profiles/staff-profiles.ts>) — employee code, department, designation, status enum.
+- [`staff_qualifications`](<../../libs/database/src/schema/user-profiles/staff-qualifications.ts>) — degrees, institutions, years.
+- [`guardian_profiles`](<../../libs/database/src/schema/user-profiles/guardian-profiles.ts>) — relationship enum, occupation, portal access flag.
+- [`student_guardian_links`](<../../libs/database/src/schema/user-profiles/student-guardian-links.ts>) — many-to-many link table with `isPrimary`, `canPickup`, `notifyOn`.
+- [`tenant_user_profiles`](<../../libs/database/src/schema/user-profiles/tenant-user-profiles.ts>) — the institute's own copy of the person's name, gender, date of birth and picture; joined on user and tenant. `user_profiles` is the account-level profile and is not read here (see `docs/auth.md` → "People and phone numbers").
 
 All tables spread `tenantColumns`; `student_guardian_links` uses `tenantPolicies()` for RLS.
 
@@ -79,8 +78,8 @@ updates in place.
 
 Two entry points:
 
-- **Guardian detail → Children tab** — `LinkStudentDialog` in [guardians/[id]/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/[id]/page.tsx). Picker query: `StudentsForGuardianPicker`. Test-id root: `guardian-detail-link-student-*`.
-- **Student detail → Guardians tab** — `LinkGuardianDialog` in [students/[id]/page.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/students/[id]/page.tsx). Picker query: `GuardiansForStudentPicker`. Test-id root: `student-detail-link-guardian-*`.
+- **Guardian detail → Children tab** — `LinkStudentDialog` in [guardians/[id]/page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/[id]/page.tsx>). Picker query: `StudentsForGuardianPicker`. Test-id root: `guardian-detail-link-student-*`.
+- **Student detail → Guardians tab** — `LinkGuardianDialog` in [students/[id]/page.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/students/[id]/page.tsx>). Picker query: `GuardiansForStudentPicker`. Test-id root: `student-detail-link-guardian-*`.
 
 Both dialogs share the same UX contract:
 
@@ -88,7 +87,7 @@ Both dialogs share the same UX contract:
   wrapped in `<Can I="update" a="Guardian">`, matching the backend
   resolver guard. Read-only roles never see the button.
 - **Searchable picker** — debounced 250ms via
-  [use-debounced-value.ts](apps/web/src/hooks/use-debounced-value.ts),
+  [use-debounced-value.ts](<../../apps/web/src/hooks/use-debounced-value.ts>),
   and the picker `useQuery` is `skip: !open` so it stays idle until the
   dialog opens. Already-linked entities are filtered out client-side as
   defense-in-depth; the unique constraint on `student_guardian_links` is
@@ -101,7 +100,7 @@ Both dialogs share the same UX contract:
   surfaces an amber demotion warning (the backend clears any existing
   primary contact for that student when a new one is linked).
 - **Shared mutation** — `useLinkGuardianToStudent()` in
-  [use-guardians.ts](apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/use-guardians.ts)
+  [use-guardians.ts](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/guardians/use-guardians.ts>)
   is imported by both pages. It refetches
   `InstituteGuardianLinkedStudents` + `InstituteStudentGuardians` with
   `awaitRefetchQueries: true`, so the new row is visible the instant the
@@ -110,7 +109,7 @@ Both dialogs share the same UX contract:
 ### Unlinking
 
 Both tabs show an **Unlink** button per link (`UnlinkGuardianButton` in
-[unlink-guardian-dialog.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/unlink-guardian-dialog.tsx),
+[unlink-guardian-dialog.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/unlink-guardian-dialog.tsx>),
 gated by `update Guardian`). The dialog reads the student's guardians first, so the rules
 `unlinkGuardianFromStudent` enforces are visible before submitting:
 
@@ -127,40 +126,9 @@ gated by `update Guardian`). The dialog reads the student's guardians first, so 
 
 Every linked student or guardian name (guardian Children tab, student Guardians tab, the student
 list's primary-guardian column) is a `PersonNameLink` from
-[person-detail-dialog.tsx](apps/web/src/app/[locale]/institute/(dashboard)/people/person-detail-dialog.tsx).
+[person-detail-dialog.tsx](<../../apps/web/src/app/[locale]/institute/(dashboard)/people/person-detail-dialog.tsx>).
 It opens the same `StudentDetailView` / `GuardianDetailView` the detail routes render, inside a
 Dialog (Sheet below `lg`), without leaving the page. Names inside the popup swap its content and
 add a **Back** step; **Open full page** goes to the route. `people/layout.tsx` mounts the provider.
 In the popup the views hide the back button and breadcrumbs, a delete returns to the previous
 popup step, and the student Attendance tab keeps its date range in local state instead of the URL.
-
-## Self-verification (manual smoke test)
-
-1. `pnpm tilt trigger db-clean`, wait for `pnpm tilt logs db-clean` to show seed complete.
-2. Login as institute admin, navigate to `/institute/people/staff`.
-3. Verify list loads with seeded staff; filter by department and confirm URL updates via nuqs.
-4. Click into a staff detail page → Qualifications tab → add a new qualification → verify row appears without full reload.
-5. Navigate to `/institute/people/guardians` → create a new guardian with Hindi name (`<I18nInput>`).
-6. From the guardian detail page, click "Link to student" → pick a seeded student → link succeeds.
-7. Open the student detail → Guardians tab should list the newly linked guardian.
-8. Click `revokeGuardianAccess` on the guardian → portal access flag flips; edit again still respects `version`.
-
-## Known gaps + follow-ups
-
-- Profile and consent management pages (privacy notices, consent records) are tracked in a separate sub-issue and still pending.
-- Staff photo upload uses the generic `user_documents` pipeline; a staff-specific UX pass is queued.
-- Bulk guardian import from admission CSV is handled in the admission module, not here.
-
-## Commands
-
-```bash
-# Run lint + typecheck
-pnpm biome check
-pnpm exec tsc --noEmit -p apps/web/tsconfig.json
-pnpm exec tsc --noEmit -p apps/api-gateway/tsconfig.app.json
-
-# Run tests (requires pnpm db:reset --test for integration layer)
-pnpm test                 # unit + component
-pnpm test:int             # integration
-pnpm test:e2e:ui          # playwright
-```

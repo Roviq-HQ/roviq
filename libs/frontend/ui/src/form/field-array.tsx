@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 // matching against concrete form types. The kit boundary therefore accepts
 // `form: any` and trusts the consumer to pass a real `useAppForm` result.
 // Runtime safety comes from TanStack's internal `form.Field` wiring.
-// biome-ignore lint/suspicious/noExplicitAny: kit boundary is intentionally loose; see docs/forms.md "Known limitations".
+// biome-ignore lint/suspicious/noExplicitAny: kit boundary is intentionally loose; see docs/guides/forms.md "Known limitations".
 type AnyForm = any;
 
 /**

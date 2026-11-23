@@ -9,16 +9,19 @@
 - **Forms**: Every date-accepting input must be backed by a date picker (not free text). The picker's `onChange` emits ISO `YYYY-MM-DD`. Zod schemas validate with `.regex(/^\d{4}-\d{2}-\d{2}$/)` or `emptyStringToUndefined(z.string().regex(...).optional())` for optional fields.
 - **Timezone**: Server-side calendar logic (attendance, reports) uses `getInstituteToday(institute)` / `getInstituteNow(institute)` from `apps/api-gateway/src/common/timezone` (API-gateway-internal). Never use bare `new Date()` for calendar-day decisions.
 
-## Apps
+## Portals
+
+One Next.js app (`apps/web`) serves three portals. `middleware.ts` picks the portal from the host name.
 
 > Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
 
-| App | URL | Purpose |
-|-----|-----|---------|
-| admin-portal | http://localhost:4200 | Platform admin — manage institutes, users, system health |
-| institute-portal | http://localhost:4300 | Institute-facing — attendance, timetables, students |
+| Portal | Local URL | Code | For |
+|--------|-----------|------|-----|
+| Admin | http://admin.localhost:4200 | `app/[locale]/admin/` | Platform staff: institutes, resellers, system health |
+| Reseller | http://reseller.localhost:4200 | `app/[locale]/reseller/` | Resellers: their institutes, billing, team |
+| Institute | http://localhost:4200 | `app/[locale]/institute/` | Institute staff, students and guardians |
 
-Both apps share UI components from `@roviq/ui`, auth logic from `@roviq/auth`, and i18n from `@roviq/i18n`.
+The portals share components from `@roviq/ui`, auth from `@roviq/auth` and i18n from `@roviq/i18n`.
 
 ## Error messages
 
@@ -75,7 +78,7 @@ shadcn/ui components + layout shell. Key exports:
 Client-side auth state management:
 - `AuthProvider` / `useAuth()` — login, logout, refresh, selectInstitute, switchInstitute
 - `ProtectedRoute` — redirects unauthenticated users to login, or to `/select-institute` when institute selection pending
-- `LoginForm` / `ReAuthForm` / `PasswordChangeForm` / `PasskeyManager` — built on the `@roviq/ui` form kit (`useAppForm` + `@tanstack/react-form`) with Zod validation. See [forms.md](forms.md) for the kit API.
+- `LoginForm` / `ReAuthForm` / `PasswordChangeForm` / `PasskeyManager` — built on the `@roviq/ui` form kit (`useAppForm` + `@tanstack/react-form`) with Zod validation. See [forms.md](guides/forms.md) for the kit API.
 - `tokenStorage` — sessionStorage (access token, platform token) + localStorage (refresh token, user, memberships)
 - `needsInstituteSelection` / `memberships` — state for multi-institute picker flow
 
@@ -97,7 +100,7 @@ Internationalization powered by next-intl and date-fns:
 - `useFormatDate()` — date formatting via date-fns with locale-aware output
 - `useFormatNumber()` — number/currency/percent formatting via `Intl.NumberFormat`
 - `LocaleSwitcher` — language dropdown component (in `@roviq/ui`)
-- `InstituteLocalesProvider` / `useInstituteLocales()` — institute content languages, separate from interface locales; `I18nField` renders enabled languages and `useI18nField()` falls back through the institute default. Required text needs English plus that default. See [content language configuration](plans/per-tenant-locale-config.md).
+- `InstituteLocalesProvider` / `useInstituteLocales()` — institute content languages, separate from interface locales; `I18nField` renders enabled languages and `useI18nField()` falls back through the institute default. Required text needs English plus that default.
 - RTL-ready: `rtlLocales` config array, `dir` attribute on `<html>`
 
 **Translation file structure** (per app):
