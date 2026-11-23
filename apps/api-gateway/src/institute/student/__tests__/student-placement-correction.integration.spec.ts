@@ -33,6 +33,7 @@ import {
   studentAcademics,
   studentProfiles,
   subjects,
+  tenantUserProfiles,
   userProfiles,
   users,
   withAdmin,
@@ -173,6 +174,14 @@ function addStudent(
       gender: Gender.FEMALE,
       createdBy: SYSTEM_USER_ID,
       updatedBy: SYSTEM_USER_ID,
+    });
+    // The institute's own copy: its lists read this, not the account profile.
+    await tx.insert(tenantUserProfiles).values({
+      ...audit(tenantId),
+      userId: user.id,
+      firstName: { en: `Student ${suffix}` },
+      lastName: { en: 'Sharma' },
+      gender: Gender.FEMALE,
     });
     const [membership] = await tx
       .insert(memberships)
