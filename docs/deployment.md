@@ -209,7 +209,7 @@ Each channel needs a provider; a channel with none records every send as skipped
 **WhatsApp needs the guardian's consent as well as a provider** (ROV-269, DPDP purpose-specific
 consent). A guardian of the institute gets a WhatsApp message only while the latest
 `consent_records` row with purpose `whatsapp_communication` is granted, for the student the
-message is about (for a message about no student: for any of their students). No row counts as
+message is about (for a message that names no student: for every student linked to them). No row counts as
 no consent. The row is read on every send and nothing is cached, so a withdrawal applies to the
 next message. A refused send is recorded as skipped (`no_consent`) and logged with the reason
 (`consent_missing` or `consent_withdrawn`) and ids only. Other channels, and recipients who are

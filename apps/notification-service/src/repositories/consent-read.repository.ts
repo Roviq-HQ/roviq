@@ -7,7 +7,8 @@ export type GuardianConsentState = 'granted' | 'withdrawn' | 'missing' | 'not_gu
 export abstract class ConsentReadRepository {
   /**
    * A guardian's consent for one purpose, from the latest row of each (guardian, student) pair.
-   * With a student: that pair decides. Without one: granted when any of the guardian's pairs is.
+   * With a student: that pair decides. Without one: every student linked to the guardian must
+   * be granted, so consent for one child never covers a message about another.
    */
   abstract guardianConsent(query: {
     tenantId: string;

@@ -637,6 +637,40 @@ describe('notification pipeline (integration)', () => {
 
       expect(outcome.status).toBe('SENT');
     });
+
+    it('should not let consent for one child cover a message about another', async () => {
+      // The guardian's consent for the first student is granted (previous test). Link a second.
+      const sibling = await createTestTeacher(db, institute.tenantId);
+      extraTeachers.push(sibling);
+      userIds.push(sibling.userId);
+      await withAdmin(db, mkAdminCtx(CTX), async (tx) => {
+        const [siblingProfile] = await tx
+          .insert(studentProfiles)
+          .values({
+            ...by,
+            tenantId: institute.tenantId,
+            userId: sibling.userId,
+            membershipId: sibling.membershipId,
+            admissionNumber: `ROV269-${sibling.membershipId.slice(-6)}`,
+            admissionDate: '2025-04-01',
+          })
+          .returning({ id: studentProfiles.id });
+        assert(siblingProfile);
+        await tx.insert(studentGuardianLinks).values({
+          ...by,
+          tenantId: institute.tenantId,
+          studentProfileId: siblingProfile.id,
+          guardianProfileId,
+          relationship: GuardianRelationship.FATHER,
+        });
+      });
+      const blocked = { status: 'SKIPPED', provider: null, skipReason: 'no_consent' };
+
+      expect((await send('WHATSAPP', aboutStudent())).status).toBe('SENT');
+      expect(await send('WHATSAPP', { studentId: sibling.membershipId })).toEqual(blocked);
+      // A message that names no student needs every linked student granted.
+      expect(await send('WHATSAPP', {})).toEqual(blocked);
+    });
   });
 
   describe('channel settings and failures', () => {

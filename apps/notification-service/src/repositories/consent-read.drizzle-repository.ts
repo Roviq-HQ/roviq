@@ -5,6 +5,7 @@ import {
   type DrizzleDB,
   guardianProfilesLive,
   mkInstituteCtx,
+  studentGuardianLinksLive,
   studentProfilesLive,
   withTenant,
 } from '@roviq/database';
@@ -33,7 +34,9 @@ export class ConsentReadDrizzleRepository extends ConsentReadRepository {
       if (guardians.length === 0) return 'not_guardian';
       const guardianIds = guardians.map((g) => g.id);
 
-      let studentProfileId: string | null = null;
+      // The pairs that must all be granted: the named student, or every linked student when the
+      // message names none, so consent for one child never covers a message about another.
+      let studentIds: string[];
       if (query.studentMembershipId) {
         const [student] = await tx
           .select({ id: studentProfilesLive.id })
@@ -42,12 +45,20 @@ export class ConsentReadDrizzleRepository extends ConsentReadRepository {
           .limit(1);
         // A student this institute does not have: nothing can have been consented to.
         if (!student) return 'missing';
-        studentProfileId = student.id;
+        studentIds = [student.id];
+      } else {
+        const links = await tx
+          .selectDistinct({ studentProfileId: studentGuardianLinksLive.studentProfileId })
+          .from(studentGuardianLinksLive)
+          .where(inArray(studentGuardianLinksLive.guardianProfileId, guardianIds));
+        if (links.length === 0) return 'missing';
+        studentIds = links.map((link) => link.studentProfileId);
       }
 
       // Append-only table: the latest row of each (guardian, student) pair is its state.
       const latest = await tx
         .selectDistinctOn([consentRecords.guardianProfileId, consentRecords.studentProfileId], {
+          studentProfileId: consentRecords.studentProfileId,
           isGranted: consentRecords.isGranted,
         })
         .from(consentRecords)
@@ -55,7 +66,7 @@ export class ConsentReadDrizzleRepository extends ConsentReadRepository {
           and(
             inArray(consentRecords.guardianProfileId, guardianIds),
             eq(consentRecords.purpose, query.purpose),
-            studentProfileId ? eq(consentRecords.studentProfileId, studentProfileId) : undefined,
+            inArray(consentRecords.studentProfileId, studentIds),
           ),
         )
         .orderBy(
@@ -65,8 +76,9 @@ export class ConsentReadDrizzleRepository extends ConsentReadRepository {
           desc(consentRecords.id),
         );
 
-      if (latest.length === 0) return 'missing';
-      return latest.some((row) => row.isGranted) ? 'granted' : 'withdrawn';
+      if (latest.some((row) => !row.isGranted)) return 'withdrawn';
+      const granted = new Set(latest.map((row) => row.studentProfileId));
+      return studentIds.every((id) => granted.has(id)) ? 'granted' : 'missing';
     });
   }
 }
