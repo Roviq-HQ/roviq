@@ -1,6 +1,6 @@
 # Working method
 
-How to verify a change, hand it to the user, and work with subagents. `CLAUDE.md` holds the rules;
+How to verify a change and work with subagents. `CLAUDE.md` holds the rules;
 this file holds the method. Every line here is a mistake that cost a session 10 to 40 minutes.
 
 ## Browser pass
@@ -71,22 +71,6 @@ can drop the SSH connection: push with a keep-alive
 
 After a rebase onto a `main` that changed the same area, run the touched integration specs again
 before pushing: fixtures written before the rebase may no longer match the schema or the queries.
-
-## Manual acceptance handoff
-
-When the user will check the work by hand, they do the checks, not the setup.
-
-- Prepare small, clearly named fixtures while building, added to the dev database in seconds with
-  additive, repeatable writes. Only what the review needs.
-- Reuse the running apps. No rebuild, full reset or separate environment for the handoff.
-- Verify the fixtures and the logins yourself. In a temporary file, under **Manual acceptance**,
-  list the URL, the logins and roles, the records with ids or direct links, and numbered steps
-  with the exact expected result of each.
-- Report what was verified automatically, what you drove in the browser, and what is left for the
-  user.
-- Keep one-time scripts and review files out of the feature commit and remove them after the
-  review. Keep the regression tests. Delete database fixtures only when asked.
-- Writes to a production database need explicit approval each time.
 
 ## Working with subagents
 

@@ -35,11 +35,6 @@ description: Use when starting work on a Linear issue — provides the full work
 - Re-read "Does NOT Change" — revert any accidental modifications
 - `git diff --stat` — only files related to this issue
 
-## 6. Prepare Manual Acceptance
-- Follow `docs/working-method.md` → "Manual acceptance handoff": ready-made local-dev fixtures inserted in seconds, verified logins, and a Linear checklist with credentials, record links, actions and exact expected results.
-- Prepare the fixture insert during implementation. Reuse the running environment; the user should do no setup.
-- Keep one-time review tooling out of the feature commit and remove it after completed review. Preserve regression tests; do not delete DB fixtures without a request.
-
-## 7. Report
+## 6. Report
 - Summarize changes, list files, show test results, note concerns
 - Browser-verify every touched code path yourself before reporting (`docs/working-method.md` → "Browser pass"), then commit under the [NACPR] rule. Never hand the commit back because the browser pass was skipped

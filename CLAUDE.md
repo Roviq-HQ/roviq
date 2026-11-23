@@ -54,8 +54,6 @@ A change is done when all of this is true. Do it without being asked, and do not
 5. **Push and merge only when the user asks.** The push runs the one full gate for the branch (`pnpm ci:check`, about 8 minutes): do not run it by hand first. Redirect the push output to a file and look for `[ci:check] FAILED`; never judge it by `; echo $?` or through `tail`.
 6. **Report** each flow you drove and what you saw, and name anything you could not verify with its reason.
 
-When the user will check the work by hand, prepare it for them: `docs/working-method.md` → "Manual acceptance handoff".
-
 ## Hard rules
 
 Full text of a rule: `sed -n '/\[TAGID\]/,/^---$/p' docs/references/hard-rules-reference.md`. Read it when the rule applies to what you are doing.
@@ -122,7 +120,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistake-referen
 ## Docs
 
 - `docs/architecture.md` · `docs/auth.md` · `docs/frontend.md` · `docs/infrastructure.md` · `docs/testing.md` (strategy, commands, CI, Compose files) · `docs/getting-started.md`
-- `docs/working-method.md` — browser pass, manual acceptance handoff, working with subagents
+- `docs/working-method.md` — browser pass, checks before calling work done, working with subagents
 - `docs/deployment.md` — what production needs. Add to it when a change needs something from production
 - `docs/dependency-updates.md` — `pnpm deps:update` (minors) and `pnpm deps:upgrade` (majors, one at a time)
 - `docs/changelogs/testing-troubleshooting.md` — append-only log of testing-infra problems and fixes. After fixing one, append an entry; never edit an old one
