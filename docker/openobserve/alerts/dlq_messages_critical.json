@@ -1,0 +1,32 @@
+{
+  "name": "dlq_messages_critical",
+  "description": "Messages are being dead-lettered faster than 10 per minute for 10 minutes. Their side effects (notifications, billing, audit) did not run. Inspect and replay them from the admin Dead Letter Queue tab.",
+  "stream_type": "metrics",
+  "stream_name": "nats_dlq_messages_total",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "sum by (origin_stream) (rate(nats_dlq_messages_total[5m]))",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0.166667
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 15
+  },
+  "pending_period_sec": 600,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "critical",
+    "component": "dlq",
+    "runbook": "docs/runbooks/dlq-messages.md"
+  }
+}

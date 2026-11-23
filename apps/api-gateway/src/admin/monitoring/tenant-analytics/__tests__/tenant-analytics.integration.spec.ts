@@ -1,6 +1,6 @@
 /**
  * adminTenantAnalytics (ROV-184) through the real resolver → service → withAdmin pipeline.
- * Prometheus is stubbed so the test never reaches another instance's observability stack.
+ * OpenObserve is stubbed so the test never reaches another instance's observability stack.
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
@@ -34,7 +34,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../../../app/app.module';
-import { PrometheusClient } from '../../prometheus.client';
+import { OpenObserveClient } from '../../openobserve.client';
 import { TenantAnalyticsRepository } from '../repositories/tenant-analytics.repository';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -75,7 +75,7 @@ describe('adminTenantAnalytics (integration)', () => {
   let teacherA: TestTeacher;
   const tokenIds: string[] = [];
 
-  const prometheus = createMock<PrometheusClient>({
+  const openObserve = createMock<OpenObserveClient>({
     query: vi.fn().mockResolvedValue([]),
     queryRange: vi.fn().mockResolvedValue([]),
   });
@@ -118,7 +118,7 @@ describe('adminTenantAnalytics (integration)', () => {
   beforeAll(async () => {
     result = await createIntegrationApp({
       modules: [AppModule],
-      overrides: [{ provide: PrometheusClient, useValue: prometheus }],
+      overrides: [{ provide: OpenObserveClient, useValue: openObserve }],
     });
     reseller = await createTestReseller(result.db);
     instA = await createTestInstitute(result.db, { resellerId: reseller.resellerId });
@@ -171,8 +171,8 @@ describe('adminTenantAnalytics (integration)', () => {
     expect(byTenant.get(instB.tenantId)).toBe(1);
   });
 
-  it('should return only the filtered reseller institutes with DB and Prometheus data', async () => {
-    vi.mocked(prometheus.query).mockResolvedValueOnce([
+  it('should return only the filtered reseller institutes with DB and OpenObserve data', async () => {
+    vi.mocked(openObserve.query).mockResolvedValueOnce([
       { metric: { tenant_id: instB.tenantId }, value: 17 },
     ]);
 

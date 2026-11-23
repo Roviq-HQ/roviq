@@ -13,10 +13,10 @@ import type { StorageHealthIndicator } from '../../../../health/indicators/stora
 import type { TemporalHealthIndicator } from '../../../../health/indicators/temporal.health';
 import { ConnectionTracker } from '../../connections/connection-tracker';
 import {
-  type PromAlert,
-  type PrometheusClient,
-  PrometheusUnavailableError,
-} from '../../prometheus.client';
+  type FiringAlert,
+  type OpenObserveClient,
+  OpenObserveUnavailableError,
+} from '../../openobserve.client';
 import {
   SYSTEM_HEALTH_POLL_INTERVAL_MS,
   SYSTEM_HEALTH_UPDATED_TOPIC,
@@ -92,7 +92,7 @@ function fakeRedis() {
   return { redis: createMock<Redis>({ pipeline: vi.fn(pipeline) }), hashes };
 }
 
-function firing(name: string, severity: string, activeAt: string): PromAlert {
+function firing(name: string, severity: string, activeAt: string): FiringAlert {
   return {
     labels: { alertname: name, severity },
     annotations: { summary: `${name} summary` },
@@ -242,7 +242,7 @@ describe('SystemHealthService', () => {
   let nats: NatsHealthIndicator;
   let temporal: TemporalHealthIndicator;
   let storage: StorageHealthIndicator;
-  let prometheus: PrometheusClient;
+  let openObserve: OpenObserveClient;
   let dlq: DlqService;
   let connections: ConnectionTracker;
   let redis: ReturnType<typeof fakeRedis>;
@@ -259,7 +259,7 @@ describe('SystemHealthService', () => {
     nats = createMock<NatsHealthIndicator>({ probe: vi.fn().mockResolvedValue(UP) });
     temporal = createMock<TemporalHealthIndicator>({ probe: vi.fn().mockResolvedValue(UP) });
     storage = createMock<StorageHealthIndicator>({ probe: vi.fn().mockResolvedValue(DOWN) });
-    prometheus = createMock<PrometheusClient>({
+    openObserve = createMock<OpenObserveClient>({
       alerts: vi
         .fn()
         .mockResolvedValue([
@@ -281,7 +281,7 @@ describe('SystemHealthService', () => {
       storage,
       redis.redis,
       createMock<NatsConnection>(),
-      prometheus,
+      openObserve,
       dlq,
       connections,
     );
@@ -355,8 +355,8 @@ describe('SystemHealthService', () => {
     ]);
   });
 
-  it('should mark alerts unavailable (not "all clear") when Prometheus is down', async () => {
-    vi.mocked(prometheus.alerts).mockRejectedValue(new PrometheusUnavailableError('down'));
+  it('should mark alerts unavailable (not "all clear") when OpenObserve is down', async () => {
+    vi.mocked(openObserve.alerts).mockRejectedValue(new OpenObserveUnavailableError('down'));
 
     const health = await service.getSystemHealth();
 

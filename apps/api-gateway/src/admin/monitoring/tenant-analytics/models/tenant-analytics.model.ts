@@ -33,14 +33,14 @@ export class TenantAnalyticsModel {
   @Field(() => Int, {
     nullable: true,
     description:
-      'Institute-scope GraphQL operations in the last 24h; null when Prometheus is unavailable',
+      'Institute-scope GraphQL operations in the last 24h; null when metrics are unavailable',
   })
   apiCalls24h!: number | null;
 
   @Field(() => [Int], {
     nullable: true,
     description:
-      '7 daily API-call totals, oldest to newest (each a 24h window ending at that point); null when Prometheus is unavailable',
+      '7 daily API-call totals, oldest to newest (each a 24h window ending at that point); null when metrics are unavailable',
   })
   activityTrend7d!: number[] | null;
 }
@@ -66,7 +66,7 @@ export class TenantAnalyticsConnection {
   totalCount!: number;
 
   @Field({
-    description: 'False when Prometheus could not be queried; API-call columns are then null',
+    description: 'False when OpenObserve could not be queried; API-call columns are then null',
   })
   metricsAvailable!: boolean;
 }

@@ -91,3 +91,39 @@ describe('api-gateway env validation: MESSAGING_ENCRYPTION_KEY', () => {
     }
   });
 });
+
+describe('api-gateway env validation: telemetry variables', () => {
+  const TEST_ENV = { ...BASE, NODE_ENV: 'test' };
+
+  it('should accept an environment with telemetry off', () => {
+    expect(() => validate(TEST_ENV)).not.toThrow();
+  });
+
+  it('should accept an endpoint with an authorization header whose value has a space and padding', () => {
+    const config = {
+      ...TEST_ENV,
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://openobserve:5081',
+      OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Basic b3BzOnBhc3M=,organization=default',
+    };
+
+    expect(() => validate(config)).not.toThrow();
+  });
+
+  it('should refuse an endpoint that is not a URL', () => {
+    expect(() => validate({ ...TEST_ENV, OTEL_EXPORTER_OTLP_ENDPOINT: 'openobserve' })).toThrow(
+      /OTEL_EXPORTER_OTLP_ENDPOINT/,
+    );
+  });
+
+  it('should refuse headers that are not key=value pairs', () => {
+    expect(() =>
+      validate({ ...TEST_ENV, OTEL_EXPORTER_OTLP_HEADERS: 'Basic b3BzOnBhc3M' }),
+    ).toThrow(/OTEL_EXPORTER_OTLP_HEADERS/);
+  });
+
+  it('should refuse an OpenObserve address that is not an http URL', () => {
+    expect(() => validate({ ...TEST_ENV, OPENOBSERVE_URL: 'openobserve:5080/x y' })).toThrow(
+      /OPENOBSERVE_URL/,
+    );
+  });
+});

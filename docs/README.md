@@ -71,7 +71,7 @@ Rules to look up, not to read through.
 ## Operations
 
 - Runbooks: [DLQ message spike](runbooks/dlq-messages.md) · [EventBus emit failures](runbooks/eventbus-emit-failures.md) · [JetStream stream migrations](runbooks/stream-migrations.md)
-- Alert rules and dashboards: `docs/observability/` (mounted into Grafana by `docker/compose.infra.yaml`)
+- Alert rules and dashboards: `docker/openobserve/`, loaded into OpenObserve by `pnpm observability:load` ([Observability](infrastructure.md#observability))
 - [Testing-infrastructure changelog](changelogs/testing-troubleshooting.md): append-only log of test-infrastructure problems and their fixes
 
 ## Writing docs

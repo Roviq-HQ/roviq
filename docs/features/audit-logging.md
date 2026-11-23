@@ -138,27 +138,27 @@ Route: `apps/web/src/app/[locale]/institute/(dashboard)/audit/`
 | `audit_events_consumed_total` | Counter | — | AuditConsumer |
 | `audit_events_dlq_total` | Counter | error_type | AuditConsumer |
 
-### Grafana Dashboard
+### Dashboard
 
-File: `docker/grafana/dashboards/audit-logging.json` (auto-provisioned)
+File: `docker/openobserve/dashboards/audit-logging.json`, loaded by `pnpm observability:load`
+(`docs/infrastructure.md` → "Observability").
 
-11 panels across 4 rows:
-1. Pipeline Health: Throughput (by scope), Consumer Lag (thresholds), DLQ Depth (red if >0)
-2. Error & Scope: Error Rate, Scope Distribution (donut), Source Distribution (donut)
-3. Impersonation & Entity: Impersonation Volume, Top Entity Types (bar), Bulk Operations
-4. Storage: Partition Sizes, Index Sizes (PostgreSQL SQL references)
+9 panels in 3 rows:
+1. Pipeline health: throughput (by scope), consumer lag, dead-lettered events
+2. Errors and scope: error rate, events by scope, events by source
+3. Impersonation and entities: impersonated actions, top entity types, events published
 
-### Alerting Rules
+### Alert rules
 
-File: `docker/grafana/provisioning/alerting/audit-rules.yaml`
+Files: `docker/openobserve/alerts/` (the five `audit_*.json` files)
 
 | Alert | Condition | Severity |
 |-------|-----------|----------|
-| DLQ depth > 0 | `roviq_audit_events_dlq_total > 0` for 1 min | CRITICAL |
-| Consumer lag > 30 | `nats_consumer_num_pending > 30` for 5 min | WARNING |
-| DELETE spike | DELETE events > 3x 7-day average | WARNING |
-| Impersonation volume | 10+ impersonation entries/hour | INFO |
-| Partition missing | No events consumed by 28th of month | WARNING |
+| `audit_dlq_depth` | `sum(audit_events_dlq_total) > 0` for 1 min | critical |
+| `audit_consumer_lag` | `jetstream_consumer_num_pending` of `audit-log-writer` > 30 for 5 min | warning |
+| `audit_event_spike` | events in the last hour > 3x the 7-day hourly average, for 5 min | warning |
+| `audit_impersonation_volume` | more than 10 impersonated actions in one scope in an hour | info |
+| `audit_partition_creation` | no event consumed and the day of the month is 28 or later, for 1 hour | warning |
 
 ## Testing
 

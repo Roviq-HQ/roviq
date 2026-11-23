@@ -19,8 +19,7 @@ interface PanelShellProps {
   /**
    * What this panel actually plots. When provided, an `(i)` icon is rendered
    * next to the title with this text as a hover tooltip. Source-of-truth lives
-   * in `_lib/metric-descriptions.ts` and is mirrored into the Grafana dashboard
-   * JSON so the wording is the same in both places.
+   * in `_lib/metric-descriptions.ts`.
    */
   description?: string;
 }

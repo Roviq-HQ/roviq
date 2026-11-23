@@ -1,0 +1,223 @@
+{
+  "version": 5,
+  "title": "Roviq: event bus",
+  "description": "Events the gateway publishes to NATS, and the ones that fail.",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "panel_1",
+          "type": "metric",
+          "title": "Emit failures per second (5m)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(event_bus_emit_failed_total[5m])) or vector(0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 12,
+            "i": 1
+          }
+        },
+        {
+          "id": "panel_2",
+          "type": "metric",
+          "title": "Successful emits per second (5m)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "(sum(rate(event_bus_emit_total[5m])) or vector(0)) - (sum(rate(event_bus_emit_failed_total[5m])) or vector(0))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 96,
+            "h": 12,
+            "i": 2
+          }
+        },
+        {
+          "id": "panel_3",
+          "type": "line",
+          "title": "Failure rate by subject prefix",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (subject_prefix) (rate(event_bus_emit_failed_total[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{subject_prefix}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 96,
+            "h": 16,
+            "i": 3
+          }
+        },
+        {
+          "id": "panel_4",
+          "type": "line",
+          "title": "Emits by subject prefix",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (subject_prefix) (rate(event_bus_emit_total[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{subject_prefix}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 12,
+            "w": 96,
+            "h": 16,
+            "i": 4
+          }
+        },
+        {
+          "id": "panel_5",
+          "type": "table",
+          "title": "Top failing subjects (last hour)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (subject_prefix) (increase(event_bus_emit_failed_total[1h])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{subject_prefix}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 28,
+            "w": 192,
+            "h": 16,
+            "i": 5
+          }
+        }
+      ]
+    }
+  ]
+}

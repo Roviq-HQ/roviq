@@ -19,9 +19,7 @@ interface StreamsPanelProps {
   refreshMs: number | null;
 }
 
-// PromQL fragment that lists every stream Prometheus has seen messages-gauge data for.
-// Metric prefix is `jetstream_*` (from `prometheus-nats-exporter` which scrapes the
-// NATS server's built-in `:8222/jsz` endpoint) — NOT the older `nats_jetstream_*` prefix.
+// Lists every JetStream stream that has reported its message gauge.
 const STREAM_DISCOVERY_QUERY = 'count by (stream_name) (jetstream_stream_total_messages)';
 
 export function StreamsPanel({ range, refreshMs }: StreamsPanelProps) {
@@ -77,14 +75,10 @@ function EmptyState() {
   return (
     <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 px-6 py-8 text-center">
       <Info className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-      <div className="text-sm font-medium">No JetStream metrics found in Prometheus</div>
+      <div className="text-sm font-medium">No JetStream metrics found in OpenObserve</div>
       <div className="max-w-md text-xs text-muted-foreground">
-        Prometheus is not currently scraping any{' '}
-        <code className="rounded bg-muted px-1 py-0.5 text-[11px]">nats_jetstream_*</code> series.
-        Add a{' '}
-        <code className="rounded bg-muted px-1 py-0.5 text-[11px]">prometheus-nats-exporter</code>{' '}
-        scrape target (or enable NATS&rsquo; built-in Prometheus endpoint) and JetStream streams
-        will appear here automatically.
+        No <code className="rounded bg-muted px-1 py-0.5 text-[11px]">jetstream_*</code> series have
+        been exported yet. They appear here once the api-gateway is running and connected to NATS.
       </div>
     </div>
   );
@@ -98,9 +92,7 @@ interface StreamCardProps {
 
 function StreamCard({ name, range, refreshMs }: StreamCardProps) {
   const filter = `{stream_name="${name}"}`;
-  // Metric names match the prometheus-nats-exporter output (`-jsz=all` flag).
-  // sum(...) is needed because each stream has multiple label dimensions
-  // (server_id, account, …) and we want a single number per stream.
+  // sum(...) folds each stream's other label dimensions into one number.
   const { data: messages } = useInstantQuery(
     `sum(jetstream_stream_total_messages${filter})`,
     refreshMs,

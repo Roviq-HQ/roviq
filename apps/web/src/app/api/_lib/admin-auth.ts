@@ -3,10 +3,9 @@
 // access token via `Authorization: Bearer …` (see _lib/auth-fetch.ts in the
 // observability dir); this verifies the JWT and confirms the `scope` claim.
 //
-// Why JWT verify here even though the api-gateway also enforces it:
-// these routes don't proxy to the api-gateway — they proxy directly to
-// Prometheus/Loki/Tempo, which have NO auth of their own. Without a check
-// here every browser/bot can scrape live metrics + log content.
+// These routes call OpenObserve with server-held credentials, not the
+// api-gateway, so without this check any browser could read live metrics,
+// logs and traces through them.
 
 import jwt from 'jsonwebtoken';
 import { NextResponse } from 'next/server';

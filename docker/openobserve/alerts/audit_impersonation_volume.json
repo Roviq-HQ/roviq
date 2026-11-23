@@ -1,0 +1,31 @@
+{
+  "name": "audit_impersonation_volume",
+  "description": "More than 10 impersonated actions in one scope in the last hour. Check that the impersonation sessions are expected.",
+  "stream_type": "metrics",
+  "stream_name": "audit_impersonation_total",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "sum by (scope) (increase(audit_impersonation_total[1h]))",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 10
+    }
+  },
+  "trigger_condition": {
+    "period": 60,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 60
+  },
+  "pending_period_sec": 0,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "info",
+    "component": "audit"
+  }
+}

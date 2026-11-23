@@ -1,7 +1,7 @@
 /**
  * ROV-184 — platform system health against the full running stack.
  *
- * The e2e stack has no Prometheus, so alerts are unavailable; every dependency,
+ * The e2e stack runs no OpenObserve, so alerts are unavailable; every dependency,
  * object storage included, is a live container and must be up.
  * Status/degraded/uptime math and change detection are unit-tested in
  * apps/api-gateway/src/admin/monitoring/system-health/__tests__.

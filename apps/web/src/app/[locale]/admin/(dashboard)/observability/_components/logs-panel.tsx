@@ -8,18 +8,22 @@ import { METRIC_INFO } from '../_lib/metric-descriptions';
 import { usePollingEffect } from '../_lib/polling';
 import { PanelShell } from './panel-shell';
 
-interface LokiStream {
-  stream: Record<string, string>;
-  values: Array<[string, string]>;
+interface LogHit {
+  _timestamp?: number;
+  severity?: string;
+  service_name?: string;
+  body?: string;
 }
 
-interface LokiQueryResponse {
-  status?: string;
-  data?: { resultType: string; result: LokiStream[] };
+interface LogSearchResponse {
+  hits?: LogHit[];
   error?: string;
+  message?: string;
 }
 
 interface LogLine {
+  // Several lines can share a millisecond and a message, so the position is part of the key.
+  key: string;
   ts: number;
   level: string;
   service: string;
@@ -41,29 +45,27 @@ interface RecentLogsPanelProps {
   headerRight?: React.ReactNode;
 }
 
-function flattenStreams(result: LokiStream[]): LogLine[] {
-  const flat: LogLine[] = [];
-  for (const stream of result) {
-    for (const [tsNano, raw] of stream.values) {
-      let level = stream.stream.level ?? 'info';
-      let message = raw;
-      try {
-        const parsed = JSON.parse(raw) as { level?: string; msg?: string; message?: string };
-        if (parsed.level) level = parsed.level;
-        if (parsed.msg ?? parsed.message) message = (parsed.msg ?? parsed.message) as string;
-      } catch {
-        // non-JSON line, keep raw
-      }
-      flat.push({
-        ts: Math.floor(Number(tsNano) / 1_000_000),
-        level: level.toLowerCase(),
-        service: stream.stream.exported_job ?? stream.stream.service_name ?? '–',
-        message,
-      });
+function toLogLines(hits: LogHit[]): LogLine[] {
+  return hits.map((hit, index) => {
+    let level = hit.severity ?? 'info';
+    let message = hit.body ?? '';
+    try {
+      const parsed = JSON.parse(message) as { level?: string; msg?: string; message?: string };
+      if (parsed.level) level = parsed.level;
+      const text = parsed.msg ?? parsed.message;
+      if (text) message = text;
+    } catch {
+      // plain-text body
     }
-  }
-  flat.sort((a, b) => b.ts - a.ts);
-  return flat.slice(0, 100);
+    const ts = Math.floor((hit._timestamp ?? 0) / 1_000);
+    return {
+      key: `${ts}-${index}`,
+      ts,
+      level: level.toLowerCase(),
+      service: hit.service_name ?? '–',
+      message,
+    };
+  });
 }
 
 export function RecentLogsPanel({
@@ -77,32 +79,30 @@ export function RecentLogsPanel({
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
   const sinceSeconds = range.seconds;
-  // Sanitised so the user-controlled URL state can't inject LogQL (review M3).
-  const sanitised = sanitizeServiceNames(services);
-  const svcRegex = sanitised.length > 0 ? sanitised.join('|') : '.+';
+  const serviceList = sanitizeServiceNames(services).join(',');
 
   usePollingEffect(
     async () => {
       try {
         const params = new URLSearchParams({
-          query: `{exported_job=~"${svcRegex}"}`,
           limit: '50',
           sinceSeconds: String(sinceSeconds),
         });
+        if (serviceList) params.set('services', serviceList);
         const res = await authFetch(`/api/logs?${params}`);
-        const body = (await res.json()) as LokiQueryResponse;
-        if (body.status !== 'success') {
-          setError(body.error ?? 'loki error');
+        const body = (await res.json()) as LogSearchResponse;
+        if (!res.ok) {
+          setError(body.error ?? body.message ?? `logs query failed (HTTP ${res.status})`);
           return;
         }
-        setLogs(flattenStreams(body.data?.result ?? []));
+        setLogs(toLogLines(body.hits ?? []));
         setLastFetchedAt(Date.now());
         setError(null);
       } catch (err) {
         setError(errMessage(err));
       }
     },
-    { refreshMs, deps: [sinceSeconds, svcRegex] },
+    { refreshMs, deps: [sinceSeconds, serviceList] },
   );
 
   return (
@@ -128,7 +128,7 @@ export function RecentLogsPanel({
           <ul className="space-y-0.5">
             {logs.map((line) => (
               <li
-                key={`${line.ts}-${line.message.slice(0, 24)}`}
+                key={line.key}
                 className="flex gap-2 border-b border-border/40 px-1 py-1 last:border-0"
               >
                 <span className="shrink-0 text-muted-foreground tabular-nums">

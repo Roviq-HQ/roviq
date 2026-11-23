@@ -84,11 +84,7 @@ To run more than one dev environment at once, see [Parallel dev instances](#para
 | Temporal | 7233 (gRPC) | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
 | Mailpit | 1025 (SMTP), 8025 (web/API), 8026 (e2e API) | Catches every email the notification service sends in dev and e2e |
-| OTel Collector | 4317 (gRPC), 4318 (HTTP), 13133 (health) | OpenTelemetry collector — receives traces/metrics/logs, fans out to Tempo/Loki/Prometheus |
-| Tempo | 3200 | Distributed tracing backend (Grafana Tempo 2.7.2) |
-| Loki | 3100 | Log aggregation backend |
-| Prometheus | 9090 | Metrics scraping and storage |
-| Grafana | 3001 | Observability dashboards — also embedded in the admin portal at `/observability` |
+| OpenObserve v1.1.2 | 5080 (UI and API), 5081 (OTLP gRPC) | Logs, metrics, traces, dashboards and alerts in one container. Off by default: see [Observability](#observability) |
 
 ### Object storage
 
@@ -170,31 +166,34 @@ Things to know:
 
 ## Observability
 
-The stack is wired end-to-end via OpenTelemetry:
+One container, OpenObserve, stores logs, metrics and traces and holds the dashboards and alerts.
+The apps export to it directly over OTLP gRPC; there is no collector and no scraper.
 
 ```
-App (OTel SDK) → OTel Collector (4317) → Tempo   (traces)
-                                        → Loki    (logs)
-                                        → Prometheus (metrics, namespace: roviq)
-                                             ↓
-                                        Grafana (3001) ← embedded in the admin portal
+api-gateway (OpenTelemetry SDK) ──OTLP gRPC──▶ OpenObserve (5081)
+gateway and admin portal ◀──HTTP queries── OpenObserve (5080) ──alert email──▶ Mailpit (dev)
 ```
 
-- **Switch**: the SDK starts only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (preloaded by `libs/backend/telemetry/src/init-telemetry.ts`). Unset, nothing loads: the metric instruments in the code are OpenTelemetry API no-ops and log lines carry no trace ids. To use the dev stack, set it to `http://localhost:<DEV_OTEL_GRPC_PORT>` in `.env` and trigger `observability`.
-- **Traces**: auto-instrumented via `@opentelemetry/auto-instrumentations-node`. Sampling: 100% in dev, 10% in production.
-- **Metrics**: exported every 10s in dev (60s in production). Metric names are prefixed `roviq_`.
-- **Per-tenant API usage** (ROV-184): the api-gateway counter `roviq.api.requests` (Apollo plugin `TenantApiRequestsPlugin`) adds 1 per GraphQL operation over HTTP from an institute-scope caller, labelled `tenant_id`. graphql-ws subscriptions are not counted. Prometheus series: `roviq_roviq_api_requests_total`. The platform-admin query `adminTenantAnalytics` (module `apps/api-gateway/src/admin/monitoring/tenant-analytics/`, ability `read SystemHealth`) reads it with `sum by (tenant_id)(increase(…[24h]))` for `apiCalls24h` and a 7-point 1-day-step range for `activityTrend7d`; `activeUsers24h` comes from `refresh_tokens` (distinct users with a token created or used in the last 24h). When Prometheus is unreachable the query still answers, with `metricsAvailable: false` and null API-call fields. A tenant's calls made before its series was first scraped are not counted, because `increase()` needs two samples.
-- **File sweeper** (ROV-300): the api-gateway counter `file_sweeper_files_total` (Prometheus: `roviq_file_sweeper_files_total`) counts files the hourly sweeper handled, labelled `action` (`pending`, `rejected`, `deleted`, `retired_timed`, `retired_unused`, `purge`) and `result` (`removed`, `failed`, `skipped`). For the two `retired_*` actions, `removed` means the file was marked DELETED, not yet erased. A steady `failed` count means storage refuses deletes. See `docs/architecture.md` → "File sweeper".
-- **Logs**: OTel Pino instrumentation injects `trace_id`/`span_id` into log records for correlation (log shipping to Loki requires a separate pipeline — not yet configured).
-- **Grafana dashboard**: every JSON file in `docker/grafana/dashboards/` is provisioned into Grafana (http://localhost:3001), which the admin portal also links from its Observability page.
+- **Turning it on in dev**: `pnpm tilt trigger observability` starts the `openobserve` container, runs `pnpm observability:load` and restarts the two backend dev servers. A dev server exports telemetry when this instance's OpenObserve answers at its start (`scripts/dev-telemetry-env.sh` sets `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS`); otherwise no OpenTelemetry SDK loads, the metric instruments in the code are no-ops and log lines carry no trace ids. `pnpm tilt trigger observability-off` stops the container and restarts the dev servers without telemetry. Sign in to the UI at `http://localhost:<DEV_OPENOBSERVE_PORT>` with the dev credentials in `.env.example`.
+- **What exports**: the api-gateway preloads `libs/backend/telemetry/src/init-telemetry.ts`. The notification service does not start the SDK, so it exports nothing.
+- **Traces**: auto-instrumented via `@opentelemetry/auto-instrumentations-node`. Sampling: 100% in dev, 10% in production. Requests to `/api/health*` are not traced.
+- **Metrics**: exported every 10s in dev (60s in production). A series is named after its instrument with dots turned into underscores (`http.server.duration` is `http_server_duration_bucket`, `_count`, `_sum`); the service is the label `service_name`. Query them with PromQL in OpenObserve or through its PromQL-compatible HTTP API, which `OpenObserveClient` and the admin portal's `/api/metrics` route use.
+- **Logs**: the Pino instrumentation sends every log record to OpenObserve with its `trace_id` and `span_id`, so a trace shows its log lines.
+- **Personal data**: `libs/backend/telemetry/src/redaction.ts` decides what leaves the process. What is exported and what is not is listed in `docs/deployment.md` → "Telemetry and shutdown".
+- **JetStream metrics**: the api-gateway reads stream and consumer state from NATS on each metric export and sends it as gauges (`apps/api-gateway/src/admin/monitoring/jetstream-metrics.ts`): `jetstream_stream_total_messages`, `jetstream_stream_total_bytes`, `jetstream_stream_consumer_count` (label `stream_name`) and `jetstream_consumer_num_pending`, `jetstream_consumer_num_redelivered`, `jetstream_consumer_num_ack_pending` (labels `stream_name`, `consumer_name`).
+- **A new metric source**: when one of the apps already talks to the source and the numbers are few, the app exports them as OpenTelemetry gauges, as it does for JetStream. For a tool that only offers a `/metrics` page to be scraped, do not write a bridge in the apps: add one scraper container (an OpenTelemetry Collector with its scrape receiver) that pushes to OpenObserve's remote-write endpoint. No source needs one today.
+- **Dashboards and alerts** live in `docker/openobserve/`: `dashboards/*.json` (OpenObserve's own export format, so a dashboard edited in the UI can be exported and committed), `alerts/*.json` (PromQL alerts; `context_attributes` holds `severity`, `component` and `runbook`) and `alert-email-template.json`. `pnpm observability:load` (`scripts/observability-load.ts`) creates or updates them through the API, creates the email destination `roviq_ops_email` and creates the metric stream an alert reads when it has no data yet. It changes nothing when OpenObserve already matches the files. Alert emails go to `OPENOBSERVE_ALERT_EMAILS`, else to `OPENOBSERVE_USER`; in dev they land in Mailpit.
+- **Per-tenant API usage** (ROV-184): the api-gateway counter `roviq.api.requests` (Apollo plugin `TenantApiRequestsPlugin`) adds 1 per GraphQL operation over HTTP from an institute-scope caller, labelled `tenant_id`. graphql-ws subscriptions are not counted. Series: `roviq_api_requests`. The platform-admin query `adminTenantAnalytics` (module `apps/api-gateway/src/admin/monitoring/tenant-analytics/`, ability `read SystemHealth`) reads it with `sum by (tenant_id)(increase(…[24h]))` for `apiCalls24h` and a 7-point 1-day-step range for `activityTrend7d`; `activeUsers24h` comes from `refresh_tokens` (distinct users with a token created or used in the last 24h). When OpenObserve is unreachable the query still answers, with `metricsAvailable: false` and null API-call fields. A tenant's calls made before its series had two samples are not counted, because `increase()` needs two.
+- **File sweeper** (ROV-300): the api-gateway counter `file_sweeper_files_total` counts files the hourly sweeper handled, labelled `action` (`pending`, `rejected`, `deleted`, `retired_timed`, `retired_unused`, `purge`) and `result` (`removed`, `failed`, `skipped`). For the two `retired_*` actions, `removed` means the file was marked DELETED, not yet erased. A steady `failed` count means storage refuses deletes. See `docs/architecture.md` → "File sweeper".
+- **Resource bounds**: OpenObserve grows into the memory it is given and preallocates write-ahead-log files, so both compose files cap the container (`mem_limit`, `cpus`) and set its cache, memtable and write-ahead-log sizes and a retention period (7 days in dev).
 
 ### Health checks and system health (ROV-184)
 
 - **`GET /api/health`** (terminus) checks all five dependencies and returns 503 if any is down: Postgres (`select 1` on the shared pool), Redis (`PING`), NATS (`rtt()` on the shared DLQ NATS connection), Temporal (gRPC health service on one lazy connection) and object storage (both buckets answer a `HeadBucket`). Each check times out after 2s. Indicators live in `apps/api-gateway/src/health/indicators/`. The e2e stack's own readiness probe is a GraphQL query.
 - **`GET /api/health/ready`** checks only Postgres, Redis and NATS, which every request needs. Readiness probes (Tilt's api-gateway resource) use it, so a Temporal or object storage outage degrades the features that use them without taking the gateway out of rotation.
 - **System health poller**: `SystemHealthService` (`apps/api-gateway/src/admin/monitoring/system-health/`) probes the same five plus `API_GATEWAY` (event-loop delay p99 from `perf_hooks.monitorEventLoopDelay`) every 15s. A reachable service slower than its threshold in `DEGRADED_THRESHOLD_MS` is `DEGRADED` (API_GATEWAY 200ms, Postgres 500ms, Redis 100ms, NATS 200ms, Temporal and object storage 1s). Each poll increments hourly Redis hashes `monitoring:uptime:<SERVICE>:<hourEpoch>` (`REDIS_KEYS.SYSTEM_HEALTH_UPTIME`, `{ up, total }`, TTL 25h); `uptimePercent` sums the last 24 buckets.
-- **GraphQL** (platform scope, ability `read SystemHealth`): `adminSystemHealth` (services, per-stream JetStream lag = summed `num_pending` of the stream's consumers, connections, firing Prometheus alerts, pending DLQ count), `adminConnectionMetrics` (graphql-ws connections and in-flight HTTP requests on the answering instance) and the subscription `adminSystemHealthUpdated`, which sends the current snapshot on subscribe and then a new one whenever a service status, stream lag, the alert set or the DLQ count changes. The change signal is the in-process pubSub topic `MONITORING.system_health_updated`; it is never published to NATS. Counters and the subscription are per gateway instance.
-- **Prometheus client**: `PrometheusClient` (`apps/api-gateway/src/admin/monitoring/prometheus.client.ts`) reads `PROMETHEUS_URL`, else `http://localhost:$DEV_PROMETHEUS_PORT`, with a 3s timeout. When Prometheus is unreachable, `alertsAvailable` is `false` and `alerts` is empty.
+- **GraphQL** (platform scope, ability `read SystemHealth`): `adminSystemHealth` (services, per-stream JetStream lag = summed `num_pending` of the stream's consumers, connections, firing OpenObserve alerts, pending DLQ count), `adminConnectionMetrics` (graphql-ws connections and in-flight HTTP requests on the answering instance) and the subscription `adminSystemHealthUpdated`, which sends the current snapshot on subscribe and then a new one whenever a service status, stream lag, the alert set or the DLQ count changes. The change signal is the in-process pubSub topic `MONITORING.system_health_updated`; it is never published to NATS. Counters and the subscription are per gateway instance.
+- **OpenObserve client**: `OpenObserveClient` (`apps/api-gateway/src/admin/monitoring/openobserve.client.ts`) reads `OPENOBSERVE_URL` (else `http://localhost:$DEV_OPENOBSERVE_PORT`), `OPENOBSERVE_ORG`, `OPENOBSERVE_USER` and `OPENOBSERVE_PASSWORD`, with a 3s timeout. When OpenObserve is unreachable or the credentials are unset, `alertsAvailable` is `false` and `alerts` is empty. An alert is firing when it is enabled and its last outcome is `firing`.
 
 ## Database
 
@@ -302,9 +301,12 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 | WEB_PORT | Web app port (optional, defaults to 4200) |
 | API_GATEWAY_INSPECT_PORT, NOTIFICATION_SERVICE_INSPECT_PORT | Node inspector ports of the Tilt-run gateway and notification service (defaults 9229, 9230). Per-instance, so parallel instances do not fight over 9229 |
 | ROVIQ_INSTANCE, ROVIQ_COMPOSE_PROJECT, ROVIQ_E2E_COMPOSE_PROJECT, DEV_*_PORT, E2E_*_PORT, TILT_PORT | Generated by `pnpm instance:new` / `instance:env` for slots other than 0. See "Parallel dev instances" |
-| OTEL_EXPORTER_OTLP_ENDPOINT | OTel Collector gRPC endpoint; unset turns telemetry off |
+| OTEL_EXPORTER_OTLP_ENDPOINT | OTLP gRPC endpoint of OpenObserve; unset turns telemetry off. Leave unset in dev: Tilt's `observability` sets it |
+| OTEL_EXPORTER_OTLP_HEADERS | gRPC metadata for the exporters: `authorization=Basic <base64 of user:password>,organization=<org>,stream-name=default` |
+| OPENOBSERVE_URL, OPENOBSERVE_ORG, OPENOBSERVE_USER, OPENOBSERVE_PASSWORD | Where the gateway, the admin portal's proxy routes and `pnpm observability:load` query OpenObserve, and as whom |
+| OPENOBSERVE_ALERT_EMAILS | Comma-separated recipients of alert emails, each an OpenObserve user (default: OPENOBSERVE_USER) |
 | OTEL_SERVICE_NAME | Service name reported in traces and metrics |
 | OTEL_SERVICE_VERSION | Service version reported in traces and metrics |
 | LOG_LEVEL | Pino log level (default: info) |
 | NEXT_PUBLIC_API_URL | Public API base URL for browser-side requests (default: http://localhost:3005) |
-| NEXT_PUBLIC_GRAFANA_URL | Grafana base URL for the admin portal Observability iframe (default: http://localhost:3001) |
+| NEXT_PUBLIC_OPENOBSERVE_URL | Browser-reachable OpenObserve URL for the admin portal's "Open in OpenObserve" links (default: http://localhost:5080) |

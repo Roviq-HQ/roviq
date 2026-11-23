@@ -14,6 +14,7 @@ import {
   TIME_RANGES,
   type TimeRange,
 } from '../_lib/constants';
+import { openObserveSectionUrl } from '../_lib/openobserve-links';
 import { ServiceFilter } from './service-filter';
 
 interface ToolbarProps {
@@ -24,7 +25,7 @@ interface ToolbarProps {
   onRefreshNow: () => void;
   services: string[];
   setServices: (s: string[]) => void;
-  grafanaUrl: string;
+  openObserveUrl: string;
 }
 
 export function Toolbar({
@@ -35,7 +36,7 @@ export function Toolbar({
   onRefreshNow,
   services,
   setServices,
-  grafanaUrl,
+  openObserveUrl,
 }: ToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -80,9 +81,13 @@ export function Toolbar({
       <div className="flex-1" />
 
       <Button variant="outline" size="sm" asChild className="gap-2">
-        <a href={`${grafanaUrl}/explore?orgId=1`} target="_blank" rel="noopener noreferrer">
+        <a
+          href={openObserveSectionUrl(openObserveUrl, 'metrics')}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <ExternalLink className="size-4" />
-          Open in Grafana
+          Open in OpenObserve
         </a>
       </Button>
     </div>

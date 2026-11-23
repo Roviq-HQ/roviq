@@ -1,0 +1,31 @@
+{
+  "name": "audit_event_spike",
+  "description": "Audit events in the last hour exceed three times the 7-day hourly average. Look for an unexpected bulk change or deletion.",
+  "stream_type": "metrics",
+  "stream_name": "audit_events_published_total",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "sum(increase(audit_events_published_total[1h])) > 3 * avg_over_time(sum(increase(audit_events_published_total[1h]))[7d:1h])",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 60,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 60
+  },
+  "pending_period_sec": 300,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "warning",
+    "component": "audit"
+  }
+}

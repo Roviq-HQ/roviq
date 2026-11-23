@@ -45,14 +45,22 @@ declare global {
       LOCKOUT_DURATION_SECONDS?: string;
       FAILURE_WINDOW_SECONDS?: string;
       NATS_VALIDATE_PAYLOADS?: string;
-      PROMETHEUS_URL?: string;
-      /** Host port of this instance's Prometheus (slot 0: 9090); fallback when PROMETHEUS_URL is unset. */
-      DEV_PROMETHEUS_PORT?: string;
-      LOKI_URL?: string;
-      TEMPO_URL?: string;
-      NEXT_PUBLIC_GRAFANA_URL?: string;
-      DEV_TEMPO_PORT?: string;
-      DEV_LOKI_PORT?: string;
+      /** OTLP gRPC endpoint of OpenObserve; unset turns telemetry off. */
+      OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+      /** gRPC metadata for the OTLP exporters: `authorization=Basic <base64>,organization=<org>,stream-name=default`. */
+      OTEL_EXPORTER_OTLP_HEADERS?: string;
+      /** HTTP base URL of OpenObserve for queries; unset: `http://localhost:$DEV_OPENOBSERVE_PORT`. */
+      OPENOBSERVE_URL?: string;
+      /** OpenObserve organization (default: `default`). */
+      OPENOBSERVE_ORG?: string;
+      OPENOBSERVE_USER?: string;
+      OPENOBSERVE_PASSWORD?: string;
+      /** Comma-separated recipients of alert emails; each must be an OpenObserve user. Unset: OPENOBSERVE_USER. */
+      OPENOBSERVE_ALERT_EMAILS?: string;
+      /** Host port of this instance's OpenObserve (slot 0: 5080); fallback when OPENOBSERVE_URL is unset. */
+      DEV_OPENOBSERVE_PORT?: string;
+      /** Browser-reachable OpenObserve URL for the admin portal's "Open in OpenObserve" links. */
+      NEXT_PUBLIC_OPENOBSERVE_URL?: string;
       /** Origin of the institute portal, e.g. https://app.roviq.com. Unset: derived from the current host. */
       NEXT_PUBLIC_INSTITUTE_URL?: string;
       /** Host port of this instance's isolated NATS test broker (slot 0: 4224). */

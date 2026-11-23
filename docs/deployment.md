@@ -138,9 +138,53 @@ To turn scanning on:
 
 ## Telemetry and shutdown
 
-- Set `OTEL_EXPORTER_OTLP_ENDPOINT` only where an OpenTelemetry collector runs. Unset, the
-  gateway starts no SDK and exports nothing; set to an unreachable address, every export fails
-  and the data is lost.
+- **OpenObserve** stores logs, metrics and traces and runs the dashboards and alerts
+  (`docs/infrastructure.md` → "Observability"). `docker/compose.app.yaml` runs it as the
+  `openobserve` service with a memory limit (2 GB), a CPU limit, a named data volume
+  (`roviq-openobserve`), bounded cache, memtable and write-ahead-log sizes and 30 days of
+  retention. It publishes no port: reach its UI over the private network (a reverse proxy
+  with its own access control, or an SSH tunnel to port 5080). It shares the server with the
+  apps, so it goes down with them: an uptime check from outside is still needed.
+- **Required variables** (compose refuses to start without them): `OPENOBSERVE_USER` (an
+  email address; it becomes OpenObserve's first user and receives alert emails),
+  `OPENOBSERVE_PASSWORD` (8 to 128 characters with a lower-case letter, an upper-case letter,
+  a digit and a special character, or the container exits) and `OTEL_EXPORTER_OTLP_HEADERS`,
+  the gRPC metadata the gateway's exporters send:
+  `authorization=Basic <base64 of user:password>,organization=default,stream-name=default`
+  (`printf '%s' "$OPENOBSERVE_USER:$OPENOBSERVE_PASSWORD" | base64 -w0`).
+- **One account for everything.** The open-source OpenObserve has only full-access roles, so
+  the exporters, the gateway's queries, the admin portal's proxy routes and the loader all use
+  `OPENOBSERVE_USER`. Anyone who can read the gateway's or the web app's environment can read
+  and delete all telemetry. The password never reaches a browser: the proxy routes build every
+  query on the server and require a platform-admin token.
+- **Alert emails** need a mail server: set `OPENOBSERVE_SMTP_ENABLED=true`,
+  `OPENOBSERVE_SMTP_HOST`, `OPENOBSERVE_SMTP_PORT`, `OPENOBSERVE_SMTP_USER`,
+  `OPENOBSERVE_SMTP_PASSWORD`, `OPENOBSERVE_SMTP_FROM` and, if not STARTTLS,
+  `OPENOBSERVE_SMTP_ENCRYPTION`. OpenObserve does not save an alert without a destination, so
+  without a mail server the loader loads the dashboards and then stops with a message.
+  More recipients: add them as users in OpenObserve and list them in `OPENOBSERVE_ALERT_EMAILS`.
+- **Each deploy** runs `pnpm observability:load` with `OPENOBSERVE_URL`, `OPENOBSERVE_USER` and
+  `OPENOBSERVE_PASSWORD` set, from a place that can reach port 5080. It creates or updates the
+  dashboards and alerts in `docker/openobserve/` and changes nothing when they already match.
+- **The web image** needs `NEXT_PUBLIC_OPENOBSERVE_URL` at build time: the address at which an
+  operator's browser reaches the OpenObserve UI, used by the "Open in OpenObserve" links.
+- **Telemetry is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set.** Unset, the gateway starts
+  no SDK and exports nothing; set to an unreachable address, every export fails and the data
+  is lost. Application logs also stay on the server's disk through Docker, which is the
+  fallback when OpenObserve is down.
+- **What is exported.** Logs: the message, level, module, error stack, trace id and, for a
+  request, its method, path and status. The request logger never writes headers, bodies or
+  query strings (`libs/backend/telemetry/src/redaction.ts`). Traces: HTTP method,
+  route, path with its query string, status, the client's IP address and user agent; SQL
+  statements with placeholders, never their parameter values; GraphQL documents with every
+  literal value replaced by `*`, never the variables; Redis command names without keys or
+  values. Metrics: counts and durations labelled by route, institute id (`tenant_id`),
+  stream and similar identifiers. Not exported: the host name, the process command line and
+  the operating-system user.
+- **What remains personal data in OpenObserve**: client IP addresses and user agents on
+  request spans, institute and record ids in metric labels and log messages, and whatever an
+  error message itself quotes. Treat the OpenObserve volume and its backups as personal data,
+  and keep its retention period no longer than the application's own log retention.
 - On SIGTERM the gateway and the notification service stop accepting connections, finish
   in-flight requests, stop their consumers and Temporal workers, close NATS, Temporal, database
   pools and Redis, flush telemetry (at most 2 s) and exit 0. Past 10 s they exit 1 and log what

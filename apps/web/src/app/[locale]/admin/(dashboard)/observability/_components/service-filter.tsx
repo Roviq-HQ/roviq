@@ -20,7 +20,7 @@ interface ServiceFilterProps {
 
 interface PromVectorResponse {
   status?: string;
-  data?: { result: Array<{ metric: { exported_job?: string } }> };
+  data?: { result: Array<{ metric: { service_name?: string } }> };
 }
 
 export function ServiceFilter({ selected, onChange }: ServiceFilterProps) {
@@ -32,13 +32,13 @@ export function ServiceFilter({ selected, onChange }: ServiceFilterProps) {
       try {
         const params = new URLSearchParams({
           endpoint: 'query',
-          query: 'count by (exported_job) (roviq_http_server_duration_milliseconds_count)',
+          query: 'count by (service_name) (http_server_duration_count)',
         });
         const res = await authFetch(`/api/metrics?${params}`);
         const body = (await res.json()) as PromVectorResponse;
         if (cancelled) return;
         const names = (body.data?.result ?? [])
-          .map((r) => r.metric.exported_job)
+          .map((r) => r.metric.service_name)
           .filter((s): s is string => Boolean(s))
           .sort();
         setServices(names);

@@ -2,11 +2,11 @@ import { BusinessException, type PlatformContext } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  PrometheusClient,
-  PrometheusUnavailableError,
-  type PromSample,
-  type PromSeries,
-} from '../../prometheus.client';
+  type MetricSample,
+  type MetricSeries,
+  OpenObserveClient,
+  OpenObserveUnavailableError,
+} from '../../openobserve.client';
 import type { AdminTenantAnalyticsArgs } from '../dto/tenant-analytics.args';
 import {
   type TenantActiveUsersRecord,
@@ -68,11 +68,11 @@ const storage: TenantStorageRecord[] = [
   { tenantId: INST_A, storageUsedBytes: 5_000 },
   { tenantId: INST_C, storageUsedBytes: 2_000_000 },
 ];
-const calls: PromSample[] = [
+const calls: MetricSample[] = [
   { metric: { tenant_id: INST_A }, value: 40.4 },
   { metric: { tenant_id: INST_B }, value: 120 },
 ];
-const trend: PromSeries[] = [
+const trend: MetricSeries[] = [
   {
     metric: { tenant_id: INST_B },
     values: [
@@ -88,7 +88,7 @@ function args(overrides: Partial<AdminTenantAnalyticsArgs> = {}): AdminTenantAna
 
 describe('TenantAnalyticsService', () => {
   let repo: TenantAnalyticsRepository;
-  let prometheus: PrometheusClient;
+  let openObserve: OpenObserveClient;
   let service: TenantAnalyticsService;
 
   beforeEach(() => {
@@ -99,18 +99,18 @@ describe('TenantAnalyticsService', () => {
       countActiveUsersSince: vi.fn().mockResolvedValue(activeUsers),
       sumStorageByTenant: vi.fn().mockResolvedValue(storage),
     });
-    prometheus = createMock<PrometheusClient>({
+    openObserve = createMock<OpenObserveClient>({
       query: vi.fn().mockResolvedValue(calls),
       queryRange: vi.fn().mockResolvedValue(trend),
     });
-    service = new TenantAnalyticsService(repo, prometheus);
+    service = new TenantAnalyticsService(repo, openObserve);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('should merge DB and Prometheus data per institute', async () => {
+  it('should merge DB and OpenObserve data per institute', async () => {
     const result = await service.list(CTX, args());
 
     expect(result.metricsAvailable).toBe(true);
@@ -146,13 +146,13 @@ describe('TenantAnalyticsService', () => {
     expect(result.edges.map((e) => e.node.instituteId)).toEqual([INST_C, INST_A, INST_B]);
   });
 
-  it('should query Prometheus once for 24h totals and once for a 7-point daily range', async () => {
+  it('should query OpenObserve once for 24h totals and once for a 7-point daily range', async () => {
     await service.list(CTX, args());
 
-    expect(prometheus.query).toHaveBeenCalledWith(
+    expect(openObserve.query).toHaveBeenCalledWith(
       `sum by (tenant_id) (increase(${TENANT_API_REQUESTS_SERIES}[24h]))`,
     );
-    expect(prometheus.queryRange).toHaveBeenCalledWith(
+    expect(openObserve.queryRange).toHaveBeenCalledWith(
       `sum by (tenant_id) (increase(${TENANT_API_REQUESTS_SERIES}[1d]))`,
       START,
       NOW_SEC,
@@ -188,7 +188,7 @@ describe('TenantAnalyticsService', () => {
     });
 
     it('should break ties by institute id so pages stay stable', async () => {
-      vi.mocked(prometheus.query).mockRejectedValue(new PrometheusUnavailableError('down'));
+      vi.mocked(openObserve.query).mockRejectedValue(new OpenObserveUnavailableError('down'));
 
       const result = await service.list(CTX, args({ sortBy: 'API_CALLS_24H', sortOrder: 'DESC' }));
 
@@ -244,9 +244,9 @@ describe('TenantAnalyticsService', () => {
     });
   });
 
-  describe('Prometheus unavailable', () => {
+  describe('OpenObserve unavailable', () => {
     it('should still answer with null API metrics and metricsAvailable=false', async () => {
-      vi.mocked(prometheus.queryRange).mockRejectedValue(new PrometheusUnavailableError('down'));
+      vi.mocked(openObserve.queryRange).mockRejectedValue(new OpenObserveUnavailableError('down'));
 
       const result = await service.list(CTX, args({ sortBy: 'ACTIVE_USERS_24H' }));
 
@@ -276,8 +276,8 @@ describe('TenantAnalyticsService', () => {
       ]);
     });
 
-    it('should rethrow errors that are not Prometheus outages', async () => {
-      vi.mocked(prometheus.query).mockRejectedValue(new TypeError('bug'));
+    it('should rethrow errors that are not OpenObserve outages', async () => {
+      vi.mocked(openObserve.query).mockRejectedValue(new TypeError('bug'));
 
       await expect(service.list(CTX, args())).rejects.toThrow(TypeError);
     });

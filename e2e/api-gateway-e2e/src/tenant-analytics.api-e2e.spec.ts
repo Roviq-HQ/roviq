@@ -3,7 +3,7 @@
  *
  * Active-user counting and the reseller-scope rejection with synthetic fixtures are covered in
  * apps/api-gateway/src/admin/monitoring/tenant-analytics/__tests__/tenant-analytics.integration.spec.ts.
- * The e2e stack runs no Prometheus, so API-call metrics are expected to be unavailable here.
+ * The e2e stack runs no OpenObserve, so API-call metrics are expected to be unavailable here.
  */
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';

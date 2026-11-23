@@ -1,0 +1,6 @@
+{
+  "name": "roviq_alert_email",
+  "type": "email",
+  "title": "[Roviq alert] {alert_name}",
+  "body": "<p><b>{alert_name}</b> is firing in organization {org_name}.</p><p>{rows}</p><p>Window: {alert_period} min, condition: {alert_operator} {alert_threshold}, matching rows: {alert_count}.</p><p><a href=\"{alert_url}\">Open in OpenObserve</a></p>"
+}

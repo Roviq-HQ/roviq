@@ -1,54 +1,47 @@
 import { NextResponse } from 'next/server';
 import { requireAdminAuth } from '../_lib/admin-auth';
+import {
+  clampInt,
+  MAX_RANGE_SECONDS,
+  OPENOBSERVE_STREAM,
+  parseServiceNames,
+  searchOpenObserve,
+  serviceNameInClause,
+} from '../_lib/openobserve';
 
-const TEMPO_URL =
-  process.env.TEMPO_URL ?? `http://localhost:${process.env.DEV_TEMPO_PORT ?? '3200'}`;
-const UPSTREAM_TIMEOUT_MS = 8_000;
 const MAX_LIMIT = 100;
-const MAX_RANGE_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+// OTLP span kinds as OpenObserve stores them: '2' server, '5' consumer (incoming work).
+const ROOT_SPAN_FILTERS = [
+  "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')",
+  "span_kind IN ('2', '5')",
+  // Docker health checks, the gateway's own health probe and codegen introspection crowd out real traffic.
+  "service_name <> 'compose'",
+  "operation_name NOT LIKE 'GET /api/health%'",
+  "operation_name <> 'HEAD /_ping'",
+  // Introspection is a child span of an ordinary `POST /api/graphql` root.
+  `trace_id NOT IN (SELECT trace_id FROM "${OPENOBSERVE_STREAM}" WHERE operation_name = 'query IntrospectionQuery')`,
+];
 
 export async function GET(request: Request) {
   const denied = requireAdminAuth(request);
   if (denied) return denied;
 
   const url = new URL(request.url);
-
-  const rawLimit = Number(url.searchParams.get('limit') ?? '20');
-  const limit = Math.min(
-    Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 20, 1),
-    MAX_LIMIT,
-  );
-
-  const rawSinceSeconds = Number(url.searchParams.get('sinceSeconds') ?? '3600');
-  const sinceSeconds = Math.min(
-    Math.max(Number.isFinite(rawSinceSeconds) ? Math.floor(rawSinceSeconds) : 3600, 1),
-    MAX_RANGE_SECONDS,
-  );
-
-  const tags = url.searchParams.get('q');
-
-  const now = Math.floor(Date.now() / 1000);
-  const upstream = new URL(`${TEMPO_URL}/api/search`);
-  upstream.searchParams.set('limit', String(limit));
-  upstream.searchParams.set('start', String(now - sinceSeconds));
-  upstream.searchParams.set('end', String(now));
-  if (tags) upstream.searchParams.set('q', tags);
-
-  try {
-    const res = await fetch(upstream.toString(), {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-    const body = await res.text();
-    return new NextResponse(body, {
-      status: res.status,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (err) {
-    return NextResponse.json(
-      { error: 'tempo unreachable', detail: err instanceof Error ? err.message : String(err) },
-      { status: 502 },
-    );
+  const services = parseServiceNames(url.searchParams.get('services'));
+  if (!services) {
+    return NextResponse.json({ error: 'invalid service name' }, { status: 400 });
   }
+  const limit = clampInt(url.searchParams.get('limit'), { fallback: 20, min: 1, max: MAX_LIMIT });
+  const sinceSeconds = clampInt(url.searchParams.get('sinceSeconds'), {
+    fallback: 3600,
+    min: 1,
+    max: MAX_RANGE_SECONDS,
+  });
+
+  const filters =
+    services.length > 0 ? [...ROOT_SPAN_FILTERS, serviceNameInClause(services)] : ROOT_SPAN_FILTERS;
+  const sql = `SELECT _timestamp, trace_id, service_name, operation_name, duration FROM "${OPENOBSERVE_STREAM}" WHERE ${filters.join(' AND ')} ORDER BY _timestamp DESC`;
+
+  return searchOpenObserve({ type: 'traces', sql, sinceSeconds, size: limit });
 }

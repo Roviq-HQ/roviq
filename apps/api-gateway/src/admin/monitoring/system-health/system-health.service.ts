@@ -27,7 +27,7 @@ import { RedisHealthIndicator } from '../../../health/indicators/redis.health';
 import { StorageHealthIndicator } from '../../../health/indicators/storage.health';
 import { TemporalHealthIndicator } from '../../../health/indicators/temporal.health';
 import { type ConnectionCounts, ConnectionTracker } from '../connections/connection-tracker';
-import { type PromAlert, PrometheusClient } from '../prometheus.client';
+import { type FiringAlert, OpenObserveClient } from '../openobserve.client';
 import {
   DEGRADED_THRESHOLD_MS,
   SYSTEM_HEALTH_POLL_INTERVAL_MS,
@@ -108,7 +108,7 @@ export function toAlertSeverity(label: string | undefined): AlertSeverity {
   }
 }
 
-export function toActiveAlert(alert: PromAlert): ActiveAlert {
+export function toActiveAlert(alert: FiringAlert): ActiveAlert {
   const name = alert.labels.alertname ?? 'unknown';
   return {
     name,
@@ -147,7 +147,7 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     private readonly storage: StorageHealthIndicator,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @Inject(DLQ_NATS_CONNECTION) private readonly nc: NatsConnection,
-    private readonly prometheus: PrometheusClient,
+    private readonly openObserve: OpenObserveClient,
     private readonly dlq: DlqService,
     private readonly connections: ConnectionTracker,
   ) {}
@@ -353,16 +353,16 @@ export class SystemHealthService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** null = Prometheus unavailable (distinct from "no alerts firing"). */
+  /** null = OpenObserve unavailable (distinct from "no alerts firing"). */
   private async firingAlerts(): Promise<ActiveAlert[] | null> {
     try {
-      const alerts = await this.prometheus.alerts();
+      const alerts = await this.openObserve.alerts();
       return alerts
         .filter((a) => a.state === 'firing')
         .map(toActiveAlert)
         .sort((a, b) => a.since.getTime() - b.since.getTime());
     } catch (err) {
-      this.logger.debug({ err }, 'Prometheus alerts unavailable');
+      this.logger.debug({ err }, 'OpenObserve alerts unavailable');
       return null;
     }
   }
