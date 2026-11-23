@@ -8,10 +8,17 @@ description: Use when creating or updating Linear issues — provides issue temp
 ## When to Create Issues
 
 - Infrastructure, convention, or architectural changes
-- Bugs discovered during implementation
-- Follow-up work identified while working on another issue
+- Bugs discovered during implementation that are too big to fix on the spot
+- Follow-up work identified while working on another issue (set the current issue as parent)
 - Translating a PRD or design doc into actionable work items
 - Always ask the user before creating — never auto-create
+
+## Before you write
+
+- Search first (`list_issues` with a keyword): update or link an existing issue instead of creating a second one.
+- Issues are public and sync to GitHub. Never put hosting, provider, cost or backup details in an issue or a comment; those go in a Linear document.
+- `save_issue` echoes the whole description back: make all edits to one issue in a single call.
+- Check the code before stating a fact about it (a file path, what a function does today).
 
 ## Required Fields
 

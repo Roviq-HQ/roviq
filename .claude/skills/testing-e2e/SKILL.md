@@ -1,6 +1,6 @@
 ---
 name: testing-e2e
-description: Use when writing, modifying, or reviewing E2E API tests (*.api-e2e.spec.ts) — covers Vitest E2E against a running api-gateway + Temporal + Mailpit stack, GraphQL gql() helper, the 7 auth helpers, seed contract, subscription patterns with graphql-ws ticket exchange, payment webhook simulation, Mailpit email assertions, and the forbidden patterns uncovered by the Hurl migration.
+description: Use when writing, modifying, or reviewing E2E API tests (*.api-e2e.spec.ts) — Vitest against the running e2e stack: the gql() helper, auth helpers, seed data, subscriptions, Temporal workflows, payment webhooks, Mailpit email, and forbidden patterns
 ---
 
 # E2E API Test Rules
@@ -9,7 +9,7 @@ description: Use when writing, modifying, or reviewing E2E API tests (*.api-e2e.
 
 Vitest `*.api-e2e.spec.ts` tests that run against a **fully running external stack** — api-gateway, postgres, redis, nats, temporal, notification-service, mailpit, object storage (RustFS). Nothing is in-process, nothing is mocked. The test is a pure external HTTP / graphql-ws client.
 
-Hurl (`*.hurl`) is **dead**. Do not add new `.hurl` files. Any leftover files in `e2e/api-gateway-e2e/hurl/` are pending deletion as their domains finish migration — they are not an extension point.
+Shared conventions: `testing-unit` skill. Tenant isolation, abilities and SQL are proven in integration specs; an E2E spec proves that the pieces work together across services (a workflow runs, an email arrives, a subscription fires).
 
 ## File location & naming
 
@@ -17,16 +17,16 @@ Hurl (`*.hurl`) is **dead**. Do not add new `.hurl` files. Any leftover files in
 - Helpers: `e2e/api-gateway-e2e/src/helpers/` (`auth.ts`, `gql-client.ts`, `ws-client.ts`, `webhook.ts`, `mailpit.ts`).
 - Shared fixtures: `e2e/shared/` — cross-cutting assets reused by Vitest E2E and Playwright.
 
-## Prerequisites
+## Running
 
 ```bash
-pnpm e2e:up            # brings up postgres/redis/nats first, then the rest with --build --wait
-pnpm test:e2e:api      # runs the Vitest E2E project against the up stack
+pnpm test:e2e:api      # rebuilds the e2e backend if it changed, re-seeds, runs the suite
 ```
 
-`pnpm e2e:up` is the only sanctioned way to bring up the Docker stack — it runs `docker compose -p <this instance's e2e project> -f docker/compose.e2e.yaml up -d --wait` after a staged startup of the infra layer, which is what the `--wait` health-gate expects. Do not invoke `docker compose … up` directly.
-
-The compose project seeds `roviq_test` (port 5435) and provisions Temporal, Mailpit and notification-service (which sends email to Mailpit and logs push, SMS and WhatsApp).
+- The e2e backend is a fixed build with no watcher. `pnpm test:e2e:api` and `pnpm ci:check` rebuild and re-seed it themselves; before any other run, and after a backend change, run `pnpm e2e:up`. Never call `docker compose … up` directly.
+- The suite needs a fresh seed. Running `vitest run --project e2e-api` a second time on a used stack gives dozens of false failures ("Institute is not active").
+- One run takes about five minutes: run it once at the end, with the output saved to a file. While working, run your one spec file right after `pnpm e2e:up`.
+- The stack is this instance's own (`roviq_test`, Temporal, Mailpit, notification-service).
 
 > Ports and URLs here are the instance 0 (main checkout) values. In a parallel dev instance each is shifted by `slot × 20`; run `pnpm instance:ports` to see yours. See `docs/infrastructure.md` → "Parallel dev instances".
 > The Compose project is `roviq-e2e` in instance 0 and `roviq-e2e-<slot>` otherwise, so container and volume names change with it. Never hardcode a port, project or container name in a spec or helper: derive it from `E2E_API_PORT`, `E2E_POSTGRES_PORT`, `E2E_NATS_PORT`, `E2E_WEB_PORT` or `ROVIQ_E2E_COMPOSE_PROJECT` with the instance 0 value as the default.
@@ -80,7 +80,7 @@ Pass credentials and IDs via `variables` — never string-interpolate them into 
 
 ## Auth helpers
 
-All live in `./helpers/auth` and read credentials from `E2E_USERS` in `e2e/shared/e2e-users.ts`.
+All live in `./helpers/auth` and read credentials from `E2E_USERS` (`e2e/shared/seed-fixtures.ts`).
 
 | Helper | Returns | Login path |
 |---|---|---|
@@ -97,10 +97,10 @@ Helpers unwrap GraphQL errors internally — if login returns errors or empty da
 ## Seed data
 
 ```typescript
-import { SEED, SEED_IDS } from '../../shared/seed';
+import { SEED, SEED_IDS } from '../../shared/seed-fixtures';
 ```
 
-`e2e/shared/seed.ts` re-exports `SEED_IDS` from `scripts/seed-ids.ts` (single source of truth) and mirrors the literals in `scripts/seed.ts`. Available keys:
+`e2e/shared/seed-fixtures.ts` is the single source (`SEED`, `SEED_IDS`, `E2E_USERS`, `SEED_PEOPLE`). Read the file for the current keys; the main ones:
 
 - `INSTITUTE_1`, `INSTITUTE_2` — `{ id, name, nameHi }`
 - `ADMIN_USER`, `TEACHER_USER`, `STUDENT_USER` — `{ id, username }`
@@ -109,7 +109,7 @@ import { SEED, SEED_IDS } from '../../shared/seed';
 - `ACADEMIC_YEAR_INST1`, `ACADEMIC_YEAR_INST2` — `{ id }`
 - `RESELLER` — `{ id, name }`
 
-Never hardcode UUIDs or names in a test. If a new seeded entity is needed, add it to `scripts/seed.ts` **and** `e2e/shared/seed.ts` in the same change.
+Never hardcode UUIDs or names in a test. A new seeded entity is added to `e2e/shared/seed-fixtures.ts` and the seed script in the same change.
 
 ## Subscriptions
 
@@ -190,7 +190,7 @@ gender: Gender.MALE,              // not 'male' or 'female'
 employmentType: EmploymentType.REGULAR,
 ```
 
-The migration surfaced several specs that copied lowercase strings out of legacy Hurl files (`'female'`, `'dynamic'`, `'active'`) which the current schema rejects at validation. Always import the enum; do not hand-roll strings for enum types. Values that are adapter literals (e.g. webhook `status: 'captured'`) are not GraphQL enums and stay as strings.
+Always import the enum; never type the string. Values that are adapter literals (webhook `status: 'captured'`) are not GraphQL enums and stay as strings.
 
 ## i18nText fields
 
@@ -219,10 +219,10 @@ Cross-scope rejection and cross-tenant isolation that are already covered by the
 ## Forbidden patterns
 
 - **No workarounds** ([NWKRD]). If a mutation emits an incomplete subscription payload and your test has to hide a null-field error to pass, fix the emitter (or the subscription return type) in the same commit — do not narrow the selection to dodge the bug.
-- **No new `.hurl` files.** Migration is one-way; new domain tests go directly in Vitest.
 - **No `sleep()` / fixed delays.** The single exception is the ~200ms subscription warm-up above. For async state transitions (audit consumer, webhook → invoice status), poll with a bounded `waitFor(...)` pattern.
 - **No mocks.** Everything hits the real running stack. If your spec needs to stub something, you're writing an integration test — move it to `apps/api-gateway/**/*.integration.spec.ts`.
-- **No direct DB writes.** Integration tests own DB-level setup. E2E composes state via GraphQL mutations + seed fixtures. Reading via `psql -U roviq -d roviq_test` (port 5435) is fine for diagnosis, not for setup.
+- **No direct DB writes.** Integration tests own DB-level setup. E2E composes state via GraphQL mutations + seed fixtures. Reading this instance's `roviq_test` with `psql` is fine for diagnosis, not for setup.
+- **A journey that needs a clean institute** creates one (`helpers/fresh-institute.ts`: platform admin creates and activates it, the first admin signs in with the emailed password and changes it). Do not bend a seeded institute.
 - **No hardcoded credentials or UUIDs.** Use `E2E_USERS` and `SEED` / `SEED_IDS`.
 - **No string interpolation for credentials in GraphQL queries.** Always use the `variables` object (query-injection risk and makes the query cacheable).
 - **No `describe.skip` without a reason + issue link.** The skip title must name the blocker (e.g. `ROV-232 — TCIssuanceWorkflow worker not registered`).

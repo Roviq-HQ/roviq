@@ -225,6 +225,33 @@ pnpm run db:reset --seed  # Nuke + push + seed in one step
 pnpm run db:studio        # Open Drizzle Studio (visual DB browser)
 ```
 
+### Time-partitioned tables
+
+A fixed list of `CREATE TABLE foo_YYYY_MM PARTITION OF foo` breaks the day the clock passes the
+last partition, in production and in tests alike. Use
+`ensure_monthly_partition(parent regclass, month_start timestamptz)` (migration
+`20260501033334_ensure-monthly-partition`) and wire all three places; skipping one brings the
+problem back:
+
+- **The create migration** backfills:
+  `SELECT ensure_monthly_partition('foo'::regclass, gs) FROM generate_series(date_trunc('month', NOW()), date_trunc('month', NOW()) + interval '6 months', interval '1 month') gs;`
+- **At app start and daily**: an `OnModuleInit` provider on the dedicated pool. Pattern:
+  `apps/api-gateway/src/audit/audit-partition-maintainer.ts`. Start-up alone misses long-lived
+  processes.
+- **`scripts/db-reset.ts`**: add the table to `PARTITIONED_TABLES` in `ensureMonthlyPartitions()`
+  so dev, e2e and integration databases get the same buffer.
+
+Indexes on a partitioned table go in a custom migration only (`CREATE INDEX IF NOT EXISTS`), never
+in the Drizzle schema: `drizzle-kit push` does not see them and re-creates them on every push,
+which fails Tilt's `db-push`. After a schema change, a second push on a reset database must
+succeed.
+
+The parent's RLS and GRANTs do not cover a partition queried by name.
+`ensure_monthly_partition` calls `lock_down_partitions(parent)`, which strips every non-owner
+privilege from each child and forces RLS with no policies. Never create a partition with a raw
+`CREATE TABLE … PARTITION OF` and never name a partition in application SQL. Detach with
+`detach_monthly_partition(parent, name)`. More: `docs/audit-logging.md`.
+
 ## NATS JetStream Streams
 
 | Stream | Subjects | Retention |

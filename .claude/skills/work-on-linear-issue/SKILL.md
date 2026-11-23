@@ -1,40 +1,36 @@
 ---
 name: work-on-linear-issue
-description: Use when starting work on a Linear issue — provides the full workflow from understanding the issue through implementation, testing, and reporting
+description: Use when starting work on a Linear issue — the order of steps from reading the issue to the report, with pointers to the rules in CLAUDE.md
 ---
 
-# Working on a Linear Issue
+# Working on a Linear issue
+
+The rules are in root `CLAUDE.md`; this is the order to apply them in.
 
 ## 1. Understand
-- Read the Linear issue fully — prerequisites, steps, file paths, verification, "Does NOT Change"
-- If it references a feature spec (Linear Document), read that too
-- Search Linear for newer issues on the same area (`list_issues` with a keyword query). Old or reopened issues are often partly replaced by a newer one — if you find one, ask which applies before coding
+- Read the whole issue and its comments (`get_issue`, then `list_comments`): prerequisites, steps, file paths, "Verification", "Does NOT Change". Read any linked Linear document.
+- Search Linear for newer issues on the same area (`list_issues` with a keyword). If one partly replaces this issue, ask which applies before coding.
+- Check the code against the issue's claims before planning: file paths and "line near N" drift, and `main` may already contain part of the work.
+- Where the issue leaves a choice open, decide, and record the decision as a comment on the issue before building.
 
-## 2. Verify Prerequisites
-- Working tree must be clean — commit or resolve pending changes first
-- `git fetch origin` then branch from `origin/main`
-- Check blocking issues are completed (files/modules exist)
-- `pnpm tilt get uiresources` — all resources healthy
-- `pnpm install` — deps current
-- If prerequisites missing → STOP, report what's missing
+## 2. Prepare the checkout
+- Your checkout is clean and on a branch cut from `origin/main` (`git fetch origin`, `git switch -c <branch> origin/main`; the issue's `gitBranchName` is the branch name). If the checkout is busy, use another instance slot (`CLAUDE.md` → "Parallel dev instances").
+- `pnpm install`, then `pnpm tilt get uiresources`: Tilt up, gateway answering.
+- A blocking issue that is not merged → stop and say what is missing.
 
-## 3. Implement
-- Branch: `git checkout -b <linear-branch-name> origin/main`
-- Follow issue's "Steps" in order, create files at exact paths specified
-- A pre-existing bug you fix along the way gets its own commit as soon as it is tested, before you continue the feature
+## 3. Build
+- Invoke the matching skill before the first edit in a domain (backend-service, drizzle-database, frontend-ux, testing-*).
+- Follow the issue's steps in order.
+- A pre-existing bug found on the way gets its own commit as soon as it is tested.
 
-## 4. Test & Verify (MANDATORY before commit/PR)
-- Write tests (unit: `*.spec.ts`, integration: `*.integration.test.ts`)
-- Run issue's Verification commands, compare to expected output
-- Run the full pre-commit gate (see Hard Rules in CLAUDE.md)
-- **Browser-verify without being asked**: drive every touched code path in the running app, backend-only changes included (`docs/working-method.md` → "Browser pass")
-- `git diff | grep -i "school"` — zero results
-- **When e2e/UI tests fail**: Use the Playwright MCP tool to debug interactively — take screenshots, inspect DOM snapshots, check console messages, and trace network requests to identify the root cause before changing code
+## 4. Verify
+- Tests for every new path; run only the spec files you touched, output saved to a file.
+- Every item under "Verification", one by one.
+- The browser pass (`docs/working-method.md` → "Browser pass"), backend-only changes included.
+- `git diff | grep -i "school"` returns nothing.
+- "Does NOT Change": `git diff --stat` shows only files this issue needs.
 
-## 5. Check Boundaries
-- Re-read "Does NOT Change" — revert any accidental modifications
-- `git diff --stat` — only files related to this issue
-
-## 6. Report
-- Summarize changes, list files, show test results, note concerns
-- Browser-verify every touched code path yourself before reporting (`docs/working-method.md` → "Browser pass"), then commit under the [NACPR] rule. Never hand the commit back because the browser pass was skipped
+## 5. Commit and report
+- `pnpm lint:fix`, commit (`CLAUDE.md` → "Finishing a change"). Push and open the PR when the user asks or the session's working agreement says so; rebase on `origin/main` first and re-run the touched integration specs after the rebase.
+- Comment on the issue: what was built, decisions and deviations, what was checked in the browser, what was not.
+- Tell the user the same, shortly, with anything they must decide.

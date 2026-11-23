@@ -3,126 +3,73 @@ name: backend-service
 description: Use when working on any backend service, resolver, repository, or module in apps/api-gateway — covers scope-to-DB-wrapper mapping, service layer rules, status transitions as domain mutations, schema patterns, event naming, and service ownership boundaries
 ---
 
-# Backend Service Rules
+# Backend services (api-gateway, notification-service)
 
-## General Conventions
+Words: **institute** (never "school" or "organization"), **tenant** for the infra side, **standard** (a class level), **section** (a division of a standard), **department** (an education level).
 
-- DI for same-process communication, NestJS microservices (NATS) for inter-service
-- `ConfigService` for all config — never `process.env`. All NestJS app modules must have `ConfigModule.forRoot({ isGlobal: true })`
-- Single root `.env` for all config — new env vars must also go in `.env.example`
+## Scope, guard and database wrapper
 
-## Scope → DB Wrapper Mapping (branded RequestContext, ROV-248)
+| Scope | Class-level guard | Wrapper | Context in a resolver |
+|---|---|---|---|
+| Institute | `@InstituteScope()` | `withTenant(db, ctx, fn)` | `assertTenantContext(user)` |
+| Reseller | `@ResellerScope()` | `withReseller(db, ctx, fn)` | `assertResellerContext(user)` |
+| Platform | `@PlatformScope()` | `withAdmin(db, ctx, fn)` | `assertPlatformContext(user)` |
+| Institute with a reseller (EE billing) | `@InstituteScope()` | `withTenant`, read `ctx.resellerId` | `assertInstituteWithReseller(user)` |
 
-`AuthUser` is a discriminated union: `PlatformContext | ResellerContext | InstituteContext` with a phantom `_scope` brand. DB wrappers accept ONLY their matching branded context — wrong combos are TypeScript errors. Resolvers narrow via the assert helpers; callers without a JWT use the synthetic factories.
+- Guards go on the class, never `APP_GUARD`. Use the assert helpers, never an inline `ForbiddenException`.
+- Platform operations live in `admin/` resolvers. Wrapper and context details, synthetic contexts and their allowlists: `drizzle-database` skill.
+- Tenant and user ids come from the request context (`getRequestContext()`), not from a parameter passed down the call chain, and never from the client.
 
-| Scope | Guard | DB Wrapper (3-arg) | How to obtain ctx |
-|-------|-------|---------------------|-------------------|
-| Institute | `@InstituteScope()` | `withTenant(db, ctx: InstituteContext, fn)` | `assertTenantContext(user)` (resolver) or `mkInstituteCtx(tenantId)` (workflow/seeder) |
-| Reseller | `@ResellerScope()` | `withReseller(db, ctx: ResellerContext, fn)` | `assertResellerContext(user)` (resolver) or `mkResellerCtx(resellerId)` (workflow/seeder) |
-| Platform | `@PlatformScope()` | `withAdmin(db, ctx: PlatformContext, fn)` | `assertPlatformContext(user)` (resolver) or `mkAdminCtx()` (workflow/seeder) |
-| Inst+Reseller | `@InstituteScope()` (EE billing) | `withTenant` then read `ctx.resellerId` | `assertInstituteWithReseller(user)` — narrows to `InstituteContext & { resellerId: string }`; replaces the previous `assertResellerContext + assertTenantContext` double-assert that narrowed to `never` |
+## Tenant isolation is your job on every operation
 
-**Compile-time lock:** `libs/database/src/__tests__/branded-context.spec.ts` uses `expectTypeOf<Parameters<typeof withTenant>[1]>().toEqualTypeOf<InstituteContext>()` to enforce the invariant against refactor drift.
+A scope guard proves who the caller is, not which rows are theirs.
 
-**Synthetic-context allowlist:** `mkAdminCtx()` / `mkResellerCtx()` / `mkInstituteCtx()` bypass JWT scope. They are gated by `pnpm check:synthetic-context-usage` (CI lint job) — adding a new importer requires explicit allowlist entry + security review.
+- **Look up every id the caller sends under the caller's own context first** (the `*Live` view inside `withTenant` / `withReseller`). A missing row answers that entity's not-found code. RLS makes another institute's row "missing", but only for rows you actually read: foreign keys accept any id.
+- **Check the ids agree with each other** (the class belongs to the year, the section to the class) before writing.
+- **Never pass a caller-supplied id to admin-context code** (`withAdmin`, `IdentityService` methods that use it). Pass only an id read from the caller's own row, and add the reached method to `ADMIN_METHOD_ALLOWLIST` with the reason.
+- **Authorize with `@CheckAbility({ action, subject })`** or `ability.can()`, never a role name. A new pair must be reachable by a role and every grant used (`ability-coverage.spec.ts`).
+- Do the checks and the write in **one transaction** where a check guards the write.
+- Every new or changed operation that takes an id gets an integration test where another institute's id is refused and nothing is written. A finding goes to the "Security Findings Log".
 
-## Service Layer
+## Resolvers, services, repositories
 
-- Services ONLY talk to repositories — never import `DRIZZLE_DB`, `withAdmin`, `withTenant`, or Drizzle tables
-- Services return repository `Record` types — GraphQL handles mapping via `@ObjectType` decorators
-- Use `EventBusService` for event publishing — never inject `JETSTREAM_CLIENT` directly in services
-- Use `BusinessException(ErrorCode.X, message)` for business errors — never `BadRequestException` with hardcoded strings
-- Use `BusinessException(ErrorCode.FORBIDDEN, message)` for scope/auth checks — never `throw new Error()` or a bare Nest exception
+- Code-first GraphQL only (`@ObjectType`, `@InputType`, `@Resolver`); no `.graphql` schema files. Resolvers are thin: validate input through the DTO, call one service method, return.
+- Queries belong in a repository; services hold the rules. Many older services still query through `DRIZZLE_DB` directly: follow the file you are in, and do not refactor a service into a repository unless the issue asks.
+- GraphQL returns `i18nText` fields as the whole object; never resolve a locale on the backend.
+- Give `@Field`, `@InputType` and mutations a `description` when the name does not say it all: rules, formats, units (paise, epoch ms), limits. It is the API's only documentation.
+- Lists: cursor pagination, one query per page for any per-row extra (no N+1), sort columns from a whitelist.
+- Files: store `files.id`, return `FileRef`, attach with `FileService.verifyUploads` and `markFilesReady(tx, …)`. Never a URL column or a raw S3 call.
+- Config through `ConfigService` (never `process.env`); a new variable goes in `.env.example`, the app's env validation, and `docs/deployment.md` when production needs it.
+- Redis keys from the `REDIS_KEYS` constants.
 
-## Status Changes = Named Domain Mutations (state machines, ROV-249)
+## Errors
 
-Never expose raw `updateStatus(id, { status })`. Each transition is a named method:
+- `throw new BusinessException(ErrorCode.X, 'message')`. Codes and their HTTP status live in `libs/shared/common-types/src/lib/error-codes.ts`; add a new code there with a one-line comment.
+- The web app shows translated copy by `extensions.code`, never the message: a new code needs copy in `apps/web/messages/{en,hi}/error.json` (or the feature's namespace).
+- Refuse before writing, in a fixed order, and never spend a rate-limit slot or emit an event on a refused request.
 
-- `activate(id)`, `deactivate(id)`, `suspend(id, reason?)`, `reject(id)`
-- `approve(id)` (pending_approval → pending)
-- `archive(id)` (academic year completing → archived)
+## Status changes
 
-Validation goes through a typed state machine, NOT ad-hoc `if/throw`:
+Each transition is a named method (`activate`, `suspend`, `approve`, `archive`), never a generic `updateStatus`. Validate with the domain state machine (`defineStateMachine` from `@roviq/common-types`: `MACHINE.assertTransition(current, next)`, which throws `INVALID_STATE_TRANSITION`), then run context checks, update, emit.
 
-```typescript
-import { INSTITUTE_STATE_MACHINE } from './institute.state-machine';
-INSTITUTE_STATE_MACHINE.assertTransition(institute.status, 'ACTIVE');
-```
+Deleting and deactivating are different operations. Delete is `softDelete()` (the resolver is `await this.service.delete(id); return true;`). Trash listings read the base table and need `restore` ability; restore with `restoreDeleted`.
 
-`defineStateMachine<S extends string>(name, transitions)` from `@roviq/common-types` returns `{ canTransition, assertTransition }` typed against the enum union. `Record<S, readonly S[]>` is exhaustively keyed — adding a new enum value without listing its outgoing transitions is a compile error. `assertTransition` throws `BusinessException(ErrorCode.INVALID_STATE_TRANSITION)` (HTTP 422) on a forbidden transition. Domain machines: `INSTITUTE_STATE_MACHINE`, `LEAVE_STATE_MACHINE`, `STUDENT_ACADEMIC_STATE_MACHINE`, `ADMISSION_APPLICATION_STATE_MACHINE`. After the transition assertion, run any context-dependent guards inline (e.g. `TRANSFERRED_OUT` requires `tcIssued`), then update + emit the domain event.
+## Enums
 
-### Resolver Delete Pattern
+One source in `@roviq/common-types` (`X_VALUES` tuple, type, and value object), imported by the database (`pgEnum`), the gateway (`@IsEnum`, `registerEnumType`) and the web app. UPPER_SNAKE values, a comment on every value. Never retype the strings in a DTO or a select.
 
-Delete = one line: `await this.service.delete(id); return true;`. `softDelete()` throws `NotFoundException`/`ConflictException` directly. No try-catch, no result objects.
+## Events
 
-### Trash/Restore
+- Emit with `EventBusService` from `@roviq/event-bus`: `eventBus.emit(EVENT_PATTERNS.STUDENT.enrolled, payload)`. Never `natsClient.emit` (`pnpm check:direct-nats-emit`).
+- A new subject: add it to `EVENT_PATTERNS` and its Zod schema to `event-schemas.ts` (`libs/backend/nats-jetstream/src/streams/`); its prefix must have a stream. Name it `ENTITY.action`, snake_case for new actions. Always include `tenantId`.
+- Emit **after** the transaction commits, and do not await it.
+- The payload is also published to the in-process GraphQL pubsub. Never put a secret in a payload that a subscription could select.
+- A consumer is a class with `@EventPattern(EVENT_PATTERNS.X.y, gatewayConsumer(pattern))` listed in a module's **`controllers`**; the app's `main.ts` calls `connectJetStreamMicroservice()`. Parse the payload with `eventPayloadSchemas[pattern].parse(data)`. Handlers must be safe to run twice: delivery is at least once. Streams are work queues: one durable per subject, shared by all handlers of that subject. (`pnpm check:event-handlers`, `docs/nats-jetstream.md`.)
 
-Trash/restore needs CASL: `@CheckAbility({ action: 'restore', subject })` (covered by `manage`). People modules (students, staff, guardians) expose `listDeleted<X>` returning the shared `DeletedPersonModel` plus `restore<X>(id)`; follow that shape for a new restorable entity. Resolver calls a service method that reads from the **base table** (not the `*_live` view) so soft-deleted rows are visible. `withTrash()` no longer exists — soft-delete visibility is enforced at the application layer via `<table>_live` views (see `/drizzle-database` skill). Restore = `restoreDeleted(tx, table, id)` from `@roviq/database`.
+## Who owns which tables
 
-## Enum Conventions
+Users, memberships, roles, profiles, refresh tokens and auth providers belong to the identity code (`apps/api-gateway/src/auth/`, `IdentityService`). Institute modules create or change them only through `IdentityService`, never with their own queries. Passwords: only `IdentityService` hashes or reissues one, and a temporary password is handed straight to `sendWelcomeNotification`, never returned, logged or stored.
 
-- **Document every value.** Every `pgEnum`, `as const` tuple, TS `enum`, or Zod `z.enum` option gets an inline comment on the line above explaining its domain meaning. No exceptions.
-- **Single source in `@roviq/common-types`.** Any enum used by 2+ layers (database + api-gateway + frontend) lives in `libs/shared/common-types/src/lib/*-enums.ts` as `export const X_VALUES = [...] as const; export type X = (typeof X_VALUES)[number]; export const X = Object.fromEntries(X_VALUES.map(v=>[v,v])) as { readonly [K in X]: K };`. Database imports `X_VALUES` for `pgEnum`, api-gateway imports `X` for `@IsEnum`/`@IsIn`/`registerEnumType`, frontend imports both for Zod + Select. NEVER hand-list the same strings in a DTO, a pgEnum, and a Select. `apps/api-gateway` does not import enum VALUES from `@roviq/database`. Playbook: `docs/plans/enum-single-source-of-truth-migration.md`. Canonical example: `GuardianEducationLevel`. Legacy `export enum FooEnum {}` in a model file + separate pgEnum is the old pattern — migrate when touched.
-- **Casing is `UPPER_SNAKE`, always.** Matches `userStatus`, `instituteStatus`, `subjectType`, `GuardianEducationLevel`. Existing lowercase enums (`resellerTier`, `resellerStatus`, `GuardianRelationship`, `STUDENT_DOCUMENT_TYPE_VALUES`, and any others) are a bug — tracked for migration in ROV-227. Do NOT add new lowercase enum values under any circumstance.
+## Tests
 
-## GraphQL Decorators
-
-`@Field`, `@InputType`, `@ObjectType`, and `registerEnumType` must carry a `description:` when the field name isn't self-explanatory — it's the only user-facing API doc the backend surfaces (shows up in SDL, Apollo DevTools, codegen). Mandatory for: business rules, format constraints, non-obvious units (paise, BigInt, epoch ms), validation gotchas, cross-reference to domain concepts. Trivial boolean toggles and obvious labels can skip.
-
-## Code-First GraphQL
-
-- NEVER use `.graphql` schema files — use code-first `@ObjectType`, `@Field`, `@Resolver` decorators exclusively
-- Resolvers are thin wrappers — all business logic lives in services. Resolvers only call service methods and return results
-- NATS consumers must be Pull-based, not Push — push consumers block and don't scale
-- Tenant context flows via AsyncLocalStorage (`getRequestContext()`) — never pass `tenantId` as a manual parameter through the call chain
-
-## Schema Patterns
-
-- `entityColumns` spread on every business table (createdAt/By, updatedAt/By, deletedAt/By, version)
-- `tenantColumns` spread on every tenant-scoped table (adds tenantId)
-- Partial unique indexes: always include `WHERE deleted_at IS NULL` (lets soft-deleted rows reuse business-unique columns like UDISE / email / code)
-- FORCE ROW LEVEL SECURITY on every table (via custom migration / `db-reset.ts` post-push loop)
-- Optimistic concurrency: `WHERE version = expected` + `version = version + 1` on updates
-- Soft delete: set `deletedAt`/`deletedBy` via `softDelete(tx, table, id)` — never `db.delete()`. Reads MUST go through the matching `<table>_live` view (security_invoker) — see `/drizzle-database` skill. Writes target the base table.
-- New soft-deletable table → declare a `<table>Live` `pgView` in `libs/database/src/schema/live-views.ts` and run `pnpm check:live-views` before commit.
-
-## Event Emission (EVENT_PATTERNS registry, ROV-245)
-
-- Inject `EventBusService` (from `apps/api-gateway/src/common/event-bus.service.ts`) and call `eventBus.emit(EVENT_PATTERNS.PREFIX.action, payload)`. The `pattern` parameter is typed as `EventPattern` — the union of every leaf in the registry — so a typo is a compile error, not a silent `"no stream matches subject"` at runtime.
-- **Single source of truth**: `libs/backend/nats-jetstream/src/streams/event-patterns.ts`. Adding a new emit subject = (1) add the entry to `EVENT_PATTERNS`, (2) ensure its prefix has a stream filter in `STREAMS` (same file dir).
-- **Subscribers** must use the same registry: `pubSub.asyncIterableIterator(EVENT_PATTERNS.X.y)` and `@EventPattern(EVENT_PATTERNS.X.y)`. Symmetry tests in `stream.config.spec.ts` assert (a) every emit subject is registered, (b) every subscribe subject is registered, (c) every concrete subscriber has at least one emit (orphan-allow-list documents known gaps).
-- **Two CI gates locking the boundaries**:
-  - `pnpm check:direct-nats-emit` — bans direct `natsClient.emit('...')` outside an explicit allowlist (forces routing through `EventBusService`'s typed signature). Workflow activities and a few legacy callers are allowlisted; new callers require justification.
-  - `pnpm check:synthetic-context-usage` — bans `mk*Ctx()` imports outside the allowlist (gates the auth backdoor — see Branded RequestContext section).
-- Never inject `JETSTREAM_CLIENT` directly in services — `EventBusService` publishes to BOTH NATS JetStream AND GraphQL pubsub in one call.
-- Always include `tenantId` in event payloads (create / update / delete / status-changed / link / unlink) so consumer DLQs can route on tenant id without a follow-up DB lookup.
-
-## Scope Assertions in Resolvers
-
-Use `assertResellerContext(user)` / `assertTenantContext(user)` from `@roviq/auth-backend` instead of `if (!user.resellerId) throw ...` — the helpers narrow the type and centralise the error shape.
-
-## Identity Service Integration
-
-**NEVER write directly to `memberships`, `users`, or `roles` tables** from the institute service. Always via NATS to Identity Service. Actor context propagated via NATS message headers.
-
-The institute service owns:
-- `institutes`, `institute_branding`, `institute_configs`, `institute_identifiers`, `institute_affiliations`
-- `academic_years`, `standards`, `sections`, `subjects`, `standard_subjects`, `section_subjects`
-- `institute_groups`
-
-The Identity Service owns:
-- `users`, `memberships`, `roles`, `profiles`, `refresh_tokens`, `auth_providers`
-
-## Domain Language
-
-- **"institute"** — never "school" or "organization" in code, comments, UI, docs
-- **"tenant"** — the infrastructure term for institute (`tenant_id`, RLS policies, `withTenant()`)
-- **"department"** — education level offered by an institute (pre_primary, primary, etc.)
-- **"standard"** — a grade/class level (Class 5, 11th Science)
-- **"section"** — a division within a standard (5-A, 5-B)
-
-## Event Naming
-
-NATS event pattern: `ENTITY.action` (e.g., `INSTITUTE.created`, `ACADEMIC_YEAR.activated`)
-- Published via `EventBusService.emit()` which sends to both NATS and GraphQL PubSub
-- Events are fire-and-forget — never await the publish
+Every new operation: integration spec for the normal case, another institute's id, a role without the ability, each refusal code (`testing-integration` skill). Unit specs for pure rules.

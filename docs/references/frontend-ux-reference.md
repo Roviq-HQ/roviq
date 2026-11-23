@@ -1152,3 +1152,28 @@ await row.getByTestId(`student-edit-button-${SEED.STUDENT_1.id}`).click();
 - Undo bulk assignment within 30 seconds via toast
 
 ---
+
+### [ERRCP] Error Copy by Code
+
+**Problem:** The backend's English error message shown raw in a toast: untranslated, technical, and it changes when a developer rewords it.
+**Rules:**
+
+- Branch on `extensions.code` with `extractGraphQLErrorCode(err)` / `isAppError(err, code)` from `@roviq/graphql`; never show `err.message`
+- Every code an operation can return has copy in both `apps/web/messages/en/` and `hi/` (`error.json`, or the feature's namespace when the wording is specific to the screen)
+- The copy says what happened and what the user can do next ("Add an email or mobile number to their profile, then send again")
+- An unknown code falls back to the generic error copy, not to the raw message
+- A component test covers the copy for each code
+
+---
+
+### [MUTRF] The Screen Follows the Mutation
+
+**Problem:** After a save the list or detail page still shows the old state until a manual refresh.
+**Rules:**
+
+- A mutation refetches the queries that list or show the changed data (`refetchQueries` by operation name), or writes the result into the Apollo cache
+- The names in `refetchQueries` must match real operation names; a wrong name only logs "Unknown query" and refetches nothing
+- Close the dialog and show the success toast only after the mutation resolves
+- In the browser pass, check the list, the detail page and any filter that depends on the changed field, then refresh once to compare with stored state
+
+---
