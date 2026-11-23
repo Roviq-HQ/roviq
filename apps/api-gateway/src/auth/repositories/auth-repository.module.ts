@@ -1,4 +1,10 @@
 import { Module } from '@nestjs/common';
+import { AuthEventDrizzleRepository } from './auth-event.drizzle-repository';
+import { AuthEventRepository } from './auth-event.repository';
+import { IdentityDrizzleRepository } from './identity.drizzle-repository';
+import { IdentityRepository } from './identity.repository';
+import { ImpersonationDrizzleRepository } from './impersonation.drizzle-repository';
+import { ImpersonationRepository } from './impersonation.repository';
 import { MembershipDrizzleRepository } from './membership.drizzle-repository';
 import { MembershipRepository } from './membership.repository';
 import { PlatformMembershipDrizzleRepository } from './platform-membership.drizzle-repository';
@@ -17,6 +23,9 @@ import { UserRepository } from './user.repository';
     { provide: PlatformMembershipRepository, useClass: PlatformMembershipDrizzleRepository },
     { provide: ResellerMembershipRepository, useClass: ResellerMembershipDrizzleRepository },
     { provide: RefreshTokenRepository, useClass: RefreshTokenDrizzleRepository },
+    { provide: IdentityRepository, useClass: IdentityDrizzleRepository },
+    { provide: ImpersonationRepository, useClass: ImpersonationDrizzleRepository },
+    { provide: AuthEventRepository, useClass: AuthEventDrizzleRepository },
   ],
   exports: [
     UserRepository,
@@ -24,6 +33,9 @@ import { UserRepository } from './user.repository';
     PlatformMembershipRepository,
     ResellerMembershipRepository,
     RefreshTokenRepository,
+    IdentityRepository,
+    ImpersonationRepository,
+    AuthEventRepository,
   ],
 })
 export class AuthRepositoryModule {}

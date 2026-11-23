@@ -1,21 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  mkAdminCtx,
-  mkInstituteCtx,
-  tenantUserProfiles,
-  tenantUserProfilesLive,
-  userProfiles,
-  userProfilesLive,
-  withAdmin,
-  withTenant,
-} from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, eq } from 'drizzle-orm';
 import { FileService } from './file.service';
-import { markFilesDeleted, markFilesReady } from './file-attachment';
+import { ProfilePhotoRepository } from './repositories/profile-photo.repository';
 
 const PURPOSE = 'PROFILE_PHOTO';
 
@@ -27,7 +14,7 @@ const PURPOSE = 'PROFILE_PHOTO';
 @Injectable()
 export class ProfilePhotoService {
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: ProfilePhotoRepository,
     private readonly files: FileService,
   ) {}
 
@@ -37,31 +24,10 @@ export class ProfilePhotoService {
     if (!userId) throw new Error('User context is required');
     if (fileId) await this.files.verifyUploads([fileId], PURPOSE);
 
-    await withAdmin(this.db, mkAdminCtx('service:profile-photo'), async (tx) => {
-      const [profile] = await tx
-        .select({ current: userProfilesLive.profileImageFileId })
-        .from(userProfilesLive)
-        .where(eq(userProfilesLive.userId, userId));
-      if (!profile) {
-        throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
-      }
-      if (profile.current === fileId) return;
-      if (fileId) {
-        await markFilesReady(tx, {
-          fileIds: [fileId],
-          purpose: PURPOSE,
-          userId,
-          subjectUserId: userId,
-        });
-      }
-      await tx
-        .update(userProfiles)
-        .set({ profileImageFileId: fileId, updatedBy: userId })
-        .where(eq(userProfiles.userId, userId));
-      if (profile.current) {
-        await markFilesDeleted(tx, { fileIds: [profile.current], userId });
-      }
-    });
+    const change = await this.repo.setOwn({ userId, fileId, purpose: PURPOSE });
+    if (change === 'not_found') {
+      throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
+    }
   }
 
   /**
@@ -73,41 +39,15 @@ export class ProfilePhotoService {
     if (!actorId || !tenantId) throw new Error('Tenant context is required');
     if (fileId) await this.files.verifyUploads([fileId], PURPOSE);
 
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'service:profile-photo'), async (tx) => {
-      const [profile] = await tx
-        .select({ current: tenantUserProfilesLive.profileImageFileId })
-        .from(tenantUserProfilesLive)
-        .where(
-          and(
-            eq(tenantUserProfilesLive.tenantId, tenantId),
-            eq(tenantUserProfilesLive.userId, targetUserId),
-          ),
-        );
-      if (!profile) {
-        throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
-      }
-      if (profile.current === fileId) return;
-      if (fileId) {
-        await markFilesReady(tx, {
-          fileIds: [fileId],
-          purpose: PURPOSE,
-          userId: actorId,
-          subjectUserId: targetUserId,
-          claimForTenantId: tenantId,
-        });
-      }
-      await tx
-        .update(tenantUserProfiles)
-        .set({ profileImageFileId: fileId, updatedBy: actorId })
-        .where(
-          and(
-            eq(tenantUserProfiles.tenantId, tenantId),
-            eq(tenantUserProfiles.userId, targetUserId),
-          ),
-        );
-      if (profile.current) {
-        await markFilesDeleted(tx, { fileIds: [profile.current], userId: actorId });
-      }
+    const change = await this.repo.setForInstitute({
+      tenantId,
+      actorId,
+      targetUserId,
+      fileId,
+      purpose: PURPOSE,
     });
+    if (change === 'not_found') {
+      throw new BusinessException(ErrorCode.USER_PROFILE_NOT_FOUND, 'User profile not found');
+    }
   }
 }

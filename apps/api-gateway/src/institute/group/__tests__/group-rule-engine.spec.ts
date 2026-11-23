@@ -1,141 +1,21 @@
 /**
  * ROV-170 — Unit tests for GroupService CRUD + rule-engine wiring.
  *
- * Pure unit: mocks `@roviq/database` (withTenant + tables), `@roviq/groups`
- * (rule interpreter), and the request context. No DB is touched. Verifies the
- * service correctly forwards rules to the interpreter and captures insert
- * payloads for dynamic groups.
+ * Pure unit: mocks the group repository, `@roviq/groups` (rule interpreter) and the request
+ * context. Verifies the service forwards rules to the interpreter and hands the insert payload
+ * for dynamic groups to the repository.
  */
-import { DomainGroupType, DynamicGroupStatus, GroupMembershipType } from '@roviq/common-types';
-import type { DrizzleDB } from '@roviq/database';
+import {
+  DomainGroupType,
+  DynamicGroupStatus,
+  ErrorCode,
+  GroupMembershipType,
+} from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const resultQueue: unknown[] = [];
-let queueIndex = 0;
-
-function queueResult(r: unknown) {
-  resultQueue.push(r);
-}
-function resetQueue() {
-  resultQueue.length = 0;
-  queueIndex = 0;
-}
-function nextResult(): unknown {
-  const r = resultQueue[queueIndex] ?? [];
-  queueIndex++;
-  return r;
-}
-
-interface CapturedInsert {
-  table: string;
-  values: Record<string, unknown> | Record<string, unknown>[] | null;
-}
-const capturedInserts: CapturedInsert[] = [];
-let currentTable: string | null = null;
-
-function createMockTx() {
-  const terminal = vi.fn(() => Promise.resolve(nextResult()));
-  return new Proxy(
-    {},
-    {
-      get(_target, prop) {
-        if (prop === 'insert') {
-          return (table: { __tableName?: string }) => {
-            currentTable = table.__tableName ?? 'unknown';
-            return createMockTx();
-          };
-        }
-        if (prop === 'values') {
-          return (vals: Record<string, unknown>) => {
-            capturedInserts.push({ table: currentTable ?? 'unknown', values: vals });
-            return createMockTx();
-          };
-        }
-        if (prop === 'limit' || prop === 'returning') return terminal;
-        if (prop === 'then') {
-          return (resolve: (v: unknown) => void) => resolve(nextResult());
-        }
-        return vi.fn(() => createMockTx());
-      },
-    },
-  );
-}
-
-async function mockWithContext(_db: unknown, ...args: unknown[]) {
-  const fn = args[args.length - 1] as (tx: unknown) => Promise<unknown>;
-  return fn(createMockTx());
-}
-
-vi.mock('@roviq/database', () => ({
-  DRIZZLE_DB: Symbol('DRIZZLE_DB'),
-  withTenant: vi.fn(mockWithContext),
-  groups: { __tableName: 'groups', id: 'id', name: 'name', deletedAt: 'deleted_at' },
-  groupRules: { __tableName: 'groupRules', groupId: 'group_id' },
-  groupChildren: { __tableName: 'groupChildren' },
-  groupMembers: {
-    __tableName: 'groupMembers',
-    groupId: 'group_id',
-    source: 'source',
-    isExcluded: 'is_excluded',
-    membershipId: 'membership_id',
-  },
-  academicYearsLive: { __tableName: 'academicYearsLive' },
-  admissionApplicationsLive: { __tableName: 'admissionApplicationsLive' },
-  attendanceEntriesLive: { __tableName: 'attendanceEntriesLive' },
-  attendanceSessionsLive: { __tableName: 'attendanceSessionsLive' },
-  botProfilesLive: { __tableName: 'botProfilesLive' },
-  enquiriesLive: { __tableName: 'enquiriesLive' },
-  groupsLive: { __tableName: 'groupsLive' },
-  guardianProfilesLive: { __tableName: 'guardianProfilesLive' },
-  holidaysLive: { __tableName: 'holidaysLive' },
-  instituteAffiliationsLive: { __tableName: 'instituteAffiliationsLive' },
-  instituteBrandingLive: { __tableName: 'instituteBrandingLive' },
-  instituteConfigsLive: { __tableName: 'instituteConfigsLive' },
-  instituteGroupBrandingLive: { __tableName: 'instituteGroupBrandingLive' },
-  instituteIdentifiersLive: { __tableName: 'instituteIdentifiersLive' },
-  institutesLive: { __tableName: 'institutesLive' },
-  issuedCertificatesLive: { __tableName: 'issuedCertificatesLive' },
-  leavesLive: { __tableName: 'leavesLive' },
-  membershipsLive: { __tableName: 'membershipsLive' },
-  rolesLive: { __tableName: 'rolesLive' },
-  sectionSubjectsLive: { __tableName: 'sectionSubjectsLive' },
-  sectionsLive: { __tableName: 'sectionsLive' },
-  staffProfilesLive: { __tableName: 'staffProfilesLive' },
-  standardSubjectsLive: { __tableName: 'standardSubjectsLive' },
-  standardsLive: { __tableName: 'standardsLive' },
-  studentAcademicsLive: { __tableName: 'studentAcademicsLive' },
-  studentProfilesLive: { __tableName: 'studentProfilesLive' },
-  subjectsLive: { __tableName: 'subjectsLive' },
-  tcRegisterLive: { __tableName: 'tcRegisterLive' },
-  mkInstituteCtx: (tenantId: string) => ({
-    _scope: 'institute',
-    scope: 'institute',
-    tenantId,
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  mkResellerCtx: (resellerId: string) => ({
-    _scope: 'reseller',
-    scope: 'reseller',
-    resellerId,
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  mkAdminCtx: () => ({
-    _scope: 'platform',
-    scope: 'platform',
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-}));
+import { GroupRepository } from '../repositories/group.repository';
+import type { GroupRecord } from '../repositories/types';
 
 vi.mock('@roviq/groups', () => ({
   extractDimensions: vi.fn((_rule: unknown) => ['academic_status']),
@@ -150,30 +30,47 @@ import { extractDimensions } from '@roviq/groups';
 // Import AFTER mocks.
 import { GroupService } from '../group.service';
 
+function groupRecord(overrides: Partial<GroupRecord>): GroupRecord {
+  return {
+    id: 'grp',
+    tenantId: 'tenant-1',
+    name: 'Group',
+    description: null,
+    groupType: DomainGroupType.CUSTOM,
+    membershipType: GroupMembershipType.DYNAMIC,
+    memberTypes: ['student'],
+    isSystem: false,
+    status: DynamicGroupStatus.ACTIVE,
+    resolvedAt: null,
+    memberCount: 0,
+    parentGroupId: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    createdBy: 'user-1',
+    updatedBy: 'user-1',
+    deletedAt: null,
+    deletedBy: null,
+    version: 1,
+    ...overrides,
+  };
+}
+
 describe('GroupService (unit)', () => {
   let service: GroupService;
+  let repo: GroupRepository;
   let eventBus: EventBusService;
 
   beforeEach(() => {
-    resetQueue();
-    capturedInserts.length = 0;
-    currentTable = null;
-    vi.clearAllMocks();
-    const db = createMock<DrizzleDB>();
+    vi.mocked(extractDimensions).mockClear();
+    repo = createMock<GroupRepository>();
     eventBus = createMock<EventBusService>({ emit: vi.fn() });
-    service = new GroupService(db, eventBus);
+    service = new GroupService(repo, eventBus);
   });
 
   it('create inserts a dynamic group and delegates rule dimensions to extractDimensions', async () => {
-    const groupRow = {
-      id: 'grp-1',
-      name: 'Class 5 enrolled',
-      groupType: 'custom',
-      membershipType: 'dynamic',
-      status: DynamicGroupStatus.ACTIVE,
-    };
-    // First .returning() call from groups insert.
-    queueResult([groupRow]);
+    vi.mocked(repo.create).mockResolvedValue(
+      groupRecord({ id: 'grp-1', name: 'Class 5 enrolled' }),
+    );
 
     const rule = { '==': [{ var: 'academic_status' }, 'enrolled'] };
     const result = await service.create({
@@ -186,24 +83,25 @@ describe('GroupService (unit)', () => {
 
     expect(result.id).toBe('grp-1');
     expect(extractDimensions).toHaveBeenCalledWith(rule);
-
-    const groupInsert = capturedInserts.find((c) => c.table === 'groups');
-    expect(groupInsert).toBeDefined();
-    const values = groupInsert?.values as Record<string, unknown>;
-    expect(values.name).toBe('Class 5 enrolled');
-    expect(values.tenantId).toBe('tenant-1');
-    expect(values.membershipType).toBe(GroupMembershipType.DYNAMIC);
-    expect(values.createdBy).toBe('user-1');
-
-    const ruleInsert = capturedInserts.find((c) => c.table === 'groupRules');
-    expect(ruleInsert).toBeDefined();
-    const ruleValues = ruleInsert?.values as Record<string, unknown>;
-    expect(ruleValues.rule).toEqual(rule);
-    expect(ruleValues.ruleDimensions).toEqual(['academic_status']);
+    expect(repo.create).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      actorId: 'user-1',
+      name: 'Class 5 enrolled',
+      description: null,
+      groupType: DomainGroupType.CUSTOM,
+      membershipType: GroupMembershipType.DYNAMIC,
+      memberTypes: ['student'],
+      isSystem: false,
+      parentGroupId: null,
+      rule: { rule, ruleDimensions: ['academic_status'], description: null },
+      childGroupIds: [],
+    });
   });
 
   it('create without a rule skips the groupRules insert entirely', async () => {
-    queueResult([{ id: 'grp-2', name: 'Static club', groupType: DomainGroupType.CLUB }]);
+    vi.mocked(repo.create).mockResolvedValue(
+      groupRecord({ id: 'grp-2', name: 'Static club', groupType: DomainGroupType.CLUB }),
+    );
 
     await service.create({
       name: 'Static club',
@@ -211,12 +109,14 @@ describe('GroupService (unit)', () => {
       membershipType: GroupMembershipType.STATIC,
     });
 
-    expect(capturedInserts.find((c) => c.table === 'groupRules')).toBeUndefined();
+    expect(vi.mocked(repo.create).mock.calls[0]?.[0].rule).toBeNull();
     expect(extractDimensions).not.toHaveBeenCalled();
   });
 
   it('findById rejects when no row is returned', async () => {
-    queueResult([]);
-    await expect(service.findById('missing')).rejects.toThrow(/not found/i);
+    vi.mocked(repo.findById).mockResolvedValue(null);
+    await expect(service.findById('missing')).rejects.toMatchObject({
+      code: ErrorCode.GROUP_NOT_FOUND,
+    });
   });
 });

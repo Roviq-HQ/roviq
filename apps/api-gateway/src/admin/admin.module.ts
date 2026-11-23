@@ -17,6 +17,7 @@ import { AdminInstituteResolver } from './institute/admin-institute.resolver';
 import { AdminInstituteService } from './institute/admin-institute.service';
 import { AdminInstituteSubscriptionResolver } from './institute/admin-institute.subscription';
 import { AdminInstituteFieldResolver } from './institute/admin-institute-field.resolver';
+import { AdminInstituteRepositoryModule } from './institute/repositories/admin-institute-repository.module';
 import { AdminInstituteGroupResolver } from './institute-group/admin-institute-group.resolver';
 import { AdminMonitoringModule } from './monitoring/admin-monitoring.module';
 import { AdminTenantAnalyticsModule } from './monitoring/tenant-analytics/admin-tenant-analytics.module';
@@ -24,6 +25,7 @@ import { AdminNotificationModule } from './notification/admin-notification.modul
 import { AdminResellerResolver } from './reseller/admin-reseller.resolver';
 import { AdminResellerService } from './reseller/admin-reseller.service';
 import { AdminResellerSubscriptionResolver } from './reseller/admin-reseller.subscription';
+import { AdminResellerRepositoryModule } from './reseller/repositories/admin-reseller-repository.module';
 import { AdminUserModule } from './user/admin-user.module';
 
 @Module({
@@ -36,6 +38,8 @@ import { AdminUserModule } from './user/admin-user.module';
     InstituteModule, // provides InstituteService for admin institute operations
     InstituteSetupModule, // runs the setup workflow that approval starts (ROV-232)
     AdminUserModule,
+    AdminInstituteRepositoryModule,
+    AdminResellerRepositoryModule,
     AdminAttendanceModule, // cross-tenant attendance summary (ROV admin attendance view)
     AdminMonitoringModule, // system health + tenant analytics (ROV-184)
     AdminTenantAnalyticsModule,

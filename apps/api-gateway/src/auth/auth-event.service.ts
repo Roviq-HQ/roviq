@@ -1,6 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { AuthFailureReason, AuthScope } from '@roviq/common-types';
-import { authEvents, DRIZZLE_DB, type DrizzleDB, mkAdminCtx, withAdmin } from '@roviq/database';
+import { AuthEventRepository } from './repositories/auth-event.repository';
 
 interface AuthEventBase {
   userId?: string;
@@ -49,25 +49,23 @@ export type AuthEventType = AuthEventInput['type'];
 export class AuthEventService {
   private readonly logger = new Logger(AuthEventService.name);
 
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(private readonly repo: AuthEventRepository) {}
 
   async emit(event: AuthEventInput): Promise<void> {
     try {
-      await withAdmin(this.db, mkAdminCtx('consumer:auth-event.service'), async (tx) => {
-        await tx.insert(authEvents).values({
-          userId: event.userId,
-          eventType: event.type,
-          portal: 'portal' in event ? event.portal : undefined,
-          scope: 'scope' in event ? event.scope : undefined,
-          tenantId: 'tenantId' in event ? event.tenantId : undefined,
-          resellerId: 'resellerId' in event ? event.resellerId : undefined,
-          authMethod: event.authMethod,
-          ipAddress: event.ip,
-          userAgent: event.userAgent,
-          deviceInfo: event.deviceInfo,
-          failureReason: 'failureReason' in event ? event.failureReason : undefined,
-          metadata: event.metadata ?? {},
-        });
+      await this.repo.insert({
+        userId: event.userId,
+        eventType: event.type,
+        portal: 'portal' in event ? event.portal : undefined,
+        scope: 'scope' in event ? event.scope : undefined,
+        tenantId: 'tenantId' in event ? event.tenantId : undefined,
+        resellerId: 'resellerId' in event ? event.resellerId : undefined,
+        authMethod: event.authMethod,
+        ipAddress: event.ip,
+        userAgent: event.userAgent,
+        deviceInfo: event.deviceInfo,
+        failureReason: 'failureReason' in event ? event.failureReason : undefined,
+        metadata: event.metadata ?? {},
       });
     } catch (error) {
       this.logger.warn(`Failed to emit auth event [${event.type}]: ${error}`);

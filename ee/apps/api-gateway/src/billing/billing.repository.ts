@@ -1,6 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
-import { DRIZZLE_DB, type DrizzleDB, institutesLive, mkAdminCtx, withAdmin } from '@roviq/database';
+import {
+  DRIZZLE_DB,
+  type DrizzleDB,
+  institutesLive,
+  mkAdminCtx,
+  softDelete,
+  withAdmin,
+} from '@roviq/database';
 import {
   gatewayConfigs,
   invoices,
@@ -81,6 +88,10 @@ export class BillingRepository {
         .returning();
       return plan;
     });
+  }
+
+  async softDeletePlan(id: string): Promise<void> {
+    await softDelete(this.db, plans, id);
   }
 
   async findPlanWithSubscriptionCount(id: string) {

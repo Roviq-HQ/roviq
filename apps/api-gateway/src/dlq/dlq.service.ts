@@ -7,11 +7,10 @@ import {
   type DlqStatus,
   ErrorCode,
 } from '@roviq/common-types';
-import { DRIZZLE_DB, type DrizzleDB, dlqMessages, mkAdminCtx, withAdmin } from '@roviq/database';
-import { and, desc, eq, type SQL, sql } from 'drizzle-orm';
 import { decodeCursor, encodeCursor } from '../common/pagination/relay-pagination.model';
 import { DLQ_NATS_CONNECTION } from './dlq-nats.provider';
 import type { DlqMessageFilterInput } from './models/dlq-message.model';
+import { DlqRepository } from './repositories/dlq.repository';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -19,7 +18,7 @@ const MAX_PAGE_SIZE = 100;
 @Injectable()
 export class DlqService {
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: DlqRepository,
     @Inject(DLQ_NATS_CONNECTION) private readonly nc: NatsConnection,
   ) {}
 
@@ -47,33 +46,19 @@ export class DlqService {
   /** List dead-lettered messages, newest-first, keyset-paginated on id DESC. */
   async list(filter: DlqMessageFilterInput = {}) {
     const limit = Math.min(filter.first ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    let beforeId: string | undefined;
+    if (filter.after) {
+      const cursor = decodeCursor(filter.after);
+      if (typeof cursor.id === 'string') beforeId = cursor.id;
+    }
 
-    const { records, totalCount } = await withAdmin(
-      this.db,
-      mkAdminCtx('service:dlq'),
-      async (tx) => {
-        const conditions: SQL[] = [];
-        if (filter.originStream) conditions.push(eq(dlqMessages.originStream, filter.originStream));
-        if (filter.status) conditions.push(eq(dlqMessages.status, filter.status));
-        if (filter.tenantId) conditions.push(eq(dlqMessages.tenantId, filter.tenantId));
-        if (filter.after) {
-          const cursor = decodeCursor(filter.after);
-          if (typeof cursor.id === 'string') conditions.push(sql`${dlqMessages.id} < ${cursor.id}`);
-        }
-        const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-        const [totalResult, rows] = await Promise.all([
-          tx.select({ value: sql<number>`count(*)::int` }).from(dlqMessages).where(where),
-          tx
-            .select()
-            .from(dlqMessages)
-            .where(where)
-            .orderBy(desc(dlqMessages.id))
-            .limit(limit + 1),
-        ]);
-        return { records: rows, totalCount: totalResult[0]?.value ?? 0 };
-      },
-    );
+    const { records, totalCount } = await this.repo.list({
+      originStream: filter.originStream,
+      status: filter.status,
+      tenantId: filter.tenantId,
+      beforeId,
+      limit: limit + 1,
+    });
 
     const hasNextPage = records.length > limit;
     const nodes = hasNextPage ? records.slice(0, limit) : records;
@@ -94,22 +79,12 @@ export class DlqService {
 
   /** Messages still awaiting an admin decision — the monitoring page's DLQ banner. */
   async countPending(): Promise<number> {
-    return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {
-      const [row] = await tx
-        .select({ value: sql<number>`count(*)::int` })
-        .from(dlqMessages)
-        .where(eq(dlqMessages.status, 'pending'));
-      return row?.value ?? 0;
-    });
+    return this.repo.countPending();
   }
 
   /** Re-publish a message to its original subject (pending|replayed → replayed). */
   async replay(id: string, replayedBy: string) {
-    return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {
-      const [row] = await tx.select().from(dlqMessages).where(eq(dlqMessages.id, id));
-      if (!row)
-        throw new BusinessException(ErrorCode.DLQ_MESSAGE_NOT_FOUND, `DLQ message ${id} not found`);
-
+    const result = await this.repo.replay(id, replayedBy, async (row) => {
       const status: DlqStatus = row.status as DlqStatus;
       DLQ_STATE_MACHINE.assertTransition(status, 'replayed');
 
@@ -119,37 +94,20 @@ export class DlqService {
         if (value) hdrs.set(key, value);
       }
       await jetstream(this.nc).publish(pub.subject, pub.data, { headers: hdrs });
-
-      const [updated] = await tx
-        .update(dlqMessages)
-        .set({
-          status: 'replayed',
-          replayedAt: new Date(),
-          replayedBy,
-          replayCount: row.replayCount + 1,
-        })
-        .where(eq(dlqMessages.id, id))
-        .returning();
-      return updated;
     });
+    if (result.kind === 'not_found')
+      throw new BusinessException(ErrorCode.DLQ_MESSAGE_NOT_FOUND, `DLQ message ${id} not found`);
+    return result.row;
   }
 
   /** Discard a message without replaying it (pending|replayed → discarded). */
   async discard(id: string) {
-    return withAdmin(this.db, mkAdminCtx('service:dlq'), async (tx) => {
-      const [row] = await tx.select().from(dlqMessages).where(eq(dlqMessages.id, id));
-      if (!row)
-        throw new BusinessException(ErrorCode.DLQ_MESSAGE_NOT_FOUND, `DLQ message ${id} not found`);
-
+    const result = await this.repo.discard(id, (row) => {
       const status: DlqStatus = row.status as DlqStatus;
       DLQ_STATE_MACHINE.assertTransition(status, 'discarded');
-
-      const [updated] = await tx
-        .update(dlqMessages)
-        .set({ status: 'discarded' })
-        .where(eq(dlqMessages.id, id))
-        .returning();
-      return updated;
     });
+    if (result.kind === 'not_found')
+      throw new BusinessException(ErrorCode.DLQ_MESSAGE_NOT_FOUND, `DLQ message ${id} not found`);
+    return result.row;
   }
 }

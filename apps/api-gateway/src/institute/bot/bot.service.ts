@@ -1,22 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { hash } from '@node-rs/argon2';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  memberships,
-  mkAdminCtx,
-  mkInstituteCtx,
-  roles,
-  rolesLive,
-  users,
-  withAdmin,
-  withTenant,
-} from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { and, eq } from 'drizzle-orm';
 import type { CreateBotInput } from './dto/create-bot.input';
 import type { UpdateBotInput } from './dto/update-bot.input';
 import type { CreateBotResponse } from './models/create-bot-response.model';
@@ -30,7 +17,6 @@ const BOT_KEY_PREFIX = 'skbot_';
 export class BotService {
   constructor(
     private readonly repo: BotProfileRepository,
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -50,43 +36,23 @@ export class BotService {
     const botEmail = `bot-${randomBytes(4).toString('hex')}@bots.roviq.internal`;
     const passwordHash = await hash(randomBytes(32).toString('hex'));
 
-    const user = await withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
-      const [created] = await tx
-        .insert(users)
-        .values({
-          createdBy: createdBy,
-          updatedBy: createdBy,
-          username: botUsername,
-          email: botEmail,
-          passwordHash,
-        })
-        .returning({ id: users.id });
-      return created;
+    const user = await this.repo.createBotUser({
+      username: botUsername,
+      email: botEmail,
+      passwordHash,
+      createdBy,
     });
 
     // 3. Find or create bot role for this tenant
     const roleId = await this.findOrCreateBotRole(tenantId, createdBy);
 
     // 4. Create membership (tenant-scoped)
-    const membership = await withTenant(
-      this.db,
-      mkInstituteCtx(tenantId, 'service:bot'),
-      async (tx) => {
-        const [created] = await tx
-          .insert(memberships)
-          .values({
-            userId: user.id,
-            roleId,
-            tenantId,
-            status: 'ACTIVE',
-            abilities: [],
-            createdBy,
-            updatedBy: createdBy,
-          })
-          .returning({ id: memberships.id });
-        return created;
-      },
-    );
+    const membership = await this.repo.createBotMembership({
+      userId: user.id,
+      roleId,
+      tenantId,
+      createdBy,
+    });
 
     // 5. Create bot_profile row
     const config = input.config ? JSON.parse(input.config) : {};
@@ -174,14 +140,7 @@ export class BotService {
     // Soft delete the bot profile
     await this.repo.softDelete(id);
 
-    // Revoke the bot's membership via withAdmin (memberships table is tenant-scoped,
-    // but we already have the membershipId and need admin to update after soft delete)
-    await withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
-      await tx
-        .update(memberships)
-        .set({ status: 'REVOKED' })
-        .where(eq(memberships.id, membershipId));
-    });
+    await this.repo.revokeMembership(membershipId);
 
     this.eventBus.emit(EVENT_PATTERNS.BOT.deleted, { botId: id, tenantId });
 
@@ -194,38 +153,17 @@ export class BotService {
    */
   private async findOrCreateBotRole(tenantId: string, createdBy: string): Promise<string> {
     // Query all institute-scoped roles for this tenant
-    const allRoles = await withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
-      return tx
-        .select({ id: rolesLive.id, name: rolesLive.name })
-        .from(rolesLive)
-        .where(and(eq(rolesLive.tenantId, tenantId), eq(rolesLive.scope, 'institute')));
-    });
+    const allRoles = await this.repo.findInstituteRoles(tenantId);
 
     // Look for a role with en name = 'Bot'
     for (const role of allRoles) {
-      const name = role.name as Record<string, string>;
-      if (name.en?.toLowerCase() === 'bot') {
+      if (role.name.en?.toLowerCase() === 'bot') {
         return role.id;
       }
     }
 
     // No bot role found — create one
-    const [newRole] = await withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
-      return tx
-        .insert(roles)
-        .values({
-          tenantId,
-          scope: 'institute',
-          name: { en: 'Bot' },
-          abilities: [],
-          isDefault: false,
-          isSystem: true,
-          status: 'ACTIVE',
-          createdBy,
-          updatedBy: createdBy,
-        })
-        .returning({ id: roles.id });
-    });
+    const newRole = await this.repo.createBotRole(tenantId, createdBy);
 
     return newRole.id;
   }

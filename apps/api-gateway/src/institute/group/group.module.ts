@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { GroupResolver } from './group.resolver';
 import { GroupService } from './group.service';
 import { GroupInvalidationHandler } from './group-invalidation.handler';
+import { GroupRepositoryModule } from './repositories/group-repository.module';
 
 @Module({
+  imports: [GroupRepositoryModule],
   controllers: [GroupInvalidationHandler],
   providers: [GroupService, GroupResolver],
   exports: [GroupService],

@@ -27,6 +27,88 @@ const PLATFORM_ONLY_DIR = 'admin';
 // another tenant's or reseller's rows. One entry per function: a new one fails CI.
 // These are reviewed claims, not proofs — re-check the function when you touch it.
 export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
+  // Repository refactor: each query moved from its service into the repository below; the
+  // reason is the one its service method carried.
+  'apps/api-gateway/src/auth/repositories/auth-event.drizzle-repository.ts#AuthEventDrizzleRepository.insert':
+    'Insert-only writer of auth events; reads nothing back.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.findUserContact':
+    'The user id is the institute row’s first_admin_user_id, read only after the platform or owning-reseller check; a reseller gets the name and phone only when wasCreatedByReseller is true.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.findUsersByEmail':
+    'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertPlatformMembership':
+    'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertPrimaryPhone':
+    'Creates a new platform-level user; no existing row is read or changed.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertUser':
+    'Creates a new platform-level user; no existing row is read or changed.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertUserProfileIfMissing':
+    'Called only for a user the same request just created; never with a caller-supplied id.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.replaceTempPassword':
+    'The resend mutations pass the user id read from the staff or guardian profile through its live view under withTenant with the caller’s tenant, so another institute’s profile id answers STAFF_NOT_FOUND or GUARDIAN_NOT_FOUND first (sign-in-details.integration.spec.ts); the update only touches a user who has never set a password.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.usernameExists':
+    'Boolean existence check; the reseller invite answers every unusable address with one error code.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.verifiedPhoneExists':
+    'Boolean existence check for a number the caller typed for a new account; refusing a taken number is what keeps the welcome from going to another person’s phone.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.wasCreatedByReseller':
+    'Boolean only; the user id is the institute row’s first_admin_user_id and the reseller id comes from the caller token, both after the owning-reseller check.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.createSession':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.endSession':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findActiveActorMembership':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findActiveMembershipsWithRole':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findActiveUserRolesInInstitute':
+    'View-as check (ROV-183): reads only roles the target holds in the caller token tenant and returns a boolean.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findExchangeRows':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findInstitute':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findInstituteAdminUserId':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findInstituteResellerId':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findPlatformRoleAbilities':
+    'Code exchange (ROV-183): the user comes from the session row, never from the caller; decides only whether the token is view-only.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findPrimaryPhone':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findResellerRoleName':
+    'Code exchange (ROV-183): user and reseller come from the session row and its institute, never from the caller; decides only whether the token is view-only.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findSessionForEnd':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.findUserStatus':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.hasActiveResellerMembership':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.hasActiveResellerMembershipOf':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.listSessions':
+    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
+  'apps/api-gateway/src/files/repositories/profile-photo.drizzle-repository.ts#ProfilePhotoDrizzleRepository.setOwn':
+    'Keyed by the user id in the verified token; the file must have been uploaded by and for that same user.',
+  'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.findInstituteType':
+    'Keyed by the tenant id in the verified token. Reads only the institute type.',
+  'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.createBotRole':
+    'Keyed by the tenant id in the verified token.',
+  'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.createBotUser':
+    'Creates a new platform-level user for a bot in the token tenant.',
+  'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.findInstituteRoles':
+    'Keyed by the tenant id in the verified token.',
+  'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.revokeMembership':
+    'Revokes the membership id read from a bot profile fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/group/repositories/group.drizzle-repository.ts#GroupDrizzleRepository.findUserNames':
+    'Reads usernames for user ids taken from membership rows fetched under tenant RLS.',
+  'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.createDocument':
+    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS.',
+  'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.removeDocument':
+    'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts.',
+  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.findUserProfile':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.setPrimaryPhone':
+    'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.updateOwnProfile':
+    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/notification-inbox/repositories/notification-inbox.drizzle-repository.ts#NotificationInboxDrizzleRepository.run':
     "Admin role only for a platform-scope token (the caller's own PlatformContext); every query adds ownedBy(): scope = 'platform' AND recipient_user_id = the token user, so another user's or scope's id answers NOTIFICATION_NOT_FOUND.",
   'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts#DeviceTokenDrizzleRepository.run':
@@ -39,52 +121,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#runInContext':
     'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
-  'apps/api-gateway/src/auth/auth-event.service.ts#AuthEventService.emit':
-    'Insert-only writer of auth events; reads nothing back.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.createMembership':
-    'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.createUser':
-    'Creates a new platform-level user; no existing row is read or changed.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.ensureUserProfile':
-    'Called only for a user the same request just created; never with a caller-supplied id.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.findUserContact':
-    'The user id is the institute row’s first_admin_user_id, read only after the platform or owning-reseller check; a reseller gets the name and phone only when wasCreatedByReseller is true.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.wasCreatedByReseller':
-    'Boolean only; the user id is the institute row’s first_admin_user_id and the reseller id comes from the caller token, both after the owning-reseller check.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.findUsersByEmail':
-    'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.isPhoneTaken':
-    'Boolean existence check for a number the caller typed for a new account; refusing a taken number is what keeps the welcome from going to another person’s phone.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.isUsernameTaken':
-    'Boolean existence check; the reseller invite answers every unusable address with one error code.',
-  'apps/api-gateway/src/auth/identity.service.ts#IdentityService.reissueTempPassword':
-    'The resend mutations pass the user id read from the staff or guardian profile through its live view under withTenant with the caller’s tenant, so another institute’s profile id answers STAFF_NOT_FOUND or GUARDIAN_NOT_FOUND first (sign-in-details.integration.spec.ts); the update only touches a user who has never set a password.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertActiveResellerMembership':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.assertStillAuthorized':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.createSession':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.dispatchImpersonationOtp':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.endImpersonation':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.exchangeCode':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.listSessions':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.resolveEndReason':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.startImpersonation':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.canImpersonateInInstitute':
-    'View-as check (ROV-183): reads only roles the target holds in the caller token tenant and returns a boolean.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.intraInstituteRefusal':
-    'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.isPlatformFullAdmin':
-    'Code exchange (ROV-183): the user comes from the session row, never from the caller; decides only whether the token is view-only.',
-  'apps/api-gateway/src/auth/impersonation.service.ts#ImpersonationService.isResellerFullAdmin':
-    'Code exchange (ROV-183): user and reseller come from the session row and its institute, never from the caller; decides only whether the token is view-only.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findActiveByUserId':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.hasMembershipInUnusableInstitute':
@@ -119,18 +155,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePreferredLocale':
     'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.lookupInstituteType':
-    'Keyed by the tenant id in the verified token. Reads only the institute type.',
-  'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.createBot':
-    'Creates a new platform-level user for a bot in the token tenant.',
-  'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.deleteBot':
-    'Revokes the membership id read from a bot profile fetched under tenant RLS.',
-  'apps/api-gateway/src/institute/bot/bot.service.ts#BotService.findOrCreateBotRole':
-    'Keyed by the tenant id in the verified token.',
   'apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts#ExportReportDrizzleRepository.run':
     'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts).',
-  'apps/api-gateway/src/institute/group/group.service.ts#GroupService.listMembers':
-    'Reads usernames for user ids taken from membership rows fetched under tenant RLS.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.create':
     'Reseller scope passes its own reseller id from the token as owner; no existing group is read or changed.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.findMembershipsByUser':
@@ -157,16 +183,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateStatus':
     'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership.',
-  'apps/api-gateway/src/files/profile-photo.service.ts#ProfilePhotoService.setOwn':
-    'Keyed by the user id in the verified token; the file must have been uploaded by and for that same user.',
-  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.deleteDocument':
-    'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts.',
-  'apps/api-gateway/src/institute/student/student.service.ts#StudentService.uploadDocument':
-    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS.',
-  'apps/api-gateway/src/institute/user/profile.service.ts#ProfileService.getMyProfile':
-    'Keyed by the user id in the verified token.',
-  'apps/api-gateway/src/institute/user/profile.service.ts#ProfileService.updateMyProfile':
-    'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.countOtherPasskeys':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.create':
@@ -206,7 +222,7 @@ export const ADMIN_REACH_ALLOWLIST: Readonly<Record<string, string>> = {
     'Reached through a dataloader that runs as the role of the request scope; the admin branch runs only for a platform-scope token.',
   'apps/api-gateway/src/files/file-purge.repository.ts':
     'Bound in FilesModule for FileSweeper; reached only by the sweeper workflow and FileService.purge (server workflows), which no resolver calls.',
-  'apps/api-gateway/src/institute/management/seed/institute-setup.service.ts':
+  'apps/api-gateway/src/institute/management/seed/repositories/institute-setup.drizzle-repository.ts':
     'Imported by InstituteService; runs only from institute activation, which no non-admin resolver method calls.',
   'ee/apps/api-gateway/src/billing/repositories/subscription.repository.ts':
     'Reached through a dataloader: counts subscribers for plan ids already returned to the caller by a reseller-scoped query.',

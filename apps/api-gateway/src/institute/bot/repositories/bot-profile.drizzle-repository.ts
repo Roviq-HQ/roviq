@@ -11,13 +11,26 @@ import {
   botProfilesLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  memberships,
+  mkAdminCtx,
   mkInstituteCtx,
+  roles,
+  rolesLive,
+  users,
+  withAdmin,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, eq, isNull } from 'drizzle-orm';
 import { BotProfileRepository } from './bot-profile.repository';
-import type { BotProfileRecord, CreateBotProfileData, UpdateBotProfileData } from './types';
+import type {
+  BotProfileRecord,
+  CreateBotMembershipData,
+  CreateBotProfileData,
+  CreateBotUserData,
+  InstituteRoleRecord,
+  UpdateBotProfileData,
+} from './types';
 
 const liveColumns = {
   id: botProfilesLive.id,
@@ -154,6 +167,80 @@ export class BotProfileDrizzleRepository extends BotProfileRepository {
         .returning({ id: botProfiles.id });
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.BOT_NOT_FOUND, `Bot profile ${id} not found`);
+    });
+  }
+
+  async createBotUser(data: CreateBotUserData): Promise<{ id: string }> {
+    return withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
+      const [created] = await tx
+        .insert(users)
+        .values({
+          createdBy: data.createdBy,
+          updatedBy: data.createdBy,
+          username: data.username,
+          email: data.email,
+          passwordHash: data.passwordHash,
+        })
+        .returning({ id: users.id });
+      return created;
+    });
+  }
+
+  async findInstituteRoles(tenantId: string): Promise<InstituteRoleRecord[]> {
+    return withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
+      return tx
+        .select({ id: rolesLive.id, name: rolesLive.name })
+        .from(rolesLive)
+        .where(and(eq(rolesLive.tenantId, tenantId), eq(rolesLive.scope, 'institute')));
+    });
+  }
+
+  async createBotRole(tenantId: string, createdBy: string): Promise<{ id: string }> {
+    const [newRole] = await withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
+      return tx
+        .insert(roles)
+        .values({
+          tenantId,
+          scope: 'institute',
+          name: { en: 'Bot' },
+          abilities: [],
+          isDefault: false,
+          isSystem: true,
+          status: 'ACTIVE',
+          createdBy,
+          updatedBy: createdBy,
+        })
+        .returning({ id: roles.id });
+    });
+    return newRole;
+  }
+
+  async createBotMembership(data: CreateBotMembershipData): Promise<{ id: string }> {
+    return withTenant(this.db, mkInstituteCtx(data.tenantId, 'service:bot'), async (tx) => {
+      const [created] = await tx
+        .insert(memberships)
+        .values({
+          userId: data.userId,
+          roleId: data.roleId,
+          tenantId: data.tenantId,
+          status: 'ACTIVE',
+          abilities: [],
+          createdBy: data.createdBy,
+          updatedBy: data.createdBy,
+        })
+        .returning({ id: memberships.id });
+      return created;
+    });
+  }
+
+  // Admin role: the bot profile is already soft-deleted, so the membership is no longer
+  // reachable under tenant RLS through it. The id comes from that profile, read under RLS.
+  async revokeMembership(membershipId: string): Promise<void> {
+    await withAdmin(this.db, mkAdminCtx('service:bot'), async (tx) => {
+      await tx
+        .update(memberships)
+        .set({ status: 'REVOKED' })
+        .where(eq(memberships.id, membershipId));
     });
   }
 }

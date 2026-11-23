@@ -3,7 +3,6 @@ import type { PartialFuncReturn } from '@golevelup/ts-vitest';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
-import type { DrizzleDB } from '@roviq/database';
 import { BillingInterval, PaymentProvider, SubscriptionStatus } from '@roviq/ee-billing-types';
 import {
   PaymentGatewayError,
@@ -105,8 +104,8 @@ describe('BillingService', () => {
     // Default: no existing invoice — allows invoice creation in webhook tests
     repo.findInvoiceByGatewayPaymentId.mockResolvedValue(null);
     // Direct construction with typed mocks — order matches BillingService constructor:
-    // (repo, eventBus, db, gatewayFactory, config)
-    service = new BillingService(repo, eventBus, createMock<DrizzleDB>(), factory, config);
+    // (repo, eventBus, gatewayFactory, config)
+    service = new BillingService(repo, eventBus, factory, config);
   });
 
   // ---------------------------------------------------------------------------
@@ -309,6 +308,18 @@ describe('BillingService', () => {
           code: ErrorCode.PLAN_NOT_INACTIVE,
         });
         expect(repo.restorePlan).not.toHaveBeenCalled();
+      }));
+  });
+
+  describe('deletePlan', () => {
+    it('should soft-delete the plan and emit BILLING.plan.deleted', () =>
+      requestContext.run(TEST_CTX, async () => {
+        repo.softDeletePlan.mockResolvedValue(undefined);
+
+        await service.deletePlan('plan-1');
+
+        expect(repo.softDeletePlan).toHaveBeenCalledWith('plan-1');
+        expect(eventBus.emit).toHaveBeenCalledWith('BILLING.plan.deleted', { id: 'plan-1' });
       }));
   });
 

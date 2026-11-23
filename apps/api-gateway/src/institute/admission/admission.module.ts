@@ -10,11 +10,12 @@ import { ApplicationDocumentResolver } from './application-document.resolver';
 import { ApplicationDocumentService } from './application-document.service';
 import { ApplicationFieldResolver } from './application-field.resolver';
 import { EnquiryResolver } from './enquiry.resolver';
+import { AdmissionRepositoryModule } from './repositories/admission-repository.module';
 import { StandardNameLoaders } from './standard-name.loaders';
 import { StudentAdmissionWorkerService } from './workflows/student-admission.worker';
 
 @Module({
-  imports: [AuthModule, FilesModule],
+  imports: [AuthModule, FilesModule, AdmissionRepositoryModule],
   providers: [
     AdmissionService,
     AdmissionQueryService,

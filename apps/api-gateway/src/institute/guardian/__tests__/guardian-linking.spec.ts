@@ -10,162 +10,8 @@
 import assert from 'node:assert';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-// ── Sequential result queue ──────────────────────────────
-
-const resultQueue: unknown[] = [];
-let queueIndex = 0;
-
-function queueResult(result: unknown) {
-  resultQueue.push(result);
-}
-
-function resetQueue() {
-  resultQueue.length = 0;
-  queueIndex = 0;
-}
-
-/** Returns next result from queue. Used by mock tx chain terminal methods. */
-function nextResult(): unknown {
-  const result = resultQueue[queueIndex] ?? [];
-  queueIndex++;
-  return result;
-}
-
-/**
- * Creates a mock tx where every terminal method (limit, returning, and the
- * chain itself when awaited) returns the next queued result.
- * Intermediate methods (select, from, where, etc.) return the chain for chaining.
- */
-function createMockTx() {
-  const terminal = vi.fn(() => Promise.resolve(nextResult()));
-
-  // Proxy-based chain: any property access returns the chain itself (for chaining),
-  // except calling the chain as a function returns a terminal promise.
-  const chain = new Proxy(
-    {},
-    {
-      get(_target, prop) {
-        // Terminal methods that resolve with next queued result
-        if (prop === 'limit' || prop === 'returning') return terminal;
-        // 'then' makes the chain awaitable — resolve with next queued result
-        if (prop === 'then') {
-          return (resolve: (v: unknown) => void) => resolve(nextResult());
-        }
-        // Everything else returns a function that returns the chain (for chaining)
-        return vi.fn(() => chain);
-      },
-    },
-  );
-
-  return chain;
-}
-
-/** withTenant/withAdmin mock — executes the callback with a mock tx */
-async function mockWithContext(_db: unknown, ...args: unknown[]) {
-  const fn = args[args.length - 1] as (tx: unknown) => Promise<unknown>;
-  const tx = createMockTx();
-  return fn(tx);
-}
-
-vi.mock('@roviq/database', () => ({
-  DRIZZLE_DB: Symbol('DRIZZLE_DB'),
-  withAdmin: vi.fn(mockWithContext),
-  withTenant: vi.fn(mockWithContext),
-  softDelete: vi.fn(async () => undefined),
-  guardianProfiles: { id: 'id', deletedAt: 'deleted_at', version: 'version' },
-  studentProfiles: { id: 'id' },
-  studentGuardianLinks: {
-    id: 'id',
-    studentProfileId: 'student_profile_id',
-    guardianProfileId: 'guardian_profile_id',
-    isPrimaryContact: 'is_primary_contact',
-    deletedAt: 'deleted_at',
-  },
-  memberships: {},
-  roles: {},
-  users: {},
-  userProfiles: {},
-  phoneNumbers: {},
-  academicYearsLive: { __tableName: 'academicYearsLive' },
-  admissionApplicationsLive: { __tableName: 'admissionApplicationsLive' },
-  attendanceEntriesLive: { __tableName: 'attendanceEntriesLive' },
-  attendanceSessionsLive: { __tableName: 'attendanceSessionsLive' },
-  botProfilesLive: { __tableName: 'botProfilesLive' },
-  enquiriesLive: { __tableName: 'enquiriesLive' },
-  groupsLive: { __tableName: 'groupsLive' },
-  guardianProfilesLive: { __tableName: 'guardianProfilesLive' },
-  holidaysLive: { __tableName: 'holidaysLive' },
-  instituteAffiliationsLive: { __tableName: 'instituteAffiliationsLive' },
-  instituteBrandingLive: { __tableName: 'instituteBrandingLive' },
-  instituteConfigsLive: { __tableName: 'instituteConfigsLive' },
-  instituteGroupBrandingLive: { __tableName: 'instituteGroupBrandingLive' },
-  instituteIdentifiersLive: { __tableName: 'instituteIdentifiersLive' },
-  institutesLive: { __tableName: 'institutesLive' },
-  issuedCertificatesLive: { __tableName: 'issuedCertificatesLive' },
-  leavesLive: { __tableName: 'leavesLive' },
-  membershipsLive: { __tableName: 'membershipsLive' },
-  rolesLive: { __tableName: 'rolesLive' },
-  sectionSubjectsLive: { __tableName: 'sectionSubjectsLive' },
-  sectionsLive: { __tableName: 'sectionsLive' },
-  staffProfilesLive: { __tableName: 'staffProfilesLive' },
-  standardSubjectsLive: { __tableName: 'standardSubjectsLive' },
-  standardsLive: { __tableName: 'standardsLive' },
-  studentAcademicsLive: { __tableName: 'studentAcademicsLive' },
-  studentProfilesLive: { __tableName: 'studentProfilesLive' },
-  subjectsLive: { __tableName: 'subjectsLive' },
-  tcRegisterLive: { __tableName: 'tcRegisterLive' },
-  mkInstituteCtx: (tenantId: string) => ({
-    _scope: 'institute',
-    scope: 'institute',
-    tenantId,
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  mkResellerCtx: (resellerId: string) => ({
-    _scope: 'reseller',
-    scope: 'reseller',
-    resellerId,
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  mkAdminCtx: () => ({
-    _scope: 'platform',
-    scope: 'platform',
-    userId: 'u',
-    membershipId: 'm',
-    roleId: 'r',
-    type: 'access',
-  }),
-  usersLive: {},
-  refreshTokensLive: { __tableName: 'refreshTokensLive' },
-  phoneNumbersLive: {},
-  authProvidersLive: { __tableName: 'authProvidersLive' },
-  platformMembershipsLive: { __tableName: 'platformMembershipsLive' },
-  resellerMembershipsLive: { __tableName: 'resellerMembershipsLive' },
-  groupMembershipsLive: { __tableName: 'groupMembershipsLive' },
-  userProfilesLive: {},
-  userAddressesLive: { __tableName: 'userAddressesLive' },
-  userDocumentsLive: { __tableName: 'userDocumentsLive' },
-  userIdentifiersLive: { __tableName: 'userIdentifiersLive' },
-  studentGuardianLinksLive: {
-    id: 'id',
-    studentProfileId: 'student_profile_id',
-    guardianProfileId: 'guardian_profile_id',
-    isPrimaryContact: 'is_primary_contact',
-  },
-  staffQualificationsLive: { __tableName: 'staffQualificationsLive' },
-  privacyNoticesLive: { __tableName: 'privacyNoticesLive' },
-  certificateTemplatesLive: { __tableName: 'certificateTemplatesLive' },
-  applicationDocumentsLive: { __tableName: 'applicationDocumentsLive' },
-  groupRulesLive: { __tableName: 'groupRulesLive' },
-  groupMembersLive: { __tableName: 'groupMembersLive' },
-  groupChildrenLive: { __tableName: 'groupChildrenLive' },
-}));
+import type { LockedGuardianLink, UnlinkPlan } from '../repositories/types';
+import { buildGuardianService, linkRow } from './guardian-unit-fixtures';
 
 vi.mock('@roviq/request-context', () => ({
   getRequestContext: vi.fn(() => ({
@@ -175,44 +21,35 @@ vi.mock('@roviq/request-context', () => ({
   })),
 }));
 
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn((...args: unknown[]) => args),
-  eq: vi.fn((a: unknown, b: unknown) => [a, b]),
-  ilike: vi.fn((a: unknown, b: unknown) => [a, b]),
-  or: vi.fn((...args: unknown[]) => args),
-  isNull: vi.fn((a: unknown) => ['isNull', a]),
-  sql: vi.fn(),
-}));
-
-async function createService() {
-  const mod = await import('../guardian.service');
-  const svc = Object.create(mod.GuardianService.prototype);
-  svc.db = {};
-  svc.eventBus = { emit: vi.fn() };
-  svc.logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  return svc;
-}
-
 describe('Guardian — Unlink Validation', () => {
-  let service: Awaited<ReturnType<typeof createService>>;
+  let ctx: ReturnType<typeof buildGuardianService>;
+  // What the repository did with the plan for the locked links: the plan, or nothing if refused.
+  let planned: UnlinkPlan[];
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    resetQueue();
-    service = await createService();
+  beforeEach(() => {
+    ctx = buildGuardianService();
+    planned = [];
   });
+
+  // The repository locks these links and runs the service's plan inside its transaction.
+  function lockedLinks(links: LockedGuardianLink[]) {
+    vi.mocked(ctx.repo.unlink).mockImplementation(async (_t, _s, _a, plan) => {
+      planned.push(plan(links));
+    });
+  }
 
   const primaryG1 = { id: 'link-1', guardianProfileId: 'g1', isPrimaryContact: true };
   const otherG2 = { id: 'link-2', guardianProfileId: 'g2', isPrimaryContact: false };
 
-  async function unlinkError(input: Parameters<typeof service.unlinkFromStudent>[0]) {
-    const err = await service.unlinkFromStudent(input).catch((e: unknown) => e);
+  async function unlinkError(input: Parameters<typeof ctx.service.unlinkFromStudent>[0]) {
+    const err = await ctx.service.unlinkFromStudent(input).catch((e: unknown) => e);
     assert(err instanceof BusinessException);
+    expect(planned).toEqual([]);
     return err.code;
   }
 
   it('unlinkFromStudent rejects when link not found', async () => {
-    queueResult([otherG2]); // locked live links → g1 not among them
+    lockedLinks([otherG2]); // g1 not among the locked live links
 
     expect(await unlinkError({ guardianProfileId: 'g1', studentProfileId: 's1' })).toBe(
       ErrorCode.GUARDIAN_LINK_NOT_FOUND,
@@ -220,7 +57,7 @@ describe('Guardian — Unlink Validation', () => {
   });
 
   it('unlinkFromStudent rejects unlink of primary without replacement', async () => {
-    queueResult([primaryG1, otherG2]);
+    lockedLinks([primaryG1, otherG2]);
 
     expect(await unlinkError({ guardianProfileId: 'g1', studentProfileId: 's1' })).toBe(
       ErrorCode.PRIMARY_GUARDIAN_REQUIRED,
@@ -228,7 +65,7 @@ describe('Guardian — Unlink Validation', () => {
   });
 
   it('unlinkFromStudent rejects unlinking the last guardian', async () => {
-    queueResult([{ ...primaryG1, isPrimaryContact: false }]);
+    lockedLinks([{ ...primaryG1, isPrimaryContact: false }]);
 
     expect(await unlinkError({ guardianProfileId: 'g1', studentProfileId: 's1' })).toBe(
       ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
@@ -236,7 +73,7 @@ describe('Guardian — Unlink Validation', () => {
   });
 
   it('unlinkFromStudent rejects a replacement primary that is not linked to the student', async () => {
-    queueResult([primaryG1, otherG2]);
+    lockedLinks([primaryG1, otherG2]);
 
     expect(
       await unlinkError({
@@ -248,7 +85,7 @@ describe('Guardian — Unlink Validation', () => {
   });
 
   it('unlinkFromStudent rejects the removed guardian as its own replacement', async () => {
-    queueResult([primaryG1, otherG2]);
+    lockedLinks([primaryG1, otherG2]);
 
     expect(
       await unlinkError({
@@ -260,7 +97,7 @@ describe('Guardian — Unlink Validation', () => {
   });
 
   it('unlinkFromStudent rejects a replacement when the removed link is not primary', async () => {
-    queueResult([
+    lockedLinks([
       { ...otherG2, isPrimaryContact: true },
       { ...primaryG1, isPrimaryContact: false },
     ]);
@@ -275,22 +112,24 @@ describe('Guardian — Unlink Validation', () => {
   });
 
   it('unlinkFromStudent soft-deletes the link, promotes the replacement and emits GUARDIAN.unlinked', async () => {
-    const { softDelete, studentGuardianLinks, withTenant } = await import('@roviq/database');
-    queueResult([primaryG1, otherG2]);
+    lockedLinks([primaryG1, otherG2]);
 
     await expect(
-      service.unlinkFromStudent({
+      ctx.service.unlinkFromStudent({
         guardianProfileId: 'g1',
         studentProfileId: 's1',
         newPrimaryGuardianId: 'g2',
       }),
     ).resolves.toBe(true);
 
-    expect(withTenant).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(softDelete).mock.calls).toEqual([
-      [expect.anything(), studentGuardianLinks, 'link-1'],
+    expect(ctx.repo.unlink).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ctx.repo.unlink).mock.calls[0]?.slice(0, 3)).toEqual([
+      'tenant-1',
+      's1',
+      'user-1',
     ]);
-    expect(service.eventBus.emit).toHaveBeenCalledWith('GUARDIAN.unlinked', {
+    expect(planned).toEqual([{ linkId: 'link-1', replacementLinkId: 'link-2' }]);
+    expect(ctx.emit).toHaveBeenCalledWith('GUARDIAN.unlinked', {
       guardianProfileId: 'g1',
       studentProfileId: 's1',
       newPrimaryGuardianId: 'g2',
@@ -300,18 +139,18 @@ describe('Guardian — Unlink Validation', () => {
 });
 
 describe('Guardian — Revoke Access (Divorce)', () => {
-  let service: Awaited<ReturnType<typeof createService>>;
+  let ctx: ReturnType<typeof buildGuardianService>;
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    resetQueue();
-    service = await createService();
+  beforeEach(() => {
+    ctx = buildGuardianService();
   });
 
   it('revokeAccess returns link with canPickup=false', async () => {
-    queueResult([{ id: 'link-1', canPickup: false, isPrimaryContact: false }]);
+    vi.mocked(ctx.repo.revokeAccess).mockResolvedValue(
+      linkRow({ id: 'link-1', canPickup: false, isPrimaryContact: false }),
+    );
 
-    const result = await service.revokeAccess({
+    const result = await ctx.service.revokeAccess({
       guardianProfileId: 'g1',
       studentProfileId: 's1',
       reason: 'Court order',
@@ -322,29 +161,28 @@ describe('Guardian — Revoke Access (Divorce)', () => {
   });
 
   it('revokeAccess throws if link not found', async () => {
-    queueResult([]); // returning → empty
+    vi.mocked(ctx.repo.revokeAccess).mockResolvedValue(null);
 
     await expect(
-      service.revokeAccess({ guardianProfileId: 'g1', studentProfileId: 's1' }),
+      ctx.service.revokeAccess({ guardianProfileId: 'g1', studentProfileId: 's1' }),
     ).rejects.toMatchObject({ code: ErrorCode.GUARDIAN_LINK_NOT_FOUND });
   });
 });
 
 describe('Guardian — Delete Validation', () => {
-  let service: Awaited<ReturnType<typeof createService>>;
+  let ctx: ReturnType<typeof buildGuardianService>;
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    resetQueue();
-    service = await createService();
+  beforeEach(() => {
+    ctx = buildGuardianService();
   });
 
   it('delete blocks if guardian is only guardian for a student', async () => {
-    queueResult([{ studentProfileId: 's1' }]); // guardian's links
-    queueResult([]); // no other guardians for s1
+    vi.mocked(ctx.repo.listLinkedStudentIds).mockResolvedValue(['s1']); // guardian's links
+    vi.mocked(ctx.repo.hasOtherGuardian).mockResolvedValue(false); // no other guardians for s1
 
-    await expect(service.delete('g1')).rejects.toMatchObject({
+    await expect(ctx.service.delete('g1')).rejects.toMatchObject({
       code: ErrorCode.LAST_GUARDIAN_CANNOT_BE_DELETED,
     });
+    expect(ctx.repo.softDelete).not.toHaveBeenCalled();
   });
 });

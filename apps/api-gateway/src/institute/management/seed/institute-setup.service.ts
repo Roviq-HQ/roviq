@@ -1,22 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { seedDefaultRoles } from '@roviq/casl';
+import { Injectable, Logger } from '@nestjs/common';
 import { BusinessException, DefaultRoles, ErrorCode } from '@roviq/common-types';
-import {
-  academicYears,
-  academicYearsLive,
-  DRIZZLE_DB,
-  type DrizzleDB,
-  instituteConfigs,
-  instituteNotificationConfigs,
-  institutes,
-  institutesLive,
-  mkAdminCtx,
-  rolesLive,
-  withAdmin,
-} from '@roviq/database';
-import { and, eq, sql } from 'drizzle-orm';
 import { IdentityService } from '../../../auth/identity.service';
 import { InstituteSeederService } from './institute-seeder.service';
+import { InstituteSetupRepository } from './repositories/institute-setup.repository';
+import type { SectionStrengthNorms, SetupStatus } from './repositories/types';
 
 export interface SetupInput {
   instituteId: string;
@@ -35,10 +22,7 @@ export interface AcademicStructureCounts {
 }
 
 /** Board-specific section strength norms (PRD §7.3); unknown or missing boards get CBSE's. */
-const SECTION_STRENGTH_NORMS: Record<
-  string,
-  { optimal: number; hardMax: number; exemptionAllowed: boolean }
-> = {
+const SECTION_STRENGTH_NORMS: Record<string, SectionStrengthNorms> = {
   CBSE: { optimal: 40, hardMax: 45, exemptionAllowed: true },
   BSEH: { optimal: 40, hardMax: 45, exemptionAllowed: true },
   RBSE: { optimal: 40, hardMax: 45, exemptionAllowed: true },
@@ -57,7 +41,7 @@ export class InstituteSetupService {
   private readonly logger = new Logger(InstituteSetupService.name);
 
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    private readonly repo: InstituteSetupRepository,
     private readonly seeder: InstituteSeederService,
     private readonly identity: IdentityService,
   ) {}
@@ -92,7 +76,7 @@ export class InstituteSetupService {
 
   /** The default institute roles (admin, principal, teacher, student, parent …). */
   async createDefaultRoles(instituteId: string): Promise<void> {
-    await seedDefaultRoles(this.db, instituteId);
+    await this.repo.createDefaultRoles(instituteId);
   }
 
   /**
@@ -102,16 +86,7 @@ export class InstituteSetupService {
    * password only gains the membership. The membership is found before it is created.
    */
   async createFirstAdmin(instituteId: string, actorId: string): Promise<void> {
-    const [institute] = await withAdmin(
-      this.db,
-      mkAdminCtx('seeder:institute-setup.service'),
-      (tx) =>
-        tx
-          .select({ firstAdminUserId: institutesLive.firstAdminUserId })
-          .from(institutesLive)
-          .where(eq(institutesLive.id, instituteId)),
-    );
-    const userId = institute?.firstAdminUserId;
+    const userId = await this.repo.findFirstAdminUserId(instituteId);
     if (!userId) {
       this.logger.warn(`Institute ${instituteId} has no first admin; setup creates no admin`);
       return;
@@ -154,46 +129,18 @@ export class InstituteSetupService {
   }
 
   private async instituteAdminRoleId(instituteId: string): Promise<string> {
-    const [role] = await withAdmin(this.db, mkAdminCtx('seeder:institute-setup.service'), (tx) =>
-      tx
-        .select({ id: rolesLive.id })
-        .from(rolesLive)
-        .where(
-          and(
-            eq(rolesLive.tenantId, instituteId),
-            sql`${rolesLive.name}->>'en' = ${DefaultRoles.InstituteAdmin}`,
-          ),
-        )
-        .limit(1),
-    );
-    if (!role) {
+    const roleId = await this.repo.findRoleIdByName(instituteId, DefaultRoles.InstituteAdmin);
+    if (!roleId) {
       throw new BusinessException(
         ErrorCode.ROLE_NOT_FOUND,
         `Institute ${instituteId} has no ${DefaultRoles.InstituteAdmin} role`,
       );
     }
-    return role.id;
+    return roleId;
   }
 
   async createDefaultNotificationConfig(instituteId: string, actorId: string): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('seeder:institute-setup.service'), async (tx) => {
-      for (const notificationType of DEFAULT_NOTIFICATION_TYPES) {
-        await tx
-          .insert(instituteNotificationConfigs)
-          .values({
-            tenantId: instituteId,
-            notificationType,
-            inAppEnabled: true,
-            whatsappEnabled: false,
-            emailEnabled: true,
-            pushEnabled: false,
-            digestEnabled: false,
-            createdBy: actorId,
-            updatedBy: actorId,
-          })
-          .onConflictDoNothing();
-      }
-    });
+    await this.repo.createNotificationConfigs(instituteId, DEFAULT_NOTIFICATION_TYPES, actorId);
   }
 
   /** The config row carries the board's section norms; readers otherwise fall back to CBSE's. */
@@ -204,17 +151,7 @@ export class InstituteSetupService {
   ): Promise<void> {
     const sectionStrengthNorms =
       (board && SECTION_STRENGTH_NORMS[board]) || SECTION_STRENGTH_NORMS.CBSE;
-    await withAdmin(this.db, mkAdminCtx('seeder:institute-setup.service'), async (tx) => {
-      await tx
-        .insert(instituteConfigs)
-        .values({
-          tenantId: instituteId,
-          sectionStrengthNorms,
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .onConflictDoNothing();
-    });
+    await this.repo.createInstituteConfig(instituteId, sectionStrengthNorms, actorId);
   }
 
   /** First academic year, active (Indian: April–March). Returns the existing one on retry. */
@@ -223,28 +160,11 @@ export class InstituteSetupService {
     const startYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
     const label = `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
 
-    return withAdmin(this.db, mkAdminCtx('seeder:institute-setup.service'), async (tx) => {
-      const existing = await tx
-        .select({ id: academicYearsLive.id })
-        .from(academicYearsLive)
-        .where(eq(academicYearsLive.tenantId, instituteId));
-      if (existing.length > 0) return existing[0].id;
-
-      const rows = await tx
-        .insert(academicYears)
-        .values({
-          tenantId: instituteId,
-          label,
-          startDate: `${startYear}-04-01`,
-          endDate: `${startYear + 1}-03-31`,
-          isActive: true,
-          status: 'ACTIVE',
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .returning({ id: academicYears.id });
-      return rows[0].id;
-    });
+    return this.repo.findOrCreateFirstAcademicYear(
+      instituteId,
+      { label, startDate: `${startYear}-04-01`, endDate: `${startYear + 1}-03-31` },
+      actorId,
+    );
   }
 
   /** Standards, sections and board subjects by institute type; coaching institutes get none. */
@@ -293,14 +213,9 @@ export class InstituteSetupService {
 
   private async updateSetupStatus(
     instituteId: string,
-    status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED',
+    status: SetupStatus,
     actorId: string,
   ): Promise<void> {
-    await withAdmin(this.db, mkAdminCtx('seeder:institute-setup.service'), async (tx) => {
-      await tx
-        .update(institutes)
-        .set({ setupStatus: status, updatedBy: actorId })
-        .where(eq(institutes.id, instituteId));
-    });
+    await this.repo.updateSetupStatus(instituteId, status, actorId);
   }
 }

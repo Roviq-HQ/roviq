@@ -7,6 +7,7 @@ import {
   DRIZZLE_DB,
   type DrizzleDB,
   guardianProfilesLive,
+  mkInstituteCtx,
   sectionsLive,
   standardsLive,
   studentAcademicsLive,
@@ -93,8 +94,9 @@ export class StudentReadRepository {
   findById(id: string, access: InstituteReadAccess) {
     return this.loadById(id, access.user, studentReadPredicate(access.ability, null));
   }
-  findForMutation(id: string, ctx: InstituteContext) {
-    return this.loadById(id, ctx, undefined);
+  /** Unrestricted read for the service after a write; same origin as its writes. */
+  findForMutation(id: string, tenantId: string) {
+    return this.loadById(id, mkInstituteCtx(tenantId, 'service:student'), undefined);
   }
   list(filter: StudentFilterInput, access: InstituteReadAccess) {
     return this.loadList(
@@ -106,8 +108,8 @@ export class StudentReadRepository {
       ),
     );
   }
-  listForAttendance(filter: StudentFilterInput, ctx: InstituteContext) {
-    return this.loadList(filter, ctx, undefined);
+  listForAttendance(filter: StudentFilterInput, tenantId: string) {
+    return this.loadList(filter, mkInstituteCtx(tenantId, 'service:student'), undefined);
   }
   private async loadById(id: string, ctx: InstituteContext, restriction: SQL | undefined) {
     const rows = await withTenant(this.db, ctx, async (tx) => {

@@ -38,3 +38,22 @@ export interface UpdateBotProfileData {
   apiKeyHash?: string;
   apiKeyPrefix?: string;
 }
+
+export interface CreateBotUserData {
+  username: string;
+  email: string;
+  passwordHash: string;
+  createdBy: string;
+}
+
+export interface CreateBotMembershipData {
+  userId: string;
+  roleId: string;
+  tenantId: string;
+  createdBy: string;
+}
+
+export interface InstituteRoleRecord {
+  id: string;
+  name: Record<string, string>;
+}

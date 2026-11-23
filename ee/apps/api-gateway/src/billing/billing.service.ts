@@ -1,4 +1,4 @@
-import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   type AppAbility,
@@ -6,14 +6,7 @@ import {
   ErrorCode,
   SUBSCRIPTION_STATE_MACHINE,
 } from '@roviq/common-types';
-import {
-  DRIZZLE_DB,
-  type DrizzleDB,
-  type I18nContent,
-  i18nDisplay,
-  SYSTEM_USER_ID,
-  softDelete,
-} from '@roviq/database';
+import { type I18nContent, i18nDisplay, SYSTEM_USER_ID } from '@roviq/database';
 import { BillingPeriod } from '@roviq/domain';
 import type {
   BillingInterval,
@@ -22,7 +15,6 @@ import type {
   PaymentProvider,
   SubscriptionStatus,
 } from '@roviq/ee-billing-types';
-import { plans } from '@roviq/ee-database';
 import {
   PaymentGatewayError,
   PaymentGatewayFactory,
@@ -42,7 +34,6 @@ export class BillingService {
   constructor(
     private readonly repo: BillingRepository,
     private readonly eventBus: EventBusService,
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly gatewayFactory: PaymentGatewayFactory,
     private readonly config: ConfigService,
   ) {}
@@ -155,7 +146,7 @@ export class BillingService {
   }
 
   async deletePlan(id: string) {
-    await softDelete(this.db, plans, id);
+    await this.repo.softDeletePlan(id);
     this.emitEvent(EVENT_PATTERNS.BILLING.plan.deleted, { id });
   }
 

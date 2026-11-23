@@ -1,3 +1,4 @@
+import type { InstituteType } from '@roviq/common-types';
 import type { AcademicYearStatus } from '@roviq/database';
 import type { YearRolloverCounts } from '../../student/year-rollover';
 import type { AcademicYearRecord, CreateAcademicYearData, UpdateAcademicYearData } from './types';
@@ -19,4 +20,6 @@ export abstract class AcademicYearRepository {
   abstract softDelete(id: string): Promise<void>;
   /** Counts what activating `targetYearId` would do to students of the active year; writes nothing. */
   abstract previewRollover(targetYearId: string): Promise<YearRolloverCounts>;
+  /** The institute's type, or null when the tenant has no institute row. */
+  abstract findInstituteType(tenantId: string): Promise<InstituteType | null>;
 }

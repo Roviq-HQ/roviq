@@ -1,14 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { BusinessException, ErrorCode, type InstituteType } from '@roviq/common-types';
 import {
   type AcademicYearStatus,
   academicYears,
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  institutesLive,
+  mkAdminCtx,
   mkInstituteCtx,
   softDelete,
   type TermConfig,
+  withAdmin,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -241,5 +244,18 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
     await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:academic-year'), async (tx) => {
       await softDelete(tx, academicYears, id);
     });
+  }
+
+  // `institutes` has no institute-role policy on its own id, hence the admin role; keyed by the token tenant.
+  async findInstituteType(tenantId: string): Promise<InstituteType | null> {
+    const rows = await withAdmin(this.db, mkAdminCtx('service:academic-year'), async (tx) => {
+      return tx
+        .select({ type: institutesLive.type })
+        .from(institutesLive)
+        .where(eq(institutesLive.id, tenantId))
+        .limit(1);
+    });
+    if (rows.length === 0) return null;
+    return rows[0].type as InstituteType;
   }
 }

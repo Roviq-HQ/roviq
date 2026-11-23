@@ -1,15 +1,13 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   ACADEMIC_YEAR_STATE_MACHINE,
   BusinessException,
   ErrorCode,
   type InstituteType,
 } from '@roviq/common-types';
-import { DRIZZLE_DB, type DrizzleDB, institutesLive, mkAdminCtx, withAdmin } from '@roviq/database';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import { eq } from 'drizzle-orm';
 import type { YearRolloverCounts } from '../student/year-rollover';
 import type { CreateAcademicYearInput } from './dto/create-academic-year.input';
 import type { UpdateAcademicYearInput } from './dto/update-academic-year.input';
@@ -32,7 +30,6 @@ const OVERLAP_VALIDATED_INSTITUTE_TYPES: ReadonlySet<InstituteType> = new Set([
 export class AcademicYearService {
   constructor(
     private readonly repo: AcademicYearRepository,
-    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -213,9 +210,8 @@ export class AcademicYearService {
    * that disallow overlap (SCHOOL, LIBRARY). Coaching institutes can run
    * multi-year programs that legitimately span overlapping academic years.
    *
-   * `institutes` is a platform-level table (no RLS for app role on its own
-   * tenant_id column), so the type lookup uses `withAdmin` — read-only,
-   * scoped to the current tenant id.
+   * `institutes` is a platform-level table, so the type lookup runs as the
+   * admin role in the repository — read-only, scoped to the current tenant id.
    */
   private async validateNoOverlap(
     startDate: string,
@@ -238,19 +234,13 @@ export class AcademicYearService {
   }
 
   private async lookupInstituteType(tenantId: string): Promise<InstituteType> {
-    const rows = await withAdmin(this.db, mkAdminCtx('service:academic-year'), async (tx) => {
-      return tx
-        .select({ type: institutesLive.type })
-        .from(institutesLive)
-        .where(eq(institutesLive.id, tenantId))
-        .limit(1);
-    });
-    if (rows.length === 0) {
+    const type = await this.repo.findInstituteType(tenantId);
+    if (type === null) {
       throw new BusinessException(
         ErrorCode.INSTITUTE_NOT_FOUND,
         'Institute not found for current tenant context',
       );
     }
-    return rows[0].type as InstituteType;
+    return type;
   }
 }
