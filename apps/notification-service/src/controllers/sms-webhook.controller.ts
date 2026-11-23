@@ -21,7 +21,7 @@ function sameSecret(given: string, expected: string): boolean {
 /**
  * The address the SMS provider posts delivery reports to. The provider cannot sign its calls,
  * so the address itself carries a secret (`SMS_WEBHOOK_SECRET`): a call without it is refused
- * before the body is read. The request log replaces that path segment (`scrubRequestUrl`).
+ * before the body is read. The request log replaces that path segment (`serializeRequest`).
  * A report can only add a DELIVERED or FAILED row to a message this service sent.
  */
 @Controller('webhooks/sms')
