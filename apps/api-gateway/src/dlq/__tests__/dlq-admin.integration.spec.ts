@@ -105,11 +105,22 @@ describe('DLQ admin reader (integration)', () => {
   });
 
   it('should count pending messages', async () => {
+    // Other spec files add and remove dead letters in the same database while this runs, so
+    // the count is compared with a direct read taken before and one taken after.
+    const direct = async (): Promise<number> => {
+      const res = await superPool.query<{ n: number }>(
+        "SELECT count(*)::int AS n FROM dlq_messages WHERE status = 'pending'",
+      );
+      return res.rows[0]?.n ?? 0;
+    };
+    const before = await direct();
     const counted = await result.app.get(DlqService).countPending();
-    const res = await superPool.query(
-      "SELECT count(*)::int AS n FROM dlq_messages WHERE status = 'pending'",
-    );
-    expect(counted).toBe(res.rows[0]?.n);
+    const after = await direct();
+
+    expect(counted).toBeGreaterThanOrEqual(Math.min(before, after));
+    expect(counted).toBeLessThanOrEqual(Math.max(before, after));
+    // This spec's own pending rows are always part of it.
+    expect(counted).toBeGreaterThanOrEqual(1);
   });
 
   it('should discard a pending message, then refuse to discard or replay it again', async () => {
