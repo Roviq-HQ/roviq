@@ -264,9 +264,8 @@ enforced yet.
   `EMAIL_FROM` (`Roviq <no-reply@your-domain>`). The sending domain needs SPF and DKIM.
 - **Push**: `NOTIFICATION_PUSH_PROVIDER=fcm` and `FCM_SERVICE_ACCOUNT_JSON`, the whole service
   account key JSON of the Firebase project. Tokens FCM reports as unregistered are retired.
-- **SMS**: no production provider yet. The `log` provider sends nothing and is refused at start
-  when `NODE_ENV=production`, so leave it unset until a provider exists; impersonation codes then
-  cannot reach a phone.
+- **SMS**: `NOTIFICATION_SMS_PROVIDER=http`. See "SMS" below. Leave it unset until the sender
+  and the templates are registered; impersonation codes then cannot reach a phone.
 - **WhatsApp**: `NOTIFICATION_WHATSAPP_PROVIDER=cloud`. See "WhatsApp alerts" below.
 - **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
   prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
@@ -326,6 +325,44 @@ messages each institute sent in a month by template category.
 Push and email go first, then WhatsApp. STOP and START are each confirmed once. A person who
 writes anything else to a sender's number gets one fixed reply a day saying the number only sends alerts; the text of what they wrote is not stored.
 There is no inbox.
+
+## SMS
+
+SMS goes out through a provider's HTTP API for registered templates (ROV-318). In India every
+commercial SMS must match a template registered in advance, per language, so the service sends
+a registration id and variable values, never free text. Today SMS carries only one-time codes
+and the temporary password of a new account.
+
+**Environment (notification service)**
+
+| Variable | Meaning |
+|----------|---------|
+| `NOTIFICATION_SMS_PROVIDER=http` | Turns the provider on. The next four are then required |
+| `SMS_API_BASE_URL` | Address of the provider's API; a message is posted to `<base>/flow` |
+| `SMS_API_KEY` | The provider's key, sent in the `authkey` header |
+| `SMS_TEMPLATE_IDS` | A JSON object from `<TEMPLATE_KEY>:<language>` to the provider's id of that registered template, for example `{"USER_WELCOME:en":"…","USER_WELCOME:hi":"…"}` |
+| `SMS_WEBHOOK_SECRET` | At least 32 random characters (`openssl rand -hex 32`); part of the delivery-report address |
+| `SMS_SENDER_ID` | Optional: the registered sender header, when the provider's template does not fix it |
+
+**Templates.** Register each template in `apps/notification-service/src/delivery/sms/sms-templates.ts`
+(the definitions sit in `apps/notification-service/src/types/secret.types.ts`) with exactly the
+text written there, in `en` and `hi`, replacing `{{1}}`, `{{2}}`, … by the registry's variable
+marker, and create the provider's template with variables named `var1`, `var2`, … in the same
+order. A type or language with no id in `SMS_TEMPLATE_IDS` is recorded as skipped
+(`no_template`). No template carries a web address.
+
+**Variables.** A value longer than 30 characters is shortened and ends in `..`. A code, a
+password or a username is never shortened: when one does not fit, the message is recorded as
+failed (`SMS_VARIABLE_TOO_LONG`) and nothing is sent.
+
+**Delivery reports.** Register `POST https://<public host>/webhooks/sms/<SMS_WEBHOOK_SECRET>`
+with the provider and route that path to the notification service. The provider cannot sign
+its calls, so the secret in the address is the only check: a call without it gets 401 and
+changes nothing. The request log replaces that part of the address. A report can only add a
+`DELIVERED` or `FAILED` row to a message the service sent; the institute comes from that
+message, never from the report. Where the proxy can, also allow only the provider's addresses.
+
+**Usage.** `adminSmsUsage(month)` counts the SMS each institute sent in a month, by type.
 
 ## PDF generation
 

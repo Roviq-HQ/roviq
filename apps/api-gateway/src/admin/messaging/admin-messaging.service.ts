@@ -14,6 +14,7 @@ import type {
 import { AdminMessagingRepository } from './repositories/admin-messaging.repository';
 import type {
   MessagingSenderRecord,
+  SmsUsageRecord,
   UpdateMessagingSenderData,
   WhatsAppUsageRecord,
 } from './repositories/types';
@@ -102,6 +103,11 @@ export class AdminMessagingService {
   /** `month` is YYYY-MM, already validated by the DTO. */
   whatsAppUsage(ctx: PlatformContext, month: string): Promise<WhatsAppUsageRecord[]> {
     return this.repo.whatsAppUsage(ctx, month);
+  }
+
+  /** `month` is YYYY-MM, already validated by the DTO. */
+  smsUsage(ctx: PlatformContext, month: string): Promise<SmsUsageRecord[]> {
+    return this.repo.smsUsage(ctx, month);
   }
 
   private async transition(

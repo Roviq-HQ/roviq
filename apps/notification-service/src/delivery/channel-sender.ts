@@ -13,6 +13,7 @@ import { ChannelAdapterError } from './adapters/channel-adapter';
 import type { ChannelAdapters } from './adapters/channel-adapters';
 import { evaluateChannelGate } from './channel-gate';
 import type { ConsentGate } from './consent-gate';
+import { type SmsDraft, type SmsSend, SmsVariableError } from './sms/sms-template';
 import type { WhatsAppRoute } from './whatsapp/whatsapp-route';
 import type { TemplateSend } from './whatsapp/whatsapp-template';
 
@@ -40,6 +41,8 @@ export interface ChannelAttempt {
   compose(locale: Locale): OutsideCopy;
   /** The approved WhatsApp template for this message; null or absent when there is none. */
   template?(locale: Locale): TemplateSend | null;
+  /** The registered SMS template for this message; null or absent when there is none. */
+  sms?(locale: Locale): SmsDraft | null;
 }
 
 /** Not sent and not refused: the caller tries again at `until`. No delivery row is written. */
@@ -92,6 +95,9 @@ export class ChannelSender {
       (await loadContact())?.preferredLocale === 'hi' ? 'hi' : 'en';
     let sender: MessagingSenderRecord | null = null;
     let template: TemplateSend | null = null;
+    let sms: SmsSend | null = null;
+    let unsendableSms = false;
+    const resolveSms = adapter?.resolveSmsTemplate?.bind(adapter);
 
     const gate = await evaluateChannelGate({
       channelEnabled: a.channelEnabled,
@@ -114,7 +120,21 @@ export class ChannelSender {
             template = a.template?.(await loadLocale()) ?? null;
             return template !== null;
           }
-        : undefined,
+        : resolveSms
+          ? async () => {
+              const locale = await loadLocale();
+              try {
+                const draft = a.sms?.(locale) ?? null;
+                sms = draft === null ? null : resolveSms(draft);
+              } catch (err) {
+                if (!(err instanceof SmsVariableError)) throw err;
+                // Not a missing template: the message exists but cannot be sent as registered.
+                unsendableSms = true;
+                return true;
+              }
+              return sms !== null;
+            }
+          : undefined,
       resolveAddresses: async () => {
         if (a.address === 'lookup')
           return this.addressesOf(a.channel, a.recipientUserId, loadContact);
@@ -140,6 +160,14 @@ export class ChannelSender {
     }
     // The gate already refused a channel without an adapter; this narrows the type.
     if (adapter === null) return { status: 'SKIPPED', provider: null, skipReason: 'no_provider' };
+    if (unsendableSms) {
+      return {
+        status: 'FAILED',
+        provider: adapter.provider,
+        errorCode: 'SMS_VARIABLE_TOO_LONG',
+        retryable: false,
+      };
+    }
 
     const route = routeOf(sender, template);
     const copy = a.compose(await loadLocale());
@@ -153,6 +181,7 @@ export class ChannelSender {
         body: copy.body,
         data: a.data,
         ...(route ? { route: route.message } : {}),
+        ...(sms ? { sms } : {}),
       });
       return {
         status: 'SENT',

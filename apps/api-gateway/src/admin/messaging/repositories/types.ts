@@ -41,3 +41,10 @@ export interface WhatsAppUsageRecord {
   templateCategory: MessageTemplateCategory | null;
   sentCount: number;
 }
+
+export interface SmsUsageRecord {
+  tenantId: string | null;
+  /** The notification type key. */
+  type: string;
+  sentCount: number;
+}

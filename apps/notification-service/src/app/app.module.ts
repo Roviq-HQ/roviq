@@ -7,10 +7,12 @@ import { TemporalClientModule } from '@roviq/temporal';
 import { type NotificationEnv, validate } from '../config/env.validation';
 import { InstitutePortal } from '../config/institute-portal';
 import { BillingNotificationController } from '../controllers/billing-notification.controller';
+import { SmsWebhookController } from '../controllers/sms-webhook.controller';
 import { WhatsAppWebhookController } from '../controllers/whatsapp-webhook.controller';
 import { buildChannelAdapters, ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { ConsentGate, GuardianConsentGate } from '../delivery/consent-gate';
+import { SmsHttp } from '../delivery/sms/sms-http';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { HealthController } from '../health/health.controller';
@@ -27,6 +29,7 @@ import { NotificationServiceRepositoryModule } from '../repositories/notificatio
 import { NotificationWriteRepository } from '../repositories/notification-write.repository';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
+import { SmsWebhookService } from '../services/sms-webhook.service';
 import { WhatsAppWebhookService } from '../services/whatsapp-webhook.service';
 import { NotificationWorkerService } from '../workflows/notification.worker';
 
@@ -44,6 +47,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     HealthController,
     BillingNotificationController,
     WhatsAppWebhookController,
+    SmsWebhookController,
     ApprovalListener,
     AttendanceListener,
     AuthListener,
@@ -58,6 +62,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
         config: ConfigService<NotificationEnv, true>,
         contacts: ContactReadRepository,
         whatsapp: WhatsAppCloud,
+        sms: SmsHttp,
       ) =>
         buildChannelAdapters(
           {
@@ -73,8 +78,9 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
           },
           contacts,
           whatsapp,
+          sms,
         ),
-      inject: [ConfigService, ContactReadRepository, WhatsAppCloud],
+      inject: [ConfigService, ContactReadRepository, WhatsAppCloud, SmsHttp],
     },
     { provide: ConsentGate, useClass: GuardianConsentGate },
     {
@@ -95,6 +101,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
       ],
     },
     WhatsAppCloud,
+    SmsHttp,
     WhatsAppRoute,
     Clock,
     NotificationDispatcher,
@@ -102,6 +109,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     InstitutePortal,
     RecipientResolver,
     WhatsAppWebhookService,
+    SmsWebhookService,
     NotificationWorkerService,
     NotificationWorkerHealthIndicator,
   ],

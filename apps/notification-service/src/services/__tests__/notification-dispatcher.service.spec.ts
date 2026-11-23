@@ -4,6 +4,7 @@ import { TemporalClientService } from '@roviq/temporal';
 import { createMock } from '@roviq/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChannelSender } from '../../delivery/channel-sender';
+import { smsDraftForSecret } from '../../delivery/sms/sms-templates';
 import { NotificationConfigReadRepository } from '../../repositories/notification-config-read.repository';
 import { NotificationWriteRepository } from '../../repositories/notification-write.repository';
 import { RecipientReadRepository } from '../../repositories/recipient-read.repository';
@@ -337,7 +338,7 @@ describe('NotificationDispatcher', () => {
       expect(sender.attempt).toHaveBeenCalledTimes(1);
       const [call] = sender.attempt.mock.calls;
       assert(call);
-      const { compose, ...attempt } = call[0];
+      const { compose, sms, ...attempt } = call[0];
       expect(attempt).toEqual({
         type: 'EMAIL_VERIFICATION',
         channel: 'EMAIL',
@@ -352,6 +353,26 @@ describe('NotificationDispatcher', () => {
         data: {},
       });
       expect(compose('en').body).toContain('482913');
+      assert(sms);
+      expect(sms('en')).toBeNull();
+    });
+
+    it('should give the registered SMS template of the message', async () => {
+      const message = { type: 'IMPERSONATION_OTP', params: { otp: '771204' } } as const;
+      await dispatcher.dispatchSecret({
+        message,
+        audience: INSTITUTE,
+        recipientUserId: 'user-admin-1',
+        addresses: { SMS: '+919800000001', EMAIL: 'admin@example.in' },
+      });
+
+      const smsCall = sender.attempt.mock.calls.find(([a]) => a.channel === 'SMS');
+      assert(smsCall);
+      const sms = smsCall[0].sms;
+      assert(sms);
+      const expected = smsDraftForSecret(message, 'hi');
+      expect(expected).not.toBeNull();
+      expect(sms('hi')).toEqual(expected);
     });
 
     it('should look up the address of a channel the event does not name', async () => {

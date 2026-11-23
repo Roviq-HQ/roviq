@@ -74,3 +74,21 @@ export class AdminWhatsAppUsageRow {
   @Field(() => Int)
   sentCount!: number;
 }
+
+@ObjectType({
+  description:
+    'SMS messages the provider accepted (status SENT) in one month, per institute and notification type.',
+})
+export class AdminSmsUsageRow {
+  @Field(() => ID, {
+    nullable: true,
+    description: 'The institute; null for platform-scope messages.',
+  })
+  tenantId!: string | null;
+
+  @Field({ description: 'The notification type key, such as FEE_REMINDER.' })
+  type!: string;
+
+  @Field(() => Int)
+  sentCount!: number;
+}

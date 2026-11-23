@@ -8,10 +8,18 @@ import {
   RegisterMessagingSenderInput,
   RotateMessagingSenderTokenArgs,
   UpdateMessagingSenderInput,
-  WhatsAppUsageArgs,
+  UsageMonthArgs,
 } from './dto/messaging-sender.dto';
-import { AdminMessagingSender, AdminWhatsAppUsageRow } from './models/admin-messaging-sender.model';
-import type { MessagingSenderRecord, WhatsAppUsageRecord } from './repositories/types';
+import {
+  AdminMessagingSender,
+  AdminSmsUsageRow,
+  AdminWhatsAppUsageRow,
+} from './models/admin-messaging-sender.model';
+import type {
+  MessagingSenderRecord,
+  SmsUsageRecord,
+  WhatsAppUsageRecord,
+} from './repositories/types';
 
 @PlatformScope()
 @Resolver(() => AdminMessagingSender)
@@ -127,9 +135,23 @@ export class AdminMessagingResolver {
   @CheckAbility({ action: 'read', subject: 'MessagingSender' })
   adminWhatsAppUsage(
     @CurrentUser() user: AuthUser,
-    @Args() args: WhatsAppUsageArgs,
+    @Args() args: UsageMonthArgs,
   ): Promise<WhatsAppUsageRecord[]> {
     assertPlatformContext(user);
     return this.service.whatsAppUsage(user, args.month);
+  }
+
+  @Query(() => [AdminSmsUsageRow], {
+    description:
+      'SMS messages the provider accepted (status SENT) in one calendar month, counted in India time (Asia/Kolkata), one row per institute and notification type.',
+  })
+  @UseGuards(AbilityGuard)
+  @CheckAbility({ action: 'read', subject: 'MessagingSender' })
+  adminSmsUsage(
+    @CurrentUser() user: AuthUser,
+    @Args() args: UsageMonthArgs,
+  ): Promise<SmsUsageRecord[]> {
+    assertPlatformContext(user);
+    return this.service.smsUsage(user, args.month);
   }
 }

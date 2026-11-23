@@ -222,3 +222,17 @@ describe('AdminMessagingService.delete', () => {
     });
   });
 });
+
+describe('AdminMessagingService.smsUsage', () => {
+  it("should return the repository's rows for the month as they are", async () => {
+    const rows = [
+      { tenantId: null, type: 'IMPERSONATION_OTP', sentCount: 2 },
+      { tenantId: TENANT, type: 'FEE_REMINDER', sentCount: 5 },
+    ];
+    const smsUsage = vi.fn(async () => rows);
+    const { service } = setup({ smsUsage });
+
+    await expect(service.smsUsage(ctx, '2032-03')).resolves.toEqual(rows);
+    expect(smsUsage).toHaveBeenCalledWith(ctx, '2032-03');
+  });
+});

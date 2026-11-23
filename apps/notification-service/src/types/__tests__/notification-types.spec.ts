@@ -414,7 +414,7 @@ describe('secret types', () => {
     });
     expect(composeSecret('IMPERSONATION_OTP', params, 'SMS', 'hi')).toEqual({
       subject: '',
-      body: 'Roviq: Roviq सपोर्ट से किसी ने आपके संस्थान को उसके एक उपयोगकर्ता के रूप में देखने की अनुमति माँगी है। यदि आप अनुमति देते हैं, तो उन्हें यह कोड दें: 771204। यह 5 मिनट में समाप्त हो जाएगा। यदि आपको इसकी अपेक्षा नहीं थी, तो इस संदेश को अनदेखा करें, कुछ नहीं होगा।',
+      body: 'Roviq: Roviq सपोर्ट आपके संस्थान को एक उपयोगकर्ता के रूप में देखना चाहता है। अनुमति दें तो उन्हें यह कोड दें: 771204। यह 5 मिनट में समाप्त होगा। अपेक्षा न हो तो अनदेखा करें।',
     });
     expect(composeSecret('IMPERSONATION_OTP', params, 'EMAIL', 'en')).toEqual({
       subject: 'Roviq support asks to view your institute',
@@ -466,7 +466,7 @@ describe('secret types', () => {
     });
   });
 
-  it('should name the institute and its sign-in address in a welcome it created (ROV-315)', () => {
+  it('should name the institute in a welcome it created, with the address in the email only (ROV-315)', () => {
     const params = {
       username: 'staff-0191-ab12',
       firstName: 'Kiran',
@@ -505,7 +505,7 @@ describe('secret types', () => {
     });
     expect(composeSecret('USER_WELCOME', params, 'SMS', 'en')).toEqual({
       subject: '',
-      body: 'Roviq: Sunrise Public created your account. Username: staff-0191-ab12 | Temp password: Tmp-7kP4. Sign in at https://app.roviq.com/login and set your own password.',
+      body: "Roviq: Sunrise Public created your account. Username: staff-0191-ab12 | Temp password: Tmp-7kP4. Sign in on your institute's Roviq portal or the Roviq app and set your own password.",
     });
     expect(
       composeSecret(
@@ -515,7 +515,7 @@ describe('secret types', () => {
         'hi',
       ).body,
     ).toBe(
-      'Roviq: Sunrise Public ने आपका खाता बनाया है। यूज़रनेम: staff-0191-ab12 | अस्थायी पासवर्ड: Tmp-7kP4। https://app.roviq.com/login पर साइन इन करें और अपना पासवर्ड बनाएँ।',
+      'Roviq: Sunrise Public ने आपका खाता बनाया। यूज़रनेम: staff-0191-ab12, अस्थायी पासवर्ड: Tmp-7kP4। संस्थान के Roviq पोर्टल पर साइन इन कर पासवर्ड बदलें।',
     );
   });
 });

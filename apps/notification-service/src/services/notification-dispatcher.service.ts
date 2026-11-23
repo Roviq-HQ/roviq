@@ -6,6 +6,7 @@ import { TemporalClientService } from '@roviq/temporal';
 import { ChannelSender, toPushData } from '../delivery/channel-sender';
 import { resolveChannelSettings } from '../delivery/channel-settings';
 import { nextDigestRunOrDefault } from '../delivery/digest-schedule';
+import { smsDraftForSecret } from '../delivery/sms/sms-templates';
 import { NotificationConfigReadRepository } from '../repositories/notification-config-read.repository';
 import { NotificationWriteRepository } from '../repositories/notification-write.repository';
 import { RecipientReadRepository } from '../repositories/recipient-read.repository';
@@ -218,6 +219,7 @@ export class NotificationDispatcher {
           address: given === undefined ? 'lookup' : { given },
           data: {},
           compose: (locale) => composeSecretMessage(message, channel, locale),
+          sms: (locale) => smsDraftForSecret(message, locale),
         });
         if (outcome.status !== 'FAILED' || !outcome.retryable) break;
         this.logger.warn(

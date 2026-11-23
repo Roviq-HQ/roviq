@@ -41,6 +41,8 @@ const BLOCK = 'mutation ($id: ID!) { adminBlockMessagingSender(id: $id) { id sta
 const DELETE = 'mutation ($id: ID!) { adminDeleteMessagingSender(id: $id) }';
 const USAGE = `query ($month: String!) {
   adminWhatsAppUsage(month: $month) { tenantId templateCategory sentCount } }`;
+const SMS_USAGE = `query ($month: String!) {
+  adminSmsUsage(month: $month) { tenantId type sentCount } }`;
 
 interface SenderView {
   id: string;
@@ -51,6 +53,12 @@ interface SenderView {
   status: string;
   dailyCap: number;
   instituteDailyCap: number | null;
+}
+
+interface SmsUsageRow {
+  tenantId: string | null;
+  type: string;
+  sentCount: number;
 }
 
 interface UsageRow {
@@ -461,6 +469,7 @@ describe('admin messaging senders (integration)', () => {
       ['adminBlockMessagingSender', BLOCK, { id }],
       ['adminDeleteMessagingSender', DELETE, { id }],
       ['adminWhatsAppUsage', USAGE, { month: '2031-10' }],
+      ['adminSmsUsage', SMS_USAGE, { month: '2032-03' }],
     ];
 
     it.each(operations)('should refuse an institute token on %s', async (_name, query, vars) => {
@@ -486,6 +495,7 @@ describe('admin messaging senders (integration)', () => {
     it('should let a read-only platform role list senders and usage', async () => {
       expect((await gql(LIST, supportToken)).errors).toBeUndefined();
       expect((await gql(USAGE, supportToken, { month: '2031-10' })).errors).toBeUndefined();
+      expect((await gql(SMS_USAGE, supportToken, { month: '2032-03' })).errors).toBeUndefined();
     });
   });
 
@@ -801,6 +811,170 @@ describe('admin messaging senders (integration)', () => {
       'October',
     ])('should refuse the month %j', async (month) => {
       expect(code(await gql(USAGE, adminToken, { month }))).toBe('VALIDATION_FAILED');
+    });
+  });
+
+  describe('adminSmsUsage', () => {
+    const insertDelivery = async (row: {
+      tenantId: string | null;
+      recipient: string;
+      type: string;
+      channel?: string;
+      status?: string;
+      at: string;
+    }) => {
+      const status = row.status ?? 'SENT';
+      const channel = row.channel ?? 'SMS';
+      const { rows } = await superPool.query<{ id: string }>(
+        `INSERT INTO notification_deliveries
+           (scope, tenant_id, recipient_user_id, type, channel, provider, status,
+            skip_reason, error_code, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id`,
+        [
+          row.tenantId ? 'institute' : 'platform',
+          row.tenantId,
+          row.recipient,
+          row.type,
+          channel,
+          channel === 'SMS' ? 'sms_http' : 'whatsapp_cloud',
+          status,
+          status === 'SKIPPED' ? 'no_template' : null,
+          status === 'FAILED' ? 'SMS_REJECTED' : null,
+          row.at,
+        ],
+      );
+      const [inserted] = rows;
+      assert(inserted);
+      createdDeliveryIds.push(inserted.id);
+    };
+
+    const mine = (rows: SmsUsageRow[]) =>
+      rows
+        .filter(
+          (r) =>
+            r.tenantId === null || r.tenantId === instA.tenantId || r.tenantId === instB.tenantId,
+        )
+        .sort((x, y) => `${x.tenantId}|${x.type}`.localeCompare(`${y.tenantId}|${y.type}`));
+
+    const usage = async (month: string) => {
+      const res = await gql<{ adminSmsUsage: SmsUsageRow[] }>(SMS_USAGE, adminToken, { month });
+      expect(res.errors).toBeUndefined();
+      return mine(res.data?.adminSmsUsage ?? []);
+    };
+
+    beforeAll(async () => {
+      const a = instA.tenantId;
+      const b = instB.tenantId;
+      const ra = instA.userId;
+      const rb = instB.userId;
+      // March 2032 in India time runs from 2032-02-29T18:30:00Z to 2032-03-31T18:30:00Z.
+      const fee = 'FEE_REMINDER';
+      const absent = 'ATTENDANCE_ABSENT';
+      await insertDelivery({ tenantId: a, recipient: ra, type: fee, at: '2032-02-29T18:30:00Z' });
+      await insertDelivery({ tenantId: a, recipient: ra, type: fee, at: '2032-03-31T18:29:59Z' });
+      await insertDelivery({
+        tenantId: a,
+        recipient: ra,
+        type: absent,
+        at: '2032-03-15T06:00:00Z',
+      });
+      await insertDelivery({ tenantId: a, recipient: ra, type: fee, at: '2032-02-29T18:29:59Z' });
+      await insertDelivery({ tenantId: a, recipient: ra, type: fee, at: '2032-03-31T18:30:00Z' });
+      for (const status of ['FAILED', 'SKIPPED']) {
+        await insertDelivery({
+          tenantId: a,
+          recipient: ra,
+          type: fee,
+          status,
+          at: '2032-03-10T06:00:00Z',
+        });
+      }
+      await insertDelivery({
+        tenantId: a,
+        recipient: ra,
+        type: fee,
+        channel: 'WHATSAPP',
+        at: '2032-03-10T06:00:00Z',
+      });
+      for (let i = 0; i < 3; i += 1) {
+        await insertDelivery({
+          tenantId: b,
+          recipient: rb,
+          type: absent,
+          at: '2032-03-20T06:00:00Z',
+        });
+      }
+      await insertDelivery({
+        tenantId: b,
+        recipient: rb,
+        type: absent,
+        status: 'FAILED',
+        at: '2032-03-20T06:00:00Z',
+      });
+      await insertDelivery({
+        tenantId: b,
+        recipient: rb,
+        type: absent,
+        channel: 'WHATSAPP',
+        at: '2032-03-20T06:00:00Z',
+      });
+      await insertDelivery({
+        tenantId: null,
+        recipient: ra,
+        type: 'IMPERSONATION_OTP',
+        at: '2032-03-05T06:00:00Z',
+      });
+    });
+
+    it('should count SENT SMS messages per institute and type in India time', async () => {
+      expect(await usage('2032-03')).toEqual(
+        mine([
+          { tenantId: null, type: 'IMPERSONATION_OTP', sentCount: 1 },
+          { tenantId: instA.tenantId, type: 'FEE_REMINDER', sentCount: 2 },
+          { tenantId: instA.tenantId, type: 'ATTENDANCE_ABSENT', sentCount: 1 },
+          { tenantId: instB.tenantId, type: 'ATTENDANCE_ABSENT', sentCount: 3 },
+        ]),
+      );
+    });
+
+    it('should put the messages just outside March into their own months', async () => {
+      expect(await usage('2032-02')).toEqual([
+        { tenantId: instA.tenantId, type: 'FEE_REMINDER', sentCount: 1 },
+      ]);
+      expect(await usage('2032-04')).toEqual([
+        { tenantId: instA.tenantId, type: 'FEE_REMINDER', sentCount: 1 },
+      ]);
+    });
+
+    it('should not count SMS messages in the WhatsApp usage', async () => {
+      const res = await gql<{ adminWhatsAppUsage: UsageRow[] }>(USAGE, adminToken, {
+        month: '2032-03',
+      });
+
+      expect(res.errors).toBeUndefined();
+      const byTenant = (rows: UsageRow[]) =>
+        rows
+          .filter((r) => r.tenantId === instA.tenantId || r.tenantId === instB.tenantId)
+          .sort((x, y) => `${x.tenantId}`.localeCompare(`${y.tenantId}`));
+      expect(byTenant(res.data?.adminWhatsAppUsage ?? [])).toEqual(
+        byTenant([
+          { tenantId: instA.tenantId, templateCategory: null, sentCount: 1 },
+          { tenantId: instB.tenantId, templateCategory: null, sentCount: 1 },
+        ]),
+      );
+    });
+
+    it.each([
+      '2032-13',
+      '2032-3',
+      '2032-00',
+      '32-03',
+      '2032-03-01',
+      '',
+      'March',
+    ])('should refuse the month %j', async (month) => {
+      expect(code(await gql(SMS_USAGE, adminToken, { month }))).toBe('VALIDATION_FAILED');
     });
   });
 });
