@@ -52,7 +52,8 @@ A change is done when all of this is true. Do it without being asked, and do not
 3. **`pnpm lint:fix` and `pnpm check:docs` are clean, docs are updated** in the same change (rules: "Docs" below), and for a model change you have checked RLS on every affected table.
 4. **Commit** (conventional commit, header ≤ 100 characters), a pre-existing fix in its own commit. Commit and open the PR as soon as the issue's own flows pass; extras are a second, small PR.
 5. **Push and merge only when the user asks.** The push runs the one full gate for the branch (`pnpm ci:check`, about 8 minutes): do not run it by hand first. Redirect the push output to a file and look for `[ci:check] FAILED`; never judge it by `; echo $?` or through `tail`.
-6. **Report** each flow you drove and what you saw, and name anything you could not verify with its reason.
+6. **Merge by squash, always**: `gh pr merge <n> --squash`, never `--merge` or `--rebase`. One pull request is one commit on `main`, titled as a conventional commit. Keep pull requests independent of each other; when one must build on another, merge the first, rebase the second onto `main`, and push it again before merging.
+7. **Report** each flow you drove and what you saw, and name anything you could not verify with its reason.
 
 ## Hard rules
 
