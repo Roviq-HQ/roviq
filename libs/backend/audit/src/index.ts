@@ -5,5 +5,10 @@ export {
   markAuditInstitute,
   markedAuditInstitute,
 } from './decorators/audit-institute.decorator';
-export { AuditMask, getAuditMaskedFields } from './decorators/audit-mask.decorator';
+export {
+  AUDIT_REDACTED,
+  AuditMask,
+  getAuditMaskedFields,
+  redactAuditMasked,
+} from './decorators/audit-mask.decorator';
 export { NoAudit } from './decorators/no-audit.decorator';

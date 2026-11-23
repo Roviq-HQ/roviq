@@ -199,6 +199,11 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/repositories/consent-read.drizzle-repository.ts',
   // ROV-314: notifications and notification_deliveries are written by roviq_admin only
   'apps/notification-service/src/repositories/notification-write.drizzle-repository.ts',
+  // ROV-319: senders, their tokens, opt-outs and inbound events are platform-role tables
+  'apps/notification-service/src/repositories/messaging-sender.drizzle-repository.ts',
+  'apps/notification-service/src/repositories/messaging-inbound.drizzle-repository.ts',
+  // ROV-319 integration fixtures: senders with tokens and phone numbers of the recipients
+  'apps/notification-service/src/__tests__/whatsapp-delivery.integration.spec.ts',
   // ROV-314 integration fixtures: institutes, guardian links and stored notification rows
   'apps/notification-service/src/__tests__/notification-pipeline.integration.spec.ts',
   'ee/apps/api-gateway/src/billing/billing-event.consumer.ts',

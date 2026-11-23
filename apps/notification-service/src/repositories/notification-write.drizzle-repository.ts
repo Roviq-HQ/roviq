@@ -69,6 +69,9 @@ export class NotificationWriteDrizzleRepository extends NotificationWriteReposit
         providerMessageId: outcome.status === 'SENT' ? outcome.providerMessageId : null,
         errorCode: outcome.status === 'FAILED' ? outcome.errorCode : null,
         skipReason: outcome.status === 'SKIPPED' ? outcome.skipReason : null,
+        senderId: outcome.status === 'SKIPPED' ? null : (outcome.route?.senderId ?? null),
+        templateCategory:
+          outcome.status === 'SKIPPED' ? null : (outcome.route?.templateCategory ?? null),
       }),
     );
   }

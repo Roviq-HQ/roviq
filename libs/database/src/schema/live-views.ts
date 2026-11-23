@@ -21,6 +21,7 @@ import { groupMembers } from './groups/group-members';
 import { groupRules } from './groups/group-rules';
 import { groups } from './groups/groups';
 import { deviceTokens } from './notification/device-tokens';
+import { messagingSenders } from './notification/messaging-senders';
 import { instituteNotificationConfigs } from './notification/notification-configs';
 import { notifications } from './notification/notifications';
 import { resellerMemberships } from './reseller/reseller-memberships';
@@ -111,6 +112,9 @@ export const notificationsLive = liveView('notifications_live').as((qb) =>
 );
 export const deviceTokensLive = liveView('device_tokens_live').as((qb) =>
   qb.select().from(deviceTokens).where(isNull(deviceTokens.deletedAt)),
+);
+export const messagingSendersLive = liveView('messaging_senders_live').as((qb) =>
+  qb.select().from(messagingSenders).where(isNull(messagingSenders.deletedAt)),
 );
 
 // Tenant business tables.

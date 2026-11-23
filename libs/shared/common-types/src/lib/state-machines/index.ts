@@ -7,6 +7,7 @@ export * from './file';
 export * from './institute';
 export * from './invoice';
 export * from './leave';
+export * from './messaging-sender';
 export * from './student-academic';
 export * from './subscription';
 export * from './tc';

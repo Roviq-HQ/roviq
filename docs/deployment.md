@@ -220,12 +220,68 @@ enforced yet.
   `EMAIL_FROM` (`Roviq <no-reply@your-domain>`). The sending domain needs SPF and DKIM.
 - **Push**: `NOTIFICATION_PUSH_PROVIDER=fcm` and `FCM_SERVICE_ACCOUNT_JSON`, the whole service
   account key JSON of the Firebase project. Tokens FCM reports as unregistered are retired.
-- **SMS and WhatsApp**: no production provider yet. The `log` provider sends nothing and is
-  refused at start when `NODE_ENV=production`, so leave these unset until a provider exists;
-  impersonation codes then cannot reach a phone.
+- **SMS**: no production provider yet. The `log` provider sends nothing and is refused at start
+  when `NODE_ENV=production`, so leave it unset until a provider exists; impersonation codes then
+  cannot reach a phone.
+- **WhatsApp**: `NOTIFICATION_WHATSAPP_PROVIDER=cloud`. See "WhatsApp alerts" below.
 - **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
   prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
   same value as the api-gateway's.
+
+## WhatsApp alerts
+
+WhatsApp messages go out through the official business API (ROV-319), from a **sender**: a
+number registered with the provider. An institute's messages use its own active sender when it
+has one, else the platform's sender. Nothing is sent until a sender exists.
+
+**Environment**
+
+| Variable | App | Meaning |
+|----------|-----|---------|
+| `NOTIFICATION_WHATSAPP_PROVIDER=cloud` | notification-service | Turns the provider on. The four below are then required |
+| `WHATSAPP_API_BASE_URL` | notification-service | Address of the provider's API including its version segment; a message is posted to `<base>/<number id>/messages` |
+| `WHATSAPP_APP_SECRET` | notification-service | Signs the provider's webhook calls |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | notification-service | Any long random string; typed again at the provider when the webhook address is registered |
+| `MESSAGING_ENCRYPTION_KEY` | notification-service and api-gateway | 64 hex characters (`openssl rand -hex 32`), the same value in both apps. Encrypts each sender's access token in `messaging_sender_secrets`. Losing it means registering every token again. Unless `NODE_ENV` is `development` or `test`, the gateway refuses to start without it, and both apps refuse the all-zero development key |
+
+**Webhook.** Route `GET` and `POST /webhooks/whatsapp` of a public host to the notification
+service, and nothing else of that service. Register the address with the provider for the
+`messages` field. Every call is checked against `WHATSAPP_APP_SECRET` over the raw body before
+it is parsed; a call that fails the check gets 401 and changes nothing. The proxy must pass the
+body through unchanged.
+
+**Templates.** A business may start a conversation only with a template approved in advance.
+Register every template in `apps/notification-service/src/delivery/whatsapp/whatsapp-templates.ts`
+(the definitions sit beside each type under `apps/notification-service/src/types/`) with the same
+name, the languages `en` and `hi`, the category, the body text exactly as written there, and one
+"visit website" button whose address is the institute portal address followed by `{{1}}`. A type
+without an approved template is recorded as skipped (`no_template`); a template the provider
+does not know fails as `WA_TEMPLATE_REJECTED`.
+
+**Senders.** A platform admin registers a sender with the GraphQL mutation
+`adminRegisterMessagingSender` (the provider's number id, the display number, the access token,
+the daily cap, and for the platform's sender the share one institute may use of it). The token
+is encrypted on arrival, and no query returns it. `adminPauseMessagingSender`,
+`adminBlockMessagingSender` and `adminActivateMessagingSender` switch a sender off and on;
+`adminRotateMessagingSenderToken` replaces the token. `adminWhatsAppUsage(month)` counts the
+messages each institute sent in a month by template category.
+
+**Rules applied to every WhatsApp send**, in this order after the institute setting and consent:
+
+1. No active sender: skipped (`no_provider`). No approved template: skipped (`no_template`).
+2. The person's latest request to that number was STOP (or a Hindi equivalent): skipped
+   (`opted_out`). This stops every WhatsApp message, security alerts included; those still go
+   by email, push and in the app. Sending START lifts it. A request belongs to the number, so
+   it survives the sender being removed and registered again.
+3. Quiet hours, 21:00 to 07:00 in the institute's timezone: a non-critical message waits until
+   07:00. Critical messages (security alerts) are sent at once.
+4. The sender reached its daily cap in the last 24 hours, or the institute reached its share of
+   the platform's sender: a non-critical message is skipped (`sender_cap`), a critical one waits
+   and tries again every hour.
+
+Push and email go first, then WhatsApp. STOP and START are each confirmed once. A person who
+writes anything else to a sender's number gets one fixed reply a day saying the number only sends alerts; the text of what they wrote is not stored.
+There is no inbox.
 
 ## PDF generation
 

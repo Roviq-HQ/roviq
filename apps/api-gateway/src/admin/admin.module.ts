@@ -19,6 +19,7 @@ import { AdminInstituteSubscriptionResolver } from './institute/admin-institute.
 import { AdminInstituteFieldResolver } from './institute/admin-institute-field.resolver';
 import { AdminInstituteRepositoryModule } from './institute/repositories/admin-institute-repository.module';
 import { AdminInstituteGroupResolver } from './institute-group/admin-institute-group.resolver';
+import { AdminMessagingModule } from './messaging/admin-messaging.module';
 import { AdminMonitoringModule } from './monitoring/admin-monitoring.module';
 import { AdminTenantAnalyticsModule } from './monitoring/tenant-analytics/admin-tenant-analytics.module';
 import { AdminNotificationModule } from './notification/admin-notification.module';
@@ -45,6 +46,7 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminTenantAnalyticsModule,
     AdminComplianceExportModule, // compliance exports of any institute (ROV-296)
     AdminNotificationModule, // notification delivery log for support (ROV-314)
+    AdminMessagingModule, // WhatsApp senders and usage (ROV-319)
   ],
   providers: [
     AdminResellerService,

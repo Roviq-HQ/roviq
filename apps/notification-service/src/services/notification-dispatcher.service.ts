@@ -212,12 +212,14 @@ export class NotificationDispatcher {
           recipientUserId: req.recipientUserId,
           notificationId: null,
           channelEnabled: true,
+          critical: true,
+          deferrable: false,
           attempt,
           address: given === undefined ? 'lookup' : { given },
           data: {},
           compose: (locale) => composeSecretMessage(message, channel, locale),
         });
-        if (outcome.status !== 'FAILED') break;
+        if (outcome.status !== 'FAILED' || !outcome.retryable) break;
         this.logger.warn(
           `${message.type} ${channel} attempt ${attempt} for user ${req.recipientUserId} failed: ${outcome.errorCode}`,
         );

@@ -62,7 +62,12 @@ const REMINDER: RegularDispatch = {
 };
 
 const SENT: DeliveryOutcome = { status: 'SENT', provider: 'log', providerMessageId: 'm1' };
-const FAILED: DeliveryOutcome = { status: 'FAILED', provider: 'smtp', errorCode: 'ECONNECTION' };
+const FAILED: DeliveryOutcome = {
+  status: 'FAILED',
+  provider: 'smtp',
+  errorCode: 'ECONNECTION',
+  retryable: true,
+};
 
 describe('NotificationDispatcher', () => {
   let configs: ReturnType<typeof createMock<NotificationConfigReadRepository>>;
@@ -340,6 +345,8 @@ describe('NotificationDispatcher', () => {
         recipientUserId: 'user-1',
         notificationId: null,
         channelEnabled: true,
+        critical: true,
+        deferrable: false,
         attempt: 1,
         address: { given: 'new-address@example.in' },
         data: {},
@@ -378,6 +385,15 @@ describe('NotificationDispatcher', () => {
       await dispatcher.dispatchSecret(VERIFICATION);
 
       expect(sender.attempt.mock.calls.map(([a]) => a.attempt)).toEqual([1, 2]);
+    });
+
+    it('should not retry a failure the provider would refuse again', async () => {
+      sender.attempt.mockResolvedValue({ ...FAILED, retryable: false });
+
+      await dispatcher.dispatchSecret(VERIFICATION);
+
+      expect(sender.attempt.mock.calls.map(([a]) => a.attempt)).toEqual([1]);
+      expect(retryWait.wait).not.toHaveBeenCalled();
     });
 
     it('should let a database failure propagate', async () => {

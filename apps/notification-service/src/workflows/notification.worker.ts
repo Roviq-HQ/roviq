@@ -5,8 +5,11 @@ import { EMBEDDED_WORKER_RESTART_DELAY_MS, EmbeddedTemporalWorker } from '@roviq
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { ConsentGate } from '../delivery/consent-gate';
+import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
+import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
+import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { createNotificationActivities } from './notification.activities';
 import { notificationWorkflowsPath } from './notification.workflows-path';
 import { NOTIFICATION_TASK_QUEUE } from './notification-workflow.types';
@@ -38,6 +41,11 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
       this.consent,
       new ContactReadDrizzleRepository(db),
       new NotificationWriteDrizzleRepository(db),
+      new WhatsAppRoute(
+        new MessagingSenderDrizzleRepository(db),
+        new RecipientReadDrizzleRepository(db),
+        new Clock(),
+      ),
     );
     return { ...createNotificationActivities(sender) };
   }

@@ -223,6 +223,10 @@ export const ErrorCode = {
   CERTIFICATE_TEMPLATE_NOT_FOUND: 'CERTIFICATE_TEMPLATE_NOT_FOUND',
   /** Dead-letter message not found */
   DLQ_MESSAGE_NOT_FOUND: 'DLQ_MESSAGE_NOT_FOUND',
+  /** Messaging sender not found, or deleted */
+  MESSAGING_SENDER_NOT_FOUND: 'MESSAGING_SENDER_NOT_FOUND',
+  /** A live sender already exists for this institute (or the platform), or this provider number is registered */
+  MESSAGING_SENDER_EXISTS: 'MESSAGING_SENDER_EXISTS',
   /** Admission enquiry not found */
   ENQUIRY_NOT_FOUND: 'ENQUIRY_NOT_FOUND',
   /** Exam schedule row not found */
@@ -534,6 +538,8 @@ export const ERROR_STATUS: Record<ErrorCode, HttpStatus> = {
   CERTIFICATE_NOT_FOUND: HttpStatus.NOT_FOUND,
   CERTIFICATE_TEMPLATE_NOT_FOUND: HttpStatus.NOT_FOUND,
   DLQ_MESSAGE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  MESSAGING_SENDER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  MESSAGING_SENDER_EXISTS: HttpStatus.CONFLICT,
   ENQUIRY_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXAM_SCHEDULE_NOT_FOUND: HttpStatus.NOT_FOUND,
   EXAM_TERM_NOT_FOUND: HttpStatus.NOT_FOUND,

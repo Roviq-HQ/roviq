@@ -1,0 +1,224 @@
+import { ErrorCode, type MessagingSenderStatus, type PlatformContext } from '@roviq/common-types';
+import type { MessagingTokenCipher } from '@roviq/crypto';
+import { createMock } from '@roviq/testing';
+import { describe, expect, it, vi } from 'vitest';
+import { AdminMessagingService } from '../admin-messaging.service';
+import type { RegisterMessagingSenderInput } from '../dto/messaging-sender.dto';
+import type { AdminMessagingRepository } from '../repositories/admin-messaging.repository';
+import type { MessagingSenderRecord } from '../repositories/types';
+
+const TOKEN = 'unit-spec-secret-token';
+const CIPHERTEXT = Buffer.from('sealed');
+const ID = '00000000-0000-7000-a000-0000000000aa';
+const TENANT = '00000000-0000-7000-a000-0000000000bb';
+
+const ctx: PlatformContext = {
+  _scope: 'platform',
+  scope: 'platform',
+  userId: '00000000-0000-7000-a000-0000000000cc',
+  membershipId: '00000000-0000-7000-a000-0000000000dd',
+  roleId: '00000000-0000-7000-a000-0000000000ee',
+  type: 'access',
+};
+
+function sender(overrides: Partial<MessagingSenderRecord> = {}): MessagingSenderRecord {
+  return {
+    id: ID,
+    scope: 'institute',
+    tenantId: TENANT,
+    providerNumberId: 'pn-1',
+    displayNumber: '+919876543210',
+    status: 'ACTIVE',
+    dailyCap: 100,
+    instituteDailyCap: null,
+    createdAt: new Date('2026-11-01T00:00:00Z'),
+    updatedAt: new Date('2026-11-01T00:00:00Z'),
+    ...overrides,
+  };
+}
+
+function setup(repoOverrides: Partial<AdminMessagingRepository> = {}) {
+  const repo = createMock<AdminMessagingRepository>(repoOverrides);
+  const cipher = createMock<MessagingTokenCipher>({ encrypt: vi.fn(() => CIPHERTEXT) });
+  return { repo, cipher, service: new AdminMessagingService(repo, cipher) };
+}
+
+const input: RegisterMessagingSenderInput = {
+  tenantId: TENANT,
+  providerNumberId: 'pn-1',
+  displayNumber: '+919876543210',
+  accessToken: TOKEN,
+  dailyCap: 100,
+};
+
+describe('AdminMessagingService.register', () => {
+  it('should hand the repository the ciphertext, never the token', async () => {
+    const register = vi.fn(async () => ({ kind: 'ok' as const, sender: sender() }));
+    const { service, cipher } = setup({ register });
+
+    await expect(service.register(ctx, input)).resolves.toEqual(sender());
+
+    expect(cipher.encrypt).toHaveBeenCalledWith(TOKEN);
+    expect(register).toHaveBeenCalledWith(ctx, {
+      tenantId: TENANT,
+      providerNumberId: 'pn-1',
+      displayNumber: '+919876543210',
+      accessTokenEncrypted: CIPHERTEXT,
+      dailyCap: 100,
+      instituteDailyCap: null,
+    });
+    expect(JSON.stringify(register.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it('should register the platform sender when tenantId is absent', async () => {
+    const register = vi.fn(async () => ({
+      kind: 'ok' as const,
+      sender: sender({ scope: 'platform', tenantId: null, instituteDailyCap: 10 }),
+    }));
+    const { service } = setup({ register });
+
+    await service.register(ctx, { ...input, tenantId: undefined, instituteDailyCap: 10 });
+
+    expect(register).toHaveBeenCalledWith(ctx, {
+      tenantId: null,
+      providerNumberId: 'pn-1',
+      displayNumber: '+919876543210',
+      accessTokenEncrypted: CIPHERTEXT,
+      dailyCap: 100,
+      instituteDailyCap: 10,
+    });
+  });
+
+  it("should refuse instituteDailyCap on an institute's sender before writing", async () => {
+    const { service, repo, cipher } = setup();
+
+    await expect(service.register(ctx, { ...input, instituteDailyCap: 5 })).rejects.toMatchObject({
+      code: ErrorCode.VALIDATION_FAILED,
+    });
+    expect(repo.register).not.toHaveBeenCalled();
+    expect(cipher.encrypt).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['institute_not_found' as const, ErrorCode.INSTITUTE_NOT_FOUND],
+    ['sender_exists' as const, ErrorCode.MESSAGING_SENDER_EXISTS],
+  ])('should turn %s into %s', async (kind, code) => {
+    const { service } = setup({ register: vi.fn(async () => ({ kind })) });
+
+    await expect(service.register(ctx, input)).rejects.toMatchObject({ code });
+  });
+
+  it('should keep the token out of the refusal message', async () => {
+    const { service } = setup({
+      register: vi.fn(async () => ({ kind: 'sender_exists' as const })),
+    });
+
+    const error = await service.register(ctx, input).catch((e: unknown) => e);
+
+    expect(JSON.stringify(error)).not.toContain(TOKEN);
+    expect(String(error)).not.toContain(TOKEN);
+  });
+});
+
+describe('AdminMessagingService.update', () => {
+  it('should answer MESSAGING_SENDER_NOT_FOUND for a missing sender', async () => {
+    const { service, repo } = setup({ findById: vi.fn(async () => null) });
+
+    await expect(service.update(ctx, ID, { dailyCap: 5 })).rejects.toMatchObject({
+      code: ErrorCode.MESSAGING_SENDER_NOT_FOUND,
+    });
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it("should refuse instituteDailyCap on an institute's sender", async () => {
+    const { service, repo } = setup({ findById: vi.fn(async () => sender()) });
+
+    await expect(service.update(ctx, ID, { instituteDailyCap: 5 })).rejects.toMatchObject({
+      code: ErrorCode.VALIDATION_FAILED,
+    });
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it("should pass null through to clear the platform sender's share limit", async () => {
+    const platform = sender({ scope: 'platform', tenantId: null, instituteDailyCap: 5 });
+    const update = vi.fn(async () => ({ ...platform, instituteDailyCap: null }));
+    const { service } = setup({ findById: vi.fn(async () => platform), update });
+
+    await service.update(ctx, ID, { instituteDailyCap: null });
+
+    expect(update).toHaveBeenCalledWith(ctx, ID, { instituteDailyCap: null });
+  });
+});
+
+describe('AdminMessagingService.rotateToken', () => {
+  it('should store the new ciphertext', async () => {
+    const replaceToken = vi.fn(async () => sender());
+    const { service, cipher } = setup({ replaceToken });
+
+    await service.rotateToken(ctx, ID, 'new-token');
+
+    expect(cipher.encrypt).toHaveBeenCalledWith('new-token');
+    expect(replaceToken).toHaveBeenCalledWith(ctx, ID, CIPHERTEXT);
+  });
+
+  it('should answer MESSAGING_SENDER_NOT_FOUND for a missing sender', async () => {
+    const { service } = setup({ replaceToken: vi.fn(async () => null) });
+
+    await expect(service.rotateToken(ctx, ID, 'new-token')).rejects.toMatchObject({
+      code: ErrorCode.MESSAGING_SENDER_NOT_FOUND,
+    });
+  });
+});
+
+describe('AdminMessagingService status transitions', () => {
+  const cases: ['pause' | 'activate' | 'block', MessagingSenderStatus, MessagingSenderStatus][] = [
+    ['pause', 'ACTIVE', 'PAUSED'],
+    ['activate', 'PAUSED', 'ACTIVE'],
+    ['activate', 'BLOCKED', 'ACTIVE'],
+    ['block', 'ACTIVE', 'BLOCKED'],
+    ['block', 'PAUSED', 'BLOCKED'],
+  ];
+
+  it.each(cases)('%s should move %s to %s', async (method, from, to) => {
+    const setStatus = vi.fn(async () => sender({ status: to }));
+    const { service } = setup({ findById: vi.fn(async () => sender({ status: from })), setStatus });
+
+    await expect(service[method](ctx, ID)).resolves.toEqual(sender({ status: to }));
+    expect(setStatus).toHaveBeenCalledWith(ctx, ID, from, to);
+  });
+
+  it.each([
+    ['pause' as const, 'PAUSED' as const],
+    ['pause' as const, 'BLOCKED' as const],
+    ['activate' as const, 'ACTIVE' as const],
+    ['block' as const, 'BLOCKED' as const],
+  ])('%s should refuse a sender in %s', async (method, from) => {
+    const { service, repo } = setup({ findById: vi.fn(async () => sender({ status: from })) });
+
+    await expect(service[method](ctx, ID)).rejects.toMatchObject({
+      code: ErrorCode.INVALID_STATE_TRANSITION,
+    });
+    expect(repo.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('should answer INVALID_STATE_TRANSITION when the status changed meanwhile', async () => {
+    const { service } = setup({
+      findById: vi.fn(async () => sender({ status: 'ACTIVE' })),
+      setStatus: vi.fn(async () => null),
+    });
+
+    await expect(service.pause(ctx, ID)).rejects.toMatchObject({
+      code: ErrorCode.INVALID_STATE_TRANSITION,
+    });
+  });
+});
+
+describe('AdminMessagingService.delete', () => {
+  it('should answer MESSAGING_SENDER_NOT_FOUND when nothing was deleted', async () => {
+    const { service } = setup({ delete: vi.fn(async () => false) });
+
+    await expect(service.delete(ctx, ID)).rejects.toMatchObject({
+      code: ErrorCode.MESSAGING_SENDER_NOT_FOUND,
+    });
+  });
+});

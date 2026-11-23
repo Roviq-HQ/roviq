@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
-import { IdentityCryptoService } from '../encrypted-field';
+import { IdentityCryptoService, MessagingTokenCipher } from '../encrypted-field';
 
 const TEST_KEY = randomBytes(32).toString('hex');
 
@@ -65,5 +65,26 @@ describe('IdentityCryptoService', () => {
 
   it('throws on wrong key length', () => {
     expect(() => createService('tooshort')).toThrow('64-character hex string');
+  });
+});
+
+describe('MessagingTokenCipher', () => {
+  it('returns the token it was given, and stores no part of it in clear', () => {
+    const cipher = new MessagingTokenCipher(TEST_KEY);
+    const sealed = cipher.encrypt('token-with-ünicode');
+    expect(sealed.toString('utf8')).not.toContain('token-with');
+    expect(cipher.decrypt(sealed)).toBe('token-with-ünicode');
+  });
+
+  it('cannot open what another key sealed', () => {
+    const identity = createService(randomBytes(32).toString('hex'));
+    const cipher = new MessagingTokenCipher(TEST_KEY);
+    expect(() => cipher.decrypt(identity.encrypt('secret'))).toThrow();
+  });
+
+  it('refuses a key that is not 64 hex characters', () => {
+    expect(() => new MessagingTokenCipher('z'.repeat(64))).toThrow(
+      /MESSAGING_ENCRYPTION_KEY must be a 64-character hex string/,
+    );
   });
 });

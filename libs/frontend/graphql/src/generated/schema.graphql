@@ -363,6 +363,36 @@ input AdminListUsersFilterInput {
   tenantId: String
 }
 
+"""
+A WhatsApp number messages are sent from: the platform's, or one institute's own. Its access token is never returned.
+"""
+type AdminMessagingSender {
+  createdAt: DateTime!
+
+  """Messages the sender may send in any 24 hours."""
+  dailyCap: Int!
+
+  """The number as people see it, E.164 with a leading +."""
+  displayNumber: String!
+  id: ID!
+
+  """
+  On the platform's sender: what one institute may use of dailyCap. Null means no share limit; always null on an institute's sender.
+  """
+  instituteDailyCap: Int
+
+  """The provider's id of the number; inbound webhooks are matched by it."""
+  providerNumberId: String!
+
+  """'platform' or 'institute'."""
+  scope: String!
+  status: MessagingSenderStatus!
+
+  """The institute; null for the platform's sender."""
+  tenantId: ID
+  updatedAt: DateTime!
+}
+
 """Optional branding configuration stored on reseller.branding (JSONB)"""
 input AdminResellerBrandingInput {
   """Hex colour (e.g. #1677FF)"""
@@ -661,6 +691,19 @@ type AdminUserStatisticsModel {
   """Accounts created in the last 7 days"""
   newThisWeek: Int!
   totalUsers: Int!
+}
+
+"""
+WhatsApp messages the provider accepted (status SENT) in one month, per institute and template category.
+"""
+type AdminWhatsAppUsageRow {
+  sentCount: Int!
+
+  """Null for messages sent without a recorded category."""
+  templateCategory: MessageTemplateCategory
+
+  """The institute; null for platform-scope messages."""
+  tenantId: ID
 }
 
 enum AdmissionApplicationStatus {
@@ -4070,6 +4113,20 @@ enum MembershipStatus {
   SUSPENDED
 }
 
+"""The provider's price class of a message template."""
+enum MessageTemplateCategory {
+  AUTHENTICATION
+  MARKETING
+  UTILITY
+}
+
+"""State of a WhatsApp sender. Only an ACTIVE sender sends."""
+enum MessagingSenderStatus {
+  ACTIVE
+  BLOCKED
+  PAUSED
+}
+
 """
 Religious minority community per National Commission for Minorities Act.
 """
@@ -4110,12 +4167,18 @@ type Mutation {
   """
   adminActivateInstitute(id: ID!): InstituteModel!
   adminActivateInstituteGroup(id: ID!): InstituteGroupModel!
+
+  """PAUSED or BLOCKED → ACTIVE: the sender sends again."""
+  adminActivateMessagingSender(id: ID!): AdminMessagingSender!
   adminAddInstituteGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
   adminAddInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
   adminApproveInstitute(id: ID!): InstituteModel!
 
   """Assign an institute to a group (franchise/trust)"""
   adminAssignInstituteGroup(groupId: ID!, id: ID!): InstituteModel!
+
+  """ACTIVE or PAUSED → BLOCKED: the provider restricted the number."""
+  adminBlockMessagingSender(id: ID!): AdminMessagingSender!
 
   """
   Change reseller tier. Cascades to all reseller_memberships: their role_id is updated so staff abilities change on next token refresh.
@@ -4130,6 +4193,11 @@ type Mutation {
   adminDeactivateInstituteGroup(id: ID!): InstituteGroupModel!
   adminDeleteInstitute(id: ID!): Boolean!
   adminDeleteInstituteGroup(id: ID!): Boolean!
+
+  """
+  Deletes the sender and its access token. Its institute (or the platform) may then register a new one.
+  """
+  adminDeleteMessagingSender(id: ID!): Boolean!
 
   """Delete a suspended reseller after 30-day grace period"""
   adminDeleteReseller(resellerId: String!): AdminResellerModel!
@@ -4149,8 +4217,16 @@ type Mutation {
   adminExportReportDownloadUrl(fileId: ID!): String!
   adminLogin(password: String!, username: String!): AuthPayload!
 
+  """ACTIVE → PAUSED: nothing is sent."""
+  adminPauseMessagingSender(id: ID!): AdminMessagingSender!
+
   """Reassign an institute to a different active reseller"""
   adminReassignInstituteReseller(id: ID!, newResellerId: ID!): InstituteModel!
+
+  """
+  Registers the platform's WhatsApp sender, or an institute's own, with its access token. One live sender per institute (and one for the platform); a provider number is registered once.
+  """
+  adminRegisterMessagingSender(input: RegisterMessagingSenderInput!): AdminMessagingSender!
   adminRejectInstitute(id: ID!, reason: String!): InstituteModel!
   adminRemoveInstituteFromGroup(instituteId: ID!): Boolean!
 
@@ -4170,6 +4246,17 @@ type Mutation {
   Retry the institute setup workflow for an institute whose setup failed or is stuck. Idempotent.
   """
   adminRetryInstituteSetup(id: ID!): InstituteModel!
+
+  """
+  Replaces the sender's access token. The old token stops being used at once.
+  """
+  adminRotateMessagingSenderToken(
+    """
+    The new provider access token. Stored encrypted; never returned or logged.
+    """
+    accessToken: String!
+    id: ID!
+  ): AdminMessagingSender!
   adminStartImpersonation(reason: String!, targetTenantId: String!, targetUserId: String!): StartImpersonationResult!
   adminSuspendInstitute(id: ID!, reason: String): InstituteModel!
   adminSuspendInstituteGroup(id: ID!): InstituteGroupModel!
@@ -4180,6 +4267,9 @@ type Mutation {
   """Unsuspend a previously suspended reseller (reactivates staff login)"""
   adminUnsuspendReseller(resellerId: String!): AdminResellerModel!
   adminUpdateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
+
+  """Changes the number shown or the caps."""
+  adminUpdateMessagingSender(id: ID!, input: UpdateMessagingSenderInput!): AdminMessagingSender!
 
   """
   Update reseller profile fields (name, branding, domain, registration, contact, address)
@@ -5146,6 +5236,9 @@ type Query {
   """List all users, newest first, with search and filters (platform admin)"""
   adminListUsers(filter: AdminListUsersFilterInput): AdminUserConnection!
 
+  """Every live WhatsApp sender, the platform's first."""
+  adminMessagingSenders: [AdminMessagingSender!]!
+
   """Platform support: every notification delivery attempt, newest first."""
   adminNotificationDeliveries(after: String, filter: NotificationDeliveryFilterInput, first: Int = 20): NotificationDeliveryConnection!
 
@@ -5180,6 +5273,14 @@ type Query {
 
   """Headline user counts (platform admin)"""
   adminUserStatistics: AdminUserStatisticsModel!
+
+  """
+  WhatsApp messages the provider accepted (status SENT) in one calendar month, counted in India time (Asia/Kolkata), one row per institute and template category.
+  """
+  adminWhatsAppUsage(
+    """Calendar month as YYYY-MM, in India time (Asia/Kolkata)."""
+    month: String!
+  ): [AdminWhatsAppUsageRow!]!
 
   """Admission funnel statistics"""
   admissionStatistics(filter: AdmissionStatisticsFilterInput): AdmissionStatisticsModel!
@@ -5579,6 +5680,33 @@ type Query {
 input RefundInput {
   amountPaise: BigInt!
   reason: String
+}
+
+"""Registers the platform's sender, or one institute's own."""
+input RegisterMessagingSenderInput {
+  """Provider access token. Stored encrypted; never returned or logged."""
+  accessToken: String!
+
+  """Messages the sender may send in any 24 hours (at least 1)."""
+  dailyCap: Int!
+
+  """
+  The number as people see it: E.164 with a leading +, e.g. +919876543210.
+  """
+  displayNumber: String!
+
+  """
+  Only on the platform's sender: what one institute may use of dailyCap (at least 1). Refused on an institute's sender.
+  """
+  instituteDailyCap: Int
+
+  """The provider's id of the number."""
+  providerNumberId: String!
+
+  """
+  The institute whose own sender this is. Absent or null registers the platform's sender.
+  """
+  tenantId: ID
 }
 
 input RejectUpiInput {
@@ -7649,6 +7777,20 @@ input UpdateLeaveInput {
 input UpdateLocaleInput {
   """en or hi; null restores browser language detection."""
   locale: String
+}
+
+"""Fields to change on a sender; an absent field is left as it is."""
+input UpdateMessagingSenderInput {
+  """At least 1."""
+  dailyCap: Int
+
+  """E.164 with a leading +."""
+  displayNumber: String
+
+  """
+  Only on the platform's sender: at least 1, or null to remove the share limit. Refused on an institute's sender.
+  """
+  instituteDailyCap: Int
 }
 
 """

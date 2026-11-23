@@ -6,48 +6,73 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
-/**
- * AES-256-GCM encryption for identity fields (Aadhaar, PAN).
- * Key from `IDENTITY_ENCRYPTION_KEY` env var (64-char hex = 32 bytes).
- * Format: packed Buffer of `IV (12B) + authTag (16B) + ciphertext`.
- */
+/** Reads a 64-character hex key (32 bytes) from the environment; refuses any other shape. */
+function readKey(config: ConfigService, name: string): Buffer {
+  return parseKey(config.getOrThrow<string>(name), name);
+}
+
+function parseKey(hexKey: string, name: string): Buffer {
+  if (!/^[0-9a-fA-F]{64}$/.test(hexKey)) {
+    throw new Error(
+      `${name} must be a 64-character hex string (32 bytes). ` +
+        "Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    );
+  }
+  return Buffer.from(hexKey, 'hex');
+}
+
+/** AES-256-GCM; the result is `IV (12B) + authTag (16B) + ciphertext`. */
+function seal(key: Buffer, plaintext: string): Buffer {
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]);
+}
+
+function open(key: Buffer, packed: Buffer): string {
+  const iv = packed.subarray(0, IV_LENGTH);
+  const authTag = packed.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = packed.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+  return decipher.update(ciphertext, undefined, 'utf8') + decipher.final('utf8');
+}
+
+/** Encrypts identity fields (Aadhaar, PAN) with the key in `IDENTITY_ENCRYPTION_KEY`. */
 @Injectable()
 export class IdentityCryptoService {
   private readonly key: Buffer;
 
-  constructor(private readonly config: ConfigService) {
-    const hexKey = this.config.getOrThrow<string>('IDENTITY_ENCRYPTION_KEY');
-    if (hexKey.length !== 64) {
-      throw new Error(
-        'IDENTITY_ENCRYPTION_KEY must be a 64-character hex string (32 bytes). ' +
-          "Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
-      );
-    }
-    this.key = Buffer.from(hexKey, 'hex');
+  constructor(config: ConfigService) {
+    this.key = readKey(config, 'IDENTITY_ENCRYPTION_KEY');
   }
 
-  /**
-   * Encrypt a plaintext string using AES-256-GCM.
-   * Returns a Buffer containing: IV (12 bytes) + authTag (16 bytes) + ciphertext.
-   */
   encrypt(plaintext: string): Buffer {
-    const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(ALGORITHM, this.key, iv);
-    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-    const authTag = cipher.getAuthTag();
-    return Buffer.concat([iv, authTag, encrypted]);
+    return seal(this.key, plaintext);
   }
 
-  /**
-   * Decrypt a Buffer produced by `encrypt`.
-   * Expects: IV (12 bytes) + authTag (16 bytes) + ciphertext.
-   */
   decrypt(packed: Buffer): string {
-    const iv = packed.subarray(0, IV_LENGTH);
-    const authTag = packed.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
-    const ciphertext = packed.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
-    const decipher = createDecipheriv(ALGORITHM, this.key, iv);
-    decipher.setAuthTag(authTag);
-    return decipher.update(ciphertext) + decipher.final('utf8');
+    return open(this.key, packed);
+  }
+}
+
+/**
+ * Encrypts the provider access token of a messaging sender. A key of its own
+ * (`MESSAGING_ENCRYPTION_KEY`): leaking one key does not open the other's data. Takes the key
+ * itself, so each app builds it from its own configuration.
+ */
+export class MessagingTokenCipher {
+  private readonly key: Buffer;
+
+  constructor(hexKey: string) {
+    this.key = parseKey(hexKey, 'MESSAGING_ENCRYPTION_KEY');
+  }
+
+  encrypt(token: string): Buffer {
+    return seal(this.key, token);
+  }
+
+  decrypt(packed: Buffer): string {
+    return open(this.key, packed);
   }
 }

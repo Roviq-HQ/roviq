@@ -1,6 +1,7 @@
 import { type CallHandler, type ExecutionContext, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { AuditEmitter } from '@roviq/audit';
+import { AuditMask } from '@roviq/audit';
 import { createMock } from '@roviq/testing';
 import type { Observable } from 'rxjs';
 import { of, throwError } from 'rxjs';
@@ -24,14 +25,16 @@ const { mockNoAudit, mockAuditInstitute, mockMarked } = vi.hoisted(() => ({
   mockMarked: vi.fn<(req: object) => string | null>(),
 }));
 
-vi.mock('@roviq/audit', () => ({
+vi.mock('@roviq/audit', async () => ({
+  // The real redaction: the interceptor's output is asserted against it.
+  ...(await vi.importActual<typeof import('@roviq/audit')>(
+    '../../../../../libs/backend/audit/src/decorators/audit-mask.decorator',
+  )),
   AuditEmitter: vi.fn(),
   AuditModule: vi.fn(),
   NoAudit: mockNoAudit,
   AuditInstitute: mockAuditInstitute,
   markedAuditInstitute: mockMarked,
-  AuditMask: vi.fn(),
-  getAuditMaskedFields: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('@nestjs/graphql', () => ({
@@ -246,6 +249,52 @@ describe('AuditInterceptor', () => {
     mockMarked.mockReturnValue(null);
     mockReflector = createMockReflector();
     interceptor = new AuditInterceptor(mockReflector, mockAuditEmitter);
+  });
+
+  it('redacts @AuditMask() fields in the recorded input, on success and on failure', async () => {
+    class SecretInput {
+      @AuditMask()
+      interceptorSpecSecret!: string;
+    }
+    expect(SecretInput).toBeDefined();
+    const args = {
+      id: 'sender-1',
+      input: { interceptorSpecSecret: 'do-not-store', label: 'Front desk', amount: 5n },
+    };
+
+    const ok = createMockGqlContext({ fieldName: 'updateSender', args });
+    mockGqlCreate(ok.gqlContext);
+    await subscribeAndExpect(interceptor.intercept(ok.context, createMockCallHandler()), () => {
+      expect(mockEmit.mock.calls[0][0].metadata).toEqual({
+        input: {
+          id: 'sender-1',
+          input: { interceptorSpecSecret: '[REDACTED]', label: 'Front desk', amount: '5' },
+        },
+      });
+    });
+
+    mockEmit.mockClear();
+    const failed = createMockGqlContext({ fieldName: 'updateSender', args });
+    mockGqlCreate(failed.gqlContext);
+    await new Promise<void>((resolve, reject) => {
+      interceptor
+        .intercept(failed.context, createErrorCallHandler(new Error('refused')))
+        .subscribe({
+          error: () =>
+            setTimeout(() => {
+              try {
+                expect(JSON.stringify(mockEmit.mock.calls)).not.toContain('do-not-store');
+                expect(mockEmit.mock.calls[0][0].metadata.input.input.interceptorSpecSecret).toBe(
+                  '[REDACTED]',
+                );
+                resolve();
+              } catch (e) {
+                reject(e);
+              }
+            }, 0),
+          complete: () => reject(new Error('Expected error')),
+        });
+    });
   });
 
   it('skips non-graphql contexts', async () => {

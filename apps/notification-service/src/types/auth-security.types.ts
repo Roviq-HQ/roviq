@@ -1,4 +1,15 @@
-import type { NotificationChannel, NotificationTypeKey } from '@roviq/common-types';
+import {
+  MessageTemplateCategory,
+  type NotificationChannel,
+  type NotificationTypeKey,
+} from '@roviq/common-types';
+import { buttonPathOf } from '../delivery/whatsapp/template-variables';
+import {
+  cleanVariable,
+  renderTemplate,
+  type WhatsAppTemplate,
+} from '../delivery/whatsapp/whatsapp-template';
+import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
 import { type Locale, localized, type RegularNotificationType } from './notification-type';
 
 export interface AuthSecurityParams {
@@ -74,6 +85,39 @@ const COPY: Record<AuthAlertKey, AuthCopy> = {
   },
 };
 
+function authWhatsApp(
+  name: string,
+  body: Record<Locale, string>,
+): WhatsAppTemplate<AuthSecurityParams> {
+  return {
+    name,
+    category: MessageTemplateCategory.UTILITY,
+    body,
+    variables: (p, locale) => [
+      cleanVariable(formatTime(p.at, locale), locale === 'hi' ? 'अज्ञात समय' : 'an unknown time'),
+      cleanVariable(p.ip ?? '', UNKNOWN_IP[locale]),
+    ],
+    buttonPath: (p) => buttonPathOf(p.accountPath),
+  };
+}
+
+const passwordResetWhatsApp = authWhatsApp('auth_password_reset_v1', {
+  en: 'Security alert: a password reset was requested for your Roviq account at {{1}} (IP: {{2}}). If this was not you, secure your account now.',
+  hi: 'सुरक्षा सूचना: {{1}} पर आपके Roviq खाते का पासवर्ड रीसेट करने का अनुरोध किया गया (IP: {{2}})। यदि यह आप नहीं थे, तो अभी अपना खाता सुरक्षित करें।',
+});
+
+const newDeviceWhatsApp = authWhatsApp('auth_new_device_v1', {
+  en: 'Security alert: your Roviq account was accessed from a new device at {{1}} (IP: {{2}}). If this was not you, secure your account now.',
+  hi: 'सुरक्षा सूचना: {{1}} पर एक नए उपकरण से आपके Roviq खाते में प्रवेश हुआ (IP: {{2}})। यदि यह आप नहीं थे, तो अभी अपना खाता सुरक्षित करें।',
+});
+
+export const authPasswordResetWhatsApp: TypeTemplates<AuthSecurityParams> = {
+  single: passwordResetWhatsApp,
+};
+export const authNewDeviceWhatsApp: TypeTemplates<AuthSecurityParams> = {
+  single: newDeviceWhatsApp,
+};
+
 // A sign-in alert on every sign-in is noise outside the app.
 const IN_APP_ONLY: readonly NotificationChannel[] = [];
 const BASE_CHANNELS: readonly NotificationChannel[] = ['EMAIL', 'PUSH'];
@@ -83,6 +127,7 @@ const WITH_WHATSAPP: readonly NotificationChannel[] = ['EMAIL', 'WHATSAPP', 'PUS
 function authAlertType(
   key: AuthAlertKey,
   channels: readonly NotificationChannel[],
+  whatsapp: WhatsAppTemplate<AuthSecurityParams> | null,
 ): RegularNotificationType<AuthSecurityParams> {
   const copy = COPY[key];
   const body = (p: AuthSecurityParams, l: Locale) =>
@@ -99,15 +144,22 @@ function authAlertType(
       body: localized((l) => body(p, l)),
       data: { path: p.accountPath },
     }),
-    outsideCopy: (p, _channel, locale) => ({
+    outsideCopy: (p, channel, locale) => ({
       subject: copy.subject[locale],
-      body: body(p, locale),
+      body:
+        channel === 'WHATSAPP' && whatsapp
+          ? renderTemplate(whatsapp.body[locale], whatsapp.variables(p, locale))
+          : body(p, locale),
     }),
   };
 }
 
-export const authLoginType = authAlertType('AUTH_LOGIN', IN_APP_ONLY);
-export const authPasswordResetType = authAlertType('AUTH_PASSWORD_RESET', WITH_WHATSAPP);
-export const authNewDeviceType = authAlertType('AUTH_NEW_DEVICE', WITH_WHATSAPP);
-export const authAccountLockedType = authAlertType('AUTH_ACCOUNT_LOCKED', BASE_CHANNELS);
-export const authSessionRevokedType = authAlertType('AUTH_SESSION_REVOKED', BASE_CHANNELS);
+export const authLoginType = authAlertType('AUTH_LOGIN', IN_APP_ONLY, null);
+export const authPasswordResetType = authAlertType(
+  'AUTH_PASSWORD_RESET',
+  WITH_WHATSAPP,
+  passwordResetWhatsApp,
+);
+export const authNewDeviceType = authAlertType('AUTH_NEW_DEVICE', WITH_WHATSAPP, newDeviceWhatsApp);
+export const authAccountLockedType = authAlertType('AUTH_ACCOUNT_LOCKED', BASE_CHANNELS, null);
+export const authSessionRevokedType = authAlertType('AUTH_SESSION_REVOKED', BASE_CHANNELS, null);

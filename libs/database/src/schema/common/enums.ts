@@ -48,6 +48,7 @@ import {
   LEAVE_STATUS_VALUES,
   LEAVE_TYPE_VALUES,
   MEMBERSHIP_STATUS_VALUES,
+  MESSAGING_SENDER_STATUS_VALUES,
   MINORITY_TYPE_VALUES,
   NEP_STAGE_VALUES,
   NOTIFICATION_CHANNEL_VALUES,
@@ -240,3 +241,7 @@ export const notificationDeliveryStatus = pgEnum(
   NOTIFICATION_DELIVERY_STATUS_VALUES,
 );
 export const devicePlatform = pgEnum('DevicePlatform', DEVICE_PLATFORM_VALUES);
+export const messagingSenderStatus = pgEnum(
+  'MessagingSenderStatus',
+  MESSAGING_SENDER_STATUS_VALUES,
+);
