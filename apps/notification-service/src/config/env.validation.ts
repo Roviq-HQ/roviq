@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SMS_TEMPLATE_IDS_ERROR, SmsRegistrations } from '../delivery/sms/sms-registrations';
 
 const envSchema = z
   .looseObject({
@@ -19,7 +20,7 @@ const envSchema = z
     // Channel providers; unset means the channel has no provider and every send is skipped
     NOTIFICATION_EMAIL_PROVIDER: z.enum(['smtp', 'log']).optional(),
     NOTIFICATION_PUSH_PROVIDER: z.enum(['fcm', 'log']).optional(),
-    NOTIFICATION_SMS_PROVIDER: z.enum(['log']).optional(),
+    NOTIFICATION_SMS_PROVIDER: z.enum(['http', 'log']).optional(),
     NOTIFICATION_WHATSAPP_PROVIDER: z.enum(['cloud', 'log']).optional(),
     // WhatsApp provider ('cloud'): API address, webhook secrets, and the key sender tokens are encrypted with
     WHATSAPP_API_BASE_URL: z.url().optional(),
@@ -28,6 +29,15 @@ const envSchema = z
     MESSAGING_ENCRYPTION_KEY: z
       .string()
       .regex(/^[0-9a-fA-F]{64}$/, 'MESSAGING_ENCRYPTION_KEY — 64 hex characters (32 bytes)')
+      .optional(),
+    // SMS provider ('http'): API address and key, sender header, template registrations, report secret
+    SMS_API_BASE_URL: z.url().optional(),
+    SMS_API_KEY: z.string().min(1).optional(),
+    SMS_SENDER_ID: z.string().min(1).optional(),
+    SMS_TEMPLATE_IDS: z.string().min(1).optional(),
+    SMS_WEBHOOK_SECRET: z
+      .string()
+      .min(32, 'SMS_WEBHOOK_SECRET — at least 32 characters')
       .optional(),
     SMTP_URL: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
@@ -69,6 +79,24 @@ const envSchema = z
           code: 'custom',
           message: `${missing.join(', ')} — required when NOTIFICATION_WHATSAPP_PROVIDER=cloud`,
         });
+      }
+    }
+    if (env.NOTIFICATION_SMS_PROVIDER === 'http') {
+      const missing = (
+        ['SMS_API_BASE_URL', 'SMS_API_KEY', 'SMS_TEMPLATE_IDS', 'SMS_WEBHOOK_SECRET'] as const
+      ).filter((name) => !env[name]);
+      if (missing.length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `${missing.join(', ')} — required when NOTIFICATION_SMS_PROVIDER=http`,
+        });
+      }
+    }
+    if (env.SMS_TEMPLATE_IDS) {
+      try {
+        new SmsRegistrations(env.SMS_TEMPLATE_IDS);
+      } catch {
+        ctx.addIssue({ code: 'custom', message: SMS_TEMPLATE_IDS_ERROR });
       }
     }
     if (

@@ -6,6 +6,8 @@ import { ConsentReadDrizzleRepository } from './consent-read.drizzle-repository'
 import { ConsentReadRepository } from './consent-read.repository';
 import { ContactReadDrizzleRepository } from './contact-read.drizzle-repository';
 import { ContactReadRepository } from './contact-read.repository';
+import { DeliveryReceiptDrizzleRepository } from './delivery-receipt.drizzle-repository';
+import { DeliveryReceiptRepository } from './delivery-receipt.repository';
 import { MessagingInboundDrizzleRepository } from './messaging-inbound.drizzle-repository';
 import { MessagingInboundRepository } from './messaging-inbound.repository';
 import { MessagingSenderDrizzleRepository } from './messaging-sender.drizzle-repository';
@@ -23,6 +25,7 @@ const REPOSITORIES = [
   { provide: RecipientReadRepository, useClass: RecipientReadDrizzleRepository },
   { provide: ContactReadRepository, useClass: ContactReadDrizzleRepository },
   { provide: ConsentReadRepository, useClass: ConsentReadDrizzleRepository },
+  { provide: DeliveryReceiptRepository, useClass: DeliveryReceiptDrizzleRepository },
   { provide: MessagingInboundRepository, useClass: MessagingInboundDrizzleRepository },
   { provide: MessagingSenderRepository, useClass: MessagingSenderDrizzleRepository },
   { provide: NotificationWriteRepository, useClass: NotificationWriteDrizzleRepository },

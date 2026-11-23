@@ -3,6 +3,7 @@ import { createMock } from '@roviq/testing';
 import { ApplicationFailure } from '@temporalio/activity';
 import { describe, expect, it, vi } from 'vitest';
 import { ChannelSender } from '../../delivery/channel-sender';
+import { smsDraftForRegular } from '../../delivery/sms/sms-templates';
 import {
   whatsappDigestTemplateFor,
   whatsappTemplateFor,
@@ -221,6 +222,42 @@ describe('sendChannel activity', () => {
     const expected = whatsappTemplateFor(message, 'hi');
     expect(expected).not.toBeNull();
     expect(template('hi')).toEqual(expected);
+  });
+
+  it('should give the registry SMS draft of a single message', async () => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+
+    await createNotificationActivities(sender, () => 1).sendChannel({ ...INPUT, channel: 'SMS' });
+
+    const [call] = sender.attempt.mock.calls;
+    assert(call);
+    const sms = call[0].sms;
+    assert(sms);
+    expect(sms('en')).toBe(smsDraftForRegular(INPUT_MESSAGE, 'en'));
+  });
+
+  it('should give no SMS draft for a digest run', async () => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+
+    await createNotificationActivities(sender, () => 1).sendChannel({
+      ...INPUT,
+      channel: 'SMS',
+      content: { kind: 'digest', digest: { type: 'LEAVE_DECIDED', items: [INPUT_MESSAGE.params] } },
+    });
+
+    const [call] = sender.attempt.mock.calls;
+    assert(call);
+    const sms = call[0].sms;
+    assert(sms);
+    expect(sms('en')).toBeNull();
   });
 
   it('should give the registry digest template of a digest run', async () => {

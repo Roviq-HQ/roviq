@@ -202,6 +202,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   // ROV-319: senders, their tokens, opt-outs and inbound events are platform-role tables
   'apps/notification-service/src/repositories/messaging-sender.drizzle-repository.ts',
   'apps/notification-service/src/repositories/messaging-inbound.drizzle-repository.ts',
+  // ROV-318: a provider's delivery report appends a row copied from the message's own SENT row
+  'apps/notification-service/src/repositories/delivery-receipt.drizzle-repository.ts',
   // ROV-319 integration fixtures: senders with tokens and phone numbers of the recipients
   'apps/notification-service/src/__tests__/whatsapp-delivery.integration.spec.ts',
   // ROV-314 integration fixtures: institutes, guardian links and stored notification rows

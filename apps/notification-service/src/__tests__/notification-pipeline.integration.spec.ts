@@ -825,7 +825,9 @@ describe('notification pipeline (integration)', () => {
       expect(email.sent).toEqual([]);
       expect(sms.sent.map((m) => m.to)).toEqual([['+919876512345']]);
       expect(sms.sent[0]?.body).toContain('Tmp-ROV315-sms7');
-      expect(sms.sent[0]?.body).toContain('https://app.roviq.test/login');
+      // A registered SMS template carries no web address (ROV-318); the email does.
+      expect(sms.sent[0]?.body).toContain("institute's Roviq portal");
+      expect(sms.sent[0]?.body).not.toContain('http');
       const rows = (await deliveriesFor(student.userId)).filter((d) => d.type === 'USER_WELCOME');
       expect(rows.map((d) => [d.channel, d.status, d.skip_reason])).toEqual([
         ['EMAIL', 'SKIPPED', 'no_address'],

@@ -98,4 +98,82 @@ describe('notification-service env validation', () => {
       expect(validate(env)).toEqual(env);
     });
   });
+
+  describe('the SMS http provider', () => {
+    const HTTP = {
+      ...BASE,
+      NOTIFICATION_SMS_PROVIDER: 'http',
+      SMS_API_BASE_URL: 'https://sms.example.test/api/v5',
+      SMS_API_KEY: 'fake-auth-key',
+      SMS_TEMPLATE_IDS: JSON.stringify({ 'AUTH_OTP:en': 'reg-1001' }),
+      SMS_WEBHOOK_SECRET: 'w'.repeat(32),
+    };
+
+    it('should accept the provider with all four settings', () => {
+      expect(validate(HTTP)).toEqual(HTTP);
+    });
+
+    it('should accept the optional sender header', () => {
+      const env = { ...HTTP, SMS_SENDER_ID: 'ROVIQS' };
+
+      expect(validate(env)).toEqual(env);
+    });
+
+    it.each([
+      'SMS_API_BASE_URL',
+      'SMS_API_KEY',
+      'SMS_TEMPLATE_IDS',
+      'SMS_WEBHOOK_SECRET',
+    ] as const)('should name %s when it is missing', (name) => {
+      const { [name]: _missing, ...env } = HTTP;
+
+      expect(() => validate(env)).toThrow(`${name} — required when NOTIFICATION_SMS_PROVIDER=http`);
+    });
+
+    it('should name every missing setting at once', () => {
+      expect(() => validate({ ...BASE, NOTIFICATION_SMS_PROVIDER: 'http' })).toThrow(
+        'SMS_API_BASE_URL, SMS_API_KEY, SMS_TEMPLATE_IDS, SMS_WEBHOOK_SECRET — required when NOTIFICATION_SMS_PROVIDER=http',
+      );
+    });
+
+    it('should refuse a webhook secret shorter than 32 characters', () => {
+      expect(() => validate({ ...HTTP, SMS_WEBHOOK_SECRET: 'w'.repeat(31) })).toThrow(
+        'SMS_WEBHOOK_SECRET — at least 32 characters',
+      );
+    });
+
+    it.each([
+      ['not JSON', '{reg-secret-9'],
+      ['an array', '["reg-secret-9"]'],
+      ['a number value', '{"AUTH_OTP:en": 9}'],
+      ['an empty value', '{"AUTH_OTP:en": "", "reg-secret-9": "x"}'],
+    ])('should refuse template ids that are %s without printing them', (_case, raw) => {
+      const error = (() => {
+        try {
+          validate({ ...HTTP, SMS_TEMPLATE_IDS: raw });
+          return null;
+        } catch (e: unknown) {
+          return e;
+        }
+      })();
+
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw new Error('expected an Error');
+      expect(error.message).toContain('SMS_TEMPLATE_IDS — must be a JSON object');
+      expect(error.message).not.toContain('reg-secret-9');
+    });
+
+    it('should refuse an API address that is not a URL', () => {
+      expect(() => validate({ ...HTTP, SMS_API_BASE_URL: 'not a url' })).toThrow(
+        'Invalid notification-service environment',
+      );
+    });
+
+    it.each([
+      ['log', { ...BASE, NOTIFICATION_SMS_PROVIDER: 'log' }],
+      ['unset', BASE],
+    ])('should need none of the settings when the provider is %s', (_case, env) => {
+      expect(validate(env)).toEqual(env);
+    });
+  });
 });

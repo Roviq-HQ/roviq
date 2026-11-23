@@ -125,3 +125,12 @@ export interface ReceiptInput {
   onlyIfNotDelivered: boolean;
   person: InboundPerson;
 }
+
+/** A delivery report from a provider that has no sender rows (SMS). */
+export interface ProviderReceipt {
+  provider: string;
+  providerMessageId: string;
+  status: 'DELIVERED' | 'FAILED';
+  /** Set for FAILED. */
+  errorCode: string | null;
+}

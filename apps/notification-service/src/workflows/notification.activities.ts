@@ -1,5 +1,6 @@
 import { ApplicationFailure, Context } from '@temporalio/activity';
 import type { ChannelSender } from '../delivery/channel-sender';
+import { smsDraftForRegular } from '../delivery/sms/sms-templates';
 import {
   whatsappDigestTemplateFor,
   whatsappTemplateFor,
@@ -41,6 +42,8 @@ export function createNotificationActivities(
           content.kind === 'single'
             ? whatsappTemplateFor(content.message, locale)
             : whatsappDigestTemplateFor(content.digest, locale),
+        sms: (locale) =>
+          content.kind === 'single' ? smsDraftForRegular(content.message, locale) : null,
       });
       if (outcome.status === 'DEFERRED') return { deferUntil: outcome.until.toISOString() };
       if (outcome.status === 'FAILED') {
