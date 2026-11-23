@@ -8,8 +8,9 @@ import {
   notificationDeliveries,
   withAdmin,
 } from '@roviq/database';
-import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import { MessagingInboundRepository } from './messaging-inbound.repository';
+import { sameNumberSenderIds } from './same-number-senders';
 import type { InboundPerson, ReceiptInput } from './types';
 
 const ORIGIN = 'repository:messaging-inbound';
@@ -152,7 +153,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
     const [row] = await tx
       .select({ id: messagingOptOuts.id })
       .from(messagingOptOuts)
-      .where(and(eq(messagingOptOuts.senderId, senderId), who))
+      .where(and(inArray(messagingOptOuts.senderId, sameNumberSenderIds(tx, senderId)), who))
       .limit(1);
     return row !== undefined;
   }
@@ -169,7 +170,7 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
       .from(messagingInboundEvents)
       .where(
         and(
-          eq(messagingInboundEvents.senderId, senderId),
+          inArray(messagingInboundEvents.senderId, sameNumberSenderIds(tx, senderId)),
           eq(messagingInboundEvents.providerUserId, providerUserId),
           isNotNull(messagingInboundEvents.recipientPhone),
         ),

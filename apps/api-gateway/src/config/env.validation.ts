@@ -95,23 +95,28 @@ const envSchema = z
     TEMPORAL_TC_TASK_QUEUE: z.string().optional(),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV !== 'production') return;
+    // Fail closed: only an environment that names itself development or test may run without a real key.
+    if (isDevOrTest(env.NODE_ENV)) return;
     if (env.MESSAGING_ENCRYPTION_KEY === undefined) {
       ctx.addIssue({
         code: 'custom',
         path: ['MESSAGING_ENCRYPTION_KEY'],
         message:
-          'MESSAGING_ENCRYPTION_KEY — required in production: 64 hex characters (32 bytes) that encrypt messaging sender access tokens',
+          'MESSAGING_ENCRYPTION_KEY — required unless NODE_ENV is development or test: 64 hex characters (32 bytes) that encrypt messaging sender access tokens',
       });
     } else if (env.MESSAGING_ENCRYPTION_KEY === DEV_MESSAGING_ENCRYPTION_KEY) {
       ctx.addIssue({
         code: 'custom',
         path: ['MESSAGING_ENCRYPTION_KEY'],
         message:
-          'MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused in production; generate one with: openssl rand -hex 32',
+          'MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused unless NODE_ENV is development or test; generate one with: openssl rand -hex 32',
       });
     }
   });
+
+function isDevOrTest(nodeEnv: string | undefined): boolean {
+  return nodeEnv === 'development' || nodeEnv === 'test';
+}
 
 export function validate(config: Record<string, unknown>) {
   const result = envSchema.safeParse(config);

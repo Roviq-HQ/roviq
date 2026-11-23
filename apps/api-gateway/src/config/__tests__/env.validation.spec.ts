@@ -24,16 +24,20 @@ const BASE = {
 const REAL_KEY = 'ab'.repeat(32);
 
 describe('api-gateway env validation: MESSAGING_ENCRYPTION_KEY', () => {
-  it('should fill in the development key outside production when it is unset', () => {
+  it('should fill in the development key in development and test when it is unset', () => {
     expect(validate({ ...BASE, NODE_ENV: 'development' }).MESSAGING_ENCRYPTION_KEY).toBe(
       DEV_MESSAGING_ENCRYPTION_KEY,
     );
-    expect(validate(BASE).MESSAGING_ENCRYPTION_KEY).toBe(DEV_MESSAGING_ENCRYPTION_KEY);
+    expect(validate({ ...BASE, NODE_ENV: 'test' }).MESSAGING_ENCRYPTION_KEY).toBe(
+      DEV_MESSAGING_ENCRYPTION_KEY,
+    );
   });
 
   it('should give the cipher a working key from the validated config when the variable is unset', () => {
     const cipher = new MessagingTokenCipher(
-      new ConfigService(validate(BASE)).getOrThrow<string>('MESSAGING_ENCRYPTION_KEY'),
+      new ConfigService(validate({ ...BASE, NODE_ENV: 'test' })).getOrThrow<string>(
+        'MESSAGING_ENCRYPTION_KEY',
+      ),
     );
 
     expect(cipher.decrypt(cipher.encrypt('token'))).toBe('token');
@@ -45,20 +49,27 @@ describe('api-gateway env validation: MESSAGING_ENCRYPTION_KEY', () => {
     );
   });
 
-  it('should require the key in production', () => {
-    expect(() => validate({ ...BASE, NODE_ENV: 'production' })).toThrow(
-      'MESSAGING_ENCRYPTION_KEY — required in production',
+  it.each([
+    'production',
+    'staging',
+    undefined,
+  ])('should require the key when NODE_ENV is %s', (nodeEnv) => {
+    expect(() => validate({ ...BASE, NODE_ENV: nodeEnv })).toThrow(
+      'MESSAGING_ENCRYPTION_KEY — required unless NODE_ENV is development or test',
     );
   });
 
-  it('should refuse the all-zero development key in production', () => {
+  it('should refuse the all-zero development key outside development and test', () => {
+    expect(() =>
+      validate({ ...BASE, MESSAGING_ENCRYPTION_KEY: DEV_MESSAGING_ENCRYPTION_KEY }),
+    ).toThrow('MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused');
     expect(() =>
       validate({
         ...BASE,
         NODE_ENV: 'production',
         MESSAGING_ENCRYPTION_KEY: DEV_MESSAGING_ENCRYPTION_KEY,
       }),
-    ).toThrow('MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused in production');
+    ).toThrow('MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused');
   });
 
   it('should accept a real key in production', () => {

@@ -203,11 +203,13 @@ describe('WhatsApp delivery and webhook (integration)', () => {
     status?: 'ACTIVE' | 'PAUSED' | 'BLOCKED';
     dailyCap?: number;
     instituteDailyCap?: number | null;
+    /** Register under a provider number an earlier sender of the spec used. */
+    numberId?: string;
   }
 
   async function addSender(options: SenderOptions) {
     numberSeq += 1;
-    const numberId = `spec-${provider.run}-${numberSeq}`;
+    const numberId = options.numberId ?? `spec-${provider.run}-${numberSeq}`;
     const token = `token-${randomBytes(8).toString('hex')}`;
     const id = await withAdmin(db, mkAdminCtx(CTX), async (tx) => {
       const [row] = await tx
@@ -725,6 +727,25 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       provider.requests.length = 0;
 
       await expect(send(instituteA, userA)).resolves.toBe('SENT');
+    });
+
+    it('should keep an opt-out when the number is removed and registered again', async () => {
+      const first = await addSender({ scope: 'platform' });
+      await post(inbound(first.numberId, phoneA.full, 'STOP'));
+      await superPool.query(
+        'UPDATE messaging_senders SET deleted_at = now(), deleted_by = $2 WHERE id = $1',
+        [first.id, SYSTEM_USER_ID],
+      );
+      const again = await addSender({ scope: 'platform', numberId: first.numberId });
+      provider.requests.length = 0;
+
+      await expect(send(instituteA, userA)).resolves.toBe('SKIPPED');
+      await post(inbound(again.numberId, phoneA.full, 'are you there?'));
+      await post(inbound(again.numberId, phoneA.full, 'stop'));
+
+      expect(provider.requests).toHaveLength(0);
+      expect(await count('messaging_opt_outs', again.id)).toBe(0);
+      expect((await deliveries(userA.userId)).at(-1)).toMatchObject({ skip_reason: 'opted_out' });
     });
 
     it('should send one fixed reply per person and day to anything else, and store no text', async () => {

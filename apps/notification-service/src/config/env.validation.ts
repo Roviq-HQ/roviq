@@ -72,13 +72,15 @@ const envSchema = z
       }
     }
     if (
-      env.NODE_ENV === 'production' &&
+      env.NODE_ENV !== 'development' &&
+      env.NODE_ENV !== 'test' &&
       env.MESSAGING_ENCRYPTION_KEY &&
       /^0+$/.test(env.MESSAGING_ENCRYPTION_KEY)
     ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused in production',
+        message:
+          'MESSAGING_ENCRYPTION_KEY — the all-zero development key is refused unless NODE_ENV is development or test',
       });
     }
     if (env.NODE_ENV === 'production') {

@@ -242,7 +242,7 @@ has one, else the platform's sender. Nothing is sent until a sender exists.
 | `WHATSAPP_API_BASE_URL` | notification-service | Address of the provider's API including its version segment; a message is posted to `<base>/<number id>/messages` |
 | `WHATSAPP_APP_SECRET` | notification-service | Signs the provider's webhook calls |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | notification-service | Any long random string; typed again at the provider when the webhook address is registered |
-| `MESSAGING_ENCRYPTION_KEY` | notification-service and api-gateway | 64 hex characters (`openssl rand -hex 32`), the same value in both apps. Encrypts each sender's access token in `messaging_sender_secrets`. Losing it means registering every token again. In production the gateway refuses to start without it |
+| `MESSAGING_ENCRYPTION_KEY` | notification-service and api-gateway | 64 hex characters (`openssl rand -hex 32`), the same value in both apps. Encrypts each sender's access token in `messaging_sender_secrets`. Losing it means registering every token again. Unless `NODE_ENV` is `development` or `test`, the gateway refuses to start without it, and both apps refuse the all-zero development key |
 
 **Webhook.** Route `GET` and `POST /webhooks/whatsapp` of a public host to the notification
 service, and nothing else of that service. Register the address with the provider for the
