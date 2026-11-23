@@ -49,8 +49,14 @@ describe('AttendanceListener', () => {
 
   it('should dispatch one institute notification per linked guardian', async () => {
     recipients.guardiansOfStudent.mockResolvedValue([
-      { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
-      { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
+      {
+        recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+        appOnly: false,
+      },
+      {
+        recipient: { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
+        appOnly: true,
+      },
     ]);
 
     await listener.handleAbsent(makeEvent(), makeCtx());
@@ -76,12 +82,23 @@ describe('AttendanceListener', () => {
       source: { stream: 'NOTIFICATION', sequence: 41 },
       dedupeKey: `attendance:session-42:${STUDENT}:ABSENT:user-guardian-1`,
       inApp: true,
+      appOnly: false,
     });
+    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        recipient: { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
+        appOnly: true,
+      }),
+    );
   });
 
   it('should pass nulls when the event has no display fields', async () => {
     recipients.guardiansOfStudent.mockResolvedValue([
-      { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+      {
+        recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+        appOnly: false,
+      },
     ]);
 
     await listener.handleAbsent(
@@ -114,12 +131,16 @@ describe('AttendanceListener', () => {
       source: { stream: 'NOTIFICATION', sequence: 41 },
       dedupeKey: `attendance:session-42:${STUDENT}:LATE:user-guardian-1`,
       inApp: true,
+      appOnly: false,
     });
   });
 
   it('should give re-sent absences of one session and student the same key, and a new status a new one', async () => {
     recipients.guardiansOfStudent.mockResolvedValue([
-      { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+      {
+        recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+        appOnly: false,
+      },
     ]);
     const keys = async (event: AttendanceAbsentEvent, sequence: number) => {
       const ctx = createMock<JetStreamContext>({

@@ -288,6 +288,7 @@ See `docs/features/examinations.md` for the offline-examination feature — the 
 - An SMS is a registered template: its id and variable values, never free text. Settings and rules: `docs/deployment.md` → "SMS".
 - A WhatsApp message goes through a sender (`messaging_senders`: the institute's own number, else the platform's) and an approved template; the provider's webhook (`/webhooks/whatsapp` on the notification service) records delivery reports and stop requests. Rules and settings: `docs/deployment.md` → "WhatsApp alerts".
 - Regular notification types run through Temporal workflows (delivery and digest, queue `notifications`).
+- An alert about a student goes to its guardians in a fixed order (`RecipientResolver.guardiansOfStudent`): a guardian who is active staff of the institute, then the primary contact, then the others by earliest link. Every guardian gets the in-app copy and push; WhatsApp, SMS and email go to the first guardian only.
 - Codes and passwords are sent inline by `dispatchSecret` and stored nowhere.
 - The gateway serves the inbox API and the live feed from `apps/api-gateway/src/notification-inbox/`.
 - The web app shows them in the bell, `apps/web/src/components/notifications/`.

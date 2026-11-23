@@ -44,7 +44,7 @@ export class AttendanceListener {
       sectionName: event.sectionName ?? null,
       standardName: event.standardName ?? null,
     };
-    for (const recipient of guardians) {
+    for (const { recipient, appOnly } of guardians) {
       await this.dispatcher.dispatch({
         message: { type: 'ATTENDANCE_ABSENT', params },
         audience: instituteAudience(event.tenantId),
@@ -52,6 +52,7 @@ export class AttendanceListener {
         source: sourceOf(ctx),
         dedupeKey: attendanceAbsentDedupeKey(params, recipient.userId),
         inApp: true,
+        appOnly,
       });
     }
   }
