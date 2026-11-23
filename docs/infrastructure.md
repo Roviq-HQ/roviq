@@ -12,6 +12,26 @@ pnpm tilt get uiresources # Check resource status
 
 Tilt UI: http://localhost:10350
 
+### Tilt commands
+
+Run apps, migrations, seeds and resets through Tilt, always as `pnpm tilt …` (the wrapper targets
+this checkout's Tilt).
+
+| Command | What it does |
+|---|---|
+| `pnpm tilt trigger db-push` | Push the schema |
+| `pnpm tilt trigger db-seed` | Seed data |
+| `pnpm tilt trigger db-clean` | Reset the database and re-seed |
+| `pnpm tilt trigger api-gateway` | Restart the API |
+| `pnpm tilt trigger web` | Restart the web app |
+| `pnpm tilt trigger e2e-gateway` | Run the API e2e tests |
+| `pnpm tilt trigger e2e-ui` | Run the Playwright UI tests for all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e) |
+| `pnpm tilt logs <resource>` | Read a resource's output, e.g. `db-clean`, `api-gateway`, `typecheck`, `codegen` |
+
+The app resources (api-gateway, notification-service, web) restart on file changes, so a trigger
+is only for the manual resources. The test commands (`pnpm e2e:up`, `pnpm test:e2e:api`,
+`pnpm ci:check` and the rest) are in `docs/testing.md` → "Commands".
+
 ### How the backend apps run in dev
 
 `api-gateway` and `notification-service` run from their TypeScript sources, not from `dist/`

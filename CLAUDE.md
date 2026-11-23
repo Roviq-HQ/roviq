@@ -2,20 +2,10 @@
 
 ### The app is currently not in production, so you are allowed to reset the db, alter any migration, alter any code/db table. Some of the code is written by older models, so if you are fable 5.2 or above, you are allowed to completely change anything to reduce bugs, tighten security, less technical debt, faster launching of the product, and a lot of things. Use that freedom inside the issue you are working on: a rewrite or redesign that no issue asks for is a proposal to the user first.
 
-**Always use `pnpm tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Always call it as `pnpm tilt …`, never bare `tilt`: the wrapper targets this checkout's own Tilt, while bare `tilt` can hit another instance's. Examples:
+**Always use `pnpm tilt trigger` to run apps, migrations, seeds, and resets** — never run `pnpm db:push`, `pnpm db:seed`, `pnpm db:reset`, `nx serve`, or `nx dev` directly. Tilt manages the full dev environment. Always call it as `pnpm tilt …`, never bare `tilt`: the wrapper targets this checkout's own Tilt, while bare `tilt` can hit another instance's.
 
-- `pnpm tilt trigger db-push` — push schema
-- `pnpm tilt trigger db-seed` — seed data
-- `pnpm tilt trigger db-clean` — reset DB + re-seed
-- `pnpm tilt trigger api-gateway` — restart API
-- `pnpm tilt trigger web` — restart web app
-- `pnpm tilt trigger e2e-gateway` — run API e2e tests
-- `pnpm tilt trigger e2e-ui` — run Playwright UI tests across all 3 e2e projects (web-admin-e2e, web-institute-e2e, web-reseller-e2e)
-- `pnpm e2e:up` — start Docker e2e infra (stays running), MUST run it before e2e testing. It re-seeds every time. The e2e backend runs a fixed build with no watcher: run it again after a backend change and it rebuilds and recreates api-gateway and notification-service (about 45 s; 16 s when the backend is unchanged). `pnpm test:e2e:api` and `pnpm ci:check` do this themselves.
-- `pnpm test:e2e:api` — Vitest E2E API tests against running api-gateway. **All new E2E API tests go here.**
-- `pnpm test:e2e:ui` — Playwright UI tests across the 3 portal e2e projects plus cross-portal.
-- `pnpm test:all` — full test pipeline: unit + integration + e2e:api + e2e:ui
-- `pnpm ci:check` — unified lint/typecheck/test/e2e gate, run by `.husky/pre-push`. CI jobs, Nx cache targets, bypass flags: `docs/testing.md` → "CI and pre-push".
+- Tilt resources and triggers (`db-push`, `db-seed`, `db-clean`, `api-gateway`, `web`, `e2e-gateway`, `e2e-ui`): `docs/infrastructure.md` → "Tilt commands".
+- Test commands (`pnpm e2e:up`, `pnpm test:e2e:api`, `pnpm test:e2e:ui`, `pnpm test:all`, `pnpm ci:check`): `docs/testing.md` → "Commands". Run `pnpm e2e:up` before any e2e test, and again after a backend change.
 
 Tilt auto-detects file changes for app resources (api-gateway, notification-service, web) — no `pnpm tilt trigger` needed after editing code, just check logs. The two backend apps run from source without type-checking: type errors show in `pnpm tilt logs typecheck`, not in the app's log. Use `pnpm tilt trigger` only for manual tasks (db-push, db-seed, db-clean, e2e-gateway). After triggering or a file change, wait max **15 seconds** then check `pnpm tilt logs`.
 
