@@ -284,7 +284,8 @@ See `docs/features/examinations.md` for the offline-examination feature — the 
 
 ## Notifications
 
-- Domain events on the `NOTIFICATION` stream are consumed by `apps/notification-service`, which writes the in-app row to PostgreSQL and sends through the channel adapters (`smtp` for email, `fcm` for push, `cloud` for WhatsApp; SMS has only the `log` adapter).
+- Domain events on the `NOTIFICATION` stream are consumed by `apps/notification-service`, which writes the in-app row to PostgreSQL and sends through the channel adapters (`smtp` for email, `fcm` for push, `cloud` for WhatsApp, `http` for SMS).
+- An SMS is a registered template: its id and variable values, never free text. Settings and rules: `docs/deployment.md` → "SMS".
 - A WhatsApp message goes through a sender (`messaging_senders`: the institute's own number, else the platform's) and an approved template; the provider's webhook (`/webhooks/whatsapp` on the notification service) records delivery reports and stop requests. Rules and settings: `docs/deployment.md` → "WhatsApp alerts".
 - Regular notification types run through Temporal workflows (delivery and digest, queue `notifications`).
 - Codes and passwords are sent inline by `dispatchSecret` and stored nowhere.
