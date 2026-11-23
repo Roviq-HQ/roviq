@@ -1,3 +1,7 @@
+-- ROV-319: messaging senders, their tokens, opt-outs and inbound events.
+-- The first line is a comment on purpose: `scripts/db-reset.ts` re-applies only migrations that
+-- start with one, and the FORCE RLS, GRANT and REVOKE statements at the end need that on a
+-- database built by `drizzle-kit push` (dev, CI).
 CREATE TYPE "MessagingSenderStatus" AS ENUM('ACTIVE', 'PAUSED', 'BLOCKED');--> statement-breakpoint
 CREATE TABLE "messaging_inbound_events" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
