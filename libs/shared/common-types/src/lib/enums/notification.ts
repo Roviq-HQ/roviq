@@ -63,6 +63,12 @@ export const NOTIFICATION_SKIP_REASON_VALUES = [
   'no_provider',
   // The recipient has no address for this channel (email, phone, device token)
   'no_address',
+  // No approved template exists for this type and language
+  'no_template',
+  // The recipient asked this sender to stop
+  'opted_out',
+  // The sender, or this institute's share of it, reached its daily cap
+  'sender_cap',
 ] as const;
 
 export type NotificationSkipReason = (typeof NOTIFICATION_SKIP_REASON_VALUES)[number];
@@ -72,6 +78,9 @@ export const NotificationSkipReason = {
   NO_CONSENT: 'no_consent',
   NO_PROVIDER: 'no_provider',
   NO_ADDRESS: 'no_address',
+  NO_TEMPLATE: 'no_template',
+  OPTED_OUT: 'opted_out',
+  SENDER_CAP: 'sender_cap',
 } as const satisfies Record<string, NotificationSkipReason>;
 
 // ─── NotificationDeliveryStatus ─────────────────────────────────────────────
@@ -92,6 +101,42 @@ export type NotificationDeliveryStatus = (typeof NOTIFICATION_DELIVERY_STATUS_VA
 export const NotificationDeliveryStatus = Object.fromEntries(
   NOTIFICATION_DELIVERY_STATUS_VALUES.map((v) => [v, v]),
 ) as { readonly [K in NotificationDeliveryStatus]: K };
+
+// ─── MessagingSenderStatus ──────────────────────────────────────────────────
+
+/** State of a WhatsApp sender (`messaging_senders.status`). Only an ACTIVE sender sends. */
+export const MESSAGING_SENDER_STATUS_VALUES = [
+  // Messages go out through this sender
+  'ACTIVE',
+  // Switched off by the platform; nothing is sent
+  'PAUSED',
+  // The provider restricted the number; nothing is sent until it is cleared
+  'BLOCKED',
+] as const;
+
+export type MessagingSenderStatus = (typeof MESSAGING_SENDER_STATUS_VALUES)[number];
+
+export const MessagingSenderStatus = Object.fromEntries(
+  MESSAGING_SENDER_STATUS_VALUES.map((v) => [v, v]),
+) as { readonly [K in MessagingSenderStatus]: K };
+
+// ─── MessageTemplateCategory ────────────────────────────────────────────────
+
+/** The provider's price class of a template (`notification_deliveries.template_category`). */
+export const MESSAGE_TEMPLATE_CATEGORY_VALUES = [
+  // A message about something the recipient's own account or ward did
+  'UTILITY',
+  // A one-time code
+  'AUTHENTICATION',
+  // Promotion; charged at a much higher rate
+  'MARKETING',
+] as const;
+
+export type MessageTemplateCategory = (typeof MESSAGE_TEMPLATE_CATEGORY_VALUES)[number];
+
+export const MessageTemplateCategory = Object.fromEntries(
+  MESSAGE_TEMPLATE_CATEGORY_VALUES.map((v) => [v, v]),
+) as { readonly [K in MessageTemplateCategory]: K };
 
 // ─── DevicePlatform ─────────────────────────────────────────────────────────
 

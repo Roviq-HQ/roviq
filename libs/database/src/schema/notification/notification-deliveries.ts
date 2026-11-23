@@ -15,6 +15,7 @@ import { notificationChannel, notificationDeliveryStatus } from '../common/enums
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
 import { institutes } from '../tenant/institutes';
+import { messagingSenders } from './messaging-senders';
 import { notifications } from './notifications';
 
 /**
@@ -52,6 +53,13 @@ export const notificationDeliveries = pgTable(
     skipReason: text('skip_reason'),
     providerMessageId: text('provider_message_id'),
     errorCode: text('error_code'),
+    /** The WhatsApp sender the attempt went through; NULL on other channels and on skips before one is chosen. */
+    senderId: uuid('sender_id').references(() => messagingSenders.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    /** The provider's price class of the template sent (a `MessageTemplateCategory`); usage is counted by it. */
+    templateCategory: text('template_category'),
     attempt: integer().default(1).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -80,6 +88,10 @@ export const notificationDeliveries = pgTable(
       'btree',
       table.notificationId.asc().nullsLast(),
     ),
+    // Counts a sender's accepted messages in the last day (the daily cap).
+    index('notification_deliveries_sender_sent_idx')
+      .using('btree', table.senderId.asc().nullsLast(), table.createdAt.desc().nullsLast())
+      .where(sql`sender_id IS NOT NULL AND status = 'SENT'`),
     index('notification_deliveries_provider_message_id_idx')
       .using('btree', table.providerMessageId.asc().nullsLast())
       .where(sql`provider_message_id IS NOT NULL`),
