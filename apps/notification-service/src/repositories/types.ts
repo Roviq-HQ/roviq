@@ -40,6 +40,12 @@ export interface Recipient {
   membershipId: string | null;
 }
 
+/** A guardian linked to a student, with what places them in the alert order. */
+export interface GuardianRecord extends Recipient {
+  isStaff: boolean;
+  isPrimaryContact: boolean;
+}
+
 export interface MembershipRecord {
   userId: string;
   isStudent: boolean;

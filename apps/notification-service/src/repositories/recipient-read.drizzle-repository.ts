@@ -6,13 +6,15 @@ import {
   institutesLive,
   membershipsLive,
   mkInstituteCtx,
+  staffProfilesLive,
   studentGuardianLinksLive,
   studentProfilesLive,
   withTenant,
 } from '@roviq/database';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { RecipientReadRepository } from './recipient-read.repository';
-import type { MembershipRecord, Recipient } from './types';
+import type { GuardianRecord, MembershipRecord } from './types';
 
 const ORIGIN = 'repository:notification-recipients';
 
@@ -22,12 +24,29 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
     super();
   }
 
-  async findStudentGuardians(tenantId: string, studentMembershipId: string): Promise<Recipient[]> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
-      tx
+  async findStudentGuardians(
+    tenantId: string,
+    studentMembershipId: string,
+  ): Promise<GuardianRecord[]> {
+    const staffMemberships = alias(membershipsLive, 'staff_memberships');
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) => {
+      // Staff of this institute: RLS limits both tables to the institute the read runs as.
+      const isStaff = sql<boolean>`EXISTS (${tx
+        .select({ one: sql`1` })
+        .from(staffProfilesLive)
+        .innerJoin(staffMemberships, eq(staffMemberships.id, staffProfilesLive.membershipId))
+        .where(
+          and(
+            eq(staffProfilesLive.userId, guardianProfilesLive.userId),
+            eq(staffMemberships.status, 'ACTIVE'),
+          ),
+        )})`;
+      return tx
         .select({
           userId: guardianProfilesLive.userId,
           membershipId: guardianProfilesLive.membershipId,
+          isStaff,
+          isPrimaryContact: studentGuardianLinksLive.isPrimaryContact,
         })
         .from(studentProfilesLive)
         .innerJoin(
@@ -45,8 +64,13 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
             eq(membershipsLive.status, 'ACTIVE'),
           ),
         )
-        .orderBy(guardianProfilesLive.userId),
-    );
+        .orderBy(
+          desc(isStaff),
+          desc(studentGuardianLinksLive.isPrimaryContact),
+          asc(studentGuardianLinksLive.createdAt),
+          asc(studentGuardianLinksLive.id),
+        );
+    });
   }
 
   async findMembership(tenantId: string, membershipId: string): Promise<MembershipRecord | null> {

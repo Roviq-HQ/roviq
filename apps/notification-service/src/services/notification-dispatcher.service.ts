@@ -49,7 +49,15 @@ export interface RegularDispatch {
   dedupeKey?: string;
   /** False when the event names no portal to show an in-app copy in. */
   inApp: boolean;
+  /**
+   * True for a student's guardian after the first (ROV-328): the in-app copy and push only.
+   * WhatsApp, SMS and email go to the first guardian alone.
+   */
+  appOnly?: boolean;
 }
+
+/** Channels a guardian after the first still gets; the in-app row is not a channel. */
+const APP_CHANNELS: ReadonlySet<NotificationChannel> = new Set(['PUSH']);
 
 export interface SecretDispatch {
   message: SecretPayload;
@@ -131,10 +139,9 @@ export class NotificationDispatcher {
       }
     }
 
-    const channels: ChannelPlan[] = type.channels.map((channel) => ({
-      channel,
-      enabled: settings.channels[channel],
-    }));
+    const channels: ChannelPlan[] = type.channels
+      .filter((channel) => !req.appOnly || APP_CHANNELS.has(channel))
+      .map((channel) => ({ channel, enabled: settings.channels[channel] }));
     if (channels.length === 0) return;
 
     if (settings.digestCron !== null && type.digest !== null && audience.tenantId !== null) {

@@ -208,6 +208,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/__tests__/whatsapp-delivery.integration.spec.ts',
   // ROV-314 integration fixtures: institutes, guardian links and stored notification rows
   'apps/notification-service/src/__tests__/notification-pipeline.integration.spec.ts',
+  // ROV-328: fixture rows (families, staff profiles) for the guardian order.
+  'apps/notification-service/src/__tests__/guardian-order.integration.spec.ts',
   'ee/apps/api-gateway/src/billing/billing-event.consumer.ts',
   'ee/apps/api-gateway/src/billing/billing.repository.ts',
   'ee/apps/api-gateway/src/billing/repositories/gateway-config.repository.ts',

@@ -59,7 +59,7 @@ export class LeaveListener {
     if (!applicant.isStudent) return;
 
     const guardians = await this.recipients.guardiansOfStudent(event.tenantId, event.userId);
-    for (const recipient of guardians) {
+    for (const { recipient, appOnly } of guardians) {
       await this.dispatcher.dispatch({
         message: {
           type: 'LEAVE_DECIDED',
@@ -69,6 +69,7 @@ export class LeaveListener {
         recipient,
         source,
         inApp: true,
+        appOnly,
       });
     }
   }
