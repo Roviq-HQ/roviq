@@ -31,5 +31,7 @@
   "STUDENT_ALREADY_ENROLLED": "This student is already enrolled in that academic year.",
   "STUDENT_YEAR_HAS_RECORDS": "This student already has attendance, marks or report cards in this year, so they cannot be removed from it.",
   "STANDARD_NOT_FOUND": "That class was not found in this academic year. Refresh and try again.",
-  "SECTION_NOT_FOUND": "That section was not found in the chosen class. Refresh and try again."
+  "SECTION_NOT_FOUND": "That section was not found in the chosen class. Refresh and try again.",
+  "MESSAGING_SENDER_NOT_FOUND": "That messaging sender was not found. Refresh and try again.",
+  "MESSAGING_SENDER_EXISTS": "A sender is already registered for this institute, or this number is already in use."
 }
