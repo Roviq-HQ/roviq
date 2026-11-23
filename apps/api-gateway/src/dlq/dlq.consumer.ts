@@ -43,7 +43,8 @@ export function toDlqRow(msg: DlqMessage, dlqStreamSeq: bigint): DlqRow {
     error: msg.error,
     retryCount: msg.retryCount,
     correlationId: msg.correlationId,
-    tenantId: msg.tenantId ?? null,
+    // Publishers send '' for a message with no institute; it is not a uuid.
+    tenantId: msg.tenantId || null,
     failedAt: msg.failedAt,
   };
 }
