@@ -202,9 +202,8 @@ services:
     environment:
       # Override ALL DB URLs to use roviq_test on Docker postgres
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test
-      # Audit consumer uses superuser role for direct INSERT to audit_logs
-      # (bypasses RLS via policy; requires DATABASE_URL_AUDIT)
-      DATABASE_URL_AUDIT: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
+      # Audit and dead-letter consumers: INSERT into audit_logs and dlq_messages only.
+      DATABASE_URL_AUDIT: postgresql://roviq_audit_writer:roviq_audit_writer_dev@postgres:5432/roviq_test
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@postgres:5432/roviq_test
       # Override service URLs to use Docker network hostnames
       NATS_URL: nats://nats:4222

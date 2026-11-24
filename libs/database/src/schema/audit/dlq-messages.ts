@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from '../auth/users';
-import { roviqAdmin } from '../common/rls-policies';
+import { roviqAdmin, roviqAuditWriter } from '../common/rls-policies';
 import { institutes } from '../tenant/institutes';
 
 /** Dead-lettered NATS messages — platform-admin inspect/replay (ROV-19). */
@@ -45,6 +45,18 @@ export const dlqMessages = pgTable(
       to: roviqAdmin,
       using: sql`true`,
       withCheck: sql`true`,
+    }),
+    pgPolicy('dlq_writer_insert', {
+      for: 'insert',
+      to: roviqAuditWriter,
+      withCheck: sql`true`,
+    }),
+    // ON CONFLICT checks the new row against a SELECT policy; the role's column grant is
+    // dlq_stream_seq only, so it still reads no message.
+    pgPolicy('dlq_writer_conflict_key', {
+      for: 'select',
+      to: roviqAuditWriter,
+      using: sql`true`,
     }),
   ],
 );

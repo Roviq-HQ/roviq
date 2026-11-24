@@ -40,7 +40,7 @@
     "DATABASE_URL_MIGRATE": "postgresql://roviq:roviq_dev@postgres:5432/roviq",
     "DATABASE_URL_TEST": "postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq_test",
     "DATABASE_URL_TEST_MIGRATE": "postgresql://roviq:roviq_dev@postgres:5432/roviq_test",
-    "DATABASE_URL_AUDIT": "postgresql://roviq:roviq_dev@postgres:5432/roviq",
+    "DATABASE_URL_AUDIT": "postgresql://roviq_audit_writer:roviq_audit_writer_dev@postgres:5432/roviq",
     "REDIS_URL": "redis://redis:6379",
     "NATS_URL": "nats://nats:4222",
     "NODE_OPTIONS": "--max-old-space-size=4096",

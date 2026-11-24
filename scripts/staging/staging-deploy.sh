@@ -16,6 +16,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 : "${STAGING_WEB_HOSTS:?}" "${STAGING_API_URL:?}" "${STAGING_CA_CERT:?}" "${INSTITUTE_PORTAL_URL:?}"
 : "${STAGING_ADMIN_USERNAME:?}" "${STAGING_ADMIN_EMAIL:?}" "${POSTGRES_POOLER_PASSWORD:?}"
+: "${POSTGRES_AUDIT_WRITER_PASSWORD:?}"
 
 REF="${1:?usage: staging-deploy.sh <commit, branch or tag>}"
 
@@ -93,6 +94,10 @@ trap rollback EXIT
 log "Running migrations"
 stg_compose "$REL" run --rm migrator
 migrated=true
+# The migrations create roviq_audit_writer, so its password is set after them.
+printf '%s\n' '\getenv pw POSTGRES_AUDIT_WRITER_PASSWORD' "ALTER ROLE roviq_audit_writer PASSWORD :'pw';" |
+    stg_compose "$REL" exec -T -e POSTGRES_AUDIT_WRITER_PASSWORD postgres \
+        psql -q -v ON_ERROR_STOP=1 -U roviq -d roviq >/dev/null
 log "Essential seed and buckets"
 stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:init'
 log "First platform admin"

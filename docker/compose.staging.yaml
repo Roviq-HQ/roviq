@@ -118,8 +118,8 @@ services:
     environment: !override
       <<: *otel
       DATABASE_URL: *app-db
-      # The audit consumer and the dead-letter queue connect as the owner role.
-      DATABASE_URL_AUDIT: postgresql://roviq:${POSTGRES_PASSWORD:?}@postgres:5432/roviq
+      # The audit and dead-letter consumers: INSERT into audit_logs and dlq_messages only.
+      DATABASE_URL_AUDIT: postgresql://roviq_audit_writer:${POSTGRES_AUDIT_WRITER_PASSWORD:?}@postgres:5432/roviq
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
       TEMPORAL_ADDRESS: temporal:7233

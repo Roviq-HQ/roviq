@@ -4,6 +4,8 @@ import { pgPolicy, pgRole } from 'drizzle-orm/pg-core';
 export const roviqApp = pgRole('roviq_app').existing();
 export const roviqReseller = pgRole('roviq_reseller').existing();
 export const roviqAdmin = pgRole('roviq_admin').existing();
+/** Login role of the audit and dead-letter consumers: INSERT into those two tables only. */
+export const roviqAuditWriter = pgRole('roviq_audit_writer').existing();
 
 /**
  * RLS owns **tenant isolation only**. Soft-delete visibility is enforced in

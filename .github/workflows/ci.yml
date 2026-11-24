@@ -74,7 +74,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
       DATABASE_URL_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
-      DATABASE_URL_AUDIT: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
+      DATABASE_URL_AUDIT: postgresql://roviq_audit_writer:roviq_audit_writer_dev@localhost:5432/roviq_test
       DATABASE_URL_TEST: postgresql://roviq_pooler:roviq_pooler_dev@localhost:5432/roviq_test
       DATABASE_URL_TEST_MIGRATE: postgresql://roviq:roviq_dev@localhost:5432/roviq_test
       REDIS_URL: redis://localhost:6379

@@ -110,7 +110,7 @@ Not granted to: `teacher`, `student`, `parent`
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `DATABASE_URL_AUDIT` | pg Pool for audit consumer writes | `postgresql://roviq:roviq_dev@localhost:5434/roviq` |
+| `DATABASE_URL_AUDIT` | pg Pool of the audit and dead-letter consumers, as `roviq_audit_writer` (INSERT into `audit_logs` and `dlq_messages` only) | `postgresql://roviq_audit_writer:roviq_audit_writer_dev@localhost:5434/roviq` |
 | `TEMPORAL_ADDRESS` | Temporal server for partition workflow | `localhost:7233` |
 
 ## Institute Portal (ROV-76)
