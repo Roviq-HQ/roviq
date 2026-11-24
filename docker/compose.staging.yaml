@@ -171,6 +171,9 @@ services:
     ports: !reset []
     environment: !override
       PORT: "4200"
+      # Next.js binds to HOSTNAME, which Docker sets to the container id: that address is on the
+      # stack's own network only, so the proxy could not reach it.
+      HOSTNAME: 0.0.0.0
       # Server-side requests reach the API through its public name, whose certificate is signed
       # by the stack's own certificate authority.
       NODE_EXTRA_CA_CERTS: /run/staging-ca.pem
