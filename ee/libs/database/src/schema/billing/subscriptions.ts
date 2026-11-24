@@ -14,6 +14,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -49,7 +50,11 @@ export const subscriptions = pgTable(
   (table) => [
     index('subscriptions_tenant_id_idx').on(table.tenantId),
     index('subscriptions_plan_id_idx').on(table.planId),
-    index('subscriptions_reseller_id_idx').on(table.resellerId),
+    index('idx_subscriptions_reseller').on(table.resellerId, table.status),
+    // One live subscription per institute.
+    uniqueIndex('uq_sub_active_tenant')
+      .on(table.tenantId)
+      .where(sql`${table.status} IN ('TRIALING', 'ACTIVE', 'PAUSED', 'PAST_DUE')`),
     index('subscriptions_status_idx').on(table.status),
     // App: read own institute's subscriptions
     pgPolicy('sub_app_read', {

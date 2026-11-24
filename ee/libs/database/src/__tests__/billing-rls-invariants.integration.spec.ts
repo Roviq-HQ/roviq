@@ -185,6 +185,26 @@ describe('Billing RLS Invariants', () => {
     }
   });
 
+  it('6b. partial unique index refuses a second live plan with the same code for a reseller', async () => {
+    const client = await superPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL ROLE roviq_admin');
+      const actor = randomUUID();
+      // The seeded FREE plan of the direct reseller already holds the code.
+      await expect(
+        client.query(
+          `INSERT INTO plans (reseller_id, name, code, interval, amount, created_by, updated_by)
+           VALUES ($1, '{"en":"Copy"}'::jsonb, 'FREE', 'MONTHLY', 0, $2, $2)`,
+          [SEED.RESELLER_DIRECT, actor],
+        ),
+      ).rejects.toThrow(/uq_plan_code_reseller/);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
   // ── 7. roviq_app cannot UPDATE subscriptions ──
 
   it('7. roviq_app cannot UPDATE subscriptions (only SELECT granted)', async () => {
