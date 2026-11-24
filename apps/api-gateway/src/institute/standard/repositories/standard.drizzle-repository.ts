@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
+  academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
   mkInstituteCtx,
@@ -12,7 +13,12 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { StandardRepository } from './standard.repository';
-import type { CreateStandardData, StandardRecord, UpdateStandardData } from './types';
+import type {
+  CreateStandardData,
+  CreateStandardResult,
+  StandardRecord,
+  UpdateStandardData,
+} from './types';
 
 // Read projection — `standards_live` view excludes soft-deleted rows.
 const liveColumns = {
@@ -83,10 +89,18 @@ export class StandardDrizzleRepository extends StandardRepository {
     });
   }
 
-  async create(data: CreateStandardData): Promise<StandardRecord> {
+  async create(data: CreateStandardData): Promise<CreateStandardResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:standard'), async (tx) => {
+      // The foreign key accepts any institute's year; RLS on the view does not.
+      const [year] = await tx
+        .select({ id: academicYearsLive.id })
+        .from(academicYearsLive)
+        .where(eq(academicYearsLive.id, data.academicYearId))
+        .limit(1);
+      if (!year) return { kind: 'year_not_found' };
+
       const rows = await tx
         .insert(standards)
         .values({
@@ -106,7 +120,7 @@ export class StandardDrizzleRepository extends StandardRepository {
           updatedBy: userId,
         })
         .returning(writeReturning);
-      return rows[0] as StandardRecord;
+      return { kind: 'ok', record: rows[0] as StandardRecord };
     });
   }
 

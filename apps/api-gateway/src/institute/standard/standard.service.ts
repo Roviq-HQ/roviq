@@ -42,7 +42,14 @@ export class StandardService {
   }
 
   async create(input: CreateStandardInput): Promise<StandardRecord> {
-    const record = await this.repo.create(input);
+    const result = await this.repo.create(input);
+    if (result.kind === 'year_not_found') {
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+        'Academic year not found in this institute',
+      );
+    }
+    const { record } = result;
 
     this.eventBus.emit(EVENT_PATTERNS.STANDARD.created, {
       standardId: record.id,

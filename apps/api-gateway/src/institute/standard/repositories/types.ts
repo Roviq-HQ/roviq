@@ -44,3 +44,7 @@ export interface UpdateStandardData {
   maxStudentsPerSection?: number;
   udiseClassCode?: number;
 }
+
+export type CreateStandardResult =
+  | { kind: 'year_not_found' }
+  | { kind: 'ok'; record: StandardRecord };
