@@ -432,8 +432,6 @@ GraphQL field middleware masks fields on student, enquiry, and application respo
 
 Default policies retain `institute_admin` and `admin_clerk` access. Principals retain Aadhaar/PAN access; income and medical information are masked. Nurses and counselors retain their medical grants; counselor notes require the `CounselorNotes` permission. Custom role and membership grants remain explicit policy overrides.
 
-The `20261114164236_rov-204-read-permissions` migration updates existing default institute roles, narrows parent reads to linked students, and leaves custom roles and `admin_clerk` unchanged. After approval for the target database, apply it with `pnpm tilt trigger db-migrate` before admitting pilot traffic. The resource is manual and does not run automatically. Invalidate affected `casl:role:{roleId}` Redis entries or allow their five-minute TTL to expire before traffic resumes. No schema or RLS policy changes are required; the existing tenant policies and live views remain in force.
-
 ### Attendance section scope
 
 Attendance reads and writes apply the caller's `Attendance` rules within the institute. `apps/api-gateway/src/institute/attendance/repositories/attendance-scope.ts` translates those rules into SQL against the section, session and entry. Session lists, session lookups, entries, session counts, date totals, absentee reports, daily breakdowns and student history apply this restriction before selecting or aggregating rows. When a section filter is omitted, the query still returns only authorized sections. A session in another section returns `ATTENDANCE_SESSION_NOT_FOUND`.
@@ -510,7 +508,6 @@ A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (
 - **Not built yet.** Applying the branding to a portal, and custom domain, which is a read-only placeholder (Auth PRD §23.3–4).
 - Each change emits `RESELLER.updated`, so the platform's reseller pages refresh.
 - Tests: `reseller-branding.spec.ts`, `reseller-settings.service.spec.ts`, `reseller-settings.integration.spec.ts`, `auth-invariants-db.integration.spec.ts` → "reseller self-service profile", `reseller-settings.api-e2e.spec.ts`.
-
 
 ## Account language
 

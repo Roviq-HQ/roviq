@@ -204,6 +204,7 @@ gateway and admin portal ◀──HTTP queries── OpenObserve (5080) ──al
 - `roviq_app` — institute-scoped runtime role (NOLOGIN, RLS enforced via `app.current_tenant_id`).
 - `roviq_reseller` — reseller-scoped runtime role (NOLOGIN, RLS enforced via `app.current_reseller_id`).
 - `roviq_admin` — platform admin runtime role (NOLOGIN, policy-based RLS bypass via `app.is_platform_admin`).
+- `roviq_audit_writer` — NOINHERIT login role of the audit and dead-letter consumers (`DATABASE_URL_AUDIT`). It may INSERT into `audit_logs` and `dlq_messages`, read only their conflict keys and the two `institutes` columns the audit trigger checks, and nothing else (SF-082).
 
 ### RLS Policies
 Tenant-scoped tables (`memberships`, `roles`, `refresh_tokens`, `profiles`, `student_guardians`) have:
@@ -266,9 +267,9 @@ Environment variables live in `.env` (gitignored). Copy `.env.example` to `.env`
 
 | Variable | Purpose |
 |----------|---------|
-| DATABASE_URL | Application runtime (roviq_app, non-superuser, RLS enforced) |
-| DATABASE_URL_ADMIN | Admin operations (roviq_admin, policy-based RLS bypass) |
-| DATABASE_URL_MIGRATE | Migrations only (roviq superuser, schema changes) |
+| DATABASE_URL | Application runtime (roviq_pooler, which assumes roviq_app, roviq_reseller or roviq_admin per request) |
+| DATABASE_URL_AUDIT | Audit and dead-letter consumers (roviq_audit_writer, insert only) |
+| DATABASE_URL_MIGRATE | Migrations, seeds and test fixtures only (roviq owner, schema changes) |
 | REDIS_URL | Redis for CASL caching |
 | NATS_URL | NATS JetStream server |
 | JWT_SECRET | Access token signing |

@@ -108,6 +108,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 - `ability.can()`, never role checks · scope decorators at class level, not `APP_GUARD` · `GqlAuthGuard` from `@roviq/auth-backend`
 - Every `@CheckAbility` pair must be reachable by a role, every grant used (`ability-coverage.spec.ts`)
 - Reads from `<table>Live` views, writes to the base table · new soft-deletable table needs a `*Live` view, every `pgTable` needs RLS · ``.default(sql`uuidv7()`)``
+- A schema change reaches a database only through a generated migration; an index, foreign key or unique rule the schema can express is declared there, not in custom SQL (`pnpm check:migrations`)
 - Security rules live in PostgreSQL where possible (GRANT, RLS, CHECK, trigger), not only in services; test by attempting the forbidden write as the role
 - `eventBus.emit(EVENT_PATTERNS.…)` via `EventBusService`, never `natsClient.emit` · every event prefix needs a stream
 - `@EventPattern` classes go in module `controllers`, and the app's `main.ts` calls `connectJetStreamMicroservice()` (`pnpm check:event-handlers`)
