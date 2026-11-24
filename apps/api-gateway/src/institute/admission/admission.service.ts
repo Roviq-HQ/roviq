@@ -55,6 +55,46 @@ export class AdmissionService {
     return userId;
   }
 
+  // The checks below read caller-supplied ids under the caller's institute before they are
+  // stored: the foreign keys accept any institute's row (ROV-293).
+  private async assertAssignee(tenantId: string, userId: string | null | undefined) {
+    if (userId && !(await this.repository.userIsMember(tenantId, userId))) {
+      throw new BusinessException(
+        ErrorCode.MEMBERSHIP_NOT_FOUND,
+        'Assignee is not a member of this institute',
+      );
+    }
+  }
+
+  private async assertYearExists(tenantId: string, academicYearId: string) {
+    const year = await this.repository.findAcademicYear(tenantId, academicYearId);
+    if (!year) {
+      throw new BusinessException(
+        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+        `Academic year ${academicYearId} not found in this institute`,
+      );
+    }
+    return year;
+  }
+
+  private async assertStandardExists(tenantId: string, standardId: string) {
+    if (!(await this.repository.standardExists(tenantId, standardId))) {
+      throw new BusinessException(
+        ErrorCode.STANDARD_NOT_FOUND,
+        `Standard ${standardId} not found in this institute`,
+      );
+    }
+  }
+
+  private async assertSectionOfStandard(tenantId: string, sectionId: string, standardId: string) {
+    if (!(await this.repository.sectionInStandard(tenantId, sectionId, standardId))) {
+      throw new BusinessException(
+        ErrorCode.SECTION_NOT_FOUND,
+        'Section not found in the class of this application',
+      );
+    }
+  }
+
   // ══════════════════════════════════════════════════════════
   // ENQUIRY CRUD
   // ══════════════════════════════════════════════════════════
@@ -62,6 +102,9 @@ export class AdmissionService {
   async createEnquiry(input: CreateEnquiryInput): Promise<EnquiryModel & { isDuplicate: boolean }> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
+
+    if (input.academicYearId) await this.assertYearExists(tenantId, input.academicYearId);
+    await this.assertAssignee(tenantId, input.assignedTo);
 
     // Auto-dedup: check for same phone + class combo
     const isDuplicate = await this.repository.hasDuplicateEnquiry(
@@ -114,6 +157,14 @@ export class AdmissionService {
   async updateEnquiry(id: string, input: UpdateEnquiryInput): Promise<EnquiryModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
+
+    if (input.assignedTo) {
+      // The enquiry first, so a missing enquiry is the answer whoever the assignee is.
+      if (!(await this.repository.findEnquiry(tenantId, id))) {
+        throw new BusinessException(ErrorCode.ENQUIRY_NOT_FOUND, 'Enquiry not found');
+      }
+      await this.assertAssignee(tenantId, input.assignedTo);
+    }
 
     const updates: Record<string, unknown> = { updatedBy: actorId };
     const fields = [
@@ -169,6 +220,9 @@ export class AdmissionService {
       );
     }
 
+    await this.assertStandardExists(tenantId, standardId);
+    await this.assertYearExists(tenantId, academicYearId);
+
     // Create application from enquiry data
     const formData = {
       studentName: enq.studentName,
@@ -208,31 +262,24 @@ export class AdmissionService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
-    // Validate the referenced standard exists in this tenant before writing.
-    // The FK would catch a missing row, but the domain error surfaces a clearer
-    // message to the caller and avoids a round-trip for a generic 500.
-    if (!(await this.repository.standardExists(tenantId, input.standardId))) {
-      throw new BusinessException(
-        ErrorCode.STANDARD_NOT_FOUND,
-        `Standard ${input.standardId} not found in this institute`,
-      );
-    }
+    await this.assertStandardExists(tenantId, input.standardId);
 
     // Applications must target an ACTIVE academic year — admissions for
     // archived/completing years are not accepted, and planning years are not
     // yet open.
-    const year = await this.repository.findAcademicYear(tenantId, input.academicYearId);
-    if (!year) {
-      throw new BusinessException(
-        ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
-        `Academic year ${input.academicYearId} not found in this institute`,
-      );
-    }
+    const year = await this.assertYearExists(tenantId, input.academicYearId);
     if (!year.isActive) {
       throw new BusinessException(
         ErrorCode.ACADEMIC_YEAR_NOT_ACTIVE,
         `Academic year ${input.academicYearId} is not active — applications cannot be accepted`,
       );
+    }
+
+    if (input.enquiryId && !(await this.repository.findEnquiry(tenantId, input.enquiryId))) {
+      throw new BusinessException(ErrorCode.ENQUIRY_NOT_FOUND, 'Enquiry not found');
+    }
+    if (input.sectionId) {
+      await this.assertSectionOfStandard(tenantId, input.sectionId, input.standardId);
     }
 
     const application = await this.repository.createApplication(tenantId, actorId, {
@@ -284,6 +331,10 @@ export class AdmissionService {
       updatedBy: actorId,
     };
 
+    if (input.sectionId) {
+      const current = await this.getApplication(id);
+      await this.assertSectionOfStandard(tenantId, input.sectionId, current.standardId);
+    }
     if (input.sectionId !== undefined) updates.sectionId = input.sectionId;
     if (input.formData !== undefined) updates.formData = input.formData;
     if (input.testScore !== undefined) updates.testScore = input.testScore;

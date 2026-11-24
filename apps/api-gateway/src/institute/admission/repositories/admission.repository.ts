@@ -37,6 +37,8 @@ export abstract class AdmissionRepository {
     data: EnquiryConversionData,
   ): Promise<ApplicationRecord>;
 
+  /** Whether the user holds a membership of the institute. */
+  abstract userIsMember(tenantId: string, userId: string): Promise<boolean>;
   abstract standardExists(tenantId: string, standardId: string): Promise<boolean>;
   abstract findAcademicYear(
     tenantId: string,
