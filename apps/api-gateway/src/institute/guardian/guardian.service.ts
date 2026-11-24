@@ -86,6 +86,18 @@ export class GuardianService {
     const tenantId = this.tenantId;
     const actorId = this.userId;
 
+    // Before anything is written: a refused link must leave no guardian account behind.
+    if (
+      input.studentProfileId &&
+      input.relationship &&
+      !(await this.repo.studentExists(tenantId, input.studentProfileId))
+    ) {
+      throw new BusinessException(
+        ErrorCode.STUDENT_NOT_FOUND,
+        'Student profile not found in this institute',
+      );
+    }
+
     const phone = input.phone ? { countryCode: '+91', number: input.phone } : undefined;
 
     // Always a new guardian: a typed number never picks an existing account (SF-053). Staff
