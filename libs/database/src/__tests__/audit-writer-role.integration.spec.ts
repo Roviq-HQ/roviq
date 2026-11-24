@@ -8,6 +8,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TEST_SUPERUSER_URL } from './test-helpers';
 
 const USER_ADMIN = '00000000-0000-7000-a000-000000000201';
+const RESELLER_DIRECT = '00000000-0000-7000-a000-000000000011';
+const INSTITUTE_1 = '00000000-0000-7000-a000-000000000101';
 
 let superPool: pg.Pool;
 
@@ -74,6 +76,28 @@ describe('roviq_audit_writer (SF-082)', () => {
     });
   });
 
+  it('inserts a reseller-scope entry about an institute, which the audit trigger checks', async () => {
+    await asWriter(async (client) => {
+      const correlationId = randomUUID();
+      await client.query(
+        `INSERT INTO audit_logs
+           (scope, reseller_id, subject_tenant_id, user_id, actor_id, action, action_type,
+            entity_type, correlation_id, source)
+         VALUES ('reseller', $1, $2, $3, $3, 'audit_writer_check', 'UPDATE', 'Institute', $4, 'TEST')
+         ON CONFLICT (id, created_at) DO NOTHING`,
+        [RESELLER_DIRECT, INSTITUTE_1, USER_ADMIN, correlationId],
+      );
+      // Read back as the owner in the same (rolled back) transaction: the writer may not read.
+      await client.query('RESET ROLE');
+      const { rows } = await client.query(
+        'SELECT subject_tenant_id FROM audit_logs WHERE correlation_id = $1',
+        [correlationId],
+      );
+      // The trigger keeps the institute because it belongs to the reseller.
+      expect(rows).toEqual([{ subject_tenant_id: INSTITUTE_1 }]);
+    });
+  });
+
   it('inserts a dead-lettered message, as the consumer does', async () => {
     await asWriter(async (client) => {
       const res = await client.query(
@@ -102,7 +126,7 @@ describe('roviq_audit_writer (SF-082)', () => {
 
   it('cannot touch any other table', async () => {
     await refused('SELECT id FROM users LIMIT 1');
-    await refused('SELECT id FROM institutes LIMIT 1');
+    await refused('SELECT name FROM institutes LIMIT 1');
     await refused(`UPDATE users SET password_hash = 'x'`);
   });
 

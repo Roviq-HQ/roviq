@@ -1,0 +1,1 @@
+CREATE POLICY "institutes_audit_writer_select" ON "institutes" AS PERMISSIVE FOR SELECT TO "roviq_audit_writer" USING (true);
