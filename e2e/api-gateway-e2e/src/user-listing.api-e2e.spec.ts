@@ -114,7 +114,9 @@ describe('User listings E2E (ROV-216)', () => {
     it('should find the seeded admin by username', async () => {
       const res = await gql(
         E2eAdminListUsersDocument,
-        { filter: { search: SEED.ADMIN_USER.username } },
+        // Other specs create many accounts whose names contain the seeded username, so the
+        // search is narrowed to the seeded institute to keep the admin on the first page.
+        { filter: { search: SEED.ADMIN_USER.username, tenantId: SEED.INSTITUTE_1.id, first: 100 } },
         platformToken,
       );
       expect(res.errors).toBeUndefined();
