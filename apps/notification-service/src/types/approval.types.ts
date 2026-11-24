@@ -39,8 +39,8 @@ const requestedWhatsApp: WhatsAppTemplate<ApprovalRequestedParams> = {
   name: 'approval_requested_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Approval needed: {{1}} submitted a {{2}} request. Summary: {{3}}.',
-    hi: 'स्वीकृति आवश्यक: {{1}} ने {{2}} अनुरोध भेजा है। सारांश: {{3}}।',
+    en: 'Approval needed: {{1}} submitted a {{2}} request. Summary: {{3}}. Open Roviq to review it.',
+    hi: 'स्वीकृति आवश्यक: {{1}} ने {{2}} अनुरोध भेजा है। सारांश: {{3}}। समीक्षा के लिए Roviq खोलें।',
   },
   variables: (p, locale) => [
     cleanVariable(p.requesterName, locale === 'hi' ? 'एक सदस्य' : 'a member'),
@@ -109,8 +109,8 @@ const resolvedWhatsApp: WhatsAppTemplate<ApprovalResolvedParams> = {
   name: 'approval_resolved_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Request update: the {{1}} request, reviewed by {{2}}, was {{3}}. Remarks: {{4}}.',
-    hi: 'अनुरोध अपडेट: {{1}} अनुरोध की समीक्षा {{2}} ने की और इसे {{3}} किया गया। टिप्पणी: {{4}}।',
+    en: 'Request update: the {{1}} request, reviewed by {{2}}, was {{3}}. Remarks: {{4}}. Open Roviq to see the details.',
+    hi: 'अनुरोध अपडेट: {{1}} अनुरोध की समीक्षा {{2}} ने की और इसे {{3}} किया गया। टिप्पणी: {{4}}। विवरण के लिए Roviq खोलें।',
   },
   variables: (p, locale) => [
     cleanVariable(p.approvalType, locale === 'hi' ? 'प्रस्तुत' : 'submitted'),
