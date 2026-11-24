@@ -213,6 +213,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/reseller/institute-group/__tests__/reseller-institute-group.integration.spec.ts',
   // ROV-186 fixtures: system roles, role switches and stored-row assertions for the settings spec.
   'apps/api-gateway/src/reseller/settings/__tests__/reseller-settings.integration.spec.ts',
+  // ROV-284 fixtures: system roles and role switches for the ability spec.
+  'apps/api-gateway/src/reseller/__tests__/reseller-role-abilities.integration.spec.ts',
   // ROV-185 fixtures: system roles, known passwords and stored-row assertions for the team spec.
   'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
   // ROV-185: roles, auth_events and refresh_tokens are unreadable as roviq_reseller.

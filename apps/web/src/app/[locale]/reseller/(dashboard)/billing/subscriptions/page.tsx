@@ -132,7 +132,10 @@ export default function SubscriptionsPage() {
                 }}
               />
 
-              <AssignPlanDialog open={assignOpen} onOpenChange={setAssignOpen} />
+              {/* The dialog loads plans as it mounts, which needs more than reading subscriptions. */}
+              <Can I="create" a="Subscription">
+                <AssignPlanDialog open={assignOpen} onOpenChange={setAssignOpen} />
+              </Can>
             </>
           ) : (
             <div className="flex h-[50vh] items-center justify-center">

@@ -95,7 +95,7 @@ npx ts-node apps/api-gateway/src/audit/workflows/partition.schedule.ts
 
 `read:AuditLog` ability required. Granted to:
 - `platform_admin`, `platform_support` (via `manage:all` / `read:all`)
-- `reseller_full_admin`, `reseller_support_admin`, `reseller_viewer`
+- `reseller_full_admin`
 - `institute_admin` (via `manage:all`)
 
 Not granted to: `teacher`, `student`, `parent`

@@ -233,8 +233,8 @@ The Team page (`/reseller/team`) lists the people from your organisation who can
 | Role | Can do |
 |---|---|
 | Reseller admin | Manage institutes, billing and the team. |
-| Reseller support | Read everything, view as institute users **in view-only mode**, and manage Support and Viewer members. |
-| Reseller viewer | Read only. The Team page shows no Invite button and no row actions. |
+| Reseller support | See institutes, institute groups, institute statistics, their users, the billing dashboard, subscriptions and invoices; view as institute users **in view-only mode**; manage Support and Viewer members. No payment gateways, plans, payments, audit logs or reseller profile. |
+| Reseller viewer | See institutes, institute groups, institute statistics, the billing dashboard, subscriptions and invoices. No team, users, audit logs, payment gateways or reseller profile; under **Settings** only **Sessions**. |
 
 You can give roles up to your own, and never above your organisation's plan tier. You cannot change members who hold a role above yours, and you cannot change your own role or status.
 
@@ -276,7 +276,7 @@ Review and control the impersonation sessions started by your team (when a team 
 1. Open **Audit Logs > Impersonation** (`/reseller/audit/impersonation`).
 2. The table lists each session with the team member, target user, institute, reason, start and expiry time, and a **status** badge: Active, Ended (the team member left), Revoked (someone else ended it) or Expired.
 3. Use the **Institute** dropdown to filter sessions to a single managed institute.
-4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm). Viewers see the list without the Terminate button.
+4. For an **Active** session, click **Terminate** to immediately sign the team member out of the impersonated account (you'll be asked to confirm). Only reseller admins can open this page.
 
 ### View as an institute user
 
@@ -288,7 +288,7 @@ Review and control the impersonation sessions started by your team (when a team 
 
 ## Settings
 
-Click **Settings** in the sidebar. The page has four sections: **Profile**, **Branding**, **Custom domain** and **Sessions**. Only a **Reseller admin** can change the first two; other roles see them read-only.
+Click **Settings** in the sidebar. The page has four sections: **Profile**, **Branding**, **Custom domain** and **Sessions**. Only a **Reseller admin** sees Profile, Branding and Custom domain; other roles see **Sessions** only.
 
 ### Profile
 

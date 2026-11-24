@@ -7,8 +7,12 @@ import GatewayConfigsPage from '../page';
 
 const createConfig = vi.hoisted(() => vi.fn());
 const configs = vi.hoisted(() => ({ list: [] as unknown[] }));
+const listConfigs = vi.hoisted(() => vi.fn());
 vi.mock('../use-gateway-configs', () => ({
-  useGatewayConfigs: () => ({ configs: configs.list, loading: false }),
+  useGatewayConfigs: () => {
+    listConfigs();
+    return { configs: configs.list, loading: false };
+  },
   useCreateGatewayConfig: () => [createConfig],
   useUpdateGatewayConfig: () => [vi.fn()],
   useDeleteGatewayConfig: () => [vi.fn()],
@@ -81,5 +85,32 @@ describe('GatewayConfigsPage dialog', () => {
         },
       },
     });
+  });
+});
+
+describe('GatewayConfigsPage access (ROV-284)', () => {
+  it('should show no gateways and send no query to a role that cannot read them', () => {
+    listConfigs.mockClear();
+    renderWithProviders(<GatewayConfigsPage />, {
+      abilityRules: [{ action: 'read', subject: 'Invoice' }],
+    });
+
+    expect(
+      screen.getByText('You do not have permission to view payment gateways.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add Gateway' })).not.toBeInTheDocument();
+    expect(listConfigs).not.toHaveBeenCalled();
+  });
+
+  it('should load the gateways for a role that can read them', () => {
+    listConfigs.mockClear();
+    renderWithProviders(<GatewayConfigsPage />, {
+      abilityRules: [{ action: 'read', subject: 'PaymentGatewayConfig' }],
+    });
+
+    expect(listConfigs).toHaveBeenCalled();
+    expect(
+      screen.queryByText('You do not have permission to view payment gateways.'),
+    ).not.toBeInTheDocument();
   });
 });

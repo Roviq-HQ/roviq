@@ -1,18 +1,39 @@
 'use client';
 
+import type { AppAction, AppSubject } from '@roviq/common-types';
 import { Link } from '@roviq/i18n';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@roviq/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  useAbility,
+} from '@roviq/ui';
 import { Building2, Settings, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 export default function ResellerDashboardPage() {
   const t = useTranslations('dashboard');
 
-  const quickLinks = [
-    { title: t('viewInstitutes'), href: '/institutes', icon: Building2 },
-    { title: t('manageTeam'), href: '/team', icon: Users },
+  const ability = useAbility();
+  const allLinks: {
+    title: string;
+    href: string;
+    icon: typeof Building2;
+    can?: [AppAction, AppSubject];
+  }[] = [
+    {
+      title: t('viewInstitutes'),
+      href: '/institutes',
+      icon: Building2,
+      can: ['read', 'Institute'],
+    },
+    { title: t('manageTeam'), href: '/team', icon: Users, can: ['read', 'ResellerTeam'] },
     { title: t('viewSettings'), href: '/settings', icon: Settings },
   ];
+  const quickLinks = allLinks.filter((link) => !link.can || ability.can(...link.can));
 
   return (
     <div className="space-y-6">

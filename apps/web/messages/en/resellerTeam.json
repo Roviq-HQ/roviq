@@ -108,5 +108,6 @@
     "TEAM_MEMBER_SELF_CHANGE": "You cannot change your own role or status. Ask another admin.",
     "TEAM_ROLE_NOT_ASSIGNABLE": "This role is above what you, or your reseller plan, can assign.",
     "TEAM_MEMBER_STATUS_UNCHANGED": "This member's status has already changed. Refresh the page."
-  }
+  },
+  "accessDenied": "You do not have permission to view the team."
 }

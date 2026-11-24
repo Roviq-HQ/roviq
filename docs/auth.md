@@ -465,8 +465,8 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 | platform | platform_admin | manage all |
 | platform | platform_support | read all + impersonate (view-only sessions) |
 | reseller | reseller_full_admin | manage institutes, manage team, impersonate |
-| reseller | reseller_support_admin | read-only + impersonation, manage team members up to its own role |
-| reseller | reseller_viewer | read stats |
+| reseller | reseller_support_admin | everything `reseller_viewer` has, read users, impersonate (view-only sessions), manage team members up to its own role |
+| reseller | reseller_viewer | read institutes, institute groups, institute statistics, the billing dashboard, subscriptions and invoices |
 | institute | institute_admin | manage all (within tenant) |
 | institute | teacher | read students/sections/standards/subjects/timetables, CRU attendance |
 | institute | student | read timetable/subjects, read own attendance |
@@ -475,14 +475,14 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 ### Platform and reseller system roles
 
 - Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
-- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed only maintains the Roviq Direct copies (fixed seed ids).
+- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed keeps the Roviq Direct copies on fixed seed ids and refreshes every reseller's copies, so a changed ability list reaches every reseller on the next deploy.
 - `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
 
 ### Reseller team (ROV-185)
 
 A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (`reseller/team/`) lists them and lets a team manager invite, change a role, deactivate and reactivate. All operations take the membership id.
 
-- **Ability.** Subject `ResellerTeam`. `reseller_full_admin` and `reseller_support_admin` hold `manage`; `reseller_viewer` reads through `read all`.
+- **Ability.** Subject `ResellerTeam`. `reseller_full_admin` and `reseller_support_admin` hold `manage`; `reseller_viewer` has no team access.
 - **Rank rules**, in `libs/shared/common-types/src/lib/reseller-roles.ts` and enforced by `ResellerTeamService` from the caller's membership in the database, not from the token:
   - Roles rank `reseller_full_admin` > `reseller_support_admin` > `reseller_viewer`.
   - A caller may assign only roles at or below their own, and at or below the reseller's tier (`RESELLER_TIER_ROLE`). `resellerAssignableTeamRoles` returns that list.
@@ -500,7 +500,7 @@ A reseller's own staff are `reseller_memberships` rows. `ResellerTeamResolver` (
 
 `ResellerSettingsResolver` (`reseller/settings/`) lets a reseller read and edit its own record. No operation takes a reseller id: the row is always the one in the token, and the repository runs as `roviq_reseller` with the caller's own context (`withReseller(db, user, …)`, no synthetic context).
 
-- **Ability.** Subject `Reseller`. `reseller_full_admin` holds `read` and `update`; the other two roles read through `read all`. In reseller scope the subject can only ever mean the caller's own reseller.
+- **Ability.** Subject `Reseller`. Only `reseller_full_admin` holds it (`read` and `update`); the portal shows the other roles only the Sessions tab of Settings. In reseller scope the subject can only ever mean the caller's own reseller.
 - **What can change.** `resellerUpdateProfile`: name, registration number and state, contact, address. `resellerUpdateBranding`: primary and secondary colour, colour scheme (`ResellerBrandingTheme`), custom CSS. Slug, tier, status and custom domain have no input field, and the database refuses them too: `roviq_reseller` holds `UPDATE` on the settings columns only, and the `reseller_own_update` policy limits the row.
 - **System reseller.** "Roviq Direct" edits everything except its name (`SYSTEM_RESELLER_PROTECTED`).
 - **Concurrency.** Both mutations take `version`; a mismatch answers `CONCURRENT_MODIFICATION`.

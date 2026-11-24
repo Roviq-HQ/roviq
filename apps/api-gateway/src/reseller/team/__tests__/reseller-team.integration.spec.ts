@@ -55,6 +55,7 @@ const LIST = `query($filter: ResellerTeamFilterInput) {
 }`;
 const GET = `query($id: ID!) { resellerGetTeamMember(membershipId: $id) { ${MEMBER} sessions { id } } }`;
 const ROLES = `query { resellerAssignableTeamRoles { id name } }`;
+const STATISTICS = `query { resellerInstituteStatistics { __typename } }`;
 const INVITE = `mutation($input: ResellerInviteTeamMemberInput!) {
   resellerInviteTeamMember(input: $input) { ${MEMBER} }
 }`;
@@ -379,16 +380,13 @@ describe('Reseller team management (integration)', () => {
       expect(codeOf(selfDeactivate)).toBe(ErrorCode.TEAM_MEMBER_SELF_CHANGE);
     });
 
-    it('lets a viewer read the team but refuses every change at the ability check', async () => {
+    // ROV-284: a viewer has no team access at all, reading included.
+    it('refuses a viewer every team operation at the ability check', async () => {
       const token = viewerTokens.accessToken;
-      const list = await gql(LIST, undefined, token);
-      expect(list.data?.resellerListTeamMembers.totalCount).toBe(3);
-      expect((await gql(ROLES, undefined, token)).data?.resellerAssignableTeamRoles).toEqual([]);
-
-      const colleague = await gql(GET, { id: support.id }, token);
-      expect(colleague.data?.resellerGetTeamMember.sessions).toBeNull();
-
       const attempts = [
+        await gql(LIST, undefined, token),
+        await gql(ROLES, undefined, token),
+        await gql(GET, { id: support.id }, token),
         await gql(
           INVITE,
           { input: { email: email('v'), roleId: team.roleIds.reseller_viewer } },
@@ -398,12 +396,7 @@ describe('Reseller team management (integration)', () => {
         await gql(DEACTIVATE, { id: support.id }, token),
         await gql(REACTIVATE, { id: support.id }, token),
       ];
-      expect(attempts.map(codeOf)).toEqual([
-        ErrorCode.FORBIDDEN,
-        ErrorCode.FORBIDDEN,
-        ErrorCode.FORBIDDEN,
-        ErrorCode.FORBIDDEN,
-      ]);
+      expect(attempts.map(codeOf)).toEqual(Array(7).fill(ErrorCode.FORBIDDEN));
     });
 
     it('refuses a platform token and an anonymous caller', async () => {
@@ -486,8 +479,8 @@ describe('Reseller team management (integration)', () => {
       const refreshed = await gql(REFRESH, { token: memberTokens.refreshToken });
       expect(refreshed.errors).toBeUndefined();
       const accessToken = refreshed.data?.refreshToken.accessToken as string;
-      const after = await gql(ROLES, undefined, accessToken);
-      expect(after.data?.resellerAssignableTeamRoles).toEqual([]);
+      // The viewer role has no team access, so the new token is refused where the old one passed.
+      expect(codeOf(await gql(ROLES, undefined, accessToken))).toBe(ErrorCode.FORBIDDEN);
       const forbidden = await gql(DEACTIVATE, { id: team.reseller.membershipId }, accessToken);
       expect(codeOf(forbidden)).toBe(ErrorCode.FORBIDDEN);
     });
@@ -521,9 +514,10 @@ describe('Reseller team management (integration)', () => {
 
       const reactivated = await gql(REACTIVATE, { id: member.id }, team.adminTokens.accessToken);
       expect(reactivated.data?.resellerReactivateTeamMember.isActive).toBe(true);
+      // The member is a viewer since the previous test: read what a viewer may read.
       const back = await login(member.username);
-      const list = await gql(LIST, undefined, back.accessToken);
-      expect(list.errors).toBeUndefined();
+      const stats = await gql(STATISTICS, undefined, back.accessToken);
+      expect(stats.errors).toBeUndefined();
     });
   });
 

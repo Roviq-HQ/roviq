@@ -13,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import {
@@ -32,6 +33,19 @@ import {
 const { resellerImpersonation } = testIds;
 
 export default function ResellerImpersonationSessionsPage() {
+  const t = useTranslations('impersonationSessions');
+  // A role without the ability sends no query.
+  if (!useAbility().can('read', 'AuditLog')) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">{t('accessDenied')}</p>
+      </div>
+    );
+  }
+  return <ResellerImpersonationSessionsContent />;
+}
+
+function ResellerImpersonationSessionsContent() {
   const t = useTranslations('impersonationSessions');
   const resolveI18n = useI18nField();
 

@@ -474,3 +474,13 @@ describe('ResellerTeamPage', () => {
     });
   });
 });
+
+describe('ResellerTeamPage access (ROV-284)', () => {
+  it('should refuse a role without team access and send no team query', () => {
+    // No Apollo mocks: a team query would render the load error instead.
+    renderPage([], { abilityRules: [{ action: 'read', subject: 'Institute' }] });
+
+    expect(screen.getByText('You do not have permission to view the team.')).toBeInTheDocument();
+    expect(screen.queryByTestId('reseller-team-name-m-me')).not.toBeInTheDocument();
+  });
+});

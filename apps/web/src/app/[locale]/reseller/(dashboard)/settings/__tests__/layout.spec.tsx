@@ -43,4 +43,36 @@ describe('ResellerSettingsLayout', () => {
     expect(screen.getByTestId('reseller-settings-tab-profile')).not.toHaveAttribute('aria-current');
     expect(screen.getByText('section body')).toBeInTheDocument();
   });
+
+  // ROV-284: the support and viewer roles do not read the reseller record.
+  it('shows only sessions to a role that cannot read the reseller', () => {
+    vi.mocked(usePathname).mockReturnValue('/settings/sessions');
+    renderWithProviders(
+      <ResellerSettingsLayout>
+        <p>section body</p>
+      </ResellerSettingsLayout>,
+      { abilityRules: [{ action: 'read', subject: 'Institute' }] },
+    );
+
+    expect(screen.getByTestId('reseller-settings-tab-sessions')).toBeInTheDocument();
+    expect(screen.queryByTestId('reseller-settings-tab-profile')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reseller-settings-tab-branding')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reseller-settings-tab-customDomain')).not.toBeInTheDocument();
+    expect(screen.getByText('section body')).toBeInTheDocument();
+  });
+
+  it('refuses the profile section to a role that cannot read the reseller', () => {
+    vi.mocked(usePathname).mockReturnValue('/settings/profile');
+    renderWithProviders(
+      <ResellerSettingsLayout>
+        <p>section body</p>
+      </ResellerSettingsLayout>,
+      { abilityRules: [{ action: 'read', subject: 'Institute' }] },
+    );
+
+    expect(
+      screen.getByText('You do not have permission to view the reseller profile.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('section body')).not.toBeInTheDocument();
+  });
 });

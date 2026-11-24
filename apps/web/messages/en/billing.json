@@ -455,7 +455,8 @@
       "defaultGatewayBody": "Used for new subscription assignments where no specific gateway is chosen. Exactly one gateway per provider can be default at a time — marking this one automatically unmarks the previously default. Existing subscriptions keep their original gateway even after the default changes.",
       "vpaTitle": "UPI VPA address",
       "vpaBody": "The UPI Virtual Payment Address (e.g. institute@hdfcbank) where manual UPI payments are collected when the gateway does not handle UPI directly. Shown to payers on the 'Pay via UPI' screen and printed on invoices. The institute's bank must support UPI Collect on this VPA — verify before publishing."
-    }
+    },
+    "accessDenied": "You do not have permission to view payment gateways."
   },
   "upiVerification": {
     "title": "UPI Payment Verification",

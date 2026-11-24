@@ -113,14 +113,17 @@ describe('Reseller settings (integration)', () => {
   });
 
   describe('reading', () => {
-    it.each([
-      'reseller_full_admin',
-      'reseller_support_admin',
-      'reseller_viewer',
-    ] as const)("%s reads its own reseller and nobody else's", async (role) => {
-      const profile = await currentProfile(await tokenAs(role));
+    it("reseller_full_admin reads its own reseller and nobody else's", async () => {
+      const profile = await currentProfile(await tokenAs('reseller_full_admin'));
       expect(profile.id).toBe(reseller.resellerId);
       expect(profile.id).not.toBe(other.resellerId);
+    });
+
+    // ROV-284: the support and viewer roles carry an explicit list without the reseller record.
+    it.each(['reseller_support_admin', 'reseller_viewer'] as const)('refuses %s', async (role) => {
+      const response = await gql(MY_PROFILE, undefined, await tokenAs(role));
+      expect(codeOf(response)).toBe('FORBIDDEN');
+      expect(response.data).toBeNull();
     });
 
     it('refuses a request without a token', async () => {
@@ -218,7 +221,7 @@ describe('Reseller settings (integration)', () => {
 
     it.each(['reseller_support_admin', 'reseller_viewer'] as const)('refuses %s', async (role) => {
       const token = await tokenAs(role);
-      const before = await currentProfile(token);
+      const before = await storedRow(reseller.resellerId);
       const response = await gql(
         UPDATE_PROFILE,
         { input: { version: before.version, name: 'Not Allowed' } },
@@ -362,7 +365,7 @@ describe('Reseller settings (integration)', () => {
 
     it('refuses a viewer', async () => {
       const token = await tokenAs('reseller_viewer');
-      const before = await currentProfile(token);
+      const before = await storedRow(reseller.resellerId);
       const response = await gql(
         UPDATE_BRANDING,
         { input: { version: before.version, primaryColor: '#000000' } },

@@ -111,4 +111,29 @@ describe('seedSystemRoles', () => {
       ]);
     });
   });
+
+  it("should refresh every reseller's stale copy of the system roles (ROV-284)", async () => {
+    await inRolledBackTx(async (tx) => {
+      const resellerId = await createReseller(tx, 'rov-284-stale');
+      await tx.insert(roles).values({
+        scope: 'reseller',
+        resellerId,
+        name: { en: 'reseller_viewer' },
+        abilities: [{ action: 'read', subject: 'all' }],
+        isSystem: true,
+        isDefault: false,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+      });
+
+      await seedSystemRoles(tx);
+
+      const copies = await resellerRoles(tx, resellerId);
+      expect(copies.map((r) => [r.name.en, r.abilities])).toEqual([
+        ['reseller_full_admin', RESELLER_SYSTEM_ROLE_ABILITIES.reseller_full_admin],
+        ['reseller_support_admin', RESELLER_SYSTEM_ROLE_ABILITIES.reseller_support_admin],
+        ['reseller_viewer', RESELLER_SYSTEM_ROLE_ABILITIES.reseller_viewer],
+      ]);
+    });
+  });
 });

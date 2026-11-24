@@ -24,6 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { CheckCircle, Clock, ShieldAlert, XCircle } from 'lucide-react';
@@ -101,6 +102,19 @@ function DeadlineCell({ deadline }: { deadline: string | null }) {
 const { resellerBillingUpi: ids } = testIds;
 
 export default function UpiVerificationPage() {
+  const t = useTranslations('billing');
+  // A role without the ability sends no query.
+  if (!useAbility().can('read', 'Payment')) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">{t('upiVerification.accessDenied')}</p>
+      </div>
+    );
+  }
+  return <UpiVerificationContent />;
+}
+
+function UpiVerificationContent() {
   const t = useTranslations('billing');
   const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();

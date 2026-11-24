@@ -111,5 +111,6 @@
     "domainEmpty": "No custom domain set",
     "domainHint": "Roviq sets this for you. It is not active yet.",
     "contactSupport": "Contact support"
-  }
+  },
+  "accessDenied": "You do not have permission to view the reseller profile."
 }

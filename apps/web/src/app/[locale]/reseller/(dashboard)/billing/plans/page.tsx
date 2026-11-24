@@ -13,6 +13,7 @@ import {
   Button,
   Can,
   DataTable,
+  useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { Plus } from 'lucide-react';
@@ -31,6 +32,19 @@ import {
 } from './use-plans';
 
 export default function PlansPage() {
+  const t = useTranslations('billing');
+  // A role without the ability sends no plans query.
+  if (!useAbility().can('read', 'SubscriptionPlan')) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">{t('plans.accessDenied')}</p>
+      </div>
+    );
+  }
+  return <PlansContent />;
+}
+
+function PlansContent() {
   const t = useTranslations('billing');
   const errorMessage = useResellerBillingErrorMessage();
   const { format } = useFormatDate();
