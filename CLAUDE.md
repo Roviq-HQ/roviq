@@ -121,7 +121,7 @@ Rationale and the enforcing gate for each line: `docs/references/mistakes.md`. R
 
 ## Docs
 
-`docs/README.md` lists every document and holds the writing rules ("Writing docs"). Read the index before looking for a doc, and the rules before writing one.
+`docs/README.md` lists every document and holds the writing rules ("Writing docs"). Read the index before looking for a doc, and the rules before writing one. Before a commit that changes behaviour, and when closing an issue, run the `update-docs` skill: it lists every place in the repository and in Linear a change is recorded.
 
 - **Describe the system as it is now**: no history, plans, known-gap lists or session notes. A plan, spec, PRD, decision or review is a Linear document; work not done is a Linear issue.
 - **One home for each fact**: find the document that owns it and edit that; link from elsewhere, never copy.
