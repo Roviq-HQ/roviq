@@ -9,6 +9,12 @@ export abstract class MessagingSenderRepository {
     provider: string,
   ): Promise<MessagingSenderRecord | null>;
 
+  /** The platform's ACTIVE sender, else null; the fallback when an institute's own cannot send. */
+  abstract findActivePlatform(
+    channel: NotificationChannel,
+    provider: string,
+  ): Promise<MessagingSenderRecord | null>;
+
   /** A live sender of any status by the provider's number id; an inbound event is mapped by it. */
   abstract findByProviderNumber(
     provider: string,

@@ -53,6 +53,8 @@ export const notificationDeliveries = pgTable(
     skipReason: text('skip_reason'),
     providerMessageId: text('provider_message_id'),
     errorCode: text('error_code'),
+    /** The delivery flow (workflow id) the attempt belongs to; a delivery report is signalled to it. */
+    flowId: text('flow_id'),
     /** The WhatsApp sender the attempt went through; NULL on other channels and on skips before one is chosen. */
     senderId: uuid('sender_id').references(() => messagingSenders.id, {
       onDelete: 'restrict',

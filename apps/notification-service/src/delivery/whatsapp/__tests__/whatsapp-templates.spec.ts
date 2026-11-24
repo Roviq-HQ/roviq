@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composeDigest, composeInApp, composeOutside } from '../../../types/compose';
+import { channelsOf } from '../../../types/flow';
 import { LOCALES, type Locale } from '../../../types/notification-type';
 import { REGULAR_TYPES, type RegularParamsMap, type RegularTypeKey } from '../../../types/registry';
 import { placeholdersOf, renderTemplate, type WhatsAppTemplate } from '../whatsapp-template';
@@ -110,8 +111,11 @@ function isRegularKey(key: string): key is RegularTypeKey {
 }
 
 const ALL_KEYS = Object.keys(REGULAR_TYPES).filter(isRegularKey);
-const WHATSAPP_KEYS = ALL_KEYS.filter((k) => REGULAR_TYPES[k].channels.includes('WHATSAPP'));
-const OTHER_KEYS = ALL_KEYS.filter((k) => !REGULAR_TYPES[k].channels.includes('WHATSAPP'));
+const onWhatsApp = (k: RegularTypeKey) => channelsOf(REGULAR_TYPES[k].flow).includes('WHATSAPP');
+// In the guardian flow, but with no approved template yet: its WhatsApp step records no_template.
+const NO_TEMPLATE_YET: readonly RegularTypeKey[] = ['LEAVE_DECIDED'];
+const WHATSAPP_KEYS = ALL_KEYS.filter((k) => onWhatsApp(k) && !NO_TEMPLATE_YET.includes(k));
+const OTHER_KEYS = ALL_KEYS.filter((k) => !onWhatsApp(k));
 
 /** What the provider reviews; the same for a template of any params. */
 type ApprovedText = Pick<WhatsAppTemplate<null>, 'name' | 'category' | 'body'>;
@@ -187,6 +191,13 @@ describe('WhatsApp template registry', () => {
 
   it('should have no template for a type that never sends on WhatsApp', () => {
     for (const key of OTHER_KEYS) expect(WHATSAPP_TEMPLATES[key]).toBeUndefined();
+  });
+
+  it('should list as waiting for a template only WhatsApp types that have none', () => {
+    for (const key of NO_TEMPLATE_YET) {
+      expect(onWhatsApp(key)).toBe(true);
+      expect(WHATSAPP_TEMPLATES[key]).toBeUndefined();
+    }
   });
 
   it('should register every template under a unique lower snake_case name ending in _v1', () => {

@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createDrizzleDb, type DrizzleDB } from '@roviq/database';
+import { TemporalClientService } from '@roviq/temporal';
 import {
   cleanupTestInstitute,
   cleanupTestTeacher,
@@ -15,11 +16,12 @@ import {
   type TestTeacher,
 } from '@roviq/testing/integration';
 import pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SmsWebhookController } from '../controllers/sms-webhook.controller';
 import type { SmsHttp } from '../delivery/sms/sms-http';
 import { SMS_HTTP_PROVIDER } from '../delivery/sms/sms-http.client';
 import { DeliveryReceiptDrizzleRepository } from '../repositories/delivery-receipt.drizzle-repository';
+import { FlowArrivals } from '../services/flow-arrivals.service';
 import { SmsWebhookService } from '../services/sms-webhook.service';
 
 const SECRET = `spec-secret-${randomUUID()}`;
@@ -33,6 +35,7 @@ describe('SMS delivery reports (integration)', () => {
   let userA: TestTeacher;
   let userB: TestTeacher;
   let controller: SmsWebhookController;
+  const temporal = createMock<TemporalClientService>({ signal: vi.fn().mockResolvedValue(true) });
   const run = randomUUID().slice(0, 8);
   let seq = 0;
 
@@ -41,14 +44,16 @@ describe('SMS delivery reports (integration)', () => {
     institute: TestInstitute,
     user: TestTeacher,
     provider = SMS_HTTP_PROVIDER,
+    flowId: string | null = null,
   ): Promise<string> {
     seq += 1;
     const requestId = `req-${run}-${seq}`;
     await superPool.query(
       `INSERT INTO notification_deliveries
-         (scope, tenant_id, recipient_user_id, type, channel, provider, status, provider_message_id)
-       VALUES ('institute', $1, $2, 'USER_WELCOME', 'SMS', $3, 'SENT', $4)`,
-      [institute.tenantId, user.userId, provider, requestId],
+         (scope, tenant_id, recipient_user_id, type, channel, provider, status, provider_message_id,
+          flow_id)
+       VALUES ('institute', $1, $2, 'USER_WELCOME', 'SMS', $3, 'SENT', $4, $5)`,
+      [institute.tenantId, user.userId, provider, requestId, flowId],
     );
     return requestId;
   }
@@ -90,11 +95,12 @@ describe('SMS delivery reports (integration)', () => {
     userB = await createTestTeacher(db, instituteB.tenantId);
     controller = new SmsWebhookController(
       createMock<SmsHttp>({ enabled: true, webhookSecret: SECRET }),
-      new SmsWebhookService(new DeliveryReceiptDrizzleRepository(db)),
+      new SmsWebhookService(new DeliveryReceiptDrizzleRepository(db), new FlowArrivals(temporal)),
     );
   });
 
   beforeEach(async () => {
+    temporal.signal.mockClear();
     await superPool.query('DELETE FROM notification_deliveries WHERE recipient_user_id = ANY($1)', [
       [userA.userId, userB.userId],
     ]);
@@ -191,5 +197,41 @@ describe('SMS delivery reports (integration)', () => {
     await expect(controller.receive(SECRET, 'not a report')).resolves.toBe('ok');
 
     expect(await rows(userA.userId)).toHaveLength(1);
+  });
+
+  it('should copy the flow id and tell the flow once when its SMS is delivered (ROV-332)', async () => {
+    const flowId = `notification-flow:spec-${run}`;
+    const requestId = await sentMessage(instituteA, userA, SMS_HTTP_PROVIDER, flowId);
+
+    await controller.receive(SECRET, report(requestId, '1'));
+    await controller.receive(SECRET, report(requestId, '1'));
+
+    const { rows: flows } = await superPool.query<{ status: string; flow_id: string | null }>(
+      `SELECT status, flow_id FROM notification_deliveries
+        WHERE provider_message_id = $1 ORDER BY created_at, id`,
+      [requestId],
+    );
+    expect(flows).toEqual([
+      { status: 'SENT', flow_id: flowId },
+      { status: 'DELIVERED', flow_id: flowId },
+    ]);
+    expect(temporal.signal.mock.calls).toEqual([
+      [flowId, 'flowArrival', [{ recipientUserId: userA.userId, via: 'SMS' }]],
+    ]);
+  });
+
+  it('should tell no flow about a failed report, or a delivered one of a message with no flow', async () => {
+    const failed = await sentMessage(
+      instituteA,
+      userA,
+      SMS_HTTP_PROVIDER,
+      `notification-flow:f-${run}`,
+    );
+    const noFlow = await sentMessage(instituteA, userA);
+
+    await controller.receive(SECRET, report(failed, '16'));
+    await controller.receive(SECRET, report(noFlow, '1'));
+
+    expect(temporal.signal).not.toHaveBeenCalled();
   });
 });

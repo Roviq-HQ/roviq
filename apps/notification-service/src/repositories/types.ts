@@ -66,6 +66,8 @@ export interface InAppRow {
   body: Record<string, string>;
   data: Record<string, string | number | null>;
   dedupeKey: string;
+  /** The flow workflow that walks this notification; null when none does (a digest). */
+  flowId: string | null;
 }
 
 /** The sender and template a WhatsApp attempt went through; stored on its delivery row. */
@@ -111,6 +113,8 @@ export interface DeliveryRow {
   channel: NotificationChannel;
   attempt: number;
   outcome: DeliveryOutcome;
+  /** The workflow whose arrival a report of this row signals; null for none. */
+  flowId: string | null;
 }
 
 /** Who an inbound event is about: a phone number, the provider's user id, or both. */
@@ -131,6 +135,23 @@ export interface ReceiptInput {
   onlyIfNotDelivered: boolean;
   person: InboundPerson;
 }
+
+/** A message of a flow confirmed delivered: the flow's workflow is told. */
+export interface FlowArrivalRecord {
+  flowId: string;
+  recipientUserId: string;
+  channel: NotificationChannel;
+}
+
+/**
+ * `recorded`: a row was appended (or a read report found one already there); `arrival` is set
+ * when the appended row is a DELIVERED one of a flow. `duplicate`: handled before.
+ * `unknown_message`: no such message was sent; nothing is written.
+ */
+export type ReceiptResult =
+  | { kind: 'recorded'; arrival: FlowArrivalRecord | null }
+  | { kind: 'duplicate' }
+  | { kind: 'unknown_message' };
 
 /** A delivery report from a provider that has no sender rows (SMS). */
 export interface ProviderReceipt {

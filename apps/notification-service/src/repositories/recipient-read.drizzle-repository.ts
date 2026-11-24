@@ -73,6 +73,36 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
     });
   }
 
+  async isActiveGuardianOf(
+    tenantId: string,
+    studentMembershipId: string,
+    guardianUserId: string,
+  ): Promise<boolean> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const [row] = await tx
+        .select({ one: sql<number>`1` })
+        .from(studentProfilesLive)
+        .innerJoin(
+          studentGuardianLinksLive,
+          eq(studentGuardianLinksLive.studentProfileId, studentProfilesLive.id),
+        )
+        .innerJoin(
+          guardianProfilesLive,
+          eq(guardianProfilesLive.id, studentGuardianLinksLive.guardianProfileId),
+        )
+        .innerJoin(membershipsLive, eq(membershipsLive.id, guardianProfilesLive.membershipId))
+        .where(
+          and(
+            eq(studentProfilesLive.membershipId, studentMembershipId),
+            eq(guardianProfilesLive.userId, guardianUserId),
+            eq(membershipsLive.status, 'ACTIVE'),
+          ),
+        )
+        .limit(1);
+      return row !== undefined;
+    });
+  }
+
   async findMembership(tenantId: string, membershipId: string): Promise<MembershipRecord | null> {
     return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
       const [row] = await tx

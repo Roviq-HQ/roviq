@@ -1,5 +1,20 @@
+import type { NotificationChannel } from '@roviq/common-types';
 import { z } from 'zod';
 import { SMS_TEMPLATE_IDS_ERROR, SmsRegistrations } from '../delivery/sms/sms-registrations';
+import { CHANNEL_PROVIDERS, providerSettingError, splitProviderSetting } from './channel-providers';
+
+/** One provider, or a comma-separated list tried in order when one cannot send. */
+const providerSetting = (channel: NotificationChannel) =>
+  z
+    .string()
+    .optional()
+    .superRefine((value, ctx) => {
+      const error = providerSettingError(channel, value);
+      if (error !== null) ctx.addIssue({ code: 'custom', message: error });
+    });
+
+const names = (value: string | undefined, name: string) =>
+  splitProviderSetting(value).includes(name);
 
 const envSchema = z
   .looseObject({
@@ -17,11 +32,11 @@ const envSchema = z
     TEMPORAL_ADDRESS: z.string().optional(),
     NOTIFICATION_WORKER_ENABLED: z.enum(['true', 'false']).optional(),
 
-    // Channel providers; unset means the channel has no provider and every send is skipped
-    NOTIFICATION_EMAIL_PROVIDER: z.enum(['smtp', 'log']).optional(),
-    NOTIFICATION_PUSH_PROVIDER: z.enum(['fcm', 'log']).optional(),
-    NOTIFICATION_SMS_PROVIDER: z.enum(['http', 'log']).optional(),
-    NOTIFICATION_WHATSAPP_PROVIDER: z.enum(['cloud', 'log']).optional(),
+    // Channel providers, first choice first; unset means the channel has no provider and every send is skipped
+    NOTIFICATION_EMAIL_PROVIDER: providerSetting('EMAIL'),
+    NOTIFICATION_PUSH_PROVIDER: providerSetting('PUSH'),
+    NOTIFICATION_SMS_PROVIDER: providerSetting('SMS'),
+    NOTIFICATION_WHATSAPP_PROVIDER: providerSetting('WHATSAPP'),
     // WhatsApp provider ('cloud'): API address, webhook secrets, and the key sender tokens are encrypted with
     WHATSAPP_API_BASE_URL: z.url().optional(),
     WHATSAPP_APP_SECRET: z.string().min(1).optional(),
@@ -53,19 +68,19 @@ const envSchema = z
     LOG_LEVEL: z.string().optional(),
   })
   .superRefine((env, ctx) => {
-    if (env.NOTIFICATION_EMAIL_PROVIDER === 'smtp' && (!env.SMTP_URL || !env.EMAIL_FROM)) {
+    if (names(env.NOTIFICATION_EMAIL_PROVIDER, 'smtp') && (!env.SMTP_URL || !env.EMAIL_FROM)) {
       ctx.addIssue({
         code: 'custom',
         message: 'SMTP_URL and EMAIL_FROM — required when NOTIFICATION_EMAIL_PROVIDER=smtp',
       });
     }
-    if (env.NOTIFICATION_PUSH_PROVIDER === 'fcm' && !env.FCM_SERVICE_ACCOUNT_JSON) {
+    if (names(env.NOTIFICATION_PUSH_PROVIDER, 'fcm') && !env.FCM_SERVICE_ACCOUNT_JSON) {
       ctx.addIssue({
         code: 'custom',
         message: 'FCM_SERVICE_ACCOUNT_JSON — required when NOTIFICATION_PUSH_PROVIDER=fcm',
       });
     }
-    if (env.NOTIFICATION_WHATSAPP_PROVIDER === 'cloud') {
+    if (names(env.NOTIFICATION_WHATSAPP_PROVIDER, 'cloud')) {
       const missing = (
         [
           'WHATSAPP_API_BASE_URL',
@@ -81,7 +96,7 @@ const envSchema = z
         });
       }
     }
-    if (env.NOTIFICATION_SMS_PROVIDER === 'http') {
+    if (names(env.NOTIFICATION_SMS_PROVIDER, 'http')) {
       const missing = (
         ['SMS_API_BASE_URL', 'SMS_API_KEY', 'SMS_TEMPLATE_IDS', 'SMS_WEBHOOK_SECRET'] as const
       ).filter((name) => !env[name]);
@@ -112,15 +127,9 @@ const envSchema = z
       });
     }
     if (env.NODE_ENV === 'production') {
-      const logged = (
-        [
-          ['NOTIFICATION_EMAIL_PROVIDER', env.NOTIFICATION_EMAIL_PROVIDER],
-          ['NOTIFICATION_PUSH_PROVIDER', env.NOTIFICATION_PUSH_PROVIDER],
-          ['NOTIFICATION_SMS_PROVIDER', env.NOTIFICATION_SMS_PROVIDER],
-          ['NOTIFICATION_WHATSAPP_PROVIDER', env.NOTIFICATION_WHATSAPP_PROVIDER],
-        ] as const
-      )
-        .filter(([, provider]) => provider === 'log')
+      const logged = Object.values(CHANNEL_PROVIDERS)
+        .map(({ setting }) => [setting, env[setting]] as const)
+        .filter(([, value]) => names(value, 'log'))
         .map(([name]) => name);
       if (logged.length > 0) {
         ctx.addIssue({

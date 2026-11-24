@@ -4164,6 +4164,10 @@ enum MonitoredService {
 }
 
 type Mutation {
+  """
+  Called by the device when it shows the push of one of your notifications, so no WhatsApp or SMS follows. Someone else's id answers NOTIFICATION_NOT_FOUND.
+  """
+  acknowledgeNotificationDelivery(notificationId: ID!): Boolean!
   activateAcademicYear(id: ID!): AcademicYearModel!
 
   """Publish a timetable (DRAFT/INACTIVE → ACTIVE)."""

@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MessagingTokenCipher } from '@roviq/crypto';
+import { providersOf } from '../../config/channel-providers';
 import type { MessagingSenderRecord } from '../../repositories/types';
 import { type CloudSender, WhatsAppCloudClient } from './whatsapp-cloud.client';
 
 /**
- * What the WhatsApp provider needs, built only when `NOTIFICATION_WHATSAPP_PROVIDER=cloud`
+ * What the WhatsApp provider needs, built only when `NOTIFICATION_WHATSAPP_PROVIDER` names `cloud`
  * (env validation then guarantees every setting). Otherwise `enabled` is false and nothing
  * here may be used.
  */
@@ -20,7 +21,10 @@ export class WhatsAppCloud {
   } | null;
 
   constructor(config: ConfigService) {
-    this.enabled = config.get<string>('NOTIFICATION_WHATSAPP_PROVIDER') === 'cloud';
+    this.enabled = providersOf(
+      'WHATSAPP',
+      config.get<string>('NOTIFICATION_WHATSAPP_PROVIDER'),
+    ).includes('cloud');
     this.parts = this.enabled
       ? {
           client: new WhatsAppCloudClient(config.getOrThrow<string>('WHATSAPP_API_BASE_URL')),

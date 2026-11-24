@@ -47,23 +47,17 @@ describe('AttendanceListener', () => {
     listener = new AttendanceListener(dispatcher, recipients);
   });
 
-  it('should dispatch one institute notification per linked guardian', async () => {
+  it('should dispatch one institute notification to every linked guardian, in order', async () => {
     recipients.guardiansOfStudent.mockResolvedValue([
-      {
-        recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
-        appOnly: false,
-      },
-      {
-        recipient: { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
-        appOnly: true,
-      },
+      { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+      { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
     ]);
 
     await listener.handleAbsent(makeEvent(), makeCtx());
 
     expect(recipients.guardiansOfStudent).toHaveBeenCalledWith(TENANT, STUDENT);
-    expect(dispatcher.dispatch).toHaveBeenCalledTimes(2);
-    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(1, {
+    expect(dispatcher.dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith({
       message: {
         type: 'ATTENDANCE_ABSENT',
         params: {
@@ -78,27 +72,20 @@ describe('AttendanceListener', () => {
         },
       },
       audience: { scope: 'institute', tenantId: TENANT, resellerId: null },
-      recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+      recipients: [
+        { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+        { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
+      ],
+      recipientsRef: { kind: 'guardians_of_student', studentMembershipId: STUDENT },
       source: { stream: 'NOTIFICATION', sequence: 41 },
-      dedupeKey: `attendance:session-42:${STUDENT}:ABSENT:user-guardian-1`,
+      dedupeKey: `attendance:session-42:${STUDENT}:ABSENT`,
       inApp: true,
-      appOnly: false,
     });
-    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        recipient: { userId: 'user-guardian-2', membershipId: 'membership-guardian-2' },
-        appOnly: true,
-      }),
-    );
   });
 
   it('should pass nulls when the event has no display fields', async () => {
     recipients.guardiansOfStudent.mockResolvedValue([
-      {
-        recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
-        appOnly: false,
-      },
+      { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
     ]);
 
     await listener.handleAbsent(
@@ -127,20 +114,17 @@ describe('AttendanceListener', () => {
         },
       },
       audience: { scope: 'institute', tenantId: TENANT, resellerId: null },
-      recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
+      recipients: [{ userId: 'user-guardian-1', membershipId: 'membership-guardian-1' }],
+      recipientsRef: { kind: 'guardians_of_student', studentMembershipId: STUDENT },
       source: { stream: 'NOTIFICATION', sequence: 41 },
-      dedupeKey: `attendance:session-42:${STUDENT}:LATE:user-guardian-1`,
+      dedupeKey: `attendance:session-42:${STUDENT}:LATE`,
       inApp: true,
-      appOnly: false,
     });
   });
 
   it('should give re-sent absences of one session and student the same key, and a new status a new one', async () => {
     recipients.guardiansOfStudent.mockResolvedValue([
-      {
-        recipient: { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
-        appOnly: false,
-      },
+      { userId: 'user-guardian-1', membershipId: 'membership-guardian-1' },
     ]);
     const keys = async (event: AttendanceAbsentEvent, sequence: number) => {
       const ctx = createMock<JetStreamContext>({
@@ -155,9 +139,9 @@ describe('AttendanceListener', () => {
     const again = await keys(makeEvent({ markedAt: '2026-03-07T09:20:00.000Z' }), 57);
     const late = await keys(makeEvent({ status: 'LATE' }), 58);
 
-    expect(first).toBe(`attendance:session-42:${STUDENT}:ABSENT:user-guardian-1`);
+    expect(first).toBe(`attendance:session-42:${STUDENT}:ABSENT`);
     expect(again).toBe(first);
-    expect(late).toBe(`attendance:session-42:${STUDENT}:LATE:user-guardian-1`);
+    expect(late).toBe(`attendance:session-42:${STUDENT}:LATE`);
   });
 
   it('should dispatch nothing when the student has no linked guardian', async () => {

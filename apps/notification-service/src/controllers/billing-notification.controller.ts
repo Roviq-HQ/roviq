@@ -139,7 +139,8 @@ export class BillingNotificationController {
       await this.dispatcher.dispatch({
         message,
         audience: instituteAudience(details.instituteId),
-        recipient: { userId: ownerUserId, membershipId: null },
+        recipients: [{ userId: ownerUserId, membershipId: null }],
+        recipientsRef: null,
         source,
         inApp: true,
       });
@@ -148,8 +149,11 @@ export class BillingNotificationController {
       await this.dispatcher.dispatch({
         message,
         audience: PLATFORM_AUDIENCE,
-        recipient: { userId: platformAdminUserId, membershipId: null },
+        recipients: [{ userId: platformAdminUserId, membershipId: null }],
+        recipientsRef: null,
         source,
+        // The owner's flow has the event's own key; the platform's needs another.
+        dedupeKey: `${source.stream}:${source.sequence}:BILLING_EVENT:platform`,
         inApp: true,
       });
     }

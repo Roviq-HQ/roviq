@@ -1,8 +1,4 @@
-import {
-  MessageTemplateCategory,
-  type NotificationChannel,
-  type NotificationTypeKey,
-} from '@roviq/common-types';
+import { MessageTemplateCategory, type NotificationTypeKey } from '@roviq/common-types';
 import { buttonPathOf } from '../delivery/whatsapp/template-variables';
 import {
   cleanVariable,
@@ -10,6 +6,7 @@ import {
   type WhatsAppTemplate,
 } from '../delivery/whatsapp/whatsapp-template';
 import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
+import { defineFlow, type NotificationFlow, step } from './flow';
 import { type Locale, localized, type RegularNotificationType } from './notification-type';
 
 export interface AuthSecurityParams {
@@ -119,14 +116,17 @@ export const authNewDeviceWhatsApp: TypeTemplates<AuthSecurityParams> = {
 };
 
 // A sign-in alert on every sign-in is noise outside the app.
-const IN_APP_ONLY: readonly NotificationChannel[] = [];
-const BASE_CHANNELS: readonly NotificationChannel[] = ['EMAIL', 'PUSH'];
+const IN_APP_ONLY = defineFlow({ steps: [step.inAppOnly()] });
+// Every channel at once and no wait: an account alert must reach the owner outside the app
+// whatever the app reports. With a wait, whoever holds a stolen session could read or
+// acknowledge the alert there and so stop the email about their own sign-in.
+const BASE_FLOW = defineFlow({ steps: [step.parallel(['PUSH', 'EMAIL'])] });
 // WhatsApp only where the user must act at once.
-const WITH_WHATSAPP: readonly NotificationChannel[] = ['EMAIL', 'WHATSAPP', 'PUSH'];
+const WITH_WHATSAPP = defineFlow({ steps: [step.parallel(['PUSH', 'EMAIL', 'WHATSAPP'])] });
 
 function authAlertType(
   key: AuthAlertKey,
-  channels: readonly NotificationChannel[],
+  flow: NotificationFlow,
   whatsapp: WhatsAppTemplate<AuthSecurityParams> | null,
 ): RegularNotificationType<AuthSecurityParams> {
   const copy = COPY[key];
@@ -137,7 +137,7 @@ function authAlertType(
     secret: false,
     settingsCategory: null,
     critical: true,
-    channels,
+    flow,
     digest: null,
     inAppCopy: (p) => ({
       title: localized((l) => copy.subject[l]),
@@ -161,5 +161,5 @@ export const authPasswordResetType = authAlertType(
   passwordResetWhatsApp,
 );
 export const authNewDeviceType = authAlertType('AUTH_NEW_DEVICE', WITH_WHATSAPP, newDeviceWhatsApp);
-export const authAccountLockedType = authAlertType('AUTH_ACCOUNT_LOCKED', BASE_CHANNELS, null);
-export const authSessionRevokedType = authAlertType('AUTH_SESSION_REVOKED', BASE_CHANNELS, null);
+export const authAccountLockedType = authAlertType('AUTH_ACCOUNT_LOCKED', BASE_FLOW, null);
+export const authSessionRevokedType = authAlertType('AUTH_SESSION_REVOKED', BASE_FLOW, null);

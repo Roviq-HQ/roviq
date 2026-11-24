@@ -1,3 +1,4 @@
+import { defineFlow, step } from './flow';
 import { type Locale, localized, type RegularNotificationType } from './notification-type';
 
 export const BILLING_MESSAGE_KINDS = [
@@ -104,7 +105,7 @@ export const billingEventType: RegularNotificationType<BillingEventParams> = {
   secret: false,
   settingsCategory: null,
   critical: true,
-  channels: ['EMAIL', 'PUSH'],
+  flow: defineFlow({ steps: [step.parallel(['EMAIL', 'PUSH'])] }),
   digest: null,
   inAppCopy: (p) => ({
     title: localized((l) => copy(p, l).subject),

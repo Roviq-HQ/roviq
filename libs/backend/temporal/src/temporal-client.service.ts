@@ -6,6 +6,7 @@ import {
   type Workflow,
   WorkflowExecutionAlreadyStartedError,
   WorkflowIdReusePolicy,
+  WorkflowNotFoundError,
   type WorkflowSignalWithStartOptionsWithArgs,
   type WorkflowStartOptions,
 } from '@temporalio/client';
@@ -60,6 +61,20 @@ export class TemporalClientService implements OnApplicationShutdown {
       options,
     );
     return handle.signaledRunId;
+  }
+
+  /**
+   * Signals the running workflow with this id. Returns false when no such workflow exists or it
+   * has already closed: a late signal is expected (a report after the flow ended), not an error.
+   */
+  async signal(workflowId: string, signalName: string, args: unknown[]): Promise<boolean> {
+    try {
+      await this.client.workflow.getHandle(workflowId).signal(signalName, ...args);
+      return true;
+    } catch (err) {
+      if (err instanceof WorkflowNotFoundError) return false;
+      throw err;
+    }
   }
 
   // After HTTP and the JetStream microservice stopped: their handlers start workflows.

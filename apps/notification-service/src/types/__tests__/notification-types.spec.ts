@@ -7,6 +7,7 @@ import {
   composeSecret,
   type RegularMessage,
 } from '../compose';
+import { channelsOf } from '../flow';
 import { LOCALES } from '../notification-type';
 import { REGULAR_TYPES, type RegularPayload, type RegularTypeKey, SECRET_TYPES } from '../registry';
 
@@ -144,7 +145,7 @@ describe('regular type copy', () => {
   it.each(
     samples.map((s) => [s.type, s] as const),
   )('%s has outside copy for each of its channels in both locales', (_key, sample) => {
-    for (const channel of REGULAR_TYPES[sample.type].channels) {
+    for (const channel of channelsOf(REGULAR_TYPES[sample.type].flow)) {
       const en = composeOutside(sample, channel, 'en');
       const hi = composeOutside(sample, channel, 'hi');
 
@@ -354,11 +355,23 @@ describe('regular type copy', () => {
   });
 
   it('should keep the sign-in alert in the app and the other security alerts on their channels', () => {
-    expect(REGULAR_TYPES.AUTH_LOGIN.channels).toEqual([]);
-    expect(REGULAR_TYPES.AUTH_PASSWORD_RESET.channels).toEqual(['EMAIL', 'WHATSAPP', 'PUSH']);
-    expect(REGULAR_TYPES.AUTH_NEW_DEVICE.channels).toEqual(['EMAIL', 'WHATSAPP', 'PUSH']);
-    expect(REGULAR_TYPES.AUTH_ACCOUNT_LOCKED.channels).toEqual(['EMAIL', 'PUSH']);
-    expect(REGULAR_TYPES.AUTH_SESSION_REVOKED.channels).toEqual(['EMAIL', 'PUSH']);
+    const channels = (key: RegularTypeKey) => channelsOf(REGULAR_TYPES[key].flow);
+
+    expect(channels('AUTH_LOGIN')).toEqual([]);
+    expect(channels('AUTH_PASSWORD_RESET')).toEqual(['PUSH', 'EMAIL', 'WHATSAPP']);
+    expect(channels('AUTH_NEW_DEVICE')).toEqual(['PUSH', 'EMAIL', 'WHATSAPP']);
+    expect(channels('AUTH_ACCOUNT_LOCKED')).toEqual(['PUSH', 'EMAIL']);
+    expect(channels('AUTH_SESSION_REVOKED')).toEqual(['PUSH', 'EMAIL']);
+  });
+
+  it('should send a security alert on every channel at once, waiting for nothing', () => {
+    const steps = (key: RegularTypeKey) =>
+      REGULAR_TYPES[key].flow.steps.map((s) =>
+        s.kind === 'send' ? [s.channels, s.waitMs] : 'not a send',
+      );
+
+    expect(steps('AUTH_NEW_DEVICE')).toEqual([[['PUSH', 'EMAIL', 'WHATSAPP'], null]]);
+    expect(steps('AUTH_ACCOUNT_LOCKED')).toEqual([[['PUSH', 'EMAIL'], null]]);
   });
 
   it('should mark only the security alerts and billing events as critical', () => {

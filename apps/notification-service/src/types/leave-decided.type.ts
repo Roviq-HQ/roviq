@@ -1,4 +1,5 @@
 import { formatCalendarDate } from './calendar-date';
+import { guardianAlertFlow } from './flow';
 import { type Locale, localized, type RegularNotificationType } from './notification-type';
 
 export interface LeaveDecidedParams {
@@ -63,7 +64,7 @@ export const leaveDecidedType: RegularNotificationType<LeaveDecidedParams> = {
   // Leave decisions follow the institute's approval settings.
   settingsCategory: 'APPROVAL',
   critical: false,
-  channels: ['EMAIL'],
+  flow: guardianAlertFlow(),
   digest: null,
   inAppCopy: (p) => ({
     title: localized((l) => subject(p, l)),

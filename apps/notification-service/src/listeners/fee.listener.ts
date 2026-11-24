@@ -75,15 +75,13 @@ export class FeeListener {
       );
       return;
     }
-    for (const { recipient, appOnly } of guardians) {
-      await this.dispatcher.dispatch({
-        message,
-        audience: instituteAudience(event.tenantId),
-        recipient,
-        source: sourceOf(ctx),
-        inApp: true,
-        appOnly,
-      });
-    }
+    await this.dispatcher.dispatch({
+      message,
+      audience: instituteAudience(event.tenantId),
+      recipients: guardians,
+      recipientsRef: { kind: 'guardians_of_student', studentMembershipId: event.studentId },
+      source: sourceOf(ctx),
+      inApp: true,
+    });
   }
 }

@@ -1,3 +1,4 @@
+import type { AdapterErrorCode } from '../adapters/adapter-errors';
 import { ChannelAdapterError } from '../adapters/channel-adapter';
 import type { TemplateSend } from './whatsapp-template';
 
@@ -12,7 +13,11 @@ export interface CloudSender {
 }
 
 /** The provider's numeric error codes, grouped by what an operator has to do about them. */
-const ERROR_CODES: ReadonlyArray<{ code: string; retryable: boolean; providerCodes: number[] }> = [
+const ERROR_CODES: ReadonlyArray<{
+  code: AdapterErrorCode;
+  retryable: boolean;
+  providerCodes: number[];
+}> = [
   // The template is missing, paused, or its variables do not fit: fix the registry or the approval.
   {
     code: 'WA_TEMPLATE_REJECTED',
@@ -30,7 +35,7 @@ const ERROR_CODES: ReadonlyArray<{ code: string; retryable: boolean; providerCod
 ];
 
 /** The stable code for a failure the provider reports later, in a delivery report. */
-export function errorCodeForProviderCode(providerCode: number | null): string {
+export function errorCodeForProviderCode(providerCode: number | null): AdapterErrorCode {
   const known = ERROR_CODES.find(
     (e) => providerCode !== null && e.providerCodes.includes(providerCode),
   );

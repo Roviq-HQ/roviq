@@ -17,13 +17,14 @@ import {
 } from '@roviq/testing/integration';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
+import { buildChannelAdapters, ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { SmsHttpAdapter } from '../delivery/adapters/sms-http.adapter';
 import { type ChannelAttempt, ChannelSender } from '../delivery/channel-sender';
 import { GuardianConsentGate } from '../delivery/consent-gate';
 import { SmsHttp } from '../delivery/sms/sms-http';
 import { SMS_HTTP_PROVIDER } from '../delivery/sms/sms-http.client';
 import { type SmsDraft, SmsVariableError } from '../delivery/sms/sms-template';
+import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
@@ -95,6 +96,8 @@ describe('SMS delivery through the provider adapter (integration)', () => {
   let institute: TestInstitute;
   let user: TestTeacher;
   let sender: ChannelSender;
+  /** `NOTIFICATION_SMS_PROVIDER=http,log`: the provider first, the log stand-in second. */
+  let failover: ChannelSender;
   const provider = new FakeProvider();
 
   function attempt(sms: ChannelAttempt['sms']): ChannelAttempt {
@@ -104,6 +107,7 @@ describe('SMS delivery through the provider adapter (integration)', () => {
       audience: { scope: 'institute', tenantId: institute.tenantId, resellerId: null },
       recipientUserId: user.userId,
       notificationId: null,
+      flowId: null,
       channelEnabled: true,
       critical: true,
       deferrable: false,
@@ -143,6 +147,20 @@ describe('SMS delivery through the provider adapter (integration)', () => {
     }
   }
 
+  function senderWith(adapters: ChannelAdapters): ChannelSender {
+    return new ChannelSender(
+      adapters,
+      new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
+      new ContactReadDrizzleRepository(db),
+      new NotificationWriteDrizzleRepository(db),
+      new WhatsAppRoute(
+        new MessagingSenderDrizzleRepository(db),
+        new RecipientReadDrizzleRepository(db),
+        new Clock(),
+      ),
+    );
+  }
+
   beforeAll(async () => {
     const poolerUrl =
       process.env.DATABASE_URL_TEST ??
@@ -166,15 +184,13 @@ describe('SMS delivery through the provider adapter (integration)', () => {
         SMS_WEBHOOK_SECRET: randomUUID() + randomUUID(),
       }),
     );
-    sender = new ChannelSender(
-      new ChannelAdapters([new SmsHttpAdapter(sms)]),
-      new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
-      new ContactReadDrizzleRepository(db),
-      new NotificationWriteDrizzleRepository(db),
-      new WhatsAppRoute(
-        new MessagingSenderDrizzleRepository(db),
-        new RecipientReadDrizzleRepository(db),
-        new Clock(),
+    sender = senderWith(new ChannelAdapters([new SmsHttpAdapter(sms)]));
+    failover = senderWith(
+      buildChannelAdapters(
+        { NOTIFICATION_SMS_PROVIDER: 'http,log' },
+        new ContactReadDrizzleRepository(db),
+        new WhatsAppCloud(new ConfigService({})),
+        sms,
       ),
     );
   });
@@ -269,5 +285,45 @@ describe('SMS delivery through the provider adapter (integration)', () => {
       ['FAILED', 'SMS_VARIABLE_TOO_LONG', SMS_HTTP_PROVIDER],
     ]);
     await expectNoCodeStored();
+  });
+
+  describe('with a second provider configured (ROV-332)', () => {
+    it('should send the same attempt through the second provider when the first is unreachable', async () => {
+      provider.answers.push({ status: 503, body: { type: 'error', message: 'down' } });
+
+      await failover.attempt(attempt(() => REGISTERED));
+
+      expect(provider.requests).toHaveLength(1);
+      const rows = await deliveries();
+      expect(rows.map((r) => [r.status, r.error_code, r.provider])).toEqual([
+        ['SENT', null, 'log'],
+      ]);
+      expect(rows[0]?.provider_message_id).toMatch(/^log-/);
+      await expectNoCodeStored();
+    });
+
+    it('should not fail over a refusal of the message and store one FAILED row', async () => {
+      provider.answers.push({
+        status: 200,
+        body: { type: 'error', message: `Invalid mobile ${PHONE}` },
+      });
+
+      await failover.attempt(attempt(() => REGISTERED));
+
+      expect(provider.requests).toHaveLength(1);
+      const rows = await deliveries();
+      expect(rows.map((r) => [r.status, r.error_code, r.provider, r.provider_message_id])).toEqual([
+        ['FAILED', 'SMS_INVALID_NUMBER', SMS_HTTP_PROVIDER, null],
+      ]);
+    });
+
+    it('should send through the first provider alone when it takes the message', async () => {
+      await failover.attempt(attempt(() => REGISTERED));
+
+      expect(provider.requests).toHaveLength(1);
+      expect(
+        (await deliveries()).map((r) => [r.status, r.provider, r.provider_message_id]),
+      ).toEqual([['SENT', SMS_HTTP_PROVIDER, provider.lastRequestId()]]);
+    });
   });
 });

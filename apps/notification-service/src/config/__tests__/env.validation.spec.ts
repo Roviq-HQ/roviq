@@ -176,4 +176,59 @@ describe('notification-service env validation', () => {
       expect(validate(env)).toEqual(env);
     });
   });
+
+  describe('an ordered list of providers', () => {
+    const HTTP_SETTINGS = {
+      SMS_API_BASE_URL: 'https://sms.example.test/api/v5',
+      SMS_API_KEY: 'fake-auth-key',
+      SMS_TEMPLATE_IDS: JSON.stringify({ 'AUTH_OTP:en': 'reg-1001' }),
+      SMS_WEBHOOK_SECRET: 'w'.repeat(32),
+    };
+
+    it.each([
+      ['a single provider', 'http'],
+      ['two providers', 'http,log'],
+      ['two providers with spaces', 'log, http'],
+    ])('should accept %s and keep the setting as given', (_case, value) => {
+      const env = { ...BASE, NODE_ENV: 'test', NOTIFICATION_SMS_PROVIDER: value, ...HTTP_SETTINGS };
+
+      expect(validate(env)).toEqual(env);
+    });
+
+    it.each([
+      ['an unknown name', 'http,carrier', "unknown provider 'carrier'"],
+      ['an empty entry', 'http,', "unknown provider ''"],
+      ['a name of another channel', 'smtp', "unknown provider 'smtp'"],
+    ])('should refuse %s', (_case, value, message) => {
+      expect(() =>
+        validate({ ...BASE, NOTIFICATION_SMS_PROVIDER: value, ...HTTP_SETTINGS }),
+      ).toThrow(`NOTIFICATION_SMS_PROVIDER — ${message}`);
+    });
+
+    it('should refuse a provider named twice', () => {
+      expect(() => validate({ ...BASE, NOTIFICATION_EMAIL_PROVIDER: 'log,log' })).toThrow(
+        "NOTIFICATION_EMAIL_PROVIDER — provider 'log' is named twice",
+      );
+    });
+
+    it("should still require a provider's own settings when it is not the first choice", () => {
+      expect(() => validate({ ...BASE, NOTIFICATION_SMS_PROVIDER: 'log,http' })).toThrow(
+        'SMS_API_BASE_URL, SMS_API_KEY, SMS_TEMPLATE_IDS, SMS_WEBHOOK_SECRET — required when NOTIFICATION_SMS_PROVIDER=http',
+      );
+      expect(() => validate({ ...BASE, NOTIFICATION_EMAIL_PROVIDER: 'log,smtp' })).toThrow(
+        'SMTP_URL and EMAIL_FROM — required when NOTIFICATION_EMAIL_PROVIDER=smtp',
+      );
+    });
+
+    it("should refuse 'log' anywhere in a list in production", () => {
+      expect(() =>
+        validate({
+          ...BASE,
+          NODE_ENV: 'production',
+          NOTIFICATION_SMS_PROVIDER: 'http,log',
+          ...HTTP_SETTINGS,
+        }),
+      ).toThrow("NOTIFICATION_SMS_PROVIDER — the 'log' provider sends nothing");
+    });
+  });
 });

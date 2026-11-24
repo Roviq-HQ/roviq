@@ -23,5 +23,12 @@ if (apiKey && projectId && messagingSenderId && appId) {
       icon: '/icon-192x192.png',
     };
     self.registration.showNotification(title, options);
+    // The worker has no session, so an open page tells the server that the push was shown.
+    const notificationId = payload.data?.notificationId;
+    if (notificationId) {
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((pages) => {
+        for (const page of pages) page.postMessage({ type: 'roviq:push-shown', notificationId });
+      });
+    }
   });
 }

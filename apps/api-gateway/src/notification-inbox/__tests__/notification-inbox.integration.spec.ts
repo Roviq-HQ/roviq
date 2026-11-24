@@ -15,6 +15,8 @@ import {
   notifications,
   withAdmin,
 } from '@roviq/database';
+import { EventBusService } from '@roviq/event-bus';
+import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { pubSub } from '@roviq/pubsub';
 import {
   cleanupTestInstitute,
@@ -36,7 +38,7 @@ import {
   type TestTeacher,
 } from '@roviq/testing/integration';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../e2e/shared/seed-fixtures';
 import { AppModule } from '../../app/app.module';
 import { notificationFeedTopic } from '../notification-feed';
@@ -58,6 +60,7 @@ const COUNT = 'query { myUnreadNotificationCount }';
 const MARK = `mutation($id: ID!) { markNotificationRead(id: $id) { ${FIELDS} } }`;
 const MARK_ALL = 'mutation { markAllNotificationsRead }';
 const ARCHIVE = `mutation($id: ID!) { archiveNotification(id: $id) { ${FIELDS} } }`;
+const ACK = 'mutation($id: ID!) { acknowledgeNotificationDelivery(notificationId: $id) }';
 const REGISTER = `mutation($token: String!, $platform: DevicePlatform!) {
   registerDeviceToken(token: $token, platform: $platform)
 }`;
@@ -98,6 +101,7 @@ interface RowTarget {
   recipientMembershipId?: string | null;
   readAt?: Date | null;
   archivedAt?: Date | null;
+  flowId?: string;
 }
 
 describe('Notification inbox (integration)', () => {
@@ -134,6 +138,7 @@ describe('Notification inbox (integration)', () => {
           body: { en: 'Your leave was approved.' },
           data: { leaveId: randomUUID() },
           readAt: target.readAt ?? null,
+          flowId: target.flowId ?? null,
           archivedAt: target.archivedAt ?? null,
           createdBy: SYSTEM,
           updatedBy: SYSTEM,
@@ -318,8 +323,13 @@ describe('Notification inbox (integration)', () => {
       const found = await service.findOwn(instituteUser(instituteA, instituteA.tenantId), id);
       const mark = await gql(MARK, tokenX, { id });
       const archive = await gql(ARCHIVE, tokenX, { id });
+      const ack = await gql(ACK, tokenX, { id });
 
       expect(found).toBeNull();
+      expect([code(ack), ack.errors?.[0]?.message]).toEqual([
+        'NOTIFICATION_NOT_FOUND',
+        'Notification not found',
+      ]);
       expect([code(mark), mark.errors?.[0]?.message]).toEqual([
         'NOTIFICATION_NOT_FOUND',
         'Notification not found',
@@ -565,6 +575,8 @@ describe('Notification inbox (integration)', () => {
           readAt: own.readAt,
           archivedAt: own.archivedAt,
           createdAt: own.createdAt,
+          // Internal to the service; `NotificationModel` has no such field.
+          flowId: own.flowId,
         },
       });
     });
@@ -710,6 +722,85 @@ describe('Notification inbox (integration)', () => {
       ['a reseller', () => tokenReseller],
     ])('refuses %s token', async (_label, token) => {
       expect(code(await gql(DELIVERIES, token()))).toBe('FORBIDDEN');
+    });
+  });
+
+  describe('delivery flow (ROV-332)', () => {
+    const flowId = `notification-flow:test:${randomUUID()}`;
+    let emit: ReturnType<typeof vi.spyOn<EventBusService, 'emit'>>;
+
+    beforeEach(() => {
+      emit = vi.spyOn(result.module.get(EventBusService, { strict: false }), 'emit');
+    });
+    afterEach(() => emit.mockRestore());
+
+    const seen = () =>
+      emit.mock.calls.filter(([pattern]) => pattern === EVENT_PATTERNS.NOTIFICATION.INAPP_SEEN);
+    const acknowledged = () =>
+      emit.mock.calls.filter(
+        ([pattern]) => pattern === EVENT_PATTERNS.NOTIFICATION.PUSH_ACKNOWLEDGED,
+      );
+
+    it('publishes a pointer when a row of a flow is read, and nothing for a row without one', async () => {
+      const inFlow = await insertRow({ recipientUserId: instituteA.userId, flowId });
+      const plain = await insertRow({ recipientUserId: instituteA.userId });
+
+      await gql(MARK, tokenX, { id: plain.id });
+      expect(seen()).toHaveLength(0);
+
+      await gql(MARK, tokenX, { id: inFlow.id });
+      expect(seen()).toEqual([
+        [
+          EVENT_PATTERNS.NOTIFICATION.INAPP_SEEN,
+          { notificationId: inFlow.id, recipientUserId: instituteA.userId },
+        ],
+      ]);
+    });
+
+    it('publishes a pointer when a row of a flow is archived', async () => {
+      const inFlow = await insertRow({ recipientUserId: instituteA.userId, flowId });
+
+      await gql(ARCHIVE, tokenX, { id: inFlow.id });
+
+      expect(seen()).toHaveLength(1);
+    });
+
+    it('publishes one pointer per flow row marked by mark-all', async () => {
+      const inFlow = await insertRow({ recipientUserId: instituteA.userId, flowId });
+      await insertRow({ recipientUserId: instituteA.userId });
+
+      await gql(MARK_ALL, tokenX);
+
+      expect(seen().map(([, payload]) => payload)).toEqual([
+        { notificationId: inFlow.id, recipientUserId: instituteA.userId },
+      ]);
+    });
+
+    it('acknowledges the push of the caller’s own row and never exposes the flow', async () => {
+      const own = await insertRow({ recipientUserId: instituteA.userId, flowId });
+
+      const response = await gql<{ acknowledgeNotificationDelivery: boolean }>(ACK, tokenX, {
+        id: own.id,
+      });
+
+      expect(response.errors).toBeUndefined();
+      expect(response.data?.acknowledgeNotificationDelivery).toBe(true);
+      expect(acknowledged()).toEqual([
+        [
+          EVENT_PATTERNS.NOTIFICATION.PUSH_ACKNOWLEDGED,
+          { notificationId: own.id, recipientUserId: instituteA.userId },
+        ],
+      ]);
+      expect(await stored(own.id)).toEqual(own);
+    });
+
+    it('refuses to acknowledge another member’s row and publishes nothing', async () => {
+      const theirs = await insertRow({ recipientUserId: memberY.userId, flowId });
+
+      const response = await gql(ACK, tokenX, { id: theirs.id });
+
+      expect(code(response)).toBe('NOTIFICATION_NOT_FOUND');
+      expect(acknowledged()).toHaveLength(0);
     });
   });
 

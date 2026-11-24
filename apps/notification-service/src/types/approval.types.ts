@@ -6,6 +6,7 @@ import {
   type WhatsAppTemplate,
 } from '../delivery/whatsapp/whatsapp-template';
 import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
+import { defineFlow, step } from './flow';
 import { type Locale, localized, type RegularNotificationType } from './notification-type';
 
 export interface ApprovalRequestedParams {
@@ -66,7 +67,7 @@ export const approvalRequestedType: RegularNotificationType<ApprovalRequestedPar
   secret: false,
   settingsCategory: 'APPROVAL',
   critical: false,
-  channels: ['WHATSAPP', 'EMAIL', 'PUSH'],
+  flow: defineFlow({ steps: [step.parallel(['WHATSAPP', 'EMAIL', 'PUSH'])] }),
   digest: null,
   inAppCopy: (p) => ({
     title: localized((l) => requestedTitle(p, l)),
@@ -139,7 +140,7 @@ export const approvalResolvedType: RegularNotificationType<ApprovalResolvedParam
   secret: false,
   settingsCategory: 'APPROVAL',
   critical: false,
-  channels: ['WHATSAPP', 'EMAIL', 'PUSH'],
+  flow: defineFlow({ steps: [step.parallel(['WHATSAPP', 'EMAIL', 'PUSH'])] }),
   digest: null,
   inAppCopy: (p) => ({
     title: localized((l) => resolvedTitle(p, l)),

@@ -72,7 +72,8 @@ export class ApprovalListener {
     await this.dispatcher.dispatch({
       message,
       audience: instituteAudience(tenantId),
-      recipient: member.recipient,
+      recipients: [member.recipient],
+      recipientsRef: null,
       source: sourceOf(ctx),
       inApp: true,
     });

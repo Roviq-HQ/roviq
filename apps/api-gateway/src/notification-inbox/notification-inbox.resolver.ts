@@ -62,6 +62,17 @@ export class NotificationInboxResolver {
     return this.service.archive(user, id);
   }
 
+  @Mutation(() => Boolean, {
+    description:
+      "Called by the device when it shows the push of one of your notifications, so no WhatsApp or SMS follows. Someone else's id answers NOTIFICATION_NOT_FOUND.",
+  })
+  acknowledgeNotificationDelivery(
+    @CurrentUser() user: AuthUser,
+    @Args('notificationId', { type: () => ID }) notificationId: string,
+  ): Promise<boolean> {
+    return this.service.acknowledgeDelivery(user, notificationId);
+  }
+
   @Subscription(() => NotificationModel, {
     description: 'A new notification for the signed-in user in this scope.',
     resolve: (record: NotificationRecord) => record,

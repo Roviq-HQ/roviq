@@ -1,4 +1,5 @@
 import type { InstituteContext, PlatformContext, ResellerContext } from '@roviq/common-types';
+import { EventBusService } from '@roviq/event-bus';
 import { createMock } from '@roviq/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { feedEventOf } from '../notification-inbox.consumer';
@@ -113,13 +114,23 @@ describe('NotificationInboxService writes', () => {
   function build() {
     const inbox = createMock<NotificationInboxRepository>();
     const devices = createMock<DeviceTokenRepository>();
-    return { inbox, devices, service: new NotificationInboxService(inbox, devices) };
+    const eventBus = createMock<EventBusService>({ emit: vi.fn() });
+    return {
+      inbox,
+      devices,
+      eventBus,
+      service: new NotificationInboxService(inbox, devices, eventBus),
+    };
   }
 
   it.each([
     ['markRead', (s: NotificationInboxService) => s.markRead(impersonated, NOTIFICATION)],
     ['markAllRead', (s: NotificationInboxService) => s.markAllRead(impersonated)],
     ['archive', (s: NotificationInboxService) => s.archive(impersonated, NOTIFICATION)],
+    [
+      'acknowledgeDelivery',
+      (s: NotificationInboxService) => s.acknowledgeDelivery(impersonated, NOTIFICATION),
+    ],
     [
       'registerDeviceToken',
       (s: NotificationInboxService) => s.registerDeviceToken(impersonated, 'fcm-token', 'WEB'),
@@ -129,7 +140,7 @@ describe('NotificationInboxService writes', () => {
       (s: NotificationInboxService) => s.unregisterDeviceToken(impersonated, 'fcm-token'),
     ],
   ])('should refuse %s in an impersonated session before touching the database', async (_name, call) => {
-    const { inbox, devices, service } = build();
+    const { inbox, devices, eventBus, service } = build();
 
     await expect(call(service)).rejects.toThrow(
       'Notifications and devices cannot be changed while impersonating',
@@ -138,6 +149,8 @@ describe('NotificationInboxService writes', () => {
     expect(inbox.markRead).not.toHaveBeenCalled();
     expect(inbox.markAllRead).not.toHaveBeenCalled();
     expect(inbox.archive).not.toHaveBeenCalled();
+    expect(inbox.findOne).not.toHaveBeenCalled();
+    expect(eventBus.emit).not.toHaveBeenCalled();
     expect(devices.register).not.toHaveBeenCalled();
     expect(devices.unregister).not.toHaveBeenCalled();
   });

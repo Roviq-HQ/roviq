@@ -7,6 +7,7 @@ import {
 } from '../delivery/whatsapp/whatsapp-template';
 import type { TypeTemplates } from '../delivery/whatsapp/whatsapp-templates';
 import { formatCalendarDate } from './calendar-date';
+import { guardianAlertFlow } from './flow';
 import {
   type Locale,
   localized,
@@ -159,7 +160,7 @@ export const feeOverdueType: RegularNotificationType<FeeOverdueParams> = {
   secret: false,
   settingsCategory: 'FEE',
   critical: false,
-  channels: ['WHATSAPP', 'EMAIL', 'PUSH'],
+  flow: guardianAlertFlow(),
   // Weekly, Monday 09:00 in the institute's timezone.
   digest: { defaultCron: '0 9 * * 1', summaryCopy: overdueSummary },
   inAppCopy: (p) => ({
@@ -187,7 +188,7 @@ export const feeReminderType: RegularNotificationType<FeeReminderParams> = {
   secret: false,
   settingsCategory: 'FEE',
   critical: false,
-  channels: ['EMAIL', 'WHATSAPP', 'PUSH'],
+  flow: guardianAlertFlow(),
   digest: null,
   inAppCopy: (p) => ({
     title: localized(reminderTitle),

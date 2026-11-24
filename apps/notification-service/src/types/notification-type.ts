@@ -1,4 +1,5 @@
 import type { NotificationChannel, NotificationTypeKey } from '@roviq/common-types';
+import type { NotificationFlow } from './flow';
 
 export type Locale = 'en' | 'hi';
 
@@ -28,8 +29,6 @@ export type SettingsCategory = 'ATTENDANCE' | 'FEE' | 'APPROVAL';
 
 interface NotificationTypeBase<P> {
   key: NotificationTypeKey;
-  /** Channels outside the app this type may use. A channel not listed produces no delivery row. */
-  channels: readonly NotificationChannel[];
   outsideCopy(params: P, channel: NotificationChannel, locale: Locale): OutsideCopy;
 }
 
@@ -39,13 +38,17 @@ interface NotificationTypeBase<P> {
  */
 export interface SecretNotificationType<P> extends NotificationTypeBase<P> {
   secret: true;
+  /** Channels this type is sent on, in order. A channel not listed produces no delivery row. */
+  channels: readonly NotificationChannel[];
 }
 
 export interface RegularNotificationType<P> extends NotificationTypeBase<P> {
   secret: false;
+  /** Which channels are tried, in what order, and how long each waits for arrival (ROV-332). */
+  flow: NotificationFlow;
   /** Null for system types (auth, billing). */
   settingsCategory: SettingsCategory | null;
-  /** Ignores institute settings: every listed channel is sent. */
+  /** Ignores institute settings: every channel of the flow is sent. */
   critical: boolean;
   inAppCopy(params: P): InAppCopy;
   digest: DigestSpec<P> | null;

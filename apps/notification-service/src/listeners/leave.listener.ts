@@ -52,25 +52,26 @@ export class LeaveListener {
         params: { ...leave, audience: 'applicant' },
       },
       audience,
-      recipient: applicant.recipient,
+      recipients: [applicant.recipient],
+      recipientsRef: null,
       source,
       inApp: true,
     });
     if (!applicant.isStudent) return;
 
     const guardians = await this.recipients.guardiansOfStudent(event.tenantId, event.userId);
-    for (const { recipient, appOnly } of guardians) {
-      await this.dispatcher.dispatch({
-        message: {
-          type: 'LEAVE_DECIDED',
-          params: { ...leave, audience: 'guardian' },
-        },
-        audience,
-        recipient,
-        source,
-        inApp: true,
-        appOnly,
-      });
-    }
+    await this.dispatcher.dispatch({
+      message: {
+        type: 'LEAVE_DECIDED',
+        params: { ...leave, audience: 'guardian' },
+      },
+      audience,
+      recipients: guardians,
+      recipientsRef: { kind: 'guardians_of_student', studentMembershipId: event.userId },
+      source,
+      // The applicant's flow has the event's own key; the guardians' flow needs another.
+      dedupeKey: `${source.stream}:${source.sequence}:LEAVE_DECIDED:guardians`,
+      inApp: true,
+    });
   }
 }

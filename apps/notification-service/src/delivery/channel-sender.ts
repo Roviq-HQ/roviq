@@ -9,7 +9,12 @@ import type {
   MessagingSenderRecord,
 } from '../repositories/types';
 import type { Locale, OutsideCopy } from '../types/notification-type';
-import { ChannelAdapterError } from './adapters/channel-adapter';
+import type { AdapterErrorCode } from './adapters/adapter-errors';
+import {
+  type ChannelAdapter,
+  ChannelAdapterError,
+  type ChannelMessage,
+} from './adapters/channel-adapter';
 import type { ChannelAdapters } from './adapters/channel-adapters';
 import { evaluateChannelGate } from './channel-gate';
 import type { ConsentGate } from './consent-gate';
@@ -23,6 +28,8 @@ export interface ChannelAttempt {
   audience: Audience;
   recipientUserId: string;
   notificationId: string | null;
+  /** The flow workflow that sent it; null for a secret type. Stored on the delivery row. */
+  flowId: string | null;
   /** Institute setting for this channel; true for critical and secret types. */
   channelEnabled: boolean;
   /** Critical and secret types: quiet hours do not apply, and over a sender's cap they wait. */
@@ -78,13 +85,15 @@ export class ChannelSender {
       channel: a.channel,
       attempt: a.attempt,
       outcome,
+      flowId: a.flowId,
     });
     return outcome;
   }
 
   private async run(a: ChannelAttempt): Promise<AttemptOutcome> {
-    const adapter = this.adapters.get(a.channel);
-    const routed = adapter?.usesSenders === true;
+    const adapters = this.adapters.list(a.channel).filter((ad) => this.adapters.available(ad));
+    const needsTemplate = adapters.some((ad) => isRouted(ad) || ad.resolveSmsTemplate);
+    const anyRouted = adapters.some(isRouted);
     const tenantId = a.audience.tenantId;
     let contact: Promise<ContactRecord | null> | null = null;
     const loadContact = () => {
@@ -93,11 +102,13 @@ export class ChannelSender {
     };
     const loadLocale = async (): Promise<Locale> =>
       (await loadContact())?.preferredLocale === 'hi' ? 'hi' : 'en';
-    let sender: MessagingSenderRecord | null = null;
-    let template: TemplateSend | null = null;
-    let sms: SmsSend | null = null;
-    let unsendableSms = false;
-    const resolveSms = adapter?.resolveSmsTemplate?.bind(adapter);
+    // Filled by the gate's checks, which run in order: provider, template, then the sender rules.
+    const found: Found = { sender: null, template: null, withProvider: [], candidates: [] };
+    // The sender rules apply to the first choice; a later routed choice is checked when reached.
+    const firstSender = () => {
+      const [first] = found.candidates;
+      return first !== undefined && isRouted(first.adapter) ? found.sender : null;
+    };
 
     const gate = await evaluateChannelGate({
       channelEnabled: a.channelEnabled,
@@ -110,44 +121,43 @@ export class ChannelSender {
           studentMembershipId: a.data.studentId ?? null,
         }),
       hasProvider: async () => {
-        if (adapter === null) return false;
-        if (!routed) return true;
-        sender = await this.whatsapp.resolveSender(tenantId);
-        return sender !== null;
+        if (anyRouted) found.sender = await this.whatsapp.resolveSender(tenantId);
+        found.withProvider = adapters.filter((ad) => !isRouted(ad) || found.sender !== null);
+        return found.withProvider.length > 0;
       },
-      hasTemplate: routed
+      hasTemplate: needsTemplate
         ? async () => {
-            template = a.template?.(await loadLocale()) ?? null;
-            return template !== null;
+            const locale = await loadLocale();
+            found.template = anyRouted ? (a.template?.(locale) ?? null) : null;
+            const draft = adapters.some((ad) => ad.resolveSmsTemplate)
+              ? smsDraftOf(a, locale)
+              : null;
+            found.candidates = found.withProvider.flatMap((ad) =>
+              candidateOf(ad, found.template, draft),
+            );
+            return found.candidates.length > 0;
           }
-        : resolveSms
-          ? async () => {
-              const locale = await loadLocale();
-              try {
-                const draft = a.sms?.(locale) ?? null;
-                sms = draft === null ? null : resolveSms(draft);
-              } catch (err) {
-                if (!(err instanceof SmsVariableError)) throw err;
-                // Not a missing template: the message exists but cannot be sent as registered.
-                unsendableSms = true;
-                return true;
-              }
-              return sms !== null;
-            }
-          : undefined,
+        : undefined,
       resolveAddresses: async () => {
         if (a.address === 'lookup')
           return this.addressesOf(a.channel, a.recipientUserId, loadContact);
         return a.address.given ? [a.address.given] : [];
       },
-      optedOut: routed
-        ? async ([phone]) =>
-            sender !== null && phone !== undefined && this.whatsapp.optedOut(sender, phone)
+      optedOut: anyRouted
+        ? async ([phone]) => {
+            const sender = firstSender();
+            return sender !== null && phone !== undefined && this.whatsapp.optedOut(sender, phone);
+          }
         : undefined,
-      quietUntil: routed ? () => this.whatsapp.quietUntil(tenantId, a.critical) : undefined,
-      capacity: routed
+      quietUntil: anyRouted
         ? async () =>
-            sender === null ? 'ok' : this.whatsapp.capacity(sender, tenantId, a.critical)
+            firstSender() === null ? null : this.whatsapp.quietUntil(tenantId, a.critical)
+        : undefined,
+      capacity: anyRouted
+        ? async () => {
+            const sender = firstSender();
+            return sender === null ? 'ok' : this.whatsapp.capacity(sender, tenantId, a.critical);
+          }
         : undefined,
     });
     if (!gate.open) {
@@ -158,45 +168,114 @@ export class ChannelSender {
       }
       return { status: 'SKIPPED', provider: null, skipReason: gate.reason };
     }
-    // The gate already refused a channel without an adapter; this narrows the type.
-    if (adapter === null) return { status: 'SKIPPED', provider: null, skipReason: 'no_provider' };
-    if (unsendableSms) {
-      return {
-        status: 'FAILED',
-        provider: adapter.provider,
-        errorCode: 'SMS_VARIABLE_TOO_LONG',
-        retryable: false,
-      };
+    if (!needsTemplate) {
+      found.candidates = found.withProvider.map((adapter) => ({ adapter, sms: null }));
     }
 
-    const route = routeOf(sender, template);
     const copy = a.compose(await loadLocale());
+    const message: ChannelMessage = {
+      channel: a.channel,
+      type: a.type,
+      recipientUserId: a.recipientUserId,
+      to: gate.addresses,
+      subject: copy.subject,
+      body: copy.body,
+      data: a.data,
+    };
+    const [phone] = gate.addresses;
+    const routed =
+      found.sender !== null && found.template !== null && phone !== undefined
+        ? { sender: found.sender, template: found.template, phone }
+        : null;
+    return this.sendThrough(a, found.candidates, message, routed);
+  }
+
+  /** Tries each provider in order; moves on only when the one before cannot send now. */
+  private async sendThrough(
+    a: ChannelAttempt,
+    candidates: readonly Candidate[],
+    message: ChannelMessage,
+    routed: Routed | null,
+  ): Promise<AttemptOutcome> {
+    let failed: FailedOutcome | null = null;
+    for (const [index, { adapter, sms }] of candidates.entries()) {
+      if (sms === 'unsendable') return variableTooLong(adapter);
+      const tried = isRouted(adapter)
+        ? await this.sendRouted(adapter, message, a, routed, index === 0)
+        : await this.sendOnce(adapter, message, sms, null);
+      if (tried === null) continue;
+      if (tried.outcome.status === 'SENT' || !tried.unavailable) return tried.outcome;
+      failed = tried.outcome;
+    }
+    // The gate already refused a channel without a provider.
+    return failed ?? { status: 'SKIPPED', provider: null, skipReason: 'no_provider' };
+  }
+
+  /** Null when the sender may not be used for this message. */
+  private async sendRouted(
+    adapter: ChannelAdapter,
+    message: ChannelMessage,
+    a: ChannelAttempt,
+    routed: Routed | null,
+    gated: boolean,
+  ): Promise<Tried | null> {
+    if (routed === null) return null;
+    const { sender, template, phone } = routed;
+    if (!gated && !(await this.senderUsable(sender, phone, a, true))) return null;
+    const tried = await this.sendOnce(adapter, message, null, { sender, template });
+    if (!tried.unavailable) return tried;
+    // One official provider: the platform's number is the failover for an institute's own.
+    const platform = await this.whatsapp.fallbackFor(sender);
+    if (platform === null || !(await this.senderUsable(platform, phone, a, false))) return tried;
+    return this.sendOnce(adapter, message, null, { sender: platform, template });
+  }
+
+  /** A sender reached by failover passes the same per-sender rules the gate applies. */
+  private async senderUsable(
+    sender: MessagingSenderRecord,
+    phone: string,
+    a: ChannelAttempt,
+    quietHours: boolean,
+  ): Promise<boolean> {
+    const tenantId = a.audience.tenantId;
+    if (await this.whatsapp.optedOut(sender, phone)) return false;
+    if (quietHours && (await this.whatsapp.quietUntil(tenantId, a.critical)) !== null) return false;
+    return (await this.whatsapp.capacity(sender, tenantId, a.critical)) === 'ok';
+  }
+
+  private async sendOnce(
+    adapter: ChannelAdapter,
+    message: ChannelMessage,
+    sms: SmsSend | null,
+    via: { sender: MessagingSenderRecord; template: TemplateSend } | null,
+  ): Promise<Tried> {
+    const route = via === null ? null : routeOf(via.sender, via.template);
     try {
       const result = await adapter.send({
-        channel: a.channel,
-        type: a.type,
-        recipientUserId: a.recipientUserId,
-        to: gate.addresses,
-        subject: copy.subject,
-        body: copy.body,
-        data: a.data,
+        ...message,
         ...(route ? { route: route.message } : {}),
         ...(sms ? { sms } : {}),
       });
       return {
-        status: 'SENT',
-        provider: adapter.provider,
-        providerMessageId: result.providerMessageId ?? null,
-        ...(route ? { route: route.stored } : {}),
+        outcome: {
+          status: 'SENT',
+          provider: adapter.provider,
+          providerMessageId: result.providerMessageId ?? null,
+          ...(route ? { route: route.stored } : {}),
+        },
+        unavailable: false,
       };
     } catch (err) {
       if (err instanceof ChannelAdapterError) {
         return {
-          status: 'FAILED',
-          provider: adapter.provider,
-          errorCode: err.code,
-          retryable: err.retryable,
-          ...(route ? { route: route.stored } : {}),
+          outcome: {
+            status: 'FAILED',
+            provider: adapter.provider,
+            errorCode: err.code,
+            retryable: err.retryable,
+            ...(route ? { route: route.stored } : {}),
+          },
+          unavailable: err.kind === 'provider_unavailable',
         };
       }
       throw err;
@@ -222,6 +301,64 @@ export class ChannelSender {
         return this.contacts.findDeviceTokens(userId);
     }
   }
+}
+
+type SentOutcome = Extract<DeliveryOutcome, { status: 'SENT' }>;
+type FailedOutcome = Extract<DeliveryOutcome, { status: 'FAILED' }>;
+
+interface Tried {
+  outcome: SentOutcome | FailedOutcome;
+  /** True when the provider could not send now, so the next one may take the attempt. */
+  unavailable: boolean;
+}
+
+interface Routed {
+  sender: MessagingSenderRecord;
+  template: TemplateSend;
+  phone: string;
+}
+
+interface Found {
+  sender: MessagingSenderRecord | null;
+  template: TemplateSend | null;
+  withProvider: ChannelAdapter[];
+  candidates: Candidate[];
+}
+
+interface Candidate {
+  adapter: ChannelAdapter;
+  /** The registered SMS template; `unsendable` when the draft cannot be sent as registered. */
+  sms: SmsSend | null | 'unsendable';
+}
+
+const isRouted = (adapter: ChannelAdapter) => adapter.usesSenders === true;
+
+function smsDraftOf(a: ChannelAttempt, locale: Locale): SmsDraft | null | 'unsendable' {
+  try {
+    return a.sms?.(locale) ?? null;
+  } catch (err) {
+    if (!(err instanceof SmsVariableError)) throw err;
+    // Not a missing template: the message exists but cannot be sent as registered.
+    return 'unsendable';
+  }
+}
+
+/** The provider as a candidate for this message, or none: an SMS one needs a registered template. */
+function candidateOf(
+  adapter: ChannelAdapter,
+  template: TemplateSend | null,
+  draft: SmsDraft | null | 'unsendable',
+): Candidate[] {
+  if (isRouted(adapter)) return template === null ? [] : [{ adapter, sms: null }];
+  if (!adapter.resolveSmsTemplate) return [{ adapter, sms: null }];
+  if (draft === 'unsendable') return [{ adapter, sms: 'unsendable' }];
+  const sms = draft === null ? null : adapter.resolveSmsTemplate(draft);
+  return sms === null ? [] : [{ adapter, sms }];
+}
+
+function variableTooLong(adapter: ChannelAdapter): FailedOutcome {
+  const errorCode: AdapterErrorCode = 'SMS_VARIABLE_TOO_LONG';
+  return { status: 'FAILED', provider: adapter.provider, errorCode, retryable: false };
 }
 
 function routeOf(

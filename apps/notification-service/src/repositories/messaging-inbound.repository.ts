@@ -1,14 +1,12 @@
-import type { InboundPerson, ReceiptInput } from './types';
+import type { InboundPerson, ReceiptInput, ReceiptResult } from './types';
 
 export abstract class MessagingInboundRepository {
   /**
    * Appends a DELIVERED or FAILED row copied from the SENT row of the same sender and message.
-   * `duplicate`: the event was handled before. `unknown_message`: this sender sent no such
-   * message; nothing is written.
+   * The flow id is copied too. `duplicate`: the event was handled before. `unknown_message`:
+   * this sender sent no such message; nothing is written.
    */
-  abstract recordReceipt(
-    input: ReceiptInput,
-  ): Promise<'recorded' | 'duplicate' | 'unknown_message'>;
+  abstract recordReceipt(input: ReceiptInput): Promise<ReceiptResult>;
 
   /**
    * Appends the person's request to stop or to start again. `changed` is false for a repeated
