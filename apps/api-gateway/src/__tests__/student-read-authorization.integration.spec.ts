@@ -74,6 +74,7 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
   let nurse: Actor;
   let receptionist: Actor;
   let support: Actor;
+  let librarian: Actor;
   let principal: Actor;
   let clerk: Actor;
   let applicationId: string;
@@ -195,6 +196,7 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
     nurse = await actor('nurse');
     receptionist = await actor('receptionist');
     support = await actor('support_staff');
+    librarian = await actor('librarian');
     principal = await actor('principal');
     clerk = await actor('admin_clerk');
     limitedAdmissions = await actor('receptionist', tenant, [
@@ -412,9 +414,50 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
     const receptionPage = await list(receptionist);
     expect(receptionPage.edges[0].node.admissionNumber).not.toBeNull();
     expect(receptionPage.edges[0].node.medicalInfo).toBeNull();
-    const supportPage = await list(support);
-    expect(supportPage.edges[0].node.admissionNumber).toBeNull();
-    expect(supportPage.edges[0].node.medicalInfo).toBeNull();
+  });
+
+  // ROV-217: support staff hold no student data at all.
+  it('refuses the student list to support staff', async () => {
+    const response = await gqlRequest(app.httpServer, {
+      token: support.token,
+      query: '{ listStudents { totalCount } }',
+    });
+    expect(response.errors?.map((error) => error.extensions?.code)).toEqual(['FORBIDDEN']);
+    expect(response.data).toBeNull();
+  });
+
+  // ROV-217: caste, religion and welfare fields only for the roles that keep the records.
+  it('hides caste and welfare fields from a librarian and keeps them for the principal', async () => {
+    const fields = 'socialCategory caste religion isBpl isMinority isCwsn';
+    const page = async (person: Actor) => {
+      const response = await gqlRequest<{
+        listStudents: { edges: { node: Record<string, unknown> }[] };
+      }>(app.httpServer, {
+        token: person.token,
+        query: `{ listStudents { edges { node { firstName ${fields} } } } }`,
+      });
+      expect(response.errors).toBeUndefined();
+      assert(response.data);
+      return response.data.listStudents.edges.map((edge) => edge.node);
+    };
+
+    const seenByLibrarian = await page(librarian);
+    expect(seenByLibrarian).toHaveLength(2);
+    for (const node of seenByLibrarian) {
+      expect(node.firstName).not.toBeNull();
+      expect([node.socialCategory, node.caste, node.religion]).toEqual([null, null, null]);
+      expect([node.isBpl, node.isMinority, node.isCwsn]).toEqual([null, null, null]);
+    }
+    for (const node of await page(principal)) {
+      expect(node.socialCategory).not.toBeNull();
+      expect(node.isBpl).not.toBeNull();
+    }
+
+    const filtered = await gqlRequest(app.httpServer, {
+      token: librarian.token,
+      query: '{ listStudents(filter: { socialCategory: GENERAL }) { totalCount } }',
+    });
+    expect(filtered.errors?.map((error) => error.extensions?.code)).toEqual(['FORBIDDEN']);
   });
 
   it('restricted fields cannot be inferred using list filters', async () => {

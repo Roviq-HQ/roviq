@@ -6,8 +6,9 @@
  * The latest row per (guardian, student, purpose) determines current consent state.
  */
 
+import { subject } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
@@ -147,7 +148,11 @@ export class ConsentService {
    * ability enforced at the resolver. No guardian/membership resolution
    * needed — the student itself is the scope anchor.
    */
-  async consentStatusForStudent(studentProfileId: string) {
+  /** A parent's rule covers only their linked children; staff with consent access see any. */
+  async consentStatusForStudent(studentProfileId: string, ability: AppAbility) {
+    if (!ability.can('read', subject('Consent', { studentProfileId }))) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, 'Not a student linked to this guardian');
+    }
     const tenantId = this.tenantId;
 
     const rows = await this.repo.latestForStudent(tenantId, studentProfileId);

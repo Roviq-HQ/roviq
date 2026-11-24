@@ -430,7 +430,7 @@ Student lists, direct lookup, counts, statistics, documents, academic history, a
 
 GraphQL field middleware masks fields on student, enquiry, and application responses, including mutation and subscription results. Restricted student fields are nullable. Sensitive values in application `formData` are removed recursively. Filters and sorting on restricted student fields are rejected to prevent inference from counts or ordering.
 
-Default policies retain `institute_admin` and `admin_clerk` access. Principals retain Aadhaar/PAN access; income and medical information are masked. Nurses and counselors retain their medical grants; counselor notes require the `CounselorNotes` permission. Custom role and membership grants remain explicit policy overrides.
+Default policies retain `institute_admin` and `admin_clerk` access. Principals retain Aadhaar/PAN access; income and medical information are masked. Nurses and counselors retain their medical grants; counselor notes require the `CounselorNotes` permission. Caste, religion, social category, BPL, minority and disability fields are visible only to `institute_admin`, `principal`, `vice_principal`, `admin_clerk` and `class_teacher` (own sections). Custom role and membership grants remain explicit policy overrides.
 
 ### Attendance section scope
 
@@ -465,10 +465,16 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 | reseller | reseller_full_admin | manage institutes, manage team, impersonate |
 | reseller | reseller_support_admin | everything `reseller_viewer` has, read users, impersonate (view-only sessions), manage team members up to its own role |
 | reseller | reseller_viewer | read institutes, institute groups, institute statistics, the billing dashboard, subscriptions and invoices |
-| institute | institute_admin | manage all (within tenant) |
-| institute | teacher | read students/sections/standards/subjects/timetables, CRU attendance |
-| institute | student | read timetable/subjects, read own attendance |
-| institute | parent | read timetable/attendance/students |
+| institute | 22 default roles | `DEFAULT_ROLE_ABILITIES` in `libs/shared/common-types/src/lib/common-types.ts`; the rules that bound them are below |
+
+Default institute roles:
+
+- `institute_admin` manages everything in its institute except the institute's own lifecycle and institute groups.
+- A class teacher reads the students and guardians of the sections they teach; a student reads their own record; a parent reads their linked children.
+- Report cards: a student reads only their own published cards and a parent only their linked children's. `reportCardInstances`, `reportCardInstance` and `reportCardPdf` apply the caller's rules to the instance (`report-card-scope.ts`); another student's card answers `REPORT_CARD_NOT_FOUND`.
+- Consent: a parent's rule covers only their linked children; `consentStatusForStudent` refuses another family's child with `FORBIDDEN`.
+- `support_staff` reads no student data. Every role that reads students also reads standards and sections, which the student list filters by.
+- Institute setup creates the default roles (`seedDefaultRoles`). The essential seed, which runs on every deploy, rewrites the abilities and navigation of every institute's existing default roles from the code (`refreshDefaultRoleAbilities`); it creates no role. A role keeps its old abilities in the ability cache for up to five minutes.
 
 ### Platform and reseller system roles
 

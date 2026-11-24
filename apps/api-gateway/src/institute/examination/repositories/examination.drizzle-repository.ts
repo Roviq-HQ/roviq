@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ExamStatus, GradingSchemeKind, ReportCardStatus } from '@roviq/common-types';
+import type {
+  AppAbility,
+  ExamStatus,
+  GradingSchemeKind,
+  ReportCardStatus,
+} from '@roviq/common-types';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
   academicYearsLive,
@@ -47,6 +52,7 @@ import {
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, between, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { ExaminationRepository } from './examination.repository';
+import { reportCardInstanceInScope } from './report-card-scope';
 import type {
   AttendanceTally,
   CoScholasticAreaRecord,
@@ -1421,12 +1427,20 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
     });
   }
 
-  async findReportCardInstanceById(id: string): Promise<ReportCardInstanceRecord | null> {
+  async findReportCardInstanceById(
+    id: string,
+    ability: AppAbility,
+  ): Promise<ReportCardInstanceRecord | null> {
     return withTenant(this.db, this.ctx(), async (tx) => {
       const rows = await tx
         .select()
         .from(reportCardInstancesLive)
-        .where(eq(reportCardInstancesLive.id, id));
+        .where(
+          and(
+            eq(reportCardInstancesLive.id, id),
+            reportCardInstanceInScope(ability, reportCardInstancesLive.id),
+          ),
+        );
       return (rows[0] as ReportCardInstanceRecord | undefined) ?? null;
     });
   }
@@ -1434,6 +1448,7 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
   async findReportCardInstance(
     reportCardId: string,
     studentProfileId: string,
+    ability: AppAbility,
   ): Promise<ReportCardInstanceRecord | null> {
     return withTenant(this.db, this.ctx(), async (tx) => {
       const rows = await tx
@@ -1443,20 +1458,27 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
           and(
             eq(reportCardInstancesLive.reportCardId, reportCardId),
             eq(reportCardInstancesLive.studentProfileId, studentProfileId),
+            reportCardInstanceInScope(ability, reportCardInstancesLive.id),
           ),
         );
       return (rows[0] as ReportCardInstanceRecord | undefined) ?? null;
     });
   }
 
-  async listReportCardInstances(reportCardId: string): Promise<ReportCardInstanceRecord[]> {
+  async listReportCardInstances(
+    reportCardId: string,
+    ability: AppAbility,
+  ): Promise<ReportCardInstanceRecord[]> {
     return withTenant(this.db, this.ctx(), async (tx) => {
       return tx
         .select()
         .from(reportCardInstancesLive)
-        .where(eq(reportCardInstancesLive.reportCardId, reportCardId)) as Promise<
-        ReportCardInstanceRecord[]
-      >;
+        .where(
+          and(
+            eq(reportCardInstancesLive.reportCardId, reportCardId),
+            reportCardInstanceInScope(ability, reportCardInstancesLive.id),
+          ),
+        ) as Promise<ReportCardInstanceRecord[]>;
     });
   }
 

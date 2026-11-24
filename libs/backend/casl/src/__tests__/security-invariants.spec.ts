@@ -213,12 +213,13 @@ describe('it_admin', () => {
 // ── 16-17: support_staff (minimal access) ─────────────────
 
 describe('support_staff', () => {
-  it('#16: support_staff can read Student (name+photo only)', () => {
+  // ROV-217: no student data; an institute that wants more gives a custom role.
+  it('#16: support_staff cannot read students or their attendance', () => {
     const ability = abilityForRole('support_staff');
-    expect(ability.can('read', 'Student')).toBe(true);
-    // Cannot manage anything else
-    expect(ability.can('manage', 'Student')).toBe(false);
+    expect(ability.can('read', 'Student')).toBe(false);
     expect(ability.can('read', 'Attendance')).toBe(false);
+    expect(ability.can('read', 'Guardian')).toBe(false);
+    expect(ability.can('read', 'Institute')).toBe(true);
   });
 });
 

@@ -64,7 +64,7 @@ Both resolvers guard with `@UseGuards(GqlAuthGuard, InstituteScopeGuard, Ability
 
 ## CASL
 
-Subjects `Exam`, `GradingScheme`, `ReportCard`. `manage` on all three is granted to `principal`, `vice_principal`, `academic_coordinator`, and `exam_coordinator` (plus `institute_admin` via `manage:all`). `subject_teacher` additionally gets `manage:Exam` (so subject teachers can run the exam → marks → results flow for their subjects). `read:ReportCard` is granted to `student` and `parent` (own cards via `myReportCards`). Both directions are enforced by `apps/api-gateway/src/__tests__/ability-coverage.spec.ts`.
+Subjects `Exam`, `GradingScheme`, `ReportCard`. `manage` on all three is granted to `principal`, `vice_principal`, `academic_coordinator`, and `exam_coordinator` (plus `institute_admin` via `manage:all`). `subject_teacher` additionally gets `manage:Exam`, which reaches every exam of the institute. `read:ReportCard` is granted to `student` and `parent` with conditions: a student reads their own published cards, a parent their linked children's. The instance queries (`reportCardInstances`, `reportCardInstance`, `reportCardPdf`) apply those conditions through `repositories/report-card-scope.ts`, so another student's or an unpublished card answers `REPORT_CARD_NOT_FOUND`. Both directions are enforced by `apps/api-gateway/src/__tests__/ability-coverage.spec.ts`.
 
 ## Frontend
 

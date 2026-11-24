@@ -2,6 +2,7 @@ export { BaseRepository } from './base-repository';
 export { SYSTEM_USER_ID } from './constants';
 export { DatabaseModule } from './database.module';
 export { escapeLikePattern, i18nDisplay, i18nLocaleEquals, i18nNameSearch } from './i18n';
+export { refreshInstituteDefaultRoles } from './institute-default-roles';
 export { RoviqDrizzleLogger } from './logger';
 export { uniqueViolationConstraint } from './pg-errors';
 export { createDrizzleDb, DRIZZLE_DB, type DrizzleDB } from './providers';

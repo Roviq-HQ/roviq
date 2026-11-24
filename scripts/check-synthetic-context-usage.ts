@@ -68,6 +68,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/consent/__tests__/consent-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.fixture.ts',
+  // ROV-217 fixtures: student and parent roles, a guardian link and published instances.
+  'apps/api-gateway/src/institute/examination/__tests__/report-card-own-access.integration.spec.ts',
   'apps/api-gateway/src/institute/group/__tests__/group-crud.integration.spec.ts',
   'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/guardian/__tests__/guardian-create-foreign-id.integration.spec.ts',

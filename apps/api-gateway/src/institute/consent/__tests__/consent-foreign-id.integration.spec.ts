@@ -3,13 +3,20 @@
  * consent records and write no consent record in either institute.
  */
 import { randomUUID } from 'node:crypto';
-import { AcademicStatus, AdmissionType, ErrorCode, SocialCategory } from '@roviq/common-types';
+import {
+  AcademicStatus,
+  AdmissionType,
+  DEFAULT_ROLE_ABILITIES,
+  ErrorCode,
+  SocialCategory,
+} from '@roviq/common-types';
 import {
   consentRecords,
   type DrizzleDB,
   guardianProfiles,
   memberships,
   mkAdminCtx,
+  roles,
   SYSTEM_USER_ID,
   studentGuardianLinks,
   studentProfiles,
@@ -250,5 +257,55 @@ describe('consent: a student of another institute (ROV-293)', () => {
 
     expect(res.errors).toBeUndefined();
     expect(res.data?.consentStatusForStudent).toEqual([]);
+  });
+
+  // ROV-217: a parent's consent rule covers only their linked children.
+  it("consentStatusForStudent should answer a parent for their own child and refuse another family's", async () => {
+    const { parentToken, ownChildId, otherChildId } = await asAdmin(async (tx) => {
+      const [parentRole] = await tx
+        .insert(roles)
+        .values({
+          tenantId: instA.tenantId,
+          name: { en: `parent ${randomUUID().slice(0, 8)}` },
+          abilities: DEFAULT_ROLE_ABILITIES.parent,
+          ...BY,
+        })
+        .returning({ id: roles.id });
+      const parent = await insertUserWithMembership(tx, instA, 'parent');
+      await tx
+        .update(memberships)
+        .set({ roleId: parentRole.id })
+        .where(eq(memberships.id, parent.membershipId));
+      const ownChild = await insertStudent(tx, instA);
+      await linkGuardian(tx, instA, parent, ownChild);
+      const otherChild = await insertStudent(tx, instA);
+      const otherParent = await insertUserWithMembership(tx, instA, 'other_parent');
+      await linkGuardian(tx, instA, otherParent, otherChild);
+      return {
+        ownChildId: ownChild,
+        otherChildId: otherChild,
+        parentToken: createInstituteToken({
+          sub: parent.userId,
+          tenantId: instA.tenantId,
+          membershipId: parent.membershipId,
+          roleId: parentRole.id,
+        }),
+      };
+    });
+
+    const own = await gqlRequest(result.httpServer, {
+      query: STATUS,
+      variables: { studentProfileId: ownChildId },
+      token: parentToken,
+    });
+    expect(own.errors).toBeUndefined();
+
+    const other = await gqlRequest(result.httpServer, {
+      query: STATUS,
+      variables: { studentProfileId: otherChildId },
+      token: parentToken,
+    });
+    expect(other.errors?.[0]?.extensions?.code).toBe(ErrorCode.FORBIDDEN);
+    expect(other.data).toBeNull();
   });
 });
