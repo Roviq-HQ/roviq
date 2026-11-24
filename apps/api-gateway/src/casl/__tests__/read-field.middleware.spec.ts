@@ -68,9 +68,39 @@ describe('student read field authorization', () => {
       conditions: ['allergy'],
     });
   });
-  it('support staff sees names but not admission numbers', async () => {
-    expect(await read('support_staff', 'firstName', { en: 'Test' })).toEqual({ en: 'Test' });
+  it('support staff sees no student field (ROV-217)', async () => {
+    expect(await read('support_staff', 'firstName', { en: 'Test' })).toBeNull();
     expect(await read('support_staff', 'admissionNumber', 'ADM-1')).toBeNull();
+  });
+  // ROV-217: caste, religion and welfare fields stay with the roles that keep the records.
+  it.each<DefaultRole>([
+    'librarian',
+    'transport_incharge',
+    'hostel_warden',
+    'sports_coach',
+    'activity_teacher',
+    'exam_coordinator',
+    'accountant',
+    'counselor',
+    'subject_teacher',
+    'student',
+    'parent',
+  ])('%s cannot read caste, religion or welfare fields', async (role) => {
+    for (const field of ['caste', 'religion', 'socialCategory', 'isBpl', 'isMinority', 'isCwsn']) {
+      expect(await read(role, field, 'value')).toBeNull();
+    }
+    expect(await read(role, 'firstName', { en: 'Test' })).toEqual({ en: 'Test' });
+  });
+  it.each<DefaultRole>([
+    'institute_admin',
+    'principal',
+    'vice_principal',
+    'admin_clerk',
+    'class_teacher',
+  ])('%s keeps caste, religion and welfare fields', async (role) => {
+    for (const field of ['caste', 'religion', 'socialCategory', 'isBpl', 'isMinority', 'isCwsn']) {
+      expect(await read(role, field, 'value')).toBe('value');
+    }
   });
   it('receptionist sees admission numbers but not birth dates', async () => {
     expect(await read('receptionist', 'admissionNumber', 'ADM-1')).toBe('ADM-1');

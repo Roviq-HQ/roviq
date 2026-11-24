@@ -204,7 +204,7 @@ export const DefaultRoles = {
   ExamCoordinator: 'exam_coordinator',
   /** Reads student medical info, manages health records */
   Nurse: 'nurse',
-  /** Reads student name + photo only */
+  /** No student data: institute info and their own profile (ROV-217) */
   SupportStaff: 'support_staff',
   /** Enrolled learner — reads own data only */
   Student: 'student',
@@ -438,9 +438,12 @@ export const SUBSCRIPTION_READER = Symbol('SUBSCRIPTION_READER');
  * - Aadhaar/PAN: ONLY admin_clerk + principal (via fields property)
  * - Annual income: ONLY admin_clerk (RTE eligibility)
  * - Medical info: ONLY nurse + institute_admin + counselor
+ * - Caste, religion, social category, BPL, minority, disability: ONLY institute_admin, principal,
+ *   vice_principal, admin_clerk, class_teacher (ROV-217)
  * - class_teacher: section-scoped via $user.assignedSections condition
  * - student: own data only via $user.sub condition
- * - guardian: linked children only (handled in resolver, not CASL condition)
+ * - parent: linked children only via $user.linkedStudentIds
+ * - report cards: students and parents read published ones of their own (ROV-217)
  */
 /**
  * Self-service abilities granted to every institute role. Every user can
@@ -572,6 +575,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 6. accountant ───────────────────────────────────────
   accountant: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'Fee' },
     { action: 'read', subject: 'TC' },
@@ -649,6 +654,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 9. activity_teacher ─────────────────────────────────
   activity_teacher: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'Activity' },
     { action: 'read', subject: 'Section' },
@@ -659,6 +665,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 10. lab_assistant ───────────────────────────────────
   lab_assistant: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     {
       action: 'read',
       subject: 'Student',
@@ -673,6 +681,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 11. librarian ───────────────────────────────────────
   librarian: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'LibraryTransaction' },
     { action: 'read', subject: 'AcademicYear' },
@@ -682,6 +692,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 12. transport_incharge ──────────────────────────────
   transport_incharge: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'BusRoute' },
     { action: 'read', subject: 'AcademicYear' },
@@ -691,6 +703,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 13. hostel_warden ───────────────────────────────────
   hostel_warden: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'HostelRoom' },
     { action: 'read', subject: 'AcademicYear' },
@@ -700,6 +714,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 14. counselor — manages confidential notes (NOT visible to principal) ──
   counselor: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'manage', subject: 'CounselorNotes' },
     { action: 'read', subject: 'Student' },
     { action: 'read', subject: 'HealthRecord' },
@@ -710,6 +726,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 15. sports_coach ────────────────────────────────────
   sports_coach: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'SportsTeam' },
     { action: 'read', subject: 'AcademicYear' },
@@ -755,22 +773,16 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 19. nurse — reads student medical info ──────────────
   nurse: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student', fields: ['id', 'firstName', 'lastName', 'medicalInfo'] },
     { action: 'manage', subject: 'HealthRecord' },
     { action: 'read', subject: 'AcademicYear' },
     { action: 'read', subject: 'Institute' },
   ],
 
-  // ── 20. support_staff — reads student name + photo only ──
-  support_staff: [
-    ...SELF_SERVICE_ABILITIES,
-    {
-      action: 'read',
-      subject: 'Student',
-      fields: ['id', 'firstName', 'lastName', 'profileImage'],
-    },
-    { action: 'read', subject: 'Institute' },
-  ],
+  // ── 20. support_staff — no student data ──
+  support_staff: [...SELF_SERVICE_ABILITIES, { action: 'read', subject: 'Institute' }],
 
   // ── 21. student — reads own data only ───────────────────
   student: [
@@ -782,7 +794,11 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Subject' },
     { action: 'read', subject: 'Timetable' },
-    { action: 'read', subject: 'ReportCard' },
+    {
+      action: 'read',
+      subject: 'ReportCard',
+      conditions: { userId: '$user.sub', status: 'PUBLISHED' },
+    },
     // Attendance entries reference the student's membership, not their user id.
     { action: 'read', subject: 'Attendance', conditions: { studentId: '$user.membershipId' } },
     // Students can file own leaves + read the holiday calendar.
@@ -805,14 +821,22 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
       subject: 'Attendance',
       conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
     },
-    { action: 'manage', subject: 'Consent' },
+    {
+      action: 'manage',
+      subject: 'Consent',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' } },
+    },
     { action: 'read', subject: 'Institute' },
     { action: 'read', subject: 'AcademicYear' },
     { action: 'read', subject: 'Standard' },
     { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Subject' },
     { action: 'read', subject: 'Timetable' },
-    { action: 'read', subject: 'ReportCard' },
+    {
+      action: 'read',
+      subject: 'ReportCard',
+      conditions: { studentProfileId: { $in: '$user.linkedStudentIds' }, status: 'PUBLISHED' },
+    },
     // Guardians file, read and withdraw their children's leaves.
     {
       action: 'create',
@@ -833,6 +857,23 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   ],
 };
 
+/** Caste, religion and welfare fields: only roles that keep the institute's records see them. */
+const DEMOGRAPHIC_FIELDS = [
+  'caste',
+  'religion',
+  'socialCategory',
+  'isBpl',
+  'isMinority',
+  'minorityType',
+  'isCwsn',
+  'cwsnType',
+];
+const DEMOGRAPHIC_READERS: ReadonlySet<DefaultRole> = new Set<DefaultRole>([
+  'principal',
+  'vice_principal',
+  'class_teacher',
+]);
+
 // Broad read/manage rules must not implicitly disclose sensitive fields.
 for (const role of new Set(Object.values(DefaultRoles))) {
   if (role === DefaultRoles.InstituteAdmin || role === DefaultRoles.AdminClerk) continue;
@@ -840,5 +881,6 @@ for (const role of new Set(Object.values(DefaultRoles))) {
   if (role === DefaultRoles.Principal) fields.splice(0, 2);
   if (role === DefaultRoles.Counselor) fields.splice(fields.indexOf('counselorNotes'), 1);
   if (role !== DefaultRoles.Nurse && role !== DefaultRoles.Counselor) fields.push('medicalInfo');
+  if (!DEMOGRAPHIC_READERS.has(role)) fields.push(...DEMOGRAPHIC_FIELDS);
   DEFAULT_ROLE_ABILITIES[role].push({ action: 'read', subject: 'Student', fields, inverted: true });
 }

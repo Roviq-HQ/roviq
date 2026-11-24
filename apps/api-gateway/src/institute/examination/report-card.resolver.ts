@@ -6,8 +6,8 @@ import {
   GqlAuthGuard,
   InstituteScopeGuard,
 } from '@roviq/auth-backend';
-import { AbilityGuard, CheckAbility } from '@roviq/casl';
-import type { AuthUser } from '@roviq/common-types';
+import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
+import type { AppAbility, AuthUser } from '@roviq/common-types';
 import {
   CreateCoScholasticAreaInput,
   CreateReportCardInput,
@@ -166,8 +166,9 @@ export class ReportCardResolver {
   @CheckAbility({ action: 'read', subject: 'ReportCard' })
   reportCardInstances(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
+    @CurrentAbility() ability: AppAbility,
   ): Promise<ReportCardInstanceRecord[]> {
-    return this.cards.listInstances(reportCardId);
+    return this.cards.listInstances(reportCardId, ability);
   }
 
   @Query(() => ReportCardInstanceModel)
@@ -175,8 +176,9 @@ export class ReportCardResolver {
   reportCardInstance(
     @Args('reportCardId', { type: () => ID }) reportCardId: string,
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
+    @CurrentAbility() ability: AppAbility,
   ): Promise<ReportCardInstanceRecord> {
-    return this.cards.getInstance(reportCardId, studentProfileId);
+    return this.cards.getInstance(reportCardId, studentProfileId, ability);
   }
 
   @Query(() => [ReportCardInstanceModel], {
@@ -190,8 +192,11 @@ export class ReportCardResolver {
 
   @Query(() => String, { description: 'Base64-encoded report-card PDF.' })
   @CheckAbility({ action: 'read', subject: 'ReportCard' })
-  async reportCardPdf(@Args('instanceId', { type: () => ID }) instanceId: string): Promise<string> {
-    const buffer = await this.pdf.render(instanceId);
+  async reportCardPdf(
+    @Args('instanceId', { type: () => ID }) instanceId: string,
+    @CurrentAbility() ability: AppAbility,
+  ): Promise<string> {
+    const buffer = await this.pdf.render(instanceId, ability);
     return buffer.toString('base64');
   }
 }

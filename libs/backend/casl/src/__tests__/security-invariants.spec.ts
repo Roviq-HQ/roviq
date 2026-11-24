@@ -213,12 +213,25 @@ describe('it_admin', () => {
 // ── 16-17: support_staff (minimal access) ─────────────────
 
 describe('support_staff', () => {
-  it('#16: support_staff can read Student (name+photo only)', () => {
+  // ROV-217: no student data; an institute that wants more gives a custom role.
+  it('#16: support_staff cannot read students or their attendance', () => {
     const ability = abilityForRole('support_staff');
-    expect(ability.can('read', 'Student')).toBe(true);
-    // Cannot manage anything else
-    expect(ability.can('manage', 'Student')).toBe(false);
+    expect(ability.can('read', 'Student')).toBe(false);
     expect(ability.can('read', 'Attendance')).toBe(false);
+    expect(ability.can('read', 'Guardian')).toBe(false);
+    expect(ability.can('read', 'Institute')).toBe(true);
+  });
+});
+
+// The student list filters by class and section: a role that lists students must read them.
+describe('class structure for student readers', () => {
+  it.each(
+    Object.keys(DEFAULT_ROLE_ABILITIES) as (keyof typeof DEFAULT_ROLE_ABILITIES)[],
+  )('%s reads standards and sections when it reads students', (role) => {
+    const ability = abilityForRole(role);
+    if (!ability.can('read', 'Student')) return;
+    expect(ability.can('read', 'Standard')).toBe(true);
+    expect(ability.can('read', 'Section')).toBe(true);
   });
 });
 

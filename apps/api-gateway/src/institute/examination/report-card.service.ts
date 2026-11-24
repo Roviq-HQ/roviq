@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
 import { assertExamRefs } from './examination-refs';
 import { ReportCardGenerationService } from './report-card-generation.service';
 import { ExaminationRepository } from './repositories/examination.repository';
@@ -64,15 +64,17 @@ export class ReportCardService {
     return this.generation.publish(reportCardId);
   }
 
-  listInstances(reportCardId: string): Promise<ReportCardInstanceRecord[]> {
-    return this.repo.listReportCardInstances(reportCardId);
+  /** Instances the ability covers: all for staff who manage report cards, own ones otherwise. */
+  listInstances(reportCardId: string, ability: AppAbility): Promise<ReportCardInstanceRecord[]> {
+    return this.repo.listReportCardInstances(reportCardId, ability);
   }
 
   async getInstance(
     reportCardId: string,
     studentProfileId: string,
+    ability: AppAbility,
   ): Promise<ReportCardInstanceRecord> {
-    const inst = await this.repo.findReportCardInstance(reportCardId, studentProfileId);
+    const inst = await this.repo.findReportCardInstance(reportCardId, studentProfileId, ability);
     if (!inst) throw new BusinessException(ErrorCode.REPORT_CARD_NOT_FOUND, 'Instance not found');
     return inst;
   }

@@ -1,4 +1,9 @@
-import type { ExamStatus, GradingSchemeKind, ReportCardStatus } from '@roviq/common-types';
+import type {
+  AppAbility,
+  ExamStatus,
+  GradingSchemeKind,
+  ReportCardStatus,
+} from '@roviq/common-types';
 import type {
   AttendanceTally,
   CoScholasticAreaRecord,
@@ -156,12 +161,20 @@ export abstract class ExaminationRepository {
   abstract upsertReportCardInstances(
     data: UpsertReportCardInstanceData[],
   ): Promise<ReportCardInstanceRecord[]>;
-  abstract findReportCardInstanceById(id: string): Promise<ReportCardInstanceRecord | null>;
+  abstract findReportCardInstanceById(
+    id: string,
+    ability: AppAbility,
+  ): Promise<ReportCardInstanceRecord | null>;
+  /** Null also when the ability does not cover the instance (another student's card). */
   abstract findReportCardInstance(
     reportCardId: string,
     studentProfileId: string,
+    ability: AppAbility,
   ): Promise<ReportCardInstanceRecord | null>;
-  abstract listReportCardInstances(reportCardId: string): Promise<ReportCardInstanceRecord[]>;
+  abstract listReportCardInstances(
+    reportCardId: string,
+    ability: AppAbility,
+  ): Promise<ReportCardInstanceRecord[]>;
   abstract listReportCardInstancesByStudent(
     studentProfileId: string,
   ): Promise<ReportCardInstanceRecord[]>;

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { type AppAbility, BusinessException, ErrorCode } from '@roviq/common-types';
 import PDFDocument from 'pdfkit';
 import type { ReportCardPayload } from './report-card-generation.service';
 import { ExaminationRepository } from './repositories/examination.repository';
@@ -13,8 +13,8 @@ const COL = { subject: 200, exams: 200, pct: 75, grade: 60 } as const;
 export class ReportCardPdfService {
   constructor(private readonly repo: ExaminationRepository) {}
 
-  async render(instanceId: string): Promise<Buffer> {
-    const instance = await this.repo.findReportCardInstanceById(instanceId);
+  async render(instanceId: string, ability: AppAbility): Promise<Buffer> {
+    const instance = await this.repo.findReportCardInstanceById(instanceId, ability);
     if (!instance)
       throw new BusinessException(
         ErrorCode.REPORT_CARD_NOT_FOUND,

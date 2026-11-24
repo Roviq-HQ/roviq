@@ -1,8 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Context, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser, GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
-import { AbilityGuard, CheckAbility } from '@roviq/casl';
-import type { AuthUser } from '@roviq/common-types';
+import { AbilityGuard, CheckAbility, CurrentAbility } from '@roviq/casl';
+import type { AppAbility, AuthUser } from '@roviq/common-types';
 import { extractMeta, type GqlContext } from '../../auth/gql-context';
 import { ConsentService } from './consent.service';
 import { GrantConsentInput } from './dto/grant-consent.input';
@@ -63,7 +63,8 @@ export class ConsentResolver {
   @CheckAbility({ action: 'read', subject: 'Consent' })
   async consentStatusForStudent(
     @Args('studentProfileId', { type: () => ID }) studentProfileId: string,
+    @CurrentAbility() ability: AppAbility,
   ): Promise<ConsentStatus[]> {
-    return this.consentService.consentStatusForStudent(studentProfileId);
+    return this.consentService.consentStatusForStudent(studentProfileId, ability);
   }
 }
