@@ -36,8 +36,9 @@ stg_compose "$REL" stop "${APP_SERVICES[@]}"
 
 restart_apps() {
     if [[ "$KEEP_STOPPED" == false ]]; then
-        log "Starting the apps again"
-        stg_compose "$REL" start "${APP_SERVICES[@]}"
+        # stderr: the backup folder stays the last line of stdout.
+        log "Starting the apps again" >&2
+        stg_compose "$REL" start "${APP_SERVICES[@]}" >&2
     fi
 }
 trap restart_apps EXIT
@@ -50,10 +51,9 @@ log "Dumping database roles"
 stg_compose "$REL" exec -T postgres pg_dumpall -U roviq --roles-only >"$OUT/roles.sql"
 
 log "Copying the object store"
-docker run --rm \
-    -v "${STAGING_PROJECT}_roviq-objects:/data:ro" \
-    -v "$OUT:/out" \
-    postgres:18-alpine tar -C /data -czf /out/objects.tar.gz .
+# Written by this shell, not the container, so the archive belongs to the user running the backup.
+docker run --rm -v "${STAGING_PROJECT}_roviq-objects:/data:ro" \
+    postgres:18-alpine tar -C /data -czf - . >"$OUT/objects.tar.gz"
 
 {
     echo "release=$SHA"
