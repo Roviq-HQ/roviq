@@ -295,7 +295,7 @@ Streams are defined in `STREAMS` constant and auto-created on server startup:
 |---|---|---|---|---|
 | INSTITUTE | `INSTITUTE.>` | workqueue | 3 | Institute domain events |
 | ADMIN | `ADMIN.>` | workqueue | 3 | Platform admin events |
-| NOTIFICATION | `NOTIFICATION.>` | workqueue | 5 | User notifications |
+| NOTIFICATION | `NOTIFICATION.>` | interest | 5 | User notifications |
 | AUDIT | `AUDIT.>` | limits | 5 | Audit log events |
 | BILLING | `BILLING.>` | workqueue | 3 | Billing/payment events |
 | DLQ | `DLQ.>` | limits | 1 | Dead Letter Queue |

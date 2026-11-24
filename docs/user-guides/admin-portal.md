@@ -264,6 +264,15 @@ On the **Impersonation** tab, an additional **scope** filter lets you show entri
 
 ---
 
+## Monitoring
+
+1. From the sidebar, open **Monitoring**.
+2. The page shows the live health of the platform's services, the event queues and each institute's activity.
+3. The **Notification delivery** panel shows, per channel (email, push, SMS, WhatsApp), the messages sent and failed in the last 24 hours and when the platform's test message (the canary) was last accepted. "Late" means no test message was accepted in the last 30 minutes; "Not sent" means none ever was. Below it are the WhatsApp senders and their state (active, paused or blocked).
+4. When the counts cannot be read, the panel says the metrics are unavailable; the canary times and the senders are still shown.
+
+---
+
 ## Observability
 
 1. From the sidebar, open **Observability**.
