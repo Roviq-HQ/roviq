@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import { verify } from '@node-rs/argon2';
 import { BotType } from '@roviq/common-types';
 import { botProfiles, memberships, mkAdminCtx, withAdmin } from '@roviq/database';
+import { EventBusService } from '@roviq/event-bus';
 import {
   createInstituteToken,
   createIntegrationApp,
@@ -17,7 +18,7 @@ import {
   type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 
 const CREATE_BOT = /* GraphQL */ `
@@ -127,8 +128,22 @@ const DELETE_BOT = /* GraphQL */ `
     deleteBot(id: $id)
   }
 `;
+const ROTATE_BOT_KEY_BY_ID = /* GraphQL */ `
+  mutation RotateBotApiKey($id: ID!) {
+    rotateBotApiKey(botId: $id) {
+      apiKey
+    }
+  }
+`;
+const UPDATE_BOT = /* GraphQL */ `
+  mutation UpdateBot($id: ID!) {
+    updateBot(id: $id, input: { status: SUSPENDED, webhookUrl: "https://attacker.test/hook" }) {
+      id
+    }
+  }
+`;
 
-describe('deleteBot: another institute id (ROV-293)', () => {
+describe('bot operations: another institute id (ROV-293)', () => {
   let result: IntegrationAppResult;
   let instA: TestInstitute;
   let tokenA: string;
@@ -194,5 +209,26 @@ describe('deleteBot: another institute id (ROV-293)', () => {
     expect(after.bot.deletedAt).toBeNull();
     expect(after.membership?.status).toBe('ACTIVE');
     expect(await botsOf(instA.tenantId)).toEqual(ownBefore);
+  });
+
+  it.each([
+    ['rotateBotApiKey', ROTATE_BOT_KEY_BY_ID],
+    ['updateBot', UPDATE_BOT],
+  ] as const)('%s should refuse a bot of another institute and change neither institute', async (_operation, query) => {
+    const before = await botState(foreignBotId);
+    const ownBefore = await botsOf(instA.tenantId);
+    const emit = vi.spyOn(EventBusService.prototype, 'emit');
+
+    const res = await gqlRequest(result.httpServer, {
+      query,
+      variables: { id: foreignBotId },
+      token: tokenA,
+    });
+
+    expect(res.errors?.[0]?.extensions?.code).toBe('BOT_NOT_FOUND');
+    expect(res.data).toBeNull();
+    expect(await botState(foreignBotId)).toEqual(before);
+    expect(await botsOf(instA.tenantId)).toEqual(ownBefore);
+    expect(emit.mock.calls.map(([pattern]) => pattern)).toEqual([]);
   });
 });
