@@ -10,7 +10,7 @@ import {
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { FlowArrivalRepository } from './flow-arrival.repository';
 import { arrivalOf } from './flow-arrival-of';
-import type { FlowArrivalRecord } from './types';
+import type { FlowArrivalRecord, WrittenDelivery } from './types';
 
 const ORIGIN = 'repository:flow-arrival';
 
@@ -44,7 +44,7 @@ export class FlowArrivalDrizzleRepository extends FlowArrivalRepository {
     notificationId: string,
     recipientUserId: string,
   ): Promise<
-    | { kind: 'recorded'; arrival: FlowArrivalRecord | null }
+    | { kind: 'recorded'; arrival: FlowArrivalRecord | null; written: WrittenDelivery[] }
     | { kind: 'no_push' }
     | { kind: 'duplicate' }
   > {
@@ -87,7 +87,13 @@ export class FlowArrivalDrizzleRepository extends FlowArrivalRepository {
         flowId: sent.flowId,
         status: 'DELIVERED',
       });
-      return { kind: 'recorded', arrival: arrivalOf(sent, 'DELIVERED') };
+      return {
+        kind: 'recorded',
+        arrival: arrivalOf(sent, 'DELIVERED'),
+        written: [
+          { channel: sent.channel, status: 'DELIVERED', provider: sent.provider, errorCode: null },
+        ],
+      };
     });
   }
 }

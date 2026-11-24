@@ -61,7 +61,18 @@ export interface DigestSpec<P> {
   summaryCopy(items: readonly P[], channel: NotificationChannel, locale: Locale): OutsideCopy;
 }
 
-export type NotificationType<P> = SecretNotificationType<P> | RegularNotificationType<P>;
+/**
+ * Sent by the platform to its own address, at once, like a secret type: no in-app row, no
+ * Temporal input, no institute. Consent and quiet hours do not apply to a platform-owned address.
+ */
+export interface PlatformNotificationType<P> extends NotificationTypeBase<P> {
+  platform: true;
+}
+
+export type NotificationType<P> =
+  | SecretNotificationType<P>
+  | RegularNotificationType<P>
+  | PlatformNotificationType<P>;
 
 export function localized(compose: (locale: Locale) => string): LocalizedText {
   return { en: compose('en'), hi: compose('hi') };

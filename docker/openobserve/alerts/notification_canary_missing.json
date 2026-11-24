@@ -1,0 +1,32 @@
+{
+  "name": "notification_canary_missing",
+  "description": "The delivery canary has not been accepted by the provider on a channel for more than 30 minutes. Messages on that channel are probably not reaching anyone.",
+  "stream_type": "metrics",
+  "stream_name": "notification_canary_last_success",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "time() - max by (channel) (notification_canary_last_success)",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 1800
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 30
+  },
+  "pending_period_sec": 60,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "page",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#canary-missing"
+  }
+}

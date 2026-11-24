@@ -3,6 +3,7 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { EVENT_PATTERNS, eventPayloadSchemas } from '@roviq/nats-jetstream';
 import { FlowArrivalRepository } from '../repositories/flow-arrival.repository';
 import { FlowArrivals } from '../services/flow-arrivals.service';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 
 /**
  * Proof from the gateway that a notification reached its recipient (ROV-332): the in-app copy
@@ -16,6 +17,7 @@ export class ArrivalListener {
   constructor(
     private readonly repo: FlowArrivalRepository,
     private readonly arrivals: FlowArrivals,
+    private readonly metrics: NotificationMetrics,
   ) {}
 
   @EventPattern(EVENT_PATTERNS.NOTIFICATION.INAPP_SEEN, {
@@ -47,7 +49,9 @@ export class ArrivalListener {
       this.logger.warn(`Push acknowledged for notification ${notificationId} that sent no push`);
       return;
     }
-    if (result.kind === 'recorded' && result.arrival) {
+    if (result.kind !== 'recorded') return;
+    this.metrics.reported(result.written);
+    if (result.arrival) {
       const { flowId, recipientUserId: userId, channel } = result.arrival;
       await this.arrivals.arrived(flowId, userId, channel);
     }

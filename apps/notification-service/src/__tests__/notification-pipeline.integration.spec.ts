@@ -63,6 +63,7 @@ import { NotificationWriteDrizzleRepository } from '../repositories/notification
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { appOnlyFlow, channelsOf } from '../types/flow';
 import { DigestBuffer, runDigestLoop } from '../workflows/digest-logic';
 import { runFlow } from '../workflows/flow-runner';
@@ -293,6 +294,7 @@ describe('notification pipeline (integration)', () => {
       contacts,
       writes,
       new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
+      new NotificationMetrics(),
     );
     dispatcher = new NotificationDispatcher(
       new NotificationConfigReadDrizzleRepository(db),
@@ -646,6 +648,7 @@ describe('notification pipeline (integration)', () => {
           new RecipientReadDrizzleRepository(db),
           new Clock(),
         ),
+        new NotificationMetrics(),
       );
     });
 

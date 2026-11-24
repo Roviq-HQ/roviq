@@ -23,6 +23,7 @@ import { SMS_HTTP_PROVIDER } from '../delivery/sms/sms-http.client';
 import { DeliveryReceiptDrizzleRepository } from '../repositories/delivery-receipt.drizzle-repository';
 import { FlowArrivals } from '../services/flow-arrivals.service';
 import { SmsWebhookService } from '../services/sms-webhook.service';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 
 const SECRET = `spec-secret-${randomUUID()}`;
 
@@ -95,7 +96,11 @@ describe('SMS delivery reports (integration)', () => {
     userB = await createTestTeacher(db, instituteB.tenantId);
     controller = new SmsWebhookController(
       createMock<SmsHttp>({ enabled: true, webhookSecret: SECRET }),
-      new SmsWebhookService(new DeliveryReceiptDrizzleRepository(db), new FlowArrivals(temporal)),
+      new SmsWebhookService(
+        new DeliveryReceiptDrizzleRepository(db),
+        new FlowArrivals(temporal),
+        new NotificationMetrics(),
+      ),
     );
   });
 

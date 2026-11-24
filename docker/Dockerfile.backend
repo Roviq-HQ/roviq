@@ -131,7 +131,8 @@ COPY --from=build /app/package.json ./
 
 USER node
 EXPOSE 3000
-CMD ["node", "dist/src/main.js"]
+# The preload starts OpenTelemetry before the app loads; without OTEL_EXPORTER_OTLP_ENDPOINT it does nothing.
+CMD ["node", "--require", "./node_modules/@roviq/telemetry/src/init-telemetry.js", "dist/src/main.js"]
 
 # ── Production: notification-service ─────────────────────────
 # Mirrors the api-gateway stage. The dist/libs → node_modules/@roviq copy
@@ -148,7 +149,7 @@ COPY --from=build /app/package.json ./
 
 USER node
 EXPOSE 3002
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "--require", "./node_modules/@roviq/telemetry/src/init-telemetry.js", "dist/src/main.js"]
 
 # ── Migrator: Drizzle migrations ─────────────────────────────
 # drizzle.config.ts conditionally pulls in ee/libs/database when ROVIQ_EE=true

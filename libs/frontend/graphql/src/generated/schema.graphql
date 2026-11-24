@@ -4927,12 +4927,39 @@ enum NepStage {
   SECONDARY
 }
 
+"""The delivery canary's last success on one channel"""
+type NotificationCanaryStatus {
+  channel: NotificationChannel!
+
+  """
+  When the provider last accepted a canary on this channel; null when never
+  """
+  lastSuccessAt: DateTime
+}
+
 """Channel outside the app a notification was sent on."""
 enum NotificationChannel {
   EMAIL
   PUSH
   SMS
   WHATSAPP
+}
+
+"""
+Delivery attempts on one channel over the last 24 hours, from the metrics
+"""
+type NotificationChannelHealth {
+  channel: NotificationChannel!
+
+  """
+  Sends that failed, and messages the provider later reported undelivered; null when metrics are unavailable
+  """
+  failed24h: Int
+
+  """
+  Messages the provider accepted, the delivery canary included; null when metrics are unavailable
+  """
+  sent24h: Int
 }
 
 type NotificationConfigModel {
@@ -5127,6 +5154,23 @@ type NotificationEdge {
   node: NotificationModel!
 }
 
+"""Platform admin: whether notifications are being delivered (ROV-329)"""
+type NotificationHealth {
+  """
+  Always all four channels; read from the delivery rows, so it needs no metrics
+  """
+  canary: [NotificationCanaryStatus!]!
+
+  """Always all four channels, in NotificationChannel order"""
+  channels: [NotificationChannelHealth!]!
+  checkedAt: DateTime!
+
+  """
+  False when OpenObserve is unreachable: the 24-hour counts are then null, not zero
+  """
+  metricsAvailable: Boolean!
+}
+
 """One in-app notification addressed to the signed-in user."""
 type NotificationModel {
   archivedAt: DateTime
@@ -5156,6 +5200,7 @@ enum NotificationModule {
   BILLING
   FEE
   LEAVE
+  PLATFORM
 }
 
 type PageInfo {
@@ -5392,6 +5437,11 @@ type Query {
 
   """Platform support: every notification delivery attempt, newest first."""
   adminNotificationDeliveries(after: String, filter: NotificationDeliveryFilterInput, first: Int = 20): NotificationDeliveryConnection!
+
+  """
+  Platform admin: sends and failures per channel in the last 24 hours and the delivery canary (ROV-329)
+  """
+  adminNotificationHealth: NotificationHealth!
 
   """
   Platform admin: one reseller's billing summary (MRR, subscriptions, overdue)

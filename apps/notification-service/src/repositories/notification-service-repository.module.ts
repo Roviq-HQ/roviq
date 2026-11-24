@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@roviq/database';
 import { BillingReadDrizzleRepository } from './billing-read.drizzle-repository';
 import { BillingReadRepository } from './billing-read.repository';
+import { CanaryReadDrizzleRepository } from './canary-read.drizzle-repository';
+import { CanaryReadRepository } from './canary-read.repository';
 import { ConsentReadDrizzleRepository } from './consent-read.drizzle-repository';
 import { ConsentReadRepository } from './consent-read.repository';
 import { ContactReadDrizzleRepository } from './contact-read.drizzle-repository';
@@ -26,6 +28,7 @@ const REPOSITORIES = [
   { provide: BillingReadRepository, useClass: BillingReadDrizzleRepository },
   { provide: RecipientReadRepository, useClass: RecipientReadDrizzleRepository },
   { provide: ContactReadRepository, useClass: ContactReadDrizzleRepository },
+  { provide: CanaryReadRepository, useClass: CanaryReadDrizzleRepository },
   { provide: ConsentReadRepository, useClass: ConsentReadDrizzleRepository },
   { provide: DeliveryReceiptRepository, useClass: DeliveryReceiptDrizzleRepository },
   { provide: FlowArrivalRepository, useClass: FlowArrivalDrizzleRepository },

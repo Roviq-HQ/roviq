@@ -153,10 +153,24 @@ describe('pure helpers', () => {
       });
     });
 
+    it.each([
+      ['page', 'CRITICAL'],
+      ['ticket', 'WARNING'],
+    ])('should map the %s severity to %s', (label, severity) => {
+      expect(
+        toActiveAlert(firing('NotificationCanaryMissing', label, '2026-11-18T07:00:00Z')),
+      ).toEqual({
+        name: 'NotificationCanaryMissing',
+        severity,
+        message: 'NotificationCanaryMissing summary',
+        since: new Date('2026-11-18T07:00:00Z'),
+      });
+    });
+
     it('should fall back to INFO and the alert name', () => {
       expect(
         toActiveAlert({
-          labels: { alertname: 'Odd', severity: 'page' },
+          labels: { alertname: 'Odd', severity: 'notice' },
           annotations: {},
           state: 'firing',
           activeAt: '2026-11-18T07:00:00Z',

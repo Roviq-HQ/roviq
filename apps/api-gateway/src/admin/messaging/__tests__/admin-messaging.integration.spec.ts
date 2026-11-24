@@ -663,6 +663,7 @@ describe('admin messaging senders (integration)', () => {
     const insertDelivery = async (row: {
       tenantId: string | null;
       recipient: string;
+      type?: string;
       channel?: string;
       status?: string;
       category?: string | null;
@@ -673,7 +674,7 @@ describe('admin messaging senders (integration)', () => {
         `INSERT INTO notification_deliveries
            (scope, tenant_id, recipient_user_id, type, channel, provider, status,
             skip_reason, error_code, template_category, created_at)
-         VALUES ($1, $2, $3, 'ATTENDANCE_ABSENT', $4, 'whatsapp_cloud', $5, $6, $7, $8, $9)
+         VALUES ($1, $2, $3, $10, $4, 'whatsapp_cloud', $5, $6, $7, $8, $9)
          RETURNING id`,
         [
           row.tenantId ? 'institute' : 'platform',
@@ -685,6 +686,7 @@ describe('admin messaging senders (integration)', () => {
           status === 'FAILED' ? 'provider_error' : null,
           row.category === undefined ? 'UTILITY' : row.category,
           row.at,
+          row.type ?? 'ATTENDANCE_ABSENT',
         ],
       );
       const [inserted] = rows;
@@ -766,9 +768,16 @@ describe('admin messaging senders (integration)', () => {
         at: '2031-10-20T06:00:00Z',
       });
       await insertDelivery({ tenantId: null, recipient: ra, at: '2031-10-05T06:00:00Z' });
+      // The platform's delivery canary (ROV-329) is a test message, not usage.
+      await insertDelivery({
+        tenantId: null,
+        recipient: ra,
+        type: 'DELIVERY_CANARY',
+        at: '2031-10-05T06:15:00Z',
+      });
     });
 
-    it('should count SENT WhatsApp messages per institute and category in India time', async () => {
+    it('should count SENT WhatsApp messages per institute and category in India time, without the canary', async () => {
       const res = await gql<{ adminWhatsAppUsage: UsageRow[] }>(USAGE, adminToken, {
         month: '2031-10',
       });
@@ -925,9 +934,15 @@ describe('admin messaging senders (integration)', () => {
         type: 'IMPERSONATION_OTP',
         at: '2032-03-05T06:00:00Z',
       });
+      await insertDelivery({
+        tenantId: null,
+        recipient: ra,
+        type: 'DELIVERY_CANARY',
+        at: '2032-03-05T06:15:00Z',
+      });
     });
 
-    it('should count SENT SMS messages per institute and type in India time', async () => {
+    it('should count SENT SMS messages per institute and type in India time, without the canary', async () => {
       expect(await usage('2032-03')).toEqual(
         mine([
           { tenantId: null, type: 'IMPERSONATION_OTP', sentCount: 1 },

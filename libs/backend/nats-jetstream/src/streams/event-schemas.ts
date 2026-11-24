@@ -3,6 +3,7 @@ import {
   AUTH_SECURITY_EVENT_TYPE_VALUES,
   COMPLIANCE_REPORT_TYPE_VALUES,
   FILE_PURPOSE_VALUES,
+  NOTIFICATION_CHANNEL_VALUES,
 } from '@roviq/common-types';
 import { z } from 'zod';
 import type { EventPattern } from './event-patterns';
@@ -397,6 +398,12 @@ const NOTIFICATION_SCHEMAS = {
       .catchall(z.unknown()),
     scope: z.enum(['platform', 'reseller', 'institute']).optional(),
     resellerId: uuid.nullable().optional(),
+  }),
+  // No address or recipient: the consumer reads both from its own settings. Never an institute's.
+  'NOTIFICATION.canary.requested': z.object({
+    channel: z.enum(NOTIFICATION_CHANNEL_VALUES),
+    requestedAt: z.iso.datetime(),
+    tenantId: z.null(),
   }),
   'NOTIFICATION.fee.overdue': tenantBase.catchall(z.unknown()),
   'NOTIFICATION.fee.reminder': tenantBase.catchall(z.unknown()),

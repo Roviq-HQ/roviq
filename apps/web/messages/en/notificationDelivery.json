@@ -51,7 +51,8 @@
     "IMPERSONATION_OTP": "Support access code",
     "USER_WELCOME": "Welcome message",
     "BILLING_EVENT": "Billing update",
-    "unknown": "Other notification"
+    "unknown": "Other notification",
+    "DELIVERY_CANARY": "Delivery check (platform)"
   },
   "reasons": {
     "channel_disabled": "Switched off in notification settings",

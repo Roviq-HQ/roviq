@@ -233,6 +233,12 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/repositories/flow-arrival.drizzle-repository.ts',
   // ROV-332 integration fixtures: families with phones, device tokens and consent rows
   'apps/notification-service/src/__tests__/notification-flow.integration.spec.ts',
+  // ROV-329: the canary's last success per channel seeds a gauge at start; no caller context
+  'apps/notification-service/src/repositories/canary-read.drizzle-repository.ts',
+  // ROV-329 integration fixture: the platform's WhatsApp sender for the canary
+  'apps/notification-service/src/__tests__/delivery-canary.integration.spec.ts',
+  // ROV-329 integration fixture: a platform role without read SystemHealth
+  'apps/api-gateway/src/admin/monitoring/notification-health/__tests__/notification-health.integration.spec.ts',
   'ee/apps/api-gateway/src/billing/billing-event.consumer.ts',
   'ee/apps/api-gateway/src/billing/billing.repository.ts',
   'ee/apps/api-gateway/src/billing/repositories/gateway-config.repository.ts',

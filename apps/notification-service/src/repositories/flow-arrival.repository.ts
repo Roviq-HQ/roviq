@@ -1,4 +1,4 @@
-import type { FlowArrivalRecord } from './types';
+import type { FlowArrivalRecord, WrittenDelivery } from './types';
 
 /** Reads and writes behind arrival events from the gateway (ROV-332). */
 export abstract class FlowArrivalRepository {
@@ -19,7 +19,7 @@ export abstract class FlowArrivalRepository {
     notificationId: string,
     recipientUserId: string,
   ): Promise<
-    | { kind: 'recorded'; arrival: FlowArrivalRecord | null }
+    | { kind: 'recorded'; arrival: FlowArrivalRecord | null; written: WrittenDelivery[] }
     | { kind: 'no_push' }
     | { kind: 'duplicate' }
   >;

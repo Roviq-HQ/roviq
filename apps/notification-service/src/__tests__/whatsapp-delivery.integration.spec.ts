@@ -57,6 +57,7 @@ import {
   STOP_CONFIRMATION,
   WhatsAppWebhookService,
 } from '../services/whatsapp-webhook.service';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 import type { RegularPayload } from '../types/registry';
 import { createNotificationActivities } from '../workflows/notification.activities';
 
@@ -380,6 +381,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       new ContactReadDrizzleRepository(db),
       new NotificationWriteDrizzleRepository(db),
       new WhatsAppRoute(senders, new RecipientReadDrizzleRepository(db), clock),
+      new NotificationMetrics(),
     );
     controller = new WhatsAppWebhookController(
       cloud,
@@ -389,6 +391,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
         cloud,
         clock,
         new FlowArrivals(temporal),
+        new NotificationMetrics(),
       ),
     );
   });

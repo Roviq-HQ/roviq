@@ -93,5 +93,32 @@
     "UNAUTHENTICATED": "Your session has expired. Please sign in again.",
     "retry": "Retry",
     "retryTitle": "Try loading this section again"
+  },
+  "notifications": {
+    "heading": "Notification delivery",
+    "description": "Messages per channel in the last 24 hours, and when the platform's test message (the canary) last reached the provider.",
+    "metricsUnavailable": "Metrics unavailable — OpenObserve cannot be reached, so the 24-hour counts cannot be shown.",
+    "channel": "Channel",
+    "sent24h": "Sent (24h)",
+    "failed24h": "Failed (24h)",
+    "canary": "Canary",
+    "channels": {
+      "EMAIL": "Email",
+      "PUSH": "Push",
+      "SMS": "SMS",
+      "WHATSAPP": "WhatsApp"
+    },
+    "canaryOk": "Accepted {time}",
+    "canaryLate": "Late: last accepted {time}",
+    "canaryNever": "Not sent",
+    "sendersHeading": "WhatsApp senders",
+    "sendersEmpty": "No WhatsApp senders are registered.",
+    "senderPlatform": "Platform",
+    "senderInstitute": "Institute",
+    "senderStatus": {
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "BLOCKED": "Blocked"
+    }
   }
 }

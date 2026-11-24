@@ -1,6 +1,5 @@
 'use client';
 
-import { NOTIFICATION_TYPE_VALUES } from '@roviq/common-types';
 import { extractGraphQLErrorCode } from '@roviq/graphql';
 import type { NotificationChannel, NotificationDeliveryState } from '@roviq/graphql/generated';
 import { useFormatDate, useI18nField } from '@roviq/i18n';
@@ -46,6 +45,7 @@ import {
   DELIVERY_CHANNELS,
   DELIVERY_MODULES,
   DELIVERY_STATES,
+  DELIVERY_TYPES,
   type DeliveryFilters,
   hasActiveDeliveryFilters,
   useDeliveryFilters,
@@ -299,7 +299,7 @@ function DeliveryFilterBar({
         label={t('filters.type')}
         allLabel={t('filters.allTypes')}
         value={filters.type}
-        options={NOTIFICATION_TYPE_VALUES.map((value) => ({ value, label: copy.typeName(value) }))}
+        options={DELIVERY_TYPES.map((value) => ({ value, label: copy.typeName(value) }))}
         onChange={(type) => void setFilters({ type })}
         testId={ids.typeFilter}
       />

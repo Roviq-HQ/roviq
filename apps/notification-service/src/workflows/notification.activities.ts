@@ -29,7 +29,7 @@ export interface NotificationActivityDeps {
 export function createNotificationActivities(
   deps: NotificationActivityDeps,
   attemptOf: () => number = () => Context.current().info.attempt,
-): NotificationActivities {
+): Omit<NotificationActivities, 'requestCanary'> {
   const { sender, recipients, writes } = deps;
 
   async function recordSkip(input: RecordSkipInput): Promise<void> {

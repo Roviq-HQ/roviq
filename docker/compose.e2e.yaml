@@ -270,7 +270,7 @@ services:
     # it out.
     command: >
       sh -c 'mkdir -p /tmp/node_path && ln -sfn "$$PWD/dist/libs" /tmp/node_path/@roviq
-      && NODE_PATH=/tmp/node_path exec node dist/apps/notification-service/src/main.js'
+      && NODE_PATH=/tmp/node_path exec node --require ./dist/libs/telemetry/src/init-telemetry.js dist/apps/notification-service/src/main.js'
     volumes:
       - ..:${E2E_WORKSPACE}
       - ../.e2e/dist:${E2E_WORKSPACE}/dist

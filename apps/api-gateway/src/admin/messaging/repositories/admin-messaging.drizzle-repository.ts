@@ -5,6 +5,7 @@ import {
   type MessagingSenderStatus,
   NotificationChannel,
   NotificationDeliveryStatus,
+  NotificationTypeKey,
   type PlatformContext,
 } from '@roviq/common-types';
 import {
@@ -19,7 +20,7 @@ import {
   uniqueViolationConstraint,
   withAdmin,
 } from '@roviq/database';
-import { and, asc, count, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
 import {
   MESSAGING_SENDER_CHANNEL,
   USAGE_TIMEZONE,
@@ -91,6 +92,8 @@ function sentInMonth(channel: NotificationChannel, month: string) {
   return and(
     eq(d.channel, channel),
     eq(d.status, NotificationDeliveryStatus.SENT),
+    // The platform's own test messages are not usage of any institute or of the platform.
+    ne(d.type, NotificationTypeKey.DELIVERY_CANARY),
     gte(d.createdAt, sql`${monthStart} AT TIME ZONE ${USAGE_TIMEZONE}`),
     lt(d.createdAt, sql`(${monthStart} + interval '1 month') AT TIME ZONE ${USAGE_TIMEZONE}`),
   );

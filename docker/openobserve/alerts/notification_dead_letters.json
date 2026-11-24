@@ -1,0 +1,32 @@
+{
+  "name": "notification_dead_letters",
+  "description": "A NOTIFICATION event was dead-lettered: its notification was never sent. Inspect and replay it from the admin Dead Letter Queue tab.",
+  "stream_type": "metrics",
+  "stream_name": "nats_dlq_messages_total",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "sum(increase(nats_dlq_messages_total{origin_stream=\"NOTIFICATION\"}[5m]))",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 60
+  },
+  "pending_period_sec": 0,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "ticket",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#dead-letters"
+  }
+}

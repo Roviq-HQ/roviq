@@ -51,7 +51,8 @@
     "IMPERSONATION_OTP": "सहायता पहुँच कोड",
     "USER_WELCOME": "स्वागत संदेश",
     "BILLING_EVENT": "बिलिंग की जानकारी",
-    "unknown": "अन्य सूचना"
+    "unknown": "अन्य सूचना",
+    "DELIVERY_CANARY": "वितरण जाँच (प्लेटफ़ॉर्म)"
   },
   "reasons": {
     "channel_disabled": "सूचना सेटिंग में बंद है",

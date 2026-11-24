@@ -1,0 +1,32 @@
+{
+  "name": "notification_failure_rate",
+  "description": "More than 20% of delivery attempts on a channel failed over the last 10 minutes, with at least 20 attempts.",
+  "stream_type": "metrics",
+  "stream_name": "notification_delivery",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "(sum by (channel) (increase(notification_delivery{status=\"FAILED\"}[10m])) / sum by (channel) (increase(notification_delivery{status=~\"SENT|FAILED\"}[10m]))) and on (channel) (sum by (channel) (increase(notification_delivery{status=~\"SENT|FAILED\"}[10m])) >= 20)",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0.2
+    }
+  },
+  "trigger_condition": {
+    "period": 10,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 30
+  },
+  "pending_period_sec": 120,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "page",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#failure-rate"
+  }
+}

@@ -10,6 +10,7 @@ import { AlertsPanel } from './alerts-panel';
 import { ConnectionsPanel } from './connections-panel';
 import { DlqBanner } from './dlq-banner';
 import { NatsLagPanel } from './nats-lag-panel';
+import { NotificationsPanel } from './notifications-panel';
 import { ObservabilityLinkCard } from './observability-link-card';
 import { SectionError } from './section-error';
 import { ServiceStatusGrid } from './service-status-grid';
@@ -50,6 +51,8 @@ export function MonitoringDashboard() {
           </div>
         </>
       )}
+
+      <NotificationsPanel />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">

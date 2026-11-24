@@ -1,8 +1,10 @@
 // What leaves the process in logs and traces is decided here (docs/deployment.md → "Telemetry").
 
-const UNTRACED_PATHS = ['/api/health', '/health', '/metrics', '/favicon.ico'];
+// The notification service's provider webhooks carry a secret in the path (SMS reports) or the
+// query string (WhatsApp's verify token); a span records both.
+const UNTRACED_PATHS = ['/api/health', '/health', '/metrics', '/favicon.ico', '/webhooks/'];
 
-/** Probes and static noise that get no trace. */
+/** Probes, static noise and provider webhooks, which get no trace. */
 export function isUntracedPath(url: string | undefined): boolean {
   return UNTRACED_PATHS.some((prefix) => url?.startsWith(prefix) ?? false);
 }

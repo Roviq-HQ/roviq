@@ -1,4 +1,5 @@
 import type { RegularMessage } from '../../types/compose';
+import { type DeliveryCanaryParams, deliveryCanarySms } from '../../types/delivery-canary.type';
 import type { Locale } from '../../types/notification-type';
 import type {
   RegularTypeKey,
@@ -18,11 +19,16 @@ type SecretSmsTemplate = {
 }[SecretTypeKey];
 
 /** Every registered template, for the tests and for the operator's registration list. */
-export const SMS_TEMPLATES: readonly SecretSmsTemplate[] = [
+export const SMS_TEMPLATES: readonly (SecretSmsTemplate | SmsTemplate<DeliveryCanaryParams>)[] = [
   impersonationOtpSms,
   userWelcomeInstituteSms,
   userWelcomeSms,
+  deliveryCanarySms,
 ];
+
+export function smsDraftForCanary(params: DeliveryCanaryParams, locale: Locale): SmsDraft {
+  return toSmsDraft(deliveryCanarySms, params, locale);
+}
 
 /**
  * null when the message has no registered SMS template. Throws `SmsVariableError` when an

@@ -21,6 +21,7 @@ import { ApprovalListener } from '../listeners/approval.listener';
 import { ArrivalListener } from '../listeners/arrival.listener';
 import { AttendanceListener } from '../listeners/attendance.listener';
 import { AuthListener } from '../listeners/auth.listener';
+import { CanaryListener } from '../listeners/canary.listener';
 import { FeeListener } from '../listeners/fee.listener';
 import { LeaveListener } from '../listeners/leave.listener';
 import { UserListener } from '../listeners/user.listener';
@@ -28,11 +29,14 @@ import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
 import { ContactReadRepository } from '../repositories/contact-read.repository';
 import { NotificationServiceRepositoryModule } from '../repositories/notification-service-repository.module';
 import { NotificationWriteRepository } from '../repositories/notification-write.repository';
+import { DeliveryCanary } from '../services/delivery-canary.service';
 import { FlowArrivals } from '../services/flow-arrivals.service';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
 import { SmsWebhookService } from '../services/sms-webhook.service';
 import { WhatsAppWebhookService } from '../services/whatsapp-webhook.service';
+import { NotificationGauges } from '../telemetry/notification-gauges';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { NotificationWorkerService } from '../workflows/notification.worker';
 
 @Module({
@@ -54,6 +58,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     ArrivalListener,
     AttendanceListener,
     AuthListener,
+    CanaryListener,
     FeeListener,
     LeaveListener,
     UserListener,
@@ -94,13 +99,15 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
         contacts: ContactReadRepository,
         writes: NotificationWriteRepository,
         whatsapp: WhatsAppRoute,
-      ) => new ChannelSender(adapters, consent, contacts, writes, whatsapp),
+        metrics: NotificationMetrics,
+      ) => new ChannelSender(adapters, consent, contacts, writes, whatsapp, metrics),
       inject: [
         ChannelAdapters,
         ConsentGate,
         ContactReadRepository,
         NotificationWriteRepository,
         WhatsAppRoute,
+        NotificationMetrics,
       ],
     },
     WhatsAppCloud,
@@ -116,6 +123,9 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     SmsWebhookService,
     NotificationWorkerService,
     NotificationWorkerHealthIndicator,
+    NotificationMetrics,
+    NotificationGauges,
+    DeliveryCanary,
   ],
 })
 export class AppModule {}

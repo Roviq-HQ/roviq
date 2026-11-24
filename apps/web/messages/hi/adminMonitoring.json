@@ -93,5 +93,32 @@
     "UNAUTHENTICATED": "आपका सत्र समाप्त हो गया है। कृपया फिर से साइन इन करें।",
     "retry": "फिर से कोशिश करें",
     "retryTitle": "इस भाग को फिर से लोड करें"
+  },
+  "notifications": {
+    "heading": "सूचना वितरण",
+    "description": "पिछले 24 घंटों में हर चैनल पर संदेश, और प्लेटफ़ॉर्म का परीक्षण संदेश (कैनरी) पिछली बार प्रदाता तक कब पहुँचा।",
+    "metricsUnavailable": "मेट्रिक्स उपलब्ध नहीं — OpenObserve से संपर्क नहीं हो पा रहा, इसलिए 24 घंटे की गिनती नहीं दिखाई जा सकती।",
+    "channel": "चैनल",
+    "sent24h": "भेजे गए (24 घंटे)",
+    "failed24h": "विफल (24 घंटे)",
+    "canary": "कैनरी",
+    "channels": {
+      "EMAIL": "ईमेल",
+      "PUSH": "पुश",
+      "SMS": "SMS",
+      "WHATSAPP": "WhatsApp"
+    },
+    "canaryOk": "{time} स्वीकार किया गया",
+    "canaryLate": "देर: पिछली बार {time} स्वीकार किया गया",
+    "canaryNever": "नहीं भेजा गया",
+    "sendersHeading": "WhatsApp प्रेषक",
+    "sendersEmpty": "कोई WhatsApp प्रेषक पंजीकृत नहीं है।",
+    "senderPlatform": "प्लेटफ़ॉर्म",
+    "senderInstitute": "संस्थान",
+    "senderStatus": {
+      "ACTIVE": "सक्रिय",
+      "PAUSED": "रोका गया",
+      "BLOCKED": "अवरुद्ध"
+    }
   }
 }

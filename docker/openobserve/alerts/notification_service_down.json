@@ -1,0 +1,32 @@
+{
+  "name": "notification_service_down",
+  "description": "No notification service reports a running Temporal worker, or none has reported at all for 2 minutes. No email, push, SMS or WhatsApp message of a regular type is being sent.",
+  "stream_type": "metrics",
+  "stream_name": "notification_worker_running",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "max(last_over_time(notification_worker_running[2m])) or vector(0)",
+    "promql_condition": {
+      "column": "value",
+      "operator": "<",
+      "value": 1
+    }
+  },
+  "trigger_condition": {
+    "period": 2,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 30
+  },
+  "pending_period_sec": 60,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "page",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#service-down"
+  }
+}

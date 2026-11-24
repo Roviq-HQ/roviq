@@ -31,6 +31,9 @@ export const DELIVERY_CHANNELS = [
   'EMAIL',
 ] as const satisfies readonly NotificationChannel[];
 
+/** The platform's delivery canary never reaches an institute's log, so it is not offered. */
+export const DELIVERY_TYPES = NOTIFICATION_TYPE_VALUES.filter((type) => type !== 'DELIVERY_CANARY');
+
 export const DELIVERY_STATES = [
   'READ',
   'DELIVERED',
@@ -42,7 +45,7 @@ export const DELIVERY_STATES = [
 
 export const deliveryFilterParsers = {
   module: parseAsStringLiteral(DELIVERY_MODULES),
-  type: parseAsStringLiteral(NOTIFICATION_TYPE_VALUES),
+  type: parseAsStringLiteral(DELIVERY_TYPES),
   channel: parseAsStringLiteral(DELIVERY_CHANNELS),
   state: parseAsStringLiteral(DELIVERY_STATES),
   from: parseAsString,
