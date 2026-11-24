@@ -1,0 +1,215 @@
+# Staging: the production images as one long-lived stack behind an existing reverse proxy.
+# Used as an override of compose.app.yaml by scripts/staging-deploy.sh, never on its own:
+#
+#   docker compose -p <project> --env-file <staging env> \
+#     -f docker/compose.app.yaml -f docker/compose.staging.yaml up -d
+#
+# No container publishes a port to the network. The web app, the API, object storage and the
+# mail catcher join the proxy's external network under the aliases below; everything else stays
+# on the stack's own network. Settings and secrets come from the env file (docs/deployment.md →
+# "Staging" lists them); none has a default here.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-app-db: &app-db postgresql://roviq_pooler:${POSTGRES_POOLER_PASSWORD:?}@postgres:5432/roviq
+
+x-otel: &otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5081
+  OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?}
+
+services:
+  postgres:
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    # The init script sits at a fixed path so a new release does not recreate the database
+    # container; it runs only when the data volume is empty.
+    volumes: !override
+      - roviq-pgdata:/var/lib/postgresql
+      - ${STAGING_STATE_DIR:?}/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+
+  redis:
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - roviq-redis:/data
+
+  nats:
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - roviq-nats:/data
+
+  object-storage:
+    restart: unless-stopped
+    logging: *logging
+    ports: !reset []
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:?}
+    volumes:
+      - roviq-objects:/data
+    networks:
+      roviq-net: {}
+      proxy:
+        aliases: [roviq-lab-storage]
+
+  openobserve:
+    restart: unless-stopped
+    logging: *logging
+    # Reached from the host only, for the people who run the stack.
+    ports: ["127.0.0.1:${STAGING_METRICS_PORT:?}:5080"]
+
+  temporal:
+    image: temporalio/auto-setup:1.29.3
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:?}
+
+  temporal-ui:
+    image: temporalio/ui:2.56.4
+    restart: unless-stopped
+    logging: *logging
+    ports: ["127.0.0.1:${STAGING_WORKFLOWS_PORT:?}:8080"]
+
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    restart: unless-stopped
+    logging: *logging
+    networks:
+      roviq-net: {}
+      proxy:
+        aliases: [roviq-lab-mail]
+
+  migrator:
+    image: ${STAGING_IMAGE_PREFIX:?}/migrator:${ROVIQ_VERSION:?}
+    logging: *logging
+    # One-shot jobs: migrations, the essential seed, buckets, the first admin. The owner role's
+    # password exists only here, never on the running apps.
+    environment:
+      DATABASE_URL_MIGRATE: postgresql://roviq:${POSTGRES_PASSWORD:?}@postgres:5432/roviq
+      ROVIQ_EE: "true"
+      S3_ENDPOINT: http://object-storage:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+      S3_BUCKET_PRIVATE: roviq-private
+      S3_BUCKET_PUBLIC: roviq-public
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?}
+
+  api-gateway:
+    image: ${STAGING_IMAGE_PREFIX:?}/api-gateway:${ROVIQ_VERSION:?}
+    restart: unless-stopped
+    logging: *logging
+    ports: !reset []
+    depends_on:
+      temporal:
+        condition: service_started
+      object-storage:
+        condition: service_healthy
+    environment: !override
+      <<: *otel
+      DATABASE_URL: *app-db
+      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://nats:4222
+      TEMPORAL_ADDRESS: temporal:7233
+      API_GATEWAY_PORT: "3000"
+      ROVIQ_EE: "true"
+      S3_ENDPOINT: http://object-storage:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?}
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+      S3_BUCKET_PRIVATE: roviq-private
+      S3_BUCKET_PUBLIC: roviq-public
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_ENDPOINT:?}/roviq-public
+      FILE_SCANNER: "off"
+      JWT_SECRET: ${JWT_SECRET:?}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?}
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      MESSAGING_ENCRYPTION_KEY: ${MESSAGING_ENCRYPTION_KEY:?}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:?}
+      WEBAUTHN_RP_NAME: Roviq
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?}
+      INSTITUTE_PORTAL_URL: ${INSTITUTE_PORTAL_URL:?}
+      BILLING_RETURN_URL: ${INSTITUTE_PORTAL_URL:?}/billing/subscriptions
+      NOTIFICATION_SERVICE_URL: http://notification-service:3002
+      OTEL_SERVICE_NAME: api-gateway
+      OPENOBSERVE_URL: http://openobserve:5080
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:?}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:?}
+      AUDIT_PARTITION_WORKER_ENABLED: "true"
+      BILLING_WORKER_ENABLED: "true"
+      COMPLIANCE_EXPORT_WORKER_ENABLED: "true"
+      FILE_SWEEPER_WORKER_ENABLED: "true"
+      INSTITUTE_SETUP_WORKER_ENABLED: "true"
+      STUDENT_ADMISSION_WORKER_ENABLED: "true"
+      STUDENT_IMPORT_WORKER_ENABLED: "true"
+      TC_ISSUANCE_WORKER_ENABLED: "true"
+    networks:
+      roviq-net: {}
+      proxy:
+        aliases: [roviq-lab-api]
+
+  web:
+    image: ${STAGING_IMAGE_PREFIX:?}/web:${ROVIQ_VERSION:?}
+    restart: unless-stopped
+    logging: *logging
+    ports: !reset []
+    environment: !override
+      PORT: "4200"
+      # Server-side requests reach the API through its public name, whose certificate is signed
+      # by the stack's own certificate authority.
+      NODE_EXTRA_CA_CERTS: /run/staging-ca.pem
+      OPENOBSERVE_URL: http://openobserve:5080
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:?}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:?}
+    volumes:
+      - ${STAGING_CA_CERT:?}:/run/staging-ca.pem:ro
+    networks:
+      roviq-net: {}
+      proxy:
+        aliases: [roviq-lab-web]
+
+  notification-service:
+    image: ${STAGING_IMAGE_PREFIX:?}/notification-service:${ROVIQ_VERSION:?}
+    restart: unless-stopped
+    logging: *logging
+    ports: !reset []
+    depends_on:
+      temporal:
+        condition: service_started
+    environment: !override
+      <<: *otel
+      DATABASE_URL: *app-db
+      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://nats:4222
+      TEMPORAL_ADDRESS: temporal:7233
+      NOTIFICATION_SERVICE_PORT: "3002"
+      NOTIFICATION_WORKER_ENABLED: "true"
+      MESSAGING_ENCRYPTION_KEY: ${MESSAGING_ENCRYPTION_KEY:?}
+      INSTITUTE_PORTAL_URL: ${INSTITUTE_PORTAL_URL:?}
+      OTEL_SERVICE_NAME: notification-service
+      NOTIFICATION_EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
+      EMAIL_FROM: ${EMAIL_FROM:?}
+      NOTIFICATION_PUSH_PROVIDER: log
+      NOTIFICATION_SMS_PROVIDER: log
+      NOTIFICATION_WHATSAPP_PROVIDER: log
+
+networks:
+  proxy:
+    external: true
+    name: ${STAGING_PROXY_NETWORK:?}
+
+volumes:
+  roviq-redis:
+  roviq-nats:
+  roviq-objects:

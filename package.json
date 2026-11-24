@@ -51,6 +51,7 @@
     "db:generate": "nx run database:db:generate",
     "db:seed": "pnpx tsx scripts/seed-demo.ts",
     "db:seed:essential": "pnpx tsx scripts/seed-essential.ts",
+    "admin:create": "pnpx tsx scripts/create-platform-admin.ts",
     "db:seed:demo": "pnpx tsx scripts/seed-demo.ts",
     "db:seed:e2e": "pnpx tsx scripts/seed-e2e.ts",
     "db:push": "nx run database:db:push",
