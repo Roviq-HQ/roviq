@@ -476,5 +476,14 @@ describe('guardian: another institute id (ROV-293)', () => {
         { tenantId: instA.tenantId, isPrimaryContact: true, canPickup: true, deleted: null },
       ]);
     });
+
+    // Runs after the unlink above: that link is soft-deleted now.
+    it('should refuse to revoke a link that was removed', async () => {
+      await refusesAndWritesNothing(
+        REVOKE,
+        { input: { studentProfileId: a.s1, guardianProfileId: a.g1, reason: 'Removed link' } },
+        ErrorCode.GUARDIAN_LINK_NOT_FOUND,
+      );
+    });
   });
 });
