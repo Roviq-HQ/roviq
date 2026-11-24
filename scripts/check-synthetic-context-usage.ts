@@ -64,6 +64,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/consent/__tests__/consent-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/group/__tests__/group-crud.integration.spec.ts',
   'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
@@ -79,6 +80,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/__tests__/student-create-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/subject/__tests__/subject-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/reseller/institute/__tests__/reseller-institute-foreign-id.integration.spec.ts',
   // ROV-205: isolated security-invariant fixtures and RLS-scoped predicate execution only.
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',

@@ -134,24 +134,54 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/bot/__tests__/bot-api-key.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/certificate
-  approveTC: PENDING,
+  approveTC: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
   exportComplianceReport: {
     spec: 'apps/api-gateway/src/institute/certificate/__tests__/compliance-export.integration.spec.ts',
   },
-  generateCertificatePdf: PENDING,
-  generateTCPdf: PENDING,
-  getCertificate: PENDING,
-  getCertificateTemplateFields: PENDING,
-  getTCDetails: PENDING,
-  issueCertificate: PENDING,
-  issueTC: PENDING,
-  listCertificates: PENDING,
-  listTCs: PENDING,
-  previewCertificate: PENDING,
-  rejectTC: PENDING,
-  requestCertificate: PENDING,
-  requestDuplicateTC: PENDING,
-  requestTC: PENDING,
+  generateCertificatePdf: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  generateTCPdf: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  getCertificate: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  getCertificateTemplateFields: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  getTCDetails: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  issueCertificate: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  issueTC: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  listCertificates: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  listTCs: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  previewCertificate: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  rejectTC: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  requestCertificate: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  requestDuplicateTC: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
+  requestTC: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/certificate-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/consent
   consentStatusForStudent: {
     spec: 'apps/api-gateway/src/institute/consent/__tests__/consent-foreign-id.integration.spec.ts',
@@ -481,32 +511,84 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/subject/__tests__/subject-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/timetable
-  activateTimetable: PENDING,
-  addTimetablePeriod: PENDING,
-  addTimetableSection: PENDING,
-  archiveTimetable: PENDING,
-  assignTimetableEntry: PENDING,
-  clearTimetableDayOverride: PENDING,
-  clearTimetableEntry: PENDING,
-  createTimetable: PENDING,
-  createTimetableDayOverride: PENDING,
-  deactivateTimetable: PENDING,
-  deleteTimetable: PENDING,
-  removeTimetablePeriod: PENDING,
-  removeTimetableSection: PENDING,
-  restoreTimetable: PENDING,
-  sectionTimetable: PENDING,
-  sectionTimetablePdf: PENDING,
-  staffDaySchedule: PENDING,
-  staffTimetable: PENDING,
-  staffTimetablePdf: PENDING,
-  timetable: PENDING,
-  timetableDayOverrides: PENDING,
-  timetableDaySchedule: PENDING,
-  timetables: PENDING,
-  timetableStatistics: PENDING,
-  updateTimetable: PENDING,
-  updateTimetablePeriod: PENDING,
+  activateTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  addTimetablePeriod: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  addTimetableSection: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  archiveTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  assignTimetableEntry: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  clearTimetableDayOverride: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  clearTimetableEntry: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  createTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  createTimetableDayOverride: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  deactivateTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  deleteTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  removeTimetablePeriod: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  removeTimetableSection: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  restoreTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  sectionTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  sectionTimetablePdf: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  staffDaySchedule: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  staffTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  staffTimetablePdf: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  timetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  timetableDayOverrides: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  timetableDaySchedule: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  timetables: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  timetableStatistics: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  updateTimetable: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
+  updateTimetablePeriod: {
+    spec: 'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/notification-inbox
   acknowledgeNotificationDelivery: {
     spec: 'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
