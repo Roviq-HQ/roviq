@@ -20,6 +20,7 @@ import type {
   TimetableStatisticsRow,
 } from './repositories/types';
 import { TimetableGenerationService } from './timetable-generation.service';
+import { assertTimetableRefs } from './timetable-refs';
 
 /** Service-layer input for creating a timetable + generating its grid. */
 export interface CreateTimetableServiceInput {
@@ -82,6 +83,7 @@ export class TimetableService {
 
   async create(input: CreateTimetableServiceInput): Promise<TimetableRecord> {
     const academicYearId = await this.resolveAcademicYearId(input.academicYearId);
+    await assertTimetableRefs(this.repo, { academicYearId, sectionIds: input.sectionIds });
     if (!isValidDateRange(input.effectiveFrom, input.effectiveTo)) {
       throw new BusinessException(
         ErrorCode.INVALID_DATE_RANGE,
@@ -257,19 +259,19 @@ export class TimetableService {
 
   async delete(ids: string[]): Promise<number> {
     const tenantId = this.tenantId();
-    for (const id of ids) {
-      await this.repo.softDeleteTimetable(id);
+    await this.repo.softDeleteTimetables(ids);
+    for (const id of new Set(ids)) {
       this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.deleted, { timetableId: id, tenantId });
     }
     return ids.length;
   }
 
   async restore(ids: string[]): Promise<number> {
-    for (const id of ids) {
-      const restored = await this.repo.restoreTimetable(id);
+    const restored = await this.repo.restoreTimetables(ids);
+    for (const timetable of restored) {
       this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.restored, {
-        timetableId: restored.id,
-        tenantId: restored.tenantId,
+        timetableId: timetable.id,
+        tenantId: timetable.tenantId,
       });
     }
     return ids.length;
@@ -279,6 +281,7 @@ export class TimetableService {
 
   async addSection(timetableId: string, sectionId: string): Promise<TimetableSectionRecord> {
     const timetable = await this.findById(timetableId);
+    await assertTimetableRefs(this.repo, { sectionIds: [sectionId] });
     const record = await this.repo.addSection(timetableId, sectionId);
     this.eventBus.emit(EVENT_PATTERNS.TIMETABLE.section_added, {
       timetableId,
@@ -290,6 +293,7 @@ export class TimetableService {
 
   async removeSection(timetableId: string, sectionId: string): Promise<boolean> {
     const timetable = await this.findById(timetableId);
+    await assertTimetableRefs(this.repo, { sectionIds: [sectionId] });
     await this.repo.removeSection(timetableId, sectionId);
     // Clear this section's assignment cells so the grid stays consistent.
     const entries = await this.repo.findEntriesBySection(timetableId, sectionId);

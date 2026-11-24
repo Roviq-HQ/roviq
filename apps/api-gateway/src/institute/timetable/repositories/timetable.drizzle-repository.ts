@@ -2,9 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Weekday } from '@roviq/common-types';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
+  academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
   i18nDisplay,
+  membershipsLive,
   mkInstituteCtx,
   sectionsLive,
   softDelete,
@@ -25,7 +27,19 @@ import {
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, asc, between, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  between,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  sql,
+} from 'drizzle-orm';
 import { TimetableRepository } from './timetable.repository';
 import type {
   ClearEntryQuery,
@@ -40,6 +54,8 @@ import type {
   TimetableLabelMaps,
   TimetablePeriodRecord,
   TimetableRecord,
+  TimetableRefKind,
+  TimetableRefs,
   TimetableSectionRecord,
   TimetableStatisticsRow,
   UpdatePeriodData,
@@ -448,23 +464,76 @@ export class TimetableDrizzleRepository extends TimetableRepository {
     });
   }
 
-  async softDeleteTimetable(id: string): Promise<void> {
+  async softDeleteTimetables(ids: string[]): Promise<void> {
+    const unique = [...new Set(ids)];
     await withTenant(this.db, this.ctx(), async (tx) => {
-      await softDelete(tx, timetables, id);
+      const live = await tx
+        .select({ id: timetablesLive.id })
+        .from(timetablesLive)
+        .where(inArray(timetablesLive.id, unique));
+      // Thrown inside the transaction, before any write.
+      if (live.length !== unique.length) {
+        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, 'Timetable not found');
+      }
+      for (const id of unique) await softDelete(tx, timetables, id);
     });
   }
 
-  async restoreTimetable(id: string): Promise<TimetableRecord> {
+  async restoreTimetables(ids: string[]): Promise<TimetableRecord[]> {
+    const unique = [...new Set(ids)];
     const { userId } = getRequestContext();
     return withTenant(this.db, this.ctx(), async (tx) => {
       const rows = await tx
         .update(timetables)
         .set({ deletedAt: null, deletedBy: null, updatedBy: userId })
-        .where(eq(timetables.id, id))
+        .where(and(inArray(timetables.id, unique), isNotNull(timetables.deletedAt)))
         .returning(timetableWriteReturning);
-      if (rows.length === 0)
-        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, `Timetable ${id} not found`);
-      return rows[0] as TimetableRecord;
+      // The throw rolls back the rows restored so far.
+      if (rows.length !== unique.length) {
+        throw new BusinessException(ErrorCode.TIMETABLE_NOT_FOUND, 'Timetable not found');
+      }
+      return rows as TimetableRecord[];
+    });
+  }
+
+  async findMissingRef(refs: TimetableRefs): Promise<TimetableRefKind | null> {
+    const ids = (list?: (string | null | undefined)[]) => [
+      ...new Set((list ?? []).filter((id): id is string => Boolean(id))),
+    ];
+    const sectionIds = ids(refs.sectionIds);
+    const subjectIds = ids(refs.subjectIds);
+    const teacherIds = ids(refs.teacherIds);
+    return withTenant(this.db, this.ctx(), async (tx) => {
+      if (refs.academicYearId) {
+        const rows = await tx
+          .select({ id: academicYearsLive.id })
+          .from(academicYearsLive)
+          .where(eq(academicYearsLive.id, refs.academicYearId))
+          .limit(1);
+        if (rows.length === 0) return 'year';
+      }
+      if (sectionIds.length > 0) {
+        const rows = await tx
+          .select({ id: sectionsLive.id })
+          .from(sectionsLive)
+          .where(inArray(sectionsLive.id, sectionIds));
+        if (rows.length !== sectionIds.length) return 'section';
+      }
+      if (subjectIds.length > 0) {
+        const rows = await tx
+          .select({ id: subjectsLive.id })
+          .from(subjectsLive)
+          .where(inArray(subjectsLive.id, subjectIds));
+        if (rows.length !== subjectIds.length) return 'subject';
+      }
+      if (teacherIds.length > 0) {
+        const rows = await tx
+          .select({ id: membershipsLive.id })
+          .from(membershipsLive)
+          .where(inArray(membershipsLive.id, teacherIds));
+        if (rows.length !== teacherIds.length) return 'teacher';
+      }
+      return null;
     });
   }
 

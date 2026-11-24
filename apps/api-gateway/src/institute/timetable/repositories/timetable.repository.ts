@@ -12,6 +12,8 @@ import type {
   TimetableLabelMaps,
   TimetablePeriodRecord,
   TimetableRecord,
+  TimetableRefKind,
+  TimetableRefs,
   TimetableSectionRecord,
   TimetableStatisticsRow,
   UpdatePeriodData,
@@ -53,8 +55,15 @@ export abstract class TimetableRepository {
   ): Promise<{ timetable: TimetableRecord; previousActiveId: string | null }>;
   abstract findActiveTimetable(academicYearId: string): Promise<TimetableRecord | null>;
   abstract statistics(academicYearId?: string): Promise<TimetableStatisticsRow>;
-  abstract softDeleteTimetable(id: string): Promise<void>;
-  abstract restoreTimetable(id: string): Promise<TimetableRecord>;
+  /** All or nothing: throws TIMETABLE_NOT_FOUND and deletes none when one id is not a live timetable. */
+  abstract softDeleteTimetables(ids: string[]): Promise<void>;
+  /** All or nothing: throws TIMETABLE_NOT_FOUND and restores none when one id is not a deleted timetable. */
+  abstract restoreTimetables(ids: string[]): Promise<TimetableRecord[]>;
+  /**
+   * Reads caller-supplied ids under the caller's institute and names the first kind that has a
+   * missing row. The foreign keys of the timetable tables accept any institute's row.
+   */
+  abstract findMissingRef(refs: TimetableRefs): Promise<TimetableRefKind | null>;
 
   // Covered sections
   abstract addSection(timetableId: string, sectionId: string): Promise<TimetableSectionRecord>;

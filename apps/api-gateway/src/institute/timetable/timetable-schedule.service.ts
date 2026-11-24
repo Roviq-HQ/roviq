@@ -4,6 +4,7 @@ import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { TimetableRepository } from './repositories/timetable.repository';
 import type { TimetableEntryRecord } from './repositories/types';
+import { assertTimetableCell, assertTimetableRefs } from './timetable-refs';
 
 /** One parallel group within a cell (whole class = single split with index 0). */
 export interface AssignSplitInput {
@@ -54,6 +55,10 @@ export class TimetableScheduleService {
       );
 
     const period = await this.assertAssignableTarget(input);
+    await assertTimetableRefs(this.repo, {
+      subjectIds: input.splits.map((split) => split.subjectId),
+      teacherIds: input.splits.map((split) => split.teacherId),
+    });
 
     const result: TimetableEntryRecord[] = [];
     for (const dayOfWeek of input.days) {
@@ -155,6 +160,7 @@ export class TimetableScheduleService {
         ErrorCode.TIMETABLE_NOT_FOUND,
         `Timetable ${input.timetableId} not found`,
       );
+    await assertTimetableCell(this.repo, input);
     await this.repo.clearEntry({
       timetableId: input.timetableId,
       sectionId: input.sectionId,
