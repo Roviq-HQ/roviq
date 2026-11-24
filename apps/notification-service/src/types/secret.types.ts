@@ -99,11 +99,10 @@ export interface UserWelcomeParams {
   username: string;
   firstName: string | null;
   tempPassword: string;
-  /**
-   * Set for an account an institute created: the person did not ask for it, so the message
-   * names the institute and where to sign in.
-   */
-  institute: { name: Record<string, string>; signInUrl: string } | null;
+  /** The sign-in page of the portal the account belongs to. */
+  signInUrl: string;
+  /** Set for an account an institute created: the person did not ask for it, so it is named. */
+  institute: { name: Record<string, string> } | null;
 }
 
 function nameIn(name: Record<string, string>, locale: 'en' | 'hi'): string {
@@ -148,7 +147,7 @@ export const userWelcomeType: SecretNotificationType<UserWelcomeParams> = {
     const name = p.firstName ?? p.username;
     if (p.institute) {
       const institute = nameIn(p.institute.name, locale);
-      const url = p.institute.signInUrl;
+      const url = p.signInUrl;
       if (channel === 'SMS') {
         return { subject: '', body: smsText(userWelcomeInstituteSms, p, locale) };
       }
@@ -191,7 +190,7 @@ export const userWelcomeType: SecretNotificationType<UserWelcomeParams> = {
             `यूज़रनेम: ${p.username}`,
             `अस्थायी पासवर्ड: ${p.tempPassword}`,
             '',
-            'लॉग इन करें और पहली बार साइन-इन करते समय अपना पासवर्ड बदलें।',
+            `${p.signInUrl} पर साइन इन करें। पहली बार साइन इन करते समय आपसे अपना पासवर्ड बनाने को कहा जाएगा।`,
           ].join('\n'),
         }
       : {
@@ -203,7 +202,7 @@ export const userWelcomeType: SecretNotificationType<UserWelcomeParams> = {
             `Username: ${p.username}`,
             `Temporary password: ${p.tempPassword}`,
             '',
-            'Log in and change your password on first sign-in.',
+            `Sign in at ${p.signInUrl}. You will be asked to choose your own password the first time.`,
           ].join('\n'),
         };
   },

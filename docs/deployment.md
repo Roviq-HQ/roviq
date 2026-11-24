@@ -264,9 +264,10 @@ enforced yet.
 - **Redis**: the notification service needs `REDIS_URL`, the same Redis as the api-gateway. The
   per-sender rate limit and the circuit breakers live there (`docs/architecture.md` →
   "Notifications"); the service does not start without it.
-- **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
-  prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
-  same value as the api-gateway's.
+- **Portal addresses**: the notification service prints `<url>/login` in the sign-in details of a
+  new account, from the setting of the account's portal: `INSTITUTE_PORTAL_URL` (institute users,
+  ROV-315; the same value as the api-gateway's), `RESELLER_PORTAL_URL` (reseller team members) and
+  `ADMIN_PORTAL_URL` (platform users). Unset, they point at the development hosts.
 
 ### Delivery canary and alerts
 

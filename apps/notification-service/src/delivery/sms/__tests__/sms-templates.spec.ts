@@ -21,10 +21,8 @@ const WELCOME_FROM_INSTITUTE: SecretPayload = {
     username: 'staff-0191-ab12',
     firstName: LONG_FIRST_NAME,
     tempPassword: PASSWORD,
-    institute: {
-      name: { en: LONG_INSTITUTE_EN, hi: LONG_INSTITUTE_HI },
-      signInUrl: 'https://app.roviq.com/login',
-    },
+    signInUrl: 'https://app.roviq.com/login',
+    institute: { name: { en: LONG_INSTITUTE_EN, hi: LONG_INSTITUTE_HI } },
   },
 };
 const WELCOME_WITHOUT_NAME: SecretPayload = {
@@ -33,12 +31,19 @@ const WELCOME_WITHOUT_NAME: SecretPayload = {
     username: 'staff-0191-ab12',
     firstName: null,
     tempPassword: PASSWORD,
-    institute: { name: { en: '  ' }, signInUrl: 'https://app.roviq.com/login' },
+    signInUrl: 'https://app.roviq.com/login',
+    institute: { name: { en: '  ' } },
   },
 };
 const WELCOME_PLAIN = {
   type: 'USER_WELCOME',
-  params: { username: 'priya.verma', firstName: null, tempPassword: PASSWORD, institute: null },
+  params: {
+    username: 'priya.verma',
+    firstName: null,
+    tempPassword: PASSWORD,
+    signInUrl: 'https://reseller.roviq.com/login',
+    institute: null,
+  },
 } satisfies SecretPayload;
 const VERIFICATION: SecretPayload = { type: 'EMAIL_VERIFICATION', params: { code: CODE } };
 
