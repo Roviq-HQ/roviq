@@ -8,9 +8,9 @@ import {
   SYSTEM_USER_ID,
   withAdmin,
 } from '@roviq/database';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NotificationWriteRepository } from './notification-write.repository';
-import type { DeliveryRow, InAppRow } from './types';
+import type { DeferralRow, DeliveryRow, InAppRow } from './types';
 
 const ORIGIN = 'repository:notification-write';
 
@@ -76,5 +76,39 @@ export class NotificationWriteDrizzleRepository extends NotificationWriteReposit
           outcome.status === 'SKIPPED' ? null : (outcome.route?.templateCategory ?? null),
       }),
     );
+  }
+
+  async recordDeferral(row: DeferralRow): Promise<void> {
+    const t = notificationDeliveries;
+    await withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
+      if (row.flowId !== null) {
+        const [held] = await tx
+          .select({ id: t.id })
+          .from(t)
+          .where(
+            and(
+              eq(t.flowId, row.flowId),
+              eq(t.recipientUserId, row.recipientUserId),
+              eq(t.channel, row.channel),
+              eq(t.status, 'DEFERRED'),
+            ),
+          )
+          .limit(1);
+        if (held) return;
+      }
+      await tx.insert(t).values({
+        scope: row.audience.scope,
+        tenantId: row.audience.tenantId,
+        resellerId: row.audience.resellerId,
+        notificationId: row.notificationId,
+        recipientUserId: row.recipientUserId,
+        type: row.type,
+        channel: row.channel,
+        attempt: row.attempt,
+        flowId: row.flowId,
+        status: 'DEFERRED',
+        skipReason: row.reason,
+      });
+    });
   }
 }

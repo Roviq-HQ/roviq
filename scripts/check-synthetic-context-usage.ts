@@ -65,6 +65,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts',
   // ROV-314: notification, delivery and impersonation-session fixtures for the inbox tests only.
   'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
+  // ROV-327: student, guardian, notification and delivery fixtures for the institute log tests only.
+  'apps/api-gateway/src/institute/notification-delivery/__tests__/notification-delivery-log.integration.spec.ts',
   // ROV-301: files read as the caller's own role; profile photo writes on the shared user profile.
   'apps/api-gateway/src/files/file.loaders.ts',
   'apps/api-gateway/src/institute/profile-photo/profile-photo-target.repository.ts',

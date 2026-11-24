@@ -77,7 +77,7 @@ Pages map 1:1 to modules, all under `apps/web/src/app/[locale]/`.
 | --- | --- |
 | `/institute/attendance` | Teacher's daily roster — open a session, mark the section |
 | `/institute/attendance/reports` | Absentee and section reports |
-| `/institute/attendance/history` | Per-student history over a date range |
+| `/institute/attendance/history` | Per-student history over a date range; each row links to "Who was notified" for that session |
 | `/institute/leave` | Leaves list + filters (staff-scoped or all, based on ability) |
 | `/institute/leave/apply` | Submit a new leave |
 | `/institute/leave/[id]` | Leave detail + approve/reject actions |
@@ -100,10 +100,12 @@ Below is the exact flow that ties the three modules together.
 
 **Notification fan-out.** The backend emits `NOTIFICATION.*` events on significant domain transitions. `apps/notification-service` consumes them via NATS listeners and sends notifications:
 
-| Event | Notification type | Channels |
-| --- | --- | --- |
-| `NOTIFICATION.attendance.absent` | `ATTENDANCE_ABSENT` | in-app → digest → WhatsApp → email → push |
-| `NOTIFICATION.leave.decided` | `LEAVE_DECIDED` | in-app → email |
+| Event | Notification type |
+| --- | --- |
+| `NOTIFICATION.attendance.absent` | `ATTENDANCE_ABSENT` |
+| `NOTIFICATION.leave.decided` | `LEAVE_DECIDED` |
+
+The channels of each type and their order are its flow: `docs/architecture.md` → "Notifications". Who received an alert, and what happened on each channel, is on the institute's "Notification delivery" page (`/institute/settings/notifications/delivery`).
 
 ## 5. Permissions matrix
 

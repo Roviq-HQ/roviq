@@ -2,7 +2,8 @@ import type { InboundPerson, ReceiptInput, ReceiptResult } from './types';
 
 export abstract class MessagingInboundRepository {
   /**
-   * Appends a DELIVERED or FAILED row copied from the SENT row of the same sender and message.
+   * Appends a DELIVERED, READ or FAILED row copied from the SENT row of the same sender and
+   * message; a message gets at most one DELIVERED row, whichever report brings it.
    * The flow id is copied too. `duplicate`: the event was handled before. `unknown_message`:
    * this sender sent no such message; nothing is written.
    */

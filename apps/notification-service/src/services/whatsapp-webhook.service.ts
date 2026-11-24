@@ -75,9 +75,8 @@ export class WhatsAppWebhookService {
       senderId: sender.id,
       eventId: `${receipt.messageId}:${receipt.status}`,
       providerMessageId: receipt.messageId,
-      status: failed ? 'FAILED' : 'DELIVERED',
+      status: failed ? 'FAILED' : receipt.status === 'read' ? 'READ' : 'DELIVERED',
       errorCode: failed ? errorCodeForProviderCode(receipt.providerErrorCode) : null,
-      onlyIfNotDelivered: receipt.status === 'read',
       person: { phone: receipt.recipientPhone, providerUserId: receipt.providerUserId },
     });
     if (result.kind === 'recorded' && result.arrival) {

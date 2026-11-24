@@ -206,6 +206,7 @@ export function createApolloClient(config: ApolloClientConfig) {
           adminAuditLogs: relayStylePagination(['filter']),
           subscriptions: relayStylePagination(['filter']),
           invoices: relayStylePagination(['instituteId', 'filter']),
+          notificationDeliveryLog: relayStylePagination(['filter']),
           adminListUsers: filterCursorPagination(),
           adminListResellers: filterCursorPagination(),
           adminListInstitutes: filterCursorPagination(),

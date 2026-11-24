@@ -131,6 +131,35 @@ export const testIds = {
     readOnlyNote: 'notification-read-only-note',
   },
 
+  // ── Institute: notification delivery log (settings/notifications/delivery) ──
+  notificationDelivery: {
+    page: 'notification-delivery-page',
+    table: 'notification-delivery-table',
+    accessDenied: 'notification-delivery-access-denied',
+    empty: 'notification-delivery-empty',
+    error: 'notification-delivery-error',
+    retryBtn: 'notification-delivery-retry-btn',
+    exportBtn: 'notification-delivery-export-btn',
+    clearFiltersBtn: 'notification-delivery-clear-filters-btn',
+    moduleFilter: 'notification-delivery-module-filter',
+    typeFilter: 'notification-delivery-type-filter',
+    channelFilter: 'notification-delivery-channel-filter',
+    stateFilter: 'notification-delivery-state-filter',
+    fromInput: 'notification-delivery-from-input',
+    toInput: 'notification-delivery-to-input',
+    criticalOnlySwitch: 'notification-delivery-critical-only-switch',
+    notDeliveredOnlySwitch: 'notification-delivery-not-delivered-only-switch',
+    chip: (key: string) => `notification-delivery-chip-${key}`,
+    chipRemove: (key: string) => `notification-delivery-chip-remove-${key}`,
+    channelCell: (entryId: string, channel: string) =>
+      `notification-delivery-cell-${entryId}-${channel}`,
+    reason: (entryId: string, channel: string) =>
+      `notification-delivery-reason-${entryId}-${channel}`,
+    settingsLink: 'notification-delivery-settings-link',
+    studentLink: 'notification-delivery-student-link',
+    sessionLink: (rowKey: string) => `notification-delivery-session-link-${rowKey}`,
+  },
+
   // ── Admin: institutes list + filters + columns ─────────────────────────
   adminInstitutes: {
     page: 'institutes-page',

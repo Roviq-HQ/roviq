@@ -4940,6 +4940,19 @@ type NotificationConnection {
   totalCount: Int!
 }
 
+"""Where one message to one recipient stands on one channel."""
+type NotificationDeliveryChannelState {
+  """Time of the attempt or report that set the state."""
+  at: DateTime!
+  channel: NotificationChannel!
+
+  """
+  For FAILED, SKIPPED and WAITING: the skip reason (e.g. `no_consent`, `quiet_hours`) or error code (e.g. `WA_NOT_ON_WHATSAPP`) of the latest attempt; otherwise null.
+  """
+  reason: String
+  state: NotificationDeliveryState!
+}
+
 type NotificationDeliveryConnection {
   edges: [NotificationDeliveryEdge!]!
   pageInfo: PageInfo!
@@ -4959,6 +4972,89 @@ input NotificationDeliveryFilterInput {
   tenantId: ID
 
   """Notification kind, e.g. ATTENDANCE_ABSENT."""
+  type: String
+}
+
+type NotificationDeliveryLogConnection {
+  edges: [NotificationDeliveryLogEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type NotificationDeliveryLogEdge {
+  cursor: String!
+  node: NotificationDeliveryLogEntry!
+}
+
+"""
+One message to one recipient, with its state on every channel it was tried on.
+"""
+type NotificationDeliveryLogEntry {
+  """Time of the first attempt of the message."""
+  at: DateTime!
+  channels: [NotificationDeliveryChannelState!]!
+
+  """Sent whatever the institute settings say and outside quiet hours."""
+  critical: Boolean!
+
+  """Opaque; stable for the same message and recipient."""
+  id: ID!
+  module: NotificationModule!
+
+  """
+  From the institute's register; null when the institute holds no profile.
+  """
+  recipientFirstName: I18nText
+  recipientLastName: I18nText
+  recipientUserId: ID!
+
+  """
+  The recipient's relationship to the student (a GuardianRelationship), when known.
+  """
+  relationship: String
+  studentFirstName: I18nText
+  studentLastName: I18nText
+
+  """
+  Membership id of the student the message is about, when it is about one.
+  """
+  studentMembershipId: ID
+
+  """Notification kind, e.g. ATTENDANCE_ABSENT."""
+  type: String!
+}
+
+"""Filters for the institute notification delivery log; all optional."""
+input NotificationDeliveryLogFilterInput {
+  """
+  Messages tried on this channel (with `state`: in that state on this channel).
+  """
+  channel: NotificationChannel
+
+  """Only critical types."""
+  criticalOnly: Boolean
+
+  """First attempt at or after."""
+  from: DateTime
+  module: NotificationModule
+
+  """Only messages that no channel has DELIVERED or READ."""
+  notDeliveredOnly: Boolean
+  recipientUserId: ID
+
+  """Attendance session id."""
+  sessionId: ID
+
+  """Messages with at least one channel in this state."""
+  state: NotificationDeliveryState
+
+  """Student membership id."""
+  studentId: ID
+
+  """First attempt at or before."""
+  to: DateTime
+
+  """Notification kind, e.g. FEE_OVERDUE."""
   type: String
 }
 
@@ -4991,10 +5087,24 @@ type NotificationDeliveryModel {
   type: String!
 }
 
-"""Outcome of one delivery attempt."""
-enum NotificationDeliveryStatus {
+"""
+State of one message to one recipient on one channel: READ or DELIVERED when any report says so, else the latest attempt (SENT, FAILED, SKIPPED; a held message is WAITING).
+"""
+enum NotificationDeliveryState {
   DELIVERED
   FAILED
+  READ
+  SENT
+  SKIPPED
+  WAITING
+}
+
+"""Outcome of one delivery attempt."""
+enum NotificationDeliveryStatus {
+  DEFERRED
+  DELIVERED
+  FAILED
+  READ
   SENT
   SKIPPED
 }
@@ -5022,6 +5132,17 @@ type NotificationModel {
 
   """Notification kind, e.g. ATTENDANCE_ABSENT or LEAVE_DECIDED."""
   type: String!
+}
+
+"""The part of the product a notification type belongs to."""
+enum NotificationModule {
+  ACCOUNT
+  ACCOUNT_SECURITY
+  APPROVAL
+  ATTENDANCE
+  BILLING
+  FEE
+  LEAVE
 }
 
 type PageInfo {
@@ -5557,6 +5678,11 @@ type Query {
   """Unread, unarchived notifications of the signed-in user."""
   myUnreadNotificationCount: Int!
   notificationConfigs: [NotificationConfigModel!]!
+
+  """
+  The institute's notifications sent outside the app: one entry per message and recipient with its state on each channel, newest activity first. `first` is capped at 100.
+  """
+  notificationDeliveryLog(after: String, filter: NotificationDeliveryLogFilterInput, first: Int = 25): NotificationDeliveryLogConnection!
 
   """
   Renders a preview HTML for a certificate by substituting student data into the template. No row is persisted.

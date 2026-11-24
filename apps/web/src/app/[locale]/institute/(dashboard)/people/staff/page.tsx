@@ -24,6 +24,7 @@ import {
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DeletedRecordsButton } from '@web/components/people/deleted-records';
+import { buildCsv, downloadCsv } from '@web/lib/csv';
 import {
   Briefcase,
   CheckCircle2,
@@ -284,36 +285,18 @@ export default function StaffPage() {
         t('columns.employmentType'),
         t('columns.isClassTeacher'),
       ];
-      const csvEscape = (value: string) => {
-        if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-        return value;
-      };
-      const lines = [
-        header.map(csvEscape).join(','),
-        ...rows.map((s) =>
-          [
-            s.employeeId ?? '',
-            fullName(s),
-            s.designation ?? '',
-            s.department ?? '',
-            s.employmentType ?? '',
-            s.isClassTeacher ? 'Yes' : 'No',
-          ]
-            .map(csvEscape)
-            .join(','),
-        ),
-      ];
-      const blob = new Blob([`\uFEFF${lines.join('\n')}`], {
-        type: 'text/csv;charset=utf-8;',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `staff-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const csv = buildCsv(
+        header,
+        rows.map((s) => [
+          s.employeeId ?? '',
+          fullName(s),
+          s.designation ?? '',
+          s.department ?? '',
+          s.employmentType ?? '',
+          s.isClassTeacher ? 'Yes' : 'No',
+        ]),
+      );
+      downloadCsv(`staff-${new Date().toISOString().slice(0, 10)}.csv`, csv);
       toast.success(t('export.success', { count: rows.length }));
     },
     [fullName, t],

@@ -1,7 +1,10 @@
 'use client';
 
 import { gql, useMutation, useQuery } from '@roviq/graphql';
+import { Link as LocaleLink } from '@roviq/i18n';
 import {
+  Button,
+  Can,
   Card,
   CardContent,
   CardDescription,
@@ -16,6 +19,8 @@ import {
   TableRow,
   useAbility,
 } from '@roviq/ui';
+import { testIds } from '@roviq/ui/testing/testid-registry';
+import { MailCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type {
@@ -98,6 +103,7 @@ function getDefaultConfig(notificationType: string): NotificationConfig {
 
 export default function NotificationPreferencesPage() {
   const t = useTranslations('notifications');
+  const tDelivery = useTranslations('notificationDelivery');
   const canEdit = useAbility().can('update_config', 'Institute');
 
   const { data, loading } = useQuery<NotificationConfigsQuery>(NOTIFICATION_CONFIGS_QUERY);
@@ -144,6 +150,17 @@ export default function NotificationPreferencesPage() {
         <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
         {!canEdit && <p className="mt-1 text-sm text-muted-foreground">{t('readOnly')}</p>}
+        <Can I="read" a="NotificationDelivery">
+          <Button variant="link" className="mt-1 h-auto gap-1.5 p-0" asChild>
+            <LocaleLink
+              href="/institute/settings/notifications/delivery"
+              data-testid={testIds.notificationDelivery.settingsLink}
+            >
+              <MailCheck className="size-4" />
+              {tDelivery('settingsLink')}
+            </LocaleLink>
+          </Button>
+        </Can>
       </div>
 
       <Card>

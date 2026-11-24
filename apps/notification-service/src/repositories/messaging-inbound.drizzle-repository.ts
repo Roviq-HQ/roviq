@@ -46,32 +46,38 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
       );
       if (!fresh) return { kind: 'duplicate' };
 
-      if (input.onlyIfNotDelivered) {
-        const [delivered] = await tx
-          .select({ id: notificationDeliveries.id })
-          .from(notificationDeliveries)
-          .where(and(ofMessage, eq(notificationDeliveries.status, 'DELIVERED')))
-          .limit(1);
-        if (delivered) return { kind: 'recorded', arrival: null };
+      const append = (status: 'DELIVERED' | 'READ' | 'FAILED') =>
+        tx.insert(notificationDeliveries).values({
+          scope: sent.scope,
+          tenantId: sent.tenantId,
+          resellerId: sent.resellerId,
+          notificationId: sent.notificationId,
+          recipientUserId: sent.recipientUserId,
+          type: sent.type,
+          channel: sent.channel,
+          provider: sent.provider,
+          attempt: sent.attempt,
+          senderId: sent.senderId,
+          templateCategory: sent.templateCategory,
+          providerMessageId: sent.providerMessageId,
+          flowId: sent.flowId,
+          status,
+          errorCode: status === 'FAILED' ? (input.errorCode ?? 'WA_REJECTED') : null,
+        });
+      if (input.status === 'FAILED') {
+        await append('FAILED');
+        return { kind: 'recorded', arrival: arrivalOf(sent, 'FAILED') };
       }
-      await tx.insert(notificationDeliveries).values({
-        scope: sent.scope,
-        tenantId: sent.tenantId,
-        resellerId: sent.resellerId,
-        notificationId: sent.notificationId,
-        recipientUserId: sent.recipientUserId,
-        type: sent.type,
-        channel: sent.channel,
-        provider: sent.provider,
-        attempt: sent.attempt,
-        senderId: sent.senderId,
-        templateCategory: sent.templateCategory,
-        providerMessageId: sent.providerMessageId,
-        flowId: sent.flowId,
-        status: input.status,
-        errorCode: input.status === 'FAILED' ? (input.errorCode ?? 'WA_REJECTED') : null,
-      });
-      return { kind: 'recorded', arrival: arrivalOf(sent, input.status) };
+      // A read report can come without a delivery report, and before a late one: the message
+      // was delivered once, so it gets one DELIVERED row and one arrival signal.
+      const [delivered] = await tx
+        .select({ id: notificationDeliveries.id })
+        .from(notificationDeliveries)
+        .where(and(ofMessage, eq(notificationDeliveries.status, 'DELIVERED')))
+        .limit(1);
+      if (!delivered) await append('DELIVERED');
+      if (input.status === 'READ') await append('READ');
+      return { kind: 'recorded', arrival: delivered ? null : arrivalOf(sent, 'DELIVERED') };
     });
   }
 

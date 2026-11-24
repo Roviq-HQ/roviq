@@ -22,11 +22,12 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  useAbility,
   useDebounce,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ArrowLeft, Check, ChevronsUpDown, ClipboardList, User } from 'lucide-react';
+import { ArrowLeft, Check, ChevronsUpDown, ClipboardList, MailCheck, User } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -284,7 +285,10 @@ function HistoryResults({
   endDate: string;
 }) {
   const t = useTranslations('attendance');
+  const tDelivery = useTranslations('notificationDelivery');
   const { format } = useFormatDate();
+  const canReadDelivery = useAbility().can('read', 'NotificationDelivery');
+  const { locale } = useParams<{ locale: string }>();
   const { rows, loading } = useStudentHistory(studentId, startDate, endDate);
 
   const tableRows: HistoryRow[] = React.useMemo(
@@ -357,6 +361,31 @@ function HistoryResults({
         );
       },
     }) as ColumnDef<HistoryRow, unknown>,
+    ...(canReadDelivery
+      ? [
+          {
+            id: 'whoWasNotified',
+            header: () => <span className="sr-only">{tDelivery('whoWasNotified')}</span>,
+            cell: ({ row }) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5"
+                asChild
+                title={tDelivery('whoWasNotified')}
+              >
+                <Link
+                  href={`/${locale}/institute/settings/notifications/delivery?sessionId=${row.original.sessionId}`}
+                  data-testid={testIds.notificationDelivery.sessionLink(row.original.key)}
+                >
+                  <MailCheck className="size-4" />
+                  {tDelivery('whoWasNotified')}
+                </Link>
+              </Button>
+            ),
+          } satisfies ColumnDef<HistoryRow, unknown>,
+        ]
+      : []),
   ];
 
   return (

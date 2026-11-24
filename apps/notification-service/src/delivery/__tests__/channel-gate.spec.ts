@@ -141,6 +141,7 @@ describe('evaluateChannelGate', () => {
       await expect(evaluateChannelGate(gate)).resolves.toEqual({
         open: false,
         deferUntil: QUIET_END,
+        deferReason: 'quiet_hours',
       });
       expect(gate.capacity).not.toHaveBeenCalled();
     });
@@ -161,6 +162,7 @@ describe('evaluateChannelGate', () => {
       await expect(evaluateChannelGate(gate)).resolves.toEqual({
         open: false,
         deferUntil: later,
+        deferReason: 'sender_cap',
       });
     });
 
