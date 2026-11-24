@@ -1,0 +1,1 @@
+CREATE POLICY "dlq_writer_insert" ON "dlq_messages" AS PERMISSIVE FOR INSERT TO "roviq_audit_writer" WITH CHECK (true);

@@ -20,7 +20,7 @@ import {
   setupStatus,
   structureFramework,
 } from '../common/enums';
-import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
+import { roviqAdmin, roviqApp, roviqAuditWriter, roviqReseller } from '../common/rls-policies';
 import { resellers } from '../reseller/resellers';
 import { instituteGroups } from './institute-groups';
 
@@ -161,6 +161,13 @@ export const institutes = pgTable(
       to: roviqAdmin,
       using: sql`true`,
       withCheck: sql`true`,
+    }),
+    // The audit_logs trigger checks that a reseller-scope entry's institute belongs to that
+    // reseller. The audit writer's column grant is id and reseller_id only.
+    pgPolicy('institutes_audit_writer_select', {
+      for: 'select',
+      to: roviqAuditWriter,
+      using: sql`true`,
     }),
   ],
 );

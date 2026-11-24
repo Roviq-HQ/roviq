@@ -21,10 +21,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const hasTestDb = !!process.env.DATABASE_URL_TEST_MIGRATE;
 
-// Use the migrate-role connection — production AuditConsumer writes via
-// `DATABASE_URL_AUDIT` (also a privileged role) since `roviq_pooler` /
-// `roviq_app` aren't granted direct INSERT on audit_logs (RLS-bypass write
-// path lives behind a privileged role only).
+// The owner connection: the spec reads rows back, which roviq_audit_writer (the
+// consumer's DATABASE_URL_AUDIT login) may not do.
 const DB_URL =
   process.env.DATABASE_URL_TEST_MIGRATE ?? 'postgresql://roviq:roviq_dev@localhost:5434/roviq_test';
 

@@ -59,14 +59,20 @@ docker run --rm -v "${TARGET}_roviq-objects:/data" -v "$BACKUP:/in:ro" \
 log "Starting a fresh database"
 stg_compose "$REL" up -d --wait postgres
 
+log "Restoring the database roles"
+# Roles belong to the cluster, not the dump; policies name them. Roles that init-db.sh already
+# created report "already exists", which is expected.
+stg_compose "$REL" exec -T postgres psql -q -U roviq -d postgres <"$BACKUP/roles.sql" >/dev/null 2>&1 || true
+
 log "Restoring the databases"
 stg_compose "$REL" exec -T postgres pg_restore -U roviq -d roviq --exit-on-error <"$BACKUP/roviq.dump"
 for db in temporal temporal_visibility; do
     stg_compose "$REL" exec -T postgres createdb -U roviq "$db"
     stg_compose "$REL" exec -T postgres pg_restore -U roviq -d "$db" --exit-on-error <"$BACKUP/$db.dump"
 done
-printf '%s\n' '\getenv pw POSTGRES_POOLER_PASSWORD' "ALTER ROLE roviq_pooler PASSWORD :'pw';" |
-    stg_compose "$REL" exec -T -e POSTGRES_POOLER_PASSWORD postgres \
+printf '%s\n' '\getenv pw POSTGRES_POOLER_PASSWORD' "ALTER ROLE roviq_pooler PASSWORD :'pw';" \
+    '\getenv aw POSTGRES_AUDIT_WRITER_PASSWORD' "ALTER ROLE roviq_audit_writer PASSWORD :'aw';" |
+    stg_compose "$REL" exec -T -e POSTGRES_POOLER_PASSWORD -e POSTGRES_AUDIT_WRITER_PASSWORD postgres \
         psql -q -v ON_ERROR_STOP=1 -U roviq -d roviq >/dev/null
 
 log "Starting the restored stack (no migration, no seed)"

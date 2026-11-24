@@ -1,0 +1,1 @@
+CREATE POLICY "dlq_writer_conflict_key" ON "dlq_messages" AS PERMISSIVE FOR SELECT TO "roviq_audit_writer" USING (true);

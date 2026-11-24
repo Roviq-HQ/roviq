@@ -27,7 +27,7 @@ Any host whose first label is not `admin` or `reseller` is served as the institu
 
 Run `pnpm db:migrate` (Drizzle `migrate`, connecting with `DATABASE_URL_MIGRATE`, the `roviq` owner role) **before** the new API version takes traffic. The chain in `libs/database/migrations/` builds an empty database by itself: the prereq migration, one generated baseline and one custom migration for what the schema cannot declare (functions, triggers, FORCE ROW LEVEL SECURITY, table and column privileges, the partitioned `audit_logs` and its first partitions). Several security rules live in the database, and the API relies on them being there.
 
-**Create the login role first.** The prereq migration creates `roviq_pooler` with the development password when the role does not exist. In production create it beforehand (`CREATE ROLE roviq_pooler LOGIN NOINHERIT PASSWORD '…'`) and give `DATABASE_URL` the same password; the migration then only adjusts its memberships.
+**Create the login role first.** The prereq migration creates `roviq_pooler` with the development password when the role does not exist. In production create it beforehand (`CREATE ROLE roviq_pooler LOGIN NOINHERIT PASSWORD '…'`) and give `DATABASE_URL` the same password; the migration then only adjusts its memberships. Do the same for `roviq_audit_writer` (`CREATE ROLE roviq_audit_writer LOGIN NOINHERIT PASSWORD '…'`), the login of `DATABASE_URL_AUDIT`: the SF-082 migration grants it INSERT on `audit_logs` and `dlq_messages` and nothing else.
 
 Consequences for operations:
 
@@ -471,7 +471,7 @@ What staging shows about any environment:
 - **The web app needs `HOSTNAME=0.0.0.0`** when it shares more than one network: Next.js binds to
   `HOSTNAME`, which Docker sets to the container id.
 - **The API needs `DATABASE_URL_AUDIT`, `BILLING_ENCRYPTION_KEY` and `IDENTITY_ENCRYPTION_KEY`** at
-  start. `DATABASE_URL_AUDIT` points at the owner role today (SF-082).
+  start. `DATABASE_URL_AUDIT` logs in as `roviq_audit_writer`; the deploy script sets its password.
 - **The notification service refuses the `log` provider in production mode.** A channel with no
   real provider is left unset, which turns it off.
 - **The restored stack sends no real messages** only because SMS, WhatsApp and push are off and
