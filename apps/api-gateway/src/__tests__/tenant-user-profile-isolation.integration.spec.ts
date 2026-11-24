@@ -406,16 +406,17 @@ describe('Per-institute profiles and phone numbers (integration)', () => {
           parentRelation: 'FATHER',
         };
         const tenantId = a.base.tenantId;
-        const student = await activities.createUserAndMembership(tenantId, a.base.userId, seed);
-        const { studentProfileId } = await activities.createStudentProfile(
+        const student = await activities.admitStudent({
           tenantId,
-          student.userId,
-          student.membershipId,
-          a.standardId,
+          actorId: a.base.userId,
+          seed,
+          academicYearId: a.academicYearId,
+          standardId: a.standardId,
+          sectionId: null,
           formData,
-          false,
-          a.base.userId,
-        );
+          isRte: false,
+        });
+        const { studentProfileId } = student;
         await activities.linkGuardians(tenantId, studentProfileId, formData, a.base.userId, seed);
         const [link] = await asAdmin((tx) =>
           tx
