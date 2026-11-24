@@ -162,31 +162,61 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/group
-  createGroup: PENDING,
-  deleteGroup: PENDING,
-  getGroup: PENDING,
+  createGroup: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  },
+  deleteGroup: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  },
+  getGroup: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  },
   listGroupMembers: {
     spec: 'apps/api-gateway/src/institute/group/__tests__/group-crud.integration.spec.ts',
   },
-  resolveGroupMembers: PENDING,
-  setGroupMemberExcluded: PENDING,
-  updateGroup: PENDING,
+  resolveGroupMembers: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  },
+  setGroupMemberExcluded: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  },
+  updateGroup: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/guardian
   createGuardian: {
     spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-create-foreign-id.integration.spec.ts',
   },
-  deleteGuardian: PENDING,
-  getGuardian: PENDING,
-  linkGuardianToStudent: PENDING,
-  listLinkedStudents: PENDING,
-  listStudentGuardians: PENDING,
+  deleteGuardian: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  getGuardian: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  linkGuardianToStudent: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  listLinkedStudents: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  listStudentGuardians: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
   resendGuardianSignInDetails: {
     spec: 'apps/api-gateway/src/institute/sign-in-details/__tests__/sign-in-details.integration.spec.ts',
   },
-  restoreGuardian: PENDING,
-  revokeGuardianAccess: PENDING,
-  unlinkGuardianFromStudent: PENDING,
-  updateGuardian: PENDING,
+  restoreGuardian: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  revokeGuardianAccess: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  unlinkGuardianFromStudent: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
+  updateGuardian: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/holiday
   deleteHoliday: {
     spec: 'apps/api-gateway/src/institute/holiday/__tests__/holiday-foreign-id.integration.spec.ts',
@@ -246,17 +276,33 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/section/__tests__/section-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/staff
-  createStaffQualification: PENDING,
-  deleteStaffMember: PENDING,
-  deleteStaffQualification: PENDING,
-  getStaffMember: PENDING,
-  listStaffQualifications: PENDING,
+  createStaffQualification: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
+  deleteStaffMember: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
+  deleteStaffQualification: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
+  getStaffMember: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
+  listStaffQualifications: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
   resendStaffSignInDetails: {
     spec: 'apps/api-gateway/src/institute/sign-in-details/__tests__/sign-in-details.integration.spec.ts',
   },
-  restoreStaffMember: PENDING,
-  updateStaffMember: PENDING,
-  updateStaffQualification: PENDING,
+  restoreStaffMember: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
+  updateStaffMember: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
+  updateStaffQualification: {
+    spec: 'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/standard
   createStandard: {
     spec: 'apps/api-gateway/src/institute/standard/__tests__/standard-foreign-id.integration.spec.ts',
@@ -274,26 +320,54 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/standard/__tests__/standard-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/student
-  bulkCreateStudents: PENDING,
-  changeStudentClass: PENDING,
+  bulkCreateStudents: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  changeStudentClass: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
   createStudent: {
     spec: 'apps/api-gateway/src/institute/student/__tests__/student-create-foreign-id.integration.spec.ts',
   },
-  deleteStudent: PENDING,
+  deleteStudent: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
   deleteStudentDocument: {
     spec: 'apps/api-gateway/src/institute/student/__tests__/student-document-removal.integration.spec.ts',
   },
-  enrollStudent: PENDING,
-  getStudent: PENDING,
-  listStudentAcademics: PENDING,
-  listStudentDocuments: PENDING,
-  listStudents: PENDING,
-  removeStudentFromYear: PENDING,
-  restoreStudent: PENDING,
-  setPromotionDecisions: PENDING,
-  transitionStudentStatus: PENDING,
-  updateStudent: PENDING,
-  updateStudentSection: PENDING,
+  enrollStudent: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  getStudent: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  listStudentAcademics: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  listStudentDocuments: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  listStudents: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  removeStudentFromYear: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  restoreStudent: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  setPromotionDecisions: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  transitionStudentStatus: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  updateStudent: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
+  updateStudentSection: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
+  },
   uploadStudentDocument: {
     spec: 'apps/api-gateway/src/institute/student/__tests__/student-document-upload.integration.spec.ts',
   },
