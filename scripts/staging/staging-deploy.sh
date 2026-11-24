@@ -21,8 +21,9 @@ REF="${1:?usage: staging-deploy.sh <commit, branch or tag>}"
 
 # ── 1. Export the commit ─────────────────────────────────────
 git -C "$REPO_DIR" fetch --quiet origin
-SHA="$(git -C "$REPO_DIR" rev-parse --verify --short=12 "$REF^{commit}" 2>/dev/null ||
-    git -C "$REPO_DIR" rev-parse --verify --short=12 "origin/$REF^{commit}")"
+# A branch name means the remote branch: the clone's local branches are never updated.
+SHA="$(git -C "$REPO_DIR" rev-parse --verify --short=12 "origin/$REF^{commit}" 2>/dev/null ||
+    git -C "$REPO_DIR" rev-parse --verify --short=12 "$REF^{commit}")"
 REL="$RELEASES_DIR/$SHA"
 PREVIOUS="$(current_release || true)"
 log "Deploying $SHA (previous: ${PREVIOUS:-none})"
@@ -34,6 +35,7 @@ if [[ ! -d "$REL" ]]; then
 fi
 cp "$REL/docker/init-db.sh" "$STAGING_STATE_DIR/init-db.sh"
 # The nightly backup runs these copies, so it always matches the deployed release.
+[[ -d "$REL/scripts/staging" ]] || { log "$SHA has no scripts/staging: it predates staging"; exit 1; }
 mkdir -p "$STAGING_STATE_DIR/bin"
 cp "$REL"/scripts/staging/*.sh "$STAGING_STATE_DIR/bin/"
 

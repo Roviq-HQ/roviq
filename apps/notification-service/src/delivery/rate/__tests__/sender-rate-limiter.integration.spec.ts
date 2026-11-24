@@ -96,7 +96,7 @@ describe('SenderRateLimiter (real Redis)', () => {
 
     // 10 tokens, a digest must leave 3: seven digests go, the eighth waits.
     expect(digests.filter((d) => d.ok)).toHaveLength(7);
-    expect(critical).toEqual({ ok: true });
+    expect(critical).toEqual({ ok: true, grantedAt: expect.any(Date) });
   });
 
   it('should hold a second message to the same person for the gap', async () => {
@@ -106,7 +106,7 @@ describe('SenderRateLimiter (real Redis)', () => {
     const take = () =>
       limiter.take({ senderId: id, messagesPerSecond: 10, phone: to, reserve: false });
 
-    await expect(take()).resolves.toEqual({ ok: true });
+    await expect(take()).resolves.toEqual({ ok: true, grantedAt: expect.any(Date) });
     const second = await take();
     const other = await limiter.take({
       senderId: id,
@@ -117,7 +117,7 @@ describe('SenderRateLimiter (real Redis)', () => {
 
     expect(second.ok).toBe(false);
     if (!second.ok) expect(second.retryAt.getTime() - Date.now()).toBeGreaterThan(5_000);
-    expect(other).toEqual({ ok: true });
+    expect(other).toEqual({ ok: true, grantedAt: expect.any(Date) });
   });
 
   it('should never store the phone number in a key', async () => {
