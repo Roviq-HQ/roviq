@@ -41,6 +41,7 @@ describe('WhatsAppRoute', () => {
   beforeEach(() => {
     senders = createMock<MessagingSenderRepository>({
       resolveForAudience: vi.fn().mockResolvedValue(INSTITUTE_SENDER),
+      findActivePlatform: vi.fn().mockResolvedValue(null),
       isOptedOut: vi.fn().mockResolvedValue(false),
       countSentSince: vi.fn().mockResolvedValue({ total: 0, forTenant: 0 }),
     });
@@ -61,6 +62,36 @@ describe('WhatsAppRoute', () => {
         'WHATSAPP',
         'whatsapp_cloud',
       );
+    });
+  });
+
+  describe('fallbackFor', () => {
+    it("should give the platform's active sender when the institute's own failed", async () => {
+      senders.findActivePlatform.mockResolvedValue(PLATFORM_SENDER);
+
+      await expect(route.fallbackFor(INSTITUTE_SENDER)).resolves.toEqual(PLATFORM_SENDER);
+
+      expect(senders.findActivePlatform).toHaveBeenCalledWith('WHATSAPP', 'whatsapp_cloud');
+    });
+
+    it("should give none when the platform's sender is the one that failed", async () => {
+      senders.findActivePlatform.mockResolvedValue(PLATFORM_SENDER);
+
+      await expect(route.fallbackFor(PLATFORM_SENDER)).resolves.toBeNull();
+
+      expect(senders.findActivePlatform).not.toHaveBeenCalled();
+    });
+
+    it('should give none when there is no active platform sender', async () => {
+      senders.findActivePlatform.mockResolvedValue(null);
+
+      await expect(route.fallbackFor(INSTITUTE_SENDER)).resolves.toBeNull();
+    });
+
+    it('should never give back the same row', async () => {
+      senders.findActivePlatform.mockResolvedValue({ ...PLATFORM_SENDER, id: INSTITUTE_SENDER.id });
+
+      await expect(route.fallbackFor(INSTITUTE_SENDER)).resolves.toBeNull();
     });
   });
 

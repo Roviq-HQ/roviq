@@ -44,6 +44,7 @@ import { eq, inArray } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstitutePortal } from '../config/institute-portal';
+import type { AdapterErrorCode } from '../delivery/adapters/adapter-errors';
 import type { ChannelAdapter, ChannelMessage } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
@@ -85,7 +86,7 @@ const GUARDIAN_PHONE = (() => {
 class RecordingAdapter implements ChannelAdapter {
   readonly provider = 'recording';
   readonly sent: ChannelMessage[] = [];
-  failWith: string | null = null;
+  failWith: AdapterErrorCode | null = null;
 
   constructor(readonly channel: ChannelMessage['channel']) {}
 

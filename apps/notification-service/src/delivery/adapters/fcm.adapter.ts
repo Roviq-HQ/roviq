@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { JWT } from 'google-auth-library';
 import { z } from 'zod';
+import { type AdapterErrorCode, FCM_ERROR_KINDS, type FcmErrorCode } from './adapter-errors';
 import {
   type ChannelAdapter,
   ChannelAdapterError,
@@ -67,7 +68,7 @@ export class FcmPushAdapter implements ChannelAdapter {
     }
     const accessToken = await this.accessToken();
     let firstId: string | undefined;
-    let lastCode = 'FCM_ERROR';
+    let lastCode: AdapterErrorCode = 'FCM_REJECTED';
     for (const token of message.to) {
       const outcome = await this.sendOne(accessToken, token, message);
       if (outcome.ok) {
@@ -97,7 +98,7 @@ export class FcmPushAdapter implements ChannelAdapter {
     accessToken: string,
     token: string,
     message: ChannelMessage,
-  ): Promise<{ ok: true; messageId: string } | { ok: false; code: string }> {
+  ): Promise<{ ok: true; messageId: string } | { ok: false; code: AdapterErrorCode }> {
     let response: Response;
     try {
       response = await fetch(this.endpoint, {
@@ -127,9 +128,17 @@ export class FcmPushAdapter implements ChannelAdapter {
   }
 }
 
-function fcmErrorCode(httpStatus: number, payload: unknown): string {
+function isFcmCode(code: string | undefined): code is FcmErrorCode {
+  return code !== undefined && Object.hasOwn(FCM_ERROR_KINDS, code);
+}
+
+/** FCM's own code, else the request status, else a bucket by HTTP status. */
+function fcmErrorCode(httpStatus: number, payload: unknown): AdapterErrorCode {
   const parsed = fcmErrorSchema.safeParse(payload);
-  if (!parsed.success) return `FCM_HTTP_${httpStatus}`;
-  const fcmCode = parsed.data.error.details?.find((d) => d.errorCode)?.errorCode;
-  return fcmCode ?? parsed.data.error.status ?? `FCM_HTTP_${httpStatus}`;
+  if (parsed.success) {
+    const fcmCode = parsed.data.error.details?.find((d) => d.errorCode)?.errorCode;
+    if (isFcmCode(fcmCode)) return fcmCode;
+    if (isFcmCode(parsed.data.error.status)) return parsed.data.error.status;
+  }
+  return httpStatus >= 500 || httpStatus === 429 ? 'FCM_SERVER_ERROR' : 'FCM_REJECTED';
 }

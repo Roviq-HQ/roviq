@@ -36,6 +36,16 @@ export class WhatsAppRoute {
     return this.senders.resolveForAudience(tenantId, 'WHATSAPP', WHATSAPP_CLOUD_PROVIDER);
   }
 
+  /**
+   * The platform's active sender when the institute's own cannot send now; null when the failed
+   * sender is already the platform's or there is none.
+   */
+  async fallbackFor(failed: MessagingSenderRecord): Promise<MessagingSenderRecord | null> {
+    if (failed.scope !== 'institute') return null;
+    const platform = await this.senders.findActivePlatform('WHATSAPP', WHATSAPP_CLOUD_PROVIDER);
+    return platform !== null && platform.id !== failed.id ? platform : null;
+  }
+
   optedOut(sender: MessagingSenderRecord, phone: string): Promise<boolean> {
     return this.senders.isOptedOut(sender.id, phone);
   }

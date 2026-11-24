@@ -2,6 +2,7 @@ import type { NotificationChannel, NotificationTypeKey } from '@roviq/common-typ
 import type { MessagingSenderRecord } from '../../repositories/types';
 import type { SmsDraft, SmsSend } from '../sms/sms-template';
 import type { TemplateSend } from '../whatsapp/whatsapp-template';
+import { type AdapterErrorCode, type FailureKind, failureKindOf } from './adapter-errors';
 
 export interface ChannelMessage {
   channel: NotificationChannel;
@@ -27,14 +28,18 @@ export interface ChannelSendResult {
  * the provider's own message text never goes in it.
  */
 export class ChannelAdapterError extends Error {
+  /** Whether another provider of the channel may take the same attempt. */
+  readonly kind: FailureKind;
+
   constructor(
-    readonly code: string,
+    readonly code: AdapterErrorCode,
     message: string,
     /** False when the same request would be refused again. */
     readonly retryable = true,
   ) {
     super(message);
     this.name = 'ChannelAdapterError';
+    this.kind = failureKindOf(code);
   }
 }
 

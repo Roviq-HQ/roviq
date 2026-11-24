@@ -267,6 +267,13 @@ enforced yet.
 - **SMS**: `NOTIFICATION_SMS_PROVIDER=http`. See "SMS" below. Leave it unset until the sender
   and the templates are registered; impersonation codes then cannot reach a phone.
 - **WhatsApp**: `NOTIFICATION_WHATSAPP_PROVIDER=cloud`. See "WhatsApp alerts" below.
+- **More than one provider**: each `NOTIFICATION_<CHANNEL>_PROVIDER` takes one name or a
+  comma-separated list, first choice first (`http,log`). A send moves to the next provider only
+  when the one before cannot send now (unreachable, rate limited, sender or account blocked),
+  never when the message or the number was refused. Every listed provider needs its own
+  settings, an unknown or repeated name stops the service at start-up, and `log` anywhere in a
+  list is refused in production. An SMS provider with no registered template for a message is
+  passed over for it.
 - **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
   prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
   same value as the api-gateway's.
@@ -275,7 +282,10 @@ enforced yet.
 
 WhatsApp messages go out through the official business API (ROV-319), from a **sender**: a
 number registered with the provider. An institute's messages use its own active sender when it
-has one, else the platform's sender. Nothing is sent until a sender exists.
+has one, else the platform's sender. When the institute's own sender cannot send now (blocked,
+rate limited, unreachable), the same message goes through the platform's active sender, unless
+the person stopped messages from that number or it is over its cap. Nothing is sent until a
+sender exists.
 
 **Environment**
 

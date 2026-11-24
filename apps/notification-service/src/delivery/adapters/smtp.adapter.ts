@@ -1,12 +1,11 @@
 import { createTransport, type Transporter } from 'nodemailer';
+import { type AdapterErrorCode, SMTP_ERROR_KINDS, type SmtpErrorCode } from './adapter-errors';
 import {
   type ChannelAdapter,
   ChannelAdapterError,
   type ChannelMessage,
   type ChannelSendResult,
 } from './channel-adapter';
-
-const SMTP_CODE = /^E[A-Z]+$/;
 
 export interface SmtpLimits {
   connectionTimeoutMs: number;
@@ -67,16 +66,18 @@ export class SmtpEmailAdapter implements ChannelAdapter {
   }
 }
 
+function isSmtpCode(code: string): code is SmtpErrorCode {
+  return Object.hasOwn(SMTP_ERROR_KINDS, code);
+}
+
 /**
  * Nodemailer's own code (ECONNECTION, EAUTH, ETIMEDOUT, EABORT for the send deadline, ...) plus
  * the SMTP reply code.
  */
-function smtpErrorCode(err: unknown): string {
+function smtpErrorCode(err: unknown): AdapterErrorCode {
   if (typeof err !== 'object' || err === null) return 'SMTP_ERROR';
-  const code =
-    'code' in err && typeof err.code === 'string' && SMTP_CODE.test(err.code)
-      ? err.code
-      : 'SMTP_ERROR';
+  const code: SmtpErrorCode =
+    'code' in err && typeof err.code === 'string' && isSmtpCode(err.code) ? err.code : 'SMTP_ERROR';
   const reply =
     'responseCode' in err && typeof err.responseCode === 'number' ? err.responseCode : null;
   return reply ? `${code}_${reply}` : code;

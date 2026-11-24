@@ -67,6 +67,31 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
     });
   }
 
+  async findActivePlatform(
+    channel: NotificationChannel,
+    provider: string,
+  ): Promise<MessagingSenderRecord | null> {
+    return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const [row] = await tx
+        .select(senderColumns)
+        .from(messagingSendersLive)
+        .innerJoin(
+          messagingSenderSecrets,
+          eq(messagingSenderSecrets.senderId, messagingSendersLive.id),
+        )
+        .where(
+          and(
+            eq(messagingSendersLive.channel, channel),
+            eq(messagingSendersLive.provider, provider),
+            eq(messagingSendersLive.status, 'ACTIVE'),
+            eq(messagingSendersLive.scope, 'platform'),
+          ),
+        )
+        .limit(1);
+      return row ?? null;
+    });
+  }
+
   async findByProviderNumber(
     provider: string,
     providerNumberId: string,

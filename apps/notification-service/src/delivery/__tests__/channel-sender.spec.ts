@@ -8,6 +8,7 @@ import { ChannelAdapters } from '../adapters/channel-adapters';
 import { LogChannelAdapter } from '../adapters/log.adapter';
 import { type ChannelAttempt, ChannelSender } from '../channel-sender';
 import type { ConsentGate } from '../consent-gate';
+import type { SmsDraft } from '../sms/sms-template';
 import { WhatsAppRoute } from '../whatsapp/whatsapp-route';
 import type { TemplateSend } from '../whatsapp/whatsapp-template';
 
@@ -16,6 +17,17 @@ const INSTITUTE = {
   tenantId: '019a0000-0000-7000-8000-000000000001',
   resellerId: null,
 } as const;
+
+const PLATFORM_SENDER: MessagingSenderRecord = {
+  id: 'sender-platform',
+  scope: 'platform',
+  tenantId: null,
+  status: 'ACTIVE',
+  providerNumberId: 'number-platform',
+  dailyCap: 1000,
+  instituteDailyCap: 100,
+  accessTokenEncrypted: Buffer.from('fake-encrypted-platform-token'),
+};
 
 const SENDER: MessagingSenderRecord = {
   id: 'sender-1',
@@ -84,6 +96,7 @@ describe('ChannelSender', () => {
       optedOut: vi.fn().mockResolvedValue(false),
       quietUntil: vi.fn().mockResolvedValue(null),
       capacity: vi.fn().mockResolvedValue('ok'),
+      fallbackFor: vi.fn().mockResolvedValue(null),
     });
     sender = new ChannelSender(
       new ChannelAdapters([email]),
@@ -422,6 +435,291 @@ describe('ChannelSender', () => {
       await sender.attempt(whatsappAttempt());
 
       expect(template.mock.calls).toEqual([[locale]]);
+    });
+  });
+
+  describe('failover between the providers of one channel', () => {
+    const DRAFT: SmsDraft = {
+      registrationKey: 'FEE_REMINDER:hi',
+      variables: ['Aarav'],
+      unicode: false,
+    };
+    let firstSend: Mock<ChannelAdapter['send']>;
+    let secondSend: Mock<ChannelAdapter['send']>;
+    let first: ChannelAdapter;
+    let second: ChannelAdapter;
+
+    const smsAttempt = (overrides: Partial<ChannelAttempt> = {}) =>
+      attempt({ channel: 'SMS', ...overrides });
+    const senderOf = (adapters: ChannelAdapters) =>
+      new ChannelSender(
+        adapters,
+        createMock<ConsentGate>({ allows: vi.fn().mockResolvedValue(true) }),
+        contacts,
+        writes,
+        route,
+      );
+
+    beforeEach(() => {
+      firstSend = vi
+        .fn<ChannelAdapter['send']>()
+        .mockResolvedValue({ providerMessageId: 'first-1' });
+      secondSend = vi
+        .fn<ChannelAdapter['send']>()
+        .mockResolvedValue({ providerMessageId: 'second-1' });
+      first = { channel: 'SMS', provider: 'first', send: firstSend };
+      second = { channel: 'SMS', provider: 'second', send: secondSend };
+      sender = senderOf(new ChannelAdapters([first, second]));
+    });
+
+    it('should send the same attempt through the second provider when the first is unreachable', async () => {
+      firstSend.mockRejectedValue(new ChannelAdapterError('SMS_UNREACHABLE', 'request failed'));
+
+      const outcome = await sender.attempt(smsAttempt());
+
+      const expected = { status: 'SENT', provider: 'second', providerMessageId: 'second-1' };
+      expect(outcome).toEqual(expected);
+      expect(firstSend).toHaveBeenCalledTimes(1);
+      expect(secondSend).toHaveBeenCalledTimes(1);
+      expect(secondSend.mock.calls[0]?.[0]).toEqual(firstSend.mock.calls[0]?.[0]);
+      expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+      expect(writes.recordDelivery).toHaveBeenCalledWith({
+        audience: INSTITUTE,
+        notificationId: 'notification-1',
+        recipientUserId: 'user-guardian-1',
+        type: 'FEE_REMINDER',
+        channel: 'SMS',
+        attempt: 1,
+        outcome: expected,
+        flowId: 'notification-flow:key-1',
+      });
+    });
+
+    it('should not fail over a refusal of the message and record one FAILED row naming the first', async () => {
+      firstSend.mockRejectedValue(new ChannelAdapterError('SMS_INVALID_NUMBER', 'http 200', false));
+
+      const outcome = await sender.attempt(smsAttempt());
+
+      const expected = {
+        status: 'FAILED',
+        provider: 'first',
+        errorCode: 'SMS_INVALID_NUMBER',
+        retryable: false,
+      };
+      expect(outcome).toEqual(expected);
+      expect(secondSend).not.toHaveBeenCalled();
+      expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+      expect(writes.recordDelivery.mock.calls[0]?.[0].outcome).toEqual(expected);
+    });
+
+    it('should record one retryable FAILED row naming the last provider when none can send', async () => {
+      firstSend.mockRejectedValue(new ChannelAdapterError('SMS_UNREACHABLE', 'request failed'));
+      secondSend.mockRejectedValue(new ChannelAdapterError('SMS_RATE_LIMITED', 'http 429'));
+
+      const outcome = await sender.attempt(smsAttempt());
+
+      const expected = {
+        status: 'FAILED',
+        provider: 'second',
+        errorCode: 'SMS_RATE_LIMITED',
+        retryable: true,
+      };
+      expect(outcome).toEqual(expected);
+      expect(firstSend).toHaveBeenCalledTimes(1);
+      expect(secondSend).toHaveBeenCalledTimes(1);
+      expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+      expect(writes.recordDelivery.mock.calls[0]?.[0].outcome).toEqual(expected);
+    });
+
+    it('should pass over a provider that has no registered template for one that has', async () => {
+      first = { ...first, resolveSmsTemplate: () => null };
+      second = {
+        ...second,
+        resolveSmsTemplate: (draft) => ({ ...draft, templateId: 'reg-second-1' }),
+      };
+      sender = senderOf(new ChannelAdapters([first, second]));
+
+      const outcome = await sender.attempt(smsAttempt({ sms: () => DRAFT }));
+
+      expect(outcome).toEqual({
+        status: 'SENT',
+        provider: 'second',
+        providerMessageId: 'second-1',
+      });
+      expect(firstSend).not.toHaveBeenCalled();
+      expect(secondSend.mock.calls[0]?.[0].sms).toEqual({ ...DRAFT, templateId: 'reg-second-1' });
+    });
+
+    it('should send each provider its own registered template', async () => {
+      first = {
+        ...first,
+        resolveSmsTemplate: (draft) => ({ ...draft, templateId: 'reg-first-1' }),
+      };
+      second = {
+        ...second,
+        resolveSmsTemplate: (draft) => ({ ...draft, templateId: 'reg-second-1' }),
+      };
+      firstSend.mockRejectedValue(new ChannelAdapterError('SMS_SENDER_BLOCKED', 'http 401', false));
+      sender = senderOf(new ChannelAdapters([first, second]));
+
+      await sender.attempt(smsAttempt({ sms: () => DRAFT }));
+
+      expect(firstSend.mock.calls[0]?.[0].sms?.templateId).toBe('reg-first-1');
+      expect(secondSend.mock.calls[0]?.[0].sms?.templateId).toBe('reg-second-1');
+    });
+
+    it('should skip as no_template when no provider has a registered template', async () => {
+      first = { ...first, resolveSmsTemplate: () => null };
+      second = { ...second, resolveSmsTemplate: () => null };
+      sender = senderOf(new ChannelAdapters([first, second]));
+
+      const outcome = await sender.attempt(smsAttempt({ sms: () => DRAFT }));
+
+      expect(outcome).toEqual({ status: 'SKIPPED', provider: null, skipReason: 'no_template' });
+      expect(firstSend).not.toHaveBeenCalled();
+      expect(secondSend).not.toHaveBeenCalled();
+    });
+
+    it('should leave out a provider that is not available now', async () => {
+      class FirstDown extends ChannelAdapters {
+        override available(adapter: ChannelAdapter): boolean {
+          return adapter !== first;
+        }
+      }
+      sender = senderOf(new FirstDown([first, second]));
+
+      const outcome = await sender.attempt(smsAttempt());
+
+      expect(outcome).toEqual({
+        status: 'SENT',
+        provider: 'second',
+        providerMessageId: 'second-1',
+      });
+      expect(firstSend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("an institute's own WhatsApp sender that cannot send", () => {
+    let whatsappSend: Mock<ChannelAdapter['send']>;
+
+    const whatsappAttempt = () => attempt({ channel: 'WHATSAPP', template: templateIn });
+    const OWN_ROUTE = { senderId: 'sender-1', templateCategory: 'UTILITY' };
+    const PLATFORM_ROUTE = { senderId: 'sender-platform', templateCategory: 'UTILITY' };
+
+    beforeEach(() => {
+      whatsappSend = vi.fn<ChannelAdapter['send']>();
+      route.fallbackFor.mockResolvedValue(PLATFORM_SENDER);
+      sender = new ChannelSender(
+        new ChannelAdapters([
+          {
+            channel: 'WHATSAPP',
+            provider: 'whatsapp_cloud',
+            usesSenders: true,
+            send: whatsappSend,
+          },
+        ]),
+        createMock<ConsentGate>({ allows: vi.fn().mockResolvedValue(true) }),
+        contacts,
+        writes,
+        route,
+      );
+    });
+
+    it("should send the same attempt through the platform's sender and record that sender", async () => {
+      whatsappSend
+        .mockRejectedValueOnce(
+          new ChannelAdapterError('WA_SENDER_BLOCKED', 'provider code 368', false),
+        )
+        .mockResolvedValueOnce({ providerMessageId: 'wamid.platform-1' });
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      const expected = {
+        status: 'SENT',
+        provider: 'whatsapp_cloud',
+        providerMessageId: 'wamid.platform-1',
+        route: PLATFORM_ROUTE,
+      };
+      expect(outcome).toEqual(expected);
+      expect(whatsappSend.mock.calls.map(([m]) => m.route?.sender.id)).toEqual([
+        'sender-1',
+        'sender-platform',
+      ]);
+      expect(route.fallbackFor).toHaveBeenCalledWith(SENDER);
+      expect(route.optedOut).toHaveBeenLastCalledWith(PLATFORM_SENDER, '+919000000001');
+      expect(route.capacity).toHaveBeenLastCalledWith(PLATFORM_SENDER, INSTITUTE.tenantId, false);
+      expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+      expect(writes.recordDelivery.mock.calls[0]?.[0].outcome).toEqual(expected);
+    });
+
+    it("should not use the platform's sender when the person opted out of it", async () => {
+      whatsappSend.mockRejectedValue(new ChannelAdapterError('WA_UNREACHABLE', 'http 503'));
+      route.optedOut.mockImplementation(async (s) => s.id === PLATFORM_SENDER.id);
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({
+        status: 'FAILED',
+        provider: 'whatsapp_cloud',
+        errorCode: 'WA_UNREACHABLE',
+        retryable: true,
+        route: OWN_ROUTE,
+      });
+      expect(whatsappSend).toHaveBeenCalledTimes(1);
+      expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+    });
+
+    it("should not use the platform's sender when it is over its cap", async () => {
+      whatsappSend.mockRejectedValue(new ChannelAdapterError('WA_RATE_LIMITED', 'http 429'));
+      route.capacity.mockImplementation(async (s) => (s.id === PLATFORM_SENDER.id ? 'over' : 'ok'));
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({
+        status: 'FAILED',
+        provider: 'whatsapp_cloud',
+        errorCode: 'WA_RATE_LIMITED',
+        retryable: true,
+        route: OWN_ROUTE,
+      });
+      expect(whatsappSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not fail over a refusal of the message', async () => {
+      whatsappSend.mockRejectedValue(
+        new ChannelAdapterError('WA_NOT_ON_WHATSAPP', 'provider code 131026', false),
+      );
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({
+        status: 'FAILED',
+        provider: 'whatsapp_cloud',
+        errorCode: 'WA_NOT_ON_WHATSAPP',
+        retryable: false,
+        route: OWN_ROUTE,
+      });
+      expect(route.fallbackFor).not.toHaveBeenCalled();
+      expect(whatsappSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('should record the platform failure when the platform sender cannot send either', async () => {
+      whatsappSend
+        .mockRejectedValueOnce(
+          new ChannelAdapterError('WA_SENDER_BLOCKED', 'provider code 368', false),
+        )
+        .mockRejectedValueOnce(new ChannelAdapterError('WA_UNREACHABLE', 'http 502'));
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({
+        status: 'FAILED',
+        provider: 'whatsapp_cloud',
+        errorCode: 'WA_UNREACHABLE',
+        retryable: true,
+        route: PLATFORM_ROUTE,
+      });
+      expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -521,6 +521,74 @@ describe('WhatsApp delivery and webhook (integration)', () => {
     });
   });
 
+  describe("failover from an institute's own sender to the platform's (ROV-332)", () => {
+    const blocked = { status: 400, body: { error: { code: 368, message: 'temporarily blocked' } } };
+
+    it("should send the same attempt through the platform's sender when the institute's own is blocked", async () => {
+      const own = await addSender({ scope: 'institute', tenantId: instituteA.tenantId });
+      const platform = await addSender({ scope: 'platform' });
+      provider.answers.push(blocked);
+
+      await expect(send(instituteA, userA)).resolves.toBe('SENT');
+
+      expect(provider.requests.map((r) => [r.numberId, r.authorization])).toEqual([
+        [own.numberId, `Bearer ${own.token}`],
+        [platform.numberId, `Bearer ${platform.token}`],
+      ]);
+      expect(await deliveries(userA.userId)).toEqual([
+        {
+          status: 'SENT',
+          skip_reason: null,
+          error_code: null,
+          provider: WHATSAPP_CLOUD_PROVIDER,
+          provider_message_id: provider.lastMessageId(),
+          sender_id: platform.id,
+          template_category: 'UTILITY',
+          tenant_id: instituteA.tenantId,
+        },
+      ]);
+    });
+
+    it("should not send through the platform's sender to a person who opted out of it", async () => {
+      const platform = await addSender({ scope: 'platform' });
+      await post(inbound(platform.numberId, phoneA.full, 'STOP'));
+      const own = await addSender({ scope: 'institute', tenantId: instituteA.tenantId });
+      provider.requests.length = 0;
+      provider.answers.push(blocked);
+
+      const failure = await send(instituteA, userA).catch((e: unknown) => e);
+
+      assert(failure instanceof ApplicationFailure);
+      expect(failure.type).toBe('WA_SENDER_BLOCKED');
+      expect(provider.requests.map((r) => r.numberId)).toEqual([own.numberId]);
+      expect(await deliveries(userA.userId)).toEqual([
+        {
+          status: 'FAILED',
+          skip_reason: null,
+          error_code: 'WA_SENDER_BLOCKED',
+          provider: WHATSAPP_CLOUD_PROVIDER,
+          provider_message_id: null,
+          sender_id: own.id,
+          template_category: 'UTILITY',
+          tenant_id: instituteA.tenantId,
+        },
+      ]);
+    });
+
+    it("should not fail over a refusal of the message to the platform's sender", async () => {
+      const own = await addSender({ scope: 'institute', tenantId: instituteA.tenantId });
+      await addSender({ scope: 'platform' });
+      provider.answers.push({ status: 400, body: { error: { code: 131026, message: 'x' } } });
+
+      await send(instituteA, userA).catch((e: unknown) => e);
+
+      expect(provider.requests.map((r) => r.numberId)).toEqual([own.numberId]);
+      expect((await deliveries(userA.userId)).map((d) => [d.error_code, d.sender_id])).toEqual([
+        ['WA_NOT_ON_WHATSAPP', own.id],
+      ]);
+    });
+  });
+
   describe('quiet hours', () => {
     it('should hold a non-critical message at night, write nothing, and send it once they end', async () => {
       await addSender({ scope: 'platform' });

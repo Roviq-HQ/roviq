@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import type { AdapterErrorCode } from '../adapters/adapter-errors';
 
 /** One recipient's delivery state from a provider's report. */
 export interface SmsReport {
   /** The id the provider answered the send with. */
   requestId: string;
   status: 'DELIVERED' | 'FAILED';
-  errorCode: string | null;
+  errorCode: AdapterErrorCode | null;
 }
 
 /** The provider's status numbers. Any other number is not final and is dropped. */

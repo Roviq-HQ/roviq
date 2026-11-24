@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { providersOf } from '../../config/channel-providers';
 import { SmsHttpClient } from './sms-http.client';
 import { SmsRegistrations } from './sms-registrations';
 
 /**
- * What the SMS provider needs, built only when `NOTIFICATION_SMS_PROVIDER=http` (env validation
+ * What the SMS provider needs, built only when `NOTIFICATION_SMS_PROVIDER` names `http` (env validation
  * then guarantees every setting). Otherwise `enabled` is false and nothing here may be used.
  */
 @Injectable()
@@ -17,7 +18,9 @@ export class SmsHttp {
   } | null;
 
   constructor(config: ConfigService) {
-    this.enabled = config.get<string>('NOTIFICATION_SMS_PROVIDER') === 'http';
+    this.enabled = providersOf('SMS', config.get<string>('NOTIFICATION_SMS_PROVIDER')).includes(
+      'http',
+    );
     this.parts = this.enabled
       ? {
           client: new SmsHttpClient(
