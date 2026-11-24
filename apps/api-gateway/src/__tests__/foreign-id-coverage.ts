@@ -37,34 +37,88 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/admission
-  addApplicationDocument: PENDING,
-  approveApplication: PENDING,
-  convertEnquiryToApplication: PENDING,
-  createApplication: PENDING,
-  createEnquiry: PENDING,
-  getApplication: PENDING,
-  listApplicationDocuments: PENDING,
-  listApplications: PENDING,
-  listEnquiries: PENDING,
-  rejectApplication: PENDING,
-  removeApplicationDocument: PENDING,
-  updateApplication: PENDING,
-  updateEnquiry: PENDING,
+  addApplicationDocument: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  approveApplication: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  convertEnquiryToApplication: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  createApplication: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  createEnquiry: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  getApplication: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  listApplicationDocuments: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  listApplications: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  listEnquiries: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  rejectApplication: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  removeApplicationDocument: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  updateApplication: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
+  updateEnquiry: {
+    spec: 'apps/api-gateway/src/institute/admission/__tests__/admission-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/attendance
-  attendanceAbsenteesReport: PENDING,
-  attendanceCounts: PENDING,
-  attendanceCountsForDate: PENDING,
-  attendanceEntries: PENDING,
-  attendanceSectionDailyBreakdown: PENDING,
-  attendanceSections: PENDING,
-  attendanceSession: PENDING,
-  attendanceSessionsForSection: PENDING,
-  attendanceStudentHistory: PENDING,
-  bulkMarkAttendance: PENDING,
-  deleteAttendanceSession: PENDING,
-  markAttendance: PENDING,
-  openAttendanceSession: PENDING,
-  overrideAttendanceSession: PENDING,
+  attendanceAbsenteesReport: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceCounts: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceCountsForDate: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceEntries: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceSectionDailyBreakdown: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceSections: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceSession: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceSessionsForSection: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  attendanceStudentHistory: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  bulkMarkAttendance: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  deleteAttendanceSession: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  markAttendance: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  openAttendanceSession: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
+  overrideAttendanceSession: {
+    spec: 'apps/api-gateway/src/institute/attendance/__tests__/attendance-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/audit
   auditLogs: {
     spec: 'apps/api-gateway/src/audit/__tests__/audit-foreign-id.integration.spec.ts',
@@ -228,14 +282,30 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/holiday/__tests__/holiday-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/leave
-  applyLeave: PENDING,
-  approveLeave: PENDING,
-  cancelLeave: PENDING,
-  deleteLeave: PENDING,
-  leave: PENDING,
-  leaves: PENDING,
-  rejectLeave: PENDING,
-  updateLeave: PENDING,
+  applyLeave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  approveLeave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  cancelLeave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  deleteLeave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  leave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  leaves: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  rejectLeave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
+  updateLeave: {
+    spec: 'apps/api-gateway/src/institute/leave/__tests__/leave-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/management
   updateInstituteBranding: {
     spec: 'apps/api-gateway/src/institute/management/__tests__/institute-branding-foreign-id.integration.spec.ts',
@@ -245,14 +315,22 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/notification-delivery/__tests__/notification-delivery-log.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/profile-photo
-  setGuardianPhoto: PENDING,
+  setGuardianPhoto: {
+    spec: 'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
+  },
   setMyProfilePhoto: {
     spec: 'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
   },
-  setStaffPhoto: PENDING,
-  setStudentPhoto: PENDING,
+  setStaffPhoto: {
+    spec: 'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
+  },
+  setStudentPhoto: {
+    spec: 'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/role
-  updateRolePrimaryNav: PENDING,
+  updateRolePrimaryNav: {
+    spec: 'apps/api-gateway/src/institute/role/__tests__/role.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/section
   assignClassTeacher: {
     spec: 'apps/api-gateway/src/institute/section/__tests__/section-foreign-id.integration.spec.ts',

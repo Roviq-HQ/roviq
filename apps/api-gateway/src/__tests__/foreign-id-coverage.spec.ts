@@ -19,7 +19,7 @@ const RESOLVER_ROOTS = ['apps/api-gateway/src', 'ee/apps/api-gateway/src'];
 const PLATFORM_ONLY_DIR = 'admin';
 
 /** Entries still marked pending. Lower it with every operation covered; never raise it. */
-const PENDING_COUNT = 150;
+const PENDING_COUNT = 111;
 
 function resolverFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];

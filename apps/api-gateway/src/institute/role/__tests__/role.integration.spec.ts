@@ -7,15 +7,16 @@
  * Coverage:
  *   1. Round-trip: writing primaryNavSlugs via the mutation and reading them
  *      back via `instituteRoles` returns the exact list.
- *   2. Cross-tenant RLS isolation: an admin in tenant A cannot mutate a role
- *      that lives in tenant B (the role lookup hits the tenant A RLS scope
- *      and returns no rows → NotFoundException → NOT_FOUND).
+ *   2. Cross-tenant RLS isolation (ROV-293): an admin in tenant A cannot mutate a role
+ *      that lives in tenant B: ROLE_NOT_FOUND, and no role of either tenant changes.
  *   3. class-validator (DTO) rejects: > 4 slugs, unknown slug values, and
  *      duplicate slugs. Matches the @IsArray + @ArrayMaxSize +
  *      @ArrayUnique + @IsIn decorators on UpdateRolePrimaryNavInput.
  */
 
+import { ErrorCode } from '@roviq/common-types';
 import { type DrizzleDB, mkAdminCtx, roles, withAdmin } from '@roviq/database';
+import { EventBusService } from '@roviq/event-bus';
 import {
   cleanupTestInstitute,
   createInstituteToken,
@@ -25,8 +26,8 @@ import {
   type IntegrationAppResult,
   type TestInstitute,
 } from '@roviq/testing/integration';
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { asc, eq, inArray } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
 
 const UPDATE_MUTATION = /* GraphQL */ `
@@ -141,9 +142,17 @@ describe('InstituteRoleResolver (integration)', () => {
   });
 
   describe('cross-tenant isolation (RLS)', () => {
-    it("admin in tenant A cannot mutate tenant B's role — RLS hides the row, NotFoundException is thrown", async () => {
-      // Pre-state of tenant B's role for the post-condition check.
-      const before = await readPrimaryNavSlugs(result.db, tenantB.roleId);
+    it("updateRolePrimaryNav should refuse a role of another institute and change neither institute's roles", async () => {
+      const snapshot = () =>
+        withAdmin(result.db, mkAdminCtx('test:role'), (tx) =>
+          tx
+            .select()
+            .from(roles)
+            .where(inArray(roles.tenantId, [tenantA.tenantId, tenantB.tenantId]))
+            .orderBy(asc(roles.id)),
+        );
+      const before = await snapshot();
+      const emit = vi.spyOn(EventBusService.prototype, 'emit');
 
       const res = await gqlRequest<UpdateResponse>(result.httpServer, {
         query: UPDATE_MUTATION,
@@ -153,18 +162,10 @@ describe('InstituteRoleResolver (integration)', () => {
         },
       });
 
-      expect(res.errors).toBeDefined();
-      const code = res.errors?.[0]?.extensions?.code;
-      // The repo throws NotFoundException → Apollo maps to NOT_FOUND. Some
-      // releases of @nestjs/graphql normalize to BAD_REQUEST/INTERNAL_*; accept
-      // any non-2xx error code here, so long as the row stays untouched.
-      expect(code).toBeDefined();
-      expect(code).not.toBe('FORBIDDEN');
-
-      // The post-condition is the real RLS guarantee — tenant B's row must be
-      // byte-for-byte unchanged regardless of what error the resolver returned.
-      const after = await readPrimaryNavSlugs(result.db, tenantB.roleId);
-      expect(after).toEqual(before);
+      expect(res.errors?.[0]?.extensions?.code).toBe(ErrorCode.ROLE_NOT_FOUND);
+      expect(res.data).toBeNull();
+      expect(await snapshot()).toEqual(before);
+      expect(emit.mock.calls.map(([pattern]) => pattern)).toEqual([]);
     });
 
     it('instituteRoles only returns roles for the caller tenant', async () => {
