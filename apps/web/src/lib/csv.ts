@@ -21,6 +21,15 @@ export function downloadCsv(filename: string, csv: string): void {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * A spreadsheet runs a text cell that starts with one of these as a formula. Names and notes are
+ * typed by users, so such a cell gets a leading apostrophe and is shown as text.
+ */
+export function neutraliseFormula(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
 function csvEscape(value: string | number): string {
-  return `"${String(value).replace(/"/g, '""')}"`;
+  const text = typeof value === 'number' ? String(value) : neutraliseFormula(value);
+  return `"${text.replace(/"/g, '""')}"`;
 }

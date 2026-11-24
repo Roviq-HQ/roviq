@@ -24,6 +24,7 @@ import {
 } from '@roviq/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DeletedRecordsButton } from '@web/components/people/deleted-records';
+import { neutraliseFormula } from '@web/lib/csv';
 import {
   Briefcase,
   CheckCircle2,
@@ -284,7 +285,8 @@ export default function StaffPage() {
         t('columns.employmentType'),
         t('columns.isClassTeacher'),
       ];
-      const csvEscape = (value: string) => {
+      const csvEscape = (raw: string) => {
+        const value = neutraliseFormula(raw);
         if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
         return value;
       };

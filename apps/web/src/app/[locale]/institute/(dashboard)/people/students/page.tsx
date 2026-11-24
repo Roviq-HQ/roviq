@@ -41,6 +41,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DeletedRecordsButton } from '@web/components/people/deleted-records';
+import { neutraliseFormula } from '@web/lib/csv';
 import { parseISO } from 'date-fns';
 import {
   AlertCircle,
@@ -923,7 +924,8 @@ export default function StudentsPage() {
         t('columns.rte'),
         t('columns.admittedOn'),
       ];
-      const csvEscape = (value: string) => {
+      const csvEscape = (raw: string) => {
+        const value = neutraliseFormula(raw);
         if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
         return value;
       };
