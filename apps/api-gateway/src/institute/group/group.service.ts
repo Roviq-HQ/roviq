@@ -226,6 +226,7 @@ export class GroupService {
    */
   async listMembers(groupId: string): Promise<GroupMemberModel[]> {
     const tenantId = this.getTenantId();
+    await this.findById(groupId);
 
     const rows = await this.repo.listMemberRows(tenantId, groupId);
 

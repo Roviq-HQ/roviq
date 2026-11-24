@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { DomainGroupType, DynamicGroupStatus, GroupMembershipType } from '@roviq/common-types';
+import { groupMembers, mkAdminCtx, SYSTEM_USER_ID, withAdmin } from '@roviq/database';
 import {
   createInstituteToken,
   createIntegrationApp,
@@ -55,6 +56,7 @@ interface GroupNode {
 
 describe('Group CRUD (integration)', () => {
   let result: IntegrationAppResult;
+  let instA: TestInstitute;
   let tokenA: string;
   let tokenB: string;
 
@@ -95,7 +97,8 @@ describe('Group CRUD (integration)', () => {
 
   beforeAll(async () => {
     result = await createIntegrationApp({ modules: [AppModule] });
-    tokenA = tokenFor(await createTestInstitute(result.db));
+    instA = await createTestInstitute(result.db);
+    tokenA = tokenFor(instA);
     tokenB = tokenFor(await createTestInstitute(result.db));
   });
 
@@ -202,6 +205,55 @@ describe('Group CRUD (integration)', () => {
 
     expect(res.errors).toBeUndefined();
     expect(res.data?.listGroupMembers).toEqual([]);
+  });
+
+  describe('listGroupMembers with a group of another institute (ROV-293)', () => {
+    let foreignGroupId: string;
+    let foreignMemberId: string;
+
+    beforeAll(async () => {
+      foreignGroupId = await createGroup(tokenA, 'Robotics Club');
+      foreignMemberId = await withAdmin(result.db, mkAdminCtx('test:group-crud'), async (tx) => {
+        const [row] = await tx
+          .insert(groupMembers)
+          .values({
+            tenantId: instA.tenantId,
+            groupId: foreignGroupId,
+            membershipId: instA.membershipId,
+            source: 'MANUAL',
+            createdBy: SYSTEM_USER_ID,
+            updatedBy: SYSTEM_USER_ID,
+          })
+          .returning({ id: groupMembers.id });
+        return row.id;
+      });
+      const own = await gqlRequest<{ listGroupMembers: { id: string }[] }>(result.httpServer, {
+        query: LIST_GROUP_MEMBERS,
+        token: tokenA,
+        variables: { groupId: foreignGroupId },
+      });
+      expect(own.data?.listGroupMembers).toEqual([{ id: foreignMemberId }]);
+    });
+
+    it('should return no member of the other institute group', async () => {
+      const res = await gqlRequest<{ listGroupMembers: { id: string }[] }>(result.httpServer, {
+        query: LIST_GROUP_MEMBERS,
+        token: tokenB,
+        variables: { groupId: foreignGroupId },
+      });
+
+      expect(res.data?.listGroupMembers ?? []).toEqual([]);
+    });
+
+    it('should answer GROUP_NOT_FOUND, as getGroup does', async () => {
+      const res = await gqlRequest<{ listGroupMembers: { id: string }[] }>(result.httpServer, {
+        query: LIST_GROUP_MEMBERS,
+        token: tokenB,
+        variables: { groupId: foreignGroupId },
+      });
+
+      expect(res.errors?.[0]?.extensions?.code).toBe('GROUP_NOT_FOUND');
+    });
   });
 
   it('should refuse to exclude a member the group does not have', async () => {
