@@ -94,8 +94,16 @@ migrated=true
 log "Essential seed and buckets"
 stg_compose "$REL" run --rm -w /app migrator sh -c 'pnpm run db:seed:essential && pnpm run storage:init'
 log "First platform admin"
-stg_compose "$REL" run --rm -w /app migrator \
-    pnpm run --silent admin:create --username "$STAGING_ADMIN_USERNAME" --email "$STAGING_ADMIN_EMAIL"
+ADMIN_FILE="$STAGING_STATE_DIR/first-admin-password"
+ADMIN_OUT="$(stg_compose "$REL" run --rm -T -w /app migrator \
+    pnpm run --silent admin:create --username "$STAGING_ADMIN_USERNAME" --email "$STAGING_ADMIN_EMAIL")"
+if grep -q 'Temporary password' <<<"$ADMIN_OUT"; then
+    # The password never reaches the deploy log.
+    (umask 077 && tail -1 <<<"$ADMIN_OUT" >"$ADMIN_FILE")
+    log "Created platform admin $STAGING_ADMIN_USERNAME; temporary password in $ADMIN_FILE"
+else
+    log "$(tail -1 <<<"$ADMIN_OUT")"
+fi
 
 # ── 6. Apps ──────────────────────────────────────────────────
 log "Starting the apps"

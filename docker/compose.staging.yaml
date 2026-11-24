@@ -93,8 +93,7 @@ services:
   migrator:
     image: ${STAGING_IMAGE_PREFIX:?}/migrator:${ROVIQ_VERSION:?}
     logging: *logging
-    # One-shot jobs: migrations, the essential seed, buckets, the first admin. The owner role's
-    # password exists only here, never on the running apps.
+    # One-shot jobs: migrations, the essential seed, buckets, the first admin.
     environment:
       DATABASE_URL_MIGRATE: postgresql://roviq:${POSTGRES_PASSWORD:?}@postgres:5432/roviq
       ROVIQ_EE: "true"
@@ -119,6 +118,8 @@ services:
     environment: !override
       <<: *otel
       DATABASE_URL: *app-db
+      # The audit consumer and the dead-letter queue connect as the owner role.
+      DATABASE_URL_AUDIT: postgresql://roviq:${POSTGRES_PASSWORD:?}@postgres:5432/roviq
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
       TEMPORAL_ADDRESS: temporal:7233
@@ -203,9 +204,8 @@ services:
       NOTIFICATION_EMAIL_PROVIDER: smtp
       SMTP_URL: smtp://mailpit:1025
       EMAIL_FROM: ${EMAIL_FROM:?}
-      NOTIFICATION_PUSH_PROVIDER: log
-      NOTIFICATION_SMS_PROVIDER: log
-      NOTIFICATION_WHATSAPP_PROVIDER: log
+      # Push, SMS and WhatsApp stay unset: the channel is off. `log` is refused in production
+      # mode, and staging sends no real messages on those channels.
 
 networks:
   proxy:
