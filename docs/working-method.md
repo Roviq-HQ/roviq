@@ -80,16 +80,21 @@ These are the pace rules that go with it.
 - **Prove the instance is usable before sending an agent to it**: the gateway answers 200, the
   dev database has this branch's tables, the e2e stack has every service. A blocked agent costs
   its whole start-up.
-- **One builder at a time per checkout.** Research, or a browser pass, may run beside it.
+- **One builder at a time per checkout.** Research, or a browser pass, may run beside it. A
+  feature that runs from the API to a screen goes to one builder, API first and then the screen
+  against the generated types: two builders on the two halves drift apart on names, read the
+  same files twice, and neither can test the whole.
 - **Every brief is self-contained**: the checkout and its ports, the files, the rules, the tests
   required, what not to do (commit, push, Tilt and database commands, migrations), where to save
   output, and what to report.
 - **A browser pass by a subagent** must be briefed in words: one login per portal, reuse the page,
   never close the context between steps. If it tests badly, stop it, take a handover (done, left,
   test data created) and do the pass in the main session.
-- **Resume before you spawn** for a small follow-up, while the agent is below about 400,000
-  tokens. Above that, ask it for a short handover (state of the tree, decisions, what is left) and
-  give the next task to a fresh agent with that handover as its brief.
+- **Resume before you spawn** for a small follow-up, while the agent's last activity is less
+  than one hour old: its context is then still cached and the follow-up is cheap. An agent idle
+  for more than an hour is not resumed, because the whole of its context would be read again at
+  full price. Give the next task to a fresh agent, briefed from the old agent's last report and
+  the diff.
 - **Review before you repeat a claim**: read the diff, re-run the touched specs, and do the
   browser pass. A builder's "all tests pass" was true and the feature still looked broken in the
   browser twice in one week, once from a stale gateway and once from a real defect.
