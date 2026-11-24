@@ -82,6 +82,9 @@ services:
     image: axllent/mailpit:v1.33.1
     restart: unless-stopped
     logging: *logging
+    # Its own sign-in: other containers on the proxy's network reach it without the proxy.
+    environment:
+      MP_UI_AUTH: ${STAGING_MAIL_UI_AUTH:?}
     networks:
       roviq-net: {}
       proxy:
