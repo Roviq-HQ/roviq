@@ -1,2 +1,0 @@
-ALTER TABLE "group_memberships" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE POLICY "group_memberships_admin_all" ON "group_memberships" AS PERMISSIVE FOR ALL TO "roviq_admin" USING (true) WITH CHECK (true);

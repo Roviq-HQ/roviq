@@ -85,8 +85,7 @@ export const userProfiles = pgTable(
     // form is invalid. The `i18n_text_to_string(jsonb)` helper is an
     // IMMUTABLE SQL function that wraps the subquery — function calls are
     // not themselves subqueries, so the generated expression is accepted.
-    // The function is created by `scripts/db-reset.ts` step 3d before
-    // `drizzle-kit push` runs, and by the custom migration for app startup.
+    // The function is created by the prereq migration, before the baseline.
     searchVector: tsvector('search_vector').generatedAlwaysAs(
       sql`setweight(to_tsvector('simple', coalesce(i18n_text_to_string(first_name), '')), 'A') || setweight(to_tsvector('simple', coalesce(i18n_text_to_string(last_name), '')), 'B')`,
     ),

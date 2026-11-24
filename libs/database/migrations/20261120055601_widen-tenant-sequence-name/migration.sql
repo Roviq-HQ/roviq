@@ -1,1 +1,0 @@
-ALTER TABLE "tenant_sequences" ALTER COLUMN "sequence_name" SET DATA TYPE varchar(120) USING "sequence_name"::varchar(120);

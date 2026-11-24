@@ -1,7 +1,5 @@
 import assert from 'node:assert';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { SYSTEM_USER_ID } from '../../constants';
 import type { DrizzleDB } from '../../providers';
@@ -9,14 +7,12 @@ import {
   provisionResellerSystemRoles,
   RESELLER_SYSTEM_ROLE_ABILITIES,
 } from '../../reseller-system-roles';
-import { resellerMemberships, resellers, roles, users } from '../../schema';
+import { resellers, roles } from '../../schema';
 import { seedSystemRoles } from '../essential/system-roles';
 import { SEED_IDS } from '../ids';
 import { makeSeedTestDb } from './seed-test-helpers';
 
 class Rollback extends Error {}
-
-const MIGRATIONS_DIR = join(__dirname, '../../../migrations');
 
 const { pool, db } = makeSeedTestDb();
 
@@ -98,87 +94,6 @@ describe('provisionResellerSystemRoles', () => {
 
       expect(second).toEqual(first);
       expect(await resellerRoles(tx, resellerId)).toHaveLength(3);
-    });
-  });
-});
-
-describe('ROV-91 reseller role backfill migration', () => {
-  const migrationDir = readdirSync(MIGRATIONS_DIR).find((name) =>
-    name.endsWith('_rov-91-reseller-role-backfill'),
-  );
-  assert(migrationDir);
-  const statements = readFileSync(join(MIGRATIONS_DIR, migrationDir, 'migration.sql'), 'utf8')
-    .split('--> statement-breakpoint')
-    .map((statement) => statement.trim());
-
-  // The backfill touches every reseller in the database, and other test files create and delete
-  // theirs meanwhile; one deleted mid-statement fails the roles foreign key. The lock makes
-  // those writes wait until this transaction rolls back. It is taken before the test writes
-  // anything: locking after this transaction holds row locks deadlocks with a concurrent seed.
-  async function inBackfillTx(fn: (tx: DrizzleDB) => Promise<void>): Promise<void> {
-    await inRolledBackTx(async (tx) => {
-      await tx.execute(sql`LOCK TABLE resellers IN SHARE ROW EXCLUSIVE MODE`);
-      await fn(tx);
-    });
-  }
-
-  async function runBackfill(tx: DrizzleDB): Promise<void> {
-    for (const statement of statements) await tx.execute(sql.raw(statement));
-  }
-
-  it('should move a membership off the shared Roviq Direct role onto the reseller own copy', async () => {
-    await inBackfillTx(async (tx) => {
-      const resellerId = await createReseller(tx, 'rov-91-backfill');
-      const [user] = await tx
-        .insert(users)
-        .values({
-          email: 'rov-91-backfill@test.local',
-          username: 'rov-91-backfill',
-          passwordHash: 'not-a-real-hash',
-          createdBy: SYSTEM_USER_ID,
-          updatedBy: SYSTEM_USER_ID,
-        })
-        .returning({ id: users.id });
-      assert(user);
-      await tx.insert(resellerMemberships).values({
-        userId: user.id,
-        resellerId,
-        roleId: SEED_IDS.ROLE_RESELLER_VIEWER,
-        createdBy: SYSTEM_USER_ID,
-        updatedBy: SYSTEM_USER_ID,
-      });
-
-      await runBackfill(tx);
-
-      const ownRoles = await resellerRoles(tx, resellerId);
-      expect(ownRoles.map((r) => r.name.en)).toEqual([
-        'reseller_full_admin',
-        'reseller_support_admin',
-        'reseller_viewer',
-      ]);
-      const [membership] = await tx
-        .select({ roleId: resellerMemberships.roleId })
-        .from(resellerMemberships)
-        .where(eq(resellerMemberships.userId, user.id));
-      const ownViewer = ownRoles.find((r) => r.name.en === 'reseller_viewer');
-      assert(membership && ownViewer);
-      expect(membership.roleId).toBe(ownViewer.id);
-    });
-  });
-
-  it('should not add roles to a reseller that already has its own copies', async () => {
-    await inBackfillTx(async (tx) => {
-      const resellerId = await createReseller(tx, 'rov-91-backfill-noop');
-      const ids = await provisionResellerSystemRoles(tx, resellerId, SYSTEM_USER_ID);
-
-      await runBackfill(tx);
-
-      const ownRoles = await resellerRoles(tx, resellerId);
-      expect(ownRoles.map((r) => r.id)).toEqual([
-        ids.reseller_full_admin,
-        ids.reseller_support_admin,
-        ids.reseller_viewer,
-      ]);
     });
   });
 });

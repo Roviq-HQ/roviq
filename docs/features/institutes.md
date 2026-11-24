@@ -34,7 +34,7 @@ The Institute Service manages the tenant root entity and its academic structure.
 
 - **Soft delete** via `entityColumns` (deletedAt, deletedBy, version) — visibility enforced via `<table>_live` security_invoker views (see `.claude/skills/drizzle-database/SKILL.md`); reads use `institutesLive`/`academicYearsLive`/`standardsLive`/`sectionsLive`/`subjectsLive`, writes target the base table.
 - **Optimistic concurrency** on `updateInstituteInfo` via `WHERE version = expected`
-- **FORCE ROW LEVEL SECURITY** on all tables (applied automatically by `db-reset.ts` after `drizzle-kit push`; custom migrations apply the same in production)
+- **FORCE ROW LEVEL SECURITY** on all tables (set by the migrations; `pnpm check:migrations` fails on a table without it)
 - **Partial unique indexes** with `WHERE deleted_at IS NULL` on code, name, etc. — lets soft-deleted rows release uniqueness for restore
 - **pgEnum types**: `InstituteStatus`, `AcademicYearStatus`, `EducationLevel`, `SetupStatus`, etc.
 - **JSONB columns**: contact (phones/emails), address, stream config, section strength norms

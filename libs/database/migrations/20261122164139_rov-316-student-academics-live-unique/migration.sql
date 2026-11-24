@@ -1,2 +1,0 @@
-DROP INDEX "uq_student_academic_year";--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_student_academic_year" ON "student_academics" ("student_profile_id","academic_year_id") WHERE "deleted_at" IS NULL;

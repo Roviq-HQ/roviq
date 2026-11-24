@@ -96,10 +96,10 @@ pnpm run dev:notifications # Notification service       (port 3002)
 pnpm run dev:web          # Web app                     (port 4200)
 
 # Database (handled automatically by Tilt, but available manually)
-pnpm run db:push          # Push Drizzle schema to DB
+pnpm run db:migrate       # Apply pending migrations
 pnpm run db:seed          # Seed test data
-pnpm run db:reset         # Nuke DB + re-push schema
-pnpm run db:reset --seed  # Nuke + push + seed in one step
+pnpm run db:reset         # Drop DB + rebuild it from the migrations
+pnpm run db:reset --seed  # Drop + rebuild + seed in one step
 pnpm run db:studio        # Drizzle Studio (visual DB browser)
 
 # Code quality

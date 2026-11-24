@@ -969,3 +969,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the fixture bulk-loads 2,000 students and queries at once, so the tables have no statistics. After ROV-292 the rule query joins `tenant_user_profiles`; with every estimate at one row the planner paired each profile with each enrolment row (500,000 pairs, 510 ms). Found with `auto_explain` (`log_analyze`) set on `roviq_test`.
 - **Fix:** the fixture runs `ANALYZE` on the three tables it loads, over the owner connection, before the timed request (44 ms on a cold database). The 500 ms budget is unchanged.
 - **Lesson:** a timing test that follows a bulk insert must analyze the tables it loaded, as autovacuum does in production within a minute. This is the second failure of this kind in this spec (see the 2026-11-22 entry on the section-strength trigger).
+
+## 2026-11-24 — diagnosed and fixed: the migration chain could not build an empty database
+
+- **Symptom:** the first staging deploy (ROV-337) stopped at `drizzle-kit migrate` on an empty database with no message. Applying every migration in order to a scratch database: 12 of 106 failed (`type "ResellerTier" already exists`, then missing `*_live` views).
+- **Cause:** dev, e2e and the integration database were built by `drizzle-kit push`, then the custom SQL with duplicate errors tolerated, then every migration marked applied. No database was ever built by the chain itself, so its breakage was invisible.
+- **Fix:** ROV-338 replaced the chain with the prereq migration, one generated baseline and one custom migration (schema-only dumps equal to the old build apart from past-month audit partitions). Every builder now runs `drizzle-kit migrate`; `pnpm check:migrations` builds an empty database from the chain in the pre-push gate and CI, and fails on a table without FORCE RLS or a schema change no migration carries. Every existing dev database needs `pnpm tilt trigger db-clean` once.
+- **Lesson:** a path that no test exercises is broken. Production's build path is now the only build path.

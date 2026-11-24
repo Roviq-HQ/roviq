@@ -35,8 +35,6 @@ Enums (single source in `@roviq/common-types`, `UPPER_SNAKE`):
 | `ReportCardStatus` | `DRAFT`, `GENERATED`, `PUBLISHED`, `ARCHIVED` |
 | `ResultStatus` | `PASS`, `FAIL`, `COMPARTMENT`, `ABSENT`, `PENDING` |
 
-Migration: `libs/database/migrations/20260527024000_blue_owl` (12 tables, 7 enums, 12 `_live` views, RLS policies + grants).
-
 ## State machines (`@roviq/common-types`)
 
 - `EXAM_STATE_MACHINE`: `DRAFT → SCHEDULED → MARKS_ENTRY → LOCKED → RESULTS_PUBLISHED → ARCHIVED`. `LOCKED` can reopen to `MARKS_ENTRY` (correction window); any non-terminal state can jump straight to `ARCHIVED`. Enforced by named transitions, never a raw `updateStatus`.

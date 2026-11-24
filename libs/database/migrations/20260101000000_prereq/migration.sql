@@ -1,7 +1,5 @@
--- Runtime prereqs: DB roles, extensions, and SQL helpers that subsequent
--- migrations reference. Authored as the first migration so `drizzle-kit
--- migrate` can build a DB from scratch — db-reset.ts does the same setup
--- pre-push for dev resets.
+-- What must exist before the generated baseline: the database roles its policies name, the
+-- default privileges its tables are created with, the pg_trgm extension and two functions.
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'roviq_app') THEN CREATE ROLE roviq_app NOLOGIN; END IF;
@@ -9,6 +7,28 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'roviq_admin') THEN CREATE ROLE roviq_admin NOLOGIN; END IF;
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'roviq_pooler') THEN CREATE ROLE roviq_pooler WITH LOGIN PASSWORD 'roviq_pooler_dev' NOINHERIT; END IF;
 END $$;
+
+-- Roles may already exist with other attributes. The application roles never log in, and the
+-- pooler holds no privilege until a wrapper runs SET LOCAL ROLE.
+ALTER ROLE roviq_app NOLOGIN;
+ALTER ROLE roviq_reseller NOLOGIN;
+ALTER ROLE roviq_admin NOLOGIN;
+ALTER ROLE roviq_pooler LOGIN NOINHERIT;
+
+GRANT roviq_app TO roviq_pooler WITH INHERIT FALSE, SET TRUE;
+GRANT roviq_reseller TO roviq_pooler WITH INHERIT FALSE, SET TRUE;
+GRANT roviq_admin TO roviq_pooler WITH INHERIT FALSE, SET TRUE;
+
+GRANT USAGE ON SCHEMA public TO roviq_pooler, roviq_app, roviq_reseller, roviq_admin;
+
+-- What a table or view created by a later migration starts with. A migration that needs
+-- less revokes it in the same file.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO roviq_app, roviq_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES TO roviq_reseller;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO roviq_app, roviq_reseller, roviq_admin;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

@@ -1,2 +1,0 @@
-CREATE UNIQUE INDEX "uq_tc_register_open_request" ON "tc_register" ("tenant_id","student_profile_id") WHERE "is_duplicate" = false AND "status" NOT IN ('CANCELLED', 'ISSUED') AND "deleted_at" IS NULL;--> statement-breakpoint
-ALTER TABLE "tc_register" ADD CONSTRAINT "tc_register_academic_year_tenant_fkey" FOREIGN KEY ("academic_year_id","tenant_id") REFERENCES "academic_years"("id","tenant_id") ON DELETE RESTRICT ON UPDATE CASCADE;
