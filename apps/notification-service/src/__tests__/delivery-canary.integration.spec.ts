@@ -327,7 +327,7 @@ describe('delivery canary (integration)', () => {
     expect(request.body.to).toBe(PHONE.replace('+', ''));
     expect(request.body.type).toBe('template');
     expect(request.body.template).toEqual({
-      name: 'delivery_canary_v1',
+      name: 'delivery_canary_v2',
       language: { code: 'en' },
       components: [
         { type: 'body', parameters: [{ type: 'text', text: CHECK_TIME }] },

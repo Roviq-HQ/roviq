@@ -307,7 +307,7 @@ The service refuses to start when a listed channel has no address or no
 - **SMS**: the template id `DELIVERY_CANARY:<language>` in `SMS_TEMPLATE_IDS`, for the canary
   user's language. Without it every canary is skipped (`no_template`).
 - **WhatsApp**: an active platform sender (admin portal, messaging senders) and the template
-  `delivery_canary_v1` approved by the provider in the canary user's language.
+  `delivery_canary_v2` approved by the provider in the canary user's language.
 
 SMS and WhatsApp are charged per message: about 96 canaries a day on each.
 
