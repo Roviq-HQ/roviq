@@ -89,7 +89,7 @@ describe('ChannelSender', () => {
   beforeEach(() => {
     metrics = createMock<NotificationMetrics>();
     rate = createMock<SenderRateLimiter>({
-      take: vi.fn().mockResolvedValue({ ok: true }),
+      take: vi.fn().mockResolvedValue({ ok: true, grantedAt: new Date() }),
       throttle: vi.fn().mockResolvedValue(new Date('2026-11-24T10:00:02.000Z')),
     });
     breaker = createMock<ProviderBreaker>({

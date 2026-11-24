@@ -111,7 +111,8 @@ end
 return {1, math.max(now + math.ceil(1000 / rate), paused or 0)}
 `);
 
-export type RateAnswer = { ok: true } | { ok: false; retryAt: Date };
+/** `grantedAt` is the Redis clock at the grant: the moment the rate is enforced on. */
+export type RateAnswer = { ok: true; grantedAt: Date } | { ok: false; retryAt: Date };
 
 export interface RateTake {
   senderId: string;
@@ -153,7 +154,7 @@ export class SenderRateLimiter {
         ],
       ),
     );
-    return ok === 1 ? { ok: true } : { ok: false, retryAt: new Date(at) };
+    return ok === 1 ? { ok: true, grantedAt: new Date(at) } : { ok: false, retryAt: new Date(at) };
   }
 
   /** The provider said "too many": pause for `retryAfterMs`, or halve the rate. When to try again. */

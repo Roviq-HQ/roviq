@@ -60,10 +60,10 @@ const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
 /** 12:00 in India: outside quiet hours. */
 const NOON = new Date('2026-11-23T06:30:00.000Z');
 /**
- * A request leaves the service just after Redis grants it; on a local socket the two clocks
- * differ by a few milliseconds at most.
+ * Redis clock times of every grant the limiter made. The rate holds on these: arrival at the
+ * provider adds scheduling delay that varies with load.
  */
-const NETWORK_JITTER_MS = 25;
+const grants: number[] = [];
 
 class NoonClock extends Clock {
   override now(): Date {
@@ -133,11 +133,11 @@ const sleepUntil = (at: Date) =>
   new Promise((resolve) => setTimeout(resolve, Math.max(0, at.getTime() - Date.now())));
 
 /** True when no `limit + 1` requests arrived within one second. */
-function withinRate(arrivals: readonly number[], limit: number): boolean {
-  const sorted = [...arrivals].sort((a, b) => a - b);
+function withinRate(times: readonly number[], limit: number): boolean {
+  const sorted = [...times].sort((a, b) => a - b);
   return sorted.every((at, i) => {
     const later = sorted[i + limit];
-    return later === undefined || later - at >= 1000 - NETWORK_JITTER_MS;
+    return later === undefined || later - at >= 1000;
   });
 }
 
@@ -183,6 +183,13 @@ describe('sender rate and breakers (integration)', () => {
     connection: Redis = redis,
     metrics = new NotificationMetrics(),
   ): ChannelSender {
+    const limiter = new SenderRateLimiter(connection, { recipientGapMs: 0, ...rate });
+    const take = limiter.take.bind(limiter);
+    limiter.take = async (input) => {
+      const answer = await take(input);
+      if (answer.ok) grants.push(answer.grantedAt.getTime());
+      return answer;
+    };
     return new ChannelSender(
       new ChannelAdapters(adapters),
       new GuardianConsentGate(new ConsentReadDrizzleRepository(db)),
@@ -190,7 +197,7 @@ describe('sender rate and breakers (integration)', () => {
       new NotificationWriteDrizzleRepository(db),
       new WhatsAppRoute(senders, new RecipientReadDrizzleRepository(db), new NoonClock()),
       metrics,
-      new SenderRateLimiter(connection, { recipientGapMs: 0, ...rate }),
+      limiter,
       new ProviderBreaker(connection, breaker),
     );
   }
@@ -373,6 +380,7 @@ describe('sender rate and breakers (integration)', () => {
     ]);
     provider.requests.length = 0;
     provider.answers.length = 0;
+    grants.length = 0;
   });
 
   afterAll(async () => {
@@ -412,12 +420,7 @@ describe('sender rate and breakers (integration)', () => {
 
       expect(results).toEqual(Array.from({ length: 10 }, () => 'SENT'));
       expect(provider.requests).toHaveLength(10);
-      expect(
-        withinRate(
-          provider.requests.map((r) => r.at),
-          2,
-        ),
-      ).toBe(true);
+      expect(withinRate(grants, 2)).toBe(true);
       const rows = await deliveries();
       expect(rows.filter((r) => r.status === 'SENT')).toHaveLength(10);
       expect(rows.filter((r) => r.status === 'FAILED')).toEqual([]);
@@ -439,12 +442,7 @@ describe('sender rate and breakers (integration)', () => {
 
         expect(results).toEqual(Array.from({ length: 8 }, () => 'SENT'));
         expect(provider.requests).toHaveLength(8);
-        expect(
-          withinRate(
-            provider.requests.map((r) => r.at),
-            2,
-          ),
-        ).toBe(true);
+        expect(withinRate(grants, 2)).toBe(true);
       } finally {
         await second.quit();
       }
