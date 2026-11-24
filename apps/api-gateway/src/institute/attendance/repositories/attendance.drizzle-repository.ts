@@ -8,12 +8,14 @@ import {
   attendanceSessionsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  membershipsLive,
   mkInstituteCtx,
   sectionsLive,
   softDelete,
   standardsLive,
   studentAcademicsLive,
   studentProfilesLive,
+  subjectsLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -177,6 +179,32 @@ export class AttendanceDrizzleRepository extends AttendanceRepository {
         .select(sessionLiveColumns)
         .from(attendanceSessionsLive)
         .where(and(...conditions)) as Promise<AttendanceSessionRecord[]>;
+    });
+  }
+
+  async findMissingSessionRef(refs: {
+    lecturerId?: string;
+    subjectId?: string | null;
+  }): Promise<'lecturer' | 'subject' | null> {
+    const tenantId = this.getTenantId();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:attendance'), async (tx) => {
+      if (refs.lecturerId) {
+        const [row] = await tx
+          .select({ id: membershipsLive.id })
+          .from(membershipsLive)
+          .where(eq(membershipsLive.id, refs.lecturerId))
+          .limit(1);
+        if (!row) return 'lecturer';
+      }
+      if (refs.subjectId) {
+        const [row] = await tx
+          .select({ id: subjectsLive.id })
+          .from(subjectsLive)
+          .where(eq(subjectsLive.id, refs.subjectId))
+          .limit(1);
+        if (!row) return 'subject';
+      }
+      return null;
     });
   }
 

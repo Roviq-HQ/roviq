@@ -176,6 +176,7 @@ export class AttendanceService {
       lecturerId: input.lecturerId,
       date: input.date,
     });
+    await this.assertSessionRefs({ lecturerId: input.lecturerId, subjectId: input.subjectId });
     const existing = await this.repo.findSession({
       sectionId: input.sectionId,
       date: input.date,
@@ -276,6 +277,23 @@ export class AttendanceService {
     );
   }
 
+  // Before any write: a session's foreign keys accept another institute's membership or subject.
+  private async assertSessionRefs(refs: {
+    lecturerId?: string;
+    subjectId?: string | null;
+  }): Promise<void> {
+    const missing = await this.repo.findMissingSessionRef(refs);
+    if (missing === 'lecturer') {
+      throw new BusinessException(
+        ErrorCode.MEMBERSHIP_NOT_FOUND,
+        'Lecturer is not a member of this institute',
+      );
+    }
+    if (missing === 'subject') {
+      throw new BusinessException(ErrorCode.SUBJECT_NOT_FOUND, 'Subject not found');
+    }
+  }
+
   async overrideSession(
     sessionId: string,
     lecturerId: string,
@@ -292,6 +310,11 @@ export class AttendanceService {
       ...scope,
       lecturerId: session.lecturerId,
       date: session.date,
+    });
+
+    await this.assertSessionRefs({
+      lecturerId: lecturerChanged ? lecturerId : undefined,
+      subjectId: subjectChanged ? subjectId : undefined,
     });
 
     const withLecturer = lecturerChanged
