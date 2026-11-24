@@ -1,6 +1,8 @@
 import type { AcademicStatus, AppAbility, UserDocumentType } from '@roviq/common-types';
 import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
 import type {
+  AdmissionClassData,
+  AdmissionClassResult,
   DeletedStudentRecord,
   FileRecord,
   NewStudentAcademicData,
@@ -26,7 +28,16 @@ export abstract class StudentRepository {
     tenantId: string,
     data: NewStudentProfileData,
   ): Promise<{ studentProfileId: string; admissionNumber: string }>;
-  abstract createInitialAcademic(tenantId: string, data: NewStudentAcademicData): Promise<void>;
+  /** Reads the year, class and section under the institute and checks they belong together. */
+  abstract checkAdmissionClass(
+    tenantId: string,
+    data: AdmissionClassData,
+  ): Promise<AdmissionClassResult>;
+  /** Checks the year, class and section again in the transaction of the insert. */
+  abstract createInitialAcademic(
+    tenantId: string,
+    data: NewStudentAcademicData,
+  ): Promise<AdmissionClassResult>;
 
   /** The student's user id, when the ability's read rules cover the student. */
   abstract findReadableUserId(

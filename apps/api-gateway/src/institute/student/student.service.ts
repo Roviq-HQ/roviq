@@ -24,6 +24,7 @@ import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
 import { StudentRepository } from './repositories/student.repository';
+import type { AdmissionClassResult } from './repositories/types';
 import { StudentReadRepository } from './student-read.repository';
 
 const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
@@ -54,9 +55,33 @@ export class StudentService {
 
   // ── CREATE ────────────────────────────────────────────────
 
+  private assertAdmissionClass(result: AdmissionClassResult): void {
+    if (result.kind === 'year_not_found') {
+      throw new BusinessException(ErrorCode.ACADEMIC_YEAR_NOT_FOUND, 'Academic year not found');
+    }
+    if (result.kind === 'standard_not_found') {
+      throw new BusinessException(
+        ErrorCode.STANDARD_NOT_FOUND,
+        'Standard not found in this academic year',
+      );
+    }
+    if (result.kind === 'section_not_found') {
+      throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
+    }
+  }
+
   async create(input: CreateStudentInput): Promise<StudentModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
+
+    // Before anything is written: a refused admission must leave no user or membership behind,
+    // and a foreign key would accept another institute's year or section (ROV-293).
+    const admissionClass = {
+      academicYearId: input.academicYearId,
+      standardId: input.standardId,
+      sectionId: input.sectionId,
+    };
+    this.assertAdmissionClass(await this.repository.checkAdmissionClass(tenantId, admissionClass));
 
     // A typed number never identifies an existing account (SF-053): every student is a new user.
     const userId = await this.createUser(input.phone, actorId);
@@ -120,13 +145,13 @@ export class StudentService {
     });
 
     // 6. Create student_academics (initial enrollment)
-    await this.repository.createInitialAcademic(tenantId, {
-      studentProfileId,
-      academicYearId: input.academicYearId,
-      standardId: input.standardId,
-      sectionId: input.sectionId,
-      actorId,
-    });
+    this.assertAdmissionClass(
+      await this.repository.createInitialAcademic(tenantId, {
+        studentProfileId,
+        ...admissionClass,
+        actorId,
+      }),
+    );
 
     // 7. Emit event
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.admitted, {

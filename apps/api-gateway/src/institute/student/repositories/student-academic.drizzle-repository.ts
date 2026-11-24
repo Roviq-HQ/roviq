@@ -22,12 +22,12 @@ import {
   withTenant,
 } from '@roviq/database';
 import { and, desc, eq, exists, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { findClassInYear } from './class-lookup';
 import { StudentAcademicRepository } from './student-academic.repository';
 import type {
   ChangeClassData,
   ChangeClassResult,
   ClassChangeRules,
-  ClassLookupFailure,
   EnrolTargetData,
   EnrolTargetResult,
   PromotionDecisionData,
@@ -90,7 +90,7 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
         .limit(1);
       if (!year) return { kind: 'year_not_found' };
 
-      const placement = await this.findClassInYear(
+      const placement = await findClassInYear(
         tx,
         data.academicYearId,
         data.standardId,
@@ -184,7 +184,7 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
         .limit(1);
       if (!row) return { kind: 'academic_not_found' };
 
-      const placement = await this.findClassInYear(
+      const placement = await findClassInYear(
         tx,
         row.academicYearId,
         data.standardId,
@@ -412,31 +412,6 @@ export class StudentAcademicDrizzleRepository extends StudentAcademicRepository 
       assertAllUpdated(updated.length);
       return updated.length;
     });
-  }
-
-  /** RLS hides other institutes' rows, so a foreign id fails here as not found. */
-  private async findClassInYear(
-    tx: DrizzleDB,
-    academicYearId: string,
-    standardId: string,
-    sectionId: string,
-  ): Promise<ClassLookupFailure | { kind: 'ok'; numericOrder: number }> {
-    const [standard] = await tx
-      .select({ numericOrder: standardsLive.numericOrder })
-      .from(standardsLive)
-      .where(
-        and(eq(standardsLive.id, standardId), eq(standardsLive.academicYearId, academicYearId)),
-      )
-      .limit(1);
-    if (!standard) return { kind: 'standard_not_found' };
-
-    const [section] = await tx
-      .select({ id: sectionsLive.id })
-      .from(sectionsLive)
-      .where(and(eq(sectionsLive.id, sectionId), eq(sectionsLive.standardId, standardId)))
-      .limit(1);
-    if (!section) return { kind: 'section_not_found' };
-    return { kind: 'ok', numericOrder: standard.numericOrder };
   }
 
   private async readSectionCapacity(

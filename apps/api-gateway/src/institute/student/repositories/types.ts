@@ -54,6 +54,15 @@ export type NewStudentProfileData = Required<
   actorId: string;
 };
 
+/** The year, class and section a new student is admitted to. */
+export interface AdmissionClassData {
+  academicYearId: string;
+  standardId: string;
+  sectionId: string;
+}
+
+export type AdmissionClassResult = { kind: 'year_not_found' } | ClassLookupFailure | { kind: 'ok' };
+
 export interface NewStudentAcademicData {
   studentProfileId: string;
   academicYearId: string;
