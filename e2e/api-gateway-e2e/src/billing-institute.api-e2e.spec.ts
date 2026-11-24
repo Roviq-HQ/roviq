@@ -323,7 +323,14 @@ describe('Billing institute flows E2E', () => {
       expect(list.errors).toBeUndefined();
       assert(list.data);
       expect(list.data.myInvoices.some((i) => i.id === invoice.id)).toBe(false);
-      expect(await myInvoice(invoice.id, otherInstituteToken)).toBeNull();
+      // The same answer as an unknown id: the other institute cannot tell the invoice exists.
+      const read = await gql<{ myInvoice: InvoiceNode | null }>(
+        MY_INVOICE,
+        { id: invoice.id },
+        otherInstituteToken,
+      );
+      expect(codeOf(read)).toBe('INVOICE_NOT_FOUND');
+      expect(read.data).toEqual({ myInvoice: null });
     });
 
     it('rejects an unknown invoice id with INVOICE_NOT_FOUND', async () => {
