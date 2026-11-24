@@ -54,8 +54,8 @@ function codeOf(res: { errors?: readonly { extensions?: Record<string, unknown> 
 describe('Bulk student import E2E', () => {
   let tokenA: string;
   let tokenB: string;
-  let standardId: string;
-  let sectionId: string;
+  let classA: ClassIds;
+  let classB: ClassIds;
 
   function requestUpload(token: string, body: Buffer) {
     return gql<{ requestFileUpload: Ticket }>(
@@ -87,18 +87,34 @@ describe('Bulk student import E2E', () => {
     return ticket.fileId;
   }
 
-  function start(token: string | undefined, fileId: string) {
+  interface ClassIds {
+    academicYearId: string;
+    standardId: string;
+    sectionId: string;
+  }
+
+  async function firstClass(token: string, academicYearId: string): Promise<ClassIds> {
+    const standards = await gql<{ standards: { id: string }[] }>(
+      STANDARDS,
+      { ay: academicYearId },
+      token,
+    );
+    const firstStandard = standards.data?.standards[0];
+    assert(firstStandard);
+    const sections = await gql<{ sections: { id: string }[] }>(
+      SECTIONS,
+      { s: firstStandard.id },
+      token,
+    );
+    const firstSection = sections.data?.sections[0];
+    assert(firstSection);
+    return { academicYearId, standardId: firstStandard.id, sectionId: firstSection.id };
+  }
+
+  function start(token: string | undefined, fileId: string, classIds: ClassIds = classA) {
     return gql<{ bulkCreateStudents: { workflowId: string } }>(
       START,
-      {
-        input: {
-          fileId,
-          academicYearId: SEED_IDS.ACADEMIC_YEAR_INST1,
-          standardId,
-          sectionId,
-          fieldMapping: {},
-        },
-      },
+      { input: { fileId, ...classIds, fieldMapping: {} } },
       token,
     );
   }
@@ -118,18 +134,8 @@ describe('Bulk student import E2E', () => {
   beforeAll(async () => {
     ({ accessToken: tokenA } = await loginAsInstituteAdmin());
     ({ accessToken: tokenB } = await loginAsInstituteAdminSecondInstitute());
-    const standards = await gql<{ standards: { id: string }[] }>(
-      STANDARDS,
-      { ay: SEED_IDS.ACADEMIC_YEAR_INST1 },
-      tokenA,
-    );
-    const firstStandard = standards.data?.standards[0];
-    assert(firstStandard);
-    standardId = firstStandard.id;
-    const sections = await gql<{ sections: { id: string }[] }>(SECTIONS, { s: standardId }, tokenA);
-    const firstSection = sections.data?.sections[0];
-    assert(firstSection);
-    sectionId = firstSection.id;
+    classA = await firstClass(tokenA, SEED_IDS.ACADEMIC_YEAR_INST1);
+    classB = await firstClass(tokenB, SEED_IDS.ACADEMIC_YEAR_INST2);
   });
 
   describe('an import with good and bad rows', () => {
@@ -218,9 +224,18 @@ describe('Bulk student import E2E', () => {
     it("should refuse another institute starting an import from this institute's upload", async () => {
       const fileId = await uploadCsv(['first_name,date_of_birth,gender', 'A,2010-01-01,male']);
 
-      const res = await start(tokenB, fileId);
+      // Its own class, so the upload is the only thing that is not its own.
+      const res = await start(tokenB, fileId, classB);
 
       expect(codeOf(res)).toBe(ErrorCode.FILE_NOT_FOUND);
+    });
+
+    it("should refuse this institute's upload for another institute's class", async () => {
+      const fileId = await uploadCsv(['first_name,date_of_birth,gender', 'A,2010-01-01,male']);
+
+      const res = await start(tokenA, fileId, classB);
+
+      expect(codeOf(res)).toBe(ErrorCode.ACADEMIC_YEAR_NOT_FOUND);
     });
 
     it('should refuse a student uploading an import file', async () => {
