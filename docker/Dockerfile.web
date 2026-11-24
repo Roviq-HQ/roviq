@@ -15,6 +15,8 @@ RUN corepack enable
 
 COPY pnpm-lock.yaml ./
 COPY package.json ./tmp-package.json
+# pnpm-lock.yaml names patches/*.patch; the install reads them.
+COPY patches ./patches
 RUN node -e " \
   const pkg = require('./tmp-package.json'); \
   const keep = { name: pkg.name, version: pkg.version, packageManager: pkg.packageManager, \
