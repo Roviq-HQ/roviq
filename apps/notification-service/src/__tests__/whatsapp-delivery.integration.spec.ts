@@ -27,6 +27,7 @@ import {
   createTestInstitute,
   createTestTeacher,
   holdPlatformSenderLock,
+  PLATFORM_SENDER_LOCK_WAIT_MS,
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
@@ -60,6 +61,7 @@ import {
 import { NotificationMetrics } from '../telemetry/notification-metrics';
 import type { RegularPayload } from '../types/registry';
 import { createNotificationActivities } from '../workflows/notification.activities';
+import { noDeliveryLimits } from './delivery-limits';
 
 const CTX = 'test:whatsapp-delivery';
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -382,6 +384,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       new NotificationWriteDrizzleRepository(db),
       new WhatsAppRoute(senders, new RecipientReadDrizzleRepository(db), clock),
       new NotificationMetrics(),
+      ...noDeliveryLimits(),
     );
     controller = new WhatsAppWebhookController(
       cloud,
@@ -394,7 +397,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
         new NotificationMetrics(),
       ),
     );
-  });
+  }, PLATFORM_SENDER_LOCK_WAIT_MS);
 
   beforeEach(async () => {
     await removeSenders();
@@ -600,10 +603,12 @@ describe('WhatsApp delivery and webhook (integration)', () => {
 
       await expect(send(instituteA, userA, approval, true, flowId)).resolves.toEqual({
         deferUntil: NEXT_MORNING.toISOString(),
+        reason: 'quiet_hours',
       });
       // The workflow retries a deferral; a second one of the same flow adds no row.
       await expect(send(instituteA, userA, approval, true, flowId)).resolves.toEqual({
         deferUntil: NEXT_MORNING.toISOString(),
+        reason: 'quiet_hours',
       });
       expect(provider.requests).toHaveLength(0);
       expect(
@@ -635,7 +640,10 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       await expect(send(instituteA, userA)).resolves.toBe('SKIPPED');
       const waiting = await send(instituteA, userA, newDevice);
 
-      expect(waiting).toEqual({ deferUntil: new Date(NOON.getTime() + 3_600_000).toISOString() });
+      expect(waiting).toEqual({
+        deferUntil: new Date(NOON.getTime() + 3_600_000).toISOString(),
+        reason: 'sender_cap',
+      });
       expect(provider.requests).toHaveLength(2);
       expect((await deliveries(userA.userId)).map((d) => [d.status, d.skip_reason])).toEqual([
         ['SENT', null],

@@ -119,6 +119,23 @@
       "ACTIVE": "सक्रिय",
       "PAUSED": "रोका गया",
       "BLOCKED": "अवरुद्ध"
-    }
+    },
+    "senderRate": "{rate, plural, one {हर सेकंड # संदेश} other {हर सेकंड # संदेश}}",
+    "senderRateEdit": "यह प्रेषक हर सेकंड कितने संदेश भेज सकता है, बदलें",
+    "senderRateDialogTitle": "हर सेकंड संदेश",
+    "senderRateDialogDescription": "{number} सभी नोटिफ़िकेशन सर्विस मिलाकर प्रदाता को कितनी तेज़ी से संदेश देता है। सीमा से ऊपर के संदेश अपनी बारी की प्रतीक्षा करते हैं; कोई संदेश खोता नहीं।",
+    "senderRateLabel": "हर सेकंड संदेश",
+    "senderRateHint": "1 से 1000। प्रदाता ने इस नंबर के लिए जो सीमा तय की है, वही डालें।",
+    "senderRateInvalid": "1 से 1000 तक की कोई पूरी संख्या डालें।",
+    "senderRateSave": "बदलाव सहेजें",
+    "senderRateCancel": "रद्द करें",
+    "senderRateSaved": "हर सेकंड संदेश की सीमा सहेजी गई",
+    "senderRateErrors": {
+      "VALIDATION_FAILED": "सीमा 1 से 1000 तक की पूरी संख्या होनी चाहिए।",
+      "MESSAGING_SENDER_NOT_FOUND": "यह प्रेषक अब मौजूद नहीं है। पेज रीफ़्रेश करें।",
+      "FORBIDDEN": "आपको प्रेषक बदलने की अनुमति नहीं है।",
+      "other": "सीमा सहेजी नहीं जा सकी। फिर से कोशिश करें।"
+    },
+    "senderRateSaving": "सहेजा जा रहा है…"
   }
 }

@@ -94,15 +94,12 @@ const whatsappSingle: WhatsAppTemplate<AttendanceAbsentParams> = {
   name: 'attendance_absent_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Attendance update: {{1}} ({{2}}) was marked {{3}}. Date: {{4}}.',
-    hi: 'उपस्थिति सूचना: {{1}} ({{2}}) को {{3}} दर्ज किया गया। तिथि: {{4}}।',
+    en: 'Attendance update for {{1}} in {{2}}: marked {{3}} on {{4}}. Open Roviq to see the details.',
+    hi: 'उपस्थिति सूचना: {{1}} को, जो {{2}} में हैं, {{3}} दर्ज किया गया, तिथि {{4}}। विवरण के लिए Roviq खोलें।',
   },
   variables: (p, locale) => [
     cleanVariable(p.studentName ?? '', WARD[locale]),
-    cleanVariable(
-      sectionLabel(p, locale) ?? '',
-      locale === 'hi' ? 'कक्षा उपलब्ध नहीं' : 'class not given',
-    ),
+    cleanVariable(sectionLabel(p, locale) ?? '', locale === 'hi' ? 'अपनी कक्षा' : 'their class'),
     statusWord(p.status, locale),
     cleanVariable(
       formatCalendarDate(p.sessionDate, locale) ?? '',
@@ -116,8 +113,8 @@ const whatsappDigest: WhatsAppTemplate<readonly AttendanceAbsentParams[]> = {
   name: 'attendance_absent_digest_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Attendance summary for {{1}}: {{2}} absent and {{3}} late marks were recorded today.',
-    hi: 'उपस्थिति सारांश, {{1}}: आज {{2}} अनुपस्थिति और {{3}} विलंब दर्ज हुए।',
+    en: 'Attendance summary for {{1}}: today {{2}} absent and {{3}} late marks were recorded. Open Roviq to see the details.',
+    hi: 'उपस्थिति सारांश, {{1}}: आज {{2}} अनुपस्थिति और {{3}} विलंब दर्ज हुए। विवरण के लिए Roviq खोलें।',
   },
   variables: (items, locale) => {
     const late = items.filter((p) => p.status === 'LATE').length;

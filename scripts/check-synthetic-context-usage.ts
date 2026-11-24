@@ -249,6 +249,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/repositories/canary-read.drizzle-repository.ts',
   // ROV-329 integration fixture: the platform's WhatsApp sender for the canary
   'apps/notification-service/src/__tests__/delivery-canary.integration.spec.ts',
+  // ROV-330 integration fixtures: senders with a rate, read back after the provider blocks one
+  'apps/notification-service/src/__tests__/delivery-limits.integration.spec.ts',
   // ROV-329 integration fixture: a platform role without read SystemHealth
   'apps/api-gateway/src/admin/monitoring/notification-health/__tests__/notification-health.integration.spec.ts',
   'ee/apps/api-gateway/src/billing/billing-event.consumer.ts',

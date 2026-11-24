@@ -1,4 +1,8 @@
+import { NOTIFICATION_REDIS_KEYS } from '@roviq/redis';
+
 export const REDIS_KEYS = {
+  /** Written by the notification service (sender rate, throttle, breakers). */
+  ...NOTIFICATION_REDIS_KEYS,
   IMPERSONATION_CODE: 'impersonation-code:',
   IMPERSONATION_SESSION: 'impersonation-session:',
   IMPERSONATION_OTP: 'impersonation-otp:',

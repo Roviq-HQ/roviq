@@ -380,6 +380,7 @@ describe('NotificationDispatcher', () => {
         flowId: null,
         channelEnabled: true,
         critical: true,
+        digest: false,
         deferrable: false,
         attempt: 1,
         address: { given: 'new-address@example.in' },

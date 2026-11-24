@@ -53,6 +53,7 @@ describe('DeliveryCanary', () => {
       flowId: null,
       channelEnabled: true,
       critical: true,
+      digest: false,
       deferrable: false,
       attempt: 1,
       address: { given: 'canary@roviq.test' },
@@ -70,7 +71,7 @@ describe('DeliveryCanary', () => {
     assert(sent?.template);
     expect(sent.address).toEqual({ given: '+919800000001' });
     expect(sent.template('en')).toEqual({
-      name: 'delivery_canary_v1',
+      name: 'delivery_canary_v2',
       languageCode: 'en',
       category: 'UTILITY',
       bodyVariables: ['24 Nov 2026, 15:45 IST'],

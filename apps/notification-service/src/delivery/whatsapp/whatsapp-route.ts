@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { MESSAGING_SENDER_STATE_MACHINE, MessagingSenderStatus } from '@roviq/common-types';
 import { MessagingSenderRepository } from '../../repositories/messaging-sender.repository';
 import { RecipientReadRepository } from '../../repositories/recipient-read.repository';
 import type { MessagingSenderRecord } from '../../repositories/types';
@@ -44,6 +45,19 @@ export class WhatsAppRoute {
     if (failed.scope !== 'institute') return null;
     const platform = await this.senders.findActivePlatform('WHATSAPP', WHATSAPP_CLOUD_PROVIDER);
     return platform !== null && platform.id !== failed.id ? platform : null;
+  }
+
+  /**
+   * The provider says the sender may not send: ACTIVE → BLOCKED, as the system. Only that
+   * transition happens here; a platform admin reactivates it. False when it was not ACTIVE.
+   */
+  async block(sender: MessagingSenderRecord): Promise<boolean> {
+    const from = MessagingSenderStatus.ACTIVE;
+    const to = MessagingSenderStatus.BLOCKED;
+    if (sender.status !== from || !MESSAGING_SENDER_STATE_MACHINE.canTransition(from, to)) {
+      return false;
+    }
+    return this.senders.setStatusFrom(sender.id, from, to);
   }
 
   optedOut(sender: MessagingSenderRecord, phone: string): Promise<boolean> {

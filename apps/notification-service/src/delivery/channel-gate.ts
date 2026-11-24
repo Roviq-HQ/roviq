@@ -1,7 +1,10 @@
 import { NotificationSkipReason } from '@roviq/common-types';
 
 /** Why a message waits: a value of `notification_deliveries.skip_reason` on a DEFERRED row. */
-export type DeferReason = 'quiet_hours' | 'sender_cap';
+export type DeferReason = Extract<
+  NotificationSkipReason,
+  'quiet_hours' | 'sender_cap' | 'rate_limited' | 'provider_paused'
+>;
 
 export type SenderCapacity = 'ok' | 'over' | { deferUntil: Date };
 

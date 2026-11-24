@@ -63,6 +63,8 @@
     "opted_out": "The guardian asked to stop messages on this channel",
     "sender_cap": "Daily sending limit reached",
     "quiet_hours": "Waiting for quiet hours to end",
+    "rate_limited": "Waiting for a free sending slot",
+    "provider_paused": "Sending paused: the provider is not answering",
     "not_needed": "Not needed: the message had already arrived another way",
     "condition_not_met": "Not needed for this notification",
     "recipient_removed": "This person was unlinked before the message was sent",

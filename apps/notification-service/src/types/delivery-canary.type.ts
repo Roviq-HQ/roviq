@@ -34,11 +34,12 @@ export const deliveryCanarySms: SmsTemplate<DeliveryCanaryParams> = {
 };
 
 export const deliveryCanaryWhatsApp: WhatsAppTemplate<DeliveryCanaryParams> = {
-  name: 'delivery_canary_v1',
+  // v2: the provider classed v1 as marketing; a utility body names what it is about for the reader.
+  name: 'delivery_canary_v2',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Roviq delivery check of {{1}}. This message tests sending; no action is needed.',
-    hi: 'Roviq: {{1}} की डिलीवरी जाँच। यह संदेश भेजने की जाँच है; कुछ करने की ज़रूरत नहीं।',
+    en: 'Service update for your Roviq account: message delivery was checked at {{1}} and is working. No action is needed.',
+    hi: 'आपके Roviq खाते की सेवा सूचना: संदेश वितरण की जाँच {{1}} पर की गई और वह ठीक काम कर रहा है। कुछ करने की ज़रूरत नहीं।',
   },
   variables: (p, locale) => [checkTime(p, locale)],
   buttonPath: () => 'login',

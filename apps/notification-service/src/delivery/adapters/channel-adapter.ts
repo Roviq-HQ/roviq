@@ -36,6 +36,8 @@ export class ChannelAdapterError extends Error {
     message: string,
     /** False when the same request would be refused again. */
     readonly retryable = true,
+    /** How long the provider asked us to wait (its `Retry-After`); null when it did not say. */
+    readonly retryAfterMs: number | null = null,
   ) {
     super(message);
     this.name = 'ChannelAdapterError';

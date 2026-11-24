@@ -1,4 +1,4 @@
-import type { NotificationChannel } from '@roviq/common-types';
+import type { MessagingSenderStatus, NotificationChannel } from '@roviq/common-types';
 import type { MessagingSenderRecord, SenderSentCounts } from './types';
 
 export abstract class MessagingSenderRepository {
@@ -30,4 +30,14 @@ export abstract class MessagingSenderRepository {
     since: Date,
     tenantId: string | null,
   ): Promise<SenderSentCounts>;
+
+  /**
+   * Moves a live sender from `from` to `to` as the system; false when it is no longer in `from`.
+   * The caller checks the transition against the state machine.
+   */
+  abstract setStatusFrom(
+    senderId: string,
+    from: MessagingSenderStatus,
+    to: MessagingSenderStatus,
+  ): Promise<boolean>;
 }

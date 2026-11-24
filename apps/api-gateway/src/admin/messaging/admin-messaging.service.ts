@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   BusinessException,
   ErrorCode,
@@ -7,6 +7,8 @@ import {
   type PlatformContext,
 } from '@roviq/common-types';
 import { MessagingTokenCipher } from '@roviq/crypto';
+import { REDIS_CLIENT, senderResetKeys } from '@roviq/redis';
+import type Redis from 'ioredis';
 import type {
   RegisterMessagingSenderInput,
   UpdateMessagingSenderInput,
@@ -24,6 +26,7 @@ export class AdminMessagingService {
   constructor(
     private readonly repo: AdminMessagingRepository,
     private readonly cipher: MessagingTokenCipher,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   list(ctx: PlatformContext): Promise<MessagingSenderRecord[]> {
@@ -72,6 +75,7 @@ export class AdminMessagingService {
       ...(input.displayNumber !== undefined && { displayNumber: input.displayNumber }),
       ...(input.dailyCap !== undefined && { dailyCap: input.dailyCap }),
       ...(input.instituteDailyCap !== undefined && { instituteDailyCap: input.instituteDailyCap }),
+      ...(input.messagesPerSecond !== undefined && { messagesPerSecond: input.messagesPerSecond }),
     };
     return this.found(await this.repo.update(ctx, id, data), id);
   }
@@ -88,8 +92,14 @@ export class AdminMessagingService {
     return this.transition(ctx, id, MessagingSenderStatus.PAUSED);
   }
 
-  activate(ctx: PlatformContext, id: string): Promise<MessagingSenderRecord> {
-    return this.transition(ctx, id, MessagingSenderStatus.ACTIVE);
+  /**
+   * The notification service's breaker and throttle of the sender are cleared too: a sender put
+   * back after a block sends at once instead of waiting out its cool-down.
+   */
+  async activate(ctx: PlatformContext, id: string): Promise<MessagingSenderRecord> {
+    const sender = await this.transition(ctx, id, MessagingSenderStatus.ACTIVE);
+    await this.redis.del(...senderResetKeys(id));
+    return sender;
   }
 
   block(ctx: PlatformContext, id: string): Promise<MessagingSenderRecord> {

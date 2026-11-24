@@ -275,6 +275,9 @@ enforced yet.
   settings, an unknown or repeated name stops the service at start-up, and `log` anywhere in a
   list is refused in production. An SMS provider with no registered template for a message is
   passed over for it.
+- **Redis**: the notification service needs `REDIS_URL`, the same Redis as the api-gateway. The
+  per-sender rate limit and the circuit breakers live there (`docs/architecture.md` →
+  "Notifications"); the service does not start without it.
 - **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
   prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
   same value as the api-gateway's.
@@ -283,9 +286,9 @@ enforced yet.
 
 Every 15 minutes the notification service sends a test message (the canary, type
 `DELIVERY_CANARY`) on each channel listed, through the same providers as every message
-(ROV-329). The seven `notification_*` alerts in `docker/openobserve/alerts/` page when the
-canary stops reaching the provider, the failure rate rises, a sender is blocked, events wait or
-the service stops; [Notification delivery alerts](runbooks/notification-delivery.md) says what
+(ROV-329). The eight `notification_*` alerts in `docker/openobserve/alerts/` page when the
+canary stops reaching the provider, the failure rate rises, a sender is blocked, a circuit
+breaker opens, events wait or the service stops; [Notification delivery alerts](runbooks/notification-delivery.md) says what
 to check for each.
 
 | Variable | Value |
@@ -304,7 +307,7 @@ The service refuses to start when a listed channel has no address or no
 - **SMS**: the template id `DELIVERY_CANARY:<language>` in `SMS_TEMPLATE_IDS`, for the canary
   user's language. Without it every canary is skipped (`no_template`).
 - **WhatsApp**: an active platform sender (admin portal, messaging senders) and the template
-  `delivery_canary_v1` approved by the provider in the canary user's language.
+  `delivery_canary_v2` approved by the provider in the canary user's language.
 
 SMS and WhatsApp are charged per message: about 96 canaries a day on each.
 
@@ -371,6 +374,13 @@ messages each institute sent in a month by template category.
 4. The sender reached its daily cap in the last 24 hours, or the institute reached its share of
    the platform's sender: a non-critical message is skipped (`sender_cap`), a critical one waits
    and tries again every hour.
+5. The sender's rate: at most `messagesPerSecond` messages in any second (default 10, 1 to
+   1000), and one message per person every 6 seconds. A message over it waits for a free slot
+   (`rate_limited`). Set the rate the provider allows the number, on the admin Monitoring page
+   (pencil beside the sender) or through `adminUpdateMessagingSender`.
+6. The sender's circuit breaker is open after repeated failures or a block: the message goes
+   through the platform's sender, else waits (`provider_paused`). A sender the provider blocked
+   is set `BLOCKED`; `adminActivateMessagingSender` turns it back on and clears its breaker.
 
 Push and email go first, then WhatsApp. STOP and START are each confirmed once. A person who
 writes anything else to a sender's number gets one fixed reply a day saying the number only sends alerts; the text of what they wrote is not stored.
@@ -440,6 +450,7 @@ Redis is on the request path for access control, not only for caching:
 - `InstituteAccessGuard` reads `auth:institute-access:<id>` on every institute-scope request; a status change or delete writes a block marker there.
 - `TokenVersionGuard` reads `auth:token-version:<userId>` on every authenticated request. A password change writes the new version there, which ends the access tokens issued before it at once. If the key is lost the guard reads `users.token_version` from the database, so nothing is let through wrongly.
 - One-time impersonation codes, impersonation OTP requests, pending email verification codes and ws-tickets live only in Redis.
+- The notification service keeps each sender's rate count and every circuit breaker in Redis (`notification:*` keys). While Redis is unreachable it sends nothing: workflow sends are retried by Temporal, codes and temporary passwords sent at once fail.
 
 Plan Redis availability with that in mind; a Redis outage blocks every signed-in request.
 

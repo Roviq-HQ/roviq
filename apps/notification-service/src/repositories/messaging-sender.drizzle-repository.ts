@@ -1,17 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { NotificationChannel } from '@roviq/common-types';
+import type { MessagingSenderStatus, NotificationChannel } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
   messagingInboundEvents,
   messagingOptOuts,
   messagingSenderSecrets,
+  messagingSenders,
   messagingSendersLive,
   mkAdminCtx,
   notificationDeliveries,
+  SYSTEM_USER_ID,
   withAdmin,
 } from '@roviq/database';
-import { and, desc, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { MessagingSenderRepository } from './messaging-sender.repository';
 import { sameNumberSenderIds } from './same-number-senders';
 import type { MessagingSenderRecord, SenderSentCounts } from './types';
@@ -26,6 +28,7 @@ const senderColumns = {
   providerNumberId: messagingSendersLive.providerNumberId,
   dailyCap: messagingSendersLive.dailyCap,
   instituteDailyCap: messagingSendersLive.instituteDailyCap,
+  messagesPerSecond: messagingSendersLive.messagesPerSecond,
   accessTokenEncrypted: messagingSenderSecrets.accessTokenEncrypted,
 };
 
@@ -167,6 +170,31 @@ export class MessagingSenderDrizzleRepository extends MessagingSenderRepository 
           ),
         );
       return { total: row?.total ?? 0, forTenant: row?.forTenant ?? 0 };
+    });
+  }
+
+  async setStatusFrom(
+    senderId: string,
+    from: MessagingSenderStatus,
+    to: MessagingSenderStatus,
+  ): Promise<boolean> {
+    return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
+      const rows = await tx
+        .update(messagingSenders)
+        .set({
+          status: to,
+          updatedBy: SYSTEM_USER_ID,
+          version: sql`${messagingSenders.version} + 1`,
+        })
+        .where(
+          and(
+            eq(messagingSenders.id, senderId),
+            eq(messagingSenders.status, from),
+            isNull(messagingSenders.deletedAt),
+          ),
+        )
+        .returning({ id: messagingSenders.id });
+      return rows.length > 0;
     });
   }
 }

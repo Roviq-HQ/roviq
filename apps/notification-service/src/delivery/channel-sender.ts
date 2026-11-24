@@ -1,4 +1,5 @@
 import type { NotificationChannel, NotificationTypeKey } from '@roviq/common-types';
+import { senderBreakerName } from '@roviq/redis';
 import type { ContactReadRepository } from '../repositories/contact-read.repository';
 import type { NotificationWriteRepository } from '../repositories/notification-write.repository';
 import type {
@@ -19,6 +20,8 @@ import {
 import type { ChannelAdapters } from './adapters/channel-adapters';
 import { type DeferReason, evaluateChannelGate } from './channel-gate';
 import type { ConsentGate } from './consent-gate';
+import { adapterBreakerName, type ProviderBreaker } from './rate/provider-breaker';
+import type { SenderRateLimiter } from './rate/sender-rate-limiter';
 import { type SmsDraft, type SmsSend, SmsVariableError } from './sms/sms-template';
 import type { WhatsAppRoute } from './whatsapp/whatsapp-route';
 import type { TemplateSend } from './whatsapp/whatsapp-template';
@@ -35,7 +38,12 @@ export interface ChannelAttempt {
   channelEnabled: boolean;
   /** Critical and secret types: quiet hours do not apply, and over a sender's cap they wait. */
   critical: boolean;
-  /** False when the caller cannot wait: a deferral is then recorded as skipped (`sender_cap`). */
+  /** A digest: when not critical it leaves the reserved share of a sender's rate to others. */
+  digest: boolean;
+  /**
+   * False when the caller cannot wait: a deferral is then recorded as skipped (`sender_cap`
+   * from the gate, else the reason it was held).
+   */
   deferrable: boolean;
   /** 1-based; stored on the delivery row. */
   attempt: number;
@@ -76,6 +84,8 @@ export class ChannelSender {
     private readonly writes: NotificationWriteRepository,
     private readonly whatsapp: WhatsAppRoute,
     private readonly metrics: NotificationMetrics,
+    private readonly rate: SenderRateLimiter,
+    private readonly breaker: ProviderBreaker,
   ) {}
 
   async attempt(a: ChannelAttempt): Promise<AttemptOutcome> {
@@ -119,7 +129,7 @@ export class ChannelSender {
   }
 
   private async run(a: ChannelAttempt): Promise<AttemptOutcome> {
-    const adapters = this.adapters.list(a.channel).filter((ad) => this.adapters.available(ad));
+    const adapters = this.adapters.list(a.channel);
     const needsTemplate = adapters.some((ad) => isRouted(ad) || ad.resolveSmsTemplate);
     const anyRouted = adapters.some(isRouted);
     const tenantId = a.audience.tenantId;
@@ -218,7 +228,10 @@ export class ChannelSender {
     return this.sendThrough(a, found.candidates, message, routed);
   }
 
-  /** Tries each provider in order; moves on only when the one before cannot send now. */
+  /**
+   * Tries each provider in order; moves on only when the one before cannot send now. A held
+   * provider (paused breaker) is passed over; when nothing was sent, a hold defers the attempt.
+   */
   private async sendThrough(
     a: ChannelAttempt,
     candidates: readonly Candidate[],
@@ -226,17 +239,32 @@ export class ChannelSender {
     routed: Routed | null,
   ): Promise<AttemptOutcome> {
     let failed: FailedOutcome | null = null;
+    let held: Hold | null = null;
     for (const [index, { adapter, sms }] of candidates.entries()) {
       if (sms === 'unsendable') return variableTooLong(adapter);
       const tried = isRouted(adapter)
         ? await this.sendRouted(adapter, message, a, routed, index === 0)
-        : await this.sendOnce(adapter, message, sms, null);
+        : await this.sendGuarded(adapter, message, sms);
       if (tried === null) continue;
+      if ('hold' in tried) {
+        // A full sender is not a reason to try another provider.
+        if (tried.hold.reason === 'rate_limited') return this.heldOutcome(a, tried.hold);
+        held = earlier(held, tried.hold);
+        continue;
+      }
       if (tried.outcome.status === 'SENT' || !tried.unavailable) return tried.outcome;
       failed = tried.outcome;
     }
+    // A deferral spends no attempt, so it is preferred over a failure.
+    if (held !== null) return this.heldOutcome(a, held);
     // The gate already refused a channel without a provider.
     return failed ?? { status: 'SKIPPED', provider: null, skipReason: 'no_provider' };
+  }
+
+  private heldOutcome(a: ChannelAttempt, hold: Hold): AttemptOutcome {
+    return a.deferrable
+      ? { status: 'DEFERRED', until: hold.until, reason: hold.reason }
+      : { status: 'SKIPPED', provider: null, skipReason: hold.reason };
   }
 
   /** Null when the sender may not be used for this message. */
@@ -250,12 +278,13 @@ export class ChannelSender {
     if (routed === null) return null;
     const { sender, template, phone } = routed;
     if (!gated && !(await this.senderUsable(sender, phone, a, true))) return null;
-    const tried = await this.sendOnce(adapter, message, null, { sender, template });
-    if (!tried.unavailable) return tried;
+    const tried = await this.sendViaSender(adapter, message, a, sender, template, phone);
+    const fallBack = 'hold' in tried ? tried.hold.reason === 'provider_paused' : tried.unavailable;
+    if (!fallBack) return tried;
     // One official provider: the platform's number is the failover for an institute's own.
     const platform = await this.whatsapp.fallbackFor(sender);
     if (platform === null || !(await this.senderUsable(platform, phone, a, false))) return tried;
-    return this.sendOnce(adapter, message, null, { sender: platform, template });
+    return this.sendViaSender(adapter, message, a, platform, template, phone);
   }
 
   /** A sender reached by failover passes the same per-sender rules the gate applies. */
@@ -271,12 +300,78 @@ export class ChannelSender {
     return (await this.whatsapp.capacity(sender, tenantId, a.critical)) === 'ok';
   }
 
+  /** One send through one sender: its rate, then its breaker, then the provider. */
+  private async sendViaSender(
+    adapter: ChannelAdapter,
+    message: ChannelMessage,
+    a: ChannelAttempt,
+    sender: MessagingSenderRecord,
+    template: TemplateSend,
+    phone: string,
+  ): Promise<Tried> {
+    const token = await this.rate.take({
+      senderId: sender.id,
+      messagesPerSecond: sender.messagesPerSecond,
+      phone,
+      reserve: a.digest && !a.critical,
+    });
+    if (!token.ok) return { hold: { reason: 'rate_limited', until: token.retryAt } };
+    const name = senderBreakerName(sender.id);
+    const allowed = await this.breaker.allow(name);
+    if (!allowed.ok) return { hold: { reason: 'provider_paused', until: allowed.retryAt } };
+
+    const tried = await this.sendOnce(adapter, message, null, { sender, template });
+    if (tried.outcome.status === 'FAILED' && tried.outcome.errorCode === 'WA_RATE_LIMITED') {
+      const until = await this.rate.throttle(
+        sender.id,
+        sender.messagesPerSecond,
+        tried.retryAfterMs,
+      );
+      // The provider answered, so it is reachable.
+      await this.breaker.succeeded(name);
+      // A caller that cannot wait keeps the FAILED row and the failover to the platform's sender.
+      return a.deferrable ? { hold: { reason: 'rate_limited', until } } : tried;
+    }
+    await this.recordHealth(name, adapter, tried);
+    if (tried.outcome.status === 'FAILED' && tried.outcome.errorCode === 'WA_SENDER_BLOCKED') {
+      await this.whatsapp.block(sender);
+    }
+    return tried;
+  }
+
+  /** A provider of a channel without senders, behind its breaker. */
+  private async sendGuarded(
+    adapter: ChannelAdapter,
+    message: ChannelMessage,
+    sms: SmsSend | null,
+  ): Promise<Tried> {
+    const name = adapterBreakerName(adapter.channel, adapter.provider);
+    const allowed = await this.breaker.allow(name);
+    if (!allowed.ok) return { hold: { reason: 'provider_paused', until: allowed.retryAt } };
+    const tried = await this.sendOnce(adapter, message, sms, null);
+    await this.recordHealth(name, adapter, tried);
+    return tried;
+  }
+
+  /** Only "cannot send now" counts against a breaker; a blocked sender opens it at once. */
+  private async recordHealth(name: string, adapter: ChannelAdapter, tried: Sent): Promise<void> {
+    const { outcome } = tried;
+    if (outcome.status === 'SENT' || !tried.unavailable) {
+      await this.breaker.succeeded(name);
+      return;
+    }
+    const opened = BLOCKED_CODES.has(outcome.errorCode)
+      ? await this.breaker.trip(name)
+      : await this.breaker.failed(name);
+    if (opened) this.metrics.breakerOpened(adapter.channel, adapter.provider, outcome.errorCode);
+  }
+
   private async sendOnce(
     adapter: ChannelAdapter,
     message: ChannelMessage,
     sms: SmsSend | null,
     via: { sender: MessagingSenderRecord; template: TemplateSend } | null,
-  ): Promise<Tried> {
+  ): Promise<Sent> {
     const route = via === null ? null : routeOf(via.sender, via.template);
     const started = performance.now();
     try {
@@ -293,6 +388,7 @@ export class ChannelSender {
           ...(route ? { route: route.stored } : {}),
         },
         unavailable: false,
+        retryAfterMs: null,
       };
     } catch (err) {
       if (err instanceof ChannelAdapterError) {
@@ -305,6 +401,7 @@ export class ChannelSender {
             ...(route ? { route: route.stored } : {}),
           },
           unavailable: err.kind === 'provider_unavailable',
+          retryAfterMs: err.retryAfterMs,
         };
       }
       throw err;
@@ -337,11 +434,31 @@ export class ChannelSender {
 type SentOutcome = Extract<DeliveryOutcome, { status: 'SENT' }>;
 type FailedOutcome = Extract<DeliveryOutcome, { status: 'FAILED' }>;
 
-interface Tried {
+/** A provider call and its answer. */
+interface Sent {
   outcome: SentOutcome | FailedOutcome;
   /** True when the provider could not send now, so the next one may take the attempt. */
   unavailable: boolean;
+  /** The provider's `Retry-After` on a failure; null when it gave none. */
+  retryAfterMs: number | null;
 }
+
+/** Not sent and not failed: the sender is full or the provider is paused until `until`. */
+interface Hold {
+  reason: Extract<DeferReason, 'rate_limited' | 'provider_paused'>;
+  until: Date;
+}
+
+type Tried = Sent | { hold: Hold };
+
+const earlier = (known: Hold | null, next: Hold): Hold =>
+  known === null || next.until < known.until ? next : known;
+
+/** The provider says the sender or account may not send: its breaker opens at once. */
+const BLOCKED_CODES: ReadonlySet<string> = new Set<AdapterErrorCode>([
+  'WA_SENDER_BLOCKED',
+  'SMS_SENDER_BLOCKED',
+]);
 
 interface Routed {
   sender: MessagingSenderRecord;

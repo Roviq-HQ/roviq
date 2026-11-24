@@ -7,6 +7,8 @@ import { Client, Connection } from '@temporalio/client';
 import { ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { ConsentGate } from '../delivery/consent-gate';
+import { ProviderBreaker } from '../delivery/rate/provider-breaker';
+import { SenderRateLimiter } from '../delivery/rate/sender-rate-limiter';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
@@ -35,6 +37,8 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
     private readonly metrics: NotificationMetrics,
     private readonly eventBus: EventBusService,
     private readonly canary: DeliveryCanary,
+    private readonly rate: SenderRateLimiter,
+    private readonly breaker: ProviderBreaker,
   ) {
     super(config, {
       flag: 'NOTIFICATION_WORKER_ENABLED',
@@ -55,6 +59,8 @@ export class NotificationWorkerService extends EmbeddedTemporalWorker {
       writes,
       new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
       this.metrics,
+      this.rate,
+      this.breaker,
     );
     return {
       ...createNotificationActivities({ sender, recipients, writes }),

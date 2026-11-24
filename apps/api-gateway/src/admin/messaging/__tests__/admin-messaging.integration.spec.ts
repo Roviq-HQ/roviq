@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { AuditEmitter } from '@roviq/audit';
 import { MessagingTokenCipher } from '@roviq/crypto';
+import { REDIS_CLIENT } from '@roviq/redis';
 import {
   cleanupTestInstitute,
   cleanupTestReseller,
@@ -14,9 +15,11 @@ import {
   gqlRequest,
   holdPlatformSenderLock,
   type IntegrationAppResult,
+  PLATFORM_SENDER_LOCK_WAIT_MS,
   type TestInstitute,
   type TestReseller,
 } from '@roviq/testing/integration';
+import type Redis from 'ioredis';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SEED_IDS } from '../../../../../../e2e/shared/seed-fixtures';
@@ -26,7 +29,7 @@ const SUPERUSER_URL =
   process.env.DATABASE_URL_TEST_MIGRATE ?? 'postgresql://roviq:roviq_dev@localhost:5434/roviq_test';
 
 const SENDER_FIELDS =
-  'id scope tenantId providerNumberId displayNumber status dailyCap instituteDailyCap createdAt updatedAt';
+  'id scope tenantId providerNumberId displayNumber status dailyCap instituteDailyCap messagesPerSecond createdAt updatedAt';
 
 const LIST = `query { adminMessagingSenders { ${SENDER_FIELDS} } }`;
 const REGISTER = `mutation ($input: RegisterMessagingSenderInput!) {
@@ -53,6 +56,7 @@ interface SenderView {
   status: string;
   dailyCap: number;
   instituteDailyCap: number | null;
+  messagesPerSecond: number;
 }
 
 interface SmsUsageRow {
@@ -181,7 +185,7 @@ describe('admin messaging senders (integration)', () => {
       membershipId: reseller.membershipId,
       roleId: reseller.roleId,
     });
-  });
+  }, PLATFORM_SENDER_LOCK_WAIT_MS);
 
   afterEach(async () => {
     // Every test starts without a live sender of this spec, so the one-per-scope indexes are free.
@@ -529,6 +533,94 @@ describe('admin messaging senders (integration)', () => {
         [own.id],
       );
       expect(rows).toEqual([{ institute_daily_cap: null }]);
+    });
+
+    it('should show the default rate and change it within 1 to 1000', async () => {
+      const own = await registerOk({
+        tenantId: instA.tenantId,
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000035',
+        accessToken: newToken(),
+        dailyCap: 10,
+      });
+      expect(own.messagesPerSecond).toBe(10);
+      const stored = async () => {
+        const { rows } = await superPool.query<{ messages_per_second: number }>(
+          'SELECT messages_per_second FROM messaging_senders WHERE id = $1',
+          [own.id],
+        );
+        return rows[0]?.messages_per_second;
+      };
+
+      const res = await gql<{ adminUpdateMessagingSender: SenderView }>(UPDATE, adminToken, {
+        id: own.id,
+        input: { messagesPerSecond: 80 },
+      });
+
+      expect(res.errors).toBeUndefined();
+      expect(res.data?.adminUpdateMessagingSender.messagesPerSecond).toBe(80);
+      expect(res.data?.adminUpdateMessagingSender.dailyCap).toBe(10);
+      expect(await stored()).toBe(80);
+      for (const messagesPerSecond of [0, 1001, -1]) {
+        const refused = await gql(UPDATE, adminToken, {
+          id: own.id,
+          input: { messagesPerSecond },
+        });
+        expect(code(refused)).toBe('VALIDATION_FAILED');
+      }
+      expect(await stored()).toBe(80);
+      for (const token of [instituteToken, resellerToken, supportToken]) {
+        const refused = await gql(UPDATE, token, { id: own.id, input: { messagesPerSecond: 5 } });
+        expect(code(refused)).toBe('FORBIDDEN');
+      }
+      expect(await stored()).toBe(80);
+    });
+
+    it('should refuse a rate outside 1 to 1000 in the database, as the admin role', async () => {
+      const own = await registerOk({
+        tenantId: instA.tenantId,
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000036',
+        accessToken: newToken(),
+        dailyCap: 10,
+      });
+
+      const client = await superPool.connect();
+      try {
+        for (const rate of [0, 1001]) {
+          await client.query('BEGIN');
+          await client.query('SET LOCAL ROLE roviq_admin');
+          await expect(
+            client.query('UPDATE messaging_senders SET messages_per_second = $1 WHERE id = $2', [
+              rate,
+              own.id,
+            ]),
+          ).rejects.toMatchObject({ code: '23514', constraint: 'chk_messaging_senders_rate' });
+          await client.query('ROLLBACK');
+        }
+      } finally {
+        client.release();
+      }
+    });
+
+    it("should clear the sender's breaker and throttle when it is activated", async () => {
+      const own = await registerOk({
+        tenantId: instA.tenantId,
+        providerNumberId: providerNumber(),
+        displayNumber: '+919800000037',
+        accessToken: newToken(),
+        dailyCap: 10,
+      });
+      await gql(BLOCK, adminToken, { id: own.id });
+      const del = vi.spyOn(result.app.get<Redis>(REDIS_CLIENT), 'del');
+
+      const res = await gql(ACTIVATE, adminToken, { id: own.id });
+
+      expect(res.errors).toBeUndefined();
+      expect(del).toHaveBeenCalledWith(
+        `notification:breaker:sender:${own.id}`,
+        `notification:sender-throttle:${own.id}`,
+      );
     });
 
     it("should set and clear the platform sender's share limit", async () => {

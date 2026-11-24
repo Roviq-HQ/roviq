@@ -389,6 +389,11 @@ type AdminMessagingSender {
   """
   instituteDailyCap: Int
 
+  """
+  Messages the sender hands the provider per second, over every notification service instance (1 to 1000).
+  """
+  messagesPerSecond: Int!
+
   """The provider's id of the number; inbound webhooks are matched by it."""
   providerNumberId: String!
 
@@ -4193,7 +4198,9 @@ type Mutation {
   adminActivateInstitute(id: ID!): InstituteModel!
   adminActivateInstituteGroup(id: ID!): InstituteGroupModel!
 
-  """PAUSED or BLOCKED → ACTIVE: the sender sends again."""
+  """
+  PAUSED or BLOCKED → ACTIVE: the sender sends again at once; its paused state and slowed rate in the notification service are cleared.
+  """
   adminActivateMessagingSender(id: ID!): AdminMessagingSender!
   adminAddInstituteGroupMember(groupId: ID!, roleId: ID!, userId: ID!): GroupMembershipModel!
   adminAddInstituteToGroup(groupId: ID!, instituteId: ID!): Boolean!
@@ -4293,7 +4300,7 @@ type Mutation {
   adminUnsuspendReseller(resellerId: String!): AdminResellerModel!
   adminUpdateInstituteGroup(id: ID!, input: UpdateInstituteGroupInput!): InstituteGroupModel!
 
-  """Changes the number shown or the caps."""
+  """Changes the number shown, the caps or the messages per second."""
   adminUpdateMessagingSender(id: ID!, input: UpdateMessagingSenderInput!): AdminMessagingSender!
 
   """
@@ -8072,6 +8079,11 @@ input UpdateMessagingSenderInput {
   Only on the platform's sender: at least 1, or null to remove the share limit. Refused on an institute's sender.
   """
   instituteDailyCap: Int
+
+  """
+  Messages per second the sender may hand the provider, 1 to 1000. Set it to the provider's limit for the number.
+  """
+  messagesPerSecond: Int
 }
 
 """

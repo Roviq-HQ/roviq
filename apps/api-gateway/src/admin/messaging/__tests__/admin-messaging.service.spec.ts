@@ -1,6 +1,7 @@
 import { ErrorCode, type MessagingSenderStatus, type PlatformContext } from '@roviq/common-types';
 import type { MessagingTokenCipher } from '@roviq/crypto';
 import { createMock } from '@roviq/testing';
+import type Redis from 'ioredis';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminMessagingService } from '../admin-messaging.service';
 import type { RegisterMessagingSenderInput } from '../dto/messaging-sender.dto';
@@ -31,6 +32,7 @@ function sender(overrides: Partial<MessagingSenderRecord> = {}): MessagingSender
     status: 'ACTIVE',
     dailyCap: 100,
     instituteDailyCap: null,
+    messagesPerSecond: 10,
     createdAt: new Date('2026-11-01T00:00:00Z'),
     updatedAt: new Date('2026-11-01T00:00:00Z'),
     ...overrides,
@@ -40,7 +42,8 @@ function sender(overrides: Partial<MessagingSenderRecord> = {}): MessagingSender
 function setup(repoOverrides: Partial<AdminMessagingRepository> = {}) {
   const repo = createMock<AdminMessagingRepository>(repoOverrides);
   const cipher = createMock<MessagingTokenCipher>({ encrypt: vi.fn(() => CIPHERTEXT) });
-  return { repo, cipher, service: new AdminMessagingService(repo, cipher) };
+  const redis = createMock<Redis>({ del: vi.fn().mockResolvedValue(2) });
+  return { repo, cipher, redis, service: new AdminMessagingService(repo, cipher, redis) };
 }
 
 const input: RegisterMessagingSenderInput = {
@@ -148,6 +151,15 @@ describe('AdminMessagingService.update', () => {
 
     expect(update).toHaveBeenCalledWith(ctx, ID, { instituteDailyCap: null });
   });
+
+  it('should pass the messages per second through', async () => {
+    const update = vi.fn(async () => sender({ messagesPerSecond: 80 }));
+    const { service } = setup({ findById: vi.fn(async () => sender()), update });
+
+    await service.update(ctx, ID, { messagesPerSecond: 80 });
+
+    expect(update).toHaveBeenCalledWith(ctx, ID, { messagesPerSecond: 80 });
+  });
 });
 
 describe('AdminMessagingService.rotateToken', () => {
@@ -199,6 +211,29 @@ describe('AdminMessagingService status transitions', () => {
       code: ErrorCode.INVALID_STATE_TRANSITION,
     });
     expect(repo.setStatus).not.toHaveBeenCalled();
+  });
+
+  it("should clear the sender's breaker and throttle on activate", async () => {
+    const { service, redis } = setup({
+      findById: vi.fn(async () => sender({ status: 'BLOCKED' })),
+      setStatus: vi.fn(async () => sender({ status: 'ACTIVE' })),
+    });
+
+    await service.activate(ctx, ID);
+
+    expect(redis.del).toHaveBeenCalledWith(
+      `notification:breaker:sender:${ID}`,
+      `notification:sender-throttle:${ID}`,
+    );
+  });
+
+  it('should clear nothing when activate is refused', async () => {
+    const { service, redis } = setup({ findById: vi.fn(async () => sender({ status: 'ACTIVE' })) });
+
+    await expect(service.activate(ctx, ID)).rejects.toMatchObject({
+      code: ErrorCode.INVALID_STATE_TRANSITION,
+    });
+    expect(redis.del).not.toHaveBeenCalled();
   });
 
   it('should answer INVALID_STATE_TRANSITION when the status changed meanwhile', async () => {

@@ -29,6 +29,10 @@ export const NOTIFICATION_INSTRUMENTS = {
   delivery: { name: 'notification.delivery', labels: [L.CHANNEL, L.STATUS, L.PROVIDER, L.REASON] },
   deliveryDuration: { name: 'notification.delivery.duration', labels: [L.CHANNEL, L.PROVIDER] },
   deferred: { name: 'notification.deferred', labels: [L.CHANNEL, L.REASON] },
+  breakerOpened: {
+    name: 'notification.breaker.opened',
+    labels: [L.CHANNEL, L.PROVIDER, L.REASON],
+  },
   eventLag: { name: 'notification.event.lag', labels: [L.STREAM, L.CONSUMER] },
   canaryLastSuccess: { name: 'notification.canary.last_success', labels: [L.CHANNEL] },
   workerRunning: { name: 'notification.worker.running', labels: [] },
@@ -85,8 +89,15 @@ export class NotificationMetrics {
     { description: 'Time of one provider call', unit: 'ms' },
   );
   private readonly deferrals = this.meter.createCounter(NOTIFICATION_INSTRUMENTS.deferred.name, {
-    description: 'Messages held for later (quiet hours, a full sender)',
+    description:
+      'Messages held for later (quiet hours, a full or slowed sender, a paused provider)',
   });
+  private readonly breakers = this.meter.createCounter(
+    NOTIFICATION_INSTRUMENTS.breakerOpened.name,
+    {
+      description: 'A provider or sender breaker opened: sending through it pauses',
+    },
+  );
   private readonly canaryGauge = this.meter.createObservableGauge(
     NOTIFICATION_INSTRUMENTS.canaryLastSuccess.name,
     { description: 'Unix seconds of the last canary the provider accepted', unit: 's' },
@@ -119,6 +130,15 @@ export class NotificationMetrics {
 
   deferred(channel: NotificationChannel, reason: string): void {
     this.deferrals.add(1, { [L.CHANNEL]: channel, [L.REASON]: reasonLabel(reason) });
+  }
+
+  /** No sender id: the label set stays bounded. `reason` is the failure code that opened it. */
+  breakerOpened(channel: NotificationChannel, provider: string, reason: string): void {
+    this.breakers.add(1, {
+      [L.CHANNEL]: channel,
+      [L.PROVIDER]: provider,
+      [L.REASON]: reasonLabel(reason),
+    });
   }
 
   /** Keeps the latest time per channel, so a seed read after a live success cannot move it back. */

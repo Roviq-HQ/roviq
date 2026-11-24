@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { composeDigest, composeInApp, composeOutside } from '../../../types/compose';
+import { deliveryCanaryWhatsApp } from '../../../types/delivery-canary.type';
 import { channelsOf } from '../../../types/flow';
 import { LOCALES, type Locale } from '../../../types/notification-type';
 import { REGULAR_TYPES, type RegularParamsMap, type RegularTypeKey } from '../../../types/registry';
-import { placeholdersOf, renderTemplate, type WhatsAppTemplate } from '../whatsapp-template';
+import {
+  placeholdersOf,
+  renderTemplate,
+  templateBodyProblems,
+  type WhatsAppTemplate,
+} from '../whatsapp-template';
 import {
   WHATSAPP_TEMPLATES,
   whatsappDigestTemplateFor,
@@ -293,7 +299,7 @@ describe('whatsappTemplateFor', () => {
       name: 'attendance_absent_v1',
       languageCode: 'hi',
       category: 'UTILITY',
-      bodyVariables: ['आपके बच्चे', 'कक्षा उपलब्ध नहीं', 'विलंब से उपस्थित', 'आज'],
+      bodyVariables: ['आपके बच्चे', 'अपनी कक्षा', 'विलंब से उपस्थित', 'आज'],
       buttonPath: 'institute/attendance',
     });
   });
@@ -321,22 +327,24 @@ describe('whatsappTemplateFor', () => {
     expect(
       composeOutside({ type: 'ATTENDANCE_ABSENT', params: attendance }, 'WHATSAPP', 'en').body,
     ).toBe(
-      'Attendance update: Aarav Sharma (Class 5-A) was marked absent. Date: 22 November 2026.',
+      'Attendance update for Aarav Sharma in Class 5-A: marked absent on 22 November 2026. Open Roviq to see the details.',
     );
     expect(composeOutside({ type: 'FEE_OVERDUE', params: overdue }, 'WHATSAPP', 'hi').body).toBe(
-      'शुल्क बकाया: Aarav Sharma का शुल्क (Tuition) INR 5000 बकाया है, जिसकी देय तिथि 10 अप्रैल 2026 थी।',
+      'शुल्क बकाया: Aarav Sharma का Tuition शुल्क, राशि INR 5000, बकाया है, जिसकी देय तिथि 10 अप्रैल 2026 थी। विवरण के लिए Roviq खोलें।',
     );
     expect(composeOutside({ type: 'FEE_REMINDER', params: reminder }, 'WHATSAPP', 'en').body).toBe(
-      'Fee reminder: Aarav Sharma has a fee (Tuition) of INR 5000 for April 2026, due on 10 April 2026.',
+      'Fee reminder: Aarav Sharma has a fee (Tuition) of INR 5000 for April 2026, due on 10 April 2026. Open Roviq to see the details.',
     );
     expect(
       composeOutside({ type: 'APPROVAL_REQUESTED', params: requested }, 'WHATSAPP', 'en').body,
     ).toBe(
-      'Approval needed: Priya Verma submitted a LEAVE request. Summary: Two days, family function.',
+      'Approval needed: Priya Verma submitted a LEAVE request. Summary: Two days, family function. Open Roviq to review it.',
     );
     expect(
       composeOutside({ type: 'APPROVAL_RESOLVED', params: resolved }, 'WHATSAPP', 'hi').body,
-    ).toBe('अनुरोध अपडेट: प्रस्तुत अनुरोध की समीक्षा समीक्षक ने की और इसे अस्वीकृत किया गया। टिप्पणी: कोई नहीं।');
+    ).toBe(
+      'अनुरोध अपडेट: प्रस्तुत अनुरोध की समीक्षा समीक्षक ने की और इसे अस्वीकृत किया गया। टिप्पणी: कोई नहीं। विवरण के लिए Roviq खोलें।',
+    );
     expect(
       composeOutside({ type: 'AUTH_PASSWORD_RESET', params: reset }, 'WHATSAPP', 'en').body,
     ).toBe(
@@ -397,7 +405,7 @@ describe('whatsappDigestTemplateFor', () => {
       buttonPath: 'institute/attendance',
     });
     expect(composeDigest({ type: 'ATTENDANCE_ABSENT', items }, 'WHATSAPP', 'hi').body).toBe(
-      'उपस्थिति सारांश, Aarav Sharma, Diya Rao, Kabir Singh और 1 अन्य: आज 3 अनुपस्थिति और 2 विलंब दर्ज हुए।',
+      'उपस्थिति सारांश, Aarav Sharma, Diya Rao, Kabir Singh और 1 अन्य: आज 3 अनुपस्थिति और 2 विलंब दर्ज हुए। विवरण के लिए Roviq खोलें।',
     );
   });
 
@@ -419,5 +427,35 @@ describe('whatsappDigestTemplateFor', () => {
       bodyVariables: ['Aarav Sharma', '5'],
       buttonPath: 'institute/dashboard',
     });
+  });
+});
+
+describe("the provider's rules for a template body", () => {
+  const bodies = [
+    ...Object.values(WHATSAPP_TEMPLATES).flatMap((t) =>
+      t.digest ? [t.single, t.digest] : [t.single],
+    ),
+    deliveryCanaryWhatsApp,
+  ].flatMap((template) =>
+    LOCALES.map((locale) => [template.name, locale, template.body[locale]] as const),
+  );
+
+  it.each(bodies)('%s (%s) would be accepted', (_name, _locale, body) => {
+    expect(templateBodyProblems(body)).toEqual([]);
+  });
+
+  it('names each kind of refusal', () => {
+    expect(templateBodyProblems('{{1}} was marked absent today in class')).toContain(
+      'starts with a variable',
+    );
+    expect(templateBodyProblems('The student was marked absent. Date: {{1}}.')).toContain(
+      'ends with a variable',
+    );
+    expect(templateBodyProblems('Fee for {{1}} ({{2}}) is due this week, please pay')).toContain(
+      'two variables with no word between them',
+    );
+    expect(templateBodyProblems('Fee {{1}} due {{2}} now')).toContain(
+      'too many variables for its length',
+    );
   });
 });

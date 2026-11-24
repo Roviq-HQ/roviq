@@ -254,6 +254,7 @@ export class NotificationDispatcher {
           flowId: null,
           channelEnabled: true,
           critical: true,
+          digest: false,
           deferrable: false,
           attempt,
           address: given === undefined ? 'lookup' : { given },

@@ -9,6 +9,8 @@ import { ChannelAdapters } from '../adapters/channel-adapters';
 import { LogChannelAdapter } from '../adapters/log.adapter';
 import { type ChannelAttempt, ChannelSender } from '../channel-sender';
 import type { ConsentGate } from '../consent-gate';
+import type { ProviderBreaker } from '../rate/provider-breaker';
+import type { SenderRateLimiter } from '../rate/sender-rate-limiter';
 import type { SmsDraft } from '../sms/sms-template';
 import { WhatsAppRoute } from '../whatsapp/whatsapp-route';
 import type { TemplateSend } from '../whatsapp/whatsapp-template';
@@ -27,6 +29,7 @@ const PLATFORM_SENDER: MessagingSenderRecord = {
   providerNumberId: 'number-platform',
   dailyCap: 1000,
   instituteDailyCap: 100,
+  messagesPerSecond: 10,
   accessTokenEncrypted: Buffer.from('fake-encrypted-platform-token'),
 };
 
@@ -38,6 +41,7 @@ const SENDER: MessagingSenderRecord = {
   providerNumberId: 'number-1',
   dailyCap: 1000,
   instituteDailyCap: null,
+  messagesPerSecond: 10,
   accessTokenEncrypted: Buffer.from('fake-encrypted-token'),
 };
 
@@ -61,6 +65,7 @@ function attempt(overrides: Partial<ChannelAttempt> = {}): ChannelAttempt {
     flowId: 'notification-flow:key-1',
     channelEnabled: true,
     critical: false,
+    digest: false,
     deferrable: true,
     attempt: 1,
     address: 'lookup',
@@ -77,10 +82,22 @@ describe('ChannelSender', () => {
   let writes: ReturnType<typeof createMock<NotificationWriteRepository>>;
   let route: ReturnType<typeof createMock<WhatsAppRoute>>;
   let metrics: ReturnType<typeof createMock<NotificationMetrics>>;
+  let rate: ReturnType<typeof createMock<SenderRateLimiter>>;
+  let breaker: ReturnType<typeof createMock<ProviderBreaker>>;
   let sender: ChannelSender;
 
   beforeEach(() => {
     metrics = createMock<NotificationMetrics>();
+    rate = createMock<SenderRateLimiter>({
+      take: vi.fn().mockResolvedValue({ ok: true }),
+      throttle: vi.fn().mockResolvedValue(new Date('2026-11-24T10:00:02.000Z')),
+    });
+    breaker = createMock<ProviderBreaker>({
+      allow: vi.fn().mockResolvedValue({ ok: true }),
+      succeeded: vi.fn().mockResolvedValue(undefined),
+      failed: vi.fn().mockResolvedValue(false),
+      trip: vi.fn().mockResolvedValue(true),
+    });
     send = vi.fn<ChannelAdapter['send']>().mockResolvedValue({ providerMessageId: 'smtp-1' });
     email = { channel: 'EMAIL', provider: 'smtp', send };
     contacts = createMock<ContactReadRepository>({
@@ -101,6 +118,7 @@ describe('ChannelSender', () => {
       quietUntil: vi.fn().mockResolvedValue(null),
       capacity: vi.fn().mockResolvedValue('ok'),
       fallbackFor: vi.fn().mockResolvedValue(null),
+      block: vi.fn().mockResolvedValue(true),
     });
     sender = new ChannelSender(
       new ChannelAdapters([email]),
@@ -109,6 +127,8 @@ describe('ChannelSender', () => {
       writes,
       route,
       metrics,
+      rate,
+      breaker,
     );
   });
 
@@ -196,6 +216,8 @@ describe('ChannelSender', () => {
       writes,
       route,
       metrics,
+      rate,
+      breaker,
     );
 
     const outcome = await sender.attempt(attempt());
@@ -276,6 +298,8 @@ describe('ChannelSender', () => {
       writes,
       route,
       metrics,
+      rate,
+      breaker,
     );
 
     const outcome = await sender.attempt(attempt({ channel: 'WHATSAPP', template: templateIn }));
@@ -313,6 +337,8 @@ describe('ChannelSender', () => {
         writes,
         route,
         metrics,
+        rate,
+        breaker,
       );
     });
 
@@ -539,6 +565,8 @@ describe('ChannelSender', () => {
         writes,
         route,
         metrics,
+        rate,
+        breaker,
       );
 
     beforeEach(() => {
@@ -661,13 +689,13 @@ describe('ChannelSender', () => {
       expect(secondSend).not.toHaveBeenCalled();
     });
 
-    it('should leave out a provider that is not available now', async () => {
-      class FirstDown extends ChannelAdapters {
-        override available(adapter: ChannelAdapter): boolean {
-          return adapter !== first;
-        }
-      }
-      sender = senderOf(new FirstDown([first, second]));
+    it('should leave out a provider whose breaker is open', async () => {
+      breaker.allow.mockImplementation(async (name: string) =>
+        name === 'adapter:SMS:first'
+          ? { ok: false, retryAt: new Date('2026-11-24T10:01:00.000Z') }
+          : { ok: true },
+      );
+      sender = senderOf(new ChannelAdapters([first, second]));
 
       const outcome = await sender.attempt(smsAttempt());
 
@@ -677,6 +705,79 @@ describe('ChannelSender', () => {
         providerMessageId: 'second-1',
       });
       expect(firstSend).not.toHaveBeenCalled();
+    });
+
+    it('should defer as provider_paused until the earliest breaker ends when every provider is open', async () => {
+      breaker.allow.mockImplementation(async (name: string) => ({
+        ok: false,
+        retryAt: new Date(
+          name === 'adapter:SMS:first' ? '2026-11-24T10:01:00.000Z' : '2026-11-24T10:00:30.000Z',
+        ),
+      }));
+      sender = senderOf(new ChannelAdapters([first, second]));
+
+      const outcome = await sender.attempt(smsAttempt());
+
+      expect(outcome).toEqual({
+        status: 'DEFERRED',
+        until: new Date('2026-11-24T10:00:30.000Z'),
+        reason: 'provider_paused',
+      });
+      expect(firstSend).not.toHaveBeenCalled();
+      expect(secondSend).not.toHaveBeenCalled();
+      expect(writes.recordDelivery).not.toHaveBeenCalled();
+      expect(writes.recordDeferral).toHaveBeenCalledWith({
+        audience: INSTITUTE,
+        notificationId: 'notification-1',
+        recipientUserId: 'user-guardian-1',
+        type: 'FEE_REMINDER',
+        channel: 'SMS',
+        attempt: 1,
+        flowId: 'notification-flow:key-1',
+        reason: 'provider_paused',
+      });
+    });
+
+    it('should skip as provider_paused when every provider is open and the caller cannot wait', async () => {
+      breaker.allow.mockResolvedValue({ ok: false, retryAt: new Date('2026-11-24T10:01:00.000Z') });
+
+      const outcome = await sender.attempt(smsAttempt({ deferrable: false }));
+
+      expect(outcome).toEqual({ status: 'SKIPPED', provider: null, skipReason: 'provider_paused' });
+      expect(writes.recordDeferral).not.toHaveBeenCalled();
+    });
+
+    it('should count an unreachable answer against the breaker and report it when it opens', async () => {
+      firstSend.mockRejectedValue(new ChannelAdapterError('SMS_UNREACHABLE', 'http 503'));
+      breaker.failed.mockResolvedValue(true);
+
+      await sender.attempt(smsAttempt());
+
+      expect(breaker.failed).toHaveBeenCalledWith('adapter:SMS:first');
+      expect(breaker.succeeded).toHaveBeenCalledWith('adapter:SMS:second');
+      expect(metrics.breakerOpened).toHaveBeenCalledWith('SMS', 'first', 'SMS_UNREACHABLE');
+    });
+
+    it('should open the breaker at once when the provider blocks the SMS sender', async () => {
+      firstSend.mockRejectedValue(
+        new ChannelAdapterError('SMS_SENDER_BLOCKED', 'suspended', false),
+      );
+
+      await sender.attempt(smsAttempt());
+
+      expect(breaker.trip).toHaveBeenCalledWith('adapter:SMS:first');
+      expect(breaker.failed).not.toHaveBeenCalled();
+      expect(metrics.breakerOpened).toHaveBeenCalledWith('SMS', 'first', 'SMS_SENDER_BLOCKED');
+    });
+
+    it('should count a refused message as an answer, not against the breaker', async () => {
+      firstSend.mockRejectedValue(new ChannelAdapterError('SMS_INVALID_NUMBER', 'bad', false));
+
+      await sender.attempt(smsAttempt());
+
+      expect(breaker.succeeded).toHaveBeenCalledWith('adapter:SMS:first');
+      expect(breaker.failed).not.toHaveBeenCalled();
+      expect(breaker.trip).not.toHaveBeenCalled();
     });
   });
 
@@ -704,6 +805,8 @@ describe('ChannelSender', () => {
         writes,
         route,
         metrics,
+        rate,
+        breaker,
       );
     });
 
@@ -752,7 +855,7 @@ describe('ChannelSender', () => {
     });
 
     it("should not use the platform's sender when it is over its cap", async () => {
-      whatsappSend.mockRejectedValue(new ChannelAdapterError('WA_RATE_LIMITED', 'http 429'));
+      whatsappSend.mockRejectedValue(new ChannelAdapterError('WA_UNREACHABLE', 'http 503'));
       route.capacity.mockImplementation(async (s) => (s.id === PLATFORM_SENDER.id ? 'over' : 'ok'));
 
       const outcome = await sender.attempt(whatsappAttempt());
@@ -760,7 +863,7 @@ describe('ChannelSender', () => {
       expect(outcome).toEqual({
         status: 'FAILED',
         provider: 'whatsapp_cloud',
-        errorCode: 'WA_RATE_LIMITED',
+        errorCode: 'WA_UNREACHABLE',
         retryable: true,
         route: OWN_ROUTE,
       });
@@ -802,6 +905,134 @@ describe('ChannelSender', () => {
         route: PLATFORM_ROUTE,
       });
       expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+    });
+
+    it('should defer as rate_limited without calling the provider when the sender has no token', async () => {
+      const retryAt = new Date('2026-11-24T10:00:00.400Z');
+      rate.take.mockResolvedValue({ ok: false, retryAt });
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({ status: 'DEFERRED', until: retryAt, reason: 'rate_limited' });
+      expect(whatsappSend).not.toHaveBeenCalled();
+      expect(route.fallbackFor).not.toHaveBeenCalled();
+      expect(writes.recordDelivery).not.toHaveBeenCalled();
+      expect(writes.recordDeferral).toHaveBeenCalledWith({
+        audience: INSTITUTE,
+        notificationId: 'notification-1',
+        recipientUserId: 'user-guardian-1',
+        type: 'FEE_REMINDER',
+        channel: 'WHATSAPP',
+        attempt: 1,
+        flowId: 'notification-flow:key-1',
+        reason: 'rate_limited',
+      });
+    });
+
+    it('should skip as rate_limited when the sender has no token and the caller cannot wait', async () => {
+      rate.take.mockResolvedValue({ ok: false, retryAt: new Date('2026-11-24T10:00:01.000Z') });
+
+      const outcome = await sender.attempt(attempt({ ...whatsappAttempt(), deferrable: false }));
+
+      expect(outcome).toEqual({ status: 'SKIPPED', provider: null, skipReason: 'rate_limited' });
+    });
+
+    it.each([
+      [false, false, false],
+      [true, false, true],
+      [true, true, false],
+    ])('should take a token with digest %s and critical %s reserving %s', async (digest, critical, reserve) => {
+      whatsappSend.mockResolvedValue({ providerMessageId: 'wamid.1' });
+
+      await sender.attempt(attempt({ ...whatsappAttempt(), digest, critical }));
+
+      expect(rate.take).toHaveBeenCalledWith({
+        senderId: 'sender-1',
+        messagesPerSecond: 10,
+        phone: '+919000000001',
+        reserve,
+      });
+    });
+
+    it("should defer until the provider's Retry-After and throttle the sender, without a FAILED row", async () => {
+      const until = new Date('2026-11-24T10:00:02.000Z');
+      whatsappSend.mockRejectedValue(
+        new ChannelAdapterError('WA_RATE_LIMITED', 'http 429', true, 2000),
+      );
+      rate.throttle.mockResolvedValue(until);
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({ status: 'DEFERRED', until, reason: 'rate_limited' });
+      expect(rate.throttle).toHaveBeenCalledWith('sender-1', 10, 2000);
+      expect(whatsappSend).toHaveBeenCalledTimes(1);
+      expect(route.fallbackFor).not.toHaveBeenCalled();
+      expect(writes.recordDelivery).not.toHaveBeenCalled();
+      expect(breaker.failed).not.toHaveBeenCalled();
+    });
+
+    it("should keep today's FAILED row and failover on a throttle when the caller cannot wait", async () => {
+      whatsappSend
+        .mockRejectedValueOnce(new ChannelAdapterError('WA_RATE_LIMITED', 'http 429'))
+        .mockResolvedValueOnce({ providerMessageId: 'wamid.platform-1' });
+
+      const outcome = await sender.attempt(attempt({ ...whatsappAttempt(), deferrable: false }));
+
+      expect(rate.throttle).toHaveBeenCalledWith('sender-1', 10, null);
+      expect(outcome).toEqual({
+        status: 'SENT',
+        provider: 'whatsapp_cloud',
+        providerMessageId: 'wamid.platform-1',
+        route: PLATFORM_ROUTE,
+      });
+    });
+
+    it("should send through the platform's sender while the institute's breaker is open", async () => {
+      breaker.allow.mockImplementation(async (name: string) =>
+        name === 'sender:sender-1'
+          ? { ok: false, retryAt: new Date('2026-11-24T10:01:00.000Z') }
+          : { ok: true },
+      );
+      whatsappSend.mockResolvedValue({ providerMessageId: 'wamid.platform-1' });
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({
+        status: 'SENT',
+        provider: 'whatsapp_cloud',
+        providerMessageId: 'wamid.platform-1',
+        route: PLATFORM_ROUTE,
+      });
+      expect(whatsappSend.mock.calls.map(([m]) => m.route?.sender.id)).toEqual(['sender-platform']);
+    });
+
+    it('should defer as provider_paused when both breakers are open', async () => {
+      const retryAt = new Date('2026-11-24T10:01:00.000Z');
+      breaker.allow.mockResolvedValue({ ok: false, retryAt });
+
+      const outcome = await sender.attempt(whatsappAttempt());
+
+      expect(outcome).toEqual({ status: 'DEFERRED', until: retryAt, reason: 'provider_paused' });
+      expect(whatsappSend).not.toHaveBeenCalled();
+    });
+
+    it('should open the breaker, block the sender and fail over when the provider blocks it', async () => {
+      whatsappSend
+        .mockRejectedValueOnce(
+          new ChannelAdapterError('WA_SENDER_BLOCKED', 'provider code 368', false),
+        )
+        .mockResolvedValueOnce({ providerMessageId: 'wamid.platform-1' });
+
+      await sender.attempt(whatsappAttempt());
+
+      expect(breaker.trip).toHaveBeenCalledWith('sender:sender-1');
+      expect(route.block).toHaveBeenCalledWith(SENDER);
+      expect(metrics.breakerOpened).toHaveBeenCalledWith(
+        'WHATSAPP',
+        'whatsapp_cloud',
+        'WA_SENDER_BLOCKED',
+      );
+      expect(breaker.succeeded).toHaveBeenCalledWith('sender:sender-platform');
     });
   });
 });

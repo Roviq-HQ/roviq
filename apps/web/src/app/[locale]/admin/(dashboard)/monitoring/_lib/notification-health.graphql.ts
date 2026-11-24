@@ -28,6 +28,16 @@ export const ADMIN_MONITORING_SENDERS = gql`
       tenantId
       displayNumber
       status
+      messagesPerSecond
+    }
+  }
+`;
+
+export const ADMIN_UPDATE_SENDER_RATE = gql`
+  mutation AdminUpdateSenderRate($id: ID!, $messagesPerSecond: Int!) {
+    adminUpdateMessagingSender(id: $id, input: { messagesPerSecond: $messagesPerSecond }) {
+      id
+      messagesPerSecond
     }
   }
 `;

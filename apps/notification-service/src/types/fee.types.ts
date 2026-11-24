@@ -58,8 +58,8 @@ const overdueWhatsAppSingle: WhatsAppTemplate<FeeOverdueParams> = {
   name: 'fee_overdue_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Fee overdue: {{1}} has an unpaid fee ({{2}}) of {{3}} that was due on {{4}}.',
-    hi: 'शुल्क बकाया: {{1}} का शुल्क ({{2}}) {{3}} बकाया है, जिसकी देय तिथि {{4}} थी।',
+    en: 'Fee overdue: {{1}} has an unpaid fee ({{2}}) of {{3}} that was due on {{4}}. Open Roviq to see the details.',
+    hi: 'शुल्क बकाया: {{1}} का {{2}} शुल्क, राशि {{3}}, बकाया है, जिसकी देय तिथि {{4}} थी। विवरण के लिए Roviq खोलें।',
   },
   variables: (p, locale) => [
     cleanVariable(p.studentName, WARD[locale]),
@@ -74,7 +74,7 @@ const overdueWhatsAppDigest: WhatsAppTemplate<readonly FeeOverdueParams[]> = {
   name: 'fee_overdue_digest_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Fee overdue summary for {{1}}: {{2}} fees are unpaid past their due date this week.',
+    en: 'Fee overdue summary for {{1}}: this week {{2}} fees are unpaid past their due date.',
     hi: 'बकाया शुल्क सारांश, {{1}}: इस सप्ताह {{2}} शुल्क देय तिथि के बाद भी बकाया हैं।',
   },
   variables: (items, locale) => [
@@ -97,8 +97,8 @@ const reminderWhatsApp: WhatsAppTemplate<FeeReminderParams> = {
   name: 'fee_reminder_v1',
   category: MessageTemplateCategory.UTILITY,
   body: {
-    en: 'Fee reminder: {{1}} has a fee ({{2}}) of {{3}} for {{4}}, due on {{5}}.',
-    hi: 'शुल्क अनुस्मारक: {{1}} का शुल्क ({{2}}) {{3}}, अवधि {{4}}, {{5}} तक देय है।',
+    en: 'Fee reminder: {{1}} has a fee ({{2}}) of {{3}} for {{4}}, due on {{5}}. Open Roviq to see the details.',
+    hi: 'शुल्क अनुस्मारक: {{1}} का {{2}} शुल्क, राशि {{3}}, अवधि {{4}} के लिए, {{5}} तक देय है। विवरण के लिए Roviq खोलें।',
   },
   variables: (p, locale) => [
     cleanVariable(p.studentName, WARD[locale]),

@@ -203,6 +203,7 @@ services:
     environment:
       # Four-role model: runtime connects via roviq_pooler.
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq
+      REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
       NOTIFICATION_SERVICE_PORT: 3002
       OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5081
@@ -210,6 +211,8 @@ services:
       OTEL_SERVICE_NAME: notification-service
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       nats:
         condition: service_healthy

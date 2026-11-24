@@ -5,11 +5,18 @@ import { validate } from '../env.validation';
 const BASE = {
   DATABASE_URL: 'postgresql://roviq_pooler@localhost/roviq',
   NATS_URL: 'nats://localhost:4222',
+  REDIS_URL: 'redis://localhost:6379',
 };
 
 describe('notification-service env validation', () => {
   it('should accept no providers at all', () => {
     expect(validate(BASE)).toEqual(BASE);
+  });
+
+  it('should require REDIS_URL', () => {
+    const { REDIS_URL: _, ...withoutRedis } = BASE;
+
+    expect(() => validate(withoutRedis)).toThrow('REDIS_URL — Redis connection URL');
   });
 
   it('should require SMTP_URL and EMAIL_FROM for the smtp provider', () => {

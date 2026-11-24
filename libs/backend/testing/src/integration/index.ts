@@ -46,7 +46,7 @@ export {
   type IntegrationAppResult,
 } from './integration-app.js';
 // Serializes specs that create the one platform messaging sender
-export { holdPlatformSenderLock } from './platform-sender-lock.js';
+export { holdPlatformSenderLock, PLATFORM_SENDER_LOCK_WAIT_MS } from './platform-sender-lock.js';
 // Async polling helpers
 export { type AuditLogQuery, waitForAuditLog, waitForCondition } from './polling.js';
 // Test-env defaults — callers rarely need this directly; createIntegrationApp

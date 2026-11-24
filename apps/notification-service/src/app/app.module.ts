@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TerminusModule } from '@nestjs/terminus';
 import { EventBusModule } from '@roviq/event-bus';
+import { REDIS_CLIENT, RedisModule } from '@roviq/redis';
 import { TelemetryModule } from '@roviq/telemetry';
 import { TemporalClientModule } from '@roviq/temporal';
+import type Redis from 'ioredis';
 import { type NotificationEnv, validate } from '../config/env.validation';
 import { InstitutePortal } from '../config/institute-portal';
 import { BillingNotificationController } from '../controllers/billing-notification.controller';
@@ -12,6 +14,8 @@ import { WhatsAppWebhookController } from '../controllers/whatsapp-webhook.contr
 import { buildChannelAdapters, ChannelAdapters } from '../delivery/adapters/channel-adapters';
 import { ChannelSender } from '../delivery/channel-sender';
 import { ConsentGate, GuardianConsentGate } from '../delivery/consent-gate';
+import { ProviderBreaker } from '../delivery/rate/provider-breaker';
+import { SenderRateLimiter } from '../delivery/rate/sender-rate-limiter';
 import { SmsHttp } from '../delivery/sms/sms-http';
 import { WhatsAppCloud } from '../delivery/whatsapp/whatsapp-cloud';
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
@@ -43,6 +47,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate }),
     TelemetryModule,
+    RedisModule,
     NotificationServiceRepositoryModule,
     NatsJetStreamModule,
     EventBusModule,
@@ -92,6 +97,16 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     },
     { provide: ConsentGate, useClass: GuardianConsentGate },
     {
+      provide: SenderRateLimiter,
+      useFactory: (redis: Redis) => new SenderRateLimiter(redis),
+      inject: [REDIS_CLIENT],
+    },
+    {
+      provide: ProviderBreaker,
+      useFactory: (redis: Redis) => new ProviderBreaker(redis),
+      inject: [REDIS_CLIENT],
+    },
+    {
       provide: ChannelSender,
       useFactory: (
         adapters: ChannelAdapters,
@@ -100,7 +115,9 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
         writes: NotificationWriteRepository,
         whatsapp: WhatsAppRoute,
         metrics: NotificationMetrics,
-      ) => new ChannelSender(adapters, consent, contacts, writes, whatsapp, metrics),
+        rate: SenderRateLimiter,
+        breaker: ProviderBreaker,
+      ) => new ChannelSender(adapters, consent, contacts, writes, whatsapp, metrics, rate, breaker),
       inject: [
         ChannelAdapters,
         ConsentGate,
@@ -108,6 +125,8 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
         NotificationWriteRepository,
         WhatsAppRoute,
         NotificationMetrics,
+        SenderRateLimiter,
+        ProviderBreaker,
       ],
     },
     WhatsAppCloud,

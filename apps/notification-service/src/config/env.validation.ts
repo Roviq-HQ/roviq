@@ -24,6 +24,11 @@ const envSchema = z
       error: 'DATABASE_URL — PostgreSQL connection string for the application runtime role',
     }),
 
+    // Redis: sender rate limits and provider breakers, shared by every instance
+    REDIS_URL: z.string({
+      error: 'REDIS_URL — Redis connection URL (e.g. redis://localhost:6379)',
+    }),
+
     // NATS
     NATS_URL: z.string({
       error: 'NATS_URL — NATS server URL for event streaming (e.g. nats://localhost:4222)',

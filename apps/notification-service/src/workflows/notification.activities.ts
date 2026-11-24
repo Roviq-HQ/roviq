@@ -80,6 +80,7 @@ export function createNotificationActivities(
         flowId: input.flowId,
         channelEnabled: input.enabled,
         critical: REGULAR_TYPES[type].critical,
+        digest: content.kind === 'digest',
         deferrable: input.deferrable,
         attempt: attemptOf(),
         address: 'lookup',
@@ -95,7 +96,9 @@ export function createNotificationActivities(
         sms: (locale) =>
           content.kind === 'single' ? smsDraftForRegular(content.message, locale) : null,
       });
-      if (outcome.status === 'DEFERRED') return { deferUntil: outcome.until.toISOString() };
+      if (outcome.status === 'DEFERRED') {
+        return { deferUntil: outcome.until.toISOString(), reason: outcome.reason };
+      }
       if (outcome.status === 'FAILED') {
         const message = `channel ${input.channel} failed`;
         throw outcome.retryable
