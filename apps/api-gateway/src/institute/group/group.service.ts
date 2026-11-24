@@ -79,6 +79,9 @@ export class GroupService {
       rule,
       childGroupIds: input.childGroupIds ?? [],
     });
+    if (!group) {
+      throw new BusinessException(ErrorCode.GROUP_NOT_FOUND, 'Parent or child group not found');
+    }
 
     this.logger.log(`Group created: ${group.id} (${input.groupType}/${input.membershipType})`);
     return group;

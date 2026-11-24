@@ -41,9 +41,21 @@ export class GroupDrizzleRepository extends GroupRepository {
     super();
   }
 
-  async create(data: CreateGroupData): Promise<GroupRecord> {
+  async create(data: CreateGroupData): Promise<GroupRecord | null> {
     const { tenantId, actorId } = data;
     const rows = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      // Foreign keys accept any institute's group; the view under RLS does not.
+      const linkedIds = [
+        ...new Set([...(data.parentGroupId ? [data.parentGroupId] : []), ...data.childGroupIds]),
+      ];
+      if (linkedIds.length > 0) {
+        const found = await tx
+          .select({ id: groupsLive.id })
+          .from(groupsLive)
+          .where(inArray(groupsLive.id, linkedIds));
+        if (found.length !== linkedIds.length) return [];
+      }
+
       const newGroups = await tx
         .insert(groups)
         .values({
@@ -87,7 +99,7 @@ export class GroupDrizzleRepository extends GroupRepository {
 
       return newGroups;
     });
-    return rows[0] as GroupRecord;
+    return rows.length === 0 ? null : (rows[0] as GroupRecord);
   }
 
   async findById(tenantId: string, id: string): Promise<GroupRecord | null> {
@@ -122,29 +134,29 @@ export class GroupDrizzleRepository extends GroupRepository {
     rule: GroupRuleData | null,
   ): Promise<GroupRecord | null> {
     const rows = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      if (rule) {
-        // Replace any existing rule rows before the groups UPDATE so the
-        // invalidation is atomic with the rule change.
-        await tx
-          .update(groupRules)
-          .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId })
-          .where(and(eq(groupRules.groupId, id), isNull(groupRules.deletedAt)));
-        await tx.insert(groupRules).values({
-          createdBy: actorId,
-          updatedBy: actorId,
-          groupId: id,
-          tenantId,
-          rule: rule.rule,
-          ruleDimensions: rule.ruleDimensions,
-          description: rule.description,
-        });
-      }
-
-      return tx
+      // The group first: RLS makes another institute's group match nothing, and the rule rows
+      // below would otherwise be stored against its id (a foreign key does not apply RLS).
+      const updated = await tx
         .update(groups)
         .set({ updatedBy: actorId, ...updates })
         .where(and(eq(groups.id, id), isNull(groups.deletedAt)))
         .returning();
+      if (updated.length === 0 || !rule) return updated;
+
+      await tx
+        .update(groupRules)
+        .set({ deletedAt: new Date(), deletedBy: actorId, updatedBy: actorId })
+        .where(and(eq(groupRules.groupId, id), isNull(groupRules.deletedAt)));
+      await tx.insert(groupRules).values({
+        createdBy: actorId,
+        updatedBy: actorId,
+        groupId: id,
+        tenantId,
+        rule: rule.rule,
+        ruleDimensions: rule.ruleDimensions,
+        description: rule.description,
+      });
+      return updated;
     });
     return rows.length === 0 ? null : (rows[0] as GroupRecord);
   }
