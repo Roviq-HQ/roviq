@@ -5,6 +5,7 @@ import {
   ExaminationGradingService,
   type GradeBandInput,
 } from './examination-grading.service';
+import { assertExamRefs } from './examination-refs';
 import { ExaminationRepository } from './repositories/examination.repository';
 import type {
   CoScholasticAssessmentRecord,
@@ -131,7 +132,42 @@ export class ExaminationMarksService {
         );
       }
     }
+    // Every row before the first write: a mark for a student outside the paper's section, or
+    // of another institute, must not be stored and must not let earlier rows through.
+    const sectionBySchedule = new Map(schedules.map((s) => [s.id, s.sectionId]));
+    await this.assertStudentsOnRoster(
+      exam.academicYearId,
+      marks.map((m) => ({
+        sectionId: sectionBySchedule.get(m.examScheduleId),
+        studentId: m.studentId,
+      })),
+    );
     return this.repo.upsertMarks(marks);
+  }
+
+  /** Each student must be enrolled in the section their row is for, in the exam's year. */
+  private async assertStudentsOnRoster(
+    academicYearId: string,
+    rows: { sectionId: string | undefined; studentId: string }[],
+  ): Promise<void> {
+    const rosters = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!row.sectionId) {
+        throw new BusinessException(ErrorCode.EXAM_SCHEDULE_NOT_FOUND, 'Datesheet row not found');
+      }
+      let roster = rosters.get(row.sectionId);
+      if (!roster) {
+        const students = await this.repo.listSectionRoster(row.sectionId, academicYearId);
+        roster = new Set(students.map((student) => student.membershipId));
+        rosters.set(row.sectionId, roster);
+      }
+      if (!roster.has(row.studentId)) {
+        throw new BusinessException(
+          ErrorCode.STUDENT_NOT_FOUND,
+          'Student is not in the section of this paper',
+        );
+      }
+    }
   }
 
   /**
@@ -221,14 +257,49 @@ export class ExaminationMarksService {
   }
 
   /** Bulk-enter NEP topic-wise competency assessments. */
-  upsertTopicAssessments(data: UpsertTopicAssessmentData[]): Promise<ExamTopicAssessmentRecord[]> {
+  async upsertTopicAssessments(
+    data: UpsertTopicAssessmentData[],
+  ): Promise<ExamTopicAssessmentRecord[]> {
+    await assertExamRefs(this.repo, {
+      scheduleIds: data.map((row) => row.examScheduleId),
+      subjectTopicIds: data.map((row) => row.subjectTopicId),
+    });
+    // Rosters per paper: the section of the schedule, in the year of its exam.
+    const yearBySchedule = new Map<string, { sectionId: string; academicYearId: string }>();
+    for (const scheduleId of new Set(data.map((row) => row.examScheduleId))) {
+      const schedule = await this.repo.findScheduleById(scheduleId);
+      const exam = schedule ? await this.repo.findExamById(schedule.examId) : null;
+      if (!schedule || !exam) {
+        throw new BusinessException(ErrorCode.EXAM_SCHEDULE_NOT_FOUND, 'Datesheet row not found');
+      }
+      yearBySchedule.set(scheduleId, {
+        sectionId: schedule.sectionId,
+        academicYearId: exam.academicYearId,
+      });
+    }
+    const byYear = new Map<string, { sectionId: string; studentId: string }[]>();
+    for (const row of data) {
+      const paper = yearBySchedule.get(row.examScheduleId);
+      if (!paper) continue;
+      const rows = byYear.get(paper.academicYearId) ?? [];
+      rows.push({ sectionId: paper.sectionId, studentId: row.studentId });
+      byYear.set(paper.academicYearId, rows);
+    }
+    for (const [academicYearId, rows] of byYear) {
+      await this.assertStudentsOnRoster(academicYearId, rows);
+    }
     return this.repo.upsertTopicAssessments(data);
   }
 
   /** Bulk-enter co-scholastic grades for a term. */
-  upsertCoScholasticAssessments(
+  async upsertCoScholasticAssessments(
     data: UpsertCoScholasticAssessmentData[],
   ): Promise<CoScholasticAssessmentRecord[]> {
+    await assertExamRefs(this.repo, {
+      coScholasticAreaIds: data.map((row) => row.coScholasticAreaId),
+      examTermIds: data.map((row) => row.examTermId),
+      studentIds: data.map((row) => row.studentId),
+    });
     return this.repo.upsertCoScholasticAssessments(data);
   }
 

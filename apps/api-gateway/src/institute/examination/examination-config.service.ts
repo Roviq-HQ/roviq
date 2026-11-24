@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode, type GradingSchemeKind } from '@roviq/common-types';
 import { ExaminationGradingService, type GradeBandInput } from './examination-grading.service';
+import { assertExamRefs } from './examination-refs';
 import { ExaminationRepository } from './repositories/examination.repository';
 import type {
   CoScholasticAreaRecord,
@@ -82,7 +83,8 @@ export class ExaminationConfigService {
 
   // ── Exam terms ────────────────────────────────────────────────────────────
 
-  createExamTerm(data: CreateExamTermData): Promise<ExamTermRecord> {
+  async createExamTerm(data: CreateExamTermData): Promise<ExamTermRecord> {
+    await assertExamRefs(this.repo, { academicYearId: data.academicYearId });
     return this.repo.createExamTerm(data);
   }
 
@@ -107,7 +109,11 @@ export class ExaminationConfigService {
 
   // ── NEP subject topics ──────────────────────────────────────────────────────
 
-  createSubjectTopic(data: CreateSubjectTopicData): Promise<SubjectTopicRecord> {
+  async createSubjectTopic(data: CreateSubjectTopicData): Promise<SubjectTopicRecord> {
+    await assertExamRefs(this.repo, {
+      subjectIds: [data.subjectId],
+      standardIds: [data.standardId],
+    });
     return this.repo.createSubjectTopic(data);
   }
 
@@ -121,7 +127,8 @@ export class ExaminationConfigService {
 
   // ── Co-scholastic areas ──────────────────────────────────────────────────────
 
-  createCoScholasticArea(data: CreateCoScholasticAreaData): Promise<CoScholasticAreaRecord> {
+  async createCoScholasticArea(data: CreateCoScholasticAreaData): Promise<CoScholasticAreaRecord> {
+    await assertExamRefs(this.repo, { gradingSchemeIds: [data.gradingSchemeId] });
     return this.repo.createCoScholasticArea(data);
   }
 

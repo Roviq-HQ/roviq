@@ -5,6 +5,7 @@ import {
   EXAM_STATE_MACHINE,
   type ExamStatus,
 } from '@roviq/common-types';
+import { assertExamRefs } from './examination-refs';
 import { ExaminationRepository } from './repositories/examination.repository';
 import type {
   CreateExamData,
@@ -24,7 +25,12 @@ export class ExaminationService {
 
   // ── Exam master ──────────────────────────────────────────────────────────
 
-  createExam(data: CreateExamData): Promise<ExamRecord> {
+  async createExam(data: CreateExamData): Promise<ExamRecord> {
+    await assertExamRefs(this.repo, {
+      academicYearId: data.academicYearId,
+      examTermIds: [data.examTermId],
+      gradingSchemeIds: [data.gradingSchemeId],
+    });
     return this.repo.createExam(data);
   }
 
@@ -38,7 +44,13 @@ export class ExaminationService {
     return this.repo.listExams(query);
   }
 
-  updateExam(id: string, data: UpdateExamData): Promise<ExamRecord> {
+  async updateExam(id: string, data: UpdateExamData): Promise<ExamRecord> {
+    // The exam first, so a missing exam is the answer whatever else was sent.
+    await this.getExam(id);
+    await assertExamRefs(this.repo, {
+      examTermIds: [data.examTermId],
+      gradingSchemeIds: [data.gradingSchemeId],
+    });
     return this.repo.updateExam(id, data);
   }
 
@@ -86,6 +98,12 @@ export class ExaminationService {
   // ── Datesheet (schedules) ────────────────────────────────────────────────
 
   async addSchedule(data: CreateExamScheduleData): Promise<ExamScheduleRecord> {
+    await assertExamRefs(this.repo, {
+      examIds: [data.examId],
+      sectionIds: [data.sectionId],
+      subjectIds: [data.subjectId],
+      membershipIds: [data.invigilatorId],
+    });
     await this.assertNoClash(
       data.examId,
       data.sectionId,
@@ -107,6 +125,7 @@ export class ExaminationService {
     const current = await this.repo.findScheduleById(id);
     if (!current)
       throw new BusinessException(ErrorCode.EXAM_NOT_FOUND, `Datesheet row ${id} not found`);
+    await assertExamRefs(this.repo, { membershipIds: [data.invigilatorId] });
     // Resolve effective values: partial update keeps current fields when omitted.
     const examDate = data.examDate !== undefined ? data.examDate : current.examDate;
     const startTime = data.startTime !== undefined ? data.startTime : current.startTime;
