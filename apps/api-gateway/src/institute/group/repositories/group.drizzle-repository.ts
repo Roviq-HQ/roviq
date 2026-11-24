@@ -11,10 +11,8 @@ import {
   groups,
   groupsLive,
   membershipsLive,
-  mkAdminCtx,
   mkInstituteCtx,
   usersLive,
-  withAdmin,
   withTenant,
 } from '@roviq/database';
 import { groupRuleToDrizzleSql, type JsonLogicRule } from '@roviq/groups';
@@ -405,9 +403,8 @@ export class GroupDrizzleRepository extends GroupRepository {
     });
   }
 
-  // `users` is a platform table with no institute policy, hence the admin role.
-  async findUserNames(userIds: string[]): Promise<UserNameRow[]> {
-    return withAdmin(this.db, mkAdminCtx(ORIGIN), async (tx) => {
+  async findUserNames(tenantId: string, userIds: string[]): Promise<UserNameRow[]> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
       return tx
         .select({ id: usersLive.id, username: usersLive.username, email: usersLive.email })
         .from(usersLive)

@@ -8,7 +8,7 @@ import {
   refreshTokens,
   refreshTokensLive,
   rolesLive,
-  usersLive,
+  users,
   withAdmin,
 } from '@roviq/database';
 import { and, eq, gt, isNull, ne } from 'drizzle-orm';
@@ -90,14 +90,14 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           userAgent: refreshTokensLive.userAgent,
           lastUsedAt: refreshTokensLive.lastUsedAt,
           user: {
-            id: usersLive.id,
-            username: usersLive.username,
-            email: usersLive.email,
-            status: usersLive.status,
-            passwordChangedAt: usersLive.passwordChangedAt,
-            mustChangePassword: usersLive.mustChangePassword,
-            emailVerifiedAt: usersLive.emailVerifiedAt,
-            tokenVersion: usersLive.tokenVersion,
+            id: users.id,
+            username: users.username,
+            email: users.email,
+            status: users.status,
+            passwordChangedAt: users.passwordChangedAt,
+            mustChangePassword: users.mustChangePassword,
+            emailVerifiedAt: users.emailVerifiedAt,
+            tokenVersion: users.tokenVersion,
           },
           membershipId: membershipsLive.id,
           membershipTenantId: membershipsLive.tenantId,
@@ -114,7 +114,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           instituteResellerId: institutesLive.resellerId,
         })
         .from(refreshTokensLive)
-        .innerJoin(usersLive, eq(refreshTokensLive.userId, usersLive.id))
+        .innerJoin(users, and(eq(refreshTokensLive.userId, users.id), isNull(users.deletedAt))) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
         .leftJoin(membershipsLive, eq(refreshTokensLive.membershipId, membershipsLive.id))
         .leftJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
         .leftJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))
@@ -201,14 +201,14 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           userAgent: refreshTokensLive.userAgent,
           lastUsedAt: refreshTokensLive.lastUsedAt,
           user: {
-            id: usersLive.id,
-            username: usersLive.username,
-            email: usersLive.email,
-            status: usersLive.status,
-            passwordChangedAt: usersLive.passwordChangedAt,
-            mustChangePassword: usersLive.mustChangePassword,
-            emailVerifiedAt: usersLive.emailVerifiedAt,
-            tokenVersion: usersLive.tokenVersion,
+            id: users.id,
+            username: users.username,
+            email: users.email,
+            status: users.status,
+            passwordChangedAt: users.passwordChangedAt,
+            mustChangePassword: users.mustChangePassword,
+            emailVerifiedAt: users.emailVerifiedAt,
+            tokenVersion: users.tokenVersion,
           },
           membershipId: membershipsLive.id,
           membershipTenantId: membershipsLive.tenantId,
@@ -222,7 +222,7 @@ export class RefreshTokenDrizzleRepository extends RefreshTokenRepository {
           instituteResellerId: institutesLive.resellerId,
         })
         .from(refreshTokensLive)
-        .innerJoin(usersLive, eq(refreshTokensLive.userId, usersLive.id))
+        .innerJoin(users, and(eq(refreshTokensLive.userId, users.id), isNull(users.deletedAt))) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
         .leftJoin(membershipsLive, eq(refreshTokensLive.membershipId, membershipsLive.id))
         .leftJoin(rolesLive, eq(membershipsLive.roleId, rolesLive.id))
         .leftJoin(institutesLive, eq(membershipsLive.tenantId, institutesLive.id))

@@ -97,8 +97,6 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the tenant id in the verified token.',
   'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.revokeMembership':
     'Revokes the membership id read from a bot profile fetched under tenant RLS. Foreign-id test: bot-api-key.integration.spec.ts.',
-  'apps/api-gateway/src/institute/group/repositories/group.drizzle-repository.ts#GroupDrizzleRepository.findUserNames':
-    'Reads usernames for user ids taken from membership rows fetched under tenant RLS. Foreign-id test: group-crud.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.createDocument':
     'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. Foreign-id test: student-document-upload.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.removeDocument':

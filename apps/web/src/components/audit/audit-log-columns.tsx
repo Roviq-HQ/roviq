@@ -10,6 +10,7 @@ import {
   type AuditScope,
   auditEntityHref,
   getImpersonatorScope,
+  outsideActorScope,
   TIER_BADGE_CLASS,
 } from './audit-utils';
 
@@ -81,10 +82,15 @@ export function createAuditLogColumns({
       header: t('columns.actor'),
       cell: ({ row }) => {
         const log = row.original;
-        const actor = log.actorName ?? log.actorId.slice(0, 8);
-        // On an institute's own log, mark what the platform or its reseller did to it.
+        const unnamed = outsideActorScope(log, scope);
+        const actor =
+          log.actorName ?? (unnamed ? t(`actorScope.${unnamed}`) : log.actorId.slice(0, 8));
+        // On an institute's own log, mark what the platform or its reseller did to it. An
+        // unnamed outsider already reads as its side, so the badge would only repeat it.
         const outside =
-          scope === 'institute' && (log.scope === 'platform' || log.scope === 'reseller')
+          !unnamed &&
+          scope === 'institute' &&
+          (log.scope === 'platform' || log.scope === 'reseller')
             ? log.scope
             : null;
         return (

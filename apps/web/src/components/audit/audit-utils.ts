@@ -36,6 +36,18 @@ export type AuditLogRow = Pick<
 
 export type AuditScope = 'admin' | 'reseller' | 'institute';
 
+/**
+ * Who a row's actor is, for a portal that cannot read that person's name: an institute or a
+ * reseller sees only its own people, so a platform or reseller actor shows as its side.
+ */
+export function outsideActorScope(
+  log: Pick<AuditLogRow, 'actorName' | 'scope'>,
+  viewer: AuditScope,
+): 'platform' | 'reseller' | null {
+  if (log.actorName || viewer === 'admin') return null;
+  return log.scope === 'platform' || log.scope === 'reseller' ? log.scope : null;
+}
+
 export const ACTION_TYPES = [
   'CREATE',
   'UPDATE',

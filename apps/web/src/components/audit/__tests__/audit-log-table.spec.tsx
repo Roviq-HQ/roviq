@@ -11,6 +11,8 @@ import type { AuditLogRow } from '../audit-utils';
 const { auditLogs } = testIds;
 
 const STUDENT_ID = '019a0000-0000-7000-8000-0000000000aa';
+// A prefix no other id of the fixture shares, so the shortened id is found only as the actor.
+const OUTSIDER_ID = '7c1e0000-0000-7000-8000-0000000000bb';
 
 function makeLog(overrides: Partial<AuditLogRow> = {}): AuditLogRow {
   return {
@@ -149,6 +151,34 @@ describe('AuditLogTable', () => {
     expect(
       screen.queryByTestId(testIds.auditLogs.outsideActorBadge(own.id)),
     ).not.toBeInTheDocument();
+  });
+
+  it('names an unnamed platform actor by its side, without repeating the badge', () => {
+    const log = makeLog({ scope: 'platform', actorName: null, actorId: OUTSIDER_ID });
+    renderTable({ logs: [log] });
+
+    expect(screen.getByText('Roviq platform')).toBeInTheDocument();
+    expect(screen.queryByText(OUTSIDER_ID.slice(0, 8))).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(testIds.auditLogs.outsideActorBadge(log.id)),
+    ).not.toBeInTheDocument();
+  });
+
+  it('names an unnamed reseller actor by its side in a reseller log too, in Hindi', () => {
+    renderTable(
+      { scope: 'reseller', logs: [makeLog({ scope: 'reseller', actorName: null })] },
+      'hi',
+    );
+
+    expect(screen.getByText('रीसेलर')).toBeInTheDocument();
+  });
+
+  it('keeps the id for an unnamed actor in the platform log', () => {
+    const log = makeLog({ scope: 'platform', actorName: null, actorId: OUTSIDER_ID });
+    renderTable({ scope: 'admin', logs: [log] });
+
+    expect(screen.getByText(OUTSIDER_ID.slice(0, 8))).toBeInTheDocument();
+    expect(screen.queryByText('Roviq platform')).not.toBeInTheDocument();
   });
 
   it('translates the impersonation badge', () => {

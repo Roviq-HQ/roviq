@@ -44,16 +44,27 @@ export const users = pgTable(
     check('users_preferred_locale_check', sql`${table.preferredLocale} IN ('en', 'hi')`),
     uniqueIndex('users_email_key').using('btree', table.email.asc().nullsLast()),
     uniqueIndex('users_username_key').using('btree', table.username.asc().nullsLast()),
-    // All roles can SELECT users
+    // An institute reads its members; a reseller reads its institutes' members and its team.
+    // password_hash and token_version are not granted to either role (column grants, ROV-279).
     pgPolicy('users_app_select', {
       for: 'select',
       to: roviqApp,
-      using: sql`true`,
+      using: sql`id IN (
+        SELECT m.user_id FROM memberships m
+        WHERE m.tenant_id = current_setting('app.current_tenant_id', true)::uuid
+      )`,
     }),
     pgPolicy('users_reseller_select', {
       for: 'select',
       to: roviqReseller,
-      using: sql`true`,
+      using: sql`id IN (
+        SELECT m.user_id FROM memberships m
+        JOIN institutes i ON i.id = m.tenant_id
+        WHERE i.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+      ) OR id IN (
+        SELECT rm.user_id FROM reseller_memberships rm
+        WHERE rm.reseller_id = current_setting('app.current_reseller_id', true)::uuid
+      )`,
     }),
     // Only admin can INSERT/UPDATE/DELETE
     pgPolicy('users_admin_all', {

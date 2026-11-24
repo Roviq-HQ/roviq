@@ -28,9 +28,8 @@ const SKIP_BASENAMES = new Set([
   'rls-policies.ts',
 ]);
 
-// Platform-level tables still without RLS. roviq_app holds full GRANTs on them, so only
-// application code isolates tenants here. ROV-279 removes these exemptions.
-export const RLS_EXEMPT_BASENAMES = new Set(['auth-providers.ts', 'phone-numbers.ts']);
+// Tables allowed without RLS. Empty: adding one needs a security review first.
+export const RLS_EXEMPT_BASENAMES = new Set<string>();
 
 const RLS_INDICATORS = [
   'tenantPolicies(',

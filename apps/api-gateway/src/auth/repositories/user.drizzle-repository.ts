@@ -7,20 +7,20 @@ import {
   usersLive,
   withAdmin,
 } from '@roviq/database';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { UserRecord } from './types';
 import { UserRepository } from './user.repository';
 
 const userSelect = {
-  id: usersLive.id,
-  username: usersLive.username,
-  email: usersLive.email,
-  passwordHash: usersLive.passwordHash,
-  status: usersLive.status,
-  passwordChangedAt: usersLive.passwordChangedAt,
-  mustChangePassword: usersLive.mustChangePassword,
-  emailVerifiedAt: usersLive.emailVerifiedAt,
-  tokenVersion: usersLive.tokenVersion,
+  id: users.id,
+  username: users.username,
+  email: users.email,
+  passwordHash: users.passwordHash,
+  status: users.status,
+  passwordChangedAt: users.passwordChangedAt,
+  mustChangePassword: users.mustChangePassword,
+  emailVerifiedAt: users.emailVerifiedAt,
+  tokenVersion: users.tokenVersion,
 } as const;
 
 @Injectable()
@@ -51,14 +51,22 @@ export class UserDrizzleRepository extends UserRepository {
 
   async findById(id: string): Promise<UserRecord | null> {
     const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
-      tx.select(userSelect).from(usersLive).where(eq(usersLive.id, id)).limit(1),
+      tx
+        .select(userSelect)
+        .from(users) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
+        .where(and(eq(users.id, id), isNull(users.deletedAt)))
+        .limit(1),
     );
     return user ?? null;
   }
 
   async findByUsername(username: string): Promise<UserRecord | null> {
     const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
-      tx.select(userSelect).from(usersLive).where(eq(usersLive.username, username)).limit(1),
+      tx
+        .select(userSelect)
+        .from(users) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
+        .where(and(eq(users.username, username), isNull(users.deletedAt)))
+        .limit(1),
     );
     return user ?? null;
   }

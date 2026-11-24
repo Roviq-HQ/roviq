@@ -2,9 +2,9 @@ import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
-import { DRIZZLE_DB, type DrizzleDB, mkAdminCtx, usersLive, withAdmin } from '@roviq/database';
+import { DRIZZLE_DB, type DrizzleDB, mkAdminCtx, users, withAdmin } from '@roviq/database';
 import { REDIS_CLIENT } from '@roviq/redis';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import { TOKEN_VERSION_CACHE_TTL_SECONDS, tokenVersionKeys } from '../token-version-cache';
 import { readRequestTokenClaims } from './request-token-claims';
@@ -52,9 +52,9 @@ export class TokenVersionGuard implements CanActivate {
   private async loadAndCache(userId: string, cacheKey: string): Promise<number> {
     const [row] = await withAdmin(this.db, mkAdminCtx('service:token-version-guard'), (tx) =>
       tx
-        .select({ tokenVersion: usersLive.tokenVersion })
-        .from(usersLive)
-        .where(eq(usersLive.id, userId))
+        .select({ tokenVersion: users.tokenVersion })
+        .from(users) // allow-base-read: password_hash and token_version are not on users_live (ROV-279)
+        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
         .limit(1),
     );
     // A token for a user that no longer exists is refused by the resolvers that load the user.

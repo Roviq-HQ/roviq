@@ -69,12 +69,15 @@ test.describe('ROV-185 reseller — team', () => {
     await page.getByTestId(resellerTeam.roleSelect).click();
     await page.getByRole('option', { name: 'Reseller viewer' }).click();
     await page.getByTestId(resellerTeam.roleSubmitBtn).click();
+    // A closing dialog hands focus back and would close a menu opened under it.
+    await expect(page.getByTestId(resellerTeam.roleDialog)).toBeHidden();
     await expect(row).toContainText('Reseller viewer');
 
     await row.getByRole('button').click();
     await page.getByTestId(resellerTeam.actionDeactivate).click();
     await expect(page.getByTestId(resellerTeam.confirmDialog)).toContainText(email);
     await page.getByTestId(resellerTeam.confirmBtn).click();
+    await expect(page.getByTestId(resellerTeam.confirmDialog)).toBeHidden();
     await expect(row).toContainText('Inactive');
 
     await page.getByTestId(resellerTeam.statusFilter).click();

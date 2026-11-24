@@ -248,6 +248,7 @@ describe('LeavesPage', () => {
       {
         id: 'leave-1',
         userId: 'stu-1',
+        applicant: null,
         startDate: '2026-04-10',
         endDate: '2026-04-11',
         type: 'CASUAL',
@@ -261,6 +262,7 @@ describe('LeavesPage', () => {
       {
         id: 'leave-2',
         userId: 'stu-2',
+        applicant: null,
         startDate: '2026-04-12',
         endDate: '2026-04-13',
         type: 'MEDICAL',

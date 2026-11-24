@@ -42,7 +42,7 @@ withAdmin(db, ctx: PlatformContext, async (tx) => { … })
 - Tenant-scoped table: spread `...tenantColumns` (tenant id, timestamps, `created_by` / `updated_by`, soft delete, `version`), an index starting with `tenant_id`, and `...tenantPolicies('table_name')`. Never write policy SQL inline.
 - Any other mutable table: `...entityColumns` and `entityPolicies(...)`.
 - Exempt from audit and soft-delete columns: append-only records (`audit_logs`, `auth_events`, `dlq_messages`, `consent_records`, `impersonation_sessions`, `notification_deliveries`), counters, and EE financial records (status only, never deleted).
-- Every `pgTable` opts into RLS or is on the exempt list (`pnpm check:rls-coverage`).
+- Every `pgTable` opts into RLS (`pnpm check:rls-coverage`); the exempt list is empty and an addition needs a security review.
 - `created_by` / `updated_by` are NOT NULL with no default on purpose: pass the acting user's id, or `SYSTEM_USER_ID` for unattended work.
 - Ids: ``.default(sql`uuidv7()`)``. Never `serial()`, `.defaultRandom()` or `gen_random_uuid()`.
 - Tenant-authored names: `i18nText('name')` (jsonb `{ en, hi }`). Not for emails, usernames, codes or enums.

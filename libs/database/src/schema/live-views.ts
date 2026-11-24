@@ -269,8 +269,30 @@ export const studentProfilesLive = liveView('student_profiles_live').as((qb) =>
 );
 
 // Identity, memberships, personal data and group internals.
+// No password_hash or token_version: institute and reseller roles hold no grant on them, and a
+// view that selects a column needs that grant from every role that reads the view.
 export const usersLive = liveView('users_live').as((qb) =>
-  qb.select().from(users).where(isNull(users.deletedAt)),
+  qb
+    .select({
+      id: users.id,
+      email: users.email,
+      username: users.username,
+      avatarUrl: users.avatarUrl,
+      preferredLocale: users.preferredLocale,
+      status: users.status,
+      passwordChangedAt: users.passwordChangedAt,
+      mustChangePassword: users.mustChangePassword,
+      emailVerifiedAt: users.emailVerifiedAt,
+      createdAt: users.createdAt,
+      createdBy: users.createdBy,
+      updatedAt: users.updatedAt,
+      updatedBy: users.updatedBy,
+      deletedAt: users.deletedAt,
+      deletedBy: users.deletedBy,
+      version: users.version,
+    })
+    .from(users)
+    .where(isNull(users.deletedAt)),
 );
 export const refreshTokensLive = liveView('refresh_tokens_live').as((qb) =>
   qb.select().from(refreshTokens).where(isNull(refreshTokens.deletedAt)),

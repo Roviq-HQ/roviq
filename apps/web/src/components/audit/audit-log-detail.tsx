@@ -22,6 +22,7 @@ import {
   type AuditScope,
   auditEntityHref,
   getImpersonatorScope,
+  outsideActorScope,
 } from './audit-utils';
 import { useAuditLabels } from './use-audit-labels';
 
@@ -189,6 +190,8 @@ export function AuditLogDetail({
   const style = getActionTypeStyle(log.actionType);
   const entityHref = auditEntityHref(scope, log.entityType, log.entityId);
   const sessionId = log.impersonationSessionId;
+  const unnamed = outsideActorScope(log, scope);
+  const actorName = log.actorName ?? (unnamed ? t(`actorScope.${unnamed}`) : null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -254,7 +257,7 @@ export function AuditLogDetail({
                       {t('detail.impersonated')}
                     </span>
                     <ImpersonationBadge
-                      impersonatorName={log.actorName ?? log.actorId.slice(0, 8)}
+                      impersonatorName={actorName ?? log.actorId.slice(0, 8)}
                       actorScope={getImpersonatorScope(log)}
                       userName={log.userName ?? undefined}
                       labels={labels.impersonation}
@@ -284,7 +287,7 @@ export function AuditLogDetail({
             <SectionHeader>{t('detail.sections.identity')}</SectionHeader>
             <div>
               <FieldRow label={t('detail.actorId')} copyValue={log.actorId}>
-                <NameWithId name={log.actorName} id={log.actorId} />
+                <NameWithId name={actorName} id={log.actorId} />
               </FieldRow>
               <FieldRow label={t('detail.userId')} copyValue={log.userId}>
                 <NameWithId name={log.userName} id={log.userId} />

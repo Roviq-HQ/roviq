@@ -169,7 +169,6 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/certificate/exports/awr.export.ts',
   // ROV-296: compliance export generators and activities, run by the export workflow as the institute it names.
   'apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts',
-  // ROV-296: phone_numbers has no institute policy; read as admin only for this institute's people.
   'apps/api-gateway/src/institute/certificate/exports/cbse-candidates.ts',
   'apps/api-gateway/src/institute/certificate/exports/rte-report.export.ts',
   'apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts',
