@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
+import { assertExamRefs } from './examination-refs';
 import { ReportCardGenerationService } from './report-card-generation.service';
 import { ExaminationRepository } from './repositories/examination.repository';
 import type {
@@ -16,11 +17,26 @@ export class ReportCardService {
     private readonly generation: ReportCardGenerationService,
   ) {}
 
-  createReportCard(data: CreateReportCardData): Promise<ReportCardRecord> {
+  async createReportCard(data: CreateReportCardData): Promise<ReportCardRecord> {
+    await assertExamRefs(this.repo, {
+      academicYearId: data.academicYearId,
+      examTermIds: [data.examTermId],
+      gradingSchemeIds: [data.gradingSchemeId],
+    });
     return this.repo.createReportCard(data);
   }
 
-  updateReportCard(id: string, data: Partial<CreateReportCardData>): Promise<ReportCardRecord> {
+  async updateReportCard(
+    id: string,
+    data: Partial<CreateReportCardData>,
+  ): Promise<ReportCardRecord> {
+    // The card first, so a missing card is the answer whatever else was sent.
+    await this.getReportCard(id);
+    await assertExamRefs(this.repo, {
+      academicYearId: data.academicYearId,
+      examTermIds: [data.examTermId],
+      gradingSchemeIds: [data.gradingSchemeId],
+    });
     return this.repo.updateReportCard(id, data);
   }
 

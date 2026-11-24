@@ -71,7 +71,8 @@ export class InstituteBillingResolver {
   async myInvoice(@CurrentUser() user: AuthUser, @Args('id', { type: () => ID }) id: string) {
     assertInstituteWithReseller(user);
     const invoice = await this.invoiceService.getInvoice(user.resellerId, id);
-    if (invoice.tenantId !== user.tenantId) return null;
+    // Same answer as a missing invoice: null would tell a sibling institute's invoice exists.
+    if (invoice.tenantId !== user.tenantId) billingError('INVOICE_NOT_FOUND', 'Invoice not found');
     return invoice;
   }
 

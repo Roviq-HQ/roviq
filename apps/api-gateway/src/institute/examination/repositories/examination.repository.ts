@@ -13,6 +13,8 @@ import type {
   ExamLabelMaps,
   ExamMarkRecord,
   ExamRecord,
+  ExamRefKind,
+  ExamRefs,
   ExamScheduleRecord,
   ExamTermRecord,
   ExamTopicAssessmentRecord,
@@ -41,6 +43,12 @@ import type {
  * state transitions live in the services.
  */
 export abstract class ExaminationRepository {
+  /**
+   * Reads caller-supplied ids under the caller's institute and names the first kind that has a
+   * missing row. The foreign keys of the examination tables accept any institute's row.
+   */
+  abstract findMissingRef(refs: ExamRefs): Promise<ExamRefKind | null>;
+
   // ── Grading schemes + bands ──────────────────────────────────────────────
   abstract createGradingScheme(
     data: CreateGradingSchemeData,

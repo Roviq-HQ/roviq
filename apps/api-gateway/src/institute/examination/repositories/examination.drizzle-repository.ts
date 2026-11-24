@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { ExamStatus, GradingSchemeKind, ReportCardStatus } from '@roviq/common-types';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
+  academicYearsLive,
   attendanceEntriesLive,
   attendanceSessionsLive,
   coScholasticAreas,
@@ -25,6 +26,7 @@ import {
   gradingSchemes,
   gradingSchemesLive,
   i18nDisplay,
+  membershipsLive,
   mkInstituteCtx,
   reportCardInstances,
   reportCardInstancesLive,
@@ -59,6 +61,8 @@ import type {
   ExamLabelMaps,
   ExamMarkRecord,
   ExamRecord,
+  ExamRefKind,
+  ExamRefs,
   ExamScheduleRecord,
   ExamTermRecord,
   ExamTopicAssessmentRecord,
@@ -233,6 +237,67 @@ export class ExaminationDrizzleRepository extends ExaminationRepository {
 
   private ctx() {
     return mkInstituteCtx(this.getTenantId(), 'repository:examination');
+  }
+
+  async findMissingRef(refs: ExamRefs): Promise<ExamRefKind | null> {
+    const year = refs.academicYearId ? [refs.academicYearId] : [];
+    // Each entry: the kind, the ids sent, and the view they must all be found in.
+    const checks = [
+      { kind: 'year', ids: year, table: academicYearsLive, id: academicYearsLive.id },
+      { kind: 'term', ids: refs.examTermIds, table: examTermsLive, id: examTermsLive.id },
+      {
+        kind: 'scheme',
+        ids: refs.gradingSchemeIds,
+        table: gradingSchemesLive,
+        id: gradingSchemesLive.id,
+      },
+      { kind: 'exam', ids: refs.examIds, table: examsLive, id: examsLive.id },
+      { kind: 'section', ids: refs.sectionIds, table: sectionsLive, id: sectionsLive.id },
+      { kind: 'subject', ids: refs.subjectIds, table: subjectsLive, id: subjectsLive.id },
+      { kind: 'standard', ids: refs.standardIds, table: standardsLive, id: standardsLive.id },
+      {
+        kind: 'membership',
+        ids: refs.membershipIds,
+        table: membershipsLive,
+        id: membershipsLive.id,
+      },
+      {
+        kind: 'schedule',
+        ids: refs.scheduleIds,
+        table: examSchedulesLive,
+        id: examSchedulesLive.id,
+      },
+      {
+        kind: 'topic',
+        ids: refs.subjectTopicIds,
+        table: subjectTopicsLive,
+        id: subjectTopicsLive.id,
+      },
+      {
+        kind: 'area',
+        ids: refs.coScholasticAreaIds,
+        table: coScholasticAreasLive,
+        id: coScholasticAreasLive.id,
+      },
+      {
+        kind: 'student',
+        ids: refs.studentIds,
+        table: studentProfilesLive,
+        id: studentProfilesLive.membershipId,
+      },
+    ] as const;
+    return withTenant(this.db, this.ctx(), async (tx) => {
+      for (const check of checks) {
+        const ids = [...new Set((check.ids ?? []).filter((id): id is string => Boolean(id)))];
+        if (ids.length === 0) continue;
+        const rows = await tx
+          .selectDistinct({ id: check.id })
+          .from(check.table)
+          .where(inArray(check.id, ids));
+        if (rows.length !== ids.length) return check.kind;
+      }
+      return null;
+    });
   }
 
   // ── Grading schemes + bands ──────────────────────────────────────────────

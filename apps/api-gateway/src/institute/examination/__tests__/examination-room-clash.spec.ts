@@ -32,6 +32,7 @@ describe('ExaminationService room-clash validation', () => {
 
   beforeEach(() => {
     repo = createMock<ExaminationRepository>({
+      findMissingRef: vi.fn().mockResolvedValue(null),
       // No same-section clash — isolates the room check.
       findSchedulesByExamSection: vi.fn(async () => []),
       createSchedule: vi.fn(async (data) => buildSchedule({ ...data, id: 'new' })),

@@ -383,3 +383,37 @@ export interface AttendanceTally {
   present: number;
   total: number;
 }
+
+type IdList = (string | null | undefined)[];
+
+/** Caller-supplied ids an examination write stores; each is read under the caller's institute. */
+export interface ExamRefs {
+  academicYearId?: string;
+  examTermIds?: IdList;
+  gradingSchemeIds?: IdList;
+  examIds?: IdList;
+  sectionIds?: IdList;
+  subjectIds?: IdList;
+  standardIds?: IdList;
+  /** Memberships of any role (an invigilator). */
+  membershipIds?: IdList;
+  scheduleIds?: IdList;
+  subjectTopicIds?: IdList;
+  coScholasticAreaIds?: IdList;
+  /** Memberships that must belong to a student of the institute. */
+  studentIds?: IdList;
+}
+
+export type ExamRefKind =
+  | 'year'
+  | 'term'
+  | 'scheme'
+  | 'exam'
+  | 'section'
+  | 'subject'
+  | 'standard'
+  | 'membership'
+  | 'schedule'
+  | 'topic'
+  | 'area'
+  | 'student';

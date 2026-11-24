@@ -256,6 +256,11 @@ export class ResellerBillingResolver {
   ) {
     const sub = await this.subscriptionService.getSubscription(rid(user), input.subscriptionId);
     if (!sub) billingError('SUBSCRIPTION_NOT_FOUND', 'Subscription not found');
+    // The invoice is for the institute the subscription belongs to. RLS on invoices checks
+    // only the reseller, so any other tenant id would be billed as given.
+    if (sub.tenantId !== input.tenantId) {
+      billingError('INSTITUTE_NOT_FOUND', 'Institute not found for this subscription');
+    }
     return this.invoiceService.generateInvoice(rid(user), 'RVQ', {
       tenantId: input.tenantId,
       subscriptionId: input.subscriptionId,
