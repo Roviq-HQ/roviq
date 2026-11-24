@@ -389,7 +389,7 @@ A staff member or guardian the institute creates gets a new account and is sent 
 
 - **When**: on `createStaffMember`, on `createGuardian`, and when the admission workflow creates a guardian. Nothing is sent when the workflow links an existing guardian (a sibling's parent found by phone): that person already has a password.
 - **Where**: only to real addresses. A `…@roviq.placeholder` email (`isPlaceholderEmail`) is dropped, so `UserCreatedEvent.email` may be null. A person with neither a real email nor a phone gets nothing.
-- **Message**: with scope `institute` the copy names the institute and the sign-in page, `INSTITUTE_PORTAL_URL` (default `http://localhost:<WEB_PORT>`) plus `/login`. The first institute admin gets the same copy.
+- **Message**: with scope `institute` the copy names the institute and the sign-in page, `INSTITUTE_PORTAL_URL` (default `http://localhost:<WEB_PORT>`) plus `/login`. The first institute admin gets the same copy. A reseller team member or platform user gets the general welcome with their own portal's sign-in page (`RESELLER_PORTAL_URL`, `ADMIN_PORTAL_URL`; `docs/deployment.md` → "Notification delivery").
 - **Resend**: `resendStaffSignInDetails(staffProfileId)` (`update Staff`) and `resendGuardianSignInDetails(guardianProfileId)` (`update Guardian`). The profile is read through its live view under `withTenant`, so another institute's id answers `STAFF_NOT_FOUND` / `GUARDIAN_NOT_FOUND`. Then, in order:
   - no real address → `SIGN_IN_CONTACT_MISSING` (422);
   - the person has set a password → `SIGN_IN_ALREADY_COMPLETED` (409);

@@ -7,7 +7,7 @@ import { TelemetryModule } from '@roviq/telemetry';
 import { TemporalClientModule } from '@roviq/temporal';
 import type Redis from 'ioredis';
 import { type NotificationEnv, validate } from '../config/env.validation';
-import { InstitutePortal } from '../config/institute-portal';
+import { Portals } from '../config/portals';
 import { BillingNotificationController } from '../controllers/billing-notification.controller';
 import { SmsWebhookController } from '../controllers/sms-webhook.controller';
 import { WhatsAppWebhookController } from '../controllers/whatsapp-webhook.controller';
@@ -136,7 +136,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     NotificationDispatcher,
     FlowArrivals,
     RetryWait,
-    InstitutePortal,
+    Portals,
     RecipientResolver,
     WhatsAppWebhookService,
     SmsWebhookService,

@@ -64,8 +64,11 @@ const envSchema = z
     EMAIL_FROM: z.string().optional(),
     FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
 
-    // Public address of the institute portal, named in sign-in details; defaults to localhost:WEB_PORT
+    // Public addresses of the three portals, named in sign-in details. Default to
+    // localhost, reseller.localhost and admin.localhost on WEB_PORT.
     INSTITUTE_PORTAL_URL: z.string().optional(),
+    RESELLER_PORTAL_URL: z.string().optional(),
+    ADMIN_PORTAL_URL: z.string().optional(),
     WEB_PORT: z.string().optional(),
 
     // Delivery canary: unset channels = off. Each listed channel needs its provider and address

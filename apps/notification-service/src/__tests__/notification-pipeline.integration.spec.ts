@@ -43,7 +43,7 @@ import { ApplicationFailure } from '@temporalio/activity';
 import { eq, inArray } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InstitutePortal } from '../config/institute-portal';
+import { Portals } from '../config/portals';
 import type { AdapterErrorCode } from '../delivery/adapters/adapter-errors';
 import type { ChannelAdapter, ChannelMessage } from '../delivery/adapters/channel-adapter';
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
@@ -311,7 +311,7 @@ describe('notification pipeline (integration)', () => {
     users = new UserListener(
       dispatcher,
       recipients,
-      new InstitutePortal(new ConfigService({ INSTITUTE_PORTAL_URL: 'https://app.roviq.test/' })),
+      new Portals(new ConfigService({ INSTITUTE_PORTAL_URL: 'https://app.roviq.test/' })),
     );
   });
 

@@ -483,11 +483,12 @@ describe('secret types', () => {
     });
   });
 
-  it('should word the welcome email with the username and temporary password', () => {
+  it('should word the welcome email with the username, temporary password and sign-in page', () => {
     const params = {
       username: 'priya.verma',
       firstName: 'Priya',
       tempPassword: 'Tmp-9xQ2',
+      signInUrl: 'https://reseller.roviq.com/login',
       institute: null,
     };
 
@@ -500,7 +501,7 @@ describe('secret types', () => {
         'Username: priya.verma',
         'Temporary password: Tmp-9xQ2',
         '',
-        'Log in and change your password on first sign-in.',
+        'Sign in at https://reseller.roviq.com/login. You will be asked to choose your own password the first time.',
       ].join('\n'),
     });
     expect(composeSecret('USER_WELCOME', params, 'SMS', 'hi')).toEqual({
@@ -514,10 +515,8 @@ describe('secret types', () => {
       username: 'staff-0191-ab12',
       firstName: 'Kiran',
       tempPassword: 'Tmp-7kP4',
-      institute: {
-        name: { en: 'Sunrise Public', hi: 'सनराइज़ पब्लिक' },
-        signInUrl: 'https://app.roviq.com/login',
-      },
+      signInUrl: 'https://app.roviq.com/login',
+      institute: { name: { en: 'Sunrise Public', hi: 'सनराइज़ पब्लिक' } },
     };
 
     expect(composeSecret('USER_WELCOME', params, 'EMAIL', 'en')).toEqual({
@@ -553,7 +552,7 @@ describe('secret types', () => {
     expect(
       composeSecret(
         'USER_WELCOME',
-        { ...params, institute: { ...params.institute, name: { en: 'Sunrise Public' } } },
+        { ...params, institute: { name: { en: 'Sunrise Public' } } },
         'SMS',
         'hi',
       ).body,

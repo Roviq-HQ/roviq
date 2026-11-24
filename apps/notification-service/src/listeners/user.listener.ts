@@ -2,7 +2,7 @@ import { Controller, Logger } from '@nestjs/common';
 import { Ctx, EventPattern, Payload } from '@nestjs/microservices';
 import { JetStreamContext } from '@roviq/nats-jetstream';
 import { NOTIFICATION_SUBJECTS, type UserCreatedEvent } from '@roviq/notifications';
-import { InstitutePortal } from '../config/institute-portal';
+import { Portals } from '../config/portals';
 import { RecipientReadRepository } from '../repositories/recipient-read.repository';
 import type { Audience } from '../repositories/types';
 import { NotificationDispatcher } from '../services/notification-dispatcher.service';
@@ -26,7 +26,7 @@ export class UserListener {
   constructor(
     private readonly dispatcher: NotificationDispatcher,
     private readonly recipients: RecipientReadRepository,
-    private readonly portal: InstitutePortal,
+    private readonly portals: Portals,
   ) {}
 
   @EventPattern(NOTIFICATION_SUBJECTS.USER_CREATED, {
@@ -46,6 +46,7 @@ export class UserListener {
           username: event.username,
           firstName: event.firstName,
           tempPassword: event.tempPassword,
+          signInUrl: this.portals.signInUrl(event.scope),
           institute: await this.instituteOf(event),
         },
       },
@@ -58,6 +59,6 @@ export class UserListener {
   private async instituteOf(event: UserCreatedEvent): Promise<UserWelcomeParams['institute']> {
     if (event.scope !== 'institute' || !event.tenantId) return null;
     const name = await this.recipients.findInstituteName(event.tenantId);
-    return name ? { name, signInUrl: this.portal.signInUrl() } : null;
+    return name ? { name } : null;
   }
 }
