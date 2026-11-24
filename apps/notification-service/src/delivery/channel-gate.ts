@@ -1,5 +1,8 @@
 import { NotificationSkipReason } from '@roviq/common-types';
 
+/** Why a message waits: a value of `notification_deliveries.skip_reason` on a DEFERRED row. */
+export type DeferReason = 'quiet_hours' | 'sender_cap';
+
 export type SenderCapacity = 'ok' | 'over' | { deferUntil: Date };
 
 export interface ChannelGateChecks {
@@ -22,8 +25,8 @@ export interface ChannelGateChecks {
 export type ChannelGateResult =
   | { open: true; addresses: readonly string[] }
   | { open: false; reason: NotificationSkipReason }
-  /** Not refused: try again at `deferUntil`. Nothing is recorded for a deferral. */
-  | { open: false; deferUntil: Date };
+  /** Not refused: try again at `deferUntil`. */
+  | { open: false; deferUntil: Date; deferReason: DeferReason };
 
 /**
  * The single gate both send paths use. Checks run in this order and stop at the first "no":
@@ -43,9 +46,10 @@ export async function evaluateChannelGate(checks: ChannelGateChecks): Promise<Ch
   if (checks.optedOut && (await checks.optedOut(addresses)))
     return { open: false, reason: NotificationSkipReason.OPTED_OUT };
   const quietUntil = checks.quietUntil ? await checks.quietUntil() : null;
-  if (quietUntil) return { open: false, deferUntil: quietUntil };
+  if (quietUntil) return { open: false, deferUntil: quietUntil, deferReason: 'quiet_hours' };
   const capacity = checks.capacity ? await checks.capacity() : 'ok';
   if (capacity === 'over') return { open: false, reason: NotificationSkipReason.SENDER_CAP };
-  if (capacity !== 'ok') return { open: false, deferUntil: capacity.deferUntil };
+  if (capacity !== 'ok')
+    return { open: false, deferUntil: capacity.deferUntil, deferReason: 'sender_cap' };
   return { open: true, addresses };
 }

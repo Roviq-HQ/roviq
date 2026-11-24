@@ -17,6 +17,7 @@ import { InstituteGroupModule } from './institute-group/institute-group.module';
 import { LeaveModule } from './leave/leave.module';
 import { InstituteModule } from './management/institute.module';
 import { NotificationConfigModule } from './notification-config/notification-config.module';
+import { NotificationDeliveryModule } from './notification-delivery/notification-delivery.module';
 import { ProfilePhotoModule } from './profile-photo/profile-photo.module';
 import { SectionModule } from './section/section.module';
 import { StaffModule } from './staff/staff.module';
@@ -45,6 +46,7 @@ import { ProfileModule } from './user/profile.module';
     InstituteGroupModule,
     LeaveModule,
     NotificationConfigModule,
+    NotificationDeliveryModule,
     ProfileModule,
     ProfilePhotoModule,
     SectionModule,

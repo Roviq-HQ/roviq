@@ -7,12 +7,9 @@ import {
 } from '@roviq/common-types';
 import { DateTimeScalar } from '@roviq/nestjs-graphql';
 import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import '../../../common/notification-channel.enum';
 import { createConnectionType } from '../../../common/pagination/relay-pagination.model';
 
-registerEnumType(NotificationChannel, {
-  name: 'NotificationChannel',
-  description: 'Channel outside the app a notification was sent on.',
-});
 registerEnumType(NotificationDeliveryStatus, {
   name: 'NotificationDeliveryStatus',
   description: 'Outcome of one delivery attempt.',

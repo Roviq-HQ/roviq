@@ -5,6 +5,7 @@
  * hook. Three cases cover the pre-pick empty state, the populated table + summary
  * strip, and the row-level testIds.
  */
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
@@ -143,5 +144,39 @@ describe('AttendanceHistoryPage', () => {
     // Row key scope-check: the cells sit inside the history table.
     const table = screen.getByTestId('history-table');
     expect(within(table).getByTestId(`history-row-${rowKey}-date`)).toBeInTheDocument();
+  });
+
+  describe('"Who was notified" link', () => {
+    const row: HistoryRowFixture = {
+      sessionId: 'sess-9',
+      sectionId: 'sec-1',
+      date: '2026-04-11',
+      period: null,
+      subjectId: null,
+      status: 'ABSENT',
+      remarks: null,
+      markedAt: '2026-04-11T09:00:00Z',
+    };
+    const link = testIds.notificationDelivery.sessionLink('sess-9-2026-04-11-day');
+
+    it('opens the delivery page filtered to the row session', () => {
+      QUERY_STATE_OVERRIDES.studentId = 'stu-1';
+      hookState.rows = [row];
+      renderWithProviders(<AttendanceHistoryPage />);
+      expect(screen.getByTestId(link)).toHaveAttribute(
+        'href',
+        expect.stringContaining('/institute/settings/notifications/delivery?sessionId=sess-9'),
+      );
+    });
+
+    it('is not shown without the delivery read ability', () => {
+      QUERY_STATE_OVERRIDES.studentId = 'stu-1';
+      hookState.rows = [row];
+      renderWithProviders(<AttendanceHistoryPage />, {
+        abilityRules: [{ action: 'read', subject: 'Attendance' }],
+      });
+      expect(screen.getByTestId('history-table')).toBeInTheDocument();
+      expect(screen.queryByTestId(link)).not.toBeInTheDocument();
+    });
   });
 });

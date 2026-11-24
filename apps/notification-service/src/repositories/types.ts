@@ -117,6 +117,11 @@ export interface DeliveryRow {
   flowId: string | null;
 }
 
+/** A message held for later (quiet hours, a full sender). */
+export interface DeferralRow extends Omit<DeliveryRow, 'outcome'> {
+  reason: 'quiet_hours' | 'sender_cap';
+}
+
 /** Who an inbound event is about: a phone number, the provider's user id, or both. */
 export interface InboundPerson {
   phone: string | null;
@@ -128,11 +133,10 @@ export interface ReceiptInput {
   /** Unique per report: the message id and the reported status. */
   eventId: string;
   providerMessageId: string;
-  status: 'DELIVERED' | 'FAILED';
+  /** READ appends a READ row, and a DELIVERED row first when no delivery report came before it. */
+  status: 'DELIVERED' | 'READ' | 'FAILED';
   /** Set for FAILED. */
   errorCode: string | null;
-  /** A read report: append DELIVERED only when no delivery report came before it. */
-  onlyIfNotDelivered: boolean;
   person: InboundPerson;
 }
 

@@ -590,19 +590,27 @@ describe('WhatsApp delivery and webhook (integration)', () => {
   });
 
   describe('quiet hours', () => {
-    it('should hold a non-critical message at night, write nothing, and send it once they end', async () => {
+    it('should hold a non-critical message at night as one DEFERRED row, and send it once they end', async () => {
       await addSender({ scope: 'platform' });
+      const flowId = `notification-flow:quiet-${provider.run}`;
       clock.at = NIGHT;
 
-      await expect(send(instituteA, userA)).resolves.toEqual({
+      await expect(send(instituteA, userA, approval, true, flowId)).resolves.toEqual({
+        deferUntil: NEXT_MORNING.toISOString(),
+      });
+      // The workflow retries a deferral; a second one of the same flow adds no row.
+      await expect(send(instituteA, userA, approval, true, flowId)).resolves.toEqual({
         deferUntil: NEXT_MORNING.toISOString(),
       });
       expect(provider.requests).toHaveLength(0);
-      expect(await deliveries(userA.userId)).toEqual([]);
+      expect(
+        (await deliveries(userA.userId)).map((d) => [d.status, d.skip_reason, d.provider]),
+      ).toEqual([['DEFERRED', 'quiet_hours', null]]);
 
       clock.at = NEXT_MORNING;
-      await expect(send(instituteA, userA)).resolves.toBe('SENT');
+      await expect(send(instituteA, userA, approval, true, flowId)).resolves.toBe('SENT');
       expect(provider.requests).toHaveLength(1);
+      expect((await deliveries(userA.userId)).map((d) => d.status)).toEqual(['DEFERRED', 'SENT']);
     });
 
     it('should send a critical message at night', async () => {
@@ -626,9 +634,10 @@ describe('WhatsApp delivery and webhook (integration)', () => {
 
       expect(waiting).toEqual({ deferUntil: new Date(NOON.getTime() + 3_600_000).toISOString() });
       expect(provider.requests).toHaveLength(2);
-      expect((await deliveries(userA.userId)).map((d) => d.skip_reason ?? d.status)).toEqual([
-        'SENT',
-        'sender_cap',
+      expect((await deliveries(userA.userId)).map((d) => [d.status, d.skip_reason])).toEqual([
+        ['SENT', null],
+        ['SKIPPED', 'sender_cap'],
+        ['DEFERRED', 'sender_cap'],
       ]);
 
       // On the workflow's last try the wait ends as a recorded skip, never as a silent loss.
@@ -699,26 +708,29 @@ describe('WhatsApp delivery and webhook (integration)', () => {
   });
 
   describe('webhook: delivery reports', () => {
-    it('should append one DELIVERED row for a report, once however often it is repeated', async () => {
+    it('should append one DELIVERED and one READ row, once however often each is repeated', async () => {
       const platform = await addSender({ scope: 'platform' });
       await send(instituteA, userA);
       const messageId = provider.lastMessageId();
       const delivered = report(platform.numberId, messageId, 'delivered', phoneA.full);
+      const read = report(platform.numberId, messageId, 'read', phoneA.full);
 
       await expect(post(delivered)).resolves.toBe('ok');
       await post(delivered);
-      await post(report(platform.numberId, messageId, 'read', phoneA.full));
+      await post(read);
+      await post(read);
       await post(report(platform.numberId, messageId, 'sent', phoneA.full));
 
+      const copied = {
+        provider_message_id: messageId,
+        sender_id: platform.id,
+        tenant_id: instituteA.tenantId,
+        template_category: 'UTILITY',
+      };
       expect(await deliveries(userA.userId)).toMatchObject([
         { status: 'SENT', provider_message_id: messageId },
-        {
-          status: 'DELIVERED',
-          provider_message_id: messageId,
-          sender_id: platform.id,
-          tenant_id: instituteA.tenantId,
-          template_category: 'UTILITY',
-        },
+        { status: 'DELIVERED', ...copied },
+        { status: 'READ', ...copied },
       ]);
     });
 
@@ -740,6 +752,7 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       expect(rows).toEqual([
         { status: 'SENT', flow_id: flowId },
         { status: 'DELIVERED', flow_id: flowId },
+        { status: 'READ', flow_id: flowId },
       ]);
       expect(temporal.signal.mock.calls).toEqual([
         [flowId, 'flowArrival', [{ recipientUserId: userA.userId, via: 'WHATSAPP' }]],
@@ -756,13 +769,24 @@ describe('WhatsApp delivery and webhook (integration)', () => {
       expect(temporal.signal).not.toHaveBeenCalled();
     });
 
-    it('should append DELIVERED for a read report that arrives without a delivery report', async () => {
+    it('should append DELIVERED then READ for a read report without a delivery report, and tell the flow once', async () => {
       const platform = await addSender({ scope: 'platform' });
-      await send(instituteA, userA);
+      const flowId = `notification-flow:read-${provider.run}`;
+      await send(instituteA, userA, approval, true, flowId);
+      const read = report(platform.numberId, provider.lastMessageId(), 'read', phoneA.full);
 
-      await post(report(platform.numberId, provider.lastMessageId(), 'read', phoneA.full));
+      await post(read);
+      await post(read);
+      await post(report(platform.numberId, provider.lastMessageId(), 'delivered', phoneA.full));
 
-      expect((await deliveries(userA.userId)).map((d) => d.status)).toEqual(['SENT', 'DELIVERED']);
+      expect((await deliveries(userA.userId)).map((d) => d.status)).toEqual([
+        'SENT',
+        'DELIVERED',
+        'READ',
+      ]);
+      expect(temporal.signal.mock.calls).toEqual([
+        [flowId, 'flowArrival', [{ recipientUserId: userA.userId, via: 'WHATSAPP' }]],
+      ]);
     });
 
     it('should append FAILED with a stable code for a failed report', async () => {

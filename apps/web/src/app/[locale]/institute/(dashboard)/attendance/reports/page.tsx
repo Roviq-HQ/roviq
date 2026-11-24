@@ -30,6 +30,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { buildCsv, downloadCsv } from '@web/lib/csv';
 import { ArrowLeft, BarChart3, CalendarDays, Download, History, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -63,36 +64,6 @@ function daysAgoIso(days: number): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
-}
-
-// ── CSV helpers ────────────────────────────────────────────────────────
-// Inline on purpose (not a shared util yet) — RFC 4180 quoting is the
-// only rule we need for a two-button export. If a third consumer shows
-// up we promote this to libs/ui or libs/common-types.
-
-function csvEscape(value: string | number): string {
-  const s = String(value);
-  // Double any embedded quotes and wrap the whole field in quotes.
-  return `"${s.replace(/"/g, '""')}"`;
-}
-
-function buildCsv(headers: readonly string[], rows: readonly (string | number)[][]): string {
-  const lines = [headers.map(csvEscape).join(',')];
-  for (const row of rows) lines.push(row.map(csvEscape).join(','));
-  // Leading BOM so Excel opens UTF-8 (हिन्दी) cleanly on Windows.
-  return `﻿${lines.join('\n')}`;
-}
-
-function triggerDownload(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -344,7 +315,7 @@ function AbsenteesByStudentTab() {
       `${r.absentPct}%`,
       r.absentDates.join(';'),
     ]);
-    triggerDownload(`attendance-absentees-${startDate}_${endDate}.csv`, buildCsv(headers, body));
+    downloadCsv(`attendance-absentees-${startDate}_${endDate}.csv`, buildCsv(headers, body));
   }
 
   return (
@@ -666,7 +637,7 @@ function DailyBreakdownTab() {
       r.lateCount,
       r.absenteeIds.join(';'),
     ]);
-    triggerDownload(`attendance-daily-${date}.csv`, buildCsv(headers, body));
+    downloadCsv(`attendance-daily-${date}.csv`, buildCsv(headers, body));
   }
 
   return (

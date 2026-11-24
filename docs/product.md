@@ -54,7 +54,7 @@ reseller "Roviq Direct".
 | Certificates | Transfer certificates with public verification, bonafide and other certificates as PDF | [Certificates](features/certificates.md) |
 | Groups | Groups of people (class, section, house, club and others), filled by hand or by rules | `apps/api-gateway/src/institute/group/` |
 | Government and board reports | Exports for UDISE+, CBSE, BSEH, Shala Darpan and RTE, and the TC and admission registers. Today they are produced from the Admin portal's institute page | [Deployment](deployment.md#background-workers) |
-| Notifications | In-app inbox, email and push; each institute chooses its channels | [Architecture](architecture.md#notifications) |
+| Notifications | In-app inbox, email and push; each institute chooses its channels and sees who received each notification, per channel | [Architecture](architecture.md#notifications) |
 | Audit | Who did what and when, including actions by the reseller and by Roviq staff | [Audit logging](features/audit-logging.md) |
 | Privacy | Consent records per guardian and purpose | [Deployment](deployment.md#notification-delivery) |
 

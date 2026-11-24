@@ -51,6 +51,68 @@ export const NotificationTypeKey = Object.fromEntries(
   NOTIFICATION_TYPE_VALUES.map((v) => [v, v]),
 ) as { readonly [K in NotificationTypeKey]: K };
 
+// ─── NotificationModule ─────────────────────────────────────────────────────
+
+/** The part of the product a notification type belongs to; the delivery log filters by it. */
+export const NOTIFICATION_MODULE_VALUES = [
+  // Absence and late marks
+  'ATTENDANCE',
+  // Fee reminders and overdue fees
+  'FEE',
+  // Leave decisions
+  'LEAVE',
+  // Approval requests and their results
+  'APPROVAL',
+  // Sign-ins, password resets, locks, revoked sessions and impersonation codes
+  'ACCOUNT_SECURITY',
+  // Welcome messages and email verification
+  'ACCOUNT',
+  // Subscription and payment changes of the institute
+  'BILLING',
+] as const;
+
+export type NotificationModule = (typeof NOTIFICATION_MODULE_VALUES)[number];
+
+export const NotificationModule = Object.fromEntries(
+  NOTIFICATION_MODULE_VALUES.map((v) => [v, v]),
+) as { readonly [K in NotificationModule]: K };
+
+/** Exhaustive: a new type does not compile until it has a module. */
+export const NOTIFICATION_MODULE_OF: Record<NotificationTypeKey, NotificationModule> = {
+  ATTENDANCE_ABSENT: 'ATTENDANCE',
+  FEE_OVERDUE: 'FEE',
+  FEE_REMINDER: 'FEE',
+  LEAVE_DECIDED: 'LEAVE',
+  APPROVAL_REQUESTED: 'APPROVAL',
+  APPROVAL_RESOLVED: 'APPROVAL',
+  AUTH_LOGIN: 'ACCOUNT_SECURITY',
+  AUTH_PASSWORD_RESET: 'ACCOUNT_SECURITY',
+  AUTH_NEW_DEVICE: 'ACCOUNT_SECURITY',
+  AUTH_ACCOUNT_LOCKED: 'ACCOUNT_SECURITY',
+  AUTH_SESSION_REVOKED: 'ACCOUNT_SECURITY',
+  IMPERSONATION_OTP: 'ACCOUNT_SECURITY',
+  EMAIL_VERIFICATION: 'ACCOUNT',
+  USER_WELCOME: 'ACCOUNT',
+  BILLING_EVENT: 'BILLING',
+};
+
+/**
+ * Types sent whatever the institute's settings say and outside quiet hours: the registry's
+ * critical types and every secret type (a code or password). notification-service tests that
+ * this list matches its registry.
+ */
+export const CRITICAL_NOTIFICATION_TYPES: readonly NotificationTypeKey[] = [
+  'AUTH_LOGIN',
+  'AUTH_PASSWORD_RESET',
+  'AUTH_NEW_DEVICE',
+  'AUTH_ACCOUNT_LOCKED',
+  'AUTH_SESSION_REVOKED',
+  'BILLING_EVENT',
+  'EMAIL_VERIFICATION',
+  'IMPERSONATION_OTP',
+  'USER_WELCOME',
+];
+
 // ─── NotificationSkipReason ─────────────────────────────────────────────────
 
 /** `notification_deliveries.skip_reason`, in the order the channel gate checks them. */
@@ -69,6 +131,8 @@ export const NOTIFICATION_SKIP_REASON_VALUES = [
   'opted_out',
   // The sender, or this institute's share of it, reached its daily cap
   'sender_cap',
+  // Only on a DEFERRED row: the institute's quiet hours hold the message until they end
+  'quiet_hours',
   // Another step or recipient of the flow was reached first, so this one was not tried
   'not_needed',
   // The step's condition did not hold for this notification
@@ -87,6 +151,7 @@ export const NotificationSkipReason = {
   NO_TEMPLATE: 'no_template',
   OPTED_OUT: 'opted_out',
   SENDER_CAP: 'sender_cap',
+  QUIET_HOURS: 'quiet_hours',
   NOT_NEEDED: 'not_needed',
   CONDITION_NOT_MET: 'condition_not_met',
   RECIPIENT_REMOVED: 'recipient_removed',
@@ -103,6 +168,10 @@ export const NOTIFICATION_DELIVERY_STATUS_VALUES = [
   'FAILED',
   // Never attempted; `skip_reason` says why (channel off, no consent, no provider)
   'SKIPPED',
+  // The recipient opened the message (only where the provider reports it)
+  'READ',
+  // Held for later; `skip_reason` says why (`quiet_hours`, `sender_cap`). A later row says how it ended
+  'DEFERRED',
 ] as const;
 
 export type NotificationDeliveryStatus = (typeof NOTIFICATION_DELIVERY_STATUS_VALUES)[number];
@@ -110,6 +179,33 @@ export type NotificationDeliveryStatus = (typeof NOTIFICATION_DELIVERY_STATUS_VA
 export const NotificationDeliveryStatus = Object.fromEntries(
   NOTIFICATION_DELIVERY_STATUS_VALUES.map((v) => [v, v]),
 ) as { readonly [K in NotificationDeliveryStatus]: K };
+
+// ─── NotificationDeliveryState ──────────────────────────────────────────────
+
+/**
+ * What the institute's delivery log shows for one message, recipient and channel, derived
+ * from all its `notification_deliveries` rows.
+ */
+export const NOTIFICATION_DELIVERY_STATE_VALUES = [
+  // A READ row exists: the recipient opened it
+  'READ',
+  // A DELIVERED row exists and no READ row: it reached the recipient's device
+  'DELIVERED',
+  // The latest row is SENT: the provider accepted it and no report has come back yet
+  'SENT',
+  // The latest row is FAILED: the provider refused it or reported it undeliverable
+  'FAILED',
+  // The latest row is SKIPPED: never attempted (channel off, no consent, no address, …)
+  'SKIPPED',
+  // The latest row is DEFERRED: held by quiet hours or a full sender, to be tried later
+  'WAITING',
+] as const;
+
+export type NotificationDeliveryState = (typeof NOTIFICATION_DELIVERY_STATE_VALUES)[number];
+
+export const NotificationDeliveryState = Object.fromEntries(
+  NOTIFICATION_DELIVERY_STATE_VALUES.map((v) => [v, v]),
+) as { readonly [K in NotificationDeliveryState]: K };
 
 // ─── MessagingSenderStatus ──────────────────────────────────────────────────
 

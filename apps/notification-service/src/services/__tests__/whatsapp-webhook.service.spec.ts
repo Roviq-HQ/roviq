@@ -133,21 +133,19 @@ describe('WhatsAppWebhookService', () => {
         providerMessageId: 'wamid.1',
         status: 'DELIVERED',
         errorCode: null,
-        onlyIfNotDelivered: false,
         person: PERSON,
       });
     });
 
-    it('should record a read report as delivered only if not delivered before', async () => {
+    it('should record a read report as READ', async () => {
       await service.handle([receipt('read')]);
 
       expect(inbound.recordReceipt).toHaveBeenCalledWith({
         senderId: 'sender-1',
         eventId: 'wamid.1:read',
         providerMessageId: 'wamid.1',
-        status: 'DELIVERED',
+        status: 'READ',
         errorCode: null,
-        onlyIfNotDelivered: true,
         person: PERSON,
       });
     });
@@ -164,7 +162,6 @@ describe('WhatsAppWebhookService', () => {
         providerMessageId: 'wamid.1',
         status: 'FAILED',
         errorCode,
-        onlyIfNotDelivered: false,
         person: PERSON,
       });
     });

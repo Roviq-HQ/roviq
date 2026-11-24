@@ -6,11 +6,13 @@
  */
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { AcademicStatus, AdmissionType, Gender, SocialCategory } from '@roviq/common-types';
+import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
 import peopleLinksEn from '@web-messages/en/peopleLinks.json';
 import messagesEn from '@web-messages/en/students.json';
+import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── sonner ────────────────────────────────────────────────
@@ -37,6 +39,16 @@ vi.mock('next/navigation', () => ({
   permanentRedirect: vi.fn(),
   notFound: vi.fn(),
   RedirectType: { push: 'push', replace: 'replace' },
+}));
+
+// next-intl's Link renders nothing under happy-dom; a plain anchor keeps the href assertable.
+vi.mock('@roviq/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@roviq/i18n')>()),
+  Link: ({ href, children, ...rest }: ComponentProps<'a'>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 const mockStudent = {
@@ -438,5 +450,32 @@ describe('StudentDetailPage › Guardians tab › CASL gating', () => {
       screen.getByRole('tab', { name: new RegExp(messagesEn.detail.tabs.guardians, 'i') }),
     );
     expect(screen.queryByTestId('student-detail-link-guardian-btn')).not.toBeInTheDocument();
+  });
+});
+
+describe('StudentDetailPage › "Who was notified" link', () => {
+  const link = testIds.notificationDelivery.studentLink;
+
+  beforeEach(() => {
+    linkedGuardiansRef.current = [];
+    pickerGuardiansRef.current = [];
+    Object.assign(mockStudent, { membershipId: 'mem-1' });
+  });
+
+  it('opens the delivery page filtered by the student membership id', () => {
+    renderPage();
+    expect(screen.getByTestId(link)).toHaveAttribute(
+      'href',
+      expect.stringContaining('/institute/settings/notifications/delivery?studentId=mem-1'),
+    );
+  });
+
+  it('is not shown without the delivery read ability', () => {
+    renderWithProviders(<StudentDetailPage />, {
+      messages: { students: messagesEn },
+      abilityRules: [{ action: 'read', subject: 'Student' }],
+    });
+    expect(screen.getAllByText(/ADM-0001/i).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId(link)).not.toBeInTheDocument();
   });
 });

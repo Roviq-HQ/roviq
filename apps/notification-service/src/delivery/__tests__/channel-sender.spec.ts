@@ -90,6 +90,7 @@ describe('ChannelSender', () => {
     });
     writes = createMock<NotificationWriteRepository>({
       recordDelivery: vi.fn().mockResolvedValue(undefined),
+      recordDeferral: vi.fn().mockResolvedValue(undefined),
     });
     route = createMock<WhatsAppRoute>({
       resolveSender: vi.fn().mockResolvedValue(SENDER),
@@ -299,17 +300,28 @@ describe('ChannelSender', () => {
       expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
     });
 
-    it('should defer through quiet hours and write no delivery row', async () => {
+    it('should defer through quiet hours and record one deferral, not a delivery', async () => {
       const until = new Date('2026-11-24T01:30:00.000Z');
       route.quietUntil.mockResolvedValue(until);
 
       const outcome = await sender.attempt(whatsappAttempt());
 
-      expect(outcome).toEqual({ status: 'DEFERRED', until });
+      expect(outcome).toEqual({ status: 'DEFERRED', until, reason: 'quiet_hours' });
       expect(route.quietUntil).toHaveBeenCalledWith(INSTITUTE.tenantId, false);
       expect(route.capacity).not.toHaveBeenCalled();
       expect(whatsappSend).not.toHaveBeenCalled();
       expect(writes.recordDelivery).not.toHaveBeenCalled();
+      expect(writes.recordDeferral).toHaveBeenCalledTimes(1);
+      expect(writes.recordDeferral).toHaveBeenCalledWith({
+        audience: INSTITUTE,
+        notificationId: 'notification-1',
+        recipientUserId: 'user-guardian-1',
+        type: 'FEE_REMINDER',
+        channel: 'WHATSAPP',
+        attempt: 1,
+        flowId: 'notification-flow:key-1',
+        reason: 'quiet_hours',
+      });
     });
 
     it.each([
@@ -326,6 +338,7 @@ describe('ChannelSender', () => {
       expect(outcome).toEqual(expected);
       expect(whatsappSend).not.toHaveBeenCalled();
       expect(writes.recordDelivery).toHaveBeenCalledTimes(1);
+      expect(writes.recordDeferral).not.toHaveBeenCalled();
       expect(writes.recordDelivery).toHaveBeenCalledWith({
         audience: INSTITUTE,
         notificationId: 'notification-1',
@@ -348,16 +361,27 @@ describe('ChannelSender', () => {
       expect(whatsappSend).not.toHaveBeenCalled();
     });
 
-    it('should defer a critical message over the cap and write no delivery row', async () => {
+    it('should defer a critical message over the cap and record a sender_cap deferral', async () => {
       const until = new Date('2026-11-23T11:00:00.000Z');
       route.capacity.mockResolvedValue({ deferUntil: until });
 
       const outcome = await sender.attempt(whatsappAttempt({ critical: true }));
 
-      expect(outcome).toEqual({ status: 'DEFERRED', until });
+      expect(outcome).toEqual({ status: 'DEFERRED', until, reason: 'sender_cap' });
       expect(route.quietUntil).toHaveBeenCalledWith(INSTITUTE.tenantId, true);
       expect(route.capacity).toHaveBeenCalledWith(SENDER, INSTITUTE.tenantId, true);
       expect(writes.recordDelivery).not.toHaveBeenCalled();
+      expect(writes.recordDeferral).toHaveBeenCalledTimes(1);
+      expect(writes.recordDeferral).toHaveBeenCalledWith({
+        audience: INSTITUTE,
+        notificationId: 'notification-1',
+        recipientUserId: 'user-guardian-1',
+        type: 'FEE_REMINDER',
+        channel: 'WHATSAPP',
+        attempt: 1,
+        flowId: 'notification-flow:key-1',
+        reason: 'sender_cap',
+      });
     });
 
     it('should send once through the sender and template and record the route', async () => {

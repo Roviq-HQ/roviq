@@ -146,7 +146,7 @@ export const AppSubject = {
   Export: 'Export',
   /** Dead-lettered NATS message — platform admin inspects, replays, or discards (ROV-19) */
   DlqMessage: 'DlqMessage',
-  /** One attempt to send a notification outside the app — platform support reads it (ROV-314) */
+  /** One attempt to send a notification outside the app — platform support reads every one (ROV-314), an institute its own (ROV-327) */
   NotificationDelivery: 'NotificationDelivery',
   /** A WhatsApp number messages are sent from, the platform's or an institute's (ROV-319) */
   MessagingSender: 'MessagingSender',
@@ -492,6 +492,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
     { action: 'manage', subject: 'ReportCard' },
     { action: 'manage', subject: 'TC' },
     { action: 'read', subject: 'AuditLog' },
+    // Who received each notification, on every channel (ROV-327).
+    { action: 'read', subject: 'NotificationDelivery' },
     { action: 'read', subject: 'AcademicYear' },
     { action: 'read', subject: 'Institute' },
     { action: 'read', subject: 'Guardian' },

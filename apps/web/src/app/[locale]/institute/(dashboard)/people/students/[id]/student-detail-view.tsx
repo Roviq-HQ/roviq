@@ -104,6 +104,7 @@ import {
   History,
   Info,
   Loader2,
+  MailCheck,
   MoveRight,
   Plus,
   ShieldCheck,
@@ -453,6 +454,7 @@ export function StudentDetailView({ studentId }: { studentId: string }) {
  */
 function StudentSidebar({ student }: { student: StudentDetailNode }) {
   const t = useTranslations('students');
+  const tDelivery = useTranslations('notificationDelivery');
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
   const firstName = resolveI18n(student.firstName);
@@ -553,6 +555,25 @@ function StudentSidebar({ student }: { student: StudentDetailNode }) {
                 </LocaleLink>
               </Button>
             </Can>
+            {student.membershipId && (
+              <Can I="read" a="NotificationDelivery">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto gap-1.5 p-0"
+                  asChild
+                  title={tDelivery('whoWasNotified')}
+                >
+                  <LocaleLink
+                    href={`/institute/settings/notifications/delivery?studentId=${student.membershipId}`}
+                    data-testid={testIds.notificationDelivery.studentLink}
+                  >
+                    <MailCheck className="size-3.5" />
+                    {tDelivery('whoWasNotified')}
+                  </LocaleLink>
+                </Button>
+              </Can>
+            )}
           </div>
 
           <div>

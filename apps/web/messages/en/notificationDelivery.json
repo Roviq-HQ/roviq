@@ -1,0 +1,114 @@
+{
+  "title": "Notification delivery",
+  "description": "Who received each notification, and what happened on each channel.",
+  "accessDenied": "You do not have access to notification delivery. Contact your administrator.",
+  "settingsLink": "See who received each notification",
+  "whoWasNotified": "Who was notified",
+  "columns": {
+    "time": "Time",
+    "notification": "Notification",
+    "about": "About",
+    "recipient": "Recipient"
+  },
+  "critical": "Important",
+  "noChannel": "Not tried on this channel",
+  "channels": {
+    "PUSH": "Push alert",
+    "WHATSAPP": "WhatsApp",
+    "SMS": "SMS",
+    "EMAIL": "Email"
+  },
+  "states": {
+    "READ": "Read",
+    "DELIVERED": "Delivered",
+    "SENT": "Sent",
+    "FAILED": "Failed",
+    "SKIPPED": "Not sent",
+    "WAITING": "Waiting"
+  },
+  "modules": {
+    "ATTENDANCE": "Attendance",
+    "FEE": "Fees",
+    "LEAVE": "Leave",
+    "APPROVAL": "Approvals",
+    "ACCOUNT_SECURITY": "Account security",
+    "ACCOUNT": "Account",
+    "BILLING": "Billing"
+  },
+  "types": {
+    "ATTENDANCE_ABSENT": "Absent or late",
+    "FEE_OVERDUE": "Fee overdue",
+    "FEE_REMINDER": "Fee reminder",
+    "LEAVE_DECIDED": "Leave decision",
+    "APPROVAL_REQUESTED": "Approval requested",
+    "APPROVAL_RESOLVED": "Approval decided",
+    "AUTH_LOGIN": "Sign-in",
+    "AUTH_PASSWORD_RESET": "Password reset",
+    "AUTH_NEW_DEVICE": "Sign-in from a new device",
+    "AUTH_ACCOUNT_LOCKED": "Account locked",
+    "AUTH_SESSION_REVOKED": "Session signed out",
+    "EMAIL_VERIFICATION": "Email verification code",
+    "IMPERSONATION_OTP": "Support access code",
+    "USER_WELCOME": "Welcome message",
+    "BILLING_EVENT": "Billing update",
+    "unknown": "Other notification"
+  },
+  "reasons": {
+    "channel_disabled": "Switched off in notification settings",
+    "no_consent": "The guardian has not agreed to messages on this channel",
+    "no_provider": "This channel is not set up for the institute yet",
+    "no_address": "No phone number or email on record",
+    "no_template": "No approved message wording for this notification yet",
+    "opted_out": "The guardian asked to stop messages on this channel",
+    "sender_cap": "Daily sending limit reached",
+    "quiet_hours": "Waiting for quiet hours to end",
+    "not_needed": "Not needed: the message had already arrived another way",
+    "condition_not_met": "Not needed for this notification",
+    "recipient_removed": "This person was unlinked before the message was sent",
+    "WA_NOT_ON_WHATSAPP": "This number is not on WhatsApp",
+    "SMS_INVALID_NUMBER": "The phone number on record is not valid",
+    "SMS_BLOCKED_BY_RECIPIENT": "The recipient has blocked messages from the institute",
+    "NO_RECIPIENT": "No one to send this message to",
+    "other": "Could not be delivered; we are looking into it"
+  },
+  "filters": {
+    "module": "Module",
+    "allModules": "All modules",
+    "type": "Notification",
+    "allTypes": "All notifications",
+    "channel": "Channel",
+    "allChannels": "All channels",
+    "state": "State",
+    "allStates": "All states",
+    "from": "From",
+    "to": "To",
+    "criticalOnly": "Important only",
+    "notDeliveredOnly": "Not delivered only",
+    "clearAll": "Clear all filters",
+    "studentChip": "Student: {name}",
+    "studentChipUnnamed": "One student",
+    "sessionChip": "One attendance session",
+    "recipientChip": "Recipient: {name}",
+    "recipientChipUnnamed": "One recipient",
+    "removeChip": "Remove filter: {label}"
+  },
+  "export": "Export CSV",
+  "exportTitle": "Download the rows loaded below as a CSV file",
+  "csvRelationship": "Relationship",
+  "empty": {
+    "title": "No notifications sent yet",
+    "description": "Each notification the institute sends appears here with its delivery on every channel.",
+    "filteredTitle": "No notifications match these filters",
+    "filteredDescription": "Change or clear the filters to see more."
+  },
+  "errors": {
+    "FORBIDDEN": "You do not have access to notification delivery.",
+    "generic": "Could not load notification delivery. Please try again.",
+    "retry": "Try again"
+  },
+  "pagination": {
+    "loadMore": "Load more",
+    "showing": "Showing",
+    "of": "of"
+  }
+}

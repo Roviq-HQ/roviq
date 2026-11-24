@@ -16,7 +16,7 @@ import {
   type ChannelMessage,
 } from './adapters/channel-adapter';
 import type { ChannelAdapters } from './adapters/channel-adapters';
-import { evaluateChannelGate } from './channel-gate';
+import { type DeferReason, evaluateChannelGate } from './channel-gate';
 import type { ConsentGate } from './consent-gate';
 import { type SmsDraft, type SmsSend, SmsVariableError } from './sms/sms-template';
 import type { WhatsAppRoute } from './whatsapp/whatsapp-route';
@@ -52,17 +52,19 @@ export interface ChannelAttempt {
   sms?(locale: Locale): SmsDraft | null;
 }
 
-/** Not sent and not refused: the caller tries again at `until`. No delivery row is written. */
+/** Not sent and not refused: the caller tries again at `until`. */
 export interface DeferredAttempt {
   status: 'DEFERRED';
   until: Date;
+  reason: DeferReason;
 }
 
 export type AttemptOutcome = DeliveryOutcome | DeferredAttempt;
 
 /**
  * One attempt on one channel: gate, compose in the recipient's locale, send, and record exactly
- * one `notification_deliveries` row (none for a deferral). A provider failure becomes a FAILED
+ * one `notification_deliveries` row (a deferral writes one DEFERRED row per flow, recipient and
+ * channel, however often it is retried). A provider failure becomes a FAILED
  * row; any other error (database, programming) propagates.
  */
 export class ChannelSender {
@@ -76,7 +78,19 @@ export class ChannelSender {
 
   async attempt(a: ChannelAttempt): Promise<AttemptOutcome> {
     const outcome = await this.run(a);
-    if (outcome.status === 'DEFERRED') return outcome;
+    if (outcome.status === 'DEFERRED') {
+      await this.writes.recordDeferral({
+        audience: a.audience,
+        notificationId: a.notificationId,
+        recipientUserId: a.recipientUserId,
+        type: a.type,
+        channel: a.channel,
+        attempt: a.attempt,
+        flowId: a.flowId,
+        reason: outcome.reason,
+      });
+      return outcome;
+    }
     await this.writes.recordDelivery({
       audience: a.audience,
       notificationId: a.notificationId,
@@ -163,7 +177,7 @@ export class ChannelSender {
     if (!gate.open) {
       if ('deferUntil' in gate) {
         return a.deferrable
-          ? { status: 'DEFERRED', until: gate.deferUntil }
+          ? { status: 'DEFERRED', until: gate.deferUntil, reason: gate.deferReason }
           : { status: 'SKIPPED', provider: null, skipReason: 'sender_cap' };
       }
       return { status: 'SKIPPED', provider: null, skipReason: gate.reason };

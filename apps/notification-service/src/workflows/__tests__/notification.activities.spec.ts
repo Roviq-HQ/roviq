@@ -212,9 +212,11 @@ describe('sendChannel activity', () => {
 
   it('should return the deferral time as an ISO string', async () => {
     const sender = createMock<ChannelSender>({
-      attempt: vi
-        .fn()
-        .mockResolvedValue({ status: 'DEFERRED', until: new Date('2026-11-24T01:30:00.000Z') }),
+      attempt: vi.fn().mockResolvedValue({
+        status: 'DEFERRED',
+        until: new Date('2026-11-24T01:30:00.000Z'),
+        reason: 'quiet_hours',
+      }),
     });
 
     const result = await createNotificationActivities(deps(sender), () => 1).sendChannel(INPUT);
