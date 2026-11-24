@@ -80,6 +80,10 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/staff/__tests__/staff-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/standard/__tests__/standard-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-create-foreign-id.integration.spec.ts',
+  // ROV-275: fixtures and row snapshots for the one-transaction student create and its cleanup.
+  'apps/api-gateway/src/institute/student/__tests__/student-create-atomic.integration.spec.ts',
+  'apps/api-gateway/src/institute/student/__tests__/student-bulk-import-atomic.integration.spec.ts',
+  'apps/api-gateway/src/auth/__tests__/discard-new-user.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/subject/__tests__/subject-foreign-id.integration.spec.ts',
   'apps/api-gateway/src/institute/timetable/__tests__/timetable-foreign-id.integration.spec.ts',

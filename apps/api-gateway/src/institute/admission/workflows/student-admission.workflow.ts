@@ -2,7 +2,7 @@
  * StudentAdmissionWorkflow (ROV-159).
  *
  * Temporal workflow: approved application → fully enrolled student.
- * 10 idempotent activity steps. Timeout: 5 minutes.
+ * Idempotent activity steps; the student's institute rows are written in one transaction. Timeout: 5 minutes.
  */
 import { proxyActivities } from '@temporalio/workflow';
 import type {
@@ -33,48 +33,28 @@ export async function StudentAdmissionWorkflow(
     await activities.validateSectionCapacity(tenantId, sectionId);
   }
 
-  // 3. Create the student user + membership (student role). `applicationId` seeds the
-  // placeholder `admission-<id>@roviq.placeholder` so retries reuse the same user.
-  const { userId, membershipId } = await activities.createUserAndMembership(
+  // 3. The student account, then every institute-side row in one transaction (ROV-275).
+  // `applicationId` seeds the placeholder `admission-<id>@roviq.placeholder` so a retry finds
+  // the account an earlier attempt made.
+  const { membershipId, studentProfileId, admissionNumber } = await activities.admitStudent({
     tenantId,
     actorId,
-    applicationId,
-  );
-
-  // 4. Create user_profile from form_data
-  await activities.createUserProfile(tenantId, userId, formData, actorId);
-
-  // 5. Create student_profile with admission_number
-  const { studentProfileId, admissionNumber } = await activities.createStudentProfile(
-    tenantId,
-    userId,
-    membershipId,
+    seed: applicationId,
+    academicYearId,
     standardId,
+    sectionId,
     formData,
     isRte,
-    actorId,
-  );
+  });
 
-  // 6. Create student_academics (section placement)
-  if (sectionId) {
-    await activities.createStudentAcademics(
-      tenantId,
-      studentProfileId,
-      academicYearId,
-      standardId,
-      sectionId,
-      actorId,
-    );
-  }
-
-  // 7. Link guardians from parent info — applicationId seed keeps placeholder
+  // 4. Link guardians from parent info — applicationId seed keeps placeholder
   // guardian creation idempotent across retries.
   await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, applicationId);
 
-  // 8. Update application: status='enrolled', student_profile_id
+  // 5. Update application: status='enrolled', student_profile_id
   await activities.updateApplicationEnrolled(applicationId, tenantId, studentProfileId, actorId);
 
-  // 9. Emit student.admitted
+  // 6. Emit student.admitted
   if (sectionId) {
     await activities.emitStudentAdmittedEvent(
       tenantId,
@@ -85,7 +65,7 @@ export async function StudentAdmissionWorkflow(
     );
   }
 
-  // 10. Apply previous school TC data if present
+  // 7. Apply the TC data of the previous institute, if present
   await activities.applyPreviousSchoolData(tenantId, studentProfileId, formData, actorId);
 
   return { studentProfileId, admissionNumber, membershipId };

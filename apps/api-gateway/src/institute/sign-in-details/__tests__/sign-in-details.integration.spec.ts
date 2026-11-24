@@ -92,6 +92,7 @@ interface Institute {
   base: TestInstitute;
   token: string;
   standardId: string;
+  academicYearId: string;
 }
 
 let phoneCounter = 0;
@@ -159,7 +160,7 @@ async function setUpInstitute(db: DrizzleDB): Promise<Institute> {
       capacity: 40,
       ...BY,
     });
-    return { base, token, standardId: std.id };
+    return { base, token, standardId: std.id, academicYearId: year.id };
   });
 }
 
@@ -336,16 +337,17 @@ describe('Sign-in details for staff and guardians (integration)', () => {
         const seed = randomUUID();
         const formData = { studentName: 'Admitted Child', parentName: 'Typed Parent', parentPhone };
         const tenantId = a.base.tenantId;
-        const student = await activities.createUserAndMembership(tenantId, a.base.userId, seed);
-        const { studentProfileId } = await activities.createStudentProfile(
+        const student = await activities.admitStudent({
           tenantId,
-          student.userId,
-          student.membershipId,
-          a.standardId,
+          actorId: a.base.userId,
+          seed,
+          academicYearId: a.academicYearId,
+          standardId: a.standardId,
+          sectionId: null,
           formData,
-          false,
-          a.base.userId,
-        );
+          isRte: false,
+        });
+        const { studentProfileId } = student;
         await activities.linkGuardians(tenantId, studentProfileId, formData, a.base.userId, seed);
         return student.userId;
       }

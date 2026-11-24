@@ -1,5 +1,5 @@
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
-import { assertAdmissionClass } from './admission-class';
+import { admissionClassError, assertAdmissionClass } from './admission-class';
 /** Student CRUD service (ROV-154). Queries live in StudentRepository and StudentReadRepository. */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -24,6 +24,7 @@ import type { StudentFilterInput } from './dto/student-filter.input';
 import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
+import type { AdmitStudentResult } from './repositories/admit-student';
 import { StudentRepository } from './repositories/student.repository';
 import { StudentReadRepository } from './student-read.repository';
 
@@ -70,75 +71,60 @@ export class StudentService {
 
     // A typed number never identifies an existing account (SF-053): every student is a new user.
     const userId = await this.createUser(input.phone, actorId);
-    await this.identityService.ensureUserProfile(
-      userId,
-      { firstName: input.firstName, lastName: input.lastName },
-      actorId,
-    );
-
-    // 3. Find student role + create membership
-    const studentRoleId = await this.repository.findStudentRoleId(tenantId);
-    if (!studentRoleId) {
-      throw new BusinessException(
-        ErrorCode.ROLE_NOT_FOUND,
-        'Student role not found for this institute',
-      );
-    }
-
-    // An existing membership inserts nothing: look it up instead.
-    const membershipId =
-      (await this.repository.createMembership(tenantId, {
+    const name = { firstName: input.firstName, lastName: input.lastName };
+    let admitted: AdmitStudentResult;
+    try {
+      await this.identityService.ensureUserProfile(userId, name, actorId);
+      admitted = await this.repository.admit({
+        tenantId,
         userId,
-        roleId: studentRoleId,
         actorId,
-        profile: {
-          firstName: input.firstName,
-          lastName: input.lastName,
+        ...admissionClass,
+        tenantProfile: {
+          ...name,
           gender: input.gender,
           dateOfBirth: input.dateOfBirth,
           bloodGroup: input.bloodGroup,
           religion: input.religion,
           motherTongue: input.motherTongue,
         },
-      })) ?? (await this.repository.findMembershipId(tenantId, userId, studentRoleId));
+        profile: {
+          admissionDate: input.admissionDate ?? new Date().toISOString().split('T')[0],
+          admissionClass: input.admissionClass ?? null,
+          admissionType: input.admissionType ?? AdmissionType.NEW,
+          academicStatus: AcademicStatus.ENROLLED,
+          socialCategory: input.socialCategory ?? SocialCategory.GENERAL,
+          caste: input.caste ?? null,
+          isMinority: input.isMinority ?? false,
+          minorityType: input.minorityType ?? null,
+          isBpl: input.isBpl ?? false,
+          isCwsn: input.isCwsn ?? false,
+          cwsnType: input.cwsnType ?? null,
+          isRteAdmitted: input.isRteAdmitted ?? false,
+          rteCertificate: input.rteCertificate ?? null,
+          previousSchoolName: input.previousSchoolName ?? null,
+          previousSchoolBoard: input.previousSchoolBoard ?? null,
+          previousSchoolUdise: input.previousSchoolUdise ?? null,
+          incomingTcNumber: input.incomingTcNumber ?? null,
+          incomingTcDate: input.incomingTcDate ?? null,
+        },
+      });
+    } catch (error) {
+      await this.discardAccount(userId);
+      throw error;
+    }
+    if (admitted.kind !== 'ok') {
+      await this.discardAccount(userId);
+      throw admitted.kind === 'role_not_found'
+        ? new BusinessException(
+            ErrorCode.ROLE_NOT_FOUND,
+            'Student role not found for this institute',
+          )
+        : admissionClassError(admitted);
+    }
+    const { studentProfileId, membershipId, admissionNumber } = admitted;
 
-    // 4–5. Admission number + student_profile in one transaction (no gaps on failure)
-    const admissionDate = input.admissionDate ?? new Date().toISOString().split('T')[0];
-    const { studentProfileId, admissionNumber } = await this.repository.createProfile(tenantId, {
-      userId,
-      membershipId,
-      standardId: input.standardId,
-      actorId,
-      admissionDate,
-      admissionClass: input.admissionClass ?? null,
-      admissionType: input.admissionType ?? AdmissionType.NEW,
-      academicStatus: AcademicStatus.ENROLLED,
-      socialCategory: input.socialCategory ?? SocialCategory.GENERAL,
-      caste: input.caste ?? null,
-      isMinority: input.isMinority ?? false,
-      minorityType: input.minorityType ?? null,
-      isBpl: input.isBpl ?? false,
-      isCwsn: input.isCwsn ?? false,
-      cwsnType: input.cwsnType ?? null,
-      isRteAdmitted: input.isRteAdmitted ?? false,
-      rteCertificate: input.rteCertificate ?? null,
-      previousSchoolName: input.previousSchoolName ?? null,
-      previousSchoolBoard: input.previousSchoolBoard ?? null,
-      previousSchoolUdise: input.previousSchoolUdise ?? null,
-      incomingTcNumber: input.incomingTcNumber ?? null,
-      incomingTcDate: input.incomingTcDate ?? null,
-    });
-
-    // 6. Create student_academics (initial enrollment)
-    assertAdmissionClass(
-      await this.repository.createInitialAcademic(tenantId, {
-        studentProfileId,
-        ...admissionClass,
-        actorId,
-      }),
-    );
-
-    // 7. Emit event
+    // Emitted only once the institute transaction has committed.
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.admitted, {
       studentProfileId,
       membershipId,
@@ -531,6 +517,18 @@ export class StudentService {
         tcNumber: input.tcNumber ?? null,
         tenantId,
       });
+    }
+  }
+
+  /** A failed admission must not leave the account it made behind (ROV-275). */
+  private async discardAccount(userId: string): Promise<void> {
+    try {
+      if (!(await this.identityService.discardNewUser(userId))) {
+        this.logger.warn(`Kept account ${userId} of a failed admission: it is in use`);
+      }
+    } catch (error) {
+      // The admission's own error is the one the caller must see.
+      this.logger.error(`Could not remove account ${userId} of a failed admission`, error);
     }
   }
 

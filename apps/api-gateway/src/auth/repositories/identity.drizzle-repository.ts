@@ -124,6 +124,41 @@ export class IdentityDrizzleRepository extends IdentityRepository {
     });
   }
 
+  async deleteUnusedUser(userId: string): Promise<boolean> {
+    return withAdmin(this.db, mkAdminCtx('service:identity'), async (tx) => {
+      const [user] = await tx
+        .select({ passwordChangedAt: users.passwordChangedAt })
+        .from(users) // allow-base-read: a soft-deleted account is not a new one and is refused
+        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+        .for('update');
+      if (!user || user.passwordChangedAt) return false;
+      // A deleted membership is still a use, so these read base tables. A session needs a
+      // membership, so no session can exist without one of these rows.
+      const uses = [
+        await tx
+          .select({ id: memberships.id })
+          .from(memberships) // allow-base-read: deleted memberships count as use
+          .where(eq(memberships.userId, userId))
+          .limit(1),
+        await tx
+          .select({ id: resellerMemberships.id })
+          .from(resellerMemberships) // allow-base-read: deleted memberships count as use
+          .where(eq(resellerMemberships.userId, userId))
+          .limit(1),
+        await tx
+          .select({ id: platformMemberships.id })
+          .from(platformMemberships) // allow-base-read: deleted memberships count as use
+          .where(eq(platformMemberships.userId, userId))
+          .limit(1),
+      ];
+      if (uses.some((rows) => rows.length > 0)) return false;
+      await tx.delete(phoneNumbers).where(eq(phoneNumbers.userId, userId));
+      await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
+      await tx.delete(users).where(eq(users.id, userId));
+      return true;
+    });
+  }
+
   async wasCreatedByReseller(userId: string, resellerId: string): Promise<boolean> {
     const rows = await withAdmin(this.db, mkAdminCtx('service:identity'), (tx) =>
       tx

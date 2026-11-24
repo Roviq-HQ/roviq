@@ -31,6 +31,8 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   // reason is the one its service method carried.
   'apps/api-gateway/src/auth/repositories/auth-event.drizzle-repository.ts#AuthEventDrizzleRepository.insert':
     'Insert-only writer of auth events; reads nothing back.',
+  'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.deleteUnusedUser':
+    'Deletes only the account the same request just created for a failed admission, never a caller-supplied id, and refuses any account with a membership or a changed password. Test: discard-new-user.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.findUserContact':
     'The user id is the institute row’s first_admin_user_id, read only after the platform or owning-reseller check; a reseller gets the name and phone only when wasCreatedByReseller is true.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.findUsersByEmail':

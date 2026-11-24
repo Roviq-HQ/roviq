@@ -20,6 +20,12 @@ export abstract class IdentityRepository {
   abstract insertUserProfileIfMissing(profile: NewUserProfile): Promise<void>;
   /** User and primary phone read in one transaction; null when the user is gone. */
   abstract findUserContact(userId: string): Promise<UserContactRow | null>;
+  /**
+   * In one transaction: deletes the user, its phones and its account profile, but only when it
+   * has never been used: no membership of any scope (deleted ones count; a session needs one)
+   * and a password it never changed. Returns false and deletes nothing otherwise.
+   */
+  abstract deleteUnusedUser(userId: string): Promise<boolean>;
   abstract wasCreatedByReseller(userId: string, resellerId: string): Promise<boolean>;
   /**
    * In one transaction: replaces the hash only while `must_change_password` is still true and

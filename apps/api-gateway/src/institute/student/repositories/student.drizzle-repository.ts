@@ -4,13 +4,9 @@ import {
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
-  memberships,
-  membershipsLive,
   mkAdminCtx,
   mkInstituteCtx,
-  rolesLive,
   softDelete,
-  studentAcademics,
   studentAcademicsLive,
   studentProfiles,
   studentProfilesLive,
@@ -22,7 +18,6 @@ import {
 } from '@roviq/database';
 import { and, desc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import {
-  ensureTenantUserProfile,
   type TenantUserProfileFields,
   updateTenantUserProfile,
 } from '../../../auth/tenant-user-profile';
@@ -32,8 +27,8 @@ import {
   loadUserDocumentFiles,
   removeUserDocument,
 } from '../../../files/user-document-files';
-import { nextAdmissionNumber } from '../admission-number.sequence';
 import { studentReadPredicate } from '../student-read-predicate';
+import { type AdmitStudentData, type AdmitStudentResult, admitStudent } from './admit-student';
 import { findYearAndClass } from './class-lookup';
 import { StudentRepository } from './student.repository';
 import type {
@@ -41,10 +36,7 @@ import type {
   AdmissionClassResult,
   DeletedStudentRecord,
   FileRecord,
-  NewStudentAcademicData,
   NewStudentDocumentData,
-  NewStudentMembershipData,
-  NewStudentProfileData,
   RestoreStudentResult,
   StudentStatusRecord,
   UserDocumentRecord,
@@ -58,84 +50,10 @@ export class StudentDrizzleRepository extends StudentRepository {
     super();
   }
 
-  async findStudentRoleId(tenantId: string): Promise<string | null> {
-    const rows = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      return tx
-        .select({ id: rolesLive.id })
-        .from(rolesLive)
-        .where(
-          and(
-            eq(rolesLive.tenantId, tenantId),
-            sql`${rolesLive.name}->>'en' = 'student' OR ${rolesLive.name}->>'en' = 'Student'`,
-          ),
-        )
-        .limit(1);
-    });
-    return rows[0]?.id ?? null;
-  }
-
-  async createMembership(tenantId: string, data: NewStudentMembershipData): Promise<string | null> {
-    const inserted = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const rows = await tx
-        .insert(memberships)
-        .values({
-          userId: data.userId,
-          tenantId,
-          roleId: data.roleId,
-          status: 'ACTIVE',
-          abilities: [],
-          createdBy: data.actorId,
-          updatedBy: data.actorId,
-        })
-        .onConflictDoNothing()
-        .returning({ id: memberships.id });
-      await ensureTenantUserProfile(tx, {
-        tenantId,
-        userId: data.userId,
-        actorId: data.actorId,
-        ...data.profile,
-      });
-      return rows;
-    });
-    return inserted[0]?.id ?? null;
-  }
-
-  async findMembershipId(tenantId: string, userId: string, roleId: string): Promise<string> {
-    const existing = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      return tx
-        .select({ id: membershipsLive.id })
-        .from(membershipsLive)
-        .where(
-          and(
-            eq(membershipsLive.userId, userId),
-            eq(membershipsLive.tenantId, tenantId),
-            eq(membershipsLive.roleId, roleId),
-          ),
-        )
-        .limit(1);
-    });
-    return existing[0].id;
-  }
-
-  async createProfile(
-    tenantId: string,
-    data: NewStudentProfileData,
-  ): Promise<{ studentProfileId: string; admissionNumber: string }> {
-    const { standardId, actorId, ...profile } = data;
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const admissionNumber = await nextAdmissionNumber(tx, tenantId, standardId);
-      const newProfiles = await tx
-        .insert(studentProfiles)
-        .values({
-          ...profile,
-          tenantId,
-          admissionNumber,
-          createdBy: actorId,
-          updatedBy: actorId,
-        })
-        .returning({ id: studentProfiles.id });
-      return { studentProfileId: newProfiles[0].id, admissionNumber };
-    });
+  admit(data: AdmitStudentData): Promise<AdmitStudentResult> {
+    return withTenant(this.db, mkInstituteCtx(data.tenantId, ORIGIN), (tx) =>
+      admitStudent(tx, data),
+    );
   }
 
   checkAdmissionClass(tenantId: string, data: AdmissionClassData): Promise<AdmissionClassResult> {
@@ -147,31 +65,6 @@ export class StudentDrizzleRepository extends StudentRepository {
         data.sectionId,
       );
       return found.kind === 'ok' ? { kind: 'ok' } : found;
-    });
-  }
-
-  createInitialAcademic(
-    tenantId: string,
-    data: NewStudentAcademicData,
-  ): Promise<AdmissionClassResult> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const found = await findYearAndClass(
-        tx,
-        data.academicYearId,
-        data.standardId,
-        data.sectionId,
-      );
-      if (found.kind !== 'ok') return found;
-      await tx.insert(studentAcademics).values({
-        studentProfileId: data.studentProfileId,
-        academicYearId: data.academicYearId,
-        standardId: data.standardId,
-        sectionId: data.sectionId,
-        tenantId,
-        createdBy: data.actorId,
-        updatedBy: data.actorId,
-      });
-      return { kind: 'ok' };
     });
   }
 

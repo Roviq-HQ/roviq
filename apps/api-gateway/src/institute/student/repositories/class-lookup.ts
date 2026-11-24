@@ -34,6 +34,26 @@ export async function findClassInYear(
   return { kind: 'ok', numericOrder: standard.numericOrder };
 }
 
+/** The year, and the standard in it, read under the caller's institute; no section. */
+export async function findYearAndStandard(
+  tx: DrizzleDB,
+  academicYearId: string,
+  standardId: string,
+): Promise<{ kind: 'year_not_found' } | { kind: 'standard_not_found' } | { kind: 'ok' }> {
+  const [year] = await tx
+    .select({ id: academicYearsLive.id })
+    .from(academicYearsLive)
+    .where(eq(academicYearsLive.id, academicYearId))
+    .limit(1);
+  if (!year) return { kind: 'year_not_found' };
+  const [standard] = await tx
+    .select({ id: standardsLive.id })
+    .from(standardsLive)
+    .where(and(eq(standardsLive.id, standardId), eq(standardsLive.academicYearId, academicYearId)))
+    .limit(1);
+  return standard ? { kind: 'ok' } : { kind: 'standard_not_found' };
+}
+
 /** `findClassInYear`, after reading the year itself under the caller's institute. */
 export async function findYearAndClass(
   tx: DrizzleDB,

@@ -13,23 +13,12 @@ import {
   SocialCategory,
   studentImportFieldForHeader,
 } from '@roviq/common-types';
-import {
-  type DrizzleDB,
-  memberships,
-  mkInstituteCtx,
-  rolesLive,
-  studentAcademics,
-  studentProfiles,
-  studentProfilesLive,
-  tenantSequences,
-  withTenant,
-} from '@roviq/database';
+import { type DrizzleDB, mkInstituteCtx, studentProfilesLive, withTenant } from '@roviq/database';
 import { EVENT_PATTERNS, type EventPattern } from '@roviq/nats-jetstream';
-import { and, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import Papa from 'papaparse';
 import type { IdentityService } from '../../../auth/identity.service';
-import { ensureTenantUserProfile } from '../../../auth/tenant-user-profile';
-import { nextAdmissionNumber } from '../admission-number.sequence';
+import { admitStudent, findStudentRoleId } from '../repositories/admit-student';
 import type {
   BulkStudentImportActivities,
   ImportFileStore,
@@ -392,58 +381,6 @@ async function createUser(
   return userId;
 }
 
-/** Find the 'student' role for a tenant. Returns roleId or null. */
-async function findStudentRoleId(db: DrizzleDB, tenantId: string): Promise<string | null> {
-  const studentRole = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'workflow:bulk-student-import.activities'),
-    async (tx) => {
-      return tx
-        .select({ id: rolesLive.id })
-        .from(rolesLive)
-        .where(
-          and(
-            eq(rolesLive.tenantId, tenantId),
-            sql`${rolesLive.name}->>'en' = 'student' OR ${rolesLive.name}->>'en' = 'Student'`,
-          ),
-        )
-        .limit(1);
-    },
-  );
-  return studentRole.length > 0 ? studentRole[0].id : null;
-}
-
-/** Generate next roll number for a section+year via tenant_sequences. */
-async function generateRollNumber(
-  db: DrizzleDB,
-  tenantId: string,
-  sectionId: string,
-  academicYearId: string,
-): Promise<string> {
-  const rollSeqName = `roll_no:${sectionId}:${academicYearId}`;
-  const rollResult = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'workflow:bulk-student-import.activities'),
-    async (tx) => {
-      await tx
-        .insert(tenantSequences)
-        .values({
-          tenantId,
-          sequenceName: rollSeqName,
-          currentValue: 0n,
-          formatTemplate: '{value:04d}',
-        })
-        .onConflictDoNothing();
-
-      const result = await tx.execute(
-        sql`SELECT * FROM next_sequence_value(${tenantId}::uuid, ${rollSeqName})`,
-      );
-      return result.rows[0] as { next_val: string; formatted: string };
-    },
-  );
-  return rollResult.formatted || String(rollResult.next_val);
-}
-
 // ── Per-row insert helpers for insertBatch ───────────────
 
 /** Params shared across all rows in a single batch insert call. */
@@ -455,139 +392,71 @@ interface InsertRowContext {
   defaultStandardId: string;
   defaultSectionId: string;
   createdBy: string;
-  studentRoleId: string;
   emitEvent: (pattern: EventPattern, data: unknown) => void;
 }
 
-/** The account name, and the institute's own copy with the demographics. Both idempotent. */
-async function upsertUserProfile(
-  ctx: Pick<InsertRowContext, 'db' | 'identityService' | 'tenantId' | 'createdBy'>,
-  userId: string,
-  row: ValidatedRow,
-): Promise<void> {
-  const name = {
-    firstName: { en: row.firstName },
-    lastName: row.lastName ? { en: row.lastName } : null,
-  };
-  await ctx.identityService.ensureUserProfile(userId, name, ctx.createdBy);
-  await withTenant(
+/** The institute-side rows of one row's student, in one transaction (ROV-275). */
+function admitRow(ctx: InsertRowContext, row: ValidatedRow, userId: string) {
+  return withTenant(
     ctx.db,
     mkInstituteCtx(ctx.tenantId, 'workflow:bulk-student-import.activities'),
     (tx) =>
-      ensureTenantUserProfile(tx, {
+      admitStudent(tx, {
         tenantId: ctx.tenantId,
         userId,
         actorId: ctx.createdBy,
-        ...name,
-        gender: row.gender,
-        dateOfBirth: row.dateOfBirth,
-        bloodGroup: row.bloodGroup ?? null,
-        religion: row.religion ?? null,
+        academicYearId: ctx.academicYearId,
+        standardId: row.standardId ?? ctx.defaultStandardId,
+        sectionId: row.sectionId ?? ctx.defaultSectionId,
+        tenantProfile: {
+          ...rowName(row),
+          gender: row.gender,
+          dateOfBirth: row.dateOfBirth,
+          bloodGroup: row.bloodGroup ?? null,
+          religion: row.religion ?? null,
+        },
+        profile: {
+          admissionDate: new Date().toISOString().split('T')[0],
+          admissionClass: null,
+          admissionType: row.admissionType ?? AdmissionType.NEW,
+          academicStatus: AcademicStatus.ENROLLED,
+          socialCategory: row.socialCategory ?? SocialCategory.GENERAL,
+          caste: null,
+          isMinority: false,
+          minorityType: null,
+          isBpl: false,
+          isCwsn: false,
+          cwsnType: null,
+          isRteAdmitted: false,
+          rteCertificate: null,
+          previousSchoolName: row.previousSchoolName ?? null,
+          previousSchoolBoard: null,
+          previousSchoolUdise: null,
+          incomingTcNumber: null,
+          incomingTcDate: null,
+        },
+        admissionNumber: row.admissionNumber ?? null,
+        assignRollNumber: true,
       }),
   );
 }
 
-/** Create membership for the student. Returns membershipId, or null if already exists. */
-async function createMembership(
-  db: DrizzleDB,
-  tenantId: string,
-  userId: string,
-  studentRoleId: string,
-  createdBy: string,
-): Promise<string | null> {
-  const newMemberships = await withTenant(
-    db,
-    mkInstituteCtx(tenantId, 'workflow:bulk-student-import.activities'),
-    async (tx) => {
-      return tx
-        .insert(memberships)
-        .values({
-          userId,
-          tenantId,
-          roleId: studentRoleId,
-          status: 'ACTIVE',
-          abilities: [],
-          createdBy,
-          updatedBy: createdBy,
-        })
-        .onConflictDoNothing()
-        .returning({ id: memberships.id });
-    },
-  );
-  return newMemberships.length > 0 ? newMemberships[0].id : null;
+function rowName(row: ValidatedRow) {
+  return {
+    firstName: { en: row.firstName },
+    lastName: row.lastName ? { en: row.lastName } : null,
+  };
 }
 
-/** Create student_profile + student_academics and emit event. */
-async function createStudentRecords(
-  ctx: InsertRowContext,
-  row: ValidatedRow,
-  userId: string,
-  membershipId: string,
-): Promise<void> {
-  const targetStandardId = row.standardId ?? ctx.defaultStandardId;
-  const targetSectionId = row.sectionId ?? ctx.defaultSectionId;
-
-  const { newProfiles, admissionNumber } = await withTenant(
-    ctx.db,
-    mkInstituteCtx(ctx.tenantId, 'workflow:bulk-student-import'),
-    async (tx) => {
-      const admissionNumber =
-        row.admissionNumber ?? (await nextAdmissionNumber(tx, ctx.tenantId, targetStandardId));
-      const newProfiles = await tx
-        .insert(studentProfiles)
-        .values({
-          userId,
-          membershipId,
-          tenantId: ctx.tenantId,
-          admissionNumber,
-          admissionDate: new Date().toISOString().split('T')[0],
-          admissionType: row.admissionType ?? AdmissionType.NEW,
-          academicStatus: AcademicStatus.ENROLLED,
-          socialCategory: row.socialCategory ?? SocialCategory.GENERAL,
-          previousSchoolName: row.previousSchoolName ?? null,
-          createdBy: ctx.createdBy,
-          updatedBy: ctx.createdBy,
-        })
-        .returning({ id: studentProfiles.id });
-      return { newProfiles, admissionNumber };
-    },
-  );
-
-  const rollNumber = await generateRollNumber(
-    ctx.db,
-    ctx.tenantId,
-    targetSectionId,
-    ctx.academicYearId,
-  );
-
-  await withTenant(
-    ctx.db,
-    mkInstituteCtx(ctx.tenantId, 'workflow:bulk-student-import'),
-    async (tx) => {
-      await tx.insert(studentAcademics).values({
-        studentProfileId: newProfiles[0].id,
-        academicYearId: ctx.academicYearId,
-        standardId: targetStandardId,
-        sectionId: targetSectionId,
-        rollNumber,
-        tenantId: ctx.tenantId,
-        createdBy: ctx.createdBy,
-        updatedBy: ctx.createdBy,
-      });
-    },
-  );
-
-  logger.log(
-    `Row ${row.rowNumber}: Created student "${row.firstName}" (admission: ${admissionNumber})`,
-  );
-
-  ctx.emitEvent(EVENT_PATTERNS.STUDENT.admitted, {
-    tenantId: ctx.tenantId,
-    userId,
-    studentProfileId: newProfiles[0].id,
-    admissionNumber,
-    rowNumber: row.rowNumber,
-  });
+/** A row that failed must not leave the account it made behind (ROV-275). */
+async function discardAccount(ctx: InsertRowContext, userId: string, rowNumber: number) {
+  try {
+    if (!(await ctx.identityService.discardNewUser(userId))) {
+      logger.warn(`Row ${rowNumber}: kept account ${userId}: it is in use`);
+    }
+  } catch (error) {
+    logger.error(`Row ${rowNumber}: could not remove account ${userId}`, error);
+  }
 }
 
 /**
@@ -610,23 +479,29 @@ async function insertSingleRow(
 
   // A typed number never identifies an existing account (SF-053): every row is a new user.
   const userId = await createUser(ctx.identityService, row, ctx.tenantId, ctx.createdBy);
-
-  await upsertUserProfile(ctx, userId, row);
-
-  // Create membership
-  const membershipId = await createMembership(
-    ctx.db,
-    ctx.tenantId,
-    userId,
-    ctx.studentRoleId,
-    ctx.createdBy,
-  );
-  if (!membershipId) {
-    return 'skipped';
+  let admitted: Awaited<ReturnType<typeof admitRow>>;
+  try {
+    await ctx.identityService.ensureUserProfile(userId, rowName(row), ctx.createdBy);
+    admitted = await admitRow(ctx, row, userId);
+  } catch (error) {
+    await discardAccount(ctx, userId, row.rowNumber);
+    throw error;
+  }
+  if (admitted.kind !== 'ok') {
+    await discardAccount(ctx, userId, row.rowNumber);
+    throw new Error(`Student not admitted: ${admitted.kind}`);
   }
 
-  // Create student profile + academics + emit event
-  await createStudentRecords(ctx, row, userId, membershipId);
+  logger.log(
+    `Row ${row.rowNumber}: Created student "${row.firstName}" (admission: ${admitted.admissionNumber})`,
+  );
+  ctx.emitEvent(EVENT_PATTERNS.STUDENT.admitted, {
+    tenantId: ctx.tenantId,
+    userId,
+    studentProfileId: admitted.studentProfileId,
+    admissionNumber: admitted.admissionNumber,
+    rowNumber: row.rowNumber,
+  });
   return 'created';
 }
 
@@ -707,7 +582,11 @@ export function createBulkStudentImportActivities(
       const errors: RowError[] = [];
 
       // Look up student role once per batch (same tenant)
-      const studentRoleId = await findStudentRoleId(db, tenantId);
+      const studentRoleId = await withTenant(
+        db,
+        mkInstituteCtx(tenantId, 'workflow:bulk-student-import.activities'),
+        (tx) => findStudentRoleId(tx, tenantId),
+      );
       if (!studentRoleId) {
         for (const row of rows) {
           errors.push({
@@ -738,7 +617,6 @@ export function createBulkStudentImportActivities(
         defaultStandardId,
         defaultSectionId,
         createdBy,
-        studentRoleId,
         emitEvent,
       };
 

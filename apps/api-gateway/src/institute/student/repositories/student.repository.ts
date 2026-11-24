@@ -1,43 +1,28 @@
 import type { AcademicStatus, AppAbility, UserDocumentType } from '@roviq/common-types';
 import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
+import type { AdmitStudentData, AdmitStudentResult } from './admit-student';
 import type {
   AdmissionClassData,
   AdmissionClassResult,
   DeletedStudentRecord,
   FileRecord,
-  NewStudentAcademicData,
   NewStudentDocumentData,
-  NewStudentMembershipData,
-  NewStudentProfileData,
   RestoreStudentResult,
   StudentStatusRecord,
   UserDocumentRecord,
 } from './types';
 
 export abstract class StudentRepository {
-  /** The institute's role named "student" (either case), if any. */
-  abstract findStudentRoleId(tenantId: string): Promise<string | null>;
-  /** Membership plus the institute's profile copy; null when the membership already existed. */
-  abstract createMembership(
-    tenantId: string,
-    data: NewStudentMembershipData,
-  ): Promise<string | null>;
-  abstract findMembershipId(tenantId: string, userId: string, roleId: string): Promise<string>;
-  /** Draws the admission number and inserts the profile in one transaction, so a failure leaves no gap. */
-  abstract createProfile(
-    tenantId: string,
-    data: NewStudentProfileData,
-  ): Promise<{ studentProfileId: string; admissionNumber: string }>;
   /** Reads the year, class and section under the institute and checks they belong together. */
   abstract checkAdmissionClass(
     tenantId: string,
     data: AdmissionClassData,
   ): Promise<AdmissionClassResult>;
-  /** Checks the year, class and section again in the transaction of the insert. */
-  abstract createInitialAcademic(
-    tenantId: string,
-    data: NewStudentAcademicData,
-  ): Promise<AdmissionClassResult>;
+  /**
+   * Membership, the institute's profile copy, student profile with its admission number, and
+   * enrolment, in one transaction: nothing is written unless all of it is.
+   */
+  abstract admit(data: AdmitStudentData): Promise<AdmitStudentResult>;
 
   /** The student's user id, when the ability's read rules cover the student. */
   abstract findReadableUserId(

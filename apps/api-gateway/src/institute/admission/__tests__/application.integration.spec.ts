@@ -614,20 +614,16 @@ describe('Admission applications (integration)', () => {
       parentRelation: 'FATHER',
     };
 
-    const { userId: studentUserId, membershipId } = await activities.createUserAndMembership(
+    const { userId: studentUserId, studentProfileId } = await activities.admitStudent({
       tenantId,
       actorId,
       seed,
-    );
-    const { studentProfileId } = await activities.createStudentProfile(
-      tenantId,
-      studentUserId,
-      membershipId,
-      fixture.standardId,
+      academicYearId: fixture.academicYearId,
+      standardId: fixture.standardId,
+      sectionId: null,
       formData,
-      false,
-      actorId,
-    );
+      isRte: false,
+    });
     await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
     // Temporal retries must not create a second guardian.
     await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
@@ -685,20 +681,16 @@ describe('Admission applications (integration)', () => {
       parentName: 'Kavita Rao',
       parentPhone: `8${String(Date.now()).slice(-9)}`,
     };
-    const { userId, membershipId } = await activities.createUserAndMembership(
+    const { studentProfileId } = await activities.admitStudent({
       tenantId,
       actorId,
       seed,
-    );
-    const { studentProfileId } = await activities.createStudentProfile(
-      tenantId,
-      userId,
-      membershipId,
-      fixture.standardId,
+      academicYearId: fixture.academicYearId,
+      standardId: fixture.standardId,
+      sectionId: null,
       formData,
-      false,
-      actorId,
-    );
+      isRte: false,
+    });
 
     await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
 
@@ -733,16 +725,16 @@ describe('Admission applications (integration)', () => {
         parentPhone: outsiderPhone,
         parentRelation: 'MOTHER',
       };
-      const student = await activities.createUserAndMembership(tenantId, actorId, seed);
-      const { studentProfileId } = await activities.createStudentProfile(
+      const { studentProfileId } = await activities.admitStudent({
         tenantId,
-        student.userId,
-        student.membershipId,
-        fixture.standardId,
-        formData,
-        false,
         actorId,
-      );
+        seed,
+        academicYearId: fixture.academicYearId,
+        standardId: fixture.standardId,
+        sectionId: null,
+        formData,
+        isRte: false,
+      });
       await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
       return studentProfileId;
     };
@@ -807,16 +799,16 @@ describe('Admission applications (integration)', () => {
     };
     const admit = async () => {
       const seed = randomUUID();
-      const student = await activities.createUserAndMembership(tenantId, actorId, seed);
-      const { studentProfileId } = await activities.createStudentProfile(
+      const { studentProfileId } = await activities.admitStudent({
         tenantId,
-        student.userId,
-        student.membershipId,
-        fixture.standardId,
-        formData,
-        false,
         actorId,
-      );
+        seed,
+        academicYearId: fixture.academicYearId,
+        standardId: fixture.standardId,
+        sectionId: null,
+        formData,
+        isRte: false,
+      });
       await activities.linkGuardians(tenantId, studentProfileId, formData, actorId, seed);
       return studentProfileId;
     };
