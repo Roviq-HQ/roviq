@@ -475,7 +475,7 @@ The default `parent` role reads attendance only for linked children: `{ studentP
 ### Platform and reseller system roles
 
 - Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
-- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed only maintains the Roviq Direct copies (fixed seed ids). Migration `rov-91-reseller-role-backfill` gives resellers that predate this their own copies and moves any `reseller_memberships` row that still points at another reseller's role onto them.
+- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed only maintains the Roviq Direct copies (fixed seed ids).
 - `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
 
 ### Reseller team (ROV-185)
