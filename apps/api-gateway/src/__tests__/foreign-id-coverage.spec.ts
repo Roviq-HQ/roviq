@@ -18,9 +18,6 @@ const RESOLVER_ROOTS = ['apps/api-gateway/src', 'ee/apps/api-gateway/src'];
 /** Resolvers under an `admin/` directory are platform scope: they see every tenant by design. */
 const PLATFORM_ONLY_DIR = 'admin';
 
-/** Entries still marked pending. Lower it with every operation covered; never raise it. */
-const PENDING_COUNT = 70;
-
 function resolverFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((entry) => {
@@ -117,10 +114,5 @@ describe('foreign-id test coverage of institute and reseller operations', () => 
       .filter(([, coverage]) => 'exempt' in coverage && coverage.exempt.trim().length < 20)
       .map(([name]) => name);
     expect(unexplained).toEqual([]);
-  });
-
-  it('should not let the number of pending operations grow', () => {
-    const pending = Object.values(FOREIGN_ID_COVERAGE).filter((c) => 'pending' in c).length;
-    expect(pending).toBe(PENDING_COUNT);
   });
 });

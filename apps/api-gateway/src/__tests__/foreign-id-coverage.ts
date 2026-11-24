@@ -7,11 +7,7 @@ export type ForeignIdCoverage =
   /** Repo-relative path of the spec holding the foreign-id test. It must name the operation. */
   | { spec: string }
   /** No id of the operation can name a row of another institute or reseller; say why. */
-  | { exempt: string }
-  /** Not covered yet. The count may only go down: `PENDING_COUNT` in the spec. */
-  | { pending: true };
-
-const PENDING: ForeignIdCoverage = { pending: true };
+  | { exempt: string };
 
 export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = {
   // apps/api-gateway/src/institute/academic-year
@@ -193,51 +189,141 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/institute/consent/__tests__/consent-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/examination
-  addExamSchedule: PENDING,
-  archiveExam: PENDING,
-  createCoScholasticArea: PENDING,
-  createExam: PENDING,
-  createExamTerm: PENDING,
-  createReportCard: PENDING,
-  createSubjectTopic: PENDING,
-  deleteCoScholasticArea: PENDING,
-  deleteExam: PENDING,
-  deleteExamTerm: PENDING,
-  deleteGradingScheme: PENDING,
-  deleteReportCard: PENDING,
-  deleteSubjectTopic: PENDING,
-  enterCoScholasticAssessments: PENDING,
-  enterExamMarks: PENDING,
-  enterTopicAssessments: PENDING,
-  exam: PENDING,
-  examDatesheet: PENDING,
-  examDatesheetPdf: PENDING,
-  examMarksSheet: PENDING,
-  examResults: PENDING,
-  examsList: PENDING,
-  examTerms: PENDING,
-  generateReportCards: PENDING,
-  gradingScheme: PENDING,
-  lockExam: PENDING,
-  openExamMarksEntry: PENDING,
-  publishExamResults: PENDING,
-  publishReportCards: PENDING,
-  removeExamSchedule: PENDING,
-  replaceGradeBands: PENDING,
-  reportCard: PENDING,
-  reportCardInstance: PENDING,
-  reportCardInstances: PENDING,
-  reportCardPdf: PENDING,
-  reportCards: PENDING,
-  restoreExam: PENDING,
-  scheduleExam: PENDING,
-  subjectTopics: PENDING,
-  unarchiveExam: PENDING,
-  updateExam: PENDING,
-  updateExamSchedule: PENDING,
-  updateExamTerm: PENDING,
-  updateGradingScheme: PENDING,
-  updateReportCard: PENDING,
+  addExamSchedule: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  archiveExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  createCoScholasticArea: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  createExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  createExamTerm: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  createReportCard: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  createSubjectTopic: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  deleteCoScholasticArea: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  deleteExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  deleteExamTerm: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  deleteGradingScheme: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  deleteReportCard: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  deleteSubjectTopic: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  enterCoScholasticAssessments: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  enterExamMarks: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  enterTopicAssessments: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  exam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  examDatesheet: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  examDatesheetPdf: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  examMarksSheet: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  examResults: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  examsList: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  examTerms: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  generateReportCards: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  gradingScheme: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  lockExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  openExamMarksEntry: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  publishExamResults: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  publishReportCards: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  removeExamSchedule: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  replaceGradeBands: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  reportCard: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  reportCardInstance: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  reportCardInstances: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  reportCardPdf: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  reportCards: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
+  restoreExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  scheduleExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  subjectTopics: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  unarchiveExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  updateExam: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  updateExamSchedule: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  updateExamTerm: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  updateGradingScheme: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/examination-foreign-id.integration.spec.ts',
+  },
+  updateReportCard: {
+    spec: 'apps/api-gateway/src/institute/examination/__tests__/report-card-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/file
   fileDownloadUrl: {
     spec: 'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
@@ -608,7 +694,9 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/reseller/institute
-  resellerGetInstitute: PENDING,
+  resellerGetInstitute: {
+    spec: 'apps/api-gateway/src/reseller/__tests__/reseller-foreign-id.integration.spec.ts',
+  },
   resellerReactivateInstitute: {
     spec: 'apps/api-gateway/src/reseller/institute/__tests__/reseller-institute-foreign-id.integration.spec.ts',
   },
@@ -616,10 +704,16 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/reseller/institute/__tests__/reseller-institute-foreign-id.integration.spec.ts',
   },
   // apps/api-gateway/src/reseller/institute-group
-  resellerAddInstituteToGroup: PENDING,
-  resellerRemoveInstituteFromGroup: PENDING,
+  resellerAddInstituteToGroup: {
+    spec: 'apps/api-gateway/src/reseller/__tests__/reseller-foreign-id.integration.spec.ts',
+  },
+  resellerRemoveInstituteFromGroup: {
+    spec: 'apps/api-gateway/src/reseller/__tests__/reseller-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/reseller/settings
-  resellerUpdateBranding: PENDING,
+  resellerUpdateBranding: {
+    spec: 'apps/api-gateway/src/reseller/__tests__/reseller-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/reseller/team
   resellerChangeTeamMemberRole: {
     spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
@@ -637,27 +731,55 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
     spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
   },
   // ee/apps/api-gateway/src/billing/institute
-  generateInvoicePdf: PENDING,
+  generateInvoicePdf: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
   initiatePayment: { spec: 'apps/api-gateway/src/__tests__/billing.integration.spec.ts' },
-  myInvoice: PENDING,
-  submitUpiProof: PENDING,
+  myInvoice: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  submitUpiProof: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
   // ee/apps/api-gateway/src/billing/reseller
-  archivePlan: PENDING,
-  cancelSubscription: PENDING,
-  changePlan: PENDING,
-  deleteGatewayConfig: PENDING,
-  deletePlan: PENDING,
-  generateInvoice: PENDING,
-  invoicePayments: PENDING,
-  invoices: PENDING,
-  issueRefund: PENDING,
-  pauseSubscription: PENDING,
-  recordManualPayment: PENDING,
-  rejectUpiPayment: PENDING,
-  restorePlan: PENDING,
-  resumeSubscription: PENDING,
-  subscriptionPlan: PENDING,
-  updateGatewayConfig: PENDING,
-  updateSubscriptionPlan: PENDING,
-  verifyUpiPayment: PENDING,
+  archivePlan: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
+  cancelSubscription: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  changePlan: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
+  deleteGatewayConfig: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  deletePlan: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
+  generateInvoice: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  invoicePayments: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  invoices: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
+  issueRefund: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
+  pauseSubscription: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  recordManualPayment: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  rejectUpiPayment: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  restorePlan: { spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts' },
+  resumeSubscription: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  subscriptionPlan: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  updateGatewayConfig: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  updateSubscriptionPlan: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
+  verifyUpiPayment: {
+    spec: 'apps/api-gateway/src/__tests__/billing-foreign-id.integration.spec.ts',
+  },
 };
