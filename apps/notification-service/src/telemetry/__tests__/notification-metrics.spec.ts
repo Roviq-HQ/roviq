@@ -24,6 +24,7 @@ describe('notification metric labels', () => {
       'notification.delivery': ['channel', 'status', 'provider', 'reason'],
       'notification.delivery.duration': ['channel', 'provider'],
       'notification.deferred': ['channel', 'reason'],
+      'notification.breaker.opened': ['channel', 'provider', 'reason'],
       'notification.event.lag': ['stream', 'consumer'],
       'notification.canary.last_success': ['channel'],
       'notification.worker.running': [],
@@ -73,6 +74,8 @@ describe('reasonLabel', () => {
     ['no_template', 'no_template'],
     ['quiet_hours', 'quiet_hours'],
     ['sender_cap', 'sender_cap'],
+    ['rate_limited', 'rate_limited'],
+    ['provider_paused', 'provider_paused'],
   ])('should label %s as %s', (code, label) => {
     expect(reasonLabel(code)).toBe(label);
   });

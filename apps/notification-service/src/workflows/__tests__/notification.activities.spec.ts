@@ -221,7 +221,7 @@ describe('sendChannel activity', () => {
 
     const result = await createNotificationActivities(deps(sender), () => 1).sendChannel(INPUT);
 
-    expect(result).toEqual({ deferUntil: '2026-11-24T01:30:00.000Z' });
+    expect(result).toEqual({ deferUntil: '2026-11-24T01:30:00.000Z', reason: 'quiet_hours' });
   });
 
   it('should throw a non-retryable failure when the provider would refuse again', async () => {
@@ -389,6 +389,23 @@ describe('sendChannel activity', () => {
     await createNotificationActivities(deps(sender), () => 1).sendChannel({ ...INPUT, deferrable });
 
     expect(sender.attempt.mock.calls.map(([a]) => a.deferrable)).toEqual([deferrable]);
+  });
+
+  it('should mark a digest run as a digest and a single message as not', async () => {
+    const sender = createMock<ChannelSender>({
+      attempt: vi
+        .fn()
+        .mockResolvedValue({ status: 'SENT', provider: 'log', providerMessageId: null }),
+    });
+    const activities = createNotificationActivities(deps(sender), () => 1);
+
+    await activities.sendChannel(INPUT);
+    await activities.sendChannel({
+      ...INPUT,
+      content: { kind: 'digest', digest: { type: 'LEAVE_DECIDED', items: [INPUT_MESSAGE.params] } },
+    });
+
+    expect(sender.attempt.mock.calls.map(([a]) => a.digest)).toEqual([false, true]);
   });
 });
 

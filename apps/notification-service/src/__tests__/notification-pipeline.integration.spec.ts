@@ -74,6 +74,7 @@ import {
   type FlowWorkflowInput,
   sendData,
 } from '../workflows/notification-workflow.types';
+import { noDeliveryLimits } from './delivery-limits';
 
 const CTX = 'test:notification-pipeline';
 const by = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -295,6 +296,7 @@ describe('notification pipeline (integration)', () => {
       writes,
       new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
       new NotificationMetrics(),
+      ...noDeliveryLimits(),
     );
     dispatcher = new NotificationDispatcher(
       new NotificationConfigReadDrizzleRepository(db),
@@ -649,6 +651,7 @@ describe('notification pipeline (integration)', () => {
           new Clock(),
         ),
         new NotificationMetrics(),
+        ...noDeliveryLimits(),
       );
     });
 

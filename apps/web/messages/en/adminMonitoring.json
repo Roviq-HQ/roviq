@@ -119,6 +119,23 @@
       "ACTIVE": "Active",
       "PAUSED": "Paused",
       "BLOCKED": "Blocked"
-    }
+    },
+    "senderRate": "{rate, plural, one {# message a second} other {# messages a second}}",
+    "senderRateEdit": "Change how many messages this sender may send each second",
+    "senderRateDialogTitle": "Messages per second",
+    "senderRateDialogDescription": "How fast {number} hands messages to the provider, across every notification service. Messages over the limit wait their turn; none are lost.",
+    "senderRateLabel": "Messages per second",
+    "senderRateHint": "1 to 1000. Use the limit the provider set for this number.",
+    "senderRateInvalid": "Enter a whole number from 1 to 1000.",
+    "senderRateSave": "Save changes",
+    "senderRateCancel": "Cancel",
+    "senderRateSaved": "Messages per second saved",
+    "senderRateErrors": {
+      "VALIDATION_FAILED": "The rate must be a whole number from 1 to 1000.",
+      "MESSAGING_SENDER_NOT_FOUND": "This sender no longer exists. Refresh the page.",
+      "FORBIDDEN": "You are not allowed to change senders.",
+      "other": "The rate could not be saved. Try again."
+    },
+    "senderRateSaving": "Saving…"
   }
 }

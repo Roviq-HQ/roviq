@@ -52,6 +52,7 @@ const senderColumns = {
   status: messagingSenders.status,
   dailyCap: messagingSenders.dailyCap,
   instituteDailyCap: messagingSenders.instituteDailyCap,
+  messagesPerSecond: messagingSenders.messagesPerSecond,
   createdAt: messagingSenders.createdAt,
   updatedAt: messagingSenders.updatedAt,
 };
@@ -65,6 +66,7 @@ const liveColumns = {
   status: messagingSendersLive.status,
   dailyCap: messagingSendersLive.dailyCap,
   instituteDailyCap: messagingSendersLive.instituteDailyCap,
+  messagesPerSecond: messagingSendersLive.messagesPerSecond,
   createdAt: messagingSendersLive.createdAt,
   updatedAt: messagingSendersLive.updatedAt,
 };
@@ -188,6 +190,9 @@ export class AdminMessagingDrizzleRepository extends AdminMessagingRepository {
           ...(data.dailyCap !== undefined && { dailyCap: data.dailyCap }),
           ...(data.instituteDailyCap !== undefined && {
             instituteDailyCap: data.instituteDailyCap,
+          }),
+          ...(data.messagesPerSecond !== undefined && {
+            messagesPerSecond: data.messagesPerSecond,
           }),
           updatedBy: ctx.userId,
           version: sql`${messagingSenders.version} + 1`,

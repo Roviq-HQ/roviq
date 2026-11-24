@@ -72,6 +72,7 @@ describe('WhatsAppWebhookService', () => {
       providerNumberId: NUMBER_ID,
       dailyCap: 1000,
       instituteDailyCap: null,
+      messagesPerSecond: 10,
       accessTokenEncrypted: cloud.cipher.encrypt(TOKEN),
     };
     senders = createMock<MessagingSenderRepository>({

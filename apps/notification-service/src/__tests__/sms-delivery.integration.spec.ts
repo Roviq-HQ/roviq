@@ -32,6 +32,7 @@ import { MessagingSenderDrizzleRepository } from '../repositories/messaging-send
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
+import { noDeliveryLimits } from './delivery-limits';
 
 const AUTH_KEY = `spec-key-${randomUUID()}`;
 const CODE = '739155';
@@ -160,6 +161,7 @@ describe('SMS delivery through the provider adapter (integration)', () => {
         new Clock(),
       ),
       new NotificationMetrics(),
+      ...noDeliveryLimits(),
     );
   }
 

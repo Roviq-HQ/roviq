@@ -1,4 +1,5 @@
 import type { NotificationChannel, NotificationSkipReason } from '@roviq/common-types';
+import type { DeferReason } from '../delivery/channel-gate';
 import type { Audience } from '../repositories/types';
 import type { RegularDigest, RegularMessage } from '../types/compose';
 import type { NotificationFlow } from '../types/flow';
@@ -97,10 +98,14 @@ export interface RecordSkipInput {
   flowId: string | null;
 }
 
-/** Quiet hours or a full sender: the workflow sleeps until `deferUntil` and tries again. */
+/** Quiet hours, a full or slowed sender, a paused provider: sleep until `deferUntil`, try again. */
 export interface ChannelDeferral {
   deferUntil: string;
+  reason: DeferReason;
 }
+
+/** Deferrals that come from sending speed or a provider pause, counted apart from the others. */
+export const HELD_DEFER_REASONS: readonly DeferReason[] = ['rate_limited', 'provider_paused'];
 
 export interface CanaryWorkflowInput {
   /** Each is asked for one test message, in order. */
@@ -127,6 +132,12 @@ export interface NotificationActivities {
 
 /** How often a channel may be deferred; the try after the last one sends or records a skip. */
 export const MAX_CHANNEL_DEFERRALS = 30;
+/**
+ * How often a channel may be held by the sender's rate or a paused provider. A busy sender holds
+ * a message for seconds, an open breaker for a minute at a time: this covers about 8 hours of a
+ * provider outage while the workflow's history stays small.
+ */
+export const MAX_HELD_DEFERRALS = 480;
 
 /** The data a send carries; a push also carries its notification id so a device can acknowledge it. */
 export function sendData(

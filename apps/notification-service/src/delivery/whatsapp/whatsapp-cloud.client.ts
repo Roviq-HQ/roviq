@@ -42,14 +42,34 @@ export function errorCodeForProviderCode(providerCode: number | null): AdapterEr
   return known?.code ?? 'WA_REJECTED';
 }
 
-function errorFor(providerCode: number | null, httpStatus: number): ChannelAdapterError {
+/** `Retry-After` as seconds or an HTTP date; null when absent or unreadable. */
+export function retryAfterMsOf(header: string | null, now = Date.now()): number | null {
+  if (header === null || header.trim() === '') return null;
+  const value = header.trim();
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : Math.max(0, at - now);
+}
+
+function errorFor(
+  providerCode: number | null,
+  httpStatus: number,
+  retryAfterMs: number | null,
+): ChannelAdapterError {
   const known = ERROR_CODES.find(
     (e) => providerCode !== null && e.providerCodes.includes(providerCode),
   );
   if (known) {
-    return new ChannelAdapterError(known.code, `provider code ${providerCode}`, known.retryable);
+    return new ChannelAdapterError(
+      known.code,
+      `provider code ${providerCode}`,
+      known.retryable,
+      known.code === 'WA_RATE_LIMITED' ? retryAfterMs : null,
+    );
   }
-  if (httpStatus === 429) return new ChannelAdapterError('WA_RATE_LIMITED', 'http 429');
+  if (httpStatus === 429) {
+    return new ChannelAdapterError('WA_RATE_LIMITED', 'http 429', true, retryAfterMs);
+  }
   if (httpStatus >= 500) return new ChannelAdapterError('WA_UNREACHABLE', `http ${httpStatus}`);
   // A refusal this table does not know. The message text may quote the recipient, so only the code is kept.
   return new ChannelAdapterError(
@@ -145,7 +165,13 @@ export class WhatsAppCloudClient {
       throw new ChannelAdapterError('WA_UNREACHABLE', 'request failed or timed out');
     }
     const body: unknown = await response.json().catch(() => null);
-    if (!response.ok) throw errorFor(providerCodeOf(body), response.status);
+    if (!response.ok) {
+      throw errorFor(
+        providerCodeOf(body),
+        response.status,
+        retryAfterMsOf(response.headers.get('retry-after')),
+      );
+    }
     return messageIdOf(body);
   }
 }

@@ -38,10 +38,4 @@ describe('buildChannelAdapters', () => {
     expect(adapters.list('WHATSAPP').map((a) => a.provider)).toEqual(['whatsapp_cloud', 'log']);
     expect(adapters.list('WHATSAPP').map((a) => a.channel)).toEqual(['WHATSAPP', 'WHATSAPP']);
   });
-
-  it('should treat every provider as available until a breaker exists', () => {
-    const adapters = build({ NOTIFICATION_PUSH_PROVIDER: 'log' });
-
-    expect(adapters.list('PUSH').map((a) => adapters.available(a))).toEqual([true]);
-  });
 });

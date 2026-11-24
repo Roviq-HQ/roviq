@@ -55,8 +55,9 @@ function anchorsOf(markdown: string): Set<string> {
 }
 
 describe('notification alert files', () => {
-  it('should hold the seven notification alerts', () => {
+  it('should hold the eight notification alerts', () => {
     expect(files.sort()).toEqual([
+      'notification_breaker_opened.json',
       'notification_canary_missing.json',
       'notification_dead_letters.json',
       'notification_events_stuck.json',

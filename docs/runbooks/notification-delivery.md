@@ -1,7 +1,7 @@
 # Notification delivery alerts
 
 The notification service measures its own delivery and sends a test message (the canary) every
-15 minutes (`docs/architecture.md` → "Notifications"). Seven OpenObserve alerts in
+15 minutes (`docs/architecture.md` → "Notifications"). Eight OpenObserve alerts in
 `docker/openobserve/alerts/notification_*.json` watch it; the metrics they read are listed in
 `docs/infrastructure.md` → "Observability". Each section below is what to check first when one
 fires. `page` alerts mean messages are not reaching people now; `ticket` alerts can wait for
@@ -52,10 +52,32 @@ with at least 20 attempts.
 `notification_sender_blocked` (page): the provider refused a send with `WA_SENDER_BLOCKED` or
 `SMS_SENDER_BLOCKED`.
 
-1. WhatsApp: the admin portal's messaging senders; mark the sender blocked so the platform's
-   sender takes over, and resolve the restriction in the provider's console.
-2. SMS: the sender header or the account was suspended at the provider; check the registration.
-3. Messages of the blocked sender are recorded `FAILED` until it is cleared; nothing is resent.
+1. WhatsApp: the service has already marked the sender `BLOCKED` and opened its breaker, so an
+   institute's messages go through the platform's sender. Resolve the restriction in the
+   provider's console, then activate the sender again in the admin portal's messaging senders;
+   activating clears its breaker and its throttle.
+2. A blocked platform sender leaves WhatsApp without a sender: messages are skipped
+   `no_provider` until it is active again.
+3. SMS: the sender header or the account was suspended at the provider; check the registration.
+   The SMS provider's breaker is open, so each send waits a minute (`provider_paused`) and then
+   one probe tries again.
+
+## Breaker opened
+
+`notification_breaker_opened` (page): a provider (label `provider`, on `channel`) or a WhatsApp
+sender answered "cannot send now" 5 times in a row within a minute, or blocked the sender; the
+`reason` label is the code that opened it.
+
+1. Sends through it are held as `DEFERRED` with `provider_paused` and tried again after a
+   minute, when one probe goes through: a success closes the breaker, a failure keeps it open
+   for another minute. With a second provider in `NOTIFICATION_<CHANNEL>_PROVIDER`, that one
+   takes the messages meanwhile; an institute's own WhatsApp sender falls back to the platform's.
+2. `reason` `*_UNREACHABLE`, `FCM_SERVER_ERROR` or an SMTP connection code: the provider's status
+   page and the network from the service to it.
+3. `reason` `EAUTH`, `FCM_AUTH` or `*_SENDER_BLOCKED`: credentials or the account; see "Sender
+   blocked" above for WhatsApp.
+4. Nothing is lost while it is open: a message gives up only after about 8 hours of holds, and
+   is then recorded `SKIPPED` with `provider_paused`.
 
 ## Events stuck
 

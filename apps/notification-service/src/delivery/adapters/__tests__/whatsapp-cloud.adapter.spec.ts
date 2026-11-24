@@ -57,6 +57,7 @@ describe('WhatsAppCloudAdapter', () => {
       providerNumberId: 'fake-number-id-1',
       dailyCap: 1000,
       instituteDailyCap: null,
+      messagesPerSecond: 10,
       accessTokenEncrypted: cloud.cipher.encrypt(TOKEN),
     };
   });

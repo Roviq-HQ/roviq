@@ -6,6 +6,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -15,6 +16,8 @@ import {
 const E164 = /^\+[1-9]\d{6,14}$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const TOKEN_MAX_LENGTH = 4096;
+/** The database CHECK `chk_messaging_senders_rate` holds the same bounds. */
+const MESSAGES_PER_SECOND = { min: 1, max: 1000 } as const;
 
 @InputType({ description: "Registers the platform's sender, or one institute's own." })
 export class RegisterMessagingSenderInput {
@@ -84,6 +87,17 @@ export class UpdateMessagingSenderInput {
   @IsInt()
   @Min(1)
   instituteDailyCap?: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      "Messages per second the sender may hand the provider, 1 to 1000. Set it to the provider's limit for the number.",
+  })
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  @Min(MESSAGES_PER_SECOND.min)
+  @Max(MESSAGES_PER_SECOND.max)
+  messagesPerSecond?: number;
 }
 
 @ArgsType()

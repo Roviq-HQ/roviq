@@ -10,6 +10,7 @@ export interface MessagingSenderRecord {
   status: MessagingSenderStatus;
   dailyCap: number;
   instituteDailyCap: number | null;
+  messagesPerSecond: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +35,7 @@ export interface UpdateMessagingSenderData {
   dailyCap?: number;
   /** Null clears the share limit. */
   instituteDailyCap?: number | null;
+  messagesPerSecond?: number;
 }
 
 export interface WhatsAppUsageRecord {

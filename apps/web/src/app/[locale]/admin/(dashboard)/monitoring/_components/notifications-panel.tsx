@@ -5,6 +5,7 @@ import type { MessagingSenderStatus } from '@roviq/graphql/generated';
 import { useFormatDate, useFormatNumber } from '@roviq/i18n';
 import {
   Badge,
+  Button,
   Can,
   Card,
   CardContent,
@@ -21,14 +22,16 @@ import {
   TableRow,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
-import { AlertTriangle, CheckCircle2, CloudOff, Pause } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CloudOff, Pause, Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import * as React from 'react';
 import {
   AdminMonitoringSendersDocument,
   AdminNotificationHealthDocument,
   type AdminNotificationHealthQuery,
 } from '../_lib/notification-health.graphql.generated';
 import { SectionError } from './section-error';
+import { SenderRateDialog, type SenderRateTarget } from './sender-rate-dialog';
 
 const { adminMonitoring: ids } = testIds;
 
@@ -170,6 +173,7 @@ const SENDER_STATUS: Record<MessagingSenderStatus, string> = {
 
 function SendersList() {
   const t = useTranslations('adminMonitoring.notifications');
+  const [editing, setEditing] = React.useState<SenderRateTarget | null>(null);
   const { data, error, refetch } = useQuery(AdminMonitoringSendersDocument, {
     pollInterval: NOTIFICATION_HEALTH_POLL_MS,
   });
@@ -205,7 +209,27 @@ function SendersList() {
               <span className="text-xs text-muted-foreground">
                 {sender.tenantId === null ? t('senderPlatform') : t('senderInstitute')}
               </span>
-              <Badge className={cn('ms-auto', SENDER_STATUS[sender.status])}>
+              <span
+                className="ms-auto text-xs text-muted-foreground tabular-nums"
+                data-testid={ids.notificationsSenderRate(sender.id)}
+              >
+                {t('senderRate', { rate: sender.messagesPerSecond })}
+              </span>
+              <Can I="update" a="MessagingSender">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  title={t('senderRateEdit')}
+                  aria-label={t('senderRateEdit')}
+                  onClick={() => setEditing(sender)}
+                  data-testid={ids.notificationsSenderRateEdit(sender.id)}
+                >
+                  <Pencil aria-hidden="true" />
+                </Button>
+              </Can>
+              <Badge className={SENDER_STATUS[sender.status]}>
                 {sender.status === 'BLOCKED' ? (
                   <AlertTriangle aria-hidden="true" />
                 ) : sender.status === 'PAUSED' ? (
@@ -219,6 +243,7 @@ function SendersList() {
           ))}
         </ul>
       )}
+      {editing ? <SenderRateDialog sender={editing} open onClose={() => setEditing(null)} /> : null}
     </section>
   );
 }

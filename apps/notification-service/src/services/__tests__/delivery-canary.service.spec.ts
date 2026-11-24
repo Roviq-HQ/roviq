@@ -53,6 +53,7 @@ describe('DeliveryCanary', () => {
       flowId: null,
       channelEnabled: true,
       critical: true,
+      digest: false,
       deferrable: false,
       attempt: 1,
       address: { given: 'canary@roviq.test' },

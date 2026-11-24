@@ -24,6 +24,7 @@ import {
   createTestInstitute,
   createTestTeacher,
   holdPlatformSenderLock,
+  PLATFORM_SENDER_LOCK_WAIT_MS,
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
@@ -48,6 +49,7 @@ import { NotificationWriteDrizzleRepository } from '../repositories/notification
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { DeliveryCanary } from '../services/delivery-canary.service';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
+import { noDeliveryLimits } from './delivery-limits';
 
 const CTX = 'test:delivery-canary';
 const AT = '2026-11-24T10:15:00.000Z';
@@ -127,6 +129,7 @@ describe('delivery canary (integration)', () => {
         new Clock(),
       ),
       new NotificationMetrics(),
+      ...noDeliveryLimits(),
     );
   }
 
@@ -229,7 +232,7 @@ describe('delivery canary (integration)', () => {
       new CanaryReadDrizzleRepository(db),
       metrics,
     );
-  });
+  }, PLATFORM_SENDER_LOCK_WAIT_MS);
 
   beforeEach(async () => {
     providers.requests.length = 0;

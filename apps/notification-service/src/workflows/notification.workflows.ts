@@ -34,7 +34,9 @@ import {
   type FlowArrival,
   type FlowRecipient,
   type FlowWorkflowInput,
+  HELD_DEFER_REASONS,
   MAX_CHANNEL_DEFERRALS,
+  MAX_HELD_DEFERRALS,
   type NotificationActivities,
   type SendChannelInput,
   sendData,
@@ -82,18 +84,21 @@ class Arrivals {
 }
 
 /**
- * Sends on one channel, sleeping through each deferral (quiet hours, a full sender). Someone
- * reached during a deferral makes the send unneeded. A send that fails for good is FAILED.
+ * Sends on one channel, sleeping through each deferral (quiet hours, a full or slowed sender, a
+ * paused provider). Someone reached during a deferral makes the send unneeded. A send that fails
+ * for good is FAILED. Holds by the sender's rate or a paused provider have their own, larger cap.
  */
 async function sendChannel(input: ChannelSend, arrivals: Arrivals): Promise<SendResult> {
   try {
-    for (let deferrals = 0; deferrals <= MAX_CHANNEL_DEFERRALS; deferrals += 1) {
-      const result = await activities.sendChannel({
-        ...input,
-        deferrable: deferrals < MAX_CHANNEL_DEFERRALS,
-      });
+    let deferrals = 0;
+    let held = 0;
+    for (;;) {
+      const last = deferrals >= MAX_CHANNEL_DEFERRALS || held >= MAX_HELD_DEFERRALS;
+      const result = await activities.sendChannel({ ...input, deferrable: !last });
       if (typeof result === 'string') return result;
-      if (deferrals === MAX_CHANNEL_DEFERRALS) break;
+      if (last) break;
+      if (HELD_DEFER_REASONS.includes(result.reason)) held += 1;
+      else deferrals += 1;
       const wait = Date.parse(result.deferUntil) - Date.now();
       if (wait > 0 && (await arrivals.wait(wait))) {
         await activities.recordSkip({

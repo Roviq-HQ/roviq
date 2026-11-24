@@ -6,6 +6,7 @@ import {
   type FlowArrival,
   type FlowWorkflowInput,
   MAX_CHANNEL_DEFERRALS,
+  MAX_HELD_DEFERRALS,
   type NotificationActivities,
 } from '../notification-workflow.types';
 
@@ -178,7 +179,7 @@ describe('NotificationFlowWorkflow', () => {
     temporal.sendChannel
       .mockResolvedValueOnce('SKIPPED')
       .mockResolvedValueOnce('SKIPPED')
-      .mockResolvedValueOnce({ deferUntil: '2026-11-24T01:30:00.000Z' });
+      .mockResolvedValueOnce({ deferUntil: '2026-11-24T01:30:00.000Z', reason: 'quiet_hours' });
 
     await NotificationFlowWorkflow(input());
 
@@ -195,7 +196,7 @@ describe('NotificationFlowWorkflow', () => {
     temporal.sendChannel
       .mockResolvedValueOnce('SKIPPED')
       .mockResolvedValueOnce('SKIPPED')
-      .mockResolvedValueOnce({ deferUntil: '2026-11-24T01:30:00.000Z' });
+      .mockResolvedValueOnce({ deferUntil: '2026-11-24T01:30:00.000Z', reason: 'quiet_hours' });
     temporal.duringWait.mockImplementationOnce(() =>
       arrive({ recipientUserId: 'user-guardian-1', via: 'IN_APP' }),
     );
@@ -220,7 +221,7 @@ describe('NotificationFlowWorkflow', () => {
       Promise.resolve(
         i.channel === 'WHATSAPP' && i.recipientUserId === 'user-guardian-1'
           ? i.deferrable
-            ? { deferUntil: '2026-11-23T18:00:00.000Z' }
+            ? { deferUntil: '2026-11-23T18:00:00.000Z', reason: 'quiet_hours' as const }
             : 'SKIPPED'
           : i.channel === 'PUSH'
             ? 'SKIPPED'
@@ -239,6 +240,57 @@ describe('NotificationFlowWorkflow', () => {
     ]);
     // One wait per deferral, then the flow goes on: guardian 1's SMS is sent next.
     expect(sends()[2 + MAX_CHANNEL_DEFERRALS + 1]).toEqual(['user-guardian-1', 'SMS']);
+  });
+
+  it('should count holds by the rate or a paused provider apart from the 30 deferrals', async () => {
+    let held = 0;
+    temporal.sendChannel.mockImplementation((i) => {
+      if (i.channel !== 'WHATSAPP' || i.recipientUserId !== 'user-guardian-1') {
+        return Promise.resolve(i.channel === 'PUSH' ? 'SKIPPED' : 'SENT');
+      }
+      held += 1;
+      return Promise.resolve(
+        held <= MAX_CHANNEL_DEFERRALS + 5
+          ? {
+              deferUntil: '2026-11-23T18:00:00.000Z',
+              reason: held % 2 === 0 ? ('rate_limited' as const) : ('provider_paused' as const),
+            }
+          : 'SENT',
+      );
+    });
+
+    await NotificationFlowWorkflow(input());
+
+    const whatsapp = temporal.sendChannel.mock.calls
+      .map(([i]) => i)
+      .filter((i) => i.channel === 'WHATSAPP' && i.recipientUserId === 'user-guardian-1');
+    expect(whatsapp.map((i) => i.deferrable)).toEqual(
+      Array.from({ length: MAX_CHANNEL_DEFERRALS + 6 }, () => true),
+    );
+  });
+
+  it('should make the call after the last held deferral final', async () => {
+    temporal.sendChannel.mockImplementation((i) =>
+      Promise.resolve(
+        i.channel === 'WHATSAPP' && i.recipientUserId === 'user-guardian-1'
+          ? i.deferrable
+            ? { deferUntil: '2026-11-23T18:00:00.000Z', reason: 'rate_limited' as const }
+            : 'SKIPPED'
+          : i.channel === 'PUSH'
+            ? 'SKIPPED'
+            : 'SENT',
+      ),
+    );
+
+    await NotificationFlowWorkflow(input());
+
+    const whatsapp = temporal.sendChannel.mock.calls
+      .map(([i]) => i)
+      .filter((i) => i.channel === 'WHATSAPP' && i.recipientUserId === 'user-guardian-1');
+    expect(whatsapp.map((i) => i.deferrable)).toEqual([
+      ...Array.from({ length: MAX_HELD_DEFERRALS }, () => true),
+      false,
+    ]);
   });
 });
 

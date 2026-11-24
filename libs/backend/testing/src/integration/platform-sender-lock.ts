@@ -3,6 +3,9 @@ import pg from 'pg';
 /** Any fixed number; every spec that creates the platform's messaging sender uses this one. */
 const PLATFORM_SENDER_LOCK = 319_001;
 
+/** A `beforeAll` that takes the lock waits behind every other spec holding it, not the default 10 s. */
+export const PLATFORM_SENDER_LOCK_WAIT_MS = 180_000;
+
 /**
  * Only one live platform messaging sender may exist, and spec files run in parallel against
  * one database. A spec that creates one holds this lock from `beforeAll` to `afterAll`, and

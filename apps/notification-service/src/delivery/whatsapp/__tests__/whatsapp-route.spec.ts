@@ -20,6 +20,7 @@ const PLATFORM_SENDER: MessagingSenderRecord = {
   providerNumberId: 'fake-number-id-1',
   dailyCap: 100,
   instituteDailyCap: 10,
+  messagesPerSecond: 10,
   accessTokenEncrypted: Buffer.from('fake-encrypted-token'),
 };
 
@@ -44,6 +45,7 @@ describe('WhatsAppRoute', () => {
       findActivePlatform: vi.fn().mockResolvedValue(null),
       isOptedOut: vi.fn().mockResolvedValue(false),
       countSentSince: vi.fn().mockResolvedValue({ total: 0, forTenant: 0 }),
+      setStatusFrom: vi.fn().mockResolvedValue(true),
     });
     recipients = createMock<RecipientReadRepository>({
       findInstituteTimezone: vi.fn().mockResolvedValue('Asia/Kolkata'),
@@ -215,6 +217,26 @@ describe('WhatsAppRoute', () => {
       senders.countSentSince.mockResolvedValue({ total: 50, forTenant: 50 });
 
       await expect(route.capacity(sender, tenantId, false)).resolves.toBe('ok');
+    });
+  });
+
+  describe('block', () => {
+    it('should move an active sender to BLOCKED as the system', async () => {
+      await expect(route.block(INSTITUTE_SENDER)).resolves.toBe(true);
+
+      expect(senders.setStatusFrom).toHaveBeenCalledWith('sender-institute', 'ACTIVE', 'BLOCKED');
+    });
+
+    it.each(['BLOCKED', 'PAUSED'] as const)('should leave a %s sender as it is', async (status) => {
+      await expect(route.block({ ...INSTITUTE_SENDER, status })).resolves.toBe(false);
+
+      expect(senders.setStatusFrom).not.toHaveBeenCalled();
+    });
+
+    it('should answer false when the sender changed meanwhile', async () => {
+      senders.setStatusFrom.mockResolvedValue(false);
+
+      await expect(route.block(PLATFORM_SENDER)).resolves.toBe(false);
     });
   });
 });

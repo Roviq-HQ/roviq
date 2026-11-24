@@ -47,6 +47,12 @@ export class AdminMessagingSender {
   })
   instituteDailyCap!: number | null;
 
+  @Field(() => Int, {
+    description:
+      'Messages the sender hands the provider per second, over every notification service instance (1 to 1000).',
+  })
+  messagesPerSecond!: number;
+
   @Field(() => DateTimeScalar)
   createdAt!: Date;
 

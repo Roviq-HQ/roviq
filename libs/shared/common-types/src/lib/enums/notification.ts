@@ -138,6 +138,10 @@ export const NOTIFICATION_SKIP_REASON_VALUES = [
   'sender_cap',
   // Only on a DEFERRED row: the institute's quiet hours hold the message until they end
   'quiet_hours',
+  // The sender is sending as fast as the provider allows, or the provider asked it to slow down
+  'rate_limited',
+  // The provider or sender keeps failing, so sending through it is paused for a short time
+  'provider_paused',
   // Another step or recipient of the flow was reached first, so this one was not tried
   'not_needed',
   // The step's condition did not hold for this notification
@@ -157,6 +161,8 @@ export const NotificationSkipReason = {
   OPTED_OUT: 'opted_out',
   SENDER_CAP: 'sender_cap',
   QUIET_HOURS: 'quiet_hours',
+  RATE_LIMITED: 'rate_limited',
+  PROVIDER_PAUSED: 'provider_paused',
   NOT_NEEDED: 'not_needed',
   CONDITION_NOT_MET: 'condition_not_met',
   RECIPIENT_REMOVED: 'recipient_removed',
@@ -175,7 +181,8 @@ export const NOTIFICATION_DELIVERY_STATUS_VALUES = [
   'SKIPPED',
   // The recipient opened the message (only where the provider reports it)
   'READ',
-  // Held for later; `skip_reason` says why (`quiet_hours`, `sender_cap`). A later row says how it ended
+  // Held for later; `skip_reason` says why (quiet hours, a full or slowed sender, a paused provider).
+  // A later row says how it ended
   'DEFERRED',
 ] as const;
 

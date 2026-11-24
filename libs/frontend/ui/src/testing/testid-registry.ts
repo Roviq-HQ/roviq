@@ -472,6 +472,12 @@ export const testIds = {
     notificationsSendersError: 'admin-monitoring-notifications-senders-error',
     notificationsSendersEmpty: 'admin-monitoring-notifications-senders-empty',
     notificationsSender: (id: string) => `admin-monitoring-notifications-sender-${id}`,
+    notificationsSenderRate: (id: string) => `admin-monitoring-notifications-sender-rate-${id}`,
+    notificationsSenderRateEdit: (id: string) =>
+      `admin-monitoring-notifications-sender-rate-edit-${id}`,
+    senderRateDialog: 'admin-monitoring-sender-rate-dialog',
+    senderRateInput: 'admin-monitoring-sender-rate-input',
+    senderRateSave: 'admin-monitoring-sender-rate-save',
   },
 
   // ── Admin: attendance ─────────────────────────────────────────────────

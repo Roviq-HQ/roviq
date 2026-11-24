@@ -75,6 +75,7 @@ export class DeliveryCanary implements OnApplicationBootstrap {
       flowId: null,
       channelEnabled: true,
       critical: true,
+      digest: false,
       deferrable: false,
       attempt: 1,
       address: addressOf(settings, channel),

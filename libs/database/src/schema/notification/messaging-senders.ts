@@ -41,6 +41,8 @@ export const messagingSenders = pgTable(
     dailyCap: integer('daily_cap').notNull(),
     /** On the platform's sender: what one institute may use of `daily_cap`. NULL means no share limit. */
     instituteDailyCap: integer('institute_daily_cap'),
+    /** The most messages the sender hands the provider in one second, over every instance (ROV-330). */
+    messagesPerSecond: integer('messages_per_second').default(10).notNull(),
     ...entityColumns,
   },
   (table) => [
@@ -56,6 +58,7 @@ export const messagingSenders = pgTable(
       'chk_messaging_senders_caps',
       sql`"daily_cap" > 0 AND ("institute_daily_cap" IS NULL OR "institute_daily_cap" > 0)`,
     ),
+    check('chk_messaging_senders_rate', sql`"messages_per_second" BETWEEN 1 AND 1000`),
     uniqueIndex('messaging_senders_provider_number_key')
       .using('btree', table.provider.asc().nullsLast(), table.providerNumberId.asc().nullsLast())
       .where(sql`deleted_at IS NULL`),

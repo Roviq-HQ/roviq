@@ -5,6 +5,7 @@ import type {
   NotificationSkipReason,
   NotificationTypeKey,
 } from '@roviq/common-types';
+import type { DeferReason } from '../delivery/channel-gate';
 
 export interface NotificationConfigRecord {
   inAppEnabled: boolean;
@@ -97,6 +98,8 @@ export interface MessagingSenderRecord {
   providerNumberId: string;
   dailyCap: number;
   instituteDailyCap: number | null;
+  /** Messages the sender may hand the provider per second, over every instance. */
+  messagesPerSecond: number;
   accessTokenEncrypted: Buffer;
 }
 
@@ -117,9 +120,9 @@ export interface DeliveryRow {
   flowId: string | null;
 }
 
-/** A message held for later (quiet hours, a full sender). */
+/** A message held for later (quiet hours, a full or slowed sender, a paused provider). */
 export interface DeferralRow extends Omit<DeliveryRow, 'outcome'> {
-  reason: 'quiet_hours' | 'sender_cap';
+  reason: DeferReason;
 }
 
 /** Who an inbound event is about: a phone number, the provider's user id, or both. */

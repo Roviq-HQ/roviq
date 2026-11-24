@@ -11,7 +11,8 @@ import { WhatsAppCloudAdapter } from './whatsapp-cloud.adapter';
 
 /**
  * The providers of each channel, first choice first; a channel without one is skipped as
- * `no_provider`. A send moves down the list only when a provider cannot send now.
+ * `no_provider`. A send moves down the list only when a provider cannot send now or its
+ * breaker is open (`ChannelSender`).
  */
 export class ChannelAdapters {
   private readonly byChannel = new Map<NotificationChannel, ChannelAdapter[]>();
@@ -30,11 +31,6 @@ export class ChannelAdapters {
 
   has(channel: NotificationChannel): boolean {
     return this.list(channel).length > 0;
-  }
-
-  /** Whether a send may try this provider now; the seam for a circuit breaker (ROV-330). */
-  available(_adapter: ChannelAdapter): boolean {
-    return true;
   }
 }
 

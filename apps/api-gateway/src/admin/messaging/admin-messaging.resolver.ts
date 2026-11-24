@@ -50,7 +50,9 @@ export class AdminMessagingResolver {
     return this.service.register(user, input);
   }
 
-  @Mutation(() => AdminMessagingSender, { description: 'Changes the number shown or the caps.' })
+  @Mutation(() => AdminMessagingSender, {
+    description: 'Changes the number shown, the caps or the messages per second.',
+  })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'update', subject: 'MessagingSender' })
   adminUpdateMessagingSender(
@@ -87,7 +89,8 @@ export class AdminMessagingResolver {
   }
 
   @Mutation(() => AdminMessagingSender, {
-    description: 'PAUSED or BLOCKED → ACTIVE: the sender sends again.',
+    description:
+      'PAUSED or BLOCKED → ACTIVE: the sender sends again at once; its paused state and slowed rate in the notification service are cleared.',
   })
   @UseGuards(AbilityGuard)
   @CheckAbility({ action: 'update', subject: 'MessagingSender' })

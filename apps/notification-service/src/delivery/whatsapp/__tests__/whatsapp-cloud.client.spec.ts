@@ -3,6 +3,7 @@ import { ChannelAdapterError } from '../../adapters/channel-adapter';
 import {
   type CloudSender,
   errorCodeForProviderCode,
+  retryAfterMsOf,
   WhatsAppCloudClient,
 } from '../whatsapp-cloud.client';
 import type { TemplateSend } from '../whatsapp-template';
@@ -231,6 +232,42 @@ describe('WhatsAppCloudClient', () => {
       expectNoSecrets(error);
     });
 
+    it("should carry the provider's Retry-After seconds on a rate-limit error", async () => {
+      const { client } = clientAnswering(
+        new Response(JSON.stringify({ error: { code: 130429 } }), {
+          status: 429,
+          headers: { 'content-type': 'application/json', 'retry-after': '7' },
+        }),
+      );
+
+      const error = await failureOf(client.sendTemplate(SENDER, PHONE, TEMPLATE));
+
+      expect(error.code).toBe('WA_RATE_LIMITED');
+      expect(error.retryAfterMs).toBe(7000);
+    });
+
+    it('should carry no wait on a rate-limit error without Retry-After', async () => {
+      const { client } = clientAnswering(jsonResponse(429, { error: { message: 'slow down' } }));
+
+      const error = await failureOf(client.sendTemplate(SENDER, PHONE, TEMPLATE));
+
+      expect(error.retryAfterMs).toBeNull();
+    });
+
+    it('should not carry Retry-After on an error that is not a rate limit', async () => {
+      const { client } = clientAnswering(
+        new Response(JSON.stringify({ error: { code: 368 } }), {
+          status: 403,
+          headers: { 'retry-after': '30' },
+        }),
+      );
+
+      const error = await failureOf(client.sendTemplate(SENDER, PHONE, TEMPLATE));
+
+      expect(error.code).toBe('WA_SENDER_BLOCKED');
+      expect(error.retryAfterMs).toBeNull();
+    });
+
     it.each([500, 502, 503])('should map HTTP %i to WA_UNREACHABLE, retryable', async (status) => {
       const { client } = clientAnswering(jsonResponse(status, { error: { message: 'down' } }));
 
@@ -291,5 +328,22 @@ describe('errorCodeForProviderCode', () => {
     [0, 'WA_REJECTED'],
   ])('should map %s to %s', (providerCode, code) => {
     expect(errorCodeForProviderCode(providerCode)).toBe(code);
+  });
+});
+
+describe('retryAfterMsOf', () => {
+  const NOW = Date.parse('2026-11-24T10:00:00.000Z');
+
+  it.each([
+    ['5', 5000],
+    [' 0 ', 0],
+    ['Tue, 24 Nov 2026 10:00:03 GMT', 3000],
+    ['Tue, 24 Nov 2026 09:59:00 GMT', 0],
+  ])('should read %j as %i ms', (header, ms) => {
+    expect(retryAfterMsOf(header, NOW)).toBe(ms);
+  });
+
+  it.each([null, '', 'soon'])('should read %j as no wait', (header) => {
+    expect(retryAfterMsOf(header, NOW)).toBeNull();
   });
 });
