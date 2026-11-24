@@ -499,7 +499,7 @@ Audit Logs record all important actions performed within your institute. This he
    - **What** was done (for example, "Created standard Class 5", "Updated institute settings")
    - **When** it happened (date and time)
 
-Actions that Roviq staff or your reseller take on your institute (for example suspending it, exporting its data or changing its plan) also appear here, marked **Roviq platform** or **Reseller**. For these entries you see who acted, what was done and the stated reason.
+Actions that Roviq staff or your reseller take on your institute (for example suspending it, exporting its data or changing its plan) also appear here, marked **Roviq platform** or **Reseller**. For these entries you see which side acted, what was done and the stated reason; the person's name is not shown, because they are not a member of your institute.
 
 Use the filters and search to find specific entries.
 
