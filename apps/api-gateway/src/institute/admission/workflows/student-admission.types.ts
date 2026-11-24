@@ -68,39 +68,28 @@ export interface StudentAdmissionActivities {
 
   validateSectionCapacity(tenantId: string, sectionId: string): Promise<void>;
 
-  createUserAndMembership(
-    tenantId: string,
-    createdBy: string,
-    /** Stable per-application seed for the student's placeholder email/username, so a
-     *  Temporal retry reuses the user it already created instead of orphaning a duplicate. */
-    seed: string,
-  ): Promise<{ userId: string; membershipId: string }>;
-
-  createUserProfile(
-    tenantId: string,
-    userId: string,
-    formData: Record<string, unknown>,
-    createdBy: string,
-  ): Promise<void>;
-
-  createStudentProfile(
-    tenantId: string,
-    userId: string,
-    membershipId: string,
-    standardId: string,
-    formData: Record<string, unknown>,
-    isRte: boolean,
-    createdBy: string,
-  ): Promise<{ studentProfileId: string; admissionNumber: string }>;
-
-  createStudentAcademics(
-    tenantId: string,
-    studentProfileId: string,
-    academicYearId: string,
-    standardId: string,
-    sectionId: string,
-    createdBy: string,
-  ): Promise<void>;
+  /**
+   * The student account (found again by the application's placeholder email on a retry), then
+   * membership, the institute's profile copy, student profile with admission number and, with a
+   * section, the enrolment, all in one transaction. A failure leaves no institute row and no
+   * account; a retry after a committed attempt returns that attempt's student.
+   */
+  admitStudent(input: {
+    tenantId: string;
+    actorId: string;
+    /** The application id: seeds the placeholder email and username. */
+    seed: string;
+    academicYearId: string;
+    standardId: string;
+    sectionId: string | null;
+    formData: Record<string, unknown>;
+    isRte: boolean;
+  }): Promise<{
+    userId: string;
+    membershipId: string;
+    studentProfileId: string;
+    admissionNumber: string;
+  }>;
 
   linkGuardians(
     tenantId: string,

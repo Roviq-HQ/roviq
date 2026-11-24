@@ -277,6 +277,15 @@ export class IdentityService {
     return { userId, tempPassword };
   }
 
+  /**
+   * Removes an account made moments ago for a person whose institute record then failed to
+   * save, so a failed admission leaves no account behind. Only an account nobody has used can
+   * go: one with a membership of any scope or a changed password is kept (false).
+   */
+  async discardNewUser(userId: string): Promise<boolean> {
+    return this.repo.deleteUnusedUser(userId);
+  }
+
   async createMembership(input: CreateMembershipInput): Promise<CreateMembershipResult> {
     if (input.scope === 'institute') {
       if (!input.tenantId) throw new Error('tenantId is required for institute-scope membership');

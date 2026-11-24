@@ -10,17 +10,9 @@ import type {
   studentProfiles,
   userDocuments,
 } from '@roviq/database';
-import type { TenantUserProfileFields } from '../../../auth/tenant-user-profile';
 import type { FileRecord } from '../../../files/repositories/types';
 
 export type { SectionStrengthNorms };
-
-export interface NewStudentMembershipData {
-  userId: string;
-  roleId: string;
-  actorId: string;
-  profile: TenantUserProfileFields;
-}
 
 type StudentProfileInsert = typeof studentProfiles.$inferInsert;
 
@@ -62,14 +54,6 @@ export interface AdmissionClassData {
 }
 
 export type AdmissionClassResult = { kind: 'year_not_found' } | ClassLookupFailure | { kind: 'ok' };
-
-export interface NewStudentAcademicData {
-  studentProfileId: string;
-  academicYearId: string;
-  standardId: string;
-  sectionId: string;
-  actorId: string;
-}
 
 export interface StudentStatusRecord {
   academicStatus: AcademicStatus;

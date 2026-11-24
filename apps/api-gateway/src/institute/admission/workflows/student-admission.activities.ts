@@ -27,7 +27,6 @@ import {
   mkInstituteCtx,
   rolesLive,
   sectionsLive,
-  studentAcademics,
   studentGuardianLinks,
   studentGuardianLinksLive,
   studentProfiles,
@@ -45,7 +44,7 @@ import {
   ensureTenantUserProfile,
   findActiveGuardianByPhone,
 } from '../../../auth/tenant-user-profile';
-import { nextAdmissionNumber } from '../../student/admission-number.sequence';
+import { admitStudent as admitStudentInTx } from '../../student/repositories/admit-student';
 import type {
   ApplicationPayload,
   EnquiryPayload,
@@ -59,6 +58,17 @@ export function createStudentAdmissionActivities(
   eventBus: EventBusService,
   identityService: IdentityService,
 ): StudentAdmissionActivities {
+  /** A failed admission must not leave the account it made behind (ROV-275). */
+  async function discardAccount(userId: string): Promise<void> {
+    try {
+      if (!(await identityService.discardNewUser(userId))) {
+        logger.warn(`Kept account ${userId} of a failed admission: it is in use`);
+      }
+    } catch (error) {
+      logger.error(`Could not remove account ${userId} of a failed admission`, error);
+    }
+  }
+
   return {
     async loadApplicationData(applicationId, tenantId) {
       logger.log(`Loading application ${applicationId}`);
@@ -155,118 +165,25 @@ export function createStudentAdmissionActivities(
       }
     },
 
-    async createUserAndMembership(tenantId, createdBy, seed) {
-      // The parent phone in the form belongs to the guardian (linkGuardians); the student user
-      // never carries it, or the guardian lookup by phone would find the student.
-      const userId = await (async (): Promise<string> => {
-        // Deterministic placeholder email derived from the stable applicationId
-        // seed so every Temporal retry resolves the same user. Check for an
-        // existing row by email *before* calling IdentityService — without this
-        // guard, a retry would re-enter createUser() and throw a unique-
-        // constraint violation on `users.email`.
-        const email = `admission-${seed}@roviq.placeholder`;
-        const username = `admission-${seed}`;
-
-        const existingByEmail = await withAdmin(
-          db,
-          mkAdminCtx('workflow:student-admission.activities'),
-          async (tx) => {
-            return tx
-              .select({ id: usersLive.id })
-              .from(usersLive)
-              .where(eq(usersLive.email, email))
-              .limit(1);
-          },
-        );
-        if (existingByEmail.length > 0) {
-          logger.log(`Found existing placeholder user by email: ${existingByEmail[0].id}`);
-          return existingByEmail[0].id;
-        }
-
-        const { userId: newUserId } = await identityService.createUser({
-          email,
-          username,
-          actorId: createdBy,
-        });
-        eventBus.emit(EVENT_PATTERNS.USER.admission_created, {
-          tenantId,
-          userId: newUserId,
-          email,
-          username,
-        });
-
-        return newUserId;
-      })();
-
-      // Find student role
-      const studentRole = await withTenant(
+    async admitStudent(input) {
+      const { tenantId, actorId, seed, formData } = input;
+      // Deterministic placeholder from the application id: a retry finds the user an earlier
+      // attempt made. The parent phone belongs to the guardian (linkGuardians), never the student.
+      const email = `admission-${seed}@roviq.placeholder`;
+      const username = `admission-${seed}`;
+      const [existing] = await withAdmin(
         db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          return tx
-            .select({ id: rolesLive.id })
-            .from(rolesLive)
-            .where(
-              and(
-                eq(rolesLive.tenantId, tenantId),
-                sql`${rolesLive.name}->>'en' = 'student' OR ${rolesLive.name}->>'en' = 'Student'`,
-              ),
-            )
-            .limit(1);
-        },
+        mkAdminCtx('workflow:student-admission.activities'),
+        (tx) =>
+          tx
+            .select({ id: usersLive.id })
+            .from(usersLive)
+            .where(eq(usersLive.email, email))
+            .limit(1),
       );
+      const userId =
+        existing?.id ?? (await identityService.createUser({ email, username, actorId })).userId;
 
-      if (studentRole.length === 0) throw new Error('Student role not found');
-
-      // Create membership (idempotent)
-      const newMemberships = await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          return tx
-            .insert(memberships)
-            .values({
-              userId,
-              tenantId,
-              roleId: studentRole[0].id,
-              status: 'ACTIVE',
-              abilities: [],
-              createdBy,
-              updatedBy: createdBy,
-            })
-            .onConflictDoNothing()
-            .returning({ id: memberships.id });
-        },
-      );
-
-      let membershipId: string;
-      if (newMemberships.length > 0) {
-        membershipId = newMemberships[0].id;
-      } else {
-        const existing = await withTenant(
-          db,
-          mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-          async (tx) => {
-            return tx
-              .select({ id: membershipsLive.id })
-              .from(membershipsLive)
-              .where(
-                and(
-                  eq(membershipsLive.userId, userId),
-                  eq(membershipsLive.tenantId, tenantId),
-                  eq(membershipsLive.roleId, studentRole[0].id),
-                ),
-              )
-              .limit(1);
-          },
-        );
-        membershipId = existing[0].id;
-      }
-
-      return { userId, membershipId };
-    },
-
-    async createUserProfile(tenantId, userId, formData, createdBy) {
       const firstNameStr = (formData.firstName ??
         formData.first_name ??
         formData.studentName ??
@@ -278,108 +195,84 @@ export function createStudentAdmissionActivities(
         lastName: lastNameStr ? { en: lastNameStr } : null,
       };
 
-      await identityService.ensureUserProfile(userId, name, createdBy);
-      await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        (tx) =>
-          ensureTenantUserProfile(tx, {
-            tenantId,
-            userId,
-            actorId: createdBy,
-            ...name,
-            gender: (formData.gender as Gender) ?? null,
-            dateOfBirth: ((formData.dateOfBirth ?? formData.date_of_birth) as string) ?? null,
-          }),
-      );
-    },
-
-    async createStudentProfile(
-      tenantId,
-      userId,
-      membershipId,
-      standardId,
-      formData,
-      isRte,
-      createdBy,
-    ) {
-      // Check if already created (idempotent)
-      const existing = await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          return tx
-            .select({
-              id: studentProfilesLive.id,
-              admissionNumber: studentProfilesLive.admissionNumber,
-            })
-            .from(studentProfilesLive)
-            .where(eq(studentProfilesLive.membershipId, membershipId))
-            .limit(1);
-        },
-      );
-
-      if (existing.length > 0) {
-        return { studentProfileId: existing[0].id, admissionNumber: existing[0].admissionNumber };
+      let admitted: Awaited<ReturnType<typeof admitInInstitute>>;
+      try {
+        await identityService.ensureUserProfile(userId, name, actorId);
+        admitted = await admitInInstitute();
+      } catch (error) {
+        await discardAccount(userId);
+        throw error;
       }
+      if (admitted.kind !== 'ok') {
+        await discardAccount(userId);
+        // The class of the application is gone or the institute has no student role: a retry
+        // cannot fix either.
+        throw ApplicationFailure.nonRetryable(`Student not admitted: ${admitted.kind}`);
+      }
+      if (!existing) {
+        eventBus.emit(EVENT_PATTERNS.USER.admission_created, { tenantId, userId, email, username });
+      }
+      return {
+        userId,
+        membershipId: admitted.membershipId,
+        studentProfileId: admitted.studentProfileId,
+        admissionNumber: admitted.admissionNumber,
+      };
 
-      const rows = await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          const admissionNumber = await nextAdmissionNumber(tx, tenantId, standardId);
-          const inserted = await tx
-            .insert(studentProfiles)
-            .values({
+      /** One transaction; a retry after a committed attempt finds that attempt's student. */
+      function admitInInstitute() {
+        return withTenant(
+          db,
+          mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
+          async (tx) => {
+            const [done] = await tx
+              .select({
+                membershipId: studentProfilesLive.membershipId,
+                studentProfileId: studentProfilesLive.id,
+                admissionNumber: studentProfilesLive.admissionNumber,
+              })
+              .from(studentProfilesLive)
+              .where(eq(studentProfilesLive.userId, userId))
+              .limit(1);
+            if (done) return { kind: 'ok' as const, ...done };
+            return admitStudentInTx(tx, {
+              tenantId,
               userId,
-              membershipId,
-              tenantId,
-              admissionNumber,
-              admissionDate: new Date().toISOString().split('T')[0],
-              admissionType: AdmissionType.NEW,
-              academicStatus: AcademicStatus.ENROLLED,
-              socialCategory: (formData.socialCategory ??
-                formData.social_category ??
-                SocialCategory.GENERAL) as SocialCategory,
-              isRteAdmitted: isRte,
-              createdBy,
-              updatedBy: createdBy,
-            })
-            .returning({ id: studentProfiles.id });
-          return { inserted, admissionNumber };
-        },
-      );
-
-      return { studentProfileId: rows.inserted[0].id, admissionNumber: rows.admissionNumber };
-    },
-
-    async createStudentAcademics(
-      tenantId,
-      studentProfileId,
-      academicYearId,
-      standardId,
-      sectionId,
-      createdBy,
-    ) {
-      // Idempotent for Temporal retries; a database trigger keeps sections.current_strength.
-      await withTenant(
-        db,
-        mkInstituteCtx(tenantId, 'workflow:student-admission.activities'),
-        async (tx) => {
-          await tx
-            .insert(studentAcademics)
-            .values({
-              studentProfileId,
-              academicYearId,
-              standardId,
-              sectionId,
-              tenantId,
-              createdBy,
-              updatedBy: createdBy,
-            })
-            .onConflictDoNothing();
-        },
-      );
+              actorId,
+              academicYearId: input.academicYearId,
+              standardId: input.standardId,
+              sectionId: input.sectionId,
+              tenantProfile: {
+                ...name,
+                gender: (formData.gender as Gender) ?? null,
+                dateOfBirth: ((formData.dateOfBirth ?? formData.date_of_birth) as string) ?? null,
+              },
+              profile: {
+                admissionDate: new Date().toISOString().split('T')[0],
+                admissionClass: null,
+                admissionType: AdmissionType.NEW,
+                academicStatus: AcademicStatus.ENROLLED,
+                socialCategory: (formData.socialCategory ??
+                  formData.social_category ??
+                  SocialCategory.GENERAL) as SocialCategory,
+                caste: null,
+                isMinority: false,
+                minorityType: null,
+                isBpl: false,
+                isCwsn: false,
+                cwsnType: null,
+                isRteAdmitted: input.isRte,
+                rteCertificate: null,
+                previousSchoolName: null,
+                previousSchoolBoard: null,
+                previousSchoolUdise: null,
+                incomingTcNumber: null,
+                incomingTcDate: null,
+              },
+            });
+          },
+        );
+      }
     },
 
     async linkGuardians(tenantId, studentProfileId, formData, createdBy, seed) {
