@@ -15,6 +15,8 @@ RUN corepack enable
 
 COPY pnpm-lock.yaml ./
 COPY package.json ./tmp-package.json
+# pnpm-lock.yaml names patches/*.patch; the install reads them.
+COPY patches ./patches
 RUN node -e " \
   const pkg = require('./tmp-package.json'); \
   const keep = { name: pkg.name, version: pkg.version, packageManager: pkg.packageManager, \
@@ -39,6 +41,17 @@ ENV STANDALONE=true
 # to introspect a running gateway. See codegen.ts SCHEMA_SOURCE selector.
 ENV CI=true
 RUN pnpm codegen
+# NEXT_PUBLIC_* values are compiled into the browser bundle, so they are build arguments, not
+# run-time settings. An argument that is not passed stays undefined and the app's default applies.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_INSTITUTE_URL
+ARG NEXT_PUBLIC_ROVIQ_EE
+ARG NEXT_PUBLIC_OPENOBSERVE_URL
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+ARG NEXT_PUBLIC_FIREBASE_APP_ID
+ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ARG NEXT_PUBLIC_FIREBASE_VAPID_KEY
 RUN pnpm nx run web:build --skip-nx-cache
 
 # ── Production: web ───────────────────────────────────────────
