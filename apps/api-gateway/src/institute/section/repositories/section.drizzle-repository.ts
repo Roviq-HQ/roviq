@@ -1,20 +1,28 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import {
+  academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
   i18nNameSearch,
+  membershipsLive,
   mkInstituteCtx,
   sections,
   sectionsLive,
   softDelete,
+  standardsLive,
   studentAcademicsLive,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { SectionRepository } from './section.repository';
-import type { CreateSectionData, SectionRecord, UpdateSectionData } from './types';
+import type {
+  CreateSectionData,
+  SectionRecord,
+  SectionWriteResult,
+  UpdateSectionData,
+} from './types';
 
 // Read projection — pulls from `sections_live` (security_invoker view that
 // hides soft-deleted rows). Repositories that need trashed rows query the
@@ -127,10 +135,32 @@ export class SectionDrizzleRepository extends SectionRepository {
     });
   }
 
-  async create(data: CreateSectionData): Promise<SectionRecord> {
+  async create(data: CreateSectionData): Promise<SectionWriteResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:section'), async (tx) => {
+      // Foreign keys accept any institute's row; the views under RLS do not.
+      const [year] = await tx
+        .select({ id: academicYearsLive.id })
+        .from(academicYearsLive)
+        .where(eq(academicYearsLive.id, data.academicYearId))
+        .limit(1);
+      if (!year) return { kind: 'year_not_found' };
+      const [standard] = await tx
+        .select({ id: standardsLive.id })
+        .from(standardsLive)
+        .where(
+          and(
+            eq(standardsLive.id, data.standardId),
+            eq(standardsLive.academicYearId, data.academicYearId),
+          ),
+        )
+        .limit(1);
+      if (!standard) return { kind: 'standard_not_found' };
+      if (data.classTeacherId && !(await this.membershipExists(tx, data.classTeacherId))) {
+        return { kind: 'class_teacher_not_found' };
+      }
+
       const rows = await tx
         .insert(sections)
         .values({
@@ -142,6 +172,7 @@ export class SectionDrizzleRepository extends SectionRepository {
           stream: data.stream,
           mediumOfInstruction: data.mediumOfInstruction,
           shift: data.shift,
+          classTeacherId: data.classTeacherId,
           room: data.room,
           capacity: data.capacity,
           genderRestriction: (data.genderRestriction as GenderEnum) ?? 'CO_ED',
@@ -153,14 +184,25 @@ export class SectionDrizzleRepository extends SectionRepository {
           updatedBy: userId,
         })
         .returning(writeReturning);
-      return rows[0] as SectionRecord;
+      return { kind: 'ok', record: rows[0] as SectionRecord };
     });
   }
 
-  async update(id: string, data: UpdateSectionData): Promise<SectionRecord> {
+  async update(id: string, data: UpdateSectionData): Promise<SectionWriteResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:section'), async (tx) => {
+      // The section first: a missing section is the answer whatever the teacher id is.
+      const [section] = await tx
+        .select({ id: sectionsLive.id })
+        .from(sectionsLive)
+        .where(eq(sectionsLive.id, id))
+        .limit(1);
+      if (!section) return { kind: 'section_not_found' };
+      if (data.classTeacherId && !(await this.membershipExists(tx, data.classTeacherId))) {
+        return { kind: 'class_teacher_not_found' };
+      }
+
       const rows = await tx
         .update(sections)
         .set({
@@ -186,10 +228,18 @@ export class SectionDrizzleRepository extends SectionRepository {
         .where(and(eq(sections.id, id), isNull(sections.deletedAt)))
         .returning(writeReturning);
 
-      if (rows.length === 0)
-        throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, `Section ${id} not found`);
-      return rows[0] as SectionRecord;
+      if (rows.length === 0) return { kind: 'section_not_found' };
+      return { kind: 'ok', record: rows[0] as SectionRecord };
     });
+  }
+
+  private async membershipExists(tx: DrizzleDB, membershipId: string): Promise<boolean> {
+    const [row] = await tx
+      .select({ id: membershipsLive.id })
+      .from(membershipsLive)
+      .where(eq(membershipsLive.id, membershipId))
+      .limit(1);
+    return row !== undefined;
   }
 
   async softDelete(id: string): Promise<void> {

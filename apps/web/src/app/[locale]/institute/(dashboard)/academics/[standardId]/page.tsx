@@ -983,7 +983,7 @@ const EMPTY_SUBJECT_DEFAULTS: SubjectFormValues = {
   electiveGroup: '',
 };
 
-function CreateSubjectDialog({ standardId: _standardId }: { standardId: string }) {
+function CreateSubjectDialog({ standardId }: { standardId: string }) {
   const t = useTranslations('academics');
   const { createSubject, loading } = useCreateSubject();
   const [open, setOpen] = React.useState(false);
@@ -1013,6 +1013,8 @@ function CreateSubjectDialog({ standardId: _standardId }: { standardId: string }
           practicalMarks: parsed.practicalMarks,
           internalMarks: parsed.internalMarks,
           electiveGroup: parsed.isElective ? parsed.electiveGroup || undefined : undefined,
+          // Without the link the new subject never appears in this class's list.
+          standardIds: [standardId],
         });
         toast.success(t('created'));
         setOpen(false);

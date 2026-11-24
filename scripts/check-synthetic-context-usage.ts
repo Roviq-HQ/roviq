@@ -58,6 +58,21 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/__tests__/student-read-authorization.integration.spec.ts',
   // ROV-292: fixtures, and reads/writes as roviq_app with another institute's tenant context.
   'apps/api-gateway/src/__tests__/tenant-user-profile-isolation.integration.spec.ts',
+  // ROV-293: foreign-id fixtures (rows of a second institute or reseller) and their read-back.
+  'apps/api-gateway/src/audit/__tests__/audit-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/consent/__tests__/consent-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/group/__tests__/group-crud.integration.spec.ts',
+  'apps/api-gateway/src/institute/guardian/__tests__/guardian-create-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/holiday/__tests__/holiday-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/management/__tests__/institute-branding-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/section/__tests__/section-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/standard/__tests__/standard-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/student/__tests__/student-create-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/institute/subject/__tests__/subject-foreign-id.integration.spec.ts',
+  'apps/api-gateway/src/reseller/institute/__tests__/reseller-institute-foreign-id.integration.spec.ts',
   // ROV-205: isolated security-invariant fixtures and RLS-scoped predicate execution only.
   'apps/api-gateway/src/__tests__/user-groups-security-invariants.integration.spec.ts',
   'apps/api-gateway/src/files/repositories/file.drizzle-repository.ts',

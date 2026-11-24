@@ -33,6 +33,7 @@ vi.mock('nuqs', () => ({
 }));
 
 const deleteSectionMock = vi.fn();
+const createSubjectMock = vi.fn();
 const sectionsState: { sections: Section[] } = { sections: [] };
 
 vi.mock('../../use-academics', () => ({
@@ -50,7 +51,7 @@ vi.mock('../../use-academics', () => ({
     refetch: vi.fn(),
   }),
   useCreateSection: () => ({ createSection: vi.fn(), loading: false }),
-  useCreateSubject: () => ({ createSubject: vi.fn(), loading: false }),
+  useCreateSubject: () => ({ createSubject: createSubjectMock, loading: false }),
   useDeleteSection: () => ({ deleteSection: deleteSectionMock, loading: false }),
 }));
 
@@ -159,5 +160,40 @@ describe('StandardDetailPage section delete', () => {
     expect(
       within(screen.getByTestId(ids.sectionsTable)).getByText(SECTION_B.displayLabel ?? ''),
     ).toBeInTheDocument();
+  });
+});
+
+describe('StandardDetailPage subject create', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createSubjectMock.mockReset();
+    sectionsState.sections = [SECTION_B];
+  });
+
+  it('should link the new subject to the class it is created from', async () => {
+    createSubjectMock.mockResolvedValue({ data: { createSubject: { id: 'sub-1' } } });
+    renderPage();
+    await userEvent.click(screen.getByTestId(ids.standardSubjectsTab));
+    await userEvent.click(screen.getByTestId(ids.subjectNewBtn));
+    const dialog = await screen.findByRole('dialog');
+
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /^Name/ }), 'Rhymes');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'New Subject' }));
+
+    expect(createSubjectMock).toHaveBeenCalledWith({
+      name: 'Rhymes',
+      shortName: undefined,
+      boardCode: undefined,
+      type: 'ACADEMIC',
+      isMandatory: false,
+      hasPractical: false,
+      isElective: false,
+      theoryMarks: 80,
+      practicalMarks: 0,
+      internalMarks: 20,
+      electiveGroup: undefined,
+      standardIds: ['std-6'],
+    });
+    expect(toast.success).toHaveBeenCalledWith('Created successfully');
   });
 });

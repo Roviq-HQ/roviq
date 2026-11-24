@@ -826,8 +826,17 @@ describe('Billing Integration', () => {
       });
     });
 
-    it("should answer INVOICE_NOT_FOUND when paying another institute's invoice", async () => {
+    it("should answer INVOICE_NOT_FOUND when paying another institute's invoice, writing nothing", async () => {
       const invoiceB = await openInvoiceFor(other);
+      const stored = () =>
+        withAdmin(result.db, mkAdminCtx('test:billing'), async (tx) => ({
+          invoice: await tx.select().from(invoices).where(eq(invoices.id, invoiceB)),
+          payments: await tx
+            .select()
+            .from(payments)
+            .where(inArray(payments.tenantId, [own.tenantId, other.tenantId])),
+        }));
+      const before = await stored();
 
       const res = await gqlRequest(result.httpServer, {
         query: /* GraphQL */ `
@@ -840,6 +849,8 @@ describe('Billing Integration', () => {
       });
 
       expect(res.errors?.[0]?.extensions?.code).toBe('INVOICE_NOT_FOUND');
+      expect(res.data).toBeNull();
+      expect(await stored()).toEqual(before);
     });
   });
 

@@ -54,3 +54,15 @@ export interface UpdateSubjectData {
   isElective?: boolean;
   electiveGroup?: string;
 }
+
+export type SubjectLinkFailure =
+  | { kind: 'subject_not_found' }
+  | { kind: 'standard_not_found' }
+  | { kind: 'section_not_found' };
+
+export type SubjectLinkResult = SubjectLinkFailure | { kind: 'ok' };
+
+export type CreateSubjectResult =
+  | { kind: 'standard_not_found' }
+  | { kind: 'section_not_found' }
+  | { kind: 'ok'; record: SubjectRecord };

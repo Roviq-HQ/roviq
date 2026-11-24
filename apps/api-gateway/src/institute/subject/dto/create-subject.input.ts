@@ -106,7 +106,7 @@ export class CreateSubjectInput {
   electiveGroup?: string;
 
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsUUID(undefined, { each: true })
   @IsOptional()
   @Field(() => [ID], {
     nullable: true,
@@ -115,7 +115,7 @@ export class CreateSubjectInput {
   standardIds?: string[];
 
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsUUID(undefined, { each: true })
   @IsOptional()
   @Field(() => [ID], {
     nullable: true,

@@ -13,6 +13,7 @@ Many institutes share one database. The database, not the application, keeps the
 | Separate database roles | The app logs in as a role with no data access, and each request switches to the role of its scope: institute, reseller or platform. No role bypasses row-level security | [Infrastructure](infrastructure.md#database) |
 | Rules in the database | Security rules are grants, policies, constraints and triggers where PostgreSQL can express them, so no code path can skip them. Tests attempt the forbidden write as each role | [Testing](testing.md#security-invariants) |
 | Automated gates | A table without row-level security, or institute code that reaches platform-level access, fails the build | [Mistakes](references/mistakes.md) |
+| A test per operation | Every institute and reseller operation that takes an id is listed with the test that sends it another institute's id and expects a refusal. An operation that is not listed fails the build; the operations not yet tested are counted, and the count may only go down | [Auth](auth.md#a-scope-guard-is-not-tenant-isolation-rov-290) |
 
 ## Sign-in and sessions
 

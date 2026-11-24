@@ -34,21 +34,21 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.findUserContact':
     'The user id is the institute row’s first_admin_user_id, read only after the platform or owning-reseller check; a reseller gets the name and phone only when wasCreatedByReseller is true.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.findUsersByEmail':
-    'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code.',
+    'Email lookup for linking a membership; returns only user id and deleted flag, and the reseller invite answers every unusable address with one error code. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertPlatformMembership':
-    'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first.',
+    'Tenant or reseller id comes from the caller token; the reseller invite verifies the role belongs to that reseller first. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertPrimaryPhone':
-    'Creates a new platform-level user; no existing row is read or changed.',
+    'Creates a new platform-level user; no existing row is read or changed. Foreign-id test: guardian-create-foreign-id.integration.spec.ts, reseller-team.integration.spec.ts, student-create-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertUser':
-    'Creates a new platform-level user; no existing row is read or changed.',
+    'Creates a new platform-level user; no existing row is read or changed. Foreign-id test: guardian-create-foreign-id.integration.spec.ts, reseller-team.integration.spec.ts, student-create-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.insertUserProfileIfMissing':
-    'Called only for a user the same request just created; never with a caller-supplied id.',
+    'Called only for a user the same request just created; never with a caller-supplied id. Foreign-id test: guardian-create-foreign-id.integration.spec.ts, student-create-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.replaceTempPassword':
-    'The resend mutations pass the user id read from the staff or guardian profile through its live view under withTenant with the caller’s tenant, so another institute’s profile id answers STAFF_NOT_FOUND or GUARDIAN_NOT_FOUND first (sign-in-details.integration.spec.ts); the update only touches a user who has never set a password.',
+    'The resend mutations pass the user id read from the staff or guardian profile through its live view under withTenant with the caller’s tenant, so another institute’s profile id answers STAFF_NOT_FOUND or GUARDIAN_NOT_FOUND first (sign-in-details.integration.spec.ts); the update only touches a user who has never set a password. Foreign-id test: sign-in-details.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.usernameExists':
-    'Boolean existence check; the reseller invite answers every unusable address with one error code.',
+    'Boolean existence check; the reseller invite answers every unusable address with one error code. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.verifiedPhoneExists':
-    'Boolean existence check for a number the caller typed for a new account; refusing a taken number is what keeps the welcome from going to another person’s phone.',
+    'Boolean existence check for a number the caller typed for a new account; refusing a taken number is what keeps the welcome from going to another person’s phone. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/identity.drizzle-repository.ts#IdentityDrizzleRepository.wasCreatedByReseller':
     'Boolean only; the user id is the institute row’s first_admin_user_id and the reseller id comes from the caller token, both after the owning-reseller check.',
   'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.createSession':
@@ -86,9 +86,9 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/auth/repositories/impersonation.drizzle-repository.ts#ImpersonationDrizzleRepository.listSessions':
     'Impersonation (ROV-94): every target is checked against the actor scope, tenant, reseller and role rank before a session is issued; sessions are listed and ended only for the actor.',
   'apps/api-gateway/src/files/repositories/profile-photo.drizzle-repository.ts#ProfilePhotoDrizzleRepository.setOwn':
-    'Keyed by the user id in the verified token; the file must have been uploaded by and for that same user.',
+    'Keyed by the user id in the verified token; the file must have been uploaded by and for that same user. Foreign-id test: profile-photo-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.findInstituteType':
-    'Keyed by the tenant id in the verified token. Reads only the institute type.',
+    'Keyed by the tenant id in the verified token. Reads only the institute type. Foreign-id test: academic-year-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.createBotRole':
     'Keyed by the tenant id in the verified token.',
   'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.createBotUser':
@@ -96,13 +96,13 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.findInstituteRoles':
     'Keyed by the tenant id in the verified token.',
   'apps/api-gateway/src/institute/bot/repositories/bot-profile.drizzle-repository.ts#BotProfileDrizzleRepository.revokeMembership':
-    'Revokes the membership id read from a bot profile fetched under tenant RLS.',
+    'Revokes the membership id read from a bot profile fetched under tenant RLS. Foreign-id test: bot-api-key.integration.spec.ts.',
   'apps/api-gateway/src/institute/group/repositories/group.drizzle-repository.ts#GroupDrizzleRepository.findUserNames':
-    'Reads usernames for user ids taken from membership rows fetched under tenant RLS.',
+    'Reads usernames for user ids taken from membership rows fetched under tenant RLS. Foreign-id test: group-crud.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.createDocument':
-    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS.',
+    'Writes platform-level user tables (no tenant RLS) for a user id taken from a row already read under tenant RLS. Foreign-id test: student-document-upload.integration.spec.ts.',
   'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts#StudentDrizzleRepository.removeDocument':
-    'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts.',
+    'Soft-deletes a platform-level user document (no tenant RLS) only after reading it under tenant RLS joined to a student of the caller institute that the caller may read. Cross-institute refusal: student-document-removal.integration.spec.ts. Foreign-id test: student-document-removal.integration.spec.ts.',
   'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.findUserProfile':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.setPrimaryPhone':
@@ -110,7 +110,7 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/institute/user/repositories/profile.drizzle-repository.ts#ProfileDrizzleRepository.updateOwnProfile':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/notification-inbox/repositories/notification-inbox.drizzle-repository.ts#NotificationInboxDrizzleRepository.run':
-    "Admin role only for a platform-scope token (the caller's own PlatformContext); every query adds ownedBy(): scope = 'platform' AND recipient_user_id = the token user, so another user's or scope's id answers NOTIFICATION_NOT_FOUND.",
+    "Admin role only for a platform-scope token (the caller's own PlatformContext); every query adds ownedBy(): scope = 'platform' AND recipient_user_id = the token user, so another user's or scope's id answers NOTIFICATION_NOT_FOUND. Foreign-id test: notification-inbox.integration.spec.ts.",
   'apps/api-gateway/src/notification-inbox/repositories/device-token.drizzle-repository.ts#DeviceTokenDrizzleRepository.run':
     'device_tokens is platform-role only. Every write is keyed by the token user id, never an argument; unregister retires only a row whose user_id is the caller, and register moves a token to the caller only by retiring the old row.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.markEmailVerified':
@@ -118,9 +118,9 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/public-verification/tc-verification.repository.ts#TcVerificationRepository.findByToken':
     'Public TC check by the 32-character random token from the printed QR code; runs only the verify_tc() function, which returns the six fields of the verification page.',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#AuditQueryDrizzleRepository.findAuditLogs':
-    'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
+    'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token. Foreign-id test: audit-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/audit/repositories/audit-query.drizzle-repository.ts#runInContext':
-    'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token.',
+    'Admin role only when the caller passes neither tenant nor reseller id; institute and reseller resolvers always pass their own from the token. Foreign-id test: audit-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.findActiveByUserId':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
   'apps/api-gateway/src/auth/repositories/membership.drizzle-repository.ts#MembershipDrizzleRepository.hasMembershipInUnusableInstitute':
@@ -156,7 +156,7 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePreferredLocale':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/institute/certificate/repositories/export-report.drizzle-repository.ts#ExportReportDrizzleRepository.run':
-    'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts).',
+    'Admin role only for a PlatformContext; the institute resolver passes its own InstituteContext from the token and runs under withTenant (cross-institute test in compliance-export.integration.spec.ts). Foreign-id test: compliance-export.integration.spec.ts.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.create':
     'Reseller scope passes its own reseller id from the token as owner; no existing group is read or changed.',
   'apps/api-gateway/src/institute/institute-group/repositories/institute-group.drizzle-repository.ts#InstituteGroupDrizzleRepository.findMembershipsByUser':
@@ -168,13 +168,13 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findBranding':
     'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findById':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument. Foreign-id test: institute-branding-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findConfig':
     'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.findIdentifiers':
     'Field resolver: an institute caller may only resolve its own institute (assertReadable); reseller and platform parents come from queries already scoped to the caller.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateBranding':
-    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
+    'Keyed by the tenant id in the verified token. The resolver takes no institute id argument. Foreign-id test: institute-branding-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateConfig':
     'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateInfo':
@@ -182,7 +182,7 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateLocales':
     'Keyed by the tenant id in the verified token. The resolver takes no institute id argument.',
   'apps/api-gateway/src/institute/management/repositories/institute.drizzle-repository.ts#InstituteDrizzleRepository.updateStatus':
-    'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership.',
+    'Reseller scope only: called on the institute it just created, or after findByReseller proved ownership. Foreign-id test: reseller-institute-foreign-id.integration.spec.ts.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.countOtherPasskeys':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.create':
@@ -198,19 +198,19 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
   'apps/api-gateway/src/passkey/repositories/auth-provider.drizzle-repository.ts#AuthProviderDrizzleRepository.updateProviderData':
     'Passkey login: looked up by the username or credential id the authenticator presents; nothing is returned before the signature verifies.',
   'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.findLastActive':
-    'Team (ROV-185): takes user ids the service read under withReseller for the caller token reseller; returns only a timestamp per id.',
+    'Team (ROV-185): takes user ids the service read under withReseller for the caller token reseller; returns only a timestamp per id. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.listRoles':
-    'Team (ROV-185): filters on the reseller id from the caller token; no caller-supplied id.',
+    'Team (ROV-185): filters on the reseller id from the caller token; no caller-supplied id. Foreign-id test: reseller-team.integration.spec.ts.',
   'apps/api-gateway/src/reseller/team/repositories/reseller-team.drizzle-repository.ts#ResellerTeamDrizzleRepository.listSessions':
-    'Team (ROV-185): takes a membership id the service first found under withReseller for the caller token reseller.',
+    'Team (ROV-185): takes a membership id the service first found under withReseller for the caller token reseller. Foreign-id test: reseller-team.integration.spec.ts.',
   'ee/libs/backend/payments/src/repositories/payment-gateway-config.drizzle-repository.ts#PaymentGatewayConfigDrizzleRepository.findActiveByResellerId':
-    'Keyed by the reseller id in the verified token.',
+    'Keyed by the reseller id in the verified token. Foreign-id test: billing.integration.spec.ts.',
   'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findAbilities':
-    'Loads abilities for the membership id and tenant id in the verified token.',
+    'Loads abilities for the membership id and tenant id in the verified token. Foreign-id test: files-foreign-id.integration.spec.ts.',
   'libs/backend/casl/src/repositories/membership-ability.drizzle-repository.ts#MembershipAbilityDrizzleRepository.findReadAssignments':
-    'Loads abilities for the membership id and tenant id in the verified token.',
+    'Loads abilities for the membership id and tenant id in the verified token. Foreign-id test: files-foreign-id.integration.spec.ts.',
   'libs/backend/casl/src/repositories/role.drizzle-repository.ts#RoleDrizzleRepository.findAbilities':
-    'Loads abilities for the role id in the verified token.',
+    'Loads abilities for the role id in the verified token. Foreign-id test: files-foreign-id.integration.spec.ts.',
   'libs/backend/casl/src/repositories/role.drizzle-repository.ts#RoleDrizzleRepository.findPrimaryNavSlugs':
     'Loads abilities for the role id in the verified token.',
 };

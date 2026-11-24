@@ -106,6 +106,8 @@ A scope guard only proves the token's scope. Which rows the caller may touch is 
 - Institute scope reads and edits only its own institute (`myInstitute`, `updateInstituteInfo(input)`, `myInstituteGroup`).
 - `institute_admin` holds `manage all` minus institute-group management and platform-level `Institute` actions.
 - `pnpm check:admin-context-reach` resolves calls from every resolver outside `admin/` and lists each reachable function that opens the admin context, with the reason it cannot be aimed at another tenant. A new one fails CI until it is listed. The reasons are reviewed claims, not proofs: the proof for an operation is a test that sends another tenant's id and asserts refusal.
+- `apps/api-gateway/src/__tests__/foreign-id-coverage.spec.ts` keeps that proof complete (ROV-293). It reads the generated schema, takes every Query and Mutation outside `admin/` that has an `ID` argument or an input object with an `ID` field, and fails when one is missing from the registry `foreign-id-coverage.ts` beside it. An entry is the spec that holds the test (the file must exist and name the operation), an exemption with its reason, or `pending`; the number of pending entries is fixed in the spec and may only go down.
+- The test sends a real id of a second institute (for reseller scope: of another reseller, and of an institute the platform owns), asserts the refusal code, and for a mutation reads the foreign row back unchanged and checks that nothing was written in the caller's institute. A filter query answers a foreign id with an empty result and no error, so that it does not confirm the id exists; its test pins the exact rows returned.
 
 ## Protected Routes
 - Backend: `@InstituteScope()` / `@PlatformScope()` / `@ResellerScope()` on resolver classes

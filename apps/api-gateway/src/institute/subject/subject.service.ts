@@ -7,7 +7,7 @@ import { AcademicYearRepository } from '../academic-year/repositories/academic-y
 import type { CreateSubjectInput } from './dto/create-subject.input';
 import type { UpdateSubjectInput } from './dto/update-subject.input';
 import { SubjectRepository } from './repositories/subject.repository';
-import type { SubjectNameOption, SubjectRecord } from './repositories/types';
+import type { SubjectLinkFailure, SubjectNameOption, SubjectRecord } from './repositories/types';
 
 @Injectable()
 export class SubjectService {
@@ -57,7 +57,9 @@ export class SubjectService {
   }
 
   async create(input: CreateSubjectInput): Promise<SubjectRecord> {
-    const record = await this.repo.create(input);
+    const result = await this.repo.create(input);
+    if (result.kind !== 'ok') throw linkError(result);
+    const { record } = result;
     this.eventBus.emit(EVENT_PATTERNS.SUBJECT.created, {
       subjectId: record.id,
       tenantId: record.tenantId,
@@ -87,7 +89,8 @@ export class SubjectService {
   }
 
   async assignToStandard(subjectId: string, standardId: string): Promise<boolean> {
-    await this.repo.assignToStandard(subjectId, standardId);
+    const result = await this.repo.assignToStandard(subjectId, standardId);
+    if (result.kind !== 'ok') throw linkError(result);
     this.eventBus.emit(EVENT_PATTERNS.SUBJECT.assigned_to_standard, {
       subjectId,
       standardId,
@@ -97,7 +100,8 @@ export class SubjectService {
   }
 
   async removeFromStandard(subjectId: string, standardId: string): Promise<boolean> {
-    await this.repo.removeFromStandard(subjectId, standardId);
+    const result = await this.repo.removeFromStandard(subjectId, standardId);
+    if (result.kind !== 'ok') throw linkError(result);
     this.eventBus.emit(EVENT_PATTERNS.SUBJECT.removed_from_standard, {
       subjectId,
       standardId,
@@ -107,7 +111,8 @@ export class SubjectService {
   }
 
   async assignToSection(subjectId: string, sectionId: string): Promise<boolean> {
-    await this.repo.assignToSection(subjectId, sectionId);
+    const result = await this.repo.assignToSection(subjectId, sectionId);
+    if (result.kind !== 'ok') throw linkError(result);
     this.eventBus.emit(EVENT_PATTERNS.SUBJECT.assigned_to_section, {
       subjectId,
       sectionId,
@@ -117,12 +122,24 @@ export class SubjectService {
   }
 
   async removeFromSection(subjectId: string, sectionId: string): Promise<boolean> {
-    await this.repo.removeFromSection(subjectId, sectionId);
+    const result = await this.repo.removeFromSection(subjectId, sectionId);
+    if (result.kind !== 'ok') throw linkError(result);
     this.eventBus.emit(EVENT_PATTERNS.SUBJECT.removed_from_section, {
       subjectId,
       sectionId,
       tenantId: this.tenantId,
     });
     return true;
+  }
+}
+
+function linkError(failure: SubjectLinkFailure): BusinessException {
+  switch (failure.kind) {
+    case 'subject_not_found':
+      return new BusinessException(ErrorCode.SUBJECT_NOT_FOUND, 'Subject not found');
+    case 'standard_not_found':
+      return new BusinessException(ErrorCode.STANDARD_NOT_FOUND, 'Standard not found');
+    case 'section_not_found':
+      return new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
   }
 }

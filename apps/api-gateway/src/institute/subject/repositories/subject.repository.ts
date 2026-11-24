@@ -1,5 +1,7 @@
 import type {
   CreateSubjectData,
+  CreateSubjectResult,
+  SubjectLinkResult,
   SubjectNameOption,
   SubjectRecord,
   UpdateSubjectData,
@@ -10,11 +12,13 @@ export abstract class SubjectRepository {
   abstract findAll(): Promise<SubjectRecord[]>;
   abstract findByStandard(standardId: string): Promise<SubjectRecord[]>;
   abstract findByAcademicYear(academicYearId: string): Promise<SubjectNameOption[]>;
-  abstract create(data: CreateSubjectData): Promise<SubjectRecord>;
+  /** Reads every standard and section id under the caller's institute before any insert. */
+  abstract create(data: CreateSubjectData): Promise<CreateSubjectResult>;
   abstract update(id: string, data: UpdateSubjectData): Promise<SubjectRecord>;
   abstract softDelete(id: string): Promise<void>;
-  abstract assignToStandard(subjectId: string, standardId: string): Promise<void>;
-  abstract removeFromStandard(subjectId: string, standardId: string): Promise<void>;
-  abstract assignToSection(subjectId: string, sectionId: string): Promise<void>;
-  abstract removeFromSection(subjectId: string, sectionId: string): Promise<void>;
+  /** The four link methods read both ids under the caller's institute before writing. */
+  abstract assignToStandard(subjectId: string, standardId: string): Promise<SubjectLinkResult>;
+  abstract removeFromStandard(subjectId: string, standardId: string): Promise<SubjectLinkResult>;
+  abstract assignToSection(subjectId: string, sectionId: string): Promise<SubjectLinkResult>;
+  abstract removeFromSection(subjectId: string, sectionId: string): Promise<SubjectLinkResult>;
 }

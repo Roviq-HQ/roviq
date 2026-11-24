@@ -5,6 +5,7 @@ import {
   type DrizzleDB,
   mkInstituteCtx,
   sectionSubjects,
+  sectionsLive,
   softDelete,
   standardSubjects,
   standardSubjectsLive,
@@ -18,6 +19,9 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { SubjectRepository } from './subject.repository';
 import type {
   CreateSubjectData,
+  CreateSubjectResult,
+  SubjectLinkFailure,
+  SubjectLinkResult,
   SubjectNameOption,
   SubjectRecord,
   UpdateSubjectData,
@@ -132,10 +136,28 @@ export class SubjectDrizzleRepository extends SubjectRepository {
     });
   }
 
-  async create(data: CreateSubjectData): Promise<SubjectRecord> {
+  async create(data: CreateSubjectData): Promise<CreateSubjectResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+      // Foreign keys accept any institute's row; the views under RLS do not.
+      const standardIds = [...new Set(data.standardIds ?? [])];
+      const sectionIds = [...new Set(data.sectionIds ?? [])];
+      if (standardIds.length > 0) {
+        const found = await tx
+          .select({ id: standardsLive.id })
+          .from(standardsLive)
+          .where(inArray(standardsLive.id, standardIds));
+        if (found.length !== standardIds.length) return { kind: 'standard_not_found' };
+      }
+      if (sectionIds.length > 0) {
+        const found = await tx
+          .select({ id: sectionsLive.id })
+          .from(sectionsLive)
+          .where(inArray(sectionsLive.id, sectionIds));
+        if (found.length !== sectionIds.length) return { kind: 'section_not_found' };
+      }
+
       const rows = await tx
         .insert(subjects)
         .values({
@@ -159,9 +181,9 @@ export class SubjectDrizzleRepository extends SubjectRepository {
       const subject = rows[0] as SubjectRecord;
 
       // Link to standards if provided
-      if (data.standardIds?.length) {
+      if (standardIds.length > 0) {
         await tx.insert(standardSubjects).values(
-          data.standardIds.map((standardId) => ({
+          standardIds.map((standardId) => ({
             tenantId,
             subjectId: subject.id,
             standardId,
@@ -172,9 +194,9 @@ export class SubjectDrizzleRepository extends SubjectRepository {
       }
 
       // Link to sections if provided
-      if (data.sectionIds?.length) {
+      if (sectionIds.length > 0) {
         await tx.insert(sectionSubjects).values(
-          data.sectionIds.map((sectionId) => ({
+          sectionIds.map((sectionId) => ({
             tenantId,
             subjectId: subject.id,
             sectionId,
@@ -184,7 +206,7 @@ export class SubjectDrizzleRepository extends SubjectRepository {
         );
       }
 
-      return subject;
+      return { kind: 'ok', record: subject };
     });
   }
 
@@ -224,21 +246,26 @@ export class SubjectDrizzleRepository extends SubjectRepository {
     });
   }
 
-  async assignToStandard(subjectId: string, standardId: string): Promise<void> {
+  async assignToStandard(subjectId: string, standardId: string): Promise<SubjectLinkResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+      const missing = await this.missingForStandardLink(tx, subjectId, standardId);
+      if (missing) return missing;
       await tx
         .insert(standardSubjects)
         .values({ tenantId, subjectId, standardId, createdBy: userId, updatedBy: userId })
         .onConflictDoNothing();
+      return { kind: 'ok' };
     });
   }
 
-  async removeFromStandard(subjectId: string, standardId: string): Promise<void> {
+  async removeFromStandard(subjectId: string, standardId: string): Promise<SubjectLinkResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+      const missing = await this.missingForStandardLink(tx, subjectId, standardId);
+      if (missing) return missing;
       await tx
         .update(standardSubjects)
         .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
@@ -249,24 +276,30 @@ export class SubjectDrizzleRepository extends SubjectRepository {
             isNull(standardSubjects.deletedAt),
           ),
         );
+      return { kind: 'ok' };
     });
   }
 
-  async assignToSection(subjectId: string, sectionId: string): Promise<void> {
+  async assignToSection(subjectId: string, sectionId: string): Promise<SubjectLinkResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+      const missing = await this.missingForSectionLink(tx, subjectId, sectionId);
+      if (missing) return missing;
       await tx
         .insert(sectionSubjects)
         .values({ tenantId, subjectId, sectionId, createdBy: userId, updatedBy: userId })
         .onConflictDoNothing();
+      return { kind: 'ok' };
     });
   }
 
-  async removeFromSection(subjectId: string, sectionId: string): Promise<void> {
+  async removeFromSection(subjectId: string, sectionId: string): Promise<SubjectLinkResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    await withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:subject'), async (tx) => {
+      const missing = await this.missingForSectionLink(tx, subjectId, sectionId);
+      if (missing) return missing;
       await tx
         .update(sectionSubjects)
         .set({ deletedAt: new Date(), deletedBy: userId, updatedBy: userId })
@@ -277,6 +310,45 @@ export class SubjectDrizzleRepository extends SubjectRepository {
             isNull(sectionSubjects.deletedAt),
           ),
         );
+      return { kind: 'ok' };
     });
+  }
+
+  // Foreign keys accept any institute's row; these reads under RLS do not.
+  private async subjectExists(tx: DrizzleDB, subjectId: string): Promise<boolean> {
+    const [row] = await tx
+      .select({ id: subjectsLive.id })
+      .from(subjectsLive)
+      .where(eq(subjectsLive.id, subjectId))
+      .limit(1);
+    return row !== undefined;
+  }
+
+  private async missingForStandardLink(
+    tx: DrizzleDB,
+    subjectId: string,
+    standardId: string,
+  ): Promise<SubjectLinkFailure | null> {
+    if (!(await this.subjectExists(tx, subjectId))) return { kind: 'subject_not_found' };
+    const [standard] = await tx
+      .select({ id: standardsLive.id })
+      .from(standardsLive)
+      .where(eq(standardsLive.id, standardId))
+      .limit(1);
+    return standard ? null : { kind: 'standard_not_found' };
+  }
+
+  private async missingForSectionLink(
+    tx: DrizzleDB,
+    subjectId: string,
+    sectionId: string,
+  ): Promise<SubjectLinkFailure | null> {
+    if (!(await this.subjectExists(tx, subjectId))) return { kind: 'subject_not_found' };
+    const [section] = await tx
+      .select({ id: sectionsLive.id })
+      .from(sectionsLive)
+      .where(eq(sectionsLive.id, sectionId))
+      .limit(1);
+    return section ? null : { kind: 'section_not_found' };
   }
 }

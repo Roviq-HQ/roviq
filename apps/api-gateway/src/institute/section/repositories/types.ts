@@ -31,6 +31,7 @@ export interface CreateSectionData {
   stream?: { name: string; code: string };
   mediumOfInstruction?: string;
   shift?: string;
+  classTeacherId?: string;
   room?: string;
   capacity?: number;
   genderRestriction?: string;
@@ -55,3 +56,11 @@ export interface UpdateSectionData {
   endTime?: string;
   batchStatus?: string;
 }
+
+export type SectionWriteFailure =
+  | { kind: 'year_not_found' }
+  | { kind: 'standard_not_found' }
+  | { kind: 'section_not_found' }
+  | { kind: 'class_teacher_not_found' };
+
+export type SectionWriteResult = SectionWriteFailure | { kind: 'ok'; record: SectionRecord };

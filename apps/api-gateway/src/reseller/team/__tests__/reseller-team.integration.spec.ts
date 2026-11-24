@@ -12,6 +12,7 @@ import { ErrorCode, type ResellerSystemRoleName } from '@roviq/common-types';
 import {
   auditLogs,
   authEvents,
+  memberships,
   mkAdminCtx,
   provisionResellerSystemRoles,
   refreshTokens,
@@ -523,6 +524,150 @@ describe('Reseller team management (integration)', () => {
       const back = await login(member.username);
       const list = await gql(LIST, undefined, back.accessToken);
       expect(list.errors).toBeUndefined();
+    });
+  });
+
+  describe('ids of another reseller or of the platform (ROV-293)', () => {
+    let team: Team;
+    let outsider: Team;
+    let ownViewer: Member;
+    let outsiderViewer: Member;
+    let platformOwned: TestInstitute;
+
+    /** Team rows of both resellers and the platform-owned institute's membership. */
+    const stored = () =>
+      admin(async (tx) => ({
+        team: await tx
+          .select()
+          .from(resellerMemberships) // allow-base-read: asserting the stored rows
+          .where(
+            inArray(resellerMemberships.resellerId, [
+              team.reseller.resellerId,
+              outsider.reseller.resellerId,
+            ]),
+          ),
+        institute: await tx
+          .select()
+          .from(memberships) // allow-base-read: asserting the stored row
+          .where(eq(memberships.id, platformOwned.membershipId)),
+      }));
+
+    beforeAll(async () => {
+      team = await setUpTeam();
+      outsider = await setUpTeam();
+      ownViewer = await invite(team, 'fid-own-viewer', 'reseller_viewer');
+      outsiderViewer = await invite(outsider, 'fid-outsider-viewer', 'reseller_viewer');
+      platformOwned = await createTestInstitute(result.db);
+      createdInstitutes.push(platformOwned);
+    });
+
+    const foreignMembers = [
+      ['a member of another reseller', () => outsiderViewer.id],
+      ['a membership of a platform-owned institute', () => platformOwned.membershipId],
+    ] as const;
+
+    it.each(
+      foreignMembers,
+    )('resellerGetTeamMember should refuse %s and return none of it', async (_label, pick) => {
+      const response = await gql(GET, { id: pick() }, team.adminTokens.accessToken);
+
+      expect(codeOf(response)).toBe(ErrorCode.TEAM_MEMBER_NOT_FOUND);
+      expect(response.data).toBeNull();
+    });
+
+    it.each(
+      foreignMembers,
+    )('resellerChangeTeamMemberRole should refuse %s and change nothing', async (_label, pick) => {
+      const before = await stored();
+
+      const response = await gql(
+        CHANGE_ROLE,
+        { id: pick(), roleId: team.roleIds.reseller_support_admin },
+        team.adminTokens.accessToken,
+      );
+
+      expect(codeOf(response)).toBe(ErrorCode.TEAM_MEMBER_NOT_FOUND);
+      expect(response.data).toBeNull();
+      expect(await stored()).toEqual(before);
+    });
+
+    const foreignRoles = [
+      ['a role of another reseller', () => outsider.roleIds.reseller_viewer],
+      ['a role of a platform-owned institute', () => platformOwned.roleId],
+    ] as const;
+
+    it.each(
+      foreignRoles,
+    )('resellerChangeTeamMemberRole should refuse %s for its own member and change nothing', async (_label, pick) => {
+      const before = await stored();
+
+      const response = await gql(
+        CHANGE_ROLE,
+        { id: ownViewer.id, roleId: pick() },
+        team.adminTokens.accessToken,
+      );
+
+      expect(codeOf(response)).toBe(ErrorCode.FORBIDDEN);
+      expect(response.data).toBeNull();
+      expect(await stored()).toEqual(before);
+    });
+
+    it.each(
+      foreignRoles,
+    )('resellerInviteTeamMember should refuse %s and create no account or membership', async (_label, pick) => {
+      const address = email(`fid-invite-${randomUUID().slice(0, 6)}`);
+      const before = await stored();
+
+      const response = await gql(
+        INVITE,
+        { input: { email: address, roleId: pick() } },
+        team.adminTokens.accessToken,
+      );
+
+      expect(codeOf(response)).toBe(ErrorCode.FORBIDDEN);
+      expect(response.data).toBeNull();
+      expect(await stored()).toEqual(before);
+      const accounts = await admin((tx) =>
+        tx
+          .select({ id: users.id })
+          .from(users) // allow-base-read: asserting no account was created
+          .where(eq(users.email, address)),
+      );
+      expect(accounts).toEqual([]);
+    });
+
+    it.each(
+      foreignMembers,
+    )('resellerDeactivateTeamMember should refuse %s and change nothing', async (_label, pick) => {
+      const before = await stored();
+
+      const response = await gql(DEACTIVATE, { id: pick() }, team.adminTokens.accessToken);
+
+      expect(codeOf(response)).toBe(ErrorCode.TEAM_MEMBER_NOT_FOUND);
+      expect(response.data).toBeNull();
+      expect(await stored()).toEqual(before);
+    });
+
+    it.each(
+      foreignMembers,
+    )('resellerReactivateTeamMember should refuse %s while it is inactive and change nothing', async (_label, pick) => {
+      await admin(async (tx) => {
+        await tx
+          .update(resellerMemberships)
+          .set({ isActive: false })
+          .where(eq(resellerMemberships.id, outsiderViewer.id));
+        await tx
+          .update(memberships)
+          .set({ status: 'SUSPENDED' })
+          .where(eq(memberships.id, platformOwned.membershipId));
+      });
+      const before = await stored();
+
+      const response = await gql(REACTIVATE, { id: pick() }, team.adminTokens.accessToken);
+
+      expect(codeOf(response)).toBe(ErrorCode.TEAM_MEMBER_NOT_FOUND);
+      expect(response.data).toBeNull();
+      expect(await stored()).toEqual(before);
     });
   });
 

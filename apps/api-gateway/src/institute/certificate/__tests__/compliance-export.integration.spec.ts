@@ -430,14 +430,33 @@ describe('Compliance exports (integration)', () => {
       expect(listed.data?.listExportReports.map((r) => r.id)).toContain(report.id);
     });
 
-    it('should refuse an academic year of another institute', async () => {
-      const { errors } = await gql(
+    it('should refuse an academic year of another institute, writing nothing in either', async () => {
+      const exportsOf = (tenantId: string) =>
+        withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+          tx.select().from(exportReports).where(eq(exportReports.tenantId, tenantId)),
+        );
+      const yearRow = () =>
+        withAdmin(result.db, mkAdminCtx(ORIGIN), (tx) =>
+          tx.select().from(academicYears).where(eq(academicYears.id, yearB)),
+        );
+      const before = {
+        a: await exportsOf(instituteA.tenantId),
+        b: await exportsOf(instituteB.tenantId),
+        year: await yearRow(),
+      };
+
+      const { data, errors } = await gql(
         INSTITUTE_EXPORT,
         { input: { reportType: 'AWR', academicYearId: yearB } },
         instituteAToken,
       );
 
       expect(errors?.[0]?.extensions?.code).toBe(ErrorCode.ACADEMIC_YEAR_NOT_FOUND);
+      expect(data).toBeNull();
+      expect(startWorkflow).not.toHaveBeenCalled();
+      expect(await exportsOf(instituteA.tenantId)).toEqual(before.a);
+      expect(await exportsOf(instituteB.tenantId)).toEqual(before.b);
+      expect(await yearRow()).toEqual(before.year);
     });
 
     it('should refuse a report type the institute does not qualify for, creating no row', async () => {

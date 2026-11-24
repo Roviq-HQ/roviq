@@ -34,8 +34,11 @@ import {
 } from '../../../files/user-document-files';
 import { nextAdmissionNumber } from '../admission-number.sequence';
 import { studentReadPredicate } from '../student-read-predicate';
+import { findYearAndClass } from './class-lookup';
 import { StudentRepository } from './student.repository';
 import type {
+  AdmissionClassData,
+  AdmissionClassResult,
   DeletedStudentRecord,
   FileRecord,
   NewStudentAcademicData,
@@ -135,8 +138,30 @@ export class StudentDrizzleRepository extends StudentRepository {
     });
   }
 
-  async createInitialAcademic(tenantId: string, data: NewStudentAcademicData): Promise<void> {
-    await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+  checkAdmissionClass(tenantId: string, data: AdmissionClassData): Promise<AdmissionClassResult> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const found = await findYearAndClass(
+        tx,
+        data.academicYearId,
+        data.standardId,
+        data.sectionId,
+      );
+      return found.kind === 'ok' ? { kind: 'ok' } : found;
+    });
+  }
+
+  createInitialAcademic(
+    tenantId: string,
+    data: NewStudentAcademicData,
+  ): Promise<AdmissionClassResult> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const found = await findYearAndClass(
+        tx,
+        data.academicYearId,
+        data.standardId,
+        data.sectionId,
+      );
+      if (found.kind !== 'ok') return found;
       await tx.insert(studentAcademics).values({
         studentProfileId: data.studentProfileId,
         academicYearId: data.academicYearId,
@@ -146,6 +171,7 @@ export class StudentDrizzleRepository extends StudentRepository {
         createdBy: data.actorId,
         updatedBy: data.actorId,
       });
+      return { kind: 'ok' };
     });
   }
 

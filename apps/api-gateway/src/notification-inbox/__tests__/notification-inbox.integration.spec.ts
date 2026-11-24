@@ -251,6 +251,7 @@ describe('Notification inbox (integration)', () => {
     let ownShared: Row;
     let ownMembership: Row;
     let otherInstitute: Row;
+    let otherInstituteMember: Row;
     let otherMembership: Row;
     let otherMember: Row;
     let ownPlatform: Row;
@@ -264,6 +265,11 @@ describe('Notification inbox (integration)', () => {
       await insertRow({ recipientUserId: instituteA.userId, archivedAt: new Date() });
       otherInstitute = await insertRow({
         recipientUserId: instituteA.userId,
+        tenantId: instituteB.tenantId,
+      });
+      otherInstituteMember = await insertRow({
+        recipientUserId: instituteB.userId,
+        recipientMembershipId: instituteB.membershipId,
         tenantId: instituteB.tenantId,
       });
       otherMembership = await insertRow({
@@ -312,6 +318,7 @@ describe('Notification inbox (integration)', () => {
 
     it.each([
       ['another institute', () => otherInstitute.id],
+      ['a member of another institute', () => otherInstituteMember.id],
       ['another membership of theirs', () => otherMembership.id],
       ['another member of the same institute', () => otherMember.id],
       ['another scope', () => ownPlatform.id],
@@ -341,7 +348,13 @@ describe('Notification inbox (integration)', () => {
     });
 
     it('leaves rows it refused untouched', async () => {
-      for (const row of [otherInstitute, otherMembership, otherMember, ownPlatform]) {
+      for (const row of [
+        otherInstitute,
+        otherInstituteMember,
+        otherMembership,
+        otherMember,
+        ownPlatform,
+      ]) {
         expect(await stored(row.id)).toEqual(row);
       }
     });
@@ -792,6 +805,25 @@ describe('Notification inbox (integration)', () => {
         ],
       ]);
       expect(await stored(own.id)).toEqual(own);
+    });
+
+    it('refuses a flow row of a member of another institute, publishing and changing nothing', async () => {
+      const foreign = await insertRow({
+        recipientUserId: instituteB.userId,
+        recipientMembershipId: instituteB.membershipId,
+        tenantId: instituteB.tenantId,
+        flowId,
+      });
+
+      for (const query of [MARK, ARCHIVE, ACK]) {
+        const response = await gql(query, tokenX, { id: foreign.id });
+        expect(code(response)).toBe('NOTIFICATION_NOT_FOUND');
+        expect(response.data).toBeNull();
+      }
+
+      expect(seen()).toHaveLength(0);
+      expect(acknowledged()).toHaveLength(0);
+      expect(await stored(foreign.id)).toEqual(foreign);
     });
 
     it('refuses to acknowledge another member’s row and publishes nothing', async () => {
