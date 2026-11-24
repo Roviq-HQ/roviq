@@ -218,10 +218,11 @@ describe('In-app notifications (E2E)', () => {
         const forThis = (deliveries.data?.adminNotificationDeliveries.edges ?? [])
           .map((edge) => edge.node)
           .filter((node) => node.notificationId === notification.id);
-        // A failed attempt is retried as a new row, so compare the channels tried.
+        // A guardian's flow is app, then WhatsApp, then SMS; every channel leaves a row, also
+        // when it was not needed. A failed attempt is retried as a new row, so compare channels.
         expect([...new Set(forThis.map((node) => node.channel))].sort()).toEqual([
-          'EMAIL',
           'PUSH',
+          'SMS',
           'WHATSAPP',
         ]);
         for (const node of forThis) {
