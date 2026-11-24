@@ -15,6 +15,7 @@ import {
   jsonb,
   pgPolicy,
   pgTable,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -55,6 +56,9 @@ export const plans = pgTable(
     index('idx_plans_name_gin').using('gin', table.name),
     index('idx_plans_name_trgm').using('gin', sql`i18n_text_to_string(${table.name}) gin_trgm_ops`),
     index('plans_reseller_id_idx').on(table.resellerId),
+    uniqueIndex('uq_plan_code_reseller')
+      .on(table.resellerId, table.code)
+      .where(sql`${table.deletedAt} IS NULL`),
     index('plans_status_idx').on(table.status),
     // Reseller: read own plans. Soft-delete visibility lives in `plansLive`,
     // not RLS — see drizzle-database skill.

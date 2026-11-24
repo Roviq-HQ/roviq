@@ -14,6 +14,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -54,10 +55,15 @@ export const invoices = pgTable(
     ...trackingColumns,
   },
   (table) => [
-    index('invoices_tenant_id_idx').on(table.tenantId),
+    // Invoice lists are per institute or per reseller, newest first.
+    index('idx_invoices_tenant').on(table.tenantId, table.createdAt.desc()),
     index('invoices_subscription_id_idx').on(table.subscriptionId),
-    index('invoices_reseller_id_idx').on(table.resellerId),
-    index('invoices_status_idx').on(table.status),
+    index('idx_invoices_reseller').on(table.resellerId, table.createdAt.desc()),
+    // Only unpaid invoices are looked up by status (reminders, overdue checks).
+    index('idx_invoices_status')
+      .on(table.status)
+      .where(sql`${table.status} IN ('SENT', 'OVERDUE')`),
+    uniqueIndex('uq_invoice_number_reseller').on(table.resellerId, table.invoiceNumber),
     // App: read own institute's invoices
     pgPolicy('inv_app_read', {
       for: 'select',

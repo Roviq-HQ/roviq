@@ -114,6 +114,8 @@ export const institutes = pgTable(
       'gin',
       sql`i18n_text_to_string(${table.name}) gin_trgm_ops`,
     ),
+    // Search matches the code with ILIKE '%…%'.
+    index('idx_institutes_code_trgm').using('gin', sql`${table.code} gin_trgm_ops`),
     uniqueIndex('institutes_slug_key').using('btree', table.slug.asc().nullsLast()),
     index('institutes_group_id_idx').on(table.groupId),
     uniqueIndex('institutes_code_key')
