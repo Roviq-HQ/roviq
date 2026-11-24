@@ -30,7 +30,11 @@ The rules are in root `CLAUDE.md`; this is the order to apply them in.
 - `git diff | grep -i "school"` returns nothing.
 - "Does NOT Change": `git diff --stat` shows only files this issue needs.
 
-## 5. Commit and report
+## 5. Update the records
+- Invoke the `update-docs` skill before the commit, every time, without being asked. It walks every place this change is recorded: in the repository (`docs/`, `README.md`, `.env.example`, `CLAUDE.md`, skills) and in Linear (the issue comment and status, the roadmap, the decisions log, the findings log, the project and its milestone).
+- Invoke it again when a later commit on the branch changes behaviour, and after the merge (issue status `Done`, roadmap line).
+
+## 6. Commit and report
 - `pnpm lint:fix`, commit (`CLAUDE.md` → "Finishing a change"). Push and open the PR when the user asks or the session's working agreement says so; rebase on `origin/main` first and re-run the touched integration specs after the rebase.
-- Comment on the issue: what was built, decisions and deviations, what was checked in the browser, what was not.
+- The issue comment written in step 5 says what was built, decisions and deviations, what was checked in the browser, what was not.
 - Tell the user the same, shortly, with anything they must decide.
