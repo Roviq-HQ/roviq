@@ -292,15 +292,18 @@ export class CertificateService {
     let certificateData: Record<string, unknown> = {};
     if (input.studentProfileId) {
       const student = await this.certificates.findStudent(ctx, input.studentProfileId);
-      if (student) {
-        certificateData = {
-          studentName: `${i18nDisplay(student.firstName)} ${i18nDisplay(student.lastName)}`.trim(),
-          admissionNumber: student.admissionNumber,
-          class: student.admissionClass,
-          purpose: input.purpose,
-          date: todayIso(),
-        };
-      }
+      // Before the serial is taken: the foreign key would accept another institute's student.
+      if (!student) throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
+      certificateData = {
+        studentName: `${i18nDisplay(student.firstName)} ${i18nDisplay(student.lastName)}`.trim(),
+        admissionNumber: student.admissionNumber,
+        class: student.admissionClass,
+        purpose: input.purpose,
+        date: todayIso(),
+      };
+    }
+    if (input.staffProfileId && !(await this.certificates.staffExists(ctx, input.staffProfileId))) {
+      throw new BusinessException(ErrorCode.STAFF_NOT_FOUND, 'Staff member not found');
     }
 
     const approvalChain = template.approvalChain ?? [];

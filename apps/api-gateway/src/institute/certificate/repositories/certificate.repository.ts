@@ -14,6 +14,7 @@ export abstract class CertificateRepository {
     ctx: InstituteContext,
     templateId: string,
   ): Promise<CertificateTemplateRow | null>;
+  abstract staffExists(ctx: InstituteContext, staffProfileId: string): Promise<boolean>;
   abstract findStudent(
     ctx: InstituteContext,
     studentProfileId: string,
