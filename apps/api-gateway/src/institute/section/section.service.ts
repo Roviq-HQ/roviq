@@ -8,7 +8,7 @@ import { StandardRepository } from '../standard/repositories/standard.repository
 import type { CreateSectionInput } from './dto/create-section.input';
 import type { UpdateSectionInput } from './dto/update-section.input';
 import { SectionRepository } from './repositories/section.repository';
-import type { SectionRecord } from './repositories/types';
+import type { SectionRecord, SectionWriteResult } from './repositories/types';
 
 @Injectable()
 export class SectionService {
@@ -67,7 +67,7 @@ export class SectionService {
       );
     }
 
-    const record = await this.repo.create(input);
+    const record = this.unwrap(await this.repo.create(input), input.standardId);
 
     this.eventBus.emit(EVENT_PATTERNS.SECTION.created, {
       sectionId: record.id,
@@ -79,7 +79,7 @@ export class SectionService {
   }
 
   async update(id: string, input: UpdateSectionInput): Promise<SectionRecord> {
-    const record = await this.repo.update(id, input);
+    const record = this.unwrap(await this.repo.update(id, input), id);
 
     this.eventBus.emit(EVENT_PATTERNS.SECTION.updated, {
       sectionId: record.id,
@@ -90,13 +90,37 @@ export class SectionService {
   }
 
   async assignClassTeacher(sectionId: string, classTeacherId: string): Promise<SectionRecord> {
-    const record = await this.repo.update(sectionId, { classTeacherId });
+    const record = this.unwrap(await this.repo.update(sectionId, { classTeacherId }), sectionId);
     this.eventBus.emit(EVENT_PATTERNS.SECTION.teacher_assigned, {
       sectionId: record.id,
       tenantId: record.tenantId,
       classTeacherId,
     });
     return record;
+  }
+
+  private unwrap(result: SectionWriteResult, id: string): SectionRecord {
+    switch (result.kind) {
+      case 'ok':
+        return result.record;
+      case 'year_not_found':
+        throw new BusinessException(
+          ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+          'Academic year not found in this institute',
+        );
+      case 'standard_not_found':
+        throw new BusinessException(
+          ErrorCode.STANDARD_NOT_FOUND,
+          `Standard ${id} not found in this academic year`,
+        );
+      case 'section_not_found':
+        throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, `Section ${id} not found`);
+      case 'class_teacher_not_found':
+        throw new BusinessException(
+          ErrorCode.MEMBERSHIP_NOT_FOUND,
+          'Class teacher is not a member of this institute',
+        );
+    }
   }
 
   async delete(id: string): Promise<boolean> {
