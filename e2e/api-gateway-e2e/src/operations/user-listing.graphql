@@ -1,0 +1,73 @@
+query E2eAdminListUsers($filter: AdminListUsersFilterInput) {
+  adminListUsers(filter: $filter) {
+    edges {
+      cursor
+      node {
+        id
+        username
+        memberships {
+          tenantId
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}
+
+query E2eAdminSearchUsers($query: String!, $limit: Int) {
+  adminSearchUsers(query: $query, limit: $limit) {
+    id
+    username
+  }
+}
+
+query E2eResellerListUsers($filter: ResellerListUsersFilterInput) {
+  resellerListUsers(filter: $filter) {
+    edges {
+      node {
+        id
+        username
+        memberships {
+          tenantId
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+    }
+    totalCount
+  }
+}
+
+query E2eResellerOwnInstituteIds($filter: InstituteFilterInput) {
+  resellerListInstitutes(filter: $filter) {
+    edges {
+      node {
+        id
+      }
+    }
+    pageInfo {
+      hasNextPage
+    }
+  }
+}
+
+mutation E2eUserListingCreateReseller($input: AdminCreateResellerInput!) {
+  adminCreateReseller(input: $input) {
+    id
+  }
+}
+
+query E2eMutationNames {
+  __schema {
+    mutationType {
+      fields {
+        name
+      }
+    }
+  }
+}
