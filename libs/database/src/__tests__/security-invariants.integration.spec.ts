@@ -509,7 +509,7 @@ describe('ROV-90: group_memberships is admin-only', () => {
 });
 
 describe('ROV-90: users is read-only outside roviq_admin', () => {
-  it('roviq_app and roviq_reseller hold SELECT and nothing else', async () => {
+  it('roviq_app and roviq_reseller hold no table-wide privilege', async () => {
     const res = await superPool.query(
       `SELECT r AS role, p AS privilege, has_table_privilege(r, 'users', p) AS granted
        FROM unnest(ARRAY['roviq_app', 'roviq_reseller']) r,
@@ -519,12 +519,29 @@ describe('ROV-90: users is read-only outside roviq_admin', () => {
     expect(res.rows).toEqual([
       { role: 'roviq_app', privilege: 'DELETE', granted: false },
       { role: 'roviq_app', privilege: 'INSERT', granted: false },
-      { role: 'roviq_app', privilege: 'SELECT', granted: true },
+      { role: 'roviq_app', privilege: 'SELECT', granted: false },
       { role: 'roviq_app', privilege: 'UPDATE', granted: false },
       { role: 'roviq_reseller', privilege: 'DELETE', granted: false },
       { role: 'roviq_reseller', privilege: 'INSERT', granted: false },
-      { role: 'roviq_reseller', privilege: 'SELECT', granted: true },
+      { role: 'roviq_reseller', privilege: 'SELECT', granted: false },
       { role: 'roviq_reseller', privilege: 'UPDATE', granted: false },
+    ]);
+  });
+
+  it('roviq_app and roviq_reseller read every column but password_hash and token_version (ROV-279)', async () => {
+    const res = await superPool.query(
+      `SELECT r AS role, c AS col, has_column_privilege(r, 'users', c, 'SELECT') AS granted
+       FROM unnest(ARRAY['roviq_app', 'roviq_reseller']) r,
+            unnest(ARRAY['password_hash', 'token_version', 'username']) c
+       ORDER BY r, c`,
+    );
+    expect(res.rows).toEqual([
+      { role: 'roviq_app', col: 'password_hash', granted: false },
+      { role: 'roviq_app', col: 'token_version', granted: false },
+      { role: 'roviq_app', col: 'username', granted: true },
+      { role: 'roviq_reseller', col: 'password_hash', granted: false },
+      { role: 'roviq_reseller', col: 'token_version', granted: false },
+      { role: 'roviq_reseller', col: 'username', granted: true },
     ]);
   });
 

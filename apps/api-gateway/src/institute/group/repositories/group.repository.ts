@@ -66,7 +66,7 @@ export abstract class GroupRepository {
     membershipIds: string[],
   ): Promise<MembershipUserRow[]>;
   /** Platform-level user names for user ids read from this institute's memberships. */
-  abstract findUserNames(userIds: string[]): Promise<UserNameRow[]>;
+  abstract findUserNames(tenantId: string, userIds: string[]): Promise<UserNameRow[]>;
   /** Null when the member is not in the group. */
   abstract setMemberExcluded(
     tenantId: string,

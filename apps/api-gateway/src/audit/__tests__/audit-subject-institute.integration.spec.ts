@@ -168,7 +168,8 @@ describe('platform actions in an institute audit log (integration)', () => {
       tenantId: null,
       action: 'adminSuspendInstitute',
     });
-    expect(platformRow?.actorName).toEqual(expect.any(String));
+    // The institute reads only its own members' accounts; the screen names the side instead.
+    expect(platformRow?.actorName).toBeNull();
     expect(rows.find((row) => row.id === ownRowId)?.scope).toBe('institute');
   });
 

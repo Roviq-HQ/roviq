@@ -211,7 +211,7 @@ Tenant-scoped tables (`memberships`, `roles`, `refresh_tokens`, `profiles`, `stu
 - Tenant isolation policy: `tenant_id = current_setting('app.current_tenant_id', true)::uuid`
 - Admin bypass policy: `current_setting('app.is_platform_admin', true) = 'true'`
 
-Platform tables (`users`, `institutes`, `phone_numbers`, `auth_providers`) have **no RLS**.
+Platform tables that hold people (`users`, `phone_numbers`, `auth_providers` and the `user_*` tables) have RLS too: `docs/architecture.md` → "Multi-Tenancy: RLS over Schema-per-Tenant" describes who reads them.
 
 ### Migrations
 

@@ -1,12 +1,5 @@
 import { UserIdentifierType } from '@roviq/common-types';
-import {
-  type DrizzleDB,
-  mkAdminCtx,
-  mkInstituteCtx,
-  phoneNumbersLive,
-  withAdmin,
-  withTenant,
-} from '@roviq/database';
+import { type DrizzleDB, mkInstituteCtx, phoneNumbersLive, withTenant } from '@roviq/database';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { formatDateDmy, fullName, genderLabel, groupBy, identifierMap } from './export-helpers';
 import {
@@ -43,9 +36,7 @@ export interface CbseCandidate {
 
 /**
  * Students of the given UDISE+ classes in the year (Class 9 = 9), their parents, identifiers
- * and mobile numbers. Every institute table is read as the institute. `phone_numbers` is a
- * platform table with no institute policy, so it is read with `withAdmin`, but only for the
- * user ids found above: no other institute's people are read.
+ * and mobile numbers, all read as the institute.
  */
 export async function fetchCbseCandidates(
   db: DrizzleDB,
@@ -54,43 +45,38 @@ export async function fetchCbseCandidates(
   udiseClassCodes: readonly number[],
   origin: `workflow:${string}`,
 ): Promise<CbseCandidateData> {
-  const data = await withTenant(db, mkInstituteCtx(tenantId, origin), async (tx) => ({
-    students: await studentsInYear(tx, academicYearId, udiseClassCodes),
-    guardians: await guardianNames(tx),
-    identifiers: await personIdentifiers(tx, [
-      UserIdentifierType.APAAR,
-      UserIdentifierType.CBSE_REGISTRATION,
-    ]),
-  }));
-
-  const studentIds = new Set(data.students.map((s) => s.id));
-  const userIds = [
-    ...new Set([
-      ...data.students.map((s) => s.userId),
-      ...data.guardians.filter((g) => studentIds.has(g.studentProfileId)).map((g) => g.userId),
-    ]),
-  ];
-  const phoneRows =
-    userIds.length === 0
-      ? []
-      : await withAdmin(db, mkAdminCtx(origin), (tx) =>
-          tx
-            .select({
-              userId: phoneNumbersLive.userId,
-              countryCode: phoneNumbersLive.countryCode,
-              number: phoneNumbersLive.number,
-            })
+  return withTenant(db, mkInstituteCtx(tenantId, origin), async (tx) => {
+    const data = {
+      students: await studentsInYear(tx, academicYearId, udiseClassCodes),
+      guardians: await guardianNames(tx),
+      identifiers: await personIdentifiers(tx, [
+        UserIdentifierType.APAAR,
+        UserIdentifierType.CBSE_REGISTRATION,
+      ]),
+    };
+    const studentIds = new Set(data.students.map((s) => s.id));
+    const userIds = [
+      ...new Set([
+        ...data.students.map((s) => s.userId),
+        ...data.guardians.filter((g) => studentIds.has(g.studentProfileId)).map((g) => g.userId),
+      ]),
+    ];
+    const phoneRows =
+      userIds.length === 0
+        ? []
+        : await tx
+            .select({ userId: phoneNumbersLive.userId, number: phoneNumbersLive.number })
             .from(phoneNumbersLive)
             .where(
               and(inArray(phoneNumbersLive.userId, userIds), eq(phoneNumbersLive.isPrimary, true)),
             )
-            .orderBy(desc(phoneNumbersLive.createdAt)),
-        );
-  const phones = new Map<string, string>();
-  for (const row of phoneRows) {
-    if (!phones.has(row.userId)) phones.set(row.userId, row.number);
-  }
-  return { ...data, phones };
+            .orderBy(desc(phoneNumbersLive.createdAt));
+    const phones = new Map<string, string>();
+    for (const row of phoneRows) {
+      if (!phones.has(row.userId)) phones.set(row.userId, row.number);
+    }
+    return { ...data, phones };
+  });
 }
 
 /** The candidates in sheet order, with every value in the format both CBSE sheets share. */

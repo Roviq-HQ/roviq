@@ -235,12 +235,12 @@ export class GroupService {
 
     if (rows.length === 0) return [];
 
-    // Display names come from memberships (institute RLS) → users (platform table).
+    // Display names come from memberships → users, both read under the institute's RLS.
     const membershipIds = rows.map((r) => r.membershipId);
     const membershipRows = await this.repo.findMembershipUsers(tenantId, membershipIds);
 
     const userIds = membershipRows.map((m) => m.userId);
-    const userRows = userIds.length > 0 ? await this.repo.findUserNames(userIds) : [];
+    const userRows = userIds.length > 0 ? await this.repo.findUserNames(tenantId, userIds) : [];
 
     const userById = new Map(userRows.map((u) => [u.id, u]));
     const displayByMembership = new Map<string, string>();
