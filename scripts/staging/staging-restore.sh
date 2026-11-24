@@ -6,20 +6,35 @@
 #
 # The project defaults to "<staging project>-restore" and must not exist yet. It gets its own
 # volumes and a private network instead of the proxy's, so nothing outside the host can reach
-# it. The API answers on 127.0.0.1:$STAGING_RESTORE_API_PORT (default 13999). Remove the drill
-# with `docker compose -p <project> down -v` when it has been checked.
+# it. The API answers on 127.0.0.1:$STAGING_RESTORE_API_PORT (default 13999). Remove the drill,
+# volumes included, with: staging-restore.sh --remove <backup folder> [project]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=staging-lib.sh
 . "$SCRIPT_DIR/staging-lib.sh"
 
-BACKUP="${1:?usage: staging-restore.sh <backup folder> [project]}"
+REMOVE=false
+if [[ "${1:-}" == "--remove" ]]; then
+    REMOVE=true
+    shift
+fi
+BACKUP="${1:?usage: staging-restore.sh [--remove] <backup folder> [project]}"
 TARGET="${2:-${STAGING_PROJECT}-restore}"
+[[ "$TARGET" != "$STAGING_PROJECT" ]] || { echo "Refusing to use the live project" >&2; exit 1; }
 [[ -f "$BACKUP/manifest" ]] || { echo "$BACKUP has no manifest" >&2; exit 1; }
 SHA="$(sed -n 's/^release=//p' "$BACKUP/manifest")"
 REL="$RELEASES_DIR/$SHA"
 [[ -d "$REL" ]] || { echo "Release $SHA of the backup is not in $RELEASES_DIR" >&2; exit 1; }
+
+if [[ "$REMOVE" == true ]]; then
+    docker rm -f "$TARGET-api-port" >/dev/null 2>&1 || true
+    STAGING_PROJECT="$TARGET" STAGING_PROXY_NETWORK="$TARGET-net" \
+        STAGING_METRICS_PORT=13998 STAGING_WORKFLOWS_PORT=13997 stg_compose "$REL" down -v
+    docker network rm "$TARGET-net" >/dev/null 2>&1 || true
+    log "Removed $TARGET"
+    exit 0
+fi
 
 if docker volume ls -q --filter "label=com.docker.compose.project=$TARGET" | grep -q .; then
     echo "Project $TARGET already has volumes; restore needs fresh ones." >&2

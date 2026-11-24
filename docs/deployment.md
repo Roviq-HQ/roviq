@@ -458,3 +458,37 @@ Plan Redis availability with that in mind; a Redis outage blocks every signed-in
 ## Impersonation OTP delivery
 
 Reseller impersonation (and platform impersonation into an institute that requires consent) sends a 6-digit code to the institute admin's primary phone through the notification service (`NOTIFICATION.auth.security`). An institute whose admin has no primary phone cannot be impersonated by a reseller: the request is refused with `IMPERSONATION_CONSENT_UNAVAILABLE`. Make sure institute admins have a primary phone on file, and that the notification service's SMS channel is configured.
+
+## Staging
+
+A staging host runs the production images as one long-lived stack behind a reverse proxy that it
+shares with other sites (ROV-337). The repository holds what does not depend on the host:
+
+| File | What it does |
+|---|---|
+| `docker/compose.staging.yaml` | Override of `docker/compose.app.yaml`: no published port (the metrics store and the workflow console are bound to `127.0.0.1`), pinned infrastructure images, bounded logs, persistent volumes for the object store and NATS, a mail catcher with its own sign-in, and the web app, the API, object storage and the mail catcher on the proxy's external network as `roviq-lab-web`, `roviq-lab-api`, `roviq-lab-storage` and `roviq-lab-mail` |
+| `scripts/staging/staging-deploy.sh <ref>` | Exports the commit with `git archive`, builds its four images (tagged with the commit), backs up, starts the infrastructure, sets the runtime role's password, runs `drizzle-kit migrate`, the essential seed, `pnpm storage:init` and `pnpm admin:create`, starts the apps and checks the API health and the three portals through their public names. A failure after the migration starts the previous release's apps again |
+| `scripts/staging/staging-backup.sh` | Stops the apps, dumps the `roviq`, `temporal` and `temporal_visibility` databases and the roles, archives the object store, writes a manifest of the release and its image ids, starts the apps again, and removes backups older than `STAGING_BACKUP_KEEP_DAYS` |
+| `scripts/staging/staging-restore.sh <backup>` | Restores a backup into a separate project with fresh volumes and a private network, and checks the restored API (`--remove` deletes the drill) |
+| `scripts/create-platform-admin.ts` (`pnpm admin:create`) | Creates the first platform admin on a database that has only the essential seed, with a random password that must be changed at first sign-in; does nothing once a platform admin exists |
+
+Every script reads the env file named by `STAGING_ENV_FILE`. Besides the app secrets, it sets
+`STAGING_PROJECT`, `STAGING_STATE_DIR` (releases, backups, the copied scripts, `init-db.sh` and the
+first admin's password file), `STAGING_IMAGE_PREFIX`, `STAGING_PROXY_NETWORK`, `STAGING_CA_CERT`
+(the certificate authority of the proxy's certificate, trusted by the web app's server side),
+`STAGING_API_URL`, `STAGING_WEB_HOSTS`, `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_EMAIL`,
+`STAGING_MAIL_UI_AUTH`, `STAGING_METRICS_PORT` and `STAGING_WORKFLOWS_PORT`.
+
+What staging shows about any environment:
+
+- **`NEXT_PUBLIC_*` values are build arguments** of `docker/Dockerfile.web`; the deploy script
+  passes `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_INSTITUTE_URL` and `NEXT_PUBLIC_ROVIQ_EE`.
+- **The web app needs `HOSTNAME=0.0.0.0`** when it shares more than one network: Next.js binds to
+  `HOSTNAME`, which Docker sets to the container id.
+- **The API needs `DATABASE_URL_AUDIT`, `BILLING_ENCRYPTION_KEY` and `IDENTITY_ENCRYPTION_KEY`** at
+  start. `DATABASE_URL_AUDIT` points at the owner role today (SF-082).
+- **The notification service refuses the `log` provider in production mode.** A channel with no
+  real provider is left unset, which turns it off.
+- **The restored stack sends no real messages** only because SMS, WhatsApp and push are off and
+  e-mail goes to the stack's own mail catcher. A staging that turns a real provider on needs the
+  restore drill to turn it off.
