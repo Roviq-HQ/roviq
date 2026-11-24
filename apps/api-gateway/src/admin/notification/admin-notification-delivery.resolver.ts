@@ -29,12 +29,13 @@ export class AdminNotificationDeliveryResolver {
   @CheckAbility({ action: 'read', subject: 'NotificationDelivery' })
   adminNotificationDeliveries(
     @CurrentUser() user: AuthUser,
+    // Optional, not `| null`: a union emits no class metadata, and the input would go unvalidated.
     @Args('filter', { type: () => NotificationDeliveryFilterInput, nullable: true })
-    filter: NotificationDeliveryFilterInput | null,
-    @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first: number | null,
-    @Args('after', { type: () => String, nullable: true }) after: string | null,
+    filter?: NotificationDeliveryFilterInput,
+    @Args('first', { type: () => Int, nullable: true, defaultValue: 20 }) first?: number,
+    @Args('after', { type: () => String, nullable: true }) after?: string,
   ): Promise<NotificationDeliveryConnectionResult> {
     assertPlatformContext(user);
-    return this.service.list(user, filter ?? {}, first, after);
+    return this.service.list(user, filter ?? {}, first ?? null, after ?? null);
   }
 }
