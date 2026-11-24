@@ -10,6 +10,8 @@ import { ConfigService } from '@nestjs/config';
 import { BusinessException, ErrorCode } from '@roviq/common-types';
 import { Client, Connection } from '@temporalio/client';
 import { FileService } from '../../files/file.service';
+import { assertAdmissionClass } from './admission-class';
+import { StudentRepository } from './repositories/student.repository';
 import type {
   BulkImportProgress,
   BulkStudentImportResult,
@@ -28,6 +30,7 @@ export class StudentBulkImportService {
   constructor(
     private readonly config: ConfigService,
     private readonly files: FileService,
+    private readonly students: StudentRepository,
   ) {}
 
   /**
@@ -43,6 +46,16 @@ export class StudentBulkImportService {
     createdBy: string;
     fieldMapping: Record<string, string>;
   }): Promise<string> {
+    // Before the file is claimed or the workflow starts: the workflow runs with a synthetic
+    // context, so this is the only place the caller's own institute checks the three ids.
+    assertAdmissionClass(
+      await this.students.checkAdmissionClass(input.tenantId, {
+        academicYearId: input.academicYearId,
+        standardId: input.standardId,
+        sectionId: input.sectionId,
+      }),
+    );
+
     // The workflow is what owns the CSV, so the upload is made READY before it starts.
     await this.files.claimUploads([input.fileId], 'BULK_IMPORT_CSV');
 
