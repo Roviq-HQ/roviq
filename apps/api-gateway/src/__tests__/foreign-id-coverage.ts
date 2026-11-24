@@ -20,7 +20,9 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   activateAcademicYear: PENDING,
   archiveAcademicYear: PENDING,
   deleteAcademicYear: PENDING,
-  updateAcademicYear: PENDING,
+  updateAcademicYear: {
+    spec: 'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/admission
   addApplicationDocument: PENDING,
   approveApplication: PENDING,
@@ -51,14 +53,20 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   openAttendanceSession: PENDING,
   overrideAttendanceSession: PENDING,
   // apps/api-gateway/src/institute/audit
-  auditLogs: PENDING,
+  auditLogs: {
+    spec: 'apps/api-gateway/src/audit/__tests__/audit-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/bot
-  deleteBot: PENDING,
+  deleteBot: {
+    spec: 'apps/api-gateway/src/institute/bot/__tests__/bot-api-key.integration.spec.ts',
+  },
   rotateBotApiKey: PENDING,
   updateBot: PENDING,
   // apps/api-gateway/src/institute/certificate
   approveTC: PENDING,
-  exportComplianceReport: PENDING,
+  exportComplianceReport: {
+    spec: 'apps/api-gateway/src/institute/certificate/__tests__/compliance-export.integration.spec.ts',
+  },
   generateCertificatePdf: PENDING,
   generateTCPdf: PENDING,
   getCertificate: PENDING,
@@ -124,24 +132,34 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   updateGradingScheme: PENDING,
   updateReportCard: PENDING,
   // apps/api-gateway/src/institute/file
-  fileDownloadUrl: PENDING,
-  requestFileUpload: PENDING,
+  fileDownloadUrl: {
+    spec: 'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
+  },
+  requestFileUpload: {
+    spec: 'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/group
   createGroup: PENDING,
   deleteGroup: PENDING,
   getGroup: PENDING,
-  listGroupMembers: PENDING,
+  listGroupMembers: {
+    spec: 'apps/api-gateway/src/institute/group/__tests__/group-crud.integration.spec.ts',
+  },
   resolveGroupMembers: PENDING,
   setGroupMemberExcluded: PENDING,
   updateGroup: PENDING,
   // apps/api-gateway/src/institute/guardian
-  createGuardian: PENDING,
+  createGuardian: {
+    spec: 'apps/api-gateway/src/institute/guardian/__tests__/guardian-create-foreign-id.integration.spec.ts',
+  },
   deleteGuardian: PENDING,
   getGuardian: PENDING,
   linkGuardianToStudent: PENDING,
   listLinkedStudents: PENDING,
   listStudentGuardians: PENDING,
-  resendGuardianSignInDetails: PENDING,
+  resendGuardianSignInDetails: {
+    spec: 'apps/api-gateway/src/institute/sign-in-details/__tests__/sign-in-details.integration.spec.ts',
+  },
   restoreGuardian: PENDING,
   revokeGuardianAccess: PENDING,
   unlinkGuardianFromStudent: PENDING,
@@ -160,10 +178,14 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   rejectLeave: PENDING,
   updateLeave: PENDING,
   // apps/api-gateway/src/institute/management
-  updateInstituteBranding: PENDING,
+  updateInstituteBranding: {
+    spec: 'apps/api-gateway/src/institute/management/__tests__/institute-branding-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/profile-photo
   setGuardianPhoto: PENDING,
-  setMyProfilePhoto: PENDING,
+  setMyProfilePhoto: {
+    spec: 'apps/api-gateway/src/institute/profile-photo/__tests__/profile-photo-foreign-id.integration.spec.ts',
+  },
   setStaffPhoto: PENDING,
   setStudentPhoto: PENDING,
   // apps/api-gateway/src/institute/role
@@ -182,7 +204,9 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   deleteStaffQualification: PENDING,
   getStaffMember: PENDING,
   listStaffQualifications: PENDING,
-  resendStaffSignInDetails: PENDING,
+  resendStaffSignInDetails: {
+    spec: 'apps/api-gateway/src/institute/sign-in-details/__tests__/sign-in-details.integration.spec.ts',
+  },
   restoreStaffMember: PENDING,
   updateStaffMember: PENDING,
   updateStaffQualification: PENDING,
@@ -195,9 +219,13 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   // apps/api-gateway/src/institute/student
   bulkCreateStudents: PENDING,
   changeStudentClass: PENDING,
-  createStudent: PENDING,
+  createStudent: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-create-foreign-id.integration.spec.ts',
+  },
   deleteStudent: PENDING,
-  deleteStudentDocument: PENDING,
+  deleteStudentDocument: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-document-removal.integration.spec.ts',
+  },
   enrollStudent: PENDING,
   getStudent: PENDING,
   listStudentAcademics: PENDING,
@@ -209,7 +237,9 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   transitionStudentStatus: PENDING,
   updateStudent: PENDING,
   updateStudentSection: PENDING,
-  uploadStudentDocument: PENDING,
+  uploadStudentDocument: {
+    spec: 'apps/api-gateway/src/institute/student/__tests__/student-document-upload.integration.spec.ts',
+  },
   // apps/api-gateway/src/institute/subject
   assignSubjectToSection: PENDING,
   assignSubjectToStandard: PENDING,
@@ -249,31 +279,55 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   updateTimetable: PENDING,
   updateTimetablePeriod: PENDING,
   // apps/api-gateway/src/notification-inbox
-  acknowledgeNotificationDelivery: PENDING,
-  archiveNotification: PENDING,
-  markNotificationRead: PENDING,
+  acknowledgeNotificationDelivery: {
+    spec: 'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
+  },
+  archiveNotification: {
+    spec: 'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
+  },
+  markNotificationRead: {
+    spec: 'apps/api-gateway/src/notification-inbox/__tests__/notification-inbox.integration.spec.ts',
+  },
   // apps/api-gateway/src/reseller/audit
-  resellerAuditLogs: PENDING,
+  resellerAuditLogs: {
+    spec: 'apps/api-gateway/src/audit/__tests__/audit-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/reseller/file
-  resellerRequestFileUpload: PENDING,
+  resellerRequestFileUpload: {
+    spec: 'apps/api-gateway/src/files/__tests__/files-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/reseller/institute
   resellerGetInstitute: PENDING,
-  resellerReactivateInstitute: PENDING,
-  resellerSuspendInstitute: PENDING,
+  resellerReactivateInstitute: {
+    spec: 'apps/api-gateway/src/reseller/institute/__tests__/reseller-institute-foreign-id.integration.spec.ts',
+  },
+  resellerSuspendInstitute: {
+    spec: 'apps/api-gateway/src/reseller/institute/__tests__/reseller-institute-foreign-id.integration.spec.ts',
+  },
   // apps/api-gateway/src/reseller/institute-group
   resellerAddInstituteToGroup: PENDING,
   resellerRemoveInstituteFromGroup: PENDING,
   // apps/api-gateway/src/reseller/settings
   resellerUpdateBranding: PENDING,
   // apps/api-gateway/src/reseller/team
-  resellerChangeTeamMemberRole: PENDING,
-  resellerDeactivateTeamMember: PENDING,
-  resellerGetTeamMember: PENDING,
-  resellerInviteTeamMember: PENDING,
-  resellerReactivateTeamMember: PENDING,
+  resellerChangeTeamMemberRole: {
+    spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
+  },
+  resellerDeactivateTeamMember: {
+    spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
+  },
+  resellerGetTeamMember: {
+    spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
+  },
+  resellerInviteTeamMember: {
+    spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
+  },
+  resellerReactivateTeamMember: {
+    spec: 'apps/api-gateway/src/reseller/team/__tests__/reseller-team.integration.spec.ts',
+  },
   // ee/apps/api-gateway/src/billing/institute
   generateInvoicePdf: PENDING,
-  initiatePayment: PENDING,
+  initiatePayment: { spec: 'apps/api-gateway/src/__tests__/billing.integration.spec.ts' },
   myInvoice: PENDING,
   submitUpiProof: PENDING,
   // ee/apps/api-gateway/src/billing/reseller

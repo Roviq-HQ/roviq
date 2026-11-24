@@ -337,6 +337,7 @@ describe('deleteStudentDocument (integration)', () => {
     const response = await remove(document.id, foreignAdminToken);
 
     expect(response.errors?.[0]?.extensions?.code).toBe(ErrorCode.STUDENT_NOT_FOUND);
+    expect(response.data).toBeNull();
     await expectUntouched(document);
   });
 

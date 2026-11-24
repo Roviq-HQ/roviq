@@ -33,7 +33,7 @@ import {
   type TestInstitute,
   waitForCondition,
 } from '@roviq/testing/integration';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import {
   afterAll,
@@ -388,6 +388,20 @@ describe('Sign-in details for staff and guardians (integration)', () => {
       const guardian = await createGuardian(b, { phone: mobile() });
       const staffHash = await passwordHashOf(staff.person.userId);
       const guardianHash = await passwordHashOf(guardian.person.userId);
+      const personIds = [staff.person.userId, guardian.person.userId];
+      const stored = () =>
+        asAdmin(async (tx) => ({
+          users: await tx.select().from(users).where(inArray(users.id, personIds)),
+          tokens: await tx
+            .select()
+            .from(refreshTokens)
+            .where(inArray(refreshTokens.userId, personIds)),
+          deliveries: await tx
+            .select()
+            .from(notificationDeliveries)
+            .where(inArray(notificationDeliveries.tenantId, [a.base.tenantId, b.base.tenantId])),
+        }));
+      const before = await stored();
       emit.mockClear();
 
       const staffRes = await gql(RESEND_STAFF, { id: staff.person.id }, a.token);
@@ -395,9 +409,12 @@ describe('Sign-in details for staff and guardians (integration)', () => {
 
       expect(codeOf(staffRes)).toBe('STAFF_NOT_FOUND');
       expect(codeOf(guardianRes)).toBe('GUARDIAN_NOT_FOUND');
+      expect(staffRes.data).toBeNull();
+      expect(guardianRes.data).toBeNull();
       expect(welcomes()).toEqual([]);
       expect(await passwordHashOf(staff.person.userId)).toBe(staffHash);
       expect(await passwordHashOf(guardian.person.userId)).toBe(guardianHash);
+      expect(await stored()).toEqual(before);
     });
 
     it('replaces the temporary password and revokes the sessions the old one opened', async () => {

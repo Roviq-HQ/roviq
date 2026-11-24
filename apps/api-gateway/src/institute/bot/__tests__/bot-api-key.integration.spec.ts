@@ -7,13 +7,14 @@
 import assert from 'node:assert';
 import { verify } from '@node-rs/argon2';
 import { BotType } from '@roviq/common-types';
-import { botProfiles, mkAdminCtx, withAdmin } from '@roviq/database';
+import { botProfiles, memberships, mkAdminCtx, withAdmin } from '@roviq/database';
 import {
   createInstituteToken,
   createIntegrationApp,
   createTestInstitute,
   gqlRequest,
   type IntegrationAppResult,
+  type TestInstitute,
 } from '@roviq/testing/integration';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -118,5 +119,80 @@ describe('Bot API key storage (integration)', () => {
     expect(hash).not.toContain(rotatedKey);
     expect(await verify(hash, rotatedKey)).toBe(true);
     expect(await verify(hash, created.apiKey)).toBe(false);
+  });
+});
+
+const DELETE_BOT = /* GraphQL */ `
+  mutation DeleteBot($id: ID!) {
+    deleteBot(id: $id)
+  }
+`;
+
+describe('deleteBot: another institute id (ROV-293)', () => {
+  let result: IntegrationAppResult;
+  let instA: TestInstitute;
+  let tokenA: string;
+  let foreignBotId: string;
+
+  const tokenFor = (inst: TestInstitute) =>
+    createInstituteToken({
+      sub: inst.userId,
+      tenantId: inst.tenantId,
+      membershipId: inst.membershipId,
+      roleId: inst.roleId,
+    });
+
+  const botState = (botId: string) =>
+    withAdmin(result.db, mkAdminCtx('test:bot'), async (tx) => {
+      const [bot] = await tx.select().from(botProfiles).where(eq(botProfiles.id, botId));
+      assert(bot);
+      const [membership] = await tx
+        .select()
+        .from(memberships)
+        .where(eq(memberships.id, bot.membershipId));
+      return { bot, membership };
+    });
+
+  const botsOf = (tenantId: string) =>
+    withAdmin(result.db, mkAdminCtx('test:bot'), (tx) =>
+      tx.select().from(botProfiles).where(eq(botProfiles.tenantId, tenantId)),
+    );
+
+  beforeAll(async () => {
+    result = await createIntegrationApp({ modules: [AppModule] });
+    instA = await createTestInstitute(result.db);
+    const instB = await createTestInstitute(result.db);
+    tokenA = tokenFor(instA);
+    const created = await gqlRequest<CreateBotResponse>(result.httpServer, {
+      query: CREATE_BOT,
+      variables: { input: { botType: BotType.FEE_REMINDER } },
+      token: tokenFor(instB),
+    });
+    expect(created.errors).toBeUndefined();
+    assert(created.data);
+    foreignBotId = created.data.createBot.bot.id;
+  });
+
+  afterAll(async () => {
+    await result?.close();
+  });
+
+  it('should refuse deleteBot on a bot of another institute and change neither institute', async () => {
+    const before = await botState(foreignBotId);
+    const ownBefore = await botsOf(instA.tenantId);
+
+    const res = await gqlRequest<{ deleteBot: boolean }>(result.httpServer, {
+      query: DELETE_BOT,
+      variables: { id: foreignBotId },
+      token: tokenA,
+    });
+
+    expect(res.errors?.[0]?.extensions?.code).toBe('BOT_NOT_FOUND');
+    expect(res.data?.deleteBot ?? null).toBeNull();
+    const after = await botState(foreignBotId);
+    expect(after).toEqual(before);
+    expect(after.bot.deletedAt).toBeNull();
+    expect(after.membership?.status).toBe('ACTIVE');
+    expect(await botsOf(instA.tenantId)).toEqual(ownBefore);
   });
 });

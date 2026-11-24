@@ -44,7 +44,7 @@ import {
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { of } from 'rxjs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../../app/app.module';
@@ -112,8 +112,14 @@ describe('uploadStudentDocument (integration)', () => {
     });
 
   async function createStudent(): Promise<void> {
+    ({ userId: studentUserId, profileId: studentProfileId } = await insertStudent(tenant));
+  }
+
+  async function insertStudent(
+    owner: TestInstitute,
+  ): Promise<{ userId: string; profileId: string }> {
     const suffix = randomUUID().slice(0, 8);
-    await withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
+    return withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
       const [user] = await tx
         .insert(users)
         .values({
@@ -131,7 +137,7 @@ describe('uploadStudentDocument (integration)', () => {
         updatedBy: SYSTEM_USER_ID,
       });
       await tx.insert(tenantUserProfiles).values({
-        tenantId: tenant.tenantId,
+        tenantId: owner.tenantId,
         userId: user.id,
         firstName: { en: `Student ${suffix}` },
         createdBy: SYSTEM_USER_ID,
@@ -141,8 +147,8 @@ describe('uploadStudentDocument (integration)', () => {
         .insert(memberships)
         .values({
           userId: user.id,
-          roleId: tenant.roleId,
-          tenantId: tenant.tenantId,
+          roleId: owner.roleId,
+          tenantId: owner.tenantId,
           abilities: [],
           createdBy: SYSTEM_USER_ID,
           updatedBy: SYSTEM_USER_ID,
@@ -151,7 +157,7 @@ describe('uploadStudentDocument (integration)', () => {
       const [profile] = await tx
         .insert(studentProfiles)
         .values({
-          tenantId: tenant.tenantId,
+          tenantId: owner.tenantId,
           userId: user.id,
           membershipId: membership.id,
           admissionNumber: `ADM-${suffix}`,
@@ -163,20 +169,23 @@ describe('uploadStudentDocument (integration)', () => {
           updatedBy: SYSTEM_USER_ID,
         })
         .returning({ id: studentProfiles.id });
-      studentUserId = user.id;
-      studentProfileId = profile.id;
+      return { userId: user.id, profileId: profile.id };
     });
   }
 
   /** A page the uploader has put in storage but not attached yet, as `requestFileUpload` leaves it. */
-  async function createPendingFile(uploaderId: string, bytes = PDF): Promise<string> {
-    const objectKey = `users/${studentUserId}/user-document/${randomUUID()}.pdf`;
+  async function createPendingFile(
+    uploaderId: string,
+    bytes = PDF,
+    subjectUserId = studentUserId,
+  ): Promise<string> {
+    const objectKey = `users/${subjectUserId}/user-document/${randomUUID()}.pdf`;
     await storage.put('private', `pending/${objectKey}`, bytes, { contentType: 'application/pdf' });
     const id = await withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
       const [file] = await tx
         .insert(files)
         .values({
-          subjectUserId: studentUserId,
+          subjectUserId,
           visibility: 'PRIVATE',
           purpose: 'USER_DOCUMENT',
           objectKey,
@@ -424,5 +433,90 @@ describe('uploadStudentDocument (integration)', () => {
     const retried = await upload('MEDICAL_CERTIFICATE', [page], adminToken);
     expect(retried.errors).toBeUndefined();
     expect(await fileStatuses([page])).toEqual(['READY']);
+  });
+
+  describe('ids of another institute (ROV-293)', () => {
+    let foreignTenant: TestInstitute;
+    let foreignStudent: { userId: string; profileId: string };
+
+    const documentsOf = (userIds: string[]) =>
+      withAdmin(app.db, mkAdminCtx(ORIGIN), (tx) =>
+        tx.select().from(userDocuments).where(inArray(userDocuments.userId, userIds)),
+      );
+    const fileRows = (ids: string[]) =>
+      withAdmin(app.db, mkAdminCtx(ORIGIN), (tx) =>
+        tx.select().from(files).where(inArray(files.id, ids)),
+      );
+
+    beforeAll(async () => {
+      foreignTenant = await createTestInstitute(app.db);
+      foreignStudent = await insertStudent(foreignTenant);
+    });
+
+    afterAll(async () => {
+      await withAdmin(app.db, mkAdminCtx(ORIGIN), async (tx) => {
+        await tx.delete(userDocuments).where(eq(userDocuments.userId, foreignStudent.userId));
+        await tx
+          .delete(files)
+          .where(
+            or(
+              eq(files.subjectUserId, foreignStudent.userId),
+              eq(files.uploadedBy, foreignTenant.userId),
+            ),
+          );
+        await tx.delete(studentProfiles).where(eq(studentProfiles.id, foreignStudent.profileId));
+        await tx.delete(userProfiles).where(eq(userProfiles.userId, foreignStudent.userId));
+      });
+      await cleanupTestInstitute(app.db, foreignTenant);
+      await withAdmin(app.db, mkAdminCtx(ORIGIN), (tx) =>
+        tx.delete(users).where(eq(users.id, foreignStudent.userId)),
+      );
+    });
+
+    it('answers STUDENT_NOT_FOUND for a student of another institute, writing nothing', async () => {
+      const page = await createPendingFile(tenant.userId, PDF, foreignStudent.userId);
+      const ownPage = await createPendingFile(tenant.userId);
+      const before = {
+        documents: await documentsOf([foreignStudent.userId, studentUserId]),
+        files: await fileRows([page, ownPage]),
+      };
+
+      for (const pageIds of [[page], [ownPage]]) {
+        const response = await gqlRequest<{ uploadStudentDocument: { id: string } }>(
+          app.httpServer,
+          {
+            query: UPLOAD,
+            variables: {
+              input: {
+                studentProfileId: foreignStudent.profileId,
+                type: 'BIRTH_CERTIFICATE',
+                fileIds: pageIds,
+              },
+            },
+            token: adminToken,
+          },
+        );
+
+        expect(response.errors?.[0]?.extensions?.code).toBe(ErrorCode.STUDENT_NOT_FOUND);
+        expect(response.data).toBeNull();
+      }
+      expect(await documentsOf([foreignStudent.userId, studentUserId])).toEqual(before.documents);
+      expect(await fileRows([page, ownPage])).toEqual(before.files);
+    });
+
+    it('answers FILE_NOT_FOUND for a page another institute uploaded, writing nothing', async () => {
+      const foreignPage = await createPendingFile(foreignTenant.userId, PDF, foreignStudent.userId);
+      const before = {
+        documents: await documentsOf([foreignStudent.userId, studentUserId]),
+        files: await fileRows([foreignPage]),
+      };
+
+      const response = await upload('BIRTH_CERTIFICATE', [foreignPage], adminToken);
+
+      expect(response.errors?.[0]?.extensions?.code).toBe(ErrorCode.FILE_NOT_FOUND);
+      expect(response.data).toBeNull();
+      expect(await documentsOf([foreignStudent.userId, studentUserId])).toEqual(before.documents);
+      expect(await fileRows([foreignPage])).toEqual(before.files);
+    });
   });
 });
