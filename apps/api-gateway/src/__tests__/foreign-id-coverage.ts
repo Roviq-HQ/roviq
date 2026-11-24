@@ -30,6 +30,9 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   deleteAcademicYear: {
     spec: 'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',
   },
+  setRolloverSectionMap: {
+    spec: 'apps/api-gateway/src/institute/academic-year/__tests__/rollover-section-map.integration.spec.ts',
+  },
   updateAcademicYear: {
     spec: 'apps/api-gateway/src/institute/academic-year/__tests__/academic-year-foreign-id.integration.spec.ts',
   },
@@ -206,6 +209,10 @@ export const FOREIGN_ID_COVERAGE: Readonly<Record<string, ForeignIdCoverage>> = 
   // apps/api-gateway/src/institute/management
   updateInstituteBranding: {
     spec: 'apps/api-gateway/src/institute/management/__tests__/institute-branding-foreign-id.integration.spec.ts',
+  },
+  // apps/api-gateway/src/institute/notification-delivery
+  notificationDeliveryLog: {
+    spec: 'apps/api-gateway/src/institute/notification-delivery/__tests__/notification-delivery-log.integration.spec.ts',
   },
   // apps/api-gateway/src/institute/profile-photo
   setGuardianPhoto: PENDING,

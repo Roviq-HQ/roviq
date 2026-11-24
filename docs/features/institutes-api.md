@@ -102,6 +102,14 @@ Every operation here acts on the caller's own institute (the tenant in the token
 | `removeSubjectFromStandard(subjectId, standardId)` | `update:Subject` | `Boolean` |
 | `removeSubjectFromSection(subjectId, sectionId)` | `update:Subject` | `Boolean` |
 
+Every id these mutations take is read under the caller's institute in the write transaction, and a missing row refuses the request before anything is written or emitted:
+
+- `createStandard`: the academic year (`ACADEMIC_YEAR_NOT_FOUND`).
+- `createSection`: the standard (`STANDARD_NOT_FOUND`), the academic year (`ACADEMIC_YEAR_NOT_FOUND`), that the standard belongs to that year (`STANDARD_NOT_FOUND`), then the class teacher's membership (`MEMBERSHIP_NOT_FOUND`).
+- `updateSection`, `assignClassTeacher`: the section (`SECTION_NOT_FOUND`), then the class teacher's membership.
+- `createSubject`: each standard and section it names (`STANDARD_NOT_FOUND`, `SECTION_NOT_FOUND`).
+- The four subject link mutations: the subject (`SUBJECT_NOT_FOUND`), then the standard or section.
+
 ### Queries
 
 | Query | CASL | Returns |
