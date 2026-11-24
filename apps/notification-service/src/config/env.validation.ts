@@ -1,6 +1,7 @@
 import type { NotificationChannel } from '@roviq/common-types';
 import { z } from 'zod';
 import { SMS_TEMPLATE_IDS_ERROR, SmsRegistrations } from '../delivery/sms/sms-registrations';
+import { CANARY_ADDRESS_SETTING, parseCanaryChannels } from './canary-settings';
 import { CHANNEL_PROVIDERS, providerSettingError, splitProviderSetting } from './channel-providers';
 
 /** One provider, or a comma-separated list tried in order when one cannot send. */
@@ -62,6 +63,24 @@ const envSchema = z
     INSTITUTE_PORTAL_URL: z.string().optional(),
     WEB_PORT: z.string().optional(),
 
+    // Delivery canary: unset channels = off. Each listed channel needs its provider and address
+    NOTIFICATION_CANARY_CHANNELS: z.string().optional(),
+    NOTIFICATION_CANARY_USER_ID: z
+      .uuid(
+        'NOTIFICATION_CANARY_USER_ID — the id of the platform user canary rows are recorded against',
+      )
+      .optional(),
+    NOTIFICATION_CANARY_EMAIL: z
+      .email('NOTIFICATION_CANARY_EMAIL — an email address the platform team reads')
+      .optional(),
+    NOTIFICATION_CANARY_PHONE: z
+      .string()
+      .regex(
+        /^\+[1-9]\d{7,14}$/,
+        'NOTIFICATION_CANARY_PHONE — a phone number with country code, e.g. +919800000000',
+      )
+      .optional(),
+
     // Optional
     NODE_ENV: z.string().optional(),
     NOTIFICATION_SERVICE_PORT: z.coerce.number().optional(),
@@ -107,6 +126,7 @@ const envSchema = z
         });
       }
     }
+    for (const message of canaryIssues(env)) ctx.addIssue({ code: 'custom', message });
     if (env.SMS_TEMPLATE_IDS) {
       try {
         new SmsRegistrations(env.SMS_TEMPLATE_IDS);
@@ -141,6 +161,51 @@ const envSchema = z
   });
 
 export type NotificationEnv = z.infer<typeof envSchema>;
+
+function canaryIssues(
+  env: Pick<
+    NotificationEnv,
+    | 'NOTIFICATION_EMAIL_PROVIDER'
+    | 'NOTIFICATION_PUSH_PROVIDER'
+    | 'NOTIFICATION_SMS_PROVIDER'
+    | 'NOTIFICATION_WHATSAPP_PROVIDER'
+    | 'NOTIFICATION_CANARY_CHANNELS'
+    | 'NOTIFICATION_CANARY_USER_ID'
+    | 'NOTIFICATION_CANARY_EMAIL'
+    | 'NOTIFICATION_CANARY_PHONE'
+  >,
+): string[] {
+  if (!env.NOTIFICATION_CANARY_CHANNELS) return [];
+  const channels = parseCanaryChannels(env.NOTIFICATION_CANARY_CHANNELS);
+  if (channels === null) {
+    return [
+      'NOTIFICATION_CANARY_CHANNELS — a comma-separated list of distinct channels from EMAIL, PUSH, SMS, WHATSAPP',
+    ];
+  }
+  const issues: string[] = [];
+  if (!env.NOTIFICATION_CANARY_USER_ID) {
+    issues.push('NOTIFICATION_CANARY_USER_ID — required when NOTIFICATION_CANARY_CHANNELS is set');
+  }
+  const unsent = channels
+    .map((channel) => CHANNEL_PROVIDERS[channel].setting)
+    .filter((name) => !env[name]);
+  if (unsent.length > 0) {
+    issues.push(`${unsent.join(', ')} — required for the channels in NOTIFICATION_CANARY_CHANNELS`);
+  }
+  const missing = [
+    ...new Set(
+      channels
+        .map((channel) => CANARY_ADDRESS_SETTING[channel])
+        .filter((name) => name !== null && !env[name]),
+    ),
+  ];
+  if (missing.length > 0) {
+    issues.push(
+      `${missing.join(', ')} — required for the channels in NOTIFICATION_CANARY_CHANNELS`,
+    );
+  }
+  return issues;
+}
 
 export function validate(config: Record<string, unknown>): NotificationEnv {
   const result = envSchema.safeParse(config);

@@ -13,11 +13,17 @@ import {
 } from './auth-security.types';
 import type { BillingEventParams } from './billing-event.type';
 import { billingEventType } from './billing-event.type';
+import type { DeliveryCanaryParams } from './delivery-canary.type';
+import { deliveryCanaryType } from './delivery-canary.type';
 import type { FeeOverdueParams, FeeReminderParams } from './fee.types';
 import { feeOverdueType, feeReminderType } from './fee.types';
 import type { LeaveDecidedParams } from './leave-decided.type';
 import { leaveDecidedType } from './leave-decided.type';
-import type { RegularNotificationType, SecretNotificationType } from './notification-type';
+import type {
+  PlatformNotificationType,
+  RegularNotificationType,
+  SecretNotificationType,
+} from './notification-type';
 import type {
   EmailVerificationParams,
   ImpersonationOtpParams,
@@ -47,12 +53,17 @@ export interface RegularParamsMap {
   BILLING_EVENT: BillingEventParams;
 }
 
+export interface PlatformParamsMap {
+  DELIVERY_CANARY: DeliveryCanaryParams;
+}
+
 export type SecretTypeKey = keyof SecretParamsMap;
 export type RegularTypeKey = keyof RegularParamsMap;
+export type PlatformTypeKey = keyof PlatformParamsMap;
 
-type Covered = SecretTypeKey | RegularTypeKey;
+type Covered = SecretTypeKey | RegularTypeKey | PlatformTypeKey;
 type MustBeEmpty<T extends never> = T;
-/** Fails to compile unless the two maps cover NOTIFICATION_TYPE_VALUES exactly. */
+/** Fails to compile unless the three maps cover NOTIFICATION_TYPE_VALUES exactly. */
 export type RegistryCoverage = [
   MustBeEmpty<Exclude<NotificationTypeKey, Covered>>,
   MustBeEmpty<Exclude<Covered, NotificationTypeKey>>,
@@ -62,6 +73,12 @@ export const SECRET_TYPES: { [K in SecretTypeKey]: SecretNotificationType<Secret
   EMAIL_VERIFICATION: emailVerificationType,
   IMPERSONATION_OTP: impersonationOtpType,
   USER_WELCOME: userWelcomeType,
+};
+
+export const PLATFORM_TYPES: {
+  [K in PlatformTypeKey]: PlatformNotificationType<PlatformParamsMap[K]>;
+} = {
+  DELIVERY_CANARY: deliveryCanaryType,
 };
 
 export const REGULAR_TYPES: {

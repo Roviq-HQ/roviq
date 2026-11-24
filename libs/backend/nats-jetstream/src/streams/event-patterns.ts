@@ -16,6 +16,8 @@ const NOTIFICATION = {
   APPROVAL_RESOLVED: 'NOTIFICATION.approval.resolved',
   ATTENDANCE_ABSENT: 'NOTIFICATION.attendance.absent',
   AUTH_SECURITY: 'NOTIFICATION.auth.security',
+  // Emitted by notification-service's canary schedule: send one test message on a channel (ROV-329).
+  CANARY_REQUESTED: 'NOTIFICATION.canary.requested',
   FEE_OVERDUE: 'NOTIFICATION.fee.overdue',
   FEE_REMINDER: 'NOTIFICATION.fee.reminder',
   // Emitted by notification-service after it stores a new in-app notification; carries no text.

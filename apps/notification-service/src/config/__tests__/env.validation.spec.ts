@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { canarySettingsOf } from '../canary-settings';
 import { validate } from '../env.validation';
 
 const BASE = {
@@ -229,6 +230,106 @@ describe('notification-service env validation', () => {
           ...HTTP_SETTINGS,
         }),
       ).toThrow("NOTIFICATION_SMS_PROVIDER — the 'log' provider sends nothing");
+    });
+  });
+
+  describe('the delivery canary', () => {
+    const USER = '019a0000-0000-7000-8000-0000000000aa';
+    const PROVIDERS = {
+      NOTIFICATION_EMAIL_PROVIDER: 'log',
+      NOTIFICATION_PUSH_PROVIDER: 'log',
+      NOTIFICATION_SMS_PROVIDER: 'log',
+      NOTIFICATION_WHATSAPP_PROVIDER: 'log',
+    };
+    const CANARY = {
+      ...BASE,
+      ...PROVIDERS,
+      NOTIFICATION_CANARY_CHANNELS: 'EMAIL,PUSH,SMS,WHATSAPP',
+      NOTIFICATION_CANARY_USER_ID: USER,
+      NOTIFICATION_CANARY_EMAIL: 'canary@roviq.test',
+      NOTIFICATION_CANARY_PHONE: '+919800000001',
+    };
+
+    it('should be off when no channel is listed', () => {
+      expect(canarySettingsOf(validate(BASE))).toBeNull();
+    });
+
+    it('should accept every channel with the user and both addresses', () => {
+      expect(canarySettingsOf(validate(CANARY))).toEqual({
+        channels: ['EMAIL', 'PUSH', 'SMS', 'WHATSAPP'],
+        userId: USER,
+        email: 'canary@roviq.test',
+        phone: '+919800000001',
+      });
+    });
+
+    it('should need no address for push alone', () => {
+      const env = {
+        ...BASE,
+        NOTIFICATION_PUSH_PROVIDER: 'log',
+        NOTIFICATION_CANARY_CHANNELS: 'PUSH',
+        NOTIFICATION_CANARY_USER_ID: USER,
+      };
+
+      expect(canarySettingsOf(validate(env))).toEqual({
+        channels: ['PUSH'],
+        userId: USER,
+        email: null,
+        phone: null,
+      });
+    });
+
+    it('should require the user when channels are listed', () => {
+      expect(() => validate({ ...BASE, NOTIFICATION_CANARY_CHANNELS: 'PUSH' })).toThrow(
+        'NOTIFICATION_CANARY_USER_ID — required when NOTIFICATION_CANARY_CHANNELS is set',
+      );
+    });
+
+    it('should refuse a listed channel without its address', () => {
+      expect(() =>
+        validate({
+          ...BASE,
+          ...PROVIDERS,
+          NOTIFICATION_CANARY_CHANNELS: 'EMAIL,SMS,WHATSAPP',
+          NOTIFICATION_CANARY_USER_ID: USER,
+        }),
+      ).toThrow(
+        'NOTIFICATION_CANARY_EMAIL, NOTIFICATION_CANARY_PHONE — required for the channels in NOTIFICATION_CANARY_CHANNELS',
+      );
+    });
+
+    it('should refuse a listed channel without a provider', () => {
+      const {
+        NOTIFICATION_SMS_PROVIDER: _sms,
+        NOTIFICATION_WHATSAPP_PROVIDER: _wa,
+        ...rest
+      } = CANARY;
+
+      expect(() => validate(rest)).toThrow(
+        'NOTIFICATION_SMS_PROVIDER, NOTIFICATION_WHATSAPP_PROVIDER — required for the channels in NOTIFICATION_CANARY_CHANNELS',
+      );
+    });
+
+    it.each([
+      ['an unknown channel', 'EMAIL,FAX'],
+      ['a repeated channel', 'EMAIL,EMAIL'],
+      ['an empty list', ' , '],
+    ])('should refuse %s', (_name, channels) => {
+      expect(() => validate({ ...CANARY, NOTIFICATION_CANARY_CHANNELS: channels })).toThrow(
+        'NOTIFICATION_CANARY_CHANNELS — a comma-separated list of distinct channels',
+      );
+    });
+
+    it('should refuse a phone number without its country code', () => {
+      expect(() => validate({ ...CANARY, NOTIFICATION_CANARY_PHONE: '9800000001' })).toThrow(
+        'NOTIFICATION_CANARY_PHONE — a phone number with country code',
+      );
+    });
+
+    it('should refuse a user id that is not a uuid', () => {
+      expect(() => validate({ ...CANARY, NOTIFICATION_CANARY_USER_ID: 'admin' })).toThrow(
+        'NOTIFICATION_CANARY_USER_ID — the id of the platform user',
+      );
     });
   });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ContactReadRepository } from '../../repositories/contact-read.repository';
 import { NotificationWriteRepository } from '../../repositories/notification-write.repository';
 import type { MessagingSenderRecord } from '../../repositories/types';
+import type { NotificationMetrics } from '../../telemetry/notification-metrics';
 import { type ChannelAdapter, ChannelAdapterError } from '../adapters/channel-adapter';
 import { ChannelAdapters } from '../adapters/channel-adapters';
 import { LogChannelAdapter } from '../adapters/log.adapter';
@@ -75,9 +76,11 @@ describe('ChannelSender', () => {
   let contacts: ReturnType<typeof createMock<ContactReadRepository>>;
   let writes: ReturnType<typeof createMock<NotificationWriteRepository>>;
   let route: ReturnType<typeof createMock<WhatsAppRoute>>;
+  let metrics: ReturnType<typeof createMock<NotificationMetrics>>;
   let sender: ChannelSender;
 
   beforeEach(() => {
+    metrics = createMock<NotificationMetrics>();
     send = vi.fn<ChannelAdapter['send']>().mockResolvedValue({ providerMessageId: 'smtp-1' });
     email = { channel: 'EMAIL', provider: 'smtp', send };
     contacts = createMock<ContactReadRepository>({
@@ -105,6 +108,7 @@ describe('ChannelSender', () => {
       contacts,
       writes,
       route,
+      metrics,
     );
   });
 
@@ -134,6 +138,47 @@ describe('ChannelSender', () => {
     });
   });
 
+  it('should count the SENT row and time the provider call', async () => {
+    await sender.attempt(attempt());
+
+    expect(metrics.delivery).toHaveBeenCalledTimes(1);
+    expect(metrics.delivery).toHaveBeenCalledWith({
+      channel: 'EMAIL',
+      status: 'SENT',
+      provider: 'smtp',
+      reason: null,
+    });
+    expect(metrics.providerCall).toHaveBeenCalledTimes(1);
+    expect(metrics.providerCall).toHaveBeenCalledWith('EMAIL', 'smtp', expect.any(Number));
+    expect(metrics.deferred).not.toHaveBeenCalled();
+  });
+
+  it('should count a FAILED row with its error code and still time the call', async () => {
+    send.mockRejectedValue(new ChannelAdapterError('EAUTH_535', 'auth failed'));
+
+    await sender.attempt(attempt());
+
+    expect(metrics.delivery).toHaveBeenCalledWith({
+      channel: 'EMAIL',
+      status: 'FAILED',
+      provider: 'smtp',
+      reason: 'EAUTH_535',
+    });
+    expect(metrics.providerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('should count a SKIPPED row with its reason and make no provider call', async () => {
+    await sender.attempt(attempt({ channelEnabled: false }));
+
+    expect(metrics.delivery).toHaveBeenCalledWith({
+      channel: 'EMAIL',
+      status: 'SKIPPED',
+      provider: null,
+      reason: 'channel_disabled',
+    });
+    expect(metrics.providerCall).not.toHaveBeenCalled();
+  });
+
   it('should record channel_disabled without calling the adapter', async () => {
     const outcome = await sender.attempt(attempt({ channelEnabled: false }));
 
@@ -144,7 +189,14 @@ describe('ChannelSender', () => {
 
   it('should record no_consent when the consent gate refuses', async () => {
     const consent = createMock<ConsentGate>({ allows: vi.fn().mockResolvedValue(false) });
-    sender = new ChannelSender(new ChannelAdapters([email]), consent, contacts, writes, route);
+    sender = new ChannelSender(
+      new ChannelAdapters([email]),
+      consent,
+      contacts,
+      writes,
+      route,
+      metrics,
+    );
 
     const outcome = await sender.attempt(attempt());
 
@@ -223,6 +275,7 @@ describe('ChannelSender', () => {
       contacts,
       writes,
       route,
+      metrics,
     );
 
     const outcome = await sender.attempt(attempt({ channel: 'WHATSAPP', template: templateIn }));
@@ -259,6 +312,7 @@ describe('ChannelSender', () => {
         contacts,
         writes,
         route,
+        metrics,
       );
     });
 
@@ -322,6 +376,8 @@ describe('ChannelSender', () => {
         flowId: 'notification-flow:key-1',
         reason: 'quiet_hours',
       });
+      expect(metrics.deferred).toHaveBeenCalledWith('WHATSAPP', 'quiet_hours');
+      expect(metrics.delivery).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -482,6 +538,7 @@ describe('ChannelSender', () => {
         contacts,
         writes,
         route,
+        metrics,
       );
 
     beforeEach(() => {
@@ -646,6 +703,7 @@ describe('ChannelSender', () => {
         contacts,
         writes,
         route,
+        metrics,
       );
     });
 

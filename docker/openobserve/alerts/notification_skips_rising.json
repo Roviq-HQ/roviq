@@ -1,0 +1,32 @@
+{
+  "name": "notification_skips_rising",
+  "description": "Deliveries were skipped because a channel has no provider or a message has no approved template (no_provider, no_template).",
+  "stream_type": "metrics",
+  "stream_name": "notification_delivery",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "sum by (channel, reason) (increase(notification_delivery{status=\"SKIPPED\",reason=~\"no_provider|no_template\"}[15m]))",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 0
+    }
+  },
+  "trigger_condition": {
+    "period": 15,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 240
+  },
+  "pending_period_sec": 0,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "ticket",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#skips-rising"
+  }
+}

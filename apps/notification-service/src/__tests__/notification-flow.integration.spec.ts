@@ -58,6 +58,7 @@ import { FlowArrivals } from '../services/flow-arrivals.service';
 import { NotificationDispatcher, RetryWait } from '../services/notification-dispatcher.service';
 import { RecipientResolver } from '../services/recipient-resolver.service';
 import { SmsWebhookService } from '../services/sms-webhook.service';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { runFlow } from '../workflows/flow-runner';
 import { createNotificationActivities } from '../workflows/notification.activities';
 import {
@@ -424,6 +425,7 @@ describe('notification flow (integration)', () => {
       new ContactReadDrizzleRepository(db),
       writes,
       new WhatsAppRoute(new MessagingSenderDrizzleRepository(db), recipients, new Clock()),
+      new NotificationMetrics(),
     );
     const dispatcher = new NotificationDispatcher(
       new NotificationConfigReadDrizzleRepository(db),
@@ -435,8 +437,12 @@ describe('notification flow (integration)', () => {
       createMock<RetryWait>(),
     );
     attendance = new AttendanceListener(dispatcher, new RecipientResolver(recipients));
-    arrivals = new ArrivalListener(new FlowArrivalDrizzleRepository(db), flowArrivals);
-    smsWebhook = new SmsWebhookService(receipts, flowArrivals);
+    arrivals = new ArrivalListener(
+      new FlowArrivalDrizzleRepository(db),
+      flowArrivals,
+      new NotificationMetrics(),
+    );
+    smsWebhook = new SmsWebhookService(receipts, flowArrivals, new NotificationMetrics());
   });
 
   beforeEach(() => {

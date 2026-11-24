@@ -38,8 +38,14 @@ export abstract class AdminMessagingRepository {
   ): Promise<MessagingSenderRecord | null>;
   /** Soft-deletes the sender and hard-deletes its token. False when it is missing or deleted. */
   abstract delete(ctx: PlatformContext, id: string): Promise<boolean>;
-  /** SENT WhatsApp deliveries in calendar month `month` (YYYY-MM, India time), per institute and category. */
+  /**
+   * SENT WhatsApp deliveries in calendar month `month` (YYYY-MM, India time), per institute and
+   * category; delivery canary rows are not usage.
+   */
   abstract whatsAppUsage(ctx: PlatformContext, month: string): Promise<WhatsAppUsageRecord[]>;
-  /** SENT SMS deliveries in calendar month `month` (YYYY-MM, India time), per institute and type. */
+  /**
+   * SENT SMS deliveries in calendar month `month` (YYYY-MM, India time), per institute and type;
+   * delivery canary rows are not usage.
+   */
   abstract smsUsage(ctx: PlatformContext, month: string): Promise<SmsUsageRecord[]>;
 }

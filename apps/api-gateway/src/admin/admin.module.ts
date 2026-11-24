@@ -21,6 +21,7 @@ import { AdminInstituteRepositoryModule } from './institute/repositories/admin-i
 import { AdminInstituteGroupResolver } from './institute-group/admin-institute-group.resolver';
 import { AdminMessagingModule } from './messaging/admin-messaging.module';
 import { AdminMonitoringModule } from './monitoring/admin-monitoring.module';
+import { AdminNotificationHealthModule } from './monitoring/notification-health/admin-notification-health.module';
 import { AdminTenantAnalyticsModule } from './monitoring/tenant-analytics/admin-tenant-analytics.module';
 import { AdminNotificationModule } from './notification/admin-notification.module';
 import { AdminResellerResolver } from './reseller/admin-reseller.resolver';
@@ -44,6 +45,7 @@ import { AdminUserModule } from './user/admin-user.module';
     AdminAttendanceModule, // cross-tenant attendance summary (ROV admin attendance view)
     AdminMonitoringModule, // system health + tenant analytics (ROV-184)
     AdminTenantAnalyticsModule,
+    AdminNotificationHealthModule,
     AdminComplianceExportModule, // compliance exports of any institute (ROV-296)
     AdminNotificationModule, // notification delivery log for support (ROV-314)
     AdminMessagingModule, // WhatsApp senders and usage (ROV-319)

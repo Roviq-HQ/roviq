@@ -464,6 +464,14 @@ export const testIds = {
     tenantNextPage: 'admin-monitoring-tenant-next-page',
     tenantPrevPage: 'admin-monitoring-tenant-prev-page',
     tenantPageInfo: 'admin-monitoring-tenant-page-info',
+    notificationsPanel: 'admin-monitoring-notifications-panel',
+    notificationsError: 'admin-monitoring-notifications-error',
+    notificationsRetryBtn: 'admin-monitoring-notifications-retry-btn',
+    notificationsMetricsUnavailable: 'admin-monitoring-notifications-metrics-unavailable',
+    notificationsChannel: (channel: string) => `admin-monitoring-notifications-channel-${channel}`,
+    notificationsSendersError: 'admin-monitoring-notifications-senders-error',
+    notificationsSendersEmpty: 'admin-monitoring-notifications-senders-empty',
+    notificationsSender: (id: string) => `admin-monitoring-notifications-sender-${id}`,
   },
 
   // ── Admin: attendance ─────────────────────────────────────────────────

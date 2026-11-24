@@ -14,6 +14,7 @@ import { Clock } from '../delivery/whatsapp/whatsapp-route';
 import { MessagingInboundRepository } from '../repositories/messaging-inbound.repository';
 import { MessagingSenderRepository } from '../repositories/messaging-sender.repository';
 import type { MessagingSenderRecord } from '../repositories/types';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { FlowArrivals } from './flow-arrivals.service';
 
 /** Sent once when a person asks to stop. Both languages: the person's own is not known here. */
@@ -50,6 +51,7 @@ export class WhatsAppWebhookService {
     private readonly cloud: WhatsAppCloud,
     private readonly clock: Clock,
     private readonly arrivals: FlowArrivals,
+    private readonly metrics: NotificationMetrics,
   ) {}
 
   async handle(batches: readonly InboundBatch[]): Promise<void> {
@@ -79,6 +81,7 @@ export class WhatsAppWebhookService {
       errorCode: failed ? errorCodeForProviderCode(receipt.providerErrorCode) : null,
       person: { phone: receipt.recipientPhone, providerUserId: receipt.providerUserId },
     });
+    if (result.kind === 'recorded') this.metrics.reported(result.written);
     if (result.kind === 'recorded' && result.arrival) {
       const { flowId, recipientUserId, channel } = result.arrival;
       await this.arrivals.arrived(flowId, recipientUserId, channel);

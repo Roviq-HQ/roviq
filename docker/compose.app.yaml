@@ -205,6 +205,9 @@ services:
       DATABASE_URL: postgresql://roviq_pooler:roviq_pooler_dev@postgres:5432/roviq
       NATS_URL: nats://nats:4222
       NOTIFICATION_SERVICE_PORT: 3002
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5081
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?OTEL_EXPORTER_OTLP_HEADERS must be set}
+      OTEL_SERVICE_NAME: notification-service
     depends_on:
       postgres:
         condition: service_healthy

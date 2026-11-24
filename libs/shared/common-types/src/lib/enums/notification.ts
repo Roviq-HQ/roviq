@@ -43,6 +43,8 @@ export const NOTIFICATION_TYPE_VALUES = [
   'USER_WELCOME',
   // A subscription or payment of an institute changed
   'BILLING_EVENT',
+  // A scheduled test message the platform sends itself to prove delivery works; never an institute's
+  'DELIVERY_CANARY',
 ] as const;
 
 export type NotificationTypeKey = (typeof NOTIFICATION_TYPE_VALUES)[number];
@@ -69,6 +71,8 @@ export const NOTIFICATION_MODULE_VALUES = [
   'ACCOUNT',
   // Subscription and payment changes of the institute
   'BILLING',
+  // The platform's own delivery checks; never shown to an institute
+  'PLATFORM',
 ] as const;
 
 export type NotificationModule = (typeof NOTIFICATION_MODULE_VALUES)[number];
@@ -94,6 +98,7 @@ export const NOTIFICATION_MODULE_OF: Record<NotificationTypeKey, NotificationMod
   EMAIL_VERIFICATION: 'ACCOUNT',
   USER_WELCOME: 'ACCOUNT',
   BILLING_EVENT: 'BILLING',
+  DELIVERY_CANARY: 'PLATFORM',
 };
 
 /**

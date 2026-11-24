@@ -1,0 +1,32 @@
+{
+  "name": "notification_events_stuck",
+  "description": "An event on the NOTIFICATION stream has waited more than 5 minutes for its consumer. The notifications it carries are late.",
+  "stream_type": "metrics",
+  "stream_name": "notification_event_lag",
+  "is_real_time": false,
+  "enabled": true,
+  "query_condition": {
+    "type": "promql",
+    "promql": "max by (consumer) (notification_event_lag)",
+    "promql_condition": {
+      "column": "value",
+      "operator": ">",
+      "value": 300
+    }
+  },
+  "trigger_condition": {
+    "period": 5,
+    "operator": ">=",
+    "threshold": 1,
+    "frequency": 1,
+    "frequency_type": "minutes",
+    "silence": 30
+  },
+  "pending_period_sec": 60,
+  "destinations": ["roviq_ops_email"],
+  "context_attributes": {
+    "severity": "page",
+    "component": "notifications",
+    "runbook": "docs/runbooks/notification-delivery.md#events-stuck"
+  }
+}

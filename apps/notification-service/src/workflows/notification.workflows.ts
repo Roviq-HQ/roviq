@@ -6,7 +6,10 @@
  * NotificationDigestWorkflow: one per institute + recipient + type; collects signalled items
  * until the window closes and sends one summary through the same flow.
  *
- * Neither ever receives an address, a name, a code or a password.
+ * DeliveryCanaryWorkflow (ROV-329): started by the canary schedule; asks for one test message
+ * per configured channel.
+ *
+ * None ever receives an address, a name, a code or a password.
  */
 import {
   condition,
@@ -18,9 +21,11 @@ import {
 } from '@temporalio/workflow';
 import type { FlowCondition } from '../types/flow';
 import { appOnlyFlow } from '../types/flow-channels';
+import { runCanary } from './canary-logic';
 import { DigestBuffer, runDigestLoop } from './digest-logic';
 import { runFlow, type SendResult } from './flow-runner';
 import {
+  type CanaryWorkflowInput,
   CHANNEL_ACTIVITY_RETRY,
   DIGEST_ITEM_SIGNAL,
   type DigestItem,
@@ -38,6 +43,11 @@ import {
 const activities = proxyActivities<NotificationActivities>({
   startToCloseTimeout: '1 minute',
   retry: CHANNEL_ACTIVITY_RETRY,
+});
+
+const canaryActivities = proxyActivities<Pick<NotificationActivities, 'requestCanary'>>({
+  startToCloseTimeout: '30 seconds',
+  retry: { maximumAttempts: 3, initialInterval: '5 seconds' },
 });
 
 export const digestItemSignal = defineSignal<[DigestItem]>(DIGEST_ITEM_SIGNAL);
@@ -217,4 +227,8 @@ export async function NotificationDigestWorkflow(input: DigestWorkflowInput): Pr
       );
     },
   });
+}
+
+export async function DeliveryCanaryWorkflow(input: CanaryWorkflowInput): Promise<void> {
+  await runCanary(input, new Date().toISOString(), canaryActivities.requestCanary);
 }

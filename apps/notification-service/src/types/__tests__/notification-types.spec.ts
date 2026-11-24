@@ -9,7 +9,13 @@ import {
 } from '../compose';
 import { channelsOf } from '../flow';
 import { LOCALES } from '../notification-type';
-import { REGULAR_TYPES, type RegularPayload, type RegularTypeKey, SECRET_TYPES } from '../registry';
+import {
+  PLATFORM_TYPES,
+  REGULAR_TYPES,
+  type RegularPayload,
+  type RegularTypeKey,
+  SECRET_TYPES,
+} from '../registry';
 
 const SAMPLES: { [K in RegularTypeKey]: RegularMessage<K> } = {
   ATTENDANCE_ABSENT: {
@@ -116,7 +122,11 @@ const DEVANAGARI = /[ऀ-ॿ]/;
 
 describe('notification type registry', () => {
   it('should cover every notification type exactly once', () => {
-    const keys = [...Object.keys(SECRET_TYPES), ...Object.keys(REGULAR_TYPES)].sort();
+    const keys = [
+      ...Object.keys(SECRET_TYPES),
+      ...Object.keys(REGULAR_TYPES),
+      ...Object.keys(PLATFORM_TYPES),
+    ].sort();
 
     expect(keys).toEqual([...NOTIFICATION_TYPE_VALUES].sort());
   });
@@ -124,6 +134,26 @@ describe('notification type registry', () => {
   it('should key every type module under its own key', () => {
     for (const [key, type] of Object.entries(SECRET_TYPES)) expect(type.key).toBe(key);
     for (const [key, type] of Object.entries(REGULAR_TYPES)) expect(type.key).toBe(key);
+    for (const [key, type] of Object.entries(PLATFORM_TYPES)) expect(type.key).toBe(key);
+  });
+});
+
+describe('platform type copy', () => {
+  const params = { requestedAt: '2026-11-24T10:15:00.000Z' };
+
+  it('should say on every channel and in both languages that no action is needed', () => {
+    for (const channel of ['EMAIL', 'PUSH', 'SMS', 'WHATSAPP'] as const) {
+      const en = PLATFORM_TYPES.DELIVERY_CANARY.outsideCopy(params, channel, 'en');
+      const hi = PLATFORM_TYPES.DELIVERY_CANARY.outsideCopy(params, channel, 'hi');
+      expect(en.body).toMatch(/no action is needed/i);
+      expect(hi.body).toMatch(DEVANAGARI);
+    }
+  });
+
+  it('should name the time of the check in India time', () => {
+    expect(PLATFORM_TYPES.DELIVERY_CANARY.outsideCopy(params, 'SMS', 'en').body).toBe(
+      'Roviq: Delivery check of 24 Nov 2026, 15:45 IST. This message tests sending; no action is needed.',
+    );
   });
 });
 

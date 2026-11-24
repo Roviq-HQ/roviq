@@ -43,6 +43,8 @@ export class DeliveryReceiptDrizzleRepository extends DeliveryReceiptRepository 
         .limit(1);
       if (same) return { kind: 'duplicate' };
 
+      const errorCode =
+        receipt.status === 'FAILED' ? (receipt.errorCode ?? 'SMS_UNDELIVERED') : null;
       await tx.insert(notificationDeliveries).values({
         scope: sent.scope,
         tenantId: sent.tenantId,
@@ -56,9 +58,15 @@ export class DeliveryReceiptDrizzleRepository extends DeliveryReceiptRepository 
         providerMessageId: sent.providerMessageId,
         flowId: sent.flowId,
         status: receipt.status,
-        errorCode: receipt.status === 'FAILED' ? (receipt.errorCode ?? 'SMS_UNDELIVERED') : null,
+        errorCode,
       });
-      return { kind: 'recorded', arrival: arrivalOf(sent, receipt.status) };
+      return {
+        kind: 'recorded',
+        arrival: arrivalOf(sent, receipt.status),
+        written: [
+          { channel: sent.channel, status: receipt.status, provider: sent.provider, errorCode },
+        ],
+      };
     });
   }
 }

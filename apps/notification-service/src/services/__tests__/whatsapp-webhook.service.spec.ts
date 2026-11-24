@@ -8,7 +8,12 @@ import type { WhatsAppCloudClient } from '../../delivery/whatsapp/whatsapp-cloud
 import { Clock } from '../../delivery/whatsapp/whatsapp-route';
 import { MessagingInboundRepository } from '../../repositories/messaging-inbound.repository';
 import { MessagingSenderRepository } from '../../repositories/messaging-sender.repository';
-import type { MessagingSenderRecord } from '../../repositories/types';
+import type {
+  MessagingSenderRecord,
+  ReceiptResult,
+  WrittenDelivery,
+} from '../../repositories/types';
+import type { NotificationMetrics } from '../../telemetry/notification-metrics';
 import { FlowArrivals } from '../flow-arrivals.service';
 import {
   AUTO_REPLY,
@@ -21,6 +26,12 @@ const TOKEN = 'fake-access-token-1';
 const NUMBER_ID = 'fake-number-id-1';
 const PHONE = '+919000000001';
 const PERSON = { phone: PHONE, providerUserId: 'fake-user-1' };
+const DELIVERED_ROW: WrittenDelivery = {
+  channel: 'WHATSAPP',
+  status: 'DELIVERED',
+  provider: 'whatsapp_cloud',
+  errorCode: null,
+};
 
 function cloudConfig() {
   return new ConfigService({
@@ -47,6 +58,7 @@ describe('WhatsAppWebhookService', () => {
   let clock: Clock;
   let sender: MessagingSenderRecord;
   let arrivals: ReturnType<typeof createMock<FlowArrivals>>;
+  let metrics: ReturnType<typeof createMock<NotificationMetrics>>;
   let service: WhatsAppWebhookService;
 
   beforeEach(() => {
@@ -66,14 +78,15 @@ describe('WhatsAppWebhookService', () => {
       findByProviderNumber: vi.fn().mockResolvedValue(sender),
     });
     inbound = createMock<MessagingInboundRepository>({
-      recordReceipt: vi.fn().mockResolvedValue({ kind: 'recorded', arrival: null }),
+      recordReceipt: vi.fn().mockResolvedValue({ kind: 'recorded', arrival: null, written: [] }),
       recordPreference: vi.fn().mockResolvedValue({ changed: true, phone: PHONE }),
       recordMessage: vi.fn().mockResolvedValue({ reply: true }),
     });
     clock = new Clock();
     vi.spyOn(clock, 'now').mockReturnValue(new Date('2026-11-23T10:00:00.000Z'));
     arrivals = createMock<FlowArrivals>({ arrived: vi.fn().mockResolvedValue(undefined) });
-    service = new WhatsAppWebhookService(senders, inbound, cloud, clock, arrivals);
+    metrics = createMock<NotificationMetrics>();
+    service = new WhatsAppWebhookService(senders, inbound, cloud, clock, arrivals, metrics);
   });
 
   it('should record nothing and send nothing for a number that is no sender here', async () => {
@@ -174,6 +187,7 @@ describe('WhatsAppWebhookService', () => {
           recipientUserId: 'user-1',
           channel: 'WHATSAPP',
         },
+        written: [DELIVERED_ROW],
       });
 
       await service.handle([receipt('delivered')]);
@@ -183,13 +197,14 @@ describe('WhatsAppWebhookService', () => {
         'user-1',
         'WHATSAPP',
       );
+      expect(metrics.reported).toHaveBeenCalledWith([DELIVERED_ROW]);
     });
 
-    it.each([
-      ['a report of a message with no flow', { kind: 'recorded', arrival: null }],
+    it.each<[string, ReceiptResult]>([
+      ['a report of a message with no flow', { kind: 'recorded', arrival: null, written: [] }],
       ['a repeated report', { kind: 'duplicate' }],
       ['a report of an unknown message', { kind: 'unknown_message' }],
-    ] as const)('should signal no flow for %s', async (_name, result) => {
+    ])('should signal no flow for %s', async (_name, result) => {
       inbound.recordReceipt.mockResolvedValue(result);
 
       await service.handle([receipt('delivered')]);

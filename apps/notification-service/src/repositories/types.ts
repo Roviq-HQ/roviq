@@ -147,13 +147,21 @@ export interface FlowArrivalRecord {
   channel: NotificationChannel;
 }
 
+/** A report row a call appended: what the delivery metric counts. */
+export interface WrittenDelivery {
+  channel: NotificationChannel;
+  status: 'DELIVERED' | 'READ' | 'FAILED';
+  provider: string | null;
+  errorCode: string | null;
+}
+
 /**
  * `recorded`: a row was appended (or a read report found one already there); `arrival` is set
  * when the appended row is a DELIVERED one of a flow. `duplicate`: handled before.
  * `unknown_message`: no such message was sent; nothing is written.
  */
 export type ReceiptResult =
-  | { kind: 'recorded'; arrival: FlowArrivalRecord | null }
+  | { kind: 'recorded'; arrival: FlowArrivalRecord | null; written: WrittenDelivery[] }
   | { kind: 'duplicate' }
   | { kind: 'unknown_message' };
 

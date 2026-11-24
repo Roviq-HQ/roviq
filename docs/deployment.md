@@ -149,7 +149,7 @@ To turn scanning on:
   email address; it becomes OpenObserve's first user and receives alert emails),
   `OPENOBSERVE_PASSWORD` (8 to 128 characters with a lower-case letter, an upper-case letter,
   a digit and a special character, or the container exits) and `OTEL_EXPORTER_OTLP_HEADERS`,
-  the gRPC metadata the gateway's exporters send:
+  the gRPC metadata the gateway's and the notification service's exporters send:
   `authorization=Basic <base64 of user:password>,organization=default,stream-name=default`
   (`printf '%s' "$OPENOBSERVE_USER:$OPENOBSERVE_PASSWORD" | base64 -w0`).
 - **One account for everything.** The open-source OpenObserve has only full-access roles, so
@@ -168,13 +168,14 @@ To turn scanning on:
   dashboards and alerts in `docker/openobserve/` and changes nothing when they already match.
 - **The web image** needs `NEXT_PUBLIC_OPENOBSERVE_URL` at build time: the address at which an
   operator's browser reaches the OpenObserve UI, used by the "Open in OpenObserve" links.
-- **Telemetry is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set.** Unset, the gateway starts
+- **Telemetry is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set.** Unset, an app starts
   no SDK and exports nothing; set to an unreachable address, every export fails and the data
   is lost. Application logs also stay on the server's disk through Docker, which is the
   fallback when OpenObserve is down.
 - **What is exported.** Logs: the message, level, module, error stack, trace id and, for a
   request, its method, path and status. The request logger never writes headers, bodies or
-  query strings (`libs/backend/telemetry/src/redaction.ts`). Traces: HTTP method,
+  query strings (`libs/backend/telemetry/src/redaction.ts`), and the notification service's
+  `/webhooks/` requests are not traced, since their path or query carries a secret. Traces: HTTP method,
   route, path with its query string, status, the client's IP address and user agent; SQL
   statements with placeholders, never their parameter values; GraphQL documents with every
   literal value replaced by `*`, never the variables; Redis command names without keys or
@@ -277,6 +278,45 @@ enforced yet.
 - **Institute portal address**: the notification service also reads `INSTITUTE_PORTAL_URL` and
   prints `<url>/login` in the sign-in details sent to new institute users (ROV-315). Set it to the
   same value as the api-gateway's.
+
+### Delivery canary and alerts
+
+Every 15 minutes the notification service sends a test message (the canary, type
+`DELIVERY_CANARY`) on each channel listed, through the same providers as every message
+(ROV-329). The seven `notification_*` alerts in `docker/openobserve/alerts/` page when the
+canary stops reaching the provider, the failure rate rises, a sender is blocked, events wait or
+the service stops; [Notification delivery alerts](runbooks/notification-delivery.md) says what
+to check for each.
+
+| Variable | Value |
+| --- | --- |
+| `NOTIFICATION_CANARY_CHANNELS` | The channels to test, comma-separated. Production: `EMAIL,PUSH,SMS,WHATSAPP`. Unset turns the canary off and removes its Temporal schedule |
+| `NOTIFICATION_CANARY_USER_ID` | Required with a channel: the id of the platform user the canary is addressed to (an existing `users` row) |
+| `NOTIFICATION_CANARY_EMAIL` | Required with `EMAIL`: the mailbox that receives it |
+| `NOTIFICATION_CANARY_PHONE` | Required with `SMS` or `WHATSAPP`: the phone in E.164 (`+91…`) |
+
+The service refuses to start when a listed channel has no address or no
+`NOTIFICATION_<CHANNEL>_PROVIDER`. What each channel needs besides:
+
+- **Email**: the email provider settings above.
+- **Push**: the canary user signed in on a device with notifications allowed, so that user has a
+  registered device token; the canary goes to that user's own devices.
+- **SMS**: the template id `DELIVERY_CANARY:<language>` in `SMS_TEMPLATE_IDS`, for the canary
+  user's language. Without it every canary is skipped (`no_template`).
+- **WhatsApp**: an active platform sender (admin portal, messaging senders) and the template
+  `delivery_canary_v1` approved by the provider in the canary user's language.
+
+SMS and WhatsApp are charged per message: about 96 canaries a day on each.
+
+- The canary is critical: quiet hours and consent do not apply. It is recorded in
+  `notification_deliveries` with scope `platform`; it is left out of the WhatsApp and SMS usage
+  reports and of every institute's delivery log, and it counts towards the platform sender's
+  own daily cap but never towards an institute's share.
+- The schedule `notification-delivery-canary` is created or updated when a notification service
+  with `NOTIFICATION_WORKER_ENABLED=true` starts, and removed when the variable is unset.
+- **Outside the repository**: an uptime check from outside the server on `GET /api/health`
+  (OpenObserve runs on the same server, so it cannot report the server down), and a paging
+  route for `page` alerts. Both are configured in the providers' consoles.
 
 ## WhatsApp alerts
 

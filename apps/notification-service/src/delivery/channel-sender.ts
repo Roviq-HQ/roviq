@@ -8,6 +8,7 @@ import type {
   DeliveryRoute,
   MessagingSenderRecord,
 } from '../repositories/types';
+import type { NotificationMetrics } from '../telemetry/notification-metrics';
 import type { Locale, OutsideCopy } from '../types/notification-type';
 import type { AdapterErrorCode } from './adapters/adapter-errors';
 import {
@@ -74,6 +75,7 @@ export class ChannelSender {
     private readonly contacts: ContactReadRepository,
     private readonly writes: NotificationWriteRepository,
     private readonly whatsapp: WhatsAppRoute,
+    private readonly metrics: NotificationMetrics,
   ) {}
 
   async attempt(a: ChannelAttempt): Promise<AttemptOutcome> {
@@ -89,6 +91,7 @@ export class ChannelSender {
         flowId: a.flowId,
         reason: outcome.reason,
       });
+      this.metrics.deferred(a.channel, outcome.reason);
       return outcome;
     }
     await this.writes.recordDelivery({
@@ -100,6 +103,17 @@ export class ChannelSender {
       attempt: a.attempt,
       outcome,
       flowId: a.flowId,
+    });
+    this.metrics.delivery({
+      channel: a.channel,
+      status: outcome.status,
+      provider: outcome.provider,
+      reason:
+        outcome.status === 'FAILED'
+          ? outcome.errorCode
+          : outcome.status === 'SKIPPED'
+            ? outcome.skipReason
+            : null,
     });
     return outcome;
   }
@@ -264,6 +278,7 @@ export class ChannelSender {
     via: { sender: MessagingSenderRecord; template: TemplateSend } | null,
   ): Promise<Tried> {
     const route = via === null ? null : routeOf(via.sender, via.template);
+    const started = performance.now();
     try {
       const result = await adapter.send({
         ...message,
@@ -293,6 +308,8 @@ export class ChannelSender {
         };
       }
       throw err;
+    } finally {
+      this.metrics.providerCall(message.channel, adapter.provider, performance.now() - started);
     }
   }
 

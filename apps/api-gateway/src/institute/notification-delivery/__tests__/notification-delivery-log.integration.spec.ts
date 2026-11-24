@@ -507,6 +507,14 @@ describe('notificationDeliveryLog (integration)', () => {
           scope: 'platform',
         },
         {
+          at: 90,
+          type: 'DELIVERY_CANARY',
+          recipient: guardianA.userId,
+          channel: 'WHATSAPP',
+          status: 'SENT',
+          scope: 'platform',
+        },
+        {
           at: 91,
           type: 'AUTH_LOGIN',
           recipient: guardianA.userId,
@@ -833,6 +841,12 @@ describe('notificationDeliveryLog (integration)', () => {
 
     it('should never show platform or reseller rows, even about a member of the institute', async () => {
       const page = await log(principalToken, { filter: { type: 'AUTH_LOGIN' } });
+
+      expect(page.totalCount).toBe(0);
+    });
+
+    it("should never show the platform's delivery canary, even sent to a member of the institute", async () => {
+      const page = await log(principalToken, { filter: { type: 'DELIVERY_CANARY' } });
 
       expect(page.totalCount).toBe(0);
     });

@@ -12,7 +12,7 @@ import { and, desc, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import { arrivalOf } from './flow-arrival-of';
 import { MessagingInboundRepository } from './messaging-inbound.repository';
 import { sameNumberSenderIds } from './same-number-senders';
-import type { InboundPerson, ReceiptInput, ReceiptResult } from './types';
+import type { InboundPerson, ReceiptInput, ReceiptResult, WrittenDelivery } from './types';
 
 const ORIGIN = 'repository:messaging-inbound';
 
@@ -46,8 +46,10 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
       );
       if (!fresh) return { kind: 'duplicate' };
 
-      const append = (status: 'DELIVERED' | 'READ' | 'FAILED') =>
-        tx.insert(notificationDeliveries).values({
+      const written: WrittenDelivery[] = [];
+      const append = async (status: 'DELIVERED' | 'READ' | 'FAILED') => {
+        const errorCode = status === 'FAILED' ? (input.errorCode ?? 'WA_REJECTED') : null;
+        await tx.insert(notificationDeliveries).values({
           scope: sent.scope,
           tenantId: sent.tenantId,
           resellerId: sent.resellerId,
@@ -62,11 +64,13 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
           providerMessageId: sent.providerMessageId,
           flowId: sent.flowId,
           status,
-          errorCode: status === 'FAILED' ? (input.errorCode ?? 'WA_REJECTED') : null,
+          errorCode,
         });
+        written.push({ channel: sent.channel, status, provider: sent.provider, errorCode });
+      };
       if (input.status === 'FAILED') {
         await append('FAILED');
-        return { kind: 'recorded', arrival: arrivalOf(sent, 'FAILED') };
+        return { kind: 'recorded', arrival: arrivalOf(sent, 'FAILED'), written };
       }
       // A read report can come without a delivery report, and before a late one: the message
       // was delivered once, so it gets one DELIVERED row and one arrival signal.
@@ -77,7 +81,11 @@ export class MessagingInboundDrizzleRepository extends MessagingInboundRepositor
         .limit(1);
       if (!delivered) await append('DELIVERED');
       if (input.status === 'READ') await append('READ');
-      return { kind: 'recorded', arrival: delivered ? null : arrivalOf(sent, 'DELIVERED') };
+      return {
+        kind: 'recorded',
+        arrival: delivered ? null : arrivalOf(sent, 'DELIVERED'),
+        written,
+      };
     });
   }
 

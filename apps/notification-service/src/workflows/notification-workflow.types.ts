@@ -9,6 +9,7 @@ export const FLOW_WORKFLOW_TYPE = 'NotificationFlowWorkflow';
 export const DIGEST_WORKFLOW_TYPE = 'NotificationDigestWorkflow';
 export const DIGEST_ITEM_SIGNAL = 'digestItem';
 export const FLOW_ARRIVAL_SIGNAL = 'flowArrival';
+export const CANARY_WORKFLOW_TYPE = 'DeliveryCanaryWorkflow';
 
 export const CHANNEL_ACTIVITY_RETRY = {
   maximumAttempts: 5,
@@ -101,6 +102,17 @@ export interface ChannelDeferral {
   deferUntil: string;
 }
 
+export interface CanaryWorkflowInput {
+  /** Each is asked for one test message, in order. */
+  channels: NotificationChannel[];
+}
+
+export interface CanaryRequest {
+  channel: NotificationChannel;
+  /** ISO time of the scheduled run; the message shows it. */
+  requestedAt: string;
+}
+
 export interface NotificationActivities {
   /**
    * One delivery row per execution (none for a deferral); throws on a provider failure so
@@ -109,6 +121,8 @@ export interface NotificationActivities {
   sendChannel(input: SendChannelInput): Promise<'SENT' | 'SKIPPED' | ChannelDeferral>;
   /** One SKIPPED delivery row for a channel the flow did not try. */
   recordSkip(input: RecordSkipInput): Promise<void>;
+  /** Publishes one canary request on the NOTIFICATION stream; the listener sends it. */
+  requestCanary(input: CanaryRequest): Promise<void>;
 }
 
 /** How often a channel may be deferred; the try after the last one sends or records a skip. */

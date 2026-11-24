@@ -31,6 +31,7 @@ import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizz
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
+import { NotificationMetrics } from '../telemetry/notification-metrics';
 
 const AUTH_KEY = `spec-key-${randomUUID()}`;
 const CODE = '739155';
@@ -158,6 +159,7 @@ describe('SMS delivery through the provider adapter (integration)', () => {
         new RecipientReadDrizzleRepository(db),
         new Clock(),
       ),
+      new NotificationMetrics(),
     );
   }
 

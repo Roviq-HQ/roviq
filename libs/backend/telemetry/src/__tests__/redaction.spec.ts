@@ -58,6 +58,11 @@ describe('isUntracedPath', () => {
     expect(isUntracedPath('/api/health/ready')).toBe(true);
   });
 
+  it('should skip the provider webhooks, whose path or query carries a secret', () => {
+    expect(isUntracedPath('/webhooks/sms/0123456789abcdef0123456789abcdef')).toBe(true);
+    expect(isUntracedPath('/webhooks/whatsapp?hub.verify_token=fake-token')).toBe(true);
+  });
+
   it('should trace application requests', () => {
     expect(isUntracedPath('/api/graphql')).toBe(false);
     expect(isUntracedPath(undefined)).toBe(false);

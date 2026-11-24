@@ -99,9 +99,12 @@ export function computeUptimePercent(buckets: Array<{ up: number; total: number 
 
 export function toAlertSeverity(label: string | undefined): AlertSeverity {
   switch (label?.toLowerCase()) {
+    // `page` and `ticket`: the notification alerts name who acts and how fast (ROV-329).
     case 'critical':
+    case 'page':
       return 'CRITICAL';
     case 'warning':
+    case 'ticket':
       return 'WARNING';
     default:
       return 'INFO';
