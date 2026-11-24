@@ -6,8 +6,7 @@
  * security invariant holds at the database level.
  *
  * Setup: requires a running postgres with all roles (roviq_pooler, roviq_app,
- * roviq_reseller, roviq_admin) and schema pushed via db:push + FORCE RLS +
- * the audit-logs-infra custom migration applied.
+ * roviq_reseller, roviq_admin) and a schema built by the migrations, plus seed data.
  *
  * Run: pnpm nx test database -- audit-security-invariants
  */

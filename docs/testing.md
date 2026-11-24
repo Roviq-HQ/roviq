@@ -71,7 +71,7 @@ The auth invariants from Auth PRD v3.0 Section 21 (ROV-102). Where the database 
 
 A test counts only if it attempts the forbidden action and expects a refusal. A test that writes a row and reads it back proves nothing and does not belong here.
 
-`DB` = `libs/database/src/__tests__/auth-invariants-db.integration.spec.ts` (rules from the `rov-102-*` migrations), `RLS` = `libs/database/src/__tests__/security-invariants.integration.spec.ts`, `E2E` = `e2e/api-gateway-e2e/src/security-invariants.api-e2e.spec.ts`.
+`DB` = `libs/database/src/__tests__/auth-invariants-db.integration.spec.ts` (rules enforced in the database), `RLS` = `libs/database/src/__tests__/security-invariants.integration.spec.ts`, `E2E` = `e2e/api-gateway-e2e/src/security-invariants.api-e2e.spec.ts`.
 
 | # | Invariant | Enforced by | Proven by |
 |---|---|---|---|

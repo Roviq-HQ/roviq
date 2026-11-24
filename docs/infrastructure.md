@@ -215,13 +215,13 @@ Platform tables that hold people (`users`, `phone_numbers`, `auth_providers` and
 
 ### Migrations
 
-Tilt runs schema push and seeding automatically on `pnpm tilt up`. A database that was never set up (no migration baseline, no users) is bootstrapped first with `pnpm db:reset --if-empty`, because a bare schema push does not create the prereq functions, grants and custom migrations. For manual use:
+Every database is built by `drizzle-kit migrate` from `libs/database/migrations/`; nothing pushes the schema. Tilt's `db-push` resource builds an empty database with `pnpm db:reset --if-empty` and then applies pending migrations, on `pnpm tilt up` and whenever a migration is added; `db-seed` follows. A database built by an older chain is not migrated: `pnpm tilt trigger db-clean` rebuilds it. `pnpm check:migrations` (in the pre-push gate and CI) builds an empty database from the chain and fails when a table lacks FORCE RLS or the schema has a change no migration carries. For manual use:
 
 ```bash
-pnpm run db:push          # Push Drizzle schema to DB
+pnpm run db:migrate       # Apply pending migrations
 pnpm run db:seed          # Seed test data
-pnpm run db:reset         # Nuke DB + re-push schema (or use db-clean in Tilt UI)
-pnpm run db:reset --seed  # Nuke + push + seed in one step
+pnpm run db:reset         # Drop DB + rebuild it from the migrations (or use db-clean in Tilt UI)
+pnpm run db:reset --seed  # Drop + rebuild + seed in one step
 pnpm run db:studio        # Open Drizzle Studio (visual DB browser)
 ```
 
@@ -230,21 +230,16 @@ pnpm run db:studio        # Open Drizzle Studio (visual DB browser)
 A fixed list of `CREATE TABLE foo_YYYY_MM PARTITION OF foo` breaks the day the clock passes the
 last partition, in production and in tests alike. Use
 `ensure_monthly_partition(parent regclass, month_start timestamptz)` (migration
-`20260501033334_ensure-monthly-partition`) and wire all three places; skipping one brings the
-problem back:
+`baseline-custom`) and wire both places; skipping one brings the problem back:
 
 - **The create migration** backfills:
   `SELECT ensure_monthly_partition('foo'::regclass, gs) FROM generate_series(date_trunc('month', NOW()), date_trunc('month', NOW()) + interval '6 months', interval '1 month') gs;`
 - **At app start and daily**: an `OnModuleInit` provider on the dedicated pool. Pattern:
   `apps/api-gateway/src/audit/audit-partition-maintainer.ts`. Start-up alone misses long-lived
   processes.
-- **`scripts/db-reset.ts`**: add the table to `PARTITIONED_TABLES` in `ensureMonthlyPartitions()`
-  so dev, e2e and integration databases get the same buffer.
 
-Indexes on a partitioned table go in a custom migration only (`CREATE INDEX IF NOT EXISTS`), never
-in the Drizzle schema: `drizzle-kit push` does not see them and re-creates them on every push,
-which fails Tilt's `db-push`. After a schema change, a second push on a reset database must
-succeed.
+A partitioned table and its indexes are created in a custom migration (`CREATE INDEX IF NOT
+EXISTS`), not declared in the Drizzle schema.
 
 The parent's RLS and GRANTs do not cover a partition queried by name.
 `ensure_monthly_partition` calls `lock_down_partitions(parent)`, which strips every non-owner

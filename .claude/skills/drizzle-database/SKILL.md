@@ -69,12 +69,12 @@ withAdmin(db, ctx: PlatformContext, async (tx) => { … })
 
 ## Changing the schema
 
-- Dev: edit the schema; Tilt's `db-push` applies it to this instance's own database. `pnpm tilt trigger db-clean` resets and re-seeds it. Never run `drizzle-kit push`, `pnpm db:*` or `db-migrate` yourself.
+- Every database (dev, e2e, integration tests, staging, production) is built only by `drizzle-kit migrate` from `libs/database/migrations/`. A schema edit reaches no database until its migration exists: generate it, and Tilt's `db-push` resource applies it to this instance's database. `pnpm tilt trigger db-clean` rebuilds and re-seeds it. Never run `drizzle-kit push` or `pnpm db:*` yourself.
 - A change that must reach other environments is a migration in `libs/database/migrations/` (one folder per migration): `pnpm nx run database:db:generate` from the schema, or `drizzle-kit generate --custom --name=<name>` for hand-written SQL (functions, triggers, FORCE RLS, partitioned-table indexes). On a Fable session migrations are written by Fable, not by a subagent.
-- **A migration that carries hand-written SQL must start with a `--` comment line.** Dev and CI databases are built by `drizzle-kit push`, and `scripts/db-reset.ts` then re-applies only the migrations whose first non-empty line is a comment. Without it, the GRANT, REVOKE and FORCE RLS statements appended to a generated migration run in the migrated test database (the pre-push gate passes) but not in CI.
+- **A migration that creates a table also enables and forces its row security and grants it to the app roles.** Nothing else does: `pnpm check:migrations` builds an empty database from the chain and fails on a table without FORCE RLS, and on a schema change no migration carries.
 - `drizzle-kit` does not diff RLS policies, and a renamed policy makes `generate` ask questions: keep policy names stable.
 - After a schema change: update `scripts/seed*.ts`, grep `scripts/`, `e2e/` and the specs for old column names, and run the integration specs of the area (the test database migrates itself at the start of a run).
-- Time-partitioned tables: create partitions only through `ensure_monthly_partition(parent, month_start)`, wire the three places the pattern needs (create migration, boot maintainer, `scripts/db-reset.ts`), and keep their indexes in custom SQL. Details: `docs/infrastructure.md` → "Time-partitioned tables".
+- Time-partitioned tables: create partitions only through `ensure_monthly_partition(parent, month_start)`, wire the two places the pattern needs (create migration, boot maintainer), and keep their indexes in custom SQL. Details: `docs/infrastructure.md` → "Time-partitioned tables".
 
 ## CASL
 

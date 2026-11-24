@@ -16,8 +16,6 @@ All spread `tenantColumns`, have an `institutes` FK on `tenant_id`, RLS via `ten
 
 Enums (single source in `@roviq/common-types`): `TimetableStatus` (DRAFT/ACTIVE/INACTIVE/ARCHIVED), `Weekday` (MONDAY–SUNDAY), `PeriodKind` (PERIOD/BREAK/EXTRA), `DaySession` (MORNING/MAIN/EVENING), `TimetableOverrideType`.
 
-Migration: `libs/database/migrations/20260526224039_thankful_ravenous` (tables, enums, indexes, `_live` views, RLS policies, grants).
-
 ## Services
 
 - `timetable-generation.service.ts` — pure period-grid builder (minutes math): regular periods → lunch breaks interleaved after their configured period → morning extras prepended / evening extras appended (namespaced labels). Validates lunch positions, durations, period count. 6 unit tests.

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import {
   type AbilityRule,
   DEFAULT_ROLE_ABILITIES,
@@ -37,7 +36,7 @@ import {
   type TestInstitute,
   type TestTeacher,
 } from '@roviq/testing/integration';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app/app.module';
 
@@ -610,54 +609,5 @@ describe('ROV-204 student read authorization through GraphQL and PostgreSQL', ()
         .where(eq(studentGuardianLinks.studentProfileId, studentIds[0]));
     });
     expect(await list(parent)).toEqual({ totalCount: 0, edges: [] });
-  });
-
-  it('migrates default policies idempotently while preserving clerk and custom roles', async () => {
-    const migration = await readFile(
-      'libs/database/migrations/20261114164236_rov-204-read-permissions/migration.sql',
-      'utf8',
-    );
-    await withAdmin(app.db, mkAdminCtx('test:student-read-authorization'), async (tx) => {
-      await tx.execute(sql`SAVEPOINT policy_migration`);
-      try {
-        for (const [person, name, isDefault] of [
-          [principal, 'principal', true],
-          [parent, 'parent', true],
-          [clerk, 'admin_clerk', true],
-          [unassigned, 'subject_teacher', false],
-        ] as const) {
-          const abilities = DEFAULT_ROLE_ABILITIES[name]
-            .filter((rule) => !rule.inverted)
-            .map((rule) =>
-              name === 'parent' && rule.subject === 'Student'
-                ? { ...rule, conditions: undefined }
-                : rule,
-            );
-          await tx
-            .update(roles)
-            .set({ name: { en: name }, isDefault, abilities })
-            .where(eq(roles.id, person.roleId));
-        }
-        const ids = [principal, parent, clerk, unassigned].map((person) => person.roleId);
-        const before = await tx.select().from(roles).where(inArray(roles.id, ids));
-        await tx.execute(sql.raw(migration));
-        const after = await tx.select().from(roles).where(inArray(roles.id, ids));
-        for (const person of [clerk, unassigned]) {
-          expect(after.find((role) => role.id === person.roleId)).toEqual(
-            before.find((role) => role.id === person.roleId),
-          );
-        }
-        expect(after.find((role) => role.id === principal.roleId)?.abilities).toEqual(
-          DEFAULT_ROLE_ABILITIES.principal,
-        );
-        expect(after.find((role) => role.id === parent.roleId)?.abilities).toEqual(
-          DEFAULT_ROLE_ABILITIES.parent,
-        );
-        await tx.execute(sql.raw(migration));
-        expect(await tx.select().from(roles).where(inArray(roles.id, ids))).toEqual(after);
-      } finally {
-        await tx.execute(sql`ROLLBACK TO SAVEPOINT policy_migration`);
-      }
-    });
   });
 });

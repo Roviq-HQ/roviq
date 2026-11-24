@@ -76,7 +76,7 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO roviq_reseller;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO roviq_admin;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO roviq_admin;
 
--- ── Default privileges for future tables (created by db:push as roviq) ──
+-- ── Default privileges for future tables (created by the migrations as roviq) ──
 ALTER DEFAULT PRIVILEGES FOR ROLE roviq IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO roviq_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE roviq IN SCHEMA public

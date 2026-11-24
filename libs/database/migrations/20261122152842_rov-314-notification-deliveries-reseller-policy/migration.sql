@@ -1,1 +1,0 @@
-CREATE POLICY "notification_deliveries_reseller_none" ON "notification_deliveries" AS PERMISSIVE FOR SELECT TO "roviq_reseller" USING (false);

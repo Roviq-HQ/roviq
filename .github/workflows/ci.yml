@@ -34,6 +34,8 @@ jobs:
         run: pnpm run check:live-views-coverage
       - name: Check RLS coverage (every pgTable opts into RLS or is exempt)
         run: pnpm run check:rls-coverage
+      - name: Check migrations (the chain builds an empty database and matches the schema)
+        run: pnpm run check:migrations
       - name: Check synthetic-context usage (mk*Ctx allowlist — security backdoor gate)
         run: pnpm run check:synthetic-context-usage
       - name: Check admin-context reach (admin-role files reachable from institute/reseller resolvers)

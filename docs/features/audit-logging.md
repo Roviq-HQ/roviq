@@ -39,7 +39,7 @@ Service side-effects → AuditEmitter → NATS JetStream (AUDIT.log)
 - **Tracing**: `correlation_id`, `ip_address`, `user_agent`, `source`
 - **CHECK constraint** (`chk_audit_scope`): enforces scope/FK consistency
 
-**Indexes live in custom migrations only.** `drizzle-kit push` does not see an index on a partitioned table, so an index declared in the Drizzle schema is created again on every push and Tilt's `db-push` fails with "already exists". Create it in a custom migration with `CREATE INDEX IF NOT EXISTS` (examples: `audit_logs_synthetic_origin_idx`, `audit_logs_subject_tenant_idx`).
+**Indexes live in the custom migration.** `audit_logs` is created there as a partitioned table, so its indexes are created there too, with `CREATE INDEX IF NOT EXISTS` (examples: `audit_logs_synthetic_origin_idx`, `audit_logs_subject_tenant_idx`).
 
 ## RLS Policies (5 roles)
 

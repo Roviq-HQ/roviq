@@ -40,34 +40,32 @@ local_resource(
   labels=['dev'],
 )
 
-# Schema push — auto-runs, retries until postgres is ready.
-# A database with no tables is bootstrapped first (prereq functions, grants, custom migrations).
+# Migrations — builds an empty database, then applies whatever is pending; re-runs when a
+# migration is added. Retries until postgres is ready. Still named db-push: other resources
+# and the docs depend on the name.
 local_resource(
   'db-push',
   cmd='''
+    log=$(mktemp)
+    trap 'rm -f "$log"' EXIT
     for i in $(seq 1 30); do
-      if pnpm run db:reset --if-empty 2>/dev/null && pnpm run db:push 2>/dev/null; then
-        echo "Schema push completed successfully"
+      pnpm run db:reset --if-empty >"$log" 2>&1 && pnpm run db:migrate >>"$log" 2>&1 && {
+        echo "Migrations applied"
         exit 0
+      }
+      # The database belongs to another migration chain: waiting will not help.
+      if grep -q 'pnpm tilt trigger db-clean' "$log"; then
+        break
       fi
       echo "Waiting for PostgreSQL... (attempt $i/30)"
       sleep 2
     done
-    echo "Schema push failed after 30 attempts"
+    cat "$log"
+    echo "Migrations failed"
     exit 1
   ''',
-  deps=['libs/database/src/schema'],
+  deps=['libs/database/migrations'],
   resource_deps=['pnpm-install', 'postgres'],
-  labels=['dev'],
-)
-
-# Data migrations require an explicit manual trigger.
-local_resource(
-  'db-migrate',
-  cmd='pnpm run db:migrate',
-  resource_deps=['pnpm-install', 'postgres'],
-  trigger_mode=TRIGGER_MODE_MANUAL,
-  auto_init=False,
   labels=['dev'],
 )
 

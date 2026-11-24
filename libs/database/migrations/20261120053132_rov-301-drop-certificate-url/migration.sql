@@ -1,4 +1,0 @@
-ALTER TYPE "FilePurpose" ADD VALUE 'STAFF_CERTIFICATE';--> statement-breakpoint
-DROP VIEW "staff_qualifications_live";--> statement-breakpoint
-ALTER TABLE "staff_qualifications" DROP COLUMN "certificate_url";--> statement-breakpoint
-CREATE VIEW "staff_qualifications_live" WITH (security_invoker = true) AS (select "id", "staff_profile_id", "type", "degree_name", "institution", "board_university", "year_of_passing", "grade_percentage", "tenant_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at", "deleted_by", "version" from "staff_qualifications" where ("staff_qualifications"."deleted_at" is null));

@@ -18,29 +18,26 @@ for i in $(seq 1 30); do
 done
 
 # Check if the database is already initialized (tables exist).
-# First run:  db:reset --seed (full drop + push + GRANTs + FORCE RLS + seed)
-# Subsequent: db:push only   (fast schema sync, preserves manual test data)
+# First run:  db:reset --seed (build the database from the migrations, then seed)
+# Subsequent: db:migrate     (apply pending migrations, keeps manual test data)
 TABLE_COUNT=$(PGPASSWORD=roviq_dev psql -h postgres -U roviq -d roviq -tAc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'" 2>/dev/null || echo "0")
 
 if [ "$TABLE_COUNT" -gt "0" ]; then
-  echo "Database already initialized ($TABLE_COUNT tables). Running schema sync..."
+  echo "Database already initialized ($TABLE_COUNT tables). Applying pending migrations..."
   for i in $(seq 1 5); do
-    if pnpm run db:push 2>&1; then
-      echo "Schema sync completed"
+    if pnpm run db:migrate 2>&1; then
+      echo "Migrations applied"
       break
     fi
     if [ "$i" -eq 5 ]; then
-      echo "ERROR: Schema sync failed after 5 attempts"
+      echo "ERROR: Migrations failed after 5 attempts"
       exit 1
     fi
-    echo "Retrying db:push... (attempt $i/5)"
+    echo "Retrying db:migrate... (attempt $i/5)"
     sleep 3
   done
 else
-  # First run: db:reset applies the full four-role GRANT model including
-  # table-specific restrictions (e.g., REVOKE UPDATE/DELETE on audit_logs
-  # from roviq_app) that db:push alone does not handle.
   echo "First run — full database reset + seed..."
   for i in $(seq 1 5); do
     if pnpm run db:reset --seed 2>&1; then
