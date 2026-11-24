@@ -176,7 +176,9 @@ export default function ResellerInstituteDetailPage() {
           <TabsTrigger value="overview">{td('tabs.overview')}</TabsTrigger>
           <TabsTrigger value="academic">{td('tabs.academic')}</TabsTrigger>
           <TabsTrigger value="compliance">{td('tabs.compliance')}</TabsTrigger>
-          <TabsTrigger value="users">{td('tabs.users')}</TabsTrigger>
+          <Can I="read" a="User">
+            <TabsTrigger value="users">{td('tabs.users')}</TabsTrigger>
+          </Can>
           <TabsTrigger value="audit">{td('tabs.audit')}</TabsTrigger>
         </TabsList>
 
@@ -396,9 +398,11 @@ export default function ResellerInstituteDetailPage() {
         </TabsContent>
 
         {/* ── Users Tab ── */}
-        <TabsContent value="users" className="mt-6">
-          <ResellerInstituteUsersTab instituteId={institute.id} instituteName={instituteName} />
-        </TabsContent>
+        <Can I="read" a="User">
+          <TabsContent value="users" className="mt-6">
+            <ResellerInstituteUsersTab instituteId={institute.id} instituteName={instituteName} />
+          </TabsContent>
+        </Can>
 
         {/* ── Audit Tab ── */}
         <TabsContent value="audit" className="mt-6">

@@ -1,9 +1,10 @@
 'use client';
 
+import { createMongoAbility } from '@casl/ability';
 import { ProtectedRoute, useAuth } from '@roviq/auth';
-import { NAV_SLUGS } from '@roviq/common-types';
+import { type AppAbility, NAV_SLUGS } from '@roviq/common-types';
 import { gql, useQuery } from '@roviq/graphql';
-import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
+import type { LayoutConfig, NavGroup, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
 import { NotificationBell } from '@web/components/notifications/notification-bell';
 import {
@@ -19,6 +20,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 import { useLocaleChange } from '../../../../hooks/use-locale-change';
 import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 
@@ -52,10 +54,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   };
 
   const eeEnabled = process.env.NEXT_PUBLIC_ROVIQ_EE === 'true';
+  const abilityRules = user?.abilityRules;
+  const canReadPayments = useMemo(
+    () => createMongoAbility<AppAbility>(abilityRules ?? []).can('read', 'Payment'),
+    [abilityRules],
+  );
 
   const { data: unverifiedData } = useQuery<{
     unverifiedPayments: { id: string }[];
-  }>(UNVERIFIED_COUNT_QUERY, { skip: !eeEnabled });
+  }>(UNVERIFIED_COUNT_QUERY, { skip: !eeEnabled || !canReadPayments });
   const unverifiedCount = unverifiedData?.unverifiedPayments?.length ?? 0;
 
   // Reseller registry only includes slugs that map to real routes in this
@@ -78,7 +85,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       href: '/team',
       icon: Users,
       label: t('team'),
-      ability: { action: 'read', subject: 'User' },
+      ability: { action: 'read', subject: 'ResellerTeam' },
     },
     [NAV_SLUGS.billing]: {
       href: '/billing/dashboard',
@@ -134,9 +141,24 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         title: t('overview'),
         items: [
           { title: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
-          { title: t('institutes'), href: '/institutes', icon: Building2 },
-          { title: t('instituteGroups'), href: '/institute-groups', icon: FolderTree },
-          { title: t('team'), href: '/team', icon: Users },
+          {
+            title: t('institutes'),
+            href: '/institutes',
+            icon: Building2,
+            ability: { action: 'read', subject: 'Institute' },
+          },
+          {
+            title: t('instituteGroups'),
+            href: '/institute-groups',
+            icon: FolderTree,
+            ability: { action: 'read', subject: 'InstituteGroup' },
+          },
+          {
+            title: t('team'),
+            href: '/team',
+            icon: Users,
+            ability: { action: 'read', subject: 'ResellerTeam' },
+          },
         ],
       },
       ...(eeEnabled
@@ -144,26 +166,61 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             {
               title: t('billing'),
               items: [
-                { title: t('billingDashboard'), href: '/billing/dashboard', icon: LayoutDashboard },
-                { title: t('plans'), href: '/billing/plans', icon: CreditCard },
-                { title: t('subscriptions'), href: '/billing/subscriptions', icon: CreditCard },
-                { title: t('invoices'), href: '/billing/invoices', icon: FileText },
-                { title: t('gatewayConfigs'), href: '/billing/gateway-configs', icon: Settings },
+                {
+                  title: t('billingDashboard'),
+                  href: '/billing/dashboard',
+                  icon: LayoutDashboard,
+                  ability: { action: 'read', subject: 'BillingDashboard' },
+                },
+                {
+                  title: t('plans'),
+                  href: '/billing/plans',
+                  icon: CreditCard,
+                  ability: { action: 'read', subject: 'SubscriptionPlan' },
+                },
+                {
+                  title: t('subscriptions'),
+                  href: '/billing/subscriptions',
+                  icon: CreditCard,
+                  ability: { action: 'read', subject: 'Subscription' },
+                },
+                {
+                  title: t('invoices'),
+                  href: '/billing/invoices',
+                  icon: FileText,
+                  ability: { action: 'read', subject: 'Invoice' },
+                },
+                {
+                  title: t('gatewayConfigs'),
+                  href: '/billing/gateway-configs',
+                  icon: Settings,
+                  ability: { action: 'read', subject: 'PaymentGatewayConfig' },
+                },
                 {
                   title: t('upiVerification'),
                   href: '/billing/upi-verification',
                   icon: ShieldCheck,
+                  ability: { action: 'read', subject: 'Payment' },
                   badge: unverifiedCount > 0 ? String(unverifiedCount) : undefined,
                 },
               ],
-            },
+            } satisfies NavGroup,
           ]
         : []),
       {
         title: t('system'),
         items: [
-          { title: t('auditLogs'), href: '/audit', icon: ScrollText },
-          { title: t('settings'), href: '/settings', icon: Settings },
+          {
+            title: t('auditLogs'),
+            href: '/audit',
+            icon: ScrollText,
+            ability: { action: 'read', subject: 'AuditLog' },
+          },
+          {
+            title: t('settings'),
+            href: '/settings',
+            icon: Settings,
+          },
           { title: t('account'), href: '/account', icon: UserCog },
         ],
       },

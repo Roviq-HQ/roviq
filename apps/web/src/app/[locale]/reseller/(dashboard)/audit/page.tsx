@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Can } from '@roviq/ui';
+import { Badge, Can, useAbility } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { AuditColumnKey } from '@web/components/audit/audit-log-columns';
 import { AuditLogFilters, useAuditLogFilters } from '@web/components/audit/audit-log-filters';
@@ -28,6 +28,19 @@ const COLUMNS: readonly AuditColumnKey[] = [
 ];
 
 export default function ResellerAuditLogsPage() {
+  const t = useTranslations('auditLogs');
+  // A role without the ability sends no query.
+  if (!useAbility().can('read', 'AuditLog')) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">{t('accessDenied')}</p>
+      </div>
+    );
+  }
+  return <ResellerAuditLogsContent />;
+}
+
+function ResellerAuditLogsContent() {
   const t = useTranslations('auditLogs');
   const [filters, setFilters] = useAuditLogFilters();
   const { institutes } = useResellerInstitutes();

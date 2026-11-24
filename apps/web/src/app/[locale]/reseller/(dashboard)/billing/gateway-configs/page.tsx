@@ -27,6 +27,7 @@ import {
   SelectValue,
   Skeleton,
   Switch,
+  useAbility,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { CreditCard, Plus, Shield } from 'lucide-react';
@@ -56,6 +57,24 @@ interface GatewayConfig {
 }
 
 export default function GatewayConfigsPage() {
+  const t = useTranslations('billing');
+  const ability = useAbility();
+
+  // Gateway configurations hold API keys: a role without the ability never sends the query.
+  if (!ability.can('read', 'PaymentGatewayConfig')) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">{t('gateway.title')}</h1>
+        <div className="flex h-[50vh] items-center justify-center">
+          <p className="text-muted-foreground">{t('gateway.accessDenied')}</p>
+        </div>
+      </div>
+    );
+  }
+  return <GatewayConfigsContent />;
+}
+
+function GatewayConfigsContent() {
   const t = useTranslations('billing');
   const { configs, loading } = useGatewayConfigs();
   const [dialogOpen, setDialogOpen] = React.useState(false);

@@ -1,21 +1,26 @@
 'use client';
 
 import { Link, usePathname } from '@roviq/i18n';
+import { useAbility } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useTranslations } from 'next-intl';
 
 const { resellerSettings } = testIds;
 
+// Sessions are the signed-in person's own and need no ability; the rest is the reseller's record.
 const TABS = [
-  { key: 'profile', href: '/settings/profile' },
-  { key: 'branding', href: '/settings/branding' },
-  { key: 'customDomain', href: '/settings/custom-domain' },
-  { key: 'sessions', href: '/settings/sessions' },
+  { key: 'profile', href: '/settings/profile', needsReseller: true },
+  { key: 'branding', href: '/settings/branding', needsReseller: true },
+  { key: 'customDomain', href: '/settings/custom-domain', needsReseller: true },
+  { key: 'sessions', href: '/settings/sessions', needsReseller: false },
 ] as const;
 
 export default function ResellerSettingsLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations('resellerSettings');
   const pathname = usePathname();
+  const canReadReseller = useAbility().can('read', 'Reseller');
+  const tabs = TABS.filter((tab) => canReadReseller || !tab.needsReseller);
+  const allowed = tabs.some((tab) => pathname.endsWith(tab.href)) || pathname.endsWith('/settings');
 
   return (
     <div className="space-y-6">
@@ -31,7 +36,7 @@ export default function ResellerSettingsLayout({ children }: { children: React.R
         className="flex gap-1 overflow-x-auto overflow-y-hidden border-b"
         data-testid={resellerSettings.tabs}
       >
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = pathname.endsWith(tab.href);
           return (
             <Link
@@ -51,7 +56,13 @@ export default function ResellerSettingsLayout({ children }: { children: React.R
         })}
       </nav>
 
-      {children}
+      {allowed ? (
+        children
+      ) : (
+        <div className="flex h-[40vh] items-center justify-center">
+          <p className="text-muted-foreground">{t('accessDenied')}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,17 @@ import { roles } from './schema/tenant/roles';
 
 export { RESELLER_SYSTEM_ROLE_NAMES, type ResellerSystemRoleName };
 
+// An explicit list, never `read all`: that would include payment gateway configurations,
+// which hold API keys.
+const VIEWER_ABILITIES: AbilityRule[] = [
+  { action: 'read', subject: 'Institute' },
+  { action: 'view_statistics', subject: 'Institute' },
+  { action: 'read', subject: 'InstituteGroup' },
+  { action: 'read', subject: 'BillingDashboard' },
+  { action: 'read', subject: 'Subscription' },
+  { action: 'read', subject: 'Invoice' },
+];
+
 export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, AbilityRule[]> = {
   reseller_full_admin: [
     { action: 'create', subject: 'Institute' },
@@ -40,13 +51,15 @@ export const RESELLER_SYSTEM_ROLE_ABILITIES: Record<ResellerSystemRoleName, Abil
     { action: 'read', subject: 'Reseller' },
     { action: 'update', subject: 'Reseller' },
   ],
+  // Impersonation by support staff is view-only (ImpersonationService, SF-016).
   reseller_support_admin: [
-    { action: 'read', subject: 'all' },
+    ...VIEWER_ABILITIES,
+    { action: 'read', subject: 'User' },
     { action: 'impersonate', subject: 'User' },
     // Capped in ResellerTeamService: never a member or a role senior to their own.
     { action: 'manage', subject: 'ResellerTeam' },
   ],
-  reseller_viewer: [{ action: 'read', subject: 'all' }],
+  reseller_viewer: VIEWER_ABILITIES,
 };
 
 /**

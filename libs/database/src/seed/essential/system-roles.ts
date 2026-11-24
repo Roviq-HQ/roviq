@@ -1,8 +1,11 @@
 import type { AbilityRule } from '@roviq/common-types';
 import { sql } from 'drizzle-orm';
-import { roles, SYSTEM_USER_ID } from '../..';
+import { resellersLive, roles, SYSTEM_USER_ID } from '../..';
 import type { DrizzleDB } from '../../providers';
-import { RESELLER_SYSTEM_ROLE_ABILITIES } from '../../reseller-system-roles';
+import {
+  provisionResellerSystemRoles,
+  RESELLER_SYSTEM_ROLE_ABILITIES,
+} from '../../reseller-system-roles';
 import { SEED_IDS } from '../ids';
 
 const BY = { createdBy: SYSTEM_USER_ID, updatedBy: SYSTEM_USER_ID };
@@ -81,4 +84,10 @@ export async function seedSystemRoles(tx: DrizzleDB): Promise<void> {
         scope: sql`excluded.scope`,
       },
     });
+
+  // Every reseller owns a copy of the system roles; a changed ability list reaches them all.
+  const live = await tx.select({ id: resellersLive.id }).from(resellersLive);
+  for (const reseller of live) {
+    await provisionResellerSystemRoles(tx, reseller.id, SYSTEM_USER_ID);
+  }
 }

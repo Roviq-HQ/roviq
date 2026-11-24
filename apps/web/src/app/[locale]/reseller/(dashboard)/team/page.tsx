@@ -25,6 +25,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  useAbility,
   useDebounce,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -53,6 +54,19 @@ const filterParsers = {
 };
 
 export default function ResellerTeamPage() {
+  const t = useTranslations('resellerTeam');
+  // A role without team access sends no team query.
+  if (!useAbility().can('read', 'ResellerTeam')) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <p className="text-muted-foreground">{t('accessDenied')}</p>
+      </div>
+    );
+  }
+  return <ResellerTeamContent />;
+}
+
+function ResellerTeamContent() {
   const t = useTranslations('resellerTeam');
   const { user } = useAuth();
   const { format, formatDistance } = useFormatDate();

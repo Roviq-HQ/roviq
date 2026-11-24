@@ -1,7 +1,7 @@
 'use client';
 
 import { gql, useQuery } from '@roviq/graphql';
-import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@roviq/ui';
+import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton, useAbility } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import {
   AlertTriangle,
@@ -69,11 +69,11 @@ interface DashboardData {
 
 interface DashboardQueryData {
   resellerBillingDashboard: DashboardData;
-  unverifiedPayments: { id: string }[];
+  unverifiedPayments?: { id: string }[];
 }
 
 const DASHBOARD_QUERY = gql`
-  query ResellerBillingDashboard {
+  query ResellerBillingDashboard($withPayments: Boolean!) {
     resellerBillingDashboard {
       mrr
       activeSubscriptions
@@ -82,7 +82,7 @@ const DASHBOARD_QUERY = gql`
       overdueInvoiceCount
       subscriptionsByStatus
     }
-    unverifiedPayments(first: 100) {
+    unverifiedPayments(first: 100) @include(if: $withPayments) {
       id
     }
   }
@@ -105,7 +105,10 @@ function formatIndianCurrency(paise: number): string {
 
 export default function BillingDashboardPage() {
   const t = useTranslations('billing');
-  const { data, loading } = useQuery<DashboardQueryData>(DASHBOARD_QUERY);
+  const ability = useAbility();
+  const { data, loading } = useQuery<DashboardQueryData>(DASHBOARD_QUERY, {
+    variables: { withPayments: ability.can('read', 'Payment') },
+  });
 
   const dashboard = data?.resellerBillingDashboard;
 
@@ -145,7 +148,7 @@ export default function BillingDashboardPage() {
   const activeSubscriptions = Number(dashboard?.activeSubscriptions ?? 0);
   const churnRate = Number(dashboard?.churnRate ?? 0);
   const overdueCount = Number(dashboard?.overdueInvoiceCount ?? 0);
-  const unverifiedUpiCount = data?.unverifiedPayments.length ?? 0;
+  const unverifiedUpiCount = data?.unverifiedPayments?.length ?? 0;
 
   return (
     <div className="space-y-6">
