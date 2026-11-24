@@ -14,7 +14,8 @@ import type {
 
 export abstract class GroupRepository {
   /** Group, its rule and its composite children, in one transaction. */
-  abstract create(data: CreateGroupData): Promise<GroupRecord>;
+  /** Null when the parent or a child group is not a group of the institute. */
+  abstract create(data: CreateGroupData): Promise<GroupRecord | null>;
   abstract findById(tenantId: string, id: string): Promise<GroupRecord | null>;
   /** Ordered by name. */
   abstract list(tenantId: string, query: GroupListQuery): Promise<GroupRecord[]>;

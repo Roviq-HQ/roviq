@@ -3,6 +3,7 @@ import { ErrorCode } from '@roviq/common-types';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileService } from '../../../files/file.service';
+import type { StudentRepository } from '../repositories/student.repository';
 import { StudentBulkImportService } from '../student-bulk-import.service';
 
 const connect = vi.hoisted(() => vi.fn());
@@ -19,6 +20,7 @@ const OTHER_TENANT_ID = '00000000-0000-7000-a000-000000000102';
 
 describe('StudentBulkImportService', () => {
   let claimUploads: ReturnType<typeof vi.fn<FileService['claimUploads']>>;
+  let checkAdmissionClass: ReturnType<typeof vi.fn<StudentRepository['checkAdmissionClass']>>;
   let service: StudentBulkImportService;
 
   const input = {
@@ -35,9 +37,13 @@ describe('StudentBulkImportService', () => {
     connect.mockReset().mockResolvedValue({ close: vi.fn() });
     start.mockReset().mockResolvedValue(undefined);
     claimUploads = vi.fn<FileService['claimUploads']>().mockResolvedValue(undefined);
+    checkAdmissionClass = vi
+      .fn<StudentRepository['checkAdmissionClass']>()
+      .mockResolvedValue({ kind: 'ok' });
     service = new StudentBulkImportService(
       createMock<ConfigService>({ get: vi.fn().mockReturnValue('temporal:7233') }),
       createMock<FileService>({ claimUploads }),
+      createMock<StudentRepository>({ checkAdmissionClass }),
     );
   });
 
@@ -53,6 +59,22 @@ describe('StudentBulkImportService', () => {
         workflowExecutionTimeout: '10 minutes',
         args: [input],
       });
+    });
+
+    it('should refuse a class that is not of the institute before claiming the upload', async () => {
+      checkAdmissionClass.mockResolvedValue({ kind: 'section_not_found' });
+
+      await expect(service.startBulkImport(input)).rejects.toMatchObject({
+        code: ErrorCode.SECTION_NOT_FOUND,
+      });
+
+      expect(checkAdmissionClass).toHaveBeenCalledWith(TENANT_ID, {
+        academicYearId: 'year-1',
+        standardId: 'standard-1',
+        sectionId: 'section-1',
+      });
+      expect(claimUploads).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
     });
 
     it('should not start a workflow when the upload cannot be claimed', async () => {

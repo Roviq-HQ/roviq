@@ -37,6 +37,14 @@ export abstract class AttendanceRepository {
     session: AttendanceSessionRecord,
     studentId: string,
   ): Promise<boolean>;
+  /**
+   * Reads the lecturer's membership and the subject under the caller's institute. The foreign
+   * keys of a session accept any institute's row.
+   */
+  abstract findMissingSessionRef(refs: {
+    lecturerId?: string;
+    subjectId?: string | null;
+  }): Promise<'lecturer' | 'subject' | null>;
   abstract createSession(data: CreateSessionData): Promise<AttendanceSessionRecord>;
   abstract assignLecturer(sessionId: string, lecturerId: string): Promise<AttendanceSessionRecord>;
   abstract setSubject(

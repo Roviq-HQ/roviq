@@ -207,3 +207,14 @@ export interface TimetableLabelMaps {
   /** Teacher label keyed by membership id, e.g. "Rajesh Sharma". */
   teachers: Record<string, string>;
 }
+
+/** Caller-supplied ids a timetable write stores; each is read under the caller's institute. */
+export interface TimetableRefs {
+  academicYearId?: string;
+  sectionIds?: string[];
+  subjectIds?: (string | null | undefined)[];
+  /** Membership ids. */
+  teacherIds?: (string | null | undefined)[];
+}
+
+export type TimetableRefKind = 'year' | 'section' | 'subject' | 'teacher';

@@ -16,6 +16,7 @@ import type {
   TimetablePeriodRecord,
   TimetableRecord,
 } from './repositories/types';
+import { assertTimetableCell, assertTimetableRefs } from './timetable-refs';
 
 /** A section or staff weekly grid: the period rows, the working days, and the cells. */
 export interface TimetableGrid {
@@ -184,6 +185,12 @@ export class TimetableViewService {
         ErrorCode.TIMETABLE_NOT_FOUND,
         `Timetable ${input.timetableId} not found`,
       );
+
+    await assertTimetableCell(this.repo, input);
+    await assertTimetableRefs(this.repo, {
+      subjectIds: [input.subjectId],
+      teacherIds: [input.teacherId],
+    });
 
     // Snapshot the master cell so history survives later master edits.
     const dayOfWeek = weekdayOf(input.date);

@@ -140,6 +140,7 @@ function buildRepoMock(): MockedRepo {
     findSession: vi.fn(),
     findSessionsInRange: vi.fn(),
     findSectionScope: vi.fn(),
+    findMissingSessionRef: vi.fn(),
     listSections: vi.fn(),
     isStudentInSession: vi.fn(),
     createSession: vi.fn(),
@@ -234,6 +235,7 @@ describe('AttendanceService (unit)', () => {
       },
     });
     repo.findSectionScope.mockResolvedValue(SECTION_SCOPE);
+    repo.findMissingSessionRef.mockResolvedValue(null);
     repo.isStudentInSession.mockResolvedValue(true);
   });
 

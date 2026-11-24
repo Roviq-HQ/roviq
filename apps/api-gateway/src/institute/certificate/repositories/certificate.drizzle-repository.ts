@@ -6,6 +6,7 @@ import {
   type DrizzleDB,
   issuedCertificates,
   issuedCertificatesLive,
+  staffProfilesLive,
   studentProfilesLive,
   tenantSequences,
   tenantUserProfilesLive,
@@ -47,6 +48,17 @@ export class CertificateDrizzleRepository extends CertificateRepository {
         .limit(1),
     );
     return row ?? null;
+  }
+
+  async staffExists(ctx: InstituteContext, staffProfileId: string): Promise<boolean> {
+    const rows = await withTenant(this.db, ctx, (tx) =>
+      tx
+        .select({ id: staffProfilesLive.id })
+        .from(staffProfilesLive)
+        .where(eq(staffProfilesLive.id, staffProfileId))
+        .limit(1),
+    );
+    return rows.length > 0;
   }
 
   async findStudent(

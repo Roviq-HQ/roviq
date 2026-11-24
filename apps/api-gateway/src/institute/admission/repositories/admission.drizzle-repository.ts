@@ -8,6 +8,7 @@ import {
   type DrizzleDB,
   enquiries,
   enquiriesLive,
+  membershipsLive,
   mkInstituteCtx,
   sectionsLive,
   standardsLive,
@@ -135,6 +136,17 @@ export class AdmissionDrizzleRepository extends AdmissionRepository {
       return apps;
     });
     return toApplicationModel(appRows[0]);
+  }
+
+  async userIsMember(tenantId: string, userId: string): Promise<boolean> {
+    const rows = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      return tx
+        .select({ id: membershipsLive.id })
+        .from(membershipsLive)
+        .where(eq(membershipsLive.userId, userId))
+        .limit(1);
+    });
+    return rows.length > 0;
   }
 
   async standardExists(tenantId: string, standardId: string): Promise<boolean> {

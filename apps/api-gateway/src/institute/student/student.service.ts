@@ -1,4 +1,5 @@
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
+import { assertAdmissionClass } from './admission-class';
 /** Student CRUD service (ROV-154). Queries live in StudentRepository and StudentReadRepository. */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -24,7 +25,6 @@ import type { UpdateStudentInput } from './dto/update-student.input';
 import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
 import { StudentRepository } from './repositories/student.repository';
-import type { AdmissionClassResult } from './repositories/types';
 import { StudentReadRepository } from './student-read.repository';
 
 const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
@@ -55,21 +55,6 @@ export class StudentService {
 
   // ── CREATE ────────────────────────────────────────────────
 
-  private assertAdmissionClass(result: AdmissionClassResult): void {
-    if (result.kind === 'year_not_found') {
-      throw new BusinessException(ErrorCode.ACADEMIC_YEAR_NOT_FOUND, 'Academic year not found');
-    }
-    if (result.kind === 'standard_not_found') {
-      throw new BusinessException(
-        ErrorCode.STANDARD_NOT_FOUND,
-        'Standard not found in this academic year',
-      );
-    }
-    if (result.kind === 'section_not_found') {
-      throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
-    }
-  }
-
   async create(input: CreateStudentInput): Promise<StudentModel> {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
@@ -81,7 +66,7 @@ export class StudentService {
       standardId: input.standardId,
       sectionId: input.sectionId,
     };
-    this.assertAdmissionClass(await this.repository.checkAdmissionClass(tenantId, admissionClass));
+    assertAdmissionClass(await this.repository.checkAdmissionClass(tenantId, admissionClass));
 
     // A typed number never identifies an existing account (SF-053): every student is a new user.
     const userId = await this.createUser(input.phone, actorId);
@@ -145,7 +130,7 @@ export class StudentService {
     });
 
     // 6. Create student_academics (initial enrollment)
-    this.assertAdmissionClass(
+    assertAdmissionClass(
       await this.repository.createInitialAcademic(tenantId, {
         studentProfileId,
         ...admissionClass,
@@ -402,6 +387,10 @@ export class StudentService {
 
   async delete(id: string): Promise<boolean> {
     const tenantId = this.getTenantId();
+
+    if (!(await this.repository.exists(tenantId, id))) {
+      throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
+    }
 
     // Check for active enrollments in current year (exclude students who already left)
     const hasActiveEnrollment = await this.repository.hasActiveEnrollment(tenantId, id, [

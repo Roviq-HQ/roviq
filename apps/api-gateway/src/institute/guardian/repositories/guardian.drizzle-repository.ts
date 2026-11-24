@@ -430,6 +430,7 @@ export class GuardianDrizzleRepository extends GuardianRepository {
           and(
             eq(studentGuardianLinks.studentProfileId, studentProfileId),
             eq(studentGuardianLinks.guardianProfileId, guardianProfileId),
+            isNull(studentGuardianLinks.deletedAt),
           ),
         )
         .returning();
