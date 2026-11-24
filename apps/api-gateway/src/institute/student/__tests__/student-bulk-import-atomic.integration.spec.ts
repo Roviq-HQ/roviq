@@ -181,4 +181,74 @@ describe('bulk import insertBatch: one transaction per row (ROV-275)', () => {
     expect(after.academics.map((a) => a.rollNumber).sort()).toEqual(['0001', '0002']);
     expect(after.academics.every((a) => a.sectionId === liveSectionId)).toBe(true);
   });
+
+  it("should refuse a row naming another institute's class and section, writing nothing", async () => {
+    const other = await createTestInstitute(result.db);
+    const foreign = await asAdmin(async (tx) => {
+      const [year] = await tx
+        .insert(academicYears)
+        .values({
+          tenantId: other.tenantId,
+          label: '2026-27',
+          startDate: '2026-04-01',
+          endDate: '2027-03-31',
+          isActive: true,
+          status: 'ACTIVE',
+          ...BY,
+        })
+        .returning({ id: academicYears.id });
+      const [standard] = await tx
+        .insert(standards)
+        .values({
+          tenantId: other.tenantId,
+          academicYearId: year.id,
+          name: { en: 'Class 4' },
+          numericOrder: 4,
+          level: 'PRIMARY',
+          ...BY,
+        })
+        .returning({ id: standards.id });
+      const [section] = await tx
+        .insert(sections)
+        .values({
+          tenantId: other.tenantId,
+          standardId: standard.id,
+          academicYearId: year.id,
+          name: { en: 'A' },
+          displayLabel: 'Class 4-A',
+          capacity: 40,
+          ...BY,
+        })
+        .returning({ id: sections.id });
+      return { standardId: standard.id, sectionId: section.id };
+    });
+    const activities = createBulkStudentImportActivities(
+      result.db,
+      null,
+      result.app.get(IdentityService),
+      createMock<ImportFileStore>(),
+    );
+    const before = await written();
+
+    const outcome = await activities.insertBatch(
+      inst.tenantId,
+      yearId,
+      standardId,
+      liveSectionId,
+      inst.userId,
+      // A row with its own admission number skips the series, so only the class check can refuse it.
+      [{ ...row(1, 'Dhruv'), admissionNumber: 'CSV-0001', ...foreign }],
+    );
+
+    expect(outcome.created).toBe(0);
+    expect(outcome.errors.map((e) => e.rowNumber)).toEqual([1]);
+    expect(await written()).toEqual(before);
+    const pointing = await asAdmin((tx) =>
+      tx
+        .select({ id: studentAcademics.id })
+        .from(studentAcademics)
+        .where(eq(studentAcademics.sectionId, foreign.sectionId)),
+    );
+    expect(pointing).toEqual([]);
+  });
 });
