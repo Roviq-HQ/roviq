@@ -25,7 +25,7 @@ export function downloadCsv(filename: string, csv: string): void {
  * A spreadsheet runs a text cell that starts with one of these as a formula. Names and notes are
  * typed by users, so such a cell gets a leading apostrophe and is shown as text.
  */
-export function neutraliseFormula(value: string): string {
+function neutraliseFormula(value: string): string {
   return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 

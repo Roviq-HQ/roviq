@@ -41,7 +41,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import type { ColumnDef } from '@tanstack/react-table';
 import { DeletedRecordsButton } from '@web/components/people/deleted-records';
-import { neutraliseFormula } from '@web/lib/csv';
+import { buildCsv, downloadCsv } from '@web/lib/csv';
 import { parseISO } from 'date-fns';
 import {
   AlertCircle,
@@ -924,14 +924,9 @@ export default function StudentsPage() {
         t('columns.rte'),
         t('columns.admittedOn'),
       ];
-      const csvEscape = (raw: string) => {
-        const value = neutraliseFormula(raw);
-        if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-        return value;
-      };
-      const lines = [
-        header.map((value) => csvEscape(value ?? '')).join(','),
-        ...rows.map((s) =>
+      const csv = buildCsv(
+        header.map((value) => value ?? ''),
+        rows.map((s) =>
           [
             s.admissionNumber,
             fullName(s),
@@ -944,22 +939,10 @@ export default function StudentsPage() {
             s.socialCategory,
             s.isRteAdmitted ? 'Yes' : 'No',
             s.admissionDate,
-          ]
-            .map((value) => csvEscape(value ?? ''))
-            .join(','),
+          ].map((value) => value ?? ''),
         ),
-      ];
-      const blob = new Blob([`\uFEFF${lines.join('\n')}`], {
-        type: 'text/csv;charset=utf-8;',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      );
+      downloadCsv(`students-${new Date().toISOString().slice(0, 10)}.csv`, csv);
       toast.success(t('export.success', { count: rows.length }));
     },
     [fullName, guardianName, resolveI18n, t],
