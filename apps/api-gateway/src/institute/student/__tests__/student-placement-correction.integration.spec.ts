@@ -851,14 +851,15 @@ describe('Student placement correction (integration)', () => {
     };
 
     const rollOver = (tenantId: string, y: { prevYearId: string; nextYearId: string }) =>
-      withTenant(result.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
-        rollOverStudents(tx, {
+      withTenant(result.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+        const { counts } = await rollOverStudents(tx, {
           tenantId,
           previousYearId: y.prevYearId,
           academicYearId: y.nextYearId,
           write: true,
-        }),
-      );
+        });
+        return counts;
+      });
 
     beforeAll(async () => {
       inst = await createTestInstitute(result.db);

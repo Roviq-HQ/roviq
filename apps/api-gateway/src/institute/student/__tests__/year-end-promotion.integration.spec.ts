@@ -497,13 +497,16 @@ describe('Year-end promotion (integration)', () => {
         alreadyPlaced: 0,
       });
 
-      const counts = await withTenant(result.db, mkInstituteCtx(coaching.tenantId, ORIGIN), (tx) =>
-        rollOverStudents(tx, {
-          tenantId: coaching.tenantId,
-          previousYearId: coaching.prevYearId,
-          academicYearId: coaching.nextYearId,
-          write: true,
-        }),
+      const { counts } = await withTenant(
+        result.db,
+        mkInstituteCtx(coaching.tenantId, ORIGIN),
+        (tx) =>
+          rollOverStudents(tx, {
+            tenantId: coaching.tenantId,
+            previousYearId: coaching.prevYearId,
+            academicYearId: coaching.nextYearId,
+            write: true,
+          }),
       );
 
       expect(counts).toEqual(preview);
@@ -528,13 +531,16 @@ describe('Year-end promotion (integration)', () => {
         students: [{ key: 'top', order: 5 }],
       });
 
-      const counts = await withTenant(result.db, mkInstituteCtx(fixture.tenantId, ORIGIN), (tx) =>
-        rollOverStudents(tx, {
-          tenantId: fixture.tenantId,
-          previousYearId: fixture.prevYearId,
-          academicYearId: fixture.nextYearId,
-          write: true,
-        }),
+      const { counts } = await withTenant(
+        result.db,
+        mkInstituteCtx(fixture.tenantId, ORIGIN),
+        (tx) =>
+          rollOverStudents(tx, {
+            tenantId: fixture.tenantId,
+            previousYearId: fixture.prevYearId,
+            academicYearId: fixture.nextYearId,
+            write: true,
+          }),
       );
 
       expect(counts).toEqual({
@@ -555,13 +561,16 @@ describe('Year-end promotion (integration)', () => {
     });
 
     it("should count nothing and write nothing for one institute's tenant carrying another's year ids", async () => {
-      const counts = await withTenant(result.db, mkInstituteCtx(school.tenantId, ORIGIN), (tx) =>
-        rollOverStudents(tx, {
-          tenantId: school.tenantId,
-          previousYearId: other.prevYearId,
-          academicYearId: other.nextYearId,
-          write: true,
-        }),
+      const { counts } = await withTenant(
+        result.db,
+        mkInstituteCtx(school.tenantId, ORIGIN),
+        (tx) =>
+          rollOverStudents(tx, {
+            tenantId: school.tenantId,
+            previousYearId: other.prevYearId,
+            academicYearId: other.nextYearId,
+            write: true,
+          }),
       );
 
       expect(counts).toEqual({
@@ -660,14 +669,15 @@ describe('Year-end promotion (integration)', () => {
       );
 
     const rollOver = (fixture: YearFixture) =>
-      withTenant(result.db, mkInstituteCtx(fixture.tenantId, ORIGIN), (tx) =>
-        rollOverStudents(tx, {
+      withTenant(result.db, mkInstituteCtx(fixture.tenantId, ORIGIN), async (tx) => {
+        const { counts } = await rollOverStudents(tx, {
           tenantId: fixture.tenantId,
           previousYearId: fixture.prevYearId,
           academicYearId: fixture.nextYearId,
           write: true,
-        }),
-      );
+        });
+        return counts;
+      });
 
     const sectionsOf = async (fixture: YearFixture) =>
       new Map((await nextYearRows(fixture)).map((r) => [r.studentProfileId, r.sectionId]));

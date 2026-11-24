@@ -88,6 +88,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/student/__tests__/gateway-event-handlers.integration.spec.ts',
   // ROV-321: integration fixtures (years, standards, institute type) and the write-mode rollover.
   'apps/api-gateway/src/institute/student/__tests__/year-end-promotion.integration.spec.ts',
+  // ROV-323: integration fixtures (years, classes, sections, students) and RLS checks per role.
+  'apps/api-gateway/src/institute/academic-year/__tests__/rollover-section-map.integration.spec.ts',
   // ROV-322: integration fixtures (years, classes, records, groups) and the write-mode rollover.
   'apps/api-gateway/src/institute/student/__tests__/student-placement-correction.integration.spec.ts',
   // ROV-315: integration fixtures (users, delivery rows) and the leak check over audit and notification tables.
