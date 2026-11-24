@@ -1,7 +1,12 @@
 'use client';
 
 import { gql, useMutation, useQuery } from '@roviq/graphql';
-import type { AcademicYearModel, AcademicYearRolloverPreview } from '@roviq/graphql/generated';
+import type {
+  AcademicYearModel,
+  AcademicYearRolloverPreview,
+  RolloverSectionLoad,
+  RolloverSectionMove,
+} from '@roviq/graphql/generated';
 
 const ACADEMIC_YEARS_QUERY = gql`
   query AcademicYears {
@@ -64,6 +69,32 @@ const ACADEMIC_YEAR_ROLLOVER_PREVIEW = gql`
       notCarried
       noClassInNewYear
       alreadyPlaced
+      sections {
+        sectionId
+        standardId
+        standardName
+        sectionName
+        currentStrength
+        incoming
+        capacity
+      }
+      moves {
+        fromSectionId
+        fromStandardName
+        fromSectionName
+        toStandardId
+        toSectionId
+        students
+        overridden
+      }
+    }
+  }
+`;
+
+const SET_ROLLOVER_SECTION_MAP = gql`
+  mutation SetRolloverSectionMap($input: SetRolloverSectionMapInput!) {
+    setRolloverSectionMap(input: $input) {
+      movingUp
     }
   }
 `;
@@ -138,7 +169,12 @@ export function useActivateAcademicYear() {
   };
 }
 
-export type RolloverPreview = Omit<AcademicYearRolloverPreview, '__typename'>;
+export type RolloverSection = Omit<RolloverSectionLoad, '__typename'>;
+export type RolloverMove = Omit<RolloverSectionMove, '__typename'>;
+export type RolloverPreview = Omit<
+  AcademicYearRolloverPreview,
+  '__typename' | 'sections' | 'moves'
+> & { sections: RolloverSection[]; moves: RolloverMove[] };
 
 /** Loads only while `academicYearId` is set, and never from cache: student records change. */
 export function useAcademicYearRolloverPreview(academicYearId: string | null) {
@@ -152,6 +188,22 @@ export function useAcademicYearRolloverPreview(academicYearId: string | null) {
   );
 
   return { preview: data?.academicYearRolloverPreview ?? null, loading, error };
+}
+
+/** Chooses the section the students of one section go to; `toSectionId: null` restores the name rule. */
+export function useSetRolloverSectionMap() {
+  const [mutate, { loading }] = useMutation(SET_ROLLOVER_SECTION_MAP, {
+    refetchQueries: ['AcademicYearRolloverPreview'],
+    awaitRefetchQueries: true,
+  });
+
+  return {
+    setSectionTarget: (
+      academicYearId: string,
+      entry: { fromSectionId: string; toSectionId: string | null },
+    ) => mutate({ variables: { input: { academicYearId, entries: [entry] } } }),
+    loading,
+  };
 }
 
 export function useArchiveAcademicYear() {

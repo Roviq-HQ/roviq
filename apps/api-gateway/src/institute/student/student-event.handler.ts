@@ -36,7 +36,7 @@ export class StudentEventHandler {
       return;
     }
 
-    const counts = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
+    const { counts } = await withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), (tx) =>
       rollOverStudents(tx, { tenantId, previousYearId, academicYearId, write: true }),
     );
 

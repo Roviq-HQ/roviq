@@ -50,7 +50,26 @@
     "notCarried": "{count, plural, one {# student is} other {# students are}} marked completed or transferred and will not be carried.",
     "alreadyPlaced": "{count, plural, one {# student already has} other {# students already have}} a class in the new year and will not be moved.",
     "noClassInNewYear": "{count, plural, one {# student has} other {# students have}} no class or section waiting in the new year and will be left out. Create the missing classes and sections in the new year first.",
-    "none": "No students will be moved."
+    "none": "No students will be moved.",
+    "sections": {
+      "title": "Where each section goes",
+      "description": "Students keep the section with the same name. To send a whole section elsewhere, choose it here. One student can be moved from the students list after activation.",
+      "from": "Section",
+      "students": "Students",
+      "goesTo": "Goes to",
+      "sizeAfter": "Size after",
+      "sectionLabel": "{standard} · {section}",
+      "sectionWithSize": "{section} ({size})",
+      "automatic": "Same name (automatic)",
+      "selectLabel": "Section for the students of {section}",
+      "size": "{size} of {capacity}",
+      "overLimit": "Over the limit",
+      "noClass": "No class or section in the new year",
+      "alsoGoes": "{count, plural, one {# student goes} other {# students go}} to {section}",
+      "alsoNoClass": "{count, plural, one {# student has} other {# students have}} no class or section in the new year",
+      "capacityWarning": "{count, plural, one {# section} other {# sections}} would go over the limit of {capacity} students: {sections}. The students are placed anyway. Add a section in the new year, or change where a section goes.",
+      "saved": "Section choice saved"
+    }
   },
   "archive": "Archive",
   "archiveTitle": "Archive Academic Year",

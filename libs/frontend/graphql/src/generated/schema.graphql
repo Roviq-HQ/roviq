@@ -122,6 +122,11 @@ type AcademicYearRolloverPreview {
   """
   completing: Int!
 
+  """
+  One line per source section and target section, source sections in class order, the largest group of a section first.
+  """
+  moves: [RolloverSectionMove!]!
+
   """Students placed in a higher class than last year."""
   movingUp: Int!
 
@@ -132,6 +137,9 @@ type AcademicYearRolloverPreview {
 
   """Students recorded as GRADUATED or TRANSFERRED."""
   notCarried: Int!
+
+  """Every section of the year being activated, in class order."""
+  sections: [RolloverSectionLoad!]!
 
   """Students placed in the same class as last year."""
   staying: Int!
@@ -4753,6 +4761,11 @@ type Mutation {
   """
   setPromotionDecisions(input: SetPromotionDecisionsInput!): Int!
 
+  """
+  Chooses where the rollover sends the students of sections of the active year when this year is activated. Sets the override of each section named in entries and leaves the others; returns the new preview.
+  """
+  setRolloverSectionMap(input: SetRolloverSectionMapInput!): AcademicYearRolloverPreview!
+
   """Set or remove a staff member profile picture."""
   setStaffPhoto(
     """
@@ -6456,6 +6469,62 @@ type Role {
   primaryNavSlugs: [String!]!
 }
 
+"""
+A section of the year being activated and what the rollover would add to it.
+"""
+type RolloverSectionLoad {
+  """
+  The institute's hard limit per section. The section is over it when currentStrength + incoming is greater. The rollover places the students anyway.
+  """
+  capacity: Int!
+
+  """Students already in the section."""
+  currentStrength: Int!
+
+  """Students the rollover would place in the section."""
+  incoming: Int!
+  sectionId: ID!
+  sectionName: I18nText!
+  standardId: ID!
+  standardName: I18nText!
+}
+
+"""
+Where the year rollover sends the students of one section of the active year, in place of the section with the same name.
+"""
+input RolloverSectionMapEntryInput {
+  """A section of the currently active year."""
+  fromSectionId: ID!
+
+  """
+  A section of the year being activated. Used only for students whose class in that year is this section's class. Null removes the override.
+  """
+  toSectionId: ID
+}
+
+"""
+Students of one section of the active year who would go to one section of the year being activated.
+"""
+type RolloverSectionMove {
+  fromSectionId: ID!
+  fromSectionName: I18nText!
+  fromStandardName: I18nText!
+
+  """The target section was chosen with setRolloverSectionMap."""
+  overridden: Boolean!
+  students: Int!
+
+  """
+  Null when that class has no section: these students would not be placed.
+  """
+  toSectionId: ID
+
+  """
+  Null when the students' class does not exist in the year being activated.
+  """
+  toStandardId: ID
+}
+
 """Preview result from dry-run rule evaluation"""
 type RulePreviewResult {
   count: Int!
@@ -6590,6 +6659,17 @@ input SetPromotionDecisionsInput {
 
   """1 to 500 student year record ids (studentAcademicId)."""
   studentAcademicIds: [ID!]!
+}
+
+"""
+Sets the override of each section named in entries and leaves the other sections as they are.
+"""
+input SetRolloverSectionMapInput {
+  """The year that will be activated. Not the active year."""
+  academicYearId: ID!
+
+  """At most 500 entries, each source section once."""
+  entries: [RolloverSectionMapEntryInput!]!
 }
 
 """

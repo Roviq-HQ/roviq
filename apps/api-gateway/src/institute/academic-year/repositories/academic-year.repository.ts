@@ -1,7 +1,13 @@
 import type { InstituteType } from '@roviq/common-types';
 import type { AcademicYearStatus } from '@roviq/database';
-import type { YearRolloverCounts } from '../../student/year-rollover';
-import type { AcademicYearRecord, CreateAcademicYearData, UpdateAcademicYearData } from './types';
+import type {
+  AcademicYearRecord,
+  CreateAcademicYearData,
+  RolloverPreviewRecord,
+  RolloverSectionMapEntry,
+  SetRolloverSectionMapResult,
+  UpdateAcademicYearData,
+} from './types';
 
 export abstract class AcademicYearRepository {
   abstract findById(id: string): Promise<AcademicYearRecord | null>;
@@ -18,8 +24,16 @@ export abstract class AcademicYearRepository {
   abstract activate(id: string, previousActiveId: string | null): Promise<AcademicYearRecord>;
   abstract updateStatus(id: string, status: AcademicYearStatus): Promise<AcademicYearRecord>;
   abstract softDelete(id: string): Promise<void>;
-  /** Counts what activating `targetYearId` would do to students of the active year; writes nothing. */
-  abstract previewRollover(targetYearId: string): Promise<YearRolloverCounts>;
+  /** What activating `targetYearId` would do to students of the active year; writes nothing. */
+  abstract previewRollover(targetYearId: string): Promise<RolloverPreviewRecord>;
+  /**
+   * Sets or removes the override of each named section of the active year, after reading the
+   * year and every section under the caller's institute. Nothing is written unless all pass.
+   */
+  abstract setRolloverSectionMap(
+    targetYearId: string,
+    entries: RolloverSectionMapEntry[],
+  ): Promise<SetRolloverSectionMapResult>;
   /** The institute's type, or null when the tenant has no institute row. */
   abstract findInstituteType(tenantId: string): Promise<InstituteType | null>;
 }

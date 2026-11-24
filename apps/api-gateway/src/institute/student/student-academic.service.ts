@@ -21,12 +21,7 @@ import type {
   SectionCapacityRecord,
   SectionStrengthNorms,
 } from './repositories/types';
-
-const DEFAULT_SECTION_NORMS: SectionStrengthNorms = {
-  optimal: 40,
-  hardMax: 45,
-  exemptionAllowed: true,
-};
+import { DEFAULT_SECTION_NORMS } from './section-norms';
 
 @Injectable()
 export class StudentAcademicService {

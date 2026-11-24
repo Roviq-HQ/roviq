@@ -215,11 +215,22 @@ or RE_ENROLLED, the row's `promotion_status` decides the target level (`numeric_
 | `PENDING` or none in a COACHING institute; `DETAINED` | The same level |
 | `GRADUATED`, `TRANSFERRED` | No row (`notCarried`) |
 
-The target level is matched to the new year's standard with that `numeric_order`. The student
-keeps their section: they go into that standard's live section whose English name
-(`name->>'en'`, trimmed, case-insensitive) equals their previous-year section's, so 5-B moves to
-6-B and a detained 5-B student stays in 5-B. When the previous section is gone or no section of
-that name exists, or for ties, the section with the lowest `display_order` (then id) is used.
+The target level is matched to the new year's standard with that `numeric_order`. The section
+in that standard is chosen in this order:
+
+1. The section the admin mapped the student's previous section to: a live row of
+   `year_rollover_section_map` for the year being activated, used only when its target is a live
+   section of that standard. An override of 5-B to 6-C therefore does not move a detained 5-B
+   student.
+2. The live section whose English name (`name->>'en'`, trimmed, case-insensitive) equals the
+   previous section's, so 5-B moves to 6-B and a detained 5-B student stays in 5-B.
+3. The section with the lowest `display_order` (then id).
+
+Section capacity is not checked. The function also returns `moves`: the number of students per
+previous section and target section, from which the preview builds its per-section sizes.
+`setRolloverSectionMap` reads both sections under the caller's institute before storing a row,
+and a trigger on the table refuses a row whose sections are not of the row's institute or whose
+target section is not in the row's year.
 There is no capacity check. The insert is `ON CONFLICT
 DO NOTHING` on the live `(student_profile_id, academic_year_id)` index, so redelivery is safe.
 The handler logs one line with the counts: `movingUp`, `staying`, `completing` (top level, no

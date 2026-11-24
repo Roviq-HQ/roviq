@@ -8,9 +8,11 @@ import {
 import { EventBusService } from '@roviq/event-bus';
 import { EVENT_PATTERNS } from '@roviq/nats-jetstream';
 import { getRequestContext } from '@roviq/request-context';
-import type { YearRolloverCounts } from '../student/year-rollover';
+import { DEFAULT_SECTION_NORMS } from '../student/section-norms';
 import type { CreateAcademicYearInput } from './dto/create-academic-year.input';
+import type { RolloverSectionMapEntryInput } from './dto/set-rollover-section-map.input';
 import type { UpdateAcademicYearInput } from './dto/update-academic-year.input';
+import type { AcademicYearRolloverPreview } from './models/academic-year-rollover-preview.model';
 import { AcademicYearRepository } from './repositories/academic-year.repository';
 import type { AcademicYearRecord } from './repositories/types';
 
@@ -171,9 +173,45 @@ export class AcademicYearService {
     return record;
   }
 
-  async previewRollover(id: string): Promise<YearRolloverCounts> {
+  async previewRollover(id: string): Promise<AcademicYearRolloverPreview> {
     await this.findById(id);
-    return this.repo.previewRollover(id);
+    const { counts, sections, moves, hardMax } = await this.repo.previewRollover(id);
+    const capacity = hardMax ?? DEFAULT_SECTION_NORMS.hardMax;
+    return { ...counts, sections: sections.map((s) => ({ ...s, capacity })), moves };
+  }
+
+  async setRolloverSectionMap(
+    id: string,
+    entries: RolloverSectionMapEntryInput[],
+  ): Promise<AcademicYearRolloverPreview> {
+    const result = await this.repo.setRolloverSectionMap(
+      id,
+      entries.map((e) => ({ fromSectionId: e.fromSectionId, toSectionId: e.toSectionId ?? null })),
+    );
+    switch (result.kind) {
+      case 'year_not_found':
+        throw new BusinessException(
+          ErrorCode.ACADEMIC_YEAR_NOT_FOUND,
+          `Academic year ${id} not found`,
+        );
+      case 'year_is_active':
+        throw new BusinessException(
+          ErrorCode.YEAR_ALREADY_ACTIVE,
+          'This academic year is already active',
+        );
+      case 'no_active_year':
+        throw new BusinessException(
+          ErrorCode.ACADEMIC_YEAR_NOT_ACTIVE,
+          'No academic year is active: there are no students to roll over',
+        );
+      case 'section_not_found':
+        throw new BusinessException(
+          ErrorCode.SECTION_NOT_FOUND,
+          `Section ${result.sectionId} not found in the expected academic year`,
+        );
+      case 'ok':
+        return this.previewRollover(id);
+    }
   }
 
   async archive(id: string): Promise<AcademicYearRecord> {

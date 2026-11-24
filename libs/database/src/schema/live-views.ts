@@ -66,6 +66,7 @@ import { timetableEntries } from './tenant/timetable/timetable-entries';
 import { timetablePeriods } from './tenant/timetable/timetable-periods';
 import { timetableSections } from './tenant/timetable/timetable-sections';
 import { timetables } from './tenant/timetable/timetables';
+import { yearRolloverSectionMap } from './tenant/year-rollover-section-map';
 import { botProfiles } from './user-profiles/bot-profiles';
 import { guardianProfiles } from './user-profiles/guardian-profiles';
 import { privacyNotices } from './user-profiles/privacy-notices';
@@ -334,4 +335,7 @@ export const groupMembersLive = liveView('group_members_live').as((qb) =>
 );
 export const groupChildrenLive = liveView('group_children_live').as((qb) =>
   qb.select().from(groupChildren).where(isNull(groupChildren.deletedAt)),
+);
+export const yearRolloverSectionMapLive = liveView('year_rollover_section_map_live').as((qb) =>
+  qb.select().from(yearRolloverSectionMap).where(isNull(yearRolloverSectionMap.deletedAt)),
 );

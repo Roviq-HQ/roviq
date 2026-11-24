@@ -4,6 +4,7 @@ import { GqlAuthGuard, InstituteScopeGuard } from '@roviq/auth-backend';
 import { AbilityGuard, CheckAbility } from '@roviq/casl';
 import { AcademicYearService } from './academic-year.service';
 import { CreateAcademicYearInput } from './dto/create-academic-year.input';
+import { SetRolloverSectionMapInput } from './dto/set-rollover-section-map.input';
 import { UpdateAcademicYearInput } from './dto/update-academic-year.input';
 import { AcademicYearModel } from './models/academic-year.model';
 import { AcademicYearRolloverPreview } from './models/academic-year-rollover-preview.model';
@@ -58,6 +59,17 @@ export class AcademicYearResolver {
     @Args('academicYearId', { type: () => ID }) academicYearId: string,
   ): Promise<AcademicYearRolloverPreview> {
     return this.academicYearService.previewRollover(academicYearId);
+  }
+
+  @Mutation(() => AcademicYearRolloverPreview, {
+    description:
+      'Chooses where the rollover sends the students of sections of the active year when this year is activated. Sets the override of each section named in entries and leaves the others; returns the new preview.',
+  })
+  @CheckAbility({ action: 'update', subject: 'AcademicYear' })
+  async setRolloverSectionMap(
+    @Args('input') input: SetRolloverSectionMapInput,
+  ): Promise<AcademicYearRolloverPreview> {
+    return this.academicYearService.setRolloverSectionMap(input.academicYearId, input.entries);
   }
 
   @Mutation(() => AcademicYearModel)

@@ -996,6 +996,18 @@ export const testIds = {
     activatePreview: 'academic-years-activate-preview',
     activatePreviewLine: (key: string) => `academic-years-activate-preview-${key}`,
     activatePreviewWarning: 'academic-years-activate-preview-warning',
+    activateSectionTable: 'academic-years-activate-section-table',
+    activateSectionRow: (fromSectionId: string) =>
+      `academic-years-activate-section-row-${fromSectionId}`,
+    activateSectionSelect: (fromSectionId: string) =>
+      `academic-years-activate-section-select-${fromSectionId}`,
+    activateSectionOption: (sectionId: string) =>
+      `academic-years-activate-section-option-${sectionId}`,
+    activateSectionSize: (fromSectionId: string) =>
+      `academic-years-activate-section-size-${fromSectionId}`,
+    activateSectionOther: (fromSectionId: string) =>
+      `academic-years-activate-section-other-${fromSectionId}`,
+    activateCapacityWarning: 'academic-years-activate-capacity-warning',
     activateConfirmBtn: 'academic-years-activate-confirm-btn',
     activateCancelBtn: 'academic-years-activate-cancel-btn',
   },

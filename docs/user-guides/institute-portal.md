@@ -110,8 +110,20 @@ The new academic year will be created in an inactive state.
 #### Activating an Academic Year
 
 1. Find the academic year you want to activate in the list.
-2. Click on it to open the detail view.
-3. Click **Activate**.
+2. Click **Activate** on its card. A dialog opens; nothing changes yet.
+3. Read **What happens to students**: how many students move up, stay in the same class, or
+   are not carried into the new year.
+4. Check **Where each section goes**. Each section of the current year has one row: its
+   students, the section they will go to, and how large that section will be against your
+   institute's limit per section. Students keep the section with the same name (5-B goes to
+   6-B). To send a whole section somewhere else, choose another section of the same class in
+   the **Goes to** list. The choice is saved at once. Choose **Same name (automatic)** to undo
+   it.
+5. If a warning lists sections that would go over the limit, add a section in the new year or
+   change where a section goes. The students are placed even when a section is over the limit.
+6. Click **Activate**.
+
+To move one student instead of a whole section, use the students list after activation.
 
 > **Important:** Only one academic year can be active at a time. Activating a new year does not automatically archive the previous one -- you must archive it separately.
 

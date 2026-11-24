@@ -33,5 +33,7 @@
   "STANDARD_NOT_FOUND": "That class was not found in this academic year. Refresh and try again.",
   "SECTION_NOT_FOUND": "That section was not found in the chosen class. Refresh and try again.",
   "MESSAGING_SENDER_NOT_FOUND": "That messaging sender was not found. Refresh and try again.",
-  "MESSAGING_SENDER_EXISTS": "A sender is already registered for this institute, or this number is already in use."
+  "MESSAGING_SENDER_EXISTS": "A sender is already registered for this institute, or this number is already in use.",
+  "ACADEMIC_YEAR_NOT_FOUND": "That academic year was not found. Refresh and try again.",
+  "ACADEMIC_YEAR_NOT_ACTIVE": "No academic year is active for this."
 }

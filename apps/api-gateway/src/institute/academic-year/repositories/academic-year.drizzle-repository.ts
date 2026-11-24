@@ -6,19 +6,30 @@ import {
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  instituteConfigsLive,
   institutesLive,
   mkAdminCtx,
   mkInstituteCtx,
+  sectionsLive,
   softDelete,
+  standardsLive,
   type TermConfig,
   withAdmin,
   withTenant,
+  yearRolloverSectionMap,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
-import { rollOverStudents, type YearRolloverCounts } from '../../student/year-rollover';
+import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { rollOverStudents } from '../../student/year-rollover';
 import { AcademicYearRepository } from './academic-year.repository';
-import type { AcademicYearRecord, CreateAcademicYearData, UpdateAcademicYearData } from './types';
+import type {
+  AcademicYearRecord,
+  CreateAcademicYearData,
+  RolloverPreviewRecord,
+  RolloverSectionMapEntry,
+  SetRolloverSectionMapResult,
+  UpdateAcademicYearData,
+} from './types';
 
 // Read projection — `academic_years_live` view excludes soft-deleted rows.
 const liveColumns = {
@@ -94,7 +105,7 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
     });
   }
 
-  async previewRollover(targetYearId: string): Promise<YearRolloverCounts> {
+  async previewRollover(targetYearId: string): Promise<RolloverPreviewRecord> {
     const tenantId = this.getTenantId();
     return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:academic-year'), async (tx) => {
       const [active] = await tx
@@ -103,20 +114,168 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
         .where(eq(academicYearsLive.isActive, true));
       if (!active) {
         return {
-          movingUp: 0,
-          staying: 0,
-          completing: 0,
-          notCarried: 0,
-          noClassInNewYear: 0,
-          alreadyPlaced: 0,
+          counts: {
+            movingUp: 0,
+            staying: 0,
+            completing: 0,
+            notCarried: 0,
+            noClassInNewYear: 0,
+            alreadyPlaced: 0,
+          },
+          sections: [],
+          moves: [],
+          hardMax: null,
         };
       }
-      return rollOverStudents(tx, {
+      const { counts, moves } = await rollOverStudents(tx, {
         tenantId,
         previousYearId: active.id,
         academicYearId: targetYearId,
         write: false,
       });
+
+      const sectionColumns = {
+        sectionId: sectionsLive.id,
+        standardId: sectionsLive.standardId,
+        standardName: standardsLive.name,
+        sectionName: sectionsLive.name,
+        currentStrength: sectionsLive.currentStrength,
+      };
+      const classOrder = [
+        asc(standardsLive.numericOrder),
+        asc(sectionsLive.displayOrder),
+        asc(sectionsLive.id),
+      ];
+      const targetSections = await tx
+        .select(sectionColumns)
+        .from(sectionsLive)
+        .innerJoin(standardsLive, eq(standardsLive.id, sectionsLive.standardId))
+        .where(eq(sectionsLive.academicYearId, targetYearId))
+        .orderBy(...classOrder);
+      const fromIds = [...new Set(moves.map((m) => m.fromSectionId))];
+      const fromSections =
+        fromIds.length === 0
+          ? []
+          : await tx
+              .select(sectionColumns)
+              .from(sectionsLive)
+              .innerJoin(standardsLive, eq(standardsLive.id, sectionsLive.standardId))
+              .where(inArray(sectionsLive.id, fromIds))
+              .orderBy(...classOrder);
+      const [config] = await tx
+        .select({ norms: instituteConfigsLive.sectionStrengthNorms })
+        .from(instituteConfigsLive)
+        .limit(1);
+
+      const incoming = new Map<string, number>();
+      for (const move of moves) {
+        if (move.toSectionId) {
+          incoming.set(move.toSectionId, (incoming.get(move.toSectionId) ?? 0) + move.students);
+        }
+      }
+      return {
+        counts,
+        sections: targetSections.map((s) => ({ ...s, incoming: incoming.get(s.sectionId) ?? 0 })),
+        // Source sections in class order; the largest group of a section first.
+        moves: fromSections.flatMap((from) =>
+          moves
+            .filter((m) => m.fromSectionId === from.sectionId)
+            .sort((a, b) => b.students - a.students)
+            .map((m) => ({
+              ...m,
+              fromStandardName: from.standardName,
+              fromSectionName: from.sectionName,
+            })),
+        ),
+        hardMax: config?.norms?.hardMax ?? null,
+      };
+    });
+  }
+
+  async setRolloverSectionMap(
+    targetYearId: string,
+    entries: RolloverSectionMapEntry[],
+  ): Promise<SetRolloverSectionMapResult> {
+    const tenantId = this.getTenantId();
+    const { userId } = getRequestContext();
+    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:academic-year'), async (tx) => {
+      // Every id is read through RLS first: a foreign key would accept another institute's row.
+      const years = await tx
+        .select({ id: academicYearsLive.id, isActive: academicYearsLive.isActive })
+        .from(academicYearsLive)
+        .where(or(eq(academicYearsLive.id, targetYearId), eq(academicYearsLive.isActive, true)));
+      const target = years.find((y) => y.id === targetYearId);
+      if (!target) return { kind: 'year_not_found' };
+      if (target.isActive) return { kind: 'year_is_active' };
+      const active = years.find((y) => y.isActive);
+      if (!active) return { kind: 'no_active_year' };
+
+      const toSet = entries.filter(
+        (e): e is { fromSectionId: string; toSectionId: string } => e.toSectionId !== null,
+      );
+      const sectionIds = [
+        ...new Set([...entries.map((e) => e.fromSectionId), ...toSet.map((e) => e.toSectionId)]),
+      ];
+      if (sectionIds.length === 0) return { kind: 'ok' };
+      const found = await tx
+        .select({ id: sectionsLive.id, academicYearId: sectionsLive.academicYearId })
+        .from(sectionsLive)
+        .where(inArray(sectionsLive.id, sectionIds));
+      const yearOf = new Map(found.map((s) => [s.id, s.academicYearId]));
+      for (const entry of entries) {
+        if (yearOf.get(entry.fromSectionId) !== active.id) {
+          return { kind: 'section_not_found', sectionId: entry.fromSectionId };
+        }
+        if (entry.toSectionId !== null && yearOf.get(entry.toSectionId) !== targetYearId) {
+          return { kind: 'section_not_found', sectionId: entry.toSectionId };
+        }
+      }
+
+      const now = new Date();
+      const toClear = entries.filter((e) => e.toSectionId === null).map((e) => e.fromSectionId);
+      if (toClear.length > 0) {
+        await tx
+          .update(yearRolloverSectionMap)
+          .set({
+            deletedAt: now,
+            deletedBy: userId,
+            updatedAt: now,
+            updatedBy: userId,
+            version: sql`${yearRolloverSectionMap.version} + 1`,
+          })
+          .where(
+            and(
+              eq(yearRolloverSectionMap.academicYearId, targetYearId),
+              inArray(yearRolloverSectionMap.fromSectionId, toClear),
+              isNull(yearRolloverSectionMap.deletedAt),
+            ),
+          );
+      }
+      if (toSet.length > 0) {
+        await tx
+          .insert(yearRolloverSectionMap)
+          .values(
+            toSet.map((e) => ({
+              tenantId,
+              academicYearId: targetYearId,
+              fromSectionId: e.fromSectionId,
+              toSectionId: e.toSectionId,
+              createdBy: userId,
+              updatedBy: userId,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [yearRolloverSectionMap.academicYearId, yearRolloverSectionMap.fromSectionId],
+            targetWhere: sql`${yearRolloverSectionMap.deletedAt} IS NULL`,
+            set: {
+              toSectionId: sql`excluded.to_section_id`,
+              updatedAt: now,
+              updatedBy: userId,
+              version: sql`${yearRolloverSectionMap.version} + 1`,
+            },
+          });
+      }
+      return { kind: 'ok' };
     });
   }
 

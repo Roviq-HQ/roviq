@@ -33,19 +33,40 @@ export interface YearRolloverParams {
   write: boolean;
 }
 
-type CountRow = { [K in keyof YearRolloverCounts]: number } & Record<string, unknown>;
+/** Students of one section of the previous year who go (or would go) to one section. */
+export interface YearRolloverMove {
+  fromSectionId: string;
+  /** Null when the target level has no standard in the new year. */
+  toStandardId: string | null;
+  /** Null when the target standard has no section: these students are not placed. */
+  toSectionId: string | null;
+  students: number;
+  /** The section came from `year_rollover_section_map`, not from the name rule. */
+  overridden: boolean;
+}
+
+export interface YearRolloverResult {
+  counts: YearRolloverCounts;
+  moves: YearRolloverMove[];
+}
+
+type ResultRow = { [K in keyof YearRolloverCounts]: number } & {
+  moves: YearRolloverMove[];
+} & Record<string, unknown>;
 
 /**
  * Year-end promotion rule, shared by the `ACADEMIC_YEAR.activated` consumer and the activation
  * preview. Must run inside `withTenant`: every read goes through RLS-filtered `*_live` views.
  * Standards belong to one year, so the target level (a `numeric_order`) is matched to the new
- * year's standard with that order; the student keeps a section of the same English name there,
- * else goes into its first section.
+ * year's standard with that order. There the student goes to the section the admin mapped the
+ * old section to (`year_rollover_section_map`, only when it is a section of that standard), else
+ * keeps a section of the same English name, else goes into the first section. Section capacity
+ * is not checked: an activation must not strand a student.
  */
 export async function rollOverStudents(
   tx: DrizzleDB,
   { tenantId, previousYearId, academicYearId, write }: YearRolloverParams,
-): Promise<YearRolloverCounts> {
+): Promise<YearRolloverResult> {
   const statuses = sql.join(
     CONTINUING_STATUSES.map((s) => sql`${s}`),
     sql`, `,
@@ -62,7 +83,7 @@ export async function rollOverStudents(
         RETURNING student_profile_id`
     : sql`SELECT student_profile_id FROM placeable`;
 
-  const result = await tx.execute<CountRow>(sql`
+  const result = await tx.execute<ResultRow>(sql`
     WITH classified AS (
       SELECT sa.student_profile_id,
              cs.numeric_order AS current_order,
@@ -85,6 +106,8 @@ export async function rollOverStudents(
              END AS rule,
              pts.numeric_order AS explicit_order,
              lower(btrim(psec.name->>'en')) AS section_key,
+             sa.section_id AS from_section_id,
+             map.to_section_id AS override_section_id,
              -- Both years: an institute that adds a class this year has no higher level last year.
              (SELECT min(hs.numeric_order) FROM standards_live hs
                WHERE hs.academic_year_id IN (${previousYearId}::uuid, ${academicYearId}::uuid)
@@ -94,6 +117,8 @@ export async function rollOverStudents(
       JOIN standards_live cs ON cs.id = sa.standard_id
       LEFT JOIN standards_live pts ON pts.id = sa.promoted_to_standard_id
       LEFT JOIN sections_live psec ON psec.id = sa.section_id
+      LEFT JOIN year_rollover_section_map_live map
+        ON map.academic_year_id = ${academicYearId}::uuid AND map.from_section_id = sa.section_id
       WHERE sa.academic_year_id = ${previousYearId}::uuid
         AND sp.academic_status IN (${statuses})
         AND EXISTS (SELECT 1 FROM academic_years_live ay WHERE ay.id = ${academicYearId}::uuid)
@@ -109,15 +134,17 @@ export async function rollOverStudents(
       WHERE NOT c.not_carried AND NOT c.already_placed
     ),
     matched AS (
-      SELECT t.student_profile_id, t.current_order, t.target_order,
-             ns.id AS standard_id, sec.id AS section_id
+      SELECT t.student_profile_id, t.current_order, t.target_order, t.from_section_id,
+             ns.id AS standard_id, sec.id AS section_id,
+             COALESCE(sec.id = t.override_section_id, false) AS overridden
       FROM targeted t
       LEFT JOIN standards_live ns
         ON ns.academic_year_id = ${academicYearId}::uuid AND ns.numeric_order = t.target_order
       LEFT JOIN LATERAL (
         SELECT s.id FROM sections_live s
         WHERE s.standard_id = ns.id AND s.academic_year_id = ${academicYearId}::uuid
-        ORDER BY COALESCE(lower(btrim(s.name->>'en')) = t.section_key, false) DESC,
+        ORDER BY COALESCE(s.id = t.override_section_id, false) DESC,
+                 COALESCE(lower(btrim(s.name->>'en')) = t.section_key, false) DESC,
                  s.display_order, s.id
         LIMIT 1
       ) sec ON true
@@ -139,15 +166,28 @@ export async function rollOverStudents(
       (SELECT count(*) FROM classified WHERE not_carried)::int AS "notCarried",
       (SELECT count(*) FROM matched WHERE section_id IS NULL)::int AS "noClassInNewYear",
       ((SELECT count(*) FROM classified WHERE already_placed AND NOT not_carried)
-        + (SELECT count(*) FROM placeable) - (SELECT count(*) FROM placed))::int AS "alreadyPlaced"
+        + (SELECT count(*) FROM placeable) - (SELECT count(*) FROM placed))::int AS "alreadyPlaced",
+      (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                'fromSectionId', g.from_section_id, 'toStandardId', g.standard_id,
+                'toSectionId', g.section_id, 'students', g.students,
+                'overridden', g.overridden)), '[]'::jsonb)
+         FROM (
+           SELECT m.from_section_id, m.standard_id, m.section_id, count(*)::int AS students,
+                  bool_or(m.overridden) AS overridden
+           FROM (SELECT * FROM placed UNION ALL SELECT * FROM matched WHERE section_id IS NULL) m
+           GROUP BY m.from_section_id, m.standard_id, m.section_id
+         ) g) AS "moves"
   `);
   const [row] = result.rows;
   return {
-    movingUp: row.movingUp,
-    staying: row.staying,
-    completing: row.completing,
-    notCarried: row.notCarried,
-    noClassInNewYear: row.noClassInNewYear,
-    alreadyPlaced: row.alreadyPlaced,
+    counts: {
+      movingUp: row.movingUp,
+      staying: row.staying,
+      completing: row.completing,
+      notCarried: row.notCarried,
+      noClassInNewYear: row.noClassInNewYear,
+      alreadyPlaced: row.alreadyPlaced,
+    },
+    moves: row.moves,
   };
 }

@@ -16,6 +16,7 @@ import { AlertTriangle, Zap } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { RolloverSectionTable } from './rollover-section-table';
 import {
   type AcademicYear,
   type RolloverPreview,
@@ -66,7 +67,10 @@ export function ActivateYearDialog({ year }: { year: Pick<AcademicYear, 'id' | '
         <Zap className="size-3.5" aria-hidden="true" />
         {t('activate')}
       </Button>
-      <DialogContent data-testid={instituteAcademicYears.activateDialog}>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+        data-testid={instituteAcademicYears.activateDialog}
+      >
         <DialogHeader>
           <DialogTitle>{t('activateTitle')}</DialogTitle>
           <DialogDescription>{t('activateConfirm', { year: year.label })}</DialogDescription>
@@ -81,7 +85,10 @@ export function ActivateYearDialog({ year }: { year: Pick<AcademicYear, 'id' | '
           {previewLoading || !preview ? (
             <Skeleton className="h-16 w-full" />
           ) : (
-            <RolloverPreviewLines preview={preview} />
+            <>
+              <RolloverPreviewLines preview={preview} />
+              <RolloverSectionTable academicYearId={year.id} preview={preview} />
+            </>
           )}
         </section>
         <DialogFooter>
