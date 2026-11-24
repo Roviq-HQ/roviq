@@ -572,6 +572,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 6. accountant ───────────────────────────────────────
   accountant: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'Fee' },
     { action: 'read', subject: 'TC' },
@@ -649,6 +651,7 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 9. activity_teacher ─────────────────────────────────
   activity_teacher: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'Activity' },
     { action: 'read', subject: 'Section' },
@@ -659,6 +662,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 10. lab_assistant ───────────────────────────────────
   lab_assistant: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     {
       action: 'read',
       subject: 'Student',
@@ -673,6 +678,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 11. librarian ───────────────────────────────────────
   librarian: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'LibraryTransaction' },
     { action: 'read', subject: 'AcademicYear' },
@@ -682,6 +689,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 12. transport_incharge ──────────────────────────────
   transport_incharge: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'BusRoute' },
     { action: 'read', subject: 'AcademicYear' },
@@ -691,6 +700,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 13. hostel_warden ───────────────────────────────────
   hostel_warden: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'HostelRoom' },
     { action: 'read', subject: 'AcademicYear' },
@@ -700,6 +711,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 14. counselor — manages confidential notes (NOT visible to principal) ──
   counselor: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'manage', subject: 'CounselorNotes' },
     { action: 'read', subject: 'Student' },
     { action: 'read', subject: 'HealthRecord' },
@@ -710,6 +723,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 15. sports_coach ────────────────────────────────────
   sports_coach: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student' },
     { action: 'manage', subject: 'SportsTeam' },
     { action: 'read', subject: 'AcademicYear' },
@@ -755,6 +770,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 19. nurse — reads student medical info ──────────────
   nurse: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     { action: 'read', subject: 'Student', fields: ['id', 'firstName', 'lastName', 'medicalInfo'] },
     { action: 'manage', subject: 'HealthRecord' },
     { action: 'read', subject: 'AcademicYear' },
@@ -764,6 +781,8 @@ export const DEFAULT_ROLE_ABILITIES: Record<DefaultRole, AbilityRule[]> = {
   // ── 20. support_staff — reads student name + photo only ──
   support_staff: [
     ...SELF_SERVICE_ABILITIES,
+    { action: 'read', subject: 'Standard' },
+    { action: 'read', subject: 'Section' },
     {
       action: 'read',
       subject: 'Student',

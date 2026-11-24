@@ -222,6 +222,18 @@ describe('support_staff', () => {
   });
 });
 
+// The student list filters by class and section: a role that lists students must read them.
+describe('class structure for student readers', () => {
+  it.each(
+    Object.keys(DEFAULT_ROLE_ABILITIES) as (keyof typeof DEFAULT_ROLE_ABILITIES)[],
+  )('%s reads standards and sections when it reads students', (role) => {
+    const ability = abilityForRole(role);
+    if (!ability.can('read', 'Student')) return;
+    expect(ability.can('read', 'Standard')).toBe(true);
+    expect(ability.can('read', 'Section')).toBe(true);
+  });
+});
+
 // ── 18: cross-tenant isolation ────────────────────────────
 
 describe('cross-tenant', () => {
