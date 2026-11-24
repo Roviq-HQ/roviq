@@ -25,6 +25,7 @@ This guide is for institute administrators, teachers, clerks, and staff who use 
 7. [Settings](#settings)
    - [Institute Settings](#institute-settings)
    - [Notification Preferences](#notification-preferences)
+   - [Notification Delivery](#notification-delivery)
    - [Sessions](#sessions)
 8. [Audit Logs](#audit-logs)
 9. [Account (Passkey Manager)](#account-passkey-manager)
@@ -442,6 +443,22 @@ Control which notifications you receive and through which channels.
 3. Toggle each cell on or off based on your preference.
 
 Changes are saved automatically.
+
+---
+
+### Notification Delivery
+
+See who received each notification the institute sent, and what happened on each channel. The page is open to the institute admin and the principal.
+
+1. In the sidebar, click **Notification delivery** (under the System group), or use the link on the notification settings page.
+2. Each row is one message to one person: the time, the notification, the student it is about, the recipient and their relationship to the student, and one column per channel (push alert, WhatsApp, SMS, email).
+3. A channel shows **Read**, **Delivered**, **Sent**, **Failed**, **Not sent** or **Waiting**. Under Failed, Not sent and Waiting the reason is given in words, for example "The guardian has not agreed to messages on this channel" or "No phone number or email on record". A dash means the channel was not part of this message.
+4. Use the filters above the table (module, notification, channel, state, dates, **Important only**, **Not delivered only**). The filters stay in the page address, so a refreshed or shared link shows the same list.
+5. Click **Export CSV** to download the rows shown.
+
+**Who was notified.** A student's page and each row of a student's attendance history have a **Who was notified** link. It opens this page filtered to that student or to that attendance session.
+
+"Read" is shown only where the provider reports it. A message that had already arrived another way is shown as "Not sent" on the remaining channels, with that reason.
 
 ---
 
