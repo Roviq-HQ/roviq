@@ -40,6 +40,46 @@
       "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d"
     }
   },
+  "adminInstituteGroups.new.code": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe"
+    }
+  },
+  "adminInstituteGroups.new.registrationNumber": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe"
+    }
+  },
+  "adminInstituteGroups.new.registrationState": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe"
+    }
+  },
+  "adminInstituteGroups.new.type": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/admin/(dashboard)/institute-groups/new/page.tsx": "897cf2f8241cf5fe",
+      "libs/shared/common-types/src/lib/enums/institute-group.ts": "285053dfa4a00221"
+    }
+  },
+  "adminInstitutes.new.group": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "libs/database/src/schema/tenant/institute-groups.ts": "a978cdf4e353eb8d"
+    }
+  },
+  "adminInstitutes.new.reseller": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394"
+    }
+  },
   "admission.convert.academicYear": {
     "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
     "targets": {
@@ -218,6 +258,182 @@
     "targets": {
       "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts": "d3fb24649fabde8c",
       "libs/shared/common-types/src/lib/compliance/export-eligibility.ts#eligibleComplianceReportTypes": "cc7d735fbadbdf21"
+    }
+  },
+  "institutes.new.board": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43"
+    }
+  },
+  "institutes.new.code": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
+      "libs/database/src/schema/tenant/institutes.ts": "44e731c5c9d98c44"
+    }
+  },
+  "institutes.new.firstAdmin": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43"
+    }
+  },
+  "institutes.new.structureFramework": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
+      "libs/shared/common-types/src/lib/enums/institute.ts": "38613559a9bfc4a5"
+    }
+  },
+  "institutes.new.type": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/admin/institute/dto/admin-create-institute.input.ts": "4412ed4b226a6de2",
+      "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
+      "apps/web/src/app/[locale]/admin/(dashboard)/institutes/new/page.tsx": "9cd147fa75180394",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43",
+      "libs/database/src/schema/tenant/institutes.ts": "44e731c5c9d98c44",
+      "libs/shared/common-types/src/lib/enums/institute.ts": "38613559a9bfc4a5"
+    }
+  },
+  "resellerBilling.gateway.defaultGateway": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+    }
+  },
+  "resellerBilling.gateway.keyId": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+    }
+  },
+  "resellerBilling.gateway.keySecret": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+    }
+  },
+  "resellerBilling.gateway.testMode": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+    }
+  },
+  "resellerBilling.gateway.vpa": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+    }
+  },
+  "resellerBilling.gateway.webhookSecret": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/gateway-configs/page.tsx": "6e125c04f45882bb"
+    }
+  },
+  "resellerBilling.plan.amount": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "01bf805d057be470"
+    }
+  },
+  "resellerBilling.plan.code": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "01bf805d057be470"
+    }
+  },
+  "resellerBilling.plan.interval": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "01bf805d057be470"
+    }
+  },
+  "resellerBilling.plan.limits": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "01bf805d057be470"
+    }
+  },
+  "resellerBilling.plan.trialDays": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/plans/plan-form-dialog.tsx": "01bf805d057be470"
+    }
+  },
+  "resellerBilling.recordPayment.collectionDate": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/record-payment-dialog.tsx": "34e39013ead0c460"
+    }
+  },
+  "resellerBilling.recordPayment.method": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/record-payment-dialog.tsx": "34e39013ead0c460"
+    }
+  },
+  "resellerBilling.recordPayment.receiptNumber": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/record-payment-dialog.tsx": "34e39013ead0c460"
+    }
+  },
+  "resellerBilling.refund.amount": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/refund-dialog.tsx": "ab6535c10e8de82a"
+    }
+  },
+  "resellerBilling.refund.reason": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/invoices/refund-dialog.tsx": "ab6535c10e8de82a"
+    }
+  },
+  "resellerBilling.subscriptionActions.proration": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/subscriptions/change-plan-dialog.tsx": "0365559eb5dd5bfc"
+    }
+  },
+  "resellerBilling.subscriptionActions.reason": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/billing/subscriptions/subscription-action-dialog.tsx": "eee85948a1770417"
+    }
+  },
+  "resellerInstitutes.new.group": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/api-gateway/src/reseller/institute/dto/reseller-create-institute-request.input.ts": "ce8b766c27204696",
+      "apps/web/src/app/[locale]/reseller/(dashboard)/institutes/new/page.tsx": "14b20289b7180d43"
+    }
+  },
+  "resellerSettings.branding.customCss": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/settings/branding/page.tsx": "14155d6b7d2b4316"
+    }
+  },
+  "resellerSettings.branding.primaryColor": {
+    "reviewedReason": "moved to or rewritten in the rich layout; behaviour unchanged",
+    "targets": {
+      "apps/web/src/app/[locale]/reseller/(dashboard)/settings/branding/page.tsx": "14155d6b7d2b4316"
     }
   },
   "staff.new.department": {
