@@ -10,6 +10,9 @@ import {
 } from '@roviq/ui/components/ui/select';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
 import { FieldLabelWithInfo } from '@roviq/ui/form/fields/field-label-with-info';
+import type { FieldHelpTopic, HelpText } from '@roviq/ui/form/help/field-help';
+import { useFieldHelpIds } from '@roviq/ui/form/help/use-field-help-ids';
+import { useHelpText } from '@roviq/ui/form/help/use-help-text';
 import { useFieldContext } from '@roviq/ui/form/use-app-form';
 import type { ReactNode } from 'react';
 
@@ -29,6 +32,8 @@ export interface SelectFieldProps<TValue extends string = string> {
    * a custom popover, hover-card, or drawer trigger without an API change.
    */
   info?: ReactNode;
+  /** Help topic from `apps/web/src/help`; replaces `info`. */
+  help?: FieldHelpTopic;
   placeholder?: string;
   testId?: string;
   disabled?: boolean;
@@ -51,6 +56,7 @@ export function SelectField<TValue extends string = string>({
   options,
   description,
   info,
+  help,
   placeholder,
   testId,
   disabled,
@@ -62,9 +68,25 @@ export function SelectField<TValue extends string = string>({
   const errors = fieldErrorMessages(field);
   const invalid = errors.length > 0;
   const value = typeof field.state.value === 'string' ? field.state.value : '';
+  const optionLabels = Object.fromEntries(
+    options.flatMap((opt) => (typeof opt.label === 'string' ? [[opt.value, opt.label]] : [])),
+  );
+  const ids = useFieldHelpIds({
+    name: field.name,
+    help,
+    hasDescription: Boolean(description),
+    invalid,
+  });
   return (
     <Field data-invalid={invalid || undefined}>
-      <FieldLabelWithInfo htmlFor={field.name} info={info} required={required}>
+      <FieldLabelWithInfo
+        htmlFor={field.name}
+        info={info}
+        help={help}
+        optionLabels={optionLabels}
+        hintId={ids.hintId}
+        required={required}
+      >
         {label}
       </FieldLabelWithInfo>
       <Select
@@ -83,6 +105,7 @@ export function SelectField<TValue extends string = string>({
           id={field.name}
           onBlur={field.handleBlur}
           aria-invalid={invalid || undefined}
+          aria-describedby={ids.describedBy}
           aria-required={required || undefined}
           data-testid={testId}
         >
@@ -90,14 +113,35 @@ export function SelectField<TValue extends string = string>({
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+            <SelectItem
+              key={opt.value}
+              value={opt.value}
+              disabled={opt.disabled}
+              description={
+                help?.options?.[opt.value] ? (
+                  <HelpTextLine text={help.options[opt.value]} values={help.values} />
+                ) : undefined
+              }
+            >
               {opt.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      {description && <FieldDescription>{description}</FieldDescription>}
-      {invalid && <FieldError errors={errors} />}
+      {description && <FieldDescription id={ids.descriptionId}>{description}</FieldDescription>}
+      {invalid && <FieldError id={ids.errorId} errors={errors} />}
     </Field>
   );
+}
+
+/** One help text in the active locale; only mounted when there is help, so plain selects need no intl context. */
+function HelpTextLine({
+  text,
+  values,
+}: {
+  text: HelpText | undefined;
+  values?: Readonly<Record<string, string | number>>;
+}) {
+  const resolve = useHelpText();
+  return text ? resolve(text, values) : null;
 }

@@ -9,10 +9,14 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldInfoPopover,
+  FieldHelpButton,
+  type FieldHelpTopic,
+  FieldHint,
   FieldLabel,
+  FieldLabelWithInfo,
   FieldLegend,
   FieldSet,
+  type FormHelpMode,
   fieldErrorMessages,
   Input,
   Separator,
@@ -24,8 +28,10 @@ import {
   SheetTitle,
   Spinner,
   useAppForm,
+  useFormHelpMode,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { academicYearHelp } from '@web/help/academic-years/academic-year.help';
 import { parseISO } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -95,6 +101,7 @@ function buildSchema(t: ReturnType<typeof useTranslations>) {
 export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) {
   const t = useTranslations('academicYears');
   const tCommon = useTranslations('common');
+  const helpMode = useFormHelpMode();
   const { format } = useFormatDate();
   const [mutate, { loading }] = useMutation(UPDATE_ACADEMIC_YEAR, {
     refetchQueries: ['AcademicYears'],
@@ -335,19 +342,13 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                     const value = typeof field.state.value === 'string' ? field.state.value : '';
                     return (
                       <Field data-invalid={invalid || undefined}>
-                        <span className="flex items-center gap-2">
-                          <FieldLabel htmlFor={field.name}>{t('label')}</FieldLabel>
-                          <FieldInfoPopover
-                            title={t('fieldHelp.labelTitle')}
-                            data-testid={instituteAcademicYears.editLabelInfo}
-                          >
-                            <p>{t('fieldHelp.labelBody')}</p>
-                            <p>
-                              <em>{t('fieldHelp.labelExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        </span>
-                        <FieldDescription>{t('labelDescription')}</FieldDescription>
+                        <FieldLabelWithInfo
+                          htmlFor={field.name}
+                          help={academicYearHelp.label}
+                          hintId={`${field.name}-hint`}
+                        >
+                          {t('label')}
+                        </FieldLabelWithInfo>
                         <Input
                           id={field.name}
                           name={field.name}
@@ -357,13 +358,19 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                           onBlur={field.handleBlur}
                           placeholder={t('labelPlaceholder')}
                           aria-invalid={invalid || undefined}
-                          aria-describedby={`${field.name}-hint`}
+                          aria-describedby={describedBy(
+                            field.name,
+                            academicYearHelp.label,
+                            helpMode,
+                            invalid,
+                          )}
                         />
-                        <FieldDescription id={`${field.name}-hint`}>
+                        <FieldDescription id={`${field.name}-description`}>
                           {t('labelFormatHint')}
                         </FieldDescription>
                         {invalid && (
                           <FieldError
+                            id={`${field.name}-error`}
                             data-testid={instituteAcademicYears.editLabelError}
                             errors={errors}
                           />
@@ -381,8 +388,13 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                       const value = typeof field.state.value === 'string' ? field.state.value : '';
                       return (
                         <Field data-invalid={invalid || undefined}>
-                          <FieldLabel htmlFor={field.name}>{t('startDate')}</FieldLabel>
-                          <FieldDescription>{t('startDateDescription')}</FieldDescription>
+                          <FieldLabelWithInfo
+                            htmlFor={field.name}
+                            help={academicYearHelp.startDate}
+                            hintId={`${field.name}-hint`}
+                          >
+                            {t('startDate')}
+                          </FieldLabelWithInfo>
                           <Input
                             id={field.name}
                             name={field.name}
@@ -392,13 +404,19 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                             onChange={(e) => field.handleChange(e.target.value)}
                             onBlur={field.handleBlur}
                             aria-invalid={invalid || undefined}
-                            aria-describedby={`${field.name}-hint`}
+                            aria-describedby={describedBy(
+                              field.name,
+                              academicYearHelp.startDate,
+                              helpMode,
+                              invalid,
+                            )}
                           />
-                          <FieldDescription id={`${field.name}-hint`}>
+                          <FieldDescription id={`${field.name}-description`}>
                             {t('dateFormatHint')}
                           </FieldDescription>
                           {invalid && (
                             <FieldError
+                              id={`${field.name}-error`}
                               data-testid={instituteAcademicYears.editStartDateError}
                               errors={errors}
                             />
@@ -415,8 +433,13 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                       const value = typeof field.state.value === 'string' ? field.state.value : '';
                       return (
                         <Field data-invalid={invalid || undefined}>
-                          <FieldLabel htmlFor={field.name}>{t('endDate')}</FieldLabel>
-                          <FieldDescription>{t('endDateDescription')}</FieldDescription>
+                          <FieldLabelWithInfo
+                            htmlFor={field.name}
+                            help={academicYearHelp.endDate}
+                            hintId={`${field.name}-hint`}
+                          >
+                            {t('endDate')}
+                          </FieldLabelWithInfo>
                           <Input
                             id={field.name}
                             name={field.name}
@@ -427,13 +450,19 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                             onBlur={field.handleBlur}
                             min={startDate || undefined}
                             aria-invalid={invalid || undefined}
-                            aria-describedby={`${field.name}-hint`}
+                            aria-describedby={describedBy(
+                              field.name,
+                              academicYearHelp.endDate,
+                              helpMode,
+                              invalid,
+                            )}
                           />
-                          <FieldDescription id={`${field.name}-hint`}>
+                          <FieldDescription id={`${field.name}-description`}>
                             {t('dateFormatHint')}
                           </FieldDescription>
                           {invalid && (
                             <FieldError
+                              id={`${field.name}-error`}
                               data-testid={instituteAcademicYears.editEndDateError}
                               errors={errors}
                             />
@@ -457,13 +486,10 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                       <div className="flex items-center justify-between">
                         <FieldLegend className="flex items-center gap-2">
                           {t('termStructure')}
-                          <FieldInfoPopover
-                            title={t('fieldHelp.termStructureTitle')}
-                            data-testid={instituteAcademicYears.editTermStructureInfo}
-                          >
-                            <p>{t('fieldHelp.termStructureBody')}</p>
-                            <p>{t('fieldHelp.termStructureCommonChoices')}</p>
-                          </FieldInfoPopover>
+                          <FieldHelpButton
+                            topic={academicYearHelp.termStructure}
+                            fieldLabel={t('termStructure')}
+                          />
                         </FieldLegend>
                         {!isReadOnly && (
                           <Button
@@ -482,6 +508,7 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
                           </Button>
                         )}
                       </div>
+                      <FieldHint topic={academicYearHelp.termStructure} />
 
                       {terms.length === 0 ? (
                         <p className="mt-2 text-sm text-muted-foreground">{t('termsEmpty')}</p>
@@ -664,3 +691,19 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
 }
 
 import { testIds } from '@roviq/ui/testing/testid-registry';
+
+/** The input's hint (when shown), description and error ids. */
+function describedBy(
+  name: string,
+  help: FieldHelpTopic,
+  mode: FormHelpMode,
+  invalid: boolean,
+): string {
+  return [
+    mode === 'ICON_AND_HINT' && help.hint ? `${name}-hint` : null,
+    `${name}-description`,
+    invalid ? `${name}-error` : null,
+  ]
+    .filter((id): id is string => id !== null)
+    .join(' ');
+}

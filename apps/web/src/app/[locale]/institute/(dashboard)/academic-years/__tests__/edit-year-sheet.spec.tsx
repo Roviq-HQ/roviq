@@ -64,8 +64,24 @@ describe('EditYearSheet', () => {
     });
 
     expect(screen.getAllByText(/edit academic year/i).length).toBeGreaterThan(0);
-    const labelInput = screen.getByLabelText(/academic year label/i) as HTMLInputElement;
+    const labelInput = screen.getByRole<HTMLInputElement>('textbox', {
+      name: 'Academic Year Label',
+    });
     expect(labelInput.value).toBe('2026-27');
+  });
+
+  it('should describe the label input by its hint and its format instruction', () => {
+    renderWithProviders(<EditYearSheet year={buildYear()} open={true} onOpenChange={() => {}} />, {
+      messages,
+    });
+    expect(
+      screen.getByRole('textbox', { name: 'Academic Year Label' }),
+    ).toHaveAccessibleDescription(
+      'Printed in government exports and their file names. Use the format YYYY-YY (e.g. 2026-27).',
+    );
+    expect(
+      screen.getByRole('button', { name: 'More about Academic Year Label' }),
+    ).toBeInTheDocument();
   });
 
   it('shows read-only banner and hides Save button for ARCHIVED years', () => {
@@ -86,7 +102,7 @@ describe('EditYearSheet', () => {
       messages,
     });
 
-    const labelInput = screen.getByLabelText(/academic year label/i);
+    const labelInput = screen.getByRole('textbox', { name: 'Academic Year Label' });
     await userEvent.clear(labelInput);
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
@@ -104,7 +120,7 @@ describe('EditYearSheet', () => {
       { messages },
     );
 
-    const labelInput = screen.getByLabelText(/academic year label/i);
+    const labelInput = screen.getByRole('textbox', { name: 'Academic Year Label' });
     await userEvent.clear(labelInput);
     await userEvent.type(labelInput, '2027-28');
 

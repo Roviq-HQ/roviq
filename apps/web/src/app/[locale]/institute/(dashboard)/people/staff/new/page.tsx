@@ -16,7 +16,6 @@ import {
   Can,
   DraftBanner,
   FieldGroup,
-  FieldInfoPopover,
   FieldLegend,
   FieldSet,
   I18nField,
@@ -24,6 +23,7 @@ import {
   useAppForm,
   useBreadcrumbOverride,
 } from '@roviq/ui';
+import { staffNewHelp } from '@web/help/staff/staff-new.help';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -221,15 +221,7 @@ export default function CreateStaffPage() {
                         options={socialOptions}
                         placeholder={t('new.placeholders.socialCategory')}
                         testId="staff-new-social-category-select"
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.fieldHelp.socialCategoryTitle')}
-                            data-testid={instituteStaff.newSocialCategoryInfo}
-                          >
-                            <p>{t('new.fieldHelp.socialCategoryBody')}</p>
-                            <p>{t('new.fieldHelp.socialCategoryOptions')}</p>
-                          </FieldInfoPopover>
-                        }
+                        help={staffNewHelp.socialCategory}
                       />
                     )}
                   </form.AppField>
@@ -272,17 +264,7 @@ export default function CreateStaffPage() {
                         label={t('new.fields.employeeId')}
                         placeholder={t('new.placeholders.employeeId')}
                         testId="staff-new-employee-id-input"
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.fieldHelp.employeeIdTitle')}
-                            data-testid={instituteStaff.newEmployeeIdInfo}
-                          >
-                            <p>{t('new.fieldHelp.employeeIdBody')}</p>
-                            <p>
-                              <em>{t('new.fieldHelp.employeeIdExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        }
+                        help={staffNewHelp.employeeId}
                       />
                     )}
                   </form.AppField>
@@ -292,17 +274,7 @@ export default function CreateStaffPage() {
                         label={t('new.fields.designation')}
                         placeholder={t('new.placeholders.designation')}
                         testId="staff-new-designation-input"
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.fieldHelp.designationTitle')}
-                            data-testid={instituteStaff.newDesignationInfo}
-                          >
-                            <p>{t('new.fieldHelp.designationBody')}</p>
-                            <p>
-                              <em>{t('new.fieldHelp.designationExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        }
+                        help={staffNewHelp.designation}
                       />
                     )}
                   </form.AppField>
@@ -312,17 +284,7 @@ export default function CreateStaffPage() {
                         label={t('new.fields.department')}
                         placeholder={t('new.placeholders.department')}
                         testId="staff-new-department-input"
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.fieldHelp.departmentTitle')}
-                            data-testid={instituteStaff.newDepartmentInfo}
-                          >
-                            <p>{t('new.fieldHelp.departmentBody')}</p>
-                            <p>
-                              <em>{t('new.fieldHelp.departmentExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        }
+                        help={staffNewHelp.department}
                       />
                     )}
                   </form.AppField>
@@ -333,21 +295,7 @@ export default function CreateStaffPage() {
                         options={employmentTypeOptions}
                         placeholder={t('new.placeholders.employmentType')}
                         testId="staff-new-employment-type-select"
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.fieldHelp.employmentTypeTitle')}
-                            data-testid={instituteStaff.newEmploymentTypeInfo}
-                          >
-                            <p>{t('new.fieldHelp.employmentTypeBody')}</p>
-                            <ul className="mt-1 list-disc space-y-0.5 ps-4">
-                              <li>{t('new.fieldHelp.employmentTypeRegular')}</li>
-                              <li>{t('new.fieldHelp.employmentTypeContractual')}</li>
-                              <li>{t('new.fieldHelp.employmentTypePartTime')}</li>
-                              <li>{t('new.fieldHelp.employmentTypeGuest')}</li>
-                              <li>{t('new.fieldHelp.employmentTypeVolunteer')}</li>
-                            </ul>
-                          </FieldInfoPopover>
-                        }
+                        help={staffNewHelp.employmentType}
                       />
                     )}
                   </form.AppField>

@@ -37,6 +37,7 @@ export {
 export { FieldHelpButton, type FieldHelpButtonProps } from './help/field-help-button';
 export { FieldHint } from './help/field-hint';
 export { FormHelpModeProvider, useFormHelpMode } from './help/form-help-mode';
+export { HelpArticleBody, HelpArticleSheet } from './help/help-article';
 export { useFieldHelpIds } from './help/use-field-help-ids';
 export { useHelpText } from './help/use-help-text';
 export { setServerFieldError } from './server-field-error';

@@ -5,6 +5,10 @@ import { useInstituteLocales } from '@roviq/i18n';
 import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@roviq/ui/components/ui/field';
 import { Input } from '@roviq/ui/components/ui/input';
 import { fieldErrorMessages } from '@roviq/ui/form/errors';
+import type { FieldHelpTopic } from '@roviq/ui/form/help/field-help';
+import { FieldHelpButton } from '@roviq/ui/form/help/field-help-button';
+import { FieldHint } from '@roviq/ui/form/help/field-hint';
+import { useFieldHelpIds } from '@roviq/ui/form/help/use-field-help-ids';
 import { cn } from '@roviq/ui/lib/utils';
 import type { AnyFieldApi } from '@tanstack/react-form';
 import { useLocale } from 'next-intl';
@@ -42,6 +46,8 @@ export interface I18nFieldProps {
    * `<FieldInfoPopover>` but any `ReactNode` is accepted.
    */
   info?: ReactNode;
+  /** Help topic from `apps/web/src/help`; replaces `info`. */
+  help?: FieldHelpTopic;
   placeholder?: I18nFieldPlaceholder;
   testId?: string;
   className?: string;
@@ -83,18 +89,33 @@ export function I18nField({
   label,
   description,
   info,
+  help,
   placeholder,
   testId,
   className,
 }: I18nFieldProps) {
   const activeLocale = useLocale();
   const { supportedLocales } = useInstituteLocales();
+  const ids = useFieldHelpIds({
+    name,
+    help,
+    hasDescription: Boolean(description),
+    invalid: false,
+  });
   return (
     <FieldSet className={cn('space-y-1', className)}>
       <FieldLegend variant="label" className="flex items-center gap-2">
         {label}
-        {info}
+        {help ? (
+          <FieldHelpButton
+            topic={help}
+            fieldLabel={typeof label === 'string' ? label : undefined}
+          />
+        ) : (
+          info
+        )}
       </FieldLegend>
+      {help && <FieldHint topic={help} id={ids.hintId} />}
       <div className="mt-1 space-y-2">
         {supportedLocales.map((locale) => (
           <I18nFieldLocaleRow
@@ -104,11 +125,12 @@ export function I18nField({
             parentLabel={typeof label === 'string' ? label : ''}
             locale={locale}
             placeholder={resolvePlaceholder(placeholder, locale, activeLocale)}
+            describedBy={ids.describedBy}
             testId={testId}
           />
         ))}
       </div>
-      {description && <FieldDescription>{description}</FieldDescription>}
+      {description && <FieldDescription id={ids.descriptionId}>{description}</FieldDescription>}
     </FieldSet>
   );
 }
@@ -120,6 +142,8 @@ interface I18nFieldLocaleRowProps {
   locale: string;
   /** Already-resolved placeholder for THIS row's locale, or undefined to omit. */
   placeholder?: string;
+  /** The parent's hint and description ids. */
+  describedBy?: string;
   testId?: string;
 }
 
@@ -129,6 +153,7 @@ function I18nFieldLocaleRow({
   parentLabel,
   locale,
   placeholder,
+  describedBy,
   testId,
 }: I18nFieldLocaleRowProps) {
   return (
@@ -138,6 +163,9 @@ function I18nFieldLocaleRow({
         const errors = fieldErrorMessages(field);
         const invalid = errors.length > 0;
         const value = typeof field.state.value === 'string' ? field.state.value : '';
+        const errorId = `${field.name}-error`;
+        const rowDescribedBy =
+          [describedBy, invalid ? errorId : undefined].filter(Boolean).join(' ') || undefined;
         const ariaLabel = parentLabel
           ? `${parentLabel} (${instituteLocaleLabels[locale] ?? locale})`
           : (instituteLocaleLabels[locale] ?? locale);
@@ -154,10 +182,11 @@ function I18nFieldLocaleRow({
                 placeholder={placeholder}
                 aria-label={ariaLabel}
                 aria-invalid={invalid || undefined}
+                aria-describedby={rowDescribedBy}
                 data-testid={testId ? `${testId}-${locale}` : undefined}
               />
             </div>
-            {invalid && <FieldError errors={errors} />}
+            {invalid && <FieldError id={errorId} errors={errors} />}
           </div>
         );
       }}
