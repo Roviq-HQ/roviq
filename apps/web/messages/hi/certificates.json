@@ -230,9 +230,10 @@
     "DUPLICATE_ISSUED": "डुप्लिकेट जारी"
   },
   "certificateStatuses": {
-    "REQUESTED": "अनुरोधित",
+    "DRAFT": "मसौदा",
+    "PENDING_APPROVAL": "स्वीकृति की प्रतीक्षा",
+    "APPROVED": "स्वीकृत",
     "ISSUED": "जारी",
-    "REJECTED": "अस्वीकृत",
     "CANCELLED": "रद्द"
   },
   "types": {

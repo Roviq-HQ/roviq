@@ -230,9 +230,10 @@
     "DUPLICATE_ISSUED": "Duplicate Issued"
   },
   "certificateStatuses": {
-    "REQUESTED": "Requested",
+    "DRAFT": "Draft",
+    "PENDING_APPROVAL": "Waiting for approval",
+    "APPROVED": "Approved",
     "ISSUED": "Issued",
-    "REJECTED": "Rejected",
     "CANCELLED": "Cancelled"
   },
   "types": {

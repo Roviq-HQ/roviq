@@ -14,7 +14,18 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Stable results: a new object per render would re-fire the dialog's reset effect.
-const certificatesResult = { certificates: [], loading: false };
+const draftCertificate = {
+  id: 'cert-1',
+  serialNumber: 'CERT/BON/0001',
+  studentProfileId: null,
+  purpose: 'Scholarship application',
+  status: 'DRAFT',
+  createdAt: '2026-11-25T10:00:00.000Z',
+};
+const certificatesResult: { certificates: (typeof draftCertificate)[]; loading: boolean } = {
+  certificates: [],
+  loading: false,
+};
 const mutationResult: [ReturnType<typeof vi.fn>, { loading: boolean }] = [
   vi.fn(),
   { loading: false },
@@ -58,6 +69,17 @@ async function openBonafideDialog(messages: typeof messagesEn) {
   );
   return screen.findByRole('dialog');
 }
+
+describe('OtherCertificatesPage — certificate list', () => {
+  it('labels a draft certificate with its translated status', () => {
+    certificatesResult.certificates = [draftCertificate];
+    renderWithProviders(<OtherCertificatesPage />, { messages: { certificates: messagesEn } });
+
+    expect(screen.getByText(messagesEn.certificateStatuses.DRAFT)).toBeInTheDocument();
+    expect(screen.queryByText('certificates.certificateStatuses.DRAFT')).not.toBeInTheDocument();
+    certificatesResult.certificates = [];
+  });
+});
 
 describe('OtherCertificatesPage — issue dialog', () => {
   it("offers the institute's templates of the dialog's type by name", async () => {
