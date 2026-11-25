@@ -286,6 +286,63 @@ describe('M7: consent_records append-only enforcement', () => {
       expect(res.rows[1].is_granted).toBe(false);
     });
   });
+
+  it('accepts only the upper snake purposes and verification methods (ROV-227)', async () => {
+    await inTransaction(async (client) => {
+      const testUser1 = await createTestUser(client, 'eeeeeeee-bc05-0001-0001-000000000001');
+      const testUser2 = await createTestUser(client, 'eeeeeeee-bc05-0001-0001-000000000002');
+      const roleId = await findRole(client, SEED.INSTITUTE_1);
+      const studentProfileId = await createStudentProfile(
+        client,
+        'ffffffff-c005-0001-0001-000000000001',
+        'ffffffff-c005-0001-0001-000000000010',
+        testUser1,
+        SEED.INSTITUTE_1,
+        roleId,
+        'CONSENT-S005',
+      );
+      const guardianProfileId = await createGuardianProfile(
+        client,
+        'ffffffff-c005-0001-0001-000000000002',
+        'ffffffff-c005-0001-0001-000000000020',
+        testUser2,
+        SEED.INSTITUTE_1,
+        roleId,
+      );
+      const insert = (purpose: string, method: string | null) =>
+        client.query(
+          `INSERT INTO consent_records (tenant_id, guardian_profile_id, student_profile_id, purpose, is_granted, granted_at, verification_method)
+           VALUES ($1, $2, $3, $4, true, now(), $5)`,
+          [SEED.INSTITUTE_1, guardianProfileId, studentProfileId, purpose, method],
+        );
+      // A refused statement aborts the transaction, so each attempt runs in a savepoint.
+      const refused = async (purpose: string, method: string | null, constraint: RegExp) => {
+        await client.query('SAVEPOINT attempt');
+        await expect(insert(purpose, method)).rejects.toThrow(constraint);
+        await client.query('ROLLBACK TO SAVEPOINT attempt');
+      };
+
+      await refused('academic_data_processing', null, /chk_consent_purpose/);
+      await refused(
+        'ACADEMIC_DATA_PROCESSING',
+        'school_erp_verified_account',
+        /chk_verification_method/,
+      );
+      await refused('ACADEMIC_DATA_PROCESSING', 'in_person_id_check', /chk_verification_method/);
+
+      await insert('ACADEMIC_DATA_PROCESSING', 'INSTITUTE_ERP_VERIFIED_ACCOUNT');
+      const res = await client.query(
+        'SELECT purpose, verification_method FROM consent_records WHERE guardian_profile_id = $1',
+        [guardianProfileId],
+      );
+      expect(res.rows).toEqual([
+        {
+          purpose: 'ACADEMIC_DATA_PROCESSING',
+          verification_method: 'INSTITUTE_ERP_VERIFIED_ACCOUNT',
+        },
+      ]);
+    });
+  });
 });
 
 // ── bot_profiles: bot_type CHECK constraint ─────────────────

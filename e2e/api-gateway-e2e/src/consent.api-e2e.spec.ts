@@ -96,7 +96,7 @@ describe('Consent E2E', () => {
         {
           input: {
             studentProfileId,
-            purpose: `admin_reject_${Date.now()}`,
+            purpose,
             verificationMethod: 'IN_PERSON_ID_CHECK',
           },
         },

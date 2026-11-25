@@ -652,9 +652,29 @@ describe('Auth events', () => {
       `(event_type, portal, failure_reason) VALUES ('LOGIN_FAILED', 'mobile', 'UNKNOWN_USER')`,
       /chk_auth_events_portal/,
     ],
+    [
+      'an event type in the old lowercase form (ROV-227)',
+      `(event_type, portal, failure_reason) VALUES ('login_failed', 'platform', 'UNKNOWN_USER')`,
+      /chk_auth_events_event_type/,
+    ],
+    [
+      'an unknown event type',
+      `(event_type, portal, scope) VALUES ('FOO', 'institute', 'institute')`,
+      /chk_auth_events_event_type/,
+    ],
   ])('20. auth_events rejects %s', async (_label, insert, constraint) => {
     await asRole('roviq_admin', {}, async (client) => {
       await expect(client.query(`INSERT INTO auth_events ${insert}`)).rejects.toThrow(constraint);
+    });
+  });
+
+  it('20b. an institute connection cannot record a sign-in attempt without a portal', async () => {
+    await asRole('roviq_app', { 'app.current_tenant_id': SEED.INSTITUTE_1 }, async (client) => {
+      await expect(
+        client.query(
+          `INSERT INTO auth_events (event_type, failure_reason) VALUES ('LOGIN_FAILED', 'UNKNOWN_USER')`,
+        ),
+      ).rejects.toThrow(/chk_auth_events_login_portal/);
     });
   });
 

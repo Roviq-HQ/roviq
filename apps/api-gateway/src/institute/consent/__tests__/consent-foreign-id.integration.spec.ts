@@ -42,14 +42,14 @@ const PURPOSE = 'PHOTO_VIDEO_MARKETING';
 
 const GRANT = /* GraphQL */ `
   mutation GrantConsent($studentProfileId: ID!) {
-    grantConsent(input: { studentProfileId: $studentProfileId, purpose: "${PURPOSE}" }) {
+    grantConsent(input: { studentProfileId: $studentProfileId, purpose: ${PURPOSE} }) {
       id
     }
   }
 `;
 const WITHDRAW = /* GraphQL */ `
   mutation WithdrawConsent($studentProfileId: ID!) {
-    withdrawConsent(input: { studentProfileId: $studentProfileId, purpose: "${PURPOSE}" }) {
+    withdrawConsent(input: { studentProfileId: $studentProfileId, purpose: ${PURPOSE} }) {
       id
     }
   }
@@ -307,5 +307,20 @@ describe('consent: a student of another institute (ROV-293)', () => {
     });
     expect(other.errors?.[0]?.extensions?.code).toBe(ErrorCode.FORBIDDEN);
     expect(other.data).toBeNull();
+  });
+
+  it('grantConsent refuses a purpose in the old lowercase form before writing (ROV-227)', async () => {
+    const before = await consentsOf(instA.tenantId);
+    // gqlRequest throws on the HTTP 400 that a variable of the wrong enum value returns.
+    await expect(
+      gqlRequest(result.httpServer, {
+        query: `mutation($input: GrantConsentInput!) { grantConsent(input: $input) { id } }`,
+        variables: {
+          input: { studentProfileId: ownStudentId, purpose: 'photo_video_marketing' },
+        },
+        token: tokenA,
+      }),
+    ).rejects.toThrow(/photo_video_marketing.*ConsentPurpose/);
+    expect(await consentsOf(instA.tenantId)).toEqual(before);
   });
 });

@@ -186,6 +186,12 @@ describe('refresh tokens', () => {
         'UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1',
         [id],
       );
+      await expectRefused(
+        client,
+        /chk_refresh_token_revoked_reason/,
+        `UPDATE refresh_tokens SET revoked_at = now(), revoked_reason = 'rotation' WHERE id = $1`,
+        [id],
+      );
 
       await client.query(
         `UPDATE refresh_tokens SET revoked_at = now(), revoked_reason = 'USER_INITIATED' WHERE id = $1`,
