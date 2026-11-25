@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE_DB, type DrizzleDB, dlqMessages, mkAdminCtx, withAdmin } from '@roviq/database';
-import { and, desc, eq, type SQL, sql } from 'drizzle-orm';
-import { DlqRepository } from './dlq.repository';
+import { and, count, desc, eq, gte, type SQL, sql } from 'drizzle-orm';
+import { DlqRepository, type DlqStreamCount } from './dlq.repository';
 import type { DlqListQuery, DlqMessageRecord, DlqTransitionResult } from './types';
 
 @Injectable()
@@ -35,6 +35,16 @@ export class DlqDrizzleRepository extends DlqRepository {
         .where(eq(dlqMessages.status, 'pending'));
       return row?.value ?? 0;
     });
+  }
+
+  async countSinceByStream(since: Date): Promise<DlqStreamCount[]> {
+    return withAdmin(this.db, mkAdminCtx('service:dlq'), (tx) =>
+      tx
+        .select({ originStream: dlqMessages.originStream, count: count() })
+        .from(dlqMessages)
+        .where(gte(dlqMessages.createdAt, since))
+        .groupBy(dlqMessages.originStream),
+    );
   }
 
   async replay(

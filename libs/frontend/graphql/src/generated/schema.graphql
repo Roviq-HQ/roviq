@@ -4953,20 +4953,18 @@ enum NotificationChannel {
 }
 
 """
-Delivery attempts on one channel over the last 24 hours, from the metrics
+Delivery attempts on one channel over the last 24 hours, from the delivery rows
 """
 type NotificationChannelHealth {
   channel: NotificationChannel!
 
   """
-  Sends that failed, and messages the provider later reported undelivered; null when metrics are unavailable
+  Sends that failed, and messages the provider later reported undelivered
   """
-  failed24h: Int
+  failed24h: Int!
 
-  """
-  Messages the provider accepted, the delivery canary included; null when metrics are unavailable
-  """
-  sent24h: Int
+  """Messages the provider accepted, the delivery canary included"""
+  sent24h: Int!
 }
 
 type NotificationConfigModel {
@@ -5163,19 +5161,12 @@ type NotificationEdge {
 
 """Platform admin: whether notifications are being delivered (ROV-329)"""
 type NotificationHealth {
-  """
-  Always all four channels; read from the delivery rows, so it needs no metrics
-  """
+  """Always all four channels; read from the delivery rows"""
   canary: [NotificationCanaryStatus!]!
 
   """Always all four channels, in NotificationChannel order"""
   channels: [NotificationChannelHealth!]!
   checkedAt: DateTime!
-
-  """
-  False when OpenObserve is unreachable: the 24-hour counts are then null, not zero
-  """
-  metricsAvailable: Boolean!
 }
 
 """One in-app notification addressed to the signed-in user."""

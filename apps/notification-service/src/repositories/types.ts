@@ -103,6 +103,13 @@ export interface MessagingSenderRecord {
   accessTokenEncrypted: Buffer;
 }
 
+export interface SenderStateRecord {
+  id: string;
+  channel: NotificationChannel;
+  provider: string;
+  status: MessagingSenderStatus;
+}
+
 export interface SenderSentCounts {
   total: number;
   forTenant: number;

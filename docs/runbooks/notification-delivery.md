@@ -49,8 +49,8 @@ with at least 20 attempts.
 
 ## Sender blocked
 
-`notification_sender_blocked` (page): the provider refused a send with `WA_SENDER_BLOCKED` or
-`SMS_SENDER_BLOCKED`.
+`notification_sender_blocked` (page): a WhatsApp sender's status is `BLOCKED` (label `channel`):
+the provider refused a send with `WA_SENDER_BLOCKED`. It lasts until the sender is active again.
 
 1. WhatsApp: the service has already marked the sender `BLOCKED` and opened its breaker, so an
    institute's messages go through the platform's sender. Resolve the restriction in the
@@ -58,15 +58,17 @@ with at least 20 attempts.
    activating clears its breaker and its throttle.
 2. A blocked platform sender leaves WhatsApp without a sender: messages are skipped
    `no_provider` until it is active again.
-3. SMS: the sender header or the account was suspended at the provider; check the registration.
-   The SMS provider's breaker is open, so each send waits a minute (`provider_paused`) and then
-   one probe tries again.
+3. SMS has no sender row: `SMS_SENDER_BLOCKED` opens the SMS provider's breaker and raises
+   "Breaker opened" below. The sender header or the account was suspended at the provider; check
+   the registration.
 
 ## Breaker opened
 
-`notification_breaker_opened` (page): a provider (label `provider`, on `channel`) or a WhatsApp
-sender answered "cannot send now" 5 times in a row within a minute, or blocked the sender; the
-`reason` label is the code that opened it.
+`notification_breaker_opened` (page): a circuit breaker is open (labels `channel`, `provider`): a
+provider or a WhatsApp sender answered "cannot send now" 5 times in a row within a minute, or
+blocked the sender. The code that opened it is the `reason` label of the counter
+`notification_breaker_opened`. The alert clears when a send through it succeeds, or 10 minutes
+after it opened if nothing is sent through it.
 
 1. Sends through it are held as `DEFERRED` with `provider_paused` and tried again after a
    minute, when one probe goes through: a success closes the breaker, a failure keeps it open
@@ -92,8 +94,8 @@ for its consumer (label `consumer`).
 
 ## Dead letters
 
-`notification_dead_letters` (ticket): a `NOTIFICATION.*` event was dead-lettered, so its
-notification was never sent.
+`notification_dead_letters` (ticket): a `NOTIFICATION.*` event was dead-lettered in the last 5
+minutes, so its notification was never sent.
 
 1. The admin portal's Dead Letter Queue tab: the subject and the error of the message.
 2. Fix the cause, then replay it from there; the handlers are safe to run twice.
@@ -109,3 +111,16 @@ in the last 15 minutes (labels `channel`, `reason`).
 2. `no_template`: a template is missing from `SMS_TEMPLATE_IDS` or not approved by the provider
    (`docs/deployment.md` → "SMS" and "WhatsApp alerts").
 3. Expected while a channel is being set up; the alert stops once the skips stop.
+
+## Checking that an alert fires
+
+The e2e stack has no metrics store, so an alert is checked on the dev stack after a change to its
+rule or to the metric it reads. Each single-event alert reads a gauge (`docs/infrastructure.md` →
+"Observability"), so the first event after a restart counts.
+
+1. `pnpm tilt trigger observability` loads the rules and restarts both services.
+2. Cause one event of the kind the rule watches, for example a send to a channel whose provider
+   is unset (`no_provider`), or a breaker opened by stopping the provider (5 failed sends within a
+   minute).
+3. Within a minute the rule's query in OpenObserve (Metrics, PromQL) answers above 0, and the
+   alert fires on its next run. When the condition ends, the query reads 0 on the next export.

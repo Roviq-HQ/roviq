@@ -1,5 +1,5 @@
 import type { MessagingSenderStatus, NotificationChannel } from '@roviq/common-types';
-import type { MessagingSenderRecord, SenderSentCounts } from './types';
+import type { MessagingSenderRecord, SenderSentCounts, SenderStateRecord } from './types';
 
 export abstract class MessagingSenderRepository {
   /** The institute's own ACTIVE sender, else the platform's ACTIVE sender, else null. */
@@ -40,4 +40,7 @@ export abstract class MessagingSenderRepository {
     from: MessagingSenderStatus,
     to: MessagingSenderStatus,
   ): Promise<boolean>;
+
+  /** Every live sender's channel, provider and status, for the state gauges. */
+  abstract listStates(): Promise<SenderStateRecord[]>;
 }

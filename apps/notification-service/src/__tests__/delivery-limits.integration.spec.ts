@@ -46,10 +46,12 @@ import { WHATSAPP_CLOUD_PROVIDER } from '../delivery/whatsapp/whatsapp-cloud.cli
 import { Clock, WhatsAppRoute } from '../delivery/whatsapp/whatsapp-route';
 import { ConsentReadDrizzleRepository } from '../repositories/consent-read.drizzle-repository';
 import { ContactReadDrizzleRepository } from '../repositories/contact-read.drizzle-repository';
+import { DeliveryStatsDrizzleRepository } from '../repositories/delivery-stats.drizzle-repository';
 import { MessagingSenderDrizzleRepository } from '../repositories/messaging-sender.drizzle-repository';
 import { NotificationWriteDrizzleRepository } from '../repositories/notification-write.drizzle-repository';
 import { RecipientReadDrizzleRepository } from '../repositories/recipient-read.drizzle-repository';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
+import { breakerTargets, stateReadings } from '../telemetry/notification-state-gauges';
 import type { RegularPayload } from '../types/registry';
 import { createNotificationActivities } from '../workflows/notification.activities';
 import type { SendChannelInput } from '../workflows/notification-workflow.types';
@@ -613,6 +615,79 @@ describe('sender rate and breakers (integration)', () => {
       // Three failures opened the first provider's breaker; the last two never reached it.
       expect(first.calls).toBe(3);
       expect(second.calls).toBe(5);
+    });
+  });
+
+  describe('what the state gauges read', () => {
+    it('should count a sender the provider blocked, with no send, and its open breaker', async () => {
+      const own = await addSender('institute', 10);
+      await senders.setStatusFrom(own.id, 'ACTIVE', 'BLOCKED');
+      const breaker = new ProviderBreaker(redis);
+      await breaker.trip(senderBreakerName(own.id));
+
+      const listed = (await senders.listStates()).filter((s) => s.id === own.id);
+      const targets = breakerTargets([], listed);
+      const readings = stateReadings(
+        targets,
+        await breaker.openAmong(targets.map((t) => t.name)),
+        listed,
+      );
+
+      expect(listed).toEqual([
+        { id: own.id, channel: 'WHATSAPP', provider: WHATSAPP_CLOUD_PROVIDER, status: 'BLOCKED' },
+      ]);
+      expect(readings.breakersOpen).toEqual([
+        { channel: 'WHATSAPP', provider: WHATSAPP_CLOUD_PROVIDER, open: 1 },
+      ]);
+      expect(readings.sendersBlocked).toContainEqual({ channel: 'WHATSAPP', blocked: 1 });
+      expect(provider.requests).toHaveLength(0);
+    });
+
+    it('should leave out a deleted sender', async () => {
+      const gone = await addSender('institute', 10);
+      await superPool.query('UPDATE messaging_senders SET deleted_at = now() WHERE id = $1', [
+        gone.id,
+      ]);
+
+      expect((await senders.listStates()).some((s) => s.id === gone.id)).toBe(false);
+    });
+
+    it('should count SKIPPED rows written since the given time, per channel and reason', async () => {
+      // Far ahead of any other row, so only these are counted.
+      const at = new Date('2098-03-01T00:00:00.000Z');
+      const minutes = (m: number) => new Date(at.getTime() + m * 60_000);
+      const insert = (channel: string, status: string, reason: string | null, when: Date) =>
+        superPool.query(
+          `INSERT INTO notification_deliveries
+             (scope, tenant_id, recipient_user_id, type, channel, status, skip_reason, error_code,
+              created_at)
+           VALUES ('institute', $1, $2, 'APPROVAL_REQUESTED', $3, $4, $5, $6, $7)`,
+          [
+            instituteA.tenantId,
+            userA.userId,
+            channel,
+            status,
+            reason,
+            status === 'FAILED' ? 'EAUTH' : null,
+            when,
+          ],
+        );
+      await insert('SMS', 'SKIPPED', 'no_template', minutes(0));
+      await insert('SMS', 'SKIPPED', 'no_template', minutes(-14));
+      await insert('EMAIL', 'SKIPPED', 'no_provider', minutes(-1));
+      await insert('SMS', 'SKIPPED', 'no_template', minutes(-16));
+      await insert('SMS', 'SENT', null, minutes(0));
+      await insert('SMS', 'FAILED', null, minutes(0));
+
+      const counts = await new DeliveryStatsDrizzleRepository(db).countSkippedSince(minutes(-15));
+
+      expect(counts).toHaveLength(2);
+      expect(counts).toEqual(
+        expect.arrayContaining([
+          { channel: 'SMS', reason: 'no_template', count: 2 },
+          { channel: 'EMAIL', reason: 'no_provider', count: 1 },
+        ]),
+      );
     });
   });
 });

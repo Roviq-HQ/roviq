@@ -4,12 +4,13 @@ import type pg from 'pg';
 import { DlqConsumer } from './dlq.consumer';
 import { DlqService } from './dlq.service';
 import { DLQ_DB_POOL, dlqDbProvider } from './dlq-db.provider';
+import { DlqGauges } from './dlq-gauges';
 import { DLQ_NATS_CONNECTION, dlqNatsProvider } from './dlq-nats.provider';
 import { DlqRepositoryModule } from './repositories/dlq-repository.module';
 
 @Module({
   imports: [DlqRepositoryModule],
-  providers: [dlqNatsProvider, dlqDbProvider, DlqConsumer, DlqService],
+  providers: [dlqNatsProvider, dlqDbProvider, DlqConsumer, DlqService, DlqGauges],
   exports: [DlqService, DLQ_NATS_CONNECTION],
 })
 export class DlqModule implements OnApplicationShutdown {

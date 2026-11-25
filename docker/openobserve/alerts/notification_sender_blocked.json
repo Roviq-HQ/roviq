@@ -1,13 +1,13 @@
 {
   "name": "notification_sender_blocked",
-  "description": "The provider refused a send because the sender or the account is blocked (WA_SENDER_BLOCKED or SMS_SENDER_BLOCKED). That channel sends nothing until it is cleared.",
+  "description": "A WhatsApp sender's status is BLOCKED: the provider refused a send with WA_SENDER_BLOCKED. Nothing is sent through that number until a platform admin reactivates it; the alert clears then.",
   "stream_type": "metrics",
-  "stream_name": "notification_delivery",
+  "stream_name": "notification_sender_blocked",
   "is_real_time": false,
   "enabled": true,
   "query_condition": {
     "type": "promql",
-    "promql": "sum by (channel, reason) (increase(notification_delivery{reason=~\"WA_SENDER_BLOCKED|SMS_SENDER_BLOCKED\"}[5m]))",
+    "promql": "max by (channel) (notification_sender_blocked)",
     "promql_condition": {
       "column": "value",
       "operator": ">",

@@ -97,7 +97,6 @@
   "notifications": {
     "heading": "Notification delivery",
     "description": "Messages per channel in the last 24 hours, and when the platform's test message (the canary) last reached the provider.",
-    "metricsUnavailable": "Metrics unavailable — OpenObserve cannot be reached, so the 24-hour counts cannot be shown.",
     "channel": "Channel",
     "sent24h": "Sent (24h)",
     "failed24h": "Failed (24h)",

@@ -4,25 +4,21 @@ import { DateTimeScalar } from '@roviq/nestjs-graphql';
 import '../../../../common/notification-channel.enum';
 
 @ObjectType('NotificationChannelHealth', {
-  description: 'Delivery attempts on one channel over the last 24 hours, from the metrics',
+  description: 'Delivery attempts on one channel over the last 24 hours, from the delivery rows',
 })
 export class NotificationChannelHealthModel {
   @Field(() => NotificationChannel)
   channel!: NotificationChannel;
 
   @Field(() => Int, {
-    nullable: true,
-    description:
-      'Messages the provider accepted, the delivery canary included; null when metrics are unavailable',
+    description: 'Messages the provider accepted, the delivery canary included',
   })
-  sent24h!: number | null;
+  sent24h!: number;
 
   @Field(() => Int, {
-    nullable: true,
-    description:
-      'Sends that failed, and messages the provider later reported undelivered; null when metrics are unavailable',
+    description: 'Sends that failed, and messages the provider later reported undelivered',
   })
-  failed24h!: number | null;
+  failed24h!: number;
 }
 
 @ObjectType('NotificationCanaryStatus', {
@@ -48,14 +44,8 @@ export class NotificationHealthModel {
   })
   channels!: NotificationChannelHealthModel[];
 
-  @Field({
-    description:
-      'False when OpenObserve is unreachable: the 24-hour counts are then null, not zero',
-  })
-  metricsAvailable!: boolean;
-
   @Field(() => [NotificationCanaryStatusModel], {
-    description: 'Always all four channels; read from the delivery rows, so it needs no metrics',
+    description: 'Always all four channels; read from the delivery rows',
   })
   canary!: NotificationCanaryStatusModel[];
 

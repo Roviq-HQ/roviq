@@ -133,4 +133,22 @@ describe('ProviderBreaker (real Redis)', () => {
     expect(answer.ok).toBe(false);
     if (!answer.ok) expect(answer.retryAt.getTime()).toBeGreaterThan(Date.now());
   });
+
+  it('should name as open the breakers that are open or probing, not closed or unknown ones', async () => {
+    const [open, probing, failing, closed, unknown] = [name(), name(), name(), name(), name()];
+    await breaker.trip(open);
+    await breaker.trip(probing);
+    await wait(COOLDOWN_MS + 50);
+    expect((await breaker.allow(probing)).ok).toBe(true);
+    await fail(failing, 2);
+    await breaker.trip(closed);
+    await wait(COOLDOWN_MS + 50);
+    await breaker.allow(closed);
+    await breaker.succeeded(closed);
+
+    const found = await breaker.openAmong([open, probing, failing, closed, unknown]);
+
+    expect([...found].sort()).toEqual([open, probing].sort());
+    await expect(breaker.openAmong([])).resolves.toEqual(new Set());
+  });
 });

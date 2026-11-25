@@ -25,7 +25,6 @@ const minutesBefore = (m: number) => new Date(Date.parse(CHECKED_AT) - m * 60 * 
 const CHANNELS: NotificationChannel[] = ['EMAIL', 'PUSH', 'SMS', 'WHATSAPP'];
 
 function health(options: {
-  metricsAvailable: boolean;
   counts?: Partial<Record<NotificationChannel, [number, number]>>;
   canary?: Partial<Record<NotificationChannel, string>>;
 }): MockedResponse<AdminNotificationHealthQuery> {
@@ -36,15 +35,14 @@ function health(options: {
         __typename: 'Query',
         adminNotificationHealth: {
           __typename: 'NotificationHealth',
-          metricsAvailable: options.metricsAvailable,
           checkedAt: CHECKED_AT,
           channels: CHANNELS.map((channel) => {
             const [sent, failed] = options.counts?.[channel] ?? [0, 0];
             return {
               __typename: 'NotificationChannelHealth',
               channel,
-              sent24h: options.metricsAvailable ? sent : null,
-              failed24h: options.metricsAvailable ? failed : null,
+              sent24h: sent,
+              failed24h: failed,
             };
           }),
           canary: CHANNELS.map((channel) => ({
@@ -91,7 +89,6 @@ describe('NotificationsPanel', () => {
     renderWithProviders(<NotificationsPanel />, {
       apolloMocks: [
         health({
-          metricsAvailable: true,
           counts: { EMAIL: [1250, 3], WHATSAPP: [40, 0] },
           canary: { EMAIL: minutesBefore(5), WHATSAPP: minutesBefore(CANARY_LATE_MS / 60000 + 15) },
         }),
@@ -109,7 +106,6 @@ describe('NotificationsPanel', () => {
     expect(
       within(screen.getByTestId(ids.notificationsChannel('SMS'))).getByText('Not sent'),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId(ids.notificationsMetricsUnavailable)).not.toBeInTheDocument();
 
     const blocked = await screen.findByTestId(ids.notificationsSender('sender-institute'));
     expect(blocked).toHaveTextContent('+919800000002');
@@ -126,23 +122,9 @@ describe('NotificationsPanel', () => {
     );
   });
 
-  it('should say the counts are unavailable rather than zero when OpenObserve is down', async () => {
-    renderWithProviders(<NotificationsPanel />, {
-      apolloMocks: [
-        health({ metricsAvailable: false, canary: { EMAIL: minutesBefore(5) } }),
-        senders([]),
-      ],
-    });
-
-    expect(await screen.findByTestId(ids.notificationsMetricsUnavailable)).toBeInTheDocument();
-    const email = screen.getByTestId(ids.notificationsChannel('EMAIL'));
-    expect(within(email).getAllByText('—')).toHaveLength(2);
-    expect(within(email).getByText(/^Accepted/)).toBeInTheDocument();
-  });
-
   it('should say no sender is registered when the list is empty', async () => {
     renderWithProviders(<NotificationsPanel />, {
-      apolloMocks: [health({ metricsAvailable: true }), senders([])],
+      apolloMocks: [health({}), senders([])],
     });
 
     expect(await screen.findByTestId(ids.notificationsSendersEmpty)).toHaveTextContent(
@@ -153,7 +135,7 @@ describe('NotificationsPanel', () => {
 
   it('should leave the senders out without read MessagingSender', async () => {
     renderWithProviders(<NotificationsPanel />, {
-      apolloMocks: [health({ metricsAvailable: true })],
+      apolloMocks: [health({})],
       abilityRules: [{ action: 'read', subject: 'SystemHealth' }],
     });
 
@@ -178,7 +160,7 @@ describe('NotificationsPanel', () => {
 
   it('should render in Hindi', async () => {
     renderWithProviders(<NotificationsPanel />, {
-      apolloMocks: [health({ metricsAvailable: true }), senders([])],
+      apolloMocks: [health({}), senders([])],
       locale: 'hi',
     });
 
@@ -213,7 +195,7 @@ describe('NotificationsPanel', () => {
       const user = userEvent.setup();
       renderWithProviders(<NotificationsPanel />, {
         apolloMocks: [
-          health({ metricsAvailable: true }),
+          health({}),
           senders([PLATFORM_SENDER]),
           ...apolloMocks,
           senders([PLATFORM_SENDER]),
@@ -228,7 +210,7 @@ describe('NotificationsPanel', () => {
 
     it('should hide the change button without update MessagingSender', async () => {
       renderWithProviders(<NotificationsPanel />, {
-        apolloMocks: [health({ metricsAvailable: true }), senders([PLATFORM_SENDER])],
+        apolloMocks: [health({}), senders([PLATFORM_SENDER])],
         abilityRules: [
           { action: 'read', subject: 'SystemHealth' },
           { action: 'read', subject: 'MessagingSender' },
