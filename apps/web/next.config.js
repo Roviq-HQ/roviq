@@ -35,6 +35,9 @@ const nextConfig = {
     // module metadata) across `next build` runs. Wipe via
     // `pnpm dlx rimraf apps/web/.next` if a dep upgrade leaves a stale hit.
     turbopackFileSystemCacheForBuild: true,
+    // Off for `next dev`: a start loads the whole disk cache into memory, so a restart frees
+    // nothing. Without it a restart begins small (scripts/dev-web.sh restarts at a cap).
+    turbopackFileSystemCacheForDev: false,
   },
 };
 

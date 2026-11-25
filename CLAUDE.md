@@ -5,6 +5,7 @@ Multi-tenant institute management SaaS. Users are "Roviqians", usernames are "Ro
 - **Say "institute", never "school" or "organization"**, everywhere: code, comments, docs, UI, Linear. The infra word is **"tenant"** (`tenant_id`, RLS, `withTenant()`, JWT claims, NATS headers).
 - **Not in production yet.** You may reset the database, alter any migration, and rewrite code written by older models to cut bugs, tighten security or reduce debt. Use that freedom inside the issue you are working on; a rewrite or redesign that no issue asks for is a proposal to the user first.
 - **Linear issues and this repository are public.** Hosting, provider, cost and backup details go in a Linear document, never in an issue, a comment, a commit or `docs/`.
+- **No personal information in anything public**: an issue, a comment, a commit, a pull request or `docs/`. That covers a person's name, e-mail, phone and location, and the developer's own computer: its hardware, memory, paths, user name and what else runs on it. Say "the development machine" and give the setting, not the measurement.
 
 ## What to work on
 
