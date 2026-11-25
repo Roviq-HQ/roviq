@@ -1,0 +1,95 @@
+{
+  "academicYears.form.endDate": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.create": "0bf64f3dbcc423c1",
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.update": "9fac9804531fd93a",
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.validateNoOverlap": "8c5ebe8fc73c50a3",
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#OVERLAP_VALIDATED_INSTITUTE_TYPES": "f5dcfb65e6052a1b",
+      "apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.findOverlapping": "21fb414830fb355b",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/edit-year-sheet.tsx#buildSchema": "443bddf63e837fd9"
+    }
+  },
+  "academicYears.form.label": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.validateLabelMatchesDates": "10915941a514990b",
+      "apps/api-gateway/src/institute/academic-year/dto/create-academic-year.input.ts#CreateAcademicYearInput.label": "9c93a4d72c427d44",
+      "apps/api-gateway/src/institute/academic-year/dto/update-academic-year.input.ts#UpdateAcademicYearInput.label": "7fe45e0f610c3d3f",
+      "apps/api-gateway/src/institute/certificate/export-file-name.ts#complianceExportFileName": "1d853ed6c0949f23",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/edit-year-sheet.tsx#buildSchema": "443bddf63e837fd9"
+    }
+  },
+  "academicYears.form.startDate": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#AcademicYearService.validateNoOverlap": "8c5ebe8fc73c50a3",
+      "apps/api-gateway/src/institute/academic-year/academic-year.service.ts#OVERLAP_VALIDATED_INSTITUTE_TYPES": "f5dcfb65e6052a1b",
+      "apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.findOverlapping": "21fb414830fb355b",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/edit-year-sheet.tsx#buildSchema": "443bddf63e837fd9"
+    }
+  },
+  "academicYears.form.termStructure": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/academic-year/dto/create-academic-year.input.ts#CreateAcademicYearInput.termStructure": "204243dd368f1ab5",
+      "apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.create": "baa5d48342ac88e1",
+      "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d"
+    }
+  },
+  "staff.new.department": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
+      "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.department": "96f6cbcbba2f0240",
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.department": "c5dedfb6acc7e29d",
+      "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.department": "0364f68ec2130e0a"
+    }
+  },
+  "staff.new.designation": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
+      "apps/api-gateway/src/institute/staff/dto/create-staff.input.ts#CreateStaffInput.designation": "bd60592071f278a7",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.list": "275a897c95017621",
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.designation": "fdac23bde0a2076e",
+      "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.designation": "de31c2c7f8ad135a"
+    }
+  },
+  "staff.new.employeeId": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
+      "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
+      "apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts#StaffDrizzleRepository.nextEmployeeId": "2495666d6de5f979",
+      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "78dfdec2b894ed29",
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employeeId": "f9e8a61520422893",
+      "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.employeeId": "e7eb23b0b39dcabe"
+    }
+  },
+  "staff.new.employmentType": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
+      "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#employmentTypeLabel": "77f867f8fc3f9ec3",
+      "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#natureOfAppointment": "258551f6a99f01be",
+      "apps/api-gateway/src/institute/staff/staff.service.ts#StaffService.create": "78dfdec2b894ed29",
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.employmentType": "475b302d88f226a3",
+      "libs/database/src/schema/user-profiles/staff-profiles.ts#staffProfiles.employmentType": "10cdeeee06753925",
+      "libs/shared/common-types/src/lib/enums/user-profile.ts#EMPLOYMENT_TYPE_VALUES": "94efbeee1c41000e"
+    }
+  },
+  "staff.new.socialCategory": {
+    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "targets": {
+      "apps/api-gateway/src/institute/certificate/exports/bseh-staff-statement.export.ts#buildBsehStaffStatement": "e15b08cbc3f69159",
+      "apps/api-gateway/src/institute/certificate/exports/export-helpers.ts#socialCategoryLabel": "3bbe711f064dffa2",
+      "apps/api-gateway/src/institute/certificate/exports/shala-darpan.export.ts#buildShalaDarpanExport": "af44050a2219aa66",
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/staff/new/page.tsx#buildSchema.socialCategory": "dedf1ebf4ff4ed89",
+      "libs/shared/common-types/src/lib/enums/user-profile.ts#SOCIAL_CATEGORY_VALUES": "bbeddad581aafbe2"
+    }
+  }
+}

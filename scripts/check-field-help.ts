@@ -24,12 +24,25 @@
 //    text allowed there. A section intro under a plain `<FieldLegend>` is not a field and passes.
 //    Instructions a person needs to fill the field go after the input; explanations go in the topic.
 //
+// 3. Drift. Each help file has a `<form>.help.sources.ts` naming the code every topic describes,
+//    and `field-help.lock.json` holds the fingerprints reviewed last. A topic with no sources entry,
+//    a target that does not resolve, or a fingerprint that differs from the lock fails, printing
+//    only that topic's English hint and body and the changed targets. Editing the copy does not
+//    clear it; `pnpm help:ack <topic> --reason "…"` does. Details: scripts/lib/field-help-drift.ts.
+//
 // No allowlist. Run via `pnpm check:field-help`.
 
 import { type Dirent, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { HELP_LIMITS } from '../libs/frontend/ui/src/form/help/field-help';
+import {
+  checkDrift,
+  formatDrift,
+  LOCK_FILE,
+  parseLock,
+  SOURCES_SUFFIX,
+} from './lib/field-help-drift';
 
 const ROOT = process.cwd();
 const WEB_SRC = 'apps/web/src';
@@ -82,6 +95,9 @@ export interface HelpTopic {
   exportName: string;
   key: string;
   id: string;
+  /** English copy, printed by the drift check. */
+  hint?: string;
+  body?: string;
 }
 
 function parse(file: string, text: string, kind: ts.ScriptKind): ts.SourceFile {
@@ -154,6 +170,13 @@ function checkHelpText(
     }
   }
   return problems;
+}
+
+function englishText(node: ts.Expression | undefined): string | undefined {
+  const obj = node ? objectLiteral(node) : null;
+  const prop = obj?.properties.find((p) => propName(p) === 'en');
+  const value = prop && ts.isPropertyAssignment(prop) ? stringValue(prop.initializer) : null;
+  return value ?? undefined;
 }
 
 function articleImport(node: ts.Expression): ts.StringLiteral | null {
@@ -292,7 +315,16 @@ function readDefineCall(
       continue;
     }
     const id = `${scope}.${key}`;
-    topics.push({ file, line: lineOf(source, prop), exportName, key, id });
+    const fields = topicFields(topic);
+    topics.push({
+      file,
+      line: lineOf(source, prop),
+      exportName,
+      key,
+      id,
+      hint: englishText(fields.get('hint')),
+      body: englishText(fields.get('body')),
+    });
     problems.push(...checkTopic({ source, id, exists }, prop, topic));
   }
   return { topics, problems };
@@ -595,18 +627,37 @@ function read(paths: string[]): Array<{ file: string; text: string }> {
   return paths.map((path) => ({ file: relative(ROOT, path), text: readFileSync(path, 'utf8') }));
 }
 
-function main(): void {
+/** Help files, their sources files, and the app files that use them. */
+export function loadFieldHelp(root: string) {
   const helpPaths: string[] = [];
-  walkFiles(join(ROOT, HELP_DIR), (name) => name.endsWith('.ts'), helpPaths);
+  walkFiles(
+    join(root, HELP_DIR),
+    (name) => name.endsWith('.ts') && !name.endsWith(SOURCES_SUFFIX),
+    helpPaths,
+  );
+  const sourcesPaths: string[] = [];
+  walkFiles(join(root, HELP_DIR), (name) => name.endsWith(SOURCES_SUFFIX), sourcesPaths);
   const appPaths: string[] = [];
   walkFiles(
-    join(ROOT, WEB_SRC),
+    join(root, WEB_SRC),
     (name) => (name.endsWith('.ts') || name.endsWith('.tsx')) && !name.endsWith('.d.ts'),
     appPaths,
   );
   const helpFiles = read(helpPaths.sort());
-  const helpSet = new Set(helpFiles.map((f) => f.file));
+  const sourcesFiles = read(sourcesPaths.sort());
+  const helpSet = new Set([...helpFiles, ...sourcesFiles].map((f) => f.file));
   const appFiles = read(appPaths.sort()).filter((f) => !helpSet.has(f.file));
+  const topics = helpFiles.flatMap(({ file, text }) => readHelpFile(file, text, () => true).topics);
+  return { helpFiles, sourcesFiles, appFiles, topics };
+}
+
+export function readRepoFile(path: string): string | null {
+  const full = resolve(ROOT, path);
+  return existsSync(full) ? readFileSync(full, 'utf8') : null;
+}
+
+function main(): void {
+  const { helpFiles, sourcesFiles, appFiles, topics } = loadFieldHelp(ROOT);
 
   const problems = [
     ...checkTopics(helpFiles, appFiles, (path) =>
@@ -616,6 +667,13 @@ function main(): void {
       .filter((f) => f.file.endsWith('.tsx'))
       .flatMap(({ file, text }) => findTextBeforeInput(file, text)),
   ];
+  const { problems: driftProblems, drift } = checkDrift(
+    topics,
+    sourcesFiles,
+    parseLock(readRepoFile(LOCK_FILE)),
+    readRepoFile,
+  );
+  problems.push(...driftProblems);
 
   if (problems.length > 0) {
     console.error('check:field-help found problems:\n');
@@ -623,6 +681,11 @@ function main(): void {
     console.error(
       `\n${problems.length} problem(s). See docs/frontend.md → "Field help" and .claude/skills/frontend-ux/SKILL.md [DNMPQ].`,
     );
+    if (drift.length > 0) console.error(`\n${formatDrift(drift)}`);
+    process.exit(1);
+  }
+  if (drift.length > 0) {
+    console.error(`check:field-help: ${formatDrift(drift)}`);
     process.exit(1);
   }
   console.log(

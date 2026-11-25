@@ -32,6 +32,7 @@ Go through every row. A row that does not apply is skipped; a row that applies i
 | A setting, a secret, a migration step or anything production needs | `.env.example`, the app's env validation, and a section in `docs/deployment.md` |
 | Steps for a developer task | `docs/guides/` |
 | A new shared UI component | `docs/frontend.md` → "Common components" |
+| A default, accepted value, permission, validation or effect that a field's help describes (frontend or backend) | Mandatory: the help topics in `apps/web/src/help/` that describe it. Name the topics you reviewed, update their copy in `en` and `hi`, move their entries in `<form>.help.sources.ts` when the behaviour moves, or say why the help still holds; then `pnpm help:ack <topic> --reason "…"`. `pnpm check:field-help` names the topics whose listed code changed; this row also covers code no sources file lists |
 | A new event or stream | `docs/guides/events.md` |
 | A rule agents must follow, a new gate, a trap | `CLAUDE.md` (one line), full text in `docs/references/`, and the matching skill in `.claude/skills/` |
 | A fix to test tooling | Append to `docs/changelogs/testing-troubleshooting.md`; never edit an old entry |

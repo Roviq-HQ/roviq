@@ -42,6 +42,12 @@ export interface FieldHelpTopic extends FieldHelpTopicInput {
   id: string;
 }
 
+/**
+ * The code each topic describes, for the drift check (`<form>.help.sources.ts`, never imported by
+ * a form): `file`, `file#Symbol` or `file#Symbol.member`, relative to the repository root.
+ */
+export type HelpSources<T> = { readonly [K in keyof T]: readonly string[] };
+
 type DefinedTopics<TScope extends string, T extends Record<string, FieldHelpTopicInput>> = {
   readonly [K in keyof T & string]: T[K] & { readonly id: `${TScope}.${K}` };
 };
