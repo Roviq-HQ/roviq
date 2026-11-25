@@ -243,7 +243,10 @@
     "isPassing": "उत्तीर्ण",
     "addBand": "बैंड जोड़ें",
     "saveBands": "बैंड सहेजें",
-    "kinds": { "SCHOLASTIC": "शैक्षणिक", "CO_SCHOLASTIC": "सह-शैक्षणिक" },
+    "kinds": {
+      "SCHOLASTIC": "शैक्षणिक",
+      "CO_SCHOLASTIC": "सह-शैक्षणिक"
+    },
     "noSchemes": "अभी कोई ग्रेडिंग योजना नहीं।",
     "created": "ग्रेडिंग योजना बनाई गई",
     "bandsSaved": "ग्रेड बैंड सहेजे गए",
@@ -281,11 +284,9 @@
   },
   "errors": {
     "generic": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
-    "EXAM_NAME_DUPLICATE": "इस वर्ष इस नाम की परीक्षा पहले से मौजूद है।",
     "EXAM_MARKS_OUT_OF_RANGE": "अंक अनुमत सीमा से बाहर हैं।",
     "EXAM_NOT_IN_MARKS_ENTRY": "अंक दर्ज करने से पहले अंक प्रविष्टि खोलें।",
     "INVALID_STATE_TRANSITION": "वह स्थिति परिवर्तन अनुमत नहीं है।",
-    "GRADING_SCHEME_INVALID_BANDS": "ग्रेड बैंड बिना अंतराल/ओवरलैप के 0–100 कवर करें।",
     "GRADING_SCHEME_IN_USE": "यह योजना संदर्भित है और हटाई नहीं जा सकती।",
     "REPORT_CARD_GENERATION_FAILED": "रिपोर्ट कार्ड निर्माण विफल। परीक्षाएँ व अंक जाँचें।"
   }

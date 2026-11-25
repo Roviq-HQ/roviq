@@ -4,10 +4,12 @@ import {
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  mapUniqueViolation,
   mkInstituteCtx,
   softDelete,
   standards,
   standardsLive,
+  type UniqueViolationErrors,
   withTenant,
 } from '@roviq/database';
 import { getRequestContext } from '@roviq/request-context';
@@ -58,6 +60,19 @@ const writeReturning = {
   updatedAt: standards.updatedAt,
 } as const;
 
+const STANDARD_TAKEN: UniqueViolationErrors = {
+  standards_tenant_year_name_key: () =>
+    new BusinessException(
+      ErrorCode.STANDARD_NAME_DUPLICATE,
+      'A standard with this name already exists in this academic year',
+    ),
+  standards_tenant_year_order_key: () =>
+    new BusinessException(
+      ErrorCode.STANDARD_ORDER_DUPLICATE,
+      'A standard with this numeric order already exists in this academic year',
+    ),
+};
+
 @Injectable()
 export class StandardDrizzleRepository extends StandardRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -92,36 +107,40 @@ export class StandardDrizzleRepository extends StandardRepository {
   async create(data: CreateStandardData): Promise<CreateStandardResult> {
     const tenantId = this.getTenantId();
     const { userId } = getRequestContext();
-    return withTenant(this.db, mkInstituteCtx(tenantId, 'repository:standard'), async (tx) => {
-      // The foreign key accepts any institute's year; RLS on the view does not.
-      const [year] = await tx
-        .select({ id: academicYearsLive.id })
-        .from(academicYearsLive)
-        .where(eq(academicYearsLive.id, data.academicYearId))
-        .limit(1);
-      if (!year) return { kind: 'year_not_found' };
+    return withTenant<CreateStandardResult>(
+      this.db,
+      mkInstituteCtx(tenantId, 'repository:standard'),
+      async (tx) => {
+        // The foreign key accepts any institute's year; RLS on the view does not.
+        const [year] = await tx
+          .select({ id: academicYearsLive.id })
+          .from(academicYearsLive)
+          .where(eq(academicYearsLive.id, data.academicYearId))
+          .limit(1);
+        if (!year) return { kind: 'year_not_found' };
 
-      const rows = await tx
-        .insert(standards)
-        .values({
-          tenantId,
-          academicYearId: data.academicYearId,
-          name: data.name,
-          numericOrder: data.numericOrder,
-          level: data.level as (typeof standards.level.enumValues)[number] | undefined,
-          nepStage: data.nepStage as (typeof standards.nepStage.enumValues)[number] | undefined,
-          department: data.department,
-          isBoardExamClass: data.isBoardExamClass,
-          streamApplicable: data.streamApplicable,
-          maxSectionsAllowed: data.maxSectionsAllowed,
-          maxStudentsPerSection: data.maxStudentsPerSection,
-          udiseClassCode: data.udiseClassCode,
-          createdBy: userId,
-          updatedBy: userId,
-        })
-        .returning(writeReturning);
-      return { kind: 'ok', record: rows[0] as StandardRecord };
-    });
+        const rows = await tx
+          .insert(standards)
+          .values({
+            tenantId,
+            academicYearId: data.academicYearId,
+            name: data.name,
+            numericOrder: data.numericOrder,
+            level: data.level as (typeof standards.level.enumValues)[number] | undefined,
+            nepStage: data.nepStage as (typeof standards.nepStage.enumValues)[number] | undefined,
+            department: data.department,
+            isBoardExamClass: data.isBoardExamClass,
+            streamApplicable: data.streamApplicable,
+            maxSectionsAllowed: data.maxSectionsAllowed,
+            maxStudentsPerSection: data.maxStudentsPerSection,
+            udiseClassCode: data.udiseClassCode,
+            createdBy: userId,
+            updatedBy: userId,
+          })
+          .returning(writeReturning);
+        return { kind: 'ok', record: rows[0] as StandardRecord };
+      },
+    ).catch(mapUniqueViolation(STANDARD_TAKEN));
   }
 
   async update(id: string, data: UpdateStandardData): Promise<StandardRecord> {
@@ -157,7 +176,7 @@ export class StandardDrizzleRepository extends StandardRepository {
       if (rows.length === 0)
         throw new BusinessException(ErrorCode.STANDARD_NOT_FOUND, `Standard ${id} not found`);
       return rows[0] as StandardRecord;
-    });
+    }).catch(mapUniqueViolation(STANDARD_TAKEN));
   }
 
   async softDelete(id: string): Promise<void> {

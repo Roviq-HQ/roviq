@@ -8,12 +8,14 @@ import {
   type DrizzleDB,
   instituteConfigsLive,
   institutesLive,
+  mapUniqueViolation,
   mkAdminCtx,
   mkInstituteCtx,
   sectionsLive,
   softDelete,
   standardsLive,
   type TermConfig,
+  type UniqueViolationErrors,
   withAdmin,
   withTenant,
   yearRolloverSectionMap,
@@ -60,6 +62,24 @@ const writeReturning = {
   createdAt: academicYears.createdAt,
   updatedAt: academicYears.updatedAt,
 } as const;
+
+// The label key also counts deleted years, which the overlap check reads past.
+const LABEL_TAKEN: UniqueViolationErrors = {
+  academic_years_tenant_label_key: () =>
+    new BusinessException(
+      ErrorCode.ACADEMIC_YEAR_LABEL_DUPLICATE,
+      'An academic year with this label already exists in this institute',
+    ),
+};
+
+// The previous year is deactivated first; only a second activation running at once gets here.
+const ALREADY_ACTIVE: UniqueViolationErrors = {
+  academic_years_tenant_active_key: () =>
+    new BusinessException(
+      ErrorCode.YEAR_ALREADY_ACTIVE,
+      'Another academic year is already active for this institute',
+    ),
+};
 
 @Injectable()
 export class AcademicYearDrizzleRepository extends AcademicYearRepository {
@@ -320,7 +340,7 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
         })
         .returning(writeReturning);
       return rows[0] as AcademicYearRecord;
-    });
+    }).catch(mapUniqueViolation(LABEL_TAKEN));
   }
 
   async update(id: string, data: UpdateAcademicYearData): Promise<AcademicYearRecord> {
@@ -348,7 +368,7 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
           `Academic year ${id} not found`,
         );
       return rows[0] as AcademicYearRecord;
-    });
+    }).catch(mapUniqueViolation(LABEL_TAKEN));
   }
 
   async activate(id: string, previousActiveId: string | null): Promise<AcademicYearRecord> {
@@ -376,7 +396,7 @@ export class AcademicYearDrizzleRepository extends AcademicYearRepository {
           `Academic year ${id} not found`,
         );
       return rows[0] as AcademicYearRecord;
-    });
+    }).catch(mapUniqueViolation(ALREADY_ACTIVE));
   }
 
   async updateStatus(id: string, status: AcademicYearStatus): Promise<AcademicYearRecord> {

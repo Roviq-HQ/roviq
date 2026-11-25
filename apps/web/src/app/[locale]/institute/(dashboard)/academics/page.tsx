@@ -33,6 +33,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { AcademicYearSelector } from '@web/components/pickers/academic-year-picker';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { Check, GraduationCap, Layers, List, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -83,7 +84,7 @@ function buildStandardSchema(
   defaultLocale: string,
 ) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.STANDARD_NAME_DUPLICATE'), defaultLocale),
+    name: buildI18nTextSchema(t('errors.nameRequired'), defaultLocale),
     numericOrder: z.number().int().min(MIN_STANDARD_NUMERIC_ORDER),
     level: z.union([z.enum(LEVEL_VALUES), z.literal('')]),
     nepStage: z.union([z.enum(NEP_STAGE_VALUES), z.literal('')]),
@@ -123,17 +124,15 @@ const EMPTY_STANDARD_DEFAULTS: StandardFormValues = {
   maxStudentsPerSection: 40,
 };
 
-function applyDuplicateNameError(
-  err: unknown,
-  fallback: string,
-  setNameError: (message: string) => void,
-  duplicateMessage: string,
-) {
-  if (extractGraphQLErrorCode(err) === 'STANDARD_NAME_DUPLICATE') {
-    setNameError(duplicateMessage);
-    return;
+function standardErrorField(code: string | null) {
+  switch (code) {
+    case 'STANDARD_NAME_DUPLICATE':
+      return 'name.en' as const;
+    case 'STANDARD_ORDER_DUPLICATE':
+      return 'numericOrder' as const;
+    default:
+      return null;
   }
-  toast.error(fallback);
 }
 
 export default function AcademicsPage() {
@@ -398,6 +397,7 @@ function buildNepStageOptions(t: ReturnType<typeof useTranslations<'academics'>>
 function CreateStandardDialog({ yearId }: { yearId: string }) {
   const t = useTranslations('academics');
   const { createStandard, loading } = useCreateStandard();
+  const errorCopy = useErrorCopy();
   const [open, setOpen] = React.useState(false);
 
   const { defaultLocale } = useInstituteLocales();
@@ -427,14 +427,9 @@ function CreateStandardDialog({ yearId }: { yearId: string }) {
         setOpen(false);
         form.reset();
       } catch (err) {
-        applyDuplicateNameError(
-          err,
-          t('errors.generic'),
-          (message) => {
-            setServerFieldError(form, 'name.en', message);
-          },
-          t('errors.STANDARD_NAME_DUPLICATE'),
-        );
+        const field = standardErrorField(extractGraphQLErrorCode(err));
+        if (field) setServerFieldError(form, field, errorCopy(err));
+        else toast.error(errorCopy(err));
       }
     },
   });
@@ -584,6 +579,7 @@ function EditStandardSheet({
 }) {
   const t = useTranslations('academics');
   const { updateStandard, loading } = useUpdateStandard();
+  const errorCopy = useErrorCopy();
 
   const { defaultLocale } = useInstituteLocales();
   const schema = React.useMemo(() => buildStandardSchema(t, defaultLocale), [t, defaultLocale]);
@@ -625,14 +621,9 @@ function EditStandardSheet({
         toast.success(t('updated'));
         onOpenChange(false);
       } catch (err) {
-        applyDuplicateNameError(
-          err,
-          t('errors.generic'),
-          (message) => {
-            setServerFieldError(form, 'name.en', message);
-          },
-          t('errors.STANDARD_NAME_DUPLICATE'),
-        );
+        const field = standardErrorField(extractGraphQLErrorCode(err));
+        if (field) setServerFieldError(form, field, errorCopy(err));
+        else toast.error(errorCopy(err));
       }
     },
   });

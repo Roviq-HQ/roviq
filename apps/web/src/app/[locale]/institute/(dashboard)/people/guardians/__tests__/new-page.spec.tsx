@@ -6,12 +6,15 @@
  * difficult to open in happy-dom, so we verify each education level via its
  * shared enum + messages JSON rather than by interacting with the trigger.
  */
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { GUARDIAN_EDUCATION_LEVEL_VALUES } from '@roviq/common-types';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import errorEn from '../../../../../../../../messages/en/error.json';
 import baseGuardianMessages from '../../../../../../../../messages/en/guardians.json';
+import errorHi from '../../../../../../../../messages/hi/error.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 
 // ── next/navigation ───────────────────────────────────────
@@ -271,5 +274,33 @@ describe('CreateGuardianPage (component)', () => {
     renderPage();
     await user.click(screen.getByTestId('guardian-new-back-btn'));
     expect(pushMock).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['en', errorEn.EMAIL_TAKEN],
+    ['hi', errorHi.EMAIL_TAKEN],
+  ] as const)('shows a taken email on the email field in %s (ROV-358)', async (locale, message) => {
+    createGuardianMock.mockReset();
+    createGuardianMock.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'raw server text', extensions: { code: 'EMAIL_TAKEN' } }],
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<CreateGuardianPage />, { locale });
+
+    await user.type(screen.getAllByRole('textbox')[0], 'Sanjay');
+    const email = screen.getByRole('textbox', { name: /email|ईमेल/i });
+    await user.type(email, 'sanjay@example.com');
+    const submit = screen
+      .getAllByRole('button')
+      .find((b) => (b as HTMLButtonElement).type === 'submit');
+    if (!submit) throw new Error('submit button missing');
+    await user.click(submit);
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(toastError).toHaveBeenCalledWith(message);
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
   });
 });

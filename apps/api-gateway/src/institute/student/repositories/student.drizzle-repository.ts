@@ -1,9 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AcademicStatus, AppAbility, UserDocumentType } from '@roviq/common-types';
+import {
+  type AcademicStatus,
+  type AppAbility,
+  BusinessException,
+  ErrorCode,
+  type UserDocumentType,
+} from '@roviq/common-types';
 import {
   academicYearsLive,
   DRIZZLE_DB,
   type DrizzleDB,
+  mapUniqueViolation,
   mkAdminCtx,
   mkInstituteCtx,
   softDelete,
@@ -11,6 +18,7 @@ import {
   studentProfiles,
   studentProfilesLive,
   tenantUserProfilesLive,
+  type UniqueViolationErrors,
   userDocuments,
   userDocumentsLive,
   withAdmin,
@@ -43,6 +51,15 @@ import type {
 } from './types';
 
 const ORIGIN = 'service:student';
+
+// Restore checks the number first; only a student admitted at the same moment gets here.
+const ADMISSION_NUMBER_TAKEN: UniqueViolationErrors = {
+  idx_student_admission_no_active: () =>
+    new BusinessException(
+      ErrorCode.ADMISSION_NUMBER_TAKEN,
+      'The admission number is now used by another student',
+    ),
+};
 
 @Injectable()
 export class StudentDrizzleRepository extends StudentRepository {
@@ -304,29 +321,33 @@ export class StudentDrizzleRepository extends StudentRepository {
   }
 
   restore(tenantId: string, id: string, actorId: string): Promise<RestoreStudentResult> {
-    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
-      const [deleted] = await tx
-        .select({ admissionNumber: studentProfiles.admissionNumber })
-        .from(studentProfiles) // allow-base-read: restore looks up a trashed row
-        .where(and(eq(studentProfiles.id, id), isNotNull(studentProfiles.deletedAt)));
-      if (!deleted) return { kind: 'not_found' };
+    return withTenant<RestoreStudentResult>(
+      this.db,
+      mkInstituteCtx(tenantId, ORIGIN),
+      async (tx) => {
+        const [deleted] = await tx
+          .select({ admissionNumber: studentProfiles.admissionNumber })
+          .from(studentProfiles) // allow-base-read: restore looks up a trashed row
+          .where(and(eq(studentProfiles.id, id), isNotNull(studentProfiles.deletedAt)));
+        if (!deleted) return { kind: 'not_found' };
 
-      // The admission number is unique among live students only, so it may
-      // have been reissued while this record sat in the Deleted list.
-      const [taken] = await tx
-        .select({ id: studentProfilesLive.id })
-        .from(studentProfilesLive)
-        .where(eq(studentProfilesLive.admissionNumber, deleted.admissionNumber))
-        .limit(1);
-      if (taken) {
-        return { kind: 'admission_number_taken', admissionNumber: deleted.admissionNumber };
-      }
+        // The admission number is unique among live students only, so it may
+        // have been reissued while this record sat in the Deleted list.
+        const [taken] = await tx
+          .select({ id: studentProfilesLive.id })
+          .from(studentProfilesLive)
+          .where(eq(studentProfilesLive.admissionNumber, deleted.admissionNumber))
+          .limit(1);
+        if (taken) {
+          return { kind: 'admission_number_taken', admissionNumber: deleted.admissionNumber };
+        }
 
-      await tx
-        .update(studentProfiles)
-        .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
-        .where(eq(studentProfiles.id, id));
-      return { kind: 'restored' };
-    });
+        await tx
+          .update(studentProfiles)
+          .set({ deletedAt: null, deletedBy: null, updatedBy: actorId })
+          .where(eq(studentProfiles.id, id));
+        return { kind: 'restored' };
+      },
+    ).catch(mapUniqueViolation(ADMISSION_NUMBER_TAKEN));
   }
 }

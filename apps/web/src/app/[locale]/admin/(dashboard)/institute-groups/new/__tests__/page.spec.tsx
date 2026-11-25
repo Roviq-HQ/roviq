@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +23,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));
 
+import errorEn from '../../../../../../../../messages/en/error.json';
 import instituteGroupsMessages from '../../../../../../../../messages/en/instituteGroups.json';
 import instituteSettingsMessages from '../../../../../../../../messages/en/instituteSettings.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
@@ -108,5 +110,31 @@ describe('NewInstituteGroupPage (admin)', () => {
       expect(screen.queryByText(/expected number/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/received NaN/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('shows a taken code on the code field (ROV-358)', async () => {
+    createGroupMock.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [
+          { message: 'raw server text', extensions: { code: 'INSTITUTE_GROUP_CODE_DUPLICATE' } },
+        ],
+      }),
+    );
+    renderWithProviders(<NewInstituteGroupPage />, { messages });
+
+    await userEvent.type(screen.getByLabelText(/group name/i), 'Acme Trust');
+    const code = screen
+      .getAllByLabelText(/short code/i)
+      .find((el) => el.tagName === 'INPUT') as HTMLInputElement;
+    await userEvent.type(code, 'acme-trust');
+    const submit = screen
+      .getAllByRole('button', { name: /create group/i })
+      .find((b) => (b as HTMLButtonElement).type === 'submit');
+    if (!submit) throw new Error('submit button missing');
+    await userEvent.click(submit);
+
+    expect(await screen.findByText(errorEn.INSTITUTE_GROUP_CODE_DUPLICATE)).toBeInTheDocument();
+    expect(code).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
   });
 });

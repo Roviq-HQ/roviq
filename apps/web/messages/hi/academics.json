@@ -109,15 +109,11 @@
     "arts": "कला"
   },
   "errors": {
-    "STANDARD_NAME_DUPLICATE": "इस नाम की कक्षा पहले से मौजूद है",
-    "SECTION_NAME_DUPLICATE": "इस नाम का वर्ग पहले से मौजूद है",
-    "STREAM_REQUIRED": "इस कक्षा के लिए धारा आवश्यक है",
-    "SECTION_CAPACITY_EXCEEDED": "वर्ग की क्षमता पार हो गई",
     "HAS_ACTIVE_ENROLLMENTS": "हटा नहीं सकते — छात्र नामांकित हैं",
     "HAS_RECORDED_ASSESSMENTS": "हटा नहीं सकते — मूल्यांकन दर्ज हैं",
-    "SUBJECT_CODE_DUPLICATE": "बोर्ड कोड इस कक्षा में पहले से उपयोग में है",
     "CONCURRENT_MODIFICATION": "किसी और ने इसे संशोधित किया है। कृपया पुनः लोड करें।",
-    "generic": "कुछ गलत हो गया। फिर से कोशिश करें; बार-बार हो तो सहायता से संपर्क करें।"
+    "generic": "कुछ गलत हो गया। फिर से कोशिश करें; बार-बार हो तो सहायता से संपर्क करें।",
+    "nameRequired": "नाम लिखें।"
   },
   "accessDenied": "आपको शैक्षणिक संरचना देखने की अनुमति नहीं है।",
   "deleteConfirmTitle": "{name} हटाएँ?",

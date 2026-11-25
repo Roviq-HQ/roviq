@@ -1,6 +1,7 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
 import { DomainGroupType, DynamicGroupStatus, GroupMembershipType } from '@roviq/common-types';
 import {
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -92,6 +93,7 @@ export class CreateGroupInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayUnique()
   @IsUUID('all', { each: true })
   childGroupIds?: string[];
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { GROUP_TYPE_VALUES, INDIAN_STATE_VALUES, optionalAddressSchema } from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -14,6 +15,7 @@ import {
   FieldInfoPopover,
   FieldLegend,
   FieldSet,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
@@ -141,7 +143,11 @@ export default function NewInstituteGroupPage() {
         toast.success(t('created'));
         router.push('/admin/institute-groups');
       } catch (err) {
-        toast.error(errorCopy(err, t('createFailed')));
+        if (extractGraphQLErrorCode(err) === 'INSTITUTE_GROUP_CODE_DUPLICATE') {
+          setServerFieldError(form, 'code', errorCopy(err));
+        } else {
+          toast.error(errorCopy(err, t('createFailed')));
+        }
       }
     },
   });

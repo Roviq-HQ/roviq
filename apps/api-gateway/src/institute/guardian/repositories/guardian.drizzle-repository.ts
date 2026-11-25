@@ -14,6 +14,7 @@ import {
   studentGuardianLinksLive,
   studentProfilesLive,
   tenantUserProfilesLive,
+  uniqueViolationConstraint,
   withTenant,
 } from '@roviq/database';
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
@@ -364,8 +365,9 @@ export class GuardianDrizzleRepository extends GuardianRepository {
       return { kind: 'ok', link };
     } catch (error) {
       // The unique index refuses a second link of the same pair; the transaction is rolled back.
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('uq_student_guardian')) return { kind: 'already_linked' };
+      if (uniqueViolationConstraint(error) === 'uq_student_guardian') {
+        return { kind: 'already_linked' };
+      }
       throw error;
     }
   }

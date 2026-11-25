@@ -9,10 +9,12 @@ import {
   instituteGroupsLive,
   institutes,
   institutesLive,
+  mapUniqueViolation,
   mkAdminCtx,
   mkInstituteCtx,
   mkResellerCtx,
   softDelete,
+  type UniqueViolationErrors,
   withAdmin,
   withReseller,
   withTenant,
@@ -68,6 +70,22 @@ const membershipWriteReturning = {
 
 // SECURITY: withAdmin methods here are for admin resolvers only. Institute scope uses
 // findForTenant; reseller scope uses the *ForReseller methods, which run under RLS (ROV-290).
+const CODE_TAKEN: UniqueViolationErrors = {
+  institute_groups_code_key: () =>
+    new BusinessException(
+      ErrorCode.INSTITUTE_GROUP_CODE_DUPLICATE,
+      'An institute group with this code already exists',
+    ),
+};
+
+const MEMBER_TAKEN: UniqueViolationErrors = {
+  group_memberships_user_group_key: () =>
+    new BusinessException(
+      ErrorCode.INSTITUTE_GROUP_MEMBER_DUPLICATE,
+      'This user is already a member of this institute group',
+    ),
+};
+
 @Injectable()
 export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {
@@ -156,7 +174,7 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .returning(groupColumns);
 
       return rows[0] as InstituteGroupRecord;
-    });
+    }).catch(mapUniqueViolation(CODE_TAKEN));
   }
 
   async update(id: string, data: UpdateInstituteGroupData): Promise<InstituteGroupRecord> {
@@ -381,7 +399,7 @@ export class InstituteGroupDrizzleRepository extends InstituteGroupRepository {
         .returning(membershipWriteReturning);
 
       return rows[0] as GroupMembershipRecord;
-    });
+    }).catch(mapUniqueViolation(MEMBER_TAKEN));
   }
 
   async removeMember(groupId: string, userId: string): Promise<void> {

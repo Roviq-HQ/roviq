@@ -1,6 +1,6 @@
 'use client';
 
-import { gql, useMutation } from '@roviq/graphql';
+import { extractGraphQLErrorCode, gql, useMutation } from '@roviq/graphql';
 import { useFormatDate, zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -27,6 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
   Spinner,
+  setServerFieldError,
   useAppForm,
   useFormHelpMode,
 } from '@roviq/ui';
@@ -161,7 +162,11 @@ export function EditYearSheet({ year, open, onOpenChange }: EditYearSheetProps) 
         toast.success(t('saved'));
         onOpenChange(false);
       } catch (err) {
-        toast.error(errorCopy(err));
+        if (extractGraphQLErrorCode(err) === 'ACADEMIC_YEAR_LABEL_DUPLICATE') {
+          setServerFieldError(form, 'label', errorCopy(err));
+        } else {
+          toast.error(errorCopy(err));
+        }
       }
     },
   });

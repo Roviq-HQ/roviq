@@ -1,5 +1,6 @@
 'use client';
 
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import {
   buildI18nTextSchema,
   useFormatDate,
@@ -38,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
+  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
@@ -463,7 +465,7 @@ function buildWizardSchema(
   defaultLocale: string,
 ) {
   return z.object({
-    name: buildI18nTextSchema(t('errors.TIMETABLE_NAME_DUPLICATE'), defaultLocale),
+    name: buildI18nTextSchema(t('errors.nameRequired'), defaultLocale),
     description: z.string(),
     sectionIds: z.array(z.string()).min(1),
     effectiveFrom: z.string().regex(DATE_REGEX),
@@ -540,7 +542,11 @@ function CreateTimetableWizard({
         form.reset(EMPTY_WIZARD);
         setOpen(false);
       } catch (err) {
-        toast.error(mapError(err, t));
+        if (extractGraphQLErrorCode(err) === 'TIMETABLE_NAME_DUPLICATE') {
+          setServerFieldError(form, 'name.en', mapError(err, t));
+        } else {
+          toast.error(mapError(err, t));
+        }
       }
     },
   });

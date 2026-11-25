@@ -1,6 +1,7 @@
 'use client';
 
 import { GENDER_VALUES, GUARDIAN_EDUCATION_LEVEL_VALUES } from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import {
   buildI18nTextSchema,
   emptyStringToUndefined,
@@ -17,6 +18,7 @@ import {
   FieldLegend,
   FieldSet,
   I18nField,
+  setServerFieldError,
   useAppForm,
   useBreadcrumbOverride,
 } from '@roviq/ui';
@@ -94,6 +96,9 @@ export default function CreateGuardianPage() {
         const id = result.data?.createGuardian.id;
         router.push(id ? `/people/guardians/${id}` : '/people/guardians');
       } catch (err) {
+        if (extractGraphQLErrorCode(err) === 'EMAIL_TAKEN') {
+          setServerFieldError(form, 'email', errorCopy(err));
+        }
         toast.error(errorCopy(err, t('new.errors.generic')));
       }
     },

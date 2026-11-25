@@ -243,7 +243,10 @@
     "isPassing": "Passing",
     "addBand": "Add band",
     "saveBands": "Save bands",
-    "kinds": { "SCHOLASTIC": "Scholastic", "CO_SCHOLASTIC": "Co-scholastic" },
+    "kinds": {
+      "SCHOLASTIC": "Scholastic",
+      "CO_SCHOLASTIC": "Co-scholastic"
+    },
     "noSchemes": "No grading schemes yet.",
     "created": "Grading scheme created",
     "bandsSaved": "Grade bands saved",
@@ -281,11 +284,9 @@
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
-    "EXAM_NAME_DUPLICATE": "An exam with this name already exists this year.",
     "EXAM_MARKS_OUT_OF_RANGE": "Marks are out of the allowed range.",
     "EXAM_NOT_IN_MARKS_ENTRY": "Open marks entry before entering marks.",
     "INVALID_STATE_TRANSITION": "That status change isn't allowed.",
-    "GRADING_SCHEME_INVALID_BANDS": "Grade bands must cover 0–100 without gaps or overlaps.",
     "GRADING_SCHEME_IN_USE": "This scheme is referenced and cannot be deleted.",
     "REPORT_CARD_GENERATION_FAILED": "Report card generation failed. Check exams and marks."
   }

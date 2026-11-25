@@ -109,15 +109,11 @@
     "arts": "Arts"
   },
   "errors": {
-    "STANDARD_NAME_DUPLICATE": "A standard with this name already exists",
-    "SECTION_NAME_DUPLICATE": "A section with this name already exists",
-    "STREAM_REQUIRED": "Stream is required for this standard",
-    "SECTION_CAPACITY_EXCEEDED": "Section capacity exceeded",
     "HAS_ACTIVE_ENROLLMENTS": "Cannot delete — students are enrolled",
     "HAS_RECORDED_ASSESSMENTS": "Cannot delete — assessments recorded",
-    "SUBJECT_CODE_DUPLICATE": "Board code already used in this standard",
     "CONCURRENT_MODIFICATION": "Someone else modified this. Please refresh.",
-    "generic": "Something went wrong. Try again; if it keeps happening, contact support."
+    "generic": "Something went wrong. Try again; if it keeps happening, contact support.",
+    "nameRequired": "Enter a name."
   },
   "accessDenied": "You don't have permission to view academic structure.",
   "deleteConfirmTitle": "Delete {name}?",

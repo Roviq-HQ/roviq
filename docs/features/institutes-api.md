@@ -181,7 +181,6 @@ Every id these mutations take is read under the caller's institute in the write 
 | `FORBIDDEN` | 403 | CASL permission denied |
 | `INSTITUTE_NOT_FOUND` | 404 | Institute not found or soft-deleted |
 | `INSTITUTE_CODE_DUPLICATE` | 409 | Code already used by another non-deleted institute |
-| `INSTITUTE_EMAIL_DUPLICATE` | 409 | Primary email already used |
 | `SETUP_NOT_COMPLETE` | 422 | Cannot activate before setup_status=completed |
 | `RESELLER_INVALID` | 422 | Reseller not found or inactive |
 | `SYSTEM_RESELLER_PROTECTED` | 422 | Cannot modify "Roviq Direct" |
@@ -190,10 +189,11 @@ Every id these mutations take is read under the caller's institute in the write 
 | `INVALID_DATE_RANGE` | 400 | Start date >= end date |
 | `LAST_ACADEMIC_YEAR` | 422 | Cannot delete last year |
 | `YEAR_ALREADY_ACTIVE` | 409 | Year is already active |
+| `ACADEMIC_YEAR_LABEL_DUPLICATE` | 409 | Label used by another year of the institute, deleted ones included |
 | `STANDARD_NAME_DUPLICATE` | 409 | Name exists in same academic year |
+| `STANDARD_ORDER_DUPLICATE` | 409 | Numeric order exists in same academic year |
 | `SECTION_NAME_DUPLICATE` | 409 | Name exists in same standard |
 | `HAS_ACTIVE_ENROLLMENTS` | 422 | Cannot delete with enrolled students |
 | `HAS_RECORDED_ASSESSMENTS` | 422 | Cannot delete subject with assessments |
 | `STREAM_REQUIRED` | 400 | Senior secondary section needs stream |
 | `SECTION_CAPACITY_EXCEEDED` | 422 | Section at/over capacity |
-| `SUBJECT_CODE_DUPLICATE` | 409 | Board code already used in standard |

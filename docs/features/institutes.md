@@ -228,11 +228,12 @@ Defined in `@roviq/common-types` `ErrorCode`:
 | `ACADEMIC_YEAR_OVERLAP` | 400 | |
 | `INVALID_DATE_RANGE` | 400 | start >= end |
 | `YEAR_ALREADY_ACTIVE` | 409 | |
+| `ACADEMIC_YEAR_LABEL_DUPLICATE` | 409 | |
 | `STANDARD_NAME_DUPLICATE` | 409 | |
+| `STANDARD_ORDER_DUPLICATE` | 409 | |
 | `SECTION_NAME_DUPLICATE` | 409 | |
 | `STREAM_REQUIRED` | 400 | Senior secondary |
 | `SECTION_CAPACITY_EXCEEDED` | 422 | |
-| `SUBJECT_CODE_DUPLICATE` | 409 | |
 
 ## Code Patterns
 

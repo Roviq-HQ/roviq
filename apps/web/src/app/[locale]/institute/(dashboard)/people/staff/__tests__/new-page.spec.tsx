@@ -13,6 +13,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import errorEn from '../../../../../../../../messages/en/error.json';
 import baseStaffMessages from '../../../../../../../../messages/en/staff.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 
@@ -159,6 +160,29 @@ describe('CreateStaffPage (component)', () => {
     const message = staffMessages.new.errors.employeeIdDuplicate;
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(toastError).toHaveBeenCalledWith(message);
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a taken email on the email field (ROV-358)', async () => {
+    createStaffMock.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'raw server text', extensions: { code: 'EMAIL_TAKEN' } }],
+      }),
+    );
+    renderPage();
+    await userEvent.type(screen.getAllByRole('textbox')[0], 'Kiran');
+    const email = screen.getByRole('textbox', { name: /^Email/ });
+    await userEvent.type(email, 'kiran@example.com');
+    const submit = screen
+      .getAllByRole('button')
+      .find((b) => (b as HTMLButtonElement).type === 'submit');
+    if (!submit) throw new Error('submit button missing');
+    await userEvent.click(submit);
+
+    expect(await screen.findByText(errorEn.EMAIL_TAKEN)).toBeInTheDocument();
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(toastError).toHaveBeenCalledWith(errorEn.EMAIL_TAKEN);
     expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
   });
