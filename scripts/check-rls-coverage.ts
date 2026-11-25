@@ -1,7 +1,5 @@
 /**
- * CI guard — every pgTable definition must opt into RLS (or be on the
- * exempt list of platform-level user tables whose access is governed by
- * DB-role GRANTs + CASL rather than per-row RLS).
+ * CI guard — every pgTable definition must opt into RLS.
  *
  * Detects RLS via any of: `tenantPolicies(`, `entityPolicies(`,
  * `immutableEntityPolicies(`, `filePolicies(`, `userScopedPolicies(`, `pgPolicy(`.

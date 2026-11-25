@@ -145,6 +145,21 @@ describe('findDeprecatedEnableRls', () => {
     expect(findDeprecatedEnableRls(dir)).toEqual([file]);
   });
 
+  it('flags the call when it is chained on its own line', () => {
+    const file = join(dir, 'groups.ts');
+    writeFileSync(
+      file,
+      `export const g = pgTable('g', {}, () => [pgPolicy('p', {})])\n  .enableRLS();`,
+    );
+    expect(findDeprecatedEnableRls(dir)).toEqual([file]);
+  });
+
+  it('leaves a table whose only marker is .enableRLS() to findMissingRls', () => {
+    const file = join(dir, 'orphan.ts');
+    writeFileSync(file, `export const orphan = pgTable('orphan', {}).enableRLS();`);
+    expect(findMissingRls(dir)).toEqual([{ file }]);
+  });
+
   it('returns empty when no file calls it', () => {
     writeFileSync(
       join(dir, 'groups.ts'),
