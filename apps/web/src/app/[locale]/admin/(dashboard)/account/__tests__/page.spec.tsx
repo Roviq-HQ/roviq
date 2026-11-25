@@ -24,11 +24,21 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));
 
+import { DisplaySettingsProvider } from '@web/components/display-settings/display-settings-context';
 import accountMessages from '../../../../../../../messages/en/account.json';
 import authMessages from '../../../../../../../messages/en/auth.json';
 import commonMessages from '../../../../../../../messages/en/common.json';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
 import AccountPage from '../page';
+
+// The dashboard layout supplies Display settings; the page is rendered the same way here.
+const renderPage = () =>
+  renderWithProviders(
+    <DisplaySettingsProvider>
+      <AccountPage />
+    </DisplaySettingsProvider>,
+    { messages },
+  );
 
 const messages = {
   account: accountMessages,
@@ -50,7 +60,7 @@ describe('AccountPage (admin)', () => {
       },
     });
 
-    renderWithProviders(<AccountPage />, { messages });
+    renderPage();
 
     expect(screen.getByRole('heading', { name: /^account$/i })).toBeInTheDocument();
     expect(screen.getByText(/manage your account settings and security/i)).toBeInTheDocument();
@@ -70,7 +80,7 @@ describe('AccountPage (admin)', () => {
       },
     });
 
-    renderWithProviders(<AccountPage />, { messages });
+    renderPage();
 
     // Masked: first 2 chars + *** + @domain
     expect(screen.getByText('pr***@roviq.test')).toBeInTheDocument();
@@ -88,7 +98,7 @@ describe('AccountPage (admin)', () => {
     useAuthMock.mockReturnValue({
       user: { username: 'admin', email: 'a@b.test', scope: 'platform' },
     });
-    renderWithProviders(<AccountPage />, { messages });
+    renderPage();
     // Scope badge text is the only place in this page that says "Platform admin".
     // (Description copy talks about "platform administrator" but not "platform admin".)
     expect(screen.getByText(/^platform admin$/i)).toBeInTheDocument();
@@ -96,7 +106,7 @@ describe('AccountPage (admin)', () => {
 
   it('renders a loading placeholder when user is not yet loaded', () => {
     useAuthMock.mockReturnValue({ user: undefined });
-    renderWithProviders(<AccountPage />, { messages });
+    renderPage();
     // common.loading translation appears in the username and email outputs.
     expect(screen.getAllByText('Loading...').length).toBeGreaterThanOrEqual(2);
   });
@@ -105,7 +115,7 @@ describe('AccountPage (admin)', () => {
     useAuthMock.mockReturnValue({
       user: { username: 'admin', email: 'a@b.test', scope: 'platform' },
     });
-    renderWithProviders(<AccountPage />, { messages });
+    renderPage();
     expect(screen.getByTestId('passkey-manager-stub')).toBeInTheDocument();
   });
 });

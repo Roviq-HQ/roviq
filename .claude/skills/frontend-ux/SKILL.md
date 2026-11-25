@@ -60,7 +60,7 @@ Users are Indian institute admins, clerks, teachers, parents — non-technical, 
 
 - [LEYPF] Sidebar: grouped + collapsible (Academics, People, Finance, Admin). Role-filtered. Pinnable favorites
 - [LODGO] Breadcrumbs everywhere, every segment clickable. Mobile: `← Parent / Current`
-- [MENVQ] ⌘K command palette: entities, quick actions, navigation. Debounced async search
+- [MENVQ] ⌘K command palette (top-bar Quick actions button): `LayoutConfig.quickActions` with abilities, pinned pages, navigation. Debounced async search
 - [MXJLE] Institute switch preserves route. Header shows institute name+logo. Impersonation = amber banner
 
 ## States

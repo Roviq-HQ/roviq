@@ -9,10 +9,12 @@ import type {
   AuthFailureReason,
   AuthScope,
   AuthUser,
+  FormHelpMode,
   InstituteContext,
 } from '@roviq/common-types';
 import {
   BusinessException,
+  DEFAULT_FORM_HELP_MODE,
   ErrorCode,
   failedPasswordRules,
   ResellerStatus,
@@ -117,6 +119,25 @@ export class AuthService {
   async updatePreferredLocale(userId: string, locale: string | null): Promise<string | null> {
     await this.userRepo.updatePreferredLocale(userId, locale);
     return locale;
+  }
+
+  /** An impersonator sees the default, not the impersonated account's choice. */
+  async getFormHelpMode(user: Pick<AuthUser, 'userId' | 'isImpersonated'>): Promise<FormHelpMode> {
+    if (user.isImpersonated) return DEFAULT_FORM_HELP_MODE;
+    return (await this.userRepo.getFormHelpMode(user.userId)) ?? DEFAULT_FORM_HELP_MODE;
+  }
+
+  async updateFormHelpMode(
+    user: Pick<AuthUser, 'userId' | 'isImpersonated'>,
+    mode: FormHelpMode,
+  ): Promise<FormHelpMode> {
+    if (user.isImpersonated)
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Cannot change account preferences while impersonating',
+      );
+    await this.userRepo.updateFormHelpMode(user.userId, mode);
+    return mode;
   }
 
   // ── Three login mutations ──────────────────────────────

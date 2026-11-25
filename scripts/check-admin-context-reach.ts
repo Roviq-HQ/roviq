@@ -149,8 +149,12 @@ export const ADMIN_METHOD_ALLOWLIST: Readonly<Record<string, string>> = {
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.findByUsername':
     'Login and token flow: looked up by the presented credential or by ids inside the verified token; nothing is returned before the credential check passes.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.getFormHelpMode':
+    'Keyed by the user id in the verified token; form_help_mode is not granted to the institute or reseller roles (ROV-344).',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.getPreferredLocale':
     'Keyed by the user id in the verified token.',
+  'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updateFormHelpMode':
+    'Keyed by the user id in the verified token; the mutation takes no id (ROV-344).',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePassword':
     'Keyed by the user id in the verified token.',
   'apps/api-gateway/src/auth/repositories/user.drizzle-repository.ts#UserDrizzleRepository.updatePreferredLocale':

@@ -262,6 +262,36 @@ describe('AuthService', () => {
     });
   });
 
+  describe('form help mode', () => {
+    const owner = { userId: 'user-1', isImpersonated: false };
+    const impersonator = { userId: 'user-1', isImpersonated: true };
+
+    it('should read the saved mode, and the default when the account has none', async () => {
+      mockUserRepo.getFormHelpMode.mockResolvedValueOnce('ICON_ONLY');
+      expect(await authService.getFormHelpMode(owner)).toBe('ICON_ONLY');
+      mockUserRepo.getFormHelpMode.mockResolvedValueOnce(null);
+      expect(await authService.getFormHelpMode(owner)).toBe('ICON_AND_HINT');
+      expect(mockUserRepo.getFormHelpMode).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should show the default to an impersonator without reading the account', async () => {
+      expect(await authService.getFormHelpMode(impersonator)).toBe('ICON_AND_HINT');
+      expect(mockUserRepo.getFormHelpMode).not.toHaveBeenCalled();
+    });
+
+    it('should save the mode for the caller only', async () => {
+      expect(await authService.updateFormHelpMode(owner, 'ICON_ONLY')).toBe('ICON_ONLY');
+      expect(mockUserRepo.updateFormHelpMode).toHaveBeenCalledWith('user-1', 'ICON_ONLY');
+    });
+
+    it('should refuse a write while impersonating', async () => {
+      await expect(authService.updateFormHelpMode(impersonator, 'ICON_ONLY')).rejects.toMatchObject(
+        { code: ErrorCode.FORBIDDEN },
+      );
+      expect(mockUserRepo.updateFormHelpMode).not.toHaveBeenCalled();
+    });
+  });
+
   describe('instituteLogin', () => {
     const mockUser = {
       id: 'user-1',

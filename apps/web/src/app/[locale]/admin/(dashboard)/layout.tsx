@@ -4,6 +4,10 @@ import { ProtectedRoute, useAuth } from '@roviq/auth';
 import { NAV_SLUGS } from '@roviq/common-types';
 import type { LayoutConfig, NavRegistryEntry } from '@roviq/ui';
 import { AbilityProvider, AdminLayout } from '@roviq/ui';
+import {
+  DisplaySettingsProvider,
+  useDisplaySettings,
+} from '@web/components/display-settings/display-settings-context';
 import { NotificationBell } from '@web/components/notifications/notification-bell';
 import {
   Activity,
@@ -15,6 +19,7 @@ import {
   FolderTree,
   LayoutDashboard,
   Settings,
+  SlidersHorizontal,
   Store,
   UserCog,
   Users,
@@ -27,7 +32,9 @@ import { usePushNotifications } from '../../../../hooks/use-push-notifications';
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
-      <DashboardShell>{children}</DashboardShell>
+      <DisplaySettingsProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </DisplaySettingsProvider>
     </ProtectedRoute>
   );
 }
@@ -35,6 +42,8 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
+  const tQuick = useTranslations('common.quickActions');
+  const { openDisplaySettings } = useDisplaySettings();
   const { logout, user } = useAuth();
 
   const { unregisterPushToken } = usePushNotifications();
@@ -95,6 +104,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     user: user ? { username: user.username, email: user.email } : undefined,
     onLogout: signOut,
     notificationBell: <NotificationBell />,
+    quickActions: [
+      {
+        id: 'display-settings',
+        title: tQuick('displaySettings'),
+        icon: SlidersHorizontal,
+        onSelect: openDisplaySettings,
+      },
+    ],
     navGroups: [
       {
         title: t('overview'),

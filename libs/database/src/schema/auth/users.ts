@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { entityColumns } from '../common/columns';
-import { userStatus } from '../common/enums';
+import { formHelpMode, userStatus } from '../common/enums';
 import { roviqAdmin, roviqApp, roviqReseller } from '../common/rls-policies';
 
 export const users = pgTable(
@@ -38,6 +38,8 @@ export const users = pgTable(
      * reissue). Access tokens carry the value they were issued with; an older one is refused.
      */
     tokenVersion: integer('token_version').default(0).notNull(),
+    /** How much field help forms show this account. Read only by its owner; not on users_live. */
+    formHelpMode: formHelpMode('form_help_mode').default('ICON_AND_HINT').notNull(),
     ...entityColumns,
   },
   (table) => [

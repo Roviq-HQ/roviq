@@ -66,6 +66,14 @@ export const testIds = {
     option: (locale: string) => `account-language-option-${locale}`,
     retry: 'account-language-retry',
   },
+  displaySettings: {
+    dialog: 'display-settings-dialog',
+    card: 'display-settings-card',
+    modeOption: (mode: string) => `display-settings-mode-${mode}`,
+    sampleInput: 'display-settings-sample-input',
+    status: 'display-settings-status',
+    retry: 'display-settings-retry',
+  },
   sessions: {
     title: 'sessions-title',
     item: 'session-item',
@@ -103,6 +111,10 @@ export const testIds = {
     userMenuTrigger: 'user-menu-trigger',
     userMenuProfile: 'user-menu-profile',
     userMenuLogout: 'user-menu-logout',
+    // Quick actions (top-bar button and the command palette it opens)
+    quickActionsButton: 'quick-actions-button',
+    commandPalette: 'command-palette',
+    quickAction: (id: string) => `quick-action-${id}`,
     // Sidebar (search, filter, nav group/pin toggles, mobile drawer footer)
     sidebarSearch: 'sidebar-search',
     sidebarFilterInput: 'sidebar-filter-input',

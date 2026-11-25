@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { FormHelpMode } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -46,6 +47,26 @@ export class UserDrizzleRepository extends UserRepository {
         .update(users)
         .set({ preferredLocale: locale, updatedBy: userId })
         .where(eq(users.id, userId)),
+    );
+  }
+
+  async getFormHelpMode(userId: string): Promise<FormHelpMode | null> {
+    const [user] = await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+      tx
+        .select({ formHelpMode: users.formHelpMode })
+        .from(users) // allow-base-read: form_help_mode is read only by its owner and is not on users_live
+        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+        .limit(1),
+    );
+    return user?.formHelpMode ?? null;
+  }
+
+  async updateFormHelpMode(userId: string, mode: FormHelpMode): Promise<void> {
+    await withAdmin(this.db, mkAdminCtx('repository:user'), (tx) =>
+      tx
+        .update(users)
+        .set({ formHelpMode: mode, updatedBy: userId })
+        .where(and(eq(users.id, userId), isNull(users.deletedAt))),
     );
   }
 

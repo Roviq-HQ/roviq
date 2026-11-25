@@ -2960,6 +2960,14 @@ type FileUploadTicket {
   uploadUrl: String!
 }
 
+"""
+How much field help forms show: ICON_AND_HINT adds a one-sentence hint under labels, ICON_ONLY shows only the help button.
+"""
+enum FormHelpMode {
+  ICON_AND_HINT
+  ICON_ONLY
+}
+
 type FunnelStage {
   count: Int!
   stage: String!
@@ -4927,6 +4935,11 @@ type Mutation {
 
   """Edit a PENDING leave before it is decided."""
   updateLeave(id: ID!, input: UpdateLeaveInput!): LeaveModel!
+
+  """
+  Saves the form help mode of the signed-in account. Refused while impersonating.
+  """
+  updateMyFormHelpMode(mode: FormHelpMode!): FormHelpMode!
   updateMyPreferredLocale(input: UpdateLocaleInput!): String
 
   """Update own profile (phone, photo, nationality)"""
@@ -5800,6 +5813,11 @@ type Query {
 
   """The signed-in user's email address and whether it is verified."""
   myEmailVerification: EmailVerificationModel!
+
+  """
+  Saved form help mode of the signed-in account across all portals; the default while impersonating.
+  """
+  myFormHelpMode: FormHelpMode!
   myGroups: [GroupMembershipModel!]!
   myInstitute: InstituteModel!
 

@@ -1,11 +1,15 @@
+import {
+  DEFAULT_FORM_HELP_MODE,
+  FORM_HELP_MODE_VALUES,
+  type FormHelpMode,
+} from '@roviq/common-types';
 import type { Locale } from '@roviq/i18n';
 
 /** App-owned help copy in every UI locale; a missing locale is a type error. */
 export type HelpText = Readonly<Record<Locale, string>>;
 
-export const FORM_HELP_MODES = ['ICON_AND_HINT', 'ICON_ONLY'] as const;
-export type FormHelpMode = (typeof FORM_HELP_MODES)[number];
-export const DEFAULT_FORM_HELP_MODE: FormHelpMode = 'ICON_AND_HINT';
+export const FORM_HELP_MODES = FORM_HELP_MODE_VALUES;
+export { DEFAULT_FORM_HELP_MODE, type FormHelpMode };
 
 export const HELP_LIMITS = { hint: 80, body: 400 } as const;
 

@@ -97,6 +97,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 - `file-upload/FileUpload crop="square"` — opens a crop dialog (drag, pinch, zoom slider, arrow keys) before a profile picture is uploaded; the cropped picture is what gets sent. Every picked image is also scaled down in the browser first (`prepareImage`).
 - `file-upload/FileDownloadButton` — opens a sensitive file (`FileRef` whose `url` is null): each click asks the server for a 60-second link (`scope="institute"`, `"admin"` for a user document, or `"adminExport"` for a compliance export), which is what writes the audit entry. Never render a stored `url` for these files
 - `people/ProfilePhotoButton` — "Change picture" button and dialog for a student, staff member, guardian or the signed-in user (`kind`, `profileId`, `userId`): crop, upload, save or remove, then reloads the queries on screen. Wrap it in `<Can I="update" …>`
+- `display-settings/DisplaySettingsProvider` + `useDisplaySettings()` — wraps each portal's dashboard layout: loads the account's form help mode (`myFormHelpMode`), passes it to `FormHelpModeProvider` from `@roviq/ui`, and hosts the Display settings dialog (`openDisplaySettings()`, a Quick action in every portal). A browser copy keyed by account id (`roviq:form-help-mode:<userId>`) shows the last confirmed value while loading; a failed load falls back to it or the default, a failed save keeps the last confirmed choice and offers Retry; while impersonating it is read-only and the copy is left alone. `DisplaySettingsDialog` (dialog on desktop, bottom sheet on phones) and `DisplaySettingsCard` (My Account) render the same `DisplaySettingsPanel`.
 - `account/LanguagePreference` — shared account language setting for all three portals; saved preferences apply on sign-in, with browser language then English as fallback. The topbar selector remains a per-visit override.
 - `AccountLocaleSync` — applies the account language on sign-in and on switching accounts, preserving the route, query and fragment. A session restored on page load keeps the locale in the URL, so a `/hi/...` link opens in Hindi whatever the saved language.
 - `PersonNameLink` + `PersonDetailDialogProvider` (`app/[locale]/institute/(dashboard)/people/person-detail-dialog.tsx`) — a linked student/guardian name that opens that person's full detail view in a popup with Back history; use it wherever a related person's name is shown under People. Lives beside the routes because it renders the route views.
@@ -206,6 +207,11 @@ const config: LayoutConfig = {
     memberships: [{ tenantId, instituteName, instituteLogoUrl, roleName }],
     onSwitch: (tenantId) => switchInstitute(tenantId),
   },
+  quickActions: [
+    { id: 'display-settings', title: t('displaySettings'), icon: SlidersHorizontal, onSelect: openDisplaySettings },
+    { id: 'add-student', title: t('addStudent'), href: '/people/students/new',
+      ability: { action: 'create', subject: 'Student' } },
+  ],
 };
 
 export default function Layout({ children }) {
@@ -222,9 +228,9 @@ exposes 4 primary destinations.
 
 | Class   | Width      | Sidebar      | Topbar          | Bottom tab bar |
 | ------- | ---------- | ------------ | --------------- | -------------- |
-| Phone   | `<sm`      | Drawer       | Hamburger + crumbs + bell + avatar | Visible (4 slugs + More) |
-| Tablet  | `sm`–`xl`  | Drawer       | Hamburger + crumbs + bell + avatar | Visible        |
-| Desktop | `xl+` (1280+) | Always-on | Crumbs + search + bell + avatar    | Hidden         |
+| Phone   | `<sm`      | Drawer       | Hamburger + crumbs + Quick actions + bell + avatar | Visible (4 slugs + More) |
+| Tablet  | `sm`–`xl`  | Drawer       | Hamburger + crumbs + Quick actions + bell + avatar | Visible        |
+| Desktop | `xl+` (1280+) | Always-on | Crumbs + Quick actions + bell + avatar | Hidden         |
 
 ### LayoutConfig extension
 
@@ -264,6 +270,15 @@ Sidebar items (`NavItem` in `navGroups`) take the same optional `ability`.
 `AdminLayout` drops items the viewer cannot use — and any group left empty —
 before the sidebar, drawer and command palette render, so a gated page never
 shows a link that leads to a forbidden screen.
+
+### Quick actions
+
+The top-bar **Quick actions** button (and Ctrl/⌘+K) opens the command palette. Its first group is
+`LayoutConfig.quickActions`: a page (`href`) or an action the app handles (`onSelect`), each with an
+optional `ability`, filtered with the nav items. The user's pinned pages follow, then every nav
+group; a pinned page that a quick action already opens is not listed twice. The institute portal
+lists Display settings, Take attendance, Today's timetable, Add student and Add staff; the admin
+and reseller portals list Display settings.
 
 ### Space under the last control
 

@@ -40,6 +40,13 @@
       "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d"
     }
   },
+  "displaySettings.sampleAdmissionNumber": {
+    "reviewedReason": "Sample topic checked against admitStudent and nextAdmissionNumber: a blank admission number takes the next in the series",
+    "targets": {
+      "apps/api-gateway/src/institute/student/admission-number.sequence.ts#nextAdmissionNumber": "cfc6226e1dea1d9d",
+      "apps/api-gateway/src/institute/student/repositories/admit-student.ts#admitStudent": "c6e093d7e143fac5"
+    }
+  },
   "staff.new.department": {
     "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
     "targets": {

@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, Check, ChevronsUpDown, Monitor, Moon, Sun } from 'lucide-react';
+import { Building2, Check, ChevronsUpDown, Monitor, Moon, Sun, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
@@ -160,7 +160,31 @@ function UserMenu({
   );
 }
 
-export function Topbar({ config }: { config: LayoutConfig }) {
+function QuickActionsButton({ onClick }: { onClick: () => void }) {
+  const t = useTranslations('common.quickActions');
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      title={t('buttonTitle')}
+      aria-keyshortcuts="Control+K Meta+K"
+      className="h-9 gap-1.5"
+      data-testid={layout.quickActionsButton}
+    >
+      <Zap className="size-4" aria-hidden="true" />
+      <span className="sr-only sm:not-sr-only">{t('button')}</span>
+    </Button>
+  );
+}
+
+export function Topbar({
+  config,
+  onOpenQuickActions,
+}: {
+  config: LayoutConfig;
+  onOpenQuickActions: () => void;
+}) {
   return (
     <header
       data-testid={layout.topbar}
@@ -172,6 +196,7 @@ export function Topbar({ config }: { config: LayoutConfig }) {
         <Breadcrumbs />
       </div>
       <div className="ms-auto flex shrink-0 items-center gap-1">
+        <QuickActionsButton onClick={onOpenQuickActions} />
         {config.notificationBell}
         <ThemeToggle />
         <div className="hidden xl:block">
