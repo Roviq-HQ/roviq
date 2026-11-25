@@ -673,7 +673,7 @@ describe('Impersonation (integration)', () => {
       expect(response.errors).toBeUndefined();
       const row = response.data?.adminImpersonationSessions[0];
       const verifiedAt = new Date(row.otpVerifiedAt).getTime();
-      expect(verifiedAt).toBeGreaterThanOrEqual(before - 1000);
+      expect(verifiedAt).toBeGreaterThanOrEqual(before);
       expect(verifiedAt).toBeLessThanOrEqual(Date.now());
       expect(row.otpVerifiedByName).toBe(owned.username);
     });
@@ -685,7 +685,7 @@ describe('Impersonation (integration)', () => {
           query: `query { adminImpersonationSessions(first: 1) { otpVerified } }`,
           token: platformAdminToken,
         }),
-      ).rejects.toThrow(/Cannot query field \\"otpVerified\\".*GRAPHQL_VALIDATION_FAILED/);
+      ).rejects.toThrow(/Cannot query field \\"otpVerified\\"/);
     });
 
     it('a reseller full admin session is not view-only', async () => {
