@@ -100,13 +100,20 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
         attendanceType: (config.attendanceType as AttendanceType) ?? AttendanceType.DAILY,
         openingTime: config.openingTime ?? '08:00',
         closingTime: config.closingTime ?? '14:00',
-        shifts: config.shifts ?? [],
-        termStructure: config.termStructure ?? [],
-        sectionStrengthNorms: config.sectionStrengthNorms ?? {
-          optimal: 40,
-          hardMax: 45,
-          exemptionAllowed: false,
-        },
+        // Copied field by field: Apollo's objects carry `__typename`, which the input refuses.
+        shifts: (config.shifts ?? []).map(({ name, start, end }) => ({ name, start, end })),
+        termStructure: (config.termStructure ?? []).map(({ label, startDate, endDate }) => ({
+          label,
+          startDate,
+          endDate,
+        })),
+        sectionStrengthNorms: config.sectionStrengthNorms
+          ? {
+              optimal: config.sectionStrengthNorms.optimal,
+              hardMax: config.sectionStrengthNorms.hardMax,
+              exemptionAllowed: config.sectionStrengthNorms.exemptionAllowed,
+            }
+          : { optimal: 40, hardMax: 45, exemptionAllowed: false },
       },
       { keepDefaultValues: true },
     );
