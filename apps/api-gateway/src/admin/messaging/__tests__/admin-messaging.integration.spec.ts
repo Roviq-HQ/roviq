@@ -132,8 +132,12 @@ describe('admin messaging senders (integration)', () => {
 
   const counts = async () => {
     const { rows } = await superPool.query<{ senders: number; secrets: number }>(
-      `SELECT (SELECT count(*)::int FROM messaging_senders) AS senders,
-              (SELECT count(*)::int FROM messaging_sender_secrets) AS secrets`,
+      // This spec's own numbers only: other specs register senders at the same time.
+      `SELECT (SELECT count(*)::int FROM messaging_senders
+                WHERE provider_number_id LIKE 'admin-messaging-spec-%') AS senders,
+              (SELECT count(*)::int FROM messaging_sender_secrets x
+                 JOIN messaging_senders s ON s.id = x.sender_id
+                WHERE s.provider_number_id LIKE 'admin-messaging-spec-%') AS secrets`,
     );
     const [row] = rows;
     assert(row);
