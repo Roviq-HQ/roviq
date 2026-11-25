@@ -997,3 +997,10 @@ Follows the "seen once, cause unconfirmed" entry of the same day. On a push of `
 - **Cause:** the development machine was out of memory and swapping. Every checkout's dev web server (`next dev`) held several GB: Turbopack's dev disk cache is loaded whole at start, so a restart freed nothing. The type-check watchers add a fixed amount per checkout.
 - **Fix:** Turbopack's disk cache is off in dev (`apps/web/next.config.js`), and `scripts/with-memory-cap.sh` restarts the dev web server and the type-check watchers above a cap (`DEV_WEB_MEMORY_CAP_MB`, `DEV_TYPECHECK_MEMORY_CAP_MB`). A first cap below what a fresh start needs made the server restart in a loop; both defaults now sit above the start-up need.
 - **Lesson:** when tests time out under load, look at memory before worker counts; and measure a process just after it starts before choosing its cap.
+
+## 2026-11-25 — diagnosed and fixed: the reseller branding tests ran out of time in teardown
+
+- **Symptom:** in the pre-push gate one of the reseller branding Playwright tests failed with "Tearing down "page" exceeded the test timeout of 30000ms", a different one each time. Every branding test took about 31 s, even one that only picks a wrong file type.
+- **Cause:** the console guardian runs an axe scan after each test. The branding preview is an `<iframe sandbox="">` with scripts off, so axe cannot run inside it, and the scan waited about 23 s on that frame before giving up.
+- **Fix:** the scan in `e2e/shared/console-guardian.ts` excludes `iframe[sandbox]`. The branding tests now take 2 to 4 s each.
+- **Lesson:** a test that is slow for no reason it can see is waiting on a fixture; time the fixture before raising a timeout.

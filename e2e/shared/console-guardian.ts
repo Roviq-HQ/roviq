@@ -282,6 +282,9 @@ export const test = base.extend<ConsoleGuardianFixture>({
           .withTags([...AXE_WCAG_TAGS])
           // Exclude third-party widgets whose DOM we don't control
           .exclude('[data-sonner-toaster]')
+          // A frame with scripts off cannot run axe: the scan waits ~23 s on it and
+          // pushes the test past its timeout (the reseller branding preview).
+          .exclude('iframe[sandbox]')
           // Radix UI primitives generate DOM that triggers these rules but
           // cannot be fixed from application code (open Radix issues)
           .disableRules([
