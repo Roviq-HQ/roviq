@@ -10,6 +10,7 @@ import type { RawRuleOf } from '@casl/ability';
 import { type AppAbility, ErrorCode } from '@roviq/common-types';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { tcHelp } from '@web/help/certificates/tc.help';
 import { toast } from 'sonner';
 import { describe, expect, it, vi } from 'vitest';
 import messagesEn from '../../../../../../../messages/en/certificates.json';
@@ -162,6 +163,21 @@ describe('TCListPage (component)', () => {
     } finally {
       tcsResult.tcs = [];
     }
+  });
+
+  it('explains the request reason from its help topic', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: messagesEn.tc.requestButton }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: `More about ${messagesEn.tc.requestDialog.reasonLabel}`,
+      }),
+    );
+
+    expect(await screen.findByText(tcHelp.requestReason.body.en)).toBeInTheDocument();
   });
 
   it('explains a duplicate TC request in translated copy instead of the server message', async () => {

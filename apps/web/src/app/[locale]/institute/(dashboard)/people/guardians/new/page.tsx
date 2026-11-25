@@ -15,13 +15,13 @@ import {
   Can,
   DraftBanner,
   FieldGroup,
-  FieldInfoPopover,
   FieldLegend,
   FieldSet,
   I18nField,
   useAppForm,
   useBreadcrumbOverride,
 } from '@roviq/ui';
+import { guardianNewHelp } from '@web/help/students/guardian-new.help';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -241,15 +241,7 @@ export default function CreateGuardianPage() {
                         options={educationLevelOptions}
                         placeholder={t('new.placeholders.educationLevel')}
                         testId="guardian-new-education-level-select"
-                        info={
-                          <FieldInfoPopover
-                            title={t('new.fieldHelp.educationLevelTitle')}
-                            data-testid={instituteGuardians.newEducationLevelInfo}
-                          >
-                            <p>{t('new.fieldHelp.educationLevelBody')}</p>
-                            <p>{t('new.fieldHelp.educationLevelOptions')}</p>
-                          </FieldInfoPopover>
-                        }
+                        help={guardianNewHelp.educationLevel}
                       />
                     )}
                   </form.AppField>

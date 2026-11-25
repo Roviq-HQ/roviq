@@ -13,8 +13,8 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   FieldSet,
   fieldErrorMessages,
   Input,
@@ -24,6 +24,7 @@ import {
   Spinner,
 } from '@roviq/ui';
 import { type AnyFieldApi, useStore } from '@tanstack/react-form';
+import { addressHelp } from '@web/help/institute-settings/address.help';
 import { Check, ChevronsUpDown, Info, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -371,19 +372,14 @@ export function AddressForm({ form, allowedStates }: AddressFormProps) {
               const value = typeof field.state.value === 'string' ? field.state.value : '';
               return (
                 <Field data-invalid={invalid || undefined}>
-                  <FieldLabel htmlFor="address-state">
+                  <FieldLabelWithInfo
+                    htmlFor="address-state"
+                    help={allowedStates ? addressHelp.stateFiltered : undefined}
+                  >
                     {allowedStates
                       ? t('stateFiltered', { count: visibleStates.length })
                       : t('state')}
-                    {allowedStates && (
-                      <FieldInfoPopover
-                        title={t('stateHelpTitle')}
-                        data-testid={instituteSettings.addressStateInfo}
-                      >
-                        <p>{t('stateHelpBody')}</p>
-                      </FieldInfoPopover>
-                    )}
-                  </FieldLabel>
+                  </FieldLabelWithInfo>
                   <Popover open={statePopoverOpen} onOpenChange={setStatePopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button

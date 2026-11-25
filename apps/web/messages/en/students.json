@@ -48,20 +48,6 @@
       "phoneFormat": "10-digit Indian mobile, stored without country code",
       "isRteAdmitted": "Tick if the student was admitted under the Right to Education Act 25% EWS/DG quota."
     },
-    "fieldHelp": {
-      "academicYearTitle": "Academic year",
-      "academicYearBody": "The Indian academic session that runs April through March (e.g. 2025–26 covers April 2025 to March 2026). The student is admitted into this session, their class and section lists are filtered by it, and promotion to the next year will create a fresh record.",
-      "academicYearExample": "If you admit a student in June 2025, select 2025–26. For admissions happening in March 2026 for the upcoming term, select 2026–27.",
-      "socialCategoryTitle": "Social category",
-      "socialCategoryBody": "The government-defined classification used for reservation quotas, RTE reporting, and state scholarship eligibility. This is never shown to teachers or other students and is masked in exports unless you have audit-admin permissions.",
-      "socialCategoryOptions": "General — no reservation category. OBC — Other Backward Class. SC — Scheduled Caste. ST — Scheduled Tribe. EWS — Economically Weaker Section (family income below the state EWS ceiling, typically ₹8 lakh/year).",
-      "admissionTypeTitle": "Admission type",
-      "admissionTypeBody": "How this student entered your institute. This drives UDISE+ reporting, fee-waiver rules, and TC history, so pick the option that matches the actual admission route.",
-      "admissionTypeNew": "New — first-time admission at any class. Most students in pre-primary and Class 1.",
-      "admissionTypeLateral": "Lateral entry — mid-session admission from another institute, usually because the family relocated.",
-      "admissionTypeReadmission": "Re-admission — a previously withdrawn or dropped-out student returning.",
-      "admissionTypeTransfer": "Transfer — joined via a Transfer Certificate from another institute at the start of a session."
-    },
     "genders": {
       "MALE": "Male",
       "FEMALE": "Female",

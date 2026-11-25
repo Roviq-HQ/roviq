@@ -20,7 +20,6 @@ import {
   EmptyTitle,
   Field,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
   Input,
   Tabs,
@@ -33,6 +32,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import type { ColumnDef } from '@tanstack/react-table';
+import { otherCertificateHelp } from '@web/help/certificates/other-certificate.help';
 import { Award, CheckCircle2, Clock, Plus, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -440,14 +440,7 @@ function IssueCertificateDialog({
                   <field.TextField
                     label={t('other.dialog.templateLabel')}
                     placeholder={t('other.dialog.templatePlaceholder')}
-                    info={
-                      <FieldInfoPopover
-                        title={t('other.dialog.fieldHelp.templateTitle')}
-                        data-testid={instituteCertificatesOther.templateInfo}
-                      >
-                        <p>{t('other.dialog.fieldHelp.templateBody')}</p>
-                      </FieldInfoPopover>
-                    }
+                    help={otherCertificateHelp.template}
                   />
                 )}
               </form.AppField>
@@ -477,17 +470,7 @@ function IssueCertificateDialog({
                   <field.TextField
                     label={t('other.dialog.purposeLabel')}
                     placeholder={t('other.dialog.purposePlaceholder')}
-                    info={
-                      <FieldInfoPopover
-                        title={t('other.dialog.fieldHelp.purposeTitle')}
-                        data-testid={instituteCertificatesOther.purposeInfo}
-                      >
-                        <p>{t('other.dialog.fieldHelp.purposeBody')}</p>
-                        <p>
-                          <em>{t('other.dialog.fieldHelp.purposeExamples')}</em>
-                        </p>
-                      </FieldInfoPopover>
-                    }
+                    help={otherCertificateHelp.purpose}
                   />
                 )}
               </form.AppField>

@@ -13,12 +13,13 @@ import {
   CardTitle,
   FieldDescription,
   FieldGroup,
-  FieldInfoPopover,
+  FieldHelpButton,
   FieldSeparator,
   Skeleton,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { instituteConfigHelp } from '@web/help/institute-settings/institute-config.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -29,7 +30,6 @@ import { type InstituteConfigFormValues, instituteConfigSchema } from './schemas
 import type { MyInstituteData } from './types';
 import { useUpdateInstituteConfig } from './use-institute-settings';
 
-const { instituteSettings } = testIds;
 interface InstituteConfigTabProps {
   institute: MyInstituteData['myInstitute'] | undefined;
   loading: boolean;
@@ -154,18 +154,7 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
                           description={tc('attendanceTypeDescription')}
                           options={attendanceOptions}
                           optional={false}
-                          info={
-                            <FieldInfoPopover
-                              title={tc('fieldHelp.attendanceTypeTitle')}
-                              data-testid={instituteSettings.configAttendanceTypeInfo}
-                            >
-                              <p>{tc('fieldHelp.attendanceTypeBody')}</p>
-                              <ul className="mt-1 list-disc space-y-0.5 ps-4">
-                                <li>{tc('fieldHelp.attendanceTypeDaily')}</li>
-                                <li>{tc('fieldHelp.attendanceTypeLectureWise')}</li>
-                              </ul>
-                            </FieldInfoPopover>
-                          }
+                          help={instituteConfigHelp.attendanceType}
                         />
                       )}
                     </form.AppField>
@@ -188,12 +177,10 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
                     <FieldSeparator>
                       <span className="inline-flex items-center gap-1.5">
                         {tc('shifts')}
-                        <FieldInfoPopover
-                          title={tc('fieldHelp.shiftsTitle')}
-                          data-testid={instituteSettings.configShiftsInfo}
-                        >
-                          <p>{tc('fieldHelp.shiftsBody')}</p>
-                        </FieldInfoPopover>
+                        <FieldHelpButton
+                          topic={instituteConfigHelp.shifts}
+                          fieldLabel={tc('shifts')}
+                        />
                       </span>
                     </FieldSeparator>
                     <FieldDescription>{tc('shiftsDescription')}</FieldDescription>
@@ -202,12 +189,10 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
                     <FieldSeparator>
                       <span className="inline-flex items-center gap-1.5">
                         {tc('gradingSystem')}
-                        <FieldInfoPopover
-                          title={tc('fieldHelp.gradingSystemTitle')}
-                          data-testid={instituteSettings.configGradingSystemInfo}
-                        >
-                          <p>{tc('fieldHelp.gradingSystemBody')}</p>
-                        </FieldInfoPopover>
+                        <FieldHelpButton
+                          topic={instituteConfigHelp.gradingSystem}
+                          fieldLabel={tc('gradingSystem')}
+                        />
                       </span>
                     </FieldSeparator>
                     <FieldDescription>{tc('gradingSystemDescription')}</FieldDescription>
@@ -234,14 +219,7 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
                             label={tc('optimalStrength')}
                             description={tc('optimalStrengthDescription')}
                             min={1}
-                            info={
-                              <FieldInfoPopover
-                                title={tc('fieldHelp.optimalStrengthTitle')}
-                                data-testid={instituteSettings.configOptimalStrengthInfo}
-                              >
-                                <p>{tc('fieldHelp.optimalStrengthBody')}</p>
-                              </FieldInfoPopover>
-                            }
+                            help={instituteConfigHelp.optimalStrength}
                           />
                         )}
                       </form.AppField>
@@ -251,14 +229,7 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
                             label={tc('hardMax')}
                             description={tc('hardMaxDescription')}
                             min={1}
-                            info={
-                              <FieldInfoPopover
-                                title={tc('fieldHelp.hardMaxTitle')}
-                                data-testid={instituteSettings.configHardMaxInfo}
-                              >
-                                <p>{tc('fieldHelp.hardMaxBody')}</p>
-                              </FieldInfoPopover>
-                            }
+                            help={instituteConfigHelp.hardMax}
                           />
                         )}
                       </form.AppField>
@@ -269,14 +240,7 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
                         <field.SwitchField
                           label={tc('exemptionAllowed')}
                           description={tc('exemptionAllowedDescription')}
-                          info={
-                            <FieldInfoPopover
-                              title={tc('fieldHelp.exemptionAllowedTitle')}
-                              data-testid={instituteSettings.configExemptionAllowedInfo}
-                            >
-                              <p>{tc('fieldHelp.exemptionAllowedBody')}</p>
-                            </FieldInfoPopover>
-                          }
+                          help={instituteConfigHelp.exemptionAllowed}
                         />
                       )}
                     </form.AppField>
@@ -307,5 +271,3 @@ export function InstituteConfigTab({ institute, loading }: InstituteConfigTabPro
     </Can>
   );
 }
-
-import { testIds } from '@roviq/ui/testing/testid-registry';

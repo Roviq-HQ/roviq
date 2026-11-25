@@ -960,9 +960,6 @@ export const testIds = {
     newTitle: 'students-new-title',
     newBackBtn: 'students-new-back-btn',
     newCancelBtn: 'students-new-cancel-btn',
-    newSocialCategoryInfo: 'students-new-social-category-info',
-    newAcademicYearInfo: 'students-new-academic-year-info',
-    newAdmissionTypeInfo: 'students-new-admission-type-info',
     // Year-end result bulk action
     bulkYearEndBtn: 'students-bulk-year-end-btn',
     yearEndDialog: 'students-year-end-dialog',
@@ -1157,15 +1154,12 @@ export const testIds = {
     formTitle: 'enquiry-form-title',
     form: 'enquiry-form',
     formCancelBtn: 'enquiry-form-cancel-btn',
-    sourceInfo: 'enquiry-source-info',
-    followupInfo: 'enquiry-followup-info',
     // Convert dialog
     convertDialog: 'convert-enquiry-dialog',
     convertCancelBtn: 'convert-cancel-btn',
     convertSubmitBtn: 'convert-submit-btn',
     convertStandardSelect: 'convert-standard-select',
     convertYearSelect: 'convert-year-select',
-    convertYearInfo: 'convert-year-info',
   },
 
   // ── Institute: admission → statistics ─────────────────────────────────
@@ -1253,10 +1247,6 @@ export const testIds = {
     generatePdfBtn: 'tc-generate-pdf-btn',
     table: 'tc-table',
     // Request dialog
-    requestAcademicYearInfo: 'tc-request-academic-year-info',
-    requestReasonInfo: 'tc-request-reason-info',
-    rejectReasonInfo: 'tc-reject-reason-info',
-    duplicateReasonInfo: 'tc-duplicate-reason-info',
     accessDenied: 'tc-access-denied',
     // Detail page
     approveBtn: 'tc-approve-btn',
@@ -1273,8 +1263,6 @@ export const testIds = {
   // ── Institute: certificates → other ───────────────────────────────────
   instituteCertificatesOther: {
     title: 'other-certs-title',
-    purposeInfo: 'cert-other-purpose-info',
-    templateInfo: 'cert-other-template-info',
   },
 
   // ── Institute: groups ─────────────────────────────────────────────────
@@ -1291,10 +1279,7 @@ export const testIds = {
     // New page
     newTitle: 'groups-new-title',
     newBackBtn: 'groups-new-back-btn',
-    newTypeInfo: 'groups-new-type-info',
-    newMemberTypesInfo: 'groups-new-member-types-info',
     newMembersSearchInput: 'groups-new-members-search-input',
-    newMembershipTypeInfo: 'groups-new-membership-type-info',
     newNoCandidates: 'groups-new-no-candidates',
     newNoSelection: 'groups-new-no-selection',
     newPrevBtn: 'groups-new-prev-btn',
@@ -1420,7 +1405,6 @@ export const testIds = {
     // New page
     newTitle: 'guardian-new-title',
     newBackBtn: 'guardian-new-back-btn',
-    newEducationLevelInfo: 'guardian-new-education-level-info',
     newDraftBanner: 'guardian-new-draft-banner',
   },
 
@@ -1520,28 +1504,15 @@ export const testIds = {
     // Info tab
     infoRefreshBtn: 'settings-info-refresh-btn',
     infoCodeInput: 'settings-info-code-input',
-    infoIdentifiersInfo: 'institute-info-identifiers-info',
-    infoAffiliationsInfo: 'institute-info-affiliations-info',
     // Branding tab
     brandingImageField: (name: string) => `branding-${name}-field`,
     brandingImageCurrent: (name: string) => `branding-${name}-current`,
     brandingImageRemoveBtn: (name: string) => `branding-${name}-remove-btn`,
     brandingImageRemoveNote: (name: string) => `branding-${name}-remove-note`,
     brandingImageUndoBtn: (name: string) => `branding-${name}-undo-btn`,
-    brandingLogoInfo: 'branding-logo-info',
-    brandingFaviconInfo: 'branding-favicon-info',
-    brandingPrimaryColorInfo: 'branding-primary-color-info',
     brandingPrimaryColorPicker: 'branding-primary-color-picker',
     brandingSecondaryColorPicker: 'branding-secondary-color-picker',
-    brandingThemeInfo: 'branding-theme-info',
-    brandingCoverInfo: 'branding-cover-info',
     // Config tab
-    configAttendanceTypeInfo: 'institute-config-attendance-type-info',
-    configShiftsInfo: 'institute-config-shifts-info',
-    configGradingSystemInfo: 'institute-config-grading-system-info',
-    configOptimalStrengthInfo: 'institute-config-optimal-strength-info',
-    configHardMaxInfo: 'institute-config-hard-max-info',
-    configExemptionAllowedInfo: 'institute-config-exemption-allowed-info',
     // Address form
     addressLine1Input: 'settings-address-line1-input',
     addressLine1Error: 'settings-address-line1-error',
@@ -1553,7 +1524,6 @@ export const testIds = {
     addressDistrictError: 'settings-address-district-error',
     addressPostalCodeInput: 'settings-address-postal-code-input',
     addressPostalCodeError: 'settings-address-postal-code-error',
-    addressStateInfo: 'settings-address-state-info',
     addressStateTrigger: 'settings-address-state-trigger',
     addressStateError: 'settings-address-state-error',
     addressLatInput: 'settings-address-lat-input',

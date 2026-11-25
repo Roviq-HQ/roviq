@@ -12,12 +12,13 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldInfoPopover,
   FieldLabel,
+  FieldLabelWithInfo,
   Skeleton,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { instituteBrandingHelp } from '@web/help/institute-settings/institute-branding.help';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -223,18 +224,9 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
 
                     <div className="grid grid-cols-2 gap-4">
                       <Field>
-                        <FieldLabel>
+                        <FieldLabelWithInfo help={instituteBrandingHelp.primaryColor}>
                           {tb('primaryColor')}
-                          <FieldInfoPopover
-                            title={tb('fieldHelp.primaryColorTitle')}
-                            data-testid={instituteSettings.brandingPrimaryColorInfo}
-                          >
-                            <p>{tb('fieldHelp.primaryColorBody')}</p>
-                            <p>
-                              <em>{tb('fieldHelp.primaryColorExample')}</em>
-                            </p>
-                          </FieldInfoPopover>
-                        </FieldLabel>
+                        </FieldLabelWithInfo>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
@@ -290,14 +282,7 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
                           options={themeOptions}
                           optional={false}
                           testId="branding-theme-select"
-                          info={
-                            <FieldInfoPopover
-                              title={tb('fieldHelp.themeTitle')}
-                              data-testid={instituteSettings.brandingThemeInfo}
-                            >
-                              <p>{tb('fieldHelp.themeBody')}</p>
-                            </FieldInfoPopover>
-                          }
+                          help={instituteBrandingHelp.theme}
                         />
                       )}
                     </form.AppField>

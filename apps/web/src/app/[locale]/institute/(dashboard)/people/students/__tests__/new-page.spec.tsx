@@ -138,6 +138,8 @@ vi.mock('../use-students', () => ({
 }));
 
 // Import AFTER mocks so they apply.
+import { ADMISSION_TYPE_VALUES } from '@roviq/common-types';
+import { studentNewHelp } from '@web/help/students/student-new.help';
 import CreateStudentPage from '../new/page';
 
 // `renderWithProviders` auto-loads the full en/hi message bundle (see the
@@ -336,9 +338,10 @@ describe('CreateStudentPage (component)', () => {
     );
   });
 
-  it('i18n fieldHelp no longer carries the `admissionTypeRte` explainer', () => {
-    const keys = Object.keys(studentsMessages.new.fieldHelp);
-    expect(keys).not.toContain('admissionTypeRte');
+  it('admission type help explains only real admission types, with no RTE option', () => {
+    const keys = Object.keys(studentNewHelp.admissionType.options ?? {});
+    expect([...keys].sort()).toEqual([...ADMISSION_TYPE_VALUES].sort());
+    expect(keys.some((key) => key.includes('RTE'))).toBe(false);
   });
 
   // ── testId coverage (e2e-friendly per [TSTID]) ────────────────────
