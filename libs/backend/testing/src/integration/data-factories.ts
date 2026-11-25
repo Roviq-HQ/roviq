@@ -365,6 +365,13 @@ export async function cleanupTestReseller(db: DrizzleDB, reseller: TestReseller)
     // Before any row lock: a test holding LOCK TABLE resellers would otherwise wait on our
     // role rows while we wait on its table lock (deadlock, 40P01).
     await tx.execute(sql`LOCK TABLE resellers IN ROW EXCLUSIVE MODE`);
+    // Lock the row before deleting its roles: a seed running now provisions roles for every
+    // live reseller, and would otherwise add new ones after ours are gone.
+    await tx
+      .select({ id: resellers.id })
+      .from(resellers)
+      .where(eq(resellers.id, reseller.resellerId))
+      .for('update');
     await tx
       .delete(resellerMemberships)
       .where(eq(resellerMemberships.resellerId, reseller.resellerId));
