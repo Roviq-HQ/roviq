@@ -1136,6 +1136,11 @@ type AuthEventModel {
   failureReason: String
   id: ID!
   ipAddress: String
+
+  """
+  Membership of the session, in the membership table of `scope`. Null when there was no session.
+  """
+  membershipId: String
   metadata: JSON
 
   """
