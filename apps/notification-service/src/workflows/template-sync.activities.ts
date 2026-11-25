@@ -2,7 +2,7 @@ import { ApplicationFailure } from '@temporalio/activity';
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import { TemplatePortalUrlError } from '../delivery/whatsapp/template-submission';
 import { type TemplateSync, TemplateSyncPausedError } from '../delivery/whatsapp/template-sync';
-import type { TemplateSyncInput } from './notification-workflow.types';
+import type { TemplateSyncInput, TemplateSyncOutcome } from './notification-workflow.types';
 
 /**
  * The template sync as a Temporal activity. Errors keep a stable type so the workflow's retry
@@ -10,12 +10,13 @@ import type { TemplateSyncInput } from './notification-workflow.types';
  */
 export function createTemplateSyncActivities(sync: TemplateSync | null) {
   return {
-    async syncWhatsAppTemplates(input: TemplateSyncInput): Promise<void> {
+    async syncWhatsAppTemplates(input: TemplateSyncInput): Promise<TemplateSyncOutcome> {
       if (sync === null) {
         throw ApplicationFailure.nonRetryable('The WhatsApp provider is not configured here');
       }
       try {
-        await sync.sync(input.providerAccountId);
+        const { pending } = await sync.sync(input.providerAccountId);
+        return { pending };
       } catch (err) {
         if (err instanceof TemplatePortalUrlError) {
           throw ApplicationFailure.nonRetryable(err.message, 'TemplatePortalUrlError');

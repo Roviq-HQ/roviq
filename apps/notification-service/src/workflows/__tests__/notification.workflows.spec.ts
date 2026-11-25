@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { guardianAlertFlow } from '../../types/flow';
-import { NotificationDigestWorkflow, NotificationFlowWorkflow } from '../notification.workflows';
+import {
+  NotificationDigestWorkflow,
+  NotificationFlowWorkflow,
+  WhatsAppTemplateSyncWorkflow,
+} from '../notification.workflows';
 import {
   type DigestItem,
   type FlowArrival,
@@ -8,11 +12,14 @@ import {
   MAX_CHANNEL_DEFERRALS,
   MAX_HELD_DEFERRALS,
   type NotificationActivities,
+  TEMPLATE_RECHECK_WAITS_MS,
+  TEMPLATE_SYNC_REQUESTED_SIGNAL,
 } from '../notification-workflow.types';
 
 const temporal = vi.hoisted(() => ({
   sendChannel: vi.fn<NotificationActivities['sendChannel']>(),
   recordSkip: vi.fn<NotificationActivities['recordSkip']>(),
+  syncWhatsAppTemplates: vi.fn<NotificationActivities['syncWhatsAppTemplates']>(),
   sleep: vi.fn<(ms: number) => Promise<void>>(),
   /** Called inside each `condition` wait, before it answers; may deliver a signal. */
   duringWait: vi.fn<(ms: number) => void>(),
@@ -24,6 +31,7 @@ vi.mock('@temporalio/workflow', () => ({
   proxyActivities: () => ({
     sendChannel: temporal.sendChannel,
     recordSkip: temporal.recordSkip,
+    syncWhatsAppTemplates: temporal.syncWhatsAppTemplates,
   }),
   sleep: temporal.sleep,
   condition: async (fn: () => boolean, ms: number) => {
@@ -377,5 +385,64 @@ describe('NotificationDigestWorkflow', () => {
       ['user-guardian-1', 'WHATSAPP'],
     ]);
     expect(skips()).toEqual([['user-guardian-1', 'SMS', 'not_needed']]);
+  });
+});
+
+describe('WhatsAppTemplateSyncWorkflow', () => {
+  const ACCOUNT = { providerAccountId: 'acct-1' };
+  const requestSync = () => temporal.handlers.get(TEMPLATE_SYNC_REQUESTED_SIGNAL)?.(null);
+
+  beforeEach(() => {
+    temporal.handlers.clear();
+    temporal.duringWait.mockReset();
+    temporal.syncWhatsAppTemplates.mockReset();
+  });
+
+  it('should sync once and end when no template waits for a review', async () => {
+    temporal.syncWhatsAppTemplates.mockResolvedValue({ pending: 0 });
+
+    await WhatsAppTemplateSyncWorkflow(ACCOUNT);
+
+    expect(temporal.syncWhatsAppTemplates).toHaveBeenCalledTimes(1);
+    expect(temporal.syncWhatsAppTemplates).toHaveBeenCalledWith(ACCOUNT);
+    expect(temporal.duringWait).not.toHaveBeenCalled();
+  });
+
+  it("should read the provider's list again while a template waits, then end when none does", async () => {
+    temporal.syncWhatsAppTemplates
+      .mockResolvedValueOnce({ pending: 2 })
+      .mockResolvedValueOnce({ pending: 1 })
+      .mockResolvedValueOnce({ pending: 0 });
+
+    await WhatsAppTemplateSyncWorkflow(ACCOUNT);
+
+    expect(temporal.syncWhatsAppTemplates).toHaveBeenCalledTimes(3);
+    expect(temporal.duringWait.mock.calls.map(([ms]) => ms)).toEqual(
+      TEMPLATE_RECHECK_WAITS_MS.slice(0, 2),
+    );
+  });
+
+  it('should stop reading again after the last wait, however many still wait', async () => {
+    temporal.syncWhatsAppTemplates.mockResolvedValue({ pending: 1 });
+
+    await WhatsAppTemplateSyncWorkflow(ACCOUNT);
+
+    expect(temporal.syncWhatsAppTemplates).toHaveBeenCalledTimes(
+      TEMPLATE_RECHECK_WAITS_MS.length + 1,
+    );
+  });
+
+  it('should sync again at once for a request that arrived during a sync', async () => {
+    temporal.syncWhatsAppTemplates
+      .mockImplementationOnce(async () => {
+        requestSync();
+        return { pending: 0 };
+      })
+      .mockResolvedValueOnce({ pending: 0 });
+
+    await WhatsAppTemplateSyncWorkflow(ACCOUNT);
+
+    expect(temporal.syncWhatsAppTemplates).toHaveBeenCalledTimes(2);
+    expect(temporal.duringWait).not.toHaveBeenCalled();
   });
 });

@@ -346,9 +346,13 @@ template of `apps/notification-service/src/delivery/whatsapp/whatsapp-templates.
 canary's, in `en` and `hi`, that the account does not hold, and stores what the provider holds in
 `messaging_templates`. It runs when a sender is registered, its token replaced or its account set,
 when a platform admin presses "Sync now" on the Monitoring page (`adminSyncWhatsAppTemplates`),
-and at the service's start when the code's templates changed. It never deletes or edits a
-template at the provider: a changed text is a new name (`…_v2`), and a unit test holds every
-name to its approved content. The provider's template events keep each row's status; a send
+and at the service's start when the code's templates changed. While a template waits for the
+provider's review the run reads the provider's list again (after 2 minutes, 10 minutes, 1 hour,
+6 hours, then daily twice), so a provider event that never arrives does not leave it waiting. It
+never deletes or edits a template at the provider: a changed text is a new name (`…_v2`), a unit
+test holds every name to its approved content, and the row of a name the code no longer defines
+is marked `retired` and no longer listed or alerted on. The provider's template events keep each
+row's status; an event that does not say where a template stands starts a run. A send
 whose template is not `APPROVED` on the sender's account, or was approved under another
 category than the one declared, is skipped as `no_template` before the provider is called.
 

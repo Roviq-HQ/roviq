@@ -1,6 +1,7 @@
+import type { MessageTemplateStatus } from '@roviq/common-types';
 import { z } from 'zod';
 import type { TemplateEventChange } from '../../repositories/messaging-template.repository';
-import { templateCategoryOf, templateStatusOf } from './whatsapp-template.client';
+import { templateCategoryOf } from './whatsapp-template.client';
 
 /** One provider event about one template of one account, reduced to the change it makes. */
 export interface TemplateEvent {
@@ -9,6 +10,39 @@ export interface TemplateEvent {
   language: string;
   field: TemplateField;
   change: TemplateEventChange;
+  /** The event does not say where the template stands now: the account's list must be read. */
+  resync: boolean;
+}
+
+/**
+ * What a status event makes of the template. `KEEP`: it is sent as before (flagged for poor
+ * feedback, or locked against edits). `ASK`: the event does not say (unarchived "to its previous
+ * status", or an event added since), so the provider's list is read.
+ */
+export function eventStatusOf(event: string | undefined): MessageTemplateStatus | 'KEEP' | 'ASK' {
+  switch (event?.toUpperCase()) {
+    case 'APPROVED':
+    case 'REINSTATED':
+      return 'APPROVED';
+    case 'PENDING':
+    case 'IN_APPEAL':
+      return 'PENDING';
+    case 'REJECTED':
+    case 'LIMIT_EXCEEDED':
+      return 'REJECTED';
+    case 'PAUSED':
+      return 'PAUSED';
+    case 'DISABLED':
+    case 'DELETED':
+    case 'PENDING_DELETION':
+    case 'ARCHIVED':
+      return 'DISABLED';
+    case 'FLAGGED':
+    case 'LOCKED':
+      return 'KEEP';
+    default:
+      return 'ASK';
+  }
 }
 
 /** The webhook fields about templates (ROV-333); every other field is not this module's. */
@@ -52,7 +86,8 @@ const payloadSchema = z.looseObject({
 function changeOf(field: TemplateField, v: z.infer<typeof valueSchema>): TemplateEventChange {
   switch (field) {
     case 'message_template_status_update': {
-      const status = templateStatusOf(v.event);
+      const status = eventStatusOf(v.event);
+      if (status === 'KEEP' || status === 'ASK') return {};
       const category = templateCategoryOf(v.message_template_category);
       return {
         status,
@@ -95,6 +130,7 @@ export function parseTemplateEvents(body: unknown): TemplateEvent[] {
         language: v.data.message_template_language,
         field,
         change: changeOf(field, v.data),
+        resync: field === 'message_template_status_update' && eventStatusOf(v.data.event) === 'ASK',
       });
     }
   }

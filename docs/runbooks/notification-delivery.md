@@ -115,15 +115,20 @@ in the last 15 minutes (labels `channel`, `reason`).
 ## Template rejected
 
 `notification_template_rejected` (ticket): a WhatsApp template is `REJECTED`, `PAUSED` or
-`DISABLED` at the provider on some account (label `reason`). Sends of the alerts that use it
-are skipped as `no_template` on that account, before the provider is called.
+`DISABLED` at the provider on some account, or has waited 48 hours for its review
+(`PENDING_LONG`); the label `reason` says which. Sends of the alerts that use it are skipped as
+`no_template` on that account, before the provider is called. Only names the code still defines
+are counted, on accounts that have a sender.
 
 1. The admin Monitoring page's "WhatsApp senders": each sender lists its templates with their
    status and the provider's rejection reason.
 2. A rejection names the rule the body broke: fix the wording under a new name (`…_v2`), never
-   by editing the provider's copy. "Sync now" submits it.
+   by editing the provider's copy. "Sync now" submits it; the sync retires the old name's row,
+   which clears the alert.
 3. A paused template recovers by itself when its quality improves; the provider's console shows
    the quality.
+4. `PENDING_LONG`: press "Sync now" (it reads the provider's list again). Still waiting: the
+   review is stuck at the provider; ask its support.
 
 ## Template changed
 

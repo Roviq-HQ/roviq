@@ -1165,7 +1165,7 @@ describe('admin messaging senders (integration)', () => {
       await removeSenders([sender.id]);
     });
 
-    it('should list the account templates, sendable only when approved as declared', async () => {
+    it('should list the account templates, sendable only when approved as declared, without retired names', async () => {
       const sender = await registerOk({
         tenantId: instB.tenantId,
         providerNumberId: providerNumber(),
@@ -1173,14 +1173,15 @@ describe('admin messaging senders (integration)', () => {
         accessToken: newToken(),
         dailyCap: 10,
       });
-      const names = [`spec_a_${randomUUID().slice(0, 6)}`, `spec_b_${randomUUID().slice(0, 6)}`];
+      const names = ['a', 'b', 'c'].map((k) => `spec_${k}_${randomUUID().slice(0, 6)}`);
       await superPool.query(
         `INSERT INTO messaging_templates
            (provider_account_id, name, language, declared_category, approved_category,
-            content_hash, status, rejected_reason, created_by, updated_by)
-         VALUES ($1, $2, 'en', 'UTILITY', 'UTILITY', 'h', 'APPROVED', NULL, $4, $4),
-                ($1, $3, 'en', 'UTILITY', 'MARKETING', 'h', 'APPROVED', NULL, $4, $4)`,
-        [SPEC_ACCOUNT, names[0], names[1], SEED_IDS.USER_ADMIN],
+            content_hash, status, retired, created_by, updated_by)
+         VALUES ($1, $2, 'en', 'UTILITY', 'UTILITY', 'h', 'APPROVED', false, $5, $5),
+                ($1, $3, 'en', 'UTILITY', 'MARKETING', 'h', 'APPROVED', false, $5, $5),
+                ($1, $4, 'en', 'UTILITY', NULL, 'h', 'REJECTED', true, $5, $5)`,
+        [SPEC_ACCOUNT, names[0], names[1], names[2], SEED_IDS.USER_ADMIN],
       );
       try {
         const res = await gql<{

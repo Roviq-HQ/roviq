@@ -17,7 +17,7 @@ export class TemplateSyncListener {
       eventPayloadSchemas[EVENT_PATTERNS.NOTIFICATION.WHATSAPP_TEMPLATES_SYNC_REQUESTED].parse(
         data,
       );
-    // A run already in progress covers this request; a redelivery starts nothing twice.
+    // A run in progress reads the list once more; a redelivery costs one more reading.
     await this.starter.start(providerAccountId);
   }
 }

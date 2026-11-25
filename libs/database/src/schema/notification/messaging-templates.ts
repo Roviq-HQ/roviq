@@ -39,6 +39,11 @@ export const messagingTemplates = pgTable(
      * changed under the same name). Nothing is overwritten; it is shown and alerted.
      */
     outOfStep: boolean('out_of_step').default(false).notNull(),
+    /**
+     * The code no longer defines this name (a reworded template has a new one). The row stays
+     * as a record; it is not listed, counted or alerted on. Set and cleared by the sync.
+     */
+    retired: boolean().default(false).notNull(),
     ...trackingColumns,
   },
   (table) => [

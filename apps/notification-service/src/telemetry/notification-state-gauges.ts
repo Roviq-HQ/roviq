@@ -18,7 +18,12 @@ import {
   type SkippedCount,
 } from '../repositories/delivery-stats.repository';
 import { MessagingSenderRepository } from '../repositories/messaging-sender.repository';
-import { MessagingTemplateRepository } from '../repositories/messaging-template.repository';
+import {
+  type AccountTemplateProblems,
+  MessagingTemplateRepository,
+  TEMPLATE_PROBLEMS,
+  type TemplateProblem,
+} from '../repositories/messaging-template.repository';
 import type { SenderStateRecord } from '../repositories/types';
 import {
   NOTIFICATION_METRIC_LABELS as L,
@@ -115,6 +120,19 @@ export function skippedReadings(
 }
 
 /**
+ * Template problems over every account. Every reason is reported, 0 included, so an alert on it
+ * clears on the next reading; the account is not a label.
+ */
+export function templateProblemReadings(
+  accounts: readonly AccountTemplateProblems[],
+): Array<{ problem: TemplateProblem; count: number }> {
+  return TEMPLATE_PROBLEMS.map((problem) => ({
+    problem,
+    count: accounts.reduce((sum, a) => sum + a[problem], 0),
+  }));
+}
+
+/**
  * Read on each metric export from Redis and the database, so a restart loses nothing:
  * `notification.breaker.open` and `notification.sender.blocked` (conditions that last) and
  * `notification.skipped.recent` (skips in the last 15 minutes). Every instance reports the same
@@ -162,16 +180,17 @@ export class NotificationStateGauges implements OnModuleInit, OnModuleDestroy {
     this.templateProblems.removeCallback(this.observeTemplates);
   }
 
-  /** Every reason is reported, 0 included, so an alert on it clears on the next reading. */
   private readonly observeTemplates = async (result: ObservableResult): Promise<void> => {
-    let counts: Array<{ problem: string; count: number }>;
+    let accounts: AccountTemplateProblems[];
     try {
-      counts = await this.templates.countProblems();
+      accounts = await this.templates.countProblems();
     } catch (err) {
       this.logger.warn({ err }, 'Could not count WhatsApp template problems');
       return;
     }
-    for (const { problem, count } of counts) result.observe(count, { [L.REASON]: problem });
+    for (const { problem, count } of templateProblemReadings(accounts)) {
+      result.observe(count, { [L.REASON]: problem });
+    }
   };
 
   private readonly observeSkipped = async (result: ObservableResult): Promise<void> => {

@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { createMock } from '@roviq/testing';
 import { beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { ChannelAdapterError } from '../../delivery/adapters/channel-adapter';
+import type { TemplateEvent } from '../../delivery/whatsapp/template-events';
 import { TemplateSendability } from '../../delivery/whatsapp/template-sendability';
 import type { InboundBatch } from '../../delivery/whatsapp/webhook-payload';
 import { WhatsAppCloud } from '../../delivery/whatsapp/whatsapp-cloud';
@@ -17,6 +18,7 @@ import type {
 } from '../../repositories/types';
 import type { NotificationMetrics } from '../../telemetry/notification-metrics';
 import { FlowArrivals } from '../flow-arrivals.service';
+import type { TemplateSyncStarter } from '../template-sync-starter.service';
 import {
   AUTO_REPLY,
   START_CONFIRMATION,
@@ -64,6 +66,7 @@ describe('WhatsAppWebhookService', () => {
   let service: WhatsAppWebhookService;
   let templates: ReturnType<typeof createMock<MessagingTemplateRepository>>;
   let sendability: TemplateSendability;
+  let starter: ReturnType<typeof createMock<TemplateSyncStarter>>;
 
   beforeEach(() => {
     cloud = new WhatsAppCloud(cloudConfig());
@@ -95,6 +98,7 @@ describe('WhatsAppWebhookService', () => {
       applyEvent: vi.fn().mockResolvedValue(true),
     });
     sendability = new TemplateSendability(templates);
+    starter = createMock<TemplateSyncStarter>({ start: vi.fn().mockResolvedValue(undefined) });
     service = new WhatsAppWebhookService(
       senders,
       inbound,
@@ -104,7 +108,63 @@ describe('WhatsAppWebhookService', () => {
       metrics,
       templates,
       sendability,
+      starter,
     );
+  });
+
+  describe('template events', () => {
+    const event = (over: Partial<TemplateEvent> = {}): TemplateEvent => ({
+      providerAccountId: 'acct-1',
+      name: 'attendance_absent_v1',
+      language: 'en',
+      field: 'message_template_status_update',
+      change: { status: 'APPROVED' },
+      resync: false,
+      ...over,
+    });
+
+    it('should apply an event to its row and start no sync', async () => {
+      await service.handleTemplateEvents([event()]);
+
+      expect(templates.applyEvent).toHaveBeenCalledWith('acct-1', 'attendance_absent_v1', 'en', {
+        status: 'APPROVED',
+      });
+      expect(starter.start).not.toHaveBeenCalled();
+    });
+
+    it("should read the account's list when a verdict arrives before the template's row exists", async () => {
+      templates.applyEvent.mockResolvedValue(false);
+
+      await service.handleTemplateEvents([event(), event({ language: 'hi' })]);
+
+      expect(starter.start).toHaveBeenCalledTimes(1);
+      expect(starter.start).toHaveBeenCalledWith('acct-1');
+    });
+
+    it("should read the account's list after an event that does not say where the template stands", async () => {
+      await service.handleTemplateEvents([event({ change: {}, resync: true })]);
+
+      expect(templates.applyEvent).not.toHaveBeenCalled();
+      expect(starter.start).toHaveBeenCalledWith('acct-1');
+    });
+
+    it('should start nothing for a template the code does not define', async () => {
+      templates.applyEvent.mockResolvedValue(false);
+
+      await service.handleTemplateEvents([
+        event({ name: 'sample_from_the_dashboard' }),
+        event({ name: 'sample_from_the_dashboard', change: {}, resync: true }),
+      ]);
+
+      expect(starter.start).not.toHaveBeenCalled();
+    });
+
+    it('should fail, so the provider sends the event again, when the sync cannot be started', async () => {
+      templates.applyEvent.mockResolvedValue(false);
+      starter.start.mockRejectedValue(new Error('temporal is down'));
+
+      await expect(service.handleTemplateEvents([event()])).rejects.toThrow('temporal is down');
+    });
   });
 
   it('should record nothing and send nothing for a number that is no sender here', async () => {

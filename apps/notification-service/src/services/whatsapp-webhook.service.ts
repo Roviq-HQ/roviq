@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChannelAdapterError } from '../delivery/adapters/channel-adapter';
 import type { TemplateEvent } from '../delivery/whatsapp/template-events';
 import { TemplateSendability } from '../delivery/whatsapp/template-sendability';
+import { registeredTemplates } from '../delivery/whatsapp/template-submission';
 import type {
   InboundBatch,
   InboundMessage,
@@ -19,6 +20,7 @@ import { MessagingTemplateRepository } from '../repositories/messaging-template.
 import type { MessagingSenderRecord } from '../repositories/types';
 import { NotificationMetrics } from '../telemetry/notification-metrics';
 import { FlowArrivals } from './flow-arrivals.service';
+import { TemplateSyncStarter } from './template-sync-starter.service';
 
 /** Sent once when a person asks to stop. Both languages: the person's own is not known here. */
 export const STOP_CONFIRMATION =
@@ -57,6 +59,7 @@ export class WhatsAppWebhookService {
     private readonly metrics: NotificationMetrics,
     private readonly templates: MessagingTemplateRepository,
     private readonly sendability: TemplateSendability,
+    private readonly starter: TemplateSyncStarter,
   ) {}
 
   /**
@@ -64,17 +67,22 @@ export class WhatsAppWebhookService {
    * registered (the provider's test button sends sample names) changes nothing.
    */
   async handleTemplateEvents(events: readonly TemplateEvent[]): Promise<void> {
+    const names = new Set(registeredTemplates().map((t) => t.name));
+    const resync = new Set<string>();
     for (const e of events) {
-      const applied = await this.templates.applyEvent(
-        e.providerAccountId,
-        e.name,
-        e.language,
-        e.change,
-      );
+      const changes = Object.keys(e.change).length > 0;
+      const applied =
+        changes &&
+        (await this.templates.applyEvent(e.providerAccountId, e.name, e.language, e.change));
       this.sendability.forget(e.providerAccountId, e.name, e.language);
-      if (!applied)
+      // The code's own template without a row yet (the event overtook the sync that submitted
+      // it), or an event that does not say where the template stands: read the account's list.
+      if (names.has(e.name) && (e.resync || (changes && !applied))) resync.add(e.providerAccountId);
+      else if (changes && !applied)
         this.logger.warn(`Template event ${e.field} for a template not registered here; ignored`);
     }
+    // A failure here answers 500, so the provider sends the events again.
+    for (const account of resync) await this.starter.start(account);
   }
 
   async handle(batches: readonly InboundBatch[]): Promise<void> {

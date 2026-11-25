@@ -99,9 +99,17 @@ describe('NotificationStateGauges', () => {
     metrics.setGlobalMeterProvider(new MeterProvider({ readers: [reader] }));
     senders.listStates.mockResolvedValue([sender('s2', 'BLOCKED')]);
     breaker.openAmong.mockResolvedValue(new Set(['adapter:SMS:http']));
+    const none = {
+      REJECTED: 0,
+      PAUSED: 0,
+      DISABLED: 0,
+      CATEGORY_CHANGED: 0,
+      OUT_OF_STEP: 0,
+      PENDING_LONG: 0,
+    };
     templates.countProblems.mockResolvedValue([
-      { problem: 'REJECTED', count: 1 },
-      { problem: 'CATEGORY_CHANGED', count: 0 },
+      { ...none, providerAccountId: 'acct-1', REJECTED: 1, PENDING_LONG: 2 },
+      { ...none, providerAccountId: 'acct-2', REJECTED: 1 },
     ]);
     stats.countSkippedSince.mockResolvedValue([
       { channel: 'WHATSAPP', reason: 'no_template', count: 1 },
@@ -159,6 +167,15 @@ describe('NotificationStateGauges', () => {
     });
     expect(got.get('notification.skipped.recent')).toEqual([
       { labels: { channel: 'WHATSAPP', reason: 'no_template' }, value: 1 },
+    ]);
+    // Summed over accounts, and every reason is there so an alert on it can clear.
+    expect(got.get('notification.template.problems')).toEqual([
+      { labels: { reason: 'REJECTED' }, value: 2 },
+      { labels: { reason: 'PAUSED' }, value: 0 },
+      { labels: { reason: 'DISABLED' }, value: 0 },
+      { labels: { reason: 'CATEGORY_CHANGED' }, value: 0 },
+      { labels: { reason: 'OUT_OF_STEP' }, value: 0 },
+      { labels: { reason: 'PENDING_LONG' }, value: 2 },
     ]);
     expect(breaker.openAmong).toHaveBeenCalledWith([
       'adapter:SMS:http',

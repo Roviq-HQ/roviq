@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createMock } from '@roviq/testing';
@@ -11,7 +12,7 @@ import type { MessagingSenderRecord } from '../../../repositories/types';
 import { LOCALES } from '../../../types/notification-type';
 import { ChannelAdapterError } from '../../adapters/channel-adapter';
 import type { ProviderBreaker } from '../../rate/provider-breaker';
-import { parseTemplateEvents } from '../template-events';
+import { eventStatusOf, parseTemplateEvents } from '../template-events';
 import { TemplateSendability } from '../template-sendability';
 import {
   contentHashOf,
@@ -22,7 +23,7 @@ import {
 } from '../template-submission';
 import { TemplateSync, TemplateSyncPausedError } from '../template-sync';
 import { placeholdersOf } from '../whatsapp-template';
-import { templateStatusOf, type WhatsAppTemplateClient } from '../whatsapp-template.client';
+import { templateStatusOf, WhatsAppTemplateClient } from '../whatsapp-template.client';
 
 const HASHES: Record<string, string> = JSON.parse(
   readFileSync(path.join(__dirname, '../whatsapp-template-hashes.json'), 'utf8'),
@@ -112,6 +113,64 @@ describe('templateStatusOf', () => {
   });
 });
 
+describe('eventStatusOf', () => {
+  it.each([
+    ['APPROVED', 'APPROVED'],
+    ['REINSTATED', 'APPROVED'],
+    ['IN_APPEAL', 'PENDING'],
+    ['REJECTED', 'REJECTED'],
+    ['PAUSED', 'PAUSED'],
+    ['DISABLED', 'DISABLED'],
+    ['ARCHIVED', 'DISABLED'],
+    ['PENDING_DELETION', 'DISABLED'],
+    // Still sent: flagged for poor feedback, or locked against edits.
+    ['FLAGGED', 'KEEP'],
+    ['LOCKED', 'KEEP'],
+    // "Restored to its previous status", and an event added later: only the list knows.
+    ['UNARCHIVED', 'ASK'],
+    ['SOMETHING_NEW', 'ASK'],
+  ])('should read the event %s as %s', (event, status) => {
+    expect(eventStatusOf(event)).toBe(status);
+  });
+});
+
+describe('WhatsAppTemplateClient errors', () => {
+  const [submission] = registrySubmissions(PUBLIC_PORTAL);
+  const answering = (status: number, body: unknown) =>
+    new WhatsAppTemplateClient('https://provider.invalid', async () =>
+      Response.json(body, { status }),
+    );
+  const createCode = async (status: number, body: unknown) => {
+    assert(submission);
+    const error = await answering(status, body)
+      .create('acct-1', 'token', submission)
+      .catch((err: unknown) => err);
+    assert(error instanceof ChannelAdapterError);
+    return error.code;
+  };
+
+  it('should call a template the provider will not take invalid', async () => {
+    expect(await createCode(400, { error: { code: 100, error_subcode: 2388299 } })).toBe(
+      'WA_TEMPLATE_INVALID',
+    );
+  });
+
+  it('should not call an answer it does not know a refusal of the template', async () => {
+    expect(await createCode(400, { error: { code: 131000 } })).toBe('WA_REJECTED');
+    expect(await createCode(404, 'not json at all')).toBe('WA_REJECTED');
+  });
+
+  it('should read a refused token, a busy provider and an existing name', async () => {
+    expect(await createCode(403, null)).toBe('WA_PERMISSION_MISSING');
+    expect(await createCode(400, { error: { code: 190 } })).toBe('WA_PERMISSION_MISSING');
+    expect(await createCode(429, null)).toBe('WA_RATE_LIMITED');
+    expect(await createCode(400, { error: { code: 100, error_subcode: 2388024 } })).toBe(
+      'WA_TEMPLATE_EXISTS',
+    );
+    expect(await createCode(503, null)).toBe('WA_UNREACHABLE');
+  });
+});
+
 describe('parseTemplateEvents', () => {
   const body = (field: string, value: Record<string, unknown>) => ({
     object: 'whatsapp_business_account',
@@ -135,8 +194,21 @@ describe('parseTemplateEvents', () => {
         language: 'hi',
         field: 'message_template_status_update',
         change: { status: 'REJECTED', rejectedReason: 'INVALID_FORMAT' },
+        resync: false,
       },
     ]);
+  });
+
+  it('should change nothing for a flagged template, and ask for the list after an event it cannot place', async () => {
+    const [flagged] = parseTemplateEvents(
+      body('message_template_status_update', { ...ids, event: 'FLAGGED' }),
+    );
+    const [unarchived] = parseTemplateEvents(
+      body('message_template_status_update', { ...ids, event: 'UNARCHIVED' }),
+    );
+
+    expect(flagged).toMatchObject({ change: {}, resync: false });
+    expect(unarchived).toMatchObject({ change: {}, resync: true });
   });
 
   it('should read a category change, a quality change, an edit and a suggested category', () => {
@@ -231,6 +303,7 @@ describe('TemplateSync', () => {
     });
     const templates = createMock<MessagingTemplateRepository>({
       upsert: vi.fn().mockResolvedValue(undefined),
+      retireExcept: vi.fn().mockResolvedValue(undefined),
     });
     const client = createMock<WhatsAppTemplateClient>({
       list: vi.fn().mockResolvedValue(held),
@@ -263,11 +336,43 @@ describe('TemplateSync', () => {
     const result = await sync.sync('acct-1');
 
     const expected = registrySubmissions(PUBLIC_PORTAL).length;
-    expect(result).toEqual({ created: expected, known: 0, refused: 0, noSender: false });
+    expect(result).toEqual({
+      created: expected,
+      known: 0,
+      refused: 0,
+      pending: expected,
+      noSender: false,
+    });
     expect(client.create).toHaveBeenCalledTimes(expected);
-    const stored = templates.upsert.mock.calls[0]?.[0] ?? [];
+    const stored = templates.upsert.mock.calls.flatMap(([rows]) => rows);
     expect(stored).toHaveLength(expected);
     expect(stored.every((r) => r.status === 'PENDING' && r.approvedCategory === null)).toBe(true);
+  });
+
+  it('should store each submitted template before it submits the next', async () => {
+    const { sync, client, templates } = setup();
+    const order: string[] = [];
+    client.create.mockImplementation(async (_a, _t, s) => {
+      order.push(`create ${s.name}:${s.language}`);
+      return { id: 'x', status: 'PENDING', category: s.category };
+    });
+    templates.upsert.mockImplementation(async (rows) => {
+      for (const r of rows) order.push(`store ${r.name}:${r.language}`);
+    });
+
+    await sync.sync('acct-1');
+
+    const keys = registrySubmissions(PUBLIC_PORTAL).map((s) => `${s.name}:${s.language}`);
+    expect(order).toEqual(keys.flatMap((k) => [`create ${k}`, `store ${k}`]));
+  });
+
+  it("should retire the account's rows of names the code no longer defines", async () => {
+    const { sync, templates } = setup();
+
+    await sync.sync('acct-1');
+
+    const names = [...new Set(registrySubmissions(PUBLIC_PORTAL).map((s) => s.name))];
+    expect(templates.retireExcept).toHaveBeenCalledWith('acct-1', names);
   });
 
   it('should submit nothing for templates the provider already holds, and record their state', async () => {
@@ -288,6 +393,7 @@ describe('TemplateSync', () => {
 
     expect(client.create).not.toHaveBeenCalled();
     expect(result.known).toBe(held.length);
+    expect(result.pending).toBe(0);
     const stored = templates.upsert.mock.calls[0]?.[0] ?? [];
     expect(stored[0]?.approvedCategory).toBe('MARKETING');
     expect(stored[1]?.outOfStep).toBe(true);
@@ -303,12 +409,35 @@ describe('TemplateSync', () => {
     const result = await sync.sync('acct-1');
 
     expect(result.refused).toBe(1);
-    const stored = templates.upsert.mock.calls[0]?.[0] ?? [];
+    const stored = templates.upsert.mock.calls.flatMap(([rows]) => rows);
     expect(stored[0]).toMatchObject({
       status: 'REJECTED',
       rejectedReason: 'WA_TEMPLATE_INVALID',
       providerTemplateId: null,
     });
+  });
+
+  it('should stop, and record no rejection, on an answer that is not about the template', async () => {
+    const { sync, client, templates } = setup();
+    client.create.mockRejectedValueOnce(
+      new ChannelAdapterError('WA_REJECTED', 'provider code 131000', false),
+    );
+
+    await expect(sync.sync('acct-1')).rejects.toThrow('provider code 131000');
+
+    expect(templates.upsert.mock.calls.flatMap(([rows]) => rows)).toEqual([]);
+  });
+
+  it('should count a name the provider says it holds, but did not list, as still to read', async () => {
+    const { sync, client } = setup();
+    client.create.mockRejectedValueOnce(
+      new ChannelAdapterError('WA_TEMPLATE_EXISTS', 'provider subcode 2388024', false),
+    );
+
+    const result = await sync.sync('acct-1');
+
+    const all = registrySubmissions(PUBLIC_PORTAL).length;
+    expect(result).toMatchObject({ created: all - 1, pending: all });
   });
 
   it('should submit nothing when the portal address is not public', async () => {
@@ -348,6 +477,6 @@ describe('TemplateSync', () => {
     await expect(sync.sync('acct-1')).rejects.toThrow('down');
 
     expect(breaker.failed).toHaveBeenCalledWith('sender:sender-1');
-    expect(templates.upsert.mock.calls[0]?.[0]).toHaveLength(1);
+    expect(templates.upsert.mock.calls.flatMap(([rows]) => rows)).toHaveLength(1);
   });
 });

@@ -23,6 +23,8 @@ export interface TemplateSyncResult {
   known: number;
   /** The provider refused the submission; stored as REJECTED with the code. */
   refused: number;
+  /** Still waiting for the provider's review, or not read yet: the list is worth reading again. */
+  pending: number;
   /** Nothing could be synced: the account has no live sender. */
   noSender: boolean;
 }
@@ -38,7 +40,8 @@ export class TemplateSyncPausedError extends Error {
 function rowOf(
   accountId: string,
   s: TemplateSubmission,
-  at: Pick<ProviderTemplate, 'id' | 'status' | 'category' | 'rejectedReason' | 'quality'> & {
+  at: Pick<ProviderTemplate, 'status' | 'category' | 'rejectedReason' | 'quality'> & {
+    id: string | null;
     outOfStep: boolean;
   },
 ): MessagingTemplateRecord {
@@ -78,7 +81,13 @@ export class TemplateSync {
   async sync(accountId: string): Promise<TemplateSyncResult> {
     // Before any call: a button the provider would refuse must not be submitted at all.
     const portal = publicPortalUrl(this.portalUrl);
-    const result: TemplateSyncResult = { created: 0, known: 0, refused: 0, noSender: false };
+    const result: TemplateSyncResult = {
+      created: 0,
+      known: 0,
+      refused: 0,
+      pending: 0,
+      noSender: false,
+    };
     const sender = await this.senders.findForAccount(accountId);
     if (sender === null) return { ...result, noSender: true };
 
@@ -87,58 +96,71 @@ export class TemplateSync {
     if (!allowed.ok) throw new TemplateSyncPausedError(allowed.retryAt);
     const { accessToken } = this.open(sender);
 
+    const submissions = registrySubmissions(portal);
     const held = await this.guarded(breakerName, () => this.client.list(accountId, accessToken));
-    const rows: MessagingTemplateRecord[] = [];
-    try {
-      for (const s of registrySubmissions(portal)) {
-        const at = held.find((p) => p.name === s.name && p.language === s.language);
-        if (at) {
-          const outOfStep =
-            (at.body !== null && at.body !== s.body) ||
-            (at.buttonLabel !== null && at.buttonLabel !== s.buttonLabel);
-          rows.push(rowOf(accountId, s, { ...at, outOfStep }));
-          result.known += 1;
+    const known: MessagingTemplateRecord[] = [];
+    const missing: TemplateSubmission[] = [];
+    for (const s of submissions) {
+      const at = held.find((p) => p.name === s.name && p.language === s.language);
+      if (!at) {
+        missing.push(s);
+        continue;
+      }
+      const outOfStep =
+        (at.body !== null && at.body !== s.body) ||
+        (at.buttonLabel !== null && at.buttonLabel !== s.buttonLabel);
+      known.push(rowOf(accountId, s, { ...at, outOfStep }));
+    }
+    // Stored at once, so a provider event that follows the list finds its row and is not
+    // overwritten by an older reading.
+    await this.store(known);
+    await this.templates.retireExcept(accountId, [...new Set(submissions.map((s) => s.name))]);
+    result.known = known.length;
+    result.pending = known.filter((r) => r.status === 'PENDING').length;
+
+    for (const s of missing) {
+      try {
+        const created = await this.guarded(breakerName, () =>
+          this.client.create(accountId, accessToken, s),
+        );
+        // Before the next call: the provider's verdict can arrive within seconds.
+        await this.store([
+          rowOf(accountId, s, {
+            ...created,
+            rejectedReason: null,
+            quality: null,
+            outOfStep: false,
+          }),
+        ]);
+        result.created += 1;
+        if (created.status === 'PENDING') result.pending += 1;
+      } catch (err) {
+        if (!(err instanceof ChannelAdapterError)) throw err;
+        if (err.code === 'WA_TEMPLATE_EXISTS') {
+          // The list did not show it yet: read again later.
+          result.pending += 1;
           continue;
         }
-        try {
-          const created = await this.guarded(breakerName, () =>
-            this.client.create(accountId, accessToken, s),
-          );
-          rows.push(
-            rowOf(accountId, s, {
-              ...created,
-              rejectedReason: null,
-              quality: null,
-              outOfStep: false,
-            }),
-          );
-          result.created += 1;
-        } catch (err) {
-          if (!(err instanceof ChannelAdapterError)) throw err;
-          // Listed again on the next run.
-          if (err.code === 'WA_TEMPLATE_EXISTS') continue;
-          if (err.code !== 'WA_TEMPLATE_INVALID') throw err;
-          rows.push(
-            rowOf(accountId, s, {
-              id: '',
-              status: 'REJECTED',
-              category: null,
-              rejectedReason: err.code,
-              quality: null,
-              outOfStep: false,
-            }),
-          );
-          result.refused += 1;
-        }
+        if (err.code !== 'WA_TEMPLATE_INVALID') throw err;
+        await this.store([
+          rowOf(accountId, s, {
+            id: null,
+            status: 'REJECTED',
+            category: null,
+            rejectedReason: err.code,
+            quality: null,
+            outOfStep: false,
+          }),
+        ]);
+        result.refused += 1;
       }
-    } finally {
-      // What was learned is kept even when a later call failed.
-      await this.templates.upsert(
-        rows.map((r) => ({ ...r, providerTemplateId: r.providerTemplateId || null })),
-      );
-      for (const r of rows) this.sendability.forget(accountId, r.name, r.language);
     }
     return result;
+  }
+
+  private async store(rows: readonly MessagingTemplateRecord[]): Promise<void> {
+    await this.templates.upsert(rows);
+    for (const r of rows) this.sendability.forget(r.providerAccountId, r.name, r.language);
   }
 
   /** A provider that cannot answer counts against the sender's breaker; one that answers clears it. */
