@@ -253,6 +253,8 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/notification-service/src/__tests__/notification-pipeline.integration.spec.ts',
   // ROV-328: fixture rows (families, staff profiles) for the guardian order.
   'apps/notification-service/src/__tests__/guardian-order.integration.spec.ts',
+  // ROV-351: years, standards, sections and coordinator roles for the capacity warning.
+  'apps/notification-service/src/__tests__/section-capacity.integration.spec.ts',
   // ROV-332 event consumer: seen and push-acknowledged events read notification rows by recipient
   'apps/notification-service/src/repositories/flow-arrival.drizzle-repository.ts',
   // ROV-332 integration fixtures: families with phones, device tokens and consent rows

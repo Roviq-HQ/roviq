@@ -20,6 +20,7 @@ export const DELIVERY_MODULES = [
   'APPROVAL',
   'ACCOUNT_SECURITY',
   'ACCOUNT',
+  'ACADEMICS',
   'BILLING',
 ] as const satisfies readonly NotificationModule[];
 

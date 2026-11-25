@@ -30,6 +30,8 @@ import type {
   UserWelcomeParams,
 } from './secret.types';
 import { emailVerificationType, impersonationOtpType, userWelcomeType } from './secret.types';
+import type { SectionCapacityWarningParams } from './section-capacity.type';
+import { sectionCapacityWarningType } from './section-capacity.type';
 
 /** Params each type's copy is composed from. Secret params never leave the listener call. */
 export interface SecretParamsMap {
@@ -51,6 +53,7 @@ export interface RegularParamsMap {
   AUTH_ACCOUNT_LOCKED: AuthSecurityParams;
   AUTH_SESSION_REVOKED: AuthSecurityParams;
   BILLING_EVENT: BillingEventParams;
+  SECTION_CAPACITY_WARNING: SectionCapacityWarningParams;
 }
 
 export interface PlatformParamsMap {
@@ -96,6 +99,7 @@ export const REGULAR_TYPES: {
   AUTH_ACCOUNT_LOCKED: authAccountLockedType,
   AUTH_SESSION_REVOKED: authSessionRevokedType,
   BILLING_EVENT: billingEventType,
+  SECTION_CAPACITY_WARNING: sectionCapacityWarningType,
 };
 
 /** A regular type's key with its params; the correlated shape every Temporal input carries. */

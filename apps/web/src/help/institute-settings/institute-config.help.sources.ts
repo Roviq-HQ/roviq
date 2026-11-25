@@ -15,6 +15,9 @@ export const instituteConfigHelpSources = {
   ],
   optimalStrength: [
     'apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll',
+    'apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.warnIfOptimalReached',
+    'apps/notification-service/src/listeners/section.listener.ts#SectionListener.handleCapacityWarning',
+    'apps/notification-service/src/repositories/recipient-read.drizzle-repository.ts#RecipientReadDrizzleRepository.findSectionCapacityAudience',
   ],
   hardMax: [
     'apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.checkCapacity',

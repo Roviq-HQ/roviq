@@ -47,6 +47,16 @@ export interface GuardianRecord extends Recipient {
   isPrimaryContact: boolean;
 }
 
+/** Who hears that a section reached its optimal strength, and the names the copy needs. */
+export interface SectionCapacityAudience {
+  sectionName: Record<string, string>;
+  standardId: string;
+  standardName: Record<string, string>;
+  /** The active class teacher; else the institute's active academic coordinators. */
+  recipients: Recipient[];
+  via: 'CLASS_TEACHER' | 'ACADEMIC_COORDINATORS';
+}
+
 export interface MembershipRecord {
   userId: string;
   isStudent: boolean;

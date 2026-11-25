@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { JetStreamContext } from '@roviq/nats-jetstream';
 import { RecipientReadRepository } from '../repositories/recipient-read.repository';
-import type { Audience, Recipient } from '../repositories/types';
+import type { Audience, Recipient, SectionCapacityAudience } from '../repositories/types';
 import type { EventSource } from './notification-dispatcher.service';
 
 export const instituteAudience = (tenantId: string): Audience => ({
@@ -46,6 +46,14 @@ export class RecipientResolver {
       userId: guardian.userId,
       membershipId: guardian.membershipId,
     }));
+  }
+
+  /** The section's class teacher, else its institute's academic coordinators (ROV-351). */
+  sectionCapacityAudience(
+    tenantId: string,
+    sectionId: string,
+  ): Promise<SectionCapacityAudience | null> {
+    return this.repo.findSectionCapacityAudience(tenantId, sectionId);
   }
 
   async member(tenantId: string, membershipId: string): Promise<ResolvedMember | null> {

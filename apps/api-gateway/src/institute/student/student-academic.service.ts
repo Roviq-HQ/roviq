@@ -95,15 +95,7 @@ export class StudentAcademicService {
       );
     }
 
-    // Emit warning if at optimal capacity
-    if (section.currentStrength + 1 >= norms.optimal) {
-      this.eventBus.emit(EVENT_PATTERNS.SECTION.capacity_warning, {
-        sectionId: input.sectionId,
-        currentStrength: section.currentStrength + 1,
-        optimal: norms.optimal,
-        tenantId,
-      });
-    }
+    this.warnIfOptimalReached(tenantId, input.sectionId, section.currentStrength, norms.optimal);
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.enrolled, {
       studentProfileId: input.studentProfileId,
@@ -148,6 +140,15 @@ export class StudentAcademicService {
       actorId,
     );
 
+    if (input.newSectionId !== oldSectionId) {
+      this.warnIfOptimalReached(
+        tenantId,
+        input.newSectionId,
+        targetSection.currentStrength,
+        norms.optimal,
+      );
+    }
+
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.section_changed, {
       studentProfileId: current.studentProfileId,
       oldSectionId,
@@ -172,6 +173,7 @@ export class StudentAcademicService {
     const tenantId = this.getTenantId();
     const actorId = this.getUserId();
 
+    let target: { strengthBefore: number; optimal: number } | null = null;
     const result = await this.repository.changeClass(
       tenantId,
       {
@@ -192,6 +194,7 @@ export class StudentAcademicService {
         assertCapacity: (capacity) => {
           const { section, norms } = this.withDefaultNorms(capacity);
           this.checkCapacity(section.currentStrength, norms, input.overrideReason);
+          target = { strengthBefore: section.currentStrength, optimal: norms.optimal };
         },
         previousYearResult: (previous, newStandard) =>
           this.alignedPreviousYearResult(previous, newStandard),
@@ -216,6 +219,10 @@ export class StudentAcademicService {
       studentProfileId: moved.studentProfileId,
       tenantId,
     });
+    if (target && moved.sectionId !== input.sectionId) {
+      const { strengthBefore, optimal } = target;
+      this.warnIfOptimalReached(tenantId, input.sectionId, strengthBefore, optimal);
+    }
 
     this.logger.log(
       `Student class changed: ${moved.studentProfileId} to standard ${input.standardId}, section ${input.sectionId}`,
@@ -316,6 +323,23 @@ export class StudentAcademicService {
       );
     }
     throw new BusinessException(ErrorCode.SECTION_NOT_FOUND, 'Section not found');
+  }
+
+  /**
+   * Once per crossing: only the placement that takes the section from below its optimal strength
+   * to it, so the class teacher is told again only after the section has dropped below and refilled.
+   */
+  private warnIfOptimalReached(
+    tenantId: string,
+    sectionId: string,
+    strengthBefore: number,
+    optimal: number,
+  ): void {
+    const strengthAfter = strengthBefore + 1;
+    if (strengthBefore >= optimal || strengthAfter < optimal) return;
+    const payload = { tenantId, sectionId, currentStrength: strengthAfter, optimal };
+    this.eventBus.emit(EVENT_PATTERNS.SECTION.capacity_warning, payload);
+    this.eventBus.emit(EVENT_PATTERNS.NOTIFICATION.SECTION_CAPACITY_WARNING, payload);
   }
 
   private async getSectionWithNorms(

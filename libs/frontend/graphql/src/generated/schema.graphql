@@ -5294,6 +5294,7 @@ type NotificationModel {
 
 """The part of the product a notification type belongs to."""
 enum NotificationModule {
+  ACADEMICS
   ACCOUNT
   ACCOUNT_SECURITY
   APPROVAL

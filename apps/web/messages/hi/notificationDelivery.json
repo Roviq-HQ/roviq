@@ -33,6 +33,7 @@
     "APPROVAL": "स्वीकृतियाँ",
     "ACCOUNT_SECURITY": "खाते की सुरक्षा",
     "ACCOUNT": "खाता",
+    "ACADEMICS": "कक्षाएँ और सेक्शन",
     "BILLING": "बिलिंग"
   },
   "types": {
@@ -50,6 +51,7 @@
     "EMAIL_VERIFICATION": "ईमेल पुष्टि कोड",
     "IMPERSONATION_OTP": "सहायता पहुँच कोड",
     "USER_WELCOME": "स्वागत संदेश",
+    "SECTION_CAPACITY_WARNING": "सेक्शन अपनी सामान्य क्षमता तक भरा",
     "BILLING_EVENT": "बिलिंग की जानकारी",
     "unknown": "अन्य सूचना",
     "DELIVERY_CANARY": "वितरण जाँच (प्लेटफ़ॉर्म)"

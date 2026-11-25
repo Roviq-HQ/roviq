@@ -8,6 +8,7 @@ export type {
   FeeOverdueEvent,
   FeeReminderEvent,
   LeaveDecidedEvent,
+  SectionCapacityWarningEvent,
   UserCreatedEvent,
   UserSyncEvent,
 } from './types/notification-events';

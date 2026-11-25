@@ -25,6 +25,8 @@ const NOTIFICATION = {
   // Emitted by the gateway when the recipient reads or archives an in-app notification of a flow.
   INAPP_SEEN: 'NOTIFICATION.inapp.seen',
   LEAVE_DECIDED: 'NOTIFICATION.leave.decided',
+  // Emitted by the gateway when a placement takes a section to its optimal strength (ROV-351).
+  SECTION_CAPACITY_WARNING: 'NOTIFICATION.section.capacity_warning',
   // Emitted by the gateway when the recipient's device reports that it showed a push.
   PUSH_ACKNOWLEDGED: 'NOTIFICATION.push.acknowledged',
   USER_CREATED: 'NOTIFICATION.user.created',

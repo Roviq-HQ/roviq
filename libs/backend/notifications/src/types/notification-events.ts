@@ -169,3 +169,17 @@ export interface LeaveDecidedEvent {
   startDate?: string;
   endDate?: string;
 }
+
+/**
+ * Emitted by the gateway when a placement takes a section from below its optimal strength to at
+ * or above it (ROV-351). notification-service tells the section's class teacher, else the
+ * institute's academic coordinators.
+ */
+export interface SectionCapacityWarningEvent {
+  tenantId: string;
+  sectionId: string;
+  /** Students placed in the section after this placement. */
+  currentStrength: number;
+  /** The section's optimal strength from the institute's capacity norms. */
+  optimal: number;
+}

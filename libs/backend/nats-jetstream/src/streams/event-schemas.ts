@@ -369,6 +369,12 @@ const AUDIT_SCHEMAS = {
 } as const;
 
 const NOTIFICATION_SCHEMAS = {
+  'NOTIFICATION.section.capacity_warning': z.object({
+    tenantId: uuid,
+    sectionId: uuid,
+    currentStrength: z.number().int(),
+    optimal: z.number().int(),
+  }),
   'NOTIFICATION.leave.decided': z.object({
     leaveId: uuid,
     tenantId: uuid,

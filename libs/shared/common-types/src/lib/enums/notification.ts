@@ -41,6 +41,8 @@ export const NOTIFICATION_TYPE_VALUES = [
   'IMPERSONATION_OTP',
   // First message to a new account, carrying its temporary password; never stored
   'USER_WELCOME',
+  // A section went over its optimal strength; goes to its class teacher, else the academic coordinators
+  'SECTION_CAPACITY_WARNING',
   // A subscription or payment of an institute changed
   'BILLING_EVENT',
   // A scheduled test message the platform sends itself to prove delivery works; never an institute's
@@ -69,6 +71,8 @@ export const NOTIFICATION_MODULE_VALUES = [
   'ACCOUNT_SECURITY',
   // Welcome messages and email verification
   'ACCOUNT',
+  // Sections and their capacity
+  'ACADEMICS',
   // Subscription and payment changes of the institute
   'BILLING',
   // The platform's own delivery checks; never shown to an institute
@@ -97,6 +101,7 @@ export const NOTIFICATION_MODULE_OF: Record<NotificationTypeKey, NotificationMod
   IMPERSONATION_OTP: 'ACCOUNT_SECURITY',
   EMAIL_VERIFICATION: 'ACCOUNT',
   USER_WELCOME: 'ACCOUNT',
+  SECTION_CAPACITY_WARNING: 'ACADEMICS',
   BILLING_EVENT: 'BILLING',
   DELIVERY_CANARY: 'PLATFORM',
 };

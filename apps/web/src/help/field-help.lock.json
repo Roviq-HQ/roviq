@@ -186,9 +186,12 @@
     }
   },
   "instituteSettings.config.optimalStrength": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "ROV-351: reaching the optimal strength now notifies the class teacher, else the academic coordinators, once per crossing; copy updated",
     "targets": {
-      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll": "1efb2382ce0ea70b"
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.enroll": "515150e0d1218f36",
+      "apps/api-gateway/src/institute/student/student-academic.service.ts#StudentAcademicService.warnIfOptimalReached": "a37d1f607d470ac0",
+      "apps/notification-service/src/listeners/section.listener.ts#SectionListener.handleCapacityWarning": "d6576d020dd30c7a",
+      "apps/notification-service/src/repositories/recipient-read.drizzle-repository.ts#RecipientReadDrizzleRepository.findSectionCapacityAudience": "7efc3493fcf23280"
     }
   },
   "instituteSettings.config.shifts": {
