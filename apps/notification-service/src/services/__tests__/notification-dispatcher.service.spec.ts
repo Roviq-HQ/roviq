@@ -131,10 +131,10 @@ describe('NotificationDispatcher', () => {
 
   describe('dispatch', () => {
     const ABSENCE_COPY = {
-      title: { en: 'Absence recorded', hi: 'अनुपस्थिति दर्ज' },
+      title: { en: 'Absence recorded', hi: 'ऐब्सेंट दर्ज' },
       body: {
         en: 'Your ward Aarav Sharma (Class 5-A) was marked absent on 10 April 2026. Please contact the institute if this is incorrect.',
-        hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को अनुपस्थित दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
+        hi: '10 अप्रैल 2026 को आपके बच्चे Aarav Sharma (Class 5-A) को ऐब्सेंट दर्ज किया गया। यदि यह सही नहीं है तो कृपया संस्थान से संपर्क करें।',
       },
       data: {
         sessionId: 'session-1',

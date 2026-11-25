@@ -134,7 +134,7 @@ describe('Notification inbox (integration)', () => {
           recipientUserId: target.recipientUserId,
           recipientMembershipId: target.recipientMembershipId ?? null,
           type: 'LEAVE_DECIDED',
-          title: { en: 'Leave approved', hi: 'छुट्टी स्वीकृत' },
+          title: { en: 'Leave approved', hi: 'छुट्टी अप्रूव' },
           body: { en: 'Your leave was approved.' },
           data: { leaveId: randomUUID() },
           readAt: target.readAt ?? null,

@@ -74,7 +74,7 @@ export const deliveryCanaryType: PlatformNotificationType<DeliveryCanaryParams> 
     return locale === 'hi'
       ? {
           subject: `Roviq डिलीवरी जाँच ${checkTime(p, locale)}`,
-          body: 'यह संदेश जाँचता है कि Roviq संदेश भेज पा रहा है। कुछ करने की ज़रूरत नहीं।',
+          body: 'यह मैसेज जाँचता है कि Roviq मैसेज भेज पा रहा है। कुछ करने की ज़रूरत नहीं।',
         }
       : {
           subject: `Roviq delivery check ${checkTime(p, locale)}`,

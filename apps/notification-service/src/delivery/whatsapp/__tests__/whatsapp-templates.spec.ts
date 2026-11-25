@@ -299,7 +299,7 @@ describe('whatsappTemplateFor', () => {
       name: 'attendance_absent_v1',
       languageCode: 'hi',
       category: 'UTILITY',
-      bodyVariables: ['आपके बच्चे', 'अपनी कक्षा', 'विलंब से उपस्थित', 'आज'],
+      bodyVariables: ['आपके बच्चे', 'अपनी क्लास', 'लेट', 'आज'],
       buttonPath: 'institute/attendance',
     });
   });
@@ -343,7 +343,7 @@ describe('whatsappTemplateFor', () => {
     expect(
       composeOutside({ type: 'APPROVAL_RESOLVED', params: resolved }, 'WHATSAPP', 'hi').body,
     ).toBe(
-      'अनुरोध अपडेट: प्रस्तुत अनुरोध की समीक्षा समीक्षक ने की और इसे अस्वीकृत किया गया। टिप्पणी: कोई नहीं। विवरण के लिए Roviq खोलें।',
+      'अनुरोध अपडेट: प्रस्तुत अनुरोध की समीक्षा समीक्षक ने की और इसे रिजेक्ट किया गया। टिप्पणी: कोई नहीं। विवरण के लिए Roviq खोलें।',
     );
     expect(
       composeOutside({ type: 'AUTH_PASSWORD_RESET', params: reset }, 'WHATSAPP', 'en').body,

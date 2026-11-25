@@ -141,7 +141,7 @@ export const feeReminderWhatsApp: TypeTemplates<FeeReminderParams> = { single: r
 
 function overdueLine(p: FeeOverdueParams, locale: Locale): string {
   return locale === 'hi'
-    ? `${p.studentName} का ${p.feeType} शुल्क ${p.currency} ${p.amount} बकाया है।`
+    ? `${p.studentName} का ${p.feeType} फ़ीस ${p.currency} ${p.amount} बकाया है।`
     : `${p.studentName} has an overdue ${p.feeType} fee of ${p.currency} ${p.amount}.`;
 }
 
@@ -154,7 +154,7 @@ function overdueSummary(
   const n = items.length;
   if (channel === 'WHATSAPP') {
     return {
-      subject: locale === 'hi' ? 'शुल्क बकाया' : 'Fee Overdue',
+      subject: locale === 'hi' ? 'फ़ीस बकाया' : 'Fee Overdue',
       body:
         n === 1 && first
           ? renderTemplate(
@@ -171,15 +171,15 @@ function overdueSummary(
     n === 1 && first
       ? overdueLine(first, locale)
       : locale === 'hi'
-        ? `इस सप्ताह बकाया शुल्क की ${n} सूचनाएँ।`
+        ? `इस सप्ताह बकाया फ़ीस के ${n} नोटिफ़िकेशन।`
         : `${n} overdue fee reminder(s) this week.`;
   if (channel === 'EMAIL') {
     return {
-      subject: locale === 'hi' ? `शुल्क बकाया: ${n} सूचना` : `Fee Overdue: ${n} reminder(s)`,
+      subject: locale === 'hi' ? `फ़ीस बकाया: ${n} नोटिफ़िकेशन` : `Fee Overdue: ${n} reminder(s)`,
       body,
     };
   }
-  return { subject: locale === 'hi' ? 'शुल्क बकाया' : 'Fee Overdue', body };
+  return { subject: locale === 'hi' ? 'फ़ीस बकाया' : 'Fee Overdue', body };
 }
 
 export const feeOverdueType: RegularNotificationType<FeeOverdueParams> = {
@@ -191,10 +191,10 @@ export const feeOverdueType: RegularNotificationType<FeeOverdueParams> = {
   // Weekly, Monday 09:00 in the institute's timezone.
   digest: { defaultCron: '0 9 * * 1', summaryCopy: overdueSummary },
   inAppCopy: (p) => ({
-    title: localized((l) => (l === 'hi' ? 'शुल्क बकाया' : 'Fee Overdue')),
+    title: localized((l) => (l === 'hi' ? 'फ़ीस बकाया' : 'Fee Overdue')),
     body: localized((l) =>
       l === 'hi'
-        ? `${p.studentName} का ${p.feeType} शुल्क ${p.currency} ${p.amount} बकाया है (देय तिथि ${p.dueDate})।`
+        ? `${p.studentName} का ${p.feeType} फ़ीस ${p.currency} ${p.amount} बकाया है (देय तिथि ${p.dueDate})।`
         : `${p.studentName} has an overdue ${p.feeType} fee of ${p.currency} ${p.amount} (due ${p.dueDate}).`,
     ),
     data: { feeId: p.feeId, studentId: p.studentId, path: FEE_PATH },
@@ -204,11 +204,11 @@ export const feeOverdueType: RegularNotificationType<FeeOverdueParams> = {
 
 function reminderLine(p: FeeReminderParams, locale: Locale): string {
   return locale === 'hi'
-    ? `${p.studentName} का ${p.feePeriod} का ${p.feeType} शुल्क ${p.currency} ${p.amount} ${p.dueDate} तक देय है।`
+    ? `${p.studentName} का ${p.feePeriod} का ${p.feeType} फ़ीस ${p.currency} ${p.amount} ${p.dueDate} तक देय है।`
     : `${p.studentName} has an upcoming ${p.feeType} fee of ${p.currency} ${p.amount} for ${p.feePeriod}, due ${p.dueDate}.`;
 }
 
-const reminderTitle = (locale: Locale) => (locale === 'hi' ? 'शुल्क अनुस्मारक' : 'Fee Reminder');
+const reminderTitle = (locale: Locale) => (locale === 'hi' ? 'फ़ीस रिमाइंडर' : 'Fee Reminder');
 
 export const feeReminderType: RegularNotificationType<FeeReminderParams> = {
   key: 'FEE_REMINDER',

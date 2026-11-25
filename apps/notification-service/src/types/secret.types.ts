@@ -26,11 +26,11 @@ export const emailVerificationType: SecretNotificationType<EmailVerificationPara
   outsideCopy: (p, _channel, locale) =>
     locale === 'hi'
       ? {
-          subject: 'आपका Roviq ईमेल सत्यापन कोड',
+          subject: 'आपका Roviq ईमेल वेरिफ़िकेशन कोड',
           body: [
-            `आपका सत्यापन कोड ${p.code} है।`,
+            `आपका वेरिफ़िकेशन कोड ${p.code} है।`,
             '',
-            'यह 10 मिनट तक मान्य है। इसे Roviq में अपने खाता पृष्ठ पर दर्ज करें।',
+            'यह 10 मिनट तक मान्य है। इसे Roviq में अपने अकाउंट पेज पर दर्ज करें।',
             'यदि आपने यह कोड नहीं माँगा था, तो इस ईमेल को अनदेखा करें।',
           ].join('\n'),
         }
@@ -73,7 +73,7 @@ export const impersonationOtpType: SecretNotificationType<ImpersonationOtpParams
       ? {
           subject: 'Roviq सपोर्ट आपके संस्थान को देखने की अनुमति माँग रहा है',
           body: [
-            'Roviq सपोर्ट से किसी ने आपके संस्थान को उसके एक उपयोगकर्ता के रूप में देखने की अनुमति माँगी है।',
+            'Roviq सपोर्ट से किसी ने आपके संस्थान को उसके एक यूज़र के रूप में देखने की अनुमति माँगी है।',
             '',
             `यदि आप अनुमति देते हैं, तो उन्हें यह कोड दें: ${p.otp}`,
             'यह 5 मिनट में समाप्त हो जाएगा।',
@@ -157,7 +157,7 @@ export const userWelcomeType: SecretNotificationType<UserWelcomeParams> = {
             body: [
               `नमस्ते ${name},`,
               '',
-              `${institute} ने Roviq पर आपके लिए एक खाता बनाया है।`,
+              `${institute} ने Roviq पर आपके लिए एक अकाउंट बनाया है।`,
               `यूज़रनेम: ${p.username}`,
               `अस्थायी पासवर्ड: ${p.tempPassword}`,
               '',
@@ -182,11 +182,11 @@ export const userWelcomeType: SecretNotificationType<UserWelcomeParams> = {
     if (channel === 'SMS') return { subject: '', body: smsText(userWelcomeSms, p, locale) };
     return locale === 'hi'
       ? {
-          subject: 'Roviq में आपका स्वागत है — आपका खाता तैयार है',
+          subject: 'Roviq में आपका स्वागत है — आपका अकाउंट तैयार है',
           body: [
             `नमस्ते ${name},`,
             '',
-            'आपका Roviq खाता बना दिया गया है।',
+            'आपका Roviq अकाउंट बना दिया गया है।',
             `यूज़रनेम: ${p.username}`,
             `अस्थायी पासवर्ड: ${p.tempPassword}`,
             '',

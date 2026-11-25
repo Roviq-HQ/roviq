@@ -25,17 +25,17 @@ import { TemplateSyncStarter } from './template-sync-starter.service';
 /** Sent once when a person asks to stop. Both languages: the person's own is not known here. */
 export const STOP_CONFIRMATION =
   'You will not get WhatsApp alerts from this number any more. This includes security alerts about your account; those still reach you by email and in the app. Send START to get WhatsApp alerts again.\n\n' +
-  'अब आपको इस नंबर से व्हाट्सऐप सूचनाएँ नहीं मिलेंगी। इसमें आपके खाते की सुरक्षा सूचनाएँ भी शामिल हैं; वे ईमेल और ऐप में मिलती रहेंगी। व्हाट्सऐप सूचनाएँ फिर से पाने के लिए START भेजें।';
+  'अब आपको इस नंबर से व्हाट्सऐप नोटिफ़िकेशन नहीं मिलेंगे। इसमें आपके अकाउंट की सुरक्षा नोटिफ़िकेशन भी शामिल हैं; वे ईमेल और ऐप में मिलते रहेंगे। व्हाट्सऐप नोटिफ़िकेशन फिर से पाने के लिए START भेजें।';
 
 /** Sent once when a person who stopped asks to get alerts again. */
 export const START_CONFIRMATION =
   'You will get WhatsApp alerts from this number again. Send STOP to stop them.\n\n' +
-  'अब आपको इस नंबर से व्हाट्सऐप सूचनाएँ फिर से मिलेंगी। इन्हें बंद करने के लिए STOP भेजें।';
+  'अब आपको इस नंबर से व्हाट्सऐप नोटिफ़िकेशन फिर से मिलेंगे। इन्हें बंद करने के लिए STOP भेजें।';
 
 /** The one reply a day to anything else a person writes. */
 export const AUTO_REPLY =
   'This number only sends alerts, and messages sent here are not read. Please contact your institute directly. Send STOP to stop these alerts.\n\n' +
-  'यह नंबर केवल सूचनाएँ भेजता है और यहाँ भेजे गए संदेश पढ़े नहीं जाते। कृपया सीधे अपने संस्थान से संपर्क करें। ये सूचनाएँ बंद करने के लिए STOP भेजें।';
+  'यह नंबर केवल नोटिफ़िकेशन भेजता है और यहाँ भेजे गए मैसेज पढ़े नहीं जाते। कृपया सीधे अपने संस्थान से संपर्क करें। ये नोटिफ़िकेशन बंद करने के लिए STOP भेजें।';
 
 /** The day "one reply a day" is counted in. */
 const REPLY_DAY_TIMEZONE = 'Asia/Kolkata';
