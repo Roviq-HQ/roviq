@@ -33,6 +33,7 @@
     "APPROVAL": "Approvals",
     "ACCOUNT_SECURITY": "Account security",
     "ACCOUNT": "Account",
+    "ACADEMICS": "Classes and sections",
     "BILLING": "Billing"
   },
   "types": {
@@ -50,6 +51,7 @@
     "EMAIL_VERIFICATION": "Email verification code",
     "IMPERSONATION_OTP": "Support access code",
     "USER_WELCOME": "Welcome message",
+    "SECTION_CAPACITY_WARNING": "Section reached its usual size",
     "BILLING_EVENT": "Billing update",
     "unknown": "Other notification",
     "DELIVERY_CANARY": "Delivery check (platform)"

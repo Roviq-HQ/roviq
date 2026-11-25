@@ -1,4 +1,4 @@
-import type { GuardianRecord, MembershipRecord } from './types';
+import type { GuardianRecord, MembershipRecord, SectionCapacityAudience } from './types';
 
 /**
  * Tenant-scoped reads that resolve who an event is for. Every read runs as the event's
@@ -23,6 +23,15 @@ export abstract class RecipientReadRepository {
     guardianUserId: string,
   ): Promise<boolean>;
   abstract findMembership(tenantId: string, membershipId: string): Promise<MembershipRecord | null>;
+  /**
+   * The section's names and who is told it reached its optimal strength: its class teacher when
+   * that membership is active, else every active member with the academic coordinator role.
+   * Null when the section is not a live section of the institute.
+   */
+  abstract findSectionCapacityAudience(
+    tenantId: string,
+    sectionId: string,
+  ): Promise<SectionCapacityAudience | null>;
   abstract findInstituteTimezone(tenantId: string): Promise<string | null>;
   /** The institute's name in every locale it was entered in. */
   abstract findInstituteName(tenantId: string): Promise<Record<string, string> | null>;

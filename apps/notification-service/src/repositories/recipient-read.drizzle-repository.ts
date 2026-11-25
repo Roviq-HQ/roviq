@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { DefaultRoles } from '@roviq/common-types';
 import {
   DRIZZLE_DB,
   type DrizzleDB,
@@ -6,7 +7,10 @@ import {
   institutesLive,
   membershipsLive,
   mkInstituteCtx,
+  rolesLive,
+  sectionsLive,
   staffProfilesLive,
+  standardsLive,
   studentGuardianLinksLive,
   studentProfilesLive,
   withTenant,
@@ -14,7 +18,7 @@ import {
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { RecipientReadRepository } from './recipient-read.repository';
-import type { GuardianRecord, MembershipRecord } from './types';
+import type { GuardianRecord, MembershipRecord, Recipient, SectionCapacityAudience } from './types';
 
 const ORIGIN = 'repository:notification-recipients';
 
@@ -112,6 +116,58 @@ export class RecipientReadDrizzleRepository extends RecipientReadRepository {
         .where(and(eq(membershipsLive.id, membershipId), eq(membershipsLive.status, 'ACTIVE')))
         .limit(1);
       return row ? { userId: row.userId, isStudent: row.studentProfileId !== null } : null;
+    });
+  }
+
+  async findSectionCapacityAudience(
+    tenantId: string,
+    sectionId: string,
+  ): Promise<SectionCapacityAudience | null> {
+    return withTenant(this.db, mkInstituteCtx(tenantId, ORIGIN), async (tx) => {
+      const [section] = await tx
+        .select({
+          sectionName: sectionsLive.name,
+          classTeacherId: sectionsLive.classTeacherId,
+          standardId: standardsLive.id,
+          standardName: standardsLive.name,
+        })
+        .from(sectionsLive)
+        .innerJoin(standardsLive, eq(standardsLive.id, sectionsLive.standardId))
+        .where(eq(sectionsLive.id, sectionId))
+        .limit(1);
+      if (!section) return null;
+      const names = {
+        sectionName: section.sectionName,
+        standardId: section.standardId,
+        standardName: section.standardName,
+      };
+
+      if (section.classTeacherId) {
+        const [teacher] = await tx
+          .select({ userId: membershipsLive.userId, membershipId: membershipsLive.id })
+          .from(membershipsLive)
+          .where(
+            and(
+              eq(membershipsLive.id, section.classTeacherId),
+              eq(membershipsLive.status, 'ACTIVE'),
+            ),
+          )
+          .limit(1);
+        if (teacher) return { ...names, recipients: [teacher], via: 'CLASS_TEACHER' as const };
+      }
+
+      const coordinators: Recipient[] = await tx
+        .select({ userId: membershipsLive.userId, membershipId: membershipsLive.id })
+        .from(membershipsLive)
+        .innerJoin(rolesLive, eq(rolesLive.id, membershipsLive.roleId))
+        .where(
+          and(
+            eq(membershipsLive.status, 'ACTIVE'),
+            sql`${rolesLive.name}->>'en' = ${DefaultRoles.AcademicCoordinator}`,
+          ),
+        )
+        .orderBy(asc(membershipsLive.createdAt), asc(membershipsLive.id));
+      return { ...names, recipients: coordinators, via: 'ACADEMIC_COORDINATORS' as const };
     });
   }
 

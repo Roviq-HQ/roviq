@@ -29,6 +29,7 @@ import { AuthListener } from '../listeners/auth.listener';
 import { CanaryListener } from '../listeners/canary.listener';
 import { FeeListener } from '../listeners/fee.listener';
 import { LeaveListener } from '../listeners/leave.listener';
+import { SectionListener } from '../listeners/section.listener';
 import { TemplateSyncListener } from '../listeners/template-sync.listener';
 import { UserListener } from '../listeners/user.listener';
 import { NatsJetStreamModule } from '../nats/nats-jetstream.module';
@@ -71,6 +72,7 @@ import { NotificationWorkerService } from '../workflows/notification.worker';
     CanaryListener,
     FeeListener,
     LeaveListener,
+    SectionListener,
     UserListener,
     TemplateSyncListener,
   ],

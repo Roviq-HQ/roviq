@@ -16,6 +16,9 @@ import {
 } from 'class-validator';
 import GraphQLJSON from 'graphql-type-json';
 
+/** The config query returns PostgreSQL's `HH:mm:ss`, so a form sending it back unchanged is valid. */
+const TIME_OF_DAY = /^\d{2}:\d{2}(:\d{2})?$/;
+
 @InputType({ description: 'A named shift period, e.g. "Morning 8:00–12:30".' })
 export class ShiftConfigInput {
   @Field({ description: 'Human-readable shift label, e.g. "Morning Shift" or "Evening Shift".' })
@@ -83,15 +86,21 @@ export class UpdateInstituteConfigInput {
   @IsOptional()
   attendanceType?: AttendanceType;
 
-  @Field({ nullable: true, description: 'HH:mm format' })
+  @Field({
+    nullable: true,
+    description: 'HH:mm, or HH:mm:ss as the config query returns it (a PostgreSQL time)',
+  })
   @IsString()
-  @Matches(/^\d{2}:\d{2}$/, { message: 'openingTime must be HH:mm' })
+  @Matches(TIME_OF_DAY, { message: 'openingTime must be HH:mm or HH:mm:ss' })
   @IsOptional()
   openingTime?: string;
 
-  @Field({ nullable: true, description: 'HH:mm format' })
+  @Field({
+    nullable: true,
+    description: 'HH:mm, or HH:mm:ss as the config query returns it (a PostgreSQL time)',
+  })
   @IsString()
-  @Matches(/^\d{2}:\d{2}$/, { message: 'closingTime must be HH:mm' })
+  @Matches(TIME_OF_DAY, { message: 'closingTime must be HH:mm or HH:mm:ss' })
   @IsOptional()
   closingTime?: string;
 

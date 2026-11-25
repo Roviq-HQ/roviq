@@ -125,6 +125,17 @@ up into Class 1 like any other level. A section that still has students cannot b
 (`SECTION_HAS_STUDENTS`), and enrolling a student twice in one year fails with
 `STUDENT_ALREADY_ENROLLED`.
 
+## Section capacity warning
+
+When `enrollStudent`, `updateStudentSection` or `changeStudentClass` takes a section from below its
+optimal strength (the institute's capacity norms) to it, the gateway emits
+`SECTION.capacity_warning` and `NOTIFICATION.section.capacity_warning` once; placements above the
+optimal do not repeat it, so it comes again only after the section drops below and refills.
+notification-service (`SectionListener`) sends the in-app and push notification
+`SECTION_CAPACITY_WARNING` to the section's active class teacher, else to every active member with
+the `academic_coordinator` role; it links to the standard's sections
+(`/institute/academics/<standardId>`). Neither is found: nothing is sent and a warning is logged.
+
 ## Correcting one student after a rollover
 
 Three actions fix one student without touching anyone else (ROV-322).

@@ -104,6 +104,7 @@ Below is the exact flow that ties the three modules together.
 | --- | --- |
 | `NOTIFICATION.attendance.absent` | `ATTENDANCE_ABSENT` |
 | `NOTIFICATION.leave.decided` | `LEAVE_DECIDED` |
+| `NOTIFICATION.section.capacity_warning` | `SECTION_CAPACITY_WARNING` (`docs/features/students.md` → "Section capacity warning") |
 
 The channels of each type and their order are its flow: `docs/architecture.md` → "Notifications". Who received an alert, and what happened on each channel, is on the institute's "Notification delivery" page (`/institute/settings/notifications/delivery`).
 

@@ -84,19 +84,100 @@ describe('StudentAcademicService (unit)', () => {
         ...ENROL_INPUT,
         actorId: 'user-1',
       });
-      // Capacity warning because currentStrength+1 (46) >= optimal (40).
-      expect(eventBus.emit).toHaveBeenCalledWith('SECTION.capacity_warning', {
-        sectionId: 'sec-1',
-        currentStrength: 46,
-        optimal: 40,
-        tenantId: 'tenant-1',
-      });
+      // Already past optimal (45 ≥ 40) before this placement: the warning went out on the crossing.
+      expect(eventBus.emit).not.toHaveBeenCalledWith('SECTION.capacity_warning', expect.anything());
       expect(eventBus.emit).toHaveBeenCalledWith('STUDENT.enrolled', {
         studentProfileId: 'student-1',
         academicYearId: 'ay-1',
         sectionId: 'sec-1',
         tenantId: 'tenant-1',
       });
+    });
+  });
+
+  describe('capacity warning, once per crossing (ROV-351)', () => {
+    const WARNING = { sectionId: 'sec-1', currentStrength: 40, optimal: 40, tenantId: 'tenant-1' };
+
+    beforeEach(() => {
+      repository.checkEnrolTarget.mockResolvedValue({ kind: 'ok' });
+      repository.createPlacement.mockResolvedValue({ id: 'sa-1' });
+    });
+
+    it('warns when a placement takes the section to its optimal strength', async () => {
+      repository.findSectionCapacity.mockResolvedValue(capacity(39, 45));
+      await service.enroll(ENROL_INPUT);
+      expect(eventBus.emit).toHaveBeenCalledWith('SECTION.capacity_warning', WARNING);
+      expect(eventBus.emit).toHaveBeenCalledWith('NOTIFICATION.section.capacity_warning', WARNING);
+    });
+
+    it('does not warn below the optimal strength or after it was already reached', async () => {
+      for (const before of [10, 38, 40, 41]) {
+        repository.findSectionCapacity.mockResolvedValue(capacity(before, 45));
+        await service.enroll(ENROL_INPUT);
+      }
+      expect(eventBus.emit).not.toHaveBeenCalledWith('SECTION.capacity_warning', expect.anything());
+      expect(eventBus.emit).not.toHaveBeenCalledWith(
+        'NOTIFICATION.section.capacity_warning',
+        expect.anything(),
+      );
+    });
+
+    it('warns when a section change takes the new section to its optimal strength', async () => {
+      repository.findPlacement.mockResolvedValue({
+        id: 'sa-1',
+        sectionId: 'sec-old',
+        studentProfileId: 'student-1',
+      });
+      repository.findSectionCapacity.mockResolvedValue(capacity(39, 45));
+      await service.changeSection({ studentAcademicId: 'sa-1', newSectionId: 'sec-1' });
+      expect(eventBus.emit).toHaveBeenCalledWith('NOTIFICATION.section.capacity_warning', WARNING);
+    });
+
+    it('warns when a class change takes the new section to its optimal strength', async () => {
+      repository.changeClass.mockImplementation(async (_tenantId, _data, rules) => {
+        rules.assertCapacity(capacity(39, 45));
+        return {
+          kind: 'ok',
+          row: {
+            id: 'sa-1',
+            studentProfileId: 'student-1',
+            academicYearId: 'ay-1',
+            standardId: 'std-old',
+            sectionId: 'sec-old',
+          },
+        };
+      });
+      await service.changeClass({
+        studentAcademicId: 'sa-1',
+        standardId: 'std-1',
+        sectionId: 'sec-1',
+      });
+      expect(eventBus.emit).toHaveBeenCalledWith('NOTIFICATION.section.capacity_warning', WARNING);
+    });
+
+    it('does not warn when a class change is refused for capacity', async () => {
+      repository.changeClass.mockImplementation(async (_tenantId, _data, rules) => {
+        rules.assertCapacity(capacity(45, 45));
+        return { kind: 'academic_not_found' };
+      });
+      await expect(
+        service.changeClass({ studentAcademicId: 'sa-1', standardId: 'std-1', sectionId: 'sec-1' }),
+      ).rejects.toMatchObject({ code: ErrorCode.SECTION_CAPACITY_EXCEEDED });
+      expect(eventBus.emit).not.toHaveBeenCalled();
+    });
+
+    it('does not warn when the student stays in the same section', async () => {
+      repository.findPlacement.mockResolvedValue({
+        id: 'sa-1',
+        sectionId: 'sec-1',
+        studentProfileId: 'student-1',
+      });
+      repository.findSectionCapacity.mockResolvedValue(capacity(39, 45));
+      await service.changeSection({ studentAcademicId: 'sa-1', newSectionId: 'sec-1' });
+      expect(eventBus.emit).not.toHaveBeenCalledWith(
+        'NOTIFICATION.section.capacity_warning',
+        expect.anything(),
+      );
     });
   });
 
