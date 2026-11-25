@@ -30,14 +30,28 @@ export const studentNewHelp = defineFieldHelp('students.new', {
     }),
   },
   academicYear: {
-    title: { en: 'Academic year', hi: 'शैक्षणिक वर्ष' },
+    title: { en: 'Academic year', hi: 'एकेडमिक ईयर (सेशन)' },
     body: {
-      en: 'The session the student joins. The standard and section lists show the standards and sections of this session, and changing it clears both. The current session is marked active.',
-      hi: 'वह सत्र जिसमें विद्यार्थी प्रवेश लेता है। कक्षा और अनुभाग की सूची इसी सत्र की कक्षाएँ और अनुभाग दिखाती है, और इसे बदलने पर दोनों खाली हो जाते हैं। वर्तमान सत्र सक्रिय के रूप में दिखता है।',
+      en: 'The session the student is joining.',
+      hi: 'स्टूडेंट किस सेशन में एडमिशन ले रहा है।',
     },
+    points: [
+      {
+        en: "The standard and section lists show only this session's standards and sections.",
+        hi: 'क्लास और सेक्शन की लिस्ट में सिर्फ़ इसी सेशन की क्लास और सेक्शन दिखते हैं।',
+      },
+      {
+        en: 'Changing it clears the standard and section you picked.',
+        hi: 'सेशन बदलने पर चुनी हुई क्लास और सेक्शन हट जाते हैं।',
+      },
+      {
+        en: 'The current session is marked Active.',
+        hi: 'अभी चल रहा सेशन ऐक्टिव लिखा दिखता है।',
+      },
+    ],
     example: {
-      en: 'Admitting in June 2025: 2025-26. Admitting in March 2026 for the session that starts in April: 2026-27.',
-      hi: 'जून 2025 में प्रवेश: 2025-26। अप्रैल से शुरू होने वाले सत्र के लिए मार्च 2026 में प्रवेश: 2026-27।',
+      en: 'Admitting in June 2025 → 2025-26. Admitting in March 2026 for the session that starts in April → 2026-27.',
+      hi: 'जून 2025 में एडमिशन → 2025-26। मार्च 2026 में अप्रैल वाले सेशन के लिए एडमिशन → 2026-27।',
     },
   },
   admissionType: {

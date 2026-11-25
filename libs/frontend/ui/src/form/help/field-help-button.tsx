@@ -70,7 +70,7 @@ export function FieldHelpButton({
             optionHeading={t('optionHeading')}
             meaningHeading={t('meaningHeading')}
             good={topic.example ? text(topic.example, topic.values) : undefined}
-            goodLabel={t('good')}
+            goodLabel={topic.avoid ? t('good') : t('example')}
             avoid={topic.avoid ? text(topic.avoid, topic.values) : undefined}
             avoidLabel={t('avoid')}
           />
@@ -153,9 +153,13 @@ function RichHelpContent({
   avoid,
   avoidLabel,
 }: RichHelpContentProps) {
+  const [leadSentence, leadRest] = splitFirstSentence(lead);
   return (
     <div className="space-y-2.5">
-      <p className="font-medium leading-snug text-foreground">{lead}</p>
+      <p className="leading-snug">
+        <span className="font-semibold text-foreground">{leadSentence}</span>
+        {leadRest && ` ${leadRest}`}
+      </p>
       {points.length > 0 && (
         <ul className="list-disc space-y-1 ps-4 marker:text-muted-foreground">
           {points.map((point) => (
@@ -214,4 +218,10 @@ function RichHelpContent({
       )}
     </div>
   );
+}
+
+/** The first sentence (ending in ".", "।", "?" or "!") and the rest, for the bold lead. */
+function splitFirstSentence(text: string): [string, string] {
+  const match = /^(.+?[.।?!])\s+(\S[\s\S]*)$/u.exec(text);
+  return match ? [match[1], match[2]] : [text, ''];
 }
