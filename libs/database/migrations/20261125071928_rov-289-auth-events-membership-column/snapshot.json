@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "42ead2d5-99b9-49e5-bd80-9bd934825ef9",
+  "id": "c48b1e6c-bce8-4527-a13e-69d36cfbc1f3",
   "prevIds": [
-    "7a3a58e3-4af2-4b64-b7c2-b77735a25c16"
+    "7919ddeb-4308-4291-9c63-9955d4be6920"
   ],
   "ddl": [
     {
@@ -23757,6 +23757,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "brin",
+      "concurrently": false,
+      "name": "notification_deliveries_created_at_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "notification_deliveries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "dedupe_key",
           "isExpression": false,
           "asc": true,
@@ -35384,6 +35405,19 @@
       "using": null,
       "withCheck": "true",
       "name": "auth_events_admin_insert",
+      "entityType": "policies",
+      "schema": "public",
+      "table": "auth_events"
+    },
+    {
+      "as": "PERMISSIVE",
+      "for": "ALL",
+      "roles": [
+        "roviq_admin"
+      ],
+      "using": "true",
+      "withCheck": "true",
+      "name": "auth_events_admin_all",
       "entityType": "policies",
       "schema": "public",
       "table": "auth_events"
