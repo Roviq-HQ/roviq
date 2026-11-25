@@ -12,6 +12,14 @@ exec {fd}<"$lock"
 if flock -n "$fd"; then
   echo "free: no gate is running"
 else
-  echo "busy: $(cat "$holder" 2>/dev/null || echo unknown holder)"
-  echo "a push started now waits for it, then runs its own gate"
+  line=$(cat "$holder" 2>/dev/null || echo unknown holder)
+  pid=$(sed -n 's/.*pid \([0-9]*\),.*/\1/p' <<< "$line")
+  if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+    echo "stale: the gate is gone ($line) but a process it started still holds the lock:"
+    fuser "$lock" 2>&1 | sed 's/^/  /' || true
+    echo "a push started now takes a new lock after about 40 seconds"
+  else
+    echo "busy: $line"
+    echo "a push started now waits for it, then runs its own gate"
+  fi
 fi

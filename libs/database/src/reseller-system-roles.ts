@@ -86,6 +86,7 @@ export async function refreshResellerSystemRoleAbilities(
           isNotNull(roles.resellerId),
           eq(roles.name, { en: name }),
           isNull(roles.deletedAt),
+          sql`${roles.abilities} IS DISTINCT FROM ${JSON.stringify(RESELLER_SYSTEM_ROLE_ABILITIES[name])}::jsonb`,
         ),
       );
   }

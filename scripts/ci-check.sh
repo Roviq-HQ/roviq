@@ -49,15 +49,43 @@ QUEUE_FD=201
 QUEUE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/roviq"
 QUEUE_FILE="$QUEUE_DIR/ci-check.lock"
 QUEUE_HOLDER="$QUEUE_DIR/ci-check.holder"
+# The lock is inherited by every process the gate starts. One left behind by a stopped gate
+# keeps it, so a waiter that finds the holder gone replaces the lock file instead of waiting on.
+queue_holder_pid() { sed -n 's/.*pid \([0-9]*\),.*/\1/p' "$QUEUE_HOLDER" 2>/dev/null; }
 if (( ! IS_CI )); then
   mkdir -p "$QUEUE_DIR"
-  exec {QUEUE_FD}>"$QUEUE_FILE" || { log "ERROR: cannot open $QUEUE_FILE"; exit 1; }
-  if ! flock -n "$QUEUE_FD"; then
-    log "waiting for the gate already running on this machine: $(cat "$QUEUE_HOLDER" 2>/dev/null || echo unknown)"
-    queue_start=$SECONDS
-    flock "$QUEUE_FD"
-    log "queue free after $((SECONDS - queue_start))s"
-  fi
+  queue_start=$SECONDS; queue_waited=0; dead_holder=""
+  while :; do
+    exec {QUEUE_FD}>>"$QUEUE_FILE" || { log "ERROR: cannot open $QUEUE_FILE"; exit 1; }
+    if flock -w 20 "$QUEUE_FD"; then
+      # Another waiter may have replaced the file while this one waited on the old one.
+      [[ "$QUEUE_FILE" -ef "/proc/$$/fd/$QUEUE_FD" ]] && break
+      exec {QUEUE_FD}>&-
+      continue
+    fi
+    exec {QUEUE_FD}>&-
+    holder=$(cat "$QUEUE_HOLDER" 2>/dev/null || echo unknown)
+    if (( ! queue_waited )); then
+      log "waiting for the gate already running on this machine: $holder"
+      queue_waited=1
+    fi
+    pid=$(queue_holder_pid)
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+      # Twice in a row, so a gate that took the lock a moment ago has written its own line.
+      if [[ "$dead_holder" == "$holder" ]]; then
+        log "that gate is gone (pid $pid) but a process it started still holds the lock:"
+        fuser "$QUEUE_FILE" 2>&1 | sed 's/^/  /' || true
+        log "taking a new lock; stop the process above if it is not yours to keep"
+        rm -f "$QUEUE_FILE"
+        dead_holder=""
+      else
+        dead_holder=$holder
+      fi
+    else
+      dead_holder=""
+    fi
+  done
+  (( queue_waited )) && log "queue free after $((SECONDS - queue_start))s"
   printf 'slot %s, branch %s, pid %s, since %s\n' "${ROVIQ_INSTANCE:-0}" \
     "$(git branch --show-current)" "$$" "$(date +%H:%M:%S)" > "$QUEUE_HOLDER"
 fi

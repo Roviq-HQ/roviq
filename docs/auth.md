@@ -475,12 +475,12 @@ Default institute roles:
 - Report cards: a student reads only their own published cards and a parent only their linked children's. `reportCardInstances`, `reportCardInstance` and `reportCardPdf` apply the caller's rules to the instance (`report-card-scope.ts`); another student's card answers `REPORT_CARD_NOT_FOUND`.
 - Consent: a parent's rule covers only their linked children; `consentStatusForStudent` refuses another family's child with `FORBIDDEN`.
 - `support_staff` reads no student data. Every role that reads students also reads standards and sections, which the student list filters by.
-- Institute setup creates the default roles (`seedDefaultRoles`). The essential seed, which runs on every deploy, rewrites the abilities and navigation of every institute's existing default roles from the code (`refreshDefaultRoleAbilities`); it creates no role. A role keeps its old abilities in the ability cache for up to five minutes.
+- Institute setup creates the default roles (`seedDefaultRoles`). The essential seed, which runs on every deploy, rewrites the abilities of every institute's existing default roles from the code (`refreshDefaultRoleAbilities`); it creates no role and leaves each role's navigation, which the institute may have changed. A role keeps its old abilities in the ability cache for up to five minutes.
 
 ### Platform and reseller system roles
 
 - Platform roles (`platform_admin`, `platform_support`) are single global rows with fixed seed ids.
-- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed keeps the Roviq Direct copies on fixed seed ids and rewrites the abilities of every reseller's existing copies (`refreshResellerSystemRoleAbilities`), so a changed ability list reaches every reseller on the next deploy; it creates no copy.
+- Each reseller owns its own copy of the three reseller roles (`roles.reseller_id` = that reseller). `provisionResellerSystemRoles(tx, resellerId, actorId)` from `@roviq/database` creates or refreshes the copies; abilities come from `RESELLER_SYSTEM_ROLE_ABILITIES`. It runs in `adminCreateReseller` and `adminChangeResellerTier`. The essential seed keeps the Roviq Direct copies on fixed seed ids and rewrites the abilities of every reseller's existing copies (`refreshResellerSystemRoleAbilities`), so a changed ability list reaches every reseller on the next deploy; it creates no copy, so a reseller role added to the code reaches existing resellers only through a migration.
 - `resellerInviteTeamMember` rejects a `roleId` that is not a live reseller-scope role of the caller's reseller. Deleting a reseller soft-deletes its roles.
 
 ### Reseller team (ROV-185)
