@@ -148,6 +148,11 @@ import {
   useUploadStudentDocument,
 } from '../use-students';
 import { RemoveDocumentButton } from './remove-document-button';
+import {
+  AdmissionInfoSection,
+  MedicalInfoSection,
+  StudentProfileReadOnly,
+} from './student-profile-read-only';
 
 const { instituteStudents } = testIds;
 /**
@@ -860,8 +865,30 @@ type ProfileFormValues = z.input<ProfileSchema>;
 
 function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch: () => void }) {
   const t = useTranslations('students');
+  // The form, its reset and its local draft are only for roles that can save it.
+  return (
+    <Can I="update" a="Student" passThrough>
+      {(canEdit: boolean) =>
+        canEdit ? (
+          <ProfileForm student={student} refetch={refetch} />
+        ) : (
+          <Card className="print:break-inside-avoid">
+            <CardHeader>
+              <CardTitle>{t('detail.profile.title')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StudentProfileReadOnly student={student} />
+            </CardContent>
+          </Card>
+        )
+      }
+    </Can>
+  );
+}
+
+function ProfileForm({ student, refetch }: { student: StudentDetailNode; refetch: () => void }) {
+  const t = useTranslations('students');
   const tError = useTranslations('error');
-  const { format } = useFormatDate();
   const [updateStudent, { loading }] = useUpdateStudent();
 
   const { defaultLocale } = useInstituteLocales();
@@ -1212,45 +1239,9 @@ function ProfileTab({ student, refetch }: { student: StudentDetailNode; refetch:
             </FieldGroup>
           </FieldSet>
 
-          <FieldSet className="print:break-inside-avoid">
-            <FieldLegend>{t('detail.profile.admissionInfo')}</FieldLegend>
-            <FieldGroup className="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel>{t('detail.profile.admissionNumber')}</FieldLabel>
-                <p className="text-sm font-mono">{student.admissionNumber}</p>
-              </Field>
-              <Field>
-                <FieldLabel>{t('detail.profile.admittedOn')}</FieldLabel>
-                <p className="text-sm">{format(parseISO(student.admissionDate), 'dd/MM/yyyy')}</p>
-              </Field>
-              {student.admissionClass && (
-                <Field>
-                  <FieldLabel>{t('detail.profile.admissionClass')}</FieldLabel>
-                  <p className="text-sm">{student.admissionClass}</p>
-                </Field>
-              )}
-              <Field>
-                <FieldLabel>{t('detail.profile.admissionType')}</FieldLabel>
-                <p className="text-sm">{student.admissionType}</p>
-              </Field>
-            </FieldGroup>
-          </FieldSet>
+          <AdmissionInfoSection student={student} />
 
-          <FieldSet className="print:break-inside-avoid">
-            <FieldLegend>{t('detail.profile.medicalInfo')}</FieldLegend>
-            {student.medicalInfo && Object.keys(student.medicalInfo).length > 0 ? (
-              <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                {Object.entries(student.medicalInfo).map(([key, value]) => (
-                  <Field key={key}>
-                    <FieldLabel className="capitalize">{key.replace(/_/g, ' ')}</FieldLabel>
-                    <p className="text-sm">{String(value ?? '—')}</p>
-                  </Field>
-                ))}
-              </FieldGroup>
-            ) : (
-              <p className="text-sm text-muted-foreground">{t('detail.profile.medicalEmpty')}</p>
-            )}
-          </FieldSet>
+          <MedicalInfoSection student={student} />
 
           <Separator />
 

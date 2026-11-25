@@ -5,6 +5,8 @@
  * own rendering: 6 tab triggers, sidebar admission number, profile form fields.
  */
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import type { RawRuleOf } from '@casl/ability';
+import type { AppAbility } from '@roviq/common-types';
 import { AcademicStatus, AdmissionType, Gender, SocialCategory } from '@roviq/common-types';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -227,6 +229,98 @@ describe('StudentDetailPage (component)', () => {
     });
     // First name label lives inside the profile panel.
     expect(within(profilePanel).getAllByText(/first name/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe('StudentDetailPage › Profile tab for roles that cannot edit (ROV-343)', () => {
+  const ids = testIds.instituteStudents;
+  const readStudent: RawRuleOf<AppAbility> = { action: 'read', subject: 'Student' };
+  const demographicFields = [
+    'caste',
+    'religion',
+    'socialCategory',
+    'isBpl',
+    'isMinority',
+    'minorityType',
+    'isCwsn',
+    'cwsnType',
+  ];
+
+  function renderProfileAs(abilityRules: RawRuleOf<AppAbility>[]) {
+    renderWithProviders(<StudentDetailPage />, {
+      messages: { students: messagesEn },
+      abilityRules,
+    });
+    return screen.getByRole('tabpanel', { name: new RegExp(messagesEn.detail.tabs.profile, 'i') });
+  }
+
+  it('should show the profile as text, with no input, reset or save', () => {
+    const panel = renderProfileAs([readStudent]);
+
+    expect(within(panel).getByTestId(ids.detailProfileReadOnly)).toBeInTheDocument();
+    expect(within(panel).queryAllByRole('textbox')).toHaveLength(0);
+    expect(within(panel).queryAllByRole('switch')).toHaveLength(0);
+    expect(within(panel).queryAllByRole('combobox')).toHaveLength(0);
+    expect(within(panel).queryByTestId(ids.detailResetBtn)).not.toBeInTheDocument();
+    expect(within(panel).getByTestId(ids.detailProfileRow('firstName'))).toHaveTextContent(
+      'Rajesh',
+    );
+    expect(within(panel).getByTestId(ids.detailProfileRow('gender'))).toHaveTextContent(
+      messagesEn.genders.MALE,
+    );
+    expect(within(panel).getByTestId(ids.detailProfileRow('dateOfBirth'))).toHaveTextContent(
+      '10/05/2010',
+    );
+    expect(within(panel).getByTestId(ids.detailProfileRow('caste'))).toHaveTextContent(
+      messagesEn.detail.profile.notSet,
+    );
+    expect(within(panel).getByTestId(ids.detailProfileRow('isBpl'))).toHaveTextContent(
+      messagesEn.detail.profile.no,
+    );
+  });
+
+  it('should leave out the fields the role may not read, not show them as empty', () => {
+    const panel = renderProfileAs([
+      readStudent,
+      {
+        action: 'read',
+        subject: 'Student',
+        fields: [...demographicFields, 'medicalInfo'],
+        inverted: true,
+      },
+    ]);
+
+    for (const field of ['caste', 'religion', 'socialCategory', 'isBpl', 'isMinority', 'isCwsn']) {
+      expect(within(panel).queryByTestId(ids.detailProfileRow(field))).not.toBeInTheDocument();
+    }
+    expect(within(panel).getByTestId(ids.detailProfileRow('motherTongue'))).toHaveTextContent(
+      'Hindi',
+    );
+    expect(within(panel).queryByTestId(ids.detailMedicalInfo)).not.toBeInTheDocument();
+  });
+
+  it('should show a role limited to some fields only those fields', () => {
+    const panel = renderProfileAs([
+      {
+        action: 'read',
+        subject: 'Student',
+        fields: ['id', 'firstName', 'lastName', 'medicalInfo'],
+      },
+    ]);
+
+    expect(within(panel).getByTestId(ids.detailProfileRow('firstName'))).toBeInTheDocument();
+    expect(within(panel).getByTestId(ids.detailProfileRow('lastName'))).toBeInTheDocument();
+    expect(within(panel).queryByTestId(ids.detailProfileRow('gender'))).not.toBeInTheDocument();
+    expect(within(panel).queryByText('ADM-0001')).not.toBeInTheDocument();
+    expect(within(panel).getByTestId(ids.detailMedicalInfo)).toBeInTheDocument();
+  });
+
+  it('should keep the editable form for a role that can update students', () => {
+    const panel = renderProfileAs([{ action: 'manage', subject: 'Student' }]);
+
+    expect(within(panel).queryByTestId(ids.detailProfileReadOnly)).not.toBeInTheDocument();
+    expect(within(panel).getByTestId(ids.detailResetBtn)).toBeInTheDocument();
+    expect(within(panel).getAllByRole('textbox').length).toBeGreaterThan(0);
   });
 });
 
