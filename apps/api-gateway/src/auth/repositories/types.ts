@@ -280,7 +280,7 @@ export interface ImpersonationSessionListRow {
   expiresAt: Date;
   endedAt: Date | null;
   endedReason: string | null;
-  otpVerified: Date | null;
+  otpVerifiedAt: Date | null;
   otpVerifiedByName: string | null;
 }
 

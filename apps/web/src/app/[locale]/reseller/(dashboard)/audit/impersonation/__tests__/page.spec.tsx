@@ -23,7 +23,7 @@ const SESSIONS = [
     expiresAt: '2999-01-01T10:00:00Z',
     endedAt: null,
     endedReason: null,
-    otpVerified: null,
+    otpVerifiedAt: null,
     status: 'ACTIVE',
   },
   {
@@ -39,7 +39,7 @@ const SESSIONS = [
     expiresAt: '2026-01-01T10:00:00Z',
     endedAt: '2026-01-01T09:30:00Z',
     endedReason: 'manual',
-    otpVerified: null,
+    otpVerifiedAt: null,
     status: 'ENDED',
   },
 ];

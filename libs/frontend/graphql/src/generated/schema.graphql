@@ -3540,7 +3540,11 @@ type ImpersonationSessionModel {
   impersonatorRole: I18nText
   impersonatorScope: String!
   ipAddress: String
-  otpVerified: DateTime
+
+  """
+  When the target institute admin approved the session with a one-time code; null when no code was needed
+  """
+  otpVerifiedAt: DateTime
   otpVerifiedByName: String
   reason: String!
   startedAt: DateTime!

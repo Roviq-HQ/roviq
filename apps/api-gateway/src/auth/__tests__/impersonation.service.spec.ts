@@ -441,7 +441,7 @@ describe('ImpersonationService', () => {
         userAgent: 'vitest',
         startedAt: row.startedAt,
         expiresAt: row.expiresAt,
-        otpVerified: null,
+        otpVerifiedAt: null,
         otpVerifiedBy: null,
       });
       assert(row.startedAt instanceof Date);
@@ -847,10 +847,10 @@ describe('ImpersonationService', () => {
         userAgent: 'vitest',
         startedAt: row.startedAt,
         expiresAt: row.expiresAt,
-        otpVerified: row.startedAt,
+        otpVerifiedAt: row.startedAt,
         otpVerifiedBy: 'admin-1',
       });
-      expect(row.otpVerified).toBeInstanceOf(Date);
+      expect(row.otpVerifiedAt).toBeInstanceOf(Date);
       expect(redis.set).toHaveBeenCalledWith(
         `${REDIS_KEYS.IMPERSONATION_CODE}${FIXED_UUID}`,
         JSON.stringify({
@@ -1328,7 +1328,7 @@ describe('ImpersonationService', () => {
       expiresAt: new Date('2999-01-01T10:00:00Z'),
       endedAt: null,
       endedReason: null,
-      otpVerified: null,
+      otpVerifiedAt: null,
       otpVerifiedByName: null,
       ...overrides,
     });

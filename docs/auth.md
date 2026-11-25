@@ -265,7 +265,7 @@ Flow when the OTP gate fires:
    - Only the user who started the request may verify it; anyone else is refused without spending an attempt.
    - With the right OTP the scope checks of the start step run again (same scope, reseller membership still active, institute still owned by that reseller) before the session is written.
    - Every attempt is reserved with an atomic `INCR` on `impersonation-otp:{requestId}:attempts` before the OTP is compared, so parallel guesses cannot share an attempt; after **3 wrong attempts** the request is deleted.
-   - Correct OTP consumes the request with `GETDEL`, writes the session row with `otp_verified` and `otp_verified_by` (the admin the OTP went to), and returns the same `{ code }` payload the no-OTP path returns.
+   - Correct OTP consumes the request with `GETDEL`, writes the session row with `otp_verified_at` and `otp_verified_by` (the admin the OTP went to), and returns the same `{ code }` payload the no-OTP path returns.
 6. When OTP is not required (institute has consent disabled and impersonator is platform), `startImpersonation` returns `{ code, requiresOtp: false }` directly.
 
 ### Who may impersonate whom (ROV-94)

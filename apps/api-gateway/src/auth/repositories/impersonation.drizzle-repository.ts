@@ -261,7 +261,7 @@ export class ImpersonationDrizzleRepository extends ImpersonationRepository {
           expiresAt: impersonationSessions.expiresAt,
           endedAt: impersonationSessions.endedAt,
           endedReason: impersonationSessions.endedReason,
-          otpVerified: impersonationSessions.otpVerified,
+          otpVerifiedAt: impersonationSessions.otpVerifiedAt,
           otpVerifiedByName: verifier.username,
         })
         .from(impersonationSessions)

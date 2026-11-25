@@ -1,7 +1,9 @@
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '@web/__test-utils__/render-with-providers';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ImpersonationSessionPanel } from '../impersonation-session-panel';
+
+const session = vi.hoisted(() => ({ otpVerifiedAt: null as string | null }));
 
 vi.mock('../use-impersonation-sessions', () => ({
   useImpersonationSessions: () => ({
@@ -21,7 +23,7 @@ vi.mock('../use-impersonation-sessions', () => ({
         expiresAt: '2026-11-18T09:00:00.000Z',
         endedAt: '2026-11-18T08:10:00.000Z',
         endedReason: 'manual',
-        otpVerified: null,
+        otpVerifiedAt: session.otpVerifiedAt,
       },
     ],
   }),
@@ -32,6 +34,10 @@ vi.mock('../use-audit-logs', () => ({
 }));
 
 describe('ImpersonationSessionPanel', () => {
+  afterEach(() => {
+    session.otpVerifiedAt = null;
+  });
+
   it('shows the impersonator’s role as a readable name, not the stored key', () => {
     renderWithProviders(
       <ImpersonationSessionPanel sessionId="session-1" open onOpenChange={vi.fn()} />,
@@ -39,5 +45,21 @@ describe('ImpersonationSessionPanel', () => {
 
     expect(screen.getByText('Institute admin')).toBeInTheDocument();
     expect(screen.queryByText('institute_admin')).not.toBeInTheDocument();
+  });
+
+  it('shows when the one-time code was verified', () => {
+    session.otpVerifiedAt = '2026-11-18T12:01:00.000Z';
+    renderWithProviders(
+      <ImpersonationSessionPanel sessionId="session-1" open onOpenChange={vi.fn()} />,
+    );
+    const verified = screen.getByText('OTP verified at').nextElementSibling;
+    expect(verified?.textContent).toMatch(/^18 Nov 2026, \d{2}:\d{2}:00$/);
+  });
+
+  it('shows a dash when no code was needed', () => {
+    renderWithProviders(
+      <ImpersonationSessionPanel sessionId="session-1" open onOpenChange={vi.fn()} />,
+    );
+    expect(screen.getByText('OTP verified at').nextElementSibling?.textContent).toBe('—');
   });
 });

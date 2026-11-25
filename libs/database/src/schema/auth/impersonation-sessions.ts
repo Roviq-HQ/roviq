@@ -33,7 +33,7 @@ export const impersonationSessions = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }),
     endedReason: varchar('ended_reason', { length: 50 }),
-    otpVerified: timestamp('otp_verified', { withTimezone: true }),
+    otpVerifiedAt: timestamp('otp_verified_at', { withTimezone: true }),
     otpVerifiedBy: uuid('otp_verified_by').references(() => users.id),
   },
   (table) => [

@@ -71,8 +71,12 @@ export class ImpersonationSessionModel {
   @Field(() => String, { nullable: true })
   endedReason!: string | null;
 
-  @Field(() => DateTimeScalar, { nullable: true })
-  otpVerified!: Date | null;
+  @Field(() => DateTimeScalar, {
+    nullable: true,
+    description:
+      'When the target institute admin approved the session with a one-time code; null when no code was needed',
+  })
+  otpVerifiedAt!: Date | null;
 
   @Field(() => String, { nullable: true })
   otpVerifiedByName!: string | null;
