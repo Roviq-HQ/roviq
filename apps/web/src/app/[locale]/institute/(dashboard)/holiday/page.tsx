@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -30,6 +29,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -245,6 +245,7 @@ interface HolidaysTableProps {
 
 function HolidaysTable({ holidays, loading, onChanged }: HolidaysTableProps) {
   const t = useTranslations('holiday');
+  const errorCopy = useErrorCopy('holiday.errors');
   const { format } = useFormatDate();
   const resolveI18n = useI18nField();
   const params = useParams();
@@ -260,7 +261,7 @@ function HolidaysTable({ holidays, loading, onChanged }: HolidaysTableProps) {
       toast.success(t('actions.delete'));
       onChanged();
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('actions.delete')));
+      toast.error(errorCopy(err));
     } finally {
       setPendingDelete(null);
     }

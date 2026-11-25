@@ -11,18 +11,14 @@ export interface ErrorBoundaryLabels {
 }
 
 function ErrorFallback({
-  error,
   resetErrorBoundary,
   labels,
 }: {
-  error: unknown;
   resetErrorBoundary: () => void;
   labels?: ErrorBoundaryLabels;
 }) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : (labels?.fallbackMessage ?? 'An unexpected error occurred');
+  // The crash's own text is for developers (React logs it); people see translated copy.
+  const message = labels?.fallbackMessage ?? 'An unexpected error occurred';
   return (
     <div className="flex min-h-[400px] items-center justify-center p-8">
       <Card className="w-full max-w-md">

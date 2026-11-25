@@ -13,7 +13,7 @@
  * guardian membership, so the type discriminator is the source of truth.
  */
 
-import { extractGraphQLError, gql, useMutation, useQuery } from '@roviq/graphql';
+import { gql, useMutation, useQuery } from '@roviq/graphql';
 import { useFormatDate, useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -39,6 +39,7 @@ import {
   Skeleton,
   Switch,
 } from '@roviq/ui';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { parseISO } from 'date-fns';
 import { AlertTriangle, RefreshCw, ShieldCheck, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -371,6 +372,7 @@ function PurposeRow({
   onChange: () => void;
 }) {
   const t = useTranslations('consent');
+  const errorCopy = useErrorCopy();
   const { format } = useFormatDate();
   const [grantConsent, grantState] = useMutation(GRANT_CONSENT);
   const [withdrawConsent, withdrawState] = useMutation(WITHDRAW_CONSENT);
@@ -391,7 +393,7 @@ function PurposeRow({
         toast.success(t('grantedToast'));
         onChange();
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('errors.grantFailed')));
+        toast.error(errorCopy(err, t('errors.grantFailed')));
       }
     } else {
       // Withdrawing — open confirmation dialog because it's append-only
@@ -410,7 +412,7 @@ function PurposeRow({
       setWithdrawOpen(false);
       onChange();
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.withdrawFailed')));
+      toast.error(errorCopy(err, t('errors.withdrawFailed')));
     }
   };
 

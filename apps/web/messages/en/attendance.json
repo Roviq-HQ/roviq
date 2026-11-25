@@ -32,10 +32,13 @@
   "selectSectionFirst": "Choose a section to take attendance",
   "accessDenied": "You do not have permission to view attendance.",
   "errors": {
-    "SESSION_TAKEN": "This period was already opened by another lecturer. Use override to take over.",
+    "ATTENDANCE_SLOT_TAKEN": "This period was already opened by another lecturer. Use override to take over.",
     "LECTURER_REQUIRED": "A lecturer membership is required to open the session.",
     "ATTENDANCE_OVERRIDE_FORBIDDEN": "Only an administrator can change attendance for a past date.",
-    "FAILED": "Something went wrong. Please try again."
+    "FAILED": "Something went wrong. Please try again.",
+    "ATTENDANCE_ON_HOLIDAY": "This date is a holiday in your institute's calendar, so attendance cannot be taken.",
+    "ATTENDANCE_EDIT_WINDOW_CLOSED": "Attendance for a past date can be changed only with the past-date override, by someone allowed to use it.",
+    "ATTENDANCE_SESSION_NOT_FOUND": "This attendance session no longer exists. Refresh the page."
   },
   "override": "Take over",
   "overriding": "Taking over…",

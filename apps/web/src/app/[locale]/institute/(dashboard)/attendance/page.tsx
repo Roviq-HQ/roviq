@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@roviq/auth';
-import { extractGraphQLError, extractGraphQLErrorCode } from '@roviq/graphql';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Avatar,
@@ -80,9 +80,8 @@ function attendanceError(
   t: ReturnType<typeof useTranslations<'attendance'>>,
   fallback: string,
 ): string {
-  return extractGraphQLErrorCode(err) === 'ATTENDANCE_OVERRIDE_FORBIDDEN'
-    ? t('errors.ATTENDANCE_OVERRIDE_FORBIDDEN')
-    : extractGraphQLError(err, fallback);
+  const code = extractGraphQLErrorCode(err);
+  return code && t.has(`errors.${code}`) ? t(`errors.${code}`) : fallback;
 }
 
 export default function AttendancePage() {
@@ -176,7 +175,7 @@ export default function AttendancePage() {
       toast.success(t('sessionOpened'));
       await refetchSessions();
     } catch (err) {
-      const msg = attendanceError(err, t, t('errors.SESSION_TAKEN'));
+      const msg = attendanceError(err, t, t('errors.FAILED'));
       toast.error(msg);
     }
   }

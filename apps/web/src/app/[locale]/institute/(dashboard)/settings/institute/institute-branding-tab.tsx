@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { zodValidator } from '@roviq/i18n';
 import {
   Can,
@@ -19,6 +18,7 @@ import {
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
 import { instituteBrandingHelp } from '@web/help/institute-settings/institute-branding.help';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -50,6 +50,7 @@ const DEFAULT_VALUES: InstituteBrandingFormValues = {
 
 export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTabProps) {
   const t = useTranslations('instituteSettings');
+  const errorCopy = useErrorCopy();
   const tb = useTranslations('instituteSettings.branding');
   const [updateBranding] = useUpdateInstituteBranding();
   const [uploading, setUploading] = React.useState<Record<string, boolean>>({});
@@ -82,9 +83,7 @@ export function InstituteBrandingTab({ institute, loading }: InstituteBrandingTa
         toast.success(t('saved'));
         setRound((current) => current + 1);
       } catch (err) {
-        toast.error(t('saveFailed'), {
-          description: extractGraphQLError(err, t('saveFailed')),
-        });
+        toast.error(errorCopy(err, t('saveFailed')));
       }
     },
   });

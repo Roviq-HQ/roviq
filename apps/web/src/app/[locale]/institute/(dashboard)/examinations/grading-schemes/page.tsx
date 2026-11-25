@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   Badge,
@@ -28,6 +27,7 @@ import {
   Skeleton,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ListChecks, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as React from 'react';
@@ -56,6 +56,7 @@ const DEFAULT_BANDS: GradeBandInput[] = [
 
 export default function GradingSchemesPage() {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const resolveI18n = useI18nField();
   const { schemes, loading } = useGradingSchemes();
   const { deleteScheme } = useDeleteGradingScheme();
@@ -66,7 +67,7 @@ export default function GradingSchemesPage() {
       await deleteScheme(id);
       toast.success(t('grading.deleted'));
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('grading.inUse')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 
@@ -169,6 +170,7 @@ function CreateSchemeDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   const t = useTranslations('examinations');
+  const errorCopy = useErrorCopy('examinations.errors');
   const { createScheme, loading } = useCreateGradingScheme();
   const [name, setName] = React.useState('');
   const [kind, setKind] = React.useState<GradingSchemeKind>('SCHOLASTIC');
@@ -199,7 +201,7 @@ function CreateSchemeDialog({
       toast.success(t('grading.created'));
       onOpenChange(false);
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('errors.GRADING_SCHEME_INVALID_BANDS')));
+      toast.error(errorCopy(err, t('errors.generic')));
     }
   };
 

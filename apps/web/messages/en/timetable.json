@@ -240,6 +240,13 @@
     "TIMETABLE_ROOM_CONFLICT": "This room is already in use in this slot",
     "INVALID_STATE_TRANSITION": "That status change isn't allowed",
     "INVALID_DATE_RANGE": "Effective-from must be on or before effective-to",
-    "generic": "Something went wrong. Please try again."
+    "generic": "Something went wrong. Please try again.",
+    "TIMETABLE_NOT_FOUND": "This timetable no longer exists. Refresh the page.",
+    "TIMETABLE_ALREADY_ACTIVE": "Another timetable is already active for this academic year. Archive it first, then activate this one.",
+    "TIMETABLE_INVALID_CONFIG": "The periods are not valid: a timetable needs at least one period, each with a valid time. Check the periods and try again.",
+    "TIMETABLE_PERIOD_NOT_FOUND": "This period no longer exists. Refresh the page.",
+    "TIMETABLE_PERIOD_NOT_ASSIGNABLE": "A break cannot have a subject or a teacher. Choose a teaching period.",
+    "TIMETABLE_SECTION_NOT_COVERED": "This section is not part of the timetable. Add it to the timetable first.",
+    "TIMETABLE_OVERRIDE_NOT_FOUND": "This change for the day no longer exists. Refresh the page."
   }
 }

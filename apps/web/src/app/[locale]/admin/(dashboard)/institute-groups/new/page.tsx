@@ -1,7 +1,6 @@
 'use client';
 
 import { GROUP_TYPE_VALUES, INDIAN_STATE_VALUES, optionalAddressSchema } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import { zodValidator } from '@roviq/i18n';
 import {
   Button,
@@ -15,10 +14,10 @@ import {
   FieldInfoPopover,
   FieldLegend,
   FieldSet,
-  setServerFieldError,
   useAppForm,
 } from '@roviq/ui';
 import { useStore } from '@tanstack/react-form';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -105,6 +104,7 @@ const DEFAULT_VALUES: CreateGroupFormValues = {
 
 export default function NewInstituteGroupPage() {
   const t = useTranslations('instituteGroups');
+  const errorCopy = useErrorCopy();
   const tGeo = useTranslations('geography');
   const router = useRouter();
   const [createGroup, { loading }] = useCreateInstituteGroup();
@@ -115,7 +115,7 @@ export default function NewInstituteGroupPage() {
   const form = useAppForm({
     defaultValues: DEFAULT_VALUES,
     validators: { onChange: zodValidator(schema), onSubmit: zodValidator(schema) },
-    onSubmit: async ({ value, formApi }) => {
+    onSubmit: async ({ value }) => {
       try {
         await createGroup({
           variables: {
@@ -141,12 +141,7 @@ export default function NewInstituteGroupPage() {
         toast.success(t('created'));
         router.push('/admin/institute-groups');
       } catch (err) {
-        const message = extractGraphQLError(err, t('createFailed'));
-        if (message.includes('CODE_DUPLICATE') || message.includes('already exists')) {
-          setServerFieldError(formApi, 'code', t('codeDuplicate'));
-        } else {
-          toast.error(t('createFailed'), { description: message });
-        }
+        toast.error(errorCopy(err, t('createFailed')));
       }
     },
   });

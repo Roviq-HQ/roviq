@@ -271,9 +271,9 @@
     }
   },
   "students.new.academicYear": {
-    "reviewedReason": "Copy written in ROV-346 against these targets; each claim was checked against the code and wrong claims rewritten",
+    "reviewedReason": "Only the save error toast changed (translated copy by code); session selection and clearing are unchanged",
     "targets": {
-      "apps/web/src/app/[locale]/institute/(dashboard)/people/students/new/page.tsx#StudentForm": "10dcffcc87ead517"
+      "apps/web/src/app/[locale]/institute/(dashboard)/people/students/new/page.tsx#StudentForm": "1a56820cfde2a47e"
     }
   },
   "students.new.admissionType": {

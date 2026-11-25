@@ -105,7 +105,8 @@
     "ACADEMIC_YEAR_OVERLAP": "Date range overlaps with an existing academic year",
     "YEAR_ALREADY_ACTIVE": "Another academic year is already active",
     "termOutOfRange": "Term dates must be within the academic year range",
-    "termOverlap": "Terms must not overlap"
+    "termOverlap": "Terms must not overlap",
+    "LABEL_DATE_MISMATCH": "The label does not match the dates: a year from June 2026 to March 2027 is labelled 2026-27. Fix the label or the dates."
   },
   "accessDenied": "You do not have permission to view academic years."
 }

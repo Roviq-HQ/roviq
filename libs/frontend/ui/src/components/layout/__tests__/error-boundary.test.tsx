@@ -27,14 +27,15 @@ describe('PageErrorBoundary', () => {
     expect(screen.getByText('All good')).toBeDefined();
   });
 
-  it('renders fallback with error message when child throws', () => {
+  it('renders the fallback copy, never the error text, when child throws', () => {
     render(
       <PageErrorBoundary>
         <ThrowingChild message="Boom" />
       </PageErrorBoundary>,
     );
     expect(screen.getByText('Something went wrong')).toBeDefined();
-    expect(screen.getByText('Boom')).toBeDefined();
+    expect(screen.getByText('An unexpected error occurred')).toBeDefined();
+    expect(screen.queryByText('Boom')).toBeNull();
   });
 
   it('renders custom labels', () => {
@@ -47,6 +48,7 @@ describe('PageErrorBoundary', () => {
     );
     expect(screen.getByText('Oops')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined();
+    expect(screen.getByText('Bad stuff')).toBeDefined();
   });
 
   it('uses fallbackMessage when error is not an Error instance', () => {

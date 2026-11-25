@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import { emptyStringToUndefined, zodValidator } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -35,6 +34,7 @@ import {
   TabsTrigger,
   useAppForm,
 } from '@roviq/ui';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { ArrowLeft, Building, Building2, Info, Pencil, Trash2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -77,6 +77,7 @@ type EditGroupFormValues = z.input<EditGroupSchema>;
 
 export default function InstituteGroupDetailPage() {
   const t = useTranslations('instituteGroups');
+  const errorCopy = useErrorCopy();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { group, loading, refetch } = useInstituteGroup(id);
@@ -116,7 +117,7 @@ export default function InstituteGroupDetailPage() {
         setEditOpen(false);
         refetch();
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('updateFailed')));
+        toast.error(errorCopy(err, t('updateFailed')));
       }
     },
   });
@@ -139,7 +140,7 @@ export default function InstituteGroupDetailPage() {
       toast.success(t('deleted'));
       router.push('/admin/institute-groups');
     } catch (err) {
-      toast.error(extractGraphQLError(err, t('deleteFailed')));
+      toast.error(errorCopy(err, t('deleteFailed')));
     }
   };
 

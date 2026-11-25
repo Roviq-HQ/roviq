@@ -1,7 +1,6 @@
 'use client';
 
 import { INSTITUTE_STATE_MACHINE } from '@roviq/common-types';
-import { extractGraphQLError } from '@roviq/graphql';
 import { useI18nField } from '@roviq/i18n';
 import {
   AlertDialog,
@@ -41,6 +40,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { FirstAdminCard } from '@web/components/institute/first-admin-card';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { CheckCircle2, Pause, Play, ShieldOff, Trash2, Users, XCircle } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -549,6 +549,7 @@ function ActionConfirmationDialog({
 export default function InstituteDetailPage() {
   const params = useParams<{ id: string }>();
   const t = useTranslations('adminInstitutes');
+  const errorCopy = useErrorCopy();
   const td = useTranslations('adminInstitutes.detail');
   const ta = useTranslations('adminInstitutes.actions');
   const resolveI18n = useI18nField();
@@ -607,7 +608,7 @@ export default function InstituteDetailPage() {
       setPickedGroupId(null);
       refetch();
     } catch (err) {
-      toast.error(ta('error'), { description: extractGraphQLError(err, ta('error')) });
+      toast.error(errorCopy(err, ta('error')));
     }
   };
 

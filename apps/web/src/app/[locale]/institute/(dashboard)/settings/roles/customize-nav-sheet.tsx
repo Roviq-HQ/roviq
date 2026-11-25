@@ -39,6 +39,7 @@ import {
   Spinner,
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import {
   Award,
   BarChart3,
@@ -217,6 +218,7 @@ export function CustomizeNavSheet({
   onSaved,
 }: CustomizeNavSheetProps) {
   const t = useTranslations('settings.roles');
+  const errorCopy = useErrorCopy();
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
 
@@ -298,8 +300,7 @@ export function CustomizeNavSheet({
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('saveFailed');
-      toast.error(message);
+      toast.error(errorCopy(err, t('saveFailed')));
     }
   }
 

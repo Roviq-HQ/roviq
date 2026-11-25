@@ -1,6 +1,5 @@
 'use client';
 
-import { extractGraphQLError } from '@roviq/graphql';
 import type { InstituteStatus } from '@roviq/graphql/generated';
 import { useI18nField } from '@roviq/i18n';
 import {
@@ -38,6 +37,7 @@ import {
 } from '@roviq/ui';
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { FirstAdminCard } from '@web/components/institute/first-admin-card';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { AlertTriangle, Loader2, Pause, Play } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -69,6 +69,7 @@ const STATUS_COLOR: Record<InstituteStatus, string> = {
 export default function ResellerInstituteDetailPage() {
   const params = useParams<{ id: string }>();
   const t = useTranslations('resellerInstitutes');
+  const errorCopy = useErrorCopy();
   const td = useTranslations('resellerInstitutes.detail');
   const ta = useTranslations('resellerInstitutes.actions');
   const tCommon = useTranslations('common');
@@ -101,9 +102,7 @@ export default function ResellerInstituteDetailPage() {
       setSuspendReason('');
       refetch();
     } catch (err) {
-      toast.error(ta('error'), {
-        description: extractGraphQLError(err, ta('error')),
-      });
+      toast.error(errorCopy(err, ta('error')));
     }
   };
 

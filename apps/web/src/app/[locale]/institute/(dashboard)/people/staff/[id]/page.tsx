@@ -65,6 +65,7 @@ import { fileUploadErrorKey } from '@web/components/file-upload/use-file-upload'
 import { ViewAsButton } from '@web/components/impersonation/view-as-button';
 import { DeletePersonButton } from '@web/components/people/deleted-records';
 import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { parseISO } from 'date-fns';
 import {
   AlertTriangle,
@@ -441,6 +442,7 @@ type ProfileFormValues = z.input<ProfileFormSchema>;
 
 function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; loading: boolean }) {
   const t = useTranslations('staff');
+  const errorCopy = useErrorCopy();
   const { format } = useFormatDate();
   const [updateStaffMember, { loading }] = useUpdateStaffMember();
 
@@ -499,11 +501,10 @@ function ProfileTab({ staff, loading: pageLoading }: { staff: StaffDetailNode; l
         form.reset(value);
         clearDraft();
       } catch (err) {
-        const message = (err as Error).message;
-        if (message.toLowerCase().includes('version') || message.includes('CONCURRENT')) {
+        if (extractGraphQLErrorCode(err) === 'CONCURRENT_MODIFICATION') {
           toast.error(t('detail.profile.concurrencyError'));
         } else {
-          toast.error(message);
+          toast.error(errorCopy(err, t('detail.profile.saveError')));
         }
       }
     },
@@ -873,6 +874,7 @@ function DeleteConfirmContent({
   onDone: () => void;
 }) {
   const t = useTranslations('staff');
+  const errorCopy = useErrorCopy();
   const [deleteQual, { loading }] = useDeleteStaffQualification();
 
   const handleDelete = async () => {
@@ -882,7 +884,7 @@ function DeleteConfirmContent({
       toast.success(t('detail.qualifications.deleteSuccess'));
       onDone();
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(errorCopy(err, t('detail.qualifications.deleteError')));
     }
   };
 

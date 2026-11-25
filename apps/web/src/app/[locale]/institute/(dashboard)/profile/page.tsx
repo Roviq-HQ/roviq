@@ -1,6 +1,6 @@
 'use client';
 
-import { extractGraphQLError, gql, useMutation, useQuery } from '@roviq/graphql';
+import { gql, useMutation, useQuery } from '@roviq/graphql';
 import { useFormatDate, useI18nField, zodValidator } from '@roviq/i18n';
 import {
   Avatar,
@@ -17,6 +17,7 @@ import {
   useAppForm,
 } from '@roviq/ui';
 import { ProfilePhotoButton } from '@web/components/people/profile-photo-button';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import { parseISO } from 'date-fns';
 import { AlertTriangle, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -214,6 +215,7 @@ type ProfileEditFormValues = z.infer<ReturnType<typeof buildProfileEditSchema>>;
 
 export default function MyProfilePage() {
   const t = useTranslations('profile');
+  const errorCopy = useErrorCopy();
   const resolveI18n = useI18nField();
   const { data, loading, error, refetch } = useQuery<MyProfileQueryResult>(MY_PROFILE_QUERY, {
     fetchPolicy: 'cache-and-network',
@@ -245,7 +247,7 @@ export default function MyProfilePage() {
         draft.clearDraft();
         await refetch();
       } catch (err) {
-        toast.error(extractGraphQLError(err, t('errors.updateFailed')));
+        toast.error(errorCopy(err, t('errors.updateFailed')));
       }
     },
   });
