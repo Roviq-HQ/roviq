@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm';
 import Papa from 'papaparse';
 import type { IdentityService } from '../../../auth/identity.service';
 import { admitStudent, findStudentRoleId } from '../repositories/admit-student';
+import { emitSectionCapacityWarning } from '../section-norms';
 import type {
   BulkStudentImportActivities,
   ImportFileStore,
@@ -502,6 +503,7 @@ async function insertSingleRow(
     admissionNumber: admitted.admissionNumber,
     rowNumber: row.rowNumber,
   });
+  emitSectionCapacityWarning(ctx.emitEvent, ctx.tenantId, admitted.strength);
   return 'created';
 }
 

@@ -26,6 +26,8 @@ import type { StudentModel } from './models/student.model';
 import type { StudentDocumentModel } from './models/student-document.model';
 import type { AdmitStudentResult } from './repositories/admit-student';
 import { StudentRepository } from './repositories/student.repository';
+import type { SectionStrengthChange } from './repositories/types';
+import { emitSectionCapacityWarning } from './section-norms';
 import { StudentReadRepository } from './student-read.repository';
 
 const DOCUMENT_FILE_PURPOSE = 'USER_DOCUMENT';
@@ -132,6 +134,7 @@ export class StudentService {
       sectionId: input.sectionId,
       tenantId,
     });
+    this.warnIfOptimalReached(tenantId, admitted.strength ? [admitted.strength] : []);
 
     this.logger.log(`Student created: ${studentProfileId} (admission: ${admissionNumber})`);
 
@@ -284,6 +287,7 @@ export class StudentService {
     if (!updated) {
       await this.throwVersionConflict(tenantId, id);
     }
+    this.warnIfOptimalReached(tenantId, updated?.strength ?? []);
 
     // Update user_profile fields if any provided
     await this.applyUserProfileUpdates(tenantId, id, input, actorId);
@@ -334,7 +338,7 @@ export class StudentService {
       );
     }
 
-    const updates: Record<string, unknown> = {
+    const updates: Record<string, unknown> & { academicStatus: AcademicStatus } = {
       academicStatus: newStatus,
       updatedBy: actorId,
     };
@@ -346,6 +350,7 @@ export class StudentService {
     if (!updated) {
       throw new BusinessException(ErrorCode.STUDENT_NOT_FOUND, 'Student not found');
     }
+    this.warnIfOptimalReached(tenantId, updated.strength);
 
     this.eventBus.emit(EVENT_PATTERNS.STUDENT.statusChanged, {
       studentProfileId: id,
@@ -542,5 +547,16 @@ export class StudentService {
       actorId,
     });
     return userId;
+  }
+
+  /** Sent after the write committed; the crossing itself was decided under the section locks. */
+  private warnIfOptimalReached(tenantId: string, strength: SectionStrengthChange[]): void {
+    for (const change of strength) {
+      emitSectionCapacityWarning(
+        (pattern, payload) => this.eventBus.emit(pattern, payload),
+        tenantId,
+        change,
+      );
+    }
   }
 }

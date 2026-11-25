@@ -127,10 +127,26 @@ up into Class 1 like any other level. A section that still has students cannot b
 
 ## Section capacity warning
 
-When `enrollStudent`, `updateStudentSection` or `changeStudentClass` takes a section from below its
-optimal strength (the institute's capacity norms) to it, the gateway emits
-`SECTION.capacity_warning` and `NOTIFICATION.section.capacity_warning` once; placements above the
-optimal do not repeat it, so it comes again only after the section drops below and refills.
+Every path that places a student in a section, or makes a placed student count again, can send it:
+
+- `enrollStudent`, `updateStudentSection` and `changeStudentClass` (`StudentAcademicService`);
+- `createStudent` (`StudentService.create`);
+- a status change back to `ENROLLED` (`transitionStudentStatus`, or `updateStudent` with
+  `academicStatus`), for each section the student is placed in;
+- the admission workflow (`admitStudent` activity);
+- bulk import (`insertBatch` activity), once per row.
+
+The write's own transaction locks the section rows (`FOR NO KEY UPDATE` in ascending id order, as
+the `refresh_section_strength` trigger does), reads `current_strength` and the optimal norm (the
+institute's capacity norms, default 40) before the write, and `current_strength` again after it.
+A write that changes an existing placement or a status locks the student's `student_academics`
+rows first, then the sections. The emit after the commit is best effort: a worker that stops
+between the two loses the warning.
+The trigger counts only `ENROLLED` students. Only when `before < optimal <= after` are
+`SECTION.capacity_warning` and `NOTIFICATION.section.capacity_warning` emitted, after the
+transaction commits (`section-norms.ts`). Concurrent placements take turns on the lock, so exactly
+one of them crosses; placements above the optimal do not repeat it, and it comes again only after
+the section drops below and refills.
 notification-service (`SectionListener`) sends the in-app and push notification
 `SECTION_CAPACITY_WARNING` to the section's active class teacher, else to every active member with
 the `academic_coordinator` role; it links to the standard's sections

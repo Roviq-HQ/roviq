@@ -7,6 +7,7 @@ import type {
   DeletedStudentRecord,
   FileRecord,
   NewStudentDocumentData,
+  ProfileWriteResult,
   RestoreStudentResult,
   StudentStatusRecord,
   UserDocumentRecord,
@@ -49,18 +50,22 @@ export abstract class StudentRepository {
   ): Promise<string | null>;
   abstract findStatus(tenantId: string, id: string): Promise<StudentStatusRecord | null>;
   abstract exists(tenantId: string, id: string): Promise<boolean>;
-  /** Optimistic: false when no live row has `expectedVersion`. */
+  /**
+   * Optimistic: null when no live row has `expectedVersion`. A change of `academicStatus` locks
+   * the student's sections first and reports how each one's strength moved.
+   */
   abstract updateProfile(
     tenantId: string,
     id: string,
     expectedVersion: number,
     updates: Record<string, unknown>,
-  ): Promise<boolean>;
+  ): Promise<ProfileWriteResult | null>;
+  /** Null when the student is gone. Reports each section's strength as `updateProfile` does. */
   abstract setStatus(
     tenantId: string,
     id: string,
-    updates: Record<string, unknown>,
-  ): Promise<boolean>;
+    updates: Record<string, unknown> & { academicStatus: AcademicStatus },
+  ): Promise<ProfileWriteResult | null>;
   /** Changes the institute's profile copy of the student; nothing when the student is gone. */
   abstract updateTenantProfile(
     tenantId: string,

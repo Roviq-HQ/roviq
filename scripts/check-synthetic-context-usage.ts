@@ -42,6 +42,7 @@ export const SYNTHETIC_CONTEXT_ALLOWLIST: ReadonlySet<string> = new Set([
   'apps/api-gateway/src/institute/staff/repositories/staff-qualification.drizzle-repository.ts',
   'apps/api-gateway/src/institute/staff/repositories/staff.drizzle-repository.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-read-statistics.spec.ts',
+  'apps/api-gateway/src/institute/student/__tests__/section-capacity-warning.integration.spec.ts',
   'apps/api-gateway/src/institute/student/__tests__/student-section-change.integration.spec.ts',
   'apps/api-gateway/src/institute/student/repositories/student-academic.drizzle-repository.ts',
   'apps/api-gateway/src/institute/student/repositories/student.drizzle-repository.ts',
