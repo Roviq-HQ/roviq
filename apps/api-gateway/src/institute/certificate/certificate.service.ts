@@ -363,10 +363,6 @@ export class CertificateService {
     return row;
   }
 
-  /**
-   * Handlebars-style placeholder names in the template's content. A template without content
-   * (legacy rows, still in setup) falls back to a fixed list per certificate type.
-   */
   listCertificateTemplates(
     ctx: InstituteContext,
     type?: CertificateTemplateType,
@@ -374,6 +370,10 @@ export class CertificateService {
     return this.certificates.listActiveTemplates(ctx, type);
   }
 
+  /**
+   * Handlebars-style placeholder names in the template's content. A template without content
+   * (legacy rows, still in setup) falls back to a fixed list per certificate type.
+   */
   async getCertificateTemplateFields(ctx: InstituteContext, templateId: string): Promise<string[]> {
     const template = await this.certificates.findTemplate(ctx, templateId);
     if (!template)
