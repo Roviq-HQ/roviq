@@ -39,6 +39,7 @@ import {
 import { testIds } from '@roviq/ui/testing/testid-registry';
 import { useStore } from '@tanstack/react-form';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { useErrorCopy } from '@web/hooks/use-error-copy';
 import {
   ArrowLeft,
   BookOpen,
@@ -564,97 +565,16 @@ function SubjectsTab({
 
 // ── Error Handling Helpers ──
 
-type SectionMessageKey =
-  | 'errors.SECTION_NAME_DUPLICATE'
-  | 'errors.STREAM_REQUIRED'
-  | 'errors.CONCURRENT_MODIFICATION'
-  | 'errors.SECTION_CAPACITY_EXCEEDED';
-
-type SubjectMessageKey =
-  | 'errors.SUBJECT_CODE_DUPLICATE'
-  | 'errors.CONCURRENT_MODIFICATION'
-  | 'errors.HAS_ACTIVE_ENROLLMENTS'
-  | 'errors.HAS_RECORDED_ASSESSMENTS';
-
-interface SectionErrorMapping {
-  code: string;
-  field?: 'name.en' | 'streamName';
-  messageKey: SectionMessageKey;
-  level?: 'error' | 'warning';
-}
-
-interface SubjectErrorMapping {
-  code: string;
-  field?: 'boardCode';
-  messageKey: SubjectMessageKey;
-  level?: 'error' | 'warning';
-}
-
-function dispatchSectionError(
-  err: unknown,
-  t: ReturnType<typeof useTranslations<'academics'>>,
-  fieldErrorSetters: Record<'name.en' | 'streamName', (message: string) => void>,
-) {
-  const code = extractGraphQLErrorCode(err);
-  for (const mapping of SECTION_ERROR_MAPPINGS) {
-    if (code !== mapping.code) continue;
-    if (mapping.field) {
-      fieldErrorSetters[mapping.field](t(mapping.messageKey));
-    } else if (mapping.level === 'warning') {
-      toast.warning(t(mapping.messageKey));
-    } else {
-      toast.error(t(mapping.messageKey));
-    }
-    return;
+function sectionErrorField(code: string | null) {
+  switch (code) {
+    case 'SECTION_NAME_DUPLICATE':
+      return 'name.en' as const;
+    case 'STREAM_REQUIRED':
+      return 'streamName' as const;
+    default:
+      return null;
   }
-  toast.error(t('errors.generic'));
 }
-
-function dispatchSubjectError(
-  err: unknown,
-  t: ReturnType<typeof useTranslations<'academics'>>,
-  fieldErrorSetters: Record<'boardCode', (message: string) => void>,
-) {
-  const code = extractGraphQLErrorCode(err);
-  for (const mapping of SUBJECT_ERROR_MAPPINGS) {
-    if (code !== mapping.code) continue;
-    if (mapping.field) {
-      fieldErrorSetters[mapping.field](t(mapping.messageKey));
-    } else if (mapping.level === 'warning') {
-      toast.warning(t(mapping.messageKey));
-    } else {
-      toast.error(t(mapping.messageKey));
-    }
-    return;
-  }
-  toast.error(t('errors.generic'));
-}
-
-const SECTION_ERROR_MAPPINGS: SectionErrorMapping[] = [
-  {
-    code: 'SECTION_NAME_DUPLICATE',
-    field: 'name.en',
-    messageKey: 'errors.SECTION_NAME_DUPLICATE',
-  },
-  { code: 'STREAM_REQUIRED', field: 'streamName', messageKey: 'errors.STREAM_REQUIRED' },
-  { code: 'CONCURRENT_MODIFICATION', messageKey: 'errors.CONCURRENT_MODIFICATION' },
-  {
-    code: 'SECTION_CAPACITY_EXCEEDED',
-    messageKey: 'errors.SECTION_CAPACITY_EXCEEDED',
-    level: 'warning',
-  },
-];
-
-const SUBJECT_ERROR_MAPPINGS: SubjectErrorMapping[] = [
-  {
-    code: 'SUBJECT_CODE_DUPLICATE',
-    field: 'boardCode',
-    messageKey: 'errors.SUBJECT_CODE_DUPLICATE',
-  },
-  { code: 'CONCURRENT_MODIFICATION', messageKey: 'errors.CONCURRENT_MODIFICATION' },
-  { code: 'HAS_ACTIVE_ENROLLMENTS', messageKey: 'errors.HAS_ACTIVE_ENROLLMENTS' },
-  { code: 'HAS_RECORDED_ASSESSMENTS', messageKey: 'errors.HAS_RECORDED_ASSESSMENTS' },
-];
 
 function buildStreamInput(
   standard: Standard | null,
@@ -712,6 +632,7 @@ function CreateSectionDialog({
 }) {
   const t = useTranslations('academics');
   const { createSection, loading } = useCreateSection();
+  const errorCopy = useErrorCopy();
   const [open, setOpen] = React.useState(false);
   const [yearId] = useQueryState('year', parseAsString);
 
@@ -774,10 +695,11 @@ function CreateSectionDialog({
         setOpen(false);
         form.reset();
       } catch (err) {
-        dispatchSectionError(err, t, {
-          'name.en': (message) => setServerFieldError(form, 'name.en', message),
-          streamName: (message) => setServerFieldError(form, 'streamName', message),
-        });
+        const code = extractGraphQLErrorCode(err);
+        const field = sectionErrorField(code);
+        if (field) setServerFieldError(form, field, errorCopy(err));
+        else if (code === 'SECTION_CAPACITY_EXCEEDED') toast.warning(errorCopy(err));
+        else toast.error(errorCopy(err));
       }
     },
   });
@@ -984,6 +906,7 @@ const EMPTY_SUBJECT_DEFAULTS: SubjectFormValues = {
 function CreateSubjectDialog({ standardId }: { standardId: string }) {
   const t = useTranslations('academics');
   const { createSubject, loading } = useCreateSubject();
+  const errorCopy = useErrorCopy();
   const [open, setOpen] = React.useState(false);
 
   const schema = React.useMemo(() => buildSubjectSchema(t), [t]);
@@ -1018,9 +941,7 @@ function CreateSubjectDialog({ standardId }: { standardId: string }) {
         setOpen(false);
         form.reset();
       } catch (err) {
-        dispatchSubjectError(err, t, {
-          boardCode: (message) => setServerFieldError(form, 'boardCode', message),
-        });
+        toast.error(errorCopy(err));
       }
     },
   });

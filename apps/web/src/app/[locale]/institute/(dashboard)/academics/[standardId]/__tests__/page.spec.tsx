@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import errorEn from '../../../../../../../../messages/en/error.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
 import type { Section } from '../../use-academics';
 
@@ -220,5 +221,21 @@ describe('StandardDetailPage section create', () => {
     expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument();
     expect(within(dialog).queryByText(/already/)).toBeNull();
     expect(createSectionMock).not.toHaveBeenCalled();
+  });
+
+  it('should show a taken name on the name field (ROV-358)', async () => {
+    createSectionMock.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [{ message: 'raw server text', extensions: { code: 'SECTION_NAME_DUPLICATE' } }],
+      }),
+    );
+    const dialog = await openCreateDialog();
+
+    await userEvent.type(within(dialog).getAllByRole('textbox')[0], 'B');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'New Section' }));
+
+    expect(await within(dialog).findByText(errorEn.SECTION_NAME_DUPLICATE)).toBeInTheDocument();
+    expect(within(dialog).queryByText('raw server text')).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

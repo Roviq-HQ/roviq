@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +21,7 @@ vi.mock('sonner', () => ({
 
 import academicYearsMessages from '../../../../../../../messages/en/academicYears.json';
 import commonMessages from '../../../../../../../messages/en/common.json';
+import errorMessages from '../../../../../../../messages/en/error.json';
 import { renderWithProviders } from '../../../../../../__test-utils__/render-with-providers';
 import { EditYearSheet } from '../edit-year-sheet';
 import type { AcademicYear } from '../use-academic-years';
@@ -134,5 +136,29 @@ describe('EditYearSheet', () => {
     };
     expect(call.variables.id).toBe('year-1');
     expect(call.variables.input.label).toBe('2027-28');
+  });
+
+  it('shows the translated taken-label message on the label field (ROV-358)', async () => {
+    mutateMock.mockRejectedValue(
+      new CombinedGraphQLErrors({
+        errors: [
+          { message: 'raw server text', extensions: { code: 'ACADEMIC_YEAR_LABEL_DUPLICATE' } },
+        ],
+      }),
+    );
+    renderWithProviders(<EditYearSheet year={buildYear()} open={true} onOpenChange={vi.fn()} />, {
+      messages,
+    });
+
+    const labelInput = screen.getByRole('textbox', { name: 'Academic Year Label' });
+    await userEvent.clear(labelInput);
+    await userEvent.type(labelInput, '2025-26');
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(
+      await screen.findByText(errorMessages.ACADEMIC_YEAR_LABEL_DUPLICATE),
+    ).toBeInTheDocument();
+    expect(labelInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { DOMAIN_GROUP_TYPE_VALUES, GROUP_MEMBERSHIP_TYPE_VALUES } from '@roviq/common-types';
+import { extractGraphQLErrorCode } from '@roviq/graphql';
 import { useI18nField, zodValidator } from '@roviq/i18n';
 import {
   Badge,
@@ -30,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
+  setServerFieldError,
   useAppForm,
   useDebounce,
 } from '@roviq/ui';
@@ -212,7 +214,12 @@ export default function NewGroupPage() {
         toast.success(t('new.createSuccess'));
         router.push(`/institute/groups/${created.id}`);
       } catch (err) {
-        toast.error(errorCopy(err, t('new.createError')));
+        if (extractGraphQLErrorCode(err) === 'GROUP_NAME_DUPLICATE') {
+          setStep('basics');
+          setServerFieldError(form, 'name', errorCopy(err));
+        } else {
+          toast.error(errorCopy(err, t('new.createError')));
+        }
       }
     },
   });

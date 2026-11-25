@@ -129,7 +129,9 @@ export function CreateYearDialog() {
         setOpen(false);
       } catch (err) {
         const code = extractGraphQLErrorCode(err);
-        if (code === 'ACADEMIC_YEAR_OVERLAP') {
+        if (code === 'ACADEMIC_YEAR_LABEL_DUPLICATE') {
+          setServerFieldError(form, 'label', errorCopy(err));
+        } else if (code === 'ACADEMIC_YEAR_OVERLAP') {
           toast.error(t('errors.ACADEMIC_YEAR_OVERLAP'));
         } else if (code === 'INVALID_DATE_RANGE') {
           setServerFieldError(form, 'endDate', t('errors.INVALID_DATE_RANGE'), {

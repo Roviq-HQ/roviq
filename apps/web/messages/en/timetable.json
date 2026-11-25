@@ -248,6 +248,9 @@
     "TIMETABLE_PERIOD_NOT_ASSIGNABLE": "A break cannot have a subject or a teacher. Choose a teaching period.",
     "TIMETABLE_SECTION_NOT_COVERED": "This section is not part of the timetable. Add it to the timetable first.",
     "TIMETABLE_OVERRIDE_NOT_FOUND": "This change for the day no longer exists. Refresh the page.",
-    "nameRequired": "Enter a name."
+    "nameRequired": "Enter a name.",
+    "TIMETABLE_SECTION_DUPLICATE": "This section is already in the timetable. Remove the repeated section and save again.",
+    "TIMETABLE_PERIOD_LABEL_DUPLICATE": "This timetable already has a period with this label. Type a different label for the period.",
+    "TIMETABLE_DAY_OVERRIDE_DUPLICATE": "This period already has a change for this date. Edit or remove that change instead of adding another."
   }
 }

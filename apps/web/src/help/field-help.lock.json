@@ -33,10 +33,10 @@
     }
   },
   "academicYears.form.termStructure": {
-    "reviewedReason": "Initial lock: copy was written against these targets in ROV-345",
+    "reviewedReason": "create now maps a taken label to ACADEMIC_YEAR_LABEL_DUPLICATE; terms are saved as before",
     "targets": {
       "apps/api-gateway/src/institute/academic-year/dto/create-academic-year.input.ts#CreateAcademicYearInput.termStructure": "204243dd368f1ab5",
-      "apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.create": "baa5d48342ac88e1",
+      "apps/api-gateway/src/institute/academic-year/repositories/academic-year.drizzle-repository.ts#AcademicYearDrizzleRepository.create": "a393fbd51d45be0f",
       "apps/web/src/app/[locale]/institute/(dashboard)/academic-years/create-year-dialog.tsx#buildSchema": "a97105720fd41b3d"
     }
   },
