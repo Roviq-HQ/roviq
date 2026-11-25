@@ -6,6 +6,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import errorEn from '../../../../../../../../messages/en/error.json';
 import groupsEn from '../../../../../../../../messages/en/groups.json';
 import groupsHi from '../../../../../../../../messages/hi/groups.json';
 import { renderWithProviders } from '../../../../../../../__test-utils__/render-with-providers';
@@ -123,6 +124,24 @@ describe('NewGroupPage submit errors', () => {
     expect(screen.queryByText('raw server text')).not.toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId(ids.newSubmitBtn)).toBeEnabled());
+  });
+
+  it('should show a taken name under the Name field and return to Basics', async () => {
+    createGroupMock.mockRejectedValue(graphQLError('GROUP_NAME_DUPLICATE'));
+    const m = renderPage();
+    await toRuleStep(m, 'DYNAMIC');
+    await fillCondition(m);
+
+    await userEvent.click(screen.getByTestId(ids.newSubmitBtn));
+
+    expect(await screen.findByText(errorEn.GROUP_NAME_DUPLICATE)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: new RegExp(m.new.basics.name) })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.queryByText(m.new.rule.sectionTitle)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(formIds.submitError)).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('should show the connection copy when the server cannot be reached', async () => {

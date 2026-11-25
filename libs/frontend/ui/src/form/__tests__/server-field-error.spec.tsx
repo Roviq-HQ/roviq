@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { zodValidator } from '@roviq/i18n';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { setServerFieldError } from '../server-field-error';
@@ -19,7 +20,8 @@ const configs = [
   { name: 'field-level validators only', validators: undefined, fieldValidators: true },
 ] as const;
 
-type Reject = (form: Parameters<typeof setServerFieldError>[0]) => void;
+type Form = Parameters<typeof setServerFieldError>[0];
+type Reject = (form: Form) => void;
 
 function Harness({
   validators,
@@ -160,5 +162,128 @@ describe.each(configs)('$name', (config) => {
         }
       },
     );
+  });
+});
+
+describe('setServerFieldError with both form objects', () => {
+  // `useAppForm` returns a copy of the FormApi that `onSubmit` receives as `formApi`.
+  function TwoHandles({ onForms }: { onForms: (form: Form, formApi: Form) => void }) {
+    const form = useAppForm({
+      defaultValues: { profile: { code: 'TAKEN' }, other: '' },
+      onSubmit: ({ formApi }) => onForms(form, formApi),
+    });
+    return (
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          void form.handleSubmit();
+        }}
+      >
+        <form.AppField name="profile.code">
+          {(f) => <f.TextField label="Code" testId="code" errorTestId="code-error" />}
+        </form.AppField>
+        <form.AppField name="other">
+          {(f) => <f.TextField label="Other" testId="other" />}
+        </form.AppField>
+        <form.AppForm>
+          <form.SubmitButton testId="submit">Save</form.SubmitButton>
+        </form.AppForm>
+      </form>
+    );
+  }
+
+  it('should replace a rejection set through formApi with one set through the form', async () => {
+    render(
+      <TwoHandles
+        onForms={(form, formApi) => {
+          setServerFieldError(formApi, 'profile.code', 'Code already exists', {
+            alsoClearOnChangeOf: ['other'],
+          });
+          setServerFieldError(form, 'profile.code', 'Code already exists');
+        }}
+      />,
+    );
+    await userEvent.click(screen.getByTestId('submit'));
+    await screen.findByTestId('code-error');
+
+    await userEvent.type(screen.getByTestId('other'), 'x');
+
+    expect(screen.getByTestId('code-error')).toHaveTextContent('Code already exists');
+  });
+});
+
+function StepHarness() {
+  const [step, setStep] = useState<'code' | 'review'>('code');
+  const form = useAppForm({
+    defaultValues: { code: 'TAKEN' },
+    onSubmit: ({ formApi }) => {
+      setServerFieldError(formApi, 'code', 'Code already in use');
+      setStep('code');
+    },
+  });
+  return (
+    <form
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      {step === 'code' ? (
+        <form.AppField name="code">{(field) => <field.TextField label="Code" />}</form.AppField>
+      ) : (
+        <p>Review</p>
+      )}
+      <button type="button" onClick={() => setStep(step === 'code' ? 'review' : 'code')}>
+        Switch step
+      </button>
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+
+describe('setServerFieldError on a field that is not mounted', () => {
+  it.each([
+    { mode: 'plain', strict: false },
+    { mode: 'React StrictMode', strict: true },
+  ])('should show the rejection when the step with the field opens ($mode)', async ({ strict }) => {
+    render(
+      strict ? (
+        <StrictMode>
+          <StepHarness />
+        </StrictMode>
+      ) : (
+        <StepHarness />
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Switch step' }));
+    expect(screen.getByText('Review')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Code already in use')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Code/ })).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('should keep the rejection when the person leaves the step and comes back', async () => {
+    render(<StepHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Code already in use');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Switch step' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Switch step' }));
+
+    expect(await screen.findByText('Code already in use')).toBeInTheDocument();
+  });
+
+  it('should clear the rejection when the value changes after coming back', async () => {
+    render(<StepHarness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Code already in use');
+
+    await userEvent.type(screen.getByRole('textbox', { name: /Code/ }), 'X');
+
+    await waitFor(() => expect(screen.queryByText('Code already in use')).not.toBeInTheDocument());
   });
 });

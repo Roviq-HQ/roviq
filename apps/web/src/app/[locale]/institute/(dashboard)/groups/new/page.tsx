@@ -260,7 +260,7 @@ export default function NewGroupPage() {
       } catch (err) {
         if (extractGraphQLErrorCode(err) === 'GROUP_NAME_DUPLICATE') {
           setStep('basics');
-          setServerFieldError(form, 'name', errorCopy(err));
+          setServerFieldError(formApi, 'name', errorCopy(err));
           return;
         }
         setFormSubmitError(formApi, failureCopy(t, errorCopy, 'submitErrors', err));
