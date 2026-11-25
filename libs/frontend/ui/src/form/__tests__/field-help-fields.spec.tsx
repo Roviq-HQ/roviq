@@ -42,6 +42,17 @@ const help = defineFieldHelp('test.fields', {
     body: { en: 'The session dates.', hi: 'सत्र तिथियाँ।' },
     article: () => Promise.resolve(article),
   },
+  code: {
+    title: { en: 'Code', hi: 'कोड' },
+    body: {
+      en: 'A short code for the institute. It shows in receipts.',
+      hi: 'संस्थान का छोटा कोड। यह रिसीट में दिखता है।',
+    },
+    points: [{ en: 'Must be unique.', hi: 'यूनिक होना चाहिए।' }],
+    options: { BASIC: { en: 'Ten users at most', hi: 'अधिकतम दस यूज़र' } },
+    example: { en: 'DPS-GBN-01', hi: 'DPS-GBN-01' },
+    avoid: { en: 'Common codes like INST-01.', hi: 'INST-01 जैसे आम कोड।' },
+  },
   broken: {
     title: { en: 'Broken', hi: 'टूटा' },
     body: { en: 'Its article fails to load.', hi: 'लेख लोड नहीं होता।' },
@@ -245,6 +256,37 @@ describe('FieldHelpButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'More about Plan' }));
     expect(await screen.findByText('Basic')).toBeInTheDocument();
     expect(screen.getByText(/Ten users at most\./)).toBeInTheDocument();
+  });
+
+  it('should show a topic with points in the rich layout', async () => {
+    render(
+      <Providers mode="ICON_ONLY">
+        <FieldHelpButton topic={help.code} fieldLabel="Code" optionLabels={{ BASIC: 'Basic' }} />
+      </Providers>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'More about Code' }));
+    const lead = await screen.findByText('A short code for the institute.');
+    expect(lead.className).toContain('font-semibold');
+    expect(screen.getByText(/It shows in receipts\./)).toBeInTheDocument();
+    expect(screen.getByRole('listitem')).toHaveTextContent('Must be unique.');
+    const table = screen.getByRole('table');
+    expect(screen.getByRole('rowheader', { name: 'Basic' })).toBeInTheDocument();
+    expect(table).toHaveTextContent('Ten users at most');
+    expect(screen.getByText('Good:').parentElement).toHaveTextContent('Good: DPS-GBN-01');
+    expect(screen.getByText('Avoid:').parentElement).toHaveTextContent(
+      'Avoid: Common codes like INST-01.',
+    );
+  });
+
+  it('should keep the plain layout for a topic without points', async () => {
+    render(
+      <Providers mode="ICON_ONLY">
+        <FieldHelpButton topic={help.plan} fieldLabel="Plan" optionLabels={{ BASIC: 'Basic' }} />
+      </Providers>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'More about Plan' }));
+    expect(await screen.findByText('Which plan applies.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
   it('should load the article on Read more and return focus to the button on close', async () => {

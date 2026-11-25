@@ -54,6 +54,16 @@ and links there. Example: the alert card on the admin Monitoring page
 (`_components/alerts-panel.tsx`, copy in `adminMonitoring.alerts.rules`, screens in
 `_lib/alert-guide.ts`; `scripts/__tests__/alert-copy.spec.ts` fails for a rule without copy).
 
+## Hindi copy
+
+Every Hindi string the app shows (message files, help topics, notification and email copy, error messages) is the Hindi people speak, not textbook Hindi. Most readers know Hindi but use English words for office and computer things.
+
+- Keep the English word a clerk already uses, written in Devanagari: एडमिशन, सेशन, क्लास, सेक्शन, स्टूडेंट, एक्सपोर्ट, रिसीट, कोड, यूनिक, अप्रूव, रिजेक्ट, सर्टिफिकेट, ट्रांसफ़र, ऐक्टिव, सेव, डिलीट, लॉग इन.
+- Write abbreviations, official names and enum-like values in Latin: TC, UDISE+, OBC, SC, ST, EWS, General, PDF, OTP.
+- Keep simple Hindi for ordinary words (नया, बदलें, चुनें, खाली छोड़ें, पहली बार, वापस).
+- Never use textbook words a reader would have to look up, such as पहचानकर्ता, अद्वितीय, अनुमोदन, रसीद, स्थानांतरण, प्रमाणपत्र, पार्श्व प्रवेश, प्रविष्टि, संशोधित.
+- No emoji in copy; icons come from the components.
+
 ## Field help
 
 Three kinds of text can sit around a form field. Forms stay short because only the instruction is always on screen.
@@ -69,11 +79,18 @@ A simple field (name, mobile) gets a clear label and nothing else.
 **Help topics** live in one module per form, `apps/web/src/help/<area>/<form>.help.ts`, made with `defineFieldHelp('<scope>', { <key>: { … } })` from `@roviq/ui`. A topic's id is `<scope>.<key>`. Every text is `{ en, hi }` (`HelpText`, typed by `Locale`, so a missing language does not build):
 
 - `title` and `body` (≤ `HELP_LIMITS.body` characters); `hint` (≤ `HELP_LIMITS.hint`) and `example` are optional.
+- `points` (short rules) and `avoid` (what not to enter, and why) are optional. A topic with `points` is shown in the **rich layout**: the first sentence of `body` in bold, the rest of it plain, the points as bullets, `options` as a two-column table (choice in bold, what it means), `example` in a green box with a check icon ("Example:", or "Good:" when the topic also has `avoid`), and `avoid` in an amber box with a warning icon. A topic without `points` keeps the plain layout.
 - `options` says what each choice changes, keyed by the real option value; `helpOptions<Enum>({ … })` types the keys.
 - `values` passes real shared constants, used as `{name}` in the copy, so a limit is never typed twice.
 - `article: () => import('./<form>.articles').then((m) => m.<key>)` loads a longer article (headings, paragraphs, steps, warnings) only when "Read more" is opened; `HelpArticleSheet` shows it over the form, which stays mounted.
 
 Two forms that describe the same behaviour import one topic.
+
+**Writing help copy.** Readers are office clerks, principals and teachers, reading in a popover.
+
+- **Shape**: `body` is one short lead sentence (what it is), then at most one more (where it is printed or used). Rules go in `points`, one fact each, at most four. Choices go in `options`, a few words each, so the table stays readable. Example values go in `example`; a common mistake goes in `avoid` with its consequence.
+- **Hindi** follows "Hindi copy" below; option labels too, because the table shows them.
+- No emoji in copy: the layout adds the icons.
 
 **Using a topic**: pass it as `help={<formHelp>.<key>}` to a shared field (`TextField`, `SelectField`, …), or to `FieldLabelWithInfo` beside a raw `FieldLabel`. The field renders the ⓘ button (its accessible name includes the field label), the hint under the label, per-option help under each `SelectField` choice, and links hint, description and error to the input through `aria-describedby` (`useFieldHelpIds`). `info={<FieldInfoPopover …/>}` with `fieldHelp.*` message keys is the older way, still used by forms not moved yet.
 
