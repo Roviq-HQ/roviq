@@ -115,7 +115,7 @@ App-wide reusable components live in `apps/web/src/components/` (import via the 
 
 - `hooks/useLocaleChange()` — topbar language switch handler wired into all three `(dashboard)/layout.tsx` (`LayoutConfig.onLocaleChange`): saves the account language, then navigates; navigates only when impersonating.
 - `FieldHelpButton` + `FieldLabelWithInfo` (`@roviq/ui`) — the ⓘ button and popover for a help topic, and a label with that button beside it plus the topic's hint; use `FieldLabelWithInfo help={…}` for a raw `FieldLabel` (see "Field help").
-- `setServerFieldError(form, field, message)` (`@roviq/ui`) — shows a server rejection under a form field; cleared when that field's value changes. Never hand-set `errorMap` with `setFieldMeta`: an `onChange` error sticks and refuses every submit.
+- `setServerFieldError(form, field, message)` (`@roviq/ui`) — shows a server rejection under a form field; cleared when that field's value changes, and kept when the field is unmounted and mounted again (a wizard step, a tab). Pass the form or the `formApi` that `onSubmit` receives. Never hand-set `errorMap` with `setFieldMeta`: an `onChange` error sticks and refuses every submit.
 - `setFormSubmitError(form, { title, description })` + `<form.SubmitError />` (`@roviq/ui`) — a failed submit that is not about one field: the alert sits directly above the submit button, scrolls into view, stays while the person edits, and clears when the next submit starts. It never disables the submit button. `clearFormSubmitError(form)` removes it early. Which error goes where: "Error messages" → "Where it shows".
 - `pickers/SectionPicker` — multi-select of class sections grouped by department → standard, with per-class / per-department / global "select all" and a live count.
 - `pickers/StandardSectionSelect` — cascading single Standard → Section dropdown selector.
@@ -170,7 +170,7 @@ Client-side auth state management:
 Apollo Client setup:
 - HTTP + WebSocket split link
 - Auth link (injects Bearer token)
-- Error link (handles 401 → auth refresh, network errors)
+- Error link: a 401 refreshes the session and retries. A query that cannot reach the server shows one translated toast (`error.networkTitle`, `error.network`, passed to `GraphQLProvider` as `networkErrorLabels`). A mutation that cannot reach the server shows nothing here: its caller reports the failure, in the form or in its own toast (`isNetworkError(error)` tells a lost connection from another failure)
 - Cache normalization for core entities
 - Load-more pagination: every paginated query field needs a merge policy in `client.ts`, or `fetchMore` replaces page 1 instead of appending. Top-level `first`/`after` args use `relayStylePagination([...])`; connections that take the cursor inside `filter` (`adminListUsers`, `adminListResellers`, `adminListInstitutes`) use `filterCursorPagination()`
 
