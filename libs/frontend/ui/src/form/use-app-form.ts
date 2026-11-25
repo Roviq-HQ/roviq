@@ -54,18 +54,20 @@ const { useAppForm: useBaseAppForm, withForm } = createFormHook({
 
 /**
  * After a refused submit, moves focus to the first field showing an error, in page order.
+ * The form is the one holding the submitter (focused at submit time); field ids are only a
+ * fallback, since two mounted forms (a page and its dialog) can share a field name.
  * Runs on the next frame: the errors render only once the submit has marked every field touched.
  */
 function focusFirstInvalidField(fieldNames: string[]): void {
   if (typeof window === 'undefined') return;
-  const returnFocus = document.activeElement;
+  const submitter = document.activeElement;
   window.requestAnimationFrame(() => {
-    const fieldElement = fieldNames
-      .map((name) => document.getElementById(name))
-      .find((el): el is HTMLElement => el !== null);
     const root =
-      fieldElement?.closest('form') ??
-      (returnFocus instanceof HTMLElement ? returnFocus.closest('form') : null);
+      (submitter instanceof HTMLElement ? submitter.closest('form') : null) ??
+      fieldNames
+        .map((name) => document.getElementById(name))
+        .find((el): el is HTMLElement => el !== null)
+        ?.closest('form');
     const target = root?.querySelector<HTMLElement>('[aria-invalid="true"]');
     target?.focus();
   });
