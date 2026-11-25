@@ -26,5 +26,10 @@
     "REGULAR": "नियमित",
     "EXTENSION_PENDING": "विस्तार लंबित",
     "REVOKED": "रद्द"
+  },
+  "fieldHelp": {
+    "moreAbout": "{label} के बारे में और जानें",
+    "example": "उदाहरण:",
+    "readMore": "और पढ़ें"
   }
 }

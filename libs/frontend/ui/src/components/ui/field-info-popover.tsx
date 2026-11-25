@@ -10,6 +10,8 @@ type FieldInfoPopoverProps = {
   align?: React.ComponentProps<typeof PopoverContent>['align'];
   iconClassName?: string;
   contentClassName?: string;
+  /** Translated accessible name of the trigger. */
+  triggerLabel?: string;
   'data-testid'?: string;
 };
 
@@ -36,6 +38,7 @@ function FieldInfoPopover({
   align = 'start',
   iconClassName,
   contentClassName,
+  triggerLabel = 'More info',
   'data-testid': testId,
 }: FieldInfoPopoverProps) {
   const [open, setOpen] = React.useState(false);
@@ -64,7 +67,7 @@ function FieldInfoPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         type="button"
-        aria-label="More info"
+        aria-label={triggerLabel}
         data-testid={testId ?? 'field-info-trigger'}
         data-slot="field-info-trigger"
         onMouseEnter={scheduleOpen}

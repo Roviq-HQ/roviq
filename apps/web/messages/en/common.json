@@ -26,5 +26,10 @@
     "REGULAR": "Regular",
     "EXTENSION_PENDING": "Extension pending",
     "REVOKED": "Revoked"
+  },
+  "fieldHelp": {
+    "moreAbout": "More about {label}",
+    "example": "Example:",
+    "readMore": "Read more"
   }
 }
